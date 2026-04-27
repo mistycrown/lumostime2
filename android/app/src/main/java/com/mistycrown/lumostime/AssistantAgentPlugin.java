@@ -4,6 +4,7 @@
  * @output Android foreground-service control and assistant system-trigger events
  * @pos Native Plugin
  * @description Capacitor plugin bridge for the Android-first background assistant agent. Starts and stops the foreground agent service, updates lightweight polling config, relays native system-trigger events back into the web layer, and surfaces assistant notification navigation.
+ * @updated 2026-04-27: Routed user-turn and task-state notifications into the running Android agent service so native throttling can respect recent foreground activity and background task changes.
  */
 package com.mistycrown.lumostime;
 
@@ -83,15 +84,47 @@ public class AssistantAgentPlugin extends Plugin {
 
     @PluginMethod
     public void notifyUserTurn(PluginCall call) {
-        String text = call.getString("text", "");
         String at = call.getString("at", "");
-        Log.d(TAG, "notifyUserTurn text=" + text + " at=" + at);
+        Context context = getContext();
+        if (!UnifiedServiceNotificationManager.isAssistantActive(context)) {
+            call.resolve();
+            return;
+        }
+
+        Intent intent = new Intent(context, AssistantAgentService.class);
+        intent.setAction(AssistantAgentService.ACTION_NOTIFY_USER_TURN);
+        if (at != null && !at.trim().isEmpty()) {
+            intent.putExtra("at", at.trim());
+        }
+
+        try {
+            startAgentService(context, intent);
+        } catch (Exception exception) {
+            call.reject(exception.getMessage());
+            return;
+        }
+
         call.resolve();
     }
 
     @PluginMethod
     public void notifyTaskStateChanged(PluginCall call) {
-        Log.d(TAG, "notifyTaskStateChanged");
+        Context context = getContext();
+        if (!UnifiedServiceNotificationManager.isAssistantActive(context)) {
+            call.resolve();
+            return;
+        }
+
+        Intent intent = new Intent(context, AssistantAgentService.class);
+        intent.setAction(AssistantAgentService.ACTION_NOTIFY_TASK_STATE_CHANGED);
+
+        try {
+            startAgentService(context, intent);
+        } catch (Exception exception) {
+            call.reject(exception.getMessage());
+            return;
+        }
+
         call.resolve();
     }
 
@@ -190,6 +223,24 @@ public class AssistantAgentPlugin extends Plugin {
         }
         if (call.getData().has("maxCheckinMinutes")) {
             intent.putExtra("maxCheckinMinutes", call.getInt("maxCheckinMinutes", 120));
+        }
+        if (call.getData().has("quietHoursEnabled")) {
+            intent.putExtra("quietHoursEnabled", call.getBoolean("quietHoursEnabled", false));
+        }
+        if (call.getData().has("quietHoursStart")) {
+            String quietHoursStart = call.getString("quietHoursStart", "");
+            if (quietHoursStart != null) {
+                intent.putExtra("quietHoursStart", quietHoursStart);
+            }
+        }
+        if (call.getData().has("quietHoursEnd")) {
+            String quietHoursEnd = call.getString("quietHoursEnd", "");
+            if (quietHoursEnd != null) {
+                intent.putExtra("quietHoursEnd", quietHoursEnd);
+            }
+        }
+        if (call.getData().has("minimumNudgeGapMinutes")) {
+            intent.putExtra("minimumNudgeGapMinutes", call.getInt("minimumNudgeGapMinutes", 45));
         }
     }
 }

@@ -4,6 +4,7 @@
  * @output A single shared Android foreground-status notification for background LumosTime services
  * @pos Native Helper
  * @description Keeps the floating window service and assistant agent service on one shared persistent Android notification while still letting AI active-message alerts appear as separate non-ongoing notifications.
+ * @updated 2026-04-27: Exposed assistant-runtime activity lookup so plugin-side user-turn and task-state signals only wake the service when the assistant loop is already active.
  */
 package com.mistycrown.lumostime;
 
@@ -110,6 +111,10 @@ public final class UnifiedServiceNotificationManager {
         SharedPreferences sharedPreferences = prefs(context);
         return sharedPreferences.getBoolean(KEY_FLOATING_ACTIVE, false)
             || sharedPreferences.getBoolean(KEY_ASSISTANT_ACTIVE, false);
+    }
+
+    public static boolean isAssistantActive(Context context) {
+        return prefs(context).getBoolean(KEY_ASSISTANT_ACTIVE, false);
     }
 
     private static Notification buildNotification(Context context) {

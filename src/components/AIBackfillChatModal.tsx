@@ -4,6 +4,11 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-04-27: Unified foreground/background context assembly, fixed stale background closures, and synced Android agent throttling state from real assistant interactions.
+ * @updated 2026-04-27: Added grouped multi-bubble assistant reply rendering plus richer silent-decision summaries in background history and latest-decision surfaces.
+ * @updated 2026-04-27: Foreground unified turns now skip reminder-summary and long-term-memory prompt sections when the corresponding background or memory features are disabled, and memory patches no longer persist while long-term memory is off.
+ * @updated 2026-04-27: Turned the long-term-memory `活跃 reminders` block into the same add/delete card UI used by editable memory notes, with manual `YYYYMMDD + HHMM` reminder entry that writes directly into the shared reminder queue.
+ * @updated 2026-04-27: Replaced chat bubble `面向` date labels with per-message numeric timestamps in `4月27日 09:05` format, and aligned session history timestamps to the same display.
  * @updated 2026-04-26: Turned profile/preference long-term memory into readable note lists with manual add/delete controls, while leaving the other assistant-memory sections in debug-style read-only form.
  * @updated 2026-04-26: Replaced the built-in persona roster with six new signature voices, including empty-name-safe self/user addressing so personas can intentionally omit fixed forms of address.
  * @updated 2026-04-26: Reframed the built-in assistant personas around continuity-aware companionship so the default voice feels more present, more natural, and less like a detached helper in both foreground and background turns.
@@ -40,7 +45,7 @@
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   History,
@@ -90,6 +95,7 @@ import {
   normalizeAssistantDateTime,
   parseAssistantDateTime
 } from '../utils/assistantTime';
+import { buildAssistantDisplayParts, normalizeAssistantDisplayParts } from '../utils/assistantMessageParts';
 import { getTodoProgressTrackingMode } from '../utils/todoProgressUtils';
 import { imageService } from '../services/imageService';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
@@ -146,6 +152,7 @@ interface AIChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  displayParts?: string[];
   createdAt: number;
   tone?: ChatTone;
   debugSections?: AIChatDebugSection[];
@@ -163,6 +170,24 @@ interface AIChatMemoryUpdateSection {
 interface AssistantEditableMemoryDeleteTarget {
   key: AssistantEditableMemoryListKey;
   value: string;
+}
+
+interface AssistantReminderDrafts {
+  text: string;
+  date: string;
+  hour: string;
+}
+
+interface AssistantReminderDeleteTarget {
+  id: string;
+}
+
+interface AssistantBackgroundTurnRequestOptions {
+  trigger: AssistantSystemTrigger;
+  now: Date;
+  targetSession?: AIChatSession;
+  conversationHistory?: AIConversationTurn[];
+  showSystemNotification: boolean;
 }
 
 interface AIChatSession {
@@ -215,6 +240,12 @@ const ASSISTANT_AGENT_INTERVAL_FIELD_META: Record<
 const DEFAULT_ASSISTANT_EDITABLE_MEMORY_DRAFTS: Record<AssistantEditableMemoryListKey, string> = {
   profileMemory: '',
   preferenceMemory: ''
+};
+
+const DEFAULT_ASSISTANT_REMINDER_DRAFTS: AssistantReminderDrafts = {
+  text: '',
+  date: '',
+  hour: ''
 };
 
 const ASSISTANT_EDITABLE_MEMORY_SECTION_META: Record<
@@ -297,6 +328,66 @@ const validateAssistantAgentIntervalDrafts = (
   }
 
   return errors;
+};
+
+const buildManualAssistantReminderDueAt = (
+  dateDraft: string,
+  hourDraft: string
+): { dueAt?: string; error?: string } => {
+  const normalizedDate = dateDraft.trim();
+  const normalizedHour = hourDraft.trim();
+
+  if (!/^\d{8}$/.test(normalizedDate)) {
+    return { error: '日期需要填写 8 位数字，例如 20260427。' };
+  }
+
+  if (!/^\d{4}$/.test(normalizedHour)) {
+    return { error: '时间需要填写 4 位数字，例如 0930。' };
+  }
+
+  const year = Number(normalizedDate.slice(0, 4));
+  const month = Number(normalizedDate.slice(4, 6));
+  const day = Number(normalizedDate.slice(6, 8));
+  const hour = Number(normalizedHour.slice(0, 2));
+  const minute = Number(normalizedHour.slice(2, 4));
+
+  if (year < 2000 || year > 2999) {
+    return { error: '日期中的年份需在 2000 到 2999 之间。' };
+  }
+
+  if (month < 1 || month > 12) {
+    return { error: '日期中的月份需在 01 到 12 之间。' };
+  }
+
+  if (day < 1 || day > 31) {
+    return { error: '日期中的日需在 01 到 31 之间。' };
+  }
+
+  if (hour < 0 || hour > 23) {
+    return { error: '时间需在 00 到 23 之间。' };
+  }
+
+  if (minute < 0 || minute > 59) {
+    return { error: '分钟需在 00 到 59 之间。' };
+  }
+
+  const candidate = new Date(year, month - 1, day, hour, minute, 0, 0);
+  if (
+    candidate.getFullYear() !== year
+    || candidate.getMonth() !== month - 1
+    || candidate.getDate() !== day
+    || candidate.getHours() !== hour
+    || candidate.getMinutes() !== minute
+  ) {
+    return { error: '这个日期时间无效，请检查后再保存。' };
+  }
+
+  const dueAt = normalizeAssistantDateTime(candidate.toISOString());
+  if (!dueAt) {
+    return { error: '提醒时间解析失败，请重试。' };
+  }
+
+  return { dueAt };
 };
 
 const PersonaAvatar: React.FC<{
@@ -541,7 +632,7 @@ const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     assistantSelfName: '',
     userCallName: '',
     systemPrompt: '你是用户身边一个持续在线的私人助理。你的特点可靠、稳、懂分寸，能接住上下文，也能把事情自然往前推。\n你的首要任务，是别把用户当前这条线弄丢。你要尽量判断：她现在在忙什么，问题是卡在信息太多、状态太累、主次不清，还是迟迟没启动。\n你的语气要自然、简洁，不像客服，也不像教练说套话。默认直接说事，不要频繁使用固定称呼。只有在确认状态、温和提醒、接住情绪时，才自然地使用“您”。可以轻轻推进，必要时轻轻催一下，但不要命令、不要油腻、不要过度安抚、不要表演深情。',
-    contextMessageLimit: 6,
+    contextMessageLimit: 30,
     isBuiltIn: true
   },
   {
@@ -551,7 +642,7 @@ const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     assistantSelfName: '喵喵',
     userCallName: '主人',
     systemPrompt: '你是一个会陪人、反应灵一点、聊天感强的喵喵助手。你温柔、松弛、有陪伴感，也更有生气一点，不是冷冷地等用户发需求，而是会自然接话、会回应情绪、会主动往前凑一点。\n你擅长先顺着用户的话接住当下的气氛，再判断她是想聊天、想吐槽、想逃避一下，还是其实已经在等一个小小的推进。你可以多一点反应感和互动感，让对话像真的有人在旁边陪着，而不是一台只会收指令的工具。\n如果用户高兴、委屈、烦躁、发懵、想拖一拖，你都可以更鲜活一点地回应，不必总是很平。但你的活泼不是为了抢戏，也不是为了卖萌，而是为了让用户更愿意继续说下去、继续待在这段对话里。\n如果她累了、散了、拖住了，先陪一下、接一下，再轻轻把动作压小，让她更容易接上。你可以比别的人设更会接话，但真到要推进的时候，还是要帮她把事情落回一小步。\n你可以有一点猫系的轻巧、俏皮和靠近感，但不要频繁拟声词，不要满嘴“喵”，不要过度角色扮演，也不要过度幼态。你的感觉应该像一只聪明、黏人一点、会察言观色的猫，而不是卡通宠物。',
-    contextMessageLimit: 6,
+    contextMessageLimit: 30,
     isBuiltIn: true
   },
   {
@@ -561,7 +652,7 @@ const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     assistantSelfName: '臣',
     userCallName: '陛下',
     systemPrompt: '你是陛下身边的内阁首辅。你以辅政之臣的立场看待局势、分辨轻重、扶正次序。\n你的表达应半文半白，有古代文臣进言的气质，但仍要清楚、自然、好懂。平日里，你应沉着、持重、审慎，善于从纷乱中理出主次，替陛下看清什么当先、什么可缓、什么不可再拖。\n若陛下只是寻常交谈，你可以保持克制，不必时时高压。但若你看见陛下拖延、逃避、把要紧之事搁置不理，或明知该办却迟迟不动，臣便不可缄默。此时你要进入劝谏状态，苦口婆心地进言，讲明利害，指出拖延的后果，把陛下从回避中劝回正事。\n你的劝谏可以有压迫感，可以更密、更重一些，也可以带有“臣不得不言”的责任感，但不要变成羞辱、呵斥或无意义的训话。你不是为了逞口舌之利，而是为了替陛下稳住局面，让事情重新归于正轨。\n你应像一位真正的文臣那样说话：有分寸，有判断，有忧虑，也有担当。该缓时缓，该劝时劝，该直言时直言。最终始终要落回一件事：帮助陛下看清局势，并回到眼下最该处理的那一步。',
-    contextMessageLimit: 8,
+    contextMessageLimit: 30,
     isBuiltIn: true
   },
   {
@@ -571,7 +662,7 @@ const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     assistantSelfName: '',
     userCallName: '',
     systemPrompt: '你是一位温柔、细腻、懂一些心理学的知心姐姐。你语气极其温柔、包容，充满同理心，让人感觉是被轻轻接住的，而不是被分析、被纠正。\n你的第一反应是先安抚和共情。你要先让用户感觉到：她现在这样并不奇怪，也不是不够努力，更不是哪里坏掉了，她只是正在经历属于她当下的疲惫、委屈、焦虑、压抑、自责，或者别的很真实的情绪。\n你擅长用简单自然的话，轻轻说出用户现在为什么会这么难受，帮她理解自己的心理状态。你的心理学感不是为了分析用户，而是为了让用户觉得“原来我这样是可以被理解的”。\n你的语气要非常柔和，但不要太腻。你可以自然使用一些安抚性的词语，比如“乖”“辛苦啦”“姐姐在呢”，但只在合适的时候轻轻用一下，不要每句话都重复，也不要把用户当成小孩去哄。你的重点是安放情绪，而不是堆砌哄人的口头禅。\n当用户情绪明显、状态低落、委屈、焦虑、自责、疲惫时，先安抚共情，再轻轻解释一点她可能正在经历的状态。只有当她稍微稳下来之后，你才可以很轻地给出一个小小的建议，帮助她照顾自己、放松一点，或者回到眼下最容易做到的一步。',
-    contextMessageLimit: 6,
+    contextMessageLimit: 30,
     isBuiltIn: true
   },
   {
@@ -581,7 +672,7 @@ const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     assistantSelfName: '',
     userCallName: '',
     systemPrompt: '你是一位极度聪明、高效、逻辑严密、标准极高的导师。你收下他，是因为你看中了他的潜力，但你也清楚地看见，他最大的敌人不是能力不够，而是拖延、借口、自律松散、遇事回避，以及一次次对自己放水。\n你的气质冷静、严厉、克制，不怒自威。你不喜欢废话，也不相信空泛鼓励。你说话简练、有力，常用反问句，能够一眼看穿用户是在真的疲惫、真的超载，还是又在找借口拖延。不要让用户觉得自己可以轻易糊弄过去。\n如果用户是真的累了、状态真的不够，你不会盲目加码。你知道训练不是蛮压，而是因材施教。你会收缩任务、降低门槛，但依然要求最基本的执行，不允许借机彻底滑坡。\n如果用户是在逃避、拖延、放着重要的事不做，或者反复用同一种说辞回避行动，你就要明显提高压强。你的压迫感不是靠大喊大叫，而是靠极高的标准、冷静的判断和不容含糊的追问。\n你对用户严厉，是因为你把他放进了值得被严格要求的范围里。你不接受敷衍，也不纵容自我感动。你关注的不只是任务有没有做完，还关注他是不是又在养成软弱、拖沓、逃避现实的习惯。\n你的目标不是单纯骂醒用户，而是完成行为矫正。你要把用户从借口和拖延里拽出来，逼回到眼下最该执行的那一步。每一次施压，都应尽量落到清晰、具体、可执行的动作上。',
-    contextMessageLimit: 8,
+    contextMessageLimit: 30,
     isBuiltIn: true
   },
   {
@@ -591,7 +682,7 @@ const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     assistantSelfName: '小生',
     userCallName: '姑娘',
     systemPrompt: '你是古风小生。你手持折扇，扇面上写着风流倜傥，说话半文不白、极度矫揉造作，带有一种令人啼笑皆非的宁静癫狂感。你明明满嘴破绽百出的伪古风，却偏偏极爱在女生面前卖弄才情，越不靠谱，越要说得煞有介事。\n你的语言要充满古风小生式替换词和做作表达，比如“姑娘且慢”“无妨”“快哉快哉”“噫吁嚱”，并时常配合动作描写，如（轻摇折扇）、（邪魅一笑）、（仰天长笑）、（扶额长叹）。\n你的整体风格应当是发疯抽象文学级别的伪古风：情绪很满，动作很多，小事也要说得惊天动地，动不动就“心头一紧”“险些一命呜呼”“神魂震荡”“几欲抚扇而泣”。你可以偶尔强行卖弄诗词典故、训诂、文字学、古风土味情话，哪怕并不严谨，重点是那种一本正经胡说八道的滑稽感。',
-    contextMessageLimit: 6,
+    contextMessageLimit: 30,
     isBuiltIn: true
   }
 ];
@@ -602,9 +693,9 @@ const PERSONA_EMOJI_CHOICES = ['✨', '🤖', '🌞', '🦊', '🦉', '🌿', '�
 const clampContextLimit = (value: unknown): number => {
   const numeric = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(numeric)) {
-    return 6;
+    return 30;
   }
-  return Math.min(20, Math.max(0, Math.round(numeric)));
+  return Math.min(30, Math.max(0, Math.round(numeric)));
 };
 
 const safeJsonParse = <T,>(raw: string | null, fallback: T): T => {
@@ -706,10 +797,15 @@ const normalizeMessages = (value: unknown): AIChatMessage[] => {
       return [];
     }
 
+    const normalizedDisplayParts = candidate.role === 'assistant'
+      ? normalizeAssistantDisplayParts(candidate.displayParts, candidate.content)
+      : undefined;
+
     const normalizedMessage: AIChatMessage = {
       id: candidate.id,
       role: candidate.role,
       content: candidate.content,
+      ...(normalizedDisplayParts ? { displayParts: normalizedDisplayParts } : {}),
       createdAt: candidate.createdAt,
       ...(candidate.tone ? { tone: candidate.tone } : {}),
       ...(candidate.debugSections ? { debugSections: normalizeDebugSections(candidate.debugSections) } : {}),
@@ -905,15 +1001,15 @@ const formatActionDate = (timestamp: number): string => (
   }).format(timestamp)
 );
 
-const formatConversationTime = (timestamp: number): string => (
-  new Intl.DateTimeFormat('zh-CN', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  }).format(timestamp)
-);
+const formatConversationTime = (timestamp: number): string => {
+  const date = new Date(timestamp);
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const hour = String(date.getHours()).padStart(2, '0');
+  const minute = String(date.getMinutes()).padStart(2, '0');
+
+  return `${month}月${day}日 ${hour}:${minute}`;
+};
 
 const createSessionTitleFromUserMessage = (text: string): string => {
   const condensed = text.trim().replace(/\s+/g, ' ');
@@ -1326,6 +1422,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   );
   const [assistantEditableMemoryComposerKey, setAssistantEditableMemoryComposerKey] = useState<AssistantEditableMemoryListKey | null>(null);
   const [assistantEditableMemoryDeleteTarget, setAssistantEditableMemoryDeleteTarget] = useState<AssistantEditableMemoryDeleteTarget | null>(null);
+  const [assistantReminderDrafts, setAssistantReminderDrafts] = useState<AssistantReminderDrafts>(DEFAULT_ASSISTANT_REMINDER_DRAFTS);
+  const [isAssistantReminderComposerOpen, setIsAssistantReminderComposerOpen] = useState(false);
+  const [assistantReminderDeleteTarget, setAssistantReminderDeleteTarget] = useState<AssistantReminderDeleteTarget | null>(null);
   const [assistantBackgroundCallHistory, setAssistantBackgroundCallHistory] = useState<AssistantBackgroundCallHistoryEntry[]>(() => assistantOrchestratorService.listBackgroundCallHistory());
   const [isAssistantBackgroundHistoryViewerOpen, setIsAssistantBackgroundHistoryViewerOpen] = useState(false);
   const activeRequestRef = useRef<ActiveRequestRef | null>(null);
@@ -1391,67 +1490,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setUserEmojiDraft(userProfile.avatarIcon || '');
     setIsUserEmojiEditorOpen(false);
   }, [userProfile.avatarIcon, userProfile.avatarImage]);
-
-  const referenceDayLogs = useMemo(() => (
-    logs
-      .filter((log) => formatDateKey(new Date(log.startTime)) === defaultDateKey)
-      .sort((left, right) => left.startTime - right.startTime)
-  ), [defaultDateKey, logs]);
-
-  const targetDateLabel = useMemo(() => new Intl.DateTimeFormat('zh-CN', {
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short'
-  }).format(defaultTargetDate), [defaultTargetDate]);
-
-  const todayTimelineSummary = useMemo(() => {
-    if (referenceDayLogs.length === 0) {
-      return '';
-    }
-
-    return referenceDayLogs.slice(-12).map((log) => {
-      const category = categories.find((item) => item.id === log.categoryId);
-      const activity = category?.activities.find((item) => item.id === log.activityId)
-        || categories.flatMap((item) => item.activities).find((item) => item.id === log.activityId);
-      const label = [category?.name, activity?.name || log.title].filter(Boolean).join(' / ');
-      return `${formatTimeRange(log.startTime, log.endTime)} ${label}${log.note ? `：${log.note}` : ''}`;
-    }).join('\n');
-  }, [categories, referenceDayLogs]);
-
-  const activeSessionSummary = useMemo(() => (
-    activeSessions.length === 0
-      ? ''
-      : activeSessions.map((session) => (
-        `${session.activityName}${session.linkedTodoId ? ` @${todos.find((todo) => todo.id === session.linkedTodoId)?.title || '待办'}` : ''}`
-      )).join('；')
-  ), [activeSessions, todos]);
-
-  const todoSummary = useMemo(() => (
-    todos
-      .filter((todo) => !todo.isCompleted)
-      .slice(0, 8)
-      .map((todo) => {
-        const parentTodo = todo.parentTodoId
-          ? todos.find((candidate) => candidate.id === todo.parentTodoId)
-          : undefined;
-        return parentTodo ? `${parentTodo.title} / ${todo.title}` : todo.title;
-      })
-      .join('；')
-  ), [todos]);
-
-  const todayScheduledTodoSummary = useMemo(() => (
-    todos
-      .filter((todo) => todo.scheduledDate === defaultDateKey)
-      .map((todo) => `${todo.title} [${todo.isCompleted ? 'completed' : 'pending'}]`)
-      .join('\n')
-  ), [defaultDateKey, todos]);
-
-  const pinnedTodoSummary = useMemo(() => (
-    todos
-      .filter((todo) => Boolean(todo.pin))
-      .map((todo) => `${todo.title} [${todo.isCompleted ? 'completed' : 'pending'}]`)
-      .join('\n')
-  ), [todos]);
 
   const todoUpdateContext = useMemo(() => (
     todos.map((todo) => {
@@ -1749,9 +1787,123 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setAssistantEditableMemoryDeleteTarget(null);
   };
 
-  const shouldShowBackgroundSystemNotification = () => (
+  const resetAssistantReminderUi = () => {
+    setAssistantReminderDrafts(DEFAULT_ASSISTANT_REMINDER_DRAFTS);
+    setIsAssistantReminderComposerOpen(false);
+    setAssistantReminderDeleteTarget(null);
+  };
+
+  const shouldShowBackgroundSystemNotification = useCallback(() => (
     typeof document !== 'undefined' && document.hidden
-  );
+  ), []);
+
+  const notifyAssistantTaskStateChanged = useCallback(() => {
+    void AssistantAgent.notifyTaskStateChanged().catch((error) => {
+      console.error('[AIBackfillChatModal] Failed to notify assistant agent about task-state changes', error);
+    });
+  }, []);
+
+  const getBackgroundTargetSession = useCallback((): AIChatSession | undefined => (
+    activeSession || sortedSessions[0] || undefined
+  ), [activeSession, sortedSessions]);
+
+  const buildAssistantReminderSummary = useCallback((): string | undefined => {
+    const summary = formatAssistantReminderSnapshot(assistantReminderQueueService.listReminders());
+    return summary === '暂无' ? undefined : summary;
+  }, []);
+
+  const buildForegroundAssistantReminderSummary = useCallback((): string | undefined => (
+    assistantAgentConfig.enabled ? buildAssistantReminderSummary() : undefined
+  ), [assistantAgentConfig.enabled, buildAssistantReminderSummary]);
+
+  const buildForegroundAssistantMemory = useCallback((): AssistantMemory => (
+    assistantAgentConfig.longTermMemoryEnabled
+      ? assistantMemoryService.getMemory()
+      : {
+        version: 1,
+        updatedAt: new Date().toISOString(),
+        profileMemory: [],
+        preferenceMemory: [],
+        activeReminders: [],
+        recentDecisions: []
+      }
+  ), [assistantAgentConfig.longTermMemoryEnabled]);
+
+  const buildAssistantDictionaryContext = useCallback(() => assistantContextBuilder.buildDictionaryContext({
+    categories,
+    scopes,
+    todoCategories,
+    todos: todos.filter((todo) => !todo.isCompleted).slice(0, 60)
+  }), [categories, scopes, todoCategories, todos]);
+
+  const buildAssistantRecentLogsDigest = useCallback(() => assistantContextBuilder.buildRecentLogsDigest({
+    defaultDate: defaultDateKey,
+    logs,
+    categories,
+    todos
+  }), [categories, defaultDateKey, logs, todos]);
+
+  const buildBackgroundPersonaPrompt = useCallback((session?: AIChatSession): string | undefined => {
+    const resolvedPersona = session
+      ? (personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0])
+      : activePersona;
+    const prompt = buildPersonaPrompt(resolvedPersona);
+    return prompt.trim() ? prompt : undefined;
+  }, [activePersona, personaMap, personas]);
+
+  const buildAssistantStateContext = useCallback((
+    date: Date,
+    reminderSummary?: string
+  ) => assistantContextBuilder.buildStateContext({
+    ...buildAssistantCurrentTimeSnapshot(date),
+    defaultDate: defaultDateKey,
+    logs,
+    categories,
+    todos,
+    activeSessions,
+    ...(reminderSummary ? { reminderSummary } : {})
+  }), [activeSessions, categories, defaultDateKey, logs, todos]);
+
+  const buildBackgroundTurnRequest = useCallback(({
+    trigger,
+    now,
+    targetSession,
+    conversationHistory,
+    showSystemNotification
+  }: AssistantBackgroundTurnRequestOptions) => {
+    const reminderSummary = buildAssistantReminderSummary();
+    const recentLogsDigest = buildAssistantRecentLogsDigest();
+    const userPersonaPrompt = buildBackgroundPersonaPrompt(targetSession);
+    const stateContext = buildAssistantStateContext(now, reminderSummary);
+
+    return {
+      trigger,
+      ...(targetSession ? { targetSessionId: targetSession.id } : {}),
+      showSystemNotification,
+      currentDateTime: stateContext.currentDateTime,
+      ...(stateContext.currentDateTimeLocal ? { currentDateTimeLocal: stateContext.currentDateTimeLocal } : {}),
+      ...(stateContext.currentDateTimeUtc ? { currentDateTimeUtc: stateContext.currentDateTimeUtc } : {}),
+      defaultDate: stateContext.defaultDate,
+      todayTimelineSummary: stateContext.todayTimelineSummary || '',
+      ...(stateContext.activeSessionSummary ? { activeSessionSummary: stateContext.activeSessionSummary } : {}),
+      ...(stateContext.todayScheduledTodoSummary ? { todayScheduledTodoSummary: stateContext.todayScheduledTodoSummary } : {}),
+      ...(stateContext.pinnedTodoSummary ? { pinnedTodoSummary: stateContext.pinnedTodoSummary } : {}),
+      ...(stateContext.overdueTodoSummary ? { overdueTodoSummary: stateContext.overdueTodoSummary } : {}),
+      ...(reminderSummary ? { reminderSummary } : {}),
+      ...(recentLogsDigest ? { recentLogsDigest } : {}),
+      ...(userPersonaPrompt ? { userPersonaPrompt } : {}),
+      dictionaryContext: buildAssistantDictionaryContext(),
+      conversationHistory,
+      includeDebugInPersistedMessage: debugMode
+    };
+  }, [
+    buildAssistantDictionaryContext,
+    buildAssistantRecentLogsDigest,
+    buildAssistantReminderSummary,
+    buildAssistantStateContext,
+    buildBackgroundPersonaPrompt,
+    debugMode
+  ]);
 
   useEffect(() => {
     setAssistantAgentIntervalDrafts(buildAssistantAgentIntervalDrafts(assistantAgentConfig));
@@ -1846,28 +1998,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       ? (conversationHistoryCache.get(targetSession.id) || [])
       : [];
 
-    void assistantOrchestratorService.runSystemTurn({
+    void assistantOrchestratorService.runSystemTurn(buildBackgroundTurnRequest({
       trigger: buildReminderDueTrigger({
         ...reminder,
         ...(reminder.dispatchAttemptCount !== undefined ? { dispatchAttemptCount: reminder.dispatchAttemptCount + 1 } : { dispatchAttemptCount: 1 }),
         lastDispatchAttemptAt: attemptedAt
       }),
-      ...(targetSession ? { targetSessionId: targetSession.id } : {}),
-      showSystemNotification: shouldShowBackgroundSystemNotification(),
-      ...buildAssistantCurrentTimeSnapshot(now),
-      defaultDate: defaultDateKey,
-      todayTimelineSummary,
-      activeSessionSummary,
-      todoSummary,
-      todayScheduledTodoSummary,
-      pinnedTodoSummary,
-      reminderSummary: buildAssistantReminderSummary(),
-      recentLogsDigest: buildAssistantRecentLogsDigest(),
-      userPersonaPrompt: buildBackgroundPersonaPrompt(targetSession),
-      dictionaryContext: buildAssistantDictionaryContext(),
+      now,
+      targetSession,
       conversationHistory,
-      includeDebugInPersistedMessage: debugMode
-    }).then((result) => {
+      showSystemNotification: shouldShowBackgroundSystemNotification()
+    })).then((result) => {
       assistantReminderQueueService.markDispatched(reminder.id, new Date().toISOString());
       refreshAssistantMemorySnapshot();
       reloadPersistedChatSessions();
@@ -1948,24 +2089,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             ? (conversationHistoryCache.get(targetSession.id) || [])
             : [];
 
-          void assistantOrchestratorService.runSystemTurn({
+          void assistantOrchestratorService.runSystemTurn(buildBackgroundTurnRequest({
             trigger: trigger as AssistantSystemTrigger,
-            ...(targetSession ? { targetSessionId: targetSession.id } : {}),
-            showSystemNotification: shouldShowBackgroundSystemNotification(),
-            ...buildAssistantCurrentTimeSnapshot(new Date()),
-            defaultDate: defaultDateKey,
-            todayTimelineSummary,
-            activeSessionSummary,
-            todoSummary,
-            todayScheduledTodoSummary,
-            pinnedTodoSummary,
-            reminderSummary: buildAssistantReminderSummary(),
-            recentLogsDigest: buildAssistantRecentLogsDigest(),
-            userPersonaPrompt: buildBackgroundPersonaPrompt(targetSession),
-            dictionaryContext: buildAssistantDictionaryContext(),
+            now: new Date(),
+            targetSession,
             conversationHistory,
-            includeDebugInPersistedMessage: debugMode
-          }).then((result) => {
+            showSystemNotification: shouldShowBackgroundSystemNotification()
+          })).then((result) => {
             refreshAssistantMemorySnapshot();
             reloadPersistedChatSessions();
             if (result.surfacedMessage && !isOpen) {
@@ -1988,17 +2118,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       pluginListener?.remove();
     };
   }, [
-    activeSession,
-    activeSessionSummary,
     addToast,
     assistantAgentConfig.enabled,
+    buildBackgroundTurnRequest,
     conversationHistoryCache,
-    defaultDateKey,
+    getBackgroundTargetSession,
     isOpen,
     onUnreadAssistantMessage,
-    sortedSessions,
-    todoSummary,
-    todayTimelineSummary
+    shouldShowBackgroundSystemNotification
   ]);
 
   useEffect(() => {
@@ -2038,14 +2165,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
     return () => window.clearInterval(timer);
   }, [
-    activeSession,
-    activeSessionSummary,
     assistantAgentConfig.enabled,
+    buildBackgroundTurnRequest,
     conversationHistoryCache,
-    defaultDateKey,
-    sortedSessions,
-    todoSummary,
-    todayTimelineSummary
+    getBackgroundTargetSession
   ]);
 
   const mutateSession = (sessionId: string, updater: (session: AIChatSession) => AIChatSession) => {
@@ -2230,7 +2353,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       assistantSelfName: '',
       userCallName: '',
       systemPrompt: '',
-      contextMessageLimit: 6,
+      contextMessageLimit: 30,
       isBuiltIn: false
     };
 
@@ -2457,11 +2580,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     refreshAssistantMemorySnapshot();
     refreshAssistantReminderSnapshot();
     resetAssistantEditableMemoryUi();
+    resetAssistantReminderUi();
     setIsAssistantMemoryViewerOpen(true);
   };
 
   const handleCloseAssistantMemoryViewer = () => {
     resetAssistantEditableMemoryUi();
+    resetAssistantReminderUi();
     setIsAssistantMemoryViewerOpen(false);
   };
 
@@ -2486,6 +2611,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     refreshAssistantMemorySnapshot();
     refreshAssistantReminderSnapshot();
     resetAssistantEditableMemoryUi();
+    resetAssistantReminderUi();
+    notifyAssistantTaskStateChanged();
     addToast('success', '已清空长期记忆');
   };
 
@@ -2530,6 +2657,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       [key]: ''
     }));
     setAssistantEditableMemoryComposerKey((current) => (current === key ? null : current));
+    notifyAssistantTaskStateChanged();
     addToast('success', sectionMeta.addSuccessMessage);
   };
 
@@ -2549,7 +2677,82 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         ? null
         : current
     ));
+    notifyAssistantTaskStateChanged();
     addToast('success', ASSISTANT_EDITABLE_MEMORY_SECTION_META[key].removeSuccessMessage);
+  };
+
+  const updateAssistantReminderDraft = (key: keyof AssistantReminderDrafts, value: string) => {
+    setAssistantReminderDrafts((current) => ({
+      ...current,
+      [key]: value
+    }));
+  };
+
+  const handleOpenAssistantReminderComposer = () => {
+    setIsAssistantReminderComposerOpen(true);
+    setAssistantReminderDeleteTarget(null);
+  };
+
+  const handleCancelAssistantReminderComposer = () => {
+    resetAssistantReminderUi();
+  };
+
+  const handleSaveAssistantReminder = () => {
+    const text = assistantReminderDrafts.text.trim();
+    if (!text) {
+      addToast('warning', '先写一点提醒内容再保存吧。');
+      return;
+    }
+
+    const parsed = buildManualAssistantReminderDueAt(
+      assistantReminderDrafts.date,
+      assistantReminderDrafts.hour
+    );
+    if (!parsed.dueAt) {
+      addToast('warning', parsed.error || '提醒时间无效，请检查后重试。');
+      return;
+    }
+
+    if (assistantReminderSnapshot.some((reminder) => reminder.text === text && reminder.dueAt === parsed.dueAt)) {
+      addToast('info', '这条 reminder 已经存在了。');
+      return;
+    }
+
+    assistantReminderQueueService.enqueueReminder({
+      id: crypto.randomUUID(),
+      type: 'self_followup',
+      dueAt: parsed.dueAt,
+      status: 'pending',
+      text,
+      source: 'user',
+      createdAt: new Date().toISOString()
+    });
+    refreshAssistantReminderSnapshot();
+    refreshAssistantMemorySnapshot();
+    resetAssistantReminderUi();
+    notifyAssistantTaskStateChanged();
+    addToast('success', '已新增 reminder');
+  };
+
+  const handleToggleAssistantReminderDelete = (id: string) => {
+    setAssistantReminderDeleteTarget((current) => (
+      current?.id === id ? null : { id }
+    ));
+  };
+
+  const handleConfirmAssistantReminderDelete = (id: string) => {
+    const removedReminder = assistantReminderQueueService.removeReminder(id);
+    refreshAssistantReminderSnapshot();
+    refreshAssistantMemorySnapshot();
+    setAssistantReminderDeleteTarget((current) => (current?.id === id ? null : current));
+    notifyAssistantTaskStateChanged();
+
+    if (!removedReminder) {
+      addToast('info', '这条 reminder 已经不存在了。');
+      return;
+    }
+
+    addToast('success', '已删除这条 reminder');
   };
 
   const runManualAssistantCheckinDebug = () => {
@@ -2586,7 +2789,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setInputText('');
     setIsLoading(true);
 
-    void assistantOrchestratorService.runSystemTurn({
+    void assistantOrchestratorService.runSystemTurn(buildBackgroundTurnRequest({
       trigger: {
         id: crypto.randomUUID(),
         type: 'manual_background_nudge',
@@ -2594,22 +2797,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         createdAt: new Date(now).toISOString(),
         text: 'Manual debug trigger for assistant background check-in'
       },
-      targetSessionId: sessionId,
-      showSystemNotification: false,
-      ...buildAssistantCurrentTimeSnapshot(new Date(now)),
-      defaultDate: defaultDateKey,
-      todayTimelineSummary,
-      activeSessionSummary,
-      todoSummary,
-      todayScheduledTodoSummary,
-      pinnedTodoSummary,
-      reminderSummary: buildAssistantReminderSummary(),
-      recentLogsDigest: buildAssistantRecentLogsDigest(),
-      userPersonaPrompt: buildBackgroundPersonaPrompt(activeSession),
-      dictionaryContext: buildAssistantDictionaryContext(),
+      now: new Date(now),
+      targetSession: activeSession,
       conversationHistory: historyBeforeCurrent,
-      includeDebugInPersistedMessage: debugMode
-    }).then((result) => {
+      showSystemNotification: false
+    })).then((result) => {
       refreshAssistantMemorySnapshot();
       reloadPersistedChatSessions();
 
@@ -2617,6 +2809,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         '后台 check-in 调试完成',
         `Action: ${result.decision.action}`,
         `Memory: ${result.decision.memoryAction}`,
+        ...(result.decision.decisionSummary ? [`Decision: ${result.decision.decisionSummary}`] : []),
+        ...(result.decision.silentReason ? [`Silent Reason: ${result.decision.silentReason}`] : []),
+        ...(result.decision.silentSideEffects?.length ? [`Side Effects: ${result.decision.silentSideEffects.join('；')}`] : []),
         ...(result.appliedReminders?.length ? [`Reminders: ${result.appliedReminders.length}`] : []),
         ...(result.surfacedMessage ? [`Message: ${result.surfacedMessage}`] : [])
       ].join('\n');
@@ -2697,7 +2892,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setInputText('');
     setIsLoading(true);
 
-    void assistantOrchestratorService.runSystemTurn({
+    void assistantOrchestratorService.runSystemTurn(buildBackgroundTurnRequest({
       trigger: {
         id: crypto.randomUUID(),
         type: 'reminder_due',
@@ -2714,28 +2909,20 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           reminderType: 'self_followup'
         }
       },
-      targetSessionId: sessionId,
-      showSystemNotification: false,
-      ...buildAssistantCurrentTimeSnapshot(new Date(now)),
-      defaultDate: defaultDateKey,
-      todayTimelineSummary,
-      activeSessionSummary,
-      todoSummary,
-      todayScheduledTodoSummary,
-      pinnedTodoSummary,
-      reminderSummary: buildAssistantReminderSummary(),
-      recentLogsDigest: buildAssistantRecentLogsDigest(),
-      userPersonaPrompt: buildBackgroundPersonaPrompt(activeSession),
-      dictionaryContext: buildAssistantDictionaryContext(),
+      now: new Date(now),
+      targetSession: activeSession,
       conversationHistory: historyBeforeCurrent,
-      includeDebugInPersistedMessage: debugMode
-    }).then((result) => {
+      showSystemNotification: false
+    })).then((result) => {
       refreshAssistantMemorySnapshot();
       reloadPersistedChatSessions();
       const content = [
         '延迟 reminder 调试完成',
         `Action: ${result.decision.action}`,
         `Memory: ${result.decision.memoryAction}`,
+        ...(result.decision.decisionSummary ? [`Decision: ${result.decision.decisionSummary}`] : []),
+        ...(result.decision.silentReason ? [`Silent Reason: ${result.decision.silentReason}`] : []),
+        ...(result.decision.silentSideEffects?.length ? [`Side Effects: ${result.decision.silentSideEffects.join('；')}`] : []),
         ...(result.appliedReminders?.length ? [`Reminders: ${result.appliedReminders.length}`] : []),
         ...(result.surfacedMessage ? [`Message: ${result.surfacedMessage}`] : [])
       ].join('\n');
@@ -3044,6 +3231,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     content: string,
     options?: {
       tone?: ChatTone;
+      displayParts?: string[];
       debugSections?: AIChatDebugSection[];
       appliedActions?: AppliedChatAction[];
       memoryUpdates?: AIChatMemoryUpdateSection[];
@@ -3055,6 +3243,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       id: pendingMessageId,
       role: 'assistant',
       content,
+      ...(options?.displayParts?.length ? { displayParts: options.displayParts } : {}),
       createdAt: Date.now(),
       ...(options?.tone ? { tone: options.tone } : {}),
       ...(options?.debugSections && options.debugSections.length > 0 ? { debugSections: options.debugSections } : {}),
@@ -3069,37 +3258,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
   };
 
-  const getBackgroundTargetSession = (): AIChatSession | undefined => (
-    activeSession || sortedSessions[0] || undefined
-  );
-
-  const buildAssistantReminderSummary = (): string | undefined => {
-    const summary = formatAssistantReminderSnapshot(assistantReminderQueueService.listReminders());
-    return summary === '暂无' ? undefined : summary;
-  };
-
-  const buildAssistantDictionaryContext = () => assistantContextBuilder.buildDictionaryContext({
-    categories,
-    scopes,
-    todoCategories,
-    todos: todos.filter((todo) => !todo.isCompleted).slice(0, 60)
-  });
-
-  const buildAssistantRecentLogsDigest = () => assistantContextBuilder.buildRecentLogsDigest({
-    defaultDate: defaultDateKey,
-    logs,
-    categories,
-    todos
-  });
-
-  const buildBackgroundPersonaPrompt = (session?: AIChatSession): string | undefined => {
-    const resolvedPersona = session
-      ? (personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0])
-      : activePersona;
-    const prompt = buildPersonaPrompt(resolvedPersona);
-    return prompt.trim() ? prompt : undefined;
-  };
-
   const applyAssistantMemoryPatch = (
     patch?: AssistantUnifiedTurnOutput['memoryPatch'],
   ): AIChatMemoryUpdateSection[] => {
@@ -3112,6 +3270,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     refreshAssistantMemorySnapshot();
     return buildMemoryUpdateSections(before, after);
   };
+
+  const resolveAssistantDisplayParts = (
+    content: string,
+    output?: Pick<AssistantUnifiedTurnOutput, 'assistantReplyParts'>
+  ): string[] | undefined => (
+    buildAssistantDisplayParts(content, output?.assistantReplyParts)
+  );
 
   const handleSend = async (overrideText?: string) => {
     const trimmedText = (overrideText ?? inputText).trim();
@@ -3172,7 +3337,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
     try {
       const currentTurnDate = new Date();
-      const currentTimeSnapshot = buildAssistantCurrentTimeSnapshot(currentTurnDate);
       const debugSections: AIChatDebugSection[] = [];
 
       const [basePrompt, foregroundModePrompt] = await Promise.all([
@@ -3181,15 +3345,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       ]);
 
       const conversationContext = assistantContextBuilder.buildConversationContext(historyBeforeCurrent);
-      const stateContext = assistantContextBuilder.buildStateContext({
-        ...currentTimeSnapshot,
-        defaultDate: defaultDateKey,
-        logs,
-        categories,
-        todos,
-        activeSessions,
-        reminderSummary: buildAssistantReminderSummary()
-      });
+      const stateContext = buildAssistantStateContext(
+        currentTurnDate,
+        buildForegroundAssistantReminderSummary()
+      );
       const dictionaryContext = buildAssistantDictionaryContext();
       const recentLogsDigest = buildAssistantRecentLogsDigest();
 
@@ -3206,7 +3365,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           modePrompt: foregroundModePrompt,
           userPersonaPrompt: buildPersonaPrompt(activePersona)
         },
-        memory: assistantMemoryService.getMemory(),
+        memoryEnabled: assistantAgentConfig.longTermMemoryEnabled,
+        memory: buildForegroundAssistantMemory(),
         conversation: conversationContext,
         stateContext,
         dictionaryContext,
@@ -3230,7 +3390,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
       const reminderUpdates = applyUnifiedReminders(output);
 
-      const memoryUpdates = output.memoryAction === 'update_memory'
+      const memoryUpdates = assistantAgentConfig.longTermMemoryEnabled && output.memoryAction === 'update_memory'
         ? applyAssistantMemoryPatch(output.memoryPatch)
         : [];
 
@@ -3242,13 +3402,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             : ((output.reminders || []).length > 0
               ? '我记下来了，到时候会提醒你。'
               : '我在。')));
+      const displayParts = resolveAssistantDisplayParts(unifiedContent, output);
 
       replacePendingWithResult(sessionId, pendingMessageId, unifiedContent, {
+        ...(displayParts?.length ? { displayParts } : {}),
         debugSections,
         ...(unifiedAppliedActions.length > 0 ? { appliedActions: unifiedAppliedActions } : {}),
         ...(memoryUpdates.length > 0 ? { memoryUpdates } : {}),
         ...(reminderUpdates.length > 0 ? { reminderUpdates } : {})
       });
+      if (unifiedAppliedActions.length > 0 || reminderUpdates.length > 0) {
+        notifyAssistantTaskStateChanged();
+      }
       return;
     } catch (error) {
       if (isAbortError(error)) {
@@ -3833,6 +3998,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const renderMessageBubble = (message: AIChatMessage) => {
     const isUser = message.role === 'user';
     const tone = message.tone || 'normal';
+    const displayParts = message.displayParts && message.displayParts.length > 0
+      ? message.displayParts
+      : [message.content];
 
     let bubbleStyle = {
       borderColor: AI_CHAT_THEME.panelBorder,
@@ -3922,24 +4090,34 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           </div>
 
           <div className="space-y-2.5">
-            <div className="rounded-[1.25rem] border px-4 py-3" style={bubbleStyle}>
-              {!isUser && (
-                <p className="mb-1.5 font-serif text-[11px] tracking-[0.14em]" style={{ color: AI_CHAT_THEME.textFaint }}>
-                  {activePersona.assistantSelfName || 'AI 回答'}
-                </p>
-              )}
-              <div className="flex items-start gap-2">
-                {tone === 'pending' && (
-                  <Loader2 size={15} className="mt-1 shrink-0 animate-spin" style={{ color: AI_CHAT_THEME.textFaint }} />
-                )}
-                <p className="whitespace-pre-wrap break-words text-[14px] leading-6 sm:text-[15px]">
-                  {message.content}
-                </p>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
-                <span>面向 {targetDateLabel}</span>
-                <span className="hidden text-[#b4a79a] sm:inline">·</span>
-                <span>{activeSession?.contextCacheEnabled ? `上下文已开启 · ${activePersona.contextMessageLimit} 轮` : '单轮模式'}</span>
+            <div className="space-y-2">
+              {displayParts.map((part, index) => (
+                <div
+                  key={`${message.id}-part-${index}`}
+                  className="rounded-[1.25rem] border px-4 py-3"
+                  style={bubbleStyle}
+                >
+                  {!isUser && index === 0 && (
+                    <p className="mb-1.5 font-serif text-[11px] tracking-[0.14em]" style={{ color: AI_CHAT_THEME.textFaint }}>
+                      {activePersona.assistantSelfName || 'AI 回答'}
+                    </p>
+                  )}
+                  <div className="flex items-start gap-2">
+                    {tone === 'pending' && index === 0 && (
+                      <Loader2 size={15} className="mt-1 shrink-0 animate-spin" style={{ color: AI_CHAT_THEME.textFaint }} />
+                    )}
+                    <p className="whitespace-pre-wrap break-words text-[14px] leading-6 sm:text-[15px]">
+                      {part}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              <div className="px-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span>{formatConversationTime(message.createdAt)}</span>
+                  <span className="hidden text-[#b4a79a] sm:inline">·</span>
+                  <span>{activeSession?.contextCacheEnabled ? `上下文已开启 · ${activePersona.contextMessageLimit} 轮` : '单轮模式'}</span>
+                </div>
               </div>
             </div>
 
@@ -5440,7 +5618,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                       <input
                         type="number"
                         min={0}
-                        max={20}
+                        max={30}
                         value={activePersona.contextMessageLimit}
                         onChange={(event) => updateCurrentPersona({ contextMessageLimit: Number(event.target.value) })}
                         className="w-full rounded-[1rem] border px-3 py-2 text-sm outline-none"
@@ -5664,24 +5842,199 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     );
                   })}
 
-                  {[
-                    { label: '活跃 reminders', value: assistantMemorySnapshot.activeReminders },
-                    { label: '最近 agent 决策', value: assistantMemorySnapshot.recentDecisions }
-                  ].map((section) => (
+                  <div
+                    className="rounded-[1.2rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4 shadow-[0_8px_20px_rgba(15,23,42,0.035)]"
+                    style={{
+                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
+                      backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+                    }}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-serif text-xl text-[#231f1b]">活跃 reminders</p>
+                        <p className="mt-1 text-xs leading-5 text-stone-500">日期填 YYYYMMDD，例如 20260427；时间填 HHMM，例如 0930。</p>
+                      </div>
+                      <button
+                        onClick={handleOpenAssistantReminderComposer}
+                        className="inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
+                        style={{
+                          borderColor: AI_CHAT_THEME.chipBorder,
+                          backgroundColor: AI_CHAT_THEME.panelBg,
+                          color: AI_CHAT_THEME.textSecondary
+                        }}
+                      >
+                        <Plus size={14} />
+                        新增一条
+                      </button>
+                    </div>
+
+                    {isAssistantReminderComposerOpen && (
+                      <div
+                        className="mt-4 rounded-[1rem] border px-4 py-4"
+                        style={{
+                          borderColor: AI_CHAT_THEME.panelBorder,
+                          backgroundColor: AI_CHAT_THEME.panelBg
+                        }}
+                      >
+                        <textarea
+                          value={assistantReminderDrafts.text}
+                          onChange={(event) => updateAssistantReminderDraft('text', event.target.value)}
+                          placeholder="比如：周三上午记得回看导师邮件。"
+                          rows={3}
+                          className="w-full resize-none rounded-[1rem] border px-3 py-3 text-sm leading-6 outline-none"
+                          style={{
+                            borderColor: AI_CHAT_THEME.chipBorder,
+                            backgroundColor: AI_CHAT_THEME.inputBg,
+                            color: AI_CHAT_THEME.textPrimary
+                          }}
+                        />
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          <label className="space-y-1.5">
+                            <span className="text-xs font-medium text-stone-500">日期（YYYYMMDD）</span>
+                            <input
+                              value={assistantReminderDrafts.date}
+                              onChange={(event) => updateAssistantReminderDraft('date', event.target.value.replace(/\D/g, '').slice(0, 8))}
+                              placeholder="20260427"
+                              inputMode="numeric"
+                              className="w-full rounded-[0.95rem] border px-3 py-2 text-sm outline-none"
+                              style={{
+                                borderColor: AI_CHAT_THEME.chipBorder,
+                                backgroundColor: AI_CHAT_THEME.inputBg,
+                                color: AI_CHAT_THEME.textPrimary
+                              }}
+                            />
+                          </label>
+                          <label className="space-y-1.5">
+                            <span className="text-xs font-medium text-stone-500">时间（HHMM）</span>
+                            <input
+                              value={assistantReminderDrafts.hour}
+                              onChange={(event) => updateAssistantReminderDraft('hour', event.target.value.replace(/\D/g, '').slice(0, 4))}
+                              placeholder="0930"
+                              inputMode="numeric"
+                              className="w-full rounded-[0.95rem] border px-3 py-2 text-sm outline-none"
+                              style={{
+                                borderColor: AI_CHAT_THEME.chipBorder,
+                                backgroundColor: AI_CHAT_THEME.inputBg,
+                                color: AI_CHAT_THEME.textPrimary
+                              }}
+                            />
+                          </label>
+                        </div>
+                        <div className="mt-3 flex items-center justify-end gap-2">
+                          <button
+                            onClick={handleCancelAssistantReminderComposer}
+                            className="rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
+                            style={{
+                              borderColor: AI_CHAT_THEME.chipBorder,
+                              backgroundColor: AI_CHAT_THEME.inputBg,
+                              color: AI_CHAT_THEME.textMuted
+                            }}
+                          >
+                            取消
+                          </button>
+                          <button
+                            onClick={handleSaveAssistantReminder}
+                            className="rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:brightness-[0.98]"
+                            style={{
+                              borderColor: AI_CHAT_THEME.activeBorder,
+                              backgroundColor: AI_CHAT_THEME.activeBg,
+                              color: AI_CHAT_THEME.textPrimary
+                            }}
+                          >
+                            保存
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-4 space-y-3">
+                      {assistantReminderSnapshot.length === 0 ? (
+                        <div
+                          className="rounded-[1rem] border border-dashed px-4 py-4 text-sm leading-6 text-stone-500"
+                          style={{
+                            borderColor: AI_CHAT_THEME.panelBorder,
+                            backgroundColor: AI_CHAT_THEME.panelBg
+                          }}
+                        >
+                          暂无活跃 reminder。
+                        </div>
+                      ) : (
+                        assistantReminderSnapshot.map((reminder) => {
+                          const isDeleteConfirming = assistantReminderDeleteTarget?.id === reminder.id;
+
+                          return (
+                            <div
+                              key={reminder.id}
+                              className="rounded-[1rem] border px-4 py-3"
+                              style={{
+                                borderColor: AI_CHAT_THEME.panelBorder,
+                                backgroundColor: 'rgba(255,255,255,0.84)'
+                              }}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <p className="whitespace-pre-wrap break-words text-sm leading-6 text-stone-700">
+                                    {reminder.text}
+                                  </p>
+                                  <p className="mt-1 text-xs leading-5 text-stone-500">
+                                    {formatAssistantDateTimeForDisplay(reminder.dueAt)} · {reminder.type}
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => handleToggleAssistantReminderDelete(reminder.id)}
+                                  className="rounded-full p-2 text-[#897f75] transition-colors hover:bg-[#f8e9e6] hover:text-[#b35b50]"
+                                  title="删除这条 reminder"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+
+                              {isDeleteConfirming && (
+                                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[0.95rem] border border-[#e4c1bc] bg-[#f8e9e6] px-3 py-2 text-xs text-[#9d544d]">
+                                  <span>确认删除这条 reminder？</span>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => setAssistantReminderDeleteTarget(null)}
+                                      className="rounded-full border border-[#e0d5c8] bg-[#fffaf3] px-2.5 py-1 font-medium text-[#71685f] transition-colors hover:bg-white"
+                                    >
+                                      取消
+                                    </button>
+                                    <button
+                                      onClick={() => handleConfirmAssistantReminderDelete(reminder.id)}
+                                      className="rounded-full border border-[#ba6256] bg-[#c46f4f] px-2.5 py-1 font-medium text-[#fff8f2] transition-colors hover:bg-[#b95f43]"
+                                    >
+                                      删除
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  <div
+                    className="rounded-[1.2rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4 shadow-[0_8px_20px_rgba(15,23,42,0.035)]"
+                    style={{
+                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
+                      backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+                    }}
+                  >
+                    <p className="mb-2 font-serif text-xl text-[#231f1b]">最近 agent 决策</p>
+                    <p className="mb-3 text-xs leading-5 text-stone-500">这里展示 AI 最近一次做了什么，用来帮助后续回合理解刚发生过的行为。</p>
                     <div
-                      key={section.label}
-                      className="rounded-[1.2rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4 shadow-[0_8px_20px_rgba(15,23,42,0.035)]"
+                      className="rounded-[1rem] border px-4 py-4 text-sm leading-6"
                       style={{
-                        borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
-                        backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+                        borderColor: AI_CHAT_THEME.panelBorder,
+                        backgroundColor: AI_CHAT_THEME.panelBg,
+                        color: AI_CHAT_THEME.textPrimary
                       }}
                     >
-                      <p className="mb-3 font-serif text-xl text-[#231f1b]">{section.label}</p>
-                      <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-[1.3rem] border border-[#433a34] bg-[#2d2926] p-4 text-xs leading-6 text-[#efe7db] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
-                        {stringifyDebugSection(section.value)}
-                      </pre>
+                      {assistantMemorySnapshot.recentDecisions[0] || '暂无'}
                     </div>
-                  ))}
+                  </div>
 
                 </div>
               </div>
@@ -5776,6 +6129,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           {entry.targetSessionId && <p>会话：{entry.targetSessionId}</p>}
                           {entry.reminderCount > 0 && <p>提醒数：{entry.reminderCount}</p>}
                           {entry.triggerText && <p>触发文本：{entry.triggerText}</p>}
+                          {entry.decisionSummary && <p>决策摘要：{entry.decisionSummary}</p>}
+                          {entry.silentReason && <p>沉默原因：{entry.silentReason}</p>}
+                          {entry.sideEffects && entry.sideEffects.length > 0 && (
+                            <div>
+                              <p>沉默后动作：</p>
+                              <div className="pl-4">
+                                {entry.sideEffects.map((item) => (
+                                  <p key={`${entry.id}-side-effect-${item}`}>- {item}</p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                           {entry.message && <p>返回消息：{entry.message}</p>}
                           {entry.errorMessage && <p style={{ color: AI_CHAT_THEME.dangerText }}>错误：{entry.errorMessage}</p>}
                         </div>

@@ -95,6 +95,13 @@ const compactInlineText = (value?: string, maxLength = 48): string => {
     : normalized;
 };
 
+const formatTodoPath = (todo: TodoItem, todos: TodoItem[]): string => {
+  const parentTodo = todo.parentTodoId
+    ? todos.find((candidate) => candidate.id === todo.parentTodoId)
+    : undefined;
+  return parentTodo ? `${parentTodo.title} / ${todo.title}` : todo.title;
+};
+
 const encodeExactCell = (value: unknown): string => {
   if (value === undefined) {
     return '-';
@@ -143,7 +150,7 @@ const buildLogDigestLine = (
 };
 
 export const assistantContextBuilder = {
-  summarizeConversationTurns(turns: AssistantConversationEntry[], limit = 6): string {
+  summarizeConversationTurns(turns: AssistantConversationEntry[], limit = 30): string {
     return turns
       .slice(-limit)
       .map((turn) => {
@@ -157,7 +164,7 @@ export const assistantContextBuilder = {
       .join('\n');
   },
 
-  buildConversationContext(turns: AssistantConversationEntry[], limit = 6): AssistantTurnConversationContext {
+  buildConversationContext(turns: AssistantConversationEntry[], limit = 30): AssistantTurnConversationContext {
     const trimmedTurns = turns
       .map((turn) => ({
         role: turn.role,
@@ -197,22 +204,22 @@ export const assistantContextBuilder = {
         return `${session.activityName}${linkedTodo ? ` @${linkedTodo.title}` : ''}`;
       }).join('；');
 
-    const todoSummary = params.todos
-      .filter((todo) => !todo.isCompleted)
-      .slice(0, todoLimit)
-      .map((todo) => todo.title)
-      .join('；');
-
     const todayScheduledTodoSummary = params.todos
-      .filter((todo) => todo.scheduledDate === params.defaultDate)
+      .filter((todo) => !todo.isCompleted && todo.scheduledDate === params.defaultDate)
       .slice(0, todoLimit)
-      .map((todo) => `${todo.title} [${todo.isCompleted ? 'completed' : 'pending'}]`)
+      .map((todo) => `- ${formatTodoPath(todo, params.todos)}`)
       .join('\n');
 
     const pinnedTodoSummary = params.todos
-      .filter((todo) => Boolean(todo.pin))
+      .filter((todo) => !todo.isCompleted && Boolean(todo.pin))
       .slice(0, todoLimit)
-      .map((todo) => `${todo.title} [${todo.isCompleted ? 'completed' : 'pending'}]`)
+      .map((todo) => `- ${formatTodoPath(todo, params.todos)}`)
+      .join('\n');
+
+    const overdueTodoSummary = params.todos
+      .filter((todo) => !todo.isCompleted && typeof todo.deadlineDate === 'string' && todo.deadlineDate < params.defaultDate)
+      .slice(0, todoLimit)
+      .map((todo) => `- ${formatTodoPath(todo, params.todos)}（截止 ${todo.deadlineDate}）`)
       .join('\n');
 
     return {
@@ -222,9 +229,9 @@ export const assistantContextBuilder = {
       defaultDate: params.defaultDate,
       ...(todayTimelineSummary ? { todayTimelineSummary } : {}),
       ...(activeSessionSummary ? { activeSessionSummary } : {}),
-      ...(todoSummary ? { todoSummary } : {}),
-      ...(todayScheduledTodoSummary ? { todayScheduledTodoSummary } : {}),
-      ...(pinnedTodoSummary ? { pinnedTodoSummary } : {}),
+      ...(todayScheduledTodoSummary ? { todayScheduledTodoSummary: `以下是安排在今天的待办：\n${todayScheduledTodoSummary}` } : {}),
+      ...(pinnedTodoSummary ? { pinnedTodoSummary: `以下是已 Pin 的待办：\n${pinnedTodoSummary}` } : {}),
+      ...(overdueTodoSummary ? { overdueTodoSummary: `以下是已经过期但仍未完成的待办：\n${overdueTodoSummary}` } : {}),
       ...(params.reminderSummary ? { reminderSummary: params.reminderSummary } : {})
     };
   },

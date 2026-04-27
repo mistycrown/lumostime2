@@ -72,6 +72,7 @@ interface AppRoutesProps {
     handleBatchAddTodos: (todos: Partial<TodoItem>[]) => void;
     handleDuplicateTodo: (todo: TodoItem, options: TodoDuplicateOptions) => void;
     handleSaveTodo: (todo: TodoItem) => void;
+    handleDeleteTodo: (id: string) => void;
     handleUpdateTodoData: (cats: TodoCategory[], todos: TodoItem[]) => void;
 
     // 大目标处理函数
@@ -83,7 +84,7 @@ interface AppRoutesProps {
 export const AppRoutes: React.FC<AppRoutesProps> = ({
     handleStartActivity,
     openAddModal, openEditModal, handleBatchAddLogs, handleQuickPunch,
-    openEditTodoModal, openAddTodoModal, handleToggleTodo, handleStartTodoFocus, handleBatchAddTodos, handleDuplicateTodo, handleSaveTodo, handleUpdateTodoData,
+    openEditTodoModal, openAddTodoModal, handleToggleTodo, handleStartTodoFocus, handleBatchAddTodos, handleDuplicateTodo, handleSaveTodo, handleDeleteTodo, handleUpdateTodoData,
     refreshKey, isSyncing, handleQuickSync,
     setStatsTitle,
     onOpenMajorGoalEditor
@@ -485,6 +486,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     onStartFocus={handleStartTodoFocus}
                     onDuplicateTodo={handleDuplicateTodo}
                     onSaveTodo={handleSaveTodo}
+                    onDeleteTodo={handleDeleteTodo}
                     autoLinkRules={autoLinkRules}
                 />
             );

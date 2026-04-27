@@ -5,6 +5,8 @@
  * @pos Service (Assistant Orchestrator)
  * @description Orchestrates Android-first assistant system turns by loading structured memory, assembling a prompt, calling the existing AI service, and applying the resulting silent/message/reminder/memory actions back into local state.
  *
+ * @updated 2026-04-27: Added readable decision summaries, silent reasons, side-effect tracking, and multi-bubble reply-part persistence for background assistant turns.
+ * @updated 2026-04-27: Passed the long-term-memory feature flag into unified turns so background prompts can skip memory instructions when memory is disabled.
  * @updated 2026-04-26: Removed an unused long-term-memory field from ephemeral assistant-memory snapshots.
  * @updated 2026-04-26: Assistant active-message notifications now use the target chat session's persona card name as the notification title when available.
  * @updated 2026-04-26: Added Android assistant active-notification surfacing and exact session/message navigation payloads for background replies that should alert the user outside the app.
@@ -19,6 +21,7 @@ import {
   type AssistantMemory,
   type AssistantOrchestratorResult,
   type AssistantReminder,
+  type AssistantSilentReason,
   type AssistantUnifiedTurnOutput,
   type AssistantTurnDictionaryContext,
   type AssistantTurnTrigger,
@@ -33,6 +36,7 @@ import { assistantPromptService } from './assistantPromptService';
 import { assistantReminderQueueService } from './assistantReminderQueueService';
 import { assistantTurnService } from './assistantTurnService';
 import { normalizeAssistantDateTime } from '../utils/assistantTime';
+import { buildAssistantDisplayParts } from '../utils/assistantMessageParts';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
 
 interface AssistantSystemTurnRequest {
@@ -45,9 +49,9 @@ interface AssistantSystemTurnRequest {
   defaultDate: string;
   todayTimelineSummary: string;
   activeSessionSummary?: string;
-  todoSummary?: string;
   todayScheduledTodoSummary?: string;
   pinnedTodoSummary?: string;
+  overdueTodoSummary?: string;
   reminderSummary?: string;
   recentLogsDigest?: string;
   userPersonaPrompt?: string;
@@ -72,6 +76,9 @@ export interface AssistantBackgroundCallHistoryEntry {
   memoryAction: AssistantSystemTurnDecision['memoryAction'];
   reminderCount: number;
   message?: string;
+  decisionSummary?: string;
+  silentReason?: AssistantSilentReason;
+  sideEffects?: string[];
   errorMessage?: string;
 }
 
@@ -79,6 +86,7 @@ interface PersistedAIChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  displayParts?: string[];
   createdAt: number;
   tone?: 'normal' | 'system' | 'error' | 'pending';
   debugSections?: Array<{
@@ -187,6 +195,11 @@ const normalizeBackgroundCallHistoryEntry = (value: unknown): AssistantBackgroun
   const status = candidate.status === 'failed' ? 'failed' : 'completed';
   const action = candidate.action === 'send_message' ? 'send_message' : 'silent';
   const memoryAction = candidate.memoryAction === 'update_memory' ? 'update_memory' : 'no_update';
+  const sideEffects = Array.isArray(candidate.sideEffects)
+    ? candidate.sideEffects
+      .map((item) => (typeof item === 'string' ? item.trim() : ''))
+      .filter(Boolean)
+    : [];
 
   if (!id || !triggerType || !requestedAt || !completedAt) {
     return null;
@@ -204,6 +217,9 @@ const normalizeBackgroundCallHistoryEntry = (value: unknown): AssistantBackgroun
     reminderCount: Number.isFinite(candidate.reminderCount) ? Math.max(0, Number(candidate.reminderCount)) : 0,
     ...(typeof candidate.targetSessionId === 'string' && candidate.targetSessionId.trim() ? { targetSessionId: candidate.targetSessionId.trim() } : {}),
     ...(typeof candidate.message === 'string' && candidate.message.trim() ? { message: candidate.message.trim() } : {}),
+    ...(typeof candidate.decisionSummary === 'string' && candidate.decisionSummary.trim() ? { decisionSummary: candidate.decisionSummary.trim() } : {}),
+    ...(typeof candidate.silentReason === 'string' && candidate.silentReason.trim() ? { silentReason: candidate.silentReason.trim() as AssistantSilentReason } : {}),
+    ...(sideEffects.length > 0 ? { sideEffects } : {}),
     ...(typeof candidate.errorMessage === 'string' && candidate.errorMessage.trim() ? { errorMessage: candidate.errorMessage.trim() } : {})
   };
 };
@@ -249,10 +265,90 @@ const getBackgroundDebugLabel = (triggerType: AssistantSystemTrigger['type']): s
   }
 };
 
+const describeSilentReason = (silentReason?: AssistantSilentReason): string => {
+  switch (silentReason) {
+    case 'active_focus_protection':
+      return '这次先不打扰：用户可能仍在专注。';
+    case 'likely_do_not_disturb':
+      return '这次先不打扰：现在更像不适合被提醒的时段。';
+    case 'state_still_clear':
+      return '这次先不打扰：当前状态还比较清晰。';
+    case 'insufficient_confidence':
+      return '这次先不打扰：当前信号还不够明确。';
+    case 'waiting_for_stronger_signal':
+      return '这次先不打扰：先继续观察，等更明确的变化。';
+    case 'followup_already_scheduled':
+      return '这次先不打扰：后续关注已经安排好了。';
+    default:
+      return '这次先不打扰：先继续观察。';
+  }
+};
+
+const dedupeStrings = (items: string[]): string[] => {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const normalized = item.trim();
+    if (!normalized || seen.has(normalized)) {
+      return false;
+    }
+
+    seen.add(normalized);
+    return true;
+  });
+};
+
+const buildMemoryPatchSideEffects = (memoryPatch?: AssistantUnifiedTurnOutput['memoryPatch']): string[] => {
+  if (!memoryPatch) {
+    return [];
+  }
+
+  return dedupeStrings([
+    memoryPatch.lastKnownState !== undefined ? '更新了当前状态摘要' : '',
+    memoryPatch.workingMemorySummary !== undefined ? '更新了当前工作摘要' : '',
+    Array.isArray(memoryPatch.profileMemory) && memoryPatch.profileMemory.length > 0 ? '补充了用户画像记忆' : '',
+    Array.isArray(memoryPatch.preferenceMemory) && memoryPatch.preferenceMemory.length > 0 ? '补充了偏好记忆' : ''
+  ]);
+};
+
+const buildAppliedSideEffects = (
+  output: AssistantUnifiedTurnOutput,
+  appliedReminders: AssistantReminder[],
+  usedLongTermMemory: boolean
+): string[] => {
+  return dedupeStrings([
+    ...buildMemoryPatchSideEffects(output.memoryPatch),
+    ...(appliedReminders.length > 0 ? [`新增了 ${appliedReminders.length} 条后续提醒`] : []),
+    ...(usedLongTermMemory ? ['记录了最近决策摘要'] : []),
+    ...((output.silentSideEffects || []).map((item) => item.trim()).filter(Boolean))
+  ]);
+};
+
+const buildDecisionSummary = (
+  output: AssistantUnifiedTurnOutput,
+  decisionAction: AssistantSystemTurnDecision['action'],
+  sideEffects: string[],
+  surfacedMessage?: string
+): string => {
+  if (output.decisionSummary?.trim()) {
+    return output.decisionSummary.trim();
+  }
+
+  if (decisionAction === 'send_message' && surfacedMessage?.trim()) {
+    return `这次有主动跟进：${surfacedMessage.trim()}`;
+  }
+
+  const effectSummary = sideEffects.length > 0
+    ? `已处理：${sideEffects.join('；')}。`
+    : '暂时没有额外动作。';
+
+  return `${describeSilentReason(output.silentReason)}${effectSummary}`;
+};
+
 const persistAssistantMessage = (
   message: string,
   targetSessionId?: string,
   options?: {
+    displayParts?: string[];
     debugSections?: Array<{
       label: string;
       exchange: AIDebugExchange;
@@ -281,6 +377,7 @@ const persistAssistantMessage = (
     id: crypto.randomUUID(),
     role: 'assistant',
     content: trimmed,
+    ...(options?.displayParts?.length ? { displayParts: options.displayParts } : {}),
     createdAt: now,
     tone: 'system',
     ...(options?.debugSections?.length ? { debugSections: options.debugSections } : {})
@@ -358,6 +455,7 @@ export const assistantOrchestratorService = {
           modePrompt: backgroundModePrompt,
           ...(request.userPersonaPrompt ? { userPersonaPrompt: request.userPersonaPrompt } : {})
         },
+        memoryEnabled: assistantConfig.longTermMemoryEnabled,
         memory,
         conversation: assistantContextBuilder.buildConversationContext(
           (request.conversationHistory || []).map((turn) => ({
@@ -372,9 +470,9 @@ export const assistantOrchestratorService = {
           defaultDate: request.defaultDate,
           todayTimelineSummary: request.todayTimelineSummary,
           ...(request.activeSessionSummary ? { activeSessionSummary: request.activeSessionSummary } : {}),
-          ...(request.todoSummary ? { todoSummary: request.todoSummary } : {}),
           ...(request.todayScheduledTodoSummary ? { todayScheduledTodoSummary: request.todayScheduledTodoSummary } : {}),
           ...(request.pinnedTodoSummary ? { pinnedTodoSummary: request.pinnedTodoSummary } : {}),
+          ...(request.overdueTodoSummary ? { overdueTodoSummary: request.overdueTodoSummary } : {}),
           ...(request.reminderSummary ? { reminderSummary: request.reminderSummary } : {})
         },
         dictionaryContext: request.dictionaryContext || {},
@@ -401,12 +499,17 @@ export const assistantOrchestratorService = {
 
     let updatedMemory: AssistantMemory = memory;
     const reminders = output.reminders || [];
+    const messageParts = output.assistantReply
+      ? buildAssistantDisplayParts(output.assistantReply, output.assistantReplyParts)
+      : undefined;
     const decision: AssistantSystemTurnDecision = {
       action: output.outcome === 'reply' && output.assistantReply ? 'send_message' : 'silent',
       memoryAction: output.memoryAction,
       ...(output.assistantReply ? { message: output.assistantReply } : {}),
+      ...(messageParts?.length ? { messageParts } : {}),
       ...(reminders.length > 0 ? { reminders } : {}),
-      ...(output.memoryAction === 'update_memory' && output.memoryPatch ? { memoryPatch: output.memoryPatch } : {})
+      ...(output.memoryAction === 'update_memory' && output.memoryPatch ? { memoryPatch: output.memoryPatch } : {}),
+      ...(output.silentReason ? { silentReason: output.silentReason } : {})
     };
     const appliedReminders: AssistantReminder[] = [];
 
@@ -442,9 +545,11 @@ export const assistantOrchestratorService = {
 
     let surfacedMessage: string | undefined;
     let surfacedMessageLocation: PersistedAssistantMessageLocation | null = null;
+    const shouldRecordDecisionSummary = assistantConfig.longTermMemoryEnabled;
     if (output.outcome === 'reply' && output.assistantReply) {
       surfacedMessage = output.assistantReply;
       surfacedMessageLocation = persistAssistantMessage(surfacedMessage, request.targetSessionId, {
+        ...(messageParts?.length ? { displayParts: messageParts } : {}),
         ...(request.includeDebugInPersistedMessage
           ? {
             debugSections: [{
@@ -454,13 +559,18 @@ export const assistantOrchestratorService = {
           }
           : {})
       });
-      if (assistantConfig.longTermMemoryEnabled) {
-        updatedMemory = assistantMemoryService.appendDecisionSummary(`system_turn:${request.trigger.type}:${surfacedMessage}`);
-      }
-    } else if (output.outcome === 'silent') {
-      if (assistantConfig.longTermMemoryEnabled) {
-        updatedMemory = assistantMemoryService.appendDecisionSummary(`system_turn:${request.trigger.type}:silent`);
-      }
+    }
+
+    const sideEffects = buildAppliedSideEffects(output, appliedReminders, shouldRecordDecisionSummary);
+    const decisionSummary = buildDecisionSummary(output, decision.action, sideEffects, surfacedMessage);
+
+    decision.decisionSummary = decisionSummary;
+    if (output.outcome === 'silent' && sideEffects.length > 0) {
+      decision.silentSideEffects = sideEffects;
+    }
+
+    if (assistantConfig.longTermMemoryEnabled) {
+      updatedMemory = assistantMemoryService.appendDecisionSummary(decisionSummary);
     }
 
     appendBackgroundCallHistory({
@@ -474,7 +584,10 @@ export const assistantOrchestratorService = {
       action: decision.action,
       memoryAction: decision.memoryAction,
       reminderCount: appliedReminders.length,
-      ...(surfacedMessage ? { message: surfacedMessage } : {})
+      ...(surfacedMessage ? { message: surfacedMessage } : {}),
+      decisionSummary,
+      ...(output.silentReason ? { silentReason: output.silentReason } : {}),
+      ...(sideEffects.length > 0 ? { sideEffects } : {})
     });
 
     if (request.showSystemNotification && surfacedMessage && surfacedMessageLocation) {

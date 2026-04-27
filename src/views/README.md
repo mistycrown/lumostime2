@@ -28,7 +28,8 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
-> Last updated: 2026-04-25
+> Last updated: 2026-04-27
+- `TodoView.tsx`: The shared quick-actions sheet now includes an inline `删除任务 -> 确认删除？` entry, so both list rows and week-view badges can remove a todo without opening the full detail editor.
 - `TodoView.tsx`: Todo-list rendering now hides unfinished subtasks whenever their parent task is completed, without mutating the child tasks; undoing the parent completion restores those child rows through the existing expand state.
 - `TodoBatchManageView.tsx`: The todo batch-management screen now hides subtasks entirely, while save operations still preserve hidden child todos and completed todos unless their parent task or category is removed.
 - `TimelineView.tsx`, `TodoView.tsx`: Their AI entry buttons now open one app-level shared AI window that stays mounted in the background, so closing the modal UI no longer interrupts an in-flight AI request.

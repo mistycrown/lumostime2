@@ -4,6 +4,7 @@
  * @output Shared quick-actions state and handlers for todo list rows and week-view badges
  * @pos Hook
  * @description Centralizes todo quick-actions sheet state so multiple entry points can open the same modal without duplicating move/complete/detail logic inside the view.
+ * @updated 2026-04-27: Routed shared quick-actions delete requests into the existing todo deletion flow.
  * @updated 2026-04-21: Added a shared pin/unpin quick action so schedule-list rows and week badges can toggle the today-top flag consistently.
  * @updated 2026-04-20: Extracted from TodoView to unify quick-actions behavior across todo-row taps and week badge actions.
  */
@@ -16,9 +17,10 @@ const QUICK_ACTION_CLOSE_GUARD_MS = 280;
 interface UseTodoQuickActionsOptions {
   onSaveTodo: (todo: TodoItem) => void;
   onEditTodo: (todo: TodoItem) => void;
+  onDeleteTodo: (id: string) => void;
 }
 
-export const useTodoQuickActions = ({ onSaveTodo, onEditTodo }: UseTodoQuickActionsOptions) => {
+export const useTodoQuickActions = ({ onSaveTodo, onEditTodo, onDeleteTodo }: UseTodoQuickActionsOptions) => {
   const [quickActionTodo, setQuickActionTodo] = useState<TodoItem | null>(null);
   const quickActionOpenedAtRef = useRef(0);
 
@@ -109,6 +111,13 @@ export const useTodoQuickActions = ({ onSaveTodo, onEditTodo }: UseTodoQuickActi
     closeQuickActions(true);
   };
 
+  const handleQuickActionDelete = () => {
+    if (!quickActionTodo) return;
+    const todoId = quickActionTodo.id;
+    closeQuickActions(true);
+    onDeleteTodo(todoId);
+  };
+
   return {
     quickActionTodo,
     openQuickActions,
@@ -118,6 +127,7 @@ export const useTodoQuickActions = ({ onSaveTodo, onEditTodo }: UseTodoQuickActi
     handleQuickActionComplete,
     handleQuickActionUndoComplete,
     handleQuickActionClearDate,
-    handleQuickActionTogglePin
+    handleQuickActionTogglePin,
+    handleQuickActionDelete
   };
 };

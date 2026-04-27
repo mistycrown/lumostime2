@@ -10,9 +10,11 @@ Components that form the structural or global UI elements.
 - `Toast.tsx`: Notification system.
 
 ## Modals
+- Update 2026-04-27: `AIBackfillChatModal.tsx` now renders one assistant turn as grouped multi-bubble chat bursts when structured reply parts are available, and the background history drawer shows readable silent-decision summaries plus post-silent side effects instead of bare `silent` outcomes.
+- Update 2026-04-27: `AIBackfillChatModal.tsx` now skips foreground reminder-summary injection when background polling is off, omits long-term-memory prompt sections when memory is disabled, and blocks foreground memory writes while long-term memory is off.
 Overlay components for complex interactions.
 
-- `AIBackfillChatModal.tsx`: The long-term-memory viewer now renders `用户画像记忆` and `偏好记忆` as readable note lists with manual add/delete controls; reminder due-times stay normalized onto a single canonical timeline, foreground turns receive explicit local/UTC current-time anchors for reminder math, background assistant replies can persist per-message debug payloads, the check-in interval inputs keep editable draft text with inline validation so invalid intermediate states never auto-save, and the built-in persona roster ships with six richer voices while allowing AI self-address and user-address fields to stay intentionally empty.
+- `AIBackfillChatModal.tsx`: The long-term-memory viewer now renders `用户画像记忆`, `偏好记忆`, and `活跃 reminders` as readable note/reminder cards with manual add/delete controls; reminder due-times stay normalized onto a single canonical timeline, foreground turns receive explicit local/UTC current-time anchors for reminder math, background assistant replies can persist per-message debug payloads, the check-in interval inputs keep editable draft text with inline validation so invalid intermediate states never auto-save, and the built-in persona roster ships with six richer voices while allowing AI self-address and user-address fields to stay intentionally empty.
 - `AddLogModal.tsx`: Main modal for logging time, including segmented start/end time inputs that auto-advance from hour to minute after two digits.
 - `TodoDatePickerModal.tsx`: Lightweight planning picker shared by todo scheduling and Memoir, supporting both full date selection and a centered month-only modal with the duplicate footer close action removed.
 - `TodoDetailModal.tsx`: Detailed view and editing for Todos, including planning fields for assigned date, deadline date, and lightweight recurrence rules.
@@ -91,7 +93,8 @@ Components for theme and appearance customization.
 - `ScheduleStyleSelector.tsx`: 日程图样式卡片选择器，提供默认、经典、极简、实色四种轻量预览。
 - `achievement/AchievementBottleIconPackSelector.tsx`: 已改为成就瓶图标包卡片选择器，支持更紧凑的预览式切换。
 - `achievement/AchievementBottleStyleSelector.tsx`: 已改为成就瓶样式卡片选择器，使用玻璃瓶身小预览区分不同气质。
-> Last updated: 2026-04-25
+> Last updated: 2026-04-27
+- `TodoQuickActionsModal.tsx`: Added an inline `删除任务 -> 确认删除？` two-step action so shared todo quick actions can remove a task directly from the sheet without opening the full detail editor first.
 - `TodoAssociation.tsx`, `TodoScheduleAssignModal.tsx`: Shared todo pickers now hide unfinished subtasks whenever their parent todo is completed, so completed parents no longer leave orphan child rows in association or schedule-selection lists.
 - `TodoScheduleAssignModal.tsx`: The arrange/due picker now renders direct subtasks beneath their parent row with expandable hierarchy controls instead of flattening children into standalone cards.
 - `MainLayout.tsx`: The floating Tag/Scope and Chronicle/Memoir switch buttons now let fallback Lucide icons inherit the floating button color, so the default UI theme stays visible on white accent-theme buttons.

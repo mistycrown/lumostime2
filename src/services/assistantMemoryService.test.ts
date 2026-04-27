@@ -105,4 +105,12 @@ describe('assistantMemoryService', () => {
 
     expect(assistantMemoryService.getMemory().profileMemory).toEqual(['用户固定周三开组会']);
   });
+  it('appendDecisionSummary stores the latest readable summary only', () => {
+    assistantMemoryService.appendDecisionSummary('这次先不打扰：当前状态还比较清晰。');
+    assistantMemoryService.appendDecisionSummary('这次先不打扰：后续关注已经安排好了。');
+
+    expect(assistantMemoryService.getMemory().recentDecisions).toEqual([
+      '这次先不打扰：后续关注已经安排好了。'
+    ]);
+  });
 });

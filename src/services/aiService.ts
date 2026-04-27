@@ -1,9 +1,11 @@
-﻿/**
+/**
  * @file aiService.ts
  * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
- * @output Parsed Time Entries (ParsedTimeEntry[]), Parsed Todos (AIParsedTodo[]), Dated AI Backfill Tool Plans, Backfill Chat Replies (string), Generated Narratives (string), Connection Status (boolean)
+ * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
  * @pos Service (AI Integration Layer)
- * @description AI 闂備礁鎼悧鍡欑矓鐎涙ɑ鍙?- 濠电姰鍨煎▔娑氣偓姘煎櫍楠炲啯绻濋崘顏佹灃?AI 闂備礁婀辩划顖炲礉閹烘梹顐介柣銏㈩焾閻ゎ噣鏌涢埥鍡楀箻缂佲偓閸戠晝enAI/Gemini闂備焦瀵х粙鎴λ囬崡鐐╂灁闁硅揪绠戠粻銉╂煃瑜滈崜鐔奉嚕閸偄绶炲璺侯儏閺€顓熺箾鐎涙鐭嬮悽顖ｄ簽濡叉劕鈹戠€ｎ亞顦遍梺鍛婁緱閸犳牠顢旈鍫熲拺闁哄娉曡倴闂佹眹鍊曞Λ娑氬垝婵犳碍鏅柛鏇ㄥ墮閳ь剛鍋ら弻鏇㈠幢閺囩喓銈扮紓浣虹帛閻╊垶鐛幒妤€唯闁挎柧鍕橀崑鐐烘煟閻樺弶澶勬繛鍙夌墵楠炲繑瀵奸弶鎴狀唽闂佸綊鍋婇崰鎾寸濞戙垺鐓欑紒妤佺☉濡參寮? * @updated 2026-04-26: Consolidated assistant inference around the shared unified-turn endpoint so foreground chat and Android-first background runs reuse the same provider/debug pipeline and explicit memory-action schema.
+ * @description AI 闂備礁鎼悧鍡欑矓鐎涙ɑ鍙?- 濠电姰鍨煎▔娑氣偓姘煎櫍楠炲啯绻濋崘顏佹灃?AI 闂備礁婀辩划顖炲礉閹烘梹顐介柣銏㈩焾閻ゎ噣鏌涢埥鍡楀箻缂佲偓閸戠晝enAI/Gemini闂備焦瀵х粙鎴λ囬崡鐐╂灁闁硅揪绠戠粻銉╂煃瑜滈崜鐔奉嚕閸偄绶炲璺侯儏閺€顓熺箾鐎涙鐭嬮悽顖ｄ簽濡cljs劕鈹戠€ｎ亞顦遍梺鍛婁緱閸犳牠顢旈鍫熲拺闁哄娉曡倴闂佹眹鍊曞Λ娑氬垝婵犳碍鏅柛鏇ㄥ墮閳ь剛鍋ら弻鏇㈠幢閺囩喓銈扮紓浣虹帛閻╊垶鐛幒妤€唯闁挎柧鍕橀崑鐐烘煟閻樺弶澶勬繛鍙夌墵楠炲繑瀵奸弶鎴狀唽闂佸綊鍋婇崰鎾寸濞戙垺鐓欑紒妤佺☉濡參寮? * @updated 2026-04-27: Extended unified assistant-turn normalization with decision summaries, silent reasons, side effects, and structured multi-bubble reply parts.
+ * @updated 2026-04-27: Removed retired intent-router and multi-planner assistant endpoints so the service now centers on the shared unified-turn path plus still-used parsing and narrative helpers.
+ * @updated 2026-04-26: Consolidated assistant inference around the shared unified-turn endpoint so foreground chat and Android-first background runs reuse the same provider/debug pipeline and explicit memory-action schema.
  
  * @updated 2026-04-26: Guaranteed a lowercase json instruction on every OpenAI json_object request so structured assistant and tool-planning calls do not fail provider-side validation.
  * @updated 2026-04-25: Expanded AI intent routing and tool planning with dedicated edit-log, update-todo, and create-subtask flows that return id-plus-patch payloads for local application.
@@ -22,9 +24,10 @@
  * 
  * 闂備礁鐤囧▔鏇熷垔鐎靛摜绠?Once I am updated, be sure to update my header comment and the folder's md.
  */
-import { TodoCategory, Category, Scope, TodoRecurrenceRule } from '../types';
+import { Scope, TodoRecurrenceRule } from '../types';
 import type {
     AssistantReminderDraft,
+    AssistantSilentReason,
     AssistantToolCall,
     AssistantUnifiedTurnOutput,
     AssistantTurnMode
@@ -56,14 +59,6 @@ interface AIRawTimeEntry {
     scopeIds?: string[]; // AI inferred scopes
 }
 
-// AI闂佸搫顦弲婊堝蓟閵娿儍娲冀椤撶喎鍓梺鍛婃处閸嬪棛绮ｉ敓鐘崇厱闁哄啫鍊告禒鎺楁煙楠炲灝鐏茬€规洘绻堥弫宥夊礋椤撶喎鐨鹃梻?
-export interface AIParsedTodo {
-    title: string;
-    categoryId?: string;
-    linkedActivityId?: string;
-    defaultScopeIds?: string[];
-}
-
 export interface AIDebugExchange {
     provider: 'openai' | 'gemini';
     requestedAt: string;
@@ -81,26 +76,8 @@ export interface AIDebugExchange {
     };
 }
 
-export interface AIBackfillChatResult {
-    reply: string;
-    debug: AIDebugExchange;
-}
-
 export interface AIAssistantUnifiedTurnResult {
     output: AssistantUnifiedTurnOutput;
-    debug: AIDebugExchange;
-}
-
-export type AIChatIntent = 'chat' | 'add_log' | 'edit_log' | 'add_todo' | 'update_todo' | 'create_subtask' | 'clarify';
-
-export interface AIIntentClassification {
-    intent: AIChatIntent;
-    reason: string;
-    assistantReply?: string;
-}
-
-export interface AIIntentClassificationResult {
-    result: AIIntentClassification;
     debug: AIDebugExchange;
 }
 
@@ -121,16 +98,6 @@ export interface AIBackfillToolCall {
     args: AIBackfillCreateLogArgs;
 }
 
-export interface AIBackfillToolPlan {
-    assistantReply: string;
-    toolCalls: AIBackfillToolCall[];
-}
-
-export interface AIBackfillToolPlanningResult {
-    plan: AIBackfillToolPlan;
-    debug: AIDebugExchange;
-}
-
 export interface AITodoCreateArgs {
     title: string;
     categoryId: string;
@@ -146,16 +113,6 @@ export interface AITodoCreateArgs {
 export interface AITodoToolCall {
     toolName: 'create_todo';
     args: AITodoCreateArgs;
-}
-
-export interface AITodoToolPlan {
-    assistantReply: string;
-    toolCalls: AITodoToolCall[];
-}
-
-export interface AITodoToolPlanningResult {
-    plan: AITodoToolPlan;
-    debug: AIDebugExchange;
 }
 
 export interface AITodoUpdatePatch {
@@ -182,16 +139,6 @@ export interface AITodoUpdateToolCall {
     args: AITodoUpdateArgs;
 }
 
-export interface AITodoUpdateToolPlan {
-    assistantReply: string;
-    toolCalls: AITodoUpdateToolCall[];
-}
-
-export interface AITodoUpdateToolPlanningResult {
-    plan: AITodoUpdateToolPlan;
-    debug: AIDebugExchange;
-}
-
 export interface AICreateSubtaskArgs {
     parentTodoId: string;
     title: string;
@@ -203,16 +150,6 @@ export interface AICreateSubtaskArgs {
 export interface AICreateSubtaskToolCall {
     toolName: 'create_subtask';
     args: AICreateSubtaskArgs;
-}
-
-export interface AICreateSubtaskToolPlan {
-    assistantReply: string;
-    toolCalls: AICreateSubtaskToolCall[];
-}
-
-export interface AICreateSubtaskToolPlanningResult {
-    plan: AICreateSubtaskToolPlan;
-    debug: AIDebugExchange;
 }
 
 export interface AIEditLogPatch {
@@ -234,16 +171,6 @@ export interface AIEditLogArgs {
 export interface AIEditLogToolCall {
     toolName: 'edit_log';
     args: AIEditLogArgs;
-}
-
-export interface AIEditLogToolPlan {
-    assistantReply: string;
-    toolCalls: AIEditLogToolCall[];
-}
-
-export interface AIEditLogToolPlanningResult {
-    plan: AIEditLogToolPlan;
-    debug: AIDebugExchange;
 }
 
 export interface AIRequestOptions {
@@ -324,7 +251,6 @@ const sanitizeDebugUrl = (url: string): string => (
     url.replace(/([?&]key=)[^&]+/gi, '$1[REDACTED]')
 );
 
-const AI_INTENTS: AIChatIntent[] = ['chat', 'add_log', 'edit_log', 'add_todo', 'update_todo', 'create_subtask', 'clarify'];
 const TODO_RECURRENCE_FREQUENCIES: Array<TodoRecurrenceRule['frequency']> = ['daily', 'weekly', 'monthly'];
 
 const normalizeConversationHistory = (conversationHistory?: AIConversationTurn[]): AIConversationTurn[] => (
@@ -406,12 +332,6 @@ const buildGeminiContents = (
     })),
     { role: 'user', parts: [{ text: userPrompt.trim() }] }
 ]);
-
-const normalizeAIIntent = (value: unknown): AIChatIntent => (
-    typeof value === 'string' && AI_INTENTS.includes(value as AIChatIntent)
-        ? value as AIChatIntent
-        : 'clarify'
-);
 
 const normalizeTodoRecurrenceRule = (value: unknown): TodoRecurrenceRule | undefined => {
     if (!value || typeof value !== 'object') {
@@ -518,6 +438,29 @@ const normalizeAssistantReminderDrafts = (value: unknown): AssistantReminderDraf
         : []
 );
 
+const ASSISTANT_SILENT_REASONS: AssistantSilentReason[] = [
+    'active_focus_protection',
+    'likely_do_not_disturb',
+    'state_still_clear',
+    'insufficient_confidence',
+    'waiting_for_stronger_signal',
+    'followup_already_scheduled'
+];
+
+const normalizeAssistantSilentReason = (value: unknown): AssistantSilentReason | undefined => (
+    typeof value === 'string' && ASSISTANT_SILENT_REASONS.includes(value as AssistantSilentReason)
+        ? value as AssistantSilentReason
+        : undefined
+);
+
+const normalizeStringList = (value: unknown): string[] => (
+    Array.isArray(value)
+        ? value
+            .map((item) => (typeof item === 'string' ? item.trim() : ''))
+            .filter(Boolean)
+        : []
+);
+
 const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
     if (!Array.isArray(value)) {
         return [];
@@ -562,6 +505,7 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
         }
 
         if (toolName === 'create_todo') {
+            const normalizedRecurrenceRule = normalizeTodoRecurrenceRule(args.recurrenceRule);
             const normalized = {
                 toolName: 'create_todo' as const,
                 args: {
@@ -571,8 +515,9 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
                     ...(normalizeNullableString(args.linkedActivityId) ? { linkedActivityId: normalizeNullableString(args.linkedActivityId)! } : {}),
                     ...(Array.isArray(args.defaultScopeIds) ? { defaultScopeIds: args.defaultScopeIds.map((scopeId: unknown) => String(scopeId).trim()).filter(Boolean) } : {}),
                     ...(typeof args.note === 'string' && args.note.trim() ? { note: args.note.trim() } : {}),
-                    ...(normalizeOptionalDateString(args.scheduledDate) ? { scheduledDate: normalizeOptionalDateString(args.scheduledDate)! } : {}),
-                    ...(normalizeOptionalDateString(args.deadlineDate) ? { deadlineDate: normalizeOptionalDateString(args.deadlineDate)! } : {})
+                    ...(!normalizedRecurrenceRule && normalizeOptionalDateString(args.scheduledDate) ? { scheduledDate: normalizeOptionalDateString(args.scheduledDate)! } : {}),
+                    ...(!normalizedRecurrenceRule && normalizeOptionalDateString(args.deadlineDate) ? { deadlineDate: normalizeOptionalDateString(args.deadlineDate)! } : {}),
+                    ...(normalizedRecurrenceRule ? { recurrenceRule: normalizedRecurrenceRule } : {})
                 }
             };
             return normalized.args.title && normalized.args.categoryId ? [normalized] : [];
@@ -580,6 +525,7 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
 
         if (toolName === 'update_todo') {
             const patch = args.patch || {};
+            const normalizedRecurrenceRule = normalizeTodoRecurrenceRule(patch.recurrenceRule);
             const normalizedPatch = {
                 ...(typeof patch.title === 'string' ? { title: patch.title.trim() } : {}),
                 ...(normalizeNullableString(patch.note) !== undefined ? { note: normalizeNullableString(patch.note) } : {}),
@@ -587,8 +533,13 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
                 ...(normalizeNullableString(patch.linkedCategoryId) !== undefined ? { linkedCategoryId: normalizeNullableString(patch.linkedCategoryId) } : {}),
                 ...(normalizeNullableString(patch.linkedActivityId) !== undefined ? { linkedActivityId: normalizeNullableString(patch.linkedActivityId) } : {}),
                 ...(normalizeNullableStringArray(patch.defaultScopeIds) !== undefined ? { defaultScopeIds: normalizeNullableStringArray(patch.defaultScopeIds) } : {}),
-                ...(normalizeNullableString(patch.scheduledDate) !== undefined ? { scheduledDate: normalizeNullableString(patch.scheduledDate) } : {}),
-                ...(normalizeNullableString(patch.deadlineDate) !== undefined ? { deadlineDate: normalizeNullableString(patch.deadlineDate) } : {}),
+                ...(patch.recurrenceRule === undefined && normalizeNullableString(patch.scheduledDate) !== undefined ? { scheduledDate: normalizeNullableString(patch.scheduledDate) } : {}),
+                ...(patch.recurrenceRule === undefined && normalizeNullableString(patch.deadlineDate) !== undefined ? { deadlineDate: normalizeNullableString(patch.deadlineDate) } : {}),
+                ...(patch.recurrenceRule === null
+                    ? { recurrenceRule: null }
+                    : normalizedRecurrenceRule
+                        ? { recurrenceRule: normalizedRecurrenceRule }
+                        : {}),
                 ...(typeof patch.pin === 'boolean' ? { pin: patch.pin } : {}),
                 ...(typeof patch.isCompleted === 'boolean' ? { isCompleted: patch.isCompleted } : {})
             };
@@ -1049,250 +1000,6 @@ Output:
         }
     },
 
-    sendBackfillChatMessage: async (
-        text: string,
-        context: {
-            currentDateTime: string;
-            targetDate: string;
-            personaPrompt?: string;
-        }
-    ): Promise<string> => {
-        const config = aiService.getConfig();
-
-        if (!config.apiKey?.trim()) {
-            throw new Error('Please configure AI settings first.');
-        }
-
-        const systemPrompt = `
-Role: You are LumosTime's AI backfill assistant.
-Task: Help the user talk through what they were doing so the app can later turn it into a backfill record.
-
-Context:
-- Current DateTime: ${context.currentDateTime}
-- Selected Backfill Date: ${context.targetDate}
-
-${buildPersonaInstruction(context.personaPrompt)}
-
-Requirements:
-1. Reply in natural Chinese.
-2. Treat each request as a single independent turn.
-3. Help the user clarify what they were doing, when they did it, and which details may still be missing.
-4. If the time range is ambiguous, ask concise follow-up questions instead of inventing details.
-5. Do not output JSON, code blocks, or tool-call syntax in this step.
-6. Keep the answer practical and reasonably concise.
-`;
-
-        const userPrompt = `
-Selected Backfill Date: ${context.targetDate}
-Current DateTime: ${context.currentDateTime}
-User Message:
-${text}
-`;
-
-        return aiService.generateNarrative(userPrompt.trim(), systemPrompt.trim());
-    },
-
-    sendBackfillChatMessageWithDebug: async (
-        text: string,
-        context: {
-            currentDateTime: string;
-            targetDate: string;
-            personaPrompt?: string;
-            conversationHistory?: AIConversationTurn[];
-        }
-    ): Promise<AIBackfillChatResult> => {
-        const config = aiService.getConfig();
-        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
-
-        if (!config.apiKey?.trim()) {
-            throw new Error('Please configure AI settings first.');
-        }
-
-        const systemPrompt = `
-Role: You are LumosTime's AI backfill assistant.
-Task: Help the user talk through what they were doing so the app can later turn it into a backfill record.
-
-Context:
-- Current DateTime: ${context.currentDateTime}
-- Selected Backfill Date: ${context.targetDate}
-
-${buildPersonaInstruction(context.personaPrompt)}
-
-Requirements:
-1. Reply in natural Chinese.
-2. Treat each request as a single independent turn.
-3. Help the user clarify what they were doing, when they did it, and which details may still be missing.
-4. If the time range is ambiguous, ask concise follow-up questions instead of inventing details.
-5. Do not output JSON, code blocks, or tool-call syntax in this step.
-6. Keep the answer practical and reasonably concise.
-`;
-
-        const userPrompt = `
-Selected Backfill Date: ${context.targetDate}
-Current DateTime: ${context.currentDateTime}
-User Message:
-${text}
-`;
-
-        if (config.provider === 'openai') {
-            const url = `${config.baseUrl}/chat/completions`;
-            const headers = {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${config.apiKey}`
-            };
-            const body = {
-                model: config.modelName,
-                messages: buildOpenAIMessageList(systemPrompt, userPrompt, context.conversationHistory)
-            };
-            const requestedAt = new Date().toISOString();
-            let responseStatus = 0;
-            let responseOk = false;
-            let responseBody: unknown = null;
-
-            try {
-                const response = await fetchFn(url, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(body)
-                });
-                responseStatus = response.status || 0;
-                responseOk = Boolean(response.ok);
-                responseBody = await response.json();
-
-                const debug: AIDebugExchange = {
-                    provider: 'openai',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody
-                    }
-                };
-
-                if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI request failed');
-                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
-                    throw error;
-                }
-
-                return {
-                    reply: ((responseBody as any)?.choices?.[0]?.message?.content || '').trim(),
-                    debug
-                };
-            } catch (error) {
-                const debug: AIDebugExchange = {
-                    provider: 'openai',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody || {
-                            transportError: error instanceof Error ? error.message : String(error)
-                        }
-                    }
-                };
-
-                const finalError = error instanceof Error ? error : new Error(String(error));
-                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
-                throw finalError;
-            }
-        }
-
-        if (config.provider === 'gemini') {
-            const baseUrl = config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta/models';
-            const url = `${baseUrl}/${config.modelName}:generateContent?key=${config.apiKey}`;
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            const body = {
-                contents: buildGeminiContents(userPrompt, context.conversationHistory),
-                system_instruction: { parts: [{ text: systemPrompt.trim() }] }
-            };
-            const requestedAt = new Date().toISOString();
-            let responseStatus = 0;
-            let responseOk = false;
-            let responseBody: unknown = null;
-
-            try {
-                const response = await fetchFn(url, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(body)
-                });
-                responseStatus = response.status || 0;
-                responseOk = Boolean(response.ok);
-                responseBody = await response.json();
-
-                const debug: AIDebugExchange = {
-                    provider: 'gemini',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody
-                    }
-                };
-
-                if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI request failed');
-                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
-                    throw error;
-                }
-
-                return {
-                    reply: (((responseBody as any)?.candidates?.[0]?.content?.parts?.[0]?.text) || '').trim(),
-                    debug
-                };
-            } catch (error) {
-                const debug: AIDebugExchange = {
-                    provider: 'gemini',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody || {
-                            transportError: error instanceof Error ? error.message : String(error)
-                        }
-                    }
-                };
-
-                const finalError = error instanceof Error ? error : new Error(String(error));
-                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
-                throw finalError;
-            }
-        }
-
-        throw new Error('AI provider not supported');
-    },
-
     requestAssistantUnifiedTurnWithDebug: async (
         params: {
             mode: AssistantTurnMode;
@@ -1329,8 +1036,15 @@ ${text}
                     : 'no_update'
             };
 
+            const assistantReplyParts = normalizeStringList(rawOutput?.assistantReplyParts);
+            if (assistantReplyParts.length > 0) {
+                normalized.assistantReplyParts = assistantReplyParts;
+            }
+
             if (typeof rawOutput?.assistantReply === 'string' && rawOutput.assistantReply.trim()) {
                 normalized.assistantReply = rawOutput.assistantReply.trim();
+            } else if (assistantReplyParts.length > 0) {
+                normalized.assistantReply = assistantReplyParts.join('\n');
             }
 
             const reminders = normalizeAssistantReminderDrafts(rawOutput?.reminders);
@@ -1340,6 +1054,20 @@ ${text}
 
             if (rawOutput?.memoryPatch && typeof rawOutput.memoryPatch === 'object') {
                 normalized.memoryPatch = rawOutput.memoryPatch;
+            }
+
+            if (typeof rawOutput?.decisionSummary === 'string' && rawOutput.decisionSummary.trim()) {
+                normalized.decisionSummary = rawOutput.decisionSummary.trim();
+            }
+
+            const silentReason = normalizeAssistantSilentReason(rawOutput?.silentReason);
+            if (silentReason) {
+                normalized.silentReason = silentReason;
+            }
+
+            const silentSideEffects = normalizeStringList(rawOutput?.silentSideEffects);
+            if (silentSideEffects.length > 0) {
+                normalized.silentSideEffects = silentSideEffects;
             }
 
             if (mode === 'foreground') {
@@ -1366,1577 +1094,6 @@ ${text}
         };
     },
 
-    classifyChatIntentWithDebug: async (
-        text: string,
-        options: AIRequestOptions = {}
-    ): Promise<AIIntentClassificationResult> => {
-        const config = aiService.getConfig();
-        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
-
-        if (!config.apiKey?.trim()) {
-            throw new Error('Please configure AI settings first.');
-        }
-
-        const systemPrompt = `
-Role: You are LumosTime's lightweight intent router.
-Task: Read one user message and classify the single primary intent for the next AI step.
-
-Allowed intents:
-- chat: casual conversation, questions, reflection, or discussion that should not call tools
-- add_log: the user is mainly describing things that already happened and wants to record/backfill them
-- edit_log: the user wants to modify an existing log/backfill record
-- add_todo: the user is mainly asking to create one or more todos, reminders, or plans for later
-- update_todo: the user wants to modify an existing todo, including schedule, deadline, pin, completion, category, note, or other fields
-- create_subtask: the user wants to add one or more child todos under an existing parent todo
-- clarify: the message is too ambiguous or mixes multiple primary intents, so the app should ask one short follow-up question instead of executing anything
-
-Requirements:
-1. Output ONLY a valid JSON object.
-2. JSON schema:
-{
-  "intent": "chat | add_log | edit_log | add_todo | update_todo | create_subtask | clarify",
-  "reason": "short string",
-  "assistantReply": "string"
-}
-3. Choose exactly one primary intent.
-4. If the user mixes multiple primary requests in one sentence, return clarify.
-5. assistantReply should usually be empty for chat, add_log, edit_log, add_todo, update_todo, and create_subtask.
-6. When intent is clarify, assistantReply must be one short Chinese follow-up question.
-7. Do not plan tools in this step.
-8. If the user is talking about assigning dates/times to existing subtasks, chapters, or parts of an existing task, prefer update_todo rather than create_subtask.
-9. Use create_subtask only when the user clearly wants to add new child tasks, split a task, or generate subtasks that do not exist yet.
-`;
-
-        const userPrompt = `
-User Message:
-${text}
-`;
-
-        const normalizeResult = (rawValue: any): AIIntentClassification => ({
-            intent: normalizeAIIntent(rawValue?.intent),
-            reason: typeof rawValue?.reason === 'string' ? rawValue.reason.trim() : '',
-            assistantReply: typeof rawValue?.assistantReply === 'string' ? rawValue.assistantReply.trim() : ''
-        });
-
-        if (config.provider === 'openai') {
-            const url = `${config.baseUrl}/chat/completions`;
-            const headers = {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${config.apiKey}`
-            };
-            const body = {
-                model: config.modelName,
-                messages: buildOpenAIJsonMessageList(systemPrompt, userPrompt),
-                response_format: { type: 'json_object' }
-            };
-            const requestedAt = new Date().toISOString();
-            let responseStatus = 0;
-            let responseOk = false;
-            let responseBody: unknown = null;
-
-            try {
-                const response = await fetchFn(url, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(body),
-                    ...(options.signal ? { signal: options.signal } : {})
-                });
-                responseStatus = response.status || 0;
-                responseOk = Boolean(response.ok);
-                responseBody = await response.json();
-
-                const debug: AIDebugExchange = {
-                    provider: 'openai',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody
-                    }
-                };
-
-                if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI request failed');
-                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
-                    throw error;
-                }
-
-                const rawContent = (responseBody as any)?.choices?.[0]?.message?.content || '{}';
-                return {
-                    result: normalizeResult(aiService.cleanAndParseJSONObject(rawContent)),
-                    debug
-                };
-            } catch (error) {
-                const debug: AIDebugExchange = {
-                    provider: 'openai',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody || {
-                            transportError: error instanceof Error ? error.message : String(error)
-                        }
-                    }
-                };
-
-                const finalError = error instanceof Error ? error : new Error(String(error));
-                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
-                throw finalError;
-            }
-        }
-
-        if (config.provider === 'gemini') {
-            const baseUrl = config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta/models';
-            const url = `${baseUrl}/${config.modelName}:generateContent?key=${config.apiKey}`;
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            const body = {
-                contents: buildGeminiContents(userPrompt),
-                system_instruction: { parts: [{ text: systemPrompt.trim() }] },
-                generationConfig: {
-                    response_mime_type: 'application/json'
-                }
-            };
-            const requestedAt = new Date().toISOString();
-            let responseStatus = 0;
-            let responseOk = false;
-            let responseBody: unknown = null;
-
-            try {
-                const response = await fetchFn(url, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(body),
-                    ...(options.signal ? { signal: options.signal } : {})
-                });
-                responseStatus = response.status || 0;
-                responseOk = Boolean(response.ok);
-                responseBody = await response.json();
-
-                const debug: AIDebugExchange = {
-                    provider: 'gemini',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody
-                    }
-                };
-
-                if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI request failed');
-                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
-                    throw error;
-                }
-
-                const rawContent = (((responseBody as any)?.candidates?.[0]?.content?.parts?.[0]?.text) || '{}');
-                return {
-                    result: normalizeResult(aiService.cleanAndParseJSONObject(rawContent)),
-                    debug
-                };
-            } catch (error) {
-                const debug: AIDebugExchange = {
-                    provider: 'gemini',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody || {
-                            transportError: error instanceof Error ? error.message : String(error)
-                        }
-                    }
-                };
-
-                const finalError = error instanceof Error ? error : new Error(String(error));
-                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
-                throw finalError;
-            }
-        }
-
-        throw new Error('AI provider not supported');
-    },
-
-    sendContextualChatReplyWithDebug: async (
-        text: string,
-        context: {
-            currentDateTime: string;
-            defaultDate: string;
-            todayTimelineSummary: string;
-            personaPrompt?: string;
-            conversationHistory?: AIConversationTurn[];
-            latestLog?: {
-                endDateTime: string;
-                date: string;
-                endTime: string;
-                title?: string;
-                note?: string;
-            } | null;
-        },
-        options: AIRequestOptions = {}
-    ): Promise<AIBackfillChatResult> => {
-        const config = aiService.getConfig();
-        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
-
-        if (!config.apiKey?.trim()) {
-            throw new Error('Please configure AI settings first.');
-        }
-
-        const systemPrompt = `
-Role: You are LumosTime's chat assistant.
-Task: Have a short natural Chinese conversation with the user without calling tools.
-
-Context:
-- Current DateTime: ${context.currentDateTime}
-- Default Date: ${context.defaultDate}
-- Latest Existing Log: ${JSON.stringify(context.latestLog || null)}
-- Today's Timeline Summary:
-${context.todayTimelineSummary || 'No timeline summary available for today.'}
-
-Requirements:
-1. Reply in natural Chinese.
-2. Keep the reply practical and concise.
-3. Do not output JSON, code blocks, or tool-call syntax.
-4. Do not claim that you already created logs or todos.
-${buildPersonaInstruction(context.personaPrompt)}
-`;
-
-        const userPrompt = `
-Current DateTime: ${context.currentDateTime}
-User Message:
-${text}
-`;
-
-        if (config.provider === 'openai') {
-            const url = `${config.baseUrl}/chat/completions`;
-            const headers = {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${config.apiKey}`
-            };
-            const body = {
-                model: config.modelName,
-                messages: buildOpenAIMessageList(systemPrompt, userPrompt, context.conversationHistory)
-            };
-            const requestedAt = new Date().toISOString();
-            let responseStatus = 0;
-            let responseOk = false;
-            let responseBody: unknown = null;
-
-            try {
-                const response = await fetchFn(url, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(body),
-                    ...(options.signal ? { signal: options.signal } : {})
-                });
-                responseStatus = response.status || 0;
-                responseOk = Boolean(response.ok);
-                responseBody = await response.json();
-
-                const debug: AIDebugExchange = {
-                    provider: 'openai',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody
-                    }
-                };
-
-                if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI request failed');
-                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
-                    throw error;
-                }
-
-                return {
-                    reply: ((responseBody as any)?.choices?.[0]?.message?.content || '').trim(),
-                    debug
-                };
-            } catch (error) {
-                const debug: AIDebugExchange = {
-                    provider: 'openai',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody || {
-                            transportError: error instanceof Error ? error.message : String(error)
-                        }
-                    }
-                };
-
-                const finalError = error instanceof Error ? error : new Error(String(error));
-                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
-                throw finalError;
-            }
-        }
-
-        if (config.provider === 'gemini') {
-            const baseUrl = config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta/models';
-            const url = `${baseUrl}/${config.modelName}:generateContent?key=${config.apiKey}`;
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            const body = {
-                contents: buildGeminiContents(userPrompt, context.conversationHistory),
-                system_instruction: { parts: [{ text: systemPrompt.trim() }] }
-            };
-            const requestedAt = new Date().toISOString();
-            let responseStatus = 0;
-            let responseOk = false;
-            let responseBody: unknown = null;
-
-            try {
-                const response = await fetchFn(url, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(body),
-                    ...(options.signal ? { signal: options.signal } : {})
-                });
-                responseStatus = response.status || 0;
-                responseOk = Boolean(response.ok);
-                responseBody = await response.json();
-
-                const debug: AIDebugExchange = {
-                    provider: 'gemini',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody
-                    }
-                };
-
-                if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI request failed');
-                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
-                    throw error;
-                }
-
-                return {
-                    reply: (((responseBody as any)?.candidates?.[0]?.content?.parts?.[0]?.text) || '').trim(),
-                    debug
-                };
-            } catch (error) {
-                const debug: AIDebugExchange = {
-                    provider: 'gemini',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody || {
-                            transportError: error instanceof Error ? error.message : String(error)
-                        }
-                    }
-                };
-
-                const finalError = error instanceof Error ? error : new Error(String(error));
-                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
-                throw finalError;
-            }
-        }
-
-        throw new Error('AI provider not supported');
-    },
-
-    planBackfillToolCallsWithDebug: async (
-        text: string,
-        context: {
-            currentDateTime: string;
-            defaultDate: string;
-            categories: Category[];
-            scopes: Scope[];
-            personaPrompt?: string;
-            conversationHistory?: AIConversationTurn[];
-            latestLog?: {
-                endDateTime: string;
-                date: string;
-                endTime: string;
-                title?: string;
-                note?: string;
-            } | null;
-            todos: Array<{
-                id: string;
-                title: string;
-                isProgress?: boolean;
-                progressTrackingMode?: string;
-                totalAmount?: number;
-                unitAmount?: number;
-                completedUnits?: number;
-                parentTodoId?: string;
-                parentTodoTitle?: string;
-                path?: string;
-            }>;
-        },
-        options: AIRequestOptions = {}
-    ): Promise<AIBackfillToolPlanningResult> => {
-        const config = aiService.getConfig();
-        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
-
-        if (!config.apiKey?.trim()) {
-            throw new Error('Please configure AI settings first.');
-        }
-
-        const categoryContext = context.categories.map((category) => ({
-            id: category.id,
-            name: category.name,
-            activities: category.activities.map((activity) => ({
-                id: activity.id,
-                name: activity.name
-            }))
-        }));
-
-        const scopeContext = context.scopes.map((scope) => ({
-            id: scope.id,
-            name: scope.name
-        }));
-
-        const todoContext = context.todos.map((todo) => ({
-            id: todo.id,
-            title: todo.title,
-            path: todo.path || todo.title,
-            parentTodoTitle: todo.parentTodoTitle || null,
-            isProgress: Boolean(todo.isProgress),
-            progressTrackingMode: todo.progressTrackingMode || 'none',
-            totalAmount: todo.totalAmount || 0,
-            unitAmount: todo.unitAmount || 1,
-            completedUnits: todo.completedUnits || 0,
-            parentTodoId: todo.parentTodoId || null
-        }));
-
-        const systemPrompt = `
-Role: You are LumosTime's AI backfill assistant with tool planning ability.
-Task: Read the user's message, decide whether one or more backfill records should be created, and separate your natural-language reply from the tool calls.
-
-Context:
-- Current DateTime: ${context.currentDateTime}
-- Default Backfill Date: ${context.defaultDate} (today unless the user explicitly says another date)
-- Latest Existing Log: ${JSON.stringify(context.latestLog || null)}
-- Available Categories and Activities: ${JSON.stringify(categoryContext)}
-- Available Scopes: ${JSON.stringify(scopeContext)}
-- Available Todos: ${JSON.stringify(todoContext)}
-
-Available Tool:
-1. create_log
-Arguments schema:
-{
-  "date": "YYYY-MM-DD",
-  "startTime": "HH:mm",
-  "endTime": "HH:mm",
-  "description": "string",
-  "categoryId": "category id",
-  "activityId": "activity id",
-  "scopeIds": ["scope id"],
-  "linkedTodoId": "todo id",
-  "progressIncrement": 1
-}
-
-${buildPersonaInstruction(context.personaPrompt)}
-
-Requirements:
-1. Output ONLY a valid JSON object.
-2. JSON schema:
-{
-  "assistantReply": "string",
-  "toolCalls": [
-    {
-      "toolName": "create_log",
-      "args": { ... }
-    }
-  ]
-}
-3. assistantReply is what the user will read in the chat.
-4. toolCalls is what the app will apply directly.
-5. If the user does not mention a date, use the default backfill date ${context.defaultDate}.
-6. If the user explicitly mentions another day such as yesterday, the day before yesterday, or a calendar date, set each affected tool call's date accordingly and mention that date clearly in assistantReply.
-7. If the time, category, or activity is too uncertain, keep toolCalls empty and ask a concise follow-up question in assistantReply.
-8. If the user describes multiple time ranges, emit multiple toolCalls.
-9. All times must use 24-hour HH:mm format.
-10. Never create a single cross-day record. If an activity crosses midnight, split it into multiple create_log tool calls, one per date segment.
-11. For words like "闂備礁鎲＄敮妤呮嚌妤ｅ啫鍨?, "闂備胶绮划宥咁熆濡尨鑰?, "闂備礁鎲＄敮妤佺珶閸℃稓宓侀柛銉墮閹?, or "闂備礁鎲＄敮妤冨枈瀹ュ棙娅?, when the user is talking about today, use Current DateTime and Latest Existing Log to infer the most likely contiguous range.
-12. If the user describes a sequence without exact times, prefer splitting the available gap into contiguous, reasonable segments that fully cover the described period instead of leaving unexplained holes.
-13. categoryId, activityId, scopeIds, and linkedTodoId must come from the provided context exactly. Do not invent IDs.
-14. Prefer a specific subtask when the todo context clearly matches a child task path or child title better than its parent.
-15. Only include progressIncrement when a linked todo clearly matches, uses manual progress, and the user explicitly provides measurable progress such as pages, units, chapters, or counts.
-16. Do not include progressIncrement for todo items whose progressTrackingMode is "subtasks".
-17. Preserve important user details in description instead of over-summarizing.
-18. Never output duplicate toolCalls. If two toolCalls would be identical, keep only one.
-`;
-
-        const userPrompt = `
-Default Backfill Date: ${context.defaultDate}
-Current DateTime: ${context.currentDateTime}
-User Message:
-${text}
-`;
-
-        const normalizePlan = (rawPlan: any): AIBackfillToolPlan => {
-            const toolCalls = Array.isArray(rawPlan?.toolCalls)
-                ? rawPlan.toolCalls.filter((call: any) => call?.toolName === 'create_log' && call?.args)
-                : [];
-
-            return {
-                assistantReply: typeof rawPlan?.assistantReply === 'string' ? rawPlan.assistantReply : '',
-                toolCalls: normalizeAIBackfillToolCalls(toolCalls.map((call: any) => ({
-                    toolName: 'create_log',
-                    args: {
-                        date: String(call.args.date || context.defaultDate || ''),
-                        startTime: String(call.args.startTime || ''),
-                        endTime: String(call.args.endTime || ''),
-                        description: String(call.args.description || ''),
-                        categoryId: String(call.args.categoryId || ''),
-                        activityId: String(call.args.activityId || ''),
-                        ...(Array.isArray(call.args.scopeIds) ? { scopeIds: call.args.scopeIds.map((id: any) => String(id)) } : {}),
-                        ...(call.args.linkedTodoId ? { linkedTodoId: String(call.args.linkedTodoId) } : {}),
-                        ...(typeof call.args.progressIncrement === 'number'
-                            ? { progressIncrement: call.args.progressIncrement }
-                            : {})
-                    }
-                })), context.defaultDate)
-            };
-        };
-
-        if (config.provider === 'openai') {
-            const url = `${config.baseUrl}/chat/completions`;
-            const headers = {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${config.apiKey}`
-            };
-            const body = {
-                model: config.modelName,
-                messages: buildOpenAIJsonMessageList(systemPrompt, userPrompt, context.conversationHistory),
-                response_format: { type: 'json_object' }
-            };
-            const requestedAt = new Date().toISOString();
-            let responseStatus = 0;
-            let responseOk = false;
-            let responseBody: unknown = null;
-
-            try {
-                const response = await fetchFn(url, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(body),
-                    ...(options.signal ? { signal: options.signal } : {})
-                });
-                responseStatus = response.status || 0;
-                responseOk = Boolean(response.ok);
-                responseBody = await response.json();
-
-                const debug: AIDebugExchange = {
-                    provider: 'openai',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody
-                    }
-                };
-
-                if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI request failed');
-                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
-                    throw error;
-                }
-
-                const rawContent = (responseBody as any)?.choices?.[0]?.message?.content || '{}';
-                const plan = normalizePlan(aiService.cleanAndParseJSONObject(rawContent));
-
-                return { plan, debug };
-            } catch (error) {
-                const debug: AIDebugExchange = {
-                    provider: 'openai',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody || {
-                            transportError: error instanceof Error ? error.message : String(error)
-                        }
-                    }
-                };
-
-                const finalError = error instanceof Error ? error : new Error(String(error));
-                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
-                throw finalError;
-            }
-        }
-
-        if (config.provider === 'gemini') {
-            const baseUrl = config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta/models';
-            const url = `${baseUrl}/${config.modelName}:generateContent?key=${config.apiKey}`;
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            const body = {
-                contents: buildGeminiContents(userPrompt, context.conversationHistory),
-                system_instruction: { parts: [{ text: systemPrompt.trim() }] },
-                generationConfig: {
-                    response_mime_type: 'application/json'
-                }
-            };
-            const requestedAt = new Date().toISOString();
-            let responseStatus = 0;
-            let responseOk = false;
-            let responseBody: unknown = null;
-
-            try {
-                const response = await fetchFn(url, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(body),
-                    ...(options.signal ? { signal: options.signal } : {})
-                });
-                responseStatus = response.status || 0;
-                responseOk = Boolean(response.ok);
-                responseBody = await response.json();
-
-                const debug: AIDebugExchange = {
-                    provider: 'gemini',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody
-                    }
-                };
-
-                if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI request failed');
-                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
-                    throw error;
-                }
-
-                const rawContent = (((responseBody as any)?.candidates?.[0]?.content?.parts?.[0]?.text) || '{}');
-                const plan = normalizePlan(aiService.cleanAndParseJSONObject(rawContent));
-
-                return { plan, debug };
-            } catch (error) {
-                const debug: AIDebugExchange = {
-                    provider: 'gemini',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody || {
-                            transportError: error instanceof Error ? error.message : String(error)
-                        }
-                    }
-                };
-
-                const finalError = error instanceof Error ? error : new Error(String(error));
-                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
-                throw finalError;
-            }
-        }
-
-        throw new Error('AI provider not supported');
-    },
-
-    planTodoToolCallsWithDebug: async (
-        text: string,
-        context: {
-            currentDateTime: string;
-            defaultDate: string;
-            todoCategories: TodoCategory[];
-            activityCategories: Category[];
-            scopes: Scope[];
-            personaPrompt?: string;
-            conversationHistory?: AIConversationTurn[];
-        },
-        options: AIRequestOptions = {}
-    ): Promise<AITodoToolPlanningResult> => {
-        const config = aiService.getConfig();
-        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
-
-        if (!config.apiKey?.trim()) {
-            throw new Error('Please configure AI settings first.');
-        }
-
-        const todoCategoryContext = context.todoCategories.map((todoCategory) => ({
-            id: todoCategory.id,
-            name: todoCategory.name
-        }));
-
-        const activityCategoryContext = context.activityCategories.map((category) => ({
-            id: category.id,
-            name: category.name,
-            activities: category.activities.map((activity) => ({
-                id: activity.id,
-                name: activity.name
-            }))
-        }));
-
-        const scopeContext = context.scopes.map((scope) => ({
-            id: scope.id,
-            name: scope.name
-        }));
-
-        const systemPrompt = `
-Role: You are LumosTime's todo planning assistant with tool planning ability.
-Task: Read the user's message, decide whether one or more todos should be created, and separate your natural-language reply from the tool calls.
-
-Context:
-- Current DateTime: ${context.currentDateTime}
-- Default Date: ${context.defaultDate}
-- Available Todo Categories: ${JSON.stringify(todoCategoryContext)}
-- Available Activity Categories and Activities: ${JSON.stringify(activityCategoryContext)}
-- Available Scopes: ${JSON.stringify(scopeContext)}
-
-Available Tool:
-1. create_todo
-Arguments schema:
-{
-  "title": "string",
-  "categoryId": "todo category id",
-  "linkedCategoryId": "activity category id",
-  "linkedActivityId": "activity id (required)",
-  "defaultScopeIds": ["scope id"],
-  "note": "string",
-  "scheduledDate": "YYYY-MM-DD",
-  "deadlineDate": "YYYY-MM-DD",
-  "recurrenceRule": {
-    "frequency": "daily | weekly | monthly",
-    "startDate": "YYYY-MM-DD",
-    "endDate": "YYYY-MM-DD",
-    "interval": 1,
-    "weekdays": [1, 3, 5],
-    "monthDays": [1, 15]
-  }
-}
-
-${buildPersonaInstruction(context.personaPrompt)}
-
-Requirements:
-1. Output ONLY a valid JSON object.
-2. JSON schema:
-{
-  "assistantReply": "string",
-  "toolCalls": [
-    {
-      "toolName": "create_todo",
-      "args": { ... }
-    }
-  ]
-}
-3. assistantReply is what the user will read in the chat.
-4. toolCalls is what the app will apply directly.
-5. If the user asks to create multiple todos, emit multiple toolCalls.
-6. title, categoryId, and linkedActivityId are required for every todo.
-7. Every newly created todo must be associated with one activity tag. If you cannot identify a reliable linkedActivityId from the provided context, do not create the todo yet.
-8. linkedCategoryId, linkedActivityId, and defaultScopeIds must come from the provided context exactly. Do not invent IDs.
-9. Use the minimal matching principle for scopes. Better to leave defaultScopeIds empty than to guess incorrectly.
-10. Distinguish the date fields strictly:
-   - scheduledDate = the day the user plans to do it
-   - deadlineDate = the latest day it should be finished
-   - recurrenceRule = a repeating pattern, not a single-day arrangement
-11. If the user does not mention any date, do not include scheduledDate, deadlineDate, or recurrenceRule.
-12. If the user only mentions a scheduled day, only include scheduledDate.
-13. If the user only mentions a deadline, only include deadlineDate.
-14. If the user only mentions recurrence, only include recurrenceRule.
-15. If the request is too ambiguous to create a todo safely, or the tag cannot be identified safely, keep toolCalls empty and ask one short follow-up question in assistantReply.
-16. Do not output duplicate toolCalls.
-`;
-
-        const userPrompt = `
-Current DateTime: ${context.currentDateTime}
-Default Date: ${context.defaultDate}
-User Message:
-${text}
-`;
-
-        const normalizePlan = (rawPlan: any): AITodoToolPlan => {
-            const fallbackCategoryId = context.todoCategories[0]?.id || '';
-            const toolCalls = Array.isArray(rawPlan?.toolCalls)
-                ? rawPlan.toolCalls.filter((call: any) => call?.toolName === 'create_todo' && call?.args)
-                : [];
-
-            return {
-                assistantReply: typeof rawPlan?.assistantReply === 'string' ? rawPlan.assistantReply : '',
-                toolCalls: toolCalls.map((call: any) => ({
-                    toolName: 'create_todo' as const,
-                    args: {
-                        title: String(call.args.title || '').trim(),
-                        categoryId: String(call.args.categoryId || fallbackCategoryId || ''),
-                        ...(call.args.linkedCategoryId ? { linkedCategoryId: String(call.args.linkedCategoryId) } : {}),
-                        ...(call.args.linkedActivityId ? { linkedActivityId: String(call.args.linkedActivityId) } : {}),
-                        ...(Array.isArray(call.args.defaultScopeIds)
-                            ? { defaultScopeIds: call.args.defaultScopeIds.map((id: any) => String(id)) }
-                            : {}),
-                        ...(typeof call.args.note === 'string' && call.args.note.trim()
-                            ? { note: call.args.note.trim() }
-                            : {}),
-                        ...(typeof call.args.scheduledDate === 'string' && call.args.scheduledDate.trim()
-                            ? { scheduledDate: call.args.scheduledDate.trim() }
-                            : {}),
-                        ...(typeof call.args.deadlineDate === 'string' && call.args.deadlineDate.trim()
-                            ? { deadlineDate: call.args.deadlineDate.trim() }
-                            : {}),
-                        ...(normalizeTodoRecurrenceRule(call.args.recurrenceRule)
-                            ? { recurrenceRule: normalizeTodoRecurrenceRule(call.args.recurrenceRule) }
-                            : {})
-                    }
-                })).filter((call) => Boolean(call.args.title))
-            };
-        };
-
-        if (config.provider === 'openai') {
-            const url = `${config.baseUrl}/chat/completions`;
-            const headers = {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${config.apiKey}`
-            };
-            const body = {
-                model: config.modelName,
-                messages: buildOpenAIJsonMessageList(systemPrompt, userPrompt, context.conversationHistory),
-                response_format: { type: 'json_object' }
-            };
-            const requestedAt = new Date().toISOString();
-            let responseStatus = 0;
-            let responseOk = false;
-            let responseBody: unknown = null;
-
-            try {
-                const response = await fetchFn(url, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(body),
-                    ...(options.signal ? { signal: options.signal } : {})
-                });
-                responseStatus = response.status || 0;
-                responseOk = Boolean(response.ok);
-                responseBody = await response.json();
-
-                const debug: AIDebugExchange = {
-                    provider: 'openai',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody
-                    }
-                };
-
-                if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI request failed');
-                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
-                    throw error;
-                }
-
-                const rawContent = (responseBody as any)?.choices?.[0]?.message?.content || '{}';
-                return {
-                    plan: normalizePlan(aiService.cleanAndParseJSONObject(rawContent)),
-                    debug
-                };
-            } catch (error) {
-                const debug: AIDebugExchange = {
-                    provider: 'openai',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody || {
-                            transportError: error instanceof Error ? error.message : String(error)
-                        }
-                    }
-                };
-
-                const finalError = error instanceof Error ? error : new Error(String(error));
-                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
-                throw finalError;
-            }
-        }
-
-        if (config.provider === 'gemini') {
-            const baseUrl = config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta/models';
-            const url = `${baseUrl}/${config.modelName}:generateContent?key=${config.apiKey}`;
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            const body = {
-                contents: buildGeminiContents(userPrompt, context.conversationHistory),
-                system_instruction: { parts: [{ text: systemPrompt.trim() }] },
-                generationConfig: {
-                    response_mime_type: 'application/json'
-                }
-            };
-            const requestedAt = new Date().toISOString();
-            let responseStatus = 0;
-            let responseOk = false;
-            let responseBody: unknown = null;
-
-            try {
-                const response = await fetchFn(url, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(body),
-                    ...(options.signal ? { signal: options.signal } : {})
-                });
-                responseStatus = response.status || 0;
-                responseOk = Boolean(response.ok);
-                responseBody = await response.json();
-
-                const debug: AIDebugExchange = {
-                    provider: 'gemini',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody
-                    }
-                };
-
-                if ((responseBody as any)?.error) {
-                    const error = new Error((responseBody as any).error.message || 'AI request failed');
-                    (error as Error & { debug?: AIDebugExchange }).debug = debug;
-                    throw error;
-                }
-
-                const rawContent = (((responseBody as any)?.candidates?.[0]?.content?.parts?.[0]?.text) || '{}');
-                return {
-                    plan: normalizePlan(aiService.cleanAndParseJSONObject(rawContent)),
-                    debug
-                };
-            } catch (error) {
-                const debug: AIDebugExchange = {
-                    provider: 'gemini',
-                    requestedAt,
-                    completedAt: new Date().toISOString(),
-                    request: {
-                        url: sanitizeDebugUrl(url),
-                        method: 'POST',
-                        headers: sanitizeDebugHeaders(headers),
-                        body
-                    },
-                    response: {
-                        status: responseStatus,
-                        ok: responseOk,
-                        body: responseBody || {
-                            transportError: error instanceof Error ? error.message : String(error)
-                        }
-                    }
-                };
-
-                const finalError = error instanceof Error ? error : new Error(String(error));
-                (finalError as Error & { debug?: AIDebugExchange }).debug = debug;
-                throw finalError;
-            }
-        }
-
-        throw new Error('AI provider not supported');
-    },
-
-    planTodoUpdateToolCallsWithDebug: async (
-        text: string,
-        context: {
-            currentDateTime: string;
-            defaultDate: string;
-            todoCategories: TodoCategory[];
-            activityCategories: Category[];
-            scopes: Scope[];
-            todos: Array<{
-                id: string;
-                title: string;
-                path: string;
-                categoryId: string;
-                categoryName: string;
-                isCompleted: boolean;
-                parentTodoId?: string;
-                parentTodoTitle?: string;
-                linkedCategoryId?: string;
-                linkedActivityId?: string;
-                scheduledDate?: string;
-                deadlineDate?: string;
-                pin?: boolean;
-            }>;
-            personaPrompt?: string;
-            conversationHistory?: AIConversationTurn[];
-        },
-        options: AIRequestOptions = {}
-    ): Promise<AITodoUpdateToolPlanningResult> => {
-        const config = aiService.getConfig();
-        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
-
-        if (!config.apiKey?.trim()) {
-            throw new Error('Please configure AI settings first.');
-        }
-
-        const todoCategoryContext = context.todoCategories.map((todoCategory) => ({
-            id: todoCategory.id,
-            name: todoCategory.name
-        }));
-        const activityCategoryContext = context.activityCategories.map((category) => ({
-            id: category.id,
-            name: category.name,
-            activities: category.activities.map((activity) => ({
-                id: activity.id,
-                name: activity.name
-            }))
-        }));
-        const scopeContext = context.scopes.map((scope) => ({
-            id: scope.id,
-            name: scope.name
-        }));
-
-        const systemPrompt = `
-Role: You are LumosTime's todo editing assistant with tool planning ability.
-Task: Read the user's message, identify which existing todo should be updated, and return only the changed fields as a patch.
-
-Context:
-- Current DateTime: ${context.currentDateTime}
-- Default Date: ${context.defaultDate}
-- Available Todo Categories: ${JSON.stringify(todoCategoryContext)}
-- Available Activity Categories and Activities: ${JSON.stringify(activityCategoryContext)}
-- Available Scopes: ${JSON.stringify(scopeContext)}
-- Existing Todos: ${JSON.stringify(context.todos)}
-
-Available Tool:
-1. update_todo
-Arguments schema:
-{
-  "todoId": "existing todo id",
-  "patch": {
-    "title": "string",
-    "note": "string | null",
-    "categoryId": "todo category id",
-    "linkedCategoryId": "activity category id | null",
-    "linkedActivityId": "activity id | null",
-    "defaultScopeIds": ["scope id"] | null,
-    "scheduledDate": "YYYY-MM-DD | null",
-    "deadlineDate": "YYYY-MM-DD | null",
-    "recurrenceRule": {
-      "frequency": "daily | weekly | monthly",
-      "startDate": "YYYY-MM-DD",
-      "endDate": "YYYY-MM-DD",
-      "interval": 1,
-      "weekdays": [1, 3, 5],
-      "monthDays": [1, 15]
-    } | null,
-    "pin": true,
-    "isCompleted": true
-  }
-}
-
-${buildPersonaInstruction(context.personaPrompt)}
-
-Requirements:
-1. Output ONLY a valid JSON object.
-2. JSON schema:
-{
-  "assistantReply": "string",
-  "toolCalls": [
-    {
-      "toolName": "update_todo",
-      "args": { ... }
-    }
-  ]
-}
-3. assistantReply is what the user will read in the chat.
-4. toolCalls is what the app will apply directly.
-5. update_todo is for editing existing todos only, including subtasks.
-6. Find the target todo strictly from the provided Existing Todos list. Do not invent IDs.
-7. patch must contain ONLY the fields that should change. Never return the full todo object.
-8. To clear a field, return null. This applies to note, linkedCategoryId, linkedActivityId, defaultScopeIds, scheduledDate, deadlineDate, and recurrenceRule.
-9. Quick operations such as schedule changes, pin/unpin, mark complete, mark incomplete, and clearing dates must also use update_todo.
-10. categoryId, linkedCategoryId, linkedActivityId, and defaultScopeIds must come from the provided context exactly.
-11. If the target todo cannot be identified safely, keep toolCalls empty and ask one short follow-up question in assistantReply.
-12. Do not output duplicate toolCalls.
-13. If the user mentions a parent task and wants to assign dates/times for its existing subtasks, chapters, or parts, update those matching child todos instead of the parent todo itself.
-14. If the user asks to arrange multiple existing subtasks, emit multiple update_todo toolCalls.
-15. If scheduling intent is clear but the exact pattern is still missing, ask one targeted follow-up question such as whether to start from today and how dense the schedule should be, instead of asking broad generic questions.
-16. If the provided Existing Todos list only contains child todos under a matched parent task, you must only update those child todos and must not invent or imply any new parent-level task.
-`;
-
-        const userPrompt = `
-Current DateTime: ${context.currentDateTime}
-Default Date: ${context.defaultDate}
-User Message:
-${text}
-`;
-
-        const normalizePlan = (rawPlan: any): AITodoUpdateToolPlan => {
-            const toolCalls = Array.isArray(rawPlan?.toolCalls)
-                ? rawPlan.toolCalls.filter((call: any) => call?.toolName === 'update_todo' && call?.args?.patch)
-                : [];
-
-            return {
-                assistantReply: typeof rawPlan?.assistantReply === 'string' ? rawPlan.assistantReply : '',
-                toolCalls: toolCalls
-                    .map((call: any) => {
-                        const patch = call.args.patch || {};
-                        const normalizedPatch: AITodoUpdatePatch = {
-                            ...(typeof patch.title === 'string' ? { title: patch.title.trim() } : {}),
-                            ...(normalizeNullableString(patch.note) !== undefined ? { note: normalizeNullableString(patch.note) } : {}),
-                            ...(typeof patch.categoryId === 'string' && patch.categoryId.trim() ? { categoryId: patch.categoryId.trim() } : {}),
-                            ...(normalizeNullableString(patch.linkedCategoryId) !== undefined ? { linkedCategoryId: normalizeNullableString(patch.linkedCategoryId) } : {}),
-                            ...(normalizeNullableString(patch.linkedActivityId) !== undefined ? { linkedActivityId: normalizeNullableString(patch.linkedActivityId) } : {}),
-                            ...(normalizeNullableStringArray(patch.defaultScopeIds) !== undefined ? { defaultScopeIds: normalizeNullableStringArray(patch.defaultScopeIds) } : {}),
-                            ...(normalizeNullableString(patch.scheduledDate) !== undefined ? { scheduledDate: normalizeNullableString(patch.scheduledDate) } : {}),
-                            ...(normalizeNullableString(patch.deadlineDate) !== undefined ? { deadlineDate: normalizeNullableString(patch.deadlineDate) } : {}),
-                            ...(patch.recurrenceRule === null
-                                ? { recurrenceRule: null }
-                                : normalizeTodoRecurrenceRule(patch.recurrenceRule)
-                                    ? { recurrenceRule: normalizeTodoRecurrenceRule(patch.recurrenceRule)! }
-                                    : {}),
-                            ...(typeof patch.pin === 'boolean' ? { pin: patch.pin } : {}),
-                            ...(typeof patch.isCompleted === 'boolean' ? { isCompleted: patch.isCompleted } : {})
-                        };
-
-                        return {
-                            toolName: 'update_todo' as const,
-                            args: {
-                                todoId: String(call.args.todoId || '').trim(),
-                                patch: normalizedPatch
-                            }
-                        };
-                    })
-                    .filter((call) => Boolean(call.args.todoId) && Object.keys(call.args.patch).length > 0)
-            };
-        };
-
-        const { result, debug } = await requestJsonObjectWithDebug(config, fetchFn, {
-            systemPrompt,
-            userPrompt,
-            conversationHistory: context.conversationHistory,
-            normalizeResult: normalizePlan,
-            options
-        });
-
-        return {
-            plan: result,
-            debug
-        };
-    },
-
-    planCreateSubtaskToolCallsWithDebug: async (
-        text: string,
-        context: {
-            currentDateTime: string;
-            defaultDate: string;
-            parentTodos: Array<{
-                id: string;
-                title: string;
-                categoryId: string;
-                categoryName: string;
-                linkedActivityId?: string;
-                linkedActivityName?: string;
-                defaultScopeIds?: string[];
-                defaultScopeNames?: string[];
-            }>;
-            personaPrompt?: string;
-            conversationHistory?: AIConversationTurn[];
-            allowDateFields?: boolean;
-        },
-        options: AIRequestOptions = {}
-    ): Promise<AICreateSubtaskToolPlanningResult> => {
-        const config = aiService.getConfig();
-        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
-
-        if (!config.apiKey?.trim()) {
-            throw new Error('Please configure AI settings first.');
-        }
-
-        const systemPrompt = `
-Role: You are LumosTime's subtask planning assistant with tool planning ability.
-Task: Read the user's message, identify the parent todo, and create one or more child todos under it.
-
-Context:
-- Current DateTime: ${context.currentDateTime}
-- Default Date: ${context.defaultDate}
-- Eligible Parent Todos: ${JSON.stringify(context.parentTodos)}
-- Allow Date Fields: ${context.allowDateFields !== false ? 'yes' : 'no'}
-
-Available Tool:
-1. create_subtask
-Arguments schema:
-{
-  "parentTodoId": "existing parent todo id",
-  "title": "string",
-  "note": "string",
-  "scheduledDate": "YYYY-MM-DD",
-  "deadlineDate": "YYYY-MM-DD"
-}
-
-${buildPersonaInstruction(context.personaPrompt)}
-
-Requirements:
-1. Output ONLY a valid JSON object.
-2. JSON schema:
-{
-  "assistantReply": "string",
-  "toolCalls": [
-    {
-      "toolName": "create_subtask",
-      "args": { ... }
-    }
-  ]
-}
-3. assistantReply is what the user will read in the chat.
-4. toolCalls is what the app will apply directly.
-5. parentTodoId must come from the provided Eligible Parent Todos list exactly. Do not invent IDs.
-6. title is required for every subtask.
-7. note, scheduledDate, and deadlineDate are optional. Do not include them unless the user really asked for them.
-8. create_subtask is only for creating child todos under an existing parent todo, not for editing.
-9. If the parent todo cannot be identified safely, keep toolCalls empty and ask one short follow-up question in assistantReply.
-10. Do not output duplicate toolCalls.
-11. If the user is actually asking to assign dates/times to existing subtasks, chapters, or parts, do not treat that as create_subtask.
-12. If the user only asked to create subtasks and did not explicitly request dates, every toolCall must omit scheduledDate and deadlineDate.
-13. If Allow Date Fields is "no", do not include scheduledDate or deadlineDate in any toolCall.
-`;
-
-        const userPrompt = `
-Current DateTime: ${context.currentDateTime}
-Default Date: ${context.defaultDate}
-User Message:
-${text}
-`;
-
-        const allowDateFields = context.allowDateFields !== false;
-
-        const normalizePlan = (rawPlan: any): AICreateSubtaskToolPlan => {
-            const toolCalls = Array.isArray(rawPlan?.toolCalls)
-                ? rawPlan.toolCalls.filter((call: any) => call?.toolName === 'create_subtask' && call?.args)
-                : [];
-
-            return {
-                assistantReply: typeof rawPlan?.assistantReply === 'string' ? rawPlan.assistantReply : '',
-                toolCalls: toolCalls.map((call: any) => ({
-                    toolName: 'create_subtask' as const,
-                    args: {
-                        parentTodoId: String(call.args.parentTodoId || '').trim(),
-                        title: String(call.args.title || '').trim(),
-                        ...(typeof call.args.note === 'string' && call.args.note.trim() ? { note: call.args.note.trim() } : {}),
-                        ...(allowDateFields && normalizeOptionalDateString(call.args.scheduledDate)
-                            ? { scheduledDate: normalizeOptionalDateString(call.args.scheduledDate)! }
-                            : {}),
-                        ...(allowDateFields && normalizeOptionalDateString(call.args.deadlineDate)
-                            ? { deadlineDate: normalizeOptionalDateString(call.args.deadlineDate)! }
-                            : {})
-                    }
-                })).filter((call) => Boolean(call.args.parentTodoId) && Boolean(call.args.title))
-            };
-        };
-
-        const { result, debug } = await requestJsonObjectWithDebug(config, fetchFn, {
-            systemPrompt,
-            userPrompt,
-            conversationHistory: context.conversationHistory,
-            normalizeResult: normalizePlan,
-            options
-        });
-
-        return {
-            plan: result,
-            debug
-        };
-    },
-
-    planEditLogToolCallsWithDebug: async (
-        text: string,
-        context: {
-            currentDateTime: string;
-            defaultDate: string;
-            categories: Category[];
-            scopes: Scope[];
-            todos: Array<{
-                id: string;
-                title: string;
-                path?: string;
-            }>;
-            logs: Array<{
-                id: string;
-                date: string;
-                startTime: string;
-                endTime: string;
-                categoryId: string;
-                categoryName: string;
-                activityId: string;
-                activityName: string;
-                note?: string;
-                linkedTodoId?: string;
-                linkedTodoTitle?: string;
-            }>;
-            personaPrompt?: string;
-            conversationHistory?: AIConversationTurn[];
-        },
-        options: AIRequestOptions = {}
-    ): Promise<AIEditLogToolPlanningResult> => {
-        const config = aiService.getConfig();
-        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
-
-        if (!config.apiKey?.trim()) {
-            throw new Error('Please configure AI settings first.');
-        }
-
-        const categoryContext = context.categories.map((category) => ({
-            id: category.id,
-            name: category.name,
-            activities: category.activities.map((activity) => ({
-                id: activity.id,
-                name: activity.name
-            }))
-        }));
-        const scopeContext = context.scopes.map((scope) => ({
-            id: scope.id,
-            name: scope.name
-        }));
-        const todoContext = context.todos.map((todo) => ({
-            id: todo.id,
-            title: todo.title,
-            path: todo.path || todo.title
-        }));
-
-        const systemPrompt = `
-Role: You are LumosTime's log editing assistant with tool planning ability.
-Task: Read the user's message, identify which existing log should be edited, and return only the changed fields as a patch.
-
-Context:
-- Current DateTime: ${context.currentDateTime}
-- Default Date: ${context.defaultDate}
-- Existing Logs: ${JSON.stringify(context.logs)}
-- Available Categories and Activities: ${JSON.stringify(categoryContext)}
-- Available Scopes: ${JSON.stringify(scopeContext)}
-- Available Todos: ${JSON.stringify(todoContext)}
-
-Available Tool:
-1. edit_log
-Arguments schema:
-{
-  "logId": "existing log id",
-  "patch": {
-    "date": "YYYY-MM-DD",
-    "startTime": "HH:mm",
-    "endTime": "HH:mm",
-    "categoryId": "category id",
-    "activityId": "activity id",
-    "note": "string | null",
-    "linkedTodoId": "todo id | null",
-    "scopeIds": ["scope id"] | null
-  }
-}
-
-${buildPersonaInstruction(context.personaPrompt)}
-
-Requirements:
-1. Output ONLY a valid JSON object.
-2. JSON schema:
-{
-  "assistantReply": "string",
-  "toolCalls": [
-    {
-      "toolName": "edit_log",
-      "args": { ... }
-    }
-  ]
-}
-3. assistantReply is what the user will read in the chat.
-4. toolCalls is what the app will apply directly.
-5. Find the target log strictly from the provided Existing Logs list. Do not invent IDs.
-6. patch must contain ONLY the fields that should change. Never return the full log object.
-7. To clear a field, return null. This applies to note, linkedTodoId, and scopeIds.
-8. date, startTime, and endTime should only be included when the user actually wants to change them.
-9. categoryId, activityId, linkedTodoId, and scopeIds must come from the provided context exactly.
-10. If the target log cannot be identified safely, keep toolCalls empty and ask one short follow-up question in assistantReply.
-11. Do not output duplicate toolCalls.
-`;
-
-        const userPrompt = `
-Current DateTime: ${context.currentDateTime}
-Default Date: ${context.defaultDate}
-User Message:
-${text}
-`;
-
-        const normalizePlan = (rawPlan: any): AIEditLogToolPlan => {
-            const toolCalls = Array.isArray(rawPlan?.toolCalls)
-                ? rawPlan.toolCalls.filter((call: any) => call?.toolName === 'edit_log' && call?.args?.patch)
-                : [];
-
-            return {
-                assistantReply: typeof rawPlan?.assistantReply === 'string' ? rawPlan.assistantReply : '',
-                toolCalls: toolCalls
-                    .map((call: any) => ({
-                        toolName: 'edit_log' as const,
-                        args: {
-                            logId: String(call.args.logId || '').trim(),
-                            patch: {
-                                ...(normalizeOptionalDateString(call.args.patch?.date) ? { date: normalizeOptionalDateString(call.args.patch.date)! } : {}),
-                                ...(typeof call.args.patch?.startTime === 'string' && call.args.patch.startTime.trim()
-                                    ? { startTime: call.args.patch.startTime.trim() }
-                                    : {}),
-                                ...(typeof call.args.patch?.endTime === 'string' && call.args.patch.endTime.trim()
-                                    ? { endTime: call.args.patch.endTime.trim() }
-                                    : {}),
-                                ...(typeof call.args.patch?.categoryId === 'string' && call.args.patch.categoryId.trim()
-                                    ? { categoryId: call.args.patch.categoryId.trim() }
-                                    : {}),
-                                ...(typeof call.args.patch?.activityId === 'string' && call.args.patch.activityId.trim()
-                                    ? { activityId: call.args.patch.activityId.trim() }
-                                    : {}),
-                                ...(normalizeNullableString(call.args.patch?.note) !== undefined
-                                    ? { note: normalizeNullableString(call.args.patch.note) }
-                                    : {}),
-                                ...(normalizeNullableString(call.args.patch?.linkedTodoId) !== undefined
-                                    ? { linkedTodoId: normalizeNullableString(call.args.patch.linkedTodoId) }
-                                    : {}),
-                                ...(normalizeNullableStringArray(call.args.patch?.scopeIds) !== undefined
-                                    ? { scopeIds: normalizeNullableStringArray(call.args.patch.scopeIds) }
-                                    : {})
-                            }
-                        }
-                    }))
-                    .filter((call) => Boolean(call.args.logId) && Object.keys(call.args.patch).length > 0)
-            };
-        };
-
-        const { result, debug } = await requestJsonObjectWithDebug(config, fetchFn, {
-            systemPrompt,
-            userPrompt,
-            conversationHistory: context.conversationHistory,
-            normalizeResult: normalizePlan,
-            options
-        });
-
-        return {
-            plan: result,
-            debug
-        };
-    },
-
-    parseTodoText: async (
-        text: string,
-        context: {
-            todoCategories: TodoCategory[]; 
-            activityCategories: Category[];
-            scopes: Scope[];
-        }
-    ): Promise<AIParsedTodo[]> => {
-        try {
-            const planningResult = await aiService.planTodoToolCallsWithDebug(text, {
-                currentDateTime: new Date().toISOString(),
-                defaultDate: new Date().toISOString().slice(0, 10),
-                todoCategories: context.todoCategories,
-                activityCategories: context.activityCategories,
-                scopes: context.scopes
-            });
-
-            return planningResult.plan.toolCalls.map((toolCall) => ({
-                title: toolCall.args.title,
-                categoryId: toolCall.args.categoryId,
-                linkedActivityId: toolCall.args.linkedActivityId,
-                defaultScopeIds: toolCall.args.defaultScopeIds || []
-            }));
-        } catch (error) {
-            console.error('Todo Parsing Error', error);
-            throw new Error('Failed to parse tasks');
-        }
-    },
 
     // 闂佽绻愮换鎰板箰濞ｆ岸鏌℃径鍡樻珕闁哄被鍔岀叅闁哄稁鍘介崕宥夋煕閺囥劌澧い蟻鍥ㄢ拻闁稿本绻冭ぐ褏绱掓潏銊㈡敜H:mm闂備焦瀵х粙鎴λ囬鍓х當鐎光偓閸曨剙浠洪梺闈涱煭缁犳垿鎮￠弴銏♀拺妞ゆ劑鍩勫Σ褰掓倵濮樸儱濮傞柟顖氬暣瀹曠喖顢楁笟濠勭闂備礁鎼悧蹇涘窗閹捐泛鍨濈€广儱顦憴锕傛煕椤愩倕鏋庨柣蹇撴喘閹鎮烽悧鍫熸嫳闂佸搫妫寸紞渚€骞嗛崘顔肩妞ゃ劎鐡岄梺璇插缁嬫帡銆冮崼銉晞濞达絽婀遍埢?
     combineWithDate: (rawEntries: AIRawTimeEntry[], targetDate: string): ParsedTimeEntry[] => {
@@ -3036,8 +1193,5 @@ ${text}
         }
     },
 
-    cleanAndParseJSONObject: (content: string): any => {
-        return cleanAndParseJSONObjectContent(content);
-    }
 };
 

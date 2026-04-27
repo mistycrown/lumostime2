@@ -3,6 +3,7 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- `assistantMessageParts.ts`: [Active] - Normalizes structured assistant reply parts and applies conservative fallback splitting so one assistant turn can render as grouped multi-bubble chat bursts without fragmenting persistence.
 - `goalUtils.ts`: [Active] - Calculates progress for Goals (duration, count, frequency).
 - `logUtils.ts`: [Active] - Handles time log manipulation, specifically splitting cross-day logs.
 - `achievementUtils.ts`: [Active] - Computes achievement daily snapshots, date ranges, and current star balances.
