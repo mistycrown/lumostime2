@@ -2,6 +2,9 @@
 
 Contains business logic and external integrations.
 
+Update 2026-04-27: `widgetService.ts` now feeds the TODAY + PIN widget from the same shared today-category helper used by todo pickers, so due-today and recurring-today todos no longer disappear from the widget payload.
+Update 2026-04-27: `assistantOrchestratorService.ts` now records the shared native trigger id plus request/response debug exchanges inside background call history, so web AI runs can be correlated with Android poll diagnostics.
+Update 2026-04-27: `aiService.ts` now normalizes malformed unified-turn `memoryPatch` payloads such as single-string `recentDecisions`, while `assistantMemoryService.ts` accepts the same drifted shapes as a final persistence guard so durable memory updates from foreground/background turns are not silently lost.
 Update 2026-04-27: `assistantOrchestratorService.ts` now records readable background decision summaries, silent reasons, and post-silent side effects in both assistant memory and background call history, while background replies can persist grouped multi-bubble display parts for later chat rendering.
 Update 2026-04-27: `assistantTurnService.ts` now skips memory rules and memory snapshots when long-term memory is disabled, while foreground chat omits reminder-summary context when background polling is off so unified assistant turns stop paying unnecessary prompt cost for disabled features.
 Update 2026-04-26: `assistantPromptService.ts` now biases the shared assistant baseline toward companionship and continuity-awareness, so background turns prefer short state-preserving check-ins over reflexive silence when the user's thread has gone stale.
@@ -30,7 +33,7 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 - `assistantMemoryService.ts`: [Active] - Stores structured assistant memory for the Android-first background AI agent, including profile facts, open loops, working summaries, the latest readable decision summary, and active reminders, with explicit replacement semantics for the active reminder list plus narrow helpers for manually appending and removing profile/preference memory notes.
 - `assistantReminderQueueService.ts`: [Active] - Persists and queries the assistant's follow-up reminder queue, canonicalizes reminder timestamps, computes due reminders against parsed datetimes, and keeps assistant memory in sync.
 - `assistantPromptService.ts`: [Active] - Loads or falls back to shared assistant-base, foreground-mode, background-mode, and foreground tool-schema prompt templates for the unified assistant flow.
-- `assistantOrchestratorService.ts`: [Active] - Runs structured assistant system turns by combining memory, trigger context, reminder summaries, persona/dictionary context, `aiService` inference, reminder writes, readable silent-decision summaries, persisted assistant-message surfacing with optional grouped reply parts, optional Android system-notification emission with exact chat navigation metadata, and optional debug-section persistence for background replies.
+- `assistantOrchestratorService.ts`: [Active] - Runs structured assistant system turns by combining memory, trigger context, reminder summaries, persona/dictionary context, `aiService` inference, reminder writes, readable silent-decision summaries, persisted assistant-message surfacing with optional grouped reply parts, optional Android system-notification emission with exact chat navigation metadata, optional debug-section persistence for background replies, and correlated background call history entries that retain the trigger id plus request/response debug exchanges.
 - `excelExportService.ts`: [Active] - Exports time logs to Excel format.
 - `geminiService.ts`: [Placeholder] - Simple Gemini test service (likely deprecated/experimental).
 - `imageCleanupService.ts`: [Active] - Checks unreferenced images, protects referenced business/settings images, and executes cleanup/report generation.
@@ -40,6 +43,7 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 - `obsidianExportService.ts`: [Active] - Exports data to Obsidian markdown files.
 - `settingsImageReferenceService.ts`: [Active] - Collects settings-level image references, currently including custom TimePal assets, for cleanup protection.
 - `syncService.ts`: [Active] - Orchestrates image synchronization between local storage and WebDAV server. Handles deletions and bidirectional sync.
+- `widgetService.ts`: [Active] - Centralizes widget payload and template helpers, including the TODAY + PIN list payload that now stays aligned with shared today-category matching for pinned, due-today, arranged-today, and recurring-today todos.
 - `achievementBottleStyleService.ts`: [Active] - Defines achievement bottle skin options, including lighter glass palettes and the extended neutral bottle set.
 - `timelineStyleService.ts`: [Active] - Manages timeline style themes, defaults, Memoir-specific offset values, and config normalization for shared timeline nodes.
 - `themePresetService.ts`: [Active] - 主题预设应用服务，拆分复杂的主题切换逻辑为独立方法

@@ -4,6 +4,7 @@
  * @output Android foreground-service control and assistant system-trigger events
  * @pos Native Plugin
  * @description Capacitor plugin bridge for the Android-first background assistant agent. Starts and stops the foreground agent service, updates lightweight polling config, relays native system-trigger events back into the web layer, and surfaces assistant notification navigation.
+ * @updated 2026-04-27: Added native diagnostic list, clear, and live-update bridge methods so Android poll decisions can be inspected from the shared AI history UI.
  * @updated 2026-04-27: Routed user-turn and task-state notifications into the running Android agent service so native throttling can respect recent foreground activity and background task changes.
  */
 package com.mistycrown.lumostime;
@@ -143,6 +144,19 @@ public class AssistantAgentPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void listDiagnostics(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("entries", AssistantAgentDiagnosticsStore.listEntries(getContext()));
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void clearDiagnostics(PluginCall call) {
+        AssistantAgentDiagnosticsStore.clear(getContext());
+        call.resolve();
+    }
+
+    @PluginMethod
     public void showAssistantNotification(PluginCall call) {
         String title = call.getString("title", "LumosTime AI 助理");
         String body = call.getString("body", "");
@@ -183,20 +197,30 @@ public class AssistantAgentPlugin extends Plugin {
         call.resolve(result);
     }
 
-    public static void dispatchSystemTrigger(String triggerType, String text, String source) {
+    public static String dispatchSystemTrigger(String triggerType, String text, String source) {
+        String triggerId = java.util.UUID.randomUUID().toString();
         if (instance == null) {
             Log.w(TAG, "dispatchSystemTrigger skipped because plugin instance is null");
-            return;
+            return triggerId;
         }
 
         JSObject payload = new JSObject();
-        payload.put("id", java.util.UUID.randomUUID().toString());
+        payload.put("id", triggerId);
         payload.put("type", triggerType);
         payload.put("source", source);
         payload.put("createdAt", new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", java.util.Locale.US)
             .format(new java.util.Date()));
         payload.put("text", text);
         instance.notifyListeners("assistantSystemTrigger", payload, true);
+        return triggerId;
+    }
+
+    public static void dispatchDiagnosticsUpdated() {
+        if (instance == null) {
+            return;
+        }
+
+        instance.notifyListeners("assistantDiagnosticsUpdated", new JSObject(), true);
     }
 
     private void startAgentService(Context context, Intent intent) {

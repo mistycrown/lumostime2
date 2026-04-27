@@ -4,6 +4,7 @@
  * @output Week buckets and schedule badge metadata for the todo week view
  * @pos Utility (Todo planning)
  * @description Shared helpers for deriving scheduled, deadline, and recurring todo visibility without creating standalone occurrence records.
+ * @updated 2026-04-27: Expanded the shared today-selector helpers so widget and picker `today + pin` views include todos that match today via arrange, due, or recurrence rules.
  * @updated 2026-04-22: Added shared today-selector helpers so todo pickers can reuse the same `pin or arranged today` virtual category.
  * @updated 2026-04-20 19:08: Added reusable today/tomorrow/this-week schedule match helpers for the todo list virtual category.
  * @updated 2026-04-20 18:12: Normalized week-view badge combinations so Due hides Arrange and Done hides Trace for the same day.
@@ -98,7 +99,10 @@ export const isTodoInAssociationTodayCategory = (
   referenceDate: Date = new Date()
 ): boolean => {
   const todayDateKey = formatDateKey(referenceDate);
-  return Boolean(todo.pin) || todo.scheduledDate === todayDateKey;
+  return Boolean(todo.pin)
+    || todo.scheduledDate === todayDateKey
+    || todo.deadlineDate === todayDateKey
+    || matchesRecurrenceRule(todo.recurrenceRule, todayDateKey);
 };
 
 export const getTodoAssociationTodayTodos = (

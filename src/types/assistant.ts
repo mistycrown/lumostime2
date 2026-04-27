@@ -5,7 +5,9 @@
  * @pos Type Definitions (Assistant Agent)
  * @description Defines the structured contracts used by the Android-first assistant agent layer so background triggers, memory updates, reminder queues, and AI system-turn decisions can stay typed and stable across services and plugins.
  *
+ * @updated 2026-04-27: Simplified assistant-facing state time context to one local-offset ISO anchor so prompts no longer need to reinterpret UTC `Z` timestamps.
  * @updated 2026-04-27: Added structured silent-reason, decision-summary, side-effect, and multi-bubble reply fields so background turns can explain quiet decisions and foreground/background replies can render as grouped short bubbles.
+ * @updated 2026-04-27: Added native assistant diagnostic entry types so Android poll ticks, skips, and dispatches can be surfaced separately from web AI call history.
  * @updated 2026-04-26: Removed an unused long-term-memory field so the assistant memory schema stays focused on the active fields still used by the app.
  * @updated 2026-04-26: Added a shared editable-memory key type so manual long-term-memory UI can safely append and remove only the user-maintained string-list sections.
  * @updated 2026-04-26: Added assistant system-notification payload and pending-navigation result types so Android alerts can reopen the shared AI chat at the exact background message.
@@ -108,6 +110,31 @@ export interface AssistantNotificationNavigation {
   openedAt?: string;
 }
 
+export type AssistantNativeDiagnosticLevel = 'info' | 'success' | 'warning' | 'error';
+
+export type AssistantNativeDiagnosticType =
+  | 'service_started'
+  | 'service_stopped'
+  | 'config_applied'
+  | 'poll_tick'
+  | 'checkin_skipped'
+  | 'checkin_dispatched'
+  | 'manual_trigger_dispatched'
+  | 'user_turn_recorded'
+  | 'task_state_changed_recorded';
+
+export interface AssistantNativeDiagnosticEntry {
+  id: string;
+  type: AssistantNativeDiagnosticType;
+  level: AssistantNativeDiagnosticLevel;
+  createdAt: string;
+  message: string;
+  triggerId?: string;
+  triggerType?: AssistantSystemTriggerType;
+  reason?: string;
+  context?: Record<string, string>;
+}
+
 export type AssistantMemoryAction = 'no_update' | 'update_memory';
 
 export type AssistantSilentReason =
@@ -184,8 +211,6 @@ export interface AssistantTurnConversationContext {
 
 export interface AssistantTurnStateContext {
   currentDateTime: string;
-  currentDateTimeLocal?: string;
-  currentDateTimeUtc?: string;
   defaultDate: string;
   todayTimelineSummary?: string;
   activeSessionSummary?: string;

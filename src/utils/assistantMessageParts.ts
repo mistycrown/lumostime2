@@ -5,10 +5,14 @@
  * @pos Utility (Assistant Message Parts)
  * @description Centralizes normalization and conservative fallback splitting for assistant replies so foreground and background messages can share one grouped multi-bubble rendering path.
  *
+ * @updated 2026-04-27: Added clause-aware fallback splitting and chunk rebalancing so longer assistant paragraphs render more like several short chat bursts.
  * @updated 2026-04-27: Added structured-part normalization and conservative fallback sentence splitting for grouped assistant chat bubbles.
  */
 
 const MAX_DISPLAY_PARTS = 4;
+const MIN_PART_LENGTH = 3;
+const MAX_PART_LENGTH = 36;
+const CLAUSE_SPLIT_MIN_CONTENT_LENGTH = 16;
 
 const trimStringArray = (value: unknown): string[] => (
   Array.isArray(value)
@@ -22,7 +26,7 @@ const trimStringArray = (value: unknown): string[] => (
 const isUsablePartSet = (parts: string[]): boolean => (
   parts.length > 1
   && parts.length <= MAX_DISPLAY_PARTS
-  && parts.every((part) => part.length >= 2)
+  && parts.every((part) => part.length >= MIN_PART_LENGTH)
 );
 
 const splitByParagraphs = (content: string): string[] => (
@@ -49,11 +53,58 @@ const splitBySentences = (content: string): string[] => {
     return [];
   }
 
-  if (parts.some((part) => part.length < 3 || part.length > 48)) {
+  if (parts.some((part) => part.length < MIN_PART_LENGTH || part.length > 48)) {
     return [];
   }
 
   return parts;
+};
+
+const splitByClauses = (content: string): string[] => {
+  if (content.length < CLAUSE_SPLIT_MIN_CONTENT_LENGTH) {
+    return [];
+  }
+
+  const clauses = content
+    .split(/(?<=[，；：])/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (clauses.length < 2 || clauses.length > 6) {
+    return [];
+  }
+
+  if (clauses.some((part) => part.length < 4)) {
+    return [];
+  }
+
+  const merged: string[] = [];
+  let current = '';
+
+  clauses.forEach((clause) => {
+    if (!current) {
+      current = clause;
+      return;
+    }
+
+    if ((current.length + clause.length) <= 20) {
+      current += clause;
+      return;
+    }
+
+    merged.push(current);
+    current = clause;
+  });
+
+  if (current) {
+    merged.push(current);
+  }
+
+  if (merged.some((part) => part.length > MAX_PART_LENGTH)) {
+    return [];
+  }
+
+  return isUsablePartSet(merged) ? merged : [];
 };
 
 export const buildAssistantDisplayParts = (
@@ -83,6 +134,11 @@ export const buildAssistantDisplayParts = (
   const sentenceParts = splitBySentences(trimmedContent);
   if (isUsablePartSet(sentenceParts)) {
     return sentenceParts;
+  }
+
+  const clauseParts = splitByClauses(trimmedContent);
+  if (isUsablePartSet(clauseParts)) {
+    return clauseParts;
   }
 
   return undefined;

@@ -5,6 +5,7 @@
  * @pos Plugin
  * @description Defines the Capacitor bridge for the Android-first assistant agent so the web layer can start or stop the background service, update polling config, and receive system-trigger events from the native layer.
  *
+ * @updated 2026-04-27: Added native diagnostic list, clear, and live-update contracts so Android poll decisions can be inspected from the shared AI history UI.
  * @updated 2026-04-26: Added active assistant notification and pending-navigation APIs so Android system alerts can reopen the shared AI chat at the exact background message.
  * @updated 2026-04-26: Added the AssistantAgent plugin interface and Android/web bridge registration for the new background AI agent.
  */
@@ -13,6 +14,7 @@ import { registerPlugin } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
 import type {
   AssistantAgentConfig,
+  AssistantNativeDiagnosticEntry,
   AssistantNotificationNavigation,
   AssistantNotificationPayload,
   AssistantSystemTrigger
@@ -25,11 +27,17 @@ export interface AssistantAgentPlugin {
   notifyUserTurn(payload: { text: string; at: string }): Promise<void>;
   notifyTaskStateChanged(): Promise<void>;
   triggerImmediateCheckin(): Promise<void>;
+  listDiagnostics(): Promise<{ entries: AssistantNativeDiagnosticEntry[] }>;
+  clearDiagnostics(): Promise<void>;
   showAssistantNotification(payload: AssistantNotificationPayload): Promise<void>;
   consumePendingAssistantNavigation(): Promise<AssistantNotificationNavigation>;
   addListener(
     eventName: 'assistantSystemTrigger',
     listenerFunc: (data: AssistantSystemTrigger) => void
+  ): Promise<PluginListenerHandle> & PluginListenerHandle;
+  addListener(
+    eventName: 'assistantDiagnosticsUpdated',
+    listenerFunc: () => void
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   removeAllListeners(): Promise<void>;
 }

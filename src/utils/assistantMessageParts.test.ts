@@ -35,4 +35,11 @@ describe('assistantMessageParts', () => {
       '然后继续。'
     ]);
   });
+  it('splits long single-sentence replies by clauses so they do not stay as one paragraph', () => {
+    expect(buildAssistantDisplayParts('你现在不用一下子把全部都理顺，先把最卡的那一步定下来，然后直接开做，剩下的边做边补。')).toEqual([
+      '你现在不用一下子把全部都理顺，',
+      '先把最卡的那一步定下来，然后直接开做，',
+      '剩下的边做边补。'
+    ]);
+  });
 });

@@ -77,6 +77,20 @@ const createLog = (
 };
 
 describe('assistantContextBuilder', () => {
+  it('buildStateContext keeps only one local-offset current time anchor', () => {
+    const stateContext = assistantContextBuilder.buildStateContext({
+      currentDateTime: '2026-04-27T18:00:00+08:00',
+      defaultDate: '2026-04-27',
+      categories,
+      todos,
+      logs: []
+    });
+
+    expect(stateContext.currentDateTime).toBe('2026-04-27T18:00:00+08:00');
+    expect('currentDateTimeLocal' in stateContext).toBe(false);
+    expect('currentDateTimeUtc' in stateContext).toBe(false);
+  });
+
   it('buildRecentLogsDigest excludes the default date and keeps log lines compact', () => {
     const digest = assistantContextBuilder.buildRecentLogsDigest({
       defaultDate: '2026-04-26',

@@ -190,12 +190,14 @@ describe('assistantOrchestratorService', () => {
 
     const history = assistantOrchestratorService.listBackgroundCallHistory();
     expect(history).toHaveLength(1);
+    expect(history[0].triggerId).toBe('trigger-1');
     expect(history[0].decisionSummary).toBe('这次先不打扰：用户可能仍在专注。已处理：更新了当前状态摘要；记录了最近决策摘要。');
     expect(history[0].silentReason).toBe('active_focus_protection');
     expect(history[0].sideEffects).toEqual([
       '更新了当前状态摘要',
       '记录了最近决策摘要'
     ]);
+    expect(history[0].debugExchange).toEqual(debugExchange);
     expect(AssistantAgent.showAssistantNotification).not.toHaveBeenCalled();
   });
 
@@ -304,5 +306,8 @@ describe('assistantOrchestratorService', () => {
       body: '先去写提纲',
       targetSessionId: 'session-1'
     }));
+    const history = assistantOrchestratorService.listBackgroundCallHistory();
+    expect(history[0].triggerId).toBe('trigger-3');
+    expect(history[0].debugExchange).toEqual(debugExchange);
   });
 });
