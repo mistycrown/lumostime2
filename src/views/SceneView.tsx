@@ -1,10 +1,11 @@
 /**
  * @file SceneView.tsx
  * @description 闂傚倷绶氬缁樹繆閸ヮ剙纾块柕鍫濇噳閺嬪秵绻涢崱妯诲碍缂佲偓瀹€鍕厸鐎广儱鍟俊鑺ャ亜锜婚崶銊㈡嫽闂佺鏈銊╁箺閻樼偨浜滈柡鍌濇硶閻忛亶鏌熼崣澶嬪唉鐎规洖宕灃濞达絼璀﹀ú?- 闂傚倷鑳剁涵鍫曞疾閻愬樊娴栭柕濞у棗小濡炪倖甯掗崯銊︾瑜版帗鐓欓柟顖嗗啯姣愬銈冨€曢幊蹇曟崲濠靛牆鏋堟俊顖濇〃婢规洘绻濋悽闈涗哗閻忓浚浜、姘愁槻闁崇懓鍟撮崺鈧い鎺戝閻撴盯鏌涘鈧粈渚€鎮橀敐鍥╃＜妞ゆ棁鍋愯倴婵炲濯寸粻鎾愁嚕閹绢喗鍋愭い鏃囧吹妞规娊姊绘担鍛婂暈妞ゃ劍鍔楀Σ鎰板即閻斿憡鐝烽梺鍝勮癁鐏炶姤顓块梻濠庡亜濞诧箑顫忚ぐ鎹ゅ洩顦规慨濠傤煼瀹曟帒顫濇潏銊﹀枛婵＄偑鍊栭弻銊╂儗閸屾氨鏆︽慨妞诲亾鐎规洏鍔戦、妯款槻闁?
+ * @updated 2026-05-01: Added a manual-mode scene-group dropdown on the scene header chip so users can quickly switch groups directly from the scene page.
  * @updated 2026-04-25: Added flex min-height guards for the scene sidebar and card list so long card stacks keep scrolling instead of being clipped on some mobile WebViews.
  */
-import React, { useState, useEffect } from 'react';
-import { Clock } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Clock, ChevronDown, Check } from 'lucide-react';
 import { IconRenderer } from '../components/IconRenderer';
 import { UIIcon } from '../components/UIIcon';
 import { SceneCard } from '../components/SceneCard';
@@ -16,7 +17,8 @@ import { useData } from '../contexts/DataContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { getLocalDateStr } from '../utils/dateUtils';
-import { findAutoSwitchTargetGroup, getActiveSceneGroup, loadSceneGroupStateFromStorage } from '../utils/sceneGroupStorage';
+import { findAutoSwitchTargetGroup, getActiveSceneGroup, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from '../utils/sceneGroupStorage';
+import { updateLocalDataTimestamp } from '../utils/localDataTimestamp';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 
 interface SceneViewProps {
@@ -66,13 +68,39 @@ export const SceneView: React.FC<SceneViewProps> = ({
   
   // 闂佽崵鍠愮划搴㈡櫠濡ゅ懎绠伴柛娑橈攻濞呯娀鏌ｅΟ鑲╁笡闁绘帟顕ч…璺ㄦ崉娓氼垱歇闂佸憡锕╅崜鐔煎蓟閿濆惟闁靛鍎烘禒鎯р攽閿涘嫬浠滈柛濠傜仢椤繘鎳￠妶鍌氫壕婵炴垶鐟辨笟娑㈡煕閻愬灚娅曠紒杈ㄥ笚缁楃喖宕归鍙ユ偅缂?
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number>(0);
+  const [isGroupMenuOpen, setIsGroupMenuOpen] = useState(false);
+  const groupMenuRef = useRef<HTMLDivElement | null>(null);
   
   // 闂傚倷鐒﹀鍨焽閸ф绀夐悗锝庡墲婵櫕銇勯幒鎴濃偓褰掑窗閸℃稒鐓ラ柡鍥殔娴滈箖鎮峰鍕凡闁稿﹨宕靛Σ鎰板箳濡や礁浜滃┑鐐跺蔼椤曆囧箖娓氣偓濮婃椽宕ㄦ繝搴㈩吅缂備浇椴稿ú姗€寮查崼鏇炲唨妞ゆ挾鍠庨崜顓㈡⒑閸涘﹥澶勯柛銊︽緲閳诲秹濮€閵堝棛鍘搁梺绋挎湰缁嬫垿顢撳鍕╀簻闁规崘娅曢幉鍝ョ磼?
   const [statsUpdateTrigger, setStatsUpdateTrigger] = useState(0);
+  const isManualSceneGroupMode = sceneGroupState.switchMode !== 'auto';
 
   const loadSceneGroups = () => {
     const loaded = loadSceneGroupStateFromStorage();
     setSceneGroupState(loaded);
+  };
+
+  const persistSceneGroupState = (nextState: SceneGroupState) => {
+    const saved = saveSceneGroupStateToStorage(nextState);
+    setSceneGroupState(saved);
+    updateLocalDataTimestamp();
+    window.dispatchEvent(new Event('sceneGroupsUpdated'));
+    window.dispatchEvent(new Event('sceneTimeSlotsUpdated'));
+  };
+
+  const handleManualGroupSelect = (groupId: string) => {
+    setIsGroupMenuOpen(false);
+    if (!isManualSceneGroupMode || sceneGroupState.activeGroupId === groupId) {
+      return;
+    }
+    const exists = sceneGroupState.groups.some(group => group.id === groupId);
+    if (!exists) {
+      return;
+    }
+    persistSceneGroupState({
+      ...sceneGroupState,
+      activeGroupId: groupId
+    });
   };
 
   // 闂傚倷绀侀幉鈥愁潖缂佹ɑ鍙忛柟顖ｇ亹瑜版帒鐐婃い鎺嗗亾缂侇偄绉归弻娑㈩敃閿濆棛顦ㄩ梺鎸庣〒閸犳劗鎹㈠☉銏犻唶婵犻潧鐗呯划鐢告⒑閸濆嫭顥犻柛鐘崇墵閻?
@@ -131,6 +159,33 @@ export const SceneView: React.FC<SceneViewProps> = ({
   }, []);
 
   // 闂傚倷绀侀崥瀣磿閹惰棄搴婇柤鑹扮堪娴滃綊鏌涢妷顔荤暗濞存粌缍婇弻鐔煎箚瑜嶉弳杈ㄣ亜閵堝懏鍤囬柡宀嬬節瀹曟﹢濡歌閻撶喎鈹戦埥鍡椾函婵炲娲熼崺鈧い鎺戝€归弳鈺呮煙閾忣偅灏甸柤娲憾瀵濡烽敃鈧崜顓㈡⒑閸涘﹥澶勯柛鎾村哺钘濈憸鏂款潖婵犳艾纾兼慨妯块哺閹茬厧顪冮妶鍡樼叆闁活剛鍘у嵄闁圭増婢橀～鍛存煟濡吋鏆╅柍?
+  useEffect(() => {
+    if (!isGroupMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (groupMenuRef.current && !groupMenuRef.current.contains(event.target as Node)) {
+        setIsGroupMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+    };
+  }, [isGroupMenuOpen]);
+
+  useEffect(() => {
+    if (!isManualSceneGroupMode) {
+      setIsGroupMenuOpen(false);
+    }
+  }, [isManualSceneGroupMode]);
+
+  useEffect(() => {
+    setIsGroupMenuOpen(false);
+  }, [sceneGroupState.activeGroupId]);
+
   const getCurrentTimeSlotIndex = (): number => {
     if (timeSlots.length === 0) return 0;
     
@@ -1082,9 +1137,51 @@ export const SceneView: React.FC<SceneViewProps> = ({
             {currentSlot.displayTitle || `${currentSlot.startTime} - ${currentSlot.endTime}`}
           </h1>
           <div className="h-px flex-1 bg-stone-100 mx-4"></div>
-          <span className="px-2 py-0.5 text-[11px] md:text-xs text-stone-500 border border-stone-200 rounded-full bg-white/70">
-            {displayedGroup.name}
-          </span>
+          {isManualSceneGroupMode ? (
+            <div ref={groupMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setIsGroupMenuOpen(prev => !prev)}
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] md:text-xs text-stone-500 border border-stone-200 rounded-full bg-white/70 transition-colors hover:border-stone-300 hover:text-stone-700"
+                aria-haspopup="menu"
+                aria-expanded={isGroupMenuOpen}
+                title="切换场景组"
+              >
+                <span>{displayedGroup.name}</span>
+                <ChevronDown size={12} className={`transition-transform ${isGroupMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {isGroupMenuOpen && (
+                <div className="absolute right-0 top-full z-30 mt-2 min-w-[10rem] overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-[0_12px_32px_rgba(0,0,0,0.12)]">
+                  <div className="max-h-72 overflow-y-auto py-1">
+                    {sceneGroupState.groups.map((group) => {
+                      const isSelected = group.id === sceneGroupState.activeGroupId;
+                      return (
+                        <button
+                          key={group.id}
+                          type="button"
+                          onClick={() => handleManualGroupSelect(group.id)}
+                          className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition-colors ${
+                            isSelected ? 'font-bold' : 'text-stone-700 hover:bg-stone-50'
+                          }`}
+                          style={isSelected ? {
+                            backgroundColor: 'color-mix(in srgb, var(--accent-color) 12%, white)',
+                            color: 'var(--accent-color)'
+                          } : undefined}
+                        >
+                          <span className="truncate">{group.name}</span>
+                          {isSelected && <Check size={15} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <span className="px-2 py-0.5 text-[11px] md:text-xs text-stone-500 border border-stone-200 rounded-full bg-white/70">
+              {displayedGroup.name}
+            </span>
+          )}
         </div>
 
         {/* 濠电姷鏁搁崑鐘典焊椤忓牜鏁嬬憸搴ㄥ箞閵娾晛鐓涢柛娑卞幘椤㈠懘姊洪幐搴ｂ槈閻庢凹鍓熼妴鍌涚節濮橆厾鍘遍梺鍦劋閹尖晛鈻撳▎鎾寸厪?- 闂傚倷绀侀幉锟犮€冮崱妞曟椽寮介鐐茬€銈呯箰濡瑩寮冲鍫熺厱闁规壋鏅涙俊鎸庣節閳?*/}

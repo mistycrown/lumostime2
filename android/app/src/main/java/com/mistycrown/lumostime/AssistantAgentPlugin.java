@@ -5,6 +5,7 @@
  * @pos Native Plugin
  * @description Capacitor plugin bridge for the Android-first background assistant agent. Starts and stops the foreground agent service, updates lightweight polling config, relays native system-trigger events back into the web layer, and surfaces assistant notification navigation.
  * @updated 2026-04-27: Added native diagnostic list, clear, and live-update bridge methods so Android poll decisions can be inspected from the shared AI history UI.
+ * @updated 2026-04-28: Added pending-trigger queue list and acknowledge methods so Web can recover native assistant triggers after resume.
  * @updated 2026-04-27: Routed user-turn and task-state notifications into the running Android agent service so native throttling can respect recent foreground activity and background task changes.
  */
 package com.mistycrown.lumostime;
@@ -19,6 +20,8 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+
+import org.json.JSONArray;
 
 @CapacitorPlugin(name = "AssistantAgent")
 public class AssistantAgentPlugin extends Plugin {
@@ -157,6 +160,63 @@ public class AssistantAgentPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void listPendingSystemTriggers(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("triggers", AssistantPendingTriggerStore.list(getContext()));
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void acknowledgeSystemTrigger(PluginCall call) {
+        String triggerId = call.getString("id", "");
+        AssistantPendingTriggerStore.acknowledge(getContext(), triggerId);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void syncNativeAIConfig(PluginCall call) {
+        AssistantNativeAIConfigStore.save(
+            getContext(),
+            call.getString("provider", ""),
+            call.getString("apiKey", ""),
+            call.getString("baseUrl", ""),
+            call.getString("modelName", "")
+        );
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void clearNativeAIConfig(PluginCall call) {
+        AssistantNativeAIConfigStore.clear(getContext());
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void syncNativeBackgroundSnapshot(PluginCall call) {
+        JSObject conversation = call.getObject("conversation");
+        AssistantNativeBackgroundSnapshotStore.save(
+            getContext(),
+            call.getString("systemPrompt", ""),
+            conversation == null ? "" : conversation.toString()
+        );
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void syncNativeReminders(PluginCall call) {
+        JSONArray reminders = call.getArray("reminders");
+        AssistantNativeReminderStore.save(getContext(), reminders);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void listNativeReminders(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("reminders", AssistantNativeReminderStore.list(getContext()));
+        call.resolve(result);
+    }
+
+    @PluginMethod
     public void showAssistantNotification(PluginCall call) {
         String title = call.getString("title", "LumosTime AI 助理");
         String body = call.getString("body", "");
@@ -197,13 +257,8 @@ public class AssistantAgentPlugin extends Plugin {
         call.resolve(result);
     }
 
-    public static String dispatchSystemTrigger(String triggerType, String text, String source) {
+    public static String dispatchSystemTrigger(Context context, String triggerType, String text, String source) {
         String triggerId = java.util.UUID.randomUUID().toString();
-        if (instance == null) {
-            Log.w(TAG, "dispatchSystemTrigger skipped because plugin instance is null");
-            return triggerId;
-        }
-
         JSObject payload = new JSObject();
         payload.put("id", triggerId);
         payload.put("type", triggerType);
@@ -211,6 +266,12 @@ public class AssistantAgentPlugin extends Plugin {
         payload.put("createdAt", new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", java.util.Locale.US)
             .format(new java.util.Date()));
         payload.put("text", text);
+        AssistantPendingTriggerStore.append(context, payload);
+
+        if (instance == null) {
+            Log.w(TAG, "dispatchSystemTrigger skipped because plugin instance is null");
+            return triggerId;
+        }
         instance.notifyListeners("assistantSystemTrigger", payload, true);
         return triggerId;
     }

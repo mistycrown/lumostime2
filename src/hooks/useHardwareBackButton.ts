@@ -12,13 +12,16 @@
  * 4. 退出应用
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-04-30: Routed Android hardware back presses through the shared AI chat back handler so AI subpages unwind before app-level exit logic runs.
  */
 import { useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { AppView } from '../types';
 import { useNavigation } from '../contexts/NavigationContext';
+import { useAIChatWindow } from '../contexts/AIChatWindowContext';
 
 export const useHardwareBackButton = () => {
+    const { isAIChatOpen, handleAIChatBack } = useAIChatWindow();
     const {
         isSettingsOpen, setIsSettingsOpen, settingsSubmenu, setSettingsSubmenu,
         isAutoLinkOpen, setIsAutoLinkOpen,
@@ -97,6 +100,10 @@ export const useHardwareBackButton = () => {
 
     useEffect(() => {
         const handleBackButton = ({ canGoBack }: { canGoBack: boolean }) => {
+            if (isAIChatOpen && handleAIChatBack()) {
+                return;
+            }
+
             // 1. Modals (High Priority)
             if (isSettingsOpen) {
                 if (settingsSubmenu !== 'main') {
@@ -213,6 +220,7 @@ export const useHardwareBackButton = () => {
             listener.then(l => l.remove());
         };
     }, [
+        handleAIChatBack, isAIChatOpen,
         isSettingsOpen, isAutoLinkOpen, isSearchOpen, isFiltersOpen, isExportViewOpen, isGalleryViewOpen, isShareViewOpen, focusDetailSessionId, isAddModalOpen, isTodoModalOpen,
         isDailyReviewOpen, isOnThisDayOpen, isWeeklyReviewOpen, isMonthlyReviewOpen, isAchievementOpen,
         isStatsFullScreen, isTodoManaging, isTagsManaging, isScopeManaging,

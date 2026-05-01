@@ -10,6 +10,10 @@ Components that form the structural or global UI elements.
 - `Toast.tsx`: Notification system.
 
 ## Modals
+- Update 2026-05-01: `AIBackfillChatModal.tsx` now uses a flatter editorial treatment across the AI workspace, tightening the composer to a two-line feel, removing extra divider framing, simplifying history delete confirmations into inline horizontal actions, and reducing nested-card radii/shadows across the AI panels.
+- Update 2026-05-01: `AIBackfillChatModal.tsx` now rehydrates completed Android-native background replies back into the persisted chat session when diagnostics refresh, so successful direct-native check-ins render in the main AI conversation and restore unread state instead of only appearing in background history.
+- Update 2026-04-30: `AIBackfillChatModal.tsx` now gives grouped assistant reply bubbles a more visible sequential entrance by increasing the stagger and adding a clearer lift/scale/highlight settle animation for each newly revealed segment.
+- Update 2026-04-30: `AIBackfillChatModal.tsx` now exposes a unified Android back-navigation chain, so hardware back closes nested AI panels first and only dismisses the root AI chat after returning to the main conversation.
 - Update 2026-04-27: `AIBackfillChatModal.tsx` now renders both user and assistant avatars above each message group as a light outside-the-bubble header, freeing more horizontal space for the conversation body without bringing back the old side avatar rail.
 - Update 2026-04-27: `AIBackfillChatModal.tsx` now labels each assistant message group with the active persona name instead of the generic `AI 回答` fallback whenever a persona name is available.
 - Update 2026-04-27: `AIBackfillChatModal.tsx` now keeps per-message `记忆更新` cards collapsed by default and expands their detailed section list only when the user taps the header row.

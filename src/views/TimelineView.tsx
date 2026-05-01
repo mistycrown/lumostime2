@@ -6,6 +6,7 @@
  * @description The primary daily view. Visualizes time usage on a timeline, supports adding/editing logs, gap detection, gesture and lightweight calendar date-switch animation, quick search and custom filter entry points, and integrates Daily/Weekly/Monthly review plus achievement bottle entry points.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-04-30: Timeline done nodes now append `@parent` context to completed subtask titles using plain text.
  * @updated 2026-04-25: Replaced the fixed five timeline header buttons with user-configurable quick actions.
  * @updated 2026-04-22: The floating AI button now opens the app-level shared AI window so closing the modal does not interrupt an in-flight request.
  * @updated 2026-04-22: Replaced the old AI backfill entry with a local-history chat modal for the first-step conversational AI flow.
@@ -42,6 +43,7 @@ import { TimelineStyleRail } from '../components/TimelineStyleRail';
 import { TimelineStyleAdjuster } from '../components/TimelineStyleAdjuster';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 import { type TimelineQuickActionKey } from '../constants/timelineQuickActions';
+import { formatCompletedTodoLabel } from '../utils/todoHierarchyUtils';
 
 // Image Thumbnail Component
 const TimelineImage: React.FC<{ filename: string, className?: string, useThumbnail?: boolean, refreshKey?: number }> = ({ filename, className = "w-16 h-16", useThumbnail = false, refreshKey = 0 }) => {
@@ -1425,7 +1427,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                                             className="block text-left hover:bg-stone-50 rounded-lg transition-colors w-full group"
                                         >
                                             <span className="text-xs text-stone-600 group-hover:text-stone-900 leading-snug">
-                                                {todo.title}
+                                                {formatCompletedTodoLabel(todos, todo)}
                                             </span>
                                         </button>
                                     );

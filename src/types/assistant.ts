@@ -119,6 +119,10 @@ export type AssistantNativeDiagnosticType =
   | 'poll_tick'
   | 'checkin_skipped'
   | 'checkin_dispatched'
+  | 'reminder_due_dispatched'
+  | 'native_request_started'
+  | 'native_request_completed'
+  | 'native_request_failed'
   | 'manual_trigger_dispatched'
   | 'user_turn_recorded'
   | 'task_state_changed_recorded';
@@ -133,6 +137,11 @@ export interface AssistantNativeDiagnosticEntry {
   triggerType?: AssistantSystemTriggerType;
   reason?: string;
   context?: Record<string, string>;
+}
+
+export interface AssistantNativeBackgroundSnapshot {
+  systemPrompt: string;
+  conversation: AssistantTurnConversationContext;
 }
 
 export type AssistantMemoryAction = 'no_update' | 'update_memory';

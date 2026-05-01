@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AssistantMemory, AssistantReminder } from '../types/assistant';
+import type { AssistantMemory, AssistantNativeDiagnosticEntry, AssistantReminder } from '../types/assistant';
 
 vi.mock('./assistantAgentConfigService', () => ({
   assistantAgentConfigService: {
@@ -309,5 +309,55 @@ describe('assistantOrchestratorService', () => {
     const history = assistantOrchestratorService.listBackgroundCallHistory();
     expect(history[0].triggerId).toBe('trigger-3');
     expect(history[0].debugExchange).toEqual(debugExchange);
+  });
+
+  it('hydrates native completed replies into persisted chat sessions only once', () => {
+    localStorage.setItem('lumostime_ai_chat_sessions_v1', JSON.stringify([{
+      id: 'session-1',
+      title: '测试会话',
+      createdAt: 1,
+      updatedAt: 1,
+      personaId: 'persona-1',
+      contextCacheEnabled: true,
+      messages: []
+    }]));
+
+    const diagnostics: AssistantNativeDiagnosticEntry[] = [{
+      id: 'diagnostic-1',
+      type: 'native_request_completed',
+      level: 'success',
+      createdAt: '2026-05-01T09:34:54.830+08:00',
+      message: 'Native background AI request completed',
+      triggerId: 'native-trigger-1',
+      triggerType: 'checkin',
+      context: {
+        requestedAt: '2026-05-01T09:34:50.519+08:00',
+        completedAt: '2026-05-01T09:34:54.830+08:00',
+        assistantReply: '距离上次说话已经过去 9 小时了。还在吗？',
+        decisionSummary: '用户 9 小时未回复，发送简短确认消息。'
+      }
+    }];
+
+    const firstHydration = assistantOrchestratorService.hydrateNativeCompletedReplies(diagnostics, {
+      targetSessionId: 'session-1'
+    });
+    const secondHydration = assistantOrchestratorService.hydrateNativeCompletedReplies(diagnostics, {
+      targetSessionId: 'session-1'
+    });
+
+    expect(firstHydration.surfacedMessages).toEqual(['距离上次说话已经过去 9 小时了。还在吗？']);
+    expect(secondHydration.surfacedMessages).toEqual([]);
+
+    const persistedSessions = JSON.parse(localStorage.getItem('lumostime_ai_chat_sessions_v1') || '[]');
+    expect(persistedSessions).toHaveLength(1);
+    expect(persistedSessions[0].messages).toHaveLength(1);
+    expect(persistedSessions[0].messages[0].content).toBe('距离上次说话已经过去 9 小时了。还在吗？');
+
+    const history = assistantOrchestratorService.listBackgroundCallHistory();
+    expect(history).toHaveLength(1);
+    expect(history[0].triggerId).toBe('native-trigger-1');
+    expect(history[0].targetSessionId).toBe('session-1');
+    expect(history[0].action).toBe('send_message');
+    expect(history[0].message).toBe('距离上次说话已经过去 9 小时了。还在吗？');
   });
 });

@@ -4,6 +4,7 @@
  * @output Regression coverage for expanded subtask display ordering
  * @pos Test
  * @description Verifies that expanded parent-task displays can show all direct subtasks while prioritizing unfinished items ahead of completed ones.
+ * @updated 2026-04-30: Added coverage for completed-subtask labels that append parent context in done timelines.
  * @updated 2026-04-25: Added coverage for hiding unfinished subtasks when their parent todo is completed without mutating child completion flags.
  * @updated 2026-04-22: Added tests for direct-child display ordering plus optional completed-task filtering.
  * @updated 2026-04-22: Added tests for direct-child display ordering with unfinished subtasks first.
@@ -11,7 +12,11 @@
 
 import { describe, expect, it } from 'vitest';
 import type { TodoItem } from '../types';
-import { getDirectChildTodosForDisplay, isIncompleteSubtaskHiddenByCompletedParent } from './todoHierarchyUtils';
+import {
+  formatCompletedTodoLabel,
+  getDirectChildTodosForDisplay,
+  isIncompleteSubtaskHiddenByCompletedParent
+} from './todoHierarchyUtils';
 
 const baseTodos: TodoItem[] = [
   {
@@ -100,5 +105,15 @@ describe('isIncompleteSubtaskHiddenByCompletedParent', () => {
     expect(isIncompleteSubtaskHiddenByCompletedParent(completedParentTodos, completedParentTodos[1])).toBe(true);
     expect(isIncompleteSubtaskHiddenByCompletedParent(completedParentTodos, completedParentTodos[2])).toBe(false);
     expect(isIncompleteSubtaskHiddenByCompletedParent(completedParentTodos, completedParentTodos[0])).toBe(false);
+  });
+});
+
+describe('formatCompletedTodoLabel', () => {
+  it('keeps standalone todo titles unchanged', () => {
+    expect(formatCompletedTodoLabel(baseTodos, baseTodos[0])).toBe('Parent');
+  });
+
+  it('appends parent context for subtasks', () => {
+    expect(formatCompletedTodoLabel(baseTodos, baseTodos[1])).toBe('Second child @Parent');
   });
 });

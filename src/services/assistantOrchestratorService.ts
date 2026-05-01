@@ -5,6 +5,8 @@
  * @pos Service (Assistant Orchestrator)
  * @description Orchestrates Android-first assistant system turns by loading structured memory, assembling a prompt, calling the existing AI service, and applying the resulting silent/message/reminder/memory actions back into local state.
  *
+ * @updated 2026-05-01: Added native-background reply hydration so Android-side completed check-ins can be surfaced back into persisted Web chat sessions instead of living only in diagnostics.
+ * @updated 2026-04-27: Persisted background message memory/reminder update metadata so chat history can render the same expand controls as foreground assistant turns.
  * @updated 2026-04-27: Added background call trigger ids plus persisted request/response debug exchanges so web AI execution can be correlated with native poll diagnostics.
  * @updated 2026-04-27: Stopped exposing assistant-facing UTC `Z` current-time anchors and now keep one local-offset ISO time anchor in background prompt state.
  * @updated 2026-04-27: Added readable decision summaries, silent reasons, side-effect tracking, and multi-bubble reply-part persistence for background assistant turns.
@@ -21,6 +23,7 @@
 
 import {
   type AssistantMemory,
+  type AssistantNativeDiagnosticEntry,
   type AssistantOrchestratorResult,
   type AssistantReminder,
   type AssistantSilentReason,
@@ -37,7 +40,7 @@ import { assistantMemoryService } from './assistantMemoryService';
 import { assistantPromptService } from './assistantPromptService';
 import { assistantReminderQueueService } from './assistantReminderQueueService';
 import { assistantTurnService } from './assistantTurnService';
-import { normalizeAssistantDateTime } from '../utils/assistantTime';
+import { formatAssistantDateTimeForDisplay, normalizeAssistantDateTime } from '../utils/assistantTime';
 import { buildAssistantDisplayParts } from '../utils/assistantMessageParts';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
 
@@ -95,6 +98,8 @@ interface PersistedAIChatMessage {
     label: string;
     exchange: AIDebugExchange;
   }>;
+  memoryUpdates?: PersistedAIChatMemoryUpdateSection[];
+  reminderUpdates?: string[];
 }
 
 interface PersistedAIChatSession {
@@ -115,6 +120,11 @@ interface PersistedAIChatPersonaSummary {
 interface PersistedAssistantMessageLocation {
   sessionId: string;
   messageId: string;
+}
+
+interface PersistedAIChatMemoryUpdateSection {
+  label: string;
+  items: string[];
 }
 
 const CHAT_SESSIONS_KEY = 'lumostime_ai_chat_sessions_v1';
@@ -282,6 +292,28 @@ const getBackgroundDebugLabel = (triggerType: AssistantSystemTrigger['type']): s
   }
 };
 
+const buildNativeHydratedHistoryId = (triggerId: string): string => `native:${triggerId}`;
+
+const buildNativeTriggerText = (triggerType?: AssistantSystemTrigger['type']): string => {
+  switch (triggerType) {
+    case 'reminder_due':
+      return 'Native background reminder trigger';
+    case 'manual_background_nudge':
+      return 'Native manual background assistant trigger';
+    case 'long_idle':
+      return 'Native long-idle assistant trigger';
+    case 'focus_started':
+      return 'Native focus-started assistant trigger';
+    case 'focus_ended':
+      return 'Native focus-ended assistant trigger';
+    case 'todo_changed':
+      return 'Native todo-changed assistant trigger';
+    case 'checkin':
+    default:
+      return 'Native background check-in trigger';
+  }
+};
+
 const describeSilentReason = (silentReason?: AssistantSilentReason): string => {
   switch (silentReason) {
     case 'active_focus_protection':
@@ -313,6 +345,42 @@ const dedupeStrings = (items: string[]): string[] => {
     return true;
   });
 };
+
+const buildPersistedMemoryUpdateSections = (
+  before: AssistantMemory,
+  after: AssistantMemory
+): PersistedAIChatMemoryUpdateSection[] => {
+  const sections: PersistedAIChatMemoryUpdateSection[] = [];
+
+  const addedProfile = after.profileMemory.filter((item) => !before.profileMemory.includes(item));
+  if (addedProfile.length > 0) {
+    sections.push({ label: '用户画像记忆', items: addedProfile });
+  }
+
+  const addedPreferences = after.preferenceMemory.filter((item) => !before.preferenceMemory.includes(item));
+  if (addedPreferences.length > 0) {
+    sections.push({ label: '偏好记忆', items: addedPreferences });
+  }
+
+  if (after.lastKnownState && after.lastKnownState !== before.lastKnownState) {
+    sections.push({ label: '当前状态', items: [after.lastKnownState] });
+  }
+
+  if (after.workingMemorySummary && after.workingMemorySummary !== before.workingMemorySummary) {
+    sections.push({ label: '工作记忆摘要', items: [after.workingMemorySummary] });
+  }
+
+  const addedDecisions = after.recentDecisions.filter((item) => !before.recentDecisions.includes(item));
+  if (addedDecisions.length > 0) {
+    sections.push({ label: '决策摘要', items: addedDecisions });
+  }
+
+  return sections;
+};
+
+const buildPersistedReminderUpdates = (reminders: AssistantReminder[]): string[] => (
+  reminders.map((reminder) => `${formatAssistantDateTimeForDisplay(reminder.dueAt)} · ${reminder.text}`)
+);
 
 const buildMemoryPatchSideEffects = (memoryPatch?: AssistantUnifiedTurnOutput['memoryPatch']): string[] => {
   if (!memoryPatch) {
@@ -370,6 +438,8 @@ const persistAssistantMessage = (
       label: string;
       exchange: AIDebugExchange;
     }>;
+    memoryUpdates?: PersistedAIChatMemoryUpdateSection[];
+    reminderUpdates?: string[];
   }
 ) : PersistedAssistantMessageLocation | null => {
   const trimmed = message.trim();
@@ -397,7 +467,9 @@ const persistAssistantMessage = (
     ...(options?.displayParts?.length ? { displayParts: options.displayParts } : {}),
     createdAt: now,
     tone: 'system',
-    ...(options?.debugSections?.length ? { debugSections: options.debugSections } : {})
+    ...(options?.debugSections?.length ? { debugSections: options.debugSections } : {}),
+    ...(options?.memoryUpdates?.length ? { memoryUpdates: options.memoryUpdates } : {}),
+    ...(options?.reminderUpdates?.length ? { reminderUpdates: options.reminderUpdates } : {})
   };
   const nextSessions = sessions.map((session) => (
     session.id === resolvedTargetSessionId
@@ -441,6 +513,78 @@ export const assistantOrchestratorService = {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent(ASSISTANT_DECISION_EVENT));
     }
+  },
+
+  hydrateNativeCompletedReplies(
+    diagnostics: AssistantNativeDiagnosticEntry[],
+    options?: {
+      targetSessionId?: string;
+    }
+  ): {
+    surfacedMessages: string[];
+  } {
+    const knownTriggerIds = new Set(
+      loadBackgroundCallHistory()
+        .map((entry) => entry.triggerId?.trim() || '')
+        .filter(Boolean)
+    );
+    const surfacedMessages: string[] = [];
+
+    diagnostics
+      .filter((entry) => entry.type === 'native_request_completed')
+      .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt))
+      .forEach((entry) => {
+        const triggerId = entry.triggerId?.trim();
+        if (!triggerId || knownTriggerIds.has(triggerId)) {
+          return;
+        }
+
+        knownTriggerIds.add(triggerId);
+        const assistantReply = entry.context?.assistantReply?.trim() || '';
+        const decisionSummary = entry.context?.decisionSummary?.trim() || '';
+        const requestedAt = entry.context?.requestedAt?.trim() || entry.createdAt;
+        const completedAt = entry.context?.completedAt?.trim() || entry.createdAt;
+        const baseHistoryEntry: AssistantBackgroundCallHistoryEntry = {
+          id: buildNativeHydratedHistoryId(triggerId),
+          triggerId,
+          triggerType: entry.triggerType || 'checkin',
+          triggerText: buildNativeTriggerText(entry.triggerType),
+          ...(options?.targetSessionId ? { targetSessionId: options.targetSessionId } : {}),
+          requestedAt,
+          completedAt,
+          status: 'completed',
+          action: assistantReply ? 'send_message' : 'silent',
+          memoryAction: 'no_update',
+          reminderCount: 0,
+          ...(assistantReply ? { message: assistantReply } : {}),
+          ...(decisionSummary
+            ? { decisionSummary }
+            : {
+              decisionSummary: assistantReply
+                ? `这次原生后台请求返回了一条消息：${assistantReply}`
+                : '这次原生后台请求已完成'
+            })
+        };
+
+        upsertBackgroundCallHistory(baseHistoryEntry);
+        if (!assistantReply) {
+          return;
+        }
+
+        const persistedLocation = persistAssistantMessage(assistantReply, options?.targetSessionId);
+        if (persistedLocation?.sessionId && persistedLocation.sessionId !== baseHistoryEntry.targetSessionId) {
+          upsertBackgroundCallHistory({
+            ...baseHistoryEntry,
+            targetSessionId: persistedLocation.sessionId
+          });
+        }
+
+        surfacedMessages.push(assistantReply);
+      });
+
+    return {
+      surfacedMessages
+    };
   },
 
   async runSystemTurn(request: AssistantSystemTurnRequest): Promise<AssistantSystemTurnExecution> {
@@ -533,6 +677,7 @@ export const assistantOrchestratorService = {
     const messageParts = output.assistantReply
       ? buildAssistantDisplayParts(output.assistantReply, output.assistantReplyParts)
       : undefined;
+    let memoryUpdates: PersistedAIChatMemoryUpdateSection[] = [];
     const decision: AssistantSystemTurnDecision = {
       action: output.outcome === 'reply' && output.assistantReply ? 'send_message' : 'silent',
       memoryAction: output.memoryAction,
@@ -546,6 +691,7 @@ export const assistantOrchestratorService = {
 
     if (assistantConfig.longTermMemoryEnabled && output.memoryAction === 'update_memory' && output.memoryPatch) {
       updatedMemory = assistantMemoryService.applyPatch(output.memoryPatch);
+      memoryUpdates = buildPersistedMemoryUpdateSections(memory, updatedMemory);
     }
 
     if (assistantConfig.enabled) {
@@ -576,11 +722,14 @@ export const assistantOrchestratorService = {
 
     let surfacedMessage: string | undefined;
     let surfacedMessageLocation: PersistedAssistantMessageLocation | null = null;
+    const reminderUpdates = buildPersistedReminderUpdates(appliedReminders);
     const shouldRecordDecisionSummary = assistantConfig.longTermMemoryEnabled;
     if (output.outcome === 'reply' && output.assistantReply) {
       surfacedMessage = output.assistantReply;
       surfacedMessageLocation = persistAssistantMessage(surfacedMessage, request.targetSessionId, {
         ...(messageParts?.length ? { displayParts: messageParts } : {}),
+        ...(memoryUpdates.length > 0 ? { memoryUpdates } : {}),
+        ...(reminderUpdates.length > 0 ? { reminderUpdates } : {}),
         ...(request.includeDebugInPersistedMessage
           ? {
             debugSections: [{

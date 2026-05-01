@@ -18,7 +18,7 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 ## Key Components
 
-*   **TimelineView**: The core dashboard visualizing daily activities and reviews, with switchable styling for normal timeline record nodes, synchronized gesture/calendar day-switch animation in the main content area, and direct header entries to global search and custom filters.
+*   **TimelineView**: The core dashboard visualizing daily activities and reviews, with switchable styling for normal timeline record nodes, synchronized gesture/calendar day-switch animation in the main content area, direct header entries to global search and custom filters, and plain-text `子任务 @父任务` labels in the trailing `Done` node for completed subtasks.
 *   **AchievementView**: Full-screen achievement bottle page entered from Timeline, combining the star container, frozen daily snapshots, editable rules, and reward redemption ledger.
 *   **StatsView**: Comprehensive analytics with multiple visualization modes (Pie, Matrix, Line, Schedule, Check, Emoji), including a subtle top-level fade transition for swipe and header date navigation. Weekly ranges should reuse the shared stats date-range helper so cross-month matrix weeks stay capped at 7 days.
 *   **SettingsView**: Central configuration hub for Sync, AI, and App preferences, including notification-aware floating-window startup and Android permission-return recovery.
@@ -28,7 +28,8 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
-> Last updated: 2026-04-27
+> Last updated: 2026-04-30
+- `TimelineView.tsx`: The trailing `Done` node now renders completed subtasks as plain text in `子任务 @父任务` form so parent context is visible without adding new UI chrome.
 - `TodoView.tsx`: The shared quick-actions sheet now includes an inline `删除任务 -> 确认删除？` entry, so both list rows and week-view badges can remove a todo without opening the full detail editor.
 - `TodoView.tsx`: Todo-list rendering now hides unfinished subtasks whenever their parent task is completed, without mutating the child tasks; undoing the parent completion restores those child rows through the existing expand state.
 - `TodoBatchManageView.tsx`: The todo batch-management screen now hides subtasks entirely, while save operations still preserve hidden child todos and completed todos unless their parent task or category is removed.

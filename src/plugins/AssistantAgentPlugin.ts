@@ -14,11 +14,14 @@ import { registerPlugin } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
 import type {
   AssistantAgentConfig,
+  AssistantNativeBackgroundSnapshot,
   AssistantNativeDiagnosticEntry,
+  AssistantReminder,
   AssistantNotificationNavigation,
   AssistantNotificationPayload,
   AssistantSystemTrigger
 } from '../types/assistant';
+import type { AIConfig } from '../services/aiService';
 
 export interface AssistantAgentPlugin {
   startAgent(options?: Partial<AssistantAgentConfig>): Promise<void>;
@@ -29,6 +32,13 @@ export interface AssistantAgentPlugin {
   triggerImmediateCheckin(): Promise<void>;
   listDiagnostics(): Promise<{ entries: AssistantNativeDiagnosticEntry[] }>;
   clearDiagnostics(): Promise<void>;
+  listPendingSystemTriggers(): Promise<{ triggers: AssistantSystemTrigger[] }>;
+  acknowledgeSystemTrigger(payload: { id: string }): Promise<void>;
+  syncNativeAIConfig(config: AIConfig): Promise<void>;
+  clearNativeAIConfig(): Promise<void>;
+  syncNativeBackgroundSnapshot(snapshot: AssistantNativeBackgroundSnapshot): Promise<void>;
+  syncNativeReminders(payload: { reminders: AssistantReminder[] }): Promise<void>;
+  listNativeReminders(): Promise<{ reminders: AssistantReminder[] }>;
   showAssistantNotification(payload: AssistantNotificationPayload): Promise<void>;
   consumePendingAssistantNavigation(): Promise<AssistantNotificationNavigation>;
   addListener(

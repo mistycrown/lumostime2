@@ -10,6 +10,8 @@
  */
 
 import type { AssistantReminder } from '../types/assistant';
+import { Capacitor } from '@capacitor/core';
+import AssistantAgent from '../plugins/AssistantAgentPlugin';
 import { assistantMemoryService } from './assistantMemoryService';
 import {
   isAssistantDateTimeDue,
@@ -85,6 +87,16 @@ const syncRemindersToMemory = (reminders: AssistantReminder[]) => {
   assistantMemoryService.replaceActiveReminders(reminders.filter((reminder) => reminder.status === 'pending'));
 };
 
+const syncRemindersToNative = (reminders: AssistantReminder[]) => {
+  if (!Capacitor.isNativePlatform()) {
+    return;
+  }
+
+  void AssistantAgent.syncNativeReminders({ reminders }).catch((error) => {
+    console.error('[assistantReminderQueueService] Failed to sync native reminders', error);
+  });
+};
+
 export const assistantReminderQueueService = {
   getStorageKey(): string {
     return ASSISTANT_REMINDER_QUEUE_KEY;
@@ -101,6 +113,7 @@ export const assistantReminderQueueService = {
     );
     localStorage.setItem(ASSISTANT_REMINDER_QUEUE_KEY, JSON.stringify(normalized));
     syncRemindersToMemory(normalized);
+    syncRemindersToNative(normalized);
     return normalized;
   },
 
@@ -222,5 +235,20 @@ export const assistantReminderQueueService = {
   clearQueue(): void {
     localStorage.removeItem(ASSISTANT_REMINDER_QUEUE_KEY);
     syncRemindersToMemory([]);
+    syncRemindersToNative([]);
+  },
+
+  async hydrateFromNative(): Promise<AssistantReminder[]> {
+    if (!Capacitor.isNativePlatform()) {
+      return assistantReminderQueueService.listReminders();
+    }
+
+    try {
+      const result = await AssistantAgent.listNativeReminders();
+      return assistantReminderQueueService.saveReminders(result.reminders || []);
+    } catch (error) {
+      console.error('[assistantReminderQueueService] Failed to hydrate reminders from native', error);
+      return assistantReminderQueueService.listReminders();
+    }
   }
 };
