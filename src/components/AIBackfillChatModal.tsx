@@ -4,6 +4,9 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-01: Unified remaining hard-edged AI panels under the same subtle corner radius so history rows, composer surfaces, and auxiliary edit boxes no longer mix square and rounded treatments.
+ * @updated 2026-05-01: Reorganized AI settings into top-level tabs plus smaller in-section tabs so persona, avatar, background-agent, and context options read as layered panels instead of one long form.
+ * @updated 2026-05-01: Simplified persona-list selection in AI settings so the active row no longer uses a tinted background and relies on the checkmark alone.
  * @updated 2026-05-01: Widened the AI settings side gutters after the divider-based redesign so the editorial layout keeps more breathing room on both sides.
  * @updated 2026-05-01: Flattened the AI workspace into a more editorial layout by tightening composer height, simplifying history-session delete confirmations, reducing heavy card nesting, and trimming excessive radii/shadows across the AI panels.
  * @updated 2026-05-01: Native background replies are now rehydrated from Android diagnostics back into persisted chat sessions, so successful direct-native check-ins render in the main conversation instead of only in the debug history.
@@ -141,6 +144,7 @@ import {
   type AppliedActionStatus
 } from '../services/assistantActionExecutor';
 import type { AssistantToolCall, AssistantUnifiedTurnOutput } from '../types/assistant';
+import { CustomSelect } from './CustomSelect';
 
 type ChatTone = 'normal' | 'system' | 'error' | 'pending';
 
@@ -228,6 +232,8 @@ interface AIBackfillChatModalProps {
   onUnreadAssistantMessage?: (count?: number) => void;
   onMarkRead?: () => void;
 }
+
+type AISettingsMainTab = 'persona' | 'call';
 
 type AssistantAgentIntervalField = 'basePollMinutes' | 'minCheckinMinutes' | 'maxCheckinMinutes';
 
@@ -1594,6 +1600,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
   const [isPersonaPanelOpen, setIsPersonaPanelOpen] = useState(false);
+  const [activeSettingsMainTab, setActiveSettingsMainTab] = useState<AISettingsMainTab>('persona');
   const [debugViewer, setDebugViewer] = useState<DebugViewerState | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingSessionTitle, setEditingSessionTitle] = useState('');
@@ -1844,11 +1851,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return rightTime - leftTime;
     });
   }, [assistantBackgroundCallHistory, assistantNativeDiagnostics]);
-  const builtinPersonas = useMemo(
-    () => personas.filter((persona) => PERSONA_PRESET_ORDER.includes(persona.id)),
-    [personas]
-  );
-
   useEffect(() => {
     setEmojiDraft(activePersona.avatarIcon || '✨');
     setIsEmojiEditorOpen(false);
@@ -4890,33 +4892,33 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         }}
         className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
       >
-        <div className={`flex w-full max-w-[96%] flex-col space-y-2.5 sm:max-w-[92%] ${isUser ? 'items-end' : 'items-start'}`}>
-          <div className={`flex items-center gap-2 px-1 ${isUser ? 'flex-row-reverse justify-end self-end' : 'justify-start self-start'}`}>
+        <div className={`flex w-full max-w-[96%] flex-col space-y-2 sm:max-w-[92%] ${isUser ? 'items-end' : 'items-start'}`}>
+          <div className={`flex items-center gap-1.5 px-1 ${isUser ? 'flex-row-reverse justify-end self-end' : 'justify-start self-start'}`}>
             <div
-              className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-[0.75rem] border"
+              className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-[0.6rem] border"
               style={avatarStyle}
             >
               {isUser ? (
                 <UserAvatar profile={userProfile} iconClassName="text-xs" />
               ) : (
-                <div className="h-full w-full overflow-hidden rounded-[0.75rem]">
-                  <PersonaAvatar persona={activePersona} className="rounded-[0.75rem]" iconClassName="text-xs" />
+                <div className="h-full w-full overflow-hidden rounded-[0.6rem]">
+                  <PersonaAvatar persona={activePersona} className="rounded-[0.6rem]" iconClassName="text-xs" />
                 </div>
               )}
             </div>
             <p
-              className="font-serif text-[11px] tracking-[0.14em]"
+              className="font-serif text-[10px] tracking-[0.08em]"
               style={{ color: AI_CHAT_THEME.textFaint }}
             >
               {bubbleTitle}
             </p>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {visibleDisplayParts.map((part, index) => (
               <RevealingMessageBubble
                 key={`${message.id}-part-${index}`}
-                className="rounded-[1.25rem] border px-4 py-3"
+                className="rounded-[0.95rem] border px-4 py-3"
                 style={bubbleStyle}
                 revealMode={isAnimatedAssistantMessage ? 'assistantStaggered' : 'default'}
                 partIndex={index}
@@ -4933,11 +4935,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               </RevealingMessageBubble>
             ))}
             {allDisplayPartsRevealed && (
-              <div className="px-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <div className="px-1 text-[10px]" style={{ color: AI_CHAT_THEME.textMuted }}>
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                   <span>{formatConversationTime(message.createdAt)}</span>
                   <span className="hidden text-[#b4a79a] sm:inline">·</span>
-                  <span>{activeSession?.contextCacheEnabled ? `上下文已开启 · ${activePersona.contextMessageLimit} 轮` : '单轮模式'}</span>
+                  <span>{activeSession?.contextCacheEnabled ? `上下文开启 · ${activePersona.contextMessageLimit}轮` : '单轮'}</span>
                   {message.memoryUpdates && message.memoryUpdates.length > 0 && (
                     <>
                       <span className="hidden text-[#b4a79a] sm:inline">·</span>
@@ -4947,7 +4949,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         className="transition-colors hover:opacity-100"
                         style={{ color: AI_CHAT_THEME.textMuted }}
                       >
-                        记忆更新 · {message.memoryUpdates.length} 项 · {isMemoryUpdatesExpanded ? '收起' : '展开'}
+                        记忆更新 {message.memoryUpdates.length}项 · {isMemoryUpdatesExpanded ? '收起' : '展开'}
                       </button>
                     </>
                   )}
@@ -4960,7 +4962,23 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         className="transition-colors hover:opacity-100"
                         style={{ color: AI_CHAT_THEME.textMuted }}
                       >
-                        提醒结果 · {message.reminderUpdates.length} 项 · {isReminderUpdatesExpanded ? '收起' : '展开'}
+                        提醒结果 {message.reminderUpdates.length}项 · {isReminderUpdatesExpanded ? '收起' : '展开'}
+                      </button>
+                    </>
+                  )}
+                  {debugMode && message.debugSections && message.debugSections.length > 0 && (
+                    <>
+                      <span className="hidden text-[#b4a79a] sm:inline">·</span>
+                      <button
+                        type="button"
+                        onClick={() => setDebugViewer({
+                          title: `${activePersona.assistantSelfName || 'AI'} 调试`,
+                          sections: message.debugSections || []
+                        })}
+                        className="transition-colors hover:opacity-100"
+                        style={{ color: AI_CHAT_THEME.textMuted }}
+                      >
+                        查看调试
                       </button>
                     </>
                   )}
@@ -4971,13 +4989,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
           {allDisplayPartsRevealed && message.appliedActions && message.appliedActions.length > 0 && (
             <div
-              className="space-y-2 rounded-[1.15rem] border p-3"
+              className="space-y-2 border-l pl-3 pr-1 py-1"
               style={{
-                borderColor: AI_CHAT_THEME.panelBorder,
-                backgroundColor: AI_CHAT_THEME.panelBgStrong
+                borderColor: AI_CHAT_THEME.activeBorder
               }}
             >
-              <p className="font-serif text-[11px] tracking-[0.14em]" style={{ color: AI_CHAT_THEME.textFaint }}>
+              <p className="font-serif text-[10px] tracking-[0.08em]" style={{ color: AI_CHAT_THEME.textFaint }}>
                 应用结果
               </p>
               <div className="space-y-2">
@@ -4988,10 +5005,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
           {allDisplayPartsRevealed && message.memoryUpdates && message.memoryUpdates.length > 0 && isMemoryUpdatesExpanded && (
             <div
-              className="space-y-2 rounded-[1.15rem] border p-3"
+              className="space-y-2 border-l pl-3 pr-1 py-1"
               style={{
-                borderColor: AI_CHAT_THEME.panelBorder,
-                backgroundColor: AI_CHAT_THEME.panelBgStrong
+                borderColor: AI_CHAT_THEME.activeBorder
               }}
             >
               <div className="space-y-2">
@@ -5017,10 +5033,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
           {allDisplayPartsRevealed && message.reminderUpdates && message.reminderUpdates.length > 0 && isReminderUpdatesExpanded && (
             <div
-              className="space-y-2 rounded-[1.15rem] border p-3"
+              className="space-y-2 border-l pl-3 pr-1 py-1"
               style={{
-                borderColor: AI_CHAT_THEME.panelBorder,
-                backgroundColor: AI_CHAT_THEME.panelBgStrong
+                borderColor: AI_CHAT_THEME.activeBorder
               }}
             >
               <div className="space-y-2">
@@ -5038,26 +5053,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               </div>
             </div>
           )}
-
-            {debugMode && message.debugSections && message.debugSections.length > 0 && (
-              <div className="pl-1">
-                <button
-                  onClick={() => setDebugViewer({
-                    title: `${activePersona.assistantSelfName || 'AI'} 调试`,
-                    sections: message.debugSections || []
-                  })}
-                  className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
-                  style={{
-                    borderColor: AI_CHAT_THEME.chipBorder,
-                    backgroundColor: AI_CHAT_THEME.panelBg,
-                    color: AI_CHAT_THEME.textSecondary
-                  }}
-                >
-                  <Sparkles size={12} />
-                  查看调试
-                </button>
-              </div>
-            )}
 
             {!isUser && tone === 'error' && message.retryInput && (
               <div className="pl-1">
@@ -5098,17 +5093,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         }}
       >
         <div
-          className="flex h-14 items-center justify-between gap-4 border-b px-4 backdrop-blur-md"
+          className="flex h-[3.25rem] items-center justify-between gap-3 border-b px-4 backdrop-blur-md"
           style={{
             borderColor: AI_CHAT_THEME.panelBorder,
             backgroundColor: AI_CHAT_THEME.panelBg
           }}
         >
-          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-3.5">
             <button
               onClick={() => !isLoading && setIsPersonaPanelOpen(true)}
               disabled={isLoading}
-              className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[1rem] border text-base transition-all disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[0.8rem] border text-base transition-all disabled:cursor-not-allowed disabled:opacity-60"
               style={{
                 borderColor: AI_CHAT_THEME.panelBorder,
                 backgroundColor: AI_CHAT_THEME.avatarBg,
@@ -5121,15 +5116,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
             <div className="min-w-0 self-center">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="truncate font-serif text-lg font-bold leading-none" style={{ color: AI_CHAT_THEME.textPrimary }}>
+                <h2 className="truncate font-serif text-[1.05rem] font-bold leading-none" style={{ color: AI_CHAT_THEME.textPrimary }}>
                   {activePersona.name || 'AI 助手'}
                 </h2>
                 {debugMode && (
                   <span
-                    className="rounded-full border px-2 py-0.5 text-[10px] font-medium tracking-[0.12em]"
+                    className="text-[10px] tracking-[0.08em]"
                     style={{
-                      borderColor: AI_CHAT_THEME.chipBorder,
-                      backgroundColor: AI_CHAT_THEME.chipBg,
                       color: AI_CHAT_THEME.textMuted
                     }}
                   >
@@ -5144,7 +5137,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             <button
               onClick={() => !isLoading && setIsHistoryPanelOpen(true)}
               disabled={isLoading}
-              className="inline-flex h-9 items-center gap-2 rounded-[0.8rem] border px-3 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-8 items-center gap-1.5 rounded-[0.75rem] border px-2.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
               style={{
                 borderColor: AI_CHAT_THEME.chipBorder,
                 backgroundColor: AI_CHAT_THEME.panelBg,
@@ -5158,7 +5151,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
             <button
               onClick={onClose}
-              className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] border transition-colors"
+              className="flex h-8 w-8 items-center justify-center rounded-[0.75rem] border transition-colors"
               style={{
                 borderColor: AI_CHAT_THEME.chipBorder,
                 backgroundColor: AI_CHAT_THEME.panelBg,
@@ -5216,7 +5209,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               <p>输入 `/debug` 可以打开或关闭调试模式。</p>
             </div>
           ) : (
-            <div className="mx-auto max-w-[920px] space-y-5">
+            <div className="mx-auto max-w-[920px] space-y-4">
               {activeSession.messages.map(renderMessageBubble)}
               <div ref={messagesEndRef} />
             </div>
@@ -5231,7 +5224,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           }}
         >
           <div
-            className="mx-auto max-w-[920px] border px-3 pb-2 pt-2.5"
+            className="mx-auto max-w-[920px] rounded-[0.85rem] border px-3 pb-2 pt-2.5"
             style={{
               borderColor: AI_CHAT_THEME.panelBorder,
               backgroundColor: AI_CHAT_THEME.panelBg,
@@ -5362,7 +5355,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     return (
                       <div
                         key={session.id}
-                        className="w-full border px-4 py-3 text-left transition-all"
+                        className="w-full rounded-[0.85rem] border px-4 py-3 text-left transition-all"
                         style={
                           session.id === activeSessionId
                             ? {
@@ -5545,571 +5538,83 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-8">
-                <div className="mx-auto flex max-w-4xl flex-col">
-                  <section
-                    className="order-1 border-b px-2 py-5 sm:px-3"
-                    style={{
-                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)'
-                    }}
-                  >
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <p className="text-sm font-bold text-stone-800">人设列表</p>
+                <div className="mx-auto max-w-4xl">
+                  <div className="mb-5 flex gap-6 overflow-x-auto border-b border-stone-200 no-scrollbar">
+                    {([
+                      { id: 'persona', label: '人设设置' },
+                      { id: 'call', label: '调用设置' }
+                    ] as Array<{ id: AISettingsMainTab; label: string }>).map((tab) => (
                       <button
-                        onClick={handleCreatePersona}
-                        className="inline-flex items-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium text-[#4b5563] transition-colors hover:bg-white"
-                        style={{
-                          borderColor: 'color-mix(in srgb, var(--accent-color) 14%, #d8dde6)',
-                          backgroundColor: 'color-mix(in srgb, var(--accent-color) 4%, white)'
-                        }}
+                        key={tab.id}
+                        onClick={() => setActiveSettingsMainTab(tab.id)}
+                        className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors ${
+                          activeSettingsMainTab === tab.id
+                            ? 'border-b-2 border-stone-900 font-bold text-stone-900'
+                            : 'text-stone-400 hover:text-stone-600'
+                        }`}
                       >
-                        <Plus size={14} />
-                        添加人设
+                        {tab.label}
                       </button>
-                    </div>
-                    <div
-                      className="border-t"
-                      style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)' }}
-                    >
-                      {builtinPersonas.map((persona) => (
-                        <button
-                          key={persona.id}
-                          onClick={() => handleApplyPersonaPreset(persona.id)}
-                          className="w-full border-b px-2 py-3 text-left transition-colors hover:bg-white/70 sm:px-3"
-                          style={
-                            activeSession?.personaId === persona.id
-                              ? {
-                                  borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
-                                  backgroundColor: 'color-mix(in srgb, var(--accent-color) 4%, white)',
-                                  color: '#1f2937'
-                                }
-                              : {
-                                  borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
-                                  backgroundColor: 'transparent',
-                                  color: '#4b5563'
-                                }
-                          }
-                        >
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[0.75rem] border bg-white text-lg"
-                              style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 12%, #e5e7eb)' }}
-                            >
-                              <PersonaAvatar persona={persona} iconClassName="text-lg" />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <p className="text-sm font-bold">{persona.name}</p>
-                                {activeSession?.personaId === persona.id && (
-                                  <span
-                                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[0.5rem] border bg-white text-[#374151]"
-                                    style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 16%, #d8dde6)' }}
-                                  >
-                                    <Check size={12} />
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-stone-500">
-                                {persona.isBuiltIn ? '内置模板' : '自定义人设'}
-                              </p>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                      {personas.filter((persona) => !PERSONA_PRESET_ORDER.includes(persona.id)).map((persona) => (
-                        <button
-                          key={persona.id}
-                          onClick={() => handleApplyPersonaPreset(persona.id)}
-                          className="w-full border-b px-2 py-3 text-left transition-colors hover:bg-white/70 sm:px-3"
-                          style={
-                            activeSession?.personaId === persona.id
-                              ? {
-                                  borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
-                                  backgroundColor: 'color-mix(in srgb, var(--accent-color) 4%, white)',
-                                  color: '#1f2937'
-                                }
-                              : {
-                                  borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
-                                  backgroundColor: 'transparent',
-                                  color: '#4b5563'
-                                }
-                          }
-                        >
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[0.75rem] border bg-white text-lg"
-                              style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 12%, #e5e7eb)' }}
-                            >
-                              <PersonaAvatar persona={persona} iconClassName="text-lg" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className="truncate text-sm font-bold">{persona.name}</p>
-                                {activeSession?.personaId === persona.id && (
-                                  <span
-                                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[0.5rem] border bg-white text-[#374151]"
-                                    style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 16%, #d8dde6)' }}
-                                  >
-                                    <Check size={12} />
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-stone-500">
-                                自定义人设
-                              </p>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
+                    ))}
+                  </div>
 
-                  <section
-                    className="order-4 border-b px-2 py-5 sm:px-3"
-                    style={{
-                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)'
-                    }}
-                  >
-                    <div className="mb-4 flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-bold text-stone-800">后台助理</p>
-                        <p className="mt-1 text-xs text-stone-500">控制 Android 后台轮询、长期记忆和Reminder 能力。</p>
-                      </div>
-                      <span
-                        className="rounded-[0.75rem] border px-3 py-1 text-xs font-medium"
-                        style={{
-                          borderColor: AI_CHAT_THEME.chipBorder,
-                          backgroundColor: AI_CHAT_THEME.chipBg,
-                          color: AI_CHAT_THEME.textMuted
-                        }}
-                      >
-                        Android
-                      </span>
-                    </div>
-
-                    <div
-                      className="border-t"
-                      style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)' }}
-                    >
-                      <div
-                        className="flex items-start justify-between gap-4 border-b py-4"
-                        style={{
-                          borderColor: AI_CHAT_THEME.panelBorder
-                        }}
-                      >
-                        <div>
-                          <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>开启后台轮询</p>
-                          <p className="mt-1 text-xs leading-5" style={{ color: AI_CHAT_THEME.textMuted }}>
-                            开启后，后台 Agent 才会随机 check-in，并在收到系统触发时发起 system turn。
-                          </p>
+                  {activeSettingsMainTab === 'persona' ? (
+                    <div className="space-y-8">
+                      <section className="space-y-4">
+                        <div className="flex min-h-[3.25rem] items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-bold text-stone-800">选择人设</p>
+                          </div>
+                          <button
+                            onClick={handleCreatePersona}
+                            className="inline-flex items-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium text-[#4b5563] transition-colors hover:bg-white"
+                            style={{
+                              borderColor: 'color-mix(in srgb, var(--accent-color) 14%, #d8dde6)',
+                              backgroundColor: 'color-mix(in srgb, var(--accent-color) 4%, white)'
+                            }}
+                          >
+                            <Plus size={14} />
+                            添加人设
+                          </button>
                         </div>
-                        <button
-                          onClick={() => handleUpdateAssistantAgentConfig({ enabled: !assistantAgentConfig.enabled })}
-                          className="inline-flex min-w-[72px] items-center justify-center rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors"
-                          style={assistantAgentConfig.enabled
-                            ? {
-                              borderColor: AI_CHAT_THEME.activeBorder,
-                              backgroundColor: AI_CHAT_THEME.activeBg,
-                              color: AI_CHAT_THEME.textPrimary
-                            }
-                            : {
+
+                        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                          <div className="block">
+                            <span className="mb-1 block text-xs font-medium text-stone-500">当前会话人设</span>
+                            <CustomSelect
+                              value={activeSession?.personaId || ''}
+                              onChange={handleApplyPersonaPreset}
+                              options={personas.map((persona) => ({
+                                value: persona.id,
+                                label: `${persona.name || '未命名人设'}${persona.isBuiltIn ? ' · 内置' : ' · 自定义'}`
+                              }))}
+                              className="w-full"
+                            />
+                          </div>
+
+                          <span
+                            className="inline-flex h-[2.625rem] items-center rounded-[0.75rem] border px-3 text-xs font-medium"
+                            style={{
                               borderColor: AI_CHAT_THEME.chipBorder,
-                              backgroundColor: AI_CHAT_THEME.inputBg,
+                              backgroundColor: AI_CHAT_THEME.chipBg,
                               color: AI_CHAT_THEME.textMuted
                             }}
-                        >
-                          {assistantAgentConfig.enabled ? '已开启' : '未开启'}
-                        </button>
-                      </div>
-
-                      <div
-                        className="border-b py-4"
-                        style={{
-                          borderColor: AI_CHAT_THEME.panelBorder
-                        }}
-                      >
-                        <div className="mb-3">
-                          <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>check-in 间隔</p>
-                          <p className="mt-1 text-xs leading-5" style={{ color: AI_CHAT_THEME.textMuted }}>
-                            后台服务会按“检查频率”定期醒来检查一次；如果到了随机 check-in 的时间，就会触发后台调用。
-                          </p>
-                        </div>
-
-                        <div className="grid gap-3 sm:grid-cols-3">
-                          <label className="block">
-                            <span className="mb-1 block text-xs font-medium text-stone-500">检查频率（分钟）</span>
-                            <div className="relative">
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                value={assistantAgentIntervalDrafts.basePollMinutes}
-                                onChange={(event) => handleAssistantAgentIntervalDraftChange('basePollMinutes', event.target.value)}
-                                onBlur={() => commitAssistantAgentIntervalDraft('basePollMinutes')}
-                                onKeyDown={(event) => {
-                                  if (event.key === 'Enter') {
-                                    event.preventDefault();
-                                    commitAssistantAgentIntervalDraft('basePollMinutes');
-                                  }
-                                }}
-                                aria-invalid={!!assistantAgentIntervalErrors.basePollMinutes}
-                                className="w-full rounded-[1rem] border px-3 py-2 pr-9 text-sm outline-none"
-                                style={{
-                                  borderColor: assistantAgentIntervalErrors.basePollMinutes ? '#ef4444' : AI_CHAT_THEME.chipBorder,
-                                  backgroundColor: AI_CHAT_THEME.inputBg,
-                                  color: AI_CHAT_THEME.textPrimary
-                                }}
-                              />
-                              {assistantAgentIntervalErrors.basePollMinutes ? (
-                                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-red-500">
-                                  <XCircle size={15} aria-hidden="true" />
-                                </span>
-                              ) : null}
-                            </div>
-                            {assistantAgentIntervalErrors.basePollMinutes ? (
-                              <span className="mt-1 block text-xs font-medium text-red-500" role="alert">
-                                {assistantAgentIntervalErrors.basePollMinutes}
-                              </span>
-                            ) : null}
-                          </label>
-
-                          <label className="block">
-                            <span className="mb-1 block text-xs font-medium text-stone-500">最低间隔（分钟）</span>
-                            <div className="relative">
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                value={assistantAgentIntervalDrafts.minCheckinMinutes}
-                                onChange={(event) => handleAssistantAgentIntervalDraftChange('minCheckinMinutes', event.target.value)}
-                                onBlur={() => commitAssistantAgentIntervalDraft('minCheckinMinutes')}
-                                onKeyDown={(event) => {
-                                  if (event.key === 'Enter') {
-                                    event.preventDefault();
-                                    commitAssistantAgentIntervalDraft('minCheckinMinutes');
-                                  }
-                                }}
-                                aria-invalid={!!assistantAgentIntervalErrors.minCheckinMinutes}
-                                className="w-full rounded-[1rem] border px-3 py-2 pr-9 text-sm outline-none"
-                                style={{
-                                  borderColor: assistantAgentIntervalErrors.minCheckinMinutes ? '#ef4444' : AI_CHAT_THEME.chipBorder,
-                                  backgroundColor: AI_CHAT_THEME.inputBg,
-                                  color: AI_CHAT_THEME.textPrimary
-                                }}
-                              />
-                              {assistantAgentIntervalErrors.minCheckinMinutes ? (
-                                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-red-500">
-                                  <XCircle size={15} aria-hidden="true" />
-                                </span>
-                              ) : null}
-                            </div>
-                            {assistantAgentIntervalErrors.minCheckinMinutes ? (
-                              <span className="mt-1 block text-xs font-medium text-red-500" role="alert">
-                                {assistantAgentIntervalErrors.minCheckinMinutes}
-                              </span>
-                            ) : null}
-                          </label>
-
-                          <label className="block">
-                            <span className="mb-1 block text-xs font-medium text-stone-500">最高间隔（分钟）</span>
-                            <div className="relative">
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                value={assistantAgentIntervalDrafts.maxCheckinMinutes}
-                                onChange={(event) => handleAssistantAgentIntervalDraftChange('maxCheckinMinutes', event.target.value)}
-                                onBlur={() => commitAssistantAgentIntervalDraft('maxCheckinMinutes')}
-                                onKeyDown={(event) => {
-                                  if (event.key === 'Enter') {
-                                    event.preventDefault();
-                                    commitAssistantAgentIntervalDraft('maxCheckinMinutes');
-                                  }
-                                }}
-                                aria-invalid={!!assistantAgentIntervalErrors.maxCheckinMinutes}
-                                className="w-full rounded-[1rem] border px-3 py-2 pr-9 text-sm outline-none"
-                                style={{
-                                  borderColor: assistantAgentIntervalErrors.maxCheckinMinutes ? '#ef4444' : AI_CHAT_THEME.chipBorder,
-                                  backgroundColor: AI_CHAT_THEME.inputBg,
-                                  color: AI_CHAT_THEME.textPrimary
-                                }}
-                              />
-                              {assistantAgentIntervalErrors.maxCheckinMinutes ? (
-                                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-red-500">
-                                  <XCircle size={15} aria-hidden="true" />
-                                </span>
-                              ) : null}
-                            </div>
-                            {assistantAgentIntervalErrors.maxCheckinMinutes ? (
-                              <span className="mt-1 block text-xs font-medium text-red-500" role="alert">
-                                {assistantAgentIntervalErrors.maxCheckinMinutes}
-                              </span>
-                            ) : null}
-                          </label>
-                        </div>
-                      </div>
-
-                      <div
-                        className="flex items-start justify-between gap-4 border-b py-4"
-                        style={{
-                          borderColor: AI_CHAT_THEME.panelBorder
-                        }}
-                      >
-                        <div>
-                          <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>开启长期记忆</p>
-                          <p className="mt-1 text-xs leading-5" style={{ color: AI_CHAT_THEME.textMuted }}>
-                            开启后，后台助理会持续保存结构化记忆，并在后续 system turn 中复用。
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => handleUpdateAssistantAgentConfig({ longTermMemoryEnabled: !assistantAgentConfig.longTermMemoryEnabled })}
-                          className="inline-flex min-w-[72px] items-center justify-center rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors"
-                          style={assistantAgentConfig.longTermMemoryEnabled
-                            ? {
-                              borderColor: AI_CHAT_THEME.activeBorder,
-                              backgroundColor: AI_CHAT_THEME.activeBg,
-                              color: AI_CHAT_THEME.textPrimary
-                            }
-                            : {
-                              borderColor: AI_CHAT_THEME.chipBorder,
-                              backgroundColor: AI_CHAT_THEME.inputBg,
-                              color: AI_CHAT_THEME.textMuted
-                            }}
-                        >
-                          {assistantAgentConfig.longTermMemoryEnabled ? '已开启' : '未开启'}
-                        </button>
-                      </div>
-
-                      <div
-                        className="hidden"
-                        style={{
-                          borderColor: AI_CHAT_THEME.panelBorder,
-                          backgroundColor: AI_CHAT_THEME.panelBg
-                        }}
-                      >
-                        <div>
-                          <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>开启 Reminder</p>
-                          <p className="mt-1 text-xs leading-5" style={{ color: AI_CHAT_THEME.textMuted }}>
-                            这一项会在后续版本开放。第一版先只接通后台轮询和长期记忆。
-                          </p>
-                        </div>
-                        <button
-                          disabled
-                          className="inline-flex min-w-[84px] items-center justify-center rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium"
-                          style={{
-                            borderColor: AI_CHAT_THEME.chipBorder,
-                            backgroundColor: AI_CHAT_THEME.inputBg,
-                            color: AI_CHAT_THEME.textMuted
-                          }}
-                        >
-                          即将支持
-                        </button>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2 pt-4">
-                        <button
-                          onClick={handleOpenAssistantMemoryViewer}
-                          className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
-                          style={{
-                            borderColor: AI_CHAT_THEME.chipBorder,
-                            backgroundColor: AI_CHAT_THEME.panelBg,
-                            color: AI_CHAT_THEME.textSecondary
-                          }}
-                        >
-                          查看长期记忆
-                        </button>
-                        <button
-                          onClick={handleOpenAssistantBackgroundHistoryViewer}
-                          className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors"
-                          style={{
-                            borderColor: AI_CHAT_THEME.chipBorder,
-                            backgroundColor: AI_CHAT_THEME.panelBg,
-                            color: AI_CHAT_THEME.textSecondary
-                          }}
-                        >
-                          查看后台调用记录
-                        </button>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section
-                    className="order-3 border-b px-2 py-5 sm:px-3"
-                    style={{
-                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)'
-                    }}
-                  >
-                    <div className="mb-4 flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-bold text-stone-800">用户头像</p>
-                      </div>
-                      <span
-                        className="rounded-[0.75rem] border px-3 py-1 text-xs font-medium"
-                        style={{
-                          borderColor: AI_CHAT_THEME.chipBorder,
-                          backgroundColor: AI_CHAT_THEME.chipBg,
-                          color: AI_CHAT_THEME.textMuted
-                        }}
-                      >
-                        全局设置
-                      </span>
-                    </div>
-
-                    <input
-                      ref={userAvatarInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleUserAvatarUpload}
-                    />
-
-                    <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start">
-                      <div className="px-1 py-1">
-                        <div className="flex items-center gap-4">
-                          <div
-                            className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-[1.35rem] border text-2xl"
-                            style={{
-                              borderColor: AI_CHAT_THEME.panelBorder,
-                              backgroundColor: AI_CHAT_THEME.avatarBg,
-                              boxShadow: AI_CHAT_THEME.avatarShadow
-                            }}
                           >
-                            <UserAvatar profile={userProfile} iconClassName="text-xl" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>当前用户头像</p>
+                            {activePersona.isBuiltIn ? '内置模板' : '自定义人设'}
+                          </span>
+                        </div>
+                      </section>
+
+                      <section
+                        className="border-t pt-5"
+                        style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)' }}
+                      >
+                        <div className="mb-4 flex min-h-[3.25rem] items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-bold text-stone-800">人设内容</p>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="space-y-3">
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            onClick={handleUseUserEmojiAvatar}
-                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white sm:flex-none"
-                            style={{
-                              borderColor: AI_CHAT_THEME.chipBorder,
-                              backgroundColor: AI_CHAT_THEME.avatarBg,
-                              color: AI_CHAT_THEME.textSecondary
-                            }}
-                          >
-                            <Sparkles size={14} />
-                            Emoji
-                          </button>
-                          <button
-                            onClick={() => userAvatarInputRef.current?.click()}
-                            disabled={isUploadingUserAvatar}
-                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
-                            style={{
-                              borderColor: AI_CHAT_THEME.chipBorder,
-                              backgroundColor: AI_CHAT_THEME.avatarBg,
-                              color: AI_CHAT_THEME.textSecondary
-                            }}
-                          >
-                            {isUploadingUserAvatar ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                            {isUploadingUserAvatar ? '上传中' : '上传图片'}
-                          </button>
-                          <button
-                            onClick={() => void handleResetUserAvatar()}
-                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white sm:flex-none"
-                            style={{
-                              borderColor: AI_CHAT_THEME.chipBorder,
-                              backgroundColor: AI_CHAT_THEME.avatarBg,
-                              color: AI_CHAT_THEME.textSecondary
-                            }}
-                          >
-                            <RotateCcw size={14} />
-                            默认
-                          </button>
-                        </div>
-
-                        {isUserEmojiEditorOpen && (
-                          <div
-                            className="border p-3"
-                            style={{
-                              borderColor: AI_CHAT_THEME.panelBorder,
-                              backgroundColor: AI_CHAT_THEME.panelBg
-                            }}
-                          >
-                            <div className="flex flex-wrap gap-2">
-                              {PERSONA_EMOJI_CHOICES.map((emoji) => (
-                                <button
-                                  key={`user-${emoji}`}
-                                  onClick={() => setUserEmojiDraft(emoji)}
-                                  className="flex h-10 w-10 items-center justify-center rounded-[0.7rem] border text-lg transition-colors hover:bg-white"
-                                  style={{
-                                    borderColor: userEmojiDraft.trim() === emoji ? AI_CHAT_THEME.activeBorder : AI_CHAT_THEME.panelBorder,
-                                    backgroundColor: userEmojiDraft.trim() === emoji ? AI_CHAT_THEME.activeBg : AI_CHAT_THEME.panelBgStrong,
-                                    color: userEmojiDraft.trim() === emoji ? AI_CHAT_THEME.textPrimary : AI_CHAT_THEME.textSecondary,
-                                    boxShadow: userEmojiDraft.trim() === emoji ? `0 0 0 1px ${accentMix(8, 'rgba(0,0,0,0.02)')}` : undefined
-                                  }}
-                                >
-                                  {emoji}
-                                </button>
-                              ))}
-                            </div>
-                            <div
-                              className="mt-3 rounded-[0.75rem] border px-3 py-3"
-                              style={{
-                                borderColor: AI_CHAT_THEME.chipBorder,
-                                backgroundColor: AI_CHAT_THEME.inputBg
-                              }}
-                            >
-                              <input
-                                value={userEmojiDraft}
-                                onChange={(event) => setUserEmojiDraft(event.target.value)}
-                                className="w-full bg-transparent text-sm outline-none"
-                                style={{ color: AI_CHAT_THEME.textPrimary }}
-                                placeholder="输入一个 Emoji，例如 🙂"
-                              />
-                            </div>
-                            <div className="mt-3 flex justify-end gap-2">
-                              <button
-                                onClick={handleCancelUserEmojiAvatarEdit}
-                                className="rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white"
-                                style={{
-                                  borderColor: AI_CHAT_THEME.chipBorder,
-                                  backgroundColor: AI_CHAT_THEME.chipBg,
-                                  color: AI_CHAT_THEME.textSecondary
-                                }}
-                              >
-                                取消
-                              </button>
-                              <button
-                                onClick={() => void handleApplyUserEmojiAvatar()}
-                                className="rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium text-white transition-colors"
-                                style={{
-                                  borderColor: AI_CHAT_THEME.primaryButtonBorder,
-                                  backgroundColor: AI_CHAT_THEME.primaryButtonBg
-                                }}
-                              >
-                                保存 Emoji
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </section>
-
-                  <section
-                    className="order-2 border-b px-2 py-5 sm:px-3"
-                    style={{
-                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)'
-                    }}
-                  >
-                    <div className="mb-4 flex items-center justify-between gap-3">
-                      <p className="text-sm font-bold text-stone-800">当前人设</p>
-                      <span
-                        className="rounded-[0.75rem] border px-3 py-1 text-xs font-medium"
-                        style={{
-                          borderColor: AI_CHAT_THEME.chipBorder,
-                          backgroundColor: AI_CHAT_THEME.chipBg,
-                          color: AI_CHAT_THEME.textMuted
-                        }}
-                      >
-                        {activePersona.isBuiltIn ? '内置模板' : '自定义人设'}
-                      </span>
-                    </div>
-
-                    <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start">
-                      <div className="space-y-3">
                         <input
                           ref={avatarInputRef}
                           type="file"
@@ -6118,353 +5623,646 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           onChange={handleAvatarUpload}
                         />
 
-                        <div className="flex flex-col gap-3 px-1 py-1">
-                          <div className="flex items-center gap-4">
-                            <div
-                              className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-[0.95rem] border text-2xl"
-                              style={{
-                                borderColor: AI_CHAT_THEME.panelBorder,
-                                backgroundColor: AI_CHAT_THEME.avatarBg,
-                                boxShadow: AI_CHAT_THEME.avatarShadow
-                              }}
-                            >
-                              <PersonaAvatar persona={activePersona} iconClassName="text-2xl" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-bold" style={{ color: AI_CHAT_THEME.textPrimary }}>{activePersona.name || '未命名人设'}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              onClick={handleUseEmojiAvatar}
-                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white sm:flex-none"
-                              style={{
-                                borderColor: AI_CHAT_THEME.chipBorder,
-                                backgroundColor: AI_CHAT_THEME.avatarBg,
-                                color: AI_CHAT_THEME.textSecondary
-                              }}
-                            >
-                              <Sparkles size={14} />
-                              Emoji
-                            </button>
-                            <button
-                              onClick={() => avatarInputRef.current?.click()}
-                              disabled={isUploadingAvatar}
-                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
-                              style={{
-                                borderColor: AI_CHAT_THEME.chipBorder,
-                                backgroundColor: AI_CHAT_THEME.avatarBg,
-                                color: AI_CHAT_THEME.textSecondary
-                              }}
-                            >
-                              {isUploadingAvatar ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                              {isUploadingAvatar ? '上传中' : '上传图片'}
-                            </button>
-                            {!activePersona.isBuiltIn && (
-                              <button
-                                onClick={() => setDeleteConfirmPersonaId((current) => current === activePersona.id ? null : activePersona.id)}
-                                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors sm:flex-none"
+                        <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start">
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-4">
+                              <div
+                                className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[0.95rem] border text-2xl"
                                 style={{
-                                  borderColor: AI_CHAT_THEME.dangerBorder,
-                                  backgroundColor: AI_CHAT_THEME.dangerBg,
-                                  color: AI_CHAT_THEME.dangerText
+                                  borderColor: AI_CHAT_THEME.panelBorder,
+                                  backgroundColor: AI_CHAT_THEME.avatarBg,
+                                  boxShadow: AI_CHAT_THEME.avatarShadow
                                 }}
                               >
-                                <Trash2 size={14} />
-                                删除人设
-                              </button>
-                            )}
-                          </div>
-                        </div>
+                                <PersonaAvatar persona={activePersona} iconClassName="text-2xl" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-bold" style={{ color: AI_CHAT_THEME.textPrimary }}>
+                                  {activePersona.name || '未命名人设'}
+                                </p>
+                              </div>
+                            </div>
 
-                        {isEmojiEditorOpen && (
-                          <div
-                            className="border p-3"
-                            style={{
-                              borderColor: AI_CHAT_THEME.panelBorder,
-                              backgroundColor: AI_CHAT_THEME.panelBg
-                            }}
-                          >
                             <div className="flex flex-wrap gap-2">
-                              {PERSONA_EMOJI_CHOICES.map((emoji) => (
-                                <button
-                                  key={emoji}
-                                  onClick={() => setEmojiDraft(emoji)}
-                                  className={`flex h-10 w-10 items-center justify-center rounded-[0.7rem] border text-lg transition-colors ${
-                                    emojiDraft.trim() === emoji
-                                      ? 'shadow-[0_0_0_1px_rgba(0,0,0,0.03)]'
-                                      : 'hover:bg-white'
-                                  }`}
-                                  style={
-                                    emojiDraft.trim() === emoji
-                                      ? {
-                                          borderColor: AI_CHAT_THEME.activeBorder,
-                                          backgroundColor: AI_CHAT_THEME.activeBg,
-                                          color: AI_CHAT_THEME.textPrimary
-                                        }
-                                      : {
-                                          borderColor: AI_CHAT_THEME.panelBorder,
-                                          backgroundColor: AI_CHAT_THEME.panelBgStrong,
-                                          color: AI_CHAT_THEME.textSecondary
-                                        }
-                                  }
-                                >
-                                  {emoji}
-                                </button>
-                              ))}
-                            </div>
-
-                            <div
-                              className="mt-3 rounded-[0.75rem] border px-3 py-3"
-                              style={{
-                                borderColor: AI_CHAT_THEME.chipBorder,
-                                backgroundColor: AI_CHAT_THEME.inputBg
-                              }}
-                            >
-                              <input
-                                value={emojiDraft}
-                                onChange={(event) => setEmojiDraft(event.target.value)}
-                                className="w-full bg-transparent text-sm outline-none"
-                                style={{ color: AI_CHAT_THEME.textPrimary }}
-                                placeholder="输入一个 Emoji，例如 ✨"
-                              />
-                            </div>
-
-                            <div className="mt-3 flex justify-end gap-2">
                               <button
-                                onClick={handleCancelEmojiAvatarEdit}
-                                className="rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white"
-                                style={{
-                                  borderColor: AI_CHAT_THEME.chipBorder,
-                                  backgroundColor: AI_CHAT_THEME.inputBg,
-                                  color: AI_CHAT_THEME.textSecondary
-                                }}
-                              >
-                                取消
-                              </button>
-                              <button
-                                onClick={() => void handleApplyEmojiAvatar()}
-                                className="rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium text-white transition-colors"
-                                style={{
-                                  borderColor: AI_CHAT_THEME.primaryButtonBorder,
-                                  backgroundColor: AI_CHAT_THEME.primaryButtonBg
-                                }}
-                              >
-                                保存 Emoji
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                        {deleteConfirmPersonaId === activePersona.id && !activePersona.isBuiltIn && (
-                          <div
-                            className="border p-3 text-xs"
-                            style={{
-                              borderColor: AI_CHAT_THEME.dangerBorder,
-                              backgroundColor: AI_CHAT_THEME.dangerBg,
-                              color: AI_CHAT_THEME.dangerText
-                            }}
-                          >
-                            <p>确认删除这个人设？</p>
-                            <div className="mt-3 flex justify-end gap-2">
-                              <button
-                                onClick={() => setDeleteConfirmPersonaId(null)}
-                                className="rounded-[0.75rem] border px-3 py-1.5 font-medium transition-colors hover:bg-white"
+                                onClick={handleUseEmojiAvatar}
+                                className="inline-flex items-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
                                 style={{
                                   borderColor: AI_CHAT_THEME.chipBorder,
                                   backgroundColor: AI_CHAT_THEME.avatarBg,
                                   color: AI_CHAT_THEME.textSecondary
                                 }}
                               >
-                                取消
+                                <Sparkles size={14} />
+                                Emoji
                               </button>
                               <button
-                                onClick={() => void handleDeleteCurrentPersona()}
-                                className="rounded-[0.75rem] border px-3 py-1.5 font-medium text-white transition-colors"
+                                onClick={() => avatarInputRef.current?.click()}
+                                disabled={isUploadingAvatar}
+                                className="inline-flex items-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
                                 style={{
-                                  borderColor: AI_CHAT_THEME.dangerBorder,
-                                  backgroundColor: AI_CHAT_THEME.dangerText
+                                  borderColor: AI_CHAT_THEME.chipBorder,
+                                  backgroundColor: AI_CHAT_THEME.avatarBg,
+                                  color: AI_CHAT_THEME.textSecondary
                                 }}
                               >
-                                删除
+                                {isUploadingAvatar ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                                {isUploadingAvatar ? '上传中' : '上传图片'}
+                              </button>
+                              {!activePersona.isBuiltIn && (
+                                <button
+                                  onClick={() => setDeleteConfirmPersonaId((current) => current === activePersona.id ? null : activePersona.id)}
+                                  className="inline-flex items-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors"
+                                  style={{
+                                    borderColor: AI_CHAT_THEME.dangerBorder,
+                                    backgroundColor: AI_CHAT_THEME.dangerBg,
+                                    color: AI_CHAT_THEME.dangerText
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                  删除人设
+                                </button>
+                              )}
+                            </div>
+
+                            {isEmojiEditorOpen && (
+                              <div
+                                className="rounded-[0.85rem] border p-3"
+                                style={{
+                                  borderColor: AI_CHAT_THEME.panelBorder,
+                                  backgroundColor: AI_CHAT_THEME.panelBg
+                                }}
+                              >
+                                <div className="flex flex-wrap gap-2">
+                                  {PERSONA_EMOJI_CHOICES.map((emoji) => (
+                                    <button
+                                      key={emoji}
+                                      onClick={() => setEmojiDraft(emoji)}
+                                      className={`flex h-10 w-10 items-center justify-center rounded-[0.7rem] border text-lg transition-colors ${
+                                        emojiDraft.trim() === emoji ? 'shadow-[0_0_0_1px_rgba(0,0,0,0.03)]' : 'hover:bg-white'
+                                      }`}
+                                      style={emojiDraft.trim() === emoji
+                                        ? {
+                                          borderColor: AI_CHAT_THEME.activeBorder,
+                                          backgroundColor: AI_CHAT_THEME.activeBg,
+                                          color: AI_CHAT_THEME.textPrimary
+                                        }
+                                        : {
+                                          borderColor: AI_CHAT_THEME.panelBorder,
+                                          backgroundColor: AI_CHAT_THEME.panelBgStrong,
+                                          color: AI_CHAT_THEME.textSecondary
+                                        }}
+                                    >
+                                      {emoji}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                <div
+                                  className="mt-3 rounded-[0.75rem] border px-3 py-3"
+                                  style={{
+                                    borderColor: AI_CHAT_THEME.chipBorder,
+                                    backgroundColor: AI_CHAT_THEME.inputBg
+                                  }}
+                                >
+                                  <input
+                                    value={emojiDraft}
+                                    onChange={(event) => setEmojiDraft(event.target.value)}
+                                    className="w-full bg-transparent text-sm outline-none"
+                                    style={{ color: AI_CHAT_THEME.textPrimary }}
+                                    placeholder="输入一个 Emoji，例如 ✨"
+                                  />
+                                </div>
+
+                                <div className="mt-3 flex justify-end gap-2">
+                                  <button
+                                    onClick={handleCancelEmojiAvatarEdit}
+                                    className="rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white"
+                                    style={{
+                                      borderColor: AI_CHAT_THEME.chipBorder,
+                                      backgroundColor: AI_CHAT_THEME.inputBg,
+                                      color: AI_CHAT_THEME.textSecondary
+                                    }}
+                                  >
+                                    取消
+                                  </button>
+                                  <button
+                                    onClick={() => void handleApplyEmojiAvatar()}
+                                    className="rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium text-white transition-colors"
+                                    style={{
+                                      borderColor: AI_CHAT_THEME.primaryButtonBorder,
+                                      backgroundColor: AI_CHAT_THEME.primaryButtonBg
+                                    }}
+                                  >
+                                    保存 Emoji
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {deleteConfirmPersonaId === activePersona.id && !activePersona.isBuiltIn && (
+                              <div
+                                className="rounded-[0.85rem] border p-3 text-xs"
+                                style={{
+                                  borderColor: AI_CHAT_THEME.dangerBorder,
+                                  backgroundColor: AI_CHAT_THEME.dangerBg,
+                                  color: AI_CHAT_THEME.dangerText
+                                }}
+                              >
+                                <p>确认删除这个人设？</p>
+                                <div className="mt-3 flex justify-end gap-2">
+                                  <button
+                                    onClick={() => setDeleteConfirmPersonaId(null)}
+                                    className="rounded-[0.75rem] border px-3 py-1.5 font-medium transition-colors hover:bg-white"
+                                    style={{
+                                      borderColor: AI_CHAT_THEME.chipBorder,
+                                      backgroundColor: AI_CHAT_THEME.avatarBg,
+                                      color: AI_CHAT_THEME.textSecondary
+                                    }}
+                                  >
+                                    取消
+                                  </button>
+                                  <button
+                                    onClick={() => void handleDeleteCurrentPersona()}
+                                    className="rounded-[0.75rem] border px-3 py-1.5 font-medium text-white transition-colors"
+                                    style={{
+                                      borderColor: AI_CHAT_THEME.dangerBorder,
+                                      backgroundColor: AI_CHAT_THEME.dangerText
+                                    }}
+                                  >
+                                    删除
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="space-y-4">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <label className="block">
+                                <span className="mb-1 block text-xs font-medium text-stone-500">名字</span>
+                                <input
+                                  value={activePersona.name}
+                                  onChange={(event) => updateCurrentPersona({ name: event.target.value })}
+                                  className="w-full rounded-[1rem] border px-3 py-2 text-sm outline-none"
+                                  style={{
+                                    borderColor: AI_CHAT_THEME.chipBorder,
+                                    backgroundColor: AI_CHAT_THEME.inputBg,
+                                    color: AI_CHAT_THEME.textPrimary
+                                  }}
+                                  placeholder="可留空"
+                                />
+                              </label>
+
+                              <label className="block">
+                                <span className="mb-1 block text-xs font-medium text-stone-500">AI 自称</span>
+                                <input
+                                  value={activePersona.assistantSelfName}
+                                  onChange={(event) => updateCurrentPersona({ assistantSelfName: event.target.value })}
+                                  className="w-full rounded-[1rem] border px-3 py-2 text-sm outline-none"
+                                  style={{
+                                    borderColor: AI_CHAT_THEME.chipBorder,
+                                    backgroundColor: AI_CHAT_THEME.inputBg,
+                                    color: AI_CHAT_THEME.textPrimary
+                                  }}
+                                  placeholder="可留空"
+                                />
+                              </label>
+                            </div>
+
+                            <label className="block">
+                              <span className="mb-1 block text-xs font-medium text-stone-500">对用户称呼</span>
+                              <input
+                                value={activePersona.userCallName}
+                                onChange={(event) => updateCurrentPersona({ userCallName: event.target.value })}
+                                className="w-full rounded-[1rem] border px-3 py-2 text-sm outline-none"
+                                style={{
+                                  borderColor: AI_CHAT_THEME.chipBorder,
+                                  backgroundColor: AI_CHAT_THEME.inputBg,
+                                  color: AI_CHAT_THEME.textPrimary
+                                }}
+                                placeholder="可留空"
+                              />
+                            </label>
+
+                            <label className="block">
+                              <span className="mb-1 block text-xs font-medium text-stone-500">自定义提示词</span>
+                              <textarea
+                                value={activePersona.systemPrompt}
+                                onChange={(event) => updateCurrentPersona({ systemPrompt: event.target.value })}
+                                className="min-h-[220px] w-full rounded-[0.85rem] border px-4 py-3 text-sm leading-7 outline-none"
+                                style={{
+                                  borderColor: AI_CHAT_THEME.chipBorder,
+                                  backgroundColor: AI_CHAT_THEME.inputBg,
+                                  color: AI_CHAT_THEME.textPrimary
+                                }}
+                                placeholder="补充这个人设的语气、风格、偏好、边界条件。"
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      </section>
+
+                      <section
+                        className="border-t pt-5"
+                        style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)' }}
+                      >
+                        <div className="mb-4 flex min-h-[3.25rem] items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-bold text-stone-800">用户头像</p>
+                          </div>
+                          <span
+                            className="rounded-[0.75rem] border px-3 py-1 text-xs font-medium"
+                            style={{
+                              borderColor: AI_CHAT_THEME.chipBorder,
+                              backgroundColor: AI_CHAT_THEME.chipBg,
+                              color: AI_CHAT_THEME.textMuted
+                            }}
+                          >
+                            全局设置
+                          </span>
+                        </div>
+
+                        <input
+                          ref={userAvatarInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleUserAvatarUpload}
+                        />
+
+                        <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start">
+                          <div className="flex items-center gap-4">
+                            <div
+                              className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[0.95rem] border text-2xl"
+                              style={{
+                                borderColor: AI_CHAT_THEME.panelBorder,
+                                backgroundColor: AI_CHAT_THEME.avatarBg,
+                                boxShadow: AI_CHAT_THEME.avatarShadow
+                              }}
+                            >
+                              <UserAvatar profile={userProfile} iconClassName="text-xl" />
+                            </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>当前用户头像</p>
+                          </div>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                onClick={handleUseUserEmojiAvatar}
+                                className="inline-flex items-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
+                                style={{
+                                  borderColor: AI_CHAT_THEME.chipBorder,
+                                  backgroundColor: AI_CHAT_THEME.avatarBg,
+                                  color: AI_CHAT_THEME.textSecondary
+                                }}
+                              >
+                                <Sparkles size={14} />
+                                Emoji
+                              </button>
+                              <button
+                                onClick={() => userAvatarInputRef.current?.click()}
+                                disabled={isUploadingUserAvatar}
+                                className="inline-flex items-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                                style={{
+                                  borderColor: AI_CHAT_THEME.chipBorder,
+                                  backgroundColor: AI_CHAT_THEME.avatarBg,
+                                  color: AI_CHAT_THEME.textSecondary
+                                }}
+                              >
+                                {isUploadingUserAvatar ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                                {isUploadingUserAvatar ? '上传中' : '上传图片'}
+                              </button>
+                              <button
+                                onClick={() => void handleResetUserAvatar()}
+                                className="inline-flex items-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
+                                style={{
+                                  borderColor: AI_CHAT_THEME.chipBorder,
+                                  backgroundColor: AI_CHAT_THEME.avatarBg,
+                                  color: AI_CHAT_THEME.textSecondary
+                                }}
+                              >
+                                <RotateCcw size={14} />
+                                默认
                               </button>
                             </div>
-                          </div>
-                        )}
 
-                        {false && (
-                        <div className="mt-4 rounded-[1.3rem] border border-[#d8dde6] bg-[#f8fafc] p-3 shadow-[0_10px_28px_rgba(15,23,42,0.04)]">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-[1rem] border border-[#d8dde6] bg-white text-xl">
-                              <UserAvatar profile={userProfile} iconClassName="text-base" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-[#111827]">用户头像</p>
-                              <p className="mt-1 text-xs text-[#6b7280]">可保持默认，也可以换成 Emoji 或图片。</p>
-                            </div>
-                          </div>
-
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <button
-                              onClick={handleUseUserEmojiAvatar}
-                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-[#d8dde6] bg-white px-3 py-2 text-xs font-medium text-[#4b5563] transition-colors hover:border-[#c7cfdb] hover:bg-[#f9fafb] sm:flex-none"
-                            >
-                              <Sparkles size={14} />
-                              Emoji
-                            </button>
-                            <button
-                              onClick={() => userAvatarInputRef.current?.click()}
-                              disabled={isUploadingUserAvatar}
-                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-[#d8dde6] bg-white px-3 py-2 text-xs font-medium text-[#4b5563] transition-colors hover:border-[#c7cfdb] hover:bg-[#f9fafb] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
-                            >
-                              {isUploadingUserAvatar ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                              {isUploadingUserAvatar ? '上传中' : '上传图片'}
-                            </button>
-                            <button
-                              onClick={() => void handleResetUserAvatar()}
-                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-[#d8dde6] bg-white px-3 py-2 text-xs font-medium text-[#4b5563] transition-colors hover:border-[#c7cfdb] hover:bg-[#f9fafb] sm:flex-none"
-                            >
-                              <RotateCcw size={14} />
-                              默认
-                            </button>
-                          </div>
-
-                          {isUserEmojiEditorOpen && (
-                            <div className="mt-3 rounded-[1.05rem] border border-[#d8dde6] bg-white p-3">
-                              <p className="text-xs font-medium text-[#6b7280]">输入一个 Emoji，或直接点选下方常用头像。</p>
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                {PERSONA_EMOJI_CHOICES.map((emoji) => (
+                            {isUserEmojiEditorOpen && (
+                              <div
+                                className="rounded-[0.85rem] border p-3"
+                                style={{
+                                  borderColor: AI_CHAT_THEME.panelBorder,
+                                  backgroundColor: AI_CHAT_THEME.panelBg
+                                }}
+                              >
+                                <div className="flex flex-wrap gap-2">
+                                  {PERSONA_EMOJI_CHOICES.map((emoji) => (
+                                    <button
+                                      key={`user-${emoji}`}
+                                      onClick={() => setUserEmojiDraft(emoji)}
+                                      className="flex h-10 w-10 items-center justify-center rounded-[0.7rem] border text-lg transition-colors hover:bg-white"
+                                      style={{
+                                        borderColor: userEmojiDraft.trim() === emoji ? AI_CHAT_THEME.activeBorder : AI_CHAT_THEME.panelBorder,
+                                        backgroundColor: userEmojiDraft.trim() === emoji ? AI_CHAT_THEME.activeBg : AI_CHAT_THEME.panelBgStrong,
+                                        color: userEmojiDraft.trim() === emoji ? AI_CHAT_THEME.textPrimary : AI_CHAT_THEME.textSecondary,
+                                        boxShadow: userEmojiDraft.trim() === emoji ? `0 0 0 1px ${accentMix(8, 'rgba(0,0,0,0.02)')}` : undefined
+                                      }}
+                                    >
+                                      {emoji}
+                                    </button>
+                                  ))}
+                                </div>
+                                <div
+                                  className="mt-3 rounded-[0.75rem] border px-3 py-3"
+                                  style={{
+                                    borderColor: AI_CHAT_THEME.chipBorder,
+                                    backgroundColor: AI_CHAT_THEME.inputBg
+                                  }}
+                                >
+                                  <input
+                                    value={userEmojiDraft}
+                                    onChange={(event) => setUserEmojiDraft(event.target.value)}
+                                    className="w-full bg-transparent text-sm outline-none"
+                                    style={{ color: AI_CHAT_THEME.textPrimary }}
+                                    placeholder="输入一个 Emoji，例如 🙂"
+                                  />
+                                </div>
+                                <div className="mt-3 flex justify-end gap-2">
                                   <button
-                                    key={`user-${emoji}`}
-                                    onClick={() => setUserEmojiDraft(emoji)}
-                                    className={`flex h-10 w-10 items-center justify-center rounded-[0.9rem] border text-lg transition-colors ${
-                                      userEmojiDraft.trim() === emoji
-                                        ? 'border-[#c7cfdb] bg-[#f5f7fa] text-[#111827]'
-                                        : 'border-[#e5e7eb] bg-[#f8fafc] text-[#4b5563] hover:bg-white'
-                                    }`}
+                                    onClick={handleCancelUserEmojiAvatarEdit}
+                                    className="rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white"
+                                    style={{
+                                      borderColor: AI_CHAT_THEME.chipBorder,
+                                      backgroundColor: AI_CHAT_THEME.chipBg,
+                                      color: AI_CHAT_THEME.textSecondary
+                                    }}
                                   >
-                                    {emoji}
+                                    取消
                                   </button>
-                                ))}
+                                  <button
+                                    onClick={() => void handleApplyUserEmojiAvatar()}
+                                    className="rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium text-white transition-colors"
+                                    style={{
+                                      borderColor: AI_CHAT_THEME.primaryButtonBorder,
+                                      backgroundColor: AI_CHAT_THEME.primaryButtonBg
+                                    }}
+                                  >
+                                    保存 Emoji
+                                  </button>
+                                </div>
                               </div>
-                              <div className="mt-3 rounded-[0.95rem] border border-[#e5e7eb] bg-[#f8fafc] px-3 py-3">
-                                <input
-                                  value={userEmojiDraft}
-                                  onChange={(event) => setUserEmojiDraft(event.target.value)}
-                                  className="w-full bg-transparent text-sm text-[#111827] outline-none"
-                                  placeholder="输入一个 Emoji，例如 🙂"
-                                />
-                              </div>
-                              <div className="mt-3 flex justify-end gap-2">
-                                <button
-                                  onClick={handleCancelUserEmojiAvatarEdit}
-                                  className="rounded-full border border-[#d8dde6] bg-[#f8fafc] px-3 py-1.5 text-xs font-medium text-[#4b5563] transition-colors hover:bg-white"
-                                >
-                                  取消
-                                </button>
-                                <button
-                                  onClick={() => void handleApplyUserEmojiAvatar()}
-                                  className="rounded-full border border-[#111827] bg-[#111827] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#0f172a]"
-                                >
-                                  保存 Emoji
-                                </button>
-                              </div>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
-                        )}
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <label className="block">
-                            <span className="mb-1 block text-xs font-medium text-stone-500">名字</span>
-                            <input
-                              value={activePersona.name}
-                              onChange={(event) => updateCurrentPersona({ name: event.target.value })}
-                              className="w-full rounded-[1rem] border px-3 py-2 text-sm outline-none"
-                              style={{
-                                borderColor: AI_CHAT_THEME.chipBorder,
-                                backgroundColor: AI_CHAT_THEME.inputBg,
-                                color: AI_CHAT_THEME.textPrimary
-                              }}
-                              placeholder="可留空"
-                            />
-                          </label>
-
-                          <label className="block">
-                            <span className="mb-1 block text-xs font-medium text-stone-500">AI 自称</span>
-                            <input
-                              value={activePersona.assistantSelfName}
-                              onChange={(event) => updateCurrentPersona({ assistantSelfName: event.target.value })}
-                              className="w-full rounded-[1rem] border px-3 py-2 text-sm outline-none"
-                              style={{
-                                borderColor: AI_CHAT_THEME.chipBorder,
-                                backgroundColor: AI_CHAT_THEME.inputBg,
-                                color: AI_CHAT_THEME.textPrimary
-                              }}
-                              placeholder="可留空"
-                            />
-                          </label>
+                      </section>
+                    </div>
+                  ) : (
+                    <div className="space-y-8">
+                      <section className="space-y-4">
+                        <div className="flex min-h-[3.25rem] items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-bold text-stone-800">上下文设置</p>
+                          </div>
+                          <span
+                            className="rounded-[0.75rem] border px-3 py-1 text-xs font-medium"
+                            style={{
+                              borderColor: AI_CHAT_THEME.chipBorder,
+                              backgroundColor: AI_CHAT_THEME.chipBg,
+                              color: AI_CHAT_THEME.textMuted
+                            }}
+                          >
+                            当前会话
+                          </span>
                         </div>
 
-                        <label className="block">
-                          <span className="mb-1 block text-xs font-medium text-stone-500">对用户称呼</span>
+                        <label className="block max-w-[240px]">
+                          <span className="mb-1 block text-xs font-medium text-stone-500">手动输入最近上下文轮数</span>
                           <input
-                            value={activePersona.userCallName}
-                            onChange={(event) => updateCurrentPersona({ userCallName: event.target.value })}
+                            type="number"
+                            min={0}
+                            max={30}
+                            value={activePersona.contextMessageLimit}
+                            onChange={(event) => updateCurrentPersona({ contextMessageLimit: Number(event.target.value) })}
                             className="w-full rounded-[1rem] border px-3 py-2 text-sm outline-none"
                             style={{
                               borderColor: AI_CHAT_THEME.chipBorder,
                               backgroundColor: AI_CHAT_THEME.inputBg,
                               color: AI_CHAT_THEME.textPrimary
                             }}
-                            placeholder="可留空"
                           />
                         </label>
+                      </section>
 
-                        <label className="block">
-                          <span className="mb-1 block text-xs font-medium text-stone-500">自定义提示词</span>
-                          <textarea
-                            value={activePersona.systemPrompt}
-                            onChange={(event) => updateCurrentPersona({ systemPrompt: event.target.value })}
-                            className="min-h-[180px] w-full rounded-[0.85rem] border px-4 py-3 text-sm leading-7 outline-none"
+                      <section
+                        className="border-t pt-5"
+                        style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)' }}
+                      >
+                        <div className="mb-4 flex min-h-[3.25rem] items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-bold text-stone-800">后台助理</p>
+                          </div>
+                          <span
+                            className="rounded-[0.75rem] border px-3 py-1 text-xs font-medium"
                             style={{
                               borderColor: AI_CHAT_THEME.chipBorder,
-                              backgroundColor: AI_CHAT_THEME.inputBg,
-                              color: AI_CHAT_THEME.textPrimary
+                              backgroundColor: AI_CHAT_THEME.chipBg,
+                              color: AI_CHAT_THEME.textMuted
                             }}
-                            placeholder="补充这个人设的语气、风格、偏好、边界条件。"
-                          />
-                        </label>
-                      </div>
-                    </div>
-                  </section>
+                          >
+                            Android
+                          </span>
+                        </div>
 
-                  <section
-                    className="order-4 px-2 py-5 sm:px-3"
-                    style={{
-                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)'
-                    }}
-                  >
-                    <p className="mb-4 text-sm font-bold text-stone-800">上下文设置</p>
-                    <label className="block">
-                      <span className="mb-1 block text-xs font-medium text-stone-500">最近上下文轮数 n</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={30}
-                        value={activePersona.contextMessageLimit}
-                        onChange={(event) => updateCurrentPersona({ contextMessageLimit: Number(event.target.value) })}
-                        className="w-full rounded-[1rem] border px-3 py-2 text-sm outline-none"
-                        style={{
-                          borderColor: AI_CHAT_THEME.chipBorder,
-                          backgroundColor: AI_CHAT_THEME.inputBg,
-                          color: AI_CHAT_THEME.textPrimary
-                        }}
-                      />
-                    </label>
-                  </section>
+                        <div className="space-y-4">
+                          <div className="flex items-start justify-between gap-4 border-b pb-4" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
+                            <div>
+                              <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>开启后台轮询</p>
+                            </div>
+                            <button
+                              onClick={() => handleUpdateAssistantAgentConfig({ enabled: !assistantAgentConfig.enabled })}
+                              className="inline-flex min-w-[72px] items-center justify-center rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors"
+                              style={assistantAgentConfig.enabled
+                                ? {
+                                  borderColor: AI_CHAT_THEME.activeBorder,
+                                  backgroundColor: AI_CHAT_THEME.activeBg,
+                                  color: AI_CHAT_THEME.textPrimary
+                                }
+                                : {
+                                  borderColor: AI_CHAT_THEME.chipBorder,
+                                  backgroundColor: AI_CHAT_THEME.inputBg,
+                                  color: AI_CHAT_THEME.textMuted
+                                }}
+                            >
+                              {assistantAgentConfig.enabled ? '已开启' : '未开启'}
+                            </button>
+                          </div>
+
+                          <div>
+                            <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>check-in 间隔</p>
+                            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                              <label className="block">
+                                <span className="mb-1 block text-xs font-medium text-stone-500">检查频率（分钟）</span>
+                                <div className="relative">
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={assistantAgentIntervalDrafts.basePollMinutes}
+                                    onChange={(event) => handleAssistantAgentIntervalDraftChange('basePollMinutes', event.target.value)}
+                                    onBlur={() => commitAssistantAgentIntervalDraft('basePollMinutes')}
+                                    onKeyDown={(event) => {
+                                      if (event.key === 'Enter') {
+                                        event.preventDefault();
+                                        commitAssistantAgentIntervalDraft('basePollMinutes');
+                                      }
+                                    }}
+                                    aria-invalid={!!assistantAgentIntervalErrors.basePollMinutes}
+                                    className="w-full rounded-[1rem] border px-3 py-2 pr-9 text-sm outline-none"
+                                    style={{
+                                      borderColor: assistantAgentIntervalErrors.basePollMinutes ? '#ef4444' : AI_CHAT_THEME.chipBorder,
+                                      backgroundColor: AI_CHAT_THEME.inputBg,
+                                      color: AI_CHAT_THEME.textPrimary
+                                    }}
+                                  />
+                                  {assistantAgentIntervalErrors.basePollMinutes ? (
+                                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-red-500">
+                                      <XCircle size={15} aria-hidden="true" />
+                                    </span>
+                                  ) : null}
+                                </div>
+                                {assistantAgentIntervalErrors.basePollMinutes ? (
+                                  <span className="mt-1 block text-xs font-medium text-red-500" role="alert">
+                                    {assistantAgentIntervalErrors.basePollMinutes}
+                                  </span>
+                                ) : null}
+                              </label>
+
+                              <label className="block">
+                                <span className="mb-1 block text-xs font-medium text-stone-500">最低间隔（分钟）</span>
+                                <div className="relative">
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={assistantAgentIntervalDrafts.minCheckinMinutes}
+                                    onChange={(event) => handleAssistantAgentIntervalDraftChange('minCheckinMinutes', event.target.value)}
+                                    onBlur={() => commitAssistantAgentIntervalDraft('minCheckinMinutes')}
+                                    onKeyDown={(event) => {
+                                      if (event.key === 'Enter') {
+                                        event.preventDefault();
+                                        commitAssistantAgentIntervalDraft('minCheckinMinutes');
+                                      }
+                                    }}
+                                    aria-invalid={!!assistantAgentIntervalErrors.minCheckinMinutes}
+                                    className="w-full rounded-[1rem] border px-3 py-2 pr-9 text-sm outline-none"
+                                    style={{
+                                      borderColor: assistantAgentIntervalErrors.minCheckinMinutes ? '#ef4444' : AI_CHAT_THEME.chipBorder,
+                                      backgroundColor: AI_CHAT_THEME.inputBg,
+                                      color: AI_CHAT_THEME.textPrimary
+                                    }}
+                                  />
+                                  {assistantAgentIntervalErrors.minCheckinMinutes ? (
+                                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-red-500">
+                                      <XCircle size={15} aria-hidden="true" />
+                                    </span>
+                                  ) : null}
+                                </div>
+                                {assistantAgentIntervalErrors.minCheckinMinutes ? (
+                                  <span className="mt-1 block text-xs font-medium text-red-500" role="alert">
+                                    {assistantAgentIntervalErrors.minCheckinMinutes}
+                                  </span>
+                                ) : null}
+                              </label>
+
+                              <label className="block">
+                                <span className="mb-1 block text-xs font-medium text-stone-500">最高间隔（分钟）</span>
+                                <div className="relative">
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={assistantAgentIntervalDrafts.maxCheckinMinutes}
+                                    onChange={(event) => handleAssistantAgentIntervalDraftChange('maxCheckinMinutes', event.target.value)}
+                                    onBlur={() => commitAssistantAgentIntervalDraft('maxCheckinMinutes')}
+                                    onKeyDown={(event) => {
+                                      if (event.key === 'Enter') {
+                                        event.preventDefault();
+                                        commitAssistantAgentIntervalDraft('maxCheckinMinutes');
+                                      }
+                                    }}
+                                    aria-invalid={!!assistantAgentIntervalErrors.maxCheckinMinutes}
+                                    className="w-full rounded-[1rem] border px-3 py-2 pr-9 text-sm outline-none"
+                                    style={{
+                                      borderColor: assistantAgentIntervalErrors.maxCheckinMinutes ? '#ef4444' : AI_CHAT_THEME.chipBorder,
+                                      backgroundColor: AI_CHAT_THEME.inputBg,
+                                      color: AI_CHAT_THEME.textPrimary
+                                    }}
+                                  />
+                                  {assistantAgentIntervalErrors.maxCheckinMinutes ? (
+                                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-red-500">
+                                      <XCircle size={15} aria-hidden="true" />
+                                    </span>
+                                  ) : null}
+                                </div>
+                                {assistantAgentIntervalErrors.maxCheckinMinutes ? (
+                                  <span className="mt-1 block text-xs font-medium text-red-500" role="alert">
+                                    {assistantAgentIntervalErrors.maxCheckinMinutes}
+                                  </span>
+                                ) : null}
+                              </label>
+                            </div>
+                          </div>
+
+                          <div className="flex items-start justify-between gap-4 border-t pt-4" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
+                            <div>
+                              <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>开启长期记忆</p>
+                            </div>
+                            <button
+                              onClick={() => handleUpdateAssistantAgentConfig({ longTermMemoryEnabled: !assistantAgentConfig.longTermMemoryEnabled })}
+                              className="inline-flex min-w-[72px] items-center justify-center rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors"
+                              style={assistantAgentConfig.longTermMemoryEnabled
+                                ? {
+                                  borderColor: AI_CHAT_THEME.activeBorder,
+                                  backgroundColor: AI_CHAT_THEME.activeBg,
+                                  color: AI_CHAT_THEME.textPrimary
+                                }
+                                : {
+                                  borderColor: AI_CHAT_THEME.chipBorder,
+                                  backgroundColor: AI_CHAT_THEME.inputBg,
+                                  color: AI_CHAT_THEME.textMuted
+                                }}
+                            >
+                              {assistantAgentConfig.longTermMemoryEnabled ? '已开启' : '未开启'}
+                            </button>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            <button
+                              onClick={handleOpenAssistantMemoryViewer}
+                              className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
+                              style={{
+                                borderColor: AI_CHAT_THEME.chipBorder,
+                                backgroundColor: AI_CHAT_THEME.panelBg,
+                                color: AI_CHAT_THEME.textSecondary
+                              }}
+                            >
+                              查看长期记忆
+                            </button>
+                            <button
+                              onClick={handleOpenAssistantBackgroundHistoryViewer}
+                              className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors"
+                              style={{
+                                borderColor: AI_CHAT_THEME.chipBorder,
+                                backgroundColor: AI_CHAT_THEME.panelBg,
+                                color: AI_CHAT_THEME.textSecondary
+                              }}
+                            >
+                              查看后台调用记录
+                            </button>
+                          </div>
+                        </div>
+                      </section>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -6609,7 +6407,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         <div className="mt-4 space-y-3">
                           {items.length === 0 ? (
                             <div
-                              className="border border-dashed px-4 py-4 text-sm leading-6 text-stone-500"
+                              className="rounded-[0.85rem] border border-dashed px-4 py-4 text-sm leading-6 text-stone-500"
                               style={{
                                 borderColor: AI_CHAT_THEME.panelBorder,
                                 backgroundColor: AI_CHAT_THEME.panelBg
@@ -6627,7 +6425,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                               return (
                                 <div
                                   key={`${key}-${item}`}
-                                  className="border px-4 py-3"
+                                  className="rounded-[0.85rem] border px-4 py-3"
                                   style={{
                                     borderColor: AI_CHAT_THEME.panelBorder,
                                     backgroundColor: 'rgba(255,255,255,0.84)'
@@ -6784,7 +6582,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     <div className="mt-4 space-y-3">
                       {assistantReminderSnapshot.length === 0 ? (
                         <div
-                          className="border border-dashed px-4 py-4 text-sm leading-6 text-stone-500"
+                          className="rounded-[0.85rem] border border-dashed px-4 py-4 text-sm leading-6 text-stone-500"
                           style={{
                             borderColor: AI_CHAT_THEME.panelBorder,
                             backgroundColor: AI_CHAT_THEME.panelBg
@@ -6799,7 +6597,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           return (
                             <div
                               key={reminder.id}
-                              className="border px-4 py-3"
+                              className="rounded-[0.85rem] border px-4 py-3"
                               style={{
                                 borderColor: AI_CHAT_THEME.panelBorder,
                                 backgroundColor: 'rgba(255,255,255,0.84)'

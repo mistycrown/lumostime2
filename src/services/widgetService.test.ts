@@ -6,11 +6,19 @@
  * @description Verifies pinned and recurring-today todos can populate the TODAY + PIN widget payload, and guards against reintroducing the header tap-to-open binding.
  * @updated 2026-04-27: Added regression coverage so recurring todos that match today are included in the TODAY + PIN widget payload.
  * @updated 2026-04-26: Added regression coverage for pinned todo actionability and removed header click bindings from the dedicated TODAY + PIN widgets.
+ * @updated 2026-05-01: Added regression coverage for dedicated tracking-calendar payload builders across tag, scope, and daily sources.
  */
 
 import { describe, expect, it } from 'vitest';
-import type { Category, TodoItem } from '../types';
-import { buildTodoPinWidgetPayload } from './widgetService';
+import type { ActiveSession, Category, CheckTemplate, DailyReview, Log, Scope, TodoItem } from '../types';
+import {
+  buildTodoPinWidgetPayload,
+  buildTrackingCalendarDailyConfig,
+  buildTrackingCalendarScopeConfig,
+  buildTrackingCalendarTagConfig,
+  buildTrackingCalendarWidgetPayload,
+  createWidgetTemplate
+} from './widgetService';
 import widgetTodoPinProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetTodoPinProviderSupport.java?raw';
 
 const REFERENCE_DATE = new Date('2026-04-26T09:30:00+08:00');
@@ -31,6 +39,41 @@ const categories: Category[] = [
     ]
   }
 ];
+
+const scopes: Scope[] = [
+  {
+    id: 'scope-reading',
+    name: '阅读',
+    icon: '📚',
+    themeColor: '#93C5FD',
+    isArchived: false,
+    order: 1
+  }
+];
+
+const checkTemplates: CheckTemplate[] = [
+  {
+    id: 'check-template-1',
+    title: '晨间',
+    order: 1,
+    enabled: true,
+    isDaily: true,
+    syncToTimeline: false,
+    items: [
+      {
+        id: 'daily-check-1',
+        content: '晨读',
+        icon: '📖',
+        type: 'manual',
+        manualMode: 'binary'
+      }
+    ]
+  }
+];
+
+const buildTrackingTemplate = (name: string) => createWidgetTemplate(name, '2x2', 'trackingCalendar');
+
+const emptySessions: ActiveSession[] = [];
 
 const buildTodo = (overrides: Partial<TodoItem>): TodoItem => ({
   id: 'todo-1',
@@ -108,6 +151,172 @@ describe('buildTodoPinWidgetPayload', () => {
       activityId: 'writing-activity',
       activityLabel: 'Writing'
     });
+  });
+});
+
+describe('buildTrackingCalendarWidgetPayload', () => {
+  it('aggregates matching tag logs by local day for tracking-calendar templates', () => {
+    const template = buildTrackingTemplate('写作日历');
+    const category = categories[0];
+    const activity = category.activities[0];
+    template.trackingConfig = buildTrackingCalendarTagConfig(category, activity);
+
+    const logs: Log[] = [
+      {
+        id: 'log-1',
+        categoryId: 'focus-category',
+        activityId: 'writing-activity',
+        startTime: new Date('2026-04-24T09:00:00+08:00').getTime(),
+        endTime: new Date('2026-04-24T10:30:00+08:00').getTime(),
+        duration: 90 * 60
+      },
+      {
+        id: 'log-2',
+        categoryId: 'focus-category',
+        activityId: 'writing-activity',
+        startTime: new Date('2026-04-26T08:00:00+08:00').getTime(),
+        endTime: new Date('2026-04-26T08:45:00+08:00').getTime(),
+        duration: 45 * 60
+      }
+    ];
+
+    const payload = buildTrackingCalendarWidgetPayload({
+      templates: [template],
+      logs,
+      activeSessions: emptySessions,
+      categories,
+      scopes,
+      dailyReviews: [],
+      checkTemplates,
+      date: REFERENCE_DATE,
+      now: 123456789
+    });
+
+    expect(payload.templates).toHaveLength(1);
+    expect(payload.templates[0].entries).toEqual([
+      { date: '2026-04-24', value: 90 },
+      { date: '2026-04-26', value: 45 }
+    ]);
+  });
+
+  it('aggregates scope-linked logs by day for scope tracking', () => {
+    const template = buildTrackingTemplate('阅读日历');
+    template.trackingConfig = buildTrackingCalendarScopeConfig(scopes[0]);
+
+    const logs: Log[] = [
+      {
+        id: 'scope-log-1',
+        categoryId: 'focus-category',
+        activityId: 'writing-activity',
+        startTime: new Date('2026-04-25T19:00:00+08:00').getTime(),
+        endTime: new Date('2026-04-25T20:00:00+08:00').getTime(),
+        duration: 60 * 60,
+        scopeIds: ['scope-reading']
+      },
+      {
+        id: 'scope-log-2',
+        categoryId: 'focus-category',
+        activityId: 'writing-activity',
+        startTime: new Date('2026-04-25T21:00:00+08:00').getTime(),
+        endTime: new Date('2026-04-25T21:30:00+08:00').getTime(),
+        duration: 30 * 60,
+        scopeIds: ['scope-reading']
+      }
+    ];
+
+    const payload = buildTrackingCalendarWidgetPayload({
+      templates: [template],
+      logs,
+      activeSessions: emptySessions,
+      categories,
+      scopes,
+      dailyReviews: [],
+      checkTemplates,
+      date: REFERENCE_DATE,
+      now: 123456789
+    });
+
+    expect(payload.templates[0].entries).toEqual([
+      { date: '2026-04-25', value: 90 }
+    ]);
+  });
+
+  it('marks completed daily checks with value 1 for daily tracking', () => {
+    const template = buildTrackingTemplate('晨读日历');
+    const dailyBinding = {
+      checkTemplateId: 'check-template-1',
+      checkItemId: 'daily-check-1',
+      content: '晨读',
+      category: '晨间',
+      type: 'manual' as const,
+      manualMode: 'binary' as const,
+      targetCount: 1,
+      icon: '📖'
+    };
+    template.trackingConfig = buildTrackingCalendarDailyConfig(dailyBinding);
+
+    const dailyReviews: DailyReview[] = [
+      {
+        id: 'review-1',
+        date: '2026-04-24',
+        createdAt: 1,
+        updatedAt: 1,
+        answers: [],
+        checkCategorySyncToTimeline: {},
+        templateSnapshot: [],
+        checkItems: [
+          {
+            id: 'daily-check-1',
+            category: '晨间',
+            content: '晨读',
+            icon: '📖',
+            isCompleted: true,
+            type: 'manual',
+            manualMode: 'binary',
+            currentCount: 1,
+            targetCount: 1
+          }
+        ]
+      },
+      {
+        id: 'review-2',
+        date: '2026-04-25',
+        createdAt: 1,
+        updatedAt: 1,
+        answers: [],
+        checkCategorySyncToTimeline: {},
+        templateSnapshot: [],
+        checkItems: [
+          {
+            id: 'daily-check-1',
+            category: '晨间',
+            content: '晨读',
+            icon: '📖',
+            isCompleted: false,
+            type: 'manual',
+            manualMode: 'binary',
+            currentCount: 0,
+            targetCount: 1
+          }
+        ]
+      }
+    ];
+
+    const payload = buildTrackingCalendarWidgetPayload({
+      templates: [template],
+      logs: [],
+      activeSessions: emptySessions,
+      categories,
+      scopes,
+      dailyReviews,
+      checkTemplates,
+      date: REFERENCE_DATE,
+      now: 123456789
+    });
+
+    expect(payload.templates[0].entries).toEqual([
+      { date: '2026-04-24', value: 1 }
+    ]);
   });
 });
 

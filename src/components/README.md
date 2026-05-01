@@ -11,6 +11,9 @@ Components that form the structural or global UI elements.
 
 ## Modals
 - Update 2026-05-01: `AIBackfillChatModal.tsx` now uses a flatter editorial treatment across the AI workspace, tightening the composer to a two-line feel, removing extra divider framing, simplifying history delete confirmations into inline horizontal actions, and reducing nested-card radii/shadows across the AI panels.
+- Update 2026-05-01: `AIBackfillChatModal.tsx` now keeps the active persona row in AI settings neutral, removing the tinted selected background so the checkmark alone carries selection state.
+- Update 2026-05-01: `AIBackfillChatModal.tsx` now organizes AI settings into top-level tabs with smaller in-section tabs, so persona picking, persona editing, user-avatar editing, background-agent controls, and context options no longer read as one long stacked form.
+- Update 2026-05-01: `AIBackfillChatModal.tsx` now applies the same small-radius corner treatment across the remaining AI boxes, keeping history rows, the composer surface, and edit/confirmation panels visually aligned.
 - Update 2026-05-01: `AIBackfillChatModal.tsx` now rehydrates completed Android-native background replies back into the persisted chat session when diagnostics refresh, so successful direct-native check-ins render in the main AI conversation and restore unread state instead of only appearing in background history.
 - Update 2026-04-30: `AIBackfillChatModal.tsx` now gives grouped assistant reply bubbles a more visible sequential entrance by increasing the stagger and adding a clearer lift/scale/highlight settle animation for each newly revealed segment.
 - Update 2026-04-30: `AIBackfillChatModal.tsx` now exposes a unified Android back-navigation chain, so hardware back closes nested AI panels first and only dismisses the root AI chat after returning to the main conversation.

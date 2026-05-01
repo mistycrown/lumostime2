@@ -19,6 +19,7 @@ object WidgetStores {
     private const val KEY_DAILY_SYNC = "daily_sync_v1"
     private const val KEY_DAILY_RUNTIME_SYNC = "daily_runtime_sync_v1"
     private const val KEY_TODO_PIN_SYNC = "todo_pin_sync_v1"
+    private const val KEY_TRACKING_CALENDAR_SYNC = "tracking_calendar_sync_v1"
     private const val KEY_DAILY_RUNTIME_VIEW_MODES = "daily_runtime_view_modes_v1"
     private const val KEY_TAP_ANIMATION = "tap_animation_v1"
     private const val KEY_LAST_WIDGET_STOP_AT = "last_widget_stop_at_v1"
@@ -60,6 +61,8 @@ object WidgetStores {
                             name = item.optString("name").ifBlank { DEFAULT_TEMPLATE_NAME },
                             size = size,
                             slots = parseSlots(item.optJSONArray("slots"), size),
+                            templateType = WidgetTemplateTypes.normalize(item.optString("templateType")),
+                            trackingConfig = item.optJSONObject("trackingConfig")?.toTrackingCalendarConfig(),
                             createdAt = item.optLong("createdAt", System.currentTimeMillis()),
                             updatedAt = item.optLong("updatedAt", System.currentTimeMillis())
                         )
@@ -73,10 +76,14 @@ object WidgetStores {
 
     fun loadTemplatesBySize(
         context: Context,
-        widgetSize: String
+        widgetSize: String,
+        templateType: String = WidgetTemplateTypes.GRID
     ): List<WidgetTemplate> {
         val normalizedSize = WidgetSizes.normalize(widgetSize)
-        return loadTemplates(context).filter { it.size == normalizedSize }
+        val normalizedTemplateType = WidgetTemplateTypes.normalize(templateType)
+        return loadTemplates(context).filter {
+            it.size == normalizedSize && WidgetTemplateTypes.normalize(it.templateType) == normalizedTemplateType
+        }
     }
 
     fun saveTemplates(context: Context, templates: List<WidgetTemplate>) {
@@ -87,9 +94,11 @@ object WidgetStores {
                 put("id", template.id)
                 put("name", template.name)
                 put("size", template.size)
+                put("templateType", WidgetTemplateTypes.normalize(template.templateType))
                 put("createdAt", template.createdAt)
                 put("updatedAt", template.updatedAt)
                 put("slots", slotsToJson(template.slots, template.size))
+                put("trackingConfig", template.trackingConfig?.toJson() ?: JSONObject.NULL)
             })
         }
 
@@ -104,9 +113,10 @@ object WidgetStores {
     fun loadTemplateForSize(
         context: Context,
         templateId: String?,
-        widgetSize: String
+        widgetSize: String,
+        templateType: String = WidgetTemplateTypes.GRID
     ): WidgetTemplate? {
-        val templates = loadTemplatesBySize(context, widgetSize)
+        val templates = loadTemplatesBySize(context, widgetSize, templateType)
         val normalizedTemplateId = parseNullableString(templateId) ?: return null
         return templates.firstOrNull { it.id == normalizedTemplateId }
     }
@@ -150,22 +160,29 @@ object WidgetStores {
     fun ensureBinding(
         context: Context,
         appWidgetId: Int,
-        widgetSize: String
+        widgetSize: String,
+        templateType: String = WidgetTemplateTypes.GRID
     ): WidgetInstanceBinding? {
         if (appWidgetId <= 0) {
             return null
         }
 
         val normalizedSize = WidgetSizes.normalize(widgetSize)
+        val normalizedTemplateType = WidgetTemplateTypes.normalize(templateType)
         val currentBinding = loadBinding(context, appWidgetId)
         if (currentBinding != null) {
-            val boundTemplate = loadTemplateForSize(context, currentBinding.templateId, normalizedSize)
+            val boundTemplate = loadTemplateForSize(
+                context,
+                currentBinding.templateId,
+                normalizedSize,
+                normalizedTemplateType
+            )
             if (boundTemplate != null) {
                 return currentBinding
             }
         }
 
-        val templates = loadTemplatesBySize(context, normalizedSize)
+        val templates = loadTemplatesBySize(context, normalizedSize, normalizedTemplateType)
         if (templates.isEmpty()) {
             return null
         }
@@ -178,19 +195,21 @@ object WidgetStores {
     fun cycleBindingToNextTemplate(
         context: Context,
         appWidgetId: Int,
-        widgetSize: String
+        widgetSize: String,
+        templateType: String = WidgetTemplateTypes.GRID
     ): WidgetInstanceBinding? {
         if (appWidgetId <= 0) {
             return null
         }
 
         val normalizedSize = WidgetSizes.normalize(widgetSize)
-        val templates = loadTemplatesBySize(context, normalizedSize)
+        val normalizedTemplateType = WidgetTemplateTypes.normalize(templateType)
+        val templates = loadTemplatesBySize(context, normalizedSize, normalizedTemplateType)
         if (templates.isEmpty()) {
             return null
         }
 
-        val currentBinding = ensureBinding(context, appWidgetId, normalizedSize)
+        val currentBinding = ensureBinding(context, appWidgetId, normalizedSize, normalizedTemplateType)
         val currentIndex = templates.indexOfFirst { it.id == currentBinding?.templateId }
         val nextTemplate = if (currentIndex < 0) templates.first() else templates[(currentIndex + 1) % templates.size]
 
@@ -241,7 +260,7 @@ object WidgetStores {
             return
         }
 
-        val templates = loadTemplatesBySize(context, WidgetSizes.DEFAULT)
+        val templates = loadTemplatesBySize(context, WidgetSizes.DEFAULT, WidgetTemplateTypes.GRID)
         val defaultTemplate = templates.firstOrNull { it.id == LEGACY_TEMPLATE_ID } ?: templates.firstOrNull()
         if (defaultTemplate == null) {
             prefs(context).edit().putBoolean(KEY_LEGACY_AUTO_BIND_PENDING, false).commit()
@@ -261,10 +280,11 @@ object WidgetStores {
     fun ensureBindings(
         context: Context,
         appWidgetIds: IntArray,
-        widgetSize: String
+        widgetSize: String,
+        templateType: String = WidgetTemplateTypes.GRID
     ) {
         appWidgetIds.forEach { appWidgetId ->
-            ensureBinding(context, appWidgetId, widgetSize)
+            ensureBinding(context, appWidgetId, widgetSize, templateType)
         }
     }
 
@@ -549,6 +569,35 @@ object WidgetStores {
         editor.putString(KEY_TODO_PIN_SYNC, json.toString()).commit()
     }
 
+    fun loadTrackingCalendarPayload(context: Context): WidgetTrackingCalendarPayload? {
+        val raw = prefs(context).getString(KEY_TRACKING_CALENDAR_SYNC, null)
+        if (raw.isNullOrBlank()) {
+            return null
+        }
+
+        return runCatching {
+            val json = JSONObject(raw)
+            WidgetTrackingCalendarPayload(
+                templates = json.optJSONArray("templates").toTrackingCalendarTemplatePayloadList(),
+                syncedAt = json.optLong("syncedAt", System.currentTimeMillis())
+            )
+        }.getOrNull()
+    }
+
+    fun saveTrackingCalendarPayload(context: Context, payload: WidgetTrackingCalendarPayload?) {
+        val editor = prefs(context).edit()
+        if (payload == null) {
+            editor.remove(KEY_TRACKING_CALENDAR_SYNC).commit()
+            return
+        }
+
+        val json = JSONObject().apply {
+            put("templates", payload.templates.toTrackingCalendarTemplatePayloadJsonArray())
+            put("syncedAt", payload.syncedAt)
+        }
+        editor.putString(KEY_TRACKING_CALENDAR_SYNC, json.toString()).commit()
+    }
+
     fun loadDailyRuntimeViewMode(context: Context, appWidgetId: Int): String {
         if (appWidgetId <= 0) {
             return WidgetDailyRuntimeViewModes.DEFAULT
@@ -780,12 +829,19 @@ object WidgetStores {
     }
 
     private fun normalizeTemplate(template: WidgetTemplate): WidgetTemplate {
-        val size = WidgetSizes.normalize(template.size)
+        val templateType = WidgetTemplateTypes.normalize(template.templateType)
+        val size = if (templateType == WidgetTemplateTypes.TRACKING_CALENDAR) {
+            WidgetSizes.SIZE_2X2
+        } else {
+            WidgetSizes.normalize(template.size)
+        }
         return WidgetTemplate(
             id = template.id,
             name = template.name.ifBlank { DEFAULT_TEMPLATE_NAME },
             size = size,
             slots = normalizeSlots(template.slots, size),
+            templateType = templateType,
+            trackingConfig = normalizeTrackingCalendarConfig(template.trackingConfig),
             createdAt = template.createdAt,
             updatedAt = template.updatedAt
         )
@@ -853,6 +909,69 @@ object WidgetStores {
             })
         }
         return array
+    }
+
+    private fun normalizeTrackingCalendarConfig(
+        config: WidgetTrackingCalendarConfig?
+    ): WidgetTrackingCalendarConfig? {
+        if (config == null) {
+            return null
+        }
+
+        val normalizedSourceType = parseNullableString(config.sourceType)
+        return WidgetTrackingCalendarConfig(
+            sourceType = when (normalizedSourceType) {
+                "tag", "scope", "daily" -> normalizedSourceType
+                else -> null
+            },
+            categoryId = parseNullableString(config.categoryId),
+            activityId = parseNullableString(config.activityId),
+            scopeId = parseNullableString(config.scopeId),
+            checkTemplateId = parseNullableString(config.checkTemplateId),
+            checkItemId = parseNullableString(config.checkItemId),
+            icon = parseNullableString(config.icon),
+            customIcon = parseNullableString(config.customIcon),
+            uiIconAssetPath = parseNullableString(config.uiIconAssetPath),
+            uiIconFallbackAssetPath = parseNullableString(config.uiIconFallbackAssetPath),
+            label = parseNullableString(config.label),
+            color = parseNullableString(config.color)
+        )
+    }
+
+    private fun JSONObject.toTrackingCalendarConfig(): WidgetTrackingCalendarConfig {
+        return normalizeTrackingCalendarConfig(
+            WidgetTrackingCalendarConfig(
+                sourceType = parseNullableString(optString("sourceType")),
+                categoryId = parseNullableString(optString("categoryId")),
+                activityId = parseNullableString(optString("activityId")),
+                scopeId = parseNullableString(optString("scopeId")),
+                checkTemplateId = parseNullableString(optString("checkTemplateId")),
+                checkItemId = parseNullableString(optString("checkItemId")),
+                icon = parseNullableString(optString("icon")),
+                customIcon = parseNullableString(optString("customIcon")),
+                uiIconAssetPath = parseNullableString(optString("uiIconAssetPath")),
+                uiIconFallbackAssetPath = parseNullableString(optString("uiIconFallbackAssetPath")),
+                label = parseNullableString(optString("label")),
+                color = parseNullableString(optString("color"))
+            )
+        ) ?: WidgetTrackingCalendarConfig()
+    }
+
+    private fun WidgetTrackingCalendarConfig.toJson(): JSONObject {
+        return JSONObject().apply {
+            put("sourceType", sourceType ?: JSONObject.NULL)
+            put("categoryId", categoryId ?: JSONObject.NULL)
+            put("activityId", activityId ?: JSONObject.NULL)
+            put("scopeId", scopeId ?: JSONObject.NULL)
+            put("checkTemplateId", checkTemplateId ?: JSONObject.NULL)
+            put("checkItemId", checkItemId ?: JSONObject.NULL)
+            put("icon", icon ?: JSONObject.NULL)
+            put("customIcon", customIcon ?: JSONObject.NULL)
+            put("uiIconAssetPath", uiIconAssetPath ?: JSONObject.NULL)
+            put("uiIconFallbackAssetPath", uiIconFallbackAssetPath ?: JSONObject.NULL)
+            put("label", label ?: JSONObject.NULL)
+            put("color", color ?: JSONObject.NULL)
+        }
     }
 
     private fun JSONArray?.toStringList(): List<String> {
@@ -1101,6 +1220,66 @@ object WidgetStores {
         return array
     }
 
+    private fun JSONArray?.toTrackingCalendarTemplatePayloadList(): List<WidgetTrackingCalendarTemplatePayload> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        return buildList {
+            for (index in 0 until length()) {
+                val item = optJSONObject(index) ?: continue
+                val templateId = parseNullableString(item.optString("templateId")) ?: continue
+                add(
+                    WidgetTrackingCalendarTemplatePayload(
+                        templateId = templateId,
+                        entries = item.optJSONArray("entries").toTrackingCalendarEntryList()
+                    )
+                )
+            }
+        }
+    }
+
+    private fun JSONArray?.toTrackingCalendarEntryList(): List<WidgetTrackingCalendarEntry> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        return buildList {
+            for (index in 0 until length()) {
+                val item = optJSONObject(index) ?: continue
+                val date = parseNullableString(item.optString("date")) ?: continue
+                add(
+                    WidgetTrackingCalendarEntry(
+                        date = date,
+                        value = item.optInt("value", 0).coerceAtLeast(0)
+                    )
+                )
+            }
+        }
+    }
+
+    private fun List<WidgetTrackingCalendarTemplatePayload>.toTrackingCalendarTemplatePayloadJsonArray(): JSONArray {
+        val array = JSONArray()
+        forEach { templatePayload ->
+            array.put(JSONObject().apply {
+                put("templateId", templatePayload.templateId)
+                put("entries", templatePayload.entries.toTrackingCalendarEntryJsonArray())
+            })
+        }
+        return array
+    }
+
+    private fun List<WidgetTrackingCalendarEntry>.toTrackingCalendarEntryJsonArray(): JSONArray {
+        val array = JSONArray()
+        forEach { entry ->
+            array.put(JSONObject().apply {
+                put("date", entry.date)
+                put("value", entry.value.coerceAtLeast(0))
+            })
+        }
+        return array
+    }
+
     private fun migrateLegacyConfigIfNeeded(context: Context) {
         val prefs = prefs(context)
         val currentTemplates = prefs.getString(KEY_TEMPLATES, null)
@@ -1131,6 +1310,8 @@ object WidgetStores {
             slots = legacySlots.map {
                 it.copy(slotType = if (!it.activityId.isNullOrBlank() && !it.categoryId.isNullOrBlank()) WidgetTypes.TIMER else null)
             },
+            templateType = WidgetTemplateTypes.GRID,
+            trackingConfig = null,
             createdAt = now,
             updatedAt = now
         )
