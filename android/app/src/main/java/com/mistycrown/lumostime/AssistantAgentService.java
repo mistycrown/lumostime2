@@ -72,13 +72,27 @@ public class AssistantAgentService extends Service {
                 null,
                 buildPollDiagnosticContext(now)
             );
+            dispatchDueNativeReminders(now);
             if (enableRandomCheckin && nextRandomCheckinAtMs > 0L && now >= nextRandomCheckinAtMs) {
                 if (shouldDispatchRandomCheckin(now)) {
-                    String triggerId = AssistantAgentPlugin.dispatchSystemTrigger(
-                        "checkin",
-                        "Assistant background check-in trigger",
-                        "system"
-                    );
+                    String triggerId;
+                    if (AssistantNativeBackgroundExecutor.canExecute(AssistantAgentService.this)) {
+                        triggerId = java.util.UUID.randomUUID().toString();
+                        AssistantNativeBackgroundExecutor.executeAsync(
+                            AssistantAgentService.this,
+                            triggerId,
+                            "checkin",
+                            "Assistant background check-in trigger",
+                            "system"
+                        );
+                    } else {
+                        triggerId = AssistantAgentPlugin.dispatchSystemTrigger(
+                            AssistantAgentService.this,
+                            "checkin",
+                            "Assistant background check-in trigger",
+                            "system"
+                        );
+                    }
                     recordAssistantNudge(now);
                     scheduleNextRandomCheckin(now);
                     appendDiagnostic(
@@ -203,11 +217,24 @@ public class AssistantAgentService extends Service {
         if (ACTION_TRIGGER_IMMEDIATE.equals(action)) {
             long now = System.currentTimeMillis();
             recordAssistantNudge(now);
-            String triggerId = AssistantAgentPlugin.dispatchSystemTrigger(
-                "manual_background_nudge",
-                "Manual immediate background assistant trigger",
-                "system"
-            );
+            String triggerId;
+            if (AssistantNativeBackgroundExecutor.canExecute(this)) {
+                triggerId = java.util.UUID.randomUUID().toString();
+                AssistantNativeBackgroundExecutor.executeAsync(
+                    this,
+                    triggerId,
+                    "manual_background_nudge",
+                    "Manual immediate background assistant trigger",
+                    "system"
+                );
+            } else {
+                triggerId = AssistantAgentPlugin.dispatchSystemTrigger(
+                    this,
+                    "manual_background_nudge",
+                    "Manual immediate background assistant trigger",
+                    "system"
+                );
+            }
             appendDiagnostic(
                 "manual_trigger_dispatched",
                 "success",
@@ -248,6 +275,69 @@ public class AssistantAgentService extends Service {
     private void stopAgentLoop() {
         loopStarted = false;
         handler.removeCallbacks(pollRunnable);
+    }
+
+    private void dispatchDueNativeReminders(long nowMs) {
+        if (!AssistantNativeBackgroundExecutor.canExecute(this)) {
+            return;
+        }
+
+        org.json.JSONArray dueReminders = AssistantNativeReminderStore.listDue(this, nowMs);
+        for (int index = 0; index < dueReminders.length(); index += 1) {
+            org.json.JSONObject reminder = dueReminders.optJSONObject(index);
+            if (reminder == null) {
+                continue;
+            }
+
+            String reminderId = safeTrim(reminder.optString("id", ""));
+            if (reminderId.isEmpty()) {
+                continue;
+            }
+
+            String attemptedAt = formatTimestamp(nowMs);
+            AssistantNativeReminderStore.recordDispatchAttempt(this, reminderId, attemptedAt);
+            org.json.JSONObject triggerPayload = AssistantNativeBackgroundExecutor.buildTriggerPayload(
+                "reminder_due:" + reminderId + ":" + nowMs,
+                "reminder_due",
+                safeTrim(reminder.optString("text", "")),
+                "system"
+            );
+            try {
+                org.json.JSONObject metadata = new org.json.JSONObject();
+                metadata.put("reminderId", reminderId);
+                metadata.put("reminderType", safeTrim(reminder.optString("type", "")));
+                metadata.put("scheduledDueAt", safeTrim(reminder.optString("dueAt", "")));
+                metadata.put("actualDispatchAt", attemptedAt);
+                metadata.put("dispatchAttemptCount", reminder.optInt("dispatchAttemptCount", 0));
+                long dueAtMs = AssistantTimeParser.parseIsoDateTime(reminder.optString("dueAt", ""));
+                if (dueAtMs > 0L) {
+                    metadata.put("delayMinutes", Math.max(0L, Math.round((nowMs - dueAtMs) / 60000.0)));
+                }
+                triggerPayload.put("metadata", metadata);
+            } catch (org.json.JSONException ignored) {
+            }
+
+            appendDiagnostic(
+                "reminder_due_dispatched",
+                "success",
+                "Native poll dispatched a reminder_due trigger",
+                safeTrim(triggerPayload.optString("id", "")),
+                "reminder_due",
+                null,
+                buildPollDiagnosticContext(nowMs)
+            );
+
+            AssistantNativeBackgroundExecutor.executeAsync(this, triggerPayload, new AssistantNativeBackgroundExecutor.ExecutionCallback() {
+                @Override
+                public void onCompleted() {
+                    AssistantNativeReminderStore.markDispatched(AssistantAgentService.this, reminderId, isoNow());
+                }
+
+                @Override
+                public void onFailed() {
+                }
+            });
+        }
     }
 
     private void rescheduleAgentLoop() {
@@ -480,6 +570,10 @@ public class AssistantAgentService extends Service {
 
         return new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US)
             .format(new java.util.Date(timestampMs));
+    }
+
+    private String isoNow() {
+        return formatTimestamp(System.currentTimeMillis());
     }
 
     private void syncUnifiedStatusNotification() {

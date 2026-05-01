@@ -4,6 +4,11 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-01: Widened the AI settings side gutters after the divider-based redesign so the editorial layout keeps more breathing room on both sides.
+ * @updated 2026-05-01: Flattened the AI workspace into a more editorial layout by tightening composer height, simplifying history-session delete confirmations, reducing heavy card nesting, and trimming excessive radii/shadows across the AI panels.
+ * @updated 2026-05-01: Native background replies are now rehydrated from Android diagnostics back into persisted chat sessions, so successful direct-native check-ins render in the main conversation instead of only in the debug history.
+ * @updated 2026-04-30: Added a unified AI hardware-back chain so nested AI pages close one layer at a time before the root chat window dismisses.
+ * @updated 2026-04-30: Strengthened multi-bubble assistant reply reveals with a longer stagger, clearer lift/scale entry, and a short highlight fade so each paragraph lands more distinctly in sequence.
  * @updated 2026-04-27: Condensed the background history drawer into a request-chain view that only shows wake time, request start, request result, and returned content for meaningful background runs.
  * @updated 2026-04-27: Simplified long-term-memory add controls down to compact plus-only icon buttons so the section headers stay lighter and less repetitive.
  * @updated 2026-04-27: Aligned the AI workspace, AI settings panel, long-term-memory viewer, background-history viewer, and debug viewer headers to the shared external-page title bar pattern by trimming their height, removing subtitle copy, and using the same compact title sizing.
@@ -56,6 +61,7 @@
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
 import {
   Check,
   History,
@@ -75,6 +81,7 @@ import {
   XCircle
 } from 'lucide-react';
 import {
+  aiService,
   type AIDebugExchange,
   type AIBackfillToolCall,
   type AIConversationTurn,
@@ -217,6 +224,7 @@ interface AIBackfillChatModalProps {
   targetDate?: Date;
   targetSessionId?: string;
   targetMessageId?: string;
+  registerBackHandler?: (handler: (() => boolean) | null) => void;
   onUnreadAssistantMessage?: (count?: number) => void;
   onMarkRead?: () => void;
 }
@@ -511,10 +519,16 @@ const RevealingMessageBubble: React.FC<{
   children: React.ReactNode;
   className: string;
   style: React.CSSProperties;
+  revealMode?: 'default' | 'assistantStaggered';
+  partIndex?: number;
+  partCount?: number;
 }> = ({
   children,
   className,
-  style
+  style,
+  revealMode = 'default',
+  partIndex = 0,
+  partCount = 1
 }) => {
   const [isVisible, setIsVisible] = useState(false);
 
@@ -526,14 +540,50 @@ const RevealingMessageBubble: React.FC<{
     return () => window.cancelAnimationFrame(frameId);
   }, []);
 
+  const isAssistantStaggered = revealMode === 'assistantStaggered';
+  const totalParts = Math.max(partCount, 1);
+  const depthRatio = totalParts > 1 ? partIndex / (totalParts - 1) : 0;
+  const hiddenOffsetPx = isAssistantStaggered
+    ? clampNumber(
+      ASSISTANT_MULTI_BUBBLE_REVEAL_BASE_OFFSET_PX + (depthRatio * 8),
+      ASSISTANT_MULTI_BUBBLE_REVEAL_BASE_OFFSET_PX,
+      ASSISTANT_MULTI_BUBBLE_REVEAL_MAX_OFFSET_PX
+    )
+    : 4;
+  const baseBoxShadow = typeof style.boxShadow === 'string' ? style.boxShadow : '';
+  const landingShadow = isAssistantStaggered
+    ? '0 18px 34px -28px rgba(15,23,42,0.28)'
+    : '0 10px 22px -24px rgba(15,23,42,0.16)';
+  const hiddenShadow = isAssistantStaggered
+    ? '0 26px 42px -34px rgba(15,23,42,0.18)'
+    : '0 12px 24px -24px rgba(15,23,42,0.10)';
+  const composedStyle: React.CSSProperties = {
+    ...style,
+    transform: isVisible
+      ? 'translate3d(0, 0, 0) scale(1)'
+      : `translate3d(0, ${hiddenOffsetPx}px, 0) scale(${isAssistantStaggered ? ASSISTANT_MULTI_BUBBLE_REVEAL_INITIAL_SCALE : 0.99})`,
+    opacity: isVisible ? 1 : 0,
+    filter: isVisible
+      ? 'blur(0px) brightness(1)'
+      : `blur(${isAssistantStaggered ? 1 : 0.6}px) brightness(${isAssistantStaggered ? 1.045 : 1.02})`,
+    boxShadow: baseBoxShadow ? `${baseBoxShadow}, ${isVisible ? landingShadow : hiddenShadow}` : (isVisible ? landingShadow : hiddenShadow),
+    transitionDuration: `${ASSISTANT_MULTI_BUBBLE_REVEAL_DURATION_MS}ms`
+  };
+
   return (
     <div
-      className={`${className} transform-gpu transition-all duration-200 ease-out ${
-        isVisible ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'
-      }`}
-      style={style}
+      className={`${className} relative overflow-hidden transform-gpu transition-[opacity,transform,filter,box-shadow] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[transform,opacity,filter]`}
+      style={composedStyle}
     >
-      {children}
+      {isAssistantStaggered && (
+        <div
+          className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/40 via-white/12 to-transparent transition-opacity duration-500"
+          style={{ opacity: isVisible ? 0 : 0.75 }}
+        />
+      )}
+      <div className="relative z-10">
+        {children}
+      </div>
     </div>
   );
 };
@@ -577,7 +627,11 @@ const CHAT_PERSONAS_KEY = 'lumostime_ai_chat_personas_v1';
 const DEBUG_MODE_KEY = 'lumostime_ai_chat_debug_mode_v1';
 const USER_PROFILE_KEY = 'lumostime_ai_chat_user_profile_v1';
 const ASSISTANT_CHAT_UPDATED_EVENT = assistantOrchestratorService.getAssistantDecisionEventName();
-const ASSISTANT_MULTI_BUBBLE_REVEAL_DELAY_MS = 420;
+const ASSISTANT_MULTI_BUBBLE_REVEAL_DELAY_MS = 540;
+const ASSISTANT_MULTI_BUBBLE_REVEAL_DURATION_MS = 320;
+const ASSISTANT_MULTI_BUBBLE_REVEAL_INITIAL_SCALE = 0.975;
+const ASSISTANT_MULTI_BUBBLE_REVEAL_BASE_OFFSET_PX = 10;
+const ASSISTANT_MULTI_BUBBLE_REVEAL_MAX_OFFSET_PX = 18;
 
 const accentMix = (accentPercent: number, baseColor: string): string => (
   `color-mix(in srgb, var(--accent-color) ${accentPercent}%, ${baseColor})`
@@ -624,9 +678,9 @@ const ACCENT_AI_CHAT_THEME = {
   codeText: '#efe7db',
   overlayDark: 'rgba(32, 25, 19, 0.18)',
   overlayLight: 'rgba(247, 241, 233, 0.94)',
-  cardShadow: '0 8px 22px rgba(52, 38, 27, 0.04)',
-  cardShadowStrong: '0 12px 28px rgba(52, 38, 27, 0.06)',
-  avatarShadow: '0 6px 16px rgba(52, 38, 27, 0.05)'
+  cardShadow: '0 4px 12px rgba(52, 38, 27, 0.025)',
+  cardShadowStrong: '0 8px 18px rgba(52, 38, 27, 0.04)',
+  avatarShadow: '0 2px 8px rgba(52, 38, 27, 0.035)'
 } as const;
 
 const getAIChatTheme = (isDefaultTheme: boolean) => {
@@ -672,9 +726,9 @@ const getAIChatTheme = (isDefaultTheme: boolean) => {
       codeText: '#efe7db',
       overlayDark: 'rgba(0, 0, 0, 0.18)',
       overlayLight: 'rgba(250, 250, 250, 0.94)',
-      cardShadow: '0 8px 20px rgba(0, 0, 0, 0.04)',
-      cardShadowStrong: '0 12px 26px rgba(0, 0, 0, 0.05)',
-      avatarShadow: '0 6px 14px rgba(0, 0, 0, 0.05)'
+      cardShadow: '0 4px 12px rgba(0, 0, 0, 0.025)',
+      cardShadowStrong: '0 8px 18px rgba(0, 0, 0, 0.04)',
+      avatarShadow: '0 2px 8px rgba(0, 0, 0, 0.035)'
     } as const;
   }
 
@@ -746,6 +800,10 @@ const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
 
 const PERSONA_PRESET_ORDER = DEFAULT_AI_PERSONAS.map((persona) => persona.id);
 const PERSONA_EMOJI_CHOICES = ['✨', '🤖', '🌞', '🦊', '🦉', '🌿', '📚', '🎯'];
+
+const clampNumber = (value: number, min: number, max: number): number => (
+  Math.min(max, Math.max(min, value))
+);
 
 const clampContextLimit = (value: unknown): number => {
   const numeric = typeof value === 'number' ? value : Number(value);
@@ -1522,6 +1580,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   targetDate,
   targetSessionId,
   targetMessageId,
+  registerBackHandler,
   onUnreadAssistantMessage,
   onMarkRead
 }) => {
@@ -1579,6 +1638,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messageElementRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const handledNavigationKeyRef = useRef('');
+  const handledAssistantTriggerIdsRef = useRef<Set<string>>(new Set());
 
   const { logs, setLogs, todos, setTodos, todoCategories } = useData();
   const { activeSessions } = useSession();
@@ -1657,7 +1717,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   );
   const assistantBackgroundTimeline = useMemo<AssistantBackgroundTimelineEntry[]>(() => {
     const visibleNativeWakeEvents = assistantNativeDiagnostics.filter((entry) => (
-      entry.type === 'checkin_dispatched' || entry.type === 'manual_trigger_dispatched'
+      entry.type === 'checkin_dispatched'
+      || entry.type === 'manual_trigger_dispatched'
+      || entry.type === 'reminder_due_dispatched'
+    ));
+    const nativeRequestEvents = assistantNativeDiagnostics.filter((entry) => (
+      entry.type === 'native_request_started'
+      || entry.type === 'native_request_completed'
+      || entry.type === 'native_request_failed'
     ));
     const nativeByTriggerId = new Map<string, AssistantNativeDiagnosticEntry>();
     visibleNativeWakeEvents.forEach((entry) => {
@@ -1665,20 +1732,68 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         nativeByTriggerId.set(entry.triggerId, entry);
       }
     });
+    const nativeRequestByTriggerId = new Map<string, {
+      startedAt?: string;
+      completedAt?: string;
+      status?: AssistantBackgroundTimelineEntry['requestStatus'];
+      outcomeSummary?: string;
+      message?: string;
+      errorMessage?: string;
+    }>();
+    nativeRequestEvents.forEach((entry) => {
+      const triggerId = entry.triggerId?.trim();
+      if (!triggerId) {
+        return;
+      }
+
+      const current = nativeRequestByTriggerId.get(triggerId) || {};
+      if (entry.type === 'native_request_started') {
+        nativeRequestByTriggerId.set(triggerId, {
+          ...current,
+          startedAt: entry.context?.requestedAt || entry.createdAt,
+          status: 'pending'
+        });
+        return;
+      }
+
+      if (entry.type === 'native_request_completed') {
+        nativeRequestByTriggerId.set(triggerId, {
+          ...current,
+          startedAt: current.startedAt || entry.context?.requestedAt,
+          completedAt: entry.context?.completedAt || entry.createdAt,
+          status: 'completed',
+          outcomeSummary: entry.context?.decisionSummary || '原生后台请求已完成',
+          message: entry.context?.assistantReply || undefined
+        });
+        return;
+      }
+
+      nativeRequestByTriggerId.set(triggerId, {
+        ...current,
+        startedAt: current.startedAt || entry.context?.requestedAt,
+        completedAt: entry.createdAt,
+        status: 'failed',
+        outcomeSummary: '原生后台请求失败了',
+        errorMessage: entry.context?.error || entry.message
+      });
+    });
 
     const usedNativeIds = new Set<string>();
     const mergedEntries: AssistantBackgroundTimelineEntry[] = assistantBackgroundCallHistory.map((entry) => {
       const nativeEvent = entry.triggerId ? nativeByTriggerId.get(entry.triggerId) : undefined;
+      const nativeRequest = entry.triggerId ? nativeRequestByTriggerId.get(entry.triggerId) : undefined;
       if (nativeEvent) {
         usedNativeIds.add(nativeEvent.id);
       }
 
+      const trimmedMessage = entry.message?.trim() || '';
+      const trimmedDecisionSummary = entry.decisionSummary?.trim() || '';
       const outcomeSummary = entry.status === 'failed'
         ? '这次后台请求失败了'
-        : entry.message?.trim()
-          ? entry.message.trim()
-          : entry.decisionSummary?.trim()
-            ? entry.decisionSummary.trim()
+        : trimmedDecisionSummary && trimmedDecisionSummary !== trimmedMessage
+          ? trimmedDecisionSummary
+          : entry.action === 'reply' && trimmedMessage
+            ? '这次请求成功并返回了一条消息'
             : entry.action === 'silent'
               ? '这次请求成功，但选择了静默'
               : '这次请求已完成';
@@ -1687,16 +1802,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         id: entry.id,
         ...(entry.triggerId ? { triggerId: entry.triggerId } : {}),
         triggerType: entry.triggerType || nativeEvent?.triggerType,
-        wakeAt: nativeEvent?.createdAt,
-        requestStartedAt: entry.requestedAt,
-        requestCompletedAt: entry.completedAt,
+        wakeAt: nativeEvent?.createdAt || entry.requestedAt,
+        requestStartedAt: nativeRequest?.startedAt || entry.requestedAt,
+        requestCompletedAt: nativeRequest?.completedAt || entry.completedAt,
         requestStatus: entry.status === 'failed'
           ? 'failed'
           : entry.status === 'pending'
             ? 'pending'
             : 'completed',
         outcomeSummary,
-        ...(entry.message?.trim() ? { message: entry.message.trim() } : {}),
+        ...(trimmedMessage && trimmedMessage !== outcomeSummary ? { message: trimmedMessage } : {}),
         ...(entry.errorMessage?.trim() ? { errorMessage: entry.errorMessage.trim() } : {}),
         ...(entry.debugExchange ? { debugExchange: entry.debugExchange } : {})
       };
@@ -1707,13 +1822,19 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         return;
       }
 
+      const nativeRequest = entry.triggerId ? nativeRequestByTriggerId.get(entry.triggerId) : undefined;
+
       mergedEntries.push({
         id: entry.id,
         ...(entry.triggerId ? { triggerId: entry.triggerId } : {}),
         triggerType: entry.triggerType,
         wakeAt: entry.createdAt,
-        requestStatus: 'not_started',
-        outcomeSummary: '原生已经醒来并派发 trigger，但 Web 侧还没有开始请求'
+        requestStartedAt: nativeRequest?.startedAt,
+        requestCompletedAt: nativeRequest?.completedAt,
+        requestStatus: nativeRequest?.status || 'not_started',
+        outcomeSummary: nativeRequest?.outcomeSummary || '原生已经醒来并派发 trigger，但 Web 侧还没有开始请求',
+        ...(nativeRequest?.message ? { message: nativeRequest.message } : {}),
+        ...(nativeRequest?.errorMessage ? { errorMessage: nativeRequest.errorMessage } : {})
       });
     });
 
@@ -2108,6 +2229,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setAssistantReminderSnapshot(assistantReminderQueueService.listReminders());
   };
 
+  const hydrateAssistantReminderSnapshotFromNative = useCallback(async () => {
+    const reminders = await assistantReminderQueueService.hydrateFromNative();
+    setAssistantReminderSnapshot(reminders);
+    return reminders;
+  }, []);
+
   const refreshAssistantBackgroundCallHistory = () => {
     setAssistantBackgroundCallHistory(assistantOrchestratorService.listBackgroundCallHistory());
   };
@@ -2115,11 +2242,25 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const refreshAssistantNativeDiagnostics = useCallback(async () => {
     try {
       const result = await AssistantAgent.listDiagnostics();
-      setAssistantNativeDiagnostics(normalizeAssistantNativeDiagnostics(result.entries));
+      const normalizedEntries = normalizeAssistantNativeDiagnostics(result.entries);
+      const backgroundTargetSessionId = activeSession?.id || sortedSessions[0]?.id;
+      setAssistantNativeDiagnostics(normalizedEntries);
+
+      const hydrationResult = assistantOrchestratorService.hydrateNativeCompletedReplies(normalizedEntries, {
+        targetSessionId: backgroundTargetSessionId
+      });
+      if (hydrationResult.surfacedMessages.length > 0) {
+        reloadPersistedChatSessions();
+        refreshAssistantBackgroundCallHistory();
+        if (!isOpenRef.current) {
+          onUnreadAssistantMessage?.(hydrationResult.surfacedMessages.length);
+          addToast('info', `AI 助理：${hydrationResult.surfacedMessages[hydrationResult.surfacedMessages.length - 1]}`);
+        }
+      }
     } catch (error) {
       console.error('[AIBackfillChatModal] Failed to load native assistant diagnostics', error);
     }
-  }, []);
+  }, [activeSession, addToast, onUnreadAssistantMessage, sortedSessions]);
 
   const resetAssistantEditableMemoryUi = () => {
     setAssistantEditableMemoryDrafts(DEFAULT_ASSISTANT_EDITABLE_MEMORY_DRAFTS);
@@ -2241,6 +2382,193 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     buildAssistantStateContext,
     buildBackgroundPersonaPrompt,
     debugMode
+  ]);
+
+  const handleAssistantSystemTrigger = useCallback(async (trigger: AssistantSystemTrigger): Promise<void> => {
+    const triggerId = trigger.id?.trim();
+    if (!triggerId) {
+      return;
+    }
+
+    if (handledAssistantTriggerIdsRef.current.has(triggerId)) {
+      try {
+        await AssistantAgent.acknowledgeSystemTrigger({ id: triggerId });
+      } catch (error) {
+        console.error('[AIBackfillChatModal] Failed to acknowledge duplicate assistant trigger', error);
+      }
+      return;
+    }
+
+    if (!assistantAgentConfig.enabled) {
+      return;
+    }
+
+    handledAssistantTriggerIdsRef.current.add(triggerId);
+    try {
+      await AssistantAgent.acknowledgeSystemTrigger({ id: triggerId });
+    } catch (error) {
+      console.error('[AIBackfillChatModal] Failed to acknowledge assistant trigger', error);
+    }
+
+    void refreshAssistantNativeDiagnostics();
+
+    const targetSession = getBackgroundTargetSession();
+    const conversationHistory = targetSession
+      ? (conversationHistoryCache.get(targetSession.id) || [])
+      : [];
+
+    try {
+      const result = await assistantOrchestratorService.runSystemTurn(buildBackgroundTurnRequest({
+        trigger,
+        now: new Date(),
+        targetSession,
+        conversationHistory,
+        showSystemNotification: shouldShowBackgroundSystemNotification()
+      }));
+
+      refreshAssistantMemorySnapshot();
+      reloadPersistedChatSessions();
+      if (result.surfacedMessage && !isOpenRef.current) {
+        onUnreadAssistantMessage?.(1);
+        addToast('info', `AI 助理：${result.surfacedMessage}`);
+      }
+    } catch (error) {
+      console.error('[AIBackfillChatModal] Assistant system turn failed', error);
+    }
+  }, [
+    addToast,
+    assistantAgentConfig.enabled,
+    buildBackgroundTurnRequest,
+    conversationHistoryCache,
+    getBackgroundTargetSession,
+    onUnreadAssistantMessage,
+    refreshAssistantNativeDiagnostics,
+    shouldShowBackgroundSystemNotification
+  ]);
+
+  const drainPendingAssistantSystemTriggers = useCallback(async () => {
+    try {
+      const result = await AssistantAgent.listPendingSystemTriggers();
+      const rawTriggers = Array.isArray(result.triggers) ? result.triggers : [];
+      if (rawTriggers.length === 0) {
+        return;
+      }
+
+      const normalizedTriggers = rawTriggers
+        .filter((trigger): trigger is AssistantSystemTrigger => (
+          Boolean(trigger)
+          && typeof trigger.id === 'string'
+          && typeof trigger.type === 'string'
+          && typeof trigger.source === 'string'
+          && typeof trigger.createdAt === 'string'
+          && typeof trigger.text === 'string'
+        ))
+        .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
+
+      const latestCheckinTrigger = [...normalizedTriggers]
+        .reverse()
+        .find((trigger) => trigger.type === 'checkin');
+
+      for (const trigger of normalizedTriggers) {
+        if (trigger.type === 'checkin' && latestCheckinTrigger && trigger.id !== latestCheckinTrigger.id) {
+          handledAssistantTriggerIdsRef.current.add(trigger.id);
+          try {
+            await AssistantAgent.acknowledgeSystemTrigger({ id: trigger.id });
+          } catch (error) {
+            console.error('[AIBackfillChatModal] Failed to acknowledge stale check-in trigger', error);
+          }
+          continue;
+        }
+
+        await handleAssistantSystemTrigger(trigger);
+      }
+    } catch (error) {
+      console.error('[AIBackfillChatModal] Failed to drain pending assistant triggers', error);
+    }
+  }, [handleAssistantSystemTrigger]);
+
+  const syncNativeBackgroundExecutionSnapshot = useCallback(async () => {
+    try {
+      const targetSession = getBackgroundTargetSession();
+      const conversationHistory = targetSession
+        ? (conversationHistoryCache.get(targetSession.id) || [])
+        : [];
+      const reminderSummary = buildAssistantReminderSummary();
+      const recentLogsDigest = buildAssistantRecentLogsDigest();
+      const userPersonaPrompt = buildBackgroundPersonaPrompt(targetSession);
+      const now = new Date();
+      const stateContext = buildAssistantStateContext(now, reminderSummary);
+      const [basePrompt, backgroundModePrompt] = await Promise.all([
+        assistantPromptService.getAssistantBasePrompt(),
+        assistantPromptService.getBackgroundModePrompt()
+      ]);
+      const memory = assistantAgentConfig.longTermMemoryEnabled
+        ? assistantMemoryService.getMemory()
+        : {
+          version: 1 as const,
+          updatedAt: new Date().toISOString(),
+          profileMemory: [],
+          preferenceMemory: [],
+          activeReminders: [],
+          recentDecisions: []
+        };
+
+      const systemPrompt = await assistantTurnService.buildSystemPrompt({
+        mode: 'background',
+        trigger: {
+          type: 'checkin',
+          source: 'system',
+          text: 'Native background check-in trigger',
+          createdAt: now.toISOString()
+        },
+        promptLayers: {
+          basePrompt,
+          modePrompt: backgroundModePrompt,
+          ...(userPersonaPrompt ? { userPersonaPrompt } : {})
+        },
+        memoryEnabled: assistantAgentConfig.longTermMemoryEnabled,
+        memory,
+        conversation: assistantContextBuilder.buildConversationContext(
+          conversationHistory.map((turn) => ({
+            role: turn.role,
+            content: turn.content
+          }))
+        ),
+        stateContext: {
+          currentDateTime: stateContext.currentDateTime,
+          defaultDate: stateContext.defaultDate,
+          ...(stateContext.todayTimelineSummary ? { todayTimelineSummary: stateContext.todayTimelineSummary } : {}),
+          ...(stateContext.activeSessionSummary ? { activeSessionSummary: stateContext.activeSessionSummary } : {}),
+          ...(stateContext.todayScheduledTodoSummary ? { todayScheduledTodoSummary: stateContext.todayScheduledTodoSummary } : {}),
+          ...(stateContext.pinnedTodoSummary ? { pinnedTodoSummary: stateContext.pinnedTodoSummary } : {}),
+          ...(stateContext.overdueTodoSummary ? { overdueTodoSummary: stateContext.overdueTodoSummary } : {}),
+          ...(reminderSummary ? { reminderSummary } : {})
+        },
+        dictionaryContext: buildAssistantDictionaryContext(),
+        ...(recentLogsDigest ? { recentLogsDigest } : {})
+      });
+
+      await AssistantAgent.syncNativeBackgroundSnapshot({
+        systemPrompt,
+        conversation: assistantContextBuilder.buildConversationContext(
+          conversationHistory.map((turn) => ({
+            role: turn.role,
+            content: turn.content
+          }))
+        )
+      });
+    } catch (error) {
+      console.error('[AIBackfillChatModal] Failed to sync native background snapshot', error);
+    }
+  }, [
+    assistantAgentConfig.longTermMemoryEnabled,
+    buildAssistantDictionaryContext,
+    buildAssistantRecentLogsDigest,
+    buildAssistantReminderSummary,
+    buildAssistantStateContext,
+    buildBackgroundPersonaPrompt,
+    conversationHistoryCache,
+    getBackgroundTargetSession
   ]);
 
   useEffect(() => {
@@ -2402,19 +2730,20 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const handleAssistantChatUpdated = () => {
       reloadPersistedChatSessions();
       refreshAssistantMemorySnapshot();
-      refreshAssistantReminderSnapshot();
+      void hydrateAssistantReminderSnapshotFromNative();
       refreshAssistantBackgroundCallHistory();
       void refreshAssistantNativeDiagnostics();
     };
 
     window.addEventListener(ASSISTANT_CHAT_UPDATED_EVENT, handleAssistantChatUpdated);
     return () => window.removeEventListener(ASSISTANT_CHAT_UPDATED_EVENT, handleAssistantChatUpdated);
-  }, [personas, refreshAssistantNativeDiagnostics]);
+  }, [hydrateAssistantReminderSnapshotFromNative, personas, refreshAssistantNativeDiagnostics]);
 
   useEffect(() => {
     let cancelled = false;
     let pluginListener: Awaited<ReturnType<typeof AssistantAgent.addListener>> | null = null;
     let diagnosticsListener: Awaited<ReturnType<typeof AssistantAgent.addListener>> | null = null;
+    let appStateListener: Awaited<ReturnType<typeof CapacitorApp.addListener>> | null = null;
 
     const bindAssistantAgent = async () => {
       try {
@@ -2423,29 +2752,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             return;
           }
 
-          void refreshAssistantNativeDiagnostics();
-
-          const targetSession = getBackgroundTargetSession();
-          const conversationHistory = targetSession
-            ? (conversationHistoryCache.get(targetSession.id) || [])
-            : [];
-
-          void assistantOrchestratorService.runSystemTurn(buildBackgroundTurnRequest({
-            trigger: trigger as AssistantSystemTrigger,
-            now: new Date(),
-            targetSession,
-            conversationHistory,
-            showSystemNotification: shouldShowBackgroundSystemNotification()
-          })).then((result) => {
-            refreshAssistantMemorySnapshot();
-            reloadPersistedChatSessions();
-            if (result.surfacedMessage && !isOpen) {
-              onUnreadAssistantMessage?.(1);
-              addToast('info', `AI 助理：${result.surfacedMessage}`);
-            }
-          }).catch((error) => {
-            console.error('[AIBackfillChatModal] Assistant system turn failed', error);
-          });
+          void handleAssistantSystemTrigger(trigger as AssistantSystemTrigger);
         });
         diagnosticsListener = await AssistantAgent.addListener('assistantDiagnosticsUpdated', () => {
           if (cancelled) {
@@ -2454,9 +2761,29 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
           void refreshAssistantNativeDiagnostics();
         });
+        appStateListener = await CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+          if (cancelled || !isActive || !assistantAgentConfig.enabled) {
+            return;
+          }
+
+          void hydrateAssistantReminderSnapshotFromNative();
+          void drainPendingAssistantSystemTriggers();
+        });
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        void hydrateAssistantReminderSnapshotFromNative();
+        void drainPendingAssistantSystemTriggers();
       } catch (error) {
         console.error('[AIBackfillChatModal] Failed to bind assistant agent listener', error);
       }
+    };
+
+    const handleVisibilityChange = () => {
+      if (cancelled || document.hidden || !assistantAgentConfig.enabled) {
+        return;
+      }
+
+      void hydrateAssistantReminderSnapshotFromNative();
+      void drainPendingAssistantSystemTriggers();
     };
 
     void bindAssistantAgent();
@@ -2465,17 +2792,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       cancelled = true;
       pluginListener?.remove();
       diagnosticsListener?.remove();
+      void appStateListener?.remove();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [
-    addToast,
     assistantAgentConfig.enabled,
-    buildBackgroundTurnRequest,
-    conversationHistoryCache,
-    getBackgroundTargetSession,
-    isOpen,
-    onUnreadAssistantMessage,
+    drainPendingAssistantSystemTriggers,
+    handleAssistantSystemTrigger,
+    hydrateAssistantReminderSnapshotFromNative,
     refreshAssistantNativeDiagnostics,
-    shouldShowBackgroundSystemNotification
   ]);
 
   useEffect(() => {
@@ -2501,6 +2826,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       cancelled = true;
     };
   }, [assistantAgentConfig]);
+
+  useEffect(() => {
+    void AssistantAgent.syncNativeAIConfig(aiService.getConfig()).catch((error) => {
+      console.error('[AIBackfillChatModal] Failed to sync native AI config on mount/update', error);
+    });
+    void syncNativeBackgroundExecutionSnapshot();
+  }, [
+    assistantAgentConfig.enabled,
+    assistantAgentConfig.longTermMemoryEnabled,
+    conversationHistoryCache,
+    syncNativeBackgroundExecutionSnapshot
+  ]);
 
   useEffect(() => {
     flushDueReminders();
@@ -3111,6 +3448,118 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
     addToast('success', '已删除这条 reminder');
   };
+
+  const handleAIInternalBack = useCallback((): boolean => {
+    if (!isOpen) {
+      return false;
+    }
+
+    if (debugViewer) {
+      setDebugViewer(null);
+      return true;
+    }
+
+    if (isAssistantBackgroundHistoryViewerOpen) {
+      handleCloseAssistantBackgroundHistoryViewer();
+      return true;
+    }
+
+    if (isAssistantMemoryViewerOpen) {
+      if (assistantReminderDeleteTarget) {
+        setAssistantReminderDeleteTarget(null);
+        return true;
+      }
+
+      if (isAssistantReminderComposerOpen) {
+        resetAssistantReminderUi();
+        return true;
+      }
+
+      if (assistantEditableMemoryDeleteTarget) {
+        setAssistantEditableMemoryDeleteTarget(null);
+        return true;
+      }
+
+      if (assistantEditableMemoryComposerKey) {
+        handleCancelAssistantEditableMemoryComposer(assistantEditableMemoryComposerKey);
+        return true;
+      }
+
+      handleCloseAssistantMemoryViewer();
+      return true;
+    }
+
+    if (isUserEmojiEditorOpen) {
+      setIsUserEmojiEditorOpen(false);
+      return true;
+    }
+
+    if (isEmojiEditorOpen) {
+      setIsEmojiEditorOpen(false);
+      return true;
+    }
+
+    if (isPersonaPanelOpen) {
+      if (deleteConfirmPersonaId) {
+        setDeleteConfirmPersonaId(null);
+        return true;
+      }
+
+      setIsPersonaPanelOpen(false);
+      return true;
+    }
+
+    if (isHistoryPanelOpen) {
+      if (deleteConfirmSessionId) {
+        setDeleteConfirmSessionId(null);
+        return true;
+      }
+
+      if (editingSessionId) {
+        handleCancelRenameSession();
+        return true;
+      }
+
+      setIsHistoryPanelOpen(false);
+      return true;
+    }
+
+    onClose();
+    return true;
+  }, [
+    assistantEditableMemoryComposerKey,
+    assistantEditableMemoryDeleteTarget,
+    assistantReminderDeleteTarget,
+    debugViewer,
+    deleteConfirmPersonaId,
+    deleteConfirmSessionId,
+    editingSessionId,
+    handleCancelAssistantEditableMemoryComposer,
+    handleCancelRenameSession,
+    handleCloseAssistantBackgroundHistoryViewer,
+    handleCloseAssistantMemoryViewer,
+    isAssistantBackgroundHistoryViewerOpen,
+    isAssistantMemoryViewerOpen,
+    isAssistantReminderComposerOpen,
+    isEmojiEditorOpen,
+    isHistoryPanelOpen,
+    isOpen,
+    isPersonaPanelOpen,
+    isUserEmojiEditorOpen,
+    onClose
+  ]);
+
+  useEffect(() => {
+    if (!registerBackHandler) {
+      return;
+    }
+
+    registerBackHandler(isOpen ? handleAIInternalBack : null);
+
+    return () => {
+      registerBackHandler(null);
+    };
+  }, [handleAIInternalBack, isOpen, registerBackHandler]);
 
   const runManualAssistantCheckinDebug = () => {
     if (!activeSession || isLoading) {
@@ -4469,6 +4918,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 key={`${message.id}-part-${index}`}
                 className="rounded-[1.25rem] border px-4 py-3"
                 style={bubbleStyle}
+                revealMode={isAnimatedAssistantMessage ? 'assistantStaggered' : 'default'}
+                partIndex={index}
+                partCount={displayParts.length}
               >
                 <div className="flex items-start gap-2">
                   {tone === 'pending' && index === 0 && (
@@ -4692,7 +5144,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             <button
               onClick={() => !isLoading && setIsHistoryPanelOpen(true)}
               disabled={isLoading}
-              className="inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-9 items-center gap-2 rounded-[0.8rem] border px-3 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
               style={{
                 borderColor: AI_CHAT_THEME.chipBorder,
                 backgroundColor: AI_CHAT_THEME.panelBg,
@@ -4706,7 +5158,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
             <button
               onClick={onClose}
-              className="flex h-9 w-9 items-center justify-center rounded-full border transition-colors"
+              className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] border transition-colors"
               style={{
                 borderColor: AI_CHAT_THEME.chipBorder,
                 backgroundColor: AI_CHAT_THEME.panelBg,
@@ -4722,7 +5174,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
           {!activeSession || activeSession.messages.length === 0 ? (
             <div
-              className="mx-auto mt-10 max-w-2xl rounded-[1.4rem] border border-dashed px-6 py-7 text-sm leading-7"
+              className="mx-auto mt-10 max-w-2xl rounded-[0.9rem] border border-dashed px-6 py-7 text-sm leading-7"
               style={{
                 borderColor: AI_CHAT_THEME.panelBorderStrong,
                 background: `linear-gradient(180deg, ${AI_CHAT_THEME.panelBg} 0%, ${AI_CHAT_THEME.panelBgSoft} 100%)`,
@@ -4779,11 +5231,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           }}
         >
           <div
-            className="mx-auto max-w-[920px] rounded-[1.1rem] border p-2.5"
+            className="mx-auto max-w-[920px] border px-3 pb-2 pt-2.5"
             style={{
               borderColor: AI_CHAT_THEME.panelBorder,
               backgroundColor: AI_CHAT_THEME.panelBg,
-              boxShadow: AI_CHAT_THEME.avatarShadow
+              boxShadow: AI_CHAT_THEME.cardShadow
             }}
           >
             <textarea
@@ -4791,18 +5243,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               onChange={(event) => setInputText(event.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={`和 ${activePersona.assistantSelfName || 'AI'} 说点什么...`}
-              className="min-h-[64px] max-h-[120px] w-full resize-none bg-transparent px-1.5 py-1 text-[15px] leading-6 outline-none"
+              className="min-h-[48px] max-h-[76px] w-full resize-none bg-transparent px-0.5 py-1 text-[15px] leading-6 outline-none"
               style={{ color: AI_CHAT_THEME.textPrimary }}
               autoFocus
             />
 
-            <div className="mt-2.5 flex flex-wrap items-center justify-between gap-3 border-t pt-2.5" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
+            <div className="mt-1.5 flex items-center justify-between gap-3">
               <button
                 onClick={() => activeSession && mutateSession(activeSession.id, (session) => ({
                   ...session,
                   contextCacheEnabled: !session.contextCacheEnabled
                 }))}
-                className="inline-flex h-9 shrink-0 items-center rounded-full border px-3 text-[13px] transition-colors"
+                className="inline-flex h-8 shrink-0 items-center rounded-[0.75rem] border px-2.5 text-[12px] transition-colors"
                 style={
                   activeSession?.contextCacheEnabled
                     ? {
@@ -4818,7 +5270,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 }
                 title="快速上下文开关"
               >
-                上下文 {activeSession?.contextCacheEnabled ? `ON · ${activePersona.contextMessageLimit}轮` : 'OFF'}
+                {activeSession?.contextCacheEnabled ? `上下文 开 · ${activePersona.contextMessageLimit}轮` : '上下文 关'}
               </button>
               <button
                 onClick={() => {
@@ -4829,7 +5281,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   void handleSend();
                 }}
                 disabled={!isLoading && !inputText.trim()}
-                className="ml-auto inline-flex h-10 min-w-[7rem] items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold transition-all disabled:cursor-not-allowed"
+                className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-[0.8rem] border transition-all disabled:cursor-not-allowed disabled:opacity-50"
                 style={
                   isLoading
                     ? {
@@ -4838,14 +5290,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         color: AI_CHAT_THEME.textSecondary
                       }
                     : {
+                        border: `1px solid ${AI_CHAT_THEME.primaryButtonBorder}`,
                         backgroundColor: AI_CHAT_THEME.primaryButtonBg,
-                        color: AI_CHAT_THEME.primaryButtonText,
-                        boxShadow: `0 0 0 1px ${AI_CHAT_THEME.primaryButtonBorder}`
+                        color: AI_CHAT_THEME.primaryButtonText
                       }
                 }
+                title={isLoading ? '停止' : '发送'}
               >
                 {isLoading ? <Square size={16} /> : <Send size={16} />}
-                <span>{isLoading ? '停止' : '发送'}</span>
               </button>
             </div>
           </div>
@@ -4854,7 +5306,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         {isHistoryPanelOpen && (
           <div className="absolute inset-0 z-10 backdrop-blur-[10px]" style={{ backgroundColor: AI_CHAT_THEME.overlayDark }}>
             <div
-              className="absolute inset-3 flex flex-col overflow-hidden rounded-[1.35rem] border sm:inset-4"
+              className="absolute inset-3 flex flex-col overflow-hidden rounded-[0.95rem] border sm:inset-4"
               style={{
                 borderColor: AI_CHAT_THEME.panelBorder,
                 backgroundColor: AI_CHAT_THEME.panelBg,
@@ -4873,7 +5325,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 </div>
                 <button
                   onClick={() => setIsHistoryPanelOpen(false)}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.8rem] border transition-colors"
                   style={{
                     borderColor: AI_CHAT_THEME.chipBorder,
                     backgroundColor: AI_CHAT_THEME.panelBg,
@@ -4887,7 +5339,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               <div className="border-b px-5 py-4" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
                 <button
                   onClick={handleCreateSession}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-[1rem] border px-4 py-3 text-sm font-semibold transition-colors"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-[0.8rem] border px-4 py-2.5 text-sm font-semibold transition-colors"
                   style={{
                     borderColor: AI_CHAT_THEME.primaryButtonBorder,
                     backgroundColor: AI_CHAT_THEME.primaryButtonBg,
@@ -4910,13 +5362,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     return (
                       <div
                         key={session.id}
-                        className="w-full rounded-[1.45rem] border px-4 py-3 text-left transition-all"
+                        className="w-full border px-4 py-3 text-left transition-all"
                         style={
                           session.id === activeSessionId
                             ? {
                                 borderColor: AI_CHAT_THEME.activeBorder,
                                 backgroundColor: AI_CHAT_THEME.activeBg,
-                                boxShadow: '0 12px 28px rgba(52,38,27,0.08), 0 0 0 1px rgba(0,0,0,0.02)'
+                                boxShadow: AI_CHAT_THEME.cardShadow
                               }
                             : {
                                 borderColor: AI_CHAT_THEME.panelBorder,
@@ -4936,7 +5388,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                             className={`flex min-w-0 flex-1 items-start gap-3 text-left ${isEditing ? '' : 'cursor-pointer'}`}
                           >
                             <div
-                              className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[0.9rem] border text-base"
+                              className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[0.7rem] border text-base"
                               style={{
                                 borderColor: AI_CHAT_THEME.panelBorder,
                                 backgroundColor: AI_CHAT_THEME.avatarBg,
@@ -4963,7 +5415,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                         handleCancelRenameSession();
                                       }
                                     }}
-                                    className="w-full rounded-[0.95rem] border px-3 py-1.5 text-sm font-semibold outline-none"
+                                    className="w-full rounded-[0.7rem] border px-3 py-1.5 text-sm font-semibold outline-none"
                                     style={{
                                       borderColor: AI_CHAT_THEME.chipBorder,
                                       backgroundColor: AI_CHAT_THEME.inputBg,
@@ -4994,24 +5446,24 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                               <>
                                 <button
                                   onClick={() => handleCommitRenameSession(session.id)}
-                                  className="rounded-full border border-[#ced8ca] bg-[#edf3ea] px-2.5 py-1 text-xs font-medium text-[#556a52] transition-colors hover:bg-[#e5eee1]"
+                                  className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#ced8ca] bg-[#edf3ea] text-[#556a52] transition-colors hover:bg-[#e5eee1]"
                                   title="保存名称"
                                 >
-                                  保存
+                                  <Check size={14} />
                                 </button>
                                 <button
                                   onClick={handleCancelRenameSession}
-                                  className="rounded-full border border-[#e3d8ca] bg-[#fff8f0] px-2.5 py-1 text-xs font-medium text-[#736a61] transition-colors hover:bg-[#f2e9de]"
+                                  className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#e3d8ca] bg-[#fff8f0] text-[#736a61] transition-colors hover:bg-[#f2e9de]"
                                   title="取消重命名"
                                 >
-                                  取消
+                                  <X size={14} />
                                 </button>
                               </>
                             ) : (
                               <>
                                 <button
                                   onClick={() => handleStartRenameSession(session)}
-                                  className="rounded-full p-2 text-[#897f75] transition-colors hover:bg-[#f1e8dd] hover:text-[#2f2a26]"
+                                  className="rounded-[0.7rem] p-2 text-[#897f75] transition-colors hover:bg-[#f1e8dd] hover:text-[#2f2a26]"
                                   title="重命名对话"
                                 >
                                   <Pencil size={14} />
@@ -5022,7 +5474,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                     setEditingSessionTitle('');
                                     setDeleteConfirmSessionId((current) => current === session.id ? null : session.id);
                                   }}
-                                  className="rounded-full p-2 text-[#897f75] transition-colors hover:bg-[#f8e9e6] hover:text-[#b35b50]"
+                                  className="rounded-[0.7rem] p-2 text-[#897f75] transition-colors hover:bg-[#f8e9e6] hover:text-[#b35b50]"
                                   title="删除对话"
                                 >
                                   <Trash2 size={14} />
@@ -5033,20 +5485,22 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         </div>
 
                         {isDeleteConfirming && !isEditing && (
-                          <div className="mt-3 flex items-center justify-between rounded-[1.15rem] border border-[#e4c1bc] bg-[#f8e9e6] px-3 py-2 text-xs text-[#9d544d]">
-                            <span>删除后不能恢复，确认删除这个对话吗？</span>
-                            <div className="flex items-center gap-2">
+                          <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#e4c1bc] pt-3 text-xs text-[#9d544d]">
+                            <span>删除后不能恢复，确认删除？</span>
+                            <div className="flex items-center gap-1.5">
                               <button
                                 onClick={() => setDeleteConfirmSessionId(null)}
-                                className="rounded-full border border-[#e0d5c8] bg-[#fffaf3] px-2.5 py-1 font-medium text-[#71685f] transition-colors hover:bg-white"
+                                className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#ddd6ce] bg-transparent text-[#71685f] transition-colors hover:bg-[#fffaf3]"
+                                title="取消删除"
                               >
-                                取消
+                                <X size={14} />
                               </button>
                               <button
                                 onClick={() => handleDeleteSession(session.id)}
-                                className="rounded-full border border-[#ba6256] bg-[#c46f4f] px-2.5 py-1 font-medium text-[#fff8f2] transition-colors hover:bg-[#b95f43]"
+                                className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#ba6256] bg-[#c46f4f] text-[#fff8f2] transition-colors hover:bg-[#b95f43]"
+                                title="确认删除"
                               >
-                                删除
+                                <Check size={14} />
                               </button>
                             </div>
                           </div>
@@ -5079,7 +5533,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 <h3 className="font-serif text-lg font-bold leading-none text-stone-800">AI 设置</h3>
                 <button
                   onClick={() => setIsPersonaPanelOpen(false)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border transition-colors"
+                  className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] border transition-colors"
                   style={{
                     borderColor: AI_CHAT_THEME.chipBorder,
                     backgroundColor: AI_CHAT_THEME.panelBg,
@@ -5090,20 +5544,19 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 </button>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
-                <div className="mx-auto flex max-w-4xl flex-col gap-6">
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-8">
+                <div className="mx-auto flex max-w-4xl flex-col">
                   <section
-                    className="order-1 rounded-[1.35rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.94)] p-5 shadow-[0_8px_22px_rgba(15,23,42,0.035)]"
+                    className="order-1 border-b px-2 py-5 sm:px-3"
                     style={{
-                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
-                      backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)'
                     }}
                   >
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <p className="text-sm font-bold text-stone-800">人设列表</p>
                       <button
                         onClick={handleCreatePersona}
-                        className="inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium text-[#4b5563] transition-colors hover:bg-white"
+                        className="inline-flex items-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium text-[#4b5563] transition-colors hover:bg-white"
                         style={{
                           borderColor: 'color-mix(in srgb, var(--accent-color) 14%, #d8dde6)',
                           backgroundColor: 'color-mix(in srgb, var(--accent-color) 4%, white)'
@@ -5113,32 +5566,32 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         添加人设
                       </button>
                     </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
+                    <div
+                      className="border-t"
+                      style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)' }}
+                    >
                       {builtinPersonas.map((persona) => (
                         <button
                           key={persona.id}
                           onClick={() => handleApplyPersonaPreset(persona.id)}
-                          className={`rounded-[1.45rem] border px-4 py-3 text-left transition-all ${
-                            activeSession?.personaId === persona.id
-                              ? 'text-[#1f2937] shadow-[0_8px_20px_rgba(15,23,42,0.045)]'
-                              : 'text-[#4b5563] hover:bg-white'
-                          }`}
+                          className="w-full border-b px-2 py-3 text-left transition-colors hover:bg-white/70 sm:px-3"
                           style={
                             activeSession?.personaId === persona.id
                               ? {
-                                  borderColor: 'color-mix(in srgb, var(--accent-color) 22%, #d8dde6)',
-                                  backgroundColor: 'color-mix(in srgb, var(--accent-color) 7%, white)',
-                                  boxShadow: '0 8px 20px rgba(15,23,42,0.045), 0 0 0 1px color-mix(in srgb, var(--accent-color) 8%, transparent)'
+                                  borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
+                                  backgroundColor: 'color-mix(in srgb, var(--accent-color) 4%, white)',
+                                  color: '#1f2937'
                                 }
                               : {
-                                  borderColor: 'color-mix(in srgb, var(--accent-color) 12%, #e5e7eb)',
-                                  backgroundColor: 'color-mix(in srgb, var(--accent-color) 3%, white)'
+                                  borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
+                                  backgroundColor: 'transparent',
+                                  color: '#4b5563'
                                 }
                           }
                         >
                           <div className="flex items-center gap-3">
                             <div
-                              className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[1rem] border bg-white text-lg shadow-[0_4px_12px_rgba(15,23,42,0.03)]"
+                              className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[0.75rem] border bg-white text-lg"
                               style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 12%, #e5e7eb)' }}
                             >
                               <PersonaAvatar persona={persona} iconClassName="text-lg" />
@@ -5148,7 +5601,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                 <p className="text-sm font-bold">{persona.name}</p>
                                 {activeSession?.personaId === persona.id && (
                                   <span
-                                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border bg-white text-[#374151]"
+                                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[0.5rem] border bg-white text-[#374151]"
                                     style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 16%, #d8dde6)' }}
                                   >
                                     <Check size={12} />
@@ -5166,27 +5619,24 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         <button
                           key={persona.id}
                           onClick={() => handleApplyPersonaPreset(persona.id)}
-                          className={`rounded-[1.45rem] border px-4 py-3 text-left transition-all ${
-                            activeSession?.personaId === persona.id
-                              ? 'text-[#1f2937] shadow-[0_8px_20px_rgba(15,23,42,0.045)]'
-                              : 'text-[#4b5563] hover:bg-white'
-                          }`}
+                          className="w-full border-b px-2 py-3 text-left transition-colors hover:bg-white/70 sm:px-3"
                           style={
                             activeSession?.personaId === persona.id
                               ? {
-                                  borderColor: 'color-mix(in srgb, var(--accent-color) 22%, #d8dde6)',
-                                  backgroundColor: 'color-mix(in srgb, var(--accent-color) 7%, white)',
-                                  boxShadow: '0 8px 20px rgba(15,23,42,0.045), 0 0 0 1px color-mix(in srgb, var(--accent-color) 8%, transparent)'
+                                  borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
+                                  backgroundColor: 'color-mix(in srgb, var(--accent-color) 4%, white)',
+                                  color: '#1f2937'
                                 }
                               : {
-                                  borderColor: 'color-mix(in srgb, var(--accent-color) 12%, #e5e7eb)',
-                                  backgroundColor: 'color-mix(in srgb, var(--accent-color) 3%, white)'
+                                  borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
+                                  backgroundColor: 'transparent',
+                                  color: '#4b5563'
                                 }
                           }
                         >
                           <div className="flex items-center gap-3">
                             <div
-                              className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[1rem] border bg-white text-lg shadow-[0_4px_12px_rgba(15,23,42,0.03)]"
+                              className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[0.75rem] border bg-white text-lg"
                               style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 12%, #e5e7eb)' }}
                             >
                               <PersonaAvatar persona={persona} iconClassName="text-lg" />
@@ -5196,7 +5646,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                 <p className="truncate text-sm font-bold">{persona.name}</p>
                                 {activeSession?.personaId === persona.id && (
                                   <span
-                                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border bg-white text-[#374151]"
+                                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[0.5rem] border bg-white text-[#374151]"
                                     style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 16%, #d8dde6)' }}
                                   >
                                     <Check size={12} />
@@ -5214,19 +5664,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   </section>
 
                   <section
-                    className="order-4 rounded-[1.35rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.94)] p-5 shadow-[0_8px_22px_rgba(15,23,42,0.035)]"
+                    className="order-4 border-b px-2 py-5 sm:px-3"
                     style={{
-                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
-                      backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)'
                     }}
                   >
                     <div className="mb-4 flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-bold text-stone-800">后台助理</p>
-                        <p className="mt-1 text-xs text-stone-500">控制 Android 后台轮询、长期记忆和未来的 Reminder 能力。</p>
+                        <p className="mt-1 text-xs text-stone-500">控制 Android 后台轮询、长期记忆和Reminder 能力。</p>
                       </div>
                       <span
-                        className="rounded-full border px-3 py-1 text-xs font-medium"
+                        className="rounded-[0.75rem] border px-3 py-1 text-xs font-medium"
                         style={{
                           borderColor: AI_CHAT_THEME.chipBorder,
                           backgroundColor: AI_CHAT_THEME.chipBg,
@@ -5237,12 +5686,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                       </span>
                     </div>
 
-                    <div className="space-y-3">
+                    <div
+                      className="border-t"
+                      style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)' }}
+                    >
                       <div
-                        className="flex items-start justify-between gap-4 rounded-[1rem] border px-4 py-3"
+                        className="flex items-start justify-between gap-4 border-b py-4"
                         style={{
-                          borderColor: AI_CHAT_THEME.panelBorder,
-                          backgroundColor: AI_CHAT_THEME.panelBg
+                          borderColor: AI_CHAT_THEME.panelBorder
                         }}
                       >
                         <div>
@@ -5253,7 +5704,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         </div>
                         <button
                           onClick={() => handleUpdateAssistantAgentConfig({ enabled: !assistantAgentConfig.enabled })}
-                          className="inline-flex min-w-[72px] items-center justify-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
+                          className="inline-flex min-w-[72px] items-center justify-center rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors"
                           style={assistantAgentConfig.enabled
                             ? {
                               borderColor: AI_CHAT_THEME.activeBorder,
@@ -5271,10 +5722,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                       </div>
 
                       <div
-                        className="rounded-[1rem] border px-4 py-3"
+                        className="border-b py-4"
                         style={{
-                          borderColor: AI_CHAT_THEME.panelBorder,
-                          backgroundColor: AI_CHAT_THEME.panelBg
+                          borderColor: AI_CHAT_THEME.panelBorder
                         }}
                       >
                         <div className="mb-3">
@@ -5396,10 +5846,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                       </div>
 
                       <div
-                        className="flex items-start justify-between gap-4 rounded-[1rem] border px-4 py-3"
+                        className="flex items-start justify-between gap-4 border-b py-4"
                         style={{
-                          borderColor: AI_CHAT_THEME.panelBorder,
-                          backgroundColor: AI_CHAT_THEME.panelBg
+                          borderColor: AI_CHAT_THEME.panelBorder
                         }}
                       >
                         <div>
@@ -5410,7 +5859,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         </div>
                         <button
                           onClick={() => handleUpdateAssistantAgentConfig({ longTermMemoryEnabled: !assistantAgentConfig.longTermMemoryEnabled })}
-                          className="inline-flex min-w-[72px] items-center justify-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
+                          className="inline-flex min-w-[72px] items-center justify-center rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors"
                           style={assistantAgentConfig.longTermMemoryEnabled
                             ? {
                               borderColor: AI_CHAT_THEME.activeBorder,
@@ -5442,7 +5891,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         </div>
                         <button
                           disabled
-                          className="inline-flex min-w-[84px] items-center justify-center rounded-full border px-3 py-1.5 text-xs font-medium"
+                          className="inline-flex min-w-[84px] items-center justify-center rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium"
                           style={{
                             borderColor: AI_CHAT_THEME.chipBorder,
                             backgroundColor: AI_CHAT_THEME.inputBg,
@@ -5453,10 +5902,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         </button>
                       </div>
 
-                      <div className="flex flex-wrap gap-2 pt-1">
+                      <div className="flex flex-wrap gap-2 pt-4">
                         <button
                           onClick={handleOpenAssistantMemoryViewer}
-                          className="rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
+                          className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
                           style={{
                             borderColor: AI_CHAT_THEME.chipBorder,
                             backgroundColor: AI_CHAT_THEME.panelBg,
@@ -5467,7 +5916,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         </button>
                         <button
                           onClick={handleOpenAssistantBackgroundHistoryViewer}
-                          className="rounded-full border px-3 py-2 text-xs font-medium transition-colors"
+                          className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors"
                           style={{
                             borderColor: AI_CHAT_THEME.chipBorder,
                             backgroundColor: AI_CHAT_THEME.panelBg,
@@ -5481,10 +5930,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   </section>
 
                   <section
-                    className="order-3 rounded-[1.35rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.94)] p-5 shadow-[0_8px_22px_rgba(15,23,42,0.035)]"
+                    className="order-3 border-b px-2 py-5 sm:px-3"
                     style={{
-                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
-                      backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)'
                     }}
                   >
                     <div className="mb-4 flex items-center justify-between gap-3">
@@ -5492,7 +5940,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         <p className="text-sm font-bold text-stone-800">用户头像</p>
                       </div>
                       <span
-                        className="rounded-full border px-3 py-1 text-xs font-medium"
+                        className="rounded-[0.75rem] border px-3 py-1 text-xs font-medium"
                         style={{
                           borderColor: AI_CHAT_THEME.chipBorder,
                           backgroundColor: AI_CHAT_THEME.chipBg,
@@ -5534,7 +5982,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         <div className="flex flex-wrap gap-2">
                           <button
                             onClick={handleUseUserEmojiAvatar}
-                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:bg-white sm:flex-none"
+                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white sm:flex-none"
                             style={{
                               borderColor: AI_CHAT_THEME.chipBorder,
                               backgroundColor: AI_CHAT_THEME.avatarBg,
@@ -5547,7 +5995,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           <button
                             onClick={() => userAvatarInputRef.current?.click()}
                             disabled={isUploadingUserAvatar}
-                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
                             style={{
                               borderColor: AI_CHAT_THEME.chipBorder,
                               backgroundColor: AI_CHAT_THEME.avatarBg,
@@ -5559,7 +6007,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           </button>
                           <button
                             onClick={() => void handleResetUserAvatar()}
-                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:bg-white sm:flex-none"
+                            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white sm:flex-none"
                             style={{
                               borderColor: AI_CHAT_THEME.chipBorder,
                               backgroundColor: AI_CHAT_THEME.avatarBg,
@@ -5573,7 +6021,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
                         {isUserEmojiEditorOpen && (
                           <div
-                            className="rounded-[1.05rem] border p-3"
+                            className="border p-3"
                             style={{
                               borderColor: AI_CHAT_THEME.panelBorder,
                               backgroundColor: AI_CHAT_THEME.panelBg
@@ -5584,7 +6032,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                 <button
                                   key={`user-${emoji}`}
                                   onClick={() => setUserEmojiDraft(emoji)}
-                                  className="flex h-10 w-10 items-center justify-center rounded-[0.9rem] border text-lg transition-colors hover:bg-white"
+                                  className="flex h-10 w-10 items-center justify-center rounded-[0.7rem] border text-lg transition-colors hover:bg-white"
                                   style={{
                                     borderColor: userEmojiDraft.trim() === emoji ? AI_CHAT_THEME.activeBorder : AI_CHAT_THEME.panelBorder,
                                     backgroundColor: userEmojiDraft.trim() === emoji ? AI_CHAT_THEME.activeBg : AI_CHAT_THEME.panelBgStrong,
@@ -5597,7 +6045,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                               ))}
                             </div>
                             <div
-                              className="mt-3 rounded-[0.95rem] border px-3 py-3"
+                              className="mt-3 rounded-[0.75rem] border px-3 py-3"
                               style={{
                                 borderColor: AI_CHAT_THEME.chipBorder,
                                 backgroundColor: AI_CHAT_THEME.inputBg
@@ -5614,7 +6062,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                             <div className="mt-3 flex justify-end gap-2">
                               <button
                                 onClick={handleCancelUserEmojiAvatarEdit}
-                                className="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white"
+                                className="rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white"
                                 style={{
                                   borderColor: AI_CHAT_THEME.chipBorder,
                                   backgroundColor: AI_CHAT_THEME.chipBg,
@@ -5625,7 +6073,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                               </button>
                               <button
                                 onClick={() => void handleApplyUserEmojiAvatar()}
-                                className="rounded-full border px-3 py-1.5 text-xs font-medium text-white transition-colors"
+                                className="rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium text-white transition-colors"
                                 style={{
                                   borderColor: AI_CHAT_THEME.primaryButtonBorder,
                                   backgroundColor: AI_CHAT_THEME.primaryButtonBg
@@ -5641,16 +6089,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   </section>
 
                   <section
-                    className="order-2 rounded-[1.35rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.94)] p-5 shadow-[0_8px_22px_rgba(15,23,42,0.035)]"
+                    className="order-2 border-b px-2 py-5 sm:px-3"
                     style={{
-                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
-                      backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)'
                     }}
                   >
                     <div className="mb-4 flex items-center justify-between gap-3">
                       <p className="text-sm font-bold text-stone-800">当前人设</p>
                       <span
-                        className="rounded-full border px-3 py-1 text-xs font-medium"
+                        className="rounded-[0.75rem] border px-3 py-1 text-xs font-medium"
                         style={{
                           borderColor: AI_CHAT_THEME.chipBorder,
                           backgroundColor: AI_CHAT_THEME.chipBg,
@@ -5674,7 +6121,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         <div className="flex flex-col gap-3 px-1 py-1">
                           <div className="flex items-center gap-4">
                             <div
-                              className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-[1.5rem] border text-2xl"
+                              className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-[0.95rem] border text-2xl"
                               style={{
                                 borderColor: AI_CHAT_THEME.panelBorder,
                                 backgroundColor: AI_CHAT_THEME.avatarBg,
@@ -5691,7 +6138,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           <div className="flex flex-wrap gap-2">
                             <button
                               onClick={handleUseEmojiAvatar}
-                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:bg-white sm:flex-none"
+                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white sm:flex-none"
                               style={{
                                 borderColor: AI_CHAT_THEME.chipBorder,
                                 backgroundColor: AI_CHAT_THEME.avatarBg,
@@ -5704,7 +6151,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                             <button
                               onClick={() => avatarInputRef.current?.click()}
                               disabled={isUploadingAvatar}
-                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
                               style={{
                                 borderColor: AI_CHAT_THEME.chipBorder,
                                 backgroundColor: AI_CHAT_THEME.avatarBg,
@@ -5717,7 +6164,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                             {!activePersona.isBuiltIn && (
                               <button
                                 onClick={() => setDeleteConfirmPersonaId((current) => current === activePersona.id ? null : activePersona.id)}
-                                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium transition-colors sm:flex-none"
+                                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors sm:flex-none"
                                 style={{
                                   borderColor: AI_CHAT_THEME.dangerBorder,
                                   backgroundColor: AI_CHAT_THEME.dangerBg,
@@ -5733,7 +6180,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
                         {isEmojiEditorOpen && (
                           <div
-                            className="rounded-[1.1rem] border p-3 shadow-[0_6px_16px_rgba(15,23,42,0.03)]"
+                            className="border p-3"
                             style={{
                               borderColor: AI_CHAT_THEME.panelBorder,
                               backgroundColor: AI_CHAT_THEME.panelBg
@@ -5744,7 +6191,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                 <button
                                   key={emoji}
                                   onClick={() => setEmojiDraft(emoji)}
-                                  className={`flex h-10 w-10 items-center justify-center rounded-2xl border text-lg transition-colors ${
+                                  className={`flex h-10 w-10 items-center justify-center rounded-[0.7rem] border text-lg transition-colors ${
                                     emojiDraft.trim() === emoji
                                       ? 'shadow-[0_0_0_1px_rgba(0,0,0,0.03)]'
                                       : 'hover:bg-white'
@@ -5769,7 +6216,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                             </div>
 
                             <div
-                              className="mt-3 rounded-[0.95rem] border px-3 py-3"
+                              className="mt-3 rounded-[0.75rem] border px-3 py-3"
                               style={{
                                 borderColor: AI_CHAT_THEME.chipBorder,
                                 backgroundColor: AI_CHAT_THEME.inputBg
@@ -5787,7 +6234,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                             <div className="mt-3 flex justify-end gap-2">
                               <button
                                 onClick={handleCancelEmojiAvatarEdit}
-                                className="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white"
+                                className="rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white"
                                 style={{
                                   borderColor: AI_CHAT_THEME.chipBorder,
                                   backgroundColor: AI_CHAT_THEME.inputBg,
@@ -5798,7 +6245,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                               </button>
                               <button
                                 onClick={() => void handleApplyEmojiAvatar()}
-                                className="rounded-full border px-3 py-1.5 text-xs font-medium text-white transition-colors"
+                                className="rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium text-white transition-colors"
                                 style={{
                                   borderColor: AI_CHAT_THEME.primaryButtonBorder,
                                   backgroundColor: AI_CHAT_THEME.primaryButtonBg
@@ -5811,7 +6258,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         )}
                         {deleteConfirmPersonaId === activePersona.id && !activePersona.isBuiltIn && (
                           <div
-                            className="rounded-[1.2rem] border p-3 text-xs shadow-[0_6px_16px_rgba(35,25,18,0.03)]"
+                            className="border p-3 text-xs"
                             style={{
                               borderColor: AI_CHAT_THEME.dangerBorder,
                               backgroundColor: AI_CHAT_THEME.dangerBg,
@@ -5822,7 +6269,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                             <div className="mt-3 flex justify-end gap-2">
                               <button
                                 onClick={() => setDeleteConfirmPersonaId(null)}
-                                className="rounded-full border px-3 py-1.5 font-medium transition-colors hover:bg-white"
+                                className="rounded-[0.75rem] border px-3 py-1.5 font-medium transition-colors hover:bg-white"
                                 style={{
                                   borderColor: AI_CHAT_THEME.chipBorder,
                                   backgroundColor: AI_CHAT_THEME.avatarBg,
@@ -5833,7 +6280,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                               </button>
                               <button
                                 onClick={() => void handleDeleteCurrentPersona()}
-                                className="rounded-full border px-3 py-1.5 font-medium text-white transition-colors"
+                                className="rounded-[0.75rem] border px-3 py-1.5 font-medium text-white transition-colors"
                                 style={{
                                   borderColor: AI_CHAT_THEME.dangerBorder,
                                   backgroundColor: AI_CHAT_THEME.dangerText
@@ -5981,7 +6428,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           <textarea
                             value={activePersona.systemPrompt}
                             onChange={(event) => updateCurrentPersona({ systemPrompt: event.target.value })}
-                            className="min-h-[180px] w-full rounded-[1.2rem] border px-4 py-3 text-sm leading-7 outline-none"
+                            className="min-h-[180px] w-full rounded-[0.85rem] border px-4 py-3 text-sm leading-7 outline-none"
                             style={{
                               borderColor: AI_CHAT_THEME.chipBorder,
                               backgroundColor: AI_CHAT_THEME.inputBg,
@@ -5995,10 +6442,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   </section>
 
                   <section
-                    className="order-4 rounded-[1.35rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.94)] p-5 shadow-[0_8px_22px_rgba(15,23,42,0.035)]"
+                    className="order-4 px-2 py-5 sm:px-3"
                     style={{
-                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
-                      backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)'
                     }}
                   >
                     <p className="mb-4 text-sm font-bold text-stone-800">上下文设置</p>
@@ -6041,7 +6487,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleClearAssistantMemory}
-                    className="rounded-full border px-3 py-2 text-xs font-medium transition-colors"
+                    className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors"
                     style={{
                       borderColor: AI_CHAT_THEME.dangerBorder,
                       backgroundColor: AI_CHAT_THEME.dangerBg,
@@ -6052,7 +6498,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   </button>
                   <button
                     onClick={handleCloseAssistantMemoryViewer}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:border-[#cfd8e3] hover:bg-[#f9fafb] hover:text-[#111827]"
+                    className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:border-[#cfd8e3] hover:bg-[#f9fafb] hover:text-[#111827]"
                   >
                     <X size={20} />
                   </button>
@@ -6062,7 +6508,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
                 <div className="mx-auto max-w-4xl space-y-4">
                   <div
-                    className="rounded-[1.2rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4 shadow-[0_8px_20px_rgba(15,23,42,0.035)]"
+                    className="rounded-[0.95rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4"
                     style={{
                       borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
                       backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
@@ -6088,7 +6534,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     return (
                       <div
                         key={key}
-                        className="rounded-[1.2rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4 shadow-[0_8px_20px_rgba(15,23,42,0.035)]"
+                        className="rounded-[0.95rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4"
                         style={{
                           borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
                           backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
@@ -6101,7 +6547,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           </div>
                           <button
                             onClick={() => handleOpenAssistantEditableMemoryComposer(key)}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border text-xs font-medium transition-colors hover:bg-white"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-[0.75rem] border text-xs font-medium transition-colors hover:bg-white"
                             style={{
                               borderColor: AI_CHAT_THEME.chipBorder,
                               backgroundColor: AI_CHAT_THEME.panelBg,
@@ -6115,7 +6561,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
                         {isComposerOpen && (
                           <div
-                            className="mt-4 rounded-[1rem] border px-4 py-4"
+                            className="mt-4 border px-4 py-4"
                             style={{
                               borderColor: AI_CHAT_THEME.panelBorder,
                               backgroundColor: AI_CHAT_THEME.panelBg
@@ -6126,7 +6572,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                               onChange={(event) => updateAssistantEditableMemoryDraft(key, event.target.value)}
                               placeholder={sectionMeta.placeholder}
                               rows={3}
-                              className="w-full resize-none rounded-[1rem] border px-3 py-3 text-sm leading-6 outline-none"
+                              className="w-full resize-none rounded-[0.75rem] border px-3 py-3 text-sm leading-6 outline-none"
                               style={{
                                 borderColor: AI_CHAT_THEME.chipBorder,
                                 backgroundColor: AI_CHAT_THEME.inputBg,
@@ -6136,7 +6582,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                             <div className="mt-3 flex items-center justify-end gap-2">
                               <button
                                 onClick={() => handleCancelAssistantEditableMemoryComposer(key)}
-                                className="rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
+                                className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
                                 style={{
                                   borderColor: AI_CHAT_THEME.chipBorder,
                                   backgroundColor: AI_CHAT_THEME.inputBg,
@@ -6147,7 +6593,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                               </button>
                               <button
                                 onClick={() => handleSaveAssistantEditableMemoryEntry(key)}
-                                className="rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:brightness-[0.98]"
+                                className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:brightness-[0.98]"
                                 style={{
                                   borderColor: AI_CHAT_THEME.activeBorder,
                                   backgroundColor: AI_CHAT_THEME.activeBg,
@@ -6163,7 +6609,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         <div className="mt-4 space-y-3">
                           {items.length === 0 ? (
                             <div
-                              className="rounded-[1rem] border border-dashed px-4 py-4 text-sm leading-6 text-stone-500"
+                              className="border border-dashed px-4 py-4 text-sm leading-6 text-stone-500"
                               style={{
                                 borderColor: AI_CHAT_THEME.panelBorder,
                                 backgroundColor: AI_CHAT_THEME.panelBg
@@ -6181,7 +6627,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                               return (
                                 <div
                                   key={`${key}-${item}`}
-                                  className="rounded-[1rem] border px-4 py-3"
+                                  className="border px-4 py-3"
                                   style={{
                                     borderColor: AI_CHAT_THEME.panelBorder,
                                     backgroundColor: 'rgba(255,255,255,0.84)'
@@ -6193,7 +6639,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                     </p>
                                     <button
                                       onClick={() => handleToggleAssistantEditableMemoryDelete(key, item)}
-                                      className="rounded-full p-2 text-[#897f75] transition-colors hover:bg-[#f8e9e6] hover:text-[#b35b50]"
+                                      className="rounded-[0.7rem] p-2 text-[#897f75] transition-colors hover:bg-[#f8e9e6] hover:text-[#b35b50]"
                                       title="删除这条记忆"
                                     >
                                       <Trash2 size={14} />
@@ -6201,20 +6647,22 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                   </div>
 
                                   {isDeleteConfirming && (
-                                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[0.95rem] border border-[#e4c1bc] bg-[#f8e9e6] px-3 py-2 text-xs text-[#9d544d]">
+                                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#e4c1bc] pt-3 text-xs text-[#9d544d]">
                                       <span>确认删除这条记忆？</span>
-                                      <div className="flex items-center gap-2">
+                                      <div className="flex items-center gap-1.5">
                                         <button
                                           onClick={() => setAssistantEditableMemoryDeleteTarget(null)}
-                                          className="rounded-full border border-[#e0d5c8] bg-[#fffaf3] px-2.5 py-1 font-medium text-[#71685f] transition-colors hover:bg-white"
+                                          className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#ddd6ce] bg-transparent text-[#71685f] transition-colors hover:bg-[#fffaf3]"
+                                          title="取消删除"
                                         >
-                                          取消
+                                          <X size={14} />
                                         </button>
                                         <button
                                           onClick={() => handleConfirmAssistantEditableMemoryDelete(key, item)}
-                                          className="rounded-full border border-[#ba6256] bg-[#c46f4f] px-2.5 py-1 font-medium text-[#fff8f2] transition-colors hover:bg-[#b95f43]"
+                                          className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#ba6256] bg-[#c46f4f] text-[#fff8f2] transition-colors hover:bg-[#b95f43]"
+                                          title="确认删除"
                                         >
-                                          删除
+                                          <Check size={14} />
                                         </button>
                                       </div>
                                     </div>
@@ -6229,7 +6677,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   })}
 
                   <div
-                    className="rounded-[1.2rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4 shadow-[0_8px_20px_rgba(15,23,42,0.035)]"
+                    className="rounded-[0.95rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4"
                     style={{
                       borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
                       backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
@@ -6242,7 +6690,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                       </div>
                       <button
                         onClick={handleOpenAssistantReminderComposer}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border text-xs font-medium transition-colors hover:bg-white"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-[0.75rem] border text-xs font-medium transition-colors hover:bg-white"
                         style={{
                           borderColor: AI_CHAT_THEME.chipBorder,
                           backgroundColor: AI_CHAT_THEME.panelBg,
@@ -6256,7 +6704,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
                     {isAssistantReminderComposerOpen && (
                       <div
-                        className="mt-4 rounded-[1rem] border px-4 py-4"
+                        className="mt-4 border px-4 py-4"
                         style={{
                           borderColor: AI_CHAT_THEME.panelBorder,
                           backgroundColor: AI_CHAT_THEME.panelBg
@@ -6267,7 +6715,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           onChange={(event) => updateAssistantReminderDraft('text', event.target.value)}
                           placeholder="比如：周三上午记得回看导师邮件。"
                           rows={3}
-                          className="w-full resize-none rounded-[1rem] border px-3 py-3 text-sm leading-6 outline-none"
+                          className="w-full resize-none rounded-[0.75rem] border px-3 py-3 text-sm leading-6 outline-none"
                           style={{
                             borderColor: AI_CHAT_THEME.chipBorder,
                             backgroundColor: AI_CHAT_THEME.inputBg,
@@ -6282,7 +6730,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                               onChange={(event) => updateAssistantReminderDraft('date', event.target.value.replace(/\D/g, '').slice(0, 8))}
                               placeholder="20260427"
                               inputMode="numeric"
-                              className="w-full rounded-[0.95rem] border px-3 py-2 text-sm outline-none"
+                              className="w-full rounded-[0.75rem] border px-3 py-2 text-sm outline-none"
                               style={{
                                 borderColor: AI_CHAT_THEME.chipBorder,
                                 backgroundColor: AI_CHAT_THEME.inputBg,
@@ -6297,7 +6745,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                               onChange={(event) => updateAssistantReminderDraft('hour', event.target.value.replace(/\D/g, '').slice(0, 4))}
                               placeholder="0930"
                               inputMode="numeric"
-                              className="w-full rounded-[0.95rem] border px-3 py-2 text-sm outline-none"
+                              className="w-full rounded-[0.75rem] border px-3 py-2 text-sm outline-none"
                               style={{
                                 borderColor: AI_CHAT_THEME.chipBorder,
                                 backgroundColor: AI_CHAT_THEME.inputBg,
@@ -6309,7 +6757,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         <div className="mt-3 flex items-center justify-end gap-2">
                           <button
                             onClick={handleCancelAssistantReminderComposer}
-                            className="rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
+                            className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
                             style={{
                               borderColor: AI_CHAT_THEME.chipBorder,
                               backgroundColor: AI_CHAT_THEME.inputBg,
@@ -6320,7 +6768,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           </button>
                           <button
                             onClick={handleSaveAssistantReminder}
-                            className="rounded-full border px-3 py-2 text-xs font-medium transition-colors hover:brightness-[0.98]"
+                            className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:brightness-[0.98]"
                             style={{
                               borderColor: AI_CHAT_THEME.activeBorder,
                               backgroundColor: AI_CHAT_THEME.activeBg,
@@ -6336,7 +6784,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     <div className="mt-4 space-y-3">
                       {assistantReminderSnapshot.length === 0 ? (
                         <div
-                          className="rounded-[1rem] border border-dashed px-4 py-4 text-sm leading-6 text-stone-500"
+                          className="border border-dashed px-4 py-4 text-sm leading-6 text-stone-500"
                           style={{
                             borderColor: AI_CHAT_THEME.panelBorder,
                             backgroundColor: AI_CHAT_THEME.panelBg
@@ -6351,7 +6799,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           return (
                             <div
                               key={reminder.id}
-                              className="rounded-[1rem] border px-4 py-3"
+                              className="border px-4 py-3"
                               style={{
                                 borderColor: AI_CHAT_THEME.panelBorder,
                                 backgroundColor: 'rgba(255,255,255,0.84)'
@@ -6368,7 +6816,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                 </div>
                                 <button
                                   onClick={() => handleToggleAssistantReminderDelete(reminder.id)}
-                                  className="rounded-full p-2 text-[#897f75] transition-colors hover:bg-[#f8e9e6] hover:text-[#b35b50]"
+                                  className="rounded-[0.7rem] p-2 text-[#897f75] transition-colors hover:bg-[#f8e9e6] hover:text-[#b35b50]"
                                   title="删除这条 reminder"
                                 >
                                   <Trash2 size={14} />
@@ -6376,20 +6824,22 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                               </div>
 
                               {isDeleteConfirming && (
-                                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[0.95rem] border border-[#e4c1bc] bg-[#f8e9e6] px-3 py-2 text-xs text-[#9d544d]">
+                                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#e4c1bc] pt-3 text-xs text-[#9d544d]">
                                   <span>确认删除这条 reminder？</span>
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1.5">
                                     <button
                                       onClick={() => setAssistantReminderDeleteTarget(null)}
-                                      className="rounded-full border border-[#e0d5c8] bg-[#fffaf3] px-2.5 py-1 font-medium text-[#71685f] transition-colors hover:bg-white"
+                                      className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#ddd6ce] bg-transparent text-[#71685f] transition-colors hover:bg-[#fffaf3]"
+                                      title="取消删除"
                                     >
-                                      取消
+                                      <X size={14} />
                                     </button>
                                     <button
                                       onClick={() => handleConfirmAssistantReminderDelete(reminder.id)}
-                                      className="rounded-full border border-[#ba6256] bg-[#c46f4f] px-2.5 py-1 font-medium text-[#fff8f2] transition-colors hover:bg-[#b95f43]"
+                                      className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#ba6256] bg-[#c46f4f] text-[#fff8f2] transition-colors hover:bg-[#b95f43]"
+                                      title="确认删除"
                                     >
-                                      删除
+                                      <Check size={14} />
                                     </button>
                                   </div>
                                 </div>
@@ -6402,7 +6852,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   </div>
 
                   <div
-                    className="rounded-[1.2rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4 shadow-[0_8px_20px_rgba(15,23,42,0.035)]"
+                    className="rounded-[0.95rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4"
                     style={{
                       borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
                       backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
@@ -6411,7 +6861,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     <p className="mb-2 font-serif text-xl text-[#231f1b]">最近 agent 决策</p>
                     <p className="mb-3 text-xs leading-5 text-stone-500">这里展示 AI 最近一次做了什么，用来帮助后续回合理解刚发生过的行为。</p>
                     <div
-                      className="rounded-[1rem] border px-4 py-4 text-sm leading-6"
+                      className="border px-4 py-4 text-sm leading-6"
                       style={{
                         borderColor: AI_CHAT_THEME.panelBorder,
                         backgroundColor: AI_CHAT_THEME.panelBg,
@@ -6444,7 +6894,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleClearAssistantBackgroundCallHistory}
-                    className="rounded-full border px-3 py-2 text-xs font-medium transition-colors"
+                    className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors"
                     style={{
                       borderColor: AI_CHAT_THEME.dangerBorder,
                       backgroundColor: AI_CHAT_THEME.dangerBg,
@@ -6455,7 +6905,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   </button>
                   <button
                     onClick={handleCloseAssistantBackgroundHistoryViewer}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:border-[#cfd8e3] hover:bg-[#f9fafb] hover:text-[#111827]"
+                    className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:border-[#cfd8e3] hover:bg-[#f9fafb] hover:text-[#111827]"
                   >
                     <X size={20} />
                   </button>
@@ -6466,7 +6916,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 <div className="mx-auto max-w-4xl space-y-4">
                   {assistantBackgroundTimeline.length === 0 ? (
                     <div
-                      className="rounded-[1.2rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-5 shadow-[0_8px_20px_rgba(15,23,42,0.035)]"
+                      className="rounded-[0.95rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-5"
                       style={{
                         borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
                         backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
@@ -6478,7 +6928,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     assistantBackgroundTimeline.map((entry) => (
                       <div
                         key={entry.id}
-                        className="rounded-[1.2rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4 shadow-[0_8px_20px_rgba(15,23,42,0.035)]"
+                        className="rounded-[0.95rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4"
                         style={{
                           borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
                           backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
@@ -6502,7 +6952,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                   exchange: entry.debugExchange
                                 }]
                               })}
-                              className="rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+                              className="rounded-[0.75rem] border px-3 py-1 text-xs font-medium transition-colors"
                               style={{
                                 borderColor: AI_CHAT_THEME.chipBorderStrong,
                                 backgroundColor: AI_CHAT_THEME.panelBg,
@@ -6546,7 +6996,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 </div>
                 <button
                   onClick={() => setDebugViewer(null)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:border-[#cfd8e3] hover:bg-[#f9fafb] hover:text-[#111827]"
+                  className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:border-[#cfd8e3] hover:bg-[#f9fafb] hover:text-[#111827]"
                 >
                   <X size={20} />
                 </button>
@@ -6557,7 +7007,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   {debugViewer.sections.map((section) => (
                     <div
                       key={section.label}
-                      className="rounded-[1.2rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4 shadow-[0_8px_20px_rgba(15,23,42,0.035)]"
+                      className="rounded-[0.95rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4"
                       style={{
                         borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
                         backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
@@ -6568,7 +7018,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         {buildDebugBlocks(section.exchange).map((block) => (
                           <div key={`${section.label}-${block.label}`}>
                             <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-stone-400">{block.label}</p>
-                            <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-[1.3rem] border border-[#433a34] bg-[#2d2926] p-4 text-xs leading-6 text-[#efe7db] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
+                            <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-[0.85rem] border border-[#433a34] bg-[#2d2926] p-4 text-xs leading-6 text-[#efe7db] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
                               {block.content}
                             </pre>
                           </div>

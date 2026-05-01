@@ -189,6 +189,7 @@ const AI_PROFILES_KEY = 'lumostime_ai_profiles';
 
 import { HTTP } from '@awesome-cordova-plugins/http';
 import { Capacitor } from '@capacitor/core';
+import AssistantAgent from '../plugins/AssistantAgentPlugin';
 
 // Helper for Native Requests
 const nativeFetch = async (url: string, options: any) => {
@@ -865,10 +866,20 @@ export const aiService = {
 
     saveConfig: (config: AIConfig) => {
         localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(config));
+        if (Capacitor.isNativePlatform()) {
+            void AssistantAgent.syncNativeAIConfig(config).catch((error) => {
+                console.error('[aiService] Failed to sync native AI config', error);
+            });
+        }
     },
 
     clearConfig: () => {
         localStorage.removeItem(AI_CONFIG_KEY);
+        if (Capacitor.isNativePlatform()) {
+            void AssistantAgent.clearNativeAIConfig().catch((error) => {
+                console.error('[aiService] Failed to clear native AI config', error);
+            });
+        }
     },
 
     saveProfile: (key: string, config: AIConfig) => {

@@ -15,11 +15,14 @@ import type { PluginListenerHandle } from '@capacitor/core';
 import type { AssistantAgentPlugin } from './AssistantAgentPlugin';
 import type {
   AssistantAgentConfig,
+  AssistantNativeBackgroundSnapshot,
   AssistantNativeDiagnosticEntry,
+  AssistantReminder,
   AssistantNotificationNavigation,
   AssistantNotificationPayload,
   AssistantSystemTrigger
 } from '../types/assistant';
+import type { AIConfig } from '../services/aiService';
 
 export class AssistantAgentWeb extends WebPlugin implements AssistantAgentPlugin {
   async startAgent(options?: Partial<AssistantAgentConfig>): Promise<void> {
@@ -52,6 +55,34 @@ export class AssistantAgentWeb extends WebPlugin implements AssistantAgentPlugin
 
   async clearDiagnostics(): Promise<void> {
     console.log('AssistantAgent.clearDiagnostics (Web - No-op)');
+  }
+
+  async listPendingSystemTriggers(): Promise<{ triggers: AssistantSystemTrigger[] }> {
+    return { triggers: [] };
+  }
+
+  async acknowledgeSystemTrigger(_payload: { id: string }): Promise<void> {
+    console.log('AssistantAgent.acknowledgeSystemTrigger (Web - No-op)');
+  }
+
+  async syncNativeAIConfig(_config: AIConfig): Promise<void> {
+    console.log('AssistantAgent.syncNativeAIConfig (Web - No-op)');
+  }
+
+  async clearNativeAIConfig(): Promise<void> {
+    console.log('AssistantAgent.clearNativeAIConfig (Web - No-op)');
+  }
+
+  async syncNativeBackgroundSnapshot(_snapshot: AssistantNativeBackgroundSnapshot): Promise<void> {
+    console.log('AssistantAgent.syncNativeBackgroundSnapshot (Web - No-op)');
+  }
+
+  async syncNativeReminders(_payload: { reminders: AssistantReminder[] }): Promise<void> {
+    console.log('AssistantAgent.syncNativeReminders (Web - No-op)');
+  }
+
+  async listNativeReminders(): Promise<{ reminders: AssistantReminder[] }> {
+    return { reminders: [] };
   }
 
   async showAssistantNotification(payload: AssistantNotificationPayload): Promise<void> {

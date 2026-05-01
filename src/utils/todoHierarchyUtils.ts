@@ -3,7 +3,8 @@
  * @input Flat todo arrays and optional parent/child todo records
  * @output Shared helpers for validating one-level todo hierarchy, syncing inherited fields, and building tree views
  * @pos Utility (Todo hierarchy)
- * @description Centralizes parent-child todo rules so list rendering, save logic, and detail editing all share the same one-level hierarchy behavior.
+ * @description Centralizes parent-child todo rules so list rendering, save logic, detail editing, and plain-text hierarchy labels all share the same one-level hierarchy behavior.
+ * @updated 2026-04-30: Added completed-todo label formatting so timeline done lists can append parent-task context for subtasks.
  * @updated 2026-04-25: Added parent-completion visibility helpers so list views can hide unfinished subtasks whenever their parent todo is completed, without mutating child completion state.
  * @updated 2026-04-22: Added direct-child display ordering plus optional completed-task filtering so expanded parent rows can honor list-level hide-completed controls.
  * @updated 2026-04-22: Added direct-child display ordering so schedule-expanded parent rows can show all subtasks with unfinished items first.
@@ -103,6 +104,18 @@ export const getParentTodo = (todos: TodoItem[], todo: Pick<TodoItem, 'id' | 'pa
   }
 
   return parentTodo;
+};
+
+export const formatCompletedTodoLabel = (
+  todos: TodoItem[],
+  todo: Pick<TodoItem, 'id' | 'title' | 'parentTodoId'>
+): string => {
+  const parentTodo = getParentTodo(todos, todo);
+  if (!parentTodo?.title) {
+    return todo.title;
+  }
+
+  return `${todo.title} @${parentTodo.title}`;
 };
 
 export const isIncompleteSubtaskHiddenByCompletedParent = (

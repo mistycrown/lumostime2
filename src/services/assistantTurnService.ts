@@ -181,6 +181,8 @@ const buildUserPrompt = (input: AssistantUnifiedTurnInput): string => [
 ].join('\n');
 
 export const assistantTurnService = {
+  buildSystemPrompt,
+  buildUserPrompt,
   async runUnifiedTurn(
     input: AssistantUnifiedTurnInput,
     conversationHistory?: AIConversationTurn[]
