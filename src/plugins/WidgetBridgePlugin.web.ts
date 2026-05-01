@@ -6,6 +6,7 @@
  * @description Prevents widget bridge calls from failing when the app runs outside native Android.
  * @updated 2026-04-25: Added no-op DAILY_RUNTIME payload sync for the native 4x4 heatmap widget.
  * @updated 2026-04-26: Added no-op TODAY + PIN widget payload sync for the dedicated scrollable todo widget.
+ * @updated 2026-05-01: Added no-op tracking-calendar payload sync for the dedicated 2x2 tracking calendar widget.
  */
 import { WebPlugin } from '@capacitor/core';
 import type {
@@ -16,6 +17,7 @@ import type {
   WidgetBridgePendingDailyAction,
   WidgetBridgePlugin,
   WidgetBridgeRuntimeState,
+  WidgetBridgeTrackingCalendarPayload,
   WidgetBridgeTodoPinPayload,
   WidgetBridgeTemplate
 } from './WidgetBridgePlugin';
@@ -57,6 +59,10 @@ export class WidgetBridgeWeb extends WebPlugin implements WidgetBridgePlugin {
 
   async syncTodoPinWidgetData(
     _options?: { payload: WidgetBridgeTodoPinPayload | null }
+  ): Promise<void> {}
+
+  async syncTrackingCalendarWidgetData(
+    _options?: { payload: WidgetBridgeTrackingCalendarPayload | null }
   ): Promise<void> {}
 
   async refreshWidget(): Promise<void> {}

@@ -32,7 +32,12 @@ public final class WidgetProviderSupport {
             return;
         }
         WidgetStores.INSTANCE.maybeAutoBindLegacyWidgets(context, appWidgetIds, widgetSize);
-        WidgetStores.INSTANCE.ensureBindings(context, appWidgetIds, widgetSize);
+        WidgetStores.INSTANCE.ensureBindings(
+                context,
+                appWidgetIds,
+                widgetSize,
+                WidgetTemplateTypes.GRID
+        );
         updateWidgets(
                 context,
                 appWidgetManager,
@@ -78,7 +83,12 @@ public final class WidgetProviderSupport {
             int[] slotViewIds
     ) {
         WidgetStores.INSTANCE.maybeAutoBindLegacyWidgets(context, appWidgetIds, widgetSize);
-        WidgetStores.INSTANCE.ensureBindings(context, appWidgetIds, widgetSize);
+        WidgetStores.INSTANCE.ensureBindings(
+                context,
+                appWidgetIds,
+                widgetSize,
+                WidgetTemplateTypes.GRID
+        );
         updateWidgets(
                 context,
                 appWidgetManager,
@@ -151,7 +161,12 @@ public final class WidgetProviderSupport {
                     AppWidgetManager.INVALID_APPWIDGET_ID
             );
             if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                WidgetStores.INSTANCE.cycleBindingToNextTemplate(context, appWidgetId, widgetSize);
+                WidgetStores.INSTANCE.cycleBindingToNextTemplate(
+                        context,
+                        appWidgetId,
+                        widgetSize,
+                        WidgetTemplateTypes.GRID
+                );
                 refreshWidget(
                         context,
                         appWidgetId,
@@ -188,7 +203,8 @@ public final class WidgetProviderSupport {
             WidgetSnapshot snapshot = WidgetSnapshotBuilder.INSTANCE.build(
                     context,
                     appWidgetId,
-                    widgetSize
+                    widgetSize,
+                    WidgetTemplateTypes.GRID
             );
             PendingIntent cycleTemplateIntent = buildCycleTemplatePendingIntent(context, providerClass, appWidgetId);
             views.setTextViewText(R.id.widget_title, snapshot.getTemplateName());

@@ -41,6 +41,8 @@ class WidgetBridgePlugin : Plugin() {
                 name = item.optString("name").ifBlank { WidgetStores.DEFAULT_TEMPLATE_NAME },
                 size = size,
                 slots = parseSlots(item.optJSONArray("slots"), size),
+                templateType = WidgetTemplateTypes.normalize(item.optString("templateType")),
+                trackingConfig = item.optJSONObject("trackingConfig")?.toTrackingCalendarConfig(),
                 createdAt = item.optLong("createdAt", System.currentTimeMillis()),
                 updatedAt = item.optLong("updatedAt", System.currentTimeMillis())
             )
@@ -208,6 +210,21 @@ class WidgetBridgePlugin : Plugin() {
     }
 
     @PluginMethod
+    fun syncTrackingCalendarWidgetData(call: PluginCall) {
+        val payloadJson = call.getObject("payload")
+        val payload = payloadJson?.let {
+            WidgetTrackingCalendarPayload(
+                templates = it.optJSONArray("templates").toTrackingCalendarTemplatePayloadList(),
+                syncedAt = it.optLong("syncedAt", System.currentTimeMillis())
+            )
+        }
+
+        WidgetStores.saveTrackingCalendarPayload(context, payload)
+        WidgetRefreshCoordinator.refreshAllAsync(context)
+        call.resolve()
+    }
+
+    @PluginMethod
     fun refreshWidget(call: PluginCall) {
         val appWidgetId = call.getInt("appWidgetId") ?: -1
         val templateId = parseNullableString(call.getString("templateId"))
@@ -266,11 +283,13 @@ class WidgetBridgePlugin : Plugin() {
             put("id", template.id)
             put("name", template.name)
             put("size", template.size)
+            put("templateType", WidgetTemplateTypes.normalize(template.templateType))
             put("createdAt", template.createdAt)
             put("updatedAt", template.updatedAt)
             put("slots", JSArray().apply {
                 template.slots.forEach { put(slotToJs(it)) }
             })
+            put("trackingConfig", template.trackingConfig?.toJs())
         }
     }
 
@@ -302,6 +321,23 @@ class WidgetBridgePlugin : Plugin() {
             put("checkManualMode", slot.checkManualMode)
             put("checkTargetCount", slot.checkTargetCount)
             put("shortcutAction", slot.shortcutAction)
+        }
+    }
+
+    private fun WidgetTrackingCalendarConfig.toJs(): JSObject {
+        return JSObject().apply {
+            put("sourceType", sourceType)
+            put("categoryId", categoryId)
+            put("activityId", activityId)
+            put("scopeId", scopeId)
+            put("checkTemplateId", checkTemplateId)
+            put("checkItemId", checkItemId)
+            put("icon", icon)
+            put("customIcon", customIcon)
+            put("uiIconAssetPath", uiIconAssetPath)
+            put("uiIconFallbackAssetPath", uiIconFallbackAssetPath)
+            put("label", label)
+            put("color", color)
         }
     }
 
@@ -353,6 +389,23 @@ class WidgetBridgePlugin : Plugin() {
             put("templateId", runtimeState.templateId)
             put("appWidgetId", runtimeState.appWidgetId)
         }
+    }
+
+    private fun JSONObject.toTrackingCalendarConfig(): WidgetTrackingCalendarConfig {
+        return WidgetTrackingCalendarConfig(
+            sourceType = parseNullableString(optString("sourceType")),
+            categoryId = parseNullableString(optString("categoryId")),
+            activityId = parseNullableString(optString("activityId")),
+            scopeId = parseNullableString(optString("scopeId")),
+            checkTemplateId = parseNullableString(optString("checkTemplateId")),
+            checkItemId = parseNullableString(optString("checkItemId")),
+            icon = parseNullableString(optString("icon")),
+            customIcon = parseNullableString(optString("customIcon")),
+            uiIconAssetPath = parseNullableString(optString("uiIconAssetPath")),
+            uiIconFallbackAssetPath = parseNullableString(optString("uiIconFallbackAssetPath")),
+            label = parseNullableString(optString("label")),
+            color = parseNullableString(optString("color"))
+        )
     }
 
     private fun JSONArray?.toStringList(): List<String> {
@@ -412,6 +465,44 @@ class WidgetBridgePlugin : Plugin() {
                     targetCount = item.optInt("targetCount", 1).coerceAtLeast(1),
                     isCompleted = item.optBoolean("isCompleted", false),
                     updatedAt = item.optLong("updatedAt", System.currentTimeMillis())
+                )
+            )
+        }
+        return values
+    }
+
+    private fun JSONArray?.toTrackingCalendarTemplatePayloadList(): List<WidgetTrackingCalendarTemplatePayload> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        val values = mutableListOf<WidgetTrackingCalendarTemplatePayload>()
+        for (index in 0 until length()) {
+            val item = optJSONObject(index) ?: continue
+            val templateId = parseNullableString(item.optString("templateId")) ?: continue
+            values.add(
+                WidgetTrackingCalendarTemplatePayload(
+                    templateId = templateId,
+                    entries = item.optJSONArray("entries").toTrackingCalendarEntryList()
+                )
+            )
+        }
+        return values
+    }
+
+    private fun JSONArray?.toTrackingCalendarEntryList(): List<WidgetTrackingCalendarEntry> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        val values = mutableListOf<WidgetTrackingCalendarEntry>()
+        for (index in 0 until length()) {
+            val item = optJSONObject(index) ?: continue
+            val date = parseNullableString(item.optString("date")) ?: continue
+            values.add(
+                WidgetTrackingCalendarEntry(
+                    date = date,
+                    value = item.optInt("value", 0).coerceAtLeast(0)
                 )
             )
         }

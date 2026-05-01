@@ -9,6 +9,7 @@
  * @updated 2026-04-26: Added TODAY + PIN widget payload builders for the dedicated scrollable 4x2 todo widget.
  * @updated 2026-04-26: Let TODAY + PIN payloads inherit linked activity/category metadata from a parent todo when the pinned child itself does not carry the mapping.
  * @updated 2026-04-26: Expanded the 4x1 timer widget template from 4 to 5 evenly spaced slots.
+ * @updated 2026-05-01: Added tracking-calendar template normalization and payload builders for the dedicated 2x2 tracking calendar widget.
  */
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, CheckTemplate, DailyReview, Log, TodoItem } from '../types';
@@ -26,6 +27,11 @@ import type {
   WidgetBridgeRuntimeState,
   WidgetBridgeSlot,
   WidgetBridgeTemplate,
+  WidgetTemplateType as WidgetBridgeTemplateType,
+  WidgetBridgeTrackingCalendarConfig,
+  WidgetBridgeTrackingCalendarEntry,
+  WidgetBridgeTrackingCalendarPayload,
+  WidgetTrackingCalendarSourceType as WidgetBridgeTrackingCalendarSourceType,
   WidgetBridgeTodoPinItem,
   WidgetBridgeTodoPinPayload,
   WidgetType
@@ -40,11 +46,14 @@ import {
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 import {
   DailyCheckTemplateMeta,
+  findCheckItemIndexInReview,
+  getCheckItemCountState,
   getDailyCheckProgressForDate,
   getDailyCheckTemplateMeta,
   getEligibleNfcDailyCheckItems
 } from '../utils/dailyCheckUtils';
 import { getLocalDateStr } from '../utils/dateUtils';
+import { splitLogByDays } from '../utils/logUtils';
 import { getTodoAssociationTodayTodos } from '../utils/todoScheduleUtils';
 
 const LEGACY_WIDGET_TIMER_STORAGE_KEY = 'lumostime_widget_timer_slots_v1';
@@ -53,16 +62,25 @@ const FALLBACK_WIDGET_ICON = '\u2022';
 
 export const DEFAULT_WIDGET_TYPE: WidgetType = 'timer';
 export const WIDGET_TYPE_OPTIONS: WidgetType[] = ['timer', 'daily', 'shortcut'];
+export const DEFAULT_WIDGET_TEMPLATE_TYPE: WidgetTemplateType = 'grid';
+export const WIDGET_TEMPLATE_TYPE_OPTIONS: WidgetTemplateType[] = ['grid', 'trackingCalendar'];
 export const DEFAULT_DAILY_WIDGET_COLOR = '#E7E5E4';
+export const DEFAULT_TRACKING_CALENDAR_COLOR = '#E7E5E4';
+export const TRACKING_CALENDAR_WIDGET_SIZE = '2x2';
+export const WIDGET_TEMPLATES_UPDATED_EVENT = 'lumostime:widget-templates-updated';
 export const DEFAULT_WIDGET_TEMPLATE_NAME = '\u6211\u7684\u5c0f\u7ec4\u4ef6';
 export const DEFAULT_WIDGET_SIZE = '2x2';
 export const WIDGET_SIZE_OPTIONS = ['2x1', '2x2', '3x2', '4x1', '4x2'] as const;
+const TRACKING_CALENDAR_LOOKBACK_DAYS = 400;
 
 export type WidgetSize = (typeof WIDGET_SIZE_OPTIONS)[number];
 export type WidgetTemplateSlotConfig = WidgetBridgeSlot;
 export type WidgetTemplate = WidgetBridgeTemplate;
 export type WidgetInstanceBinding = WidgetBridgeInstanceBinding;
 export type DailyWidgetSlotBinding = DailyCheckTemplateMeta;
+export type WidgetTemplateType = WidgetBridgeTemplateType;
+export type WidgetTrackingCalendarConfig = WidgetBridgeTrackingCalendarConfig;
+export type WidgetTrackingCalendarSourceType = WidgetBridgeTrackingCalendarSourceType;
 
 const WIDGET_SIZE_SLOT_COUNT: Record<WidgetSize, number> = {
   '2x1': 2,
@@ -108,6 +126,18 @@ export const normalizeWidgetType = (widgetType?: string | null): WidgetType =>
     ? widgetType
     : DEFAULT_WIDGET_TYPE;
 
+export const normalizeWidgetTemplateType = (
+  templateType?: string | null
+): WidgetTemplateType =>
+  templateType === 'trackingCalendar' || templateType === 'grid'
+    ? templateType
+    : DEFAULT_WIDGET_TEMPLATE_TYPE;
+
+export const normalizeTrackingCalendarSourceType = (
+  sourceType?: string | null
+): WidgetTrackingCalendarSourceType | null =>
+  sourceType === 'tag' || sourceType === 'scope' || sourceType === 'daily' ? sourceType : null;
+
 export const normalizeDailyWidgetManualMode = (
   manualMode?: string | null
 ): DailyWidgetManualMode | null => {
@@ -133,6 +163,9 @@ export const getWidgetGridBySize = (size: WidgetSize): { columns: number; rows: 
   WIDGET_SIZE_GRID[size];
 
 export const getWidgetSizeLabel = (size: WidgetSize): string => size;
+
+export const getWidgetTemplateTypeLabel = (templateType: WidgetTemplateType): string =>
+  templateType === 'trackingCalendar' ? '2×2 追踪日历' : '计时器';
 
 export const getWidgetSizeOptions = (): WidgetSize[] => [...WIDGET_SIZE_OPTIONS];
 
@@ -164,6 +197,44 @@ export const createEmptyWidgetTemplateSlots = (
   Array.from({ length: getWidgetSlotCountBySize(size) }, (_, slotIndex) =>
     createEmptyWidgetTemplateSlot(slotIndex)
   );
+
+export const createEmptyTrackingCalendarConfig = (): WidgetTrackingCalendarConfig => ({
+  sourceType: null,
+  categoryId: null,
+  activityId: null,
+  scopeId: null,
+  checkTemplateId: null,
+  checkItemId: null,
+  icon: null,
+  customIcon: null,
+  uiIconAssetPath: null,
+  uiIconFallbackAssetPath: null,
+  label: null,
+  color: null
+});
+
+export const normalizeTrackingCalendarConfig = (
+  config?: WidgetTrackingCalendarConfig | null
+): WidgetTrackingCalendarConfig | null => {
+  if (!config) {
+    return null;
+  }
+
+  return {
+    sourceType: normalizeTrackingCalendarSourceType(config.sourceType),
+    categoryId: normalizeNullableString(config.categoryId),
+    activityId: normalizeNullableString(config.activityId),
+    scopeId: normalizeNullableString(config.scopeId),
+    checkTemplateId: normalizeNullableString(config.checkTemplateId),
+    checkItemId: normalizeNullableString(config.checkItemId),
+    icon: normalizeNullableString(config.icon),
+    customIcon: normalizeNullableString(config.customIcon),
+    uiIconAssetPath: normalizeNullableString(config.uiIconAssetPath),
+    uiIconFallbackAssetPath: normalizeNullableString(config.uiIconFallbackAssetPath),
+    label: normalizeNullableString(config.label),
+    color: normalizeNullableString(config.color)
+  };
+};
 
 export const normalizeWidgetTemplateSlots = (
   slots: WidgetTemplateSlotConfig[],
@@ -202,29 +273,51 @@ export const resizeWidgetTemplateSlots = (
 ): WidgetTemplateSlotConfig[] => normalizeWidgetTemplateSlots(slots, size);
 
 export const isWidgetTemplateConfigured = (template: WidgetTemplate): boolean =>
-  template.slots.some((slot) => {
-    if (slot.slotType === 'daily') {
-      return Boolean(slot.checkItemId);
-    }
-    if (slot.slotType === 'shortcut') {
-      return Boolean(slot.shortcutAction);
-    }
-    if (slot.slotType === 'timer') {
-      return Boolean(slot.activityId && slot.categoryId);
-    }
-    return false;
-  });
+  normalizeWidgetTemplateType(template.templateType) === 'trackingCalendar'
+    ? (() => {
+        const config = normalizeTrackingCalendarConfig(template.trackingConfig);
+        if (!config?.sourceType) {
+          return false;
+        }
+        if (config.sourceType === 'tag') {
+          return Boolean(config.categoryId && config.activityId);
+        }
+        if (config.sourceType === 'scope') {
+          return Boolean(config.scopeId);
+        }
+        return Boolean(config.checkItemId);
+      })()
+    : template.slots.some((slot) => {
+        if (slot.slotType === 'daily') {
+          return Boolean(slot.checkItemId);
+        }
+        if (slot.slotType === 'shortcut') {
+          return Boolean(slot.shortcutAction);
+        }
+        if (slot.slotType === 'timer') {
+          return Boolean(slot.activityId && slot.categoryId);
+        }
+        return false;
+      });
 
 export const createWidgetTemplate = (
   name?: string,
-  size: WidgetSize = DEFAULT_WIDGET_SIZE
+  size: WidgetSize = DEFAULT_WIDGET_SIZE,
+  templateType: WidgetTemplateType = DEFAULT_WIDGET_TEMPLATE_TYPE
 ): WidgetTemplate => {
   const now = Date.now();
+  const normalizedTemplateType = normalizeWidgetTemplateType(templateType);
+  const normalizedSize = normalizedTemplateType === 'trackingCalendar'
+    ? TRACKING_CALENDAR_WIDGET_SIZE
+    : normalizeWidgetSize(size);
   return {
     id: createWidgetTemplateId(),
     name: name?.trim() || DEFAULT_WIDGET_TEMPLATE_NAME,
-    size,
-    slots: createEmptyWidgetTemplateSlots(size),
+    size: normalizedSize,
+    templateType: normalizedTemplateType,
+    slots: createEmptyWidgetTemplateSlots(normalizedSize),
+    trackingConfig:
+      normalizedTemplateType === 'trackingCalendar' ? createEmptyTrackingCalendarConfig() : null,
     createdAt: now,
     updatedAt: now
   };
@@ -233,12 +326,20 @@ export const createWidgetTemplate = (
 export const normalizeWidgetTemplate = (
   template: Partial<WidgetTemplate> & Pick<WidgetTemplate, 'id'>
 ): WidgetTemplate => {
-  const size = normalizeWidgetSize(template.size);
+  const templateType = normalizeWidgetTemplateType(template.templateType);
+  const size = templateType === 'trackingCalendar'
+    ? TRACKING_CALENDAR_WIDGET_SIZE
+    : normalizeWidgetSize(template.size);
   return {
     id: template.id,
     name: template.name?.trim() || DEFAULT_WIDGET_TEMPLATE_NAME,
     size,
+    templateType,
     slots: normalizeWidgetTemplateSlots(template.slots || [], size),
+    trackingConfig:
+      templateType === 'trackingCalendar'
+        ? normalizeTrackingCalendarConfig(template.trackingConfig) || createEmptyTrackingCalendarConfig()
+        : null,
     createdAt: Number.isFinite(template.createdAt) ? Number(template.createdAt) : Date.now(),
     updatedAt: Number.isFinite(template.updatedAt) ? Number(template.updatedAt) : Date.now()
   };
@@ -359,6 +460,91 @@ export const buildShortcutWidgetSlotConfig = (
   shortcutAction
 });
 
+export const buildTrackingCalendarTagConfig = (
+  category: Category,
+  activity: Category['activities'][number],
+  overrides?: {
+    icon?: string | null;
+    customIcon?: string | null;
+    color?: string | null;
+    uiIconAssetPath?: string | null;
+    uiIconFallbackAssetPath?: string | null;
+  }
+): WidgetTrackingCalendarConfig => ({
+  sourceType: 'tag',
+  categoryId: category.id,
+  activityId: activity.id,
+  scopeId: null,
+  checkTemplateId: null,
+  checkItemId: null,
+  icon:
+    normalizeNullableString(overrides?.customIcon)
+    || normalizeNullableString(overrides?.icon)
+    || activity.icon
+    || category.icon,
+  customIcon: normalizeNullableString(overrides?.customIcon),
+  uiIconAssetPath: normalizeNullableString(overrides?.uiIconAssetPath),
+  uiIconFallbackAssetPath: normalizeNullableString(overrides?.uiIconFallbackAssetPath),
+  label: activity.name,
+  color: normalizeNullableString(overrides?.color) || getColorHexForCharts(activity.color || category.themeColor || ''),
+});
+
+export const buildTrackingCalendarScopeConfig = (
+  scope: { id: string; name: string; icon: string; uiIcon?: string; themeColor: string },
+  overrides?: {
+    icon?: string | null;
+    customIcon?: string | null;
+    color?: string | null;
+    uiIconAssetPath?: string | null;
+    uiIconFallbackAssetPath?: string | null;
+  }
+): WidgetTrackingCalendarConfig => ({
+  sourceType: 'scope',
+  categoryId: null,
+  activityId: null,
+  scopeId: scope.id,
+  checkTemplateId: null,
+  checkItemId: null,
+  icon:
+    normalizeNullableString(overrides?.customIcon)
+    || normalizeNullableString(overrides?.icon)
+    || scope.icon
+    || FALLBACK_WIDGET_ICON,
+  customIcon: normalizeNullableString(overrides?.customIcon),
+  uiIconAssetPath: normalizeNullableString(overrides?.uiIconAssetPath),
+  uiIconFallbackAssetPath: normalizeNullableString(overrides?.uiIconFallbackAssetPath),
+  label: scope.name,
+  color: normalizeNullableString(overrides?.color) || getColorHexForCharts(scope.themeColor || ''),
+});
+
+export const buildTrackingCalendarDailyConfig = (
+  binding: DailyWidgetSlotBinding,
+  overrides?: {
+    icon?: string | null;
+    customIcon?: string | null;
+    color?: string | null;
+    uiIconAssetPath?: string | null;
+    uiIconFallbackAssetPath?: string | null;
+  }
+): WidgetTrackingCalendarConfig => ({
+  sourceType: 'daily',
+  categoryId: null,
+  activityId: null,
+  scopeId: null,
+  checkTemplateId: binding.checkTemplateId,
+  checkItemId: binding.checkItemId,
+  icon:
+    normalizeNullableString(overrides?.customIcon)
+    || normalizeNullableString(overrides?.icon)
+    || binding.icon
+    || FALLBACK_WIDGET_ICON,
+  customIcon: normalizeNullableString(overrides?.customIcon),
+  uiIconAssetPath: normalizeNullableString(overrides?.uiIconAssetPath),
+  uiIconFallbackAssetPath: normalizeNullableString(overrides?.uiIconFallbackAssetPath),
+  label: binding.content,
+  color: normalizeNullableString(overrides?.color)
+});
+
 export const findDailyWidgetBinding = (
   checkTemplates: CheckTemplate[],
   checkItemId: string
@@ -432,6 +618,71 @@ export const rebuildShortcutWidgetSlotConfig = (
   });
 };
 
+export const rebuildTrackingCalendarConfig = (
+  config: WidgetTrackingCalendarConfig | null | undefined,
+  categories: Category[],
+  scopes: Array<{ id: string; name: string; icon: string; uiIcon?: string; themeColor: string }>,
+  checkTemplates: CheckTemplate[]
+): WidgetTrackingCalendarConfig | null => {
+  const normalizedConfig = normalizeTrackingCalendarConfig(config);
+  if (!normalizedConfig?.sourceType) {
+    return createEmptyTrackingCalendarConfig();
+  }
+
+  if (normalizedConfig.sourceType === 'tag') {
+    if (!normalizedConfig.categoryId || !normalizedConfig.activityId) {
+      return createEmptyTrackingCalendarConfig();
+    }
+    const { category, activity } = findWidgetActivity(
+      categories,
+      normalizedConfig.categoryId,
+      normalizedConfig.activityId
+    );
+    if (!category || !activity) {
+      return createEmptyTrackingCalendarConfig();
+    }
+    return buildTrackingCalendarTagConfig(category, activity, {
+      icon: normalizedConfig.icon ?? null,
+      customIcon: normalizedConfig.customIcon ?? null,
+      color: normalizedConfig.color ?? null,
+      uiIconAssetPath: normalizedConfig.uiIconAssetPath ?? null,
+      uiIconFallbackAssetPath: normalizedConfig.uiIconFallbackAssetPath ?? null
+    });
+  }
+
+  if (normalizedConfig.sourceType === 'scope') {
+    if (!normalizedConfig.scopeId) {
+      return createEmptyTrackingCalendarConfig();
+    }
+    const scope = scopes.find((item) => item.id === normalizedConfig.scopeId);
+    if (!scope) {
+      return createEmptyTrackingCalendarConfig();
+    }
+    return buildTrackingCalendarScopeConfig(scope, {
+      icon: normalizedConfig.icon ?? null,
+      customIcon: normalizedConfig.customIcon ?? null,
+      color: normalizedConfig.color ?? null,
+      uiIconAssetPath: normalizedConfig.uiIconAssetPath ?? null,
+      uiIconFallbackAssetPath: normalizedConfig.uiIconFallbackAssetPath ?? null
+    });
+  }
+
+  if (!normalizedConfig.checkItemId) {
+    return createEmptyTrackingCalendarConfig();
+  }
+  const binding = findDailyWidgetBinding(checkTemplates, normalizedConfig.checkItemId);
+  if (!binding) {
+    return createEmptyTrackingCalendarConfig();
+  }
+  return buildTrackingCalendarDailyConfig(binding, {
+    icon: normalizedConfig.icon ?? null,
+    customIcon: normalizedConfig.customIcon ?? null,
+    color: normalizedConfig.color ?? null,
+    uiIconAssetPath: normalizedConfig.uiIconAssetPath ?? null,
+    uiIconFallbackAssetPath: normalizedConfig.uiIconFallbackAssetPath ?? null
+  });
+};
+
 const stripWidgetSlotUiIconFields = (
   slot: WidgetTemplateSlotConfig
 ): WidgetTemplateSlotConfig => {
@@ -441,6 +692,25 @@ const stripWidgetSlotUiIconFields = (
 
   return {
     ...slot,
+    uiIconAssetPath: null,
+    uiIconFallbackAssetPath: null
+  };
+};
+
+const stripTrackingCalendarUiIconFields = (
+  config: WidgetTrackingCalendarConfig | null | undefined
+): WidgetTrackingCalendarConfig | null => {
+  const normalizedConfig = normalizeTrackingCalendarConfig(config);
+  if (!normalizedConfig) {
+    return normalizedConfig;
+  }
+
+  if (!normalizedConfig.uiIconAssetPath && !normalizedConfig.uiIconFallbackAssetPath) {
+    return normalizedConfig;
+  }
+
+  return {
+    ...normalizedConfig,
     uiIconAssetPath: null,
     uiIconFallbackAssetPath: null
   };
@@ -465,11 +735,16 @@ export const sanitizeWidgetTemplatesForUiIconSupport = (
       }
       return nextSlot;
     });
+    const sanitizedTrackingConfig = stripTrackingCalendarUiIconFields(template.trackingConfig);
+    if (JSON.stringify(sanitizedTrackingConfig) !== JSON.stringify(template.trackingConfig ?? null)) {
+      didChange = true;
+    }
 
     return didChange
       ? {
           ...template,
           slots: sanitizedSlots,
+          trackingConfig: sanitizedTrackingConfig,
           updatedAt: Date.now()
         }
       : template;
@@ -481,7 +756,8 @@ export const sanitizeWidgetTemplatesForUiIconSupport = (
 export const rebuildWidgetTemplate = (
   template: WidgetTemplate,
   categories: Category[],
-  checkTemplates: CheckTemplate[] = []
+  checkTemplates: CheckTemplate[] = [],
+  scopes: Array<{ id: string; name: string; icon: string; uiIcon?: string; themeColor: string }> = []
 ): WidgetTemplate => ({
   ...template,
   updatedAt: Date.now(),
@@ -496,7 +772,11 @@ export const rebuildWidgetTemplate = (
             : createEmptyWidgetTemplateSlot(slot.slotIndex)
     ),
     template.size
-  )
+  ),
+  trackingConfig:
+    normalizeWidgetTemplateType(template.templateType) === 'trackingCalendar'
+      ? rebuildTrackingCalendarConfig(template.trackingConfig, categories, scopes, checkTemplates)
+      : null
 });
 
 const loadLegacyWidgetTimerSlotsFromStorage = (): WidgetTemplateSlotConfig[] => {
@@ -532,10 +812,12 @@ const migrateLegacySlotsToTemplates = (): WidgetTemplate[] => {
     id: 'widget-template-legacy-default',
     name: DEFAULT_WIDGET_TEMPLATE_NAME,
     size: DEFAULT_WIDGET_SIZE,
+    templateType: 'grid',
     slots: legacySlots.map((slot) => ({
       ...slot,
       slotType: slot.activityId && slot.categoryId ? 'timer' : null
     })),
+    trackingConfig: null,
     createdAt: now,
     updatedAt: now
   };
@@ -561,6 +843,9 @@ export const loadWidgetTemplatesFromStorage = (): WidgetTemplate[] => {
 
 export const saveWidgetTemplatesToStorage = (templates: WidgetTemplate[]) => {
   localStorage.setItem(WIDGET_TEMPLATE_STORAGE_KEY, JSON.stringify(normalizeWidgetTemplates(templates)));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(WIDGET_TEMPLATES_UPDATED_EVENT));
+  }
 };
 
 export const updateWidgetTemplateSize = (
@@ -568,8 +853,16 @@ export const updateWidgetTemplateSize = (
   size: WidgetSize
 ): WidgetTemplate => ({
   ...template,
-  size,
-  slots: resizeWidgetTemplateSlots(template.slots, size),
+  size:
+    normalizeWidgetTemplateType(template.templateType) === 'trackingCalendar'
+      ? TRACKING_CALENDAR_WIDGET_SIZE
+      : size,
+  slots: resizeWidgetTemplateSlots(
+    template.slots,
+    normalizeWidgetTemplateType(template.templateType) === 'trackingCalendar'
+      ? TRACKING_CALENDAR_WIDGET_SIZE
+      : size
+  ),
   updatedAt: Date.now()
 });
 
@@ -1019,6 +1312,165 @@ export const buildTodoPinWidgetPayload = ({
         icon: linkedTarget.icon,
         color: linkedTarget.color,
         scopeIds: todo.defaultScopeIds ?? null
+      };
+    }),
+    syncedAt: now
+  };
+};
+
+const buildTrackingCalendarWindowStartDate = (date: Date): string => {
+  const windowStart = new Date(date);
+  windowStart.setHours(0, 0, 0, 0);
+  windowStart.setDate(windowStart.getDate() - TRACKING_CALENDAR_LOOKBACK_DAYS);
+  return getLocalDateStr(windowStart);
+};
+
+const createTrackingCalendarDayValueMap = () => new Map<string, number>();
+
+const addTrackingCalendarDayValue = (
+  dayValues: Map<string, number>,
+  dateStr: string,
+  amount: number
+) => {
+  if (!dateStr || amount <= 0) {
+    return;
+  }
+  dayValues.set(dateStr, (dayValues.get(dateStr) || 0) + amount);
+};
+
+const getExpandedLogsForTracking = (
+  logs: Log[],
+  activeSessions: ActiveSession[],
+  now: number
+): Log[] => {
+  const sessionLogs: Log[] = activeSessions
+    .filter((session) => now > session.startTime)
+    .map((session) => ({
+      id: `active-session-${session.id}`,
+      activityId: session.activityId,
+      categoryId: session.categoryId,
+      startTime: session.startTime,
+      endTime: now,
+      duration: Math.max(0, (now - session.startTime) / 1000),
+      linkedTodoId: session.linkedTodoId,
+      scopeIds: session.scopeIds
+    }));
+
+  return [...logs, ...sessionLogs].flatMap((log) => {
+    if (log.endTime <= log.startTime) {
+      return [];
+    }
+
+    if (new Date(log.startTime).toDateString() === new Date(log.endTime).toDateString()) {
+      return [log];
+    }
+
+    const { id: _id, ...baseLog } = log;
+    return splitLogByDays(baseLog);
+  });
+};
+
+const buildTrackingEntriesFromDayValues = (
+  dayValues: Map<string, number>,
+  windowStartDate: string
+): WidgetBridgeTrackingCalendarEntry[] =>
+  Array.from(dayValues.entries())
+    .filter(([date]) => date >= windowStartDate)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([date, value]) => ({
+      date,
+      value: Math.max(0, Math.round(value))
+    }));
+
+export const buildTrackingCalendarWidgetPayload = ({
+  templates,
+  logs,
+  activeSessions,
+  categories,
+  scopes,
+  dailyReviews,
+  checkTemplates,
+  date = new Date(),
+  now = Date.now()
+}: {
+  templates: WidgetTemplate[];
+  logs: Log[];
+  activeSessions: ActiveSession[];
+  categories: Category[];
+  scopes: Array<{ id: string; name: string; icon: string; uiIcon?: string; themeColor: string }>;
+  dailyReviews: DailyReview[];
+  checkTemplates: CheckTemplate[];
+  date?: Date;
+  now?: number;
+}): WidgetBridgeTrackingCalendarPayload => {
+  const trackingTemplates = normalizeWidgetTemplates(templates).filter(
+    (template) =>
+      normalizeWidgetTemplateType(template.templateType) === 'trackingCalendar'
+      && isWidgetTemplateConfigured(template)
+  );
+  const windowStartDate = buildTrackingCalendarWindowStartDate(date);
+  const expandedLogs = getExpandedLogsForTracking(logs, activeSessions, now);
+
+  return {
+    templates: trackingTemplates.map((template) => {
+      const config = normalizeTrackingCalendarConfig(template.trackingConfig);
+      const dayValues = createTrackingCalendarDayValueMap();
+
+      if (config?.sourceType === 'tag' && config.categoryId && config.activityId) {
+        expandedLogs.forEach((log) => {
+          if (log.categoryId !== config.categoryId || log.activityId !== config.activityId) {
+            return;
+          }
+          addTrackingCalendarDayValue(
+            dayValues,
+            getLocalDateStr(new Date(log.startTime)),
+            log.duration / 60
+          );
+        });
+      } else if (config?.sourceType === 'scope' && config.scopeId) {
+        expandedLogs.forEach((log) => {
+          if (!log.scopeIds?.includes(config.scopeId!)) {
+            return;
+          }
+          addTrackingCalendarDayValue(
+            dayValues,
+            getLocalDateStr(new Date(log.startTime)),
+            log.duration / 60
+          );
+        });
+      } else if (config?.sourceType === 'daily' && config.checkItemId) {
+        dailyReviews.forEach((review) => {
+          if (!review.date || review.date < windowStartDate) {
+            return;
+          }
+
+          const itemIndex = findCheckItemIndexInReview(review, checkTemplates, config.checkItemId!);
+          if (itemIndex < 0) {
+            return;
+          }
+
+          const checkItem = review.checkItems?.[itemIndex];
+          if (!checkItem) {
+            return;
+          }
+
+          if (checkItem.manualMode === 'count') {
+            const countState = getCheckItemCountState(checkItem);
+            if (countState.isCompleted) {
+              addTrackingCalendarDayValue(dayValues, review.date, 1);
+            }
+            return;
+          }
+
+          if (checkItem.isCompleted) {
+            addTrackingCalendarDayValue(dayValues, review.date, 1);
+          }
+        });
+      }
+
+      return {
+        templateId: template.id,
+        entries: buildTrackingEntriesFromDayValues(dayValues, windowStartDate)
       };
     }),
     syncedAt: now

@@ -7,6 +7,7 @@
  * @updated 2026-04-25: Syncs today's DAILY_RUNTIME heatmap payload so the dedicated 4x4 widget reflects logs and live sessions.
  * @updated 2026-04-25: Strips unsupported widget UI icon assets on app startup so expired supporter access falls back to emoji rendering.
  * @updated 2026-04-26: Syncs today's TODAY + PIN todo payload so the dedicated scrollable 4x2 widget stays current.
+ * @updated 2026-05-01: Syncs tracking-calendar payloads for dedicated 2x2 monthly tracking widgets and re-runs when widget templates change.
  */
 import { App as CapacitorApp } from '@capacitor/app';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -18,6 +19,8 @@ import WidgetBridge from '../plugins/WidgetBridgePlugin';
 import { RedemptionService } from '../services/redemptionService';
 import { uiIconService } from '../services/uiIconService';
 import {
+  WIDGET_TEMPLATES_UPDATED_EVENT,
+  buildTrackingCalendarWidgetPayload,
   buildDailyRuntimeWidgetPayload,
   buildDailyWidgetSyncPayload,
   buildLogFromWidgetPendingAction,
@@ -33,11 +36,12 @@ import {
 import { applyDailyCheckActionForDate } from '../utils/dailyCheckUtils';
 
 export const useWidgetBridgeSync = () => {
-  const { categories } = useCategoryScope();
+  const { categories, scopes } = useCategoryScope();
   const { logs, todos, setLogs } = useData();
   const { activeSessions, setActiveSessions } = useSession();
   const { dailyReviews, setDailyReviews, checkTemplates, reviewTemplates } = useReview();
   const [hasHydratedNativeState, setHasHydratedNativeState] = useState(!isNativeAndroidWidgetSupported());
+  const [widgetTemplateRevision, setWidgetTemplateRevision] = useState(0);
 
   const latestSession = useMemo(
     () => (activeSessions.length > 0 ? activeSessions[activeSessions.length - 1] : null),
@@ -57,6 +61,19 @@ export const useWidgetBridgeSync = () => {
       reviewTemplates
     };
   }, [checkTemplates, dailyReviews, reviewTemplates]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const handleTemplatesUpdated = () => {
+      setWidgetTemplateRevision((previous) => previous + 1);
+    };
+
+    window.addEventListener(WIDGET_TEMPLATES_UPDATED_EVENT, handleTemplatesUpdated);
+    return () => window.removeEventListener(WIDGET_TEMPLATES_UPDATED_EVENT, handleTemplatesUpdated);
+  }, []);
 
   useEffect(() => {
     if (!isNativeAndroidWidgetSupported()) {
@@ -320,4 +337,33 @@ export const useWidgetBridgeSync = () => {
       console.error('[useWidgetBridgeSync] Failed to sync TODAY + PIN widget payload to native widget', error);
     });
   }, [categories, hasHydratedNativeState, todos]);
+
+  useEffect(() => {
+    if (!isNativeAndroidWidgetSupported() || !hasHydratedNativeState) {
+      return;
+    }
+
+    const payload = buildTrackingCalendarWidgetPayload({
+      templates: loadWidgetTemplatesFromStorage(),
+      logs,
+      activeSessions,
+      categories,
+      scopes,
+      dailyReviews,
+      checkTemplates
+    });
+
+    WidgetBridge.syncTrackingCalendarWidgetData({ payload }).catch((error) => {
+      console.error('[useWidgetBridgeSync] Failed to sync tracking calendar payload to native widget', error);
+    });
+  }, [
+    activeSessions,
+    categories,
+    checkTemplates,
+    dailyReviews,
+    hasHydratedNativeState,
+    logs,
+    scopes,
+    widgetTemplateRevision
+  ]);
 };

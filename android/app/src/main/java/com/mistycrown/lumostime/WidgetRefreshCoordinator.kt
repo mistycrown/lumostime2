@@ -33,6 +33,7 @@ object WidgetRefreshCoordinator {
         QuickLogWidget3x2.refreshAllAsync(context)
         QuickLogWidget4x1.refreshAllAsync(context)
         QuickLogWidget4x2.refreshAllAsync(context)
+        QuickLogWidgetTrackingCalendar2x2.refreshAllAsync(context)
         QuickLogWidgetDailyRuntime4x2.refreshAllAsync(context)
         QuickLogWidgetTodoPin4x2.refreshAllAsync(context)
         QuickLogWidgetTodoPin4x3.refreshAllAsync(context)
@@ -57,6 +58,8 @@ object WidgetRefreshCoordinator {
                 QuickLogWidget4x1.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidget4x2::class.java).className ->
                 QuickLogWidget4x2.refreshWidget(context, appWidgetId)
+            ComponentName(context, QuickLogWidgetTrackingCalendar2x2::class.java).className ->
+                QuickLogWidgetTrackingCalendar2x2.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidgetDailyRuntime4x2::class.java).className ->
                 QuickLogWidgetDailyRuntime4x2.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidgetTodoPin4x2::class.java).className ->

@@ -96,6 +96,21 @@ object WidgetSizes {
     }
 }
 
+object WidgetTemplateTypes {
+    const val GRID = "grid"
+    const val TRACKING_CALENDAR = "trackingCalendar"
+    const val DEFAULT = GRID
+
+    @JvmStatic
+    fun normalize(templateType: String?): String {
+        return when (templateType) {
+            TRACKING_CALENDAR,
+            GRID -> templateType
+            else -> DEFAULT
+        }
+    }
+}
+
 data class WidgetSlotConfig(
     val slotIndex: Int,
     val slotType: String? = null,
@@ -124,11 +139,28 @@ data class WidgetSlotConfig(
     }
 }
 
+data class WidgetTrackingCalendarConfig(
+    val sourceType: String? = null,
+    val categoryId: String? = null,
+    val activityId: String? = null,
+    val scopeId: String? = null,
+    val checkTemplateId: String? = null,
+    val checkItemId: String? = null,
+    val icon: String? = null,
+    val customIcon: String? = null,
+    val uiIconAssetPath: String? = null,
+    val uiIconFallbackAssetPath: String? = null,
+    val label: String? = null,
+    val color: String? = null
+)
+
 data class WidgetTemplate(
     val id: String,
     val name: String,
     val size: String = WidgetSizes.DEFAULT,
     val slots: List<WidgetSlotConfig>,
+    val templateType: String = WidgetTemplateTypes.DEFAULT,
+    val trackingConfig: WidgetTrackingCalendarConfig? = null,
     val createdAt: Long,
     val updatedAt: Long
 )
@@ -247,6 +279,21 @@ data class WidgetTodoPinItem(
 data class WidgetTodoPinPayload(
     val date: String,
     val items: List<WidgetTodoPinItem> = emptyList(),
+    val syncedAt: Long
+)
+
+data class WidgetTrackingCalendarEntry(
+    val date: String,
+    val value: Int
+)
+
+data class WidgetTrackingCalendarTemplatePayload(
+    val templateId: String,
+    val entries: List<WidgetTrackingCalendarEntry> = emptyList()
+)
+
+data class WidgetTrackingCalendarPayload(
+    val templates: List<WidgetTrackingCalendarTemplatePayload> = emptyList(),
     val syncedAt: Long
 )
 

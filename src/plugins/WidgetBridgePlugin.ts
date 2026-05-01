@@ -6,12 +6,15 @@
  * @description Exposes the Android widget template, instance binding state, and runtime bridge to the React application.
  * @updated 2026-04-25: Added dedicated DAILY_RUNTIME category/activity dual-view payload sync types for native heatmap widgets.
  * @updated 2026-04-26: Added TODAY + PIN widget payload sync types for the dedicated scrollable 4x2 todo widget.
+ * @updated 2026-05-01: Added tracking-calendar template/config contracts and payload sync types for the dedicated 2x2 tracking calendar widget.
  */
 import { registerPlugin } from '@capacitor/core';
 import { ShortcutWidgetAction } from '../services/widgetShortcutService';
 
 export type WidgetType = 'timer' | 'daily' | 'shortcut';
 export type DailyWidgetManualMode = 'binary' | 'count';
+export type WidgetTemplateType = 'grid' | 'trackingCalendar';
+export type WidgetTrackingCalendarSourceType = 'tag' | 'scope' | 'daily';
 
 export interface WidgetBridgeSlot {
   slotIndex: number;
@@ -33,11 +36,28 @@ export interface WidgetBridgeSlot {
   shortcutAction?: ShortcutWidgetAction | null;
 }
 
+export interface WidgetBridgeTrackingCalendarConfig {
+  sourceType: WidgetTrackingCalendarSourceType | null;
+  categoryId?: string | null;
+  activityId?: string | null;
+  scopeId?: string | null;
+  checkTemplateId?: string | null;
+  checkItemId?: string | null;
+  icon?: string | null;
+  customIcon?: string | null;
+  uiIconAssetPath?: string | null;
+  uiIconFallbackAssetPath?: string | null;
+  label?: string | null;
+  color?: string | null;
+}
+
 export interface WidgetBridgeTemplate {
   id: string;
   name: string;
   size: '2x1' | '2x2' | '3x2' | '4x1' | '4x2';
+  templateType?: WidgetTemplateType;
   slots: WidgetBridgeSlot[];
+  trackingConfig?: WidgetBridgeTrackingCalendarConfig | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -167,6 +187,21 @@ export interface WidgetBridgeTodoPinPayload {
   syncedAt: number;
 }
 
+export interface WidgetBridgeTrackingCalendarEntry {
+  date: string;
+  value: number;
+}
+
+export interface WidgetBridgeTrackingCalendarTemplatePayload {
+  templateId: string;
+  entries: WidgetBridgeTrackingCalendarEntry[];
+}
+
+export interface WidgetBridgeTrackingCalendarPayload {
+  templates: WidgetBridgeTrackingCalendarTemplatePayload[];
+  syncedAt: number;
+}
+
 export interface WidgetBridgePlugin {
   getTemplates(): Promise<{ templates: WidgetBridgeTemplate[] }>;
   saveTemplates(options: { templates: WidgetBridgeTemplate[] }): Promise<void>;
@@ -180,6 +215,7 @@ export interface WidgetBridgePlugin {
   syncDailyWidgetData(options: { payload: WidgetBridgeDailySyncPayload | null }): Promise<void>;
   syncDailyRuntimeWidgetData(options: { payload: WidgetBridgeDailyRuntimePayload | null }): Promise<void>;
   syncTodoPinWidgetData(options: { payload: WidgetBridgeTodoPinPayload | null }): Promise<void>;
+  syncTrackingCalendarWidgetData(options: { payload: WidgetBridgeTrackingCalendarPayload | null }): Promise<void>;
   refreshWidget(options?: { appWidgetId?: number; templateId?: string }): Promise<void>;
 }
 

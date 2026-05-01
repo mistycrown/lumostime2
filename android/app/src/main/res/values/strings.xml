@@ -18,6 +18,7 @@
     <string name="widget_label_daily_3x2">日课 3x2</string>
     <string name="widget_label_daily_4x1">日课 4x1</string>
     <string name="widget_label_daily_4x2">日课 4x2</string>
+    <string name="widget_label_tracking_calendar_2x2">2×2 追踪日历</string>
     <string name="widget_label_daily_runtime_4x4">DAILY_RUNTIME 4x3</string>
     <string name="widget_label_daily_runtime_4x2">DAILY_RUNTIME 4x2</string>
     <string name="widget_label_todo_pin_4x2">TODO + PIN 4x2</string>

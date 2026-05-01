@@ -12,9 +12,11 @@ object WidgetSnapshotBuilder {
     fun build(
         context: android.content.Context,
         appWidgetId: Int,
-        widgetSize: String
+        widgetSize: String,
+        templateType: String = WidgetTemplateTypes.GRID
     ): WidgetSnapshot {
         val normalizedSize = WidgetSizes.normalize(widgetSize)
+        val normalizedTemplateType = WidgetTemplateTypes.normalize(templateType)
         val runtimeState = WidgetStores.loadRuntimeState(context)
         val dailyPayload = WidgetStores.loadDailySyncPayload(context)
         val tapAnimationState = WidgetStores.loadTapAnimationState(context)
@@ -28,8 +30,13 @@ object WidgetSnapshotBuilder {
                 emptyMap()
             }
 
-        val binding = WidgetStores.ensureBinding(context, appWidgetId, normalizedSize)
-        val template = WidgetStores.loadTemplateForSize(context, binding?.templateId, normalizedSize)
+        val binding = WidgetStores.ensureBinding(context, appWidgetId, normalizedSize, normalizedTemplateType)
+        val template = WidgetStores.loadTemplateForSize(
+            context,
+            binding?.templateId,
+            normalizedSize,
+            normalizedTemplateType
+        )
         val hasTemplate = template != null
 
         val slots = (template?.slots ?: emptySlots(normalizedSize)).map { slot ->

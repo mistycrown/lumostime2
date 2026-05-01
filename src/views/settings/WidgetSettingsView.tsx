@@ -13,11 +13,15 @@ import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { CustomSelect } from '../../components/CustomSelect';
 import { IconRenderer } from '../../components/IconRenderer';
+import { ToastType } from '../../components/Toast';
 import {
   WidgetSlotEditorDraft,
   WidgetSlotEditorModal
 } from '../../components/WidgetSlotEditorModal';
-import { ToastType } from '../../components/Toast';
+import {
+  WidgetTrackingCalendarEditorDraft,
+  WidgetTrackingCalendarEditorModal
+} from '../../components/WidgetTrackingCalendarEditorModal';
 import WidgetBridge from '../../plugins/WidgetBridgePlugin';
 import { RedemptionService } from '../../services/redemptionService';
 import {
@@ -28,12 +32,20 @@ import {
 } from '../../services/uiIconService';
 import {
   DEFAULT_WIDGET_SIZE,
+  DEFAULT_WIDGET_TEMPLATE_TYPE,
+  TRACKING_CALENDAR_WIDGET_SIZE,
   WidgetTemplate,
   WidgetTemplateSlotConfig,
+  WidgetTemplateType,
+  WidgetTrackingCalendarConfig,
   buildDailyWidgetSlotConfig,
   buildShortcutWidgetSlotConfig,
   buildTimerWidgetSlotConfig,
+  buildTrackingCalendarDailyConfig,
+  buildTrackingCalendarScopeConfig,
+  buildTrackingCalendarTagConfig,
   countTemplateBoundInstances,
+  createEmptyTrackingCalendarConfig,
   createEmptyWidgetTemplateSlot,
   createWidgetTemplate,
   findDailyWidgetBinding,
@@ -41,14 +53,18 @@ import {
   getWidgetSizeLabel,
   getWidgetSizeOptions,
   getWidgetSlotCountBySize,
+  getWidgetTemplateTypeLabel,
   isNativeAndroidWidgetSupported,
   loadWidgetTemplatesFromStorage,
+  normalizeTrackingCalendarConfig,
   normalizeWidgetSize,
   normalizeWidgetTemplateSlots,
+  normalizeWidgetTemplateType,
   normalizeWidgetTemplates,
   rebuildDailyWidgetSlotConfig,
   rebuildShortcutWidgetSlotConfig,
   rebuildTimerWidgetSlotConfig,
+  rebuildTrackingCalendarConfig,
   rebuildWidgetTemplate,
   sanitizeWidgetTemplatesForUiIconSupport,
   saveWidgetTemplatesToStorage,
@@ -77,6 +93,20 @@ const areWidgetTemplatesEqual = (left: WidgetTemplate[], right: WidgetTemplate[]
   JSON.stringify(left) === JSON.stringify(right);
 
 const getTemplateSlotSummary = (template: WidgetTemplate): string => {
+  if (normalizeWidgetTemplateType(template.templateType) === 'trackingCalendar') {
+    const config = normalizeTrackingCalendarConfig(template.trackingConfig);
+    if (!config?.sourceType || !config.label?.trim()) {
+      return '还没有配置追踪对象';
+    }
+
+    const sourceLabel = config.sourceType === 'tag'
+      ? '标签'
+      : config.sourceType === 'scope'
+        ? '领域'
+        : '日课';
+    return `追踪${sourceLabel}：${config.label}`;
+  }
+
   const configuredLabels = template.slots
     .map((slot) => {
       const label = slot.label?.trim();
@@ -155,6 +185,46 @@ const getSlotPreviewIcon = (
   return slot.icon || '\u2022';
 };
 
+const getTemplateDisplayType = (template: WidgetTemplate): string =>
+  normalizeWidgetTemplateType(template.templateType) === 'trackingCalendar'
+    ? '2×2 追踪日历'
+    : `计时器 ${getWidgetSizeLabel(template.size)}`;
+
+const toTrackingCalendarEditorDraft = (
+  config: WidgetTrackingCalendarConfig | null | undefined,
+  canUseUiIcon: boolean
+): WidgetTrackingCalendarEditorDraft => {
+  const normalizedConfig = normalizeTrackingCalendarConfig(config) || createEmptyTrackingCalendarConfig();
+  return {
+    sourceType: normalizedConfig.sourceType ?? null,
+    categoryId: normalizedConfig.categoryId ?? null,
+    activityId: normalizedConfig.activityId ?? null,
+    scopeId: normalizedConfig.scopeId ?? null,
+    checkTemplateId: normalizedConfig.checkTemplateId ?? null,
+    checkItemId: normalizedConfig.checkItemId ?? null,
+    label: normalizedConfig.label ?? null,
+    customIcon: normalizedConfig.customIcon ?? null,
+    iconMode: canUseUiIcon && Boolean(normalizedConfig.uiIconAssetPath) ? 'uiIcon' : 'emoji',
+    uiIcon: canUseUiIcon ? getUIIconStringFromAssetPath(normalizedConfig.uiIconAssetPath) : null,
+    backgroundColor: normalizedConfig.color ?? null
+  };
+};
+
+const getTrackingPreviewIcon = (
+  config: WidgetTrackingCalendarConfig | null | undefined,
+  canUseUiIcon: boolean
+) => {
+  const normalizedConfig = normalizeTrackingCalendarConfig(config);
+  if (canUseUiIcon) {
+    const uiIcon = getUIIconStringFromAssetPath(normalizedConfig?.uiIconAssetPath);
+    if (uiIcon) {
+      return uiIcon;
+    }
+  }
+
+  return normalizedConfig?.icon || '📅';
+};
+
 export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   onBack,
   onToast,
@@ -171,6 +241,8 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [editingTemplateDraft, setEditingTemplateDraft] = useState<WidgetTemplate | null>(null);
   const [editingSlotIndex, setEditingSlotIndex] = useState<number | null>(null);
+  const [isTrackingEditorOpen, setIsTrackingEditorOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<WidgetTemplate | null>(null);
   const [isDraftDirty, setIsDraftDirty] = useState(false);
   const [canUseWidgetUiIcon, setCanUseWidgetUiIcon] = useState(false);
@@ -181,6 +253,22 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         value: size,
         label: `${getWidgetSizeLabel(size)} · ${getWidgetSlotCountBySize(size)} 个槽位`
       })),
+    []
+  );
+
+  const createTemplateOptions = useMemo(
+    () => [
+      ...getWidgetSizeOptions().map((size) => ({
+        value: `grid:${size}`,
+        label: `计时器 ${getWidgetSizeLabel(size)}`,
+        description: `${getWidgetSlotCountBySize(size)} 个槽位，适合计时器 / 日课 / 快捷方式混排`
+      })),
+      {
+        value: `trackingCalendar:${TRACKING_CALENDAR_WIDGET_SIZE}`,
+        label: '2×2 追踪日历',
+        description: '单对象月历卡片，追踪标签、领域或日课'
+      }
+    ],
     []
   );
 
@@ -320,7 +408,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   };
 
   const persistDraftNow = async (draft: WidgetTemplate) => {
-    const rebuiltDraft = rebuildWidgetTemplate(draft, categories, checkTemplates);
+    const rebuiltDraft = rebuildWidgetTemplate(draft, categories, checkTemplates, scopes);
     const nextTemplates = templates.map((template) =>
       template.id === rebuiltDraft.id ? rebuiltDraft : template
     );
@@ -342,21 +430,27 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     }, AUTO_SAVE_DELAY_MS);
 
     return () => window.clearTimeout(timeoutId);
-  }, [categories, checkTemplates, editingTemplateDraft, isDraftDirty, templates]);
+  }, [categories, checkTemplates, editingTemplateDraft, isDraftDirty, scopes, templates]);
 
-  const handleCreateTemplate = async () => {
+  const handleCreateTemplate = async (templateType: WidgetTemplateType, size: string) => {
     const templateIndex = templates.length + 1;
-    const nextTemplate = createWidgetTemplate(`小组件 ${templateIndex}`, DEFAULT_WIDGET_SIZE);
+    const nextTemplate = createWidgetTemplate(
+      `小组件 ${templateIndex}`,
+      templateType === 'trackingCalendar' ? TRACKING_CALENDAR_WIDGET_SIZE : normalizeWidgetSize(size),
+      templateType
+    );
     const didSave = await persistTemplates([...templates, nextTemplate], '已创建小组件模板');
     if (didSave) {
       setEditingTemplateDraft(nextTemplate);
       setEditingSlotIndex(null);
+      setIsTrackingEditorOpen(false);
       setIsDraftDirty(false);
+      setIsCreateModalOpen(false);
     }
   };
 
   const openEditor = (template: WidgetTemplate) => {
-    setEditingTemplateDraft(rebuildWidgetTemplate(template, categories, checkTemplates));
+    setEditingTemplateDraft(rebuildWidgetTemplate(template, categories, checkTemplates, scopes));
     setEditingSlotIndex(null);
     setIsDraftDirty(false);
   };
@@ -367,6 +461,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     }
     setEditingTemplateDraft(null);
     setEditingSlotIndex(null);
+    setIsTrackingEditorOpen(false);
     setIsDraftDirty(false);
   };
 
@@ -396,6 +491,28 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   };
 
   const resolveDraftIconConfig = (draft: WidgetSlotEditorDraft) => {
+    if (canUseWidgetUiIcon && draft.iconMode === 'uiIcon' && draft.uiIcon && uiIconService.isCustomTheme()) {
+      const { isUIIcon, value } = uiIconService.parseIconString(draft.uiIcon);
+      if (isUIIcon) {
+        const assetPaths = getUIIconAssetPathWithFallback(value as UIIconType, uiIconService.getCurrentTheme());
+        return {
+          icon: uiIconService.convertUIIconToEmoji(draft.uiIcon),
+          customIcon: null,
+          uiIconAssetPath: assetPaths.primary,
+          uiIconFallbackAssetPath: assetPaths.fallback
+        };
+      }
+    }
+
+    return {
+      icon: null,
+      customIcon: draft.customIcon,
+      uiIconAssetPath: null,
+      uiIconFallbackAssetPath: null
+    };
+  };
+
+  const resolveTrackingIconConfig = (draft: WidgetTrackingCalendarEditorDraft) => {
     if (canUseWidgetUiIcon && draft.iconMode === 'uiIcon' && draft.uiIcon && uiIconService.isCustomTheme()) {
       const { isUIIcon, value } = uiIconService.parseIconString(draft.uiIcon);
       if (isUIIcon) {
@@ -480,6 +597,84 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     setIsDraftDirty(true);
   };
 
+  const updateTrackingCalendarDraft = (draft: WidgetTrackingCalendarEditorDraft) => {
+    setEditingTemplateDraft((previousDraft) => {
+      if (!previousDraft) {
+        return previousDraft;
+      }
+
+      const iconConfig = resolveTrackingIconConfig(draft);
+      let nextTrackingConfig: WidgetTrackingCalendarConfig | null = null;
+
+      if (draft.sourceType === 'tag') {
+        if (!draft.categoryId || !draft.activityId) {
+          return previousDraft;
+        }
+        const category = categories.find((item) => item.id === draft.categoryId);
+        const activity = category?.activities.find((item) => item.id === draft.activityId);
+        if (!category || !activity) {
+          return previousDraft;
+        }
+        nextTrackingConfig = buildTrackingCalendarTagConfig(category, activity, {
+          icon: iconConfig.icon,
+          customIcon: iconConfig.customIcon,
+          color: draft.backgroundColor,
+          uiIconAssetPath: iconConfig.uiIconAssetPath,
+          uiIconFallbackAssetPath: iconConfig.uiIconFallbackAssetPath
+        });
+      } else if (draft.sourceType === 'scope') {
+        if (!draft.scopeId) {
+          return previousDraft;
+        }
+        const scope = scopes.find((item) => item.id === draft.scopeId);
+        if (!scope) {
+          return previousDraft;
+        }
+        nextTrackingConfig = buildTrackingCalendarScopeConfig(scope, {
+          icon: iconConfig.icon,
+          customIcon: iconConfig.customIcon,
+          color: draft.backgroundColor,
+          uiIconAssetPath: iconConfig.uiIconAssetPath,
+          uiIconFallbackAssetPath: iconConfig.uiIconFallbackAssetPath
+        });
+      } else if (draft.sourceType === 'daily') {
+        if (!draft.checkItemId) {
+          return previousDraft;
+        }
+        const binding = findDailyWidgetBinding(checkTemplates, draft.checkItemId);
+        if (!binding) {
+          return previousDraft;
+        }
+        nextTrackingConfig = buildTrackingCalendarDailyConfig(binding, {
+          icon: iconConfig.icon,
+          customIcon: iconConfig.customIcon,
+          color: draft.backgroundColor,
+          uiIconAssetPath: iconConfig.uiIconAssetPath,
+          uiIconFallbackAssetPath: iconConfig.uiIconFallbackAssetPath
+        });
+      }
+
+      if (!nextTrackingConfig) {
+        return previousDraft;
+      }
+
+      const previousConfig = normalizeTrackingCalendarConfig(previousDraft.trackingConfig);
+      const nextName = previousDraft.name.trim() && previousDraft.name !== previousConfig?.label
+        ? previousDraft.name
+        : (nextTrackingConfig.label || previousDraft.name);
+
+      return {
+        ...previousDraft,
+        name: nextName,
+        trackingConfig: nextTrackingConfig,
+        updatedAt: Date.now()
+      };
+    });
+
+    setIsTrackingEditorOpen(false);
+    setIsDraftDirty(true);
+  };
+
   const handleDeleteTemplate = async () => {
     if (!deleteTarget) {
       return;
@@ -499,6 +694,10 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
 
   const draftPreviewSlots = useMemo(() => {
     if (!editingTemplateDraft) {
+      return [];
+    }
+
+    if (normalizeWidgetTemplateType(editingTemplateDraft.templateType) === 'trackingCalendar') {
       return [];
     }
 
@@ -536,6 +735,23 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     const normalizedSlots = normalizeWidgetTemplateSlots(editingTemplateDraft.slots, editingTemplateDraft.size);
     return normalizedSlots.find((slot) => slot.slotIndex === editingSlotIndex) || null;
   }, [editingSlotIndex, editingTemplateDraft]);
+
+  const trackingPreviewConfig = useMemo(() => {
+    if (!editingTemplateDraft) {
+      return null;
+    }
+
+    if (normalizeWidgetTemplateType(editingTemplateDraft.templateType) !== 'trackingCalendar') {
+      return null;
+    }
+
+    return rebuildTrackingCalendarConfig(
+      editingTemplateDraft.trackingConfig,
+      categories,
+      scopes,
+      checkTemplates
+    );
+  }, [categories, checkTemplates, editingTemplateDraft, scopes]);
 
   const renderHomeGuide = (
     <div className="rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-5 text-sm text-stone-600">
@@ -624,6 +840,59 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                 </p>
               </div>
 
+              {normalizeWidgetTemplateType(editingTemplateDraft.templateType) === 'trackingCalendar' && (
+                <button
+                  type="button"
+                  onClick={() => setIsTrackingEditorOpen(true)}
+                  className="mx-auto mb-4 block w-full max-w-[320px] rounded-[32px] border border-stone-100 bg-stone-50 p-5 text-left shadow-[0_10px_24px_rgba(120,113,108,0.08)] transition-all hover:-translate-y-0.5"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-bold text-stone-800">
+                        {trackingPreviewConfig?.label || editingTemplateDraft.name.trim() || '2×2 追踪日历'}
+                      </div>
+                      <div className="mt-1 text-xs text-stone-400">
+                        {trackingPreviewConfig?.sourceType === 'tag'
+                          ? '标签追踪'
+                          : trackingPreviewConfig?.sourceType === 'scope'
+                            ? '领域追踪'
+                            : trackingPreviewConfig?.sourceType === 'daily'
+                              ? '日课追踪'
+                              : '点击配置追踪对象'}
+                      </div>
+                    </div>
+                    <div
+                      className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-white/70 bg-white"
+                      style={{ backgroundColor: trackingPreviewConfig?.color || '#FFFFFF' }}
+                    >
+                      <IconRenderer
+                        icon={getTrackingPreviewIcon(trackingPreviewConfig, canUseWidgetUiIcon)}
+                        size={28}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-7 gap-1.5 text-center text-[11px] text-stone-400">
+                    {['日', '一', '二', '三', '四', '五', '六'].map((weekday) => (
+                      <div key={weekday}>{weekday}</div>
+                    ))}
+                    {Array.from({ length: 28 }, (_, index) => (
+                      <div
+                        key={index}
+                        className={`flex h-7 items-center justify-center rounded-full ${
+                          trackingPreviewConfig?.label && index % 3 !== 0
+                            ? 'bg-stone-200 text-stone-700'
+                            : 'bg-white text-stone-300'
+                        }`}
+                      >
+                        {index + 1}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 text-xs text-stone-500">点击这里配置追踪标签、领域或日课。</div>
+                </button>
+              )}
+
+              {normalizeWidgetTemplateType(editingTemplateDraft.templateType) !== 'trackingCalendar' && (
               <div className="mx-auto w-full max-w-[420px]">
                 <div className="relative aspect-[20/13] w-full">
                   <div
@@ -670,6 +939,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                   </div>
                 </div>
               </div>
+              )}
             </div>
           </>
         ) : isLoading ? (
@@ -680,7 +950,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
           <>
             <button
               type="button"
-              onClick={() => void handleCreateTemplate()}
+              onClick={() => setIsCreateModalOpen(true)}
               className="flex w-full items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-700 shadow-sm transition-colors hover:bg-stone-50"
               disabled={isSaving}
             >
@@ -701,7 +971,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
           <>
             <button
               type="button"
-              onClick={() => void handleCreateTemplate()}
+              onClick={() => setIsCreateModalOpen(true)}
               className="flex w-full items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-700 shadow-sm transition-colors hover:bg-stone-50"
               disabled={isSaving}
             >
@@ -762,6 +1032,74 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         onClose={() => setEditingSlotIndex(null)}
         onSave={updateSlotDraft}
       />
+
+      <WidgetTrackingCalendarEditorModal
+        isOpen={Boolean(
+          isTrackingEditorOpen
+          && editingTemplateDraft
+          && normalizeWidgetTemplateType(editingTemplateDraft.templateType) === 'trackingCalendar'
+        )}
+        draft={
+          editingTemplateDraft
+            ? toTrackingCalendarEditorDraft(editingTemplateDraft.trackingConfig, canUseWidgetUiIcon)
+            : null
+        }
+        categories={categories}
+        checkTemplates={checkTemplates}
+        scopes={scopes}
+        canUseUiIcon={canUseWidgetUiIcon}
+        onClose={() => setIsTrackingEditorOpen(false)}
+        onSave={updateTrackingCalendarDraft}
+      />
+
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-[28px] bg-[#fdfbf7] p-5 shadow-2xl">
+            <div className="mb-4">
+              <h3 className="text-base font-bold text-stone-800">新建小组件模板</h3>
+              <p className="mt-1 text-sm text-stone-500">先选一个模板类型，再进入具体配置。</p>
+            </div>
+
+            <div className="space-y-3">
+              {createTemplateOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    const [templateType, size] = option.value.split(':');
+                    void handleCreateTemplate(
+                      normalizeWidgetTemplateType(templateType || DEFAULT_WIDGET_TEMPLATE_TYPE),
+                      size || DEFAULT_WIDGET_SIZE
+                    );
+                  }}
+                  className="flex w-full items-start justify-between gap-4 rounded-2xl border border-stone-200 bg-white px-4 py-4 text-left transition-colors hover:border-stone-300 hover:bg-stone-50"
+                  disabled={isSaving}
+                >
+                  <div>
+                    <div className="text-sm font-bold text-stone-800">{option.label}</div>
+                    <div className="mt-1 text-xs leading-5 text-stone-500">{option.description}</div>
+                  </div>
+                  <div className="shrink-0 rounded-full bg-stone-100 px-2.5 py-1 text-[11px] text-stone-500">
+                    {option.value.startsWith('trackingCalendar')
+                      ? getWidgetTemplateTypeLabel('trackingCalendar')
+                      : getWidgetTemplateTypeLabel('grid')}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-50"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConfirmModal
         isOpen={Boolean(deleteTarget)}
