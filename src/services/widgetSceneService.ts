@@ -28,15 +28,25 @@ import type {
 import { getDailyCheckTemplateMeta } from '../utils/dailyCheckUtils';
 import { getColorHexForCharts, getSceneCardColorPresentation } from '../utils/colorAdapterUtils';
 import { loadSceneGroupStateFromStorage } from '../utils/sceneGroupStorage';
-import { uiIconService } from './uiIconService';
+import {
+  getUIIconAssetPathWithFallback,
+  uiIconService,
+  type UIIconType
+} from './uiIconService';
 
 const FALLBACK_SCENE_WIDGET_ICON = '\u2022';
 const FALLBACK_SCENE_WIDGET_COLOR = '#E7E5E4';
 
+type ResolvedSceneIcon = {
+  icon: string;
+  uiIconAssetPath: string | null;
+  uiIconFallbackAssetPath: string | null;
+};
+
 type ResolvedSceneTodoTarget = {
   activityId: string;
   categoryId: string;
-  icon: string;
+  icon: ResolvedSceneIcon;
   color: string;
   scopeIds: string[] | null;
 };
@@ -79,6 +89,43 @@ const normalizeSceneIcon = (
   }
 
   return fallback;
+};
+
+const resolveSceneIcon = (
+  icon?: string | null,
+  uiIcon?: string | null,
+  fallback: string = FALLBACK_SCENE_WIDGET_ICON
+): ResolvedSceneIcon => {
+  const normalizedIcon = normalizeSceneIcon(icon, uiIcon, fallback);
+  const trimmedUiIcon = typeof uiIcon === 'string' ? uiIcon.trim() : '';
+
+  if (!trimmedUiIcon || !uiIconService.isCustomTheme()) {
+    return {
+      icon: normalizedIcon,
+      uiIconAssetPath: null,
+      uiIconFallbackAssetPath: null
+    };
+  }
+
+  const parsed = uiIconService.parseIconString(trimmedUiIcon);
+  if (!parsed.isUIIcon) {
+    return {
+      icon: normalizedIcon,
+      uiIconAssetPath: null,
+      uiIconFallbackAssetPath: null
+    };
+  }
+
+  const assets = getUIIconAssetPathWithFallback(
+    parsed.value as UIIconType,
+    uiIconService.getCurrentTheme()
+  );
+
+  return {
+    icon: normalizedIcon,
+    uiIconAssetPath: assets.primary,
+    uiIconFallbackAssetPath: assets.fallback
+  };
 };
 
 const resolveSceneColor = (
@@ -149,7 +196,7 @@ const resolveSceneTodoTarget = (
     return {
       activityId: linkedActivity.id,
       categoryId: resolvedCategory.id,
-      icon: normalizeSceneIcon(
+      icon: resolveSceneIcon(
         linkedActivity.icon || resolvedCategory.icon,
         linkedActivity.uiIcon || resolvedCategory.uiIcon
       ),
@@ -171,7 +218,10 @@ const buildTimerSceneItem = (card: SceneCardData, categories: Category[]): Widge
     id: card.id,
     itemType: 'timer',
     title: card.title?.trim() || target.activity.name,
-    icon: normalizeSceneIcon(target.activity.icon || target.category.icon, target.activity.uiIcon || target.category.uiIcon),
+    ...resolveSceneIcon(
+      target.activity.icon || target.category.icon,
+      target.activity.uiIcon || target.category.uiIcon
+    ),
     color: resolveSceneColor(card.color, getColorHexForCharts(target.activity.color || target.category.themeColor || '') || FALLBACK_SCENE_WIDGET_COLOR),
     activityId: target.activity.id,
     categoryId: target.category.id,
@@ -208,7 +258,7 @@ const buildTodoSceneItem = (
     id: card.id,
     itemType: 'todo',
     title: card.title?.trim() || todo.title,
-    icon: target.icon,
+    ...target.icon,
     color: resolveSceneColor(card.color, target.color),
     activityId: target.activityId,
     categoryId: target.categoryId,
@@ -239,7 +289,7 @@ const buildChecklistSceneItem = (
     id: card.id,
     itemType: 'checklist',
     title: card.title?.trim() || binding.content,
-    icon: normalizeSceneIcon(binding.icon, binding.uiIcon, '\u2713'),
+    ...resolveSceneIcon(binding.icon, binding.uiIcon, '\u2713'),
     color: resolveSceneColor(card.color, FALLBACK_SCENE_WIDGET_COLOR),
     activityId: null,
     categoryId: null,

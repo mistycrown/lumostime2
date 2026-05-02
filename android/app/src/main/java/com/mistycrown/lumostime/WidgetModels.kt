@@ -363,6 +363,8 @@ data class WidgetSceneItem(
     val itemType: String = WidgetSceneItemTypes.DEFAULT,
     val title: String,
     val icon: String,
+    val uiIconAssetPath: String? = null,
+    val uiIconFallbackAssetPath: String? = null,
     val color: String,
     val activityId: String? = null,
     val categoryId: String? = null,

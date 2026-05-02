@@ -709,6 +709,8 @@ class WidgetBridgePlugin : Plugin() {
                     itemType = WidgetSceneItemTypes.normalize(item.optString("itemType")),
                     title = title,
                     icon = parseNullableString(item.optString("icon")) ?: "\u2022",
+                    uiIconAssetPath = parseNullableString(item.optString("uiIconAssetPath")),
+                    uiIconFallbackAssetPath = parseNullableString(item.optString("uiIconFallbackAssetPath")),
                     color = parseNullableString(item.optString("color")) ?: "#E7E5E4",
                     activityId = parseNullableString(item.optString("activityId")),
                     categoryId = parseNullableString(item.optString("categoryId")),

@@ -223,6 +223,8 @@ export interface WidgetBridgeSceneItem {
   itemType: WidgetSceneItemType;
   title: string;
   icon: string;
+  uiIconAssetPath?: string | null;
+  uiIconFallbackAssetPath?: string | null;
   color: string;
   activityId?: string | null;
   categoryId?: string | null;

@@ -76,6 +76,7 @@ public class WidgetSceneTabsRemoteViewsService extends RemoteViewsService {
             fillInIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
             fillInIntent.putExtra(WidgetSceneProviderSupport.EXTRA_SLOT_ID, slot.getId());
             views.setOnClickFillInIntent(R.id.widget_scene_tab_root, fillInIntent);
+            views.setOnClickFillInIntent(R.id.widget_scene_tab_bitmap, fillInIntent);
             return views;
         }
 

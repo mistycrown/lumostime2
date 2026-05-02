@@ -28,18 +28,22 @@ public final class WidgetSceneProviderSupport {
     public static final String EXTRA_SLOT_ID = "scene_slot_id";
     public static final String EXTRA_ITEM_ID = "scene_item_id";
 
-    private static final int[] CARD_ROOT_IDS = new int[] {
-            R.id.widget_scene_card_0_root,
-            R.id.widget_scene_card_1_root,
-            R.id.widget_scene_card_2_root,
-            R.id.widget_scene_card_3_root
+    private static final int[] TAB_ROOT_IDS = new int[] {
+            R.id.widget_scene_tab_0_root,
+            R.id.widget_scene_tab_1_root,
+            R.id.widget_scene_tab_2_root,
+            R.id.widget_scene_tab_3_root,
+            R.id.widget_scene_tab_4_root,
+            R.id.widget_scene_tab_5_root
     };
 
-    private static final int[] CARD_BITMAP_IDS = new int[] {
-            R.id.widget_scene_card_0_bitmap,
-            R.id.widget_scene_card_1_bitmap,
-            R.id.widget_scene_card_2_bitmap,
-            R.id.widget_scene_card_3_bitmap
+    private static final int[] TAB_BITMAP_IDS = new int[] {
+            R.id.widget_scene_tab_0_bitmap,
+            R.id.widget_scene_tab_1_bitmap,
+            R.id.widget_scene_tab_2_bitmap,
+            R.id.widget_scene_tab_3_bitmap,
+            R.id.widget_scene_tab_4_bitmap,
+            R.id.widget_scene_tab_5_bitmap
     };
 
     private WidgetSceneProviderSupport() {}
@@ -144,17 +148,19 @@ public final class WidgetSceneProviderSupport {
             ResolvedSceneState state = resolveState(context, appWidgetId, payload);
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_layout_scene_4x3);
 
-            Intent tabsIntent = new Intent(context, WidgetSceneTabsRemoteViewsService.class);
-            tabsIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
-            tabsIntent.setData(Uri.parse(tabsIntent.toUri(Intent.URI_INTENT_SCHEME)));
-            views.setRemoteAdapter(R.id.widget_scene_tabs, tabsIntent);
-            views.setPendingIntentTemplate(
-                    R.id.widget_scene_tabs,
-                    buildTabTemplatePendingIntent(context, appWidgetId, providerClass)
-            );
-            appWidgetManager.notifyAppWidgetViewDataChanged(new int[] { appWidgetId }, R.id.widget_scene_tabs);
+            bindSceneTabs(context, views, state, appWidgetId, providerClass);
+            views.setTextViewText(R.id.widget_scene_slot_label, formatSlotLabel(state.selectedSlot));
 
-            bindSceneCards(context, views, state, appWidgetId, providerClass);
+            Intent cardsIntent = new Intent(context, WidgetSceneCardsRemoteViewsService.class);
+            cardsIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+            cardsIntent.setData(Uri.parse(cardsIntent.toUri(Intent.URI_INTENT_SCHEME)));
+            views.setRemoteAdapter(R.id.widget_scene_cards, cardsIntent);
+            views.setPendingIntentTemplate(
+                    R.id.widget_scene_cards,
+                    buildCardTemplatePendingIntent(context, appWidgetId, providerClass)
+            );
+            appWidgetManager.notifyAppWidgetViewDataChanged(new int[] { appWidgetId }, R.id.widget_scene_cards);
+
             appWidgetManager.updateAppWidget(appWidgetId, views);
         }
     }
@@ -217,130 +223,38 @@ public final class WidgetSceneProviderSupport {
         );
     }
 
-    private static void bindSceneCards(
+    private static void bindSceneTabs(
             Context context,
             RemoteViews views,
             ResolvedSceneState state,
             int appWidgetId,
             Class<? extends AppWidgetProvider> providerClass
     ) {
-        List<WidgetSceneItem> items = state.selectedSlot != null ? state.selectedSlot.getItems() : java.util.Collections.emptyList();
-        for (int index = 0; index < CARD_ROOT_IDS.length; index += 1) {
-            int rootId = CARD_ROOT_IDS[index];
-            int bitmapId = CARD_BITMAP_IDS[index];
-            if (index >= items.size()) {
+        List<WidgetSceneTimeSlot> slots = state.displayedGroup != null
+                ? state.displayedGroup.getTimeSlots()
+                : java.util.Collections.emptyList();
+
+        for (int index = 0; index < TAB_ROOT_IDS.length; index += 1) {
+            int rootId = TAB_ROOT_IDS[index];
+            int bitmapId = TAB_BITMAP_IDS[index];
+
+            if (index >= slots.size()) {
                 views.setViewVisibility(rootId, View.INVISIBLE);
                 continue;
             }
 
-            WidgetSceneItem item = items.get(index);
-            WidgetSnapshotSlot snapshotSlot = buildSnapshotSlot(item, index, context);
+            WidgetSceneTimeSlot slot = slots.get(index);
+            boolean isSelected = slot.getId() != null && slot.getId().equals(state.selectedSlotId);
             views.setViewVisibility(rootId, View.VISIBLE);
-            views.setImageViewBitmap(bitmapId, WidgetSlotBitmapRenderer.INSTANCE.render(context, snapshotSlot));
+            views.setImageViewBitmap(
+                    bitmapId,
+                    WidgetSceneTabBitmapRenderer.INSTANCE.render(context, slot.getIcon(), isSelected)
+            );
             views.setOnClickPendingIntent(
                     rootId,
-                    buildCardPendingIntent(context, appWidgetId, providerClass, state.selectedSlotId, item.getId(), index)
+                    buildTabPendingIntent(context, appWidgetId, providerClass, slot.getId(), index)
             );
         }
-    }
-
-    private static WidgetSnapshotSlot buildSnapshotSlot(
-            WidgetSceneItem item,
-            int position,
-            Context context
-    ) {
-        if (WidgetSceneItemTypes.CHECKLIST.equals(WidgetSceneItemTypes.normalize(item.getItemType()))) {
-            WidgetDailySyncPayload payload = WidgetStores.INSTANCE.loadDailySyncPayload(context);
-            WidgetDailyProgress progress = findDailyProgress(payload, item.getCheckItemId());
-            WidgetDailyCheckMeta meta = findDailyMeta(payload, item.getCheckItemId());
-            String manualMode = WidgetDailyModes.normalize(
-                    meta != null ? meta.getManualMode() : item.getCheckManualMode()
-            );
-            int targetCount = Math.max(
-                    1,
-                    meta != null ? meta.getTargetCount()
-                            : item.getCheckTargetCount() != null ? item.getCheckTargetCount() : 1
-            );
-            int currentCount = progress != null
-                    ? Math.max(0, Math.min(progress.getCurrentCount(), targetCount))
-                    : 0;
-            boolean isCompleted = progress != null && progress.isCompleted();
-
-            return new WidgetSnapshotSlot(
-                    position,
-                    WidgetTypes.DAILY,
-                    null,
-                    null,
-                    item.getCheckItemId(),
-                    item.getIcon(),
-                    null,
-                    null,
-                    item.getTitle(),
-                    item.getColor(),
-                    false,
-                    manualMode,
-                    currentCount,
-                    targetCount,
-                    isCompleted,
-                    null,
-                    null
-            );
-        }
-
-        WidgetRuntimeState runtimeState = WidgetStores.INSTANCE.loadRuntimeState(context);
-        boolean matchesRuntime = runtimeState != null
-                && Objects.equals(runtimeState.getActivityId(), item.getActivityId())
-                && Objects.equals(runtimeState.getCategoryId(), item.getCategoryId())
-                && Objects.equals(runtimeState.getLinkedTodoId(), item.getLinkedTodoId())
-                && runtimeState.getScopeIds().containsAll(item.getScopeIds())
-                && item.getScopeIds().containsAll(runtimeState.getScopeIds());
-
-        return new WidgetSnapshotSlot(
-                position,
-                WidgetTypes.TIMER,
-                item.getActivityId(),
-                item.getCategoryId(),
-                null,
-                item.getIcon(),
-                null,
-                null,
-                item.getTitle(),
-                item.getColor(),
-                matchesRuntime,
-                null,
-                0,
-                1,
-                false,
-                null,
-                null
-        );
-    }
-
-    private static WidgetDailyCheckMeta findDailyMeta(WidgetDailySyncPayload payload, String checkItemId) {
-        if (payload == null || checkItemId == null) {
-            return null;
-        }
-        for (WidgetDailyCheckMeta item : payload.getItems()) {
-            if (Objects.equals(item.getCheckItemId(), checkItemId)) {
-                return item;
-            }
-        }
-        return null;
-    }
-
-    private static WidgetDailyProgress findDailyProgress(WidgetDailySyncPayload payload, String checkItemId) {
-        if (payload == null || checkItemId == null) {
-            return null;
-        }
-        if (!Objects.equals(payload.getDate(), new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date()))) {
-            return null;
-        }
-        for (WidgetDailyProgress item : payload.getProgress()) {
-            if (Objects.equals(item.getCheckItemId(), checkItemId)) {
-                return item;
-            }
-        }
-        return null;
     }
 
     private static void refreshSingleWidget(
@@ -479,6 +393,13 @@ public final class WidgetSceneProviderSupport {
         return group.getTimeSlots().get(0).getId();
     }
 
+    private static String formatSlotLabel(WidgetSceneTimeSlot slot) {
+        if (slot == null) {
+            return "";
+        }
+        return slot.getName() + " " + slot.getStartTime() + "-" + slot.getEndTime();
+    }
+
     private static int safeParseInt(String value) {
         try {
             return Integer.parseInt(value);
@@ -487,40 +408,38 @@ public final class WidgetSceneProviderSupport {
         }
     }
 
-    private static PendingIntent buildTabTemplatePendingIntent(
+    private static PendingIntent buildTabPendingIntent(
+            Context context,
+            int appWidgetId,
+            Class<? extends AppWidgetProvider> providerClass,
+            String slotId,
+            int position
+    ) {
+        Intent intent = new Intent(context, providerClass);
+        intent.setAction(ACTION_SELECT_SCENE_TAB);
+        intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+        intent.putExtra(EXTRA_SLOT_ID, slotId);
+        return PendingIntent.getBroadcast(
+                context,
+                appWidgetId * 100 + position + 8500,
+                intent,
+                pendingIntentFlags()
+        );
+    }
+
+    private static PendingIntent buildCardTemplatePendingIntent(
             Context context,
             int appWidgetId,
             Class<? extends AppWidgetProvider> providerClass
     ) {
         Intent intent = new Intent(context, providerClass);
-        intent.setAction(ACTION_SELECT_SCENE_TAB);
-        intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
-        return PendingIntent.getBroadcast(
-                context,
-                appWidgetId + 8500,
-                intent,
-                pendingIntentTemplateFlags()
-        );
-    }
-
-    private static PendingIntent buildCardPendingIntent(
-            Context context,
-            int appWidgetId,
-            Class<? extends AppWidgetProvider> providerClass,
-            String slotId,
-            String itemId,
-            int position
-    ) {
-        Intent intent = new Intent(context, providerClass);
         intent.setAction(ACTION_TOGGLE_SCENE_ITEM);
         intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
-        intent.putExtra(EXTRA_SLOT_ID, slotId);
-        intent.putExtra(EXTRA_ITEM_ID, itemId);
         return PendingIntent.getBroadcast(
                 context,
-                appWidgetId * 100 + position + 8600,
+                appWidgetId + 8600,
                 intent,
-                pendingIntentFlags()
+                pendingIntentTemplateFlags()
         );
     }
 

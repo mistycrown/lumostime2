@@ -584,6 +584,7 @@ export const assistantOrchestratorService = {
     diagnostics: AssistantNativeDiagnosticEntry[],
     options?: {
       targetSessionId?: string;
+      showSystemNotification?: boolean;
     }
   ): {
     surfacedMessages: string[];
@@ -699,6 +700,26 @@ export const assistantOrchestratorService = {
           upsertBackgroundCallHistory({
             ...baseHistoryEntry,
             targetSessionId: persistedLocation.sessionId
+          });
+        }
+
+        if (options?.showSystemNotification && persistedLocation) {
+          const persistedSessions = loadPersistedSessions();
+          const personaNameMap = loadPersistedPersonaNameMap();
+          const targetSession = persistedSessions.find((session) => session.id === persistedLocation.sessionId);
+          const notificationTitle = (
+            targetSession?.personaId
+              ? personaNameMap.get(targetSession.personaId)
+              : undefined
+          ) || 'AI 鍔╃悊';
+
+          void AssistantAgent.showAssistantNotification({
+            title: notificationTitle,
+            body: assistantReply,
+            targetSessionId: persistedLocation.sessionId,
+            targetMessageId: persistedLocation.messageId
+          }).catch((error) => {
+            console.error('[assistantOrchestratorService] Failed to show hydrated assistant notification', error);
           });
         }
 

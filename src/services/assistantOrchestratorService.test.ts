@@ -361,6 +361,50 @@ describe('assistantOrchestratorService', () => {
     expect(history[0].message).toBe('距离上次说话已经过去 9 小时了。还在吗？');
   });
 
+  it('shows a system notification for hydrated native replies when requested', () => {
+    localStorage.setItem('lumostime_ai_chat_sessions_v1', JSON.stringify([{
+      id: 'session-1',
+      title: '测试会话',
+      createdAt: 1,
+      updatedAt: 1,
+      personaId: 'persona-1',
+      contextCacheEnabled: true,
+      messages: []
+    }]));
+    localStorage.setItem('lumostime_ai_chat_personas_v1', JSON.stringify([{
+      id: 'persona-1',
+      name: '赛博导师'
+    }]));
+
+    const diagnostics: AssistantNativeDiagnosticEntry[] = [{
+      id: 'diagnostic-notify-1',
+      type: 'native_request_completed',
+      level: 'success',
+      createdAt: '2026-05-01T10:00:00.000+08:00',
+      message: 'Native background AI request completed',
+      triggerId: 'native-trigger-notify-1',
+      triggerType: 'checkin',
+      context: {
+        requestedAt: '2026-05-01T09:59:58.000+08:00',
+        completedAt: '2026-05-01T10:00:00.000+08:00',
+        assistantReply: '记得回来告诉我进展。',
+        decisionSummary: '发出一条简短跟进提醒。'
+      }
+    }];
+
+    assistantOrchestratorService.hydrateNativeCompletedReplies(diagnostics, {
+      targetSessionId: 'session-1',
+      showSystemNotification: true
+    });
+
+    expect(AssistantAgent.showAssistantNotification).toHaveBeenCalledTimes(1);
+    expect(AssistantAgent.showAssistantNotification).toHaveBeenCalledWith(expect.objectContaining({
+      title: '赛博导师',
+      body: '记得回来告诉我进展。',
+      targetSessionId: 'session-1'
+    }));
+  });
+
   it('ignores null-like native assistant replies during hydration', () => {
     localStorage.setItem('lumostime_ai_chat_sessions_v1', JSON.stringify([{
       id: 'session-1',

@@ -1,4 +1,4 @@
-package com.mistycrown.lumostime
+﻿package com.mistycrown.lumostime
 
 import android.appwidget.AppWidgetManager
 import android.content.Context
@@ -89,7 +89,7 @@ object WidgetTrackingCalendarBitmapRenderer {
         val gridBottomPadding = 2f * density
         val sourceBaseline = 18f * density
         val titleBaseline = 35f * density
-        val title = resolveTitle(template).ifBlank { "追踪日历" }
+        val title = resolveTitle(template).ifBlank { "\u8ffd\u8e2a\u65e5\u5386" }
         val iconCenterY = 28f * density
         val iconCenterX = widgetWidthPx - headerRightPadding - 16f * density
 
@@ -177,10 +177,10 @@ object WidgetTrackingCalendarBitmapRenderer {
 
     private fun sourceLabelForConfig(config: WidgetTrackingCalendarConfig?): String {
         return when (config?.sourceType) {
-            "tag" -> "标签"
-            "scope" -> "领域"
-            "daily" -> "日课"
-            else -> "追踪"
+            "tag" -> "\u6807\u7b7e"
+            "scope" -> "\u9886\u57df"
+            "daily" -> "\u65e5\u8bfe"
+            else -> "\u8ffd\u8e2a"
         }
     }
 
@@ -223,7 +223,7 @@ object WidgetTrackingCalendarBitmapRenderer {
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         }
         val baseline = centerY - ((emojiPaint.descent() + emojiPaint.ascent()) / 2f)
-        canvas.drawText(config.icon?.ifBlank { "•" } ?: "•", centerX, baseline, emojiPaint)
+        canvas.drawText(config.icon?.ifBlank { "\u2022" } ?: "\u2022", centerX, baseline, emojiPaint)
     }
 
     private fun loadIconBitmap(
@@ -281,7 +281,7 @@ object WidgetTrackingCalendarBitmapRenderer {
             return text
         }
 
-        val ellipsis = "…"
+        val ellipsis = "\u2026"
         val ellipsisWidth = paint.measureText(ellipsis)
         var trimmed = text
         while (trimmed.isNotEmpty() && paint.measureText(trimmed) + ellipsisWidth > maxWidth) {
@@ -350,3 +350,4 @@ object WidgetTrackingCalendarBitmapRenderer {
         }
     }
 }
+
