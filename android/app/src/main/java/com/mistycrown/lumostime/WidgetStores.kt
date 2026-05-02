@@ -1468,6 +1468,8 @@ object WidgetStores {
                         itemType = WidgetSceneItemTypes.normalize(item.optString("itemType")),
                         title = title,
                         icon = parseNullableString(item.optString("icon")) ?: "\u2022",
+                        uiIconAssetPath = parseNullableString(item.optString("uiIconAssetPath")),
+                        uiIconFallbackAssetPath = parseNullableString(item.optString("uiIconFallbackAssetPath")),
                         color = parseNullableString(item.optString("color")) ?: "#E7E5E4",
                         activityId = parseNullableString(item.optString("activityId")),
                         categoryId = parseNullableString(item.optString("categoryId")),
@@ -1544,6 +1546,8 @@ object WidgetStores {
                 put("itemType", WidgetSceneItemTypes.normalize(item.itemType))
                 put("title", item.title)
                 put("icon", item.icon)
+                put("uiIconAssetPath", item.uiIconAssetPath ?: JSONObject.NULL)
+                put("uiIconFallbackAssetPath", item.uiIconFallbackAssetPath ?: JSONObject.NULL)
                 put("color", item.color)
                 put("activityId", item.activityId ?: JSONObject.NULL)
                 put("categoryId", item.categoryId ?: JSONObject.NULL)

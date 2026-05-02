@@ -2271,7 +2271,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       setAssistantNativeDiagnostics(normalizedEntries);
 
       const hydrationResult = assistantOrchestratorService.hydrateNativeCompletedReplies(normalizedEntries, {
-        targetSessionId: backgroundTargetSessionId
+        targetSessionId: backgroundTargetSessionId,
+        showSystemNotification: shouldShowBackgroundSystemNotification()
       });
       if (hydrationResult.didHydrateHistory) {
         refreshAssistantBackgroundCallHistory();
@@ -2292,7 +2293,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     } catch (error) {
       console.error('[AIBackfillChatModal] Failed to load native assistant diagnostics', error);
     }
-  }, [activeSession, addToast, onUnreadAssistantMessage, sortedSessions]);
+  }, [activeSession, addToast, onUnreadAssistantMessage, shouldShowBackgroundSystemNotification, sortedSessions]);
 
   const resetAssistantEditableMemoryUi = () => {
     setAssistantEditableMemoryDrafts(DEFAULT_ASSISTANT_EDITABLE_MEMORY_DRAFTS);

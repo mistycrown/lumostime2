@@ -1,15 +1,30 @@
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_scene_card_root"
     android:layout_width="match_parent"
-    android:layout_height="42dp"
+    android:layout_height="74dp"
     android:clickable="true"
-    android:focusable="false">
+    android:focusable="false"
+    android:gravity="center_horizontal"
+    android:orientation="vertical">
 
     <ImageView
         android:id="@+id/widget_scene_card_bitmap"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="56dp"
         android:adjustViewBounds="false"
         android:contentDescription="@null"
-        android:scaleType="fitCenter" />
-</FrameLayout>
+        android:padding="2dp"
+        android:scaleType="centerInside" />
+
+    <TextView
+        android:id="@+id/widget_scene_card_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="1"
+        android:text=""
+        android:textColor="#6C6359"
+        android:textSize="8sp" />
+</LinearLayout>

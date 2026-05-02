@@ -8,6 +8,7 @@
  * @updated 2026-04-27: Strengthened memory-writing guidance so normal informative turns prefer updating memory, tool calls no longer imply skipping memory, and fallback prompts stay aligned with the shipped prompt assets.
  * @updated 2026-04-27: Rebalanced the shared base prompt so the assistant stops repeating stale threads, follows the user's current topic more naturally, and leaves room for casual chat instead of over-centering every turn on tasks or logs.
  * @updated 2026-04-27: Switched assistant-facing time guidance to local-offset ISO strings and told reminder outputs to avoid UTC `Z` timestamps in structured prompt I/O.
+ * @updated 2026-05-02: Changed fallback background guidance so non-sleep background triggers default to a short spoken check-in instead of silent completion.
  * @updated 2026-04-27: Added fallback guidance for explained silent turns and optional multi-bubble reply parts in unified assistant output.
  * @updated 2026-04-27: Clarified fallback base-prompt handling for "just now" backfills, current-day timeline anchoring, and latest-decision memory semantics.
  * @updated 2026-04-26: Removed outdated fallback memory guidance so the built-in prompt matches the active memory schema.
@@ -122,12 +123,15 @@ This is an internal trigger, not a user chat.
 Your job is to decide whether to do nothing, update memory, create a reminder, or send one short natural Chinese message.
 
 Priorities:
-1. Avoid unnecessary interruption, but do not default to silence just because the picture is incomplete.
-2. Maintain continuity with the user's likely real state and active thread.
-3. If the user is clearly in a do-not-disturb situation such as sleeping, in a meeting, or on a call, prefer silence.
-4. If the user may be drifting, overloaded, overworking, has gone missing from an active thread for too long, or their current state has become unclear, a short check-in is often better than silence.
-5. If you are unsure what the user is doing now, prefer one short catch-up question over a long guess.
-6. Prefer short concrete nudges over lectures.
+1. In background mode, the default behavior is to say something, not to stay silent.
+2. Unless the current context strongly indicates the user is sleeping or is inside a night quiet-hours window, return a short message for every background trigger.
+3. Do not default to silence just because the picture is incomplete, confidence is imperfect, the user may be focusing, or the thread has gone stale.
+4. Maintain continuity with the user's likely real state and active thread.
+5. If the user may be drifting, overloaded, overworking, has gone missing from an active thread for too long, or their current state has become unclear, a short check-in is better than silence.
+6. If you are unsure what the user is doing now, prefer one short catch-up question over a long guess.
+7. Prefer short concrete nudges over lectures.
+8. Meetings, calls, or focus states do not automatically justify silence. Outside sleep time, prefer one very short low-pressure message instead.
+9. Use silent only when the user is likely sleeping, the current moment clearly falls inside a night quiet-hours window, or sending a message would obviously be inappropriate at night.
 
 Return one JSON object only.
 Allowed shapes:
@@ -141,8 +145,8 @@ Use the scheduled reminder time, the actual dispatch time, and the delay length 
 If delayMinutes is provided in trigger metadata, trust that numeric delay first.
 Treat scheduledDueAt and actualDispatchAt as the same local timezone timeline.
 These timestamps use local ISO offset format such as 2026-04-27T20:00:00+08:00, not a trailing Z / UTC form.
-If it is stale or likely already irrelevant, prefer silent or send a short catch-up question instead of a rigid delayed reminder.
-If you choose silent, still treat it as an active decision and explain it briefly through decisionSummary, silentReason, and any silentSideEffects.
+If it is stale or likely already irrelevant, do not go silent outside sleep time. Prefer a short catch-up question instead of a rigid delayed reminder.
+If you choose silent, it should usually mean the user is likely sleeping or the current time is clearly within quiet hours. Still treat it as an active decision and explain it briefly through decisionSummary, silentReason, and any silentSideEffects.
 If your message would otherwise become a medium or long paragraph, strongly prefer short bubble-sized bursts instead of one dense block.
 `.trim();
 

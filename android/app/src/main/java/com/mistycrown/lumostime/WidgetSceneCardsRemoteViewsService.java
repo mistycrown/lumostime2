@@ -77,6 +77,10 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
                     R.id.widget_scene_card_bitmap,
                     WidgetSlotBitmapRenderer.INSTANCE.render(context, snapshotSlot)
             );
+            views.setTextViewText(
+                    R.id.widget_scene_card_title,
+                    formatCardTitle(item.getTitle())
+            );
 
             Intent fillInIntent = new Intent();
             fillInIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
@@ -86,6 +90,8 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
             );
             fillInIntent.putExtra(WidgetSceneProviderSupport.EXTRA_ITEM_ID, item.getId());
             views.setOnClickFillInIntent(R.id.widget_scene_card_root, fillInIntent);
+            views.setOnClickFillInIntent(R.id.widget_scene_card_bitmap, fillInIntent);
+            views.setOnClickFillInIntent(R.id.widget_scene_card_title, fillInIntent);
             return views;
         }
 
@@ -152,8 +158,8 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
                         null,
                         item.getCheckItemId(),
                         item.getIcon(),
-                        null,
-                        null,
+                        item.getUiIconAssetPath(),
+                        item.getUiIconFallbackAssetPath(),
                         item.getTitle(),
                         item.getColor(),
                         false,
@@ -173,8 +179,8 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
                     item.getCategoryId(),
                     null,
                     item.getIcon(),
-                    null,
-                    null,
+                    item.getUiIconAssetPath(),
+                    item.getUiIconFallbackAssetPath(),
                     item.getTitle(),
                     item.getColor(),
                     matchesRuntime(item),
@@ -227,6 +233,21 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
 
         private String getCurrentDateString() {
             return new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+        }
+
+        private String formatCardTitle(String title) {
+            if (title == null) {
+                return "";
+            }
+            String trimmed = title.trim();
+            if (trimmed.isEmpty()) {
+                return "";
+            }
+            int maxChars = 4;
+            if (trimmed.length() <= maxChars) {
+                return trimmed;
+            }
+            return trimmed.substring(0, maxChars) + "…";
         }
     }
 }
