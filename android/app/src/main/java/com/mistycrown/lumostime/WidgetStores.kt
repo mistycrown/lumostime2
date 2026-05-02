@@ -8,6 +8,7 @@ import org.json.JSONObject
 /**
  * SharedPreferences-backed storage for widget templates, instance bindings, runtime state,
  * pending imports, and the daily widget's mirrored review snapshot.
+ * Updated 2026-05-02: Added scene widget payload storage plus per-instance selected-tab persistence.
  */
 object WidgetStores {
     private const val PREFS_NAME = "lumostime_widget_timer"
@@ -20,6 +21,8 @@ object WidgetStores {
     private const val KEY_DAILY_RUNTIME_SYNC = "daily_runtime_sync_v1"
     private const val KEY_TODO_PIN_SYNC = "todo_pin_sync_v1"
     private const val KEY_TRACKING_CALENDAR_SYNC = "tracking_calendar_sync_v1"
+    private const val KEY_SCENE_SYNC = "scene_sync_v1"
+    private const val KEY_SCENE_SELECTIONS = "scene_selections_v1"
     private const val KEY_DAILY_RUNTIME_VIEW_MODES = "daily_runtime_view_modes_v1"
     private const val KEY_TAP_ANIMATION = "tap_animation_v1"
     private const val KEY_LAST_WIDGET_STOP_AT = "last_widget_stop_at_v1"
@@ -596,6 +599,102 @@ object WidgetStores {
             put("syncedAt", payload.syncedAt)
         }
         editor.putString(KEY_TRACKING_CALENDAR_SYNC, json.toString()).commit()
+    }
+
+    fun loadScenePayload(context: Context): WidgetScenePayload? {
+        val raw = prefs(context).getString(KEY_SCENE_SYNC, null)
+        if (raw.isNullOrBlank()) {
+            return null
+        }
+
+        return runCatching {
+            val json = JSONObject(raw)
+            WidgetScenePayload(
+                switchMode = WidgetSceneGroupSwitchModes.normalize(json.optString("switchMode")),
+                activeGroupId = parseNullableString(json.optString("activeGroupId")),
+                groups = json.optJSONArray("groups").toSceneGroupList(),
+                syncedAt = json.optLong("syncedAt", System.currentTimeMillis())
+            )
+        }.getOrNull()
+    }
+
+    fun saveScenePayload(context: Context, payload: WidgetScenePayload?) {
+        val editor = prefs(context).edit()
+        if (payload == null) {
+            editor.remove(KEY_SCENE_SYNC).commit()
+            return
+        }
+
+        val json = JSONObject().apply {
+            put("switchMode", WidgetSceneGroupSwitchModes.normalize(payload.switchMode))
+            put("activeGroupId", payload.activeGroupId ?: JSONObject.NULL)
+            put("groups", payload.groups.toSceneGroupJsonArray())
+            put("syncedAt", payload.syncedAt)
+        }
+        editor.putString(KEY_SCENE_SYNC, json.toString()).commit()
+    }
+
+    fun loadSceneSelectionState(context: Context, appWidgetId: Int): WidgetSceneSelectionState? {
+        if (appWidgetId <= 0) {
+            return null
+        }
+
+        val raw = prefs(context).getString(KEY_SCENE_SELECTIONS, null)
+        if (raw.isNullOrBlank()) {
+            return null
+        }
+
+        return runCatching {
+            val root = JSONObject(raw)
+            val item = root.optJSONObject(appWidgetId.toString())
+            if (item == null) {
+                null
+            } else {
+                WidgetSceneSelectionState(
+                    appWidgetId = appWidgetId,
+                    selectedSlotId = parseNullableString(item.optString("selectedSlotId")),
+                    lastAutoSlotId = parseNullableString(item.optString("lastAutoSlotId"))
+                )
+            }
+        }.getOrNull()
+    }
+
+    fun saveSceneSelectionState(context: Context, state: WidgetSceneSelectionState) {
+        if (state.appWidgetId <= 0) {
+            return
+        }
+
+        val root = runCatching {
+            JSONObject(prefs(context).getString(KEY_SCENE_SELECTIONS, null) ?: "{}")
+        }.getOrElse {
+            JSONObject()
+        }
+
+        root.put(state.appWidgetId.toString(), JSONObject().apply {
+            put("selectedSlotId", state.selectedSlotId ?: JSONObject.NULL)
+            put("lastAutoSlotId", state.lastAutoSlotId ?: JSONObject.NULL)
+        })
+
+        prefs(context).edit().putString(KEY_SCENE_SELECTIONS, root.toString()).commit()
+    }
+
+    fun removeSceneSelectionStates(context: Context, appWidgetIds: IntArray) {
+        if (appWidgetIds.isEmpty()) {
+            return
+        }
+
+        val raw = prefs(context).getString(KEY_SCENE_SELECTIONS, null)
+        if (raw.isNullOrBlank()) {
+            return
+        }
+
+        val root = runCatching { JSONObject(raw) }.getOrElse { JSONObject() }
+        appWidgetIds.forEach { appWidgetId ->
+            if (appWidgetId > 0) {
+                root.remove(appWidgetId.toString())
+            }
+        }
+        prefs(context).edit().putString(KEY_SCENE_SELECTIONS, root.toString()).commit()
     }
 
     fun loadDailyRuntimeViewMode(context: Context, appWidgetId: Int): String {
@@ -1275,6 +1374,185 @@ object WidgetStores {
             array.put(JSONObject().apply {
                 put("date", entry.date)
                 put("value", entry.value.coerceAtLeast(0))
+            })
+        }
+        return array
+    }
+
+    private fun JSONArray?.toSceneGroupList(): List<WidgetSceneGroup> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        return buildList {
+            for (index in 0 until length()) {
+                val item = optJSONObject(index) ?: continue
+                val id = parseNullableString(item.optString("id")) ?: continue
+                add(
+                    WidgetSceneGroup(
+                        id = id,
+                        name = parseNullableString(item.optString("name")) ?: id,
+                        autoSwitch = item.optJSONObject("autoSwitch")?.toSceneAutoSwitchConfig()
+                            ?: WidgetSceneGroupAutoSwitchConfig(),
+                        timeSlots = item.optJSONArray("timeSlots").toSceneTimeSlotList()
+                    )
+                )
+            }
+        }
+    }
+
+    private fun JSONObject.toSceneAutoSwitchConfig(): WidgetSceneGroupAutoSwitchConfig {
+        return WidgetSceneGroupAutoSwitchConfig(
+            mode = WidgetSceneGroupAutoSwitchModes.normalize(optString("mode")),
+            startDate = parseNullableString(optString("startDate")),
+            endDate = parseNullableString(optString("endDate")),
+            weekdays = optJSONArray("weekdays").toSceneWeekdayList()
+        )
+    }
+
+    private fun JSONArray?.toSceneWeekdayList(): List<Int> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        return buildList {
+            for (index in 0 until length()) {
+                val day = optInt(index, -1)
+                if (day in 0..6 && !contains(day)) {
+                    add(day)
+                }
+            }
+        }.sorted()
+    }
+
+    private fun JSONArray?.toSceneTimeSlotList(): List<WidgetSceneTimeSlot> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        return buildList {
+            for (index in 0 until length()) {
+                val item = optJSONObject(index) ?: continue
+                val id = parseNullableString(item.optString("id")) ?: continue
+                val name = parseNullableString(item.optString("name")) ?: id
+                val startTime = parseNullableString(item.optString("startTime")) ?: continue
+                val endTime = parseNullableString(item.optString("endTime")) ?: continue
+                add(
+                    WidgetSceneTimeSlot(
+                        id = id,
+                        name = name,
+                        icon = parseNullableString(item.optString("icon")) ?: "\u2022",
+                        startTime = startTime,
+                        endTime = endTime,
+                        disableAutoSwitch = item.optBoolean("disableAutoSwitch", false),
+                        items = item.optJSONArray("items").toSceneItemList()
+                    )
+                )
+            }
+        }
+    }
+
+    private fun JSONArray?.toSceneItemList(): List<WidgetSceneItem> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        return buildList {
+            for (index in 0 until length()) {
+                val item = optJSONObject(index) ?: continue
+                val id = parseNullableString(item.optString("id")) ?: continue
+                val title = parseNullableString(item.optString("title")) ?: continue
+                add(
+                    WidgetSceneItem(
+                        id = id,
+                        itemType = WidgetSceneItemTypes.normalize(item.optString("itemType")),
+                        title = title,
+                        icon = parseNullableString(item.optString("icon")) ?: "\u2022",
+                        color = parseNullableString(item.optString("color")) ?: "#E7E5E4",
+                        activityId = parseNullableString(item.optString("activityId")),
+                        categoryId = parseNullableString(item.optString("categoryId")),
+                        linkedTodoId = parseNullableString(item.optString("linkedTodoId")),
+                        scopeIds = item.optJSONArray("scopeIds").toStringList(),
+                        checkTemplateId = parseNullableString(item.optString("checkTemplateId")),
+                        checkItemId = parseNullableString(item.optString("checkItemId")),
+                        checkManualMode = parseNullableString(item.optString("checkManualMode"))
+                            ?.let(WidgetDailyModes::normalize),
+                        checkTargetCount = if (item.has("checkTargetCount")) {
+                            normalizePositiveInt(item.optInt("checkTargetCount"), 1)
+                        } else {
+                            null
+                        }
+                    )
+                )
+            }
+        }
+    }
+
+    private fun List<WidgetSceneGroup>.toSceneGroupJsonArray(): JSONArray {
+        val array = JSONArray()
+        forEach { group ->
+            array.put(JSONObject().apply {
+                put("id", group.id)
+                put("name", group.name)
+                put("autoSwitch", group.autoSwitch.toSceneAutoSwitchJson())
+                put("timeSlots", group.timeSlots.toSceneTimeSlotJsonArray())
+            })
+        }
+        return array
+    }
+
+    private fun WidgetSceneGroupAutoSwitchConfig.toSceneAutoSwitchJson(): JSONObject {
+        return JSONObject().apply {
+            put("mode", WidgetSceneGroupAutoSwitchModes.normalize(mode))
+            put("startDate", startDate ?: JSONObject.NULL)
+            put("endDate", endDate ?: JSONObject.NULL)
+            put("weekdays", weekdays.toSceneWeekdayJsonArray())
+        }
+    }
+
+    private fun List<Int>.toSceneWeekdayJsonArray(): JSONArray {
+        val array = JSONArray()
+        sorted().forEach { day ->
+            if (day in 0..6) {
+                array.put(day)
+            }
+        }
+        return array
+    }
+
+    private fun List<WidgetSceneTimeSlot>.toSceneTimeSlotJsonArray(): JSONArray {
+        val array = JSONArray()
+        forEach { slot ->
+            array.put(JSONObject().apply {
+                put("id", slot.id)
+                put("name", slot.name)
+                put("icon", slot.icon)
+                put("startTime", slot.startTime)
+                put("endTime", slot.endTime)
+                put("disableAutoSwitch", slot.disableAutoSwitch)
+                put("items", slot.items.toSceneItemJsonArray())
+            })
+        }
+        return array
+    }
+
+    private fun List<WidgetSceneItem>.toSceneItemJsonArray(): JSONArray {
+        val array = JSONArray()
+        forEach { item ->
+            array.put(JSONObject().apply {
+                put("id", item.id)
+                put("itemType", WidgetSceneItemTypes.normalize(item.itemType))
+                put("title", item.title)
+                put("icon", item.icon)
+                put("color", item.color)
+                put("activityId", item.activityId ?: JSONObject.NULL)
+                put("categoryId", item.categoryId ?: JSONObject.NULL)
+                put("linkedTodoId", item.linkedTodoId ?: JSONObject.NULL)
+                put("scopeIds", item.scopeIds.toJsonArray())
+                put("checkTemplateId", item.checkTemplateId ?: JSONObject.NULL)
+                put("checkItemId", item.checkItemId ?: JSONObject.NULL)
+                put("checkManualMode", item.checkManualMode ?: JSONObject.NULL)
+                put("checkTargetCount", item.checkTargetCount ?: JSONObject.NULL)
             })
         }
         return array

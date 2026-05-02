@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file WidgetSettingsView.tsx
  * @input Widget templates, categories, daily check templates, todos, scopes, Android bridge availability
  * @output A template-based widget configuration page with per-slot mixed-type editing
@@ -210,19 +210,38 @@ const toTrackingCalendarEditorDraft = (
   };
 };
 
-const getTrackingPreviewIcon = (
+const getTrackingPreviewIconProps = (
   config: WidgetTrackingCalendarConfig | null | undefined,
   canUseUiIcon: boolean
 ) => {
   const normalizedConfig = normalizeTrackingCalendarConfig(config);
-  if (canUseUiIcon) {
-    const uiIcon = getUIIconStringFromAssetPath(normalizedConfig?.uiIconAssetPath);
-    if (uiIcon) {
-      return uiIcon;
-    }
-  }
+  const uiIcon = canUseUiIcon
+    ? getUIIconStringFromAssetPath(normalizedConfig?.uiIconAssetPath) || undefined
+    : undefined;
+  const parsedUiIcon = uiIcon ? uiIconService.parseIconString(uiIcon) : null;
+  const uiIconSrc =
+    parsedUiIcon?.isUIIcon
+      ? uiIconService.getIconPathWithFallback(parsedUiIcon.value as UIIconType).primary
+      : null;
 
-  return normalizedConfig?.icon || '📅';
+  return {
+    icon: normalizedConfig?.icon || '📅',
+    uiIcon,
+    uiIconSrc
+  };
+};
+
+const getTrackingSourceLabel = (sourceType?: WidgetTrackingCalendarConfig['sourceType'] | null): string => {
+  if (sourceType === 'tag') {
+    return '标签';
+  }
+  if (sourceType === 'scope') {
+    return '领域';
+  }
+  if (sourceType === 'daily') {
+    return '日课';
+  }
+  return '追踪';
 };
 
 export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
@@ -243,6 +262,8 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   const [editingSlotIndex, setEditingSlotIndex] = useState<number | null>(null);
   const [isTrackingEditorOpen, setIsTrackingEditorOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedCreateTemplateType, setSelectedCreateTemplateType] = useState<WidgetTemplateType>('grid');
+  const [selectedCreateSize, setSelectedCreateSize] = useState<string>(DEFAULT_WIDGET_SIZE);
   const [deleteTarget, setDeleteTarget] = useState<WidgetTemplate | null>(null);
   const [isDraftDirty, setIsDraftDirty] = useState(false);
   const [canUseWidgetUiIcon, setCanUseWidgetUiIcon] = useState(false);
@@ -257,17 +278,14 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   );
 
   const createTemplateOptions = useMemo(
+    () => [],
+    []
+  );
+
+  const createTemplateTypeOptions = useMemo(
     () => [
-      ...getWidgetSizeOptions().map((size) => ({
-        value: `grid:${size}`,
-        label: `计时器 ${getWidgetSizeLabel(size)}`,
-        description: `${getWidgetSlotCountBySize(size)} 个槽位，适合计时器 / 日课 / 快捷方式混排`
-      })),
-      {
-        value: `trackingCalendar:${TRACKING_CALENDAR_WIDGET_SIZE}`,
-        label: '2×2 追踪日历',
-        description: '单对象月历卡片，追踪标签、领域或日课'
-      }
+      { value: 'grid' as WidgetTemplateType, label: '计时器' },
+      { value: 'trackingCalendar' as WidgetTemplateType, label: '2×2 追踪日历' }
     ],
     []
   );
@@ -758,8 +776,8 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       <div className="font-bold text-stone-800">使用说明</div>
       <div className="mt-3 space-y-2 text-xs leading-6 text-stone-500">
         <div>第一步：新建一个小组件模板。</div>
-        <div>第二步：进入模板后，点击任意槽位，先选择槽位类型。</div>
-        <div>第三步：在系统桌面添加对应尺寸的小组件，点击标题即可轮换同尺寸模板。</div>
+        <div>第二步：进入模板后，配置槽位或追踪对象。</div>
+        <div>第三步：在系统桌面添加对应尺寸的小组件，点击标题即可轮换同类模板。</div>
       </div>
     </div>
   );
@@ -812,31 +830,33 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
               />
             </div>
 
-            <div className="space-y-4 rounded-[28px] border border-stone-100 bg-white p-6 shadow-sm">
-              <div>
-                <h3 className="font-bold text-stone-800">小组件尺寸</h3>
-                <p className="mt-1 text-xs text-stone-400">
-                  切换尺寸时会保留前面的槽位配置，超出的槽位会被裁掉，不足的槽位会自动补空。
-                </p>
-              </div>
+            {normalizeWidgetTemplateType(editingTemplateDraft.templateType) !== 'trackingCalendar' && (
+              <div className="space-y-4 rounded-[28px] border border-stone-100 bg-white p-6 shadow-sm">
+                <div>
+                  <h3 className="font-bold text-stone-800">小组件尺寸</h3>
+                  <p className="mt-1 text-xs text-stone-400">
+                    切换尺寸时会保留已有配置，超出的槽位会被裁掉，不足的槽位会自动补空。
+                  </p>
+                </div>
 
-              <CustomSelect
-                value={editingTemplateDraft.size}
-                options={sizeOptions}
-                onChange={updateDraftSize}
-                placeholder="选择一个尺寸"
-              />
+                <CustomSelect
+                  value={editingTemplateDraft.size}
+                  options={sizeOptions}
+                  onChange={updateDraftSize}
+                  placeholder="选择一个尺寸"
+                />
 
-              <div className="rounded-2xl bg-stone-50 px-4 py-3 text-xs text-stone-500">
-                当前尺寸：{getWidgetSizeLabel(editingTemplateDraft.size)}，共 {getWidgetSlotCountBySize(editingTemplateDraft.size)} 个槽位。
+                <div className="rounded-2xl bg-stone-50 px-4 py-3 text-xs text-stone-500">
+                  当前尺寸：{getWidgetSizeLabel(editingTemplateDraft.size)}，共 {getWidgetSlotCountBySize(editingTemplateDraft.size)} 个槽位。
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="space-y-4 rounded-[28px] border border-stone-100 bg-white p-6 shadow-sm">
               <div>
                 <h3 className="font-bold text-stone-800">模板预览</h3>
                 <p className="mt-1 text-xs text-stone-400">
-                  点击下面任意一个槽位，先设置它的类型，再配置对应内容。
+                  点击下面的预览卡片，即可继续配置槽位或追踪对象。
                 </p>
               </div>
 
@@ -844,51 +864,62 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsTrackingEditorOpen(true)}
-                  className="mx-auto mb-4 block w-full max-w-[320px] rounded-[32px] border border-stone-100 bg-stone-50 p-5 text-left shadow-[0_10px_24px_rgba(120,113,108,0.08)] transition-all hover:-translate-y-0.5"
+                  className="mx-auto mb-4 block w-full max-w-[320px] overflow-hidden rounded-[32px] border border-stone-100 bg-stone-50 text-left shadow-[0_10px_24px_rgba(120,113,108,0.08)] transition-all hover:-translate-y-0.5"
                 >
-                  <div className="flex items-center justify-between gap-3">
+                  {(() => {
+                    const previewIcon = getTrackingPreviewIconProps(trackingPreviewConfig, canUseWidgetUiIcon);
+                    return (
+                      <>
+                  <div className="flex items-start justify-between gap-3 px-5 pt-5">
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-bold text-stone-800">
-                        {trackingPreviewConfig?.label || editingTemplateDraft.name.trim() || '2×2 追踪日历'}
+                      <div className="text-[11px] font-medium tracking-[0.14em] text-stone-400">
+                        {getTrackingSourceLabel(trackingPreviewConfig?.sourceType)}
                       </div>
-                      <div className="mt-1 text-xs text-stone-400">
-                        {trackingPreviewConfig?.sourceType === 'tag'
-                          ? '标签追踪'
-                          : trackingPreviewConfig?.sourceType === 'scope'
-                            ? '领域追踪'
-                            : trackingPreviewConfig?.sourceType === 'daily'
-                              ? '日课追踪'
-                              : '点击配置追踪对象'}
+                      <div className="mt-1 truncate text-[19px] font-semibold text-stone-900">
+                        {editingTemplateDraft.name.trim() || trackingPreviewConfig?.label || '追踪日历'}
                       </div>
                     </div>
-                    <div
-                      className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-white/70 bg-white"
-                      style={{ backgroundColor: trackingPreviewConfig?.color || '#FFFFFF' }}
-                    >
-                      <IconRenderer
-                        icon={getTrackingPreviewIcon(trackingPreviewConfig, canUseWidgetUiIcon)}
-                        size={28}
-                      />
+                    <div className="mr-4 mt-1 flex h-8 w-8 shrink-0 items-center justify-center text-[24px] leading-none text-stone-700">
+                      {previewIcon.uiIconSrc ? (
+                        <img
+                          src={previewIcon.uiIconSrc}
+                          alt=""
+                          className="h-6 w-6 object-contain"
+                        />
+                      ) : (
+                        <IconRenderer
+                          icon={previewIcon.icon}
+                          size={24}
+                        />
+                      )}
                     </div>
                   </div>
-                  <div className="mt-4 grid grid-cols-7 gap-1.5 text-center text-[11px] text-stone-400">
-                    {['日', '一', '二', '三', '四', '五', '六'].map((weekday) => (
-                      <div key={weekday}>{weekday}</div>
+                  <div className="mt-3 grid grid-cols-7 gap-x-1.5 gap-y-1.5 px-2 pb-2 text-center text-[11px] text-stone-400">
+                    {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((weekday, index) => (
+                      <div key={`${weekday}-${index}`}>{weekday}</div>
                     ))}
                     {Array.from({ length: 28 }, (_, index) => (
                       <div
                         key={index}
-                        className={`flex h-7 items-center justify-center rounded-full ${
+                        className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-[16px] font-semibold ${
                           trackingPreviewConfig?.label && index % 3 !== 0
-                            ? 'bg-stone-200 text-stone-700'
-                            : 'bg-white text-stone-300'
+                            ? 'text-white'
+                            : 'text-stone-700'
                         }`}
+                        style={{
+                          backgroundColor:
+                            trackingPreviewConfig?.label && index % 3 !== 0
+                              ? (trackingPreviewConfig?.color || '#D6D3D1')
+                              : undefined
+                        }}
                       >
                         {index + 1}
                       </div>
                     ))}
                   </div>
-                  <div className="mt-4 text-xs text-stone-500">点击这里配置追踪标签、领域或日课。</div>
+                      </>
+                    );
+                  })()}
                 </button>
               )}
 
@@ -950,7 +981,11 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
           <>
             <button
               type="button"
-              onClick={() => setIsCreateModalOpen(true)}
+              onClick={() => {
+                setSelectedCreateTemplateType('grid');
+                setSelectedCreateSize(DEFAULT_WIDGET_SIZE);
+                setIsCreateModalOpen(true);
+              }}
               className="flex w-full items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-700 shadow-sm transition-colors hover:bg-stone-50"
               disabled={isSaving}
             >
@@ -961,7 +996,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
             <div className="space-y-3 rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-10 text-center">
               <p className="text-sm font-bold text-stone-700">还没有小组件模板</p>
               <p className="text-xs leading-6 text-stone-400">
-                点击上面的“新建小组件模板”，就可以开始配置混合类型的桌面槽位。
+                点击上面的“新建小组件模板”，就可以开始配置桌面小组件。
               </p>
             </div>
 
@@ -971,7 +1006,11 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
           <>
             <button
               type="button"
-              onClick={() => setIsCreateModalOpen(true)}
+              onClick={() => {
+                setSelectedCreateTemplateType('grid');
+                setSelectedCreateSize(DEFAULT_WIDGET_SIZE);
+                setIsCreateModalOpen(true);
+              }}
               className="flex w-full items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-700 shadow-sm transition-colors hover:bg-stone-50"
               disabled={isSaving}
             >
@@ -992,7 +1031,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                   >
                     <h4 className="truncate text-[15px] font-bold text-stone-800">{template.name}</h4>
                     <p className="mt-1 text-xs text-stone-500">
-                      尺寸：{getWidgetSizeLabel(template.size)} · {getWidgetSlotCountBySize(template.size)} 个槽位
+                      {getTemplateDisplayType(template)}
                     </p>
                     <p className="mt-1 line-clamp-2 text-xs leading-5 text-stone-400">
                       {getTemplateSlotSummary(template)}
@@ -1057,50 +1096,79 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
           <div className="w-full max-w-xl rounded-[28px] bg-[#fdfbf7] p-5 shadow-2xl">
             <div className="mb-4">
               <h3 className="text-base font-bold text-stone-800">新建小组件模板</h3>
-              <p className="mt-1 text-sm text-stone-500">先选一个模板类型，再进入具体配置。</p>
             </div>
 
-            <div className="space-y-3">
-              {createTemplateOptions.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => {
-                    const [templateType, size] = option.value.split(':');
-                    void handleCreateTemplate(
-                      normalizeWidgetTemplateType(templateType || DEFAULT_WIDGET_TEMPLATE_TYPE),
-                      size || DEFAULT_WIDGET_SIZE
+            <div>
+              <div className="mb-3 text-sm font-bold text-stone-800">模板类型</div>
+              <div className="grid grid-cols-2 gap-3">
+                {createTemplateTypeOptions.map((option) => {
+                  const isActive = selectedCreateTemplateType === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setSelectedCreateTemplateType(option.value)}
+                      className={isActive
+                        ? 'rounded-2xl border border-stone-800 bg-stone-800 px-4 py-4 text-sm font-medium text-white shadow-sm'
+                        : 'rounded-2xl border border-stone-200 bg-white px-4 py-4 text-sm font-medium text-stone-600 transition-all hover:border-stone-300'}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {selectedCreateTemplateType === 'grid' && (
+              <div className="mt-5">
+                <div className="mb-3 text-sm font-bold text-stone-800">尺寸</div>
+                <div className="grid grid-cols-3 gap-3">
+                  {getWidgetSizeOptions().map((size) => {
+                    const isActive = selectedCreateSize === size;
+                    return (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => setSelectedCreateSize(size)}
+                        className={isActive
+                          ? 'rounded-2xl border border-stone-800 bg-stone-800 px-4 py-3 text-sm font-medium text-white shadow-sm'
+                          : 'rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-600 transition-all hover:border-stone-300'}
+                      >
+                        {getWidgetSizeLabel(size)}
+                      </button>
                     );
-                  }}
-                  className="flex w-full items-start justify-between gap-4 rounded-2xl border border-stone-200 bg-white px-4 py-4 text-left transition-colors hover:border-stone-300 hover:bg-stone-50"
-                  disabled={isSaving}
-                >
-                  <div>
-                    <div className="text-sm font-bold text-stone-800">{option.label}</div>
-                    <div className="mt-1 text-xs leading-5 text-stone-500">{option.description}</div>
-                  </div>
-                  <div className="shrink-0 rounded-full bg-stone-100 px-2.5 py-1 text-[11px] text-stone-500">
-                    {option.value.startsWith('trackingCalendar')
-                      ? getWidgetTemplateTypeLabel('trackingCalendar')
-                      : getWidgetTemplateTypeLabel('grid')}
-                  </div>
-                </button>
-              ))}
-            </div>
+                  })}
+                </div>
+              </div>
+            )}
 
-            <div className="mt-5 flex justify-end">
+            <div className="mt-5 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setIsCreateModalOpen(false)}
-                className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-50"
-              >
+                onClick={() => {
+                  setIsCreateModalOpen(false);
+                  setSelectedCreateTemplateType('grid');
+                  setSelectedCreateSize(DEFAULT_WIDGET_SIZE);
+                }}
+                className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-50">
                 取消
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleCreateTemplate(
+                  selectedCreateTemplateType,
+                  selectedCreateTemplateType === 'trackingCalendar'
+                    ? TRACKING_CALENDAR_WIDGET_SIZE
+                    : selectedCreateSize
+                )}
+                className="rounded-full bg-stone-800 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-700"
+                disabled={isSaving}>
+                创建
               </button>
             </div>
           </div>
         </div>
       )}
-
       <ConfirmModal
         isOpen={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
@@ -1118,3 +1186,5 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     </div>
   );
 };
+
+

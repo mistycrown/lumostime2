@@ -10,6 +10,7 @@ Components that form the structural or global UI elements.
 - `Toast.tsx`: Notification system.
 
 ## Modals
+- Update 2026-05-01: `AIBackfillChatModal.tsx` now filters persisted null-like assistant message content during session normalization, so older malformed native-backfilled entries stop rendering standalone `null` bubbles after reload.
 - Update 2026-05-01: `AIBackfillChatModal.tsx` now uses a flatter editorial treatment across the AI workspace, tightening the composer to a two-line feel, removing extra divider framing, simplifying history delete confirmations into inline horizontal actions, and reducing nested-card radii/shadows across the AI panels.
 - Update 2026-05-01: `AIBackfillChatModal.tsx` now keeps the active persona row in AI settings neutral, removing the tinted selected background so the checkmark alone carries selection state.
 - Update 2026-05-01: `AIBackfillChatModal.tsx` now organizes AI settings into top-level tabs with smaller in-section tabs, so persona picking, persona editing, user-avatar editing, background-agent controls, and context options no longer read as one long stacked form.

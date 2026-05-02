@@ -10,6 +10,7 @@ import java.util.UUID
 
 /**
  * Native widget action controller for timer, daily, and shortcut widgets.
+ * Updated 2026-05-02: Added dedicated scene-widget item handling for timer-like cards and checklist cards.
  */
 object WidgetTimerController {
     private const val TAP_FEEDBACK_DURATION_MS = 260L
@@ -85,6 +86,17 @@ object WidgetTimerController {
         WidgetStores.saveLastWidgetStopAt(context, null)
         FloatingWindowService.syncFocusStateIfRunning(nextRuntime.icon, true, nextRuntime.startedAt)
         return true
+    }
+
+    fun handleSceneItemTap(
+        context: Context,
+        appWidgetId: Int,
+        item: WidgetSceneItem
+    ): Boolean {
+        return when (WidgetSceneItemTypes.normalize(item.itemType)) {
+            WidgetSceneItemTypes.CHECKLIST -> handleSceneChecklistItemTap(context, appWidgetId, item)
+            else -> handleSceneTimerItemTap(context, appWidgetId, item)
+        }
     }
 
     private fun handleTimerSlotTap(
@@ -279,6 +291,132 @@ object WidgetTimerController {
             `package` = context.packageName
         }
         context.startActivity(intent)
+        return true
+    }
+
+    private fun handleSceneTimerItemTap(
+        context: Context,
+        appWidgetId: Int,
+        item: WidgetSceneItem
+    ): Boolean {
+        if (item.activityId.isNullOrBlank() || item.categoryId.isNullOrBlank()) {
+            return false
+        }
+
+        val now = System.currentTimeMillis()
+        val currentRuntime = WidgetStores.loadRuntimeState(context)
+        val isSameItemActive = currentRuntime?.let { runtime ->
+            runtime.activityId == item.activityId &&
+                runtime.categoryId == item.categoryId &&
+                runtime.linkedTodoId == item.linkedTodoId &&
+                runtime.scopeIds.toSet() == item.scopeIds.toSet()
+        } ?: false
+
+        if (isSameItemActive && currentRuntime != null) {
+            finishRuntime(context, currentRuntime, now)
+            WidgetStores.saveRuntimeState(context, null)
+            WidgetStores.saveLastWidgetStopAt(context, now)
+            FloatingWindowService.syncFocusStateIfRunning(currentRuntime.icon, false, 0L)
+            return true
+        }
+
+        if (currentRuntime != null) {
+            finishRuntime(context, currentRuntime, now)
+        }
+
+        val nextRuntime = WidgetRuntimeState(
+            id = UUID.randomUUID().toString(),
+            widgetType = WidgetTypes.TIMER,
+            activityId = item.activityId.orEmpty(),
+            categoryId = item.categoryId.orEmpty(),
+            icon = item.icon.ifBlank { "\u2022" },
+            label = item.title,
+            color = item.color.ifBlank { "#E7E5E4" },
+            startedAt = now,
+            source = "widget",
+            linkedTodoId = item.linkedTodoId,
+            scopeIds = item.scopeIds,
+            slotIndex = null,
+            templateId = null,
+            appWidgetId = appWidgetId
+        )
+
+        WidgetStores.saveRuntimeState(context, nextRuntime)
+        WidgetStores.saveLastWidgetStopAt(context, null)
+        FloatingWindowService.syncFocusStateIfRunning(nextRuntime.icon, true, nextRuntime.startedAt)
+        return true
+    }
+
+    private fun handleSceneChecklistItemTap(
+        context: Context,
+        appWidgetId: Int,
+        item: WidgetSceneItem
+    ): Boolean {
+        val checkItemId = item.checkItemId ?: return false
+
+        val payload = WidgetStores.loadDailySyncPayload(context)
+        val todayDate = getCurrentDateString()
+        val meta = payload?.items?.firstOrNull { it.checkItemId == checkItemId }
+        val currentProgress =
+            if (payload?.date == todayDate) payload.progress.firstOrNull { it.checkItemId == checkItemId } else null
+
+        val manualMode = WidgetDailyModes.normalize(meta?.manualMode ?: item.checkManualMode)
+        val targetCount = (meta?.targetCount ?: item.checkTargetCount ?: 1).coerceAtLeast(1)
+        val currentCount = (currentProgress?.currentCount ?: 0).coerceAtLeast(0).coerceAtMost(targetCount)
+        val isCompleted = currentProgress?.isCompleted ?: false
+
+        if (manualMode == WidgetDailyModes.BINARY) {
+            if (isCompleted) {
+                return false
+            }
+
+            WidgetStores.upsertDailyProgress(
+                context,
+                WidgetDailyProgress(
+                    checkItemId = checkItemId,
+                    date = todayDate,
+                    manualMode = WidgetDailyModes.BINARY,
+                    currentCount = 1,
+                    targetCount = 1,
+                    isCompleted = true,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+        } else {
+            if (currentCount >= targetCount) {
+                return false
+            }
+
+            val nextCount = (currentCount + 1).coerceAtMost(targetCount)
+            WidgetStores.upsertDailyProgress(
+                context,
+                WidgetDailyProgress(
+                    checkItemId = checkItemId,
+                    date = todayDate,
+                    manualMode = WidgetDailyModes.COUNT,
+                    currentCount = nextCount,
+                    targetCount = targetCount,
+                    isCompleted = nextCount >= targetCount,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+        }
+
+        WidgetStores.appendPendingDailyAction(
+            context,
+            WidgetPendingDailyAction(
+                id = UUID.randomUUID().toString(),
+                widgetType = WidgetTypes.DAILY,
+                date = todayDate,
+                checkTemplateId = item.checkTemplateId,
+                checkItemId = checkItemId,
+                actionMode = "complete_once",
+                createdAt = System.currentTimeMillis(),
+                appWidgetId = appWidgetId,
+                slotIndex = null
+            )
+        )
+
         return true
     }
 

@@ -11,6 +11,7 @@ import org.json.JSONObject
 
 /**
  * Capacitor bridge for widget templates, instance binding state, runtime synchronization, and pending action import.
+ * Updated 2026-05-02: Added dedicated scene widget payload sync support for the Android 4x3 scene widget.
  */
 @CapacitorPlugin(name = "WidgetBridge")
 class WidgetBridgePlugin : Plugin() {
@@ -220,6 +221,23 @@ class WidgetBridgePlugin : Plugin() {
         }
 
         WidgetStores.saveTrackingCalendarPayload(context, payload)
+        WidgetRefreshCoordinator.refreshAllAsync(context)
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun syncSceneWidgetData(call: PluginCall) {
+        val payloadJson = call.getObject("payload")
+        val payload = payloadJson?.let {
+            WidgetScenePayload(
+                switchMode = WidgetSceneGroupSwitchModes.normalize(it.optString("switchMode")),
+                activeGroupId = parseNullableString(it.optString("activeGroupId")),
+                groups = it.optJSONArray("groups").toSceneGroupList(),
+                syncedAt = it.optLong("syncedAt", System.currentTimeMillis())
+            )
+        }
+
+        WidgetStores.saveScenePayload(context, payload)
         WidgetRefreshCoordinator.refreshAllAsync(context)
         call.resolve()
     }
@@ -597,6 +615,113 @@ class WidgetBridgePlugin : Plugin() {
                     icon = parseNullableString(item.optString("icon")),
                     color = parseNullableString(item.optString("color")),
                     scopeIds = item.optJSONArray("scopeIds").toStringList()
+                )
+            )
+        }
+        return values
+    }
+
+    private fun JSONArray?.toSceneGroupList(): List<WidgetSceneGroup> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        val values = mutableListOf<WidgetSceneGroup>()
+        for (index in 0 until length()) {
+            val item = optJSONObject(index) ?: continue
+            val id = parseNullableString(item.optString("id")) ?: continue
+            values.add(
+                WidgetSceneGroup(
+                    id = id,
+                    name = parseNullableString(item.optString("name")) ?: id,
+                    autoSwitch = item.optJSONObject("autoSwitch")?.toSceneAutoSwitchConfig()
+                        ?: WidgetSceneGroupAutoSwitchConfig(),
+                    timeSlots = item.optJSONArray("timeSlots").toSceneTimeSlotList()
+                )
+            )
+        }
+        return values
+    }
+
+    private fun JSONObject.toSceneAutoSwitchConfig(): WidgetSceneGroupAutoSwitchConfig {
+        return WidgetSceneGroupAutoSwitchConfig(
+            mode = WidgetSceneGroupAutoSwitchModes.normalize(optString("mode")),
+            startDate = parseNullableString(optString("startDate")),
+            endDate = parseNullableString(optString("endDate")),
+            weekdays = optJSONArray("weekdays").toSceneWeekdayList()
+        )
+    }
+
+    private fun JSONArray?.toSceneWeekdayList(): List<Int> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        val values = mutableListOf<Int>()
+        for (index in 0 until length()) {
+            val day = optInt(index, -1)
+            if (day in 0..6 && !values.contains(day)) {
+                values.add(day)
+            }
+        }
+        return values.sorted()
+    }
+
+    private fun JSONArray?.toSceneTimeSlotList(): List<WidgetSceneTimeSlot> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        val values = mutableListOf<WidgetSceneTimeSlot>()
+        for (index in 0 until length()) {
+            val item = optJSONObject(index) ?: continue
+            val id = parseNullableString(item.optString("id")) ?: continue
+            val startTime = parseNullableString(item.optString("startTime")) ?: continue
+            val endTime = parseNullableString(item.optString("endTime")) ?: continue
+            values.add(
+                WidgetSceneTimeSlot(
+                    id = id,
+                    name = parseNullableString(item.optString("name")) ?: id,
+                    icon = parseNullableString(item.optString("icon")) ?: "\u2022",
+                    startTime = startTime,
+                    endTime = endTime,
+                    disableAutoSwitch = item.optBoolean("disableAutoSwitch", false),
+                    items = item.optJSONArray("items").toSceneItemList()
+                )
+            )
+        }
+        return values
+    }
+
+    private fun JSONArray?.toSceneItemList(): List<WidgetSceneItem> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        val values = mutableListOf<WidgetSceneItem>()
+        for (index in 0 until length()) {
+            val item = optJSONObject(index) ?: continue
+            val id = parseNullableString(item.optString("id")) ?: continue
+            val title = parseNullableString(item.optString("title")) ?: continue
+            values.add(
+                WidgetSceneItem(
+                    id = id,
+                    itemType = WidgetSceneItemTypes.normalize(item.optString("itemType")),
+                    title = title,
+                    icon = parseNullableString(item.optString("icon")) ?: "\u2022",
+                    color = parseNullableString(item.optString("color")) ?: "#E7E5E4",
+                    activityId = parseNullableString(item.optString("activityId")),
+                    categoryId = parseNullableString(item.optString("categoryId")),
+                    linkedTodoId = parseNullableString(item.optString("linkedTodoId")),
+                    scopeIds = item.optJSONArray("scopeIds").toStringList(),
+                    checkTemplateId = parseNullableString(item.optString("checkTemplateId")),
+                    checkItemId = parseNullableString(item.optString("checkItemId")),
+                    checkManualMode = parseNullableString(item.optString("checkManualMode"))?.let(WidgetDailyModes::normalize),
+                    checkTargetCount = if (item.has("checkTargetCount")) {
+                        item.optInt("checkTargetCount", 1).coerceAtLeast(1)
+                    } else {
+                        null
+                    }
                 )
             )
         }

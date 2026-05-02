@@ -7,6 +7,7 @@
  * @updated 2026-04-25: Added dedicated DAILY_RUNTIME category/activity dual-view payload sync types for native heatmap widgets.
  * @updated 2026-04-26: Added TODAY + PIN widget payload sync types for the dedicated scrollable 4x2 todo widget.
  * @updated 2026-05-01: Added tracking-calendar template/config contracts and payload sync types for the dedicated 2x2 tracking calendar widget.
+ * @updated 2026-05-02: Added scene widget payload sync types for the dedicated 4x3 scene widget.
  */
 import { registerPlugin } from '@capacitor/core';
 import { ShortcutWidgetAction } from '../services/widgetShortcutService';
@@ -15,6 +16,14 @@ export type WidgetType = 'timer' | 'daily' | 'shortcut';
 export type DailyWidgetManualMode = 'binary' | 'count';
 export type WidgetTemplateType = 'grid' | 'trackingCalendar';
 export type WidgetTrackingCalendarSourceType = 'tag' | 'scope' | 'daily';
+export type WidgetSceneGroupSwitchMode = 'manual' | 'auto';
+export type WidgetSceneGroupAutoSwitchMode =
+  | 'disabled'
+  | 'weekday'
+  | 'weekend'
+  | 'dateRange'
+  | 'customWeekdays';
+export type WidgetSceneItemType = 'timer' | 'todo' | 'checklist';
 
 export interface WidgetBridgeSlot {
   slotIndex: number;
@@ -202,6 +211,53 @@ export interface WidgetBridgeTrackingCalendarPayload {
   syncedAt: number;
 }
 
+export interface WidgetBridgeSceneGroupAutoSwitchConfig {
+  mode: WidgetSceneGroupAutoSwitchMode;
+  startDate?: string | null;
+  endDate?: string | null;
+  weekdays?: number[] | null;
+}
+
+export interface WidgetBridgeSceneItem {
+  id: string;
+  itemType: WidgetSceneItemType;
+  title: string;
+  icon: string;
+  color: string;
+  activityId?: string | null;
+  categoryId?: string | null;
+  linkedTodoId?: string | null;
+  scopeIds?: string[] | null;
+  checkTemplateId?: string | null;
+  checkItemId?: string | null;
+  checkManualMode?: DailyWidgetManualMode | null;
+  checkTargetCount?: number | null;
+}
+
+export interface WidgetBridgeSceneTimeSlot {
+  id: string;
+  name: string;
+  icon: string;
+  startTime: string;
+  endTime: string;
+  disableAutoSwitch?: boolean;
+  items: WidgetBridgeSceneItem[];
+}
+
+export interface WidgetBridgeSceneGroup {
+  id: string;
+  name: string;
+  autoSwitch?: WidgetBridgeSceneGroupAutoSwitchConfig | null;
+  timeSlots: WidgetBridgeSceneTimeSlot[];
+}
+
+export interface WidgetBridgeScenePayload {
+  switchMode: WidgetSceneGroupSwitchMode;
+  activeGroupId: string | null;
+  groups: WidgetBridgeSceneGroup[];
+  syncedAt: number;
+}
+
 export interface WidgetBridgePlugin {
   getTemplates(): Promise<{ templates: WidgetBridgeTemplate[] }>;
   saveTemplates(options: { templates: WidgetBridgeTemplate[] }): Promise<void>;
@@ -216,6 +272,7 @@ export interface WidgetBridgePlugin {
   syncDailyRuntimeWidgetData(options: { payload: WidgetBridgeDailyRuntimePayload | null }): Promise<void>;
   syncTodoPinWidgetData(options: { payload: WidgetBridgeTodoPinPayload | null }): Promise<void>;
   syncTrackingCalendarWidgetData(options: { payload: WidgetBridgeTrackingCalendarPayload | null }): Promise<void>;
+  syncSceneWidgetData(options: { payload: WidgetBridgeScenePayload | null }): Promise<void>;
   refreshWidget(options?: { appWidgetId?: number; templateId?: string }): Promise<void>;
 }
 

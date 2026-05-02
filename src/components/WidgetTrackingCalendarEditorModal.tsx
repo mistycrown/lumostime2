@@ -5,16 +5,15 @@
  * @pos Component
  * @description Lets the user pick one tracked target plus icon/color options for the dedicated monthly tracking widget.
  * @updated 2026-05-01: Added the first tracking-calendar editor so dedicated 2x2 calendar widgets can follow tags, scopes, or daily checks.
+ * @updated 2026-05-01: Cleaned all localized copy and aligned the preview wording with the new tracking-calendar visual design.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { COLOR_OPTIONS } from '../constants';
 import { useCustomColors } from '../hooks/useCustomColors';
 import { normalizeCustomColorHex } from '../services/customColorGroupService';
-import { uiIconService } from '../services/uiIconService';
-import {
-  WidgetTrackingCalendarSourceType
-} from '../services/widgetService';
+import { UIIconType, uiIconService } from '../services/uiIconService';
+import { WidgetTrackingCalendarSourceType } from '../services/widgetService';
 import { Category, CheckTemplate, Scope } from '../types';
 import { normalizeHexColor } from '../utils/colorUtils';
 import { getEligibleNfcDailyCheckItems } from '../utils/dailyCheckUtils';
@@ -242,7 +241,7 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
       return selectedCategory?.name || '请选择一个标签';
     }
     if (localDraft.sourceType === 'scope') {
-      return '当天存在至少一条命中该领域的记录时点亮';
+      return '当天有记录关联到这个领域时点亮';
     }
     if (localDraft.sourceType === 'daily') {
       return '当天这个日课完成时点亮';
@@ -251,11 +250,14 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
   })();
 
   const effectiveColor = normalizeHexColor(localDraft.backgroundColor || '') || null;
-
-  const effectiveIcon =
-    canUseUiIcon && localDraft.iconMode === 'uiIcon' && localDraft.uiIcon
-      ? localDraft.uiIcon
-      : normalizeCustomIcon(localDraft.customIcon || '') || defaultEmojiIcon;
+  const effectiveEmojiIcon = normalizeCustomIcon(localDraft.customIcon || '') || defaultEmojiIcon;
+  const effectiveUiIcon =
+    canUseUiIcon && localDraft.iconMode === 'uiIcon' ? (localDraft.uiIcon || undefined) : undefined;
+  const parsedEffectiveUiIcon = effectiveUiIcon ? uiIconService.parseIconString(effectiveUiIcon) : null;
+  const effectiveUiIconSrc =
+    parsedEffectiveUiIcon?.isUIIcon
+      ? uiIconService.getIconPathWithFallback(parsedEffectiveUiIcon.value as UIIconType).primary
+      : null;
 
   const canSave =
     localDraft.sourceType === 'tag'
@@ -407,7 +409,19 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
               className="flex h-24 w-24 items-center justify-center rounded-full border border-stone-200 bg-white leading-none shadow-[0_10px_24px_rgba(15,23,42,0.08)] sm:h-28 sm:w-28 md:h-32 md:w-32"
               style={{ backgroundColor: effectiveColor || '#FFFFFF', containerType: 'size' } as React.CSSProperties}
             >
-              <IconRenderer key={effectiveIcon} icon={effectiveIcon} size="56cqmin" />
+              {effectiveUiIconSrc ? (
+                <img
+                  src={effectiveUiIconSrc}
+                  alt=""
+                  className="h-[56cqmin] w-[56cqmin] object-contain"
+                />
+              ) : (
+                <IconRenderer
+                  key={effectiveEmojiIcon}
+                  icon={effectiveEmojiIcon}
+                  size="56cqmin"
+                />
+              )}
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-xs font-bold uppercase tracking-widest text-stone-400">Preview</div>
@@ -451,7 +465,7 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
             <div>
               <div className="mb-3 px-1">
                 <h3 className="text-sm font-bold text-stone-800">图标样式</h3>
-                <p className="mt-1 text-xs text-stone-400">输入兑换码并启用 UI 主题后，可以切换为 UI icon。</p>
+                <p className="mt-1 text-xs text-stone-400">输入兑换码并启用 UI 主题后，可以切换成 UI icon。</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 {ICON_MODE_OPTIONS.map((option) => {

@@ -5,6 +5,7 @@
  * @pos Utility (Assistant Message Parts)
  * @description Centralizes normalization and conservative fallback splitting for assistant replies so foreground and background messages can share one grouped multi-bubble rendering path.
  *
+ * @updated 2026-05-01: Filtered null-like placeholder strings out of structured assistant reply parts so malformed model arrays no longer surface literal "null" bubbles.
  * @updated 2026-04-27: Added clause-aware fallback splitting and chunk rebalancing so longer assistant paragraphs render more like several short chat bursts.
  * @updated 2026-04-27: Added structured-part normalization and conservative fallback sentence splitting for grouped assistant chat bubbles.
  */
@@ -14,10 +15,21 @@ const MIN_PART_LENGTH = 3;
 const MAX_PART_LENGTH = 36;
 const CLAUSE_SPLIT_MIN_CONTENT_LENGTH = 16;
 
+const normalizePart = (value: unknown): string => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  const trimmed = value.trim();
+  return trimmed && !['null', 'undefined'].includes(trimmed.toLowerCase())
+    ? trimmed
+    : '';
+};
+
 const trimStringArray = (value: unknown): string[] => (
   Array.isArray(value)
     ? value
-      .map((item) => (typeof item === 'string' ? item.trim() : ''))
+      .map(normalizePart)
       .filter(Boolean)
       .slice(0, MAX_DISPLAY_PARTS)
     : []

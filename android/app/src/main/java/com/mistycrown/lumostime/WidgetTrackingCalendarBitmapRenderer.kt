@@ -1,143 +1,160 @@
 package com.mistycrown.lumostime
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.RectF
 import android.graphics.Typeface
 import android.text.TextPaint
 import androidx.collection.LruCache
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 import kotlin.math.min
 
 /**
- * Renders the dedicated 2x2 tracking-calendar widget body as a bitmap.
+ * Renders the dedicated 2x2 tracking-calendar widget as a single bitmap.
  */
 object WidgetTrackingCalendarBitmapRenderer {
-    private const val BITMAP_WIDTH_DP = 220f
-    private const val BITMAP_HEIGHT_DP = 118f
-    private const val EMPTY_DAY_COLOR = "#F5F5F4"
+    private const val FALLBACK_WIDGET_SIZE_DP = 220f
     private const val DEFAULT_ACCENT_COLOR = "#E7E5E4"
+    private val WEEKDAY_LABELS = listOf("M", "T", "W", "T", "F", "S", "S")
 
     private val iconBitmapCache = object : LruCache<String, Bitmap>(24) {}
 
     @JvmStatic
     fun render(
         context: Context,
+        appWidgetId: Int,
         template: WidgetTemplate?,
         payload: WidgetTrackingCalendarPayload?
     ): Bitmap {
         val density = context.resources.displayMetrics.density
-        val width = (BITMAP_WIDTH_DP * density).toInt().coerceAtLeast(1)
-        val height = (BITMAP_HEIGHT_DP * density).toInt().coerceAtLeast(1)
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val widgetWidthPx = resolveWidgetDimensionPx(
+            context,
+            appWidgetId,
+            AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH,
+            AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,
+            density
+        )
+        val widgetHeightPx = resolveWidgetDimensionPx(
+            context,
+            appWidgetId,
+            AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT,
+            AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,
+            density
+        )
+        val bitmap = Bitmap.createBitmap(widgetWidthPx, widgetHeightPx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         canvas.drawColor(Color.TRANSPARENT)
 
         val config = template?.trackingConfig
-        val accentColor = parseColor(config?.color ?: DEFAULT_ACCENT_COLOR)
-        val weekdayPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = parseColor("#78716C")
-            textSize = 9.8f * density
+        val accentColor = softenAccentColor(parseColor(config?.color ?: DEFAULT_ACCENT_COLOR))
+        val sourcePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = parseColor("#A8A29E")
+            textSize = 9.2f * density
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            letterSpacing = 0.06f
+        }
+        val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = parseColor("#111827")
+            textSize = 14.8f * density
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        }
+        val weekdayPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = parseColor("#9CA3AF")
+            textSize = 10f * density
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
             textAlign = Paint.Align.CENTER
         }
         val dayPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = parseColor("#1C1917")
-            textSize = 12.4f * density
-            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            color = parseColor("#111827")
+            textSize = 13f * density
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
             textAlign = Paint.Align.CENTER
         }
         val activeDayPaint = TextPaint(dayPaint).apply {
             color = Color.WHITE
         }
-        val monthPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = parseColor("#A8A29E")
-            textSize = 9.4f * density
-            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
-            letterSpacing = 0.04f
-            textAlign = Paint.Align.RIGHT
-        }
         val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL
         }
-        val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = 1.4f * density
-            color = parseColor("#D6D3D1")
-        }
+
+        val headerLeftPadding = 16f * density
+        val headerRightPadding = 14f * density
+        val gridLeftPadding = 1.5f * density
+        val gridRightPadding = 1f * density
+        val gridBottomPadding = 2f * density
+        val sourceBaseline = 18f * density
+        val titleBaseline = 35f * density
+        val title = resolveTitle(template).ifBlank { "追踪日历" }
+        val iconCenterY = 28f * density
+        val iconCenterX = widgetWidthPx - headerRightPadding - 16f * density
+
+        canvas.drawText(sourceLabelForConfig(config), headerLeftPadding, sourceBaseline, sourcePaint)
+        val titleMaxWidth = iconCenterX - headerLeftPadding - 18f * density
+        val titleText = ellipsizeText(title, titlePaint, titleMaxWidth)
+        canvas.drawText(titleText, headerLeftPadding, titleBaseline, titlePaint)
 
         drawHeaderIcon(
             canvas = canvas,
             context = context,
             config = config,
-            density = density
+            density = density,
+            centerX = iconCenterX,
+            centerY = iconCenterY
         )
 
-        val calendar = Calendar.getInstance()
         val payloadTemplate = resolveTemplatePayload(template, payload)
+        val calendar = Calendar.getInstance()
         val dayValueMap = payloadTemplate?.entries
             ?.filter { entry -> entry.date.startsWith(monthPrefix(calendar)) }
             ?.associate { entry -> dayOfMonth(entry.date) to entry.value.coerceAtLeast(0) }
             ?: emptyMap()
 
-        canvas.drawText(
-            String.format(Locale.getDefault(), "%d.%02d", calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH) + 1),
-            width - 12f * density,
-            18f * density,
-            monthPaint
-        )
-
-        val left = 8f * density
-        val top = 24f * density
-        val right = width - 8f * density
-        val bottom = height - 4f * density
-        val weekdayRowHeight = 12f * density
-        val weekdayLabels = listOf("日", "一", "二", "三", "四", "五", "六")
-        val cellGap = 4f * density
-        val gridTop = top + weekdayRowHeight + 6f * density
-        val gridHeight = bottom - gridTop
+        val gridTop = 52f * density
+        val gridBottom = widgetHeightPx - gridBottomPadding
+        val gridLeft = gridLeftPadding
+        val gridRight = widgetWidthPx - gridRightPadding
+        val weekdayHeight = 12f * density
+        val cellGapX = 3.2f * density
+        val cellGapY = 5.6f * density
         val cellSize = min(
-            (right - left - cellGap * 6f) / 7f,
-            (gridHeight - cellGap * 5f) / 6f
+            (gridRight - gridLeft - cellGapX * 6f) / 7f,
+            (gridBottom - (gridTop + weekdayHeight) - cellGapY * 5f) / 6f
         )
-        val gridWidth = cellSize * 7f + cellGap * 6f
-        val gridLeft = left + (right - left - gridWidth) / 2f
+        val gridWidth = cellSize * 7f + cellGapX * 6f
+        val centeredGridLeft = gridLeft + (gridRight - gridLeft - gridWidth) / 2f
+        val centeredGridTop = gridTop + weekdayHeight + 6f * density
 
-        weekdayLabels.forEachIndexed { index, label ->
-            val centerX = gridLeft + index * (cellSize + cellGap) + cellSize / 2f
-            canvas.drawText(label, centerX, top + weekdayRowHeight, weekdayPaint)
+        WEEKDAY_LABELS.forEachIndexed { index, label ->
+            val centerX = centeredGridLeft + index * (cellSize + cellGapX) + cellSize / 2f
+            canvas.drawText(label, centerX, gridTop + weekdayHeight, weekdayPaint)
         }
 
         val monthStart = Calendar.getInstance().apply {
             time = calendar.time
             set(Calendar.DAY_OF_MONTH, 1)
         }
-        val startOffset = monthStart.get(Calendar.DAY_OF_WEEK) - 1
+        val rawDayOfWeek = monthStart.get(Calendar.DAY_OF_WEEK)
+        val startOffset = if (rawDayOfWeek == Calendar.SUNDAY) 6 else rawDayOfWeek - Calendar.MONDAY
         val dayCount = monthStart.getActualMaximum(Calendar.DAY_OF_MONTH)
-        val todayDay = if (isTodayInMonth(calendar)) calendar.get(Calendar.DAY_OF_MONTH) else -1
-        val circleRadius = cellSize * 0.46f
+        val circleRadius = cellSize * 0.475f
 
         for (day in 1..dayCount) {
             val cellIndex = startOffset + day - 1
             val row = cellIndex / 7
             val column = cellIndex % 7
-            val centerX = gridLeft + column * (cellSize + cellGap) + cellSize / 2f
-            val centerY = gridTop + row * (cellSize + cellGap) + cellSize / 2f
+            val centerX = centeredGridLeft + column * (cellSize + cellGapX) + cellSize / 2f
+            val centerY = centeredGridTop + row * (cellSize + cellGapY) + cellSize / 2f
             val value = dayValueMap[day] ?: 0
             val isActive = value > 0
-            val isToday = day == todayDay
 
-            fillPaint.color = if (isActive) accentColor else parseColor(EMPTY_DAY_COLOR)
-            canvas.drawCircle(centerX, centerY, circleRadius, fillPaint)
-            if (isToday && !isActive) {
-                canvas.drawCircle(centerX, centerY, circleRadius, outlinePaint)
+            if (isActive) {
+                fillPaint.color = accentColor
+                canvas.drawCircle(centerX, centerY, circleRadius, fillPaint)
             }
 
             val textPaint = if (isActive) activeDayPaint else dayPaint
@@ -153,25 +170,17 @@ object WidgetTrackingCalendarBitmapRenderer {
         if (template == null) {
             return ""
         }
-
-        return template.trackingConfig?.label?.takeIf { it.isNotBlank() }
-            ?: template.name
+        return template.name.ifBlank {
+            template.trackingConfig?.label?.takeIf { it.isNotBlank() } ?: ""
+        }
     }
 
-    @JvmStatic
-    fun formatStatus(
-        template: WidgetTemplate?,
-        payload: WidgetTrackingCalendarPayload?
-    ): String {
-        val config = template?.trackingConfig ?: return "未配置"
-        val currentMonthValues = resolveTemplatePayload(template, payload)?.entries
-            ?.filter { it.date.startsWith(monthPrefix(Calendar.getInstance())) }
-            .orEmpty()
-
-        return if (config.sourceType == "daily") {
-            "${currentMonthValues.count { it.value > 0 }}天"
-        } else {
-            formatDuration(currentMonthValues.sumOf { it.value.coerceAtLeast(0) })
+    private fun sourceLabelForConfig(config: WidgetTrackingCalendarConfig?): String {
+        return when (config?.sourceType) {
+            "tag" -> "标签"
+            "scope" -> "领域"
+            "daily" -> "日课"
+            else -> "追踪"
         }
     }
 
@@ -187,15 +196,15 @@ object WidgetTrackingCalendarBitmapRenderer {
         canvas: Canvas,
         context: Context,
         config: WidgetTrackingCalendarConfig?,
-        density: Float
+        density: Float,
+        centerX: Float,
+        centerY: Float
     ) {
         if (config == null) {
             return
         }
 
-        val centerX = 16f * density
-        val centerY = 14f * density
-        val iconSizePx = (18f * density).toInt().coerceAtLeast(1)
+        val iconSizePx = (20f * density).toInt().coerceAtLeast(1)
         val iconBitmap = loadIconBitmap(context, config, iconSizePx)
         if (iconBitmap != null) {
             canvas.drawBitmap(
@@ -209,7 +218,7 @@ object WidgetTrackingCalendarBitmapRenderer {
 
         val emojiPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = parseColor("#44403C")
-            textSize = 16f * density
+            textSize = 18f * density
             textAlign = Paint.Align.CENTER
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         }
@@ -243,7 +252,7 @@ object WidgetTrackingCalendarBitmapRenderer {
         }
 
         return try {
-            context.assets.open(normalizedAssetPath).use { inputStream ->
+            context.assets.open("public/$normalizedAssetPath").use { inputStream ->
                 val decoded = BitmapFactory.decodeStream(inputStream) ?: return null
                 val scaledBitmap =
                     if (decoded.width == iconSizePx && decoded.height == iconSizePx) {
@@ -263,6 +272,24 @@ object WidgetTrackingCalendarBitmapRenderer {
         }
     }
 
+    private fun ellipsizeText(
+        text: String,
+        paint: TextPaint,
+        maxWidth: Float
+    ): String {
+        if (text.isBlank() || paint.measureText(text) <= maxWidth) {
+            return text
+        }
+
+        val ellipsis = "…"
+        val ellipsisWidth = paint.measureText(ellipsis)
+        var trimmed = text
+        while (trimmed.isNotEmpty() && paint.measureText(trimmed) + ellipsisWidth > maxWidth) {
+            trimmed = trimmed.dropLast(1)
+        }
+        return if (trimmed.isEmpty()) ellipsis else trimmed + ellipsis
+    }
+
     private fun dayOfMonth(dateStr: String): Int {
         return dateStr.takeLast(2).toIntOrNull() ?: -1
     }
@@ -276,21 +303,43 @@ object WidgetTrackingCalendarBitmapRenderer {
         )
     }
 
-    private fun isTodayInMonth(calendar: Calendar): Boolean {
-        val now = Calendar.getInstance()
-        return now.get(Calendar.YEAR) == calendar.get(Calendar.YEAR)
-            && now.get(Calendar.MONTH) == calendar.get(Calendar.MONTH)
+    private fun resolveWidgetDimensionPx(
+        context: Context,
+        appWidgetId: Int,
+        primaryKey: String,
+        fallbackKey: String,
+        density: Float
+    ): Int {
+        val fallbackPx = (FALLBACK_WIDGET_SIZE_DP * density).toInt().coerceAtLeast(1)
+        if (appWidgetId <= 0) {
+            return fallbackPx
+        }
+
+        return try {
+            val options = AppWidgetManager.getInstance(context).getAppWidgetOptions(appWidgetId)
+            val primaryDp = options.getInt(primaryKey, 0)
+            val fallbackDp = options.getInt(fallbackKey, 0)
+            val resolvedDp = maxOf(primaryDp, fallbackDp)
+            if (resolvedDp > 0) {
+                (resolvedDp * density).toInt().coerceAtLeast(1)
+            } else {
+                fallbackPx
+            }
+        } catch (_: Exception) {
+            fallbackPx
+        }
     }
 
-    private fun formatDuration(totalMinutes: Int): String {
-        val safeMinutes = totalMinutes.coerceAtLeast(0)
-        val hours = safeMinutes / 60
-        val minutes = safeMinutes % 60
-        return when {
-            hours > 0 && minutes > 0 -> "${hours}h${minutes}m"
-            hours > 0 -> "${hours}h"
-            else -> "${minutes}m"
-        }
+    private fun softenAccentColor(color: Int): Int {
+        val alpha = Color.alpha(color)
+        val red = Color.red(color)
+        val green = Color.green(color)
+        val blue = Color.blue(color)
+        val mixRatio = 0.28f
+        val mixedRed = (red + ((255 - red) * mixRatio)).toInt().coerceIn(0, 255)
+        val mixedGreen = (green + ((255 - green) * mixRatio)).toInt().coerceIn(0, 255)
+        val mixedBlue = (blue + ((255 - blue) * mixRatio)).toInt().coerceIn(0, 255)
+        return Color.argb(alpha, mixedRed, mixedGreen, mixedBlue)
     }
 
     private fun parseColor(colorString: String): Int {
