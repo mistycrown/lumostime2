@@ -9,6 +9,7 @@
  * @updated 2026-05-01: Simplified persona-list selection in AI settings so the active row no longer uses a tinted background and relies on the checkmark alone.
  * @updated 2026-05-01: Widened the AI settings side gutters after the divider-based redesign so the editorial layout keeps more breathing room on both sides.
  * @updated 2026-05-01: Flattened the AI workspace into a more editorial layout by tightening composer height, simplifying history-session delete confirmations, reducing heavy card nesting, and trimming excessive radii/shadows across the AI panels.
+ * @updated 2026-05-01: Filtered persisted null-like assistant placeholders during session hydration so malformed native-backfilled entries no longer render standalone "null" chat bubbles.
  * @updated 2026-05-01: Native background replies are now rehydrated from Android diagnostics back into persisted chat sessions, so successful direct-native check-ins render in the main conversation instead of only in the debug history.
  * @updated 2026-04-30: Added a unified AI hardware-back chain so nested AI pages close one layer at a time before the root chat window dismisses.
  * @updated 2026-04-30: Strengthened multi-bubble assistant reply reveals with a longer stagger, clearer lift/scale entry, and a short highlight fade so each paragraph lands more distinctly in sequence.
@@ -895,6 +896,17 @@ const normalizeRetryInput = (value: unknown): string | undefined => (
     : undefined
 );
 
+const normalizeMessageContent = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed && !['null', 'undefined'].includes(trimmed.toLowerCase())
+    ? trimmed
+    : undefined;
+};
+
 const normalizeMessages = (value: unknown): AIChatMessage[] => {
   if (!Array.isArray(value)) {
     return [];
@@ -921,11 +933,21 @@ const normalizeMessages = (value: unknown): AIChatMessage[] => {
     const normalizedDisplayParts = candidate.role === 'assistant'
       ? normalizeAssistantDisplayParts(candidate.displayParts, candidate.content)
       : undefined;
+    const normalizedContent = normalizeMessageContent(candidate.content)
+      || (
+        candidate.role === 'assistant'
+        && normalizedDisplayParts?.length
+          ? normalizedDisplayParts.join('\n')
+          : undefined
+      );
+    if (!normalizedContent) {
+      return [];
+    }
 
     const normalizedMessage: AIChatMessage = {
       id: candidate.id,
       role: candidate.role,
-      content: candidate.content,
+      content: normalizedContent,
       ...(normalizedDisplayParts ? { displayParts: normalizedDisplayParts } : {}),
       createdAt: candidate.createdAt,
       ...(candidate.tone ? { tone: candidate.tone } : {}),
@@ -2251,13 +2273,21 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       const hydrationResult = assistantOrchestratorService.hydrateNativeCompletedReplies(normalizedEntries, {
         targetSessionId: backgroundTargetSessionId
       });
+      if (hydrationResult.didHydrateHistory) {
+        refreshAssistantBackgroundCallHistory();
+      }
       if (hydrationResult.surfacedMessages.length > 0) {
         reloadPersistedChatSessions();
-        refreshAssistantBackgroundCallHistory();
         if (!isOpenRef.current) {
           onUnreadAssistantMessage?.(hydrationResult.surfacedMessages.length);
           addToast('info', `AI 助理：${hydrationResult.surfacedMessages[hydrationResult.surfacedMessages.length - 1]}`);
         }
+      }
+      if (hydrationResult.didUpdateMemory) {
+        refreshAssistantMemorySnapshot();
+      }
+      if (hydrationResult.didUpdateReminders) {
+        refreshAssistantReminderSnapshot();
       }
     } catch (error) {
       console.error('[AIBackfillChatModal] Failed to load native assistant diagnostics', error);
@@ -2838,6 +2868,19 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     assistantAgentConfig.enabled,
     assistantAgentConfig.longTermMemoryEnabled,
     conversationHistoryCache,
+    syncNativeBackgroundExecutionSnapshot
+  ]);
+
+  useEffect(() => {
+    if (!assistantAgentConfig.enabled) {
+      return;
+    }
+
+    void syncNativeBackgroundExecutionSnapshot();
+  }, [
+    assistantAgentConfig.enabled,
+    assistantMemorySnapshot.updatedAt,
+    assistantReminderSnapshot,
     syncNativeBackgroundExecutionSnapshot
   ]);
 
@@ -5236,7 +5279,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               onChange={(event) => setInputText(event.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={`和 ${activePersona.assistantSelfName || 'AI'} 说点什么...`}
-              className="min-h-[48px] max-h-[76px] w-full resize-none bg-transparent px-0.5 py-1 text-[15px] leading-6 outline-none"
+              className="min-h-[42px] max-h-[68px] w-full resize-none bg-transparent px-0.5 py-0.5 text-[15px] leading-6 outline-none"
               style={{ color: AI_CHAT_THEME.textPrimary }}
               autoFocus
             />
@@ -5537,7 +5580,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 </button>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-8">
+              <div className="min-h-0 flex-1 overflow-y-auto px-7 py-5 sm:px-12">
                 <div className="mx-auto max-w-4xl">
                   <div className="mb-5 flex gap-6 overflow-x-auto border-b border-stone-200 no-scrollbar">
                     {([

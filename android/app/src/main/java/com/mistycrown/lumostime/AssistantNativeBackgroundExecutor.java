@@ -4,6 +4,7 @@
  * @output Immediate Android-side background AI request execution plus diagnostic events
  * @pos Native Helper
  * @description Executes a minimal unified background AI turn directly from Android so check-in requests no longer depend on the Web runtime being awake at dispatch time.
+ * @updated 2026-05-01: Normalized JSON null-like assistant reply fields so native background diagnostics no longer persist literal "null" bubbles into chat history.
  * @updated 2026-04-30: Added direct native OpenAI/Gemini background execution for check-in-style triggers with diagnostic request lifecycle events.
  */
 package com.mistycrown.lumostime;
@@ -103,9 +104,7 @@ public final class AssistantNativeBackgroundExecutor {
                 buildResultContextMap(
                     requestedAt,
                     completedAt,
-                    normalized.optString("outcome", ""),
-                    normalized.optString("assistantReply", ""),
-                    normalized.optString("decisionSummary", "")
+                    normalized
                 )
             );
             if (callback != null) {
@@ -189,13 +188,13 @@ public final class AssistantNativeBackgroundExecutor {
     }
 
     private static JSONObject normalizeResponse(JSONObject rawOutput) throws JSONException {
-        String assistantReply = safeTrim(rawOutput.optString("assistantReply", ""));
+        String assistantReply = safeModelString(rawOutput.opt("assistantReply"));
         if (assistantReply.isEmpty()) {
             JSONArray assistantReplyParts = rawOutput.optJSONArray("assistantReplyParts");
             if (assistantReplyParts != null && assistantReplyParts.length() > 0) {
                 StringBuilder builder = new StringBuilder();
                 for (int index = 0; index < assistantReplyParts.length(); index += 1) {
-                    String part = safeTrim(assistantReplyParts.optString(index, ""));
+                    String part = safeModelString(assistantReplyParts.opt(index));
                     if (part.isEmpty()) {
                         continue;
                     }
@@ -216,7 +215,21 @@ public final class AssistantNativeBackgroundExecutor {
         JSONObject normalized = new JSONObject();
         normalized.put("outcome", outcome);
         normalized.put("assistantReply", assistantReply);
-        normalized.put("decisionSummary", safeTrim(rawOutput.optString("decisionSummary", "")));
+        normalized.put("decisionSummary", safeModelString(rawOutput.opt("decisionSummary")));
+        String memoryAction = safeModelString(rawOutput.opt("memoryAction"));
+        normalized.put("memoryAction", "update_memory".equals(memoryAction) ? "update_memory" : "no_update");
+        JSONObject memoryPatch = normalizeJsonObject(rawOutput.opt("memoryPatch"));
+        if (memoryPatch != null && memoryPatch.length() > 0) {
+            normalized.put("memoryPatch", memoryPatch);
+        }
+        JSONArray reminders = normalizeJsonArray(rawOutput.opt("reminders"));
+        if (reminders != null && reminders.length() > 0) {
+            normalized.put("reminders", reminders);
+        }
+        String silentReason = safeModelString(rawOutput.opt("silentReason"));
+        if (!silentReason.isEmpty()) {
+            normalized.put("silentReason", silentReason);
+        }
         return normalized;
     }
 
@@ -262,6 +275,40 @@ public final class AssistantNativeBackgroundExecutor {
             return new JSONObject(raw);
         } catch (JSONException error) {
             return new JSONObject();
+        }
+    }
+
+    private static JSONObject normalizeJsonObject(Object value) {
+        if (value instanceof JSONObject) {
+            return (JSONObject) value;
+        }
+
+        String raw = safeModelString(value);
+        if (raw.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return new JSONObject(raw);
+        } catch (JSONException error) {
+            return null;
+        }
+    }
+
+    private static JSONArray normalizeJsonArray(Object value) {
+        if (value instanceof JSONArray) {
+            return (JSONArray) value;
+        }
+
+        String raw = safeModelString(value);
+        if (raw.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return new JSONArray(raw);
+        } catch (JSONException error) {
+            return null;
         }
     }
 
@@ -354,20 +401,36 @@ public final class AssistantNativeBackgroundExecutor {
     private static Map<String, String> buildResultContextMap(
         String requestedAt,
         String completedAt,
-        String outcome,
-        String assistantReply,
-        String decisionSummary
+        JSONObject normalized
     ) {
         Map<String, String> context = buildContextMap(
             "requestedAt", requestedAt,
             "completedAt", completedAt,
-            "outcome", outcome
+            "outcome", safeModelString(normalized.opt("outcome"))
         );
+        String assistantReply = safeModelString(normalized.opt("assistantReply"));
         if (!safeTrim(assistantReply).isEmpty()) {
             context.put("assistantReply", assistantReply);
         }
+        String decisionSummary = safeModelString(normalized.opt("decisionSummary"));
         if (!safeTrim(decisionSummary).isEmpty()) {
             context.put("decisionSummary", decisionSummary);
+        }
+        String memoryAction = safeModelString(normalized.opt("memoryAction"));
+        if (!memoryAction.isEmpty()) {
+            context.put("memoryAction", memoryAction);
+        }
+        Object memoryPatch = normalized.opt("memoryPatch");
+        if (memoryPatch instanceof JSONObject && ((JSONObject) memoryPatch).length() > 0) {
+            context.put("memoryPatch", ((JSONObject) memoryPatch).toString());
+        }
+        Object reminders = normalized.opt("reminders");
+        if (reminders instanceof JSONArray && ((JSONArray) reminders).length() > 0) {
+            context.put("reminders", ((JSONArray) reminders).toString());
+        }
+        String silentReason = safeModelString(normalized.opt("silentReason"));
+        if (!silentReason.isEmpty()) {
+            context.put("silentReason", silentReason);
         }
         return context;
     }
@@ -400,5 +463,18 @@ public final class AssistantNativeBackgroundExecutor {
 
     private static String safeTrim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private static String safeModelString(Object value) {
+        if (value == null || JSONObject.NULL.equals(value)) {
+            return "";
+        }
+
+        String trimmed = String.valueOf(value).trim();
+        if (trimmed.isEmpty() || "null".equalsIgnoreCase(trimmed) || "undefined".equalsIgnoreCase(trimmed)) {
+            return "";
+        }
+
+        return trimmed;
     }
 }

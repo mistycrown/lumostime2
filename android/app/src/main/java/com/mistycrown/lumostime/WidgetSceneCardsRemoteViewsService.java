@@ -1,0 +1,232 @@
+package com.mistycrown.lumostime;
+
+import android.appwidget.AppWidgetManager;
+import android.content.Context;
+import android.content.Intent;
+import android.widget.RemoteViews;
+import android.widget.RemoteViewsService;
+
+import java.text.SimpleDateFormat;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+
+/**
+ * RemoteViews collection service backing the scrollable 5-column scene card grid.
+ */
+public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
+    @Override
+    public RemoteViewsFactory onGetViewFactory(Intent intent) {
+        return new Factory(getApplicationContext(), intent);
+    }
+
+    private static final class Factory implements RemoteViewsService.RemoteViewsFactory {
+        private final Context context;
+        private final int appWidgetId;
+        private WidgetSceneProviderSupport.ResolvedSceneState resolvedState;
+        private WidgetDailySyncPayload dailyPayload;
+        private WidgetRuntimeState runtimeState;
+
+        Factory(Context context, Intent intent) {
+            this.context = context;
+            this.appWidgetId = intent.getIntExtra(
+                    AppWidgetManager.EXTRA_APPWIDGET_ID,
+                    AppWidgetManager.INVALID_APPWIDGET_ID
+            );
+        }
+
+        @Override
+        public void onCreate() {
+            reloadData();
+        }
+
+        @Override
+        public void onDataSetChanged() {
+            reloadData();
+        }
+
+        @Override
+        public void onDestroy() {
+            resolvedState = null;
+            dailyPayload = null;
+            runtimeState = null;
+        }
+
+        @Override
+        public int getCount() {
+            return getItems().size();
+        }
+
+        @Override
+        public RemoteViews getViewAt(int position) {
+            List<WidgetSceneItem> items = getItems();
+            if (position < 0 || position >= items.size()) {
+                return null;
+            }
+
+            WidgetSceneItem item = items.get(position);
+            WidgetSnapshotSlot snapshotSlot = buildSnapshotSlot(item, position);
+
+            RemoteViews views = new RemoteViews(
+                    context.getPackageName(),
+                    R.layout.widget_scene_card_item
+            );
+            views.setImageViewBitmap(
+                    R.id.widget_scene_card_bitmap,
+                    WidgetSlotBitmapRenderer.INSTANCE.render(context, snapshotSlot)
+            );
+
+            Intent fillInIntent = new Intent();
+            fillInIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+            fillInIntent.putExtra(
+                    WidgetSceneProviderSupport.EXTRA_SLOT_ID,
+                    resolvedState != null ? resolvedState.selectedSlotId : null
+            );
+            fillInIntent.putExtra(WidgetSceneProviderSupport.EXTRA_ITEM_ID, item.getId());
+            views.setOnClickFillInIntent(R.id.widget_scene_card_root, fillInIntent);
+            return views;
+        }
+
+        @Override
+        public RemoteViews getLoadingView() {
+            return null;
+        }
+
+        @Override
+        public int getViewTypeCount() {
+            return 1;
+        }
+
+        @Override
+        public long getItemId(int position) {
+            List<WidgetSceneItem> items = getItems();
+            if (position < 0 || position >= items.size()) {
+                return position;
+            }
+            return items.get(position).getId().hashCode();
+        }
+
+        @Override
+        public boolean hasStableIds() {
+            return true;
+        }
+
+        private void reloadData() {
+            resolvedState = WidgetSceneProviderSupport.resolveState(context, appWidgetId);
+            dailyPayload = WidgetStores.INSTANCE.loadDailySyncPayload(context);
+            runtimeState = WidgetStores.INSTANCE.loadRuntimeState(context);
+        }
+
+        private List<WidgetSceneItem> getItems() {
+            if (resolvedState == null || resolvedState.selectedSlot == null) {
+                return Collections.emptyList();
+            }
+            return resolvedState.selectedSlot.getItems();
+        }
+
+        private WidgetSnapshotSlot buildSnapshotSlot(WidgetSceneItem item, int position) {
+            if (WidgetSceneItemTypes.CHECKLIST.equals(
+                    WidgetSceneItemTypes.normalize(item.getItemType())
+            )) {
+                WidgetDailyProgress progress = findDailyProgress(item.getCheckItemId());
+                WidgetDailyCheckMeta meta = findDailyMeta(item.getCheckItemId());
+                String manualMode = WidgetDailyModes.normalize(
+                        meta != null ? meta.getManualMode() : item.getCheckManualMode()
+                );
+                int targetCount = Math.max(
+                        1,
+                        meta != null ? meta.getTargetCount()
+                                : item.getCheckTargetCount() != null ? item.getCheckTargetCount() : 1
+                );
+                int currentCount = progress != null
+                        ? Math.max(0, Math.min(progress.getCurrentCount(), targetCount))
+                        : 0;
+                boolean isCompleted = progress != null && progress.isCompleted();
+
+                return new WidgetSnapshotSlot(
+                        position,
+                        WidgetTypes.DAILY,
+                        null,
+                        null,
+                        item.getCheckItemId(),
+                        item.getIcon(),
+                        null,
+                        null,
+                        item.getTitle(),
+                        item.getColor(),
+                        false,
+                        manualMode,
+                        currentCount,
+                        targetCount,
+                        isCompleted,
+                        null,
+                        null
+                );
+            }
+
+            return new WidgetSnapshotSlot(
+                    position,
+                    WidgetTypes.TIMER,
+                    item.getActivityId(),
+                    item.getCategoryId(),
+                    null,
+                    item.getIcon(),
+                    null,
+                    null,
+                    item.getTitle(),
+                    item.getColor(),
+                    matchesRuntime(item),
+                    null,
+                    0,
+                    1,
+                    false,
+                    null,
+                    null
+            );
+        }
+
+        private WidgetDailyCheckMeta findDailyMeta(String checkItemId) {
+            if (dailyPayload == null || checkItemId == null) {
+                return null;
+            }
+            for (WidgetDailyCheckMeta item : dailyPayload.getItems()) {
+                if (Objects.equals(item.getCheckItemId(), checkItemId)) {
+                    return item;
+                }
+            }
+            return null;
+        }
+
+        private WidgetDailyProgress findDailyProgress(String checkItemId) {
+            if (dailyPayload == null || checkItemId == null) {
+                return null;
+            }
+            if (!Objects.equals(dailyPayload.getDate(), getCurrentDateString())) {
+                return null;
+            }
+            for (WidgetDailyProgress item : dailyPayload.getProgress()) {
+                if (Objects.equals(item.getCheckItemId(), checkItemId)) {
+                    return item;
+                }
+            }
+            return null;
+        }
+
+        private boolean matchesRuntime(WidgetSceneItem item) {
+            if (runtimeState == null) {
+                return false;
+            }
+            return Objects.equals(runtimeState.getActivityId(), item.getActivityId())
+                    && Objects.equals(runtimeState.getCategoryId(), item.getCategoryId())
+                    && Objects.equals(runtimeState.getLinkedTodoId(), item.getLinkedTodoId())
+                    && runtimeState.getScopeIds().containsAll(item.getScopeIds())
+                    && item.getScopeIds().containsAll(runtimeState.getScopeIds());
+        }
+
+        private String getCurrentDateString() {
+            return new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+        }
+    }
+}

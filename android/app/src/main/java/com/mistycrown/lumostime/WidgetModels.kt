@@ -3,6 +3,7 @@ package com.mistycrown.lumostime
 /**
  * Lightweight native models used by the unified Android widget system.
  * Templates are size-based, while each slot carries its own timer, daily, or shortcut type.
+ * Updated 2026-05-02: Added native scene-widget payload, group, slot, item, and per-instance selection models.
  */
 object WidgetTypes {
     const val TIMER = "timer"
@@ -53,6 +54,59 @@ object WidgetDailyRuntimeViewModes {
     @JvmStatic
     fun toggle(mode: String?): String {
         return if (normalize(mode) == CATEGORY) ACTIVITY else CATEGORY
+    }
+}
+
+object WidgetSceneGroupSwitchModes {
+    const val MANUAL = "manual"
+    const val AUTO = "auto"
+    const val DEFAULT = MANUAL
+
+    @JvmStatic
+    fun normalize(mode: String?): String {
+        return when (mode) {
+            AUTO,
+            MANUAL -> mode
+            else -> DEFAULT
+        }
+    }
+}
+
+object WidgetSceneGroupAutoSwitchModes {
+    const val DISABLED = "disabled"
+    const val WEEKDAY = "weekday"
+    const val WEEKEND = "weekend"
+    const val DATE_RANGE = "dateRange"
+    const val CUSTOM_WEEKDAYS = "customWeekdays"
+    const val DEFAULT = DISABLED
+
+    @JvmStatic
+    fun normalize(mode: String?): String {
+        return when (mode) {
+            WEEKDAY,
+            WEEKEND,
+            DATE_RANGE,
+            CUSTOM_WEEKDAYS,
+            DISABLED -> mode
+            else -> DEFAULT
+        }
+    }
+}
+
+object WidgetSceneItemTypes {
+    const val TIMER = "timer"
+    const val TODO = "todo"
+    const val CHECKLIST = "checklist"
+    const val DEFAULT = TIMER
+
+    @JvmStatic
+    fun normalize(type: String?): String {
+        return when (type) {
+            TODO,
+            CHECKLIST,
+            TIMER -> type
+            else -> DEFAULT
+        }
     }
 }
 
@@ -295,6 +349,59 @@ data class WidgetTrackingCalendarTemplatePayload(
 data class WidgetTrackingCalendarPayload(
     val templates: List<WidgetTrackingCalendarTemplatePayload> = emptyList(),
     val syncedAt: Long
+)
+
+data class WidgetSceneGroupAutoSwitchConfig(
+    val mode: String = WidgetSceneGroupAutoSwitchModes.DEFAULT,
+    val startDate: String? = null,
+    val endDate: String? = null,
+    val weekdays: List<Int> = emptyList()
+)
+
+data class WidgetSceneItem(
+    val id: String,
+    val itemType: String = WidgetSceneItemTypes.DEFAULT,
+    val title: String,
+    val icon: String,
+    val color: String,
+    val activityId: String? = null,
+    val categoryId: String? = null,
+    val linkedTodoId: String? = null,
+    val scopeIds: List<String> = emptyList(),
+    val checkTemplateId: String? = null,
+    val checkItemId: String? = null,
+    val checkManualMode: String? = null,
+    val checkTargetCount: Int? = null
+)
+
+data class WidgetSceneTimeSlot(
+    val id: String,
+    val name: String,
+    val icon: String,
+    val startTime: String,
+    val endTime: String,
+    val disableAutoSwitch: Boolean = false,
+    val items: List<WidgetSceneItem> = emptyList()
+)
+
+data class WidgetSceneGroup(
+    val id: String,
+    val name: String,
+    val autoSwitch: WidgetSceneGroupAutoSwitchConfig = WidgetSceneGroupAutoSwitchConfig(),
+    val timeSlots: List<WidgetSceneTimeSlot> = emptyList()
+)
+
+data class WidgetScenePayload(
+    val switchMode: String = WidgetSceneGroupSwitchModes.DEFAULT,
+    val activeGroupId: String? = null,
+    val groups: List<WidgetSceneGroup> = emptyList(),
+    val syncedAt: Long
+)
+
+data class WidgetSceneSelectionState(
+    val appWidgetId: Int,
+    val selectedSlotId: String? = null,
+    val lastAutoSlotId: String? = null
 )
 
 data class WidgetPendingDailyAction(

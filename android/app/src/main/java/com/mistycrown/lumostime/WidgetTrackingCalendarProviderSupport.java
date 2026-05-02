@@ -79,13 +79,16 @@ public final class WidgetTrackingCalendarProviderSupport {
             );
 
             RemoteViews views = new RemoteViews(context.getPackageName(), layoutResId);
-            Bitmap bitmap = WidgetTrackingCalendarBitmapRenderer.INSTANCE.render(context, template, payload);
+            Bitmap bitmap = WidgetTrackingCalendarBitmapRenderer.INSTANCE.render(
+                    context,
+                    appWidgetId,
+                    template,
+                    payload
+            );
             String title = WidgetTrackingCalendarBitmapRenderer.INSTANCE.resolveTitle(template);
-            String status = WidgetTrackingCalendarBitmapRenderer.INSTANCE.formatStatus(template, payload);
             PendingIntent cycleIntent = buildCycleIntent(context, appWidgetId, providerClass);
 
             views.setTextViewText(R.id.widget_title, title);
-            views.setTextViewText(R.id.widget_tracking_calendar_status, status);
             views.setImageViewBitmap(R.id.widget_tracking_calendar_bitmap, bitmap);
             views.setOnClickPendingIntent(R.id.widget_title, cycleIntent);
             appWidgetManager.updateAppWidget(appWidgetId, views);

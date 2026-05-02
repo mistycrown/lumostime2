@@ -460,6 +460,7 @@ const normalizeStringList = (value: unknown): string[] => (
     Array.isArray(value)
         ? value
             .map((item) => (typeof item === 'string' ? item.trim() : ''))
+            .filter((item) => item && !['null', 'undefined'].includes(item.toLowerCase()))
             .filter(Boolean)
         : []
 );
@@ -1107,7 +1108,11 @@ Output:
                 normalized.assistantReplyParts = assistantReplyParts;
             }
 
-            if (typeof rawOutput?.assistantReply === 'string' && rawOutput.assistantReply.trim()) {
+            if (
+                typeof rawOutput?.assistantReply === 'string'
+                && rawOutput.assistantReply.trim()
+                && !['null', 'undefined'].includes(rawOutput.assistantReply.trim().toLowerCase())
+            ) {
                 normalized.assistantReply = rawOutput.assistantReply.trim();
             } else if (assistantReplyParts.length > 0) {
                 normalized.assistantReply = assistantReplyParts.join('\n');

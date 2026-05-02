@@ -23,9 +23,11 @@
 
 import {
   type AssistantMemory,
+  type AssistantMemoryPatch,
   type AssistantNativeDiagnosticEntry,
   type AssistantOrchestratorResult,
   type AssistantReminder,
+  type AssistantReminderDraft,
   type AssistantSilentReason,
   type AssistantUnifiedTurnOutput,
   type AssistantTurnDictionaryContext,
@@ -294,6 +296,69 @@ const getBackgroundDebugLabel = (triggerType: AssistantSystemTrigger['type']): s
 
 const buildNativeHydratedHistoryId = (triggerId: string): string => `native:${triggerId}`;
 
+const normalizeAssistantText = (value: unknown): string => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  const trimmed = value.trim();
+  return trimmed && !['null', 'undefined'].includes(trimmed.toLowerCase())
+    ? trimmed
+    : '';
+};
+
+const parseDiagnosticJson = <T,>(value: unknown, fallback: T): T => {
+  const raw = normalizeAssistantText(value);
+  if (!raw) {
+    return fallback;
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch (error) {
+    console.error('[assistantOrchestratorService] Failed to parse native diagnostic JSON payload', error);
+    return fallback;
+  }
+};
+
+const parseNativeMemoryAction = (value: unknown): 'no_update' | 'update_memory' => (
+  normalizeAssistantText(value) === 'update_memory' ? 'update_memory' : 'no_update'
+);
+
+const parseNativeMemoryPatch = (value: unknown): AssistantMemoryPatch | undefined => {
+  const parsed = parseDiagnosticJson<unknown>(value, null);
+  return parsed && typeof parsed === 'object'
+    ? parsed as AssistantMemoryPatch
+    : undefined;
+};
+
+const parseNativeReminderDrafts = (value: unknown): AssistantReminderDraft[] => {
+  const parsed = parseDiagnosticJson<unknown>(value, []);
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  return parsed.flatMap((item) => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+
+    const candidate = item as Partial<AssistantReminderDraft>;
+    const dueAt = normalizeAssistantText(candidate.dueAt);
+    const text = normalizeAssistantText(candidate.text);
+    if (!dueAt || !text) {
+      return [];
+    }
+
+    return [{
+      dueAt,
+      text,
+      ...(candidate.type ? { type: candidate.type } : {}),
+      ...(normalizeAssistantText(candidate.todoId) ? { todoId: normalizeAssistantText(candidate.todoId) } : {})
+    }];
+  });
+};
+
 const buildNativeTriggerText = (triggerType?: AssistantSystemTrigger['type']): string => {
   switch (triggerType) {
     case 'reminder_due':
@@ -442,7 +507,7 @@ const persistAssistantMessage = (
     reminderUpdates?: string[];
   }
 ) : PersistedAssistantMessageLocation | null => {
-  const trimmed = message.trim();
+  const trimmed = normalizeAssistantText(message);
   if (!trimmed) {
     return null;
   }
@@ -522,13 +587,20 @@ export const assistantOrchestratorService = {
     }
   ): {
     surfacedMessages: string[];
+    didHydrateHistory: boolean;
+    didUpdateMemory: boolean;
+    didUpdateReminders: boolean;
   } {
     const knownTriggerIds = new Set(
       loadBackgroundCallHistory()
         .map((entry) => entry.triggerId?.trim() || '')
         .filter(Boolean)
     );
+    const assistantConfig = assistantAgentConfigService.getConfig();
     const surfacedMessages: string[] = [];
+    let didHydrateHistory = false;
+    let didUpdateMemory = false;
+    let didUpdateReminders = false;
 
     diagnostics
       .filter((entry) => entry.type === 'native_request_completed')
@@ -540,10 +612,63 @@ export const assistantOrchestratorService = {
         }
 
         knownTriggerIds.add(triggerId);
-        const assistantReply = entry.context?.assistantReply?.trim() || '';
-        const decisionSummary = entry.context?.decisionSummary?.trim() || '';
-        const requestedAt = entry.context?.requestedAt?.trim() || entry.createdAt;
-        const completedAt = entry.context?.completedAt?.trim() || entry.createdAt;
+        const assistantReply = normalizeAssistantText(entry.context?.assistantReply);
+        const decisionSummary = normalizeAssistantText(entry.context?.decisionSummary);
+        const requestedAt = normalizeAssistantText(entry.context?.requestedAt) || entry.createdAt;
+        const completedAt = normalizeAssistantText(entry.context?.completedAt) || entry.createdAt;
+        const memoryAction = parseNativeMemoryAction(entry.context?.memoryAction);
+        const memoryPatch = parseNativeMemoryPatch(entry.context?.memoryPatch);
+        const reminderDrafts = parseNativeReminderDrafts(entry.context?.reminders);
+        const beforeMemory = assistantMemoryService.getMemory();
+        let memoryUpdates: PersistedAIChatMemoryUpdateSection[] = [];
+        const appliedReminders: AssistantReminder[] = [];
+
+        if (assistantConfig.longTermMemoryEnabled && memoryAction === 'update_memory' && memoryPatch) {
+          const afterMemory = assistantMemoryService.applyPatch(memoryPatch);
+          memoryUpdates = buildPersistedMemoryUpdateSections(beforeMemory, afterMemory);
+          didUpdateMemory = true;
+        }
+
+        if (assistantConfig.enabled && reminderDrafts.length > 0) {
+          reminderDrafts.forEach((reminder) => {
+            const normalizedDueAt = normalizeAssistantDateTime(reminder.dueAt);
+            if (!normalizedDueAt || !reminder.text) {
+              return;
+            }
+
+            appliedReminders.push(assistantReminderQueueService.enqueueReminder({
+              id: crypto.randomUUID(),
+              type: reminder.type || 'self_followup',
+              dueAt: normalizedDueAt,
+              status: 'pending',
+              text: reminder.text,
+              ...(reminder.todoId ? { todoId: reminder.todoId } : {}),
+              source: 'agent',
+              createdAt: completedAt
+            }));
+          });
+          didUpdateReminders = didUpdateReminders || appliedReminders.length > 0;
+        }
+
+        if (assistantConfig.longTermMemoryEnabled && appliedReminders.length > 0) {
+          assistantMemoryService.replaceActiveReminders(
+            assistantReminderQueueService.listReminders().filter((reminder) => reminder.status === 'pending')
+          );
+          didUpdateMemory = true;
+        }
+
+        const reminderUpdates = buildPersistedReminderUpdates(appliedReminders);
+        const finalDecisionSummary = decisionSummary
+          || (
+            assistantReply
+              ? `这次原生后台请求返回了一条消息：${assistantReply}`
+              : '这次原生后台请求已完成'
+          );
+        if (assistantConfig.longTermMemoryEnabled && finalDecisionSummary) {
+          assistantMemoryService.appendDecisionSummary(finalDecisionSummary);
+          didUpdateMemory = true;
+        }
+
         const baseHistoryEntry: AssistantBackgroundCallHistoryEntry = {
           id: buildNativeHydratedHistoryId(triggerId),
           triggerId,
@@ -554,24 +679,22 @@ export const assistantOrchestratorService = {
           completedAt,
           status: 'completed',
           action: assistantReply ? 'send_message' : 'silent',
-          memoryAction: 'no_update',
-          reminderCount: 0,
+          memoryAction,
+          reminderCount: appliedReminders.length,
           ...(assistantReply ? { message: assistantReply } : {}),
-          ...(decisionSummary
-            ? { decisionSummary }
-            : {
-              decisionSummary: assistantReply
-                ? `这次原生后台请求返回了一条消息：${assistantReply}`
-                : '这次原生后台请求已完成'
-            })
+          decisionSummary: finalDecisionSummary
         };
 
         upsertBackgroundCallHistory(baseHistoryEntry);
+        didHydrateHistory = true;
         if (!assistantReply) {
           return;
         }
 
-        const persistedLocation = persistAssistantMessage(assistantReply, options?.targetSessionId);
+        const persistedLocation = persistAssistantMessage(assistantReply, options?.targetSessionId, {
+          ...(memoryUpdates.length > 0 ? { memoryUpdates } : {}),
+          ...(reminderUpdates.length > 0 ? { reminderUpdates } : {})
+        });
         if (persistedLocation?.sessionId && persistedLocation.sessionId !== baseHistoryEntry.targetSessionId) {
           upsertBackgroundCallHistory({
             ...baseHistoryEntry,
@@ -583,7 +706,10 @@ export const assistantOrchestratorService = {
       });
 
     return {
-      surfacedMessages
+      surfacedMessages,
+      didHydrateHistory,
+      didUpdateMemory,
+      didUpdateReminders
     };
   },
 

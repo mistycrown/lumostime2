@@ -8,6 +8,7 @@
  * @updated 2026-04-25: Strips unsupported widget UI icon assets on app startup so expired supporter access falls back to emoji rendering.
  * @updated 2026-04-26: Syncs today's TODAY + PIN todo payload so the dedicated scrollable 4x2 widget stays current.
  * @updated 2026-05-01: Syncs tracking-calendar payloads for dedicated 2x2 monthly tracking widgets and re-runs when widget templates change.
+ * @updated 2026-05-02: Syncs full scene-group payloads so the dedicated 4x3 scene widget can follow native time-based group and tab changes.
  */
 import { App as CapacitorApp } from '@capacitor/app';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -20,10 +21,10 @@ import { RedemptionService } from '../services/redemptionService';
 import { uiIconService } from '../services/uiIconService';
 import {
   WIDGET_TEMPLATES_UPDATED_EVENT,
-  buildTrackingCalendarWidgetPayload,
   buildDailyRuntimeWidgetPayload,
   buildDailyWidgetSyncPayload,
   buildLogFromWidgetPendingAction,
+  buildTrackingCalendarWidgetPayload,
   buildTodoPinWidgetPayload,
   buildWidgetRuntimeStateFromSession,
   buildWidgetSessionFromRuntimeState,
@@ -33,6 +34,7 @@ import {
   sanitizeWidgetTemplatesForUiIconSupport,
   saveWidgetTemplatesToStorage
 } from '../services/widgetService';
+import { buildSceneWidgetPayloadFromStorage } from '../services/widgetSceneService';
 import { applyDailyCheckActionForDate } from '../utils/dailyCheckUtils';
 
 export const useWidgetBridgeSync = () => {
@@ -42,6 +44,7 @@ export const useWidgetBridgeSync = () => {
   const { dailyReviews, setDailyReviews, checkTemplates, reviewTemplates } = useReview();
   const [hasHydratedNativeState, setHasHydratedNativeState] = useState(!isNativeAndroidWidgetSupported());
   const [widgetTemplateRevision, setWidgetTemplateRevision] = useState(0);
+  const [sceneWidgetRevision, setSceneWidgetRevision] = useState(0);
 
   const latestSession = useMemo(
     () => (activeSessions.length > 0 ? activeSessions[activeSessions.length - 1] : null),
@@ -73,6 +76,32 @@ export const useWidgetBridgeSync = () => {
 
     window.addEventListener(WIDGET_TEMPLATES_UPDATED_EVENT, handleTemplatesUpdated);
     return () => window.removeEventListener(WIDGET_TEMPLATES_UPDATED_EVENT, handleTemplatesUpdated);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const bumpSceneRevision = () => {
+      setSceneWidgetRevision((previous) => previous + 1);
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === 'sceneGroupState' || event.key === 'sceneTimeSlots') {
+        bumpSceneRevision();
+      }
+    };
+
+    window.addEventListener('sceneGroupsUpdated', bumpSceneRevision);
+    window.addEventListener('sceneTimeSlotsUpdated', bumpSceneRevision);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('sceneGroupsUpdated', bumpSceneRevision);
+      window.removeEventListener('sceneTimeSlotsUpdated', bumpSceneRevision);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   useEffect(() => {
@@ -365,5 +394,27 @@ export const useWidgetBridgeSync = () => {
     logs,
     scopes,
     widgetTemplateRevision
+  ]);
+
+  useEffect(() => {
+    if (!isNativeAndroidWidgetSupported() || !hasHydratedNativeState) {
+      return;
+    }
+
+    const payload = buildSceneWidgetPayloadFromStorage({
+      categories,
+      todos,
+      checkTemplates
+    });
+
+    WidgetBridge.syncSceneWidgetData({ payload }).catch((error) => {
+      console.error('[useWidgetBridgeSync] Failed to sync scene widget payload to native widget', error);
+    });
+  }, [
+    categories,
+    checkTemplates,
+    hasHydratedNativeState,
+    sceneWidgetRevision,
+    todos
   ]);
 };

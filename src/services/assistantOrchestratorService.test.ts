@@ -360,4 +360,153 @@ describe('assistantOrchestratorService', () => {
     expect(history[0].action).toBe('send_message');
     expect(history[0].message).toBe('距离上次说话已经过去 9 小时了。还在吗？');
   });
+
+  it('ignores null-like native assistant replies during hydration', () => {
+    localStorage.setItem('lumostime_ai_chat_sessions_v1', JSON.stringify([{
+      id: 'session-1',
+      title: '测试会话',
+      createdAt: 1,
+      updatedAt: 1,
+      personaId: 'persona-1',
+      contextCacheEnabled: true,
+      messages: []
+    }]));
+
+    const diagnostics: AssistantNativeDiagnosticEntry[] = [{
+      id: 'diagnostic-null-1',
+      type: 'native_request_completed',
+      level: 'success',
+      createdAt: '2026-05-01T11:53:00.000+08:00',
+      message: 'Native background AI request completed',
+      triggerId: 'native-trigger-null-1',
+      triggerType: 'checkin',
+      context: {
+        requestedAt: '2026-05-01T11:52:58.000+08:00',
+        completedAt: '2026-05-01T11:53:00.000+08:00',
+        assistantReply: 'null',
+        decisionSummary: 'null'
+      }
+    }];
+
+    const hydration = assistantOrchestratorService.hydrateNativeCompletedReplies(diagnostics, {
+      targetSessionId: 'session-1'
+    });
+
+    expect(hydration.surfacedMessages).toEqual([]);
+
+    const persistedSessions = JSON.parse(localStorage.getItem('lumostime_ai_chat_sessions_v1') || '[]');
+    expect(persistedSessions[0].messages).toHaveLength(0);
+
+    const history = assistantOrchestratorService.listBackgroundCallHistory();
+    expect(history).toHaveLength(1);
+    expect(history[0].action).toBe('silent');
+    expect(history[0].message).toBeUndefined();
+  });
+
+  it('applies native memory patches and decision summaries during hydration', () => {
+    localStorage.setItem('lumostime_ai_chat_sessions_v1', JSON.stringify([{
+      id: 'session-1',
+      title: '测试会话',
+      createdAt: 1,
+      updatedAt: 1,
+      personaId: 'persona-1',
+      contextCacheEnabled: true,
+      messages: []
+    }]));
+
+    const diagnostics: AssistantNativeDiagnosticEntry[] = [{
+      id: 'diagnostic-memory-1',
+      type: 'native_request_completed',
+      level: 'success',
+      createdAt: '2026-05-01T12:00:00.000+08:00',
+      message: 'Native background AI request completed',
+      triggerId: 'native-trigger-memory-1',
+      triggerType: 'checkin',
+      context: {
+        requestedAt: '2026-05-01T11:59:58.000+08:00',
+        completedAt: '2026-05-01T12:00:00.000+08:00',
+        assistantReply: '我记住你刚刚在处理电脑恢复后的状态了。',
+        decisionSummary: '记录了用户刚恢复电脑、当前在重连工作流。',
+        memoryAction: 'update_memory',
+        memoryPatch: JSON.stringify({
+          lastKnownState: '刚处理完电脑恢复，正在回到工作流。',
+          workingMemorySummary: '需要重新接续中断前的任务。',
+          recentDecisions: ['优先帮助用户恢复上下文']
+        })
+      }
+    }];
+
+    const hydration = assistantOrchestratorService.hydrateNativeCompletedReplies(diagnostics, {
+      targetSessionId: 'session-1'
+    });
+
+    expect(hydration.surfacedMessages).toEqual(['我记住你刚刚在处理电脑恢复后的状态了。']);
+    expect(hydration.didUpdateMemory).toBe(true);
+    expect(assistantMemoryService.applyPatch).toHaveBeenCalledWith({
+      lastKnownState: '刚处理完电脑恢复，正在回到工作流。',
+      workingMemorySummary: '需要重新接续中断前的任务。',
+      recentDecisions: ['优先帮助用户恢复上下文']
+    });
+    expect(assistantMemoryService.appendDecisionSummary).toHaveBeenCalledWith('记录了用户刚恢复电脑、当前在重连工作流。');
+
+    const persistedSessions = JSON.parse(localStorage.getItem('lumostime_ai_chat_sessions_v1') || '[]');
+    expect(persistedSessions[0].messages).toHaveLength(1);
+    expect(persistedSessions[0].messages[0].memoryUpdates).toEqual([
+      { label: '当前状态', items: ['还在写东西'] }
+    ]);
+
+    const history = assistantOrchestratorService.listBackgroundCallHistory();
+    expect(history[0].memoryAction).toBe('update_memory');
+    expect(history[0].decisionSummary).toBe('记录了用户刚恢复电脑、当前在重连工作流。');
+  });
+
+  it('marks native hydration as memory-updated even when the patch produces no visible diff sections', () => {
+    localStorage.setItem('lumostime_ai_chat_sessions_v1', JSON.stringify([{
+      id: 'session-1',
+      title: '测试会话',
+      createdAt: 1,
+      updatedAt: 1,
+      personaId: 'persona-1',
+      contextCacheEnabled: true,
+      messages: []
+    }]));
+
+    vi.mocked(assistantMemoryService.getMemory).mockReturnValue({
+      ...baseMemory,
+      lastKnownState: '用户可能已经休息了'
+    });
+    vi.mocked(assistantMemoryService.applyPatch).mockReturnValue({
+      ...baseMemory,
+      lastKnownState: '用户可能已经休息了'
+    });
+
+    const diagnostics: AssistantNativeDiagnosticEntry[] = [{
+      id: 'diagnostic-memory-2',
+      type: 'native_request_completed',
+      level: 'success',
+      createdAt: '2026-05-01T12:10:00.000+08:00',
+      message: 'Native background AI request completed',
+      triggerId: 'native-trigger-memory-2',
+      triggerType: 'checkin',
+      context: {
+        requestedAt: '2026-05-01T12:09:58.000+08:00',
+        completedAt: '2026-05-01T12:10:00.000+08:00',
+        memoryAction: 'update_memory',
+        memoryPatch: JSON.stringify({
+          lastKnownState: '用户可能已经休息了'
+        }),
+        decisionSummary: '确认当前仍应视为休息时段。'
+      }
+    }];
+
+    const hydration = assistantOrchestratorService.hydrateNativeCompletedReplies(diagnostics, {
+      targetSessionId: 'session-1'
+    });
+
+    expect(hydration.didUpdateMemory).toBe(true);
+    expect(assistantMemoryService.applyPatch).toHaveBeenCalledWith({
+      lastKnownState: '用户可能已经休息了'
+    });
+    expect(assistantMemoryService.appendDecisionSummary).toHaveBeenCalledWith('确认当前仍应视为休息时段。');
+  });
 });

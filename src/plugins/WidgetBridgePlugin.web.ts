@@ -7,6 +7,7 @@
  * @updated 2026-04-25: Added no-op DAILY_RUNTIME payload sync for the native 4x4 heatmap widget.
  * @updated 2026-04-26: Added no-op TODAY + PIN widget payload sync for the dedicated scrollable todo widget.
  * @updated 2026-05-01: Added no-op tracking-calendar payload sync for the dedicated 2x2 tracking calendar widget.
+ * @updated 2026-05-02: Added no-op scene widget payload sync for the dedicated 4x3 scene widget.
  */
 import { WebPlugin } from '@capacitor/core';
 import type {
@@ -16,6 +17,7 @@ import type {
   WidgetBridgePendingAction,
   WidgetBridgePendingDailyAction,
   WidgetBridgePlugin,
+  WidgetBridgeScenePayload,
   WidgetBridgeRuntimeState,
   WidgetBridgeTrackingCalendarPayload,
   WidgetBridgeTodoPinPayload,
@@ -63,6 +65,10 @@ export class WidgetBridgeWeb extends WebPlugin implements WidgetBridgePlugin {
 
   async syncTrackingCalendarWidgetData(
     _options?: { payload: WidgetBridgeTrackingCalendarPayload | null }
+  ): Promise<void> {}
+
+  async syncSceneWidgetData(
+    _options?: { payload: WidgetBridgeScenePayload | null }
   ): Promise<void> {}
 
   async refreshWidget(): Promise<void> {}

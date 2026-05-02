@@ -3,6 +3,7 @@
 Contains business logic and external integrations.
 
 Update 2026-04-27: `widgetService.ts` now feeds the TODAY + PIN widget from the same shared today-category helper used by todo pickers, so due-today and recurring-today todos no longer disappear from the widget payload.
+Update 2026-05-01: `assistantOrchestratorService.ts` now treats native diagnostic `assistantReply/decisionSummary` values such as literal `null` as empty, so malformed Android background results no longer create bogus `null` chat bubbles when rehydrated into the main conversation.
 Update 2026-05-01: `assistantOrchestratorService.ts` now hydrates completed native-background replies back into persisted AI chat sessions by trigger id, so Android-direct check-ins no longer appear only in diagnostics/history while missing from the main conversation.
 Update 2026-04-27: `assistantOrchestratorService.ts` now persists background reply `memoryUpdates` and `reminderUpdates` alongside surfaced assistant messages, so automatic replies render the same subtle expand controls as foreground chat turns.
 Update 2026-04-27: `assistantOrchestratorService.ts` now records the shared native trigger id plus request/response debug exchanges inside background call history, so web AI runs can be correlated with Android poll diagnostics.
