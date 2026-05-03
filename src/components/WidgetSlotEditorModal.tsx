@@ -5,6 +5,10 @@
  * @pos Component
  * @description Unified widget slot editor that lets each slot choose its own type, icon mode, source binding, and background color.
  * @updated 2026-05-03: Rewrote the file in UTF-8, cleaned all mojibake copy, and let daily UI icon mode follow the currently selected daily item.
+ * @updated 2026-05-03: Added an explicit "follow default UI icon" action inside the UI icon picker so daily widget bindings expose the fallback entry more clearly.
+ * @updated 2026-05-03: Moved timer icon-style editing below tag, todo, and scope binding so the source comes first.
+ * @updated 2026-05-03: Added timer background-color selection and a shared default-color reset for timer, daily, and shortcut slots.
+ * @updated 2026-05-03: Restored action-aware shortcut default colors so preview and saved slots stay aligned with shortcut metadata.
  * @updated 2026-04-25: Added supporter-gated widget UI icon mode while keeping emoji-only editing as the fallback path.
  */
 
@@ -24,7 +28,7 @@ import {
   getShortcutWidgetActionLabel
 } from '../services/widgetShortcutService';
 import { Category, CheckTemplate, Scope, TodoCategory, TodoItem } from '../types';
-import { getWidgetSlotFillColor } from '../utils/colorAdapterUtils';
+import { getColorHexForCharts, getWidgetSlotFillColor } from '../utils/colorAdapterUtils';
 import { getEligibleNfcDailyCheckItems } from '../utils/dailyCheckUtils';
 import { normalizeHexColor } from '../utils/colorUtils';
 import { CustomSelect } from './CustomSelect';
@@ -146,7 +150,7 @@ const clearTypeSpecificFields = (
   if (nextType === 'shortcut') {
     return {
       ...baseDraft,
-      backgroundColor: draft.backgroundColor || DEFAULT_SHORTCUT_WIDGET_COLOR
+      backgroundColor: null
     };
   }
 
@@ -265,18 +269,7 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
     return null;
   })();
 
-  const defaultUiIconApplyLabel = (() => {
-    if (localDraft.slotType === 'timer') {
-      return '跟随当前标签 UI Icon';
-    }
-    if (localDraft.slotType === 'daily') {
-      return '跟随当前日课 UI Icon';
-    }
-    if (localDraft.slotType === 'shortcut') {
-      return '使用动作默认 UI Icon';
-    }
-    return '应用默认 UI Icon';
-  })();
+  const canApplyDefaultUiIcon = Boolean(defaultUiIcon);
 
   const setIconMode = (nextMode: WidgetSlotIconMode) => {
     updateDraft((previousDraft) => ({
@@ -318,20 +311,34 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
     return '这个槽位可以配置成计时器、日课或快捷方式';
   })();
 
-  const effectiveColor = (() => {
+  const defaultBackgroundColor = (() => {
+    if (localDraft.slotType === 'timer') {
+      return getColorHexForCharts(selectedActivity?.color || selectedCategory?.themeColor || '') || DEFAULT_DAILY_WIDGET_COLOR;
+    }
     if (localDraft.slotType === 'daily') {
-      return normalizeHexColor(localDraft.backgroundColor || '') || DEFAULT_DAILY_WIDGET_COLOR;
+      return DEFAULT_DAILY_WIDGET_COLOR;
     }
     if (localDraft.slotType === 'shortcut') {
-      return normalizeHexColor(localDraft.backgroundColor || '')
-        || getShortcutWidgetActionColor(localDraft.shortcutAction)
-        || DEFAULT_SHORTCUT_WIDGET_COLOR;
+      return getShortcutWidgetActionColor(localDraft.shortcutAction) || DEFAULT_SHORTCUT_WIDGET_COLOR;
+    }
+    return '#FFFFFF';
+  })();
+
+  const effectiveColor = (() => {
+    if (localDraft.slotType === 'timer') {
+      return normalizeHexColor(localDraft.backgroundColor || '') || defaultBackgroundColor;
+    }
+    if (localDraft.slotType === 'daily') {
+      return normalizeHexColor(localDraft.backgroundColor || '') || defaultBackgroundColor;
+    }
+    if (localDraft.slotType === 'shortcut') {
+      return normalizeHexColor(localDraft.backgroundColor || '') || defaultBackgroundColor;
     }
     return '#FFFFFF';
   })();
 
   const previewFillColor = (() => {
-    if (localDraft.slotType === 'daily' || localDraft.slotType === 'shortcut') {
+    if (localDraft.slotType === 'timer' || localDraft.slotType === 'daily' || localDraft.slotType === 'shortcut') {
       return getWidgetSlotFillColor(effectiveColor, false);
     }
     return '#FFFFFF';
@@ -370,7 +377,7 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
         customIcon: nextCustomIcon,
         iconMode: nextIconMode,
         uiIcon: nextUiIcon,
-        backgroundColor: null,
+        backgroundColor: normalizeHexColor(localDraft.backgroundColor || '') || defaultBackgroundColor,
         checkTemplateId: null,
         checkItemId: null,
         shortcutAction: null,
@@ -406,10 +413,7 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
         customIcon: nextCustomIcon,
         iconMode: nextIconMode,
         uiIcon: nextUiIcon,
-        backgroundColor:
-          normalizeHexColor(localDraft.backgroundColor || '')
-          || getShortcutWidgetActionColor(localDraft.shortcutAction)
-          || DEFAULT_SHORTCUT_WIDGET_COLOR,
+        backgroundColor: normalizeHexColor(localDraft.backgroundColor || '') || defaultBackgroundColor,
         categoryId: null,
         activityId: null,
         linkedTodoId: null,
@@ -451,7 +455,7 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
         <div>
           <h3 className="text-sm font-bold text-stone-800">UI icon</h3>
         </div>
-        {defaultUiIcon && (
+        {canApplyDefaultUiIcon && (
           <button
             type="button"
             onClick={() => {
@@ -464,7 +468,7 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
             }}
             className="shrink-0 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[11px] font-medium text-stone-500 transition-colors hover:border-stone-300 hover:text-stone-800"
           >
-            {defaultUiIconApplyLabel}
+            跟随默认 UI Icon
           </button>
         )}
       </div>
@@ -480,6 +484,65 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
           }));
         }}
       />
+    </div>
+  );
+
+  const renderIconModeSection = () => (
+    <div>
+      <div className="mb-3 px-1">
+        <h3 className="text-sm font-bold text-stone-800">图标样式</h3>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {ICON_MODE_OPTIONS.map((option) => {
+          const isActive = localDraft.iconMode === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setIconMode(option.value)}
+              className={`rounded-2xl border px-4 py-3 text-sm font-medium transition-all ${
+                isActive
+                  ? 'border-stone-800 bg-stone-800 text-white shadow-sm'
+                  : 'border-stone-200 bg-white text-stone-600 hover:border-stone-300'
+              }`}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const renderBackgroundColorSection = () => (
+    <div>
+      <div className="mb-3 flex items-center justify-between px-1">
+        <h3 className="text-sm font-bold text-stone-800">背景颜色</h3>
+        <button
+          type="button"
+          onClick={() => setDraftField('backgroundColor', null)}
+          className="text-xs font-medium text-stone-400 transition-colors hover:text-stone-700"
+        >
+          使用默认颜色
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-3">
+        {colorOptions.map((color) => {
+          const normalized = normalizeCustomColorHex(color) || DEFAULT_DAILY_WIDGET_COLOR;
+          const isActive = normalized === effectiveColor.toUpperCase();
+          return (
+            <button
+              key={normalized}
+              type="button"
+              onClick={() => setDraftField('backgroundColor', normalized)}
+              className={`h-10 w-10 rounded-full border-2 transition-transform hover:scale-105 ${
+                isActive ? 'border-stone-800' : 'border-white'
+              }`}
+              style={{ backgroundColor: normalized }}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 
@@ -547,39 +610,10 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
             </div>
           </div>
 
-          {canUseUiIcon && (
-            <div>
-              <div className="mb-3 px-1">
-                <h3 className="text-sm font-bold text-stone-800">图标样式</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {ICON_MODE_OPTIONS.map((option) => {
-                  const isActive = localDraft.iconMode === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setIconMode(option.value)}
-                      className={`rounded-2xl border px-4 py-3 text-sm font-medium transition-all ${
-                        isActive
-                          ? 'border-stone-800 bg-stone-800 text-white shadow-sm'
-                          : 'border-stone-200 bg-white text-stone-600 hover:border-stone-300'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          {canUseUiIcon && localDraft.slotType && localDraft.slotType !== 'timer' && renderIconModeSection()}
 
           {localDraft.slotType === 'timer' && (
             <>
-              {localDraft.iconMode === 'emoji'
-                ? renderEmojiInput(selectedActivity?.icon || selectedCategory?.icon || '⏱', '跟随标签图标')
-                : renderUiIconSection()}
-
               <div>
                 <div className="mb-4 px-1">
                   <h3 className="text-sm font-bold text-stone-800">标签</h3>
@@ -617,6 +651,14 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
                 selectedScopeIds={localDraft.scopeIds || undefined}
                 onSelect={(scopeIds) => setDraftField('scopeIds', scopeIds || null)}
               />
+
+              {canUseUiIcon && renderIconModeSection()}
+
+              {localDraft.iconMode === 'emoji'
+                ? renderEmojiInput(selectedActivity?.icon || selectedCategory?.icon || '⏱', '跟随标签图标')
+                : renderUiIconSection()}
+
+              {renderBackgroundColorSection()}
             </>
           )}
 
@@ -667,28 +709,8 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
                 ? renderEmojiInput(selectedDailyItem?.icon || '✓', '跟随日课图标')
                 : renderUiIconSection()}
 
-              <div>
-                <div className="mb-3 px-1">
-                  <h3 className="text-sm font-bold text-stone-800">背景颜色</h3>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {colorOptions.map((color) => {
-                    const normalized = normalizeCustomColorHex(color) || DEFAULT_DAILY_WIDGET_COLOR;
-                    const isActive = normalized === effectiveColor.toUpperCase();
-                    return (
-                      <button
-                        key={normalized}
-                        type="button"
-                        onClick={() => setDraftField('backgroundColor', normalized)}
-                        className={`h-10 w-10 rounded-full border-2 transition-transform hover:scale-105 ${
-                          isActive ? 'border-stone-800' : 'border-white'
-                        }`}
-                        style={{ backgroundColor: normalized }}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
+
+              {renderBackgroundColorSection()}
             </>
           )}
 
@@ -710,7 +732,14 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
                       ...previousDraft,
                       shortcutAction: nextAction,
                       label: getShortcutWidgetActionLabel(nextAction),
-                      backgroundColor: previousDraft.backgroundColor || getShortcutWidgetActionColor(nextAction)
+                      backgroundColor: (() => {
+                        const currentColor = normalizeHexColor(previousDraft.backgroundColor || '');
+                        const previousDefaultColor = getShortcutWidgetActionColor(previousDraft.shortcutAction);
+                        if (!currentColor || currentColor === previousDefaultColor.toUpperCase()) {
+                          return getShortcutWidgetActionColor(nextAction);
+                        }
+                        return previousDraft.backgroundColor;
+                      })()
                     }));
                   }}
                   placeholder="选择一个快捷动作"
@@ -721,29 +750,8 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
                 ? renderEmojiInput(getShortcutWidgetActionEmoji(localDraft.shortcutAction), '使用动作默认 emoji')
                 : renderUiIconSection()}
 
-              <div>
-                <div className="mb-3 px-1">
-                  <h3 className="text-sm font-bold text-stone-800">背景颜色</h3>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {colorOptions.map((color) => {
-                    const normalized = normalizeCustomColorHex(color) || DEFAULT_SHORTCUT_WIDGET_COLOR;
-                    const isActive = normalized === effectiveColor.toUpperCase();
-                    return (
-                      <button
-                        key={normalized}
-                        type="button"
-                        onClick={() => setDraftField('backgroundColor', normalized)}
-                        className={`h-10 w-10 rounded-full border-2 transition-transform hover:scale-105 ${
-                          isActive ? 'border-stone-800' : 'border-white'
-                        }`}
-                        style={{ backgroundColor: normalized }}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
 
+              {renderBackgroundColorSection()}
               {selectedShortcutMeta && (
                 <div className="rounded-3xl border border-stone-200 bg-white px-4 py-4">
                   <div className="text-sm font-semibold text-stone-800">{selectedShortcutMeta.label}</div>

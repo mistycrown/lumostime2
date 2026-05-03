@@ -71,7 +71,7 @@ object WidgetTrackingCalendarBitmapRenderer {
         }
         val dayPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = parseColor("#111827")
-            textSize = 13f * density
+            textSize = 11.8f * density
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
             textAlign = Paint.Align.CENTER
         }
@@ -84,9 +84,9 @@ object WidgetTrackingCalendarBitmapRenderer {
 
         val headerLeftPadding = 16f * density
         val headerRightPadding = 14f * density
-        val gridLeftPadding = 1.5f * density
-        val gridRightPadding = 1f * density
-        val gridBottomPadding = 2f * density
+        val gridLeftPadding = 0.5f * density
+        val gridRightPadding = 0.5f * density
+        val gridBottomPadding = 1f * density
         val sourceBaseline = 18f * density
         val titleBaseline = 35f * density
         val title = resolveTitle(template).ifBlank { "\u8ffd\u8e2a\u65e5\u5386" }
@@ -114,13 +114,13 @@ object WidgetTrackingCalendarBitmapRenderer {
             ?.associate { entry -> dayOfMonth(entry.date) to entry.value.coerceAtLeast(0) }
             ?: emptyMap()
 
-        val gridTop = 52f * density
+        val gridTop = 49f * density
         val gridBottom = widgetHeightPx - gridBottomPadding
         val gridLeft = gridLeftPadding
         val gridRight = widgetWidthPx - gridRightPadding
-        val weekdayHeight = 12f * density
+        val weekdayHeight = 10.5f * density
         val cellGapX = 3.2f * density
-        val cellGapY = 5.6f * density
+        val cellGapY = 4.4f * density
         val cellSize = min(
             (gridRight - gridLeft - cellGapX * 6f) / 7f,
             (gridBottom - (gridTop + weekdayHeight) - cellGapY * 5f) / 6f

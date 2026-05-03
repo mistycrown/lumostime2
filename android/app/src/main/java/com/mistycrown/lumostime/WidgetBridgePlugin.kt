@@ -12,6 +12,7 @@ import org.json.JSONObject
 /**
  * Capacitor bridge for widget templates, instance binding state, runtime synchronization, and pending action import.
  * Updated 2026-05-02: Added dedicated scene widget payload sync support for the Android 4x3 scene widget.
+ * Updated 2026-05-03: Routed widget sync calls to targeted widget-family refresh helpers instead of always refreshing every widget provider.
  */
 @CapacitorPlugin(name = "WidgetBridge")
 class WidgetBridgePlugin : Plugin() {
@@ -50,7 +51,8 @@ class WidgetBridgePlugin : Plugin() {
         }
 
         WidgetStores.saveTemplates(context, templates)
-        WidgetRefreshCoordinator.refreshAllAsync(context)
+        WidgetRefreshCoordinator.refreshTimerWidgets(context)
+        WidgetRefreshCoordinator.refreshTrackingCalendarWidgets(context)
         call.resolve()
     }
 
@@ -153,7 +155,9 @@ class WidgetBridgePlugin : Plugin() {
         }
 
         WidgetStores.saveRuntimeState(context, runtimeState)
-        WidgetRefreshCoordinator.refreshAllAsync(context)
+        WidgetRefreshCoordinator.refreshTimerWidgets(context)
+        WidgetRefreshCoordinator.refreshTodoPinWidgets(context)
+        WidgetRefreshCoordinator.refreshSceneWidgets(context)
         call.resolve()
     }
 
@@ -170,7 +174,8 @@ class WidgetBridgePlugin : Plugin() {
         }
 
         WidgetStores.saveDailySyncPayload(context, payload)
-        WidgetRefreshCoordinator.refreshAllAsync(context)
+        WidgetRefreshCoordinator.refreshTimerWidgets(context)
+        WidgetRefreshCoordinator.refreshSceneWidgets(context)
         call.resolve()
     }
 
@@ -190,7 +195,7 @@ class WidgetBridgePlugin : Plugin() {
         }
 
         WidgetStores.saveDailyRuntimePayload(context, payload)
-        WidgetRefreshCoordinator.refreshAllAsync(context)
+        WidgetRefreshCoordinator.refreshDailyRuntimeWidgets(context)
         call.resolve()
     }
 
@@ -206,7 +211,7 @@ class WidgetBridgePlugin : Plugin() {
         }
 
         WidgetStores.saveTodoPinPayload(context, payload)
-        WidgetRefreshCoordinator.refreshAllAsync(context)
+        WidgetRefreshCoordinator.refreshTodoPinWidgets(context)
         call.resolve()
     }
 
@@ -221,7 +226,7 @@ class WidgetBridgePlugin : Plugin() {
         }
 
         WidgetStores.saveTrackingCalendarPayload(context, payload)
-        WidgetRefreshCoordinator.refreshAllAsync(context)
+        WidgetRefreshCoordinator.refreshTrackingCalendarWidgets(context)
         call.resolve()
     }
 
@@ -238,7 +243,7 @@ class WidgetBridgePlugin : Plugin() {
         }
 
         WidgetStores.saveScenePayload(context, payload)
-        WidgetRefreshCoordinator.refreshAllAsync(context)
+        WidgetRefreshCoordinator.refreshSceneWidgets(context)
         call.resolve()
     }
 

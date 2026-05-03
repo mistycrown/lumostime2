@@ -7,6 +7,8 @@
  * @updated 2026-05-01: Added the first tracking-calendar editor so dedicated 2x2 calendar widgets can follow tags, scopes, or daily checks.
  * @updated 2026-05-01: Cleaned all localized copy and aligned the preview wording with the new tracking-calendar visual design.
  * @updated 2026-05-03: Reordered the flow to bind the tracked object before choosing icon mode, and let daily bindings fall back to their default UI icon with one tap.
+ * @updated 2026-05-03: Removed helper copy under section titles in the tracking-object editor to keep the sheet more minimal.
+ * @updated 2026-05-03: Normalized tracking-color selection comparisons so preset palette colors and custom color-group entries share the same selected outline state.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
@@ -14,8 +16,9 @@ import { COLOR_OPTIONS } from '../constants';
 import { useCustomColors } from '../hooks/useCustomColors';
 import { normalizeCustomColorHex } from '../services/customColorGroupService';
 import { UIIconType, uiIconService } from '../services/uiIconService';
-import { WidgetTrackingCalendarSourceType } from '../services/widgetService';
+import { DEFAULT_TRACKING_CALENDAR_COLOR, WidgetTrackingCalendarSourceType } from '../services/widgetService';
 import { Category, CheckTemplate, Scope } from '../types';
+import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 import { normalizeHexColor } from '../utils/colorUtils';
 import { getEligibleNfcDailyCheckItems } from '../utils/dailyCheckUtils';
 import { CustomSelect } from './CustomSelect';
@@ -115,6 +118,26 @@ const clearTypeSpecificFields = (
   label: null,
   backgroundColor: null
 });
+
+const clampColorChannel = (value: number): number => Math.max(0, Math.min(255, Math.round(value)));
+
+const getColorSelectionOutline = (hex: string): string => {
+  const normalized = normalizeCustomColorHex(hex);
+  if (!normalized) {
+    return 'rgba(68, 64, 60, 0.9)';
+  }
+
+  const raw = normalized.slice(1);
+  const expanded = raw.length === 3
+    ? raw.split('').map((char) => char + char).join('')
+    : raw;
+
+  const red = parseInt(expanded.slice(0, 2), 16);
+  const green = parseInt(expanded.slice(2, 4), 16);
+  const blue = parseInt(expanded.slice(4, 6), 16);
+
+  return `rgba(${clampColorChannel(red * 0.68)}, ${clampColorChannel(green * 0.68)}, ${clampColorChannel(blue * 0.68)}, 0.96)`;
+};
 
 export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarEditorModalProps> = ({
   isOpen,
@@ -276,20 +299,22 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
     return '清空';
   })();
 
-  const uiIconDescription = (() => {
+  const defaultTrackingColor = (() => {
     if (localDraft.sourceType === 'tag') {
-      return '标签可以直接跟随活动或分类自带的 UI icon。';
+      return getColorHexForCharts(selectedActivity?.color || selectedCategory?.themeColor || '') || null;
     }
     if (localDraft.sourceType === 'scope') {
-      return '领域可以跟随它本来的 UI icon。';
+      return getColorHexForCharts(selectedScope?.themeColor || '') || null;
     }
     if (localDraft.sourceType === 'daily') {
-      return '日课也可以跟随默认 UI icon，颜色可以先留空。';
+      return DEFAULT_TRACKING_CALENDAR_COLOR;
     }
-    return '输入兑换码并启用 UI 主题后，可以切换成 UI icon。';
+    return null;
   })();
 
-  const effectiveColor = normalizeHexColor(localDraft.backgroundColor || '') || null;
+  const effectiveColor = normalizeHexColor(localDraft.backgroundColor || '') || defaultTrackingColor;
+  const normalizedEffectiveColor = effectiveColor ? normalizeCustomColorHex(effectiveColor) : null;
+  const previewColor = effectiveColor ? `${effectiveColor}22` : '#FFFFFF';
   const effectiveEmojiIcon = normalizeCustomIcon(localDraft.customIcon || '') || defaultEmojiIcon;
   const effectiveUiIcon =
     canUseUiIcon && localDraft.iconMode === 'uiIcon' ? (localDraft.uiIcon || undefined) : undefined;
@@ -390,12 +415,11 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
     </div>
   );
 
-  const renderUiIconSection = (description: string) => (
+  const renderUiIconSection = () => (
     <div>
       <div className="mb-3 flex items-start justify-between gap-3 px-1">
         <div>
           <h3 className="text-sm font-bold text-stone-800">UI icon</h3>
-          <p className="mt-1 text-xs text-stone-400">{description}</p>
         </div>
         {defaultUiIcon && (
           <button
@@ -447,7 +471,7 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
           <div className="flex items-center gap-4 px-1">
             <div
               className="flex h-24 w-24 items-center justify-center rounded-full border border-stone-200 bg-white leading-none shadow-[0_10px_24px_rgba(15,23,42,0.08)] sm:h-28 sm:w-28 md:h-32 md:w-32"
-              style={{ backgroundColor: effectiveColor || '#FFFFFF', containerType: 'size' } as React.CSSProperties}
+              style={{ backgroundColor: previewColor, containerType: 'size' } as React.CSSProperties}
             >
               {effectiveUiIconSrc ? (
                 <img
@@ -475,11 +499,10 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
             </div>
           </div>
 
-          <div>
-            <div className="mb-3 px-1">
-              <h3 className="text-sm font-bold text-stone-800">追踪类型</h3>
-              <p className="mt-1 text-xs text-stone-400">选择这个月历要追踪标签、领域还是日课。</p>
-            </div>
+            <div>
+              <div className="mb-3 px-1">
+                <h3 className="text-sm font-bold text-stone-800">追踪类型</h3>
+              </div>
             <div className="grid grid-cols-3 gap-3">
               {SOURCE_OPTIONS.map((option) => {
                 const isActive = localDraft.sourceType === option.value;
@@ -505,7 +528,6 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
             <div>
               <div className="mb-4 px-1">
                 <h3 className="text-sm font-bold text-stone-800">标签</h3>
-                <p className="mt-1 text-xs text-stone-400">当天存在至少一条命中该标签的记录时点亮。</p>
               </div>
               <TagAssociation
                 categories={categories}
@@ -533,7 +555,6 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
             <div>
               <div className="mb-4 px-1">
                 <h3 className="text-sm font-bold text-stone-800">领域</h3>
-                <p className="mt-1 text-xs text-stone-400">当天有记录关联到这个领域时点亮。</p>
               </div>
               <CustomSelect
                 value={localDraft.scopeId || ''}
@@ -551,7 +572,6 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
             <div>
               <div className="mb-4 px-1">
                 <h3 className="text-sm font-bold text-stone-800">绑定手动日课</h3>
-                <p className="mt-1 text-xs text-stone-400">这里只显示手动日课，完成当天会点亮。</p>
               </div>
 
               {manualItems.length === 0 ? (
@@ -591,7 +611,6 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
                 <div>
                   <div className="mb-3 px-1">
                     <h3 className="text-sm font-bold text-stone-800">图标样式</h3>
-                    <p className="mt-1 text-xs text-stone-400">先选追踪对象，再决定是沿用 emoji 还是切到 UI icon。</p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     {ICON_MODE_OPTIONS.map((option) => {
@@ -624,7 +643,7 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
 
               {!canUseUiIcon || localDraft.iconMode === 'emoji'
                 ? renderEmojiInput(iconPlaceholder, iconResetLabel)
-                : renderUiIconSection(uiIconDescription)}
+                : renderUiIconSection()}
             </>
           )}
 
@@ -633,7 +652,6 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
               <div className="mb-3 flex items-center justify-between px-1">
                 <div>
                   <h3 className="text-sm font-bold text-stone-800">主题颜色</h3>
-                  <p className="mt-1 text-xs text-stone-400">不选时会尽量跟随标签或领域原色；日课可以先留空。</p>
                 </div>
                 <button
                   type="button"
@@ -649,17 +667,25 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
                   if (!normalized) {
                     return null;
                   }
-                  const isActive = normalized === effectiveColor;
+                  const isActive = normalized === normalizedEffectiveColor;
                   return (
                     <button
                       key={normalized}
                       type="button"
                       onClick={() => setDraftField('backgroundColor', normalized)}
-                      className={`h-10 w-10 rounded-full border-2 transition-transform hover:scale-105 ${
-                        isActive ? 'border-stone-800' : 'border-white'
-                      }`}
-                      style={{ backgroundColor: normalized }}
-                    />
+                      aria-pressed={isActive}
+                      className="h-10 w-10 rounded-full border-0 bg-white p-[2px] transition-colors hover:scale-105"
+                      style={{
+                        boxShadow: isActive
+                          ? `0 0 0 2px rgba(255,255,255,0.98), 0 0 0 4px ${getColorSelectionOutline(normalized)}`
+                          : '0 0 0 1px rgba(255,255,255,0.84)'
+                      }}
+                    >
+                      <span
+                        className="block h-full w-full rounded-full"
+                        style={{ backgroundColor: normalized }}
+                      />
+                    </button>
                   );
                 })}
               </div>

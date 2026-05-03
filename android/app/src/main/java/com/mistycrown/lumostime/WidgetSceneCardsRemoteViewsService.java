@@ -15,8 +15,11 @@ import java.util.Objects;
 
 /**
  * RemoteViews collection service backing the scrollable 5-column scene card grid.
+ * Updated 2026-05-03: Switched title truncation to a code-point-safe implementation so emoji and surrogate pairs are not split mid-character.
  */
 public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
+    private static final int MAX_CARD_TITLE_CODE_POINTS = 4;
+
     @Override
     public RemoteViewsFactory onGetViewFactory(Intent intent) {
         return new Factory(getApplicationContext(), intent);
@@ -286,11 +289,11 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
             if (trimmed.isEmpty()) {
                 return "";
             }
-            int maxChars = 4;
-            if (trimmed.length() <= maxChars) {
+            if (trimmed.codePointCount(0, trimmed.length()) <= MAX_CARD_TITLE_CODE_POINTS) {
                 return trimmed;
             }
-            return trimmed.substring(0, maxChars) + "…";
+            int endIndex = trimmed.offsetByCodePoints(0, MAX_CARD_TITLE_CODE_POINTS);
+            return trimmed.substring(0, endIndex) + "…";
         }
     }
 }

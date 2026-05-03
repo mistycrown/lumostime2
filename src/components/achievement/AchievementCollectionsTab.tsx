@@ -436,7 +436,7 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
                 className="inline-flex items-center gap-2 rounded-full bg-stone-900 px-4 py-2 text-sm text-white transition-colors disabled:bg-stone-300"
               >
                 <Hammer size={14} />
-                砸碎取回
+                砸碎
               </button>
             </div>
           </div>

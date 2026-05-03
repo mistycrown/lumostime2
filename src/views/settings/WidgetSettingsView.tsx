@@ -9,6 +9,8 @@
  * @updated 2026-04-26: Updated 4x1 widget previews to render five evenly spaced slots.
  * @updated 2026-05-03: Removed field-level helper copy from the widget settings editor to keep the UI more concise.
  * @updated 2026-05-03: Removed bound desktop instance counts from the widget template list.
+ * @updated 2026-05-03: Reduced load-time template writes so opening the widget settings page no longer triggers unnecessary local/native saves.
+ * @updated 2026-05-03: Tightened the 2x2 tracking-calendar preview with smaller date numbers and narrower horizontal calendar padding.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
@@ -34,7 +36,6 @@ import {
 } from '../../services/uiIconService';
 import {
   DEFAULT_WIDGET_SIZE,
-  DEFAULT_WIDGET_TEMPLATE_TYPE,
   TRACKING_CALENDAR_WIDGET_SIZE,
   WidgetTemplate,
   WidgetTemplateSlotConfig,
@@ -50,11 +51,11 @@ import {
   createEmptyWidgetTemplateSlot,
   createWidgetTemplate,
   findDailyWidgetBinding,
+  areWidgetTemplatesEqual,
   getWidgetGridBySize,
   getWidgetSizeLabel,
   getWidgetSizeOptions,
   getWidgetSlotCountBySize,
-  getWidgetTemplateTypeLabel,
   isNativeAndroidWidgetSupported,
   loadWidgetTemplatesFromStorage,
   normalizeTrackingCalendarConfig,
@@ -89,9 +90,6 @@ const AUTO_SAVE_DELAY_MS = 350;
 const PREVIEW_MAX_COLUMNS = 5;
 const PREVIEW_MAX_ROWS = 2;
 const PREVIEW_TITLE_ROW_RATIO = 0.6;
-
-const areWidgetTemplatesEqual = (left: WidgetTemplate[], right: WidgetTemplate[]): boolean =>
-  JSON.stringify(left) === JSON.stringify(right);
 
 const getTemplateSlotSummary = (template: WidgetTemplate): string => {
   if (normalizeWidgetTemplateType(template.templateType) === 'trackingCalendar') {
@@ -277,11 +275,6 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     []
   );
 
-  const createTemplateOptions = useMemo(
-    () => [],
-    []
-  );
-
   const createTemplateTypeOptions = useMemo(
     () => [
       { value: 'grid' as WidgetTemplateType, label: '计时器' },
@@ -291,12 +284,15 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   );
 
   const loadTemplates = async (allowUiIcon: boolean) => {
+    const storedLocalTemplates = normalizeWidgetTemplates(loadWidgetTemplatesFromStorage());
     const localTemplates = sanitizeWidgetTemplatesForUiIconSupport(
-      normalizeWidgetTemplates(loadWidgetTemplatesFromStorage()),
+      storedLocalTemplates,
       allowUiIcon
     );
     setTemplates(localTemplates);
-    saveWidgetTemplatesToStorage(localTemplates);
+    if (!areWidgetTemplatesEqual(localTemplates, storedLocalTemplates)) {
+      saveWidgetTemplatesToStorage(localTemplates);
+    }
 
     if (!isNativeAndroidWidgetSupported()) {
       setIsLoading(false);
@@ -305,20 +301,23 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
 
     try {
       const { templates: nativeTemplates } = await WidgetBridge.getTemplates();
+      const normalizedNativeTemplates = normalizeWidgetTemplates(nativeTemplates);
       const nextTemplates = sanitizeWidgetTemplatesForUiIconSupport(
-        nativeTemplates.length > 0 ? normalizeWidgetTemplates(nativeTemplates) : localTemplates,
+        nativeTemplates.length > 0 ? normalizedNativeTemplates : localTemplates,
         allowUiIcon
       );
 
       if (
         (nativeTemplates.length === 0 && localTemplates.length > 0)
-        || !areWidgetTemplatesEqual(nextTemplates, normalizeWidgetTemplates(nativeTemplates))
+        || !areWidgetTemplatesEqual(nextTemplates, normalizedNativeTemplates)
       ) {
         await WidgetBridge.saveTemplates({ templates: nextTemplates });
       }
 
       setTemplates(nextTemplates);
-      saveWidgetTemplatesToStorage(nextTemplates);
+      if (!areWidgetTemplatesEqual(nextTemplates, localTemplates)) {
+        saveWidgetTemplatesToStorage(nextTemplates);
+      }
     } catch (error) {
       console.error('[WidgetSettingsView] Failed to load widget templates', error);
     } finally {
@@ -546,6 +545,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
           linkedTodoId: draft.linkedTodoId,
           scopeIds: draft.scopeIds,
           customIcon: iconConfig.customIcon,
+          backgroundColor: draft.backgroundColor,
           uiIconAssetPath: iconConfig.uiIconAssetPath,
           uiIconFallbackAssetPath: iconConfig.uiIconFallbackAssetPath
         });
@@ -855,14 +855,14 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                       )}
                     </div>
                   </div>
-                  <div className="mt-3 grid grid-cols-7 gap-x-1.5 gap-y-1.5 px-2 pb-2 text-center text-[11px] text-stone-400">
+                  <div className="mt-3 grid grid-cols-7 gap-x-1 gap-y-1.5 px-1 pb-2 text-center text-[10px] text-stone-400">
                     {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((weekday, index) => (
                       <div key={`${weekday}-${index}`}>{weekday}</div>
                     ))}
                     {Array.from({ length: 28 }, (_, index) => (
                       <div
                         key={index}
-                        className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-[16px] font-semibold ${
+                        className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-[14px] font-semibold ${
                           trackingPreviewConfig?.label && index % 3 !== 0
                             ? 'text-white'
                             : 'text-stone-700'

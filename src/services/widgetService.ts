@@ -10,7 +10,8 @@
  * @updated 2026-04-26: Let TODAY + PIN payloads inherit linked activity/category metadata from a parent todo when the pinned child itself does not carry the mapping.
  * @updated 2026-04-26: Expanded the 4x1 timer widget template from 4 to 5 evenly spaced slots.
  * @updated 2026-05-01: Added tracking-calendar template normalization and payload builders for the dedicated 2x2 tracking calendar widget.
- */
+ * @updated 2026-05-03: Fixed UI-icon sanitization so only changed templates receive new timestamps, and centralized normalized template equality checks.
+*/
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, CheckTemplate, DailyReview, Log, TodoItem } from '../types';
 import type {
@@ -358,6 +359,21 @@ export const normalizeWidgetTemplates = (templates: WidgetTemplate[]): WidgetTem
     });
 };
 
+const serializeNormalizedWidgetTemplates = (templates: WidgetTemplate[]): string =>
+  JSON.stringify(normalizeWidgetTemplates(templates));
+
+const areTrackingCalendarConfigsEqual = (
+  left: WidgetTrackingCalendarConfig | null | undefined,
+  right: WidgetTrackingCalendarConfig | null | undefined
+): boolean =>
+  JSON.stringify(normalizeTrackingCalendarConfig(left))
+  === JSON.stringify(normalizeTrackingCalendarConfig(right));
+
+export const areWidgetTemplatesEqual = (
+  left: WidgetTemplate[],
+  right: WidgetTemplate[]
+): boolean => serializeNormalizedWidgetTemplates(left) === serializeNormalizedWidgetTemplates(right);
+
 export const buildTimerWidgetSlotConfig = (
   category: Category,
   activity: Category['activities'][number],
@@ -367,6 +383,7 @@ export const buildTimerWidgetSlotConfig = (
     linkedTodoId?: string | null;
     scopeIds?: string[] | null;
     customIcon?: string | null;
+    backgroundColor?: string | null;
     uiIconAssetPath?: string | null;
     uiIconFallbackAssetPath?: string | null;
   }
@@ -384,7 +401,7 @@ export const buildTimerWidgetSlotConfig = (
   uiIconAssetPath: normalizeNullableString(overrides?.uiIconAssetPath),
   uiIconFallbackAssetPath: normalizeNullableString(overrides?.uiIconFallbackAssetPath),
   label: activity.name,
-  color: getColorHexForCharts(activity.color || category.themeColor || ''),
+  color: normalizeNullableString(overrides?.backgroundColor) || getColorHexForCharts(activity.color || category.themeColor || ''),
   linkedTodoId: normalizeNullableString(overrides?.linkedTodoId),
   scopeIds: overrides?.scopeIds?.filter(Boolean) ?? null,
   checkTemplateId: null,
@@ -574,6 +591,7 @@ export const rebuildTimerWidgetSlotConfig = (
     linkedTodoId: slot.linkedTodoId ?? null,
     scopeIds: slot.scopeIds ?? null,
     customIcon: slot.customIcon ?? null,
+    backgroundColor: slot.color ?? null,
     uiIconAssetPath: slot.uiIconAssetPath ?? null,
     uiIconFallbackAssetPath: slot.uiIconFallbackAssetPath ?? null
   });
@@ -720,27 +738,29 @@ export const sanitizeWidgetTemplatesForUiIconSupport = (
   templates: WidgetTemplate[],
   allowUiIcon: boolean
 ): WidgetTemplate[] => {
+  const normalizedTemplates = normalizeWidgetTemplates(templates);
   if (allowUiIcon) {
-    return normalizeWidgetTemplates(templates);
+    return normalizedTemplates;
   }
 
   let didChange = false;
 
-  const sanitizedTemplates = templates.map((template) => {
+  const sanitizedTemplates = normalizedTemplates.map((template) => {
     const normalizedSlots = normalizeWidgetTemplateSlots(template.slots, template.size);
     const sanitizedSlots = normalizedSlots.map((slot) => {
       const nextSlot = stripWidgetSlotUiIconFields(slot);
-      if (nextSlot !== slot) {
-        didChange = true;
-      }
       return nextSlot;
     });
     const sanitizedTrackingConfig = stripTrackingCalendarUiIconFields(template.trackingConfig);
-    if (JSON.stringify(sanitizedTrackingConfig) !== JSON.stringify(template.trackingConfig ?? null)) {
+    const didTemplateChange =
+      sanitizedSlots.some((slot, index) => slot !== normalizedSlots[index])
+      || !areTrackingCalendarConfigsEqual(sanitizedTrackingConfig, template.trackingConfig);
+
+    if (didTemplateChange) {
       didChange = true;
     }
 
-    return didChange
+    return didTemplateChange
       ? {
           ...template,
           slots: sanitizedSlots,
@@ -750,7 +770,7 @@ export const sanitizeWidgetTemplatesForUiIconSupport = (
       : template;
   });
 
-  return didChange ? normalizeWidgetTemplates(sanitizedTemplates) : normalizeWidgetTemplates(templates);
+  return didChange ? normalizeWidgetTemplates(sanitizedTemplates) : normalizedTemplates;
 };
 
 export const rebuildWidgetTemplate = (
@@ -842,7 +862,21 @@ export const loadWidgetTemplatesFromStorage = (): WidgetTemplate[] => {
 };
 
 export const saveWidgetTemplatesToStorage = (templates: WidgetTemplate[]) => {
-  localStorage.setItem(WIDGET_TEMPLATE_STORAGE_KEY, JSON.stringify(normalizeWidgetTemplates(templates)));
+  const normalizedTemplates = normalizeWidgetTemplates(templates);
+  const nextRaw = JSON.stringify(normalizedTemplates);
+  const currentRaw = localStorage.getItem(WIDGET_TEMPLATE_STORAGE_KEY);
+
+  if (currentRaw) {
+    try {
+      if (areWidgetTemplatesEqual(JSON.parse(currentRaw) as WidgetTemplate[], normalizedTemplates)) {
+        return;
+      }
+    } catch (error) {
+      console.error('[widgetService] Failed to compare existing widget templates in localStorage', error);
+    }
+  }
+
+  localStorage.setItem(WIDGET_TEMPLATE_STORAGE_KEY, nextRaw);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(WIDGET_TEMPLATES_UPDATED_EVENT));
   }
