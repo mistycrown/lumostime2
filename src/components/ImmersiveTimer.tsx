@@ -4,9 +4,11 @@
  * @output Immersive fullscreen timer display and session submit trigger
  * @pos Component (View)
  * @description A fixed black-and-white immersive timer with large numeric digits, static masked art visuals, session-only orientation toggles, display-source and display-format toggles, white-noise controls, and Android immersive fullscreen handling that temporarily removes WebView insets.
+ * @updated 2026-05-03: Switched Android EdgeToEdge access to the plugin's ESM entry so Capacitor WebView builds no longer execute browser-undefined `require()` calls.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, Image as ImageIcon, MonitorSmartphone, Volume2, VolumeX, X } from 'lucide-react';
+import { EdgeToEdge } from '@capawesome/capacitor-android-edge-to-edge-support';
 import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { OrientationType, ScreenOrientation } from '@capawesome/capacitor-screen-orientation';
@@ -76,19 +78,6 @@ import {
   ImmersiveTimerFontId,
   readStoredImmersiveTimerFontId,
 } from '../utils/immersiveFonts';
-
-let EdgeToEdge: {
-  disable?: () => Promise<void>;
-  enable?: () => Promise<void>;
-  setBackgroundColor?: (options: { color: string }) => Promise<void>;
-} | null = null;
-if (Capacitor.getPlatform() === 'android') {
-  try {
-    EdgeToEdge = require('@capawesome/capacitor-android-edge-to-edge-support').EdgeToEdge;
-  } catch (error) {
-    console.warn('EdgeToEdge plugin not available for immersive timer:', error);
-  }
-}
 
 const WHITE_NOISES = [
   { id: 'none', name: '无' },

@@ -11,6 +11,7 @@ import java.util.UUID
 /**
  * Native widget action controller for timer, daily, and shortcut widgets.
  * Updated 2026-05-02: Added dedicated scene-widget item handling for timer-like cards and checklist cards.
+ * Updated 2026-05-03: Reused the shared tap-animation state for scene widget items so scene timers and checklist cards get the same springy tap feedback as the timer widget family.
  */
 object WidgetTimerController {
     private const val TAP_FEEDBACK_DURATION_MS = 260L
@@ -91,11 +92,12 @@ object WidgetTimerController {
     fun handleSceneItemTap(
         context: Context,
         appWidgetId: Int,
-        item: WidgetSceneItem
+        item: WidgetSceneItem,
+        slotIndex: Int
     ): Boolean {
         return when (WidgetSceneItemTypes.normalize(item.itemType)) {
-            WidgetSceneItemTypes.CHECKLIST -> handleSceneChecklistItemTap(context, appWidgetId, item)
-            else -> handleSceneTimerItemTap(context, appWidgetId, item)
+            WidgetSceneItemTypes.CHECKLIST -> handleSceneChecklistItemTap(context, appWidgetId, item, slotIndex)
+            else -> handleSceneTimerItemTap(context, appWidgetId, item, slotIndex)
         }
     }
 
@@ -297,7 +299,8 @@ object WidgetTimerController {
     private fun handleSceneTimerItemTap(
         context: Context,
         appWidgetId: Int,
-        item: WidgetSceneItem
+        item: WidgetSceneItem,
+        slotIndex: Int
     ): Boolean {
         if (item.activityId.isNullOrBlank() || item.categoryId.isNullOrBlank()) {
             return false
@@ -316,6 +319,14 @@ object WidgetTimerController {
             finishRuntime(context, currentRuntime, now)
             WidgetStores.saveRuntimeState(context, null)
             WidgetStores.saveLastWidgetStopAt(context, now)
+            saveTapAnimation(
+                context,
+                appWidgetId = appWidgetId,
+                widgetType = WidgetTypes.TIMER,
+                slotIndex = slotIndex,
+                animationMode = WidgetTapAnimationModes.TIMER_STOP,
+                startedAt = now
+            )
             FloatingWindowService.syncFocusStateIfRunning(currentRuntime.icon, false, 0L)
             return true
         }
@@ -343,6 +354,14 @@ object WidgetTimerController {
 
         WidgetStores.saveRuntimeState(context, nextRuntime)
         WidgetStores.saveLastWidgetStopAt(context, null)
+        saveTapAnimation(
+            context,
+            appWidgetId = appWidgetId,
+            widgetType = WidgetTypes.TIMER,
+            slotIndex = slotIndex,
+            animationMode = WidgetTapAnimationModes.TIMER_START,
+            startedAt = now
+        )
         FloatingWindowService.syncFocusStateIfRunning(nextRuntime.icon, true, nextRuntime.startedAt)
         return true
     }
@@ -350,7 +369,8 @@ object WidgetTimerController {
     private fun handleSceneChecklistItemTap(
         context: Context,
         appWidgetId: Int,
-        item: WidgetSceneItem
+        item: WidgetSceneItem,
+        slotIndex: Int
     ): Boolean {
         val checkItemId = item.checkItemId ?: return false
 
@@ -417,6 +437,18 @@ object WidgetTimerController {
             )
         )
 
+        saveTapAnimation(
+            context,
+            appWidgetId = appWidgetId,
+            widgetType = WidgetTypes.DAILY,
+            slotIndex = slotIndex,
+            animationMode = if (manualMode == WidgetDailyModes.COUNT && currentCount + 1 < targetCount) {
+                WidgetTapAnimationModes.DAILY_COUNT
+            } else {
+                WidgetTapAnimationModes.DAILY_COMPLETE
+            },
+            startedAt = System.currentTimeMillis()
+        )
         return true
     }
 

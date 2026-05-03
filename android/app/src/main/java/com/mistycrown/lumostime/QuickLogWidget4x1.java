@@ -25,7 +25,8 @@ public class QuickLogWidget4x1 extends AppWidgetProvider {
                 QuickLogWidget4x1.class,
                 WIDGET_SIZE,
                 R.layout.widget_layout_4x1,
-                SLOT_VIEW_IDS
+                SLOT_VIEW_IDS,
+                null
         );
     }
 
@@ -36,7 +37,8 @@ public class QuickLogWidget4x1 extends AppWidgetProvider {
                 QuickLogWidget4x1.class,
                 WIDGET_SIZE,
                 R.layout.widget_layout_4x1,
-                SLOT_VIEW_IDS
+                SLOT_VIEW_IDS,
+                null
         );
     }
 
@@ -49,7 +51,8 @@ public class QuickLogWidget4x1 extends AppWidgetProvider {
                 QuickLogWidget4x1.class,
                 WIDGET_SIZE,
                 R.layout.widget_layout_4x1,
-                SLOT_VIEW_IDS
+                SLOT_VIEW_IDS,
+                null
         );
     }
 
@@ -68,7 +71,8 @@ public class QuickLogWidget4x1 extends AppWidgetProvider {
                 QuickLogWidget4x1.class,
                 WIDGET_SIZE,
                 R.layout.widget_layout_4x1,
-                SLOT_VIEW_IDS
+                SLOT_VIEW_IDS,
+                null
         );
     }
 }
