@@ -2,6 +2,8 @@
 
 Contains business logic and external integrations.
 
+Update 2026-05-03: `statusBarService.ts` now imports the Android EdgeToEdge plugin through its ESM entry rather than `require()`, so Capacitor Android WebView bundles can initialize the status-bar bridge without throwing `require is not defined`.
+Update 2026-05-03: `statusBarService.ts` now restores the configured light Android edge-to-edge background outside immersive mode, so the regular status bar no longer falls through to the activity's black window background while immersive timer still forces a black bar on entry.
 Update 2026-04-27: `widgetService.ts` now feeds the TODAY + PIN widget from the same shared today-category helper used by todo pickers, so due-today and recurring-today todos no longer disappear from the widget payload.
 Update 2026-05-01: `assistantOrchestratorService.ts` now treats native diagnostic `assistantReply/decisionSummary` values such as literal `null` as empty, so malformed Android background results no longer create bogus `null` chat bubbles when rehydrated into the main conversation.
 Update 2026-05-01: `assistantOrchestratorService.ts` now hydrates completed native-background replies back into persisted AI chat sessions by trigger id, so Android-direct check-ins no longer appear only in diagnostics/history while missing from the main conversation.

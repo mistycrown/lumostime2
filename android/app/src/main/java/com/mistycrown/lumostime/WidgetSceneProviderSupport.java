@@ -112,8 +112,11 @@ public final class WidgetSceneProviderSupport {
                     && !TextUtils.isEmpty(itemId)) {
                 ResolvedSceneState state = resolveState(context, appWidgetId);
                 WidgetSceneItem item = findSceneItem(state.displayedGroup, slotId, itemId);
-                if (item != null && WidgetTimerController.INSTANCE.handleSceneItemTap(context, appWidgetId, item)) {
-                    WidgetRefreshCoordinator.INSTANCE.refreshAllAsync(context);
+                int itemIndex = findSceneItemIndex(state.displayedGroup, slotId, itemId);
+                if (item != null
+                        && itemIndex >= 0
+                        && WidgetTimerController.INSTANCE.handleSceneItemTap(context, appWidgetId, item, itemIndex)) {
+                    WidgetRefreshCoordinator.INSTANCE.refreshWidgetWithTapFeedback(context, appWidgetId);
                 } else {
                     refreshSingleWidget(context, appWidgetId, providerClass);
                 }
@@ -371,6 +374,21 @@ public final class WidgetSceneProviderSupport {
             }
         }
         return null;
+    }
+
+    static int findSceneItemIndex(WidgetSceneGroup group, String slotId, String itemId) {
+        WidgetSceneTimeSlot slot = findTimeSlotById(group, slotId);
+        if (slot == null) {
+            return -1;
+        }
+
+        List<WidgetSceneItem> items = slot.getItems();
+        for (int index = 0; index < items.size(); index += 1) {
+            if (Objects.equals(items.get(index).getId(), itemId)) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     static WidgetSceneTimeSlot findTimeSlotById(WidgetSceneGroup group, String slotId) {

@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.view.View;
 import android.widget.RemoteViews;
 
 /**
@@ -15,6 +16,7 @@ public final class WidgetProviderSupport {
     public static final String ACTION_TOGGLE_SLOT = "com.mistycrown.lumostime.action.TOGGLE_WIDGET_SLOT";
     public static final String ACTION_CYCLE_TEMPLATE = "com.mistycrown.lumostime.action.CYCLE_WIDGET_TEMPLATE";
     public static final String EXTRA_SLOT_INDEX = "slot_index";
+    private static final int MAX_SLOT_LABEL_CODE_POINTS = 4;
 
     private WidgetProviderSupport() {}
 
@@ -23,7 +25,8 @@ public final class WidgetProviderSupport {
             Class<? extends AppWidgetProvider> providerClass,
             String widgetSize,
             int layoutResId,
-            int[] slotViewIds
+            int[] slotViewIds,
+            int[] slotLabelViewIds
     ) {
         AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
         ComponentName componentName = new ComponentName(context, providerClass);
@@ -45,7 +48,8 @@ public final class WidgetProviderSupport {
                 providerClass,
                 widgetSize,
                 layoutResId,
-                slotViewIds
+                slotViewIds,
+                slotLabelViewIds
         );
     }
 
@@ -55,7 +59,8 @@ public final class WidgetProviderSupport {
             Class<? extends AppWidgetProvider> providerClass,
             String widgetSize,
             int layoutResId,
-            int[] slotViewIds
+            int[] slotViewIds,
+            int[] slotLabelViewIds
     ) {
         if (appWidgetId <= 0) {
             return;
@@ -69,7 +74,8 @@ public final class WidgetProviderSupport {
                 providerClass,
                 widgetSize,
                 layoutResId,
-                slotViewIds
+                slotViewIds,
+                slotLabelViewIds
         );
     }
 
@@ -80,7 +86,8 @@ public final class WidgetProviderSupport {
             Class<? extends AppWidgetProvider> providerClass,
             String widgetSize,
             int layoutResId,
-            int[] slotViewIds
+            int[] slotViewIds,
+            int[] slotLabelViewIds
     ) {
         WidgetStores.INSTANCE.maybeAutoBindLegacyWidgets(context, appWidgetIds, widgetSize);
         WidgetStores.INSTANCE.ensureBindings(
@@ -96,7 +103,8 @@ public final class WidgetProviderSupport {
                 providerClass,
                 widgetSize,
                 layoutResId,
-                slotViewIds
+                slotViewIds,
+                slotLabelViewIds
         );
     }
 
@@ -116,7 +124,8 @@ public final class WidgetProviderSupport {
             Class<? extends AppWidgetProvider> providerClass,
             String widgetSize,
             int layoutResId,
-            int[] slotViewIds
+            int[] slotViewIds,
+            int[] slotLabelViewIds
     ) {
         if (intent == null) {
             return;
@@ -128,7 +137,8 @@ public final class WidgetProviderSupport {
                     providerClass,
                     widgetSize,
                     layoutResId,
-                    slotViewIds
+                    slotViewIds,
+                    slotLabelViewIds
             );
             return;
         }
@@ -173,7 +183,8 @@ public final class WidgetProviderSupport {
                         providerClass,
                         widgetSize,
                         layoutResId,
-                        slotViewIds
+                        slotViewIds,
+                        slotLabelViewIds
                 );
             }
         }
@@ -192,7 +203,8 @@ public final class WidgetProviderSupport {
             Class<? extends AppWidgetProvider> providerClass,
             String widgetSize,
             int layoutResId,
-            int[] slotViewIds
+            int[] slotViewIds,
+            int[] slotLabelViewIds
     ) {
         if (appWidgetIds == null || appWidgetIds.length == 0) {
             return;
@@ -209,7 +221,7 @@ public final class WidgetProviderSupport {
             PendingIntent cycleTemplateIntent = buildCycleTemplatePendingIntent(context, providerClass, appWidgetId);
             views.setTextViewText(R.id.widget_title, snapshot.getTemplateName());
             views.setOnClickPendingIntent(R.id.widget_title, cycleTemplateIntent);
-            bindSlots(context, views, snapshot, appWidgetId, providerClass, slotViewIds);
+            bindSlots(context, views, snapshot, appWidgetId, providerClass, slotViewIds, slotLabelViewIds);
             appWidgetManager.updateAppWidget(appWidgetId, views);
         }
     }
@@ -220,18 +232,48 @@ public final class WidgetProviderSupport {
             WidgetSnapshot snapshot,
             int appWidgetId,
             Class<? extends AppWidgetProvider> providerClass,
-            int[] slotViewIds
+            int[] slotViewIds,
+            int[] slotLabelViewIds
     ) {
         int slotCount = Math.min(slotViewIds.length, snapshot.getSlots().size());
         for (int index = 0; index < slotCount; index++) {
             int viewId = slotViewIds[index];
             WidgetSnapshotSlot slot = snapshot.getSlots().get(index);
-            views.setImageViewBitmap(viewId, WidgetSlotBitmapRenderer.INSTANCE.render(context, slot));
-            views.setOnClickPendingIntent(
-                    viewId,
-                    buildSlotPendingIntent(context, providerClass, appWidgetId, slot.getSlotIndex())
+            PendingIntent slotPendingIntent = buildSlotPendingIntent(
+                    context,
+                    providerClass,
+                    appWidgetId,
+                    slot.getSlotIndex()
             );
+            views.setImageViewBitmap(viewId, WidgetSlotBitmapRenderer.INSTANCE.render(context, slot));
+            views.setOnClickPendingIntent(viewId, slotPendingIntent);
+
+            if (slotLabelViewIds != null && index < slotLabelViewIds.length) {
+                int labelViewId = slotLabelViewIds[index];
+                String label = formatSlotLabel(slot.getLabel());
+                views.setTextViewText(labelViewId, label);
+                views.setViewVisibility(labelViewId, label.isEmpty() ? View.GONE : View.VISIBLE);
+                views.setOnClickPendingIntent(labelViewId, slotPendingIntent);
+            }
         }
+    }
+
+    private static String formatSlotLabel(String label) {
+        if (label == null) {
+            return "";
+        }
+
+        String trimmed = label.trim();
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+
+        if (trimmed.codePointCount(0, trimmed.length()) <= MAX_SLOT_LABEL_CODE_POINTS) {
+            return trimmed;
+        }
+
+        int endIndex = trimmed.offsetByCodePoints(0, MAX_SLOT_LABEL_CODE_POINTS);
+        return trimmed.substring(0, endIndex) + "…";
     }
 
     private static PendingIntent buildSlotPendingIntent(

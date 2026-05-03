@@ -28,6 +28,7 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
         private WidgetSceneProviderSupport.ResolvedSceneState resolvedState;
         private WidgetDailySyncPayload dailyPayload;
         private WidgetRuntimeState runtimeState;
+        private WidgetTapAnimationState tapAnimationState;
 
         Factory(Context context, Intent intent) {
             this.context = context;
@@ -52,6 +53,7 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
             resolvedState = null;
             dailyPayload = null;
             runtimeState = null;
+            tapAnimationState = null;
         }
 
         @Override
@@ -123,6 +125,7 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
             resolvedState = WidgetSceneProviderSupport.resolveState(context, appWidgetId);
             dailyPayload = WidgetStores.INSTANCE.loadDailySyncPayload(context);
             runtimeState = WidgetStores.INSTANCE.loadRuntimeState(context);
+            tapAnimationState = WidgetStores.INSTANCE.loadTapAnimationState(context);
         }
 
         private List<WidgetSceneItem> getItems() {
@@ -133,6 +136,12 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
         }
 
         private WidgetSnapshotSlot buildSnapshotSlot(WidgetSceneItem item, int position) {
+            String widgetType = WidgetSceneItemTypes.CHECKLIST.equals(
+                    WidgetSceneItemTypes.normalize(item.getItemType())
+            ) ? WidgetTypes.DAILY : WidgetTypes.TIMER;
+            String tapAnimationMode = resolveTapAnimationMode(widgetType, position);
+            Float tapAnimationProgress = resolveTapAnimationProgress(widgetType, position);
+
             if (WidgetSceneItemTypes.CHECKLIST.equals(
                     WidgetSceneItemTypes.normalize(item.getItemType())
             )) {
@@ -167,8 +176,8 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
                         currentCount,
                         targetCount,
                         isCompleted,
-                        null,
-                        null
+                        tapAnimationMode,
+                        tapAnimationProgress
                 );
             }
 
@@ -188,8 +197,8 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
                     0,
                     1,
                     false,
-                    null,
-                    null
+                    tapAnimationMode,
+                    tapAnimationProgress
             );
         }
 
@@ -233,6 +242,40 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
 
         private String getCurrentDateString() {
             return new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+        }
+
+        private String resolveTapAnimationMode(String widgetType, int position) {
+            if (tapAnimationState == null) {
+                return null;
+            }
+            if (tapAnimationState.getAppWidgetId() != appWidgetId) {
+                return null;
+            }
+            if (!Objects.equals(WidgetTypes.normalize(tapAnimationState.getWidgetType()), WidgetTypes.normalize(widgetType))) {
+                return null;
+            }
+            if (tapAnimationState.getSlotIndex() != position) {
+                return null;
+            }
+            return tapAnimationState.getAnimationMode();
+        }
+
+        private Float resolveTapAnimationProgress(String widgetType, int position) {
+            if (tapAnimationState == null) {
+                return null;
+            }
+            if (tapAnimationState.getAppWidgetId() != appWidgetId) {
+                return null;
+            }
+            if (!Objects.equals(WidgetTypes.normalize(tapAnimationState.getWidgetType()), WidgetTypes.normalize(widgetType))) {
+                return null;
+            }
+            if (tapAnimationState.getSlotIndex() != position) {
+                return null;
+            }
+            long duration = Math.max(1L, tapAnimationState.getExpiresAt() - tapAnimationState.getStartedAt());
+            float progress = (System.currentTimeMillis() - tapAnimationState.getStartedAt()) / (float) duration;
+            return Math.max(0f, Math.min(1f, progress));
         }
 
         private String formatCardTitle(String title) {

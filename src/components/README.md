@@ -10,6 +10,8 @@ Components that form the structural or global UI elements.
 - `Toast.tsx`: Notification system.
 
 ## Modals
+- Update 2026-05-03: `AIBackfillChatModal.tsx` now declares the background-notification visibility helper before native diagnostics hydration, so production bundles no longer crash on startup with `Cannot access 'Re' before initialization`.
+- Update 2026-05-03: `ImmersiveTimer.tsx` now imports the Android EdgeToEdge plugin through its ESM entry, so Capacitor WebView builds no longer hit `require is not defined` during immersive timer setup.
 - Update 2026-05-01: `AIBackfillChatModal.tsx` now filters persisted null-like assistant message content during session normalization, so older malformed native-backfilled entries stop rendering standalone `null` bubbles after reload.
 - Update 2026-05-01: `AIBackfillChatModal.tsx` now uses a flatter editorial treatment across the AI workspace, tightening the composer to a two-line feel, removing extra divider framing, simplifying history delete confirmations into inline horizontal actions, and reducing nested-card radii/shadows across the AI panels.
 - Update 2026-05-01: `AIBackfillChatModal.tsx` now keeps the active persona row in AI settings neutral, removing the tinted selected background so the checkmark alone carries selection state.

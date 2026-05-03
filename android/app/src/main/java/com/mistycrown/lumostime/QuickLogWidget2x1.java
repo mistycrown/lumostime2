@@ -16,13 +16,19 @@ public class QuickLogWidget2x1 extends AppWidgetProvider {
             R.id.widget_slot_1
     };
 
+    private static final int[] SLOT_LABEL_VIEW_IDS = new int[] {
+            R.id.widget_slot_label_0,
+            R.id.widget_slot_label_1
+    };
+
     public static void refreshAllAsync(Context context) {
         WidgetProviderSupport.refreshAll(
                 context,
                 QuickLogWidget2x1.class,
                 WIDGET_SIZE,
                 R.layout.widget_layout_2x1,
-                SLOT_VIEW_IDS
+                SLOT_VIEW_IDS,
+                SLOT_LABEL_VIEW_IDS
         );
     }
 
@@ -33,7 +39,8 @@ public class QuickLogWidget2x1 extends AppWidgetProvider {
                 QuickLogWidget2x1.class,
                 WIDGET_SIZE,
                 R.layout.widget_layout_2x1,
-                SLOT_VIEW_IDS
+                SLOT_VIEW_IDS,
+                SLOT_LABEL_VIEW_IDS
         );
     }
 
@@ -46,7 +53,8 @@ public class QuickLogWidget2x1 extends AppWidgetProvider {
                 QuickLogWidget2x1.class,
                 WIDGET_SIZE,
                 R.layout.widget_layout_2x1,
-                SLOT_VIEW_IDS
+                SLOT_VIEW_IDS,
+                SLOT_LABEL_VIEW_IDS
         );
     }
 
@@ -65,7 +73,8 @@ public class QuickLogWidget2x1 extends AppWidgetProvider {
                 QuickLogWidget2x1.class,
                 WIDGET_SIZE,
                 R.layout.widget_layout_2x1,
-                SLOT_VIEW_IDS
+                SLOT_VIEW_IDS,
+                SLOT_LABEL_VIEW_IDS
         );
     }
 }

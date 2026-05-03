@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-03: Moved the background-notification visibility helper ahead of diagnostics hydration so production bundles no longer hit a temporal-dead-zone crash during AI modal startup.
  * @updated 2026-05-01: Unified remaining hard-edged AI panels under the same subtle corner radius so history rows, composer surfaces, and auxiliary edit boxes no longer mix square and rounded treatments.
  * @updated 2026-05-01: Reorganized AI settings into top-level tabs plus smaller in-section tabs so persona, avatar, background-agent, and context options read as layered panels instead of one long form.
  * @updated 2026-05-01: Simplified persona-list selection in AI settings so the active row no longer uses a tinted background and relies on the checkmark alone.
@@ -2263,6 +2264,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setAssistantBackgroundCallHistory(assistantOrchestratorService.listBackgroundCallHistory());
   };
 
+  const shouldShowBackgroundSystemNotification = useCallback(() => (
+    typeof document !== 'undefined' && document.hidden
+  ), []);
+
   const refreshAssistantNativeDiagnostics = useCallback(async () => {
     try {
       const result = await AssistantAgent.listDiagnostics();
@@ -2306,10 +2311,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setIsAssistantReminderComposerOpen(false);
     setAssistantReminderDeleteTarget(null);
   };
-
-  const shouldShowBackgroundSystemNotification = useCallback(() => (
-    typeof document !== 'undefined' && document.hidden
-  ), []);
 
   const notifyAssistantTaskStateChanged = useCallback(() => {
     void AssistantAgent.notifyTaskStateChanged().catch((error) => {
