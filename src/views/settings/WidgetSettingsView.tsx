@@ -7,6 +7,8 @@
  * @updated 2026-04-18: Removed template-level widget categories and switched to slot-type-first editing.
  * @updated 2026-04-25: Added supporter-gated widget UI icon editing and native asset-backed icon slot persistence.
  * @updated 2026-04-26: Updated 4x1 widget previews to render five evenly spaced slots.
+ * @updated 2026-05-03: Removed field-level helper copy from the widget settings editor to keep the UI more concise.
+ * @updated 2026-05-03: Removed bound desktop instance counts from the widget template list.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
@@ -44,7 +46,6 @@ import {
   buildTrackingCalendarDailyConfig,
   buildTrackingCalendarScopeConfig,
   buildTrackingCalendarTagConfig,
-  countTemplateBoundInstances,
   createEmptyTrackingCalendarConfig,
   createEmptyWidgetTemplateSlot,
   createWidgetTemplate,
@@ -255,7 +256,6 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
 }) => {
   const redemptionService = useMemo(() => new RedemptionService(), []);
   const [templates, setTemplates] = useState<WidgetTemplate[]>([]);
-  const [bindingCounts, setBindingCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [editingTemplateDraft, setEditingTemplateDraft] = useState<WidgetTemplate | null>(null);
@@ -299,18 +299,12 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     saveWidgetTemplatesToStorage(localTemplates);
 
     if (!isNativeAndroidWidgetSupported()) {
-      setBindingCounts({});
       setIsLoading(false);
       return;
     }
 
     try {
-      const [{ templates: nativeTemplates }, { bindings }] = await Promise.all([
-        WidgetBridge.getTemplates(),
-        WidgetBridge.getInstanceBindings()
-      ]);
-
-      let effectiveBindings = bindings;
+      const { templates: nativeTemplates } = await WidgetBridge.getTemplates();
       const nextTemplates = sanitizeWidgetTemplatesForUiIconSupport(
         nativeTemplates.length > 0 ? normalizeWidgetTemplates(nativeTemplates) : localTemplates,
         allowUiIcon
@@ -321,21 +315,12 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         || !areWidgetTemplatesEqual(nextTemplates, normalizeWidgetTemplates(nativeTemplates))
       ) {
         await WidgetBridge.saveTemplates({ templates: nextTemplates });
-        const { bindings: refreshedBindings } = await WidgetBridge.getInstanceBindings();
-        effectiveBindings = refreshedBindings;
       }
 
       setTemplates(nextTemplates);
       saveWidgetTemplatesToStorage(nextTemplates);
-
-      const counts = nextTemplates.reduce<Record<string, number>>((accumulator, template) => {
-        accumulator[template.id] = countTemplateBoundInstances(effectiveBindings, template.id);
-        return accumulator;
-      }, {});
-      setBindingCounts(counts);
     } catch (error) {
       console.error('[WidgetSettingsView] Failed to load widget templates', error);
-      setBindingCounts({});
     } finally {
       setIsLoading(false);
     }
@@ -386,25 +371,11 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       canUseWidgetUiIcon
     );
     const previousTemplates = templates;
-    const previousBindingCounts = bindingCounts;
     setIsSaving(true);
 
     try {
       if (isNativeAndroidWidgetSupported()) {
         await WidgetBridge.saveTemplates({ templates: normalizedTemplates });
-        try {
-          const { bindings } = await WidgetBridge.getInstanceBindings();
-          const counts = normalizedTemplates.reduce<Record<string, number>>((accumulator, template) => {
-            accumulator[template.id] = countTemplateBoundInstances(bindings, template.id);
-            return accumulator;
-          }, {});
-          setBindingCounts(counts);
-        } catch (error) {
-          console.error('[WidgetSettingsView] Failed to refresh widget binding counts', error);
-          setBindingCounts(previousBindingCounts);
-        }
-      } else {
-        setBindingCounts({});
       }
 
       setTemplates(normalizedTemplates);
@@ -417,7 +388,6 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       console.error('[WidgetSettingsView] Failed to persist widget templates', error);
       setTemplates(previousTemplates);
       saveWidgetTemplatesToStorage(previousTemplates);
-      setBindingCounts(previousBindingCounts);
       onToast('error', '保存小组件模板失败');
       return false;
     } finally {
@@ -817,9 +787,6 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
             <div className="space-y-4 rounded-[28px] border border-stone-100 bg-white p-6 shadow-sm">
               <div>
                 <h3 className="font-bold text-stone-800">名称</h3>
-                <p className="mt-1 text-xs text-stone-400">
-                  模板名称会显示在桌面小组件的标题区域，方便区分不同模板。
-                </p>
               </div>
 
               <input
@@ -834,9 +801,6 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
               <div className="space-y-4 rounded-[28px] border border-stone-100 bg-white p-6 shadow-sm">
                 <div>
                   <h3 className="font-bold text-stone-800">小组件尺寸</h3>
-                  <p className="mt-1 text-xs text-stone-400">
-                    切换尺寸时会保留已有配置，超出的槽位会被裁掉，不足的槽位会自动补空。
-                  </p>
                 </div>
 
                 <CustomSelect
@@ -855,9 +819,6 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
             <div className="space-y-4 rounded-[28px] border border-stone-100 bg-white p-6 shadow-sm">
               <div>
                 <h3 className="font-bold text-stone-800">模板预览</h3>
-                <p className="mt-1 text-xs text-stone-400">
-                  点击下面的预览卡片，即可继续配置槽位或追踪对象。
-                </p>
               </div>
 
               {normalizeWidgetTemplateType(editingTemplateDraft.templateType) === 'trackingCalendar' && (
@@ -1036,11 +997,6 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                     <p className="mt-1 line-clamp-2 text-xs leading-5 text-stone-400">
                       {getTemplateSlotSummary(template)}
                     </p>
-                    {bindingCounts[template.id] > 0 && (
-                      <p className="mt-1 text-[11px] text-stone-400">
-                        已绑定 {bindingCounts[template.id]} 个桌面实例
-                      </p>
-                    )}
                   </button>
 
                   <button

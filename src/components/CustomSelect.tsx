@@ -9,6 +9,7 @@ import { ChevronDown, Check } from 'lucide-react';
 interface Option {
   value: string;
   label: string;
+  icon?: React.ReactNode;
 }
 
 interface CustomSelectProps {
@@ -94,8 +95,15 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
             : 'bg-stone-50 border-stone-200 hover:border-stone-300'
         }`}
       >
-        <span className={selectedOption && !disabled ? 'text-stone-900' : 'text-stone-400'}>
-          {selectedOption ? selectedOption.label : placeholder}
+        <span className={`flex min-w-0 items-center gap-2 ${selectedOption && !disabled ? 'text-stone-900' : 'text-stone-400'}`}>
+          {selectedOption?.icon && (
+            <span className="shrink-0 flex items-center justify-center">
+              {selectedOption.icon}
+            </span>
+          )}
+          <span className="truncate">
+            {selectedOption ? selectedOption.label : placeholder}
+          </span>
         </span>
         <ChevronDown 
           size={16} 
@@ -128,7 +136,14 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                   color: 'var(--accent-color)'
                 } : undefined}
               >
-                <span>{option.label}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  {option.icon && (
+                    <span className="shrink-0 flex items-center justify-center">
+                      {option.icon}
+                    </span>
+                  )}
+                  <span className="truncate">{option.label}</span>
+                </span>
                 {option.value === value && (
                   <Check size={16} style={{ color: 'var(--accent-color)' }} />
                 )}

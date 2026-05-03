@@ -610,12 +610,22 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     const habits: Record<string, Record<string, Record<string, boolean>>> = {};
     const habitDayDetails: Record<string, Record<string, { value: number; target: number }>> = {}; // Key: "Category|Habit" -> Date -> Count Detail
     const habitStats: Record<string, { total: number, checked: number, countTotal: number, isCountMode: boolean }> = {}; // Key: "Category|Habit"
+    const activeTemplates = (checkTemplates || []).filter(template => template.enabled && template.isDaily);
     const activeTemplateItemKeys = new Set(
-      (checkTemplates || [])
-        .filter(template => template.enabled && template.isDaily)
-        .flatMap(template => template.items.map(item => `${template.title}|${item.content}`))
+      activeTemplates.flatMap(template => template.items.map(item => `${template.title}|${item.content}`))
     );
     const shouldFilterByTemplates = Array.isArray(checkTemplates);
+    const templateIconMap: Record<string, { icon: string; uiIcon?: string }> = {};
+
+    activeTemplates.forEach((template) => {
+      template.items.forEach((item) => {
+        const key = `${template.title}|${item.content}`;
+        templateIconMap[key] = {
+          icon: item.icon || '🔵',
+          uiIcon: item.uiIcon
+        };
+      });
+    });
 
     // Track insertion order for categories and habits
     const categoryOrder: string[] = [];
@@ -671,8 +681,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       }
     });
 
-    // Store icon and uiIcon for each habit
-    const habitIcons: Record<string, { icon: string, uiIcon?: string }> = {};
+    // Prefer current active template icons so stats stay in sync with the latest template UI icon selection.
+    const habitIcons: Record<string, { icon: string, uiIcon?: string }> = { ...templateIconMap };
 
     dailyReviews.forEach(review => {
       if (days.includes(review.date) && review.checkItems) {
@@ -680,9 +690,9 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
           if (!item.category) return;
           const key = `${item.category}|${item.content}`;
           if (shouldFilterByTemplates && !activeTemplateItemKeys.has(key)) return;
-          // Store the first encountered icon for each habit
-          if (!habitIcons[key] && item.icon) {
-            habitIcons[key] = { icon: item.icon, uiIcon: item.uiIcon };
+          // Fall back to historical review data only when the active template does not provide icon metadata.
+          if (!habitIcons[key] && (item.icon || item.uiIcon)) {
+            habitIcons[key] = { icon: item.icon || '🔵', uiIcon: item.uiIcon };
           }
         });
       }
@@ -693,7 +703,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       const catHabits = habitOrder[cat].map(hab => {
         const key = `${cat}|${hab}`;
         const stats = habitStats[key] || { total: 0, checked: 0, countTotal: 0, isCountMode: false };
-        const iconData = habitIcons[key] || { icon: '馃摑' };
+        const iconData = habitIcons[key] || { icon: '🔵' };
 
         return {
           name: hab,

@@ -1,22 +1,20 @@
 /**
  * @file WidgetSlotEditorModal.tsx
- * @input Unified widget slot draft, category/check/todo/scope sources, save handler
- * @output Slot editor modal that lets users choose a slot type before editing slot-specific fields
+ * @input Widget slot draft plus category/check/todo/scope sources and save handler
+ * @output Slot editor modal for timer, daily-check, and shortcut widget slots
  * @pos Component
- * @description Unifies timer, daily, and shortcut widget slot editing into a single modal so each slot can choose its own behavior type.
- * @updated 2026-04-18: Added slot-type-first editing flow for mixed widget templates.
+ * @description Unified widget slot editor that lets each slot choose its own type, icon mode, source binding, and background color.
+ * @updated 2026-05-03: Rewrote the file in UTF-8, cleaned all mojibake copy, and let daily UI icon mode follow the currently selected daily item.
  * @updated 2026-04-25: Added supporter-gated widget UI icon mode while keeping emoji-only editing as the fallback path.
- * @updated 2026-04-25: Added quick-apply UI icon defaults so widget slots can inherit tag and shortcut UI icons with one tap.
  */
+
 import React, { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { COLOR_OPTIONS } from '../constants';
 import { useCustomColors } from '../hooks/useCustomColors';
 import { normalizeCustomColorHex } from '../services/customColorGroupService';
 import { uiIconService } from '../services/uiIconService';
-import {
-  DEFAULT_DAILY_WIDGET_COLOR
-} from '../services/widgetService';
+import { DEFAULT_DAILY_WIDGET_COLOR } from '../services/widgetService';
 import {
   DEFAULT_SHORTCUT_WIDGET_COLOR,
   SHORTCUT_WIDGET_ACTION_OPTIONS,
@@ -220,12 +218,11 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
     return null;
   }
 
-  const updateDraft = (updater: (draft: WidgetSlotEditorDraft) => WidgetSlotEditorDraft) => {
+  const updateDraft = (updater: (draftState: WidgetSlotEditorDraft) => WidgetSlotEditorDraft) => {
     setLocalDraft((previousDraft) => {
       if (!previousDraft) {
         return previousDraft;
       }
-
       return updater(previousDraft);
     });
   };
@@ -242,15 +239,15 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
 
   const defaultEmojiIcon = (() => {
     if (localDraft.slotType === 'timer') {
-      return selectedActivity?.icon || selectedCategory?.icon || '\u2022';
+      return selectedActivity?.icon || selectedCategory?.icon || '•';
     }
     if (localDraft.slotType === 'daily') {
-      return selectedDailyItem?.icon || '\u2022';
+      return selectedDailyItem?.icon || '✓';
     }
     if (localDraft.slotType === 'shortcut') {
-      return getShortcutWidgetActionEmoji(localDraft.shortcutAction) || '\u2022';
+      return getShortcutWidgetActionEmoji(localDraft.shortcutAction) || '•';
     }
-    return '\u2022';
+    return '•';
   })();
 
   const defaultUiIcon = (() => {
@@ -270,15 +267,15 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
 
   const defaultUiIconApplyLabel = (() => {
     if (localDraft.slotType === 'timer') {
-      return '跟随标签 UI Icon';
+      return '跟随当前标签 UI Icon';
     }
     if (localDraft.slotType === 'daily') {
-      return '跟随日课 UI Icon';
+      return '跟随当前日课 UI Icon';
     }
     if (localDraft.slotType === 'shortcut') {
       return '使用动作默认 UI Icon';
     }
-    return '快速应用默认 UI Icon';
+    return '应用默认 UI Icon';
   })();
 
   const setIconMode = (nextMode: WidgetSlotIconMode) => {
@@ -316,7 +313,7 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
       return selectedDailyItem?.category || '选择后会显示对应日课项目';
     }
     if (localDraft.slotType === 'shortcut') {
-      return '点击后会直接执行应用内快捷动作';
+      return '点击后会直接执行对应的快捷动作';
     }
     return '这个槽位可以配置成计时器、日课或快捷方式';
   })();
@@ -448,12 +445,11 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
     </div>
   );
 
-  const renderUiIconSection = (description: string) => (
+  const renderUiIconSection = () => (
     <div>
       <div className="mb-3 flex items-start justify-between gap-3 px-1">
         <div>
           <h3 className="text-sm font-bold text-stone-800">UI icon</h3>
-          <p className="mt-1 text-xs text-stone-400">{description}</p>
         </div>
         {defaultUiIcon && (
           <button
@@ -529,7 +525,6 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
           <div>
             <div className="mb-3 px-1">
               <h3 className="text-sm font-bold text-stone-800">槽位类型</h3>
-              <p className="mt-1 text-xs text-stone-400">先决定这个槽位是计时器、日课还是快捷方式。</p>
             </div>
             <div className="grid grid-cols-3 gap-3">
               {SLOT_TYPE_OPTIONS.map((option) => {
@@ -556,7 +551,6 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
             <div>
               <div className="mb-3 px-1">
                 <h3 className="text-sm font-bold text-stone-800">图标样式</h3>
-                <p className="mt-1 text-xs text-stone-400">已输入兑换码并启用 UI 主题后，可以切换为本地 UI icon 渲染。</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 {ICON_MODE_OPTIONS.map((option) => {
@@ -583,13 +577,12 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
           {localDraft.slotType === 'timer' && (
             <>
               {localDraft.iconMode === 'emoji'
-                ? renderEmojiInput(selectedActivity?.icon || selectedCategory?.icon || '⏰', '跟随标签图标')
-                : renderUiIconSection('选择后会使用当前 UI 主题下的本地图标资源渲染桌面小组件。')}
+                ? renderEmojiInput(selectedActivity?.icon || selectedCategory?.icon || '⏱', '跟随标签图标')
+                : renderUiIconSection()}
 
               <div>
                 <div className="mb-4 px-1">
                   <h3 className="text-sm font-bold text-stone-800">标签</h3>
-                  <p className="mt-1 text-xs text-stone-400">这是槽位的主活动，会决定开始和停止时的归属。</p>
                 </div>
                 <TagAssociation
                   categories={categories}
@@ -632,7 +625,6 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
               <div>
                 <div className="mb-4 px-1">
                   <h3 className="text-sm font-bold text-stone-800">绑定手动日课</h3>
-                  <p className="mt-1 text-xs text-stone-400">这里只显示手动日课，自动日课暂时不能加入到小组件里。</p>
                 </div>
 
                 {manualItems.length === 0 ? (
@@ -644,6 +636,9 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
                     value={localDraft.checkItemId || ''}
                     options={manualItems.map((item) => ({
                       value: item.checkItemId,
+                      icon: (item.icon || item.uiIcon)
+                        ? <IconRenderer icon={item.icon || ''} uiIcon={item.uiIcon} size={16} />
+                        : undefined,
                       label: item.manualMode === 'count'
                         ? `${item.category} / ${item.content}（目标 ${item.targetCount} 次）`
                         : `${item.category} / ${item.content}`
@@ -657,7 +652,10 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
                         ...previousDraft,
                         checkTemplateId: nextItem.checkTemplateId,
                         checkItemId: nextItem.checkItemId,
-                        label: nextItem.content
+                        label: nextItem.content,
+                        uiIcon: previousDraft.iconMode === 'uiIcon'
+                          ? (nextItem.uiIcon || resolveUiIconFromEmoji(nextItem.icon || null))
+                          : previousDraft.uiIcon
                       }));
                     }}
                     placeholder="请选择一个手动日课"
@@ -667,7 +665,7 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
 
               {localDraft.iconMode === 'emoji'
                 ? renderEmojiInput(selectedDailyItem?.icon || '✓', '跟随日课图标')
-                : renderUiIconSection('选择后会把当前 UI 主题图标同步到桌面小组件。')}
+                : renderUiIconSection()}
 
               <div>
                 <div className="mb-3 px-1">
@@ -699,7 +697,6 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
               <div>
                 <div className="mb-4 px-1">
                   <h3 className="text-sm font-bold text-stone-800">快捷动作</h3>
-                  <p className="mt-1 text-xs text-stone-400">选择点击这个槽位后要打开或执行的应用内入口。</p>
                 </div>
                 <CustomSelect
                   value={localDraft.shortcutAction || ''}
@@ -722,7 +719,7 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
 
               {localDraft.iconMode === 'emoji'
                 ? renderEmojiInput(getShortcutWidgetActionEmoji(localDraft.shortcutAction), '使用动作默认 emoji')
-                : renderUiIconSection('快捷方式也可以改成当前 UI 主题的图标资源显示。')}
+                : renderUiIconSection()}
 
               <div>
                 <div className="mb-3 px-1">

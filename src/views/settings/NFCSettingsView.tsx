@@ -9,6 +9,7 @@ import {
   NfcService
 } from '../../services/NfcService';
 import { CustomSelect } from '../../components/CustomSelect';
+import { IconRenderer } from '../../components/IconRenderer';
 import { getEligibleNfcDailyCheckItems } from '../../utils/dailyCheckUtils';
 import { parseLumosTimeUrl } from '../../utils/lumosTimeUrlParser';
 
@@ -156,6 +157,9 @@ export const NFCSettingsView: React.FC<NFCSettingsViewProps> = ({
   const dailyCheckOptions = useMemo(() => {
     return getEligibleNfcDailyCheckItems(checkTemplates).map((item) => ({
       value: item.checkItemId,
+      icon: (item.icon || item.uiIcon)
+        ? <IconRenderer icon={item.icon || ''} uiIcon={item.uiIcon} size={16} />
+        : undefined,
       label: item.manualMode === 'count'
         ? `${item.category} / ${item.content}（目标 ${item.targetCount} 次）`
         : `${item.category} / ${item.content}`

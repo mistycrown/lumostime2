@@ -1,16 +1,19 @@
 /**
  * @file CheckTemplateItemRow.tsx
- * @input CheckTemplateItem, handlers
- * @output UI for editing check template item
+ * @input CheckTemplateItem plus editing handlers and optional UI icon support flag
+ * @output UI row for editing one daily check template item
  * @pos Component (Check Template)
- * @description 日课模板项编辑行 - 支持手动和自动类型
+ * @description 日课模板条目编辑行，支持手动/自动模式切换、次数目标输入、自动规则配置，以及可选的 UI icon 选择。
+ * @updated 2026-05-03: Rewrote the row in UTF-8 and added supporter-gated UI icon selection support.
  * @updated 2026-04-15: Added nightLatestStart summary rendering for auto rules.
  */
 
 import React, { useEffect, useState } from 'react';
-import { CheckTemplateItem } from '../types';
 import { X, Zap, Circle, ChevronUp, ChevronDown } from 'lucide-react';
+import { CheckTemplateItem } from '../types';
 import { AutoCheckItemEditor } from './AutoCheckItemEditor';
+import { UIIconSelectorCompact } from './UIIconSelector';
+import { IconRenderer } from './IconRenderer';
 
 interface CheckTemplateItemRowProps {
   item: CheckTemplateItem;
@@ -20,6 +23,7 @@ interface CheckTemplateItemRowProps {
   sortingMode?: boolean;
   onMoveUp?: (index: number) => void;
   onMoveDown?: (index: number) => void;
+  canUseUiIcon?: boolean;
 }
 
 export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
@@ -29,9 +33,11 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
   onDelete,
   sortingMode = false,
   onMoveUp,
-  onMoveDown
+  onMoveDown,
+  canUseUiIcon = false
 }) => {
   const [showAutoEditor, setShowAutoEditor] = useState(false);
+  const [showIconSelector, setShowIconSelector] = useState(false);
 
   const getCurrentMode = (): 'manual-binary' | 'manual-count' | 'auto' => {
     if (item.type === 'auto') return 'auto';
@@ -39,13 +45,14 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
     return 'manual-binary';
   };
 
-  const getNextMode = (mode: 'manual-binary' | 'manual-count' | 'auto'): 'manual-binary' | 'manual-count' | 'auto' => {
+  const getNextMode = (
+    mode: 'manual-binary' | 'manual-count' | 'auto'
+  ): 'manual-binary' | 'manual-count' | 'auto' => {
     if (mode === 'manual-binary') return 'manual-count';
     if (mode === 'manual-count') return 'auto';
     return 'manual-binary';
   };
 
-  // 切换模式（二值手动 / 次数手动 / 自动）
   const handleSetMode = (mode: 'manual-binary' | 'manual-count' | 'auto') => {
     if (mode === 'auto') {
       onUpdate(index, {
@@ -78,28 +85,30 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
   };
 
   const handleCycleMode = () => {
-    const current = getCurrentMode();
-    const next = getNextMode(current);
-    handleSetMode(next);
+    handleSetMode(getNextMode(getCurrentMode()));
   };
 
   const handleContentChange = (fullText: string) => {
-    // 提取第一个字符作为图标
-    const firstChar = Array.from(fullText.trim())[0] || '';
-    const icon = firstChar || '📝';
-    // 剩余部分作为内容
-    const contentArray = Array.from(fullText.trim());
+    const trimmed = fullText.trim();
+    const firstChar = Array.from(trimmed)[0] || '';
+    const icon = firstChar || '🔵';
+    const contentArray = Array.from(trimmed);
     const content = contentArray.length > 1 ? contentArray.slice(1).join('').trim() : '';
-    // 保留 type 和 autoConfig 字段
     onUpdate(index, { ...item, content, icon });
   };
 
-  // 显示值：图标 + 内容
+  const handleUiIconSelect = (_emoji: string, uiIcon: string) => {
+    onUpdate(index, {
+      ...item,
+      uiIcon: uiIcon || undefined
+    });
+    setShowIconSelector(false);
+  };
+
   const displayValue = `${item.icon || ''}${item.content || ''}`;
   const isAuto = item.type === 'auto';
   const isCountManual = !isAuto && item.manualMode === 'count';
 
-  // 次数输入框允许暂时为空（例如全选后退格），避免出现“1 无法删除”的体验问题。
   const [targetCountText, setTargetCountText] = useState<string>(
     item.targetCount === undefined ? '' : String(item.targetCount)
   );
@@ -107,7 +116,6 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
 
   useEffect(() => {
     if (!isCountManual) {
-      // 输入框被卸载时，确保不处于“编辑中”状态，避免下次切回次数模式时不同步。
       setIsEditingTargetCount(false);
       setTargetCountText(item.targetCount === undefined ? '' : String(item.targetCount));
       return;
@@ -116,22 +124,76 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
     setTargetCountText(item.targetCount === undefined ? '' : String(item.targetCount));
   }, [isCountManual, isEditingTargetCount, item.targetCount]);
 
+  const renderAutoSummary = () => {
+    if (!item.autoConfig) {
+      return <span className="text-xs font-medium">点击配置自动规则（必填）</span>;
+    }
+
+    const { filterExpression, comparisonType, operator, targetValue } = item.autoConfig;
+    const label = (() => {
+      if (comparisonType === 'duration') return '时长';
+      if (comparisonType === 'earliestStart') return '最早开始';
+      if (comparisonType === 'latestStart') return '最晚开始';
+      if (comparisonType === 'nightLatestStart') return '夜间最晚开始';
+      if (comparisonType === 'earliestEnd') return '最早结束';
+      if (comparisonType === 'latestEnd') return '最晚结束';
+      if (comparisonType === 'count') return '次数';
+      return comparisonType;
+    })();
+
+    const formattedTarget = (() => {
+      if (comparisonType === 'duration') return `${targetValue}分钟`;
+      if (comparisonType === 'count') return `${targetValue}次`;
+      const rawMinutes = comparisonType === 'nightLatestStart' && targetValue >= 24 * 60
+        ? targetValue - 24 * 60
+        : targetValue;
+      const prefix = comparisonType === 'nightLatestStart' && targetValue >= 24 * 60 ? '次日 ' : '';
+      const hour = Math.floor(rawMinutes / 60).toString().padStart(2, '0');
+      const minute = (rawMinutes % 60).toString().padStart(2, '0');
+      return `${prefix}${hour}:${minute}`;
+    })();
+
+    return (
+      <span className="font-mono text-[10px]">
+        {filterExpression || '(未设置筛选条件)'} {label} {operator} {formattedTarget}
+      </span>
+    );
+  };
+
   return (
     <>
       <div className="space-y-2">
         <div className="flex items-center gap-1.5 group">
           <span className="text-stone-300 text-xs w-4 text-center">{index + 1}</span>
 
-          {/* 内容输入 */}
           <input
             type="text"
             value={displayValue}
             onChange={(e) => handleContentChange(e.target.value)}
             className="flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-100 transition-all font-serif"
-            placeholder={isAuto ? '⚡ 输入自动日课名称...' : '💧 输入日课名称 (首字符作为图标)...'}
+            placeholder={isAuto ? '⚡ 输入自动日课名称...' : '📝 输入日课名称（首字符作为 emoji 图标）...'}
           />
-          
-          {/* 模式切换（单按钮循环） - 排序模式下隐藏 */}
+
+          {canUseUiIcon && !sortingMode && (
+            <button
+              type="button"
+              onClick={() => setShowIconSelector((prev) => !prev)}
+              className={`w-9 h-9 rounded-lg transition-all flex items-center justify-center shrink-0 ${
+                showIconSelector
+                  ? 'bg-[var(--accent-color)]/10'
+                  : 'border border-stone-200 hover:border-stone-300 bg-white'
+              }`}
+              style={showIconSelector ? { border: '0.5px solid var(--accent-color)' } : undefined}
+              title="选择 UI 图标"
+            >
+              {item.uiIcon ? (
+                <IconRenderer icon={item.icon || '•'} uiIcon={item.uiIcon} size={16} />
+              ) : (
+                <span className="text-stone-300 text-xs">+</span>
+              )}
+            </button>
+          )}
+
           {!sortingMode && (
             <button
               type="button"
@@ -143,15 +205,12 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
                     ? 'text-stone-700 bg-stone-100'
                     : 'text-stone-500 bg-stone-100'
               }`}
-              title={`点击切换类型（当前：${
-                isAuto ? '自动规则' : isCountManual ? '手动次数' : '手动勾选'
-              }）`}
+              title={`点击切换类型（当前：${isAuto ? '自动规则' : isCountManual ? '手动次数' : '手动勾选'}）`}
             >
               {isAuto ? <Zap size={16} /> : isCountManual ? <span className="text-sm font-bold leading-none">1</span> : <Circle size={16} />}
             </button>
           )}
 
-          {/* 排序按钮 - 排序模式下显示 */}
           {sortingMode && (
             <>
               <button
@@ -173,7 +232,6 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
             </>
           )}
 
-          {/* 删除按钮 - 排序模式下隐藏 */}
           {!sortingMode && (
             <button
               type="button"
@@ -186,7 +244,16 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
           )}
         </div>
 
-        {/* 次数目标配置 */}
+        {canUseUiIcon && showIconSelector && !sortingMode && (
+          <div className="ml-6 rounded-xl border border-stone-100 bg-stone-50/60 p-3">
+            <UIIconSelectorCompact
+              currentIcon={item.icon || ''}
+              currentUiIcon={item.uiIcon}
+              onSelectDual={handleUiIconSelect}
+            />
+          </div>
+        )}
+
         {isCountManual && (
           <div className="ml-6 flex items-center gap-2 text-xs text-stone-500">
             <span>目标次数</span>
@@ -224,47 +291,22 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
           </div>
         )}
 
-        {/* 自动规则预览（可点击编辑） */}
         {isAuto && (
-          <div 
+          <div
             onClick={() => setShowAutoEditor(true)}
             className={`ml-6 text-xs px-3 py-2 rounded-lg flex items-center gap-2 cursor-pointer transition-colors active:opacity-80 ${
-              item.autoConfig 
-                ? 'text-blue-600 bg-blue-50' 
+              item.autoConfig
+                ? 'text-blue-600 bg-blue-50'
                 : 'text-amber-600 bg-amber-50 animate-pulse'
             }`}
             title="点击编辑自动规则"
           >
             <Zap size={12} />
-            {item.autoConfig ? (
-              <span className="font-mono text-[10px]">
-                {item.autoConfig.filterExpression || '(未设置筛选条件)'}
-                {' '}
-                {item.autoConfig.comparisonType === 'duration' && '时长'}
-                {item.autoConfig.comparisonType === 'earliestStart' && '最早开始'}
-                {item.autoConfig.comparisonType === 'latestStart' && '最晚开始'}
-                {item.autoConfig.comparisonType === 'nightLatestStart' && '夜间最晚开始'}
-                {item.autoConfig.comparisonType === 'earliestEnd' && '最早结束'}
-                {item.autoConfig.comparisonType === 'latestEnd' && '最晚结束'}
-                {item.autoConfig.comparisonType === 'count' && '次数'}
-                {' '}
-                {item.autoConfig.operator}
-                {' '}
-                {item.autoConfig.comparisonType === 'duration' 
-                  ? `${item.autoConfig.targetValue}分钟`
-                  : item.autoConfig.comparisonType === 'count'
-                    ? `${item.autoConfig.targetValue}次`
-                    : `${item.autoConfig.comparisonType === 'nightLatestStart' && item.autoConfig.targetValue >= 24 * 60 ? '次日 ' : ''}${Math.floor(((item.autoConfig.comparisonType === 'nightLatestStart' && item.autoConfig.targetValue >= 24 * 60) ? item.autoConfig.targetValue - 24 * 60 : item.autoConfig.targetValue) / 60).toString().padStart(2, '0')}:${(((item.autoConfig.comparisonType === 'nightLatestStart' && item.autoConfig.targetValue >= 24 * 60) ? item.autoConfig.targetValue - 24 * 60 : item.autoConfig.targetValue) % 60).toString().padStart(2, '0')}`
-                }
-              </span>
-            ) : (
-              <span className="text-xs font-medium">点击配置自动规则（必需）</span>
-            )}
+            {renderAutoSummary()}
           </div>
         )}
       </div>
 
-      {/* 自动配置编辑器 */}
       {showAutoEditor && (
         <AutoCheckItemEditor
           item={item}
