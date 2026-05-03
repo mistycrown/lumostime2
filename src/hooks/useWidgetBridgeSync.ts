@@ -9,6 +9,7 @@
  * @updated 2026-04-26: Syncs today's TODAY + PIN todo payload so the dedicated scrollable 4x2 widget stays current.
  * @updated 2026-05-01: Syncs tracking-calendar payloads for dedicated 2x2 monthly tracking widgets and re-runs when widget templates change.
  * @updated 2026-05-02: Syncs full scene-group payloads so the dedicated 4x3 scene widget can follow native time-based group and tab changes.
+ * @updated 2026-05-03: Reused the shared normalized template equality helper when deciding whether unsupported UI-icon state actually changed.
  */
 import { App as CapacitorApp } from '@capacitor/app';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -20,6 +21,7 @@ import WidgetBridge from '../plugins/WidgetBridgePlugin';
 import { RedemptionService } from '../services/redemptionService';
 import { uiIconService } from '../services/uiIconService';
 import {
+  areWidgetTemplatesEqual,
   WIDGET_TEMPLATES_UPDATED_EVENT,
   buildDailyRuntimeWidgetPayload,
   buildDailyWidgetSyncPayload,
@@ -131,7 +133,7 @@ export const useWidgetBridgeSync = () => {
           nativeTemplates.length > 0 ? normalizeWidgetTemplates(nativeTemplates) : localTemplates;
         const sanitizedTemplates = sanitizeWidgetTemplatesForUiIconSupport(sourceTemplates, false);
 
-        if (JSON.stringify(sanitizedTemplates) === JSON.stringify(sourceTemplates)) {
+        if (areWidgetTemplatesEqual(sanitizedTemplates, sourceTemplates)) {
           return;
         }
 

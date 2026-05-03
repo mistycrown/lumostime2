@@ -7,18 +7,26 @@
  * @updated 2026-04-27: Added regression coverage so recurring todos that match today are included in the TODAY + PIN widget payload.
  * @updated 2026-04-26: Added regression coverage for pinned todo actionability and removed header click bindings from the dedicated TODAY + PIN widgets.
  * @updated 2026-05-01: Added regression coverage for dedicated tracking-calendar payload builders across tag, scope, and daily sources.
+ * @updated 2026-05-03: Added regression coverage to ensure unsupported UI-icon sanitization only updates templates that actually change.
+ * @updated 2026-05-03: Added regression coverage for shortcut action default colors and Unicode-safe scene card title truncation.
+ * @updated 2026-05-03: Added regression coverage for targeted native widget refresh routing in the Capacitor bridge.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ActiveSession, Category, CheckTemplate, DailyReview, Log, Scope, TodoItem } from '../types';
 import {
+  buildShortcutWidgetSlotConfig,
   buildTodoPinWidgetPayload,
   buildTrackingCalendarDailyConfig,
   buildTrackingCalendarScopeConfig,
   buildTrackingCalendarTagConfig,
   buildTrackingCalendarWidgetPayload,
-  createWidgetTemplate
+  createWidgetTemplate,
+  sanitizeWidgetTemplatesForUiIconSupport
 } from './widgetService';
+import widgetBridgePluginSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetBridgePlugin.kt?raw';
+import widgetRefreshCoordinatorSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetRefreshCoordinator.kt?raw';
+import widgetSceneCardsRemoteViewsServiceSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetSceneCardsRemoteViewsService.java?raw';
 import widgetTodoPinProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetTodoPinProviderSupport.java?raw';
 
 const REFERENCE_DATE = new Date('2026-04-26T09:30:00+08:00');
@@ -337,9 +345,88 @@ describe('buildTrackingCalendarWidgetPayload', () => {
   });
 });
 
+describe('sanitizeWidgetTemplatesForUiIconSupport', () => {
+  it('only updates templates that actually lose unsupported UI icon assets', () => {
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(5000);
+    const templateNeedingSanitization = createWidgetTemplate('Needs sanitize');
+    templateNeedingSanitization.updatedAt = 1000;
+    templateNeedingSanitization.slots[0] = {
+      ...templateNeedingSanitization.slots[0],
+      slotType: 'timer',
+      categoryId: 'focus-category',
+      activityId: 'writing-activity',
+      uiIconAssetPath: '/icons/focus.png',
+      uiIconFallbackAssetPath: '/icons/focus-fallback.png'
+    };
+
+    const untouchedTemplate = createWidgetTemplate('Already clean');
+    untouchedTemplate.updatedAt = 2000;
+
+    const sanitized = sanitizeWidgetTemplatesForUiIconSupport(
+      [templateNeedingSanitization, untouchedTemplate],
+      false
+    );
+
+    expect(sanitized[0].slots[0].uiIconAssetPath).toBeNull();
+    expect(sanitized[0].slots[0].uiIconFallbackAssetPath).toBeNull();
+    expect(sanitized[0].updatedAt).toBe(5000);
+    expect(sanitized[1].updatedAt).toBe(2000);
+
+    nowSpy.mockRestore();
+  });
+
+  it('keeps updatedAt unchanged when templates are already sanitized', () => {
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(9999);
+    const template = createWidgetTemplate('Clean template');
+    template.updatedAt = 3000;
+
+    const sanitized = sanitizeWidgetTemplatesForUiIconSupport([template], false);
+
+    expect(sanitized[0].updatedAt).toBe(3000);
+
+    nowSpy.mockRestore();
+  });
+});
+
+describe('buildShortcutWidgetSlotConfig', () => {
+  it('uses the action-specific default color when no override is provided', () => {
+    const shortcutSlot = buildShortcutWidgetSlotConfig('open_gallery', 0);
+
+    expect(shortcutSlot).toMatchObject({
+      slotType: 'shortcut',
+      label: '画廊',
+      color: '#DCFCE7'
+    });
+  });
+});
+
 describe('WidgetTodoPinProviderSupport', () => {
   it('does not bind header taps to open the app for the TODAY + PIN widgets', () => {
     expect(widgetTodoPinProviderSupportSource).not.toContain('views.setOnClickPendingIntent(R.id.widget_todo_pin_header');
     expect(widgetTodoPinProviderSupportSource).toContain('views.setPendingIntentTemplate(');
+  });
+});
+
+describe('WidgetSceneCardsRemoteViewsService', () => {
+  it('uses code-point-safe truncation for scene card titles', () => {
+    expect(widgetSceneCardsRemoteViewsServiceSource).toContain('codePointCount');
+    expect(widgetSceneCardsRemoteViewsServiceSource).toContain('offsetByCodePoints');
+    expect(widgetSceneCardsRemoteViewsServiceSource).not.toContain('substring(0, maxChars)');
+  });
+});
+
+describe('WidgetBridgePlugin refresh routing', () => {
+  it('uses widget-family refresh helpers instead of refreshing every widget for targeted sync payloads', () => {
+    expect(widgetRefreshCoordinatorSource).toContain('fun refreshTimerWidgets(context: Context)');
+    expect(widgetRefreshCoordinatorSource).toContain('fun refreshTrackingCalendarWidgets(context: Context)');
+    expect(widgetRefreshCoordinatorSource).toContain('fun refreshDailyRuntimeWidgets(context: Context)');
+    expect(widgetRefreshCoordinatorSource).toContain('fun refreshTodoPinWidgets(context: Context)');
+    expect(widgetRefreshCoordinatorSource).toContain('fun refreshSceneWidgets(context: Context)');
+
+    expect(widgetBridgePluginSource).toContain('WidgetRefreshCoordinator.refreshTimerWidgets(context)');
+    expect(widgetBridgePluginSource).toContain('WidgetRefreshCoordinator.refreshTrackingCalendarWidgets(context)');
+    expect(widgetBridgePluginSource).toContain('WidgetRefreshCoordinator.refreshDailyRuntimeWidgets(context)');
+    expect(widgetBridgePluginSource).toContain('WidgetRefreshCoordinator.refreshTodoPinWidgets(context)');
+    expect(widgetBridgePluginSource).toContain('WidgetRefreshCoordinator.refreshSceneWidgets(context)');
   });
 });

@@ -583,16 +583,6 @@
         </service>
 
         <service
-            android:name=".WidgetSceneTabsRemoteViewsService"
-            android:enabled="true"
-            android:exported="false"
-            android:permission="android.permission.BIND_REMOTEVIEWS">
-            <intent-filter>
-                <action android:name="android.widget.RemoteViewsService" />
-            </intent-filter>
-        </service>
-
-        <service
             android:name=".WidgetSceneCardsRemoteViewsService"
             android:enabled="true"
             android:exported="false"

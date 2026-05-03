@@ -12,9 +12,15 @@ import java.util.UUID
  * Native widget action controller for timer, daily, and shortcut widgets.
  * Updated 2026-05-02: Added dedicated scene-widget item handling for timer-like cards and checklist cards.
  * Updated 2026-05-03: Reused the shared tap-animation state for scene widget items so scene timers and checklist cards get the same springy tap feedback as the timer widget family.
+ * Updated 2026-05-03: Consolidated daily-slot and scene-checklist completion handling into one shared helper to keep widget-side checklist rules in sync.
  */
 object WidgetTimerController {
     private const val TAP_FEEDBACK_DURATION_MS = 260L
+
+    private data class DailyTapMutationResult(
+        val animationMode: String,
+        val occurredAt: Long
+    )
 
     fun handleSlotTap(
         context: Context,
@@ -29,8 +35,8 @@ object WidgetTimerController {
         val slot = template.slots.firstOrNull { it.slotIndex == slotIndex } ?: return false
 
         return when (WidgetTypes.normalize(slot.slotType)) {
-            WidgetTypes.DAILY -> handleDailySlotTap(context, appWidgetId, template, slot)
-            WidgetTypes.SHORTCUT -> handleShortcutSlotTap(context, appWidgetId, template, slot)
+            WidgetTypes.DAILY -> handleDailySlotTap(context, appWidgetId, slot)
+            WidgetTypes.SHORTCUT -> handleShortcutSlotTap(context, appWidgetId, slot)
             else -> handleTimerSlotTap(context, appWidgetId, template, slot)
         }
     }
@@ -181,87 +187,27 @@ object WidgetTimerController {
     private fun handleDailySlotTap(
         context: Context,
         appWidgetId: Int,
-        template: WidgetTemplate,
         slot: WidgetSlotConfig
     ): Boolean {
         val normalizedWidgetType = WidgetTypes.normalize(slot.slotType)
-        val slotIndex = slot.slotIndex
         val checkItemId = slot.checkItemId ?: return false
-
-        val payload = WidgetStores.loadDailySyncPayload(context)
-        val todayDate = getCurrentDateString()
-        val meta = payload?.items?.firstOrNull { it.checkItemId == checkItemId }
-        val currentProgress =
-            if (payload?.date == todayDate) payload.progress.firstOrNull { it.checkItemId == checkItemId } else null
-
-        val manualMode = WidgetDailyModes.normalize(meta?.manualMode ?: slot.checkManualMode)
-        val targetCount = (meta?.targetCount ?: slot.checkTargetCount ?: 1).coerceAtLeast(1)
-        val currentCount = (currentProgress?.currentCount ?: 0).coerceAtLeast(0).coerceAtMost(targetCount)
-        val isCompleted = currentProgress?.isCompleted ?: false
-
-        if (manualMode == WidgetDailyModes.BINARY) {
-            if (isCompleted) {
-                return false
-            }
-
-            WidgetStores.upsertDailyProgress(
-                context,
-                WidgetDailyProgress(
-                    checkItemId = checkItemId,
-                    date = todayDate,
-                    manualMode = WidgetDailyModes.BINARY,
-                    currentCount = 1,
-                    targetCount = 1,
-                    isCompleted = true,
-                    updatedAt = System.currentTimeMillis()
-                )
-            )
-        } else {
-            if (currentCount >= targetCount) {
-                return false
-            }
-
-            val nextCount = (currentCount + 1).coerceAtMost(targetCount)
-            WidgetStores.upsertDailyProgress(
-                context,
-                WidgetDailyProgress(
-                    checkItemId = checkItemId,
-                    date = todayDate,
-                    manualMode = WidgetDailyModes.COUNT,
-                    currentCount = nextCount,
-                    targetCount = targetCount,
-                    isCompleted = nextCount >= targetCount,
-                    updatedAt = System.currentTimeMillis()
-                )
-            )
-        }
-
-        WidgetStores.appendPendingDailyAction(
-            context,
-            WidgetPendingDailyAction(
-                id = UUID.randomUUID().toString(),
-                widgetType = WidgetTypes.DAILY,
-                date = todayDate,
-                checkTemplateId = slot.checkTemplateId,
-                checkItemId = checkItemId,
-                actionMode = "complete_once",
-                createdAt = System.currentTimeMillis(),
-                appWidgetId = appWidgetId,
-                slotIndex = slotIndex
-            )
-        )
+        val mutation = applyDailyCheckTap(
+            context = context,
+            appWidgetId = appWidgetId,
+            checkTemplateId = slot.checkTemplateId,
+            checkItemId = checkItemId,
+            fallbackManualMode = slot.checkManualMode,
+            fallbackTargetCount = slot.checkTargetCount,
+            pendingSlotIndex = slot.slotIndex
+        ) ?: return false
 
         saveTapAnimation(
             context,
             appWidgetId = appWidgetId,
             widgetType = normalizedWidgetType,
-            slotIndex = slotIndex,
-            animationMode = if (manualMode == WidgetDailyModes.COUNT && currentCount + 1 < targetCount) {
-                WidgetTapAnimationModes.DAILY_COUNT
-            } else {
-                WidgetTapAnimationModes.DAILY_COMPLETE
-            },
-            startedAt = System.currentTimeMillis()
+            slotIndex = slot.slotIndex,
+            animationMode = mutation.animationMode,
+            startedAt = mutation.occurredAt
         )
         return true
     }
@@ -269,7 +215,6 @@ object WidgetTimerController {
     private fun handleShortcutSlotTap(
         context: Context,
         appWidgetId: Int,
-        template: WidgetTemplate,
         slot: WidgetSlotConfig
     ): Boolean {
         val action = slot.shortcutAction ?: return false
@@ -373,21 +318,51 @@ object WidgetTimerController {
         slotIndex: Int
     ): Boolean {
         val checkItemId = item.checkItemId ?: return false
+        val mutation = applyDailyCheckTap(
+            context = context,
+            appWidgetId = appWidgetId,
+            checkTemplateId = item.checkTemplateId,
+            checkItemId = checkItemId,
+            fallbackManualMode = item.checkManualMode,
+            fallbackTargetCount = item.checkTargetCount,
+            pendingSlotIndex = null
+        ) ?: return false
 
+        saveTapAnimation(
+            context,
+            appWidgetId = appWidgetId,
+            widgetType = WidgetTypes.DAILY,
+            slotIndex = slotIndex,
+            animationMode = mutation.animationMode,
+            startedAt = mutation.occurredAt
+        )
+        return true
+    }
+
+    private fun applyDailyCheckTap(
+        context: Context,
+        appWidgetId: Int,
+        checkTemplateId: String?,
+        checkItemId: String,
+        fallbackManualMode: String?,
+        fallbackTargetCount: Int?,
+        pendingSlotIndex: Int?
+    ): DailyTapMutationResult? {
         val payload = WidgetStores.loadDailySyncPayload(context)
         val todayDate = getCurrentDateString()
         val meta = payload?.items?.firstOrNull { it.checkItemId == checkItemId }
         val currentProgress =
             if (payload?.date == todayDate) payload.progress.firstOrNull { it.checkItemId == checkItemId } else null
 
-        val manualMode = WidgetDailyModes.normalize(meta?.manualMode ?: item.checkManualMode)
-        val targetCount = (meta?.targetCount ?: item.checkTargetCount ?: 1).coerceAtLeast(1)
+        val manualMode = WidgetDailyModes.normalize(meta?.manualMode ?: fallbackManualMode)
+        val targetCount = (meta?.targetCount ?: fallbackTargetCount ?: 1).coerceAtLeast(1)
         val currentCount = (currentProgress?.currentCount ?: 0).coerceAtLeast(0).coerceAtMost(targetCount)
         val isCompleted = currentProgress?.isCompleted ?: false
+        val occurredAt = System.currentTimeMillis()
 
-        if (manualMode == WidgetDailyModes.BINARY) {
+        val animationMode = if (manualMode == WidgetDailyModes.BINARY) {
             if (isCompleted) {
-                return false
+                return null
             }
 
             WidgetStores.upsertDailyProgress(
@@ -399,12 +374,13 @@ object WidgetTimerController {
                     currentCount = 1,
                     targetCount = 1,
                     isCompleted = true,
-                    updatedAt = System.currentTimeMillis()
+                    updatedAt = occurredAt
                 )
             )
+            WidgetTapAnimationModes.DAILY_COMPLETE
         } else {
             if (currentCount >= targetCount) {
-                return false
+                return null
             }
 
             val nextCount = (currentCount + 1).coerceAtMost(targetCount)
@@ -417,9 +393,15 @@ object WidgetTimerController {
                     currentCount = nextCount,
                     targetCount = targetCount,
                     isCompleted = nextCount >= targetCount,
-                    updatedAt = System.currentTimeMillis()
+                    updatedAt = occurredAt
                 )
             )
+
+            if (nextCount < targetCount) {
+                WidgetTapAnimationModes.DAILY_COUNT
+            } else {
+                WidgetTapAnimationModes.DAILY_COMPLETE
+            }
         }
 
         WidgetStores.appendPendingDailyAction(
@@ -428,28 +410,19 @@ object WidgetTimerController {
                 id = UUID.randomUUID().toString(),
                 widgetType = WidgetTypes.DAILY,
                 date = todayDate,
-                checkTemplateId = item.checkTemplateId,
+                checkTemplateId = checkTemplateId,
                 checkItemId = checkItemId,
                 actionMode = "complete_once",
-                createdAt = System.currentTimeMillis(),
+                createdAt = occurredAt,
                 appWidgetId = appWidgetId,
-                slotIndex = null
+                slotIndex = pendingSlotIndex
             )
         )
 
-        saveTapAnimation(
-            context,
-            appWidgetId = appWidgetId,
-            widgetType = WidgetTypes.DAILY,
-            slotIndex = slotIndex,
-            animationMode = if (manualMode == WidgetDailyModes.COUNT && currentCount + 1 < targetCount) {
-                WidgetTapAnimationModes.DAILY_COUNT
-            } else {
-                WidgetTapAnimationModes.DAILY_COMPLETE
-            },
-            startedAt = System.currentTimeMillis()
+        return DailyTapMutationResult(
+            animationMode = animationMode,
+            occurredAt = occurredAt
         )
-        return true
     }
 
     private fun saveTapAnimation(

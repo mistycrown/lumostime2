@@ -9,6 +9,7 @@ import android.os.Looper
 /**
  * Refreshes every registered widget provider so runtime state stays in sync across sizes.
  * Updated 2026-05-02: Added the dedicated scene 4x3 widget provider to global refresh routing.
+ * Updated 2026-05-03: Added widget-family refresh helpers so bridge sync calls can refresh only the providers that depend on each payload.
  */
 object WidgetRefreshCoordinator {
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -28,18 +29,38 @@ object WidgetRefreshCoordinator {
         }
     }
 
-    fun refreshAll(context: Context) {
+    fun refreshTimerWidgets(context: Context) {
         QuickLogWidget.refreshAllAsync(context)
         QuickLogWidget2x1.refreshAllAsync(context)
         QuickLogWidget3x2.refreshAllAsync(context)
         QuickLogWidget4x1.refreshAllAsync(context)
         QuickLogWidget4x2.refreshAllAsync(context)
+    }
+
+    fun refreshTrackingCalendarWidgets(context: Context) {
         QuickLogWidgetTrackingCalendar2x2.refreshAllAsync(context)
+    }
+
+    fun refreshDailyRuntimeWidgets(context: Context) {
         QuickLogWidgetDailyRuntime4x2.refreshAllAsync(context)
+        QuickLogWidgetDailyRuntime4x4.refreshAllAsync(context)
+    }
+
+    fun refreshTodoPinWidgets(context: Context) {
         QuickLogWidgetTodoPin4x2.refreshAllAsync(context)
         QuickLogWidgetTodoPin4x3.refreshAllAsync(context)
+    }
+
+    fun refreshSceneWidgets(context: Context) {
         QuickLogWidgetScene4x3.refreshAllAsync(context)
-        QuickLogWidgetDailyRuntime4x4.refreshAllAsync(context)
+    }
+
+    fun refreshAll(context: Context) {
+        refreshTimerWidgets(context)
+        refreshTrackingCalendarWidgets(context)
+        refreshDailyRuntimeWidgets(context)
+        refreshTodoPinWidgets(context)
+        refreshSceneWidgets(context)
     }
 
     fun refreshWidget(context: Context, appWidgetId: Int) {
