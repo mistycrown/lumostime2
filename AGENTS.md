@@ -27,6 +27,8 @@
 - Use `PascalCase` for React components/views (`StatsView.tsx`), `camelCase` for utilities/services/hooks (`syncService.ts`, `useTodoManager.ts`).
 - Keep files focused; prefer small pure helpers in `src/utils/`.
 - Preserve and update file header comments (`@file`, `@input`, `@output`, etc.) when modifying source files.
+- In frontend UI, avoid adding explanatory microcopy under buttons, options, or menu items unless explicitly requested. Prefer concise labels only.
+- Prefer a minimalist editorial/print-inspired frontend style. Avoid box-inside-box, card-inside-card, or overly nested container treatments unless the existing screen already requires them.
 
 ## Testing Guidelines
 - Vitest is available (`vitest` dependency), but no default `npm test` script is defined yet.

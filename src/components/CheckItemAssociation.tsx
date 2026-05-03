@@ -105,10 +105,10 @@ export const CheckItemAssociation: React.FC<CheckItemAssociationProps> = ({
                 } : undefined}
               >
                 <div className="flex items-center gap-2.5">
-                  {item.icon && (
+                  {(item.icon || item.uiIcon) && (
                     <div className="flex-shrink-0">
                       <IconRenderer 
-                        icon={item.icon}
+                        icon={item.icon || ''}
                         uiIcon={item.uiIcon}
                         size={16}
                       />

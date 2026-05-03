@@ -318,6 +318,23 @@ describe('buildTrackingCalendarWidgetPayload', () => {
       { date: '2026-04-24', value: 1 }
     ]);
   });
+
+  it('falls back to the default color for daily tracking when no color override is provided', () => {
+    const dailyBinding = {
+      checkTemplateId: 'check-template-1',
+      checkItemId: 'daily-check-1',
+      content: '晨读',
+      category: '晨间',
+      type: 'manual' as const,
+      manualMode: 'binary' as const,
+      targetCount: 1,
+      icon: '📉'
+    };
+
+    const config = buildTrackingCalendarDailyConfig(dailyBinding);
+
+    expect(config.color).toBe('#E7E5E4');
+  });
 });
 
 describe('WidgetTodoPinProviderSupport', () => {

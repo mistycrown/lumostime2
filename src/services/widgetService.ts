@@ -542,7 +542,7 @@ export const buildTrackingCalendarDailyConfig = (
   uiIconAssetPath: normalizeNullableString(overrides?.uiIconAssetPath),
   uiIconFallbackAssetPath: normalizeNullableString(overrides?.uiIconFallbackAssetPath),
   label: binding.content,
-  color: normalizeNullableString(overrides?.color)
+  color: normalizeNullableString(overrides?.color) || DEFAULT_TRACKING_CALENDAR_COLOR
 });
 
 export const findDailyWidgetBinding = (

@@ -6,6 +6,7 @@
  * @description Lets the user pick one tracked target plus icon/color options for the dedicated monthly tracking widget.
  * @updated 2026-05-01: Added the first tracking-calendar editor so dedicated 2x2 calendar widgets can follow tags, scopes, or daily checks.
  * @updated 2026-05-01: Cleaned all localized copy and aligned the preview wording with the new tracking-calendar visual design.
+ * @updated 2026-05-03: Reordered the flow to bind the tracked object before choosing icon mode, and let daily bindings fall back to their default UI icon with one tap.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
@@ -249,6 +250,45 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
     return '可以追踪标签、领域或日课';
   })();
 
+  const iconPlaceholder = (() => {
+    if (localDraft.sourceType === 'tag') {
+      return selectedActivity?.icon || selectedCategory?.icon || '🏷️';
+    }
+    if (localDraft.sourceType === 'scope') {
+      return selectedScope?.icon || '🧭';
+    }
+    if (localDraft.sourceType === 'daily') {
+      return selectedDailyItem?.icon || '✅';
+    }
+    return '•';
+  })();
+
+  const iconResetLabel = (() => {
+    if (localDraft.sourceType === 'tag') {
+      return '跟随标签图标';
+    }
+    if (localDraft.sourceType === 'scope') {
+      return '跟随领域图标';
+    }
+    if (localDraft.sourceType === 'daily') {
+      return '跟随日课图标';
+    }
+    return '清空';
+  })();
+
+  const uiIconDescription = (() => {
+    if (localDraft.sourceType === 'tag') {
+      return '标签可以直接跟随活动或分类自带的 UI icon。';
+    }
+    if (localDraft.sourceType === 'scope') {
+      return '领域可以跟随它本来的 UI icon。';
+    }
+    if (localDraft.sourceType === 'daily') {
+      return '日课也可以跟随默认 UI icon，颜色可以先留空。';
+    }
+    return '输入兑换码并启用 UI 主题后，可以切换成 UI icon。';
+  })();
+
   const effectiveColor = normalizeHexColor(localDraft.backgroundColor || '') || null;
   const effectiveEmojiIcon = normalizeCustomIcon(localDraft.customIcon || '') || defaultEmojiIcon;
   const effectiveUiIcon =
@@ -461,140 +501,130 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
             </div>
           </div>
 
-          {canUseUiIcon && (
+          {localDraft.sourceType === 'tag' && (
             <div>
-              <div className="mb-3 px-1">
-                <h3 className="text-sm font-bold text-stone-800">图标样式</h3>
-                <p className="mt-1 text-xs text-stone-400">输入兑换码并启用 UI 主题后，可以切换成 UI icon。</p>
+              <div className="mb-4 px-1">
+                <h3 className="text-sm font-bold text-stone-800">标签</h3>
+                <p className="mt-1 text-xs text-stone-400">当天存在至少一条命中该标签的记录时点亮。</p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                {ICON_MODE_OPTIONS.map((option) => {
-                  const isActive = localDraft.iconMode === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => {
-                        updateDraft((previousDraft) => ({
-                          ...previousDraft,
-                          iconMode: option.value,
-                          customIcon: option.value === 'emoji' ? previousDraft.customIcon : null,
-                          uiIcon: option.value === 'uiIcon' ? (previousDraft.uiIcon || defaultUiIcon) : null
-                        }));
-                      }}
-                      className={`rounded-2xl border px-4 py-3 text-sm font-medium transition-all ${
-                        isActive
-                          ? 'border-stone-800 bg-stone-800 text-white shadow-sm'
-                          : 'border-stone-200 bg-white text-stone-600 hover:border-stone-300'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
+              <TagAssociation
+                categories={categories}
+                selectedCategoryId={selectedCategoryId}
+                selectedActivityId={localDraft.activityId || ''}
+                onCategorySelect={(categoryId) => {
+                  updateDraft((previousDraft) => ({
+                    ...previousDraft,
+                    categoryId,
+                    activityId: previousDraft.categoryId === categoryId ? previousDraft.activityId : null
+                  }));
+                }}
+                onActivitySelect={(activityId) => {
+                  updateDraft((previousDraft) => ({
+                    ...previousDraft,
+                    categoryId: previousDraft.categoryId || selectedCategoryId || null,
+                    activityId: activityId || null
+                  }));
+                }}
+              />
             </div>
           )}
 
-          {localDraft.sourceType === 'tag' && (
-            <>
-              {localDraft.iconMode === 'emoji'
-                ? renderEmojiInput(selectedActivity?.icon || selectedCategory?.icon || '🏷️', '跟随标签图标')
-                : renderUiIconSection('标签可以直接跟随活动或分类自带的 UI icon。')}
-
-              <div>
-                <div className="mb-4 px-1">
-                  <h3 className="text-sm font-bold text-stone-800">标签</h3>
-                  <p className="mt-1 text-xs text-stone-400">当天存在至少一条命中该标签的记录时点亮。</p>
-                </div>
-                <TagAssociation
-                  categories={categories}
-                  selectedCategoryId={selectedCategoryId}
-                  selectedActivityId={localDraft.activityId || ''}
-                  onCategorySelect={(categoryId) => {
-                    updateDraft((previousDraft) => ({
-                      ...previousDraft,
-                      categoryId,
-                      activityId: previousDraft.categoryId === categoryId ? previousDraft.activityId : null
-                    }));
-                  }}
-                  onActivitySelect={(activityId) => {
-                    updateDraft((previousDraft) => ({
-                      ...previousDraft,
-                      categoryId: previousDraft.categoryId || selectedCategoryId || null,
-                      activityId: activityId || null
-                    }));
-                  }}
-                />
-              </div>
-            </>
-          )}
-
           {localDraft.sourceType === 'scope' && (
-            <>
-              {localDraft.iconMode === 'emoji'
-                ? renderEmojiInput(selectedScope?.icon || '🧭', '跟随领域图标')
-                : renderUiIconSection('领域可以跟随它本来的 UI icon。')}
-
-              <div>
-                <div className="mb-4 px-1">
-                  <h3 className="text-sm font-bold text-stone-800">领域</h3>
-                  <p className="mt-1 text-xs text-stone-400">当天有记录关联到这个领域时点亮。</p>
-                </div>
-                <CustomSelect
-                  value={localDraft.scopeId || ''}
-                  options={scopes.map((scope) => ({
-                    value: scope.id,
-                    label: scope.name
-                  }))}
-                  onChange={(scopeId) => setDraftField('scopeId', scopeId || null)}
-                  placeholder="请选择一个领域"
-                />
+            <div>
+              <div className="mb-4 px-1">
+                <h3 className="text-sm font-bold text-stone-800">领域</h3>
+                <p className="mt-1 text-xs text-stone-400">当天有记录关联到这个领域时点亮。</p>
               </div>
-            </>
+              <CustomSelect
+                value={localDraft.scopeId || ''}
+                options={scopes.map((scope) => ({
+                  value: scope.id,
+                  label: scope.name
+                }))}
+                onChange={(scopeId) => setDraftField('scopeId', scopeId || null)}
+                placeholder="请选择一个领域"
+              />
+            </div>
           )}
 
           {localDraft.sourceType === 'daily' && (
-            <>
-              <div>
-                <div className="mb-4 px-1">
-                  <h3 className="text-sm font-bold text-stone-800">绑定手动日课</h3>
-                  <p className="mt-1 text-xs text-stone-400">这里只显示手动日课，完成当天会点亮。</p>
-                </div>
-
-                {manualItems.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-stone-200 bg-white px-4 py-8 text-center text-sm text-stone-400">
-                    还没有可绑定的手动日课
-                  </div>
-                ) : (
-                  <CustomSelect
-                    value={localDraft.checkItemId || ''}
-                    options={manualItems.map((item) => ({
-                      value: item.checkItemId,
-                      label: item.manualMode === 'count'
-                        ? `${item.category} / ${item.content}（目标 ${item.targetCount} 次）`
-                        : `${item.category} / ${item.content}`
-                    }))}
-                    onChange={(checkItemId) => {
-                      const nextItem = manualItems.find((item) => item.checkItemId === checkItemId);
-                      if (!nextItem) {
-                        return;
-                      }
-                      updateDraft((previousDraft) => ({
-                        ...previousDraft,
-                        checkTemplateId: nextItem.checkTemplateId,
-                        checkItemId: nextItem.checkItemId,
-                        label: nextItem.content
-                      }));
-                    }}
-                    placeholder="请选择一个手动日课"
-                  />
-                )}
+            <div>
+              <div className="mb-4 px-1">
+                <h3 className="text-sm font-bold text-stone-800">绑定手动日课</h3>
+                <p className="mt-1 text-xs text-stone-400">这里只显示手动日课，完成当天会点亮。</p>
               </div>
 
-              {localDraft.iconMode === 'emoji'
-                ? renderEmojiInput(selectedDailyItem?.icon || '✅', '跟随日课图标')
-                : renderUiIconSection('日课也可以切到 UI icon，但颜色可以先留空。')}
+              {manualItems.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-stone-200 bg-white px-4 py-8 text-center text-sm text-stone-400">
+                  还没有可绑定的手动日课
+                </div>
+              ) : (
+                <CustomSelect
+                  value={localDraft.checkItemId || ''}
+                  options={manualItems.map((item) => ({
+                    value: item.checkItemId,
+                    label: item.manualMode === 'count'
+                      ? `${item.category} / ${item.content}（目标 ${item.targetCount} 次）`
+                      : `${item.category} / ${item.content}`
+                  }))}
+                  onChange={(checkItemId) => {
+                    const nextItem = manualItems.find((item) => item.checkItemId === checkItemId);
+                    if (!nextItem) {
+                      return;
+                    }
+                    updateDraft((previousDraft) => ({
+                      ...previousDraft,
+                      checkTemplateId: nextItem.checkTemplateId,
+                      checkItemId: nextItem.checkItemId,
+                      label: nextItem.content
+                    }));
+                  }}
+                  placeholder="请选择一个手动日课"
+                />
+              )}
+            </div>
+          )}
+
+          {localDraft.sourceType && (
+            <>
+              {canUseUiIcon && (
+                <div>
+                  <div className="mb-3 px-1">
+                    <h3 className="text-sm font-bold text-stone-800">图标样式</h3>
+                    <p className="mt-1 text-xs text-stone-400">先选追踪对象，再决定是沿用 emoji 还是切到 UI icon。</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {ICON_MODE_OPTIONS.map((option) => {
+                      const isActive = localDraft.iconMode === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => {
+                            updateDraft((previousDraft) => ({
+                              ...previousDraft,
+                              iconMode: option.value,
+                              customIcon: option.value === 'emoji' ? previousDraft.customIcon : null,
+                              uiIcon: option.value === 'uiIcon' ? (previousDraft.uiIcon || defaultUiIcon) : null
+                            }));
+                          }}
+                          className={`rounded-2xl border px-4 py-3 text-sm font-medium transition-all ${
+                            isActive
+                              ? 'border-stone-800 bg-stone-800 text-white shadow-sm'
+                              : 'border-stone-200 bg-white text-stone-600 hover:border-stone-300'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {!canUseUiIcon || localDraft.iconMode === 'emoji'
+                ? renderEmojiInput(iconPlaceholder, iconResetLabel)
+                : renderUiIconSection(uiIconDescription)}
             </>
           )}
 
