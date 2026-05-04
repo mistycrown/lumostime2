@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { CheckTemplate, DailyReview, ReviewTemplate } from '../types';
-import { applyDailyCheckActionForDate, getEligibleNfcDailyCheckItems } from './dailyCheckUtils';
+import {
+  applyDailyCheckActionForDate,
+  getEligibleNfcDailyCheckItems,
+  getEligibleTrackingCalendarDailyCheckItems
+} from './dailyCheckUtils';
 
 const reviewTemplates: ReviewTemplate[] = [
   {
@@ -151,5 +155,12 @@ describe('dailyCheckUtils', () => {
     const eligible = getEligibleNfcDailyCheckItems(checkTemplates);
 
     expect(eligible.map(item => item.checkItemId)).toEqual(['check-binary', 'check-count']);
+  });
+
+  it('exposes both manual and automatic daily checks for tracking-calendar binding', () => {
+    const eligible = getEligibleTrackingCalendarDailyCheckItems(checkTemplates);
+
+    expect(eligible.map(item => item.checkItemId)).toEqual(['check-binary', 'check-count', 'check-auto']);
+    expect(eligible.find(item => item.checkItemId === 'check-auto')?.type).toBe('auto');
   });
 });

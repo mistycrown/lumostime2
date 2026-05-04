@@ -149,11 +149,23 @@ export const StickerSetEditModal: React.FC<StickerSetEditModalProps> = ({
                 <div key={index} className="relative aspect-square">
                   {sticker ? (
                     /* 已填充槽位 */
-                    <div className="w-full h-full rounded-xl border border-stone-100 bg-stone-50 flex items-center justify-center overflow-hidden">
+                    <div className="w-full h-full rounded-xl border border-stone-100 bg-stone-50 overflow-hidden">
                       <span className="absolute left-1.5 top-1.5 text-[10px] font-medium text-stone-300">
                         {index + 1}
                       </span>
-                      <IconRenderer icon={`image:${sticker.path}`} size="80%" />
+                      <div className="flex h-full flex-col">
+                        <div className="flex min-h-0 flex-1 items-center justify-center px-2 pt-4 pb-1">
+                          <IconRenderer icon={`image:${sticker.path}`} size="80%" />
+                        </div>
+                        <div className="px-2 pb-1.5">
+                          <span
+                            className="block truncate text-center text-[9px] font-medium leading-tight text-stone-400"
+                            title={sticker.label || ''}
+                          >
+                            {sticker.label || '\u00A0'}
+                          </span>
+                        </div>
+                      </div>
                       {/* 移除按钮 */}
                       <button
                         onClick={() => onRemoveSticker(sticker.id)}

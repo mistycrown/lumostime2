@@ -4,6 +4,7 @@
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
  * @pos Component
  * @description A reusable bottom sheet that exposes lightweight todo planning and completion actions without opening the full todo detail editor first.
+ * @updated 2026-05-04: Registered with the shared Android back-handler stack and consumed backdrop clicks so the sheet closes before app exit or underlying todo taps can fire.
  * @updated 2026-04-27: Added an inline two-step delete action so the shared todo quick-actions sheet can remove tasks without opening the full detail editor.
  * @updated 2026-04-21: Added pin/unpin quick action support plus pinned-state metadata for today-schedule prioritization.
  * @updated 2026-04-21: Switched backdrop dismissal to pointer-down handling so opening clicks no longer immediately close the shared sheet on desktop.
@@ -13,6 +14,7 @@ import React, { useEffect, useState } from 'react';
 import { CalendarDays, Check, CheckCircle2, Flag, PanelRightOpen, Pin, Trash2, X } from 'lucide-react';
 import { TodoItem } from '../types';
 import { parseDateKey } from '../utils/todoScheduleUtils';
+import { registerHardwareBackHandler } from '../hooks/useHardwareBackButton';
 
 interface TodoQuickActionsModalProps {
   isOpen: boolean;
@@ -45,6 +47,22 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
     setIsDeleteConfirming(false);
   }, [isOpen, todo?.id]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    return registerHardwareBackHandler(() => {
+      if (isDeleteConfirming) {
+        setIsDeleteConfirming(false);
+        return true;
+      }
+
+      onClose();
+      return true;
+    });
+  }, [isDeleteConfirming, isOpen, onClose]);
+
   if (!isOpen || !todo) return null;
 
   const formatQuickActionDate = (dateKey?: string) => {
@@ -72,14 +90,25 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
     { label: '完成', value: formatQuickActionDateTime(todo.completedAt) }
   ].filter((item): item is { label: string; value: string } => Boolean(item.value));
 
+  const handleBackdropClick: React.MouseEventHandler<HTMLDivElement> = (event) => {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    onClose();
+  };
+
   return (
     <div
       className="fixed inset-0 z-[130] flex items-end justify-center bg-[rgba(15,23,42,0.12)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-12 backdrop-blur-sm md:items-center md:pb-4"
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) {
-          onClose();
+          event.stopPropagation();
         }
       }}
+      onClick={handleBackdropClick}
     >
       <div
         className="w-full max-w-[26rem] overflow-hidden rounded-[2rem] border border-stone-200 bg-[#faf9f6] shadow-[0_26px_70px_rgba(15,23,42,0.14)]"

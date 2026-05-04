@@ -10,6 +10,9 @@ Components that form the structural or global UI elements.
 - `Toast.tsx`: Notification system.
 
 ## Modals
+- Update 2026-05-04: `AIBackfillChatModal.tsx` now opens a brand-new empty conversation whenever the user switches to another persona, so each chat window stays bound to one persona instead of changing persona in place.
+- Update 2026-05-04: `AIBackfillChatModal.tsx` now uses a WeChat-like grouped chat row layout, keeping the avatar beside the bubble, removing the per-message speaker label, and reusing the same avatar slot across consecutive turns from the same side.
+- Update 2026-05-04: `ImmersiveTimer.tsx` now anchors all top controls to one shared toolbar row and skips the managed `--status-bar-height` fallback in both portrait and landscape mode, fixing the immersive top-button drift that appeared after entering fullscreen on some mobile layouts.
 - Update 2026-05-03: `AIBackfillChatModal.tsx` now declares the background-notification visibility helper before native diagnostics hydration, so production bundles no longer crash on startup with `Cannot access 'Re' before initialization`.
 - Update 2026-05-03: `ImmersiveTimer.tsx` now imports the Android EdgeToEdge plugin through its ESM entry, so Capacitor WebView builds no longer hit `require is not defined` during immersive timer setup.
 - Update 2026-05-01: `AIBackfillChatModal.tsx` now filters persisted null-like assistant message content during session normalization, so older malformed native-backfilled entries stop rendering standalone `null` bubbles after reload.
@@ -112,6 +115,7 @@ Components for theme and appearance customization.
 - `achievement/AchievementBottleStyleSelector.tsx`: 已改为成就瓶样式卡片选择器，使用玻璃瓶身小预览区分不同气质。
 > Last updated: 2026-04-27
 - `TodoQuickActionsModal.tsx`: Added an inline `删除任务 -> 确认删除？` two-step action so shared todo quick actions can remove a task directly from the sheet without opening the full detail editor first.
+- `TodoQuickActionsModal.tsx`: Android back now dismisses the shared quick-actions sheet before app-level navigation runs, and tapping the blurred backdrop closes the sheet without leaking the tap through to the todo row underneath.
 - `TodoAssociation.tsx`, `TodoScheduleAssignModal.tsx`: Shared todo pickers now hide unfinished subtasks whenever their parent todo is completed, so completed parents no longer leave orphan child rows in association or schedule-selection lists.
 - `TodoScheduleAssignModal.tsx`: The arrange/due picker now renders direct subtasks beneath their parent row with expandable hierarchy controls instead of flattening children into standalone cards.
 - `MainLayout.tsx`: The floating Tag/Scope and Chronicle/Memoir switch buttons now let fallback Lucide icons inherit the floating button color, so the default UI theme stays visible on white accent-theme buttons.

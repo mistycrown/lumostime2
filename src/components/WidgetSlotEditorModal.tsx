@@ -9,6 +9,7 @@
  * @updated 2026-05-03: Moved timer icon-style editing below tag, todo, and scope binding so the source comes first.
  * @updated 2026-05-03: Added timer background-color selection and a shared default-color reset for timer, daily, and shortcut slots.
  * @updated 2026-05-03: Restored action-aware shortcut default colors so preview and saved slots stay aligned with shortcut metadata.
+ * @updated 2026-05-04: Switched widget color palettes to an auto-fit grid so swatches fill the row more evenly on narrower phones.
  * @updated 2026-04-25: Added supporter-gated widget UI icon mode while keeping emoji-only editing as the fallback path.
  */
 
@@ -72,6 +73,10 @@ interface WidgetSlotEditorModalProps {
 }
 
 const EMOJI_INPUT_MAX_LENGTH = 8;
+
+const COLOR_SWATCH_GRID_STYLE: React.CSSProperties = {
+  gridTemplateColumns: 'repeat(auto-fit, minmax(2.75rem, 1fr))'
+};
 
 const SLOT_TYPE_OPTIONS: Array<{ value: Exclude<WidgetSlotType, null>; label: string }> = [
   { value: 'timer', label: '计时器' },
@@ -526,7 +531,7 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
           使用默认颜色
         </button>
       </div>
-      <div className="flex flex-wrap gap-3">
+      <div className="grid gap-3" style={COLOR_SWATCH_GRID_STYLE}>
         {colorOptions.map((color) => {
           const normalized = normalizeCustomColorHex(color) || DEFAULT_DAILY_WIDGET_COLOR;
           const isActive = normalized === effectiveColor.toUpperCase();
@@ -535,7 +540,7 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
               key={normalized}
               type="button"
               onClick={() => setDraftField('backgroundColor', normalized)}
-              className={`h-10 w-10 rounded-full border-2 transition-transform hover:scale-105 ${
+              className={`aspect-square w-full rounded-full border-2 transition-transform hover:scale-105 ${
                 isActive ? 'border-stone-800' : 'border-white'
               }`}
               style={{ backgroundColor: normalized }}

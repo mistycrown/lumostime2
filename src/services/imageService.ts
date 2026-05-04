@@ -5,6 +5,7 @@
  * @pos Service (Local Storage)
  * @description Handles saving, retrieving, and deleting images.
  * Uses Capacitor Filesystem for Native/Electron, and IndexedDB for Web fallback.
+ * @updated 2026-05-04: Preserve uploaded PNG/WebP transparency by keeping source-compatible filenames and thumbnail encodings instead of forcing JPEG output.
  * @updated 2026-03-30: Added native camera-path save flow and normalized Base64 payload handling for Capacitor Filesystem writes.
  * @updated 2026-03-23: Added pure referenced-image list helpers for cloud sync restore/upload flows, and rebuild image manifests using only references that still exist locally.
  */
@@ -22,6 +23,11 @@ const DB_VERSION = 1;
 const DELETED_IMAGES_KEY = 'lumos_deleted_images';
 // Key for referenced images list
 const REFERENCED_IMAGES_KEY = 'lumos_referenced_images';
+const TRANSPARENT_IMAGE_MIME_TYPES = new Set([
+    'image/png',
+    'image/webp',
+    'image/gif'
+]);
 
 class ImageService {
     private dbPromise: Promise<IDBDatabase> | null = null;
@@ -33,6 +39,10 @@ class ImageService {
 
     private async init() {
         if (!Capacitor.isNativePlatform()) {
+            if (typeof indexedDB === 'undefined') {
+                console.warn('[ImageService] indexedDB is unavailable in the current environment');
+                return;
+            }
             this.dbPromise = new Promise((resolve, reject) => {
                 const request = indexedDB.open(DB_NAME, DB_VERSION);
                 request.onupgradeneeded = (event) => {
@@ -80,7 +90,9 @@ class ImageService {
         // 确保初始化完成
         await this.ensureInit();
 
-        const filename = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}.jpg`;
+        const mimeType = this.normalizeImageMimeType(file.type);
+        const extension = this.getExtensionForMimeType(mimeType);
+        const filename = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}.${extension}`;
         // console.log(`[ImageService] 生成文件名: ${filename}`);
 
         // 1. Save Original
@@ -103,7 +115,7 @@ class ImageService {
         // 2. Generate & Save Thumbnail (Best effort)
         try {
             // console.log(`[ImageService] 开始生成缩略图: thumb_${filename}`);
-            const thumbBlob = await this.generateThumbnail(file);
+            const thumbBlob = await this.generateThumbnail(file, mimeType);
             // console.log(`[ImageService] 缩略图生成成功，大小: ${thumbBlob.size} bytes`);
 
             await this.writeImage(`thumb_${filename}`, thumbBlob);
@@ -173,7 +185,7 @@ class ImageService {
 
         try {
             const originalBlob = this.base64ToBlob(originalBase64, mimeType);
-            const thumbBlob = await this.generateThumbnail(originalBlob);
+            const thumbBlob = await this.generateThumbnail(originalBlob, mimeType);
             await this.writeImage(`thumb_${filename}`, thumbBlob);
         } catch (e) {
             console.error(`[ImageService] ✗ 相机缩略图生成/保存失败: thumb_${filename}`, e);
@@ -410,7 +422,7 @@ class ImageService {
 
     // --- Helper Methods ---
 
-    private async generateThumbnail(file: Blob | File): Promise<Blob> {
+    private async generateThumbnail(file: Blob | File, preferredMimeType?: string): Promise<Blob> {
         // console.log(`[ImageService] generateThumbnail 开始，文件大小: ${file.size} bytes`);
         return new Promise((resolve, reject) => {
             const img = new Image();
@@ -439,6 +451,8 @@ class ImageService {
 
                 try {
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const outputMimeType = this.getThumbnailMimeType(preferredMimeType || file.type);
+                    const quality = outputMimeType === 'image/jpeg' ? 0.7 : 0.92;
                     canvas.toBlob(blob => {
                         if (blob) {
                             // console.log(`[ImageService] 缩略图生成成功，大小: ${blob.size} bytes`);
@@ -447,7 +461,7 @@ class ImageService {
                             console.error(`[ImageService] toBlob返回null`);
                             reject(new Error('Thumbnail generation failed'));
                         }
-                    }, 'image/jpeg', 0.7);
+                    }, outputMimeType, quality);
                 } catch (e) {
                     console.error(`[ImageService] Canvas操作异常:`, e);
                     reject(e);
@@ -686,6 +700,46 @@ class ImageService {
         }
     }
 
+    private normalizeImageMimeType(mimeType?: string): string {
+        const normalized = (mimeType || '').toLowerCase().trim();
+        if (normalized === 'image/jpg') {
+            return 'image/jpeg';
+        }
+        if (normalized.startsWith('image/')) {
+            return normalized;
+        }
+        return 'image/jpeg';
+    }
+
+    private getExtensionForMimeType(mimeType: string): string {
+        switch (this.normalizeImageMimeType(mimeType)) {
+            case 'image/png':
+                return 'png';
+            case 'image/webp':
+                return 'webp';
+            case 'image/gif':
+                return 'gif';
+            case 'image/bmp':
+                return 'bmp';
+            case 'image/svg+xml':
+                return 'svg';
+            case 'image/jpeg':
+            default:
+                return 'jpg';
+        }
+    }
+
+    private getThumbnailMimeType(mimeType?: string): string {
+        const normalized = this.normalizeImageMimeType(mimeType);
+        if (TRANSPARENT_IMAGE_MIME_TYPES.has(normalized)) {
+            if (normalized === 'image/gif') {
+                return 'image/png';
+            }
+            return normalized;
+        }
+        return 'image/jpeg';
+    }
+
     private normalizeImageExtension(format: string): string {
         const normalized = format.toLowerCase().trim();
         if (normalized === 'jpeg') {
@@ -695,6 +749,14 @@ class ImageService {
             return normalized;
         }
         return 'jpg';
+    }
+
+    getStorageExtensionForTest(mimeType?: string): string {
+        return this.getExtensionForMimeType(this.normalizeImageMimeType(mimeType));
+    }
+
+    getThumbnailMimeTypeForTest(mimeType?: string): string {
+        return this.getThumbnailMimeType(mimeType);
     }
 
     // --- Tombstone Methods for Sync ---

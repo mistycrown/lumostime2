@@ -4,6 +4,7 @@
  * @output daily check helpers for creating reviews, locating items, and applying manual actions
  * @pos Utils (Daily Check)
  * @description Shared daily check utilities used by SceneView and NFC flows to keep review creation, legacy item ID compatibility, and habit punch behavior consistent.
+ * @updated 2026-05-04: Added a dedicated tracking-calendar daily binding helper so 2x2 tracking widgets can target both manual and automatic daily checks.
  */
 import { CheckItem, CheckTemplate, CheckTemplateItem, DailyReview, ReviewTemplate, ReviewTemplateSnapshot } from '../types';
 import { normalizeCheckItem } from './checkItemNormalizer';
@@ -42,6 +43,52 @@ export interface DailyCheckActionResult {
 
 const sortTemplatesByOrder = <T extends { order: number }>(templates: T[]): T[] => {
   return [...templates].sort((a, b) => a.order - b.order);
+};
+
+const buildDailyCheckTemplateMeta = (
+  template: CheckTemplate,
+  item: CheckTemplateItem,
+  index: number
+): DailyCheckTemplateMeta => {
+  const type: 'manual' | 'auto' = item.type === 'auto' ? 'auto' : 'manual';
+  const manualMode: 'binary' | 'count' = type === 'manual' && item.manualMode === 'count'
+    ? 'count'
+    : 'binary';
+  const targetCount = manualMode === 'count'
+    ? Math.max(1, Math.floor(Number(item.targetCount) || 1))
+    : 1;
+
+  return {
+    checkTemplateId: template.id,
+    checkItemId: getCheckTemplateItemKey(template, item, index),
+    content: item.content,
+    category: template.title,
+    type,
+    manualMode,
+    targetCount,
+    icon: item.icon,
+    uiIcon: item.uiIcon
+  };
+};
+
+const getDailyCheckTemplateItems = (
+  checkTemplates: CheckTemplate[],
+  options?: { includeAuto?: boolean }
+): DailyCheckTemplateMeta[] => {
+  const includeAuto = Boolean(options?.includeAuto);
+  const items: DailyCheckTemplateMeta[] = [];
+
+  sortTemplatesByOrder(checkTemplates.filter(template => template.enabled && template.isDaily)).forEach(template => {
+    template.items.forEach((item, index) => {
+      const meta = buildDailyCheckTemplateMeta(template, item, index);
+      if (!includeAuto && meta.type !== 'manual') {
+        return;
+      }
+      items.push(meta);
+    });
+  });
+
+  return items;
 };
 
 const buildLegacyCheckItemId = (templateId: string, index: number, content: string): string => {
@@ -176,25 +223,7 @@ export const getDailyCheckTemplateMeta = (
     const item = itemIndex >= 0 ? template.items[itemIndex] : undefined;
     if (!item) continue;
 
-    const type: 'manual' | 'auto' = item.type === 'auto' ? 'auto' : 'manual';
-    const manualMode: 'binary' | 'count' = type === 'manual' && item.manualMode === 'count'
-      ? 'count'
-      : 'binary';
-    const targetCount = manualMode === 'count'
-      ? Math.max(1, Math.floor(Number(item.targetCount) || 1))
-      : 1;
-
-    return {
-      checkTemplateId: template.id,
-      checkItemId,
-      content: item.content,
-      category: template.title,
-      type,
-      manualMode,
-      targetCount,
-      icon: item.icon,
-      uiIcon: item.uiIcon
-    };
+    return buildDailyCheckTemplateMeta(template, item, itemIndex);
   }
 
   return null;
@@ -503,29 +532,9 @@ export const getDailyCheckProgressForDate = ({
 };
 
 export const getEligibleNfcDailyCheckItems = (checkTemplates: CheckTemplate[]): DailyCheckTemplateMeta[] => {
-  const items: DailyCheckTemplateMeta[] = [];
-
-  sortTemplatesByOrder(checkTemplates.filter(template => template.enabled && template.isDaily)).forEach(template => {
-    template.items.forEach((item, index) => {
-      const type: 'manual' | 'auto' = item.type === 'auto' ? 'auto' : 'manual';
-      if (type !== 'manual') {
-        return;
-      }
-
-      const manualMode: 'binary' | 'count' = item.manualMode === 'count' ? 'count' : 'binary';
-      items.push({
-        checkTemplateId: template.id,
-        checkItemId: getCheckTemplateItemKey(template, item, index),
-        content: item.content,
-        category: template.title,
-        type,
-        manualMode,
-        targetCount: manualMode === 'count' ? Math.max(1, Math.floor(Number(item.targetCount) || 1)) : 1,
-        icon: item.icon,
-        uiIcon: item.uiIcon
-      });
-    });
-  });
-
-  return items;
+  return getDailyCheckTemplateItems(checkTemplates);
 };
+
+export const getEligibleTrackingCalendarDailyCheckItems = (
+  checkTemplates: CheckTemplate[]
+): DailyCheckTemplateMeta[] => getDailyCheckTemplateItems(checkTemplates, { includeAuto: true });
