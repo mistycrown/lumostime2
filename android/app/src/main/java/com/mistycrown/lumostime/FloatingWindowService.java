@@ -4,6 +4,7 @@
  * @output Floating UI Overlay and Foreground Notification
  * @pos Native Service
  * @description Foreground Android service managing the "LumosTime Island" floating window, including overlay rendering, touch interaction, runtime state updates, and a shared persistent status notification with the AI assistant service.
+ * @updated 2026-05-04: Routed floating-window foreground startup through the shared runtime notification manager so Android 8+ no longer depends on the removed legacy notification channel.
  * @updated 2026-04-26: Switched the floating-window foreground notification onto the shared runtime-status manager so Android only shows one persistent LumosTime service notification.
  */
 package com.mistycrown.lumostime;
@@ -205,6 +206,7 @@ public class FloatingWindowService extends Service {
         instance = this;
         Log.d(TAG, "🟢 悬浮窗服务 onCreate");
 
+        createNotificationChannel();
         UnifiedServiceNotificationManager.setFloatingWindowState(this, true, false);
         startForeground(NOTIFICATION_ID, createNotification("悬浮球已开启，点击可返回 LumosTime"));
         UnifiedServiceNotificationManager.refreshStatusNotification(this);

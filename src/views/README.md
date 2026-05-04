@@ -28,7 +28,8 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
-> Last updated: 2026-04-30
+> Last updated: 2026-05-04
+- `RecordView.tsx`, `TodoView.tsx`: When a custom background is active, the left sidebar now gets its own local translucent scrim so category and utility buttons stay readable without tinting the main content panel.
 - `TimelineView.tsx`: The trailing `Done` node now renders completed subtasks as plain text in `子任务 @父任务` form so parent context is visible without adding new UI chrome.
 - `TodoView.tsx`: The shared quick-actions sheet now includes an inline `删除任务 -> 确认删除？` entry, so both list rows and week-view badges can remove a todo without opening the full detail editor.
 - `TodoView.tsx`: Todo-list rendering now hides unfinished subtasks whenever their parent task is completed, without mutating the child tasks; undoing the parent completion restores those child rows through the existing expand state.

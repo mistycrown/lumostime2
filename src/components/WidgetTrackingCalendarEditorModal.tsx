@@ -9,6 +9,8 @@
  * @updated 2026-05-03: Reordered the flow to bind the tracked object before choosing icon mode, and let daily bindings fall back to their default UI icon with one tap.
  * @updated 2026-05-03: Removed helper copy under section titles in the tracking-object editor to keep the sheet more minimal.
  * @updated 2026-05-03: Normalized tracking-color selection comparisons so preset palette colors and custom color-group entries share the same selected outline state.
+ * @updated 2026-05-04: Switched the theme-color palette to an auto-fit grid so mobile sheets distribute swatches evenly without leaving a large right-side gap.
+ * @updated 2026-05-04: Expanded daily tracking bindings to include all enabled daily checks instead of only manual punchable items.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
@@ -20,7 +22,7 @@ import { DEFAULT_TRACKING_CALENDAR_COLOR, WidgetTrackingCalendarSourceType } fro
 import { Category, CheckTemplate, Scope } from '../types';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 import { normalizeHexColor } from '../utils/colorUtils';
-import { getEligibleNfcDailyCheckItems } from '../utils/dailyCheckUtils';
+import { getEligibleTrackingCalendarDailyCheckItems } from '../utils/dailyCheckUtils';
 import { CustomSelect } from './CustomSelect';
 import { IconRenderer } from './IconRenderer';
 import { TagAssociation } from './TagAssociation';
@@ -121,6 +123,10 @@ const clearTypeSpecificFields = (
 
 const clampColorChannel = (value: number): number => Math.max(0, Math.min(255, Math.round(value)));
 
+const COLOR_SWATCH_GRID_STYLE: React.CSSProperties = {
+  gridTemplateColumns: 'repeat(auto-fit, minmax(2.75rem, 1fr))'
+};
+
 const getColorSelectionOutline = (hex: string): string => {
   const normalized = normalizeCustomColorHex(hex);
   if (!normalized) {
@@ -158,7 +164,7 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
     setLocalDraft(applyIconSupportRules(draft, canUseUiIcon));
   }, [canUseUiIcon, draft]);
 
-  const manualItems = useMemo(() => getEligibleNfcDailyCheckItems(checkTemplates), [checkTemplates]);
+  const dailyItems = useMemo(() => getEligibleTrackingCalendarDailyCheckItems(checkTemplates), [checkTemplates]);
   const selectedCategoryId = localDraft?.categoryId || categories[0]?.id || '';
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === selectedCategoryId) || categories[0],
@@ -173,8 +179,8 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
     [localDraft?.scopeId, scopes]
   );
   const selectedDailyItem = useMemo(
-    () => manualItems.find((item) => item.checkItemId === localDraft?.checkItemId) || null,
-    [localDraft?.checkItemId, manualItems]
+    () => dailyItems.find((item) => item.checkItemId === localDraft?.checkItemId) || null,
+    [dailyItems, localDraft?.checkItemId]
   );
 
   const colorOptions = useMemo(() => {
@@ -571,24 +577,24 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
           {localDraft.sourceType === 'daily' && (
             <div>
               <div className="mb-4 px-1">
-                <h3 className="text-sm font-bold text-stone-800">绑定手动日课</h3>
+                <h3 className="text-sm font-bold text-stone-800">绑定日课</h3>
               </div>
 
-              {manualItems.length === 0 ? (
+              {dailyItems.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-stone-200 bg-white px-4 py-8 text-center text-sm text-stone-400">
-                  还没有可绑定的手动日课
+                  还没有可绑定的日课
                 </div>
               ) : (
                 <CustomSelect
                   value={localDraft.checkItemId || ''}
-                  options={manualItems.map((item) => ({
+                  options={dailyItems.map((item) => ({
                     value: item.checkItemId,
                     label: item.manualMode === 'count'
                       ? `${item.category} / ${item.content}（目标 ${item.targetCount} 次）`
                       : `${item.category} / ${item.content}`
                   }))}
                   onChange={(checkItemId) => {
-                    const nextItem = manualItems.find((item) => item.checkItemId === checkItemId);
+                    const nextItem = dailyItems.find((item) => item.checkItemId === checkItemId);
                     if (!nextItem) {
                       return;
                     }
@@ -599,7 +605,7 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
                       label: nextItem.content
                     }));
                   }}
-                  placeholder="请选择一个手动日课"
+                  placeholder="请选择一个日课"
                 />
               )}
             </div>
@@ -661,7 +667,7 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
                   {localDraft.sourceType === 'daily' ? '不设置' : '跟随默认'}
                 </button>
               </div>
-              <div className="flex flex-wrap gap-3">
+              <div className="grid gap-3" style={COLOR_SWATCH_GRID_STYLE}>
                 {colorOptions.map((color) => {
                   const normalized = normalizeCustomColorHex(color);
                   if (!normalized) {
@@ -674,7 +680,7 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
                       type="button"
                       onClick={() => setDraftField('backgroundColor', normalized)}
                       aria-pressed={isActive}
-                      className="h-10 w-10 rounded-full border-0 bg-white p-[2px] transition-colors hover:scale-105"
+                      className="aspect-square w-full rounded-full border-0 bg-white p-[2px] transition-colors hover:scale-105"
                       style={{
                         boxShadow: isActive
                           ? `0 0 0 2px rgba(255,255,255,0.98), 0 0 0 4px ${getColorSelectionOutline(normalized)}`

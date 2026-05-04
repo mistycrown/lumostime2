@@ -5,6 +5,7 @@
  * @pos Service (Assistant Orchestrator)
  * @description Orchestrates Android-first assistant system turns by loading structured memory, assembling a prompt, calling the existing AI service, and applying the resulting silent/message/reminder/memory actions back into local state.
  *
+ * @updated 2026-05-04: Linked persisted background messages back to their source call-history entries so debug mode can open the right request trace directly from the message bubble.
  * @updated 2026-05-01: Added native-background reply hydration so Android-side completed check-ins can be surfaced back into persisted Web chat sessions instead of living only in diagnostics.
  * @updated 2026-04-27: Persisted background message memory/reminder update metadata so chat history can render the same expand controls as foreground assistant turns.
  * @updated 2026-04-27: Added background call trigger ids plus persisted request/response debug exchanges so web AI execution can be correlated with native poll diagnostics.
@@ -75,6 +76,7 @@ export interface AssistantBackgroundCallHistoryEntry {
   triggerType: string;
   triggerText: string;
   targetSessionId?: string;
+  persistedMessageId?: string;
   requestedAt: string;
   completedAt?: string;
   status: 'pending' | 'completed' | 'failed';
@@ -96,6 +98,7 @@ interface PersistedAIChatMessage {
   displayParts?: string[];
   createdAt: number;
   tone?: 'normal' | 'system' | 'error' | 'pending';
+  backgroundDebugHistoryId?: string;
   debugSections?: Array<{
     label: string;
     exchange: AIDebugExchange;
@@ -235,6 +238,7 @@ const normalizeBackgroundCallHistoryEntry = (value: unknown): AssistantBackgroun
     reminderCount: Number.isFinite(candidate.reminderCount) ? Math.max(0, Number(candidate.reminderCount)) : 0,
     ...(typeof candidate.targetSessionId === 'string' && candidate.targetSessionId.trim() ? { targetSessionId: candidate.targetSessionId.trim() } : {}),
     ...(typeof candidate.triggerId === 'string' && candidate.triggerId.trim() ? { triggerId: candidate.triggerId.trim() } : {}),
+    ...(typeof candidate.persistedMessageId === 'string' && candidate.persistedMessageId.trim() ? { persistedMessageId: candidate.persistedMessageId.trim() } : {}),
     ...(typeof candidate.message === 'string' && candidate.message.trim() ? { message: candidate.message.trim() } : {}),
     ...(typeof candidate.decisionSummary === 'string' && candidate.decisionSummary.trim() ? { decisionSummary: candidate.decisionSummary.trim() } : {}),
     ...(typeof candidate.silentReason === 'string' && candidate.silentReason.trim() ? { silentReason: candidate.silentReason.trim() as AssistantSilentReason } : {}),
@@ -499,6 +503,7 @@ const persistAssistantMessage = (
   targetSessionId?: string,
   options?: {
     displayParts?: string[];
+    backgroundDebugHistoryId?: string;
     debugSections?: Array<{
       label: string;
       exchange: AIDebugExchange;
@@ -532,6 +537,7 @@ const persistAssistantMessage = (
     ...(options?.displayParts?.length ? { displayParts: options.displayParts } : {}),
     createdAt: now,
     tone: 'system',
+    ...(options?.backgroundDebugHistoryId ? { backgroundDebugHistoryId: options.backgroundDebugHistoryId } : {}),
     ...(options?.debugSections?.length ? { debugSections: options.debugSections } : {}),
     ...(options?.memoryUpdates?.length ? { memoryUpdates: options.memoryUpdates } : {}),
     ...(options?.reminderUpdates?.length ? { reminderUpdates: options.reminderUpdates } : {})
@@ -693,13 +699,20 @@ export const assistantOrchestratorService = {
         }
 
         const persistedLocation = persistAssistantMessage(assistantReply, options?.targetSessionId, {
+          backgroundDebugHistoryId: baseHistoryEntry.id,
           ...(memoryUpdates.length > 0 ? { memoryUpdates } : {}),
           ...(reminderUpdates.length > 0 ? { reminderUpdates } : {})
         });
         if (persistedLocation?.sessionId && persistedLocation.sessionId !== baseHistoryEntry.targetSessionId) {
           upsertBackgroundCallHistory({
             ...baseHistoryEntry,
-            targetSessionId: persistedLocation.sessionId
+            targetSessionId: persistedLocation.sessionId,
+            persistedMessageId: persistedLocation.messageId
+          });
+        } else if (persistedLocation) {
+          upsertBackgroundCallHistory({
+            ...baseHistoryEntry,
+            persistedMessageId: persistedLocation.messageId
           });
         }
 
@@ -875,6 +888,7 @@ export const assistantOrchestratorService = {
       surfacedMessage = output.assistantReply;
       surfacedMessageLocation = persistAssistantMessage(surfacedMessage, request.targetSessionId, {
         ...(messageParts?.length ? { displayParts: messageParts } : {}),
+        backgroundDebugHistoryId: backgroundCallId,
         ...(memoryUpdates.length > 0 ? { memoryUpdates } : {}),
         ...(reminderUpdates.length > 0 ? { reminderUpdates } : {}),
         ...(request.includeDebugInPersistedMessage
@@ -914,6 +928,7 @@ export const assistantOrchestratorService = {
       reminderCount: appliedReminders.length,
       ...(surfacedMessage ? { message: surfacedMessage } : {}),
       decisionSummary,
+      ...(surfacedMessageLocation ? { persistedMessageId: surfacedMessageLocation.messageId } : {}),
       ...(output.silentReason ? { silentReason: output.silentReason } : {}),
       ...(sideEffects.length > 0 ? { sideEffects } : {}),
       debugExchange: debug

@@ -4,6 +4,7 @@
  * @output Measurement Start Event
  * @pos View (Main Tab)
  * @description The primary interface for starting new time blocks. Features a category sidebar and a grid of activity buttons with larger start-card icons.
+ * @updated 2026-05-04: Added a custom-background-only sidebar scrim so left-rail category buttons stay legible over busy wallpapers.
  * @updated 2026-04-12: Softened the sidebar toggle button styling to reduce visual weight and keep it aligned with TodoView controls.
  * @updated 2026-04-20: Switched custom background rendering to the shared preloaded display hook and reduced mobile blur cost.
  *
@@ -85,7 +86,14 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
       <div
         className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative ${isSidebarOpen ? 'w-auto md:max-w-[14rem]' : 'w-16 items-center'}`}
       >
-        <div className="flex-1 w-full">
+        {hasBackground && (
+          <div
+            className="pointer-events-none absolute inset-0 z-0"
+            style={{ backgroundColor: 'rgba(250, 249, 246, 0.62)' }}
+          />
+        )}
+
+        <div className="relative z-10 flex-1 w-full">
           {categories.map((category) => {
             const isSelected = selectedCategoryId === category.id;
             return (
@@ -126,7 +134,7 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
           className={`
-            mt-4 mx-auto p-2 rounded-full text-stone-400 hover:bg-white/50 hover:text-stone-500 transition-all active:scale-95
+            relative z-10 mt-4 mx-auto p-2 rounded-full text-stone-400 hover:bg-white/50 hover:text-stone-500 transition-all active:scale-95
             ${!isSidebarOpen ? 'bg-transparent' : 'self-end mr-4'}
           `}
         >

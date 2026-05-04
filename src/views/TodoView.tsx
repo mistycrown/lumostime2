@@ -4,6 +4,7 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
+ * @updated 2026-05-04: Added a custom-background-only sidebar scrim so the todo left rail stays readable over wallpaper textures.
  * @updated 2026-04-27: Routed the shared quick-actions sheet into todo deletion and added an inline two-tap delete entry for list and week-view action bars.
  * @updated 2026-04-25: Hide unfinished subtasks from todo-list rendering whenever their parent task is completed, while preserving child state and restoring the rows when the parent is reopened.
  * @updated 2026-04-25: Keep the todo page floating list-week switchers on the active color-scheme button style even when the UI icon theme stays default.
@@ -1841,7 +1842,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       onUndoComplete={handleQuickActionUndoComplete}
       onTogglePin={handleQuickActionTogglePin}
       onDelete={handleQuickActionDelete}
-      onClose={closeQuickActions}
+      onClose={() => closeQuickActions(true)}
     />
   );
 
@@ -2080,7 +2081,14 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       <div
         className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative ${isSidebarOpen ? 'w-auto md:min-w-[12rem]' : 'w-16 items-center'}`}
       >
-        <div className="flex-1 w-full">
+        {hasBackground && (
+          <div
+            className="pointer-events-none absolute inset-0 z-0"
+            style={{ backgroundColor: 'rgba(250, 249, 246, 0.62)' }}
+          />
+        )}
+
+        <div className="relative z-10 flex-1 w-full">
           <button
             onClick={() => {
               setSelectedCategoryId(VIRTUAL_SCHEDULE_CATEGORY_ID);
@@ -2146,7 +2154,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
         <button
           onClick={() => setShowCompletedTodos(prev => !prev)}
-          className={`mt-2 mb-2 p-2 rounded-full text-stone-400 hover:bg-white/50 hover:text-stone-500 transition-all active:scale-95 ${isSidebarOpen ? 'self-end mr-4' : 'mx-auto'}`}
+          className={`relative z-10 mt-2 mb-2 p-2 rounded-full text-stone-400 hover:bg-white/50 hover:text-stone-500 transition-all active:scale-95 ${isSidebarOpen ? 'self-end mr-4' : 'mx-auto'}`}
           title={showCompletedTodos ? 'Hide Completed Todos' : 'Show Completed Todos'}
         >
           {showCompletedTodos ? <EyeOff size={20} /> : <Eye size={20} />}
@@ -2155,7 +2163,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         {/* View Mode Toggle Button */}
         <button
           onClick={() => setViewMode(prev => prev === 'loose' ? 'compact' : 'loose')}
-          className={`mb-2 p-2 rounded-full text-stone-400 hover:bg-white/50 hover:text-stone-500 transition-all active:scale-95 ${isSidebarOpen ? 'self-end mr-4' : 'mx-auto'}`}
+          className={`relative z-10 mb-2 p-2 rounded-full text-stone-400 hover:bg-white/50 hover:text-stone-500 transition-all active:scale-95 ${isSidebarOpen ? 'self-end mr-4' : 'mx-auto'}`}
           title={viewMode === 'loose' ? "Switch to Compact View" : "Switch to Loose View"}
         >
           {viewMode === 'loose' ? <Rows size={20} /> : <LayoutList size={20} />}
@@ -2164,7 +2172,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         {/* Sidebar Toggle Button */}
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className={`mt-1 p-2 rounded-full text-stone-400 hover:bg-white/50 hover:text-stone-500 transition-all active:scale-95 ${isSidebarOpen ? 'self-end mr-4' : 'mx-auto'}`}
+          className={`relative z-10 mt-1 p-2 rounded-full text-stone-400 hover:bg-white/50 hover:text-stone-500 transition-all active:scale-95 ${isSidebarOpen ? 'self-end mr-4' : 'mx-auto'}`}
         >
           {isSidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
         </button>

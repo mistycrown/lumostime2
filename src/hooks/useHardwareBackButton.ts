@@ -12,6 +12,7 @@
  * 4. 退出应用
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-05-04: Added a shared overlay back-handler stack so transient sheets can consume Android hardware back before app-level navigation or exit runs.
  * @updated 2026-04-30: Routed Android hardware back presses through the shared AI chat back handler so AI subpages unwind before app-level exit logic runs.
  */
 import { useEffect } from 'react';
@@ -19,6 +20,32 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { AppView } from '../types';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
+
+type HardwareBackHandler = () => boolean;
+
+const hardwareBackHandlerStack: HardwareBackHandler[] = [];
+
+export const registerHardwareBackHandler = (handler: HardwareBackHandler) => {
+    hardwareBackHandlerStack.push(handler);
+
+    return () => {
+        const handlerIndex = hardwareBackHandlerStack.lastIndexOf(handler);
+        if (handlerIndex >= 0) {
+            hardwareBackHandlerStack.splice(handlerIndex, 1);
+        }
+    };
+};
+
+const runRegisteredHardwareBackHandler = () => {
+    for (let index = hardwareBackHandlerStack.length - 1; index >= 0; index -= 1) {
+        const handler = hardwareBackHandlerStack[index];
+        if (handler()) {
+            return true;
+        }
+    }
+
+    return false;
+};
 
 export const useHardwareBackButton = () => {
     const { isAIChatOpen, handleAIChatBack } = useAIChatWindow();
@@ -100,6 +127,10 @@ export const useHardwareBackButton = () => {
 
     useEffect(() => {
         const handleBackButton = ({ canGoBack }: { canGoBack: boolean }) => {
+            if (runRegisteredHardwareBackHandler()) {
+                return;
+            }
+
             if (isAIChatOpen && handleAIChatBack()) {
                 return;
             }

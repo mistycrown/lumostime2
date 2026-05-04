@@ -441,9 +441,12 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
                                                         </div>
                                                         {/* 贴纸标签（可选） */}
                                                         {sticker.label && (
-                                                            <span className="text-[9px] text-stone-400 font-medium">
-                                                                {sticker.label}
-                                                            </span>
+                                                        <span
+                                                            className="block max-w-full truncate text-[9px] text-stone-400 font-medium"
+                                                            title={sticker.label}
+                                                        >
+                                                            {sticker.label}
+                                                        </span>
                                                         )}
                                                     </button>
                                                 );

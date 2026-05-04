@@ -4,6 +4,10 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-04: Enlarged the in-chat avatars and tightened their icon centering so emoji, uploaded portraits, and fallback glyphs sit cleanly inside the message avatar frame.
+ * @updated 2026-05-04: Made persona switching open a brand-new empty conversation bound to the selected persona, so each chat window stays locked to one persona instead of changing identity in place.
+ * @updated 2026-05-04: Switched chat rows to a WeChat-like grouped layout where avatars sit beside the bubble, speaker labels are removed, and consecutive turns from the same side reuse the same avatar slot.
+ * @updated 2026-05-04: Restored a direct per-message debug entry for background assistant replies by linking chat bubbles back to persisted background call traces.
  * @updated 2026-05-03: Moved the background-notification visibility helper ahead of diagnostics hydration so production bundles no longer hit a temporal-dead-zone crash during AI modal startup.
  * @updated 2026-05-01: Unified remaining hard-edged AI panels under the same subtle corner radius so history rows, composer surfaces, and auxiliary edit boxes no longer mix square and rounded treatments.
  * @updated 2026-05-01: Reorganized AI settings into top-level tabs plus smaller in-section tabs so persona, avatar, background-agent, and context options read as layered panels instead of one long form.
@@ -179,6 +183,7 @@ interface AIChatMessage {
   displayParts?: string[];
   createdAt: number;
   tone?: ChatTone;
+  backgroundDebugHistoryId?: string;
   debugSections?: AIChatDebugSection[];
   appliedActions?: AppliedChatAction[];
   memoryUpdates?: AIChatMemoryUpdateSection[];
@@ -520,7 +525,14 @@ const UserAvatar: React.FC<{
     );
   }
 
-  return <User size={15} className={iconClassName} />;
+  return (
+    <span
+      className={`inline-flex h-full w-full items-center justify-center text-center leading-none ${iconClassName}`.trim()}
+      style={{ lineHeight: 1 }}
+    >
+      <User size={15} />
+    </span>
+  );
 };
 
 const RevealingMessageBubble: React.FC<{
@@ -619,6 +631,7 @@ interface AssistantBackgroundTimelineEntry {
   id: string;
   triggerId?: string;
   triggerType?: string;
+  persistedMessageId?: string;
   wakeAt?: string;
   requestStartedAt?: string;
   requestCompletedAt?: string;
@@ -952,6 +965,9 @@ const normalizeMessages = (value: unknown): AIChatMessage[] => {
       ...(normalizedDisplayParts ? { displayParts: normalizedDisplayParts } : {}),
       createdAt: candidate.createdAt,
       ...(candidate.tone ? { tone: candidate.tone } : {}),
+      ...(typeof candidate.backgroundDebugHistoryId === 'string' && candidate.backgroundDebugHistoryId.trim()
+        ? { backgroundDebugHistoryId: candidate.backgroundDebugHistoryId.trim() }
+        : {}),
       ...(candidate.debugSections ? { debugSections: normalizeDebugSections(candidate.debugSections) } : {}),
       ...(candidate.appliedActions ? { appliedActions: normalizeAppliedActions(candidate.appliedActions) } : {}),
       ...(candidate.memoryUpdates ? { memoryUpdates: normalizeMemoryUpdates(candidate.memoryUpdates) } : {}),
@@ -1832,6 +1848,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         id: entry.id,
         ...(entry.triggerId ? { triggerId: entry.triggerId } : {}),
         triggerType: entry.triggerType || nativeEvent?.triggerType,
+        ...(entry.persistedMessageId ? { persistedMessageId: entry.persistedMessageId } : {}),
         wakeAt: nativeEvent?.createdAt || entry.requestedAt,
         requestStartedAt: nativeRequest?.startedAt || entry.requestedAt,
         requestCompletedAt: nativeRequest?.completedAt || entry.completedAt,
@@ -1874,6 +1891,63 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return rightTime - leftTime;
     });
   }, [assistantBackgroundCallHistory, assistantNativeDiagnostics]);
+
+  const resolveMessageDebugViewer = useCallback((message: AIChatMessage): DebugViewerState | null => {
+    if (!debugMode || message.role !== 'assistant') {
+      return null;
+    }
+
+    if (message.debugSections && message.debugSections.length > 0) {
+      return {
+        title: `${activePersona.assistantSelfName || 'AI'} 调试`,
+        sections: message.debugSections
+      };
+    }
+
+    const normalizedMessage = message.content.trim();
+    const matchedBackgroundEntry = assistantBackgroundCallHistory.find((entry) => {
+      if (!entry.debugExchange) {
+        return false;
+      }
+
+      if (entry.persistedMessageId === message.id) {
+        return true;
+      }
+
+      if (message.backgroundDebugHistoryId && entry.id === message.backgroundDebugHistoryId) {
+        return true;
+      }
+
+      if (message.tone !== 'system' || !activeSession || entry.targetSessionId !== activeSession.id) {
+        return false;
+      }
+
+      if ((entry.message?.trim() || '') !== normalizedMessage) {
+        return false;
+      }
+
+      const entryTime = Date.parse(entry.completedAt || entry.requestedAt || '');
+      return Number.isFinite(entryTime) && Math.abs(entryTime - message.createdAt) <= 2 * 60 * 1000;
+    });
+
+    if (!matchedBackgroundEntry?.debugExchange) {
+      return null;
+    }
+
+    return {
+      title: `后台请求调试 · ${getAssistantBackgroundTriggerLabel(matchedBackgroundEntry.triggerType)}`,
+      sections: [{
+        label: '后台 AI 调用',
+        exchange: matchedBackgroundEntry.debugExchange
+      }]
+    };
+  }, [
+    activePersona.assistantSelfName,
+    activeSession,
+    assistantBackgroundCallHistory,
+    debugMode
+  ]);
+
   useEffect(() => {
     setEmojiDraft(activePersona.avatarIcon || '✨');
     setIsEmojiEditorOpen(false);
@@ -2985,6 +3059,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setIsHistoryPanelOpen(false);
   };
 
+  const handleCreateSessionWithPersona = (personaId: string) => {
+    const nextSession = createDefaultSession(personaId);
+    setSessions((prev) => [nextSession, ...prev]);
+    setActiveSessionId(nextSession.id);
+    setEditingSessionId(null);
+    setEditingSessionTitle('');
+    setDeleteConfirmSessionId(null);
+    setDeleteConfirmPersonaId(null);
+    setIsHistoryPanelOpen(false);
+  };
+
   const handleStartRenameSession = (session: AIChatSession) => {
     setDeleteConfirmSessionId(null);
     setEditingSessionId(session.id);
@@ -3064,22 +3149,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   };
 
   const handleApplyPersonaPreset = (personaId: string) => {
-    if (!activeSession) {
+    if (!personaId || personaId === activeSession?.personaId) {
       return;
     }
 
-    setDeleteConfirmPersonaId(null);
-    mutateSession(activeSession.id, (session) => ({
-      ...session,
-      personaId
-    }));
+    handleCreateSessionWithPersona(personaId);
   };
 
   const handleCreatePersona = () => {
-    if (!activeSession) {
-      return;
-    }
-
     const newPersona: AIChatPersona = {
       id: crypto.randomUUID(),
       name: '新的人设',
@@ -3092,11 +3169,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     };
 
     setPersonas((prev) => [...prev, newPersona]);
-    mutateSession(activeSession.id, (session) => ({
-      ...session,
-      personaId: newPersona.id
-    }));
-    setDeleteConfirmPersonaId(null);
+    handleCreateSessionWithPersona(newPersona.id);
   };
 
   const handleDeleteCurrentPersona = async () => {
@@ -4846,7 +4919,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     '这周日安排一个待办：整理实验数据。'
   ];
 
-  const renderMessageBubble = (message: AIChatMessage) => {
+  const renderMessageBubble = (message: AIChatMessage, index: number, messages: AIChatMessage[]) => {
     const isUser = message.role === 'user';
     const tone = message.tone || 'normal';
     const displayParts = message.displayParts && message.displayParts.length > 0
@@ -4858,11 +4931,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       : displayParts.length;
     const visibleDisplayParts = displayParts.slice(0, visibleDisplayPartCount);
     const allDisplayPartsRevealed = visibleDisplayPartCount >= displayParts.length;
-    const bubbleTitle = isUser
-      ? '你'
-      : (activePersona.name.trim() || activePersona.assistantSelfName || 'AI 回答');
     const isMemoryUpdatesExpanded = expandedMemoryUpdateMessageIds.has(message.id);
     const isReminderUpdatesExpanded = expandedReminderUpdateMessageIds.has(message.id);
+    const previousMessage = index > 0 ? messages[index - 1] : null;
+    const showAvatar = !previousMessage || previousMessage.role !== message.role;
 
     let bubbleStyle = {
       borderColor: AI_CHAT_THEME.panelBorder,
@@ -4923,6 +4995,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               backgroundColor: AI_CHAT_THEME.avatarBg,
               color: AI_CHAT_THEME.textSecondary
             };
+    const messageDebugViewer = resolveMessageDebugViewer(message);
 
     return (
       <div
@@ -4937,33 +5010,29 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         }}
         className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
       >
-        <div className={`flex w-full max-w-[96%] flex-col space-y-2 sm:max-w-[92%] ${isUser ? 'items-end' : 'items-start'}`}>
-          <div className={`flex items-center gap-1.5 px-1 ${isUser ? 'flex-row-reverse justify-end self-end' : 'justify-start self-start'}`}>
-            <div
-              className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-[0.6rem] border"
-              style={avatarStyle}
-            >
-              {isUser ? (
-                <UserAvatar profile={userProfile} iconClassName="text-xs" />
-              ) : (
-                <div className="h-full w-full overflow-hidden rounded-[0.6rem]">
-                  <PersonaAvatar persona={activePersona} className="rounded-[0.6rem]" iconClassName="text-xs" />
-                </div>
-              )}
-            </div>
-            <p
-              className="font-serif text-[10px] tracking-[0.08em]"
-              style={{ color: AI_CHAT_THEME.textFaint }}
-            >
-              {bubbleTitle}
-            </p>
+        <div className={`flex w-full max-w-[96%] items-start gap-2.5 sm:max-w-[92%] ${isUser ? 'ml-auto flex-row-reverse' : ''}`}>
+          <div className="w-8 shrink-0 pt-0.5">
+            {showAvatar ? (
+              <div
+                className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-[0.75rem] border"
+                style={avatarStyle}
+              >
+                {isUser ? (
+                  <UserAvatar profile={userProfile} iconClassName="text-sm" />
+                ) : (
+                  <div className="h-full w-full overflow-hidden rounded-[0.75rem]">
+                    <PersonaAvatar persona={activePersona} className="rounded-[0.75rem]" iconClassName="text-sm" />
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
 
-          <div className="space-y-1.5">
+          <div className={`min-w-0 flex-1 space-y-1.5 ${isUser ? 'items-end text-right' : 'items-start text-left'}`}>
             {visibleDisplayParts.map((part, index) => (
               <RevealingMessageBubble
                 key={`${message.id}-part-${index}`}
-                className="rounded-[0.95rem] border px-4 py-3"
+                className={`rounded-[0.95rem] border px-4 py-3 ${isUser ? 'ml-auto' : ''}`}
                 style={bubbleStyle}
                 revealMode={isAnimatedAssistantMessage ? 'assistantStaggered' : 'default'}
                 partIndex={index}
@@ -4980,8 +5049,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               </RevealingMessageBubble>
             ))}
             {allDisplayPartsRevealed && (
-              <div className="px-1 text-[10px]" style={{ color: AI_CHAT_THEME.textMuted }}>
-                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <div className={`px-1 text-[10px] ${isUser ? 'text-right' : 'text-left'}`} style={{ color: AI_CHAT_THEME.textMuted }}>
+                <div className={`flex flex-wrap items-center gap-x-2.5 gap-y-1 ${isUser ? 'justify-end' : 'justify-start'}`}>
                   <span>{formatConversationTime(message.createdAt)}</span>
                   <span className="hidden text-[#b4a79a] sm:inline">·</span>
                   <span>{activeSession?.contextCacheEnabled ? `上下文开启 · ${activePersona.contextMessageLimit}轮` : '单轮'}</span>
@@ -5011,19 +5080,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                       </button>
                     </>
                   )}
-                  {debugMode && message.debugSections && message.debugSections.length > 0 && (
+                  {messageDebugViewer && (
                     <>
                       <span className="hidden text-[#b4a79a] sm:inline">·</span>
                       <button
                         type="button"
-                        onClick={() => setDebugViewer({
-                          title: `${activePersona.assistantSelfName || 'AI'} 调试`,
-                          sections: message.debugSections || []
-                        })}
+                        onClick={() => setDebugViewer(messageDebugViewer)}
                         className="transition-colors hover:opacity-100"
                         style={{ color: AI_CHAT_THEME.textMuted }}
                       >
-                        查看调试
+                        {message.debugSections && message.debugSections.length > 0 ? '查看调试' : '查看后台调试'}
                       </button>
                     </>
                   )}
@@ -5625,7 +5691,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
                         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
                           <div className="block">
-                            <span className="mb-1 block text-xs font-medium text-stone-500">当前会话人设</span>
+                            <span className="mb-1 block text-xs font-medium text-stone-500">选择人设后会新建对话</span>
                             <CustomSelect
                               value={activeSession?.personaId || ''}
                               onChange={handleApplyPersonaPreset}
@@ -5645,7 +5711,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                               color: AI_CHAT_THEME.textMuted
                             }}
                           >
-                            {activePersona.isBuiltIn ? '内置模板' : '自定义人设'}
+                            {activePersona.isBuiltIn ? '当前窗口：内置模板' : '当前窗口：自定义人设'}
                           </span>
                         </div>
                       </section>
