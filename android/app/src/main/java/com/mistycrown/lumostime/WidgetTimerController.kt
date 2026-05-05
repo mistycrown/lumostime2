@@ -18,6 +18,7 @@ import java.util.UUID
  * Updated 2026-05-05: Added an external-stop helper so the floating window can end widget-started sessions even when the web layer has not hydrated them yet.
  * Updated 2026-05-05: Executes quick-punch shortcuts natively with a daily-style success checkmark instead of foregrounding the app.
  * Updated 2026-05-05: Lets scene widget timer/todo cards try opening configured third-party apps without blocking their normal Lumo runtime actions.
+ * Updated 2026-05-05: Preserves scene group/slot/item source metadata when a scene widget starts runtime so app-side flips can stay scoped to the tapped slot.
  */
 object WidgetTimerController {
     private const val TAP_FEEDBACK_DURATION_MS = 260L
@@ -107,12 +108,14 @@ object WidgetTimerController {
     fun handleSceneItemTap(
         context: Context,
         appWidgetId: Int,
+        sceneGroupId: String?,
+        sceneSlotId: String,
         item: WidgetSceneItem,
         slotIndex: Int
     ): Boolean {
         return when (WidgetSceneItemTypes.normalize(item.itemType)) {
             WidgetSceneItemTypes.CHECKLIST -> handleSceneChecklistItemTap(context, appWidgetId, item, slotIndex)
-            else -> handleSceneTimerItemTap(context, appWidgetId, item, slotIndex)
+            else -> handleSceneTimerItemTap(context, appWidgetId, sceneGroupId, sceneSlotId, item, slotIndex)
         }
     }
 
@@ -317,6 +320,8 @@ object WidgetTimerController {
     private fun handleSceneTimerItemTap(
         context: Context,
         appWidgetId: Int,
+        sceneGroupId: String?,
+        sceneSlotId: String,
         item: WidgetSceneItem,
         slotIndex: Int
     ): Boolean {
@@ -369,7 +374,10 @@ object WidgetTimerController {
             scopeIds = item.scopeIds,
             slotIndex = null,
             templateId = null,
-            appWidgetId = appWidgetId
+            appWidgetId = appWidgetId,
+            sceneGroupId = sceneGroupId,
+            sceneSlotId = sceneSlotId,
+            sceneItemId = item.id
         )
 
         WidgetStores.saveRuntimeState(context, nextRuntime)

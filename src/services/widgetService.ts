@@ -13,6 +13,7 @@
  * @updated 2026-05-03: Fixed UI-icon sanitization so only changed templates receive new timestamps, and centralized normalized template equality checks.
  * @updated 2026-05-05: Expanded TODAY + PIN payload builders to include native-refresh source snapshots so Android can rebuild today's list from mirrored app todos.
  * @updated 2026-05-05: Added log-tail bridge helpers so native quick-punch shortcuts can fill today's gap without foregrounding the app.
+ * @updated 2026-05-05: Preserved scene-widget runtime source metadata when converting between native runtime state and app sessions.
 */
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, CheckTemplate, DailyReview, Log, TodoItem } from '../types';
@@ -943,7 +944,10 @@ export const buildWidgetRuntimeStateFromSession = (
     scopeIds: session.scopeIds ?? null,
     slotIndex: session.slotIndex ?? null,
     templateId: session.templateId ?? null,
-    appWidgetId: session.appWidgetId ?? null
+    appWidgetId: session.appWidgetId ?? null,
+    sceneGroupId: session.sceneGroupId ?? null,
+    sceneSlotId: session.sceneSlotId ?? null,
+    sceneItemId: session.sceneItemId ?? null
   };
 };
 
@@ -966,7 +970,10 @@ export const buildWidgetSessionFromRuntimeState = (
     widgetType: normalizeWidgetType(runtimeState.widgetType),
     slotIndex: runtimeState.slotIndex ?? undefined,
     templateId: runtimeState.templateId ?? undefined,
-    appWidgetId: runtimeState.appWidgetId ?? undefined
+    appWidgetId: runtimeState.appWidgetId ?? undefined,
+    sceneGroupId: runtimeState.sceneGroupId ?? undefined,
+    sceneSlotId: runtimeState.sceneSlotId ?? undefined,
+    sceneItemId: runtimeState.sceneItemId ?? undefined
   };
 };
 

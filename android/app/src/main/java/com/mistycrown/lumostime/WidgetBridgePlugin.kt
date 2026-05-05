@@ -142,7 +142,10 @@ class WidgetBridgePlugin : Plugin() {
                 scopeIds = it.optJSONArray("scopeIds").toStringList(),
                 slotIndex = if (it.has("slotIndex")) it.optInt("slotIndex") else null,
                 templateId = parseNullableString(it.optString("templateId")),
-                appWidgetId = if (it.has("appWidgetId")) it.optInt("appWidgetId") else null
+                appWidgetId = if (it.has("appWidgetId")) it.optInt("appWidgetId") else null,
+                sceneGroupId = parseNullableString(it.optString("sceneGroupId")),
+                sceneSlotId = parseNullableString(it.optString("sceneSlotId")),
+                sceneItemId = parseNullableString(it.optString("sceneItemId"))
             )
         }
 
@@ -434,6 +437,9 @@ class WidgetBridgePlugin : Plugin() {
             put("slotIndex", runtimeState.slotIndex)
             put("templateId", runtimeState.templateId)
             put("appWidgetId", runtimeState.appWidgetId)
+            put("sceneGroupId", runtimeState.sceneGroupId)
+            put("sceneSlotId", runtimeState.sceneSlotId)
+            put("sceneItemId", runtimeState.sceneItemId)
         }
     }
 

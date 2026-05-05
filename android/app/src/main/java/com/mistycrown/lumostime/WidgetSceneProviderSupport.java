@@ -120,7 +120,14 @@ public final class WidgetSceneProviderSupport {
                 int itemIndex = findSceneItemIndex(state.displayedGroup, slotId, itemId);
                 if (item != null
                         && itemIndex >= 0
-                        && WidgetTimerController.INSTANCE.handleSceneItemTap(context, appWidgetId, item, itemIndex)) {
+                        && WidgetTimerController.INSTANCE.handleSceneItemTap(
+                                context,
+                                appWidgetId,
+                                state.displayedGroup != null ? state.displayedGroup.getId() : null,
+                                slotId,
+                                item,
+                                itemIndex
+                        )) {
                     WidgetRefreshCoordinator.INSTANCE.refreshWidgetWithTapFeedback(context, appWidgetId);
                 } else {
                     refreshSingleWidget(context, appWidgetId, providerClass);

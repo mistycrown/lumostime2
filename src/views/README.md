@@ -29,7 +29,9 @@ The views are designed as "dumb" or "presentational" components where possible, 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
 > Last updated: 2026-05-05
-- `TodoView.tsx`: Category lists now keep incomplete todos ahead of completed ones, place arranged/due todos ahead of unscheduled ones, and keep compact inline symbol-based date suffixes like `(05.06)[05.09]` fully visible by truncating the title before the dates.
+- `SettingsView.tsx`: Moved the Android `小组件` entry below the `开启悬浮球` toggle while keeping both items in the same settings group.
+- `TodoView.tsx`, `TodoDisplaySettingsModal.tsx`: Lowered the Todo sidebar utility cluster closer to the fixed footer, replaced the old eye toggle with a display-settings modal, and added persisted compact-mode toggles for linked tag, scope, schedule-type, progress-ring, and date-suffix visibility.
+- `TodoView.tsx`: Category lists now only group incomplete todos before completed ones and otherwise preserve the saved incoming todo order from batch management, while compact inline symbol-based date suffixes like `(05.06)[05.09]` stay fully visible by truncating the title before the dates.
 - `TodoView.tsx`: Completed todo rows now undo on the same left-swipe path as incomplete-row completion toggles, while right swipe still keeps `DETAIL / DUPLICATE` and lower-row taps still pass through the shared quick-actions open guard.
 - `TodoView.tsx`, `TodoQuickActionsModal.tsx`: Lower todo rows now pass the quick-actions open timestamp into the shared sheet so the same touch cannot immediately hit a freshly mounted quick-action button.
 - `TodoView.tsx`: List mode now reserves the fixed footer's height just like week mode, so lower todo rows no longer sit underneath the bottom navigation hit area.

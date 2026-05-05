@@ -3,6 +3,7 @@
  * @description 闂傚倷绶氬缁樹繆閸ヮ剙纾块柕鍫濇噳閺嬪秵绻涢崱妯诲碍缂佲偓瀹€鍕厸鐎广儱鍟俊鑺ャ亜锜婚崶銊㈡嫽闂佺鏈銊╁箺閻樼偨浜滈柡鍌濇硶閻忛亶鏌熼崣澶嬪唉鐎规洖宕灃濞达絼璀﹀ú?- 闂傚倷鑳剁涵鍫曞疾閻愬樊娴栭柕濞у棗小濡炪倖甯掗崯銊︾瑜版帗鐓欓柟顖嗗啯姣愬銈冨€曢幊蹇曟崲濠靛牆鏋堟俊顖濇〃婢规洘绻濋悽闈涗哗閻忓浚浜、姘愁槻闁崇懓鍟撮崺鈧い鎺戝閻撴盯鏌涘鈧粈渚€鎮橀敐鍥╃＜妞ゆ棁鍋愯倴婵炲濯寸粻鎾愁嚕閹绢喗鍋愭い鏃囧吹妞规娊姊绘担鍛婂暈妞ゃ劍鍔楀Σ鎰板即閻斿憡鐝烽梺鍝勮癁鐏炶姤顓块梻濠庡亜濞诧箑顫忚ぐ鎹ゅ洩顦规慨濠傤煼瀹曟帒顫濇潏銊﹀枛婵＄偑鍊栭弻銊╂儗閸屾氨鏆︽慨妞诲亾鐎规洏鍔戦、妯款槻闁?
  * @updated 2026-05-05: Reworked the custom-background surface stack so the whole scene page gets one shared base scrim and the right content panel adds a second warm overlay, matching TodoView and RecordView without a center seam.
  * @updated 2026-05-05: Fixed SceneView widget-session matching by reading active sessions from SessionContext instead of DataContext, preventing undefined access crashes in scene cards.
+ * @updated 2026-05-05: Scoped scene-widget-triggered card flips to the tapped scene group and time slot so identical cards in other slots stay untouched.
  * @updated 2026-05-01: Added a manual-mode scene-group dropdown on the scene header chip so users can quickly switch groups directly from the scene page.
  * @updated 2026-04-25: Added flex min-height guards for the scene sidebar and card list so long card stacks keep scrolling instead of being clipped on some mobile WebViews.
  */
@@ -87,23 +88,37 @@ export const SceneView: React.FC<SceneViewProps> = ({
   const [statsUpdateTrigger, setStatsUpdateTrigger] = useState(0);
   const isManualSceneGroupMode = sceneGroupState.switchMode !== 'auto';
 
-  const isWidgetSessionMatchForCard = (card: SceneCardData): boolean => {
+  const doesWidgetSceneSessionMatchCard = (session: typeof activeSessions[number], card: SceneCardData): boolean => {
+    if (session.source !== 'widget') {
+      return false;
+    }
+
     if (card.type === 'timer' && card.action.type === 'startTimer') {
-      return activeSessions.some((session) =>
-        session.source === 'widget'
-        && session.activityId === card.action.activityId
-        && session.categoryId === card.action.categoryId
-      );
+      return session.activityId === card.action.activityId
+        && session.categoryId === card.action.categoryId;
     }
 
     if (card.type === 'todo' && card.action.type === 'startTodo') {
-      return activeSessions.some((session) =>
-        session.source === 'widget'
-        && session.linkedTodoId === card.action.todoId
-      );
+      return session.linkedTodoId === card.action.todoId;
     }
 
     return false;
+  };
+
+  const isWidgetSessionMatchForScopedCard = (
+    groupId: string | null | undefined,
+    slotId: string | null | undefined,
+    card: SceneCardData
+  ): boolean => {
+    if (!groupId || !slotId) {
+      return false;
+    }
+
+    return activeSessions.some((session) =>
+      session.sceneGroupId === groupId
+      && session.sceneSlotId === slotId
+      && doesWidgetSceneSessionMatchCard(session, card)
+    );
   };
 
   const getStoredSceneCardFlipState = (cardId: string): boolean =>
@@ -217,18 +232,26 @@ export const SceneView: React.FC<SceneViewProps> = ({
   }, [isManualSceneGroupMode]);
 
   useEffect(() => {
-    const widgetSessions = activeSessions.filter((session) => session.source === 'widget');
-    if (widgetSessions.length === 0) {
+    const widgetSceneSessions = activeSessions.filter((session) =>
+      session.source === 'widget'
+      && session.sceneGroupId
+      && session.sceneSlotId
+    );
+    if (widgetSceneSessions.length === 0) {
       return;
     }
 
-    sceneGroupState.groups.forEach((group) => {
-      group.timeSlots.forEach((slot) => {
-        slot.cards.forEach((card) => {
-          if (isWidgetSessionMatchForCard(card) && !getStoredSceneCardFlipState(card.id)) {
-            localStorage.setItem(`scene_card_flipped_${card.id}`, 'true');
-          }
-        });
+    widgetSceneSessions.forEach((session) => {
+      const group = sceneGroupState.groups.find((item) => item.id === session.sceneGroupId);
+      const slot = group?.timeSlots.find((item) => item.id === session.sceneSlotId);
+      if (!slot) {
+        return;
+      }
+
+      slot.cards.forEach((card) => {
+        if (doesWidgetSceneSessionMatchCard(session, card) && !getStoredSceneCardFlipState(card.id)) {
+          localStorage.setItem(`scene_card_flipped_${card.id}`, 'true');
+        }
       });
     });
   }, [activeSessions, sceneGroupState]);
@@ -367,6 +390,8 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
   const currentSlot = timeSlots[selectedSlotIndex];
   const currentCards = currentSlot?.cards || [];
+  const displayedGroupId = displayedGroup?.id || null;
+  const currentSlotId = currentSlot?.id || null;
 
   // 缂傚倸鍊搁崐鐑芥嚄閸洖绐楅柡鍥ュ焺閺佸洭鏌熼梻瀵割槮闁哄绶氶弻锝呂旈埀顒勬偋閸℃瑧鐭堥柨鏇炲€归悡娑㈡煕閵夋垵鎳忛幉濂告⒑?- 婵犵數鍋涢顓熸叏閹绢喖绠犻幖绮规閼版寧銇勮箛鎾跺閻庢艾顦…璺ㄦ崉閾忓湱浼囬梺绯曟櫇婵炩偓闁诡喛顫夐幏鍛圭€ｎ亙澹曢梺鍛婂姈瑜板啴鎳撻崸妤佲拺缂備焦锕╁▓鏃€绻涚拠褏鐣辨い顏勫暣瀹曟帒袙閹稿骸绗╃紒鐘崇洴楠炴ê鐣烽崶锝呬壕濠电姵纰嶉埛鎴︽煟閿濆懓瀚伴柡瀣灦缁绘盯骞撻幒鎾充淮閻庢鍣崜姘舵晬閹邦厽濯村〒姘煎灟缁辨ɑ绻?
   useEffect(() => {
@@ -1304,7 +1329,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
                   logs={logs}
                   onAction={handleCardAction}
                   sceneCardTimerMode={sceneCardTimerMode}
-                  externalFlipped={isWidgetSessionMatchForCard(card) || getStoredSceneCardFlipState(card.id)}
+                  externalFlipped={isWidgetSessionMatchForScopedCard(displayedGroupId, currentSlotId, card) || getStoredSceneCardFlipState(card.id)}
                 />
               );
             })

@@ -120,6 +120,7 @@ Components for theme and appearance customization.
 - `achievement/AchievementBottleIconPackSelector.tsx`: 已改为成就瓶图标包卡片选择器，支持更紧凑的预览式切换。
 - `achievement/AchievementBottleStyleSelector.tsx`: 已改为成就瓶样式卡片选择器，使用玻璃瓶身小预览区分不同气质。
 > Last updated: 2026-05-05
+- `TodoDisplaySettingsModal.tsx`: Added a dedicated Todo display-settings modal that groups completed-task visibility with compact-row metadata toggles and closes cleanly on backdrop tap or Android back.
 - `TodoQuickActionsModal.tsx`: The shared quick-actions sheet now ignores the same touch-generated follow-up click that opened it, so tapping a lower todo row no longer flashes the sheet and instantly fires `完成 / 取消完成 / Pin` actions under the finger.
 - `TodoQuickActionsModal.tsx`: Added an inline `删除任务 -> 确认删除？` two-step action so shared todo quick actions can remove a task directly from the sheet without opening the full detail editor first.
 - `TodoQuickActionsModal.tsx`: Android back now dismisses the shared quick-actions sheet before app-level navigation runs, and tapping the blurred backdrop closes the sheet without leaking the tap through to the todo row underneath.

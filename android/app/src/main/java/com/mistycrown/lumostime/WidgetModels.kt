@@ -6,6 +6,7 @@ package com.mistycrown.lumostime
  * Updated 2026-05-02: Added native scene-widget payload, group, slot, item, and per-instance selection models.
  * Updated 2026-05-05: Added mirrored TODAY + PIN source todo/category models so native widgets can rebuild today's list on refresh without waiting for a new web payload.
  * Updated 2026-05-05: Added optional scene item app-launch metadata so scene widgets can mirror in-app third-party app launching.
+ * Updated 2026-05-05: Added optional scene runtime source metadata so app-side scene flips can stay scoped to the tapped scene slot.
  */
 object WidgetTypes {
     const val TIMER = "timer"
@@ -247,7 +248,10 @@ data class WidgetRuntimeState(
     val scopeIds: List<String> = emptyList(),
     val slotIndex: Int? = null,
     val templateId: String? = null,
-    val appWidgetId: Int? = null
+    val appWidgetId: Int? = null,
+    val sceneGroupId: String? = null,
+    val sceneSlotId: String? = null,
+    val sceneItemId: String? = null
 )
 
 data class WidgetPendingAction(
