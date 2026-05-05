@@ -4,6 +4,8 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-05: Refreshed the new-conversation empty-state examples so they cover backfill, todo creation, daily planning, reminders, long-term memory, and casual chat, while only gated capabilities show required feature toggles.
+ * @updated 2026-05-05: Added a dedicated reopen-time scroll-to-latest pass so entering the AI chat lands on the newest turn by default, while exact session/message navigation still keeps its higher priority.
  * @updated 2026-05-05: Kept applied-result, memory-update, reminder-update, and retry blocks inside the main message column so narrow mobile layouts no longer let those side panels squeeze assistant bubbles into single-character vertical text.
  * @updated 2026-05-04: Enlarged the in-chat avatars and tightened their icon centering so emoji, uploaded portraits, and fallback glyphs sit cleanly inside the message avatar frame.
  * @updated 2026-05-04: Made persona switching open a brand-new empty conversation bound to the selected persona, so each chat window stays locked to one persona instead of changing identity in place.
@@ -1675,6 +1677,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [revealedAssistantPartCounts, setRevealedAssistantPartCounts] = useState<Record<string, number>>({});
   const activeRequestRef = useRef<ActiveRequestRef | null>(null);
   const isOpenRef = useRef(isOpen);
+  const wasOpenRef = useRef(isOpen);
   const processingDueReminderIdsRef = useRef<Set<string>>(new Set());
   const assistantPartRevealTimeoutsRef = useRef<Map<string, number[]>>(new Map());
   const revealedAssistantPartCountsRef = useRef<Record<string, number>>({});
@@ -1723,6 +1726,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     () => sessions.find((session) => session.id === activeSessionId) || sessions[0] || null,
     [activeSessionId, sessions]
   );
+  const scrollToLatestMessage = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
+  }, []);
   const clearAssistantPartRevealTimeouts = useCallback((messageId?: string) => {
     if (messageId) {
       const handles = assistantPartRevealTimeoutsRef.current.get(messageId) || [];
@@ -2137,14 +2143,34 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     : '';
   const hasPendingNavigation = Boolean(activeNavigationKey)
     && handledNavigationKeyRef.current !== activeNavigationKey;
+  const hasResolvablePendingNavigation = hasPendingNavigation
+    && Boolean(targetSessionId)
+    && sessions.some((session) => session.id === targetSessionId);
 
   useEffect(() => {
-    if (hasPendingNavigation && activeSessionId === targetSessionId) {
+    if (hasResolvablePendingNavigation) {
       return;
     }
 
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [activeSession?.messages, activeSessionId, hasPendingNavigation, isLoading, targetSessionId]);
+    scrollToLatestMessage();
+  }, [activeSession?.messages, activeSessionId, hasResolvablePendingNavigation, isLoading, scrollToLatestMessage]);
+
+  useEffect(() => {
+    const wasOpen = wasOpenRef.current;
+    wasOpenRef.current = isOpen;
+
+    if (!isOpen || wasOpen || hasResolvablePendingNavigation) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      scrollToLatestMessage('auto');
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [hasResolvablePendingNavigation, isOpen, scrollToLatestMessage]);
 
   useEffect(() => {
     localStorage.setItem(CHAT_PERSONAS_KEY, JSON.stringify(personas));
@@ -2221,7 +2247,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         }
       }
 
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      scrollToLatestMessage();
       handledNavigationKeyRef.current = activeNavigationKey;
     });
   }, [
@@ -2231,6 +2257,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     hasPendingNavigation,
     isOpen,
     sessions,
+    scrollToLatestMessage,
     targetMessageId,
     targetSessionId
   ]);
@@ -4913,11 +4940,38 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           : renderTodoAction(messageId, action)
   );
 
-  const emptyPromptExamples = [
-    '今天下午两点到三点半写周报，挂到工作 / 写作。',
-    '刚刚看了 40 分钟论文，帮我补一条记录。',
-    '帮我建一个明天下午提交的待办：论文初稿。',
-    '这周日安排一个待办：整理实验数据。'
+  const emptyPromptExampleGroups: Array<{
+    title: string;
+    prompt: string;
+    requirement?: string;
+  }> = [
+    {
+      title: '添加补记',
+      prompt: '今天下午两点到三点半写周报，挂到工作 / 写作。'
+    },
+    {
+      title: '添加待办',
+      prompt: '帮我建一个明天下午提交的待办：论文初稿。'
+    },
+    {
+      title: '规划今天',
+      prompt: '我今天计划推进论文初稿、整理实验数据、晚上去跑步，帮我拆成待办，也顺手安排几个提醒。',
+      requirement: '开启后台轮询'
+    },
+    {
+      title: '定时提醒',
+      prompt: '今晚 8 点提醒我做拉伸，10 点再提醒我准备睡觉。',
+      requirement: '开启后台轮询和长期记忆'
+    },
+    {
+      title: '长期记忆',
+      prompt: '记住我喜欢先做难的事，提醒时语气可以直接一点。',
+      requirement: '开启长期记忆'
+    },
+    {
+      title: '随口聊聊',
+      prompt: '我今天感觉有点乱，也有点累，陪我理一理现在最该做什么。'
+    }
   ];
 
   const renderMessageBubble = (message: AIChatMessage, index: number, messages: AIChatMessage[]) => {
@@ -5289,16 +5343,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             >
               <p className="font-medium text-stone-700">试试这样说</p>
               <div className="mt-4 space-y-4">
-                <div>
-                  <p className="font-medium text-stone-700">添加补记</p>
-                  <p>今天下午两点到三点半写周报，挂到工作 / 写作。</p>
-                  <p>刚刚看了 40 分钟论文，帮我补一条记录。</p>
-                </div>
-                <div>
-                  <p className="font-medium text-stone-700">添加待办</p>
-                  <p>帮我建一个明天下午提交的待办：论文初稿。</p>
-                  <p>添加一个这周日准备要做的待办：整理实验数据。</p>
-                </div>
+                {emptyPromptExampleGroups.map((group) => (
+                  <div key={group.title}>
+                    <p className="font-medium text-stone-700">{group.title}</p>
+                    <p>{group.prompt}</p>
+                    {group.requirement ? (
+                      <p className="text-xs text-stone-400">功能要求：{group.requirement}</p>
+                    ) : null}
+                  </div>
+                ))}
               </div>
             </div>
           ) : null}

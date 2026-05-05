@@ -1,5 +1,6 @@
 /**
  * @file MoodPicker.tsx
+ * @updated 2026-05-05: Hide sticker labels in the picker and tighten the 4x4 grid so 16 stickers fit without an inner scrollbar.
  * @description 心情选择器组件 - 用于每日回顾（全屏模态框样式）
  * 支持 emoji 和自定义贴纸组
  */
@@ -420,7 +421,7 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
                                     }
                                     
                                     return (
-                                        <div className="grid grid-cols-4 gap-2 mb-4 max-h-[320px] overflow-y-auto">{/* 从 mb-6 改为 mb-4 */}
+                                        <div className="grid grid-cols-4 gap-1.5 mb-4">{/* 从 mb-6 改为 mb-4 */}
                                             {currentStickerSet.stickers.map((sticker) => {
                                                 const stickerIcon = `image:${sticker.path}`;
                                                 
@@ -431,23 +432,15 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
                                                             onSelect(stickerIcon);
                                                             onClose();
                                                         }}
-                                                        className="flex flex-col items-center justify-center gap-1 p-2 transition-all hover:bg-stone-50 rounded-2xl relative"
+                                                        aria-label={sticker.label || '选择贴纸'}
+                                                        className="flex items-center justify-center p-1.5 transition-all hover:bg-stone-50 rounded-2xl relative"
                                                     >
                                                         {/* 贴纸容器 */}
-                                                        <div className="relative flex items-center justify-center w-14 h-14">
+                                                        <div className="relative flex items-center justify-center w-12 h-12">
                                                             <div className="w-full h-full flex items-center justify-center">
                                                                 <IconRenderer icon={stickerIcon} size="100%" />
                                                             </div>
                                                         </div>
-                                                        {/* 贴纸标签（可选） */}
-                                                        {sticker.label && (
-                                                        <span
-                                                            className="block max-w-full truncate text-[9px] text-stone-400 font-medium"
-                                                            title={sticker.label}
-                                                        >
-                                                            {sticker.label}
-                                                        </span>
-                                                        )}
                                                     </button>
                                                 );
                                             })}

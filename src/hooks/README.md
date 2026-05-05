@@ -17,6 +17,7 @@
 > `useTodoQuickActions.ts` now centralizes lightweight todo quick-actions state so todo-list taps and week-plan badges open the same scheduling/completion sheet behavior.
 > `useTodoQuickActions.ts` now also routes shared delete requests into the existing todo deletion flow, so the quick-actions sheet can trigger the same task-removal rules as the detail editor.
 > `useTodoQuickActions.ts` also exposes a shared pin/unpin action, and `useTodoManager.ts` now initializes duplicated/new todos with `pin: false` by default.
+> `useTodoQuickActions.ts` now also exposes the sheet open timestamp plus a shared guard helper, so the bottom-sheet actions can ignore the same synthetic touch click that opened them from a lower todo row.
 
 > `useTodoStats.ts` 优先使用 `TodoCategory.color` 作为待办环形图颜色；旧分类没有保存颜色时，继续回退到历史默认调色板。
 

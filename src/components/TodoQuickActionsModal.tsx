@@ -4,6 +4,7 @@
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
  * @pos Component
  * @description A reusable bottom sheet that exposes lightweight todo planning and completion actions without opening the full todo detail editor first.
+ * @updated 2026-05-05: Ignores the same just-opened touch click for action buttons too, so tapping a bottom todo row no longer flashes the sheet and instantly fires a quick action underneath the finger.
  * @updated 2026-05-05: Moved backdrop dismissal onto the backdrop click itself so outside taps close the current sheet without click-through opening the todo row underneath, while the existing open-time close guard still blocks same-tap flash-closes.
  * @updated 2026-05-05: Split normal backdrop dismissal from forced hardware-back dismissal so row taps can still open the sheet without the same click instantly closing it.
  * @updated 2026-05-04: Registered with the shared Android back-handler stack and consumed backdrop clicks so the sheet closes before app exit or underlying todo taps can fire.
@@ -17,6 +18,7 @@ import { CalendarDays, Check, CheckCircle2, Flag, PanelRightOpen, Pin, Trash2, X
 import { TodoItem } from '../types';
 import { parseDateKey } from '../utils/todoScheduleUtils';
 import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
+import { isTodoQuickActionInteractionGuardActive } from '../hooks/useTodoQuickActions';
 
 interface TodoQuickActionsModalProps {
   isOpen: boolean;
@@ -30,6 +32,7 @@ interface TodoQuickActionsModalProps {
   onDelete: () => void;
   onClose: () => void;
   onForceClose?: () => void;
+  openedAt?: number;
 }
 
 export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
@@ -43,7 +46,8 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   onTogglePin,
   onDelete,
   onClose,
-  onForceClose
+  onForceClose,
+  openedAt = 0
 }) => {
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
 
@@ -116,6 +120,19 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
     onClose();
   };
 
+  const withActionGuard = <T extends HTMLElement>(
+    action: () => void
+  ): React.MouseEventHandler<T> => (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (event.detail !== 0 && isTodoQuickActionInteractionGuardActive(openedAt)) {
+      return;
+    }
+
+    action();
+  };
+
   return (
     <div
       className="fixed inset-0 z-[130] flex items-end justify-center bg-[rgba(15,23,42,0.12)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-12 backdrop-blur-sm md:items-center md:pb-4"
@@ -143,7 +160,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
           <div className="absolute right-5 top-4 flex items-center gap-2">
             <button
               type="button"
-              onClick={onOpenDetail}
+              onClick={withActionGuard(onOpenDetail)}
               className="rounded-full p-2 text-stone-400 transition-colors hover:bg-white hover:text-stone-600"
               title="打开详情"
             >
@@ -152,7 +169,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
             {!todo.isCompleted && (
               <button
                 type="button"
-                onClick={onComplete}
+                onClick={withActionGuard(onComplete)}
                 className="rounded-full p-2 text-stone-400 transition-colors hover:bg-white hover:text-stone-600"
                 title="标记完成"
               >
@@ -173,21 +190,21 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
                 <div className="grid grid-cols-[0.8fr_0.8fr_1.1fr]">
                   <button
                     type="button"
-                    onClick={() => onMoveDate('scheduled', 'today')}
+                    onClick={withActionGuard(() => onMoveDate('scheduled', 'today'))}
                     className="flex items-center justify-center whitespace-nowrap px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
                   >
                     <span>今</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => onMoveDate('scheduled', 'tomorrow')}
+                    onClick={withActionGuard(() => onMoveDate('scheduled', 'tomorrow'))}
                     className="flex items-center justify-center whitespace-nowrap border-l border-stone-100 px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
                   >
                     <span>明</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => onMoveDate('scheduled', 'nextWeek')}
+                    onClick={withActionGuard(() => onMoveDate('scheduled', 'nextWeek'))}
                     className="flex items-center justify-center whitespace-nowrap border-l border-stone-100 px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
                   >
                     <span>下周</span>
@@ -203,21 +220,21 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
                 <div className="grid grid-cols-[0.8fr_0.8fr_1.1fr]">
                   <button
                     type="button"
-                    onClick={() => onMoveDate('deadline', 'today')}
+                    onClick={withActionGuard(() => onMoveDate('deadline', 'today'))}
                     className="flex items-center justify-center whitespace-nowrap px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
                   >
                     今
                   </button>
                   <button
                     type="button"
-                    onClick={() => onMoveDate('deadline', 'tomorrow')}
+                    onClick={withActionGuard(() => onMoveDate('deadline', 'tomorrow'))}
                     className="flex items-center justify-center whitespace-nowrap border-l border-stone-100 px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
                   >
                     明
                   </button>
                   <button
                     type="button"
-                    onClick={() => onMoveDate('deadline', 'nextWeek')}
+                    onClick={withActionGuard(() => onMoveDate('deadline', 'nextWeek'))}
                     className="flex items-center justify-center whitespace-nowrap border-l border-stone-100 px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
                   >
                     下周
@@ -229,7 +246,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => onClearDate('scheduled')}
+                onClick={withActionGuard(() => onClearDate('scheduled'))}
                 className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
               >
                 <X size={16} className="text-stone-400" />
@@ -238,7 +255,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
 
               <button
                 type="button"
-                onClick={() => onClearDate('deadline')}
+                onClick={withActionGuard(() => onClearDate('deadline'))}
                 className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
               >
                 <X size={16} className="text-stone-400" />
@@ -248,7 +265,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
 
             <button
               type="button"
-              onClick={onTogglePin}
+              onClick={withActionGuard(onTogglePin)}
               className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
             >
               <Pin size={13} className={`${todo.pin ? 'text-stone-600' : 'text-stone-400'} rotate-[28deg]`} />
@@ -258,7 +275,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
             {todo.isCompleted && (
               <button
                 type="button"
-                onClick={onUndoComplete}
+                onClick={withActionGuard(onUndoComplete)}
                 className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
               >
                 <CheckCircle2 size={16} className="text-stone-400" />
@@ -268,14 +285,14 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
 
             <button
               type="button"
-              onClick={() => {
+              onClick={withActionGuard(() => {
                 if (isDeleteConfirming) {
                   onDelete();
                   return;
                 }
 
                 setIsDeleteConfirming(true);
-              }}
+              })}
               className={`flex w-full items-center gap-2 rounded-2xl border px-4 py-3 text-left text-sm transition-colors ${
                 isDeleteConfirming
                   ? 'border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100'
