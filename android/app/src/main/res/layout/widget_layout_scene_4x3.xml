@@ -136,18 +136,45 @@
         android:orientation="vertical"
         android:paddingStart="3dp">
 
-        <TextView
-            android:id="@+id/widget_scene_slot_label"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
             android:layout_marginTop="2dp"
-            android:ellipsize="end"
-            android:fontFamily="monospace"
-            android:maxLines="1"
-            android:text=""
-            android:textColor="#6C6359"
-            android:textSize="8sp" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_scene_slot_label"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:fontFamily="monospace"
+                android:maxLines="1"
+                android:text=""
+                android:textColor="#6C6359"
+                android:textSize="8sp" />
+
+            <FrameLayout
+                android:id="@+id/widget_scene_refresh_root"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginEnd="6dp"
+                android:clickable="true"
+                android:focusable="false"
+                android:foregroundGravity="center">
+
+                <ImageView
+                    android:id="@+id/widget_scene_refresh_icon"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:adjustViewBounds="false"
+                    android:contentDescription="@null"
+                    android:padding="2dp"
+                    android:scaleType="centerInside" />
+            </FrameLayout>
+        </LinearLayout>
 
         <GridView
             android:id="@+id/widget_scene_cards"

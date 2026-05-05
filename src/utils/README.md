@@ -7,6 +7,7 @@ Contains pure utility functions for data processing and business logic calculati
 - `goalUtils.ts`: [Active] - Calculates progress for Goals (duration, count, frequency).
 - `logUtils.ts`: [Active] - Handles time log manipulation, specifically splitting cross-day logs.
 - `achievementUtils.ts`: [Active] - Computes achievement daily snapshots, date ranges, and current star balances.
+- `dailyCheckUtils.ts`: [Active] - Builds daily check items from templates, normalizes review check data, applies NFC/widget/manual punch actions, and tolerates legacy templates with missing `items` arrays.
 - `checkStreakUtils.ts`: [Active] - Resolves per-item daily check streaks, global multiplier tiers, and weighted check-category completion values for achievement rules.
 - `colorAdapterUtils.ts`: [Active] - Unifies chart/card/schedule/tag color rendering across Tailwind palette classes and custom HEX colors.
 - `filterUtils.ts`: [Active] - Parses custom filter expressions, computes stats, and normalizes saved custom filter order.

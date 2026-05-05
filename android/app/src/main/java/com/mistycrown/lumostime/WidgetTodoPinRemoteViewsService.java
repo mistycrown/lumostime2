@@ -40,6 +40,7 @@ public class WidgetTodoPinRemoteViewsService extends RemoteViewsService {
 
         @Override
         public void onDataSetChanged() {
+            WidgetTodoPinProviderSupport.refreshTodoPinPayloadFromMirroredSources(context);
             WidgetTodoPinPayload payload = WidgetStores.INSTANCE.loadTodoPinPayload(context);
             if (payload != null && isPayloadForToday(payload)) {
                 items = payload.getItems();

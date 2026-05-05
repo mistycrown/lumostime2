@@ -14,6 +14,8 @@ import android.os.Looper
 object WidgetRefreshCoordinator {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val tapFeedbackFrameDelays = longArrayOf(0L, 48L, 108L, 176L, 244L)
+    private val sceneRefreshFrameDelays = longArrayOf(0L, 70L, 140L, 210L, 280L, 350L, 420L)
+    private val todoPinRefreshFrameDelays = longArrayOf(0L, 72L, 144L, 216L, 288L, 360L)
 
     fun refreshAllAsync(context: Context) {
         refreshAll(context)
@@ -22,6 +24,26 @@ object WidgetRefreshCoordinator {
     fun refreshWidgetWithTapFeedback(context: Context, appWidgetId: Int) {
         val appContext = context.applicationContext
         tapFeedbackFrameDelays.forEach { delayMs ->
+            mainHandler.postDelayed(
+                { refreshWidget(appContext, appWidgetId) },
+                delayMs
+            )
+        }
+    }
+
+    fun refreshTodoPinWidgetWithFeedback(context: Context, appWidgetId: Int) {
+        val appContext = context.applicationContext
+        todoPinRefreshFrameDelays.forEach { delayMs ->
+            mainHandler.postDelayed(
+                { refreshWidget(appContext, appWidgetId) },
+                delayMs
+            )
+        }
+    }
+
+    fun refreshSceneWidgetWithFeedback(context: Context, appWidgetId: Int) {
+        val appContext = context.applicationContext
+        sceneRefreshFrameDelays.forEach { delayMs ->
             mainHandler.postDelayed(
                 { refreshWidget(appContext, appWidgetId) },
                 delayMs

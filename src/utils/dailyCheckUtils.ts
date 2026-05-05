@@ -4,6 +4,7 @@
  * @output daily check helpers for creating reviews, locating items, and applying manual actions
  * @pos Utils (Daily Check)
  * @description Shared daily check utilities used by SceneView and NFC flows to keep review creation, legacy item ID compatibility, and habit punch behavior consistent.
+ * @updated 2026-05-05: Hardened template item traversal so legacy or partially synced daily check templates without `items` no longer crash NFC and widget entry points.
  * @updated 2026-05-04: Added a dedicated tracking-calendar daily binding helper so 2x2 tracking widgets can target both manual and automatic daily checks.
  */
 import { CheckItem, CheckTemplate, CheckTemplateItem, DailyReview, ReviewTemplate, ReviewTemplateSnapshot } from '../types';
@@ -45,6 +46,10 @@ const sortTemplatesByOrder = <T extends { order: number }>(templates: T[]): T[] 
   return [...templates].sort((a, b) => a.order - b.order);
 };
 
+const getTemplateItems = (template: CheckTemplate): CheckTemplateItem[] => (
+  Array.isArray(template.items) ? template.items : []
+);
+
 const buildDailyCheckTemplateMeta = (
   template: CheckTemplate,
   item: CheckTemplateItem,
@@ -79,7 +84,7 @@ const getDailyCheckTemplateItems = (
   const items: DailyCheckTemplateMeta[] = [];
 
   sortTemplatesByOrder(checkTemplates.filter(template => template.enabled && template.isDaily)).forEach(template => {
-    template.items.forEach((item, index) => {
+    getTemplateItems(template).forEach((item, index) => {
       const meta = buildDailyCheckTemplateMeta(template, item, index);
       if (!includeAuto && meta.type !== 'manual') {
         return;
@@ -130,7 +135,7 @@ export const buildDailyCheckItems = (checkTemplates: CheckTemplate[]): CheckItem
   const checkItems: CheckItem[] = [];
 
   sortTemplatesByOrder(checkTemplates.filter(template => template.enabled && template.isDaily)).forEach(template => {
-    template.items.forEach((item, index) => {
+    getTemplateItems(template).forEach((item, index) => {
       const type = item.type || 'manual';
       const manualMode = type === 'manual'
         ? (item.manualMode === 'count' ? 'count' : 'binary')
@@ -219,8 +224,9 @@ export const getDailyCheckTemplateMeta = (
   checkItemId: string
 ): DailyCheckTemplateMeta | null => {
   for (const template of checkTemplates) {
-    const itemIndex = template.items.findIndex((entry, index) => getCheckTemplateItemKey(template, entry, index) === checkItemId);
-    const item = itemIndex >= 0 ? template.items[itemIndex] : undefined;
+    const templateItems = getTemplateItems(template);
+    const itemIndex = templateItems.findIndex((entry, index) => getCheckTemplateItemKey(template, entry, index) === checkItemId);
+    const item = itemIndex >= 0 ? templateItems[itemIndex] : undefined;
     if (!item) continue;
 
     return buildDailyCheckTemplateMeta(template, item, itemIndex);

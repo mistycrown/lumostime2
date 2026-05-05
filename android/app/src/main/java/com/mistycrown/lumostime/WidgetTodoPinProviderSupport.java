@@ -7,11 +7,21 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
+import android.text.TextUtils;
 import android.widget.RemoteViews;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Shared rendering and tap handling for the dedicated TODAY + PIN widgets.
@@ -19,7 +29,10 @@ import java.util.Locale;
 public final class WidgetTodoPinProviderSupport {
     public static final String ACTION_TOGGLE_TODO_ITEM =
             "com.mistycrown.lumostime.action.TOGGLE_TODO_PIN_ITEM";
+    public static final String ACTION_REFRESH_TODO_PIN =
+            "com.mistycrown.lumostime.action.REFRESH_TODO_PIN";
     public static final String EXTRA_TODO_ID = "todo_pin_todo_id";
+    private static final long TODO_PIN_REFRESH_ANIMATION_DURATION_MS = 420L;
 
     private WidgetTodoPinProviderSupport() {}
 
@@ -33,6 +46,31 @@ public final class WidgetTodoPinProviderSupport {
         }
 
         String action = intent.getAction();
+        if (ACTION_REFRESH_TODO_PIN.equals(action)) {
+            int appWidgetId = intent.getIntExtra(
+                    AppWidgetManager.EXTRA_APPWIDGET_ID,
+                    AppWidgetManager.INVALID_APPWIDGET_ID
+            );
+            if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                long startedAt = System.currentTimeMillis();
+                WidgetStores.INSTANCE.saveTodoPinRefreshAnimationState(
+                        context,
+                        new WidgetTodoPinRefreshAnimationState(
+                                appWidgetId,
+                                startedAt,
+                                startedAt + TODO_PIN_REFRESH_ANIMATION_DURATION_MS
+                        )
+                );
+            }
+            refreshTodoPinPayloadFromMirroredSources(context);
+            if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                WidgetRefreshCoordinator.INSTANCE.refreshTodoPinWidgetWithFeedback(context, appWidgetId);
+            } else {
+                WidgetRefreshCoordinator.INSTANCE.refreshTodoPinWidgets(context);
+            }
+            return true;
+        }
+
         if (ACTION_TOGGLE_TODO_ITEM.equals(action)) {
             int appWidgetId = intent.getIntExtra(
                     AppWidgetManager.EXTRA_APPWIDGET_ID,
@@ -86,11 +124,7 @@ public final class WidgetTodoPinProviderSupport {
         }
 
         WidgetTodoPinPayload payload = WidgetStores.INSTANCE.loadTodoPinPayload(context);
-        if (!isPayloadForToday(payload)) {
-            payload = null;
-        }
-        WidgetRuntimeState runtimeState = WidgetStores.INSTANCE.loadRuntimeState(context);
-
+        payload = ensurePayloadFreshForToday(context, payload);
         for (int appWidgetId : appWidgetIds) {
             RemoteViews views = new RemoteViews(context.getPackageName(), layoutResId);
             Intent serviceIntent = new Intent(context, WidgetTodoPinRemoteViewsService.class);
@@ -100,7 +134,11 @@ public final class WidgetTodoPinProviderSupport {
             views.setRemoteAdapter(R.id.widget_todo_pin_list, serviceIntent);
             views.setEmptyView(R.id.widget_todo_pin_list, R.id.widget_todo_pin_empty);
             views.setTextViewText(R.id.widget_todo_pin_subtitle, formatHeaderDate());
-            views.setTextViewText(R.id.widget_todo_pin_status, formatStatus(payload, runtimeState));
+            bindRefreshButton(context, views, appWidgetId, providerClass);
+            views.setOnClickPendingIntent(
+                    R.id.widget_todo_pin_refresh_button,
+                    buildRefreshPendingIntent(context, appWidgetId, providerClass)
+            );
             views.setPendingIntentTemplate(
                     R.id.widget_todo_pin_list,
                     buildItemTemplatePendingIntent(context, appWidgetId, providerClass)
@@ -112,6 +150,83 @@ public final class WidgetTodoPinProviderSupport {
             );
             appWidgetManager.updateAppWidget(appWidgetId, views);
         }
+    }
+
+    private static void bindRefreshButton(
+            Context context,
+            RemoteViews views,
+            int appWidgetId,
+            Class<? extends AppWidgetProvider> providerClass
+    ) {
+        WidgetTodoPinRefreshAnimationState animationState =
+                WidgetStores.INSTANCE.loadTodoPinRefreshAnimationState(context);
+        float progress = animationState != null && animationState.getAppWidgetId() == appWidgetId
+                ? resolveRefreshAnimationProgress(animationState)
+                : 0f;
+        views.setImageViewResource(
+                R.id.widget_todo_pin_refresh_button,
+                resolveRefreshIconRes(progress)
+        );
+        views.setOnClickPendingIntent(
+                R.id.widget_todo_pin_refresh_button,
+                buildRefreshPendingIntent(context, appWidgetId, providerClass)
+        );
+    }
+
+    private static float resolveRefreshAnimationProgress(WidgetTodoPinRefreshAnimationState animationState) {
+        long duration = Math.max(1L, animationState.getExpiresAt() - animationState.getStartedAt());
+        long elapsed = Math.max(0L, System.currentTimeMillis() - animationState.getStartedAt());
+        return Math.min(1f, elapsed / (float) duration);
+    }
+
+    private static int resolveRefreshIconRes(float progress) {
+        if (progress <= 0f || progress >= 1f) {
+            return R.drawable.widget_todo_pin_refresh_icon;
+        }
+
+        if (progress < 0.2f) {
+            return R.drawable.widget_todo_pin_refresh_icon_1;
+        }
+        if (progress < 0.4f) {
+            return R.drawable.widget_todo_pin_refresh_icon_2;
+        }
+        if (progress < 0.6f) {
+            return R.drawable.widget_todo_pin_refresh_icon_3;
+        }
+        if (progress < 0.8f) {
+            return R.drawable.widget_todo_pin_refresh_icon_4;
+        }
+        return R.drawable.widget_todo_pin_refresh_icon_5;
+    }
+
+    private static WidgetTodoPinPayload ensurePayloadFreshForToday(
+            Context context,
+            WidgetTodoPinPayload payload
+    ) {
+        if (payload == null) {
+            return null;
+        }
+
+        if (isPayloadForToday(payload)) {
+            return payload;
+        }
+
+        if (payload.getSourceTodos().isEmpty()) {
+            return null;
+        }
+
+        WidgetTodoPinPayload refreshedPayload = rebuildTodoPinPayloadForToday(payload);
+        WidgetStores.INSTANCE.saveTodoPinPayload(context, refreshedPayload);
+        return refreshedPayload;
+    }
+
+    static void refreshTodoPinPayloadFromMirroredSources(Context context) {
+        WidgetTodoPinPayload payload = WidgetStores.INSTANCE.loadTodoPinPayload(context);
+        if (payload == null || payload.getSourceTodos().isEmpty()) {
+            return;
+        }
+
+        WidgetStores.INSTANCE.saveTodoPinPayload(context, rebuildTodoPinPayloadForToday(payload));
     }
 
     private static WidgetTodoPinItem findItem(WidgetTodoPinPayload payload, String todoId) {
@@ -135,27 +250,300 @@ public final class WidgetTodoPinProviderSupport {
         return today.equals(payload.getDate());
     }
 
+    private static WidgetTodoPinPayload rebuildTodoPinPayloadForToday(WidgetTodoPinPayload payload) {
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+        List<WidgetTodoPinSourceTodo> sourceTodos = payload.getSourceTodos();
+        List<WidgetTodoPinSourceCategory> sourceCategories = payload.getSourceCategories();
+        List<WidgetTodoPinItem> items = buildTodoPinItemsForDate(sourceTodos, sourceCategories, today);
+        return new WidgetTodoPinPayload(
+                today,
+                items,
+                System.currentTimeMillis(),
+                sourceTodos,
+                sourceCategories
+        );
+    }
+
+    private static List<WidgetTodoPinItem> buildTodoPinItemsForDate(
+            List<WidgetTodoPinSourceTodo> sourceTodos,
+            List<WidgetTodoPinSourceCategory> sourceCategories,
+            String targetDate
+    ) {
+        if (sourceTodos == null || sourceTodos.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<String, WidgetTodoPinSourceTodo> todoById = new HashMap<>();
+        for (WidgetTodoPinSourceTodo todo : sourceTodos) {
+            todoById.put(todo.getId(), todo);
+        }
+
+        Map<String, WidgetTodoPinSourceCategory> categoryById = new HashMap<>();
+        Map<String, WidgetTodoPinSourceActivity> activityById = new HashMap<>();
+        if (sourceCategories != null) {
+            for (WidgetTodoPinSourceCategory category : sourceCategories) {
+                categoryById.put(category.getId(), category);
+                for (WidgetTodoPinSourceActivity activity : category.getActivities()) {
+                    activityById.put(activity.getId(), activity);
+                }
+            }
+        }
+
+        List<WidgetTodoPinSourceTodo> visibleTodos = new ArrayList<>();
+        for (WidgetTodoPinSourceTodo todo : sourceTodos) {
+            if (todo.isCompleted()) {
+                continue;
+            }
+            if (isTodoInAssociationTodayCategory(todo, targetDate)) {
+                visibleTodos.add(todo);
+            }
+        }
+
+        Collections.sort(visibleTodos, new Comparator<WidgetTodoPinSourceTodo>() {
+            @Override
+            public int compare(WidgetTodoPinSourceTodo left, WidgetTodoPinSourceTodo right) {
+                if (left.getPin() != right.getPin()) {
+                    return left.getPin() ? -1 : 1;
+                }
+                return left.getTitle().compareToIgnoreCase(right.getTitle());
+            }
+        });
+
+        List<WidgetTodoPinItem> items = new ArrayList<>();
+        for (WidgetTodoPinSourceTodo todo : visibleTodos) {
+            ResolvedTodoPinLinkedTarget linkedTarget = resolveTodoPinLinkedTarget(
+                    todo,
+                    todoById,
+                    categoryById,
+                    activityById
+            );
+            items.add(new WidgetTodoPinItem(
+                    todo.getId(),
+                    todo.getTitle(),
+                    todo.getPin() ? "PIN" : "TODAY",
+                    linkedTarget.categoryId,
+                    linkedTarget.activityId,
+                    linkedTarget.activityLabel,
+                    linkedTarget.icon,
+                    linkedTarget.color,
+                    todo.getDefaultScopeIds()
+            ));
+        }
+        return items;
+    }
+
+    private static boolean isTodoInAssociationTodayCategory(
+            WidgetTodoPinSourceTodo todo,
+            String targetDate
+    ) {
+        return todo.getPin()
+                || TextUtils.equals(targetDate, todo.getScheduledDate())
+                || TextUtils.equals(targetDate, todo.getDeadlineDate())
+                || matchesRecurrenceRule(todo.getRecurrenceRule(), targetDate);
+    }
+
+    private static boolean matchesRecurrenceRule(
+            WidgetTodoPinSourceRecurrenceRule rule,
+            String targetDateKey
+    ) {
+        if (rule == null || TextUtils.isEmpty(rule.getStartDate())) {
+            return false;
+        }
+
+        Calendar targetDate = parseDateKey(targetDateKey);
+        Calendar startDate = parseDateKey(rule.getStartDate());
+        Calendar endDate = parseDateKey(rule.getEndDate());
+        if (targetDate == null || startDate == null) {
+            return false;
+        }
+        if (targetDate.before(startDate)) {
+            return false;
+        }
+        if (endDate != null && targetDate.after(endDate)) {
+            return false;
+        }
+
+        String frequency = rule.getFrequency();
+        if ("daily".equals(frequency)) {
+            int interval = Math.max(1, rule.getInterval() == null ? 1 : rule.getInterval());
+            return getDayDiff(startDate, targetDate) % interval == 0;
+        }
+        if ("weekly".equals(frequency)) {
+            int interval = Math.max(1, rule.getInterval() == null ? 1 : rule.getInterval());
+            List<Integer> weekdays = rule.getWeekdays();
+            Set<Integer> weekdaySet = new HashSet<>(weekdays == null || weekdays.isEmpty()
+                    ? Collections.singletonList(startDate.get(Calendar.DAY_OF_WEEK) - 1)
+                    : weekdays);
+            int targetWeekday = targetDate.get(Calendar.DAY_OF_WEEK) - 1;
+            if (!weekdaySet.contains(targetWeekday)) {
+                return false;
+            }
+            Calendar startWeek = startOfWeek(startDate);
+            Calendar targetWeek = startOfWeek(targetDate);
+            int weekDiff = getDayDiff(startWeek, targetWeek) / 7;
+            return weekDiff % interval == 0;
+        }
+        if ("monthly".equals(frequency)) {
+            int interval = Math.max(1, rule.getInterval() == null ? 1 : rule.getInterval());
+            List<Integer> monthDays = rule.getMonthDays();
+            Set<Integer> daySet = new HashSet<>(monthDays == null || monthDays.isEmpty()
+                    ? Collections.singletonList(startDate.get(Calendar.DAY_OF_MONTH))
+                    : monthDays);
+            int monthDiff = getMonthDiff(startDate, targetDate);
+            return monthDiff % interval == 0
+                    && daySet.contains(targetDate.get(Calendar.DAY_OF_MONTH));
+        }
+
+        return false;
+    }
+
+    private static Calendar parseDateKey(String dateKey) {
+        if (TextUtils.isEmpty(dateKey)) {
+            return null;
+        }
+
+        try {
+            String[] parts = dateKey.split("-");
+            if (parts.length != 3) {
+                return null;
+            }
+            int year = Integer.parseInt(parts[0]);
+            int month = Integer.parseInt(parts[1]);
+            int day = Integer.parseInt(parts[2]);
+            Calendar calendar = Calendar.getInstance();
+            calendar.setLenient(false);
+            calendar.set(year, month - 1, day, 0, 0, 0);
+            calendar.set(Calendar.MILLISECOND, 0);
+            calendar.getTime();
+            return calendar;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static int getDayDiff(Calendar start, Calendar end) {
+        long diffMs = normalizeDate(end).getTimeInMillis() - normalizeDate(start).getTimeInMillis();
+        return (int) (diffMs / (24L * 60L * 60L * 1000L));
+    }
+
+    private static int getMonthDiff(Calendar start, Calendar end) {
+        return (end.get(Calendar.YEAR) - start.get(Calendar.YEAR)) * 12
+                + (end.get(Calendar.MONTH) - start.get(Calendar.MONTH));
+    }
+
+    private static Calendar startOfWeek(Calendar source) {
+        Calendar calendar = normalizeDate(source);
+        int dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK);
+        int offset = dayOfWeek == Calendar.SUNDAY ? -6 : Calendar.MONDAY - dayOfWeek;
+        calendar.add(Calendar.DAY_OF_MONTH, offset);
+        return normalizeDate(calendar);
+    }
+
+    private static Calendar normalizeDate(Calendar source) {
+        Calendar normalized = (Calendar) source.clone();
+        normalized.set(Calendar.HOUR_OF_DAY, 0);
+        normalized.set(Calendar.MINUTE, 0);
+        normalized.set(Calendar.SECOND, 0);
+        normalized.set(Calendar.MILLISECOND, 0);
+        return normalized;
+    }
+
+    private static ResolvedTodoPinLinkedTarget resolveTodoPinLinkedTarget(
+            WidgetTodoPinSourceTodo todo,
+            Map<String, WidgetTodoPinSourceTodo> todoById,
+            Map<String, WidgetTodoPinSourceCategory> categoryById,
+            Map<String, WidgetTodoPinSourceActivity> activityById
+    ) {
+        List<WidgetTodoPinSourceTodo> candidates = new ArrayList<>();
+        candidates.add(todo);
+        if (!TextUtils.isEmpty(todo.getParentTodoId())) {
+            WidgetTodoPinSourceTodo parentTodo = todoById.get(todo.getParentTodoId());
+            if (parentTodo != null) {
+                candidates.add(parentTodo);
+            }
+        }
+
+        for (WidgetTodoPinSourceTodo candidate : candidates) {
+            WidgetTodoPinSourceCategory linkedCategory = candidate.getLinkedCategoryId() == null
+                    ? null
+                    : categoryById.get(candidate.getLinkedCategoryId());
+            WidgetTodoPinSourceActivity linkedActivity = candidate.getLinkedActivityId() == null
+                    ? null
+                    : activityById.get(candidate.getLinkedActivityId());
+
+            String resolvedCategoryId = linkedCategory != null ? linkedCategory.getId() : null;
+            if (resolvedCategoryId == null && linkedActivity != null) {
+                for (WidgetTodoPinSourceCategory category : categoryById.values()) {
+                    for (WidgetTodoPinSourceActivity activity : category.getActivities()) {
+                        if (TextUtils.equals(activity.getId(), linkedActivity.getId())) {
+                            resolvedCategoryId = category.getId();
+                            linkedCategory = category;
+                            break;
+                        }
+                    }
+                    if (resolvedCategoryId != null) {
+                        break;
+                    }
+                }
+            }
+
+            if (resolvedCategoryId != null && linkedActivity != null) {
+                String icon = !TextUtils.isEmpty(linkedActivity.getIcon())
+                        ? linkedActivity.getIcon()
+                        : linkedCategory != null ? linkedCategory.getIcon() : null;
+                String color = coalesceColor(
+                        linkedActivity.getColor(),
+                        linkedCategory == null ? null : linkedCategory.getThemeColor()
+                );
+                return new ResolvedTodoPinLinkedTarget(
+                        resolvedCategoryId,
+                        linkedActivity.getId(),
+                        linkedActivity.getName(),
+                        icon,
+                        color
+                );
+            }
+        }
+
+        return new ResolvedTodoPinLinkedTarget(null, null, null, null, null);
+    }
+
+    private static String coalesceColor(String activityColor, String categoryColor) {
+        if (!TextUtils.isEmpty(activityColor)) {
+            return activityColor;
+        }
+        if (!TextUtils.isEmpty(categoryColor)) {
+            return categoryColor;
+        }
+        return null;
+    }
+
+    private static final class ResolvedTodoPinLinkedTarget {
+        private final String categoryId;
+        private final String activityId;
+        private final String activityLabel;
+        private final String icon;
+        private final String color;
+
+        private ResolvedTodoPinLinkedTarget(
+                String categoryId,
+                String activityId,
+                String activityLabel,
+                String icon,
+                String color
+        ) {
+            this.categoryId = categoryId;
+            this.activityId = activityId;
+            this.activityLabel = activityLabel;
+            this.icon = icon;
+            this.color = color;
+        }
+    }
+
     private static String formatHeaderDate() {
         return new SimpleDateFormat("EEEE / MMM dd", Locale.ENGLISH)
                 .format(new Date())
                 .toUpperCase(Locale.ENGLISH);
-    }
-
-    private static String formatStatus(WidgetTodoPinPayload payload, WidgetRuntimeState runtimeState) {
-        int taskCount = payload == null ? 0 : payload.getItems().size();
-        boolean hasRunningTodo = runtimeState != null
-                && runtimeState.getLinkedTodoId() != null
-                && findItem(payload, runtimeState.getLinkedTodoId()) != null;
-
-        if (taskCount <= 0) {
-            return "NO TASKS";
-        }
-
-        if (hasRunningTodo) {
-            return "1 RUNNING / " + taskCount + " TASKS";
-        }
-
-        return taskCount + " TASKS";
     }
 
     private static void launchApp(Context context, int appWidgetId) {
@@ -179,6 +567,22 @@ public final class WidgetTodoPinProviderSupport {
                 context,
                 appWidgetId + 6400,
                 launchIntent,
+                pendingIntentFlags()
+        );
+    }
+
+    private static PendingIntent buildRefreshPendingIntent(
+            Context context,
+            int appWidgetId,
+            Class<? extends AppWidgetProvider> providerClass
+    ) {
+        Intent intent = new Intent(context, providerClass);
+        intent.setAction(ACTION_REFRESH_TODO_PIN);
+        intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+        return PendingIntent.getBroadcast(
+                context,
+                appWidgetId + 6900,
+                intent,
                 pendingIntentFlags()
         );
     }

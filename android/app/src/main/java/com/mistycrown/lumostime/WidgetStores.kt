@@ -9,6 +9,8 @@ import org.json.JSONObject
  * SharedPreferences-backed storage for widget templates, instance bindings, runtime state,
  * pending imports, and the daily widget's mirrored review snapshot.
  * Updated 2026-05-02: Added scene widget payload storage plus per-instance selected-tab persistence.
+ * Updated 2026-05-05: Added scene-widget morning refresh date tracking so the first morning unlock only refreshes once per day.
+ * Updated 2026-05-05: Expanded TODAY + PIN payload storage to retain mirrored source todos/categories for native-side list rebuilding.
  */
 object WidgetStores {
     private const val PREFS_NAME = "lumostime_widget_timer"
@@ -23,8 +25,11 @@ object WidgetStores {
     private const val KEY_TRACKING_CALENDAR_SYNC = "tracking_calendar_sync_v1"
     private const val KEY_SCENE_SYNC = "scene_sync_v1"
     private const val KEY_SCENE_SELECTIONS = "scene_selections_v1"
+    private const val KEY_SCENE_MORNING_REFRESH_DATE = "scene_morning_refresh_date_v1"
+    private const val KEY_SCENE_REFRESH_ANIMATION = "scene_refresh_animation_v1"
     private const val KEY_DAILY_RUNTIME_VIEW_MODES = "daily_runtime_view_modes_v1"
     private const val KEY_TAP_ANIMATION = "tap_animation_v1"
+    private const val KEY_TODO_PIN_REFRESH_ANIMATION = "todo_pin_refresh_animation_v1"
     private const val KEY_LAST_WIDGET_STOP_AT = "last_widget_stop_at_v1"
     private const val KEY_LEGACY_CONFIG = "shared_slots_v1"
     private const val KEY_LEGACY_AUTO_BIND_PENDING = "legacy_auto_bind_pending_v1"
@@ -552,7 +557,9 @@ object WidgetStores {
             WidgetTodoPinPayload(
                 date = json.optString("date"),
                 items = json.optJSONArray("items").toTodoPinItemList(),
-                syncedAt = json.optLong("syncedAt", System.currentTimeMillis())
+                syncedAt = json.optLong("syncedAt", System.currentTimeMillis()),
+                sourceTodos = json.optJSONArray("sourceTodos").toTodoPinSourceTodoList(),
+                sourceCategories = json.optJSONArray("sourceCategories").toTodoPinSourceCategoryList()
             )
         }.getOrNull()
     }
@@ -568,6 +575,8 @@ object WidgetStores {
             put("date", payload.date)
             put("items", payload.items.toTodoPinItemJsonArray())
             put("syncedAt", payload.syncedAt)
+            put("sourceTodos", payload.sourceTodos.toTodoPinSourceTodoJsonArray())
+            put("sourceCategories", payload.sourceCategories.toTodoPinSourceCategoryJsonArray())
         }
         editor.putString(KEY_TODO_PIN_SYNC, json.toString()).commit()
     }
@@ -697,6 +706,67 @@ object WidgetStores {
         prefs(context).edit().putString(KEY_SCENE_SELECTIONS, root.toString()).commit()
     }
 
+    fun loadSceneMorningRefreshDate(context: Context): String? =
+        parseNullableString(prefs(context).getString(KEY_SCENE_MORNING_REFRESH_DATE, null))
+
+    fun saveSceneMorningRefreshDate(context: Context, dateKey: String?) {
+        val editor = prefs(context).edit()
+        val normalizedDateKey = parseNullableString(dateKey)
+        if (normalizedDateKey == null) {
+            editor.remove(KEY_SCENE_MORNING_REFRESH_DATE).commit()
+            return
+        }
+        editor.putString(KEY_SCENE_MORNING_REFRESH_DATE, normalizedDateKey).commit()
+    }
+
+    fun loadSceneRefreshAnimationState(context: Context): WidgetSceneRefreshAnimationState? {
+        val raw = prefs(context).getString(KEY_SCENE_REFRESH_ANIMATION, null)
+        if (raw.isNullOrBlank()) {
+            return null
+        }
+
+        val state = runCatching {
+            val json = JSONObject(raw)
+            WidgetSceneRefreshAnimationState(
+                appWidgetId = json.optInt("appWidgetId", -1),
+                animationMode = json.optString("animationMode", WidgetSceneRefreshAnimationModes.REFRESH),
+                startedAt = json.optLong("startedAt", 0L),
+                expiresAt = json.optLong("expiresAt", 0L)
+            )
+        }.getOrNull()
+
+        if (
+            state == null ||
+            state.appWidgetId <= 0 ||
+            state.expiresAt <= System.currentTimeMillis()
+        ) {
+            clearSceneRefreshAnimationState(context)
+            return null
+        }
+
+        return state
+    }
+
+    fun saveSceneRefreshAnimationState(context: Context, state: WidgetSceneRefreshAnimationState?) {
+        val editor = prefs(context).edit()
+        if (state == null) {
+            editor.remove(KEY_SCENE_REFRESH_ANIMATION).commit()
+            return
+        }
+
+        val json = JSONObject().apply {
+            put("appWidgetId", state.appWidgetId)
+            put("animationMode", state.animationMode)
+            put("startedAt", state.startedAt)
+            put("expiresAt", state.expiresAt)
+        }
+        editor.putString(KEY_SCENE_REFRESH_ANIMATION, json.toString()).commit()
+    }
+
+    fun clearSceneRefreshAnimationState(context: Context) {
+        prefs(context).edit().remove(KEY_SCENE_REFRESH_ANIMATION).commit()
+    }
+
     fun loadDailyRuntimeViewMode(context: Context, appWidgetId: Int): String {
         if (appWidgetId <= 0) {
             return WidgetDailyRuntimeViewModes.DEFAULT
@@ -801,6 +871,55 @@ object WidgetStores {
 
     fun clearTapAnimationState(context: Context) {
         prefs(context).edit().remove(KEY_TAP_ANIMATION).commit()
+    }
+
+    fun loadTodoPinRefreshAnimationState(context: Context): WidgetTodoPinRefreshAnimationState? {
+        val raw = prefs(context).getString(KEY_TODO_PIN_REFRESH_ANIMATION, null)
+        if (raw.isNullOrBlank()) {
+            return null
+        }
+
+        val state = runCatching {
+            val json = JSONObject(raw)
+            WidgetTodoPinRefreshAnimationState(
+                appWidgetId = json.optInt("appWidgetId", -1),
+                startedAt = json.optLong("startedAt", 0L),
+                expiresAt = json.optLong("expiresAt", 0L)
+            )
+        }.getOrNull()
+
+        if (
+            state == null ||
+            state.appWidgetId <= 0 ||
+            state.expiresAt <= System.currentTimeMillis()
+        ) {
+            clearTodoPinRefreshAnimationState(context)
+            return null
+        }
+
+        return state
+    }
+
+    fun saveTodoPinRefreshAnimationState(
+        context: Context,
+        state: WidgetTodoPinRefreshAnimationState?
+    ) {
+        val editor = prefs(context).edit()
+        if (state == null) {
+            editor.remove(KEY_TODO_PIN_REFRESH_ANIMATION).commit()
+            return
+        }
+
+        val json = JSONObject().apply {
+            put("appWidgetId", state.appWidgetId)
+            put("startedAt", state.startedAt)
+            put("expiresAt", state.expiresAt)
+        }
+        editor.putString(KEY_TODO_PIN_REFRESH_ANIMATION, json.toString()).commit()
+    }
+
+    fun clearTodoPinRefreshAnimationState(context: Context) {
+        prefs(context).edit().remove(KEY_TODO_PIN_REFRESH_ANIMATION).commit()
     }
 
     fun upsertDailyProgress(context: Context, progress: WidgetDailyProgress) {
@@ -1316,6 +1435,169 @@ object WidgetStores {
                 put("scopeIds", item.scopeIds.toJsonArray())
             })
         }
+        return array
+    }
+
+    private fun JSONArray?.toTodoPinSourceTodoList(): List<WidgetTodoPinSourceTodo> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        return buildList {
+            for (index in 0 until length()) {
+                val item = optJSONObject(index) ?: continue
+                val id = parseNullableString(item.optString("id")) ?: continue
+                val title = parseNullableString(item.optString("title")) ?: continue
+                add(
+                    WidgetTodoPinSourceTodo(
+                        id = id,
+                        title = title,
+                        isCompleted = item.optBoolean("isCompleted", false),
+                        parentTodoId = parseNullableString(item.optString("parentTodoId")),
+                        linkedCategoryId = parseNullableString(item.optString("linkedCategoryId")),
+                        linkedActivityId = parseNullableString(item.optString("linkedActivityId")),
+                        defaultScopeIds = item.optJSONArray("defaultScopeIds").toStringList(),
+                        pin = item.optBoolean("pin", false),
+                        scheduledDate = parseNullableString(item.optString("scheduledDate")),
+                        deadlineDate = parseNullableString(item.optString("deadlineDate")),
+                        recurrenceRule = item.optJSONObject("recurrenceRule")?.toTodoPinSourceRecurrenceRule()
+                    )
+                )
+            }
+        }
+    }
+
+    private fun JSONObject.toTodoPinSourceRecurrenceRule(): WidgetTodoPinSourceRecurrenceRule? {
+        val frequency = parseNullableString(optString("frequency")) ?: return null
+        val startDate = parseNullableString(optString("startDate")) ?: return null
+        return WidgetTodoPinSourceRecurrenceRule(
+            frequency = frequency,
+            startDate = startDate,
+            endDate = parseNullableString(optString("endDate")),
+            interval = if (has("interval")) optInt("interval").takeIf { it > 0 } else null,
+            weekdays = optJSONArray("weekdays").toIntList(),
+            monthDays = optJSONArray("monthDays").toIntList()
+        )
+    }
+
+    private fun JSONArray?.toTodoPinSourceCategoryList(): List<WidgetTodoPinSourceCategory> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        return buildList {
+            for (index in 0 until length()) {
+                val item = optJSONObject(index) ?: continue
+                val id = parseNullableString(item.optString("id")) ?: continue
+                add(
+                    WidgetTodoPinSourceCategory(
+                        id = id,
+                        icon = parseNullableString(item.optString("icon")),
+                        themeColor = parseNullableString(item.optString("themeColor")),
+                        activities = item.optJSONArray("activities").toTodoPinSourceActivityList()
+                    )
+                )
+            }
+        }
+    }
+
+    private fun JSONArray?.toTodoPinSourceActivityList(): List<WidgetTodoPinSourceActivity> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        return buildList {
+            for (index in 0 until length()) {
+                val item = optJSONObject(index) ?: continue
+                val id = parseNullableString(item.optString("id")) ?: continue
+                val name = parseNullableString(item.optString("name")) ?: continue
+                add(
+                    WidgetTodoPinSourceActivity(
+                        id = id,
+                        name = name,
+                        icon = parseNullableString(item.optString("icon")),
+                        color = parseNullableString(item.optString("color"))
+                    )
+                )
+            }
+        }
+    }
+
+    private fun List<WidgetTodoPinSourceTodo>.toTodoPinSourceTodoJsonArray(): JSONArray {
+        val array = JSONArray()
+        forEach { item ->
+            array.put(JSONObject().apply {
+                put("id", item.id)
+                put("title", item.title)
+                put("isCompleted", item.isCompleted)
+                put("parentTodoId", item.parentTodoId ?: JSONObject.NULL)
+                put("linkedCategoryId", item.linkedCategoryId ?: JSONObject.NULL)
+                put("linkedActivityId", item.linkedActivityId ?: JSONObject.NULL)
+                put("defaultScopeIds", item.defaultScopeIds.toJsonArray())
+                put("pin", item.pin)
+                put("scheduledDate", item.scheduledDate ?: JSONObject.NULL)
+                put("deadlineDate", item.deadlineDate ?: JSONObject.NULL)
+                put("recurrenceRule", item.recurrenceRule?.toTodoPinSourceRecurrenceRuleJson() ?: JSONObject.NULL)
+            })
+        }
+        return array
+    }
+
+    private fun WidgetTodoPinSourceRecurrenceRule.toTodoPinSourceRecurrenceRuleJson(): JSONObject {
+        return JSONObject().apply {
+            put("frequency", frequency)
+            put("startDate", startDate)
+            put("endDate", endDate ?: JSONObject.NULL)
+            put("interval", interval ?: JSONObject.NULL)
+            put("weekdays", weekdays.toIntJsonArray())
+            put("monthDays", monthDays.toIntJsonArray())
+        }
+    }
+
+    private fun List<WidgetTodoPinSourceCategory>.toTodoPinSourceCategoryJsonArray(): JSONArray {
+        val array = JSONArray()
+        forEach { item ->
+            array.put(JSONObject().apply {
+                put("id", item.id)
+                put("icon", item.icon ?: JSONObject.NULL)
+                put("themeColor", item.themeColor ?: JSONObject.NULL)
+                put("activities", item.activities.toTodoPinSourceActivityJsonArray())
+            })
+        }
+        return array
+    }
+
+    private fun List<WidgetTodoPinSourceActivity>.toTodoPinSourceActivityJsonArray(): JSONArray {
+        val array = JSONArray()
+        forEach { item ->
+            array.put(JSONObject().apply {
+                put("id", item.id)
+                put("name", item.name)
+                put("icon", item.icon ?: JSONObject.NULL)
+                put("color", item.color ?: JSONObject.NULL)
+            })
+        }
+        return array
+    }
+
+    private fun JSONArray?.toIntList(): List<Int> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        return buildList {
+            for (index in 0 until length()) {
+                val value = optInt(index, Int.MIN_VALUE)
+                if (value != Int.MIN_VALUE && !contains(value)) {
+                    add(value)
+                }
+            }
+        }
+    }
+
+    private fun List<Int>.toIntJsonArray(): JSONArray {
+        val array = JSONArray()
+        forEach { value -> array.put(value) }
         return array
     }
 

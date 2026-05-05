@@ -1,9 +1,9 @@
 /**
  * @file widgetService.test.ts
  * @input TODAY + PIN payload builders plus native provider source text
- * @output Regression coverage for pinned/recurring TODAY + PIN widget payload items and header tap bindings
+ * @output Regression coverage for pinned/recurring TODAY + PIN widget payload items and native refresh bindings
  * @pos Test (widget service)
- * @description Verifies pinned and recurring-today todos can populate the TODAY + PIN widget payload, and guards against reintroducing the header tap-to-open binding.
+ * @description Verifies pinned and recurring-today todos can populate the TODAY + PIN widget payload, preserves mirrored source snapshots for native rebuilds, and guards the dedicated refresh-button wiring.
  * @updated 2026-04-27: Added regression coverage so recurring todos that match today are included in the TODAY + PIN widget payload.
  * @updated 2026-04-26: Added regression coverage for pinned todo actionability and removed header click bindings from the dedicated TODAY + PIN widgets.
  * @updated 2026-05-01: Added regression coverage for dedicated tracking-calendar payload builders across tag, scope, and daily sources.
@@ -25,9 +25,12 @@ import {
   sanitizeWidgetTemplatesForUiIconSupport
 } from './widgetService';
 import widgetBridgePluginSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetBridgePlugin.kt?raw';
+import widgetSceneRefreshBitmapRendererSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetSceneRefreshBitmapRenderer.kt?raw';
 import widgetRefreshCoordinatorSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetRefreshCoordinator.kt?raw';
 import widgetSceneCardsRemoteViewsServiceSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetSceneCardsRemoteViewsService.java?raw';
+import widgetSceneProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetSceneProviderSupport.java?raw';
 import widgetTodoPinProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetTodoPinProviderSupport.java?raw';
+import widgetSceneLayoutSource from '../../android/app/src/main/res/layout/widget_layout_scene_4x3.xml?raw';
 
 const REFERENCE_DATE = new Date('2026-04-26T09:30:00+08:00');
 
@@ -159,6 +162,47 @@ describe('buildTodoPinWidgetPayload', () => {
       activityId: 'writing-activity',
       activityLabel: 'Writing'
     });
+  });
+
+  it('includes mirrored source snapshots so native refresh can rebuild today items', () => {
+    const todos: TodoItem[] = [
+      buildTodo({
+        id: 'pinned-todo',
+        title: 'Pinned todo',
+        pin: true,
+        linkedCategoryId: 'focus-category',
+        linkedActivityId: 'writing-activity',
+        defaultScopeIds: ['scope-reading']
+      })
+    ];
+
+    const payload = buildTodoPinWidgetPayload({
+      todos,
+      categories,
+      date: REFERENCE_DATE,
+      now: 123456789
+    });
+
+    expect(payload.sourceTodos).toEqual([
+      expect.objectContaining({
+        id: 'pinned-todo',
+        pin: true,
+        linkedCategoryId: 'focus-category',
+        linkedActivityId: 'writing-activity',
+        defaultScopeIds: ['scope-reading']
+      })
+    ]);
+    expect(payload.sourceCategories).toEqual([
+      expect.objectContaining({
+        id: 'focus-category',
+        activities: [
+          expect.objectContaining({
+            id: 'writing-activity',
+            name: 'Writing'
+          })
+        ]
+      })
+    ]);
   });
 });
 
@@ -401,8 +445,12 @@ describe('buildShortcutWidgetSlotConfig', () => {
 });
 
 describe('WidgetTodoPinProviderSupport', () => {
-  it('does not bind header taps to open the app for the TODAY + PIN widgets', () => {
+  it('binds a dedicated refresh action instead of a header status tap for the TODAY + PIN widgets', () => {
     expect(widgetTodoPinProviderSupportSource).not.toContain('views.setOnClickPendingIntent(R.id.widget_todo_pin_header');
+    expect(widgetTodoPinProviderSupportSource).toContain('ACTION_REFRESH_TODO_PIN');
+    expect(widgetTodoPinProviderSupportSource).toContain('widget_todo_pin_refresh_button');
+    expect(widgetTodoPinProviderSupportSource).toContain('refreshTodoPinWidgetWithFeedback');
+    expect(widgetTodoPinProviderSupportSource).toContain('saveTodoPinRefreshAnimationState');
     expect(widgetTodoPinProviderSupportSource).toContain('views.setPendingIntentTemplate(');
   });
 });
@@ -412,6 +460,21 @@ describe('WidgetSceneCardsRemoteViewsService', () => {
     expect(widgetSceneCardsRemoteViewsServiceSource).toContain('codePointCount');
     expect(widgetSceneCardsRemoteViewsServiceSource).toContain('offsetByCodePoints');
     expect(widgetSceneCardsRemoteViewsServiceSource).not.toContain('substring(0, maxChars)');
+  });
+});
+
+describe('WidgetSceneProviderSupport', () => {
+  it('binds a manual refresh action, animates the refresh icon, and tracks morning unlock refreshes for the scene widget', () => {
+    expect(widgetSceneProviderSupportSource).toContain('ACTION_REFRESH_SCENE_WIDGET');
+    expect(widgetSceneProviderSupportSource).toContain('Intent.ACTION_USER_PRESENT');
+    expect(widgetSceneProviderSupportSource).toContain('saveSceneMorningRefreshDate');
+    expect(widgetSceneProviderSupportSource).toContain('saveSceneRefreshAnimationState');
+    expect(widgetSceneProviderSupportSource).toContain('WidgetSceneRefreshBitmapRenderer.INSTANCE.render');
+    expect(widgetSceneProviderSupportSource).toContain('R.id.widget_scene_refresh_root');
+    expect(widgetSceneRefreshBitmapRendererSource).toContain('TOTAL_ROTATION_DEGREES = 360f');
+    expect(widgetRefreshCoordinatorSource).toContain('fun refreshSceneWidgetWithFeedback(context: Context, appWidgetId: Int)');
+    expect(widgetSceneLayoutSource).toContain('widget_scene_refresh_root');
+    expect(widgetSceneLayoutSource).toContain('widget_scene_refresh_icon');
   });
 });
 
@@ -428,5 +491,7 @@ describe('WidgetBridgePlugin refresh routing', () => {
     expect(widgetBridgePluginSource).toContain('WidgetRefreshCoordinator.refreshDailyRuntimeWidgets(context)');
     expect(widgetBridgePluginSource).toContain('WidgetRefreshCoordinator.refreshTodoPinWidgets(context)');
     expect(widgetBridgePluginSource).toContain('WidgetRefreshCoordinator.refreshSceneWidgets(context)');
+    expect(widgetBridgePluginSource).toContain('sourceTodos = it.optJSONArray("sourceTodos").toTodoPinSourceTodoList()');
+    expect(widgetBridgePluginSource).toContain('sourceCategories = it.optJSONArray("sourceCategories").toTodoPinSourceCategoryList()');
   });
 });
