@@ -4,7 +4,8 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
- * @updated 2026-05-05: Compact rows now keep symbol-only date suffixes fully visible by truncating the todo title first, while still attaching the dates directly after the title with no extra spacing.
+ * @updated 2026-05-05: Replaced the completed-visibility eye button with a dedicated display-settings modal, added compact-mode metadata toggles, and lowered the sidebar utility controls closer to the fixed bottom navigation.
+ * @updated 2026-05-05: Category lists now only group incomplete todos before completed ones and otherwise preserve the incoming todo order from batch-management saves, while compact rows keep symbol-only date suffixes fully visible.
  * @updated 2026-05-05: Restored completed-row undo on a left swipe, while still passing the quick-actions open timestamp into the shared bottom sheet so lower-row taps cannot instantly trigger a mounted quick action.
  * @updated 2026-05-05: Stopped completed rows from undoing via left swipe, so accidental lower-list taps no longer reopen finished todos by mistake.
  * @updated 2026-05-05: Reserved bottom navigation space in list mode too, so lower todo rows no longer sit underneath the fixed footer hit area.
@@ -79,7 +80,7 @@
  */
 import React, { useState, useMemo, useRef } from 'react';
 import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log, TodoDuplicateOptions } from '../types';
-import { PlayCircle, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, LayoutList, Rows, Sparkles, Eye, EyeOff, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo, CircleAlert, PanelRightOpen, Pin } from 'lucide-react';
+import { PlayCircle, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, LayoutList, Rows, Sparkles, SlidersHorizontal, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo, CircleAlert, PanelRightOpen, Pin } from 'lucide-react';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { useToast } from '../contexts/ToastContext';
 import { IconRenderer } from '../components/IconRenderer';
@@ -99,12 +100,13 @@ import {
 } from '../utils/todoScheduleUtils';
 import { TodoScheduleAssignModal } from '../components/TodoScheduleAssignModal';
 import { TodoDatePickerModal } from '../components/TodoDatePickerModal';
+import { TodoDisplaySettingsModal, type TodoCompactDisplaySettings } from '../components/TodoDisplaySettingsModal';
 import { TodoDuplicateModal } from '../components/TodoDuplicateModal';
 import { TodoQuickActionsModal } from '../components/TodoQuickActionsModal';
 import { useTodoQuickActions } from '../hooks/useTodoQuickActions';
 import { getTodoRowGestureIntent, getTodoRowReleaseAction, TodoRowGestureIntent } from '../utils/todoRowInteraction';
 import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodosForDisplay, getParentTodo, isIncompleteSubtaskHiddenByCompletedParent } from '../utils/todoHierarchyUtils';
-import { compareCategoryListTodos, formatTodoCompactScheduleSummary, formatTodoInlineDate } from '../utils/todoListDisplayUtils';
+import { formatTodoCompactScheduleSummary, formatTodoInlineDate, orderTodoItemsByCompletionGroups } from '../utils/todoListDisplayUtils';
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
 import { UnreadCountBadge } from '../components/UnreadCountBadge';
 
@@ -146,6 +148,7 @@ const SwipeableTodoItem: React.FC<{
   onToggleChildren?: () => void;
   isFirst?: boolean;
   isLast?: boolean;
+  compactDisplaySettings: TodoCompactDisplaySettings;
 }> = ({
   todo,
   categories,
@@ -165,16 +168,24 @@ const SwipeableTodoItem: React.FC<{
   isExpanded = false,
   onToggleChildren,
   isFirst = false,
-  isLast = false
+  isLast = false,
+  compactDisplaySettings
 }) => {
   const [translateX, setTranslateX] = useState(0);
   const canQuickToggle = true;
   const quickToggleDirection: 'left' = 'left';
-  const visibleScheduleMatchLabels = scheduleMatchLabels.slice(0, VIRTUAL_SCHEDULE_MATCH_LIMIT);
-  const hiddenScheduleMatchCount = Math.max(0, scheduleMatchLabels.length - visibleScheduleMatchLabels.length);
+  const shouldShowCompactScheduleLabels = viewMode !== 'compact' || compactDisplaySettings.showScheduleType;
+  const visibleScheduleMatchLabels = shouldShowCompactScheduleLabels
+    ? scheduleMatchLabels.slice(0, VIRTUAL_SCHEDULE_MATCH_LIMIT)
+    : [];
+  const hiddenScheduleMatchCount = shouldShowCompactScheduleLabels
+    ? Math.max(0, scheduleMatchLabels.length - visibleScheduleMatchLabels.length)
+    : 0;
   const scheduledDateLabel = formatTodoInlineDate(todo.scheduledDate);
   const deadlineDateLabel = formatTodoInlineDate(todo.deadlineDate);
-  const compactScheduleSummary = viewMode === 'compact' ? formatTodoCompactScheduleSummary(todo) : null;
+  const compactScheduleSummary = viewMode === 'compact' && compactDisplaySettings.showScheduleTime
+    ? formatTodoCompactScheduleSummary(todo)
+    : null;
   const hasLooseDateMarkers = viewMode === 'loose' && Boolean(scheduledDateLabel || deadlineDateLabel);
   const progressRatio = (todo.completedUnits || 0) / (todo.totalAmount || 1);
   const progressPercentage = Math.round(progressRatio * 100);
@@ -319,8 +330,12 @@ const SwipeableTodoItem: React.FC<{
     ? []
     : todo.defaultScopeIds.map(id => scopes.find(s => s.id === id)).filter(Boolean) as Scope[];
   const isNestedChildRow = hierarchyDepth === 1 && !parentTitle;
-  const visibleLinkedDetails = isNestedChildRow ? null : linkedDetails;
-  const visibleLinkedScopes = isNestedChildRow ? [] : linkedScopes;
+  const visibleLinkedDetails = isNestedChildRow
+    ? null
+    : (viewMode === 'compact' && !compactDisplaySettings.showLinkedTag ? null : linkedDetails);
+  const visibleLinkedScopes = isNestedChildRow
+    ? []
+    : (viewMode === 'compact' && !compactDisplaySettings.showLinkedScope ? [] : linkedScopes);
 
   const { isPrivacyMode } = usePrivacy();
 
@@ -460,7 +475,7 @@ const SwipeableTodoItem: React.FC<{
             </div>
 
             {/* Progress Circle - Only in Compact Mode for Progress Tasks */}
-            {todo.isProgress && viewMode === 'compact' && (
+            {todo.isProgress && viewMode === 'compact' && compactDisplaySettings.showProgressIndicator && (
               <div className="flex-shrink-0 relative" style={{ width: '16px', height: '16px' }}>
                 <svg width="16" height="16" viewBox="0 0 16 16" className="-rotate-90">
                   {/* Background circle */}
@@ -706,6 +721,37 @@ interface TodoTreeEntryGroup {
   completedChildCount: number;
 }
 
+const TODO_COMPACT_DISPLAY_SETTINGS_STORAGE_KEY = 'todoCompactDisplaySettings';
+const DEFAULT_TODO_COMPACT_DISPLAY_SETTINGS: TodoCompactDisplaySettings = {
+  showLinkedTag: true,
+  showLinkedScope: true,
+  showScheduleType: true,
+  showProgressIndicator: true,
+  showScheduleTime: true
+};
+
+const TODO_COMPACT_DISPLAY_SETTING_KEYS = Object.keys(DEFAULT_TODO_COMPACT_DISPLAY_SETTINGS) as Array<keyof TodoCompactDisplaySettings>;
+
+const normalizeTodoCompactDisplaySettings = (value: unknown): TodoCompactDisplaySettings => {
+  if (!value || typeof value !== 'object') {
+    return { ...DEFAULT_TODO_COMPACT_DISPLAY_SETTINGS };
+  }
+
+  const candidate = value as Partial<Record<keyof TodoCompactDisplaySettings, unknown>>;
+
+  return {
+    showLinkedTag: typeof candidate.showLinkedTag === 'boolean' ? candidate.showLinkedTag : DEFAULT_TODO_COMPACT_DISPLAY_SETTINGS.showLinkedTag,
+    showLinkedScope: typeof candidate.showLinkedScope === 'boolean' ? candidate.showLinkedScope : DEFAULT_TODO_COMPACT_DISPLAY_SETTINGS.showLinkedScope,
+    showScheduleType: typeof candidate.showScheduleType === 'boolean' ? candidate.showScheduleType : DEFAULT_TODO_COMPACT_DISPLAY_SETTINGS.showScheduleType,
+    showProgressIndicator: typeof candidate.showProgressIndicator === 'boolean' ? candidate.showProgressIndicator : DEFAULT_TODO_COMPACT_DISPLAY_SETTINGS.showProgressIndicator,
+    showScheduleTime: typeof candidate.showScheduleTime === 'boolean' ? candidate.showScheduleTime : DEFAULT_TODO_COMPACT_DISPLAY_SETTINGS.showScheduleTime
+  };
+};
+
+const hasCompactDisplaySettingOverrides = (settings: TodoCompactDisplaySettings): boolean => (
+  TODO_COMPACT_DISPLAY_SETTING_KEYS.some((key) => settings[key] !== DEFAULT_TODO_COMPACT_DISPLAY_SETTINGS[key])
+);
+
 const filterVisibleTodos = (todos: TodoItem[], showCompletedTodos: boolean): TodoItem[] =>
   todos.filter((todo) => (showCompletedTodos || !todo.isCompleted) && !isIncompleteSubtaskHiddenByCompletedParent(todos, todo));
 
@@ -790,10 +836,6 @@ const sortTodoListEntries = (
   }
 
   return left.todo.title.localeCompare(right.todo.title, 'zh-CN');
-};
-
-const sortCategoryTodoEntries = (left: TodoListEntry, right: TodoListEntry): number => {
-  return compareCategoryListTodos(left.todo, right.todo);
 };
 
 const buildFallbackChildTodoEntry = (todo: TodoItem): TodoListEntry => ({
@@ -964,6 +1006,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(VIRTUAL_SCHEDULE_CATEGORY_ID);
   const [selectedScheduleFilter, setSelectedScheduleFilter] = useState<TodoScheduleRange>('today');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isDisplaySettingsOpen, setIsDisplaySettingsOpen] = useState(false);
   const [expandedParentIds, setExpandedParentIds] = useState<Record<string, boolean>>({});
   const { backgroundUrl, hasBackground, panelOverlayOpacity, useReducedEffects } = useBackgroundDisplay();
   const pageOverlayOpacity = hasBackground
@@ -1023,6 +1066,20 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     const saved = localStorage.getItem('todoShowCompleted');
     return saved !== 'false';
   });
+  const [compactDisplaySettings, setCompactDisplaySettings] = useState<TodoCompactDisplaySettings>(() => {
+    const saved = localStorage.getItem(TODO_COMPACT_DISPLAY_SETTINGS_STORAGE_KEY);
+
+    if (!saved) {
+      return { ...DEFAULT_TODO_COMPACT_DISPLAY_SETTINGS };
+    }
+
+    try {
+      return normalizeTodoCompactDisplaySettings(JSON.parse(saved));
+    } catch (error) {
+      console.error('[TodoView] Failed to parse compact display settings', error);
+      return { ...DEFAULT_TODO_COMPACT_DISPLAY_SETTINGS };
+    }
+  });
   const { openAIChat, unreadCount } = useAIChatWindow();
 
   // 鐟?viewMode 闁衡偓閻熸澘缍侀柡鍐啇缁辨繃绌卞┑鍡欐憼闁?localStorage
@@ -1033,6 +1090,10 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   React.useEffect(() => {
     localStorage.setItem('todoShowCompleted', showCompletedTodos ? 'true' : 'false');
   }, [showCompletedTodos]);
+
+  React.useEffect(() => {
+    localStorage.setItem(TODO_COMPACT_DISPLAY_SETTINGS_STORAGE_KEY, JSON.stringify(compactDisplaySettings));
+  }, [compactDisplaySettings]);
 
   React.useEffect(() => {
     localStorage.setItem('todoScreenMode', screenMode);
@@ -1170,11 +1231,12 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
   const selectedTodoEntries: TodoListEntry[] = isVirtualScheduleCategory
     ? scheduleEntriesByFilter[selectedScheduleFilter]
-    : todos
-        .filter((todo) => todo.categoryId === selectedCategoryId)
-        .filter((todo) => showCompletedTodos || !todo.isCompleted)
-        .map((todo) => buildTodoListEntry(todo, [], { includePinLabel: true }))
-        .sort(sortCategoryTodoEntries);
+    : orderTodoItemsByCompletionGroups(
+        todos
+          .filter((todo) => todo.categoryId === selectedCategoryId)
+          .filter((todo) => showCompletedTodos || !todo.isCompleted)
+      )
+      .map((todo) => buildTodoListEntry(todo, [], { includePinLabel: true }));
 
   const selectedCategoryTreeGroups = useMemo<TodoTreeEntryGroup[]>(() => {
     if (isVirtualScheduleCategory) {
@@ -1182,7 +1244,9 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     }
 
     const categoryTodos = todos.filter((todo) => todo.categoryId === selectedCategoryId);
-    const visibleCategoryTodos = filterVisibleTodos(categoryTodos, showCompletedTodos);
+    const visibleCategoryTodos = orderTodoItemsByCompletionGroups(
+      filterVisibleTodos(categoryTodos, showCompletedTodos)
+    );
     const visibleTodoEntryMap = new Map(
       visibleCategoryTodos.map((todo) => [todo.id, buildTodoListEntry(todo, [], { includePinLabel: true })])
     );
@@ -1205,8 +1269,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           completedChildCount: getCompletedDirectChildCount(categoryTodos, treeItem.todo.id)
         };
       })
-      .filter(Boolean)
-      .sort((left, right) => sortCategoryTodoEntries(left!.parentEntry, right!.parentEntry)) as TodoTreeEntryGroup[];
+      .filter(Boolean) as TodoTreeEntryGroup[];
   }, [isVirtualScheduleCategory, selectedCategoryId, showCompletedTodos, todos]);
 
   const virtualScheduleEntriesForHierarchy = useMemo<TodoListEntry[]>(
@@ -1354,6 +1417,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
   const hasSectionedTodoEntries = selectedTodoSectionsForRender.some((section) => section.entries.length > 0);
   const hasVisibleTodoEntries = hasSectionedTodoEntries || (isVirtualScheduleCategory ? selectedTodoEntriesForRender.length > 0 : selectedCategoryTreeGroups.length > 0);
+  const hasDisplaySettingsOverrides = !showCompletedTodos || hasCompactDisplaySettingOverrides(compactDisplaySettings);
 
   const handleAddTodoClick = () => {
     const targetCategoryId = isVirtualScheduleCategory ? primaryCategoryId : selectedCategoryId;
@@ -1852,6 +1916,25 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     addToast('success', `《${newTodo.title}》已添加到 ${readableDate}`);
   };
 
+  const toggleCompactDisplaySetting = (key: keyof TodoCompactDisplaySettings) => {
+    setCompactDisplaySettings((prev) => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
+  const displaySettingsModalNode = (
+    <TodoDisplaySettingsModal
+      isOpen={isDisplaySettingsOpen}
+      showCompletedTodos={showCompletedTodos}
+      compactDisplaySettings={compactDisplaySettings}
+      onToggleShowCompletedTodos={() => setShowCompletedTodos((prev) => !prev)}
+      onToggleCompactSetting={toggleCompactDisplaySetting}
+      onClose={() => setIsDisplaySettingsOpen(false)}
+      onForceClose={() => setIsDisplaySettingsOpen(false)}
+    />
+  );
+
   const duplicateModalNode = (
     <TodoDuplicateModal
       isOpen={duplicatingTodo !== null}
@@ -2071,6 +2154,8 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
         {todoQuickActionsModalNode}
 
+        {displaySettingsModalNode}
+
         {duplicateModalNode}
 
         {touchDragPreview && (
@@ -2111,7 +2196,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       
       {/* Left Sidebar - Todo Categories */}
       <div
-        className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative ${isSidebarOpen ? 'w-auto md:min-w-[12rem]' : 'w-16 items-center'}`}
+        className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-[calc(3.5rem+env(safe-area-inset-bottom))] pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative md:pb-[4.5rem] ${isSidebarOpen ? 'w-auto md:min-w-[12rem]' : 'w-16 items-center'}`}
       >
         <div className="relative z-10 flex-1 w-full">
           <button
@@ -2177,30 +2262,34 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           })}
         </div>
 
-        <button
-          onClick={() => setShowCompletedTodos(prev => !prev)}
-          className={`relative z-10 mt-2 mb-2 p-2 rounded-full text-stone-400 hover:bg-white/50 hover:text-stone-500 transition-all active:scale-95 ${isSidebarOpen ? 'self-end mr-4' : 'mx-auto'}`}
-          title={showCompletedTodos ? 'Hide Completed Todos' : 'Show Completed Todos'}
-        >
-          {showCompletedTodos ? <EyeOff size={20} /> : <Eye size={20} />}
-        </button>
+        <div className={`relative z-10 mt-3 flex flex-col gap-2 ${isSidebarOpen ? 'items-end pr-4' : 'items-center'}`}>
+          <button
+            onClick={() => setIsDisplaySettingsOpen(true)}
+            className="relative flex h-10 w-10 items-center justify-center rounded-full text-stone-400 transition-all hover:bg-white/50 hover:text-stone-500 active:scale-95"
+            title="显示设置"
+          >
+            {hasDisplaySettingsOverrides && (
+              <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-stone-500/80" />
+            )}
+            <SlidersHorizontal size={20} />
+          </button>
 
-        {/* View Mode Toggle Button */}
-        <button
-          onClick={() => setViewMode(prev => prev === 'loose' ? 'compact' : 'loose')}
-          className={`relative z-10 mb-2 p-2 rounded-full text-stone-400 hover:bg-white/50 hover:text-stone-500 transition-all active:scale-95 ${isSidebarOpen ? 'self-end mr-4' : 'mx-auto'}`}
-          title={viewMode === 'loose' ? "Switch to Compact View" : "Switch to Loose View"}
-        >
-          {viewMode === 'loose' ? <Rows size={20} /> : <LayoutList size={20} />}
-        </button>
+          <button
+            onClick={() => setViewMode(prev => prev === 'loose' ? 'compact' : 'loose')}
+            className="relative flex h-10 w-10 items-center justify-center rounded-full text-stone-400 transition-all hover:bg-white/50 hover:text-stone-500 active:scale-95"
+            title={viewMode === 'loose' ? '切换到紧缩视图' : '切换到松散视图'}
+          >
+            {viewMode === 'loose' ? <Rows size={20} /> : <LayoutList size={20} />}
+          </button>
 
-        {/* Sidebar Toggle Button */}
-        <button
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className={`relative z-10 mt-1 p-2 rounded-full text-stone-400 hover:bg-white/50 hover:text-stone-500 transition-all active:scale-95 ${isSidebarOpen ? 'self-end mr-4' : 'mx-auto'}`}
-        >
-          {isSidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
-        </button>
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="relative flex h-10 w-10 items-center justify-center rounded-full text-stone-400 transition-all hover:bg-white/50 hover:text-stone-500 active:scale-95"
+            title={isSidebarOpen ? '收起侧栏' : '展开侧栏'}
+          >
+            {isSidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+          </button>
+        </div>
       </div>
 
       {/* Right Content - Task List */}
@@ -2312,6 +2401,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                         } : undefined}
                         isFirst={index === 0}
                         isLast={index === section.entries.length - 1 && !(isExpanded && group && group.childEntries.length > 0)}
+                        compactDisplaySettings={compactDisplaySettings}
                       />
 
                       {isExpanded && group && group.childEntries.length > 0 && (
@@ -2334,6 +2424,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                               hierarchyDepth={1}
                               isFirst={childIndex === 0}
                               isLast={childIndex === group.childEntries.length - 1}
+                              compactDisplaySettings={compactDisplaySettings}
                             />
                           ))}
                         </div>
@@ -2378,6 +2469,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                       } : undefined}
                       isFirst={index === 0}
                       isLast={index === selectedTodoEntriesForRender.length - 1 && !(isExpanded && group && group.childEntries.length > 0)}
+                      compactDisplaySettings={compactDisplaySettings}
                     />
 
                     {isExpanded && group && group.childEntries.length > 0 && (
@@ -2400,6 +2492,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                             hierarchyDepth={1}
                             isFirst={childIndex === 0}
                             isLast={childIndex === group.childEntries.length - 1}
+                            compactDisplaySettings={compactDisplaySettings}
                           />
                         ))}
                       </div>
@@ -2437,6 +2530,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                       } : undefined}
                       isFirst={groupIndex === 0}
                       isLast={groupIndex === selectedCategoryTreeGroups.length - 1 && !(isExpanded && group.childEntries.length > 0)}
+                      compactDisplaySettings={compactDisplaySettings}
                     />
 
                     {isExpanded && group.childEntries.length > 0 && (
@@ -2458,6 +2552,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                             hierarchyDepth={1}
                             isFirst={childIndex === 0}
                             isLast={childIndex === group.childEntries.length - 1}
+                            compactDisplaySettings={compactDisplaySettings}
                           />
                         ))}
                       </div>
@@ -2492,6 +2587,8 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       </FloatingButton>
 
       {todoQuickActionsModalNode}
+
+      {displaySettingsModalNode}
 
       {duplicateModalNode}
     </div>

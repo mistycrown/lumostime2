@@ -12,6 +12,7 @@
  * - 2026-04-13: Passed todo and scope sources into widget settings so slot preview modals can reuse the existing selectors.
  * - 2026-04-19: Added a separate compatible S3 sync path alongside the existing Tencent Cloud COS flow.
  * - 2026-04-25: Passed timeline quick-action preferences through to the preferences settings page.
+ * - 2026-05-05: Moved the widget settings entry below the floating-window toggle in the Android features section.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -1419,17 +1420,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             label="应用关联标签规则"
                             onClick={() => openSettingsSubmenu('auto_record')}
                         />
-                        <MenuItem
-                            icon={<LayoutGrid size={18} className="text-sky-500" />}
-                            label="小组件"
-                            onClick={() => openSettingsSubmenu('widget')}
-                        />
                         <ToggleItem
                             icon={<SquareActivity size={18} className="text-teal-500" />}
                             label="开启悬浮球"
                             checked={floatingWindowEnabled}
                             onChange={handleToggleFloatingWindow}
+                        />
+                        <MenuItem
+                            icon={<LayoutGrid size={18} className="text-sky-500" />}
+                            label="小组件"
                             isLast
+                            onClick={() => openSettingsSubmenu('widget')}
                         />
                     </div>
                 </div>

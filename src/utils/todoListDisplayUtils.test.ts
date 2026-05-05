@@ -1,16 +1,16 @@
 /**
  * @file todoListDisplayUtils.test.ts
- * @input Todo list display helpers with compact schedule metadata and category-list ordering rules
- * @output Regression coverage for compact inline dates and incomplete-first scheduled category sorting
+ * @input Todo list display helpers with compact schedule metadata and completion-group ordering rules
+ * @output Regression coverage for compact inline dates and completion-group ordering that preserves incoming item order
  * @pos Test (todo list display)
- * @description Verifies the shared compact schedule summary text and the category-list comparator that now prioritizes incomplete scheduled todos.
+ * @description Verifies the shared compact schedule summary text and the category-list grouping rule that keeps incomplete todos before completed ones without reordering items inside either group.
+ * @updated 2026-05-05: Updated ordering coverage so category lists preserve incoming per-group order instead of re-sorting by schedule dates.
  * @updated 2026-05-05: Updated compact summary coverage to expect symbol-only date suffixes appended directly after the title.
- * @updated 2026-05-05: Added regression coverage for compact arranged/due summaries and category-list sorting by completion plus schedule presence.
  */
 
 import { describe, expect, test } from 'vitest';
 import { TodoItem } from '../types';
-import { compareCategoryListTodos, formatTodoCompactScheduleSummary, formatTodoInlineDate } from './todoListDisplayUtils';
+import { formatTodoCompactScheduleSummary, formatTodoInlineDate, orderTodoItemsByCompletionGroups } from './todoListDisplayUtils';
 
 const buildTodo = (overrides: Partial<TodoItem>): TodoItem => ({
   id: 'todo-1',
@@ -42,31 +42,33 @@ describe('todoListDisplayUtils', () => {
     expect(formatTodoCompactScheduleSummary(buildTodo({}))).toBeNull();
   });
 
-  test('orders category todos by incomplete first, scheduled before unscheduled, then completed last', () => {
+  test('keeps incomplete todos before completed ones while preserving incoming order inside each group', () => {
     const todos = [
-      buildTodo({ id: 'completed-scheduled', title: 'Completed Scheduled', isCompleted: true, scheduledDate: '2026-05-06' }),
-      buildTodo({ id: 'unscheduled', title: 'Incomplete Unscheduled' }),
-      buildTodo({ id: 'scheduled', title: 'Incomplete Scheduled', scheduledDate: '2026-05-06' })
+      buildTodo({ id: 'completed-a', title: 'Completed A', isCompleted: true }),
+      buildTodo({ id: 'incomplete-a', title: 'Incomplete A' }),
+      buildTodo({ id: 'completed-b', title: 'Completed B', isCompleted: true, scheduledDate: '2026-05-06' }),
+      buildTodo({ id: 'incomplete-b', title: 'Incomplete B', scheduledDate: '2026-05-08' })
     ];
 
-    expect([...todos].sort(compareCategoryListTodos).map((todo) => todo.id)).toEqual([
-      'scheduled',
-      'unscheduled',
-      'completed-scheduled'
+    expect(orderTodoItemsByCompletionGroups(todos).map((todo) => todo.id)).toEqual([
+      'incomplete-a',
+      'incomplete-b',
+      'completed-a',
+      'completed-b'
     ]);
   });
 
-  test('prefers the earlier schedule date and breaks same-day ties toward deadline urgency', () => {
+  test('does not reshuffle same-status todos even when their schedule dates differ', () => {
     const todos = [
-      buildTodo({ id: 'arrange-later', title: 'Arrange Later', scheduledDate: '2026-05-08' }),
-      buildTodo({ id: 'due-same-day', title: 'Due Same Day', deadlineDate: '2026-05-06' }),
-      buildTodo({ id: 'arrange-same-day', title: 'Arrange Same Day', scheduledDate: '2026-05-06' })
+      buildTodo({ id: 'first', title: 'First', scheduledDate: '2026-05-09' }),
+      buildTodo({ id: 'second', title: 'Second', deadlineDate: '2026-05-06' }),
+      buildTodo({ id: 'third', title: 'Third' })
     ];
 
-    expect([...todos].sort(compareCategoryListTodos).map((todo) => todo.id)).toEqual([
-      'due-same-day',
-      'arrange-same-day',
-      'arrange-later'
+    expect(orderTodoItemsByCompletionGroups(todos).map((todo) => todo.id)).toEqual([
+      'first',
+      'second',
+      'third'
     ]);
   });
 });

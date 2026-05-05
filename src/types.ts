@@ -4,6 +4,7 @@
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
+ * @updated 2026-05-05: Added optional scene-widget source metadata to active sessions so scene card syncing can stay scoped to one scene group and time slot.
  * @updated 2026-04-25: Added global check streak multiplier config plus category-level streak toggles for achievement weighting.
  * @updated 2026-04-21: Added one-level todo hierarchy support via optional `parentTodoId` and `childOrder` fields.
  * @updated 2026-04-21: Added an optional boolean `pin` flag for prioritizing todos in the today schedule list.
@@ -165,6 +166,9 @@ export interface ActiveSession {
   slotIndex?: number;
   templateId?: string;
   appWidgetId?: number;
+  sceneGroupId?: string;
+  sceneSlotId?: string;
+  sceneItemId?: string;
 }
 
 // 璇勮鎺ュ彛

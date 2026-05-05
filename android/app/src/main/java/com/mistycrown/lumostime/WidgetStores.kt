@@ -319,7 +319,10 @@ object WidgetStores {
                 scopeIds = json.optJSONArray("scopeIds").toStringList(),
                 slotIndex = if (json.has("slotIndex")) json.optInt("slotIndex") else null,
                 templateId = parseNullableString(json.optString("templateId")),
-                appWidgetId = if (json.has("appWidgetId")) json.optInt("appWidgetId") else null
+                appWidgetId = if (json.has("appWidgetId")) json.optInt("appWidgetId") else null,
+                sceneGroupId = parseNullableString(json.optString("sceneGroupId")),
+                sceneSlotId = parseNullableString(json.optString("sceneSlotId")),
+                sceneItemId = parseNullableString(json.optString("sceneItemId"))
             )
         }.getOrNull()
     }
@@ -355,6 +358,15 @@ object WidgetStores {
             }
             if (runtimeState.appWidgetId != null) {
                 put("appWidgetId", runtimeState.appWidgetId)
+            }
+            if (!runtimeState.sceneGroupId.isNullOrBlank()) {
+                put("sceneGroupId", runtimeState.sceneGroupId)
+            }
+            if (!runtimeState.sceneSlotId.isNullOrBlank()) {
+                put("sceneSlotId", runtimeState.sceneSlotId)
+            }
+            if (!runtimeState.sceneItemId.isNullOrBlank()) {
+                put("sceneItemId", runtimeState.sceneItemId)
             }
         }
         editor.putString(KEY_RUNTIME, json.toString()).commit()

@@ -10,6 +10,7 @@
  * @updated 2026-05-02: Added scene widget payload sync types for the dedicated 4x3 scene widget.
  * @updated 2026-05-05: Expanded TODAY + PIN payload sync to include native-refresh source snapshots so the widget can rebuild today's list from mirrored app todos.
  * @updated 2026-05-05: Added optional scene widget third-party app launch metadata so scene widget cards can mirror in-app launch behavior.
+ * @updated 2026-05-05: Added optional scene-widget runtime source metadata so scene card flips can stay scoped to one scene slot.
  */
 import { registerPlugin } from '@capacitor/core';
 import { ShortcutWidgetAction } from '../services/widgetShortcutService';
@@ -111,6 +112,9 @@ export interface WidgetBridgeRuntimeState {
   slotIndex?: number | null;
   templateId?: string | null;
   appWidgetId?: number | null;
+  sceneGroupId?: string | null;
+  sceneSlotId?: string | null;
+  sceneItemId?: string | null;
 }
 
 export interface WidgetBridgeLogTailState {
