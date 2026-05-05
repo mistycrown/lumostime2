@@ -49,6 +49,7 @@
 - AI 叙事设定（个人信息、自定义叙事模板）
 
 ### 7. NFCSettingsView.tsx
+- 补充：当前页包含快速打点、指定活动、日课项、读取测试、清除标签，并兼容缺少 `activities/items` 的旧数据
 - NFC 标签配置
 
 ### 8. UserGuideView.tsx

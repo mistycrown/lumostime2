@@ -8,6 +8,7 @@ import android.content.Intent;
 
 /**
  * Dedicated scene 4x3 widget provider with icon tabs and a scrollable scene card grid.
+ * Updated 2026-05-05: Added a manual refresh action plus a first-morning-unlock refresh hook for the scene widget.
  */
 public class QuickLogWidgetScene4x3 extends AppWidgetProvider {
     public static void refreshAllAsync(Context context) {

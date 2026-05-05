@@ -11,6 +11,7 @@
  * @updated 2026-04-26: Expanded the 4x1 timer widget template from 4 to 5 evenly spaced slots.
  * @updated 2026-05-01: Added tracking-calendar template normalization and payload builders for the dedicated 2x2 tracking calendar widget.
  * @updated 2026-05-03: Fixed UI-icon sanitization so only changed templates receive new timestamps, and centralized normalized template equality checks.
+ * @updated 2026-05-05: Expanded TODAY + PIN payload builders to include native-refresh source snapshots so Android can rebuild today's list from mirrored app todos.
 */
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, CheckTemplate, DailyReview, Log, TodoItem } from '../types';
@@ -33,6 +34,9 @@ import type {
   WidgetBridgeTrackingCalendarEntry,
   WidgetBridgeTrackingCalendarPayload,
   WidgetTrackingCalendarSourceType as WidgetBridgeTrackingCalendarSourceType,
+  WidgetBridgeTodoPinSourceActivity,
+  WidgetBridgeTodoPinSourceCategory,
+  WidgetBridgeTodoPinSourceTodo,
   WidgetBridgeTodoPinItem,
   WidgetBridgeTodoPinPayload,
   WidgetType
@@ -1261,6 +1265,43 @@ export const buildDailyRuntimeWidgetPayload = ({
 const TODO_PIN_BADGE_PIN: WidgetBridgeTodoPinItem['badgeLabel'] = 'PIN';
 const TODO_PIN_BADGE_TODAY: WidgetBridgeTodoPinItem['badgeLabel'] = 'TODAY';
 
+const buildTodoPinSourceTodos = (todos: TodoItem[]): WidgetBridgeTodoPinSourceTodo[] =>
+  todos.map((todo) => ({
+    id: todo.id,
+    title: todo.title,
+    isCompleted: todo.isCompleted,
+    parentTodoId: todo.parentTodoId ?? null,
+    linkedCategoryId: todo.linkedCategoryId ?? null,
+    linkedActivityId: todo.linkedActivityId ?? null,
+    defaultScopeIds: todo.defaultScopeIds ?? null,
+    pin: Boolean(todo.pin),
+    scheduledDate: todo.scheduledDate ?? null,
+    deadlineDate: todo.deadlineDate ?? null,
+    recurrenceRule: todo.recurrenceRule
+      ? {
+          frequency: todo.recurrenceRule.frequency,
+          startDate: todo.recurrenceRule.startDate,
+          endDate: todo.recurrenceRule.endDate ?? null,
+          interval: todo.recurrenceRule.interval ?? null,
+          weekdays: todo.recurrenceRule.weekdays ?? null,
+          monthDays: todo.recurrenceRule.monthDays ?? null
+        }
+      : null
+  }));
+
+const buildTodoPinSourceCategories = (categories: Category[]): WidgetBridgeTodoPinSourceCategory[] =>
+  categories.map((category) => ({
+    id: category.id,
+    icon: category.icon || null,
+    themeColor: category.themeColor || null,
+    activities: category.activities.map<WidgetBridgeTodoPinSourceActivity>((activity) => ({
+      id: activity.id,
+      name: activity.name,
+      icon: activity.icon || null,
+      color: activity.color || null
+    }))
+  }));
+
 const resolveTodoPinLinkedTarget = (
   todo: TodoItem,
   todos: TodoItem[],
@@ -1348,7 +1389,9 @@ export const buildTodoPinWidgetPayload = ({
         scopeIds: todo.defaultScopeIds ?? null
       };
     }),
-    syncedAt: now
+    syncedAt: now,
+    sourceTodos: buildTodoPinSourceTodos(todos),
+    sourceCategories: buildTodoPinSourceCategories(categories)
   };
 };
 

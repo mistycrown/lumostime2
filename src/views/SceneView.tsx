@@ -1,6 +1,7 @@
 /**
  * @file SceneView.tsx
  * @description 闂傚倷绶氬缁樹繆閸ヮ剙纾块柕鍫濇噳閺嬪秵绻涢崱妯诲碍缂佲偓瀹€鍕厸鐎广儱鍟俊鑺ャ亜锜婚崶銊㈡嫽闂佺鏈銊╁箺閻樼偨浜滈柡鍌濇硶閻忛亶鏌熼崣澶嬪唉鐎规洖宕灃濞达絼璀﹀ú?- 闂傚倷鑳剁涵鍫曞疾閻愬樊娴栭柕濞у棗小濡炪倖甯掗崯銊︾瑜版帗鐓欓柟顖嗗啯姣愬銈冨€曢幊蹇曟崲濠靛牆鏋堟俊顖濇〃婢规洘绻濋悽闈涗哗閻忓浚浜、姘愁槻闁崇懓鍟撮崺鈧い鎺戝閻撴盯鏌涘鈧粈渚€鎮橀敐鍥╃＜妞ゆ棁鍋愯倴婵炲濯寸粻鎾愁嚕閹绢喗鍋愭い鏃囧吹妞规娊姊绘担鍛婂暈妞ゃ劍鍔楀Σ鎰板即閻斿憡鐝烽梺鍝勮癁鐏炶姤顓块梻濠庡亜濞诧箑顫忚ぐ鎹ゅ洩顦规慨濠傤煼瀹曟帒顫濇潏銊﹀枛婵＄偑鍊栭弻銊╂儗閸屾氨鏆︽慨妞诲亾鐎规洏鍔戦、妯款槻闁?
+ * @updated 2026-05-05: Fixed SceneView widget-session matching by reading active sessions from SessionContext instead of DataContext, preventing undefined access crashes in scene cards.
  * @updated 2026-05-01: Added a manual-mode scene-group dropdown on the scene header chip so users can quickly switch groups directly from the scene page.
  * @updated 2026-04-25: Added flex min-height guards for the scene sidebar and card list so long card stacks keep scrolling instead of being clipped on some mobile WebViews.
  */
@@ -14,6 +15,7 @@ import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
 import { useReview } from '../contexts/ReviewContext';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useData } from '../contexts/DataContext';
+import { useSession } from '../contexts/SessionContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { getLocalDateStr } from '../utils/dateUtils';
@@ -39,7 +41,8 @@ export const SceneView: React.FC<SceneViewProps> = ({
   todos = []
 }) => {
   const { dailyReviews, checkTemplates, reviewTemplates, setDailyReviews, weeklyReviews, setWeeklyReviews, monthlyReviews, setMonthlyReviews } = useReview();
-  const { logs, activeSessions } = useData();
+  const { logs } = useData();
+  const { activeSessions } = useSession();
   const { addToast } = useToast();
   const { sceneCardTimerMode } = useSettings();
   const { 
@@ -74,6 +77,28 @@ export const SceneView: React.FC<SceneViewProps> = ({
   // 闂傚倷鐒﹀鍨焽閸ф绀夐悗锝庡墲婵櫕銇勯幒鎴濃偓褰掑窗閸℃稒鐓ラ柡鍥殔娴滈箖鎮峰鍕凡闁稿﹨宕靛Σ鎰板箳濡や礁浜滃┑鐐跺蔼椤曆囧箖娓氣偓濮婃椽宕ㄦ繝搴㈩吅缂備浇椴稿ú姗€寮查崼鏇炲唨妞ゆ挾鍠庨崜顓㈡⒑閸涘﹥澶勯柛銊︽緲閳诲秹濮€閵堝棛鍘搁梺绋挎湰缁嬫垿顢撳鍕╀簻闁规崘娅曢幉鍝ョ磼?
   const [statsUpdateTrigger, setStatsUpdateTrigger] = useState(0);
   const isManualSceneGroupMode = sceneGroupState.switchMode !== 'auto';
+
+  const isWidgetSessionMatchForCard = (card: SceneCardData): boolean => {
+    if (card.type === 'timer' && card.action.type === 'startTimer') {
+      return activeSessions.some((session) =>
+        session.source === 'widget'
+        && session.activityId === card.action.activityId
+        && session.categoryId === card.action.categoryId
+      );
+    }
+
+    if (card.type === 'todo' && card.action.type === 'startTodo') {
+      return activeSessions.some((session) =>
+        session.source === 'widget'
+        && session.linkedTodoId === card.action.todoId
+      );
+    }
+
+    return false;
+  };
+
+  const getStoredSceneCardFlipState = (cardId: string): boolean =>
+    localStorage.getItem(`scene_card_flipped_${cardId}`) === 'true';
 
   const loadSceneGroups = () => {
     const loaded = loadSceneGroupStateFromStorage();
@@ -181,6 +206,23 @@ export const SceneView: React.FC<SceneViewProps> = ({
       setIsGroupMenuOpen(false);
     }
   }, [isManualSceneGroupMode]);
+
+  useEffect(() => {
+    const widgetSessions = activeSessions.filter((session) => session.source === 'widget');
+    if (widgetSessions.length === 0) {
+      return;
+    }
+
+    sceneGroupState.groups.forEach((group) => {
+      group.timeSlots.forEach((slot) => {
+        slot.cards.forEach((card) => {
+          if (isWidgetSessionMatchForCard(card) && !getStoredSceneCardFlipState(card.id)) {
+            localStorage.setItem(`scene_card_flipped_${card.id}`, 'true');
+          }
+        });
+      });
+    });
+  }, [activeSessions, sceneGroupState]);
 
   useEffect(() => {
     setIsGroupMenuOpen(false);
@@ -1253,6 +1295,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
                   logs={logs}
                   onAction={handleCardAction}
                   sceneCardTimerMode={sceneCardTimerMode}
+                  externalFlipped={isWidgetSessionMatchForCard(card) || getStoredSceneCardFlipState(card.id)}
                 />
               );
             })

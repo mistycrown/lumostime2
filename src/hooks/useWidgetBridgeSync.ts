@@ -10,6 +10,8 @@
  * @updated 2026-05-01: Syncs tracking-calendar payloads for dedicated 2x2 monthly tracking widgets and re-runs when widget templates change.
  * @updated 2026-05-02: Syncs full scene-group payloads so the dedicated 4x3 scene widget can follow native time-based group and tab changes.
  * @updated 2026-05-03: Reused the shared normalized template equality helper when deciding whether unsupported UI-icon state actually changed.
+ * @updated 2026-05-05: Includes mirrored TODAY + PIN source todos/categories in the native sync payload so Android refresh actions can rebuild today's list without waiting for a new web-state change.
+ * @updated 2026-05-05: Clears native widget runtime after app-side stop/cancel transitions while still preserving widget-started sessions during initial hydration.
  */
 import { App as CapacitorApp } from '@capacitor/app';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -58,6 +60,7 @@ export const useWidgetBridgeSync = () => {
     checkTemplates,
     reviewTemplates
   });
+  const hasHydratedSessionRuntimeRef = useRef(false);
 
   useEffect(() => {
     latestDailyStateRef.current = {
@@ -301,16 +304,27 @@ export const useWidgetBridgeSync = () => {
 
     const syncRuntimeState = async () => {
       if (!latestSession) {
-        try {
-          const { runtimeState: nativeRuntime } = await WidgetBridge.getRuntimeState();
-          if (nativeRuntime?.source === 'widget') {
-            return;
+        if (!hasHydratedSessionRuntimeRef.current) {
+          hasHydratedSessionRuntimeRef.current = true;
+          try {
+            const { runtimeState: nativeRuntime } = await WidgetBridge.getRuntimeState();
+            if (nativeRuntime?.source === 'widget') {
+              return;
+            }
+          } catch (error) {
+            console.error('[useWidgetBridgeSync] Failed to read native runtime state', error);
           }
-        } catch (error) {
-          console.error('[useWidgetBridgeSync] Failed to read native runtime state', error);
         }
+
+        try {
+          await WidgetBridge.syncRuntimeState({ runtimeState: null });
+        } catch (error) {
+          console.error('[useWidgetBridgeSync] Failed to clear native widget runtime state', error);
+        }
+        return;
       }
 
+      hasHydratedSessionRuntimeRef.current = true;
       const runtimeState = latestSession
         ? buildWidgetRuntimeStateFromSession(latestSession, categories)
         : null;

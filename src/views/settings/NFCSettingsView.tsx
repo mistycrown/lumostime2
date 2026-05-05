@@ -154,6 +154,13 @@ export const NFCSettingsView: React.FC<NFCSettingsViewProps> = ({
   const [nfcSelectedCheckItemId, setNfcSelectedCheckItemId] = useState<string>('');
   const [readTestResult, setReadTestResult] = useState<NfcReadTestResultPayload | null>(null);
 
+  const safeCategories = useMemo(() => {
+    return (Array.isArray(categories) ? categories : []).map((category) => ({
+      ...category,
+      activities: Array.isArray(category.activities) ? category.activities : []
+    }));
+  }, [categories]);
+
   const dailyCheckOptions = useMemo(() => {
     return getEligibleNfcDailyCheckItems(checkTemplates).map((item) => ({
       value: item.checkItemId,
@@ -343,11 +350,11 @@ export const NFCSettingsView: React.FC<NFCSettingsViewProps> = ({
                 setNfcSelectedCatId(val);
                 setNfcSelectedActId('');
               }}
-              options={categories?.map((cat: Category) => ({
+              options={safeCategories.map((cat: Category) => ({
                 value: cat.id,
                 label: cat.name,
                 icon: <span className="text-lg">{cat.icon}</span>
-              })) || []}
+              }))}
             />
 
             <CustomSelect
@@ -357,8 +364,8 @@ export const NFCSettingsView: React.FC<NFCSettingsViewProps> = ({
               onChange={(val) => setNfcSelectedActId(val)}
               disabled={!nfcSelectedCatId}
               options={
-                categories
-                  ?.find((category) => category.id === nfcSelectedCatId)
+                safeCategories
+                  .find((category) => category.id === nfcSelectedCatId)
                   ?.activities.map((activity) => ({
                     value: activity.id,
                     label: activity.name,

@@ -2,6 +2,7 @@
  * @file SceneCard.tsx
  * @description 场景卡片组件 - 支持正反面翻转和滑动交互
  * @updated 2026-04-25: Replaced scene card borders with inset outlines so flipped cards keep their full stroke on mobile WebViews.
+ * @updated 2026-05-05: Added parent-driven flip synchronization so scene timer/todo cards can react to widget-started sessions.
  */
 import React, { useState, useRef } from 'react';
 import { Check, ChevronRight, Clock, CheckSquare, ListTodo, BarChart3, BookOpen, Link2 } from 'lucide-react';
@@ -31,9 +32,17 @@ interface SceneCardProps {
   logs?: Log[]; // 用于计算计时和待办的时长统计
   onAction?: (action: SceneCardData['action'], autoEnterFocus?: boolean) => void;
   sceneCardTimerMode?: 'realtime' | 'backfill'; // 场景卡片计时模式
+  externalFlipped?: boolean;
 }
 
-export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], logs = [], onAction, sceneCardTimerMode = 'realtime' }) => {
+export const SceneCard: React.FC<SceneCardProps> = ({
+  data,
+  dailyReviews = [],
+  logs = [],
+  onAction,
+  sceneCardTimerMode = 'realtime',
+  externalFlipped
+}) => {
   // 获取卡片颜色（优先使用自定义颜色，否则使用默认颜色）
   const cardColor = data.color || DEFAULT_COLORS[data.type];
   const cardPresentation = getSceneCardColorPresentation(cardColor);
@@ -176,6 +185,17 @@ export const SceneCard: React.FC<SceneCardProps> = ({ data, dailyReviews = [], l
       localStorage.setItem(`scene_card_flipped_${data.id}`, String(newFlipState));
     }
   }, [data.isCompleted, data.type, data.id, isCountChecklistCard]);
+
+  React.useEffect(() => {
+    if ((data.type !== 'timer' && data.type !== 'todo') || typeof externalFlipped !== 'boolean') {
+      return;
+    }
+    if (externalFlipped === isFlipped) {
+      return;
+    }
+    setIsFlipped(externalFlipped);
+    localStorage.setItem(`scene_card_flipped_${data.id}`, String(externalFlipped));
+  }, [data.id, data.type, externalFlipped, isFlipped]);
 
   // 保存翻转状态到 localStorage
   const saveFlipState = (flipped: boolean) => {

@@ -4,6 +4,7 @@ package com.mistycrown.lumostime
  * Lightweight native models used by the unified Android widget system.
  * Templates are size-based, while each slot carries its own timer, daily, or shortcut type.
  * Updated 2026-05-02: Added native scene-widget payload, group, slot, item, and per-instance selection models.
+ * Updated 2026-05-05: Added mirrored TODAY + PIN source todo/category models so native widgets can rebuild today's list on refresh without waiting for a new web payload.
  */
 object WidgetTypes {
     const val TIMER = "timer"
@@ -115,6 +116,10 @@ object WidgetTapAnimationModes {
     const val TIMER_STOP = "timer_stop"
     const val DAILY_COMPLETE = "daily_complete"
     const val DAILY_COUNT = "daily_count"
+}
+
+object WidgetSceneRefreshAnimationModes {
+    const val REFRESH = "scene_refresh"
 }
 
 object WidgetSizes {
@@ -333,7 +338,46 @@ data class WidgetTodoPinItem(
 data class WidgetTodoPinPayload(
     val date: String,
     val items: List<WidgetTodoPinItem> = emptyList(),
-    val syncedAt: Long
+    val syncedAt: Long,
+    val sourceTodos: List<WidgetTodoPinSourceTodo> = emptyList(),
+    val sourceCategories: List<WidgetTodoPinSourceCategory> = emptyList()
+)
+
+data class WidgetTodoPinSourceRecurrenceRule(
+    val frequency: String,
+    val startDate: String,
+    val endDate: String? = null,
+    val interval: Int? = null,
+    val weekdays: List<Int> = emptyList(),
+    val monthDays: List<Int> = emptyList()
+)
+
+data class WidgetTodoPinSourceTodo(
+    val id: String,
+    val title: String,
+    val isCompleted: Boolean = false,
+    val parentTodoId: String? = null,
+    val linkedCategoryId: String? = null,
+    val linkedActivityId: String? = null,
+    val defaultScopeIds: List<String> = emptyList(),
+    val pin: Boolean = false,
+    val scheduledDate: String? = null,
+    val deadlineDate: String? = null,
+    val recurrenceRule: WidgetTodoPinSourceRecurrenceRule? = null
+)
+
+data class WidgetTodoPinSourceActivity(
+    val id: String,
+    val name: String,
+    val icon: String? = null,
+    val color: String? = null
+)
+
+data class WidgetTodoPinSourceCategory(
+    val id: String,
+    val icon: String? = null,
+    val themeColor: String? = null,
+    val activities: List<WidgetTodoPinSourceActivity> = emptyList()
 )
 
 data class WidgetTrackingCalendarEntry(
@@ -423,6 +467,19 @@ data class WidgetTapAnimationState(
     val widgetType: String = WidgetTypes.DEFAULT,
     val slotIndex: Int,
     val animationMode: String,
+    val startedAt: Long,
+    val expiresAt: Long
+)
+
+data class WidgetTodoPinRefreshAnimationState(
+    val appWidgetId: Int,
+    val startedAt: Long,
+    val expiresAt: Long
+)
+
+data class WidgetSceneRefreshAnimationState(
+    val appWidgetId: Int,
+    val animationMode: String = WidgetSceneRefreshAnimationModes.REFRESH,
     val startedAt: Long,
     val expiresAt: Long
 )

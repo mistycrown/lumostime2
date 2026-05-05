@@ -45,16 +45,16 @@
                 android:textSize="9sp" />
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/widget_todo_pin_status"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+        <ImageView
+            android:id="@+id/widget_todo_pin_refresh_button"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
             android:layout_marginStart="8dp"
-            android:fontFamily="monospace"
-            android:letterSpacing="0.08"
-            android:text="4 TASKS"
-            android:textColor="#6C6359"
-            android:textSize="9sp" />
+            android:contentDescription="@null"
+            android:padding="2dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/widget_todo_pin_refresh_icon"
+            android:tint="#6C6359" />
     </LinearLayout>
 
     <FrameLayout

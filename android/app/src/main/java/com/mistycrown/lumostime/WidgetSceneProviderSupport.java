@@ -12,6 +12,7 @@ import android.view.View;
 import android.widget.RemoteViews;
 
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -25,8 +26,12 @@ public final class WidgetSceneProviderSupport {
             "com.mistycrown.lumostime.action.SELECT_SCENE_TAB";
     public static final String ACTION_TOGGLE_SCENE_ITEM =
             "com.mistycrown.lumostime.action.TOGGLE_SCENE_ITEM";
+    public static final String ACTION_REFRESH_SCENE_WIDGET =
+            "com.mistycrown.lumostime.action.REFRESH_SCENE_WIDGET";
     public static final String EXTRA_SLOT_ID = "scene_slot_id";
     public static final String EXTRA_ITEM_ID = "scene_item_id";
+    private static final int MORNING_REFRESH_START_HOUR = 4;
+    private static final long SCENE_REFRESH_ANIMATION_DURATION_MS = 420L;
 
     private static final int[] TAB_ROOT_IDS = new int[] {
             R.id.widget_scene_tab_0_root,
@@ -124,6 +129,42 @@ public final class WidgetSceneProviderSupport {
             return true;
         }
 
+        if (ACTION_REFRESH_SCENE_WIDGET.equals(action)) {
+            int appWidgetId = intent.getIntExtra(
+                    AppWidgetManager.EXTRA_APPWIDGET_ID,
+                    AppWidgetManager.INVALID_APPWIDGET_ID
+            );
+            if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                long startedAt = System.currentTimeMillis();
+                WidgetStores.INSTANCE.saveSceneRefreshAnimationState(
+                        context,
+                        new WidgetSceneRefreshAnimationState(
+                                appWidgetId,
+                                WidgetSceneRefreshAnimationModes.REFRESH,
+                                startedAt,
+                                startedAt + SCENE_REFRESH_ANIMATION_DURATION_MS
+                        )
+                );
+            }
+            if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                WidgetRefreshCoordinator.INSTANCE.refreshSceneWidgetWithFeedback(context, appWidgetId);
+            } else {
+                refreshAllWidgets(context, providerClass);
+            }
+            return true;
+        }
+
+        if (Intent.ACTION_USER_PRESENT.equals(action)) {
+            if (shouldRefreshOnMorningUnlock(context)) {
+                WidgetStores.INSTANCE.saveSceneMorningRefreshDate(
+                        context,
+                        buildMorningRefreshDateKey(new Date())
+                );
+                refreshAllWidgets(context, providerClass);
+            }
+            return true;
+        }
+
         return Intent.ACTION_DATE_CHANGED.equals(action)
                 || Intent.ACTION_TIME_CHANGED.equals(action)
                 || Intent.ACTION_TIMEZONE_CHANGED.equals(action);
@@ -153,6 +194,7 @@ public final class WidgetSceneProviderSupport {
 
             bindSceneTabs(context, views, state, appWidgetId, providerClass);
             views.setTextViewText(R.id.widget_scene_slot_label, formatSlotLabel(state.selectedSlot));
+            bindRefreshButton(context, views, appWidgetId, providerClass);
 
             Intent cardsIntent = new Intent(context, WidgetSceneCardsRemoteViewsService.class);
             cardsIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
@@ -267,6 +309,36 @@ public final class WidgetSceneProviderSupport {
     ) {
         AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
         updateWidgets(context, appWidgetManager, new int[] { appWidgetId }, providerClass);
+    }
+
+    private static void refreshAllWidgets(
+            Context context,
+            Class<? extends AppWidgetProvider> providerClass
+    ) {
+        AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
+        int[] appWidgetIds = appWidgetManager.getAppWidgetIds(new android.content.ComponentName(context, providerClass));
+        updateWidgets(context, appWidgetManager, appWidgetIds, providerClass);
+    }
+
+    private static void bindRefreshButton(
+            Context context,
+            RemoteViews views,
+            int appWidgetId,
+            Class<? extends AppWidgetProvider> providerClass
+    ) {
+        WidgetSceneRefreshAnimationState animationState =
+                WidgetStores.INSTANCE.loadSceneRefreshAnimationState(context);
+        float progress = animationState != null && animationState.getAppWidgetId() == appWidgetId
+                ? resolveRefreshAnimationProgress(animationState)
+                : 0f;
+        views.setImageViewBitmap(
+                R.id.widget_scene_refresh_icon,
+                WidgetSceneRefreshBitmapRenderer.INSTANCE.render(context, progress)
+        );
+        views.setOnClickPendingIntent(
+                R.id.widget_scene_refresh_root,
+                buildRefreshPendingIntent(context, appWidgetId, providerClass)
+        );
     }
 
     private static WidgetSceneGroup resolveDisplayedGroup(WidgetScenePayload payload, Date now) {
@@ -445,6 +517,28 @@ public final class WidgetSceneProviderSupport {
         );
     }
 
+    private static PendingIntent buildRefreshPendingIntent(
+            Context context,
+            int appWidgetId,
+            Class<? extends AppWidgetProvider> providerClass
+    ) {
+        Intent intent = new Intent(context, providerClass);
+        intent.setAction(ACTION_REFRESH_SCENE_WIDGET);
+        intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+        return PendingIntent.getBroadcast(
+                context,
+                appWidgetId + 8700,
+                intent,
+                pendingIntentFlags()
+        );
+    }
+
+    private static float resolveRefreshAnimationProgress(WidgetSceneRefreshAnimationState animationState) {
+        long duration = Math.max(1L, animationState.getExpiresAt() - animationState.getStartedAt());
+        long elapsed = Math.max(0L, System.currentTimeMillis() - animationState.getStartedAt());
+        return Math.min(1f, elapsed / (float) duration);
+    }
+
     private static PendingIntent buildCardTemplatePendingIntent(
             Context context,
             int appWidgetId,
@@ -477,5 +571,27 @@ public final class WidgetSceneProviderSupport {
             flags |= PendingIntent.FLAG_IMMUTABLE;
         }
         return flags;
+    }
+
+    private static boolean shouldRefreshOnMorningUnlock(Context context) {
+        AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
+        int[] appWidgetIds = appWidgetManager.getAppWidgetIds(
+                new android.content.ComponentName(context, QuickLogWidgetScene4x3.class)
+        );
+        if (appWidgetIds == null || appWidgetIds.length == 0) {
+            return false;
+        }
+
+        Calendar calendar = Calendar.getInstance();
+        if (calendar.get(Calendar.HOUR_OF_DAY) < MORNING_REFRESH_START_HOUR) {
+            return false;
+        }
+
+        String todayKey = buildMorningRefreshDateKey(calendar.getTime());
+        return !todayKey.equals(WidgetStores.INSTANCE.loadSceneMorningRefreshDate(context));
+    }
+
+    private static String buildMorningRefreshDateKey(Date date) {
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date);
     }
 }

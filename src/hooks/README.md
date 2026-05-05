@@ -3,6 +3,7 @@
 > `useAppInitialization.ts` now imports the Android EdgeToEdge plugin from its ESM entry instead of calling `require()`, so Capacitor production bundles can initialize edge-to-edge support inside the WebView without a browser-side `require is not defined` crash.
 > `useDeepLink.ts` now keeps a stable NFC/deep-link listener registration, consumes launch URLs for NFC actions on cold start, and surfaces native NFC read errors to toasts.
 > `useDeepLink.ts` now also routes NFC scans and LumosTime app links through a shared compatibility parser so older tags and WebView-specific custom-scheme variations still execute reliably.
+> `useWidgetBridgeSync.ts` now mirrors TODAY + PIN source todos/categories alongside the rendered payload so Android-side refresh actions and cross-day first-open rebuilds can recompute the widget list natively.
 > `useHardwareBackButton.ts` now exposes a shared overlay back-handler stack so transient sheets can consume Android hardware back before the app-level navigation ladder reaches view changes or `exitApp()`.
 > `useHardwareBackButton.ts` now delegates Android hardware back presses into the shared AI chat window first, so nested AI panels unwind one layer at a time before the root AI chat closes or the app exits.
 

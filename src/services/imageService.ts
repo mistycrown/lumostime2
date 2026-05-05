@@ -5,6 +5,7 @@
  * @pos Service (Local Storage)
  * @description Handles saving, retrieving, and deleting images.
  * Uses Capacitor Filesystem for Native/Electron, and IndexedDB for Web fallback.
+ * @updated 2026-05-05: Reused settings-level protected image references during manifest rebuild so AI assistant avatars participate in cleanup protection and sync.
  * @updated 2026-05-04: Preserve uploaded PNG/WebP transparency by keeping source-compatible filenames and thumbnail encodings instead of forcing JPEG output.
  * @updated 2026-03-30: Added native camera-path save flow and normalized Base64 payload handling for Capacitor Filesystem writes.
  * @updated 2026-03-23: Added pure referenced-image list helpers for cloud sync restore/upload flows, and rebuild image manifests using only references that still exist locally.
@@ -13,6 +14,7 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
 import { CustomStickerRecord, CustomStickerSetRecord, DailyReview, Log, TodoItem } from '../types';
 import { collectCustomStickerReferencedImages } from './customStickerAssetService';
+import { getSettingsReferencedImages } from './settingsImageReferenceService';
 
 // DB Configuration for Web Fallback
 const DB_NAME = 'LumosTimeImagesDB';
@@ -914,6 +916,9 @@ class ImageService {
             if (!todo.coverImage.startsWith('thumb_')) {
                 referencedSet.add(`thumb_${todo.coverImage}`);
             }
+        });
+        getSettingsReferencedImages().forEach((filename) => {
+            referencedSet.add(filename);
         });
         collectCustomStickerReferencedImages(dailyReviews, customStickerSets, customStickers).forEach((filename) => {
             referencedSet.add(filename);

@@ -2,8 +2,10 @@
 
 Contains business logic and external integrations.
 
+Update 2026-05-05: `settingsImageReferenceService.ts` now includes persisted AI assistant persona/user avatar images, and `imageService.ts` reuses that shared reference set during manifest rebuild, so image cleanup and cloud sync keep AI chat avatars.
 Update 2026-05-03: `statusBarService.ts` now imports the Android EdgeToEdge plugin through its ESM entry rather than `require()`, so Capacitor Android WebView bundles can initialize the status-bar bridge without throwing `require is not defined`.
 Update 2026-05-03: `statusBarService.ts` now restores the configured light Android edge-to-edge background outside immersive mode, so the regular status bar no longer falls through to the activity's black window background while immersive timer still forces a black bar on entry.
+Update 2026-05-05: `widgetService.ts` now includes mirrored todo/category source snapshots inside the TODAY + PIN sync payload, so Android can rebuild the widget list on demand and across date rollover without waiting for a fresh React-side todo mutation.
 Update 2026-04-27: `widgetService.ts` now feeds the TODAY + PIN widget from the same shared today-category helper used by todo pickers, so due-today and recurring-today todos no longer disappear from the widget payload.
 Update 2026-05-01: `assistantOrchestratorService.ts` now treats native diagnostic `assistantReply/decisionSummary` values such as literal `null` as empty, so malformed Android background results no longer create bogus `null` chat bubbles when rehydrated into the main conversation.
 Update 2026-05-01: `assistantOrchestratorService.ts` now hydrates completed native-background replies back into persisted AI chat sessions by trigger id, so Android-direct check-ins no longer appear only in diagnostics/history while missing from the main conversation.
@@ -42,13 +44,13 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 - `excelExportService.ts`: [Active] - Exports time logs to Excel format.
 - `geminiService.ts`: [Placeholder] - Simple Gemini test service (likely deprecated/experimental).
 - `imageCleanupService.ts`: [Active] - Checks unreferenced images, protects referenced business/settings images, and executes cleanup/report generation.
-- `imageService.ts`: [Active] - Manages local image storage using Capacitor Filesystem (native) or IndexedDB (web). Handles thumbnail generation and native camera file-path saves.
+- `imageService.ts`: [Active] - Manages local image storage using Capacitor Filesystem (native) or IndexedDB (web). Handles thumbnail generation, native camera file-path saves, and shared settings-level protected image references during manifest rebuild.
 - `narrativeService.ts`: [Active] - Generates Daily/Weekly/Monthly narratives using AI.
 - `NfcService.ts`: [Active] - Wrapper for Capacitor NFC plugin to read/write tags and receive retained scan/error payloads.
 - `obsidianExportService.ts`: [Active] - Exports data to Obsidian markdown files.
-- `settingsImageReferenceService.ts`: [Active] - Collects settings-level image references, currently including custom TimePal assets, for cleanup protection.
+- `settingsImageReferenceService.ts`: [Active] - Collects settings-level image references, including custom TimePal assets plus persisted AI assistant/user avatar images, for cleanup protection and sync manifests.
 - `syncService.ts`: [Active] - Orchestrates image synchronization between local storage and WebDAV server. Handles deletions and bidirectional sync.
-- `widgetService.ts`: [Active] - Centralizes widget payload and template helpers, including the TODAY + PIN list payload that now stays aligned with shared today-category matching for pinned, due-today, arranged-today, and recurring-today todos.
+- `widgetService.ts`: [Active] - Centralizes widget payload and template helpers, including the TODAY + PIN list payload that stays aligned with shared today-category matching for pinned, due-today, arranged-today, and recurring-today todos while also mirroring source todo/category snapshots for native refresh rebuilding.
 - `achievementBottleStyleService.ts`: [Active] - Defines achievement bottle skin options, including lighter glass palettes and the extended neutral bottle set.
 - `timelineStyleService.ts`: [Active] - Manages timeline style themes, defaults, Memoir-specific offset values, and config normalization for shared timeline nodes.
 - `themePresetService.ts`: [Active] - 主题预设应用服务，拆分复杂的主题切换逻辑为独立方法

@@ -8,6 +8,7 @@
  * @updated 2026-04-26: Added TODAY + PIN widget payload sync types for the dedicated scrollable 4x2 todo widget.
  * @updated 2026-05-01: Added tracking-calendar template/config contracts and payload sync types for the dedicated 2x2 tracking calendar widget.
  * @updated 2026-05-02: Added scene widget payload sync types for the dedicated 4x3 scene widget.
+ * @updated 2026-05-05: Expanded TODAY + PIN payload sync to include native-refresh source snapshots so the widget can rebuild today's list from mirrored app todos.
  */
 import { registerPlugin } from '@capacitor/core';
 import { ShortcutWidgetAction } from '../services/widgetShortcutService';
@@ -190,10 +191,49 @@ export interface WidgetBridgeTodoPinItem {
   scopeIds?: string[] | null;
 }
 
+export interface WidgetBridgeTodoPinSourceRecurrenceRule {
+  frequency: 'daily' | 'weekly' | 'monthly';
+  startDate: string;
+  endDate?: string | null;
+  interval?: number | null;
+  weekdays?: number[] | null;
+  monthDays?: number[] | null;
+}
+
+export interface WidgetBridgeTodoPinSourceTodo {
+  id: string;
+  title: string;
+  isCompleted: boolean;
+  parentTodoId?: string | null;
+  linkedCategoryId?: string | null;
+  linkedActivityId?: string | null;
+  defaultScopeIds?: string[] | null;
+  pin?: boolean;
+  scheduledDate?: string | null;
+  deadlineDate?: string | null;
+  recurrenceRule?: WidgetBridgeTodoPinSourceRecurrenceRule | null;
+}
+
+export interface WidgetBridgeTodoPinSourceActivity {
+  id: string;
+  name: string;
+  icon: string | null;
+  color: string | null;
+}
+
+export interface WidgetBridgeTodoPinSourceCategory {
+  id: string;
+  icon: string | null;
+  themeColor: string | null;
+  activities: WidgetBridgeTodoPinSourceActivity[];
+}
+
 export interface WidgetBridgeTodoPinPayload {
   date: string;
   items: WidgetBridgeTodoPinItem[];
   syncedAt: number;
+  sourceTodos?: WidgetBridgeTodoPinSourceTodo[];
+  sourceCategories?: WidgetBridgeTodoPinSourceCategory[];
 }
 
 export interface WidgetBridgeTrackingCalendarEntry {

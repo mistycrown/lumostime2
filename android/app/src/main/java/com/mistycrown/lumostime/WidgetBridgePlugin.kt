@@ -13,6 +13,7 @@ import org.json.JSONObject
  * Capacitor bridge for widget templates, instance binding state, runtime synchronization, and pending action import.
  * Updated 2026-05-02: Added dedicated scene widget payload sync support for the Android 4x3 scene widget.
  * Updated 2026-05-03: Routed widget sync calls to targeted widget-family refresh helpers instead of always refreshing every widget provider.
+ * Updated 2026-05-05: Expanded TODAY + PIN sync parsing to persist mirrored source todos/categories for native-side refresh rebuilding.
  */
 @CapacitorPlugin(name = "WidgetBridge")
 class WidgetBridgePlugin : Plugin() {
@@ -206,7 +207,9 @@ class WidgetBridgePlugin : Plugin() {
             WidgetTodoPinPayload(
                 date = it.optString("date"),
                 items = it.optJSONArray("items").toTodoPinItemList(),
-                syncedAt = it.optLong("syncedAt", System.currentTimeMillis())
+                syncedAt = it.optLong("syncedAt", System.currentTimeMillis()),
+                sourceTodos = it.optJSONArray("sourceTodos").toTodoPinSourceTodoList(),
+                sourceCategories = it.optJSONArray("sourceCategories").toTodoPinSourceCategoryList()
             )
         }
 
@@ -622,6 +625,106 @@ class WidgetBridgePlugin : Plugin() {
                     scopeIds = item.optJSONArray("scopeIds").toStringList()
                 )
             )
+        }
+        return values
+    }
+
+    private fun JSONArray?.toTodoPinSourceTodoList(): List<WidgetTodoPinSourceTodo> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        val values = mutableListOf<WidgetTodoPinSourceTodo>()
+        for (index in 0 until length()) {
+            val item = optJSONObject(index) ?: continue
+            val id = parseNullableString(item.optString("id")) ?: continue
+            val title = parseNullableString(item.optString("title")) ?: continue
+            values.add(
+                WidgetTodoPinSourceTodo(
+                    id = id,
+                    title = title,
+                    isCompleted = item.optBoolean("isCompleted", false),
+                    parentTodoId = parseNullableString(item.optString("parentTodoId")),
+                    linkedCategoryId = parseNullableString(item.optString("linkedCategoryId")),
+                    linkedActivityId = parseNullableString(item.optString("linkedActivityId")),
+                    defaultScopeIds = item.optJSONArray("defaultScopeIds").toStringList(),
+                    pin = item.optBoolean("pin", false),
+                    scheduledDate = parseNullableString(item.optString("scheduledDate")),
+                    deadlineDate = parseNullableString(item.optString("deadlineDate")),
+                    recurrenceRule = item.optJSONObject("recurrenceRule")?.toTodoPinSourceRecurrenceRule()
+                )
+            )
+        }
+        return values
+    }
+
+    private fun JSONObject.toTodoPinSourceRecurrenceRule(): WidgetTodoPinSourceRecurrenceRule? {
+        val frequency = parseNullableString(optString("frequency")) ?: return null
+        val startDate = parseNullableString(optString("startDate")) ?: return null
+        return WidgetTodoPinSourceRecurrenceRule(
+            frequency = frequency,
+            startDate = startDate,
+            endDate = parseNullableString(optString("endDate")),
+            interval = if (has("interval")) optInt("interval").takeIf { value -> value > 0 } else null,
+            weekdays = optJSONArray("weekdays").toIntList(),
+            monthDays = optJSONArray("monthDays").toIntList()
+        )
+    }
+
+    private fun JSONArray?.toTodoPinSourceCategoryList(): List<WidgetTodoPinSourceCategory> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        val values = mutableListOf<WidgetTodoPinSourceCategory>()
+        for (index in 0 until length()) {
+            val item = optJSONObject(index) ?: continue
+            val id = parseNullableString(item.optString("id")) ?: continue
+            values.add(
+                WidgetTodoPinSourceCategory(
+                    id = id,
+                    icon = parseNullableString(item.optString("icon")),
+                    themeColor = parseNullableString(item.optString("themeColor")),
+                    activities = item.optJSONArray("activities").toTodoPinSourceActivityList()
+                )
+            )
+        }
+        return values
+    }
+
+    private fun JSONArray?.toTodoPinSourceActivityList(): List<WidgetTodoPinSourceActivity> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        val values = mutableListOf<WidgetTodoPinSourceActivity>()
+        for (index in 0 until length()) {
+            val item = optJSONObject(index) ?: continue
+            val id = parseNullableString(item.optString("id")) ?: continue
+            val name = parseNullableString(item.optString("name")) ?: continue
+            values.add(
+                WidgetTodoPinSourceActivity(
+                    id = id,
+                    name = name,
+                    icon = parseNullableString(item.optString("icon")),
+                    color = parseNullableString(item.optString("color"))
+                )
+            )
+        }
+        return values
+    }
+
+    private fun JSONArray?.toIntList(): List<Int> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        val values = mutableListOf<Int>()
+        for (index in 0 until length()) {
+            val value = optInt(index, Int.MIN_VALUE)
+            if (value != Int.MIN_VALUE && !values.contains(value)) {
+                values.add(value)
+            }
         }
         return values
     }
