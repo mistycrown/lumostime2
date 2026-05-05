@@ -4,6 +4,8 @@
  * @output Immersive fullscreen timer display and session submit trigger
  * @pos Component (View)
  * @description A fixed black-and-white immersive timer with large numeric digits, static masked art visuals, session-only orientation toggles, display-source and display-format toggles, white-noise controls, and Android immersive fullscreen handling that temporarily removes WebView insets.
+ * @updated 2026-05-05: Stopped manually toggling the Android EdgeToEdge inset listener during immersive enter/exit because the native plugin already tracks system-bar visibility and double-toggling could leave headers pushed downward after returning.
+ * @updated 2026-05-05: Stopped issuing extra Android status-bar show/hide calls during immersive transitions so exiting fullscreen no longer risks leaving the app header shifted downward.
  * @updated 2026-05-05: Restored Android immersive system bars before unmounting the fullscreen timer so exiting immersive mode no longer leaves the app header shifted downward.
  * @updated 2026-05-04: Realigned the immersive top control bar so both portrait and landscape modes avoid inheriting the managed status-bar fallback and drifting downward.
  * @updated 2026-05-03: Switched Android EdgeToEdge access to the plugin's ESM entry so Capacitor WebView builds no longer execute browser-undefined `require()` calls.
@@ -178,33 +180,6 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
   const leftControlsInset = 'calc(1rem + env(safe-area-inset-left, 0px))';
   const rightControlsInset = 'calc(1rem + env(safe-area-inset-right, 0px))';
 
-  const waitForAnimationFrames = async (count: number = 1) => {
-    for (let index = 0; index < count; index += 1) {
-      await new Promise<void>((resolve) => {
-        if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
-          window.setTimeout(resolve, 16);
-          return;
-        }
-
-        window.requestAnimationFrame(() => resolve());
-      });
-    }
-  };
-
-  const syncAndroidInsetCssVariables = async () => {
-    if (Capacitor.getPlatform() !== 'android' || !EdgeToEdge?.getInsets || typeof document === 'undefined') {
-      return;
-    }
-
-    const insets = await EdgeToEdge.getInsets().catch(() => null);
-    if (!insets) {
-      return;
-    }
-
-    document.documentElement.style.setProperty('--status-bar-height', `${Math.max(0, insets.top)}px`);
-    document.documentElement.style.setProperty('--navigation-bar-height', `${Math.max(0, insets.bottom)}px`);
-  };
-
   const restorePlatformShell = async () => {
     if (exitTransitionPromiseRef.current) {
       await exitTransitionPromiseRef.current;
@@ -226,14 +201,6 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
 
       if (exitTransition.show) {
         await StatusBar.show().catch(() => {});
-      }
-
-      if (platform === 'android' && exitTransition.enableEdgeToEdgeInsets && EdgeToEdge?.enable) {
-        // Wait until Android reports the restored system-bar state before reapplying WebView margins.
-        await waitForAnimationFrames(2);
-        await EdgeToEdge.enable().catch(() => {});
-        await waitForAnimationFrames(1);
-        await syncAndroidInsetCssVariables().catch(() => {});
       }
 
       if (exitTransition.restoreManagedStatusBar) {
@@ -294,10 +261,6 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
 
       if (platform === 'ios') {
         await StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
-      }
-
-      if (platform === 'android' && enterTransition.disableEdgeToEdgeInsets && EdgeToEdge?.disable) {
-        await EdgeToEdge.disable().catch(() => {});
       }
 
       if (enterTransition.backgroundColor && platform === 'android') {

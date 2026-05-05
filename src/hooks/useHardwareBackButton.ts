@@ -20,32 +20,7 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { AppView } from '../types';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
-
-type HardwareBackHandler = () => boolean;
-
-const hardwareBackHandlerStack: HardwareBackHandler[] = [];
-
-export const registerHardwareBackHandler = (handler: HardwareBackHandler) => {
-    hardwareBackHandlerStack.push(handler);
-
-    return () => {
-        const handlerIndex = hardwareBackHandlerStack.lastIndexOf(handler);
-        if (handlerIndex >= 0) {
-            hardwareBackHandlerStack.splice(handlerIndex, 1);
-        }
-    };
-};
-
-const runRegisteredHardwareBackHandler = () => {
-    for (let index = hardwareBackHandlerStack.length - 1; index >= 0; index -= 1) {
-        const handler = hardwareBackHandlerStack[index];
-        if (handler()) {
-            return true;
-        }
-    }
-
-    return false;
-};
+import { runRegisteredHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
 
 export const useHardwareBackButton = () => {
     const { isAIChatOpen, handleAIChatBack } = useAIChatWindow();

@@ -13,8 +13,6 @@ export interface ImmersiveStatusBarTransition {
   backgroundColor?: string;
   hideSystemBars?: boolean;
   restoreSystemBars?: boolean;
-  disableEdgeToEdgeInsets?: boolean;
-  enableEdgeToEdgeInsets?: boolean;
 }
 
 interface EdgeToEdgeBackgroundPlugin {
@@ -26,6 +24,7 @@ export function getImmersiveStatusBarTransition(
   phase: 'enter' | 'exit'
 ): ImmersiveStatusBarTransition {
   const isMobile = platform === 'android' || platform === 'ios';
+  const isAndroid = platform === 'android';
 
   if (!isMobile) {
     return {
@@ -34,32 +33,26 @@ export function getImmersiveStatusBarTransition(
       restoreManagedStatusBar: false,
       hideSystemBars: false,
       restoreSystemBars: false,
-      disableEdgeToEdgeInsets: false,
-      enableEdgeToEdgeInsets: false,
     };
   }
 
   if (phase === 'enter') {
     return {
       hide: false,
-      show: true,
+      show: !isAndroid,
       restoreManagedStatusBar: false,
       backgroundColor: '#000000',
       hideSystemBars: true,
       restoreSystemBars: false,
-      disableEdgeToEdgeInsets: true,
-      enableEdgeToEdgeInsets: false,
     };
   }
 
   return {
     hide: false,
-    show: true,
+    show: !isAndroid,
     restoreManagedStatusBar: true,
     hideSystemBars: false,
     restoreSystemBars: true,
-    disableEdgeToEdgeInsets: false,
-    enableEdgeToEdgeInsets: true,
   };
 }
 

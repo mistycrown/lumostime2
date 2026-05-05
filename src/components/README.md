@@ -10,7 +10,11 @@ Components that form the structural or global UI elements.
 - `Toast.tsx`: Notification system.
 
 ## Modals
-- Update 2026-05-05: `ImmersiveTimer.tsx` now restores Android system bars and reapplies edge-to-edge insets before closing the fullscreen layer, fixing the app-wide title/header drop that could happen after exiting immersive focus mode.
+- Update 2026-05-05: `AIBackfillChatModal.tsx` now keeps applied-result, memory-update, reminder-update, and retry blocks inside the main message column, so narrow mobile layouts no longer squeeze assistant bubbles into single-character vertical text.
+- Update 2026-05-05: `ImmersiveTimer.tsx` now leaves Android EdgeToEdge inset tracking enabled during immersive enter/exit and only lets system-bar visibility change, because manually disabling and re-enabling the native inset listener could leave the app header stack shifted downward after returning.
+- Update 2026-05-05: `ImmersiveTimer.tsx` now lets the Android immersive plugin own system-bar visibility during fullscreen entry/exit, avoiding the extra status-bar show/hide toggles that could leave app headers shifted after tapping the immersive close button.
+- Update 2026-05-05: `ImmersiveTimer.tsx` now restores Android system bars before closing the fullscreen layer, so the app shell returns through one consistent immersive teardown path.
+- Update 2026-05-05: `FocusDetailView.tsx` now lets the shared Android hardware-back stack exit immersive focus mode before closing the whole focus detail overlay, so system back follows the same fullscreen teardown path as the in-view exit button.
 - Update 2026-05-04: `AIBackfillChatModal.tsx` now opens a brand-new empty conversation whenever the user switches to another persona, so each chat window stays bound to one persona instead of changing persona in place.
 - Update 2026-05-04: `AIBackfillChatModal.tsx` now uses a WeChat-like grouped chat row layout, keeping the avatar beside the bubble, removing the per-message speaker label, and reusing the same avatar slot across consecutive turns from the same side.
 - Update 2026-05-04: `ImmersiveTimer.tsx` now anchors all top controls to one shared toolbar row and skips the managed `--status-bar-height` fallback in both portrait and landscape mode, fixing the immersive top-button drift that appeared after entering fullscreen on some mobile layouts.
@@ -117,6 +121,7 @@ Components for theme and appearance customization.
 > Last updated: 2026-04-27
 - `TodoQuickActionsModal.tsx`: Added an inline `删除任务 -> 确认删除？` two-step action so shared todo quick actions can remove a task directly from the sheet without opening the full detail editor first.
 - `TodoQuickActionsModal.tsx`: Android back now dismisses the shared quick-actions sheet before app-level navigation runs, and tapping the blurred backdrop closes the sheet without leaking the tap through to the todo row underneath.
+- `TodoQuickActionsModal.tsx`: Backdrop dismissal now happens on the backdrop click itself, so tapping the blurred outside area closes the current quick-actions sheet without click-through opening the todo row underneath, while the existing open-time guard still blocks same-tap flash closes.
 - `TodoAssociation.tsx`, `TodoScheduleAssignModal.tsx`: Shared todo pickers now hide unfinished subtasks whenever their parent todo is completed, so completed parents no longer leave orphan child rows in association or schedule-selection lists.
 - `TodoScheduleAssignModal.tsx`: The arrange/due picker now renders direct subtasks beneath their parent row with expandable hierarchy controls instead of flattening children into standalone cards.
 - `MainLayout.tsx`: The floating Tag/Scope and Chronicle/Memoir switch buttons now let fallback Lucide icons inherit the floating button color, so the default UI theme stays visible on white accent-theme buttons.

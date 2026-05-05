@@ -851,7 +851,10 @@ class WidgetBridgePlugin : Plugin() {
                         item.optInt("checkTargetCount", 1).coerceAtLeast(1)
                     } else {
                         null
-                    }
+                    },
+                    launchApp = item.optBoolean("launchApp", false),
+                    appPackageName = parseNullableString(item.optString("appPackageName")),
+                    appName = parseNullableString(item.optString("appName"))
                 )
             )
         }

@@ -1806,7 +1806,10 @@ object WidgetStores {
                             normalizePositiveInt(item.optInt("checkTargetCount"), 1)
                         } else {
                             null
-                        }
+                        },
+                        launchApp = item.optBoolean("launchApp", false),
+                        appPackageName = parseNullableString(item.optString("appPackageName")),
+                        appName = parseNullableString(item.optString("appName"))
                     )
                 )
             }
@@ -1880,6 +1883,9 @@ object WidgetStores {
                 put("checkItemId", item.checkItemId ?: JSONObject.NULL)
                 put("checkManualMode", item.checkManualMode ?: JSONObject.NULL)
                 put("checkTargetCount", item.checkTargetCount ?: JSONObject.NULL)
+                put("launchApp", item.launchApp)
+                put("appPackageName", item.appPackageName ?: JSONObject.NULL)
+                put("appName", item.appName ?: JSONObject.NULL)
             })
         }
         return array

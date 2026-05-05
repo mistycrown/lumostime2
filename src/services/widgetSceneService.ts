@@ -5,6 +5,7 @@
  * @pos Service
  * @description Resolves scene-group time slots into native-friendly timer, todo, and checklist widget items so Android can render and refresh the dedicated scene widget without reimplementing React-side business lookups.
  * @updated 2026-05-02: Added full scene widget payload builders that mirror scene groups, slot timing, and actionable card metadata for the dedicated 4x3 scene widget.
+ * @updated 2026-05-05: Mirrored scene card third-party app launch metadata into native payloads so the Android scene widget can match in-app launch behavior.
  */
 import type {
   Activity,
@@ -230,7 +231,10 @@ const buildTimerSceneItem = (card: SceneCardData, categories: Category[]): Widge
     checkTemplateId: null,
     checkItemId: null,
     checkManualMode: null,
-    checkTargetCount: null
+    checkTargetCount: null,
+    launchApp: Boolean(card.action.launchApp && card.action.appPackageName),
+    appPackageName: card.action.appPackageName?.trim() || null,
+    appName: card.action.appName?.trim() || null
   };
 };
 
@@ -267,7 +271,10 @@ const buildTodoSceneItem = (
     checkTemplateId: null,
     checkItemId: null,
     checkManualMode: null,
-    checkTargetCount: null
+    checkTargetCount: null,
+    launchApp: Boolean(card.action.launchApp && card.action.appPackageName),
+    appPackageName: card.action.appPackageName?.trim() || null,
+    appName: card.action.appName?.trim() || null
   };
 };
 
@@ -298,7 +305,10 @@ const buildChecklistSceneItem = (
     checkTemplateId: binding.checkTemplateId,
     checkItemId: binding.checkItemId,
     checkManualMode: normalizeSceneManualMode(binding.manualMode),
-    checkTargetCount: binding.targetCount
+    checkTargetCount: binding.targetCount,
+    launchApp: false,
+    appPackageName: null,
+    appName: null
   };
 };
 

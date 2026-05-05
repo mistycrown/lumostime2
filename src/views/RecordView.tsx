@@ -4,6 +4,9 @@
  * @output Measurement Start Event
  * @pos View (Main Tab)
  * @description The primary interface for starting new time blocks. Features a category sidebar and a grid of activity buttons with larger start-card icons.
+ * @updated 2026-05-05: Reworked the custom-background surface stack so the whole record page gets one shared base scrim and the right content panel adds a second warm overlay, eliminating sidebar seams without separate left-rail patches.
+ * @updated 2026-05-05: Matched the record-page sidebar width behavior to TodoView so the left-rail scrim and panel bridge render with the same visual footprint.
+ * @updated 2026-05-05: Softened the custom-background sidebar scrim with a warm bridge into the main panel so the record layout no longer shows a visible wallpaper seam.
  * @updated 2026-05-04: Added a custom-background-only sidebar scrim so left-rail category buttons stay legible over busy wallpapers.
  * @updated 2026-04-12: Softened the sidebar toggle button styling to reduce visual weight and keep it aligned with TodoView controls.
  * @updated 2026-04-20: Switched custom background rendering to the shared preloaded display hook and reduced mobile blur cost.
@@ -27,6 +30,14 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { backgroundUrl, hasBackground, panelOverlayOpacity, useReducedEffects } = useBackgroundDisplay();
+  const pageOverlayOpacity = hasBackground
+    ? Math.min(0.64, Math.max(0.46, panelOverlayOpacity + 0.06))
+    : 0.5;
+  const pageSurfaceColor = `rgba(250, 249, 246, ${pageOverlayOpacity})`;
+  const panelLayerOpacity = hasBackground
+    ? Math.max(0.18, panelOverlayOpacity - 0.08)
+    : panelOverlayOpacity;
+  const panelSurfaceColor = `rgba(250, 249, 246, ${panelLayerOpacity})`;
 
   // 初始化时从 localStorage 恢复用户上次选择的分组
   useEffect(() => {
@@ -79,20 +90,12 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
       )}
       
       {/* 全局半透明遮罩层 - 覆盖整个下半部分 */}
-      <div className="absolute inset-0 -z-10" style={{ backgroundColor: 'rgba(250, 249, 246, 0.5)' }}></div>
+      <div className="absolute inset-0 -z-10" style={{ backgroundColor: pageSurfaceColor }}></div>
       
       {/* Left Sidebar - Categories */}
-      {/* w-auto allows it to grow with text, max-w to prevent taking over too much space on tablets */}
       <div
-        className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative ${isSidebarOpen ? 'w-auto md:max-w-[14rem]' : 'w-16 items-center'}`}
+        className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative ${isSidebarOpen ? 'w-auto md:min-w-[12rem]' : 'w-16 items-center'}`}
       >
-        {hasBackground && (
-          <div
-            className="pointer-events-none absolute inset-0 z-0"
-            style={{ backgroundColor: 'rgba(250, 249, 246, 0.62)' }}
-          />
-        )}
-
         <div className="relative z-10 flex-1 w-full">
           {categories.map((category) => {
             const isSelected = selectedCategoryId === category.id;
@@ -151,7 +154,7 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
         <div 
           className={`absolute inset-0 -z-10 rounded-tl-[2rem] ${useReducedEffects ? '' : 'backdrop-blur-sm'}`}
           style={{
-            backgroundColor: `rgba(255, 255, 255, ${panelOverlayOpacity})`
+            backgroundColor: panelSurfaceColor
           }}
         />
 

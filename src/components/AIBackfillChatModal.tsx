@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-05: Kept applied-result, memory-update, reminder-update, and retry blocks inside the main message column so narrow mobile layouts no longer let those side panels squeeze assistant bubbles into single-character vertical text.
  * @updated 2026-05-04: Enlarged the in-chat avatars and tightened their icon centering so emoji, uploaded portraits, and fallback glyphs sit cleanly inside the message avatar frame.
  * @updated 2026-05-04: Made persona switching open a brand-new empty conversation bound to the selected persona, so each chat window stays locked to one persona instead of changing identity in place.
  * @updated 2026-05-04: Switched chat rows to a WeChat-like grouped layout where avatars sit beside the bubble, speaker labels are removed, and consecutive turns from the same side reuse the same avatar slot.
@@ -5096,74 +5097,73 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 </div>
               </div>
             )}
-          </div>
 
-          {allDisplayPartsRevealed && message.appliedActions && message.appliedActions.length > 0 && (
-            <div
-              className="space-y-2 border-l pl-3 pr-1 py-1"
-              style={{
-                borderColor: AI_CHAT_THEME.activeBorder
-              }}
-            >
-              <p className="font-serif text-[10px] tracking-[0.08em]" style={{ color: AI_CHAT_THEME.textFaint }}>
-                应用结果
-              </p>
-              <div className="space-y-2">
-                {message.appliedActions.map((action) => renderAppliedAction(message.id, action))}
+            {allDisplayPartsRevealed && message.appliedActions && message.appliedActions.length > 0 && (
+              <div
+                className="space-y-2 border-l pl-3 pr-1 py-1"
+                style={{
+                  borderColor: AI_CHAT_THEME.activeBorder
+                }}
+              >
+                <p className="font-serif text-[10px] tracking-[0.08em]" style={{ color: AI_CHAT_THEME.textFaint }}>
+                  应用结果
+                </p>
+                <div className="space-y-2">
+                  {message.appliedActions.map((action) => renderAppliedAction(message.id, action))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {allDisplayPartsRevealed && message.memoryUpdates && message.memoryUpdates.length > 0 && isMemoryUpdatesExpanded && (
-            <div
-              className="space-y-2 border-l pl-3 pr-1 py-1"
-              style={{
-                borderColor: AI_CHAT_THEME.activeBorder
-              }}
-            >
-              <div className="space-y-2">
-                {message.memoryUpdates.map((section) => (
-                  <div
-                    key={`${message.id}-memory-${section.label}`}
-                    className="border-l-2 pl-3 pr-1 py-1"
-                    style={{ borderColor: AI_CHAT_THEME.activeBorder }}
-                  >
-                    <p className="text-[11px] font-semibold" style={{ color: AI_CHAT_THEME.textSecondary }}>
-                      {section.label}
-                    </p>
-                    <div className="mt-1.5 space-y-1 text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textPrimary }}>
-                      {section.items.map((item) => (
-                        <p key={`${message.id}-memory-item-${section.label}-${item}`}>{item}</p>
-                      ))}
+            {allDisplayPartsRevealed && message.memoryUpdates && message.memoryUpdates.length > 0 && isMemoryUpdatesExpanded && (
+              <div
+                className="space-y-2 border-l pl-3 pr-1 py-1"
+                style={{
+                  borderColor: AI_CHAT_THEME.activeBorder
+                }}
+              >
+                <div className="space-y-2">
+                  {message.memoryUpdates.map((section) => (
+                    <div
+                      key={`${message.id}-memory-${section.label}`}
+                      className="border-l-2 pl-3 pr-1 py-1"
+                      style={{ borderColor: AI_CHAT_THEME.activeBorder }}
+                    >
+                      <p className="text-[11px] font-semibold" style={{ color: AI_CHAT_THEME.textSecondary }}>
+                        {section.label}
+                      </p>
+                      <div className="mt-1.5 space-y-1 text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textPrimary }}>
+                        {section.items.map((item) => (
+                          <p key={`${message.id}-memory-item-${section.label}-${item}`}>{item}</p>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {allDisplayPartsRevealed && message.reminderUpdates && message.reminderUpdates.length > 0 && isReminderUpdatesExpanded && (
-            <div
-              className="space-y-2 border-l pl-3 pr-1 py-1"
-              style={{
-                borderColor: AI_CHAT_THEME.activeBorder
-              }}
-            >
-              <div className="space-y-2">
-                {message.reminderUpdates.map((item) => (
-                  <div
-                    key={`${message.id}-reminder-${item}`}
-                    className="border-l-2 pl-3 pr-1 py-1"
-                    style={{ borderColor: AI_CHAT_THEME.activeBorder }}
-                  >
-                    <p className="text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textPrimary }}>
-                      {item}
-                    </p>
-                  </div>
-                ))}
+            {allDisplayPartsRevealed && message.reminderUpdates && message.reminderUpdates.length > 0 && isReminderUpdatesExpanded && (
+              <div
+                className="space-y-2 border-l pl-3 pr-1 py-1"
+                style={{
+                  borderColor: AI_CHAT_THEME.activeBorder
+                }}
+              >
+                <div className="space-y-2">
+                  {message.reminderUpdates.map((item) => (
+                    <div
+                      key={`${message.id}-reminder-${item}`}
+                      className="border-l-2 pl-3 pr-1 py-1"
+                      style={{ borderColor: AI_CHAT_THEME.activeBorder }}
+                    >
+                      <p className="text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textPrimary }}>
+                        {item}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
             {!isUser && tone === 'error' && message.retryInput && (
               <div className="pl-1">
@@ -5182,6 +5182,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 </button>
               </div>
             )}
+          </div>
         </div>
       </div>
     );
