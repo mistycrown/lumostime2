@@ -4,6 +4,7 @@
  * @output Regression coverage for expanded subtask display ordering
  * @pos Test
  * @description Verifies that expanded parent-task displays can show all direct subtasks while prioritizing unfinished items ahead of completed ones.
+ * @updated 2026-05-05: Added regression coverage so tree building preserves incoming root order for pin-first picker and schedule lists.
  * @updated 2026-04-30: Added coverage for completed-subtask labels that append parent context in done timelines.
  * @updated 2026-04-25: Added coverage for hiding unfinished subtasks when their parent todo is completed without mutating child completion flags.
  * @updated 2026-04-22: Added tests for direct-child display ordering plus optional completed-task filtering.
@@ -13,6 +14,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TodoItem } from '../types';
 import {
+  buildTodoTreeItems,
   formatCompletedTodoLabel,
   getDirectChildTodosForDisplay,
   isIncompleteSubtaskHiddenByCompletedParent
@@ -52,6 +54,38 @@ const baseTodos: TodoItem[] = [
 ];
 
 describe('todoHierarchyUtils display ordering', () => {
+  it('preserves the incoming root todo order when building tree items', () => {
+    const orderedTodos: TodoItem[] = [
+      {
+        id: 'pinned-z',
+        categoryId: 'cat-1',
+        title: 'Zeta pinned',
+        isCompleted: false,
+        pin: true
+      } as TodoItem,
+      {
+        id: 'scheduled-a',
+        categoryId: 'cat-1',
+        title: 'Alpha scheduled',
+        isCompleted: false,
+        scheduledDate: '2026-05-05'
+      } as TodoItem,
+      {
+        id: 'pinned-b',
+        categoryId: 'cat-1',
+        title: 'Beta pinned',
+        isCompleted: false,
+        pin: true
+      } as TodoItem
+    ];
+
+    expect(buildTodoTreeItems(orderedTodos).map((item) => item.todo.id)).toEqual([
+      'pinned-z',
+      'scheduled-a',
+      'pinned-b'
+    ]);
+  });
+
   it('keeps childOrder sorting when incomplete-first ordering is disabled', () => {
     expect(getDirectChildTodosForDisplay(baseTodos, 'parent-1').map((todo) => todo.id)).toEqual([
       'child-1-done',

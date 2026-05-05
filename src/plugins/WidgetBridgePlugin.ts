@@ -92,6 +92,7 @@ export interface WidgetBridgePendingAction {
   createdAt: number;
   linkedTodoId?: string | null;
   scopeIds?: string[] | null;
+  note?: string | null;
 }
 
 export interface WidgetBridgeRuntimeState {
@@ -109,6 +110,10 @@ export interface WidgetBridgeRuntimeState {
   slotIndex?: number | null;
   templateId?: string | null;
   appWidgetId?: number | null;
+}
+
+export interface WidgetBridgeLogTailState {
+  latestLogEndTime: number | null;
 }
 
 export interface WidgetBridgeDailyCheckMeta {
@@ -316,6 +321,7 @@ export interface WidgetBridgePlugin {
   syncTrackingCalendarWidgetData(options: { payload: WidgetBridgeTrackingCalendarPayload | null }): Promise<void>;
   syncSceneWidgetData(options: { payload: WidgetBridgeScenePayload | null }): Promise<void>;
   refreshWidget(options?: { appWidgetId?: number; templateId?: string }): Promise<void>;
+  syncLogTailState(options: { logTailState: WidgetBridgeLogTailState | null }): Promise<void>;
 }
 
 const WidgetBridge = registerPlugin<WidgetBridgePlugin>('WidgetBridge', {

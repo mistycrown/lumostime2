@@ -116,6 +116,7 @@ object WidgetTapAnimationModes {
     const val TIMER_STOP = "timer_stop"
     const val DAILY_COMPLETE = "daily_complete"
     const val DAILY_COUNT = "daily_count"
+    const val SHORTCUT_SUCCESS = "shortcut_success"
 }
 
 object WidgetSceneRefreshAnimationModes {
@@ -260,7 +261,12 @@ data class WidgetPendingAction(
     val endedAt: Long,
     val createdAt: Long,
     val linkedTodoId: String? = null,
-    val scopeIds: List<String> = emptyList()
+    val scopeIds: List<String> = emptyList(),
+    val note: String? = null
+)
+
+data class WidgetLogTailState(
+    val latestLogEndTime: Long? = null
 )
 
 data class WidgetDailyCheckMeta(

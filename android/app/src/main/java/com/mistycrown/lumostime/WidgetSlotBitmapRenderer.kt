@@ -16,6 +16,7 @@ import android.util.LruCache
  *
  * Updated 2026-04-25: Prefer packaged UI icon assets for widget slots and
  * cache decoded bitmaps so unlocked icon rendering does not add visible lag.
+ * Updated 2026-05-05: Reused the daily completion checkmark for successful quick-punch shortcut taps.
  */
 object WidgetSlotBitmapRenderer {
     private const val SLOT_SIZE_DP = 72f
@@ -127,6 +128,7 @@ object WidgetSlotBitmapRenderer {
         tapScale: Float
     ) {
         val baseColor = parseColor(slot.color)
+        val accentColor = darkenColor(baseColor, 0.34f)
         val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = blendWithWhite(baseColor, 0.76f)
             style = Paint.Style.FILL
@@ -136,6 +138,19 @@ object WidgetSlotBitmapRenderer {
         val animatedCircleRadius = (circleRadius * getTapCircleScale(slot.tapAnimationProgress))
             .coerceAtMost((sizePx / 2f) - 1f)
         canvas.drawCircle(sizePx / 2f, sizePx / 2f, animatedCircleRadius, fillPaint)
+
+        if (slot.tapAnimationMode == WidgetTapAnimationModes.SHORTCUT_SUCCESS) {
+            drawCenteredText(
+                canvas = canvas,
+                context = context,
+                sizePx = sizePx,
+                text = CHECK_MARK,
+                textSizeDp = DAILY_CHECK_TEXT_SIZE_DP,
+                textColor = accentColor,
+                tapScale = tapScale
+            )
+            return
+        }
 
         drawCenteredIconOrText(
             canvas = canvas,

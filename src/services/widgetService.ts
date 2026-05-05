@@ -12,6 +12,7 @@
  * @updated 2026-05-01: Added tracking-calendar template normalization and payload builders for the dedicated 2x2 tracking calendar widget.
  * @updated 2026-05-03: Fixed UI-icon sanitization so only changed templates receive new timestamps, and centralized normalized template equality checks.
  * @updated 2026-05-05: Expanded TODAY + PIN payload builders to include native-refresh source snapshots so Android can rebuild today's list from mirrored app todos.
+ * @updated 2026-05-05: Added log-tail bridge helpers so native quick-punch shortcuts can fill today's gap without foregrounding the app.
 */
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, CheckTemplate, DailyReview, Log, TodoItem } from '../types';
@@ -26,6 +27,7 @@ import type {
   WidgetBridgeDailySyncPayload,
   WidgetBridgeInstanceBinding,
   WidgetBridgePendingAction,
+  WidgetBridgeLogTailState,
   WidgetBridgeRuntimeState,
   WidgetBridgeSlot,
   WidgetBridgeTemplate,
@@ -975,11 +977,24 @@ export const buildLogFromWidgetPendingAction = (action: WidgetBridgePendingActio
   startTime: action.startedAt,
   endTime: action.endedAt,
   duration: Math.max(0, (action.endedAt - action.startedAt) / 1000),
-  note: '',
+  note: action.note || '',
   title: action.label || undefined,
   linkedTodoId: action.linkedTodoId || undefined,
   scopeIds: action.scopeIds ?? undefined
 });
+
+export const buildWidgetLogTailState = (
+  logs: Log[]
+): WidgetBridgeLogTailState => {
+  const latestLogEndTime = logs.reduce<number | null>(
+    (latest, log) => (latest === null || log.endTime > latest ? log.endTime : latest),
+    null
+  );
+
+  return {
+    latestLogEndTime
+  };
+};
 
 export const buildDailyWidgetSyncPayload = ({
   dailyReviews,

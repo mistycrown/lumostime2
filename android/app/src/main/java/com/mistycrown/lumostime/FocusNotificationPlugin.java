@@ -70,6 +70,17 @@ public class FocusNotificationPlugin extends Plugin {
     /**
      * 静态方法: 从悬浮球触发开始计时事件(提醒模式)
      */
+    public static void triggerStopFocusFromFloating(String sessionId) {
+        if (instance != null && instance.getBridge() != null) {
+            Log.d(TAG, "triggerStopFocusFromFloating with sessionId=" + sessionId);
+            JSObject payload = new JSObject();
+            payload.put("sessionId", sessionId);
+            instance.getBridge().triggerWindowJSEvent("stopFocusFromFloating", payload.toString());
+        } else {
+            Log.w(TAG, "Unable to trigger stopFocusFromFloating: plugin instance or bridge is null");
+        }
+    }
+
     public static void triggerStartFocusFromPrompt(String packageName, String appLabel, String realAppName,
             String activityId) {
         if (instance != null && instance.getBridge() != null) {

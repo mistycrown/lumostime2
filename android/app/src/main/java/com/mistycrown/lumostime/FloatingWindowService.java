@@ -597,7 +597,12 @@ public class FloatingWindowService extends Service {
             // 如果当前是专注状态,通知React Native结束计时
             if (isFocusing) {
                 Log.d(TAG, "🎯 悬浮球点击: 专注状态 -> 触发结束计时");
-                FocusNotificationPlugin.triggerStopFocusFromFloating();
+                WidgetRuntimeState stoppedWidgetRuntime = WidgetTimerController.stopWidgetRuntimeFromExternalTrigger(this);
+                if (stoppedWidgetRuntime != null) {
+                    FocusNotificationPlugin.triggerStopFocusFromFloating(stoppedWidgetRuntime.getId());
+                } else {
+                    FocusNotificationPlugin.triggerStopFocusFromFloating();
+                }
                 return;
             }
 

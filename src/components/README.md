@@ -10,6 +10,7 @@ Components that form the structural or global UI elements.
 - `Toast.tsx`: Notification system.
 
 ## Modals
+- Update 2026-05-05: `ImmersiveTimer.tsx` now restores Android system bars and reapplies edge-to-edge insets before closing the fullscreen layer, fixing the app-wide title/header drop that could happen after exiting immersive focus mode.
 - Update 2026-05-04: `AIBackfillChatModal.tsx` now opens a brand-new empty conversation whenever the user switches to another persona, so each chat window stays bound to one persona instead of changing persona in place.
 - Update 2026-05-04: `AIBackfillChatModal.tsx` now uses a WeChat-like grouped chat row layout, keeping the avatar beside the bubble, removing the per-message speaker label, and reusing the same avatar slot across consecutive turns from the same side.
 - Update 2026-05-04: `ImmersiveTimer.tsx` now anchors all top controls to one shared toolbar row and skips the managed `--status-bar-height` fallback in both portrait and landscape mode, fixing the immersive top-button drift that appeared after entering fullscreen on some mobile layouts.

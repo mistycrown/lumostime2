@@ -25,7 +25,6 @@ import {
   sanitizeWidgetTemplatesForUiIconSupport
 } from './widgetService';
 import widgetBridgePluginSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetBridgePlugin.kt?raw';
-import widgetSceneRefreshBitmapRendererSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetSceneRefreshBitmapRenderer.kt?raw';
 import widgetRefreshCoordinatorSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetRefreshCoordinator.kt?raw';
 import widgetSceneCardsRemoteViewsServiceSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetSceneCardsRemoteViewsService.java?raw';
 import widgetSceneProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetSceneProviderSupport.java?raw';
@@ -469,9 +468,9 @@ describe('WidgetSceneProviderSupport', () => {
     expect(widgetSceneProviderSupportSource).toContain('Intent.ACTION_USER_PRESENT');
     expect(widgetSceneProviderSupportSource).toContain('saveSceneMorningRefreshDate');
     expect(widgetSceneProviderSupportSource).toContain('saveSceneRefreshAnimationState');
-    expect(widgetSceneProviderSupportSource).toContain('WidgetSceneRefreshBitmapRenderer.INSTANCE.render');
+    expect(widgetSceneProviderSupportSource).toContain('R.drawable.widget_todo_pin_refresh_icon');
+    expect(widgetSceneProviderSupportSource).toContain('R.drawable.widget_todo_pin_refresh_icon_5');
     expect(widgetSceneProviderSupportSource).toContain('R.id.widget_scene_refresh_root');
-    expect(widgetSceneRefreshBitmapRendererSource).toContain('TOTAL_ROTATION_DEGREES = 360f');
     expect(widgetRefreshCoordinatorSource).toContain('fun refreshSceneWidgetWithFeedback(context: Context, appWidgetId: Int)');
     expect(widgetSceneLayoutSource).toContain('widget_scene_refresh_root');
     expect(widgetSceneLayoutSource).toContain('widget_scene_refresh_icon');

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
@@ -13,9 +14,15 @@ import java.util.UUID
  * Updated 2026-05-02: Added dedicated scene-widget item handling for timer-like cards and checklist cards.
  * Updated 2026-05-03: Reused the shared tap-animation state for scene widget items so scene timers and checklist cards get the same springy tap feedback as the timer widget family.
  * Updated 2026-05-03: Consolidated daily-slot and scene-checklist completion handling into one shared helper to keep widget-side checklist rules in sync.
+ * Updated 2026-05-05: Added an external-stop helper so the floating window can end widget-started sessions even when the web layer has not hydrated them yet.
+ * Updated 2026-05-05: Executes quick-punch shortcuts natively with a daily-style success checkmark instead of foregrounding the app.
  */
 object WidgetTimerController {
     private const val TAP_FEEDBACK_DURATION_MS = 260L
+    private const val SHORTCUT_SUCCESS_FEEDBACK_DURATION_MS = 1000L
+    private const val QUICK_PUNCH_CATEGORY_ID = "uncategorized"
+    private const val QUICK_PUNCH_ACTIVITY_ID = "quick_punch"
+    private const val QUICK_PUNCH_TITLE = "快速打点"
 
     private data class DailyTapMutationResult(
         val animationMode: String,
@@ -221,6 +228,24 @@ object WidgetTimerController {
         val normalizedWidgetType = WidgetTypes.normalize(slot.slotType)
         val startedAt = System.currentTimeMillis()
 
+        if (action == QUICK_PUNCH_ACTIVITY_ID) {
+            val didRecord = handleQuickPunchShortcut(context, appWidgetId, slot, startedAt)
+            if (!didRecord) {
+                return false
+            }
+
+            saveTapAnimation(
+                context,
+                appWidgetId = appWidgetId,
+                widgetType = normalizedWidgetType,
+                slotIndex = slot.slotIndex,
+                animationMode = WidgetTapAnimationModes.SHORTCUT_SUCCESS,
+                startedAt = startedAt,
+                durationMs = SHORTCUT_SUCCESS_FEEDBACK_DURATION_MS
+            )
+            return true
+        }
+
         saveTapAnimation(
             context,
             appWidgetId = appWidgetId,
@@ -238,6 +263,52 @@ object WidgetTimerController {
             `package` = context.packageName
         }
         context.startActivity(intent)
+        return true
+    }
+
+    private fun handleQuickPunchShortcut(
+        context: Context,
+        appWidgetId: Int,
+        slot: WidgetSlotConfig,
+        occurredAt: Long
+    ): Boolean {
+        val todayStart = Calendar.getInstance().apply {
+            timeInMillis = occurredAt
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val latestLogEndTime = WidgetStores.loadLogTailState(context)?.latestLogEndTime
+
+        if (latestLogEndTime != null && latestLogEndTime > occurredAt) {
+            return false
+        }
+
+        val startTime = maxOf(latestLogEndTime ?: todayStart, todayStart)
+        if (occurredAt <= startTime) {
+            return false
+        }
+
+        val pendingAction = WidgetPendingAction(
+            id = UUID.randomUUID().toString(),
+            widgetType = WidgetTypes.SHORTCUT,
+            activityId = QUICK_PUNCH_ACTIVITY_ID,
+            categoryId = QUICK_PUNCH_CATEGORY_ID,
+            icon = slot.icon?.ifBlank { null } ?: "\u26A1",
+            label = slot.label?.ifBlank { null } ?: QUICK_PUNCH_TITLE,
+            color = slot.color?.ifBlank { null } ?: "#FEF3C7",
+            startedAt = startTime,
+            endedAt = occurredAt,
+            createdAt = occurredAt,
+            note = ""
+        )
+        WidgetStores.appendPendingAction(context, pendingAction)
+        WidgetStores.saveLogTailState(
+            context,
+            WidgetLogTailState(latestLogEndTime = occurredAt)
+        )
+        WidgetRefreshCoordinator.refreshWidgetWithTapFeedback(context, appWidgetId)
         return true
     }
 
@@ -431,7 +502,8 @@ object WidgetTimerController {
         widgetType: String,
         slotIndex: Int,
         animationMode: String,
-        startedAt: Long
+        startedAt: Long,
+        durationMs: Long = TAP_FEEDBACK_DURATION_MS
     ) {
         WidgetStores.saveTapAnimationState(
             context,
@@ -441,9 +513,27 @@ object WidgetTimerController {
                 slotIndex = slotIndex,
                 animationMode = animationMode,
                 startedAt = startedAt,
-                expiresAt = startedAt + TAP_FEEDBACK_DURATION_MS
+                expiresAt = startedAt + durationMs
             )
         )
+    }
+
+    @JvmStatic
+    fun stopWidgetRuntimeFromExternalTrigger(context: Context): WidgetRuntimeState? {
+        val runtimeState = WidgetStores.loadRuntimeState(context) ?: return null
+        if (runtimeState.source != "widget") {
+            return null
+        }
+
+        val endedAt = System.currentTimeMillis()
+        finishRuntime(context, runtimeState, endedAt)
+        WidgetStores.saveRuntimeState(context, null)
+        WidgetStores.saveLastWidgetStopAt(context, endedAt)
+        WidgetRefreshCoordinator.refreshTimerWidgets(context)
+        WidgetRefreshCoordinator.refreshTodoPinWidgets(context)
+        WidgetRefreshCoordinator.refreshSceneWidgets(context)
+        FloatingWindowService.syncFocusStateIfRunning(runtimeState.icon, false, 0L)
+        return runtimeState
     }
 
     private fun finishRuntime(context: Context, runtimeState: WidgetRuntimeState, endedAt: Long) {

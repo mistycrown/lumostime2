@@ -8,6 +8,7 @@
  * @updated 2026-04-27: Re-serialized assistant-facing memory and trigger timestamps into local-offset ISO strings so prompt debug views no longer surface backend UTC `Z` forms.
  * @updated 2026-04-27: Added structured silent-reason, decision-summary, side-effect, and multi-bubble reply-part guidance to the unified output prompt schema.
  * @updated 2026-04-27: Made long-term-memory prompt sections optional so turns can skip memory rules and snapshots entirely when the feature is disabled.
+ * @updated 2026-05-05: Added a hard structured-output guardrail so unified assistant turns must return one strict JSON object with no prose, code fences, or extra wrapper text.
  * @updated 2026-04-26: Switched dictionary prompt serialization from pretty JSON to compact table-style text to reduce token overhead while preserving candidate ids.
  * @updated 2026-04-26: Broke recent compressed log history into its own prompt section so debug viewers can inspect it separately from candidate dictionaries.
  * @updated 2026-04-26: Added the first unified assistant-turn service with layered prompt assembly, shared context serialization, and a single structured aiService gateway call.
@@ -34,6 +35,16 @@ export interface AssistantUnifiedTurnResult {
 const stringifyJson = (value: unknown): string => JSON.stringify(value, null, 2);
 
 const MEMORY_DISABLED_RULE = '- Long-term memory is disabled for this turn. Set memoryAction to "no_update" and omit memoryPatch.';
+const STRICT_JSON_OUTPUT_RULES = [
+  '=== Structured Output Contract ===',
+  'You must return exactly one strict JSON object.',
+  'Do not return any text before or after the JSON object.',
+  'Do not use Markdown, code fences, comments, headings, or natural-language explanation.',
+  'Do not wrap the JSON in ```json fences.',
+  'Do not output placeholder prose such as "Here is the JSON", "There was", or any apology/explanation text.',
+  'Every returned field must follow the provided schema exactly. If some field is not needed, omit it instead of explaining it in prose.',
+  'Your entire response must be valid JSON parsable by JSON.parse with no cleanup step.'
+].join('\n');
 
 const formatPromptDateTime = (value?: string | null): string | undefined => {
   if (typeof value !== 'string' || !value.trim()) {
@@ -156,6 +167,8 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
     '',
     `=== ${toolPromptLabel} ===`,
     toolSchemaPrompt,
+    '',
+    STRICT_JSON_OUTPUT_RULES,
     ...(memoryEnabled && memoryRulesPrompt ? ['', '=== Memory Update Rules ===', memoryRulesPrompt] : []),
     '=== Unified Turn Output Schema ===',
     stringifyJson(outputSchema),
