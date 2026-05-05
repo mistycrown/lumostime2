@@ -4,6 +4,7 @@
  * @output Session Updates (Note, Association), Completion Event
  * @pos View (Active Focus Overlay)
  * @description The main interface displayed during an active focus session. Shows the timer, allows associating the session with a Todo or Scope, editing the note, completing the session, and applying inline note templates.
+ * @updated 2026-05-05: Registered immersive focus mode with the shared Android back-handler stack so system back exits fullscreen before dismissing the focus detail overlay.
  * @updated 2026-04-22: Enabled hierarchical todo selection so focus-session todo pickers can expand subtasks beneath collapsed parent tasks.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -21,6 +22,7 @@ import { ReactionPicker, ReactionList } from '../components/ReactionComponents';
 import { RecommendedNoteTemplates } from '../components/RecommendedNoteTemplates';
 import { appendTemplateToNote, getRecommendedNoteTemplates, RecommendedNoteTemplate } from '../utils/noteTemplateUtils';
 import { getTodoProgressSnapshot, shouldTodoUseManualProgressInput } from '../utils/todoProgressUtils';
+import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
 
 interface FocusDetailViewProps {
     session: ActiveSession;
@@ -73,6 +75,17 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
             setProgressAmount(0);
         }
     }, [canUseManualProgressIncrement, progressAmount]);
+
+    useEffect(() => {
+        if (!isImmersiveMode) {
+            return;
+        }
+
+        return registerHardwareBackHandler(() => {
+            setIsImmersiveMode(false);
+            return true;
+        });
+    }, [isImmersiveMode]);
 
     // Auto-focus note input
     useEffect(() => {

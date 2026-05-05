@@ -4,6 +4,8 @@
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
  * @pos Component
  * @description A reusable bottom sheet that exposes lightweight todo planning and completion actions without opening the full todo detail editor first.
+ * @updated 2026-05-05: Moved backdrop dismissal onto the backdrop click itself so outside taps close the current sheet without click-through opening the todo row underneath, while the existing open-time close guard still blocks same-tap flash-closes.
+ * @updated 2026-05-05: Split normal backdrop dismissal from forced hardware-back dismissal so row taps can still open the sheet without the same click instantly closing it.
  * @updated 2026-05-04: Registered with the shared Android back-handler stack and consumed backdrop clicks so the sheet closes before app exit or underlying todo taps can fire.
  * @updated 2026-04-27: Added an inline two-step delete action so the shared todo quick-actions sheet can remove tasks without opening the full detail editor.
  * @updated 2026-04-21: Added pin/unpin quick action support plus pinned-state metadata for today-schedule prioritization.
@@ -14,7 +16,7 @@ import React, { useEffect, useState } from 'react';
 import { CalendarDays, Check, CheckCircle2, Flag, PanelRightOpen, Pin, Trash2, X } from 'lucide-react';
 import { TodoItem } from '../types';
 import { parseDateKey } from '../utils/todoScheduleUtils';
-import { registerHardwareBackHandler } from '../hooks/useHardwareBackButton';
+import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
 
 interface TodoQuickActionsModalProps {
   isOpen: boolean;
@@ -27,6 +29,7 @@ interface TodoQuickActionsModalProps {
   onTogglePin: () => void;
   onDelete: () => void;
   onClose: () => void;
+  onForceClose?: () => void;
 }
 
 export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
@@ -39,7 +42,8 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   onUndoComplete,
   onTogglePin,
   onDelete,
-  onClose
+  onClose,
+  onForceClose
 }) => {
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
 
@@ -58,10 +62,14 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
         return true;
       }
 
-      onClose();
+      if (onForceClose) {
+        onForceClose();
+      } else {
+        onClose();
+      }
       return true;
     });
-  }, [isDeleteConfirming, isOpen, onClose]);
+  }, [isDeleteConfirming, isOpen, onClose, onForceClose]);
 
   if (!isOpen || !todo) return null;
 
@@ -90,6 +98,14 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
     { label: '完成', value: formatQuickActionDateTime(todo.completedAt) }
   ].filter((item): item is { label: string; value: string } => Boolean(item.value));
 
+  const handleBackdropPointerDown: React.PointerEventHandler<HTMLDivElement> = (event) => {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+
+    event.stopPropagation();
+  };
+
   const handleBackdropClick: React.MouseEventHandler<HTMLDivElement> = (event) => {
     if (event.target !== event.currentTarget) {
       return;
@@ -103,11 +119,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   return (
     <div
       className="fixed inset-0 z-[130] flex items-end justify-center bg-[rgba(15,23,42,0.12)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-12 backdrop-blur-sm md:items-center md:pb-4"
-      onPointerDown={(event) => {
-        if (event.target === event.currentTarget) {
-          event.stopPropagation();
-        }
-      }}
+      onPointerDown={handleBackdropPointerDown}
       onClick={handleBackdropClick}
     >
       <div

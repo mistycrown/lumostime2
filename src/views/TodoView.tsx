@@ -4,6 +4,12 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
+ * @updated 2026-05-05: Stopped list-row left drags from changing completion state at all, so bottom-edge taps now stay on the quick-actions/detail path instead of mutating todos.
+ * @updated 2026-05-05: Stopped completed rows from undoing via left swipe, so accidental lower-list taps no longer reopen finished todos by mistake.
+ * @updated 2026-05-05: Restored recurring and normal incomplete rows onto the same tap/right-swipe gesture path, while moving completion changes into quick actions.
+ * @updated 2026-05-05: Replaced todo-row tap/swipe heuristics with an axis-locked gesture classifier so lower-list taps no longer get swallowed or accidentally toggle completion during scrolling.
+ * @updated 2026-05-05: Reworked the custom-background surface stack so the whole todo page gets one shared base scrim and the right content panel adds a second warm overlay, eliminating sidebar seams without separate left-rail patches.
+ * @updated 2026-05-05: Softened the custom-background sidebar scrim with a warm bridge into the main panel so the todo layout no longer shows a visible wallpaper seam.
  * @updated 2026-05-04: Added a custom-background-only sidebar scrim so the todo left rail stays readable over wallpaper textures.
  * @updated 2026-04-27: Routed the shared quick-actions sheet into todo deletion and added an inline two-tap delete entry for list and week-view action bars.
  * @updated 2026-04-25: Hide unfinished subtasks from todo-list rendering whenever their parent task is completed, while preserving child state and restoring the rows when the parent is reopened.
@@ -94,6 +100,7 @@ import { TodoDatePickerModal } from '../components/TodoDatePickerModal';
 import { TodoDuplicateModal } from '../components/TodoDuplicateModal';
 import { TodoQuickActionsModal } from '../components/TodoQuickActionsModal';
 import { useTodoQuickActions } from '../hooks/useTodoQuickActions';
+import { getTodoRowGestureIntent, getTodoRowReleaseAction, TodoRowGestureIntent } from '../utils/todoRowInteraction';
 import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodosForDisplay, getParentTodo, isIncompleteSubtaskHiddenByCompletedParent } from '../utils/todoHierarchyUtils';
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
 import { UnreadCountBadge } from '../components/UnreadCountBadge';
@@ -158,7 +165,7 @@ const SwipeableTodoItem: React.FC<{
   isLast = false
 }) => {
   const [translateX, setTranslateX] = useState(0);
-  const canQuickToggle = !todo.recurrenceRule;
+  const canQuickToggle = false;
   const visibleScheduleMatchLabels = scheduleMatchLabels.slice(0, VIRTUAL_SCHEDULE_MATCH_LIMIT);
   const hiddenScheduleMatchCount = Math.max(0, scheduleMatchLabels.length - visibleScheduleMatchLabels.length);
   const scheduledDateLabel = formatTodoInlineDate(todo.scheduledDate);
@@ -176,7 +183,6 @@ const SwipeableTodoItem: React.FC<{
     : 'inline-flex min-h-[1.5rem] max-w-full items-center gap-1 whitespace-nowrap rounded-full border border-stone-200 bg-white/80 px-2 py-0.5 font-medium leading-none text-stone-500 text-[11px] align-middle';
 
   // Constants
-  const tapActionThreshold = 10;
   const detailSwipeDistance = 36;
   const duplicateSwipeDistance = 100;
   const minSwipeDistance = 100;
@@ -184,10 +190,12 @@ const SwipeableTodoItem: React.FC<{
   const shouldSuppressClickRef = useRef(false);
   const pointerStartPointRef = useRef<{ x: number; y: number } | null>(null);
   const activePointerIdRef = useRef<number | null>(null);
+  const gestureIntentRef = useRef<TodoRowGestureIntent>('pending');
 
   const resetPointerGesture = () => {
     pointerStartPointRef.current = null;
     activePointerIdRef.current = null;
+    gestureIntentRef.current = 'pending';
     setTranslateX(0);
   };
 
@@ -201,6 +209,7 @@ const SwipeableTodoItem: React.FC<{
     shouldSuppressClickRef.current = false;
     pointerStartPointRef.current = { x: event.clientX, y: event.clientY };
     activePointerIdRef.current = event.pointerId;
+    gestureIntentRef.current = 'pending';
   };
 
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -209,8 +218,15 @@ const SwipeableTodoItem: React.FC<{
     const diffX = event.clientX - pointerStartPointRef.current.x;
     const diffY = event.clientY - pointerStartPointRef.current.y;
 
-    // Let mostly-vertical movements behave like scrolls instead of half-starting swipe actions.
-    if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > tapActionThreshold) {
+    if (gestureIntentRef.current === 'pending') {
+      gestureIntentRef.current = getTodoRowGestureIntent({
+        diffX,
+        diffY,
+        canQuickToggle
+      });
+    }
+
+    if (gestureIntentRef.current !== 'swipe') {
       setTranslateX(0);
       return;
     }
@@ -243,27 +259,25 @@ const SwipeableTodoItem: React.FC<{
 
     const diffX = event.clientX - pointerStartPointRef.current.x;
     const diffY = event.clientY - pointerStartPointRef.current.y;
-    const travelDistance = Math.hypot(diffX, diffY);
-    let handledGesture = false;
-    const isHorizontalGesture = Math.abs(diffX) > Math.abs(diffY);
+    const releaseAction = getTodoRowReleaseAction({
+      diffX,
+      diffY,
+      canQuickToggle,
+      gestureIntent: gestureIntentRef.current,
+      detailSwipeDistance,
+      duplicateSwipeDistance,
+      completeSwipeDistance: minSwipeDistance
+    });
+    let handledGesture = releaseAction !== 'none';
 
-    if (travelDistance <= tapActionThreshold) {
-      handledGesture = true;
+    if (releaseAction === 'openQuickActions') {
       onOpenQuickActions(todo);
-    } else if (isHorizontalGesture) {
-      if (diffX > duplicateSwipeDistance) {
-        // Deep right swipe -> Duplicate
-        handledGesture = true;
-        onDuplicate(todo);
-      } else if (diffX > detailSwipeDistance) {
-        // Light right swipe -> Open detail page
-        handledGesture = true;
-        onOpenDetail(todo);
-      } else if (canQuickToggle && diffX < -minSwipeDistance) {
-        // Left Swipe -> Toggle Complete
-        handledGesture = true;
-        onToggle(todo.id);
-      }
+    } else if (releaseAction === 'duplicate') {
+      onDuplicate(todo);
+    } else if (releaseAction === 'openDetail') {
+      onOpenDetail(todo);
+    } else if (releaseAction === 'toggleComplete') {
+      onToggle(todo.id);
     }
 
     shouldSuppressClickRef.current = handledGesture;
@@ -945,6 +959,14 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [expandedParentIds, setExpandedParentIds] = useState<Record<string, boolean>>({});
   const { backgroundUrl, hasBackground, panelOverlayOpacity, useReducedEffects } = useBackgroundDisplay();
+  const pageOverlayOpacity = hasBackground
+    ? Math.min(0.64, Math.max(0.46, panelOverlayOpacity + 0.06))
+    : 0.5;
+  const pageSurfaceColor = `rgba(250, 249, 246, ${pageOverlayOpacity})`;
+  const panelLayerOpacity = hasBackground
+    ? Math.max(0.18, panelOverlayOpacity - 0.08)
+    : panelOverlayOpacity;
+  const panelSurfaceColor = `rgba(250, 249, 246, ${panelLayerOpacity})`;
   const { addToast } = useToast();
   const [screenMode, setScreenMode] = useState<'list' | 'week'>(() => {
     const saved = localStorage.getItem('todoScreenMode');
@@ -1842,7 +1864,8 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       onUndoComplete={handleQuickActionUndoComplete}
       onTogglePin={handleQuickActionTogglePin}
       onDelete={handleQuickActionDelete}
-      onClose={() => closeQuickActions(true)}
+      onClose={closeQuickActions}
+      onForceClose={() => closeQuickActions(true)}
     />
   );
 
@@ -2075,19 +2098,12 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       )}
       
       {/* 闁稿繈鍔岄惇顒勫础婵犲洠鍋撹箛鏃€顫栭梺顒夊枤閸嶇數浠?- 閻熸洖妫涘ú濠囧极缂堢娀鍤嬪☉鎾愁儏瀹曟劙鏌堥妸銉ョ€?*/}
-      <div className="absolute inset-0 -z-10" style={{ backgroundColor: 'rgba(250, 249, 246, 0.5)' }}></div>
+      <div className="absolute inset-0 -z-10" style={{ backgroundColor: pageSurfaceColor }}></div>
       
       {/* Left Sidebar - Todo Categories */}
       <div
         className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative ${isSidebarOpen ? 'w-auto md:min-w-[12rem]' : 'w-16 items-center'}`}
       >
-        {hasBackground && (
-          <div
-            className="pointer-events-none absolute inset-0 z-0"
-            style={{ backgroundColor: 'rgba(250, 249, 246, 0.62)' }}
-          />
-        )}
-
         <div className="relative z-10 flex-1 w-full">
           <button
             onClick={() => {
@@ -2187,7 +2203,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         <div 
           className={`absolute inset-0 -z-10 rounded-tl-[2rem] ${useReducedEffects ? '' : 'backdrop-blur-sm'}`}
           style={{
-            backgroundColor: `rgba(255, 255, 255, ${panelOverlayOpacity})`
+            backgroundColor: panelSurfaceColor
           }}
         />
 
@@ -2243,7 +2259,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto pb-24 no-scrollbar">
+        <div className="flex-1 overflow-y-auto pb-[calc(8.5rem+env(safe-area-inset-bottom))] no-scrollbar">
           {isVirtualScheduleCategory && (selectedScheduleFilter === 'thisWeek' || selectedScheduleFilter === 'today')
             ? selectedTodoSectionsForRender.map((section) => (
               <section key={section.dateKey} className="mb-6">

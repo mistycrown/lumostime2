@@ -11,6 +11,7 @@
  * @updated 2026-05-03: Removed bound desktop instance counts from the widget template list.
  * @updated 2026-05-03: Reduced load-time template writes so opening the widget settings page no longer triggers unnecessary local/native saves.
  * @updated 2026-05-03: Tightened the 2x2 tracking-calendar preview with smaller date numbers and narrower horizontal calendar padding.
+ * @updated 2026-05-05: Rewrote the widget home guide copy to distinguish direct-add desktop widgets from configurable templates.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
@@ -745,9 +746,9 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     <div className="rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-5 text-sm text-stone-600">
       <div className="font-bold text-stone-800">使用说明</div>
       <div className="mt-3 space-y-2 text-xs leading-6 text-stone-500">
-        <div>第一步：新建一个小组件模板。</div>
-        <div>第二步：进入模板后，配置槽位或追踪对象。</div>
-        <div>第三步：在系统桌面添加对应尺寸的小组件，点击标题即可轮换同类模板。</div>
+        <div>一天热力图、今天待办、场景计时器这几类小部件可以直接添加到桌面，内容会根据当前数据自动渲染。</div>
+        <div>计时器和 2×2 追踪日历需要先在这里完成配置，再到桌面添加对应尺寸的小部件。</div>
+        <div>如果添加了多个相同尺寸的小部件，可以点击标题在同尺寸模板之间切换。</div>
       </div>
     </div>
   );

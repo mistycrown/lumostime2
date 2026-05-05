@@ -5,18 +5,18 @@ import {
 } from './statusBarTransitions';
 
 describe('getImmersiveStatusBarTransition', () => {
-  test('keeps the status bar visible with a black background when immersive mode starts on mobile', () => {
+  test('lets Android immersive mode own system-bar visibility when immersive mode starts', () => {
     expect(getImmersiveStatusBarTransition('android', 'enter')).toEqual({
       hide: false,
-      show: true,
+      show: false,
       restoreManagedStatusBar: false,
       backgroundColor: '#000000',
       hideSystemBars: true,
       restoreSystemBars: false,
-      disableEdgeToEdgeInsets: true,
-      enableEdgeToEdgeInsets: false,
     });
+  });
 
+  test('keeps the status bar visible with a black background when immersive mode starts on ios', () => {
     expect(getImmersiveStatusBarTransition('ios', 'enter')).toEqual({
       hide: false,
       show: true,
@@ -24,20 +24,26 @@ describe('getImmersiveStatusBarTransition', () => {
       backgroundColor: '#000000',
       hideSystemBars: true,
       restoreSystemBars: false,
-      disableEdgeToEdgeInsets: true,
-      enableEdgeToEdgeInsets: false,
     });
   });
 
-  test('shows and restores the managed status bar when immersive mode ends', () => {
+  test('restores Android immersive mode without extra status-bar visibility toggles', () => {
     expect(getImmersiveStatusBarTransition('android', 'exit')).toEqual({
+      hide: false,
+      show: false,
+      restoreManagedStatusBar: true,
+      hideSystemBars: false,
+      restoreSystemBars: true,
+    });
+  });
+
+  test('shows and restores the managed status bar when immersive mode ends on ios', () => {
+    expect(getImmersiveStatusBarTransition('ios', 'exit')).toEqual({
       hide: false,
       show: true,
       restoreManagedStatusBar: true,
       hideSystemBars: false,
       restoreSystemBars: true,
-      disableEdgeToEdgeInsets: false,
-      enableEdgeToEdgeInsets: true,
     });
   });
 
@@ -48,8 +54,6 @@ describe('getImmersiveStatusBarTransition', () => {
       restoreManagedStatusBar: false,
       hideSystemBars: false,
       restoreSystemBars: false,
-      disableEdgeToEdgeInsets: false,
-      enableEdgeToEdgeInsets: false,
     });
   });
 });

@@ -10,10 +10,11 @@
  * @updated 2026-05-03: Added regression coverage to ensure unsupported UI-icon sanitization only updates templates that actually change.
  * @updated 2026-05-03: Added regression coverage for shortcut action default colors and Unicode-safe scene card title truncation.
  * @updated 2026-05-03: Added regression coverage for targeted native widget refresh routing in the Capacitor bridge.
+ * @updated 2026-05-05: Added scene widget launch-app regression coverage so native scene cards can mirror in-app third-party app launches.
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import type { ActiveSession, Category, CheckTemplate, DailyReview, Log, Scope, TodoItem } from '../types';
+import type { ActiveSession, Category, CheckTemplate, DailyReview, Log, SceneGroupState, Scope, TodoItem } from '../types';
 import {
   buildShortcutWidgetSlotConfig,
   buildTodoPinWidgetPayload,
@@ -28,6 +29,8 @@ import widgetBridgePluginSource from '../../android/app/src/main/java/com/mistyc
 import widgetRefreshCoordinatorSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetRefreshCoordinator.kt?raw';
 import widgetSceneCardsRemoteViewsServiceSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetSceneCardsRemoteViewsService.java?raw';
 import widgetSceneProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetSceneProviderSupport.java?raw';
+import widgetStoresSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetStores.kt?raw';
+import widgetTimerControllerSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetTimerController.kt?raw';
 import widgetTodoPinProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetTodoPinProviderSupport.java?raw';
 import widgetSceneLayoutSource from '../../android/app/src/main/res/layout/widget_layout_scene_4x3.xml?raw';
 
@@ -443,6 +446,101 @@ describe('buildShortcutWidgetSlotConfig', () => {
   });
 });
 
+describe('buildSceneWidgetPayload', () => {
+  it('mirrors scene card app-launch metadata for timer and todo cards', async () => {
+    const localStorageStub = {
+      getItem: vi.fn().mockReturnValue(null),
+      setItem: vi.fn(),
+      removeItem: vi.fn()
+    };
+    vi.stubGlobal('localStorage', localStorageStub);
+
+    const { buildSceneWidgetPayload: buildSceneWidgetPayloadLazy } = await import('./widgetSceneService');
+    const todos: TodoItem[] = [
+      buildTodo({
+        id: 'scene-todo',
+        title: 'Scene todo',
+        linkedCategoryId: 'focus-category',
+        linkedActivityId: 'writing-activity'
+      })
+    ];
+    const sceneGroupState: SceneGroupState = {
+      version: 1,
+      switchMode: 'manual',
+      activeGroupId: 'group-1',
+      groups: [
+        {
+          id: 'group-1',
+          name: 'Weekday',
+          timeSlots: [
+            {
+              id: 'slot-1',
+              name: 'Morning',
+              icon: '🌅',
+              startTime: '08:00',
+              endTime: '12:00',
+              cards: [
+                {
+                  id: 'timer-card',
+                  type: 'timer',
+                  title: 'Deep Work',
+                  action: {
+                    type: 'startTimer',
+                    activityId: 'writing-activity',
+                    categoryId: 'focus-category',
+                    launchApp: true,
+                    appPackageName: 'com.example.writer',
+                    appName: 'Writer'
+                  }
+                },
+                {
+                  id: 'todo-card',
+                  type: 'todo',
+                  title: 'Draft chapter',
+                  action: {
+                    type: 'startTodo',
+                    todoId: 'scene-todo',
+                    launchApp: true,
+                    appPackageName: 'com.example.todo',
+                    appName: 'Todo App'
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+
+    const payload = buildSceneWidgetPayloadLazy({
+      sceneGroupState,
+      categories,
+      todos,
+      checkTemplates,
+      now: 123456789
+    });
+
+    expect(payload.groups[0].timeSlots[0].items).toEqual([
+      expect.objectContaining({
+        id: 'timer-card',
+        itemType: 'timer',
+        launchApp: true,
+        appPackageName: 'com.example.writer',
+        appName: 'Writer'
+      }),
+      expect.objectContaining({
+        id: 'todo-card',
+        itemType: 'todo',
+        launchApp: true,
+        appPackageName: 'com.example.todo',
+        appName: 'Todo App'
+      })
+    ]);
+
+    vi.unstubAllGlobals();
+  });
+});
+
 describe('WidgetTodoPinProviderSupport', () => {
   it('binds a dedicated refresh action instead of a header status tap for the TODAY + PIN widgets', () => {
     expect(widgetTodoPinProviderSupportSource).not.toContain('views.setOnClickPendingIntent(R.id.widget_todo_pin_header');
@@ -474,6 +572,15 @@ describe('WidgetSceneProviderSupport', () => {
     expect(widgetRefreshCoordinatorSource).toContain('fun refreshSceneWidgetWithFeedback(context: Context, appWidgetId: Int)');
     expect(widgetSceneLayoutSource).toContain('widget_scene_refresh_root');
     expect(widgetSceneLayoutSource).toContain('widget_scene_refresh_icon');
+  });
+
+  it('keeps third-party app launch metadata wired through the native scene widget stack', () => {
+    expect(widgetBridgePluginSource).toContain('launchApp = item.optBoolean("launchApp", false)');
+    expect(widgetBridgePluginSource).toContain('appPackageName = parseNullableString(item.optString("appPackageName"))');
+    expect(widgetStoresSource).toContain('put("launchApp", item.launchApp)');
+    expect(widgetStoresSource).toContain('put("appPackageName", item.appPackageName ?: JSONObject.NULL)');
+    expect(widgetTimerControllerSource).toContain('maybeLaunchSceneApp(context, item)');
+    expect(widgetTimerControllerSource).toContain('getLaunchIntentForPackage(packageName)');
   });
 });
 

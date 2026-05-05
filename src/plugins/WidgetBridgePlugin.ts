@@ -9,6 +9,7 @@
  * @updated 2026-05-01: Added tracking-calendar template/config contracts and payload sync types for the dedicated 2x2 tracking calendar widget.
  * @updated 2026-05-02: Added scene widget payload sync types for the dedicated 4x3 scene widget.
  * @updated 2026-05-05: Expanded TODAY + PIN payload sync to include native-refresh source snapshots so the widget can rebuild today's list from mirrored app todos.
+ * @updated 2026-05-05: Added optional scene widget third-party app launch metadata so scene widget cards can mirror in-app launch behavior.
  */
 import { registerPlugin } from '@capacitor/core';
 import { ShortcutWidgetAction } from '../services/widgetShortcutService';
@@ -279,6 +280,9 @@ export interface WidgetBridgeSceneItem {
   checkItemId?: string | null;
   checkManualMode?: DailyWidgetManualMode | null;
   checkTargetCount?: number | null;
+  launchApp?: boolean;
+  appPackageName?: string | null;
+  appName?: string | null;
 }
 
 export interface WidgetBridgeSceneTimeSlot {

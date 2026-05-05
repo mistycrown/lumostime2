@@ -28,7 +28,12 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
-> Last updated: 2026-05-04
+> Last updated: 2026-05-05
+- `TodoView.tsx`: Completed todo rows no longer undo via left swipe, and ambiguous light drifts now still fall back to opening quick actions instead of landing in a no-op gap.
+- `SceneView.tsx`, `RecordView.tsx`, `TodoView.tsx`: Reworked the custom-background layout stack so each page now uses one shared whole-page warm scrim plus a second right-panel overlay, giving the left rail its own tint without separate sidebar patches and removing the visible seam between the sidebar and the rounded content panel.
+- `TodoView.tsx`: Todo rows now use a conservative axis-locked gesture classifier, so light lower-list taps keep opening quick actions while diagonal scrolls no longer misfire into completion toggles or swallowed presses.
+- `RecordView.tsx`: Matched the expanded record-page left-rail width rule to `TodoView`, so the sidebar scrim and main-panel bridge now occupy the same footprint on both pages.
+- `RecordView.tsx`, `TodoView.tsx`: Refined the custom-background left-rail scrim into a warmer gradient bridge that blends into the main panel, removing the visible seam between the sidebar wallpaper and the rounded content surface while keeping sidebar buttons readable.
 - `RecordView.tsx`, `TodoView.tsx`: When a custom background is active, the left sidebar now gets its own local translucent scrim so category and utility buttons stay readable without tinting the main content panel.
 - `TimelineView.tsx`: The trailing `Done` node now renders completed subtasks as plain text in `子任务 @父任务` form so parent context is visible without adding new UI chrome.
 - `TodoView.tsx`: The shared quick-actions sheet now includes an inline `删除任务 -> 确认删除？` entry, so both list rows and week-view badges can remove a todo without opening the full detail editor.

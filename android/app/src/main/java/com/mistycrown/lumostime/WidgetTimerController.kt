@@ -2,6 +2,7 @@ package com.mistycrown.lumostime
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -16,6 +17,7 @@ import java.util.UUID
  * Updated 2026-05-03: Consolidated daily-slot and scene-checklist completion handling into one shared helper to keep widget-side checklist rules in sync.
  * Updated 2026-05-05: Added an external-stop helper so the floating window can end widget-started sessions even when the web layer has not hydrated them yet.
  * Updated 2026-05-05: Executes quick-punch shortcuts natively with a daily-style success checkmark instead of foregrounding the app.
+ * Updated 2026-05-05: Lets scene widget timer/todo cards try opening configured third-party apps without blocking their normal Lumo runtime actions.
  */
 object WidgetTimerController {
     private const val TAP_FEEDBACK_DURATION_MS = 260L
@@ -322,6 +324,8 @@ object WidgetTimerController {
             return false
         }
 
+        maybeLaunchSceneApp(context, item)
+
         val now = System.currentTimeMillis()
         val currentRuntime = WidgetStores.loadRuntimeState(context)
         val isSameItemActive = currentRuntime?.let { runtime ->
@@ -380,6 +384,26 @@ object WidgetTimerController {
         )
         FloatingWindowService.syncFocusStateIfRunning(nextRuntime.icon, true, nextRuntime.startedAt)
         return true
+    }
+
+    private fun maybeLaunchSceneApp(context: Context, item: WidgetSceneItem) {
+        if (!item.launchApp) {
+            return
+        }
+
+        val packageName = item.appPackageName?.trim().orEmpty()
+        if (packageName.isBlank()) {
+            return
+        }
+
+        try {
+            val packageManager: PackageManager = context.packageManager
+            val launchIntent = packageManager.getLaunchIntentForPackage(packageName) ?: return
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(launchIntent)
+        } catch (_: Exception) {
+            // Match in-app scene card behavior: launch failure should not block timer/todo actions.
+        }
     }
 
     private fun handleSceneChecklistItemTap(

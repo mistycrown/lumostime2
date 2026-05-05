@@ -1,6 +1,7 @@
 /**
  * @file SceneView.tsx
  * @description 闂傚倷绶氬缁樹繆閸ヮ剙纾块柕鍫濇噳閺嬪秵绻涢崱妯诲碍缂佲偓瀹€鍕厸鐎广儱鍟俊鑺ャ亜锜婚崶銊㈡嫽闂佺鏈銊╁箺閻樼偨浜滈柡鍌濇硶閻忛亶鏌熼崣澶嬪唉鐎规洖宕灃濞达絼璀﹀ú?- 闂傚倷鑳剁涵鍫曞疾閻愬樊娴栭柕濞у棗小濡炪倖甯掗崯銊︾瑜版帗鐓欓柟顖嗗啯姣愬銈冨€曢幊蹇曟崲濠靛牆鏋堟俊顖濇〃婢规洘绻濋悽闈涗哗閻忓浚浜、姘愁槻闁崇懓鍟撮崺鈧い鎺戝閻撴盯鏌涘鈧粈渚€鎮橀敐鍥╃＜妞ゆ棁鍋愯倴婵炲濯寸粻鎾愁嚕閹绢喗鍋愭い鏃囧吹妞规娊姊绘担鍛婂暈妞ゃ劍鍔楀Σ鎰板即閻斿憡鐝烽梺鍝勮癁鐏炶姤顓块梻濠庡亜濞诧箑顫忚ぐ鎹ゅ洩顦规慨濠傤煼瀹曟帒顫濇潏銊﹀枛婵＄偑鍊栭弻銊╂儗閸屾氨鏆︽慨妞诲亾鐎规洏鍔戦、妯款槻闁?
+ * @updated 2026-05-05: Reworked the custom-background surface stack so the whole scene page gets one shared base scrim and the right content panel adds a second warm overlay, matching TodoView and RecordView without a center seam.
  * @updated 2026-05-05: Fixed SceneView widget-session matching by reading active sessions from SessionContext instead of DataContext, preventing undefined access crashes in scene cards.
  * @updated 2026-05-01: Added a manual-mode scene-group dropdown on the scene header chip so users can quickly switch groups directly from the scene page.
  * @updated 2026-04-25: Added flex min-height guards for the scene sidebar and card list so long card stacks keep scrolling instead of being clipped on some mobile WebViews.
@@ -59,6 +60,14 @@ export const SceneView: React.FC<SceneViewProps> = ({
     setStatsRange
   } = useNavigation();
   const { backgroundUrl, hasBackground, panelOverlayOpacity, useReducedEffects } = useBackgroundDisplay();
+  const pageOverlayOpacity = hasBackground
+    ? Math.min(0.64, Math.max(0.46, panelOverlayOpacity + 0.06))
+    : 0.5;
+  const pageSurfaceColor = `rgba(250, 249, 246, ${pageOverlayOpacity})`;
+  const panelLayerOpacity = hasBackground
+    ? Math.max(0.18, panelOverlayOpacity - 0.08)
+    : panelOverlayOpacity;
+  const panelSurfaceColor = `rgba(250, 249, 246, ${panelLayerOpacity})`;
   
   // 闂傚倷绶氬缁樹繆閸ヮ剙纾块柕鍫濇噳閺嬪秵绻涢崱妯虹仼缁炬儳銈搁弻娑㈠即閵娿儱绠圭紒妤佸灴濮婅櫣鎷犻垾鍐插箰缂備浇缈伴崐妤€危閹邦兘鏋庨柟閭﹀櫘濞?localStorage 闂傚倷绀侀幉鈥愁潖缂佹ɑ鍙忛柟顖ｇ亹瑜版帒鐐婃い鎺嶇劍濞呮牠鏌ｈ箛鏇炰哗婵☆偄瀚伴獮鍐箣閿旇棄鈧數鐥鐐村婵炲吋鍔栨穱濠囶敃椤愵澀鍠婇悗娈垮櫘閸嬪﹪骞冭瀹曠厧鈹戦崼娑樹喊闂備礁鎼ˇ顐﹀疾濞嗘挻鍤勯柡鍫㈡暩閺勫倿姊?
   const [sceneGroupState, setSceneGroupState] = useState<SceneGroupState>(() => loadSceneGroupStateFromStorage());
@@ -1120,7 +1129,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
       )}
       
       {/* 闂傚倷鑳堕…鍫㈡崲閸儱绀夌€光偓閸曨剙鍓冲銈嗗笒鐎氼剛娑甸埀顒佺節閻㈤潧孝婵炶尙濞€瀹曟垿骞橀崷顓犳澑闂佸搫鍟犻崑鎾淬亜椤愶絿澧垫慨濠冩そ椤㈡寰勬繝鍐壕闂備胶顭堢粔鍫曞极閸涘﹦顩?*/}
-      <div className="absolute inset-0 -z-10" style={{ backgroundColor: 'rgba(250, 249, 246, 0.5)' }}></div>
+      <div className="absolute inset-0 -z-10" style={{ backgroundColor: pageSurfaceColor }}></div>
 
       {/* 闂佽楠哥紞濠傤焽閼姐倗纾芥慨妯挎硾閻ら箖鏌ょ粙璺ㄤ粵缂傚秴娲幃宄扳枎韫囨搩浼€闂?- 闂傚倷绀侀幖顐﹀疮椤愶附鍋夐柣鎾冲濞戙垹鍨傛い鏃囶潐閻忎線姊婚崒姘卞缂佸鍨块幃妯衡枎閹炬潙浠?*/}
       <div className="flex-shrink-0 flex h-full min-h-0 flex-col overflow-y-auto pt-6 pb-20 pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative w-16 items-center">
@@ -1169,7 +1178,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
         <div 
           className={`absolute inset-0 -z-10 rounded-tl-[2rem] ${useReducedEffects ? '' : 'backdrop-blur-sm'}`}
           style={{
-            backgroundColor: `rgba(255, 255, 255, ${panelOverlayOpacity})`
+            backgroundColor: panelSurfaceColor
           }}
         />
 
