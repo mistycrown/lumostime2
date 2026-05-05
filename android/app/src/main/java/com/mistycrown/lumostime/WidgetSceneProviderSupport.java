@@ -331,9 +331,9 @@ public final class WidgetSceneProviderSupport {
         float progress = animationState != null && animationState.getAppWidgetId() == appWidgetId
                 ? resolveRefreshAnimationProgress(animationState)
                 : 0f;
-        views.setImageViewBitmap(
+        views.setImageViewResource(
                 R.id.widget_scene_refresh_icon,
-                WidgetSceneRefreshBitmapRenderer.INSTANCE.render(context, progress)
+                resolveRefreshIconRes(progress)
         );
         views.setOnClickPendingIntent(
                 R.id.widget_scene_refresh_root,
@@ -537,6 +537,26 @@ public final class WidgetSceneProviderSupport {
         long duration = Math.max(1L, animationState.getExpiresAt() - animationState.getStartedAt());
         long elapsed = Math.max(0L, System.currentTimeMillis() - animationState.getStartedAt());
         return Math.min(1f, elapsed / (float) duration);
+    }
+
+    private static int resolveRefreshIconRes(float progress) {
+        if (progress <= 0f || progress >= 1f) {
+            return R.drawable.widget_todo_pin_refresh_icon;
+        }
+
+        if (progress < 0.2f) {
+            return R.drawable.widget_todo_pin_refresh_icon_1;
+        }
+        if (progress < 0.4f) {
+            return R.drawable.widget_todo_pin_refresh_icon_2;
+        }
+        if (progress < 0.6f) {
+            return R.drawable.widget_todo_pin_refresh_icon_3;
+        }
+        if (progress < 0.8f) {
+            return R.drawable.widget_todo_pin_refresh_icon_4;
+        }
+        return R.drawable.widget_todo_pin_refresh_icon_5;
     }
 
     private static PendingIntent buildCardTemplatePendingIntent(

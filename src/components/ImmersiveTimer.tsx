@@ -4,6 +4,7 @@
  * @output Immersive fullscreen timer display and session submit trigger
  * @pos Component (View)
  * @description A fixed black-and-white immersive timer with large numeric digits, static masked art visuals, session-only orientation toggles, display-source and display-format toggles, white-noise controls, and Android immersive fullscreen handling that temporarily removes WebView insets.
+ * @updated 2026-05-05: Restored Android immersive system bars before unmounting the fullscreen timer so exiting immersive mode no longer leaves the app header shifted downward.
  * @updated 2026-05-04: Realigned the immersive top control bar so both portrait and landscape modes avoid inheriting the managed status-bar fallback and drifting downward.
  * @updated 2026-05-03: Switched Android EdgeToEdge access to the plugin's ESM entry so Capacitor WebView builds no longer execute browser-undefined `require()` calls.
  */
@@ -19,8 +20,6 @@ import { ImmersiveVisualSelectorModal } from './ImmersiveVisualSelectorModal';
 import {
   IMMERSIVE_TIMER_COLORS,
   IMMERSIVE_TIMER_CONTROL_SURFACE,
-  IMMERSIVE_TIMER_FONT_FAMILY,
-  IMMERSIVE_TIMER_FONT_WEIGHT,
   IMMERSIVE_TIMER_HORIZONTAL_PADDING,
   IMMERSIVE_TIMER_LANDSCAPE_SIZE,
   IMMERSIVE_TIMER_LANDSCAPE_VIEWPORT,
@@ -28,7 +27,6 @@ import {
   IMMERSIVE_TIMER_MODAL_THEME,
   IMMERSIVE_TIMER_PORTRAIT_DIGIT_SIZE,
   IMMERSIVE_TIMER_PORTRAIT_TWO_SEGMENT_DIGIT_SIZE,
-  IMMERSIVE_TIMER_SEPARATOR_SLOT_WIDTH,
 } from './immersiveTimerConfig';
 import { useSettings } from '../contexts/SettingsContext';
 import ImmersiveMode from '../plugins/ImmersiveModePlugin';
@@ -103,6 +101,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
   const [showControls, setShowControls] = useState(false);
   const [showNoiseModal, setShowNoiseModal] = useState(false);
   const [showVisualModal, setShowVisualModal] = useState(false);
+  const [isRestoringShell, setIsRestoringShell] = useState(false);
   const [sessionOrientationOverride, setSessionOrientationOverride] = useState<ImmersiveTimerOrientation | null>(null);
   const [displaySource, setDisplaySource] = useState<ImmersiveDisplaySource>(() => {
     if (typeof window === 'undefined') {
@@ -155,6 +154,8 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
     typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : true
   );
   const timerRef = useRef<HTMLDivElement>(null);
+  const exitTransitionPromiseRef = useRef<Promise<void> | null>(null);
+  const hasRestoredShellRef = useRef(false);
   const effectiveOrientation = resolveImmersiveTimerOrientation(
     immersiveTimerDefaultOrientation,
     sessionOrientationOverride
@@ -176,6 +177,78 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
   const topControlsInset = 'calc(0.75rem + env(safe-area-inset-top, 0px))';
   const leftControlsInset = 'calc(1rem + env(safe-area-inset-left, 0px))';
   const rightControlsInset = 'calc(1rem + env(safe-area-inset-right, 0px))';
+
+  const waitForAnimationFrames = async (count: number = 1) => {
+    for (let index = 0; index < count; index += 1) {
+      await new Promise<void>((resolve) => {
+        if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+          window.setTimeout(resolve, 16);
+          return;
+        }
+
+        window.requestAnimationFrame(() => resolve());
+      });
+    }
+  };
+
+  const syncAndroidInsetCssVariables = async () => {
+    if (Capacitor.getPlatform() !== 'android' || !EdgeToEdge?.getInsets || typeof document === 'undefined') {
+      return;
+    }
+
+    const insets = await EdgeToEdge.getInsets().catch(() => null);
+    if (!insets) {
+      return;
+    }
+
+    document.documentElement.style.setProperty('--status-bar-height', `${Math.max(0, insets.top)}px`);
+    document.documentElement.style.setProperty('--navigation-bar-height', `${Math.max(0, insets.bottom)}px`);
+  };
+
+  const restorePlatformShell = async () => {
+    if (exitTransitionPromiseRef.current) {
+      await exitTransitionPromiseRef.current;
+      return;
+    }
+
+    if (hasRestoredShellRef.current) {
+      return;
+    }
+
+    hasRestoredShellRef.current = true;
+    const platform = Capacitor.getPlatform();
+    const exitTransition = getImmersiveStatusBarTransition(platform, 'exit');
+
+    exitTransitionPromiseRef.current = (async () => {
+      if (platform === 'android' && exitTransition.restoreSystemBars) {
+        await ImmersiveMode.exit().catch(() => {});
+      }
+
+      if (exitTransition.show) {
+        await StatusBar.show().catch(() => {});
+      }
+
+      if (platform === 'android' && exitTransition.enableEdgeToEdgeInsets && EdgeToEdge?.enable) {
+        // Wait until Android reports the restored system-bar state before reapplying WebView margins.
+        await waitForAnimationFrames(2);
+        await EdgeToEdge.enable().catch(() => {});
+        await waitForAnimationFrames(1);
+        await syncAndroidInsetCssVariables().catch(() => {});
+      }
+
+      if (exitTransition.restoreManagedStatusBar) {
+        const background = backgroundService.getCurrentBackgroundOption();
+        const backgroundUrl = background && background.id !== 'default' ? background.url : null;
+        await statusBarService.updateForBackground(backgroundUrl).catch(() => {});
+      }
+    })();
+
+    try {
+      await exitTransitionPromiseRef.current;
+    } finally {
+      exitTransitionPromiseRef.current = null;
+    }
+  };
 
   useEffect(() => {
     const platform = Capacitor.getPlatform();
@@ -249,25 +322,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
     void applyEnterTransition();
 
     return () => {
-      const exitTransition = getImmersiveStatusBarTransition(platform, 'exit');
-
-      if (platform === 'android' && exitTransition.restoreSystemBars) {
-        ImmersiveMode.exit().catch(() => {});
-      }
-
-      if (platform === 'android' && exitTransition.enableEdgeToEdgeInsets && EdgeToEdge?.enable) {
-        EdgeToEdge.enable().catch(() => {});
-      }
-
-      if (exitTransition.show) {
-        StatusBar.show().catch(() => {});
-      }
-
-      if (exitTransition.restoreManagedStatusBar) {
-        const background = backgroundService.getCurrentBackgroundOption();
-        const backgroundUrl = background && background.id !== 'default' ? background.url : null;
-        statusBarService.updateForBackground(backgroundUrl).catch(() => {});
-      }
+      void restorePlatformShell();
     };
   }, []);
 
@@ -570,9 +625,26 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
     startWhiteNoise(noiseId);
   };
 
-  const handleExit = () => {
+  const handleExit = async () => {
+    if (isRestoringShell) {
+      return;
+    }
+
+    setIsRestoringShell(true);
     stopWhiteNoise();
+    await restorePlatformShell();
     onExit();
+  };
+
+  const handleSubmit = async () => {
+    if (isRestoringShell) {
+      return;
+    }
+
+    setIsRestoringShell(true);
+    stopWhiteNoise();
+    await restorePlatformShell();
+    onSubmit();
   };
 
   return (
@@ -654,7 +726,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
               <button
                 onClick={(event) => {
                   event.stopPropagation();
-                  handleExit();
+                  void handleExit();
                 }}
                 title="返回"
                 className="pointer-events-auto h-12 w-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"
@@ -678,7 +750,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
               <button
                 onClick={(event) => {
                   event.stopPropagation();
-                  onSubmit();
+                  void handleSubmit();
                 }}
                 title="提交并保存"
                 className="pointer-events-auto h-12 w-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all shadow-lg"

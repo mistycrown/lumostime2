@@ -12,6 +12,7 @@
  * @updated 2026-05-03: Reused the shared normalized template equality helper when deciding whether unsupported UI-icon state actually changed.
  * @updated 2026-05-05: Includes mirrored TODAY + PIN source todos/categories in the native sync payload so Android refresh actions can rebuild today's list without waiting for a new web-state change.
  * @updated 2026-05-05: Clears native widget runtime after app-side stop/cancel transitions while still preserving widget-started sessions during initial hydration.
+ * @updated 2026-05-05: Mirrors the latest app log end time to native storage so widget quick-punch shortcuts can append gaps directly on the home screen.
  */
 import { App as CapacitorApp } from '@capacitor/app';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -27,6 +28,7 @@ import {
   WIDGET_TEMPLATES_UPDATED_EVENT,
   buildDailyRuntimeWidgetPayload,
   buildDailyWidgetSyncPayload,
+  buildWidgetLogTailState,
   buildLogFromWidgetPendingAction,
   buildTrackingCalendarWidgetPayload,
   buildTodoPinWidgetPayload,
@@ -296,6 +298,24 @@ export const useWidgetBridgeSync = () => {
       void appStateHandle?.remove();
     };
   }, [categories, setActiveSessions, setDailyReviews, setLogs]);
+
+  useEffect(() => {
+    if (!isNativeAndroidWidgetSupported() || !hasHydratedNativeState) {
+      return;
+    }
+
+    const syncLogTailState = async () => {
+      try {
+        await WidgetBridge.syncLogTailState({
+          logTailState: buildWidgetLogTailState(logs)
+        });
+      } catch (error) {
+        console.error('[useWidgetBridgeSync] Failed to sync widget log-tail state to native widget', error);
+      }
+    };
+
+    void syncLogTailState();
+  }, [hasHydratedNativeState, logs]);
 
   useEffect(() => {
     if (!isNativeAndroidWidgetSupported() || !hasHydratedNativeState) {

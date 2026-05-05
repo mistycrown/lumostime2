@@ -4,6 +4,7 @@
  * @output Shared helpers for validating one-level todo hierarchy, syncing inherited fields, and building tree views
  * @pos Utility (Todo hierarchy)
  * @description Centralizes parent-child todo rules so list rendering, save logic, detail editing, and plain-text hierarchy labels all share the same one-level hierarchy behavior.
+ * @updated 2026-05-05: Preserved incoming root-todo order when building tree items so upstream pin-first or schedule-first sorting survives hierarchy rendering.
  * @updated 2026-04-30: Added completed-todo label formatting so timeline done lists can append parent-task context for subtasks.
  * @updated 2026-04-25: Added parent-completion visibility helpers so list views can hide unfinished subtasks whenever their parent todo is completed, without mutating child completion state.
  * @updated 2026-04-22: Added direct-child display ordering plus optional completed-task filtering so expanded parent rows can honor list-level hide-completed controls.
@@ -193,7 +194,6 @@ export const buildTodoTreeItems = (todos: TodoItem[]): TodoTreeItem[] => {
   });
 
   return rootTodos
-    .sort((left, right) => left.title.localeCompare(right.title, 'zh-CN'))
     .map((todo) => ({
       todo,
       children: (childMap.get(todo.id) || []).sort(compareChildTodos)

@@ -4,6 +4,7 @@
  * @output Updated Review Data, Generated Narrative
  * @pos View (Review System)
  * @description The interface for conducting a daily review. Supports answering template questions (Data/Guide tabs) and generating/editing an AI-assisted narrative summary.
+ * @updated 2026-05-05: Clamp horizontal overflow in Daily Review so narrow Android WebViews do not get stretched by tab content.
  * @updated 2026-04-25: Let floating read-edit toggles inherit button theme colors so default UI icons remain visible on accent-theme white buttons.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -688,7 +689,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     };
 
     return (
-        <div className="h-full bg-[#faf9f6] overflow-y-auto no-scrollbar pb-24 px-7 pt-4">
+        <div className="h-full bg-[#faf9f6] overflow-y-auto overflow-x-hidden no-scrollbar pb-24 px-7 pt-4">
             {/* Date Display Section */}
             <div className="mb-6 flex items-center justify-between">
                 <div>
@@ -722,7 +723,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             </div>
 
             {/* Tab Content */}
-            <div className="space-y-6">
+            <div className="space-y-6 min-w-0">
                 {/* Tab 0: Check - Daily Checklist */}
                 {/* Tab 0: Check - Daily Checklist (Grouped & Printing Style) */}
                 {activeTab === 'check' && (
@@ -985,7 +986,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
 
                 {/* Tab 3: Narrative */}
                 {activeTab === 'narrative' && (
-                    <div className="space-y-4 animate-in fade-in duration-300 relative min-h-[50vh] pb-40">
+                    <div className="space-y-4 animate-in fade-in duration-300 relative min-h-[50vh] min-w-0 pb-40">
                         <ReviewNarrativeTab
                             summary={summary}
                             narrative={narrative}

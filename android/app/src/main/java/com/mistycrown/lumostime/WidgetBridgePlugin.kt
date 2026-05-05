@@ -14,6 +14,7 @@ import org.json.JSONObject
  * Updated 2026-05-02: Added dedicated scene widget payload sync support for the Android 4x3 scene widget.
  * Updated 2026-05-03: Routed widget sync calls to targeted widget-family refresh helpers instead of always refreshing every widget provider.
  * Updated 2026-05-05: Expanded TODAY + PIN sync parsing to persist mirrored source todos/categories for native-side refresh rebuilding.
+ * Updated 2026-05-05: Added log-tail synchronization so native quick-punch shortcuts can compute gap fills without opening the app.
  */
 @CapacitorPlugin(name = "WidgetBridge")
 class WidgetBridgePlugin : Plugin() {
@@ -268,6 +269,24 @@ class WidgetBridgePlugin : Plugin() {
         call.resolve()
     }
 
+    @PluginMethod
+    fun syncLogTailState(call: PluginCall) {
+        val stateJson = call.getObject("logTailState")
+        val state = stateJson?.let {
+            WidgetLogTailState(
+                latestLogEndTime = if (it.has("latestLogEndTime")) {
+                    val latestLogEndTime = it.optLong("latestLogEndTime", -1L)
+                    if (latestLogEndTime > 0L) latestLogEndTime else null
+                } else {
+                    null
+                }
+            )
+        }
+
+        WidgetStores.saveLogTailState(context, state)
+        call.resolve()
+    }
+
     private fun parseSlots(
         slotsArray: JSONArray?,
         widgetSize: String
@@ -381,6 +400,7 @@ class WidgetBridgePlugin : Plugin() {
             put("createdAt", action.createdAt)
             put("linkedTodoId", action.linkedTodoId)
             put("scopeIds", action.scopeIds.toJsonArray())
+            put("note", action.note)
         }
     }
 

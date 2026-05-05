@@ -1,49 +1,80 @@
 /**
  * @file useFloatingWindow.ts
- * @input SessionContext (activeSessions), ToastContext (addToast), handleStopActivity callback
- * @output Floating Window Listener (stopFocusFromFloating event handler)
+ * @input SessionContext active sessions, session cancellation, toast, and app-side stop callback
+ * @output Floating window event bridge for ending active focus sessions from Android
  * @pos Hook (System Integration)
- * @description 悬浮窗 Hook - 监听 Android 悬浮窗的结束计时事件，自动停止所有活动会话
- * 
- * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @description Listens for Android floating-window stop events and resolves them against app or widget-origin sessions without duplicating widget logs.
+ * @updated 2026-05-05: Honors native session ids and cancels widget-origin sessions locally after native-side shutdown so floating-window stops work for widget-started focus.
  */
 import { useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useSession } from '../contexts/SessionContext';
 import { useToast } from '../contexts/ToastContext';
 
+type FloatingStopDetail = {
+  sessionId?: string;
+};
+
+const parseFloatingStopDetail = (event: Event): FloatingStopDetail => {
+  const customEvent = event as CustomEvent<unknown>;
+  const { detail } = customEvent;
+
+  if (!detail) {
+    return {};
+  }
+
+  if (typeof detail === 'string') {
+    try {
+      const parsed = JSON.parse(detail) as FloatingStopDetail;
+      return typeof parsed === 'object' && parsed ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  if (typeof detail === 'object') {
+    return detail as FloatingStopDetail;
+  }
+
+  return {};
+};
+
 export const useFloatingWindow = (
-    handleStopActivity: (sessionId: string) => void
+  handleStopActivity: (sessionId: string) => void
 ) => {
-    const { activeSessions } = useSession();
-    const { addToast } = useToast();
+  const { activeSessions, cancelSession } = useSession();
+  const { addToast } = useToast();
 
-    useEffect(() => {
-        const setupFloatingWindowListener = () => {
-            const handleStopFromFloating = () => {
-                console.log('📥 收到悬浮球结束计时事件');
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== 'android') {
+      return;
+    }
 
-                if (activeSessions.length > 0) {
-                    console.log(`🛑 结束 ${activeSessions.length} 个活动会话`);
-                    activeSessions.forEach(session => {
-                        handleStopActivity(session.id);
-                    });
-                    addToast('success', '已从悬浮球结束计时');
-                } else {
-                    console.log('⚠️ 没有活动会话需要结束');
-                }
-            };
+    const handleStopFromFloating = (event: Event) => {
+      const { sessionId } = parseFloatingStopDetail(event);
+      const sessionsToStop = sessionId
+        ? activeSessions.filter((session) => session.id === sessionId)
+        : activeSessions;
 
-            window.addEventListener('stopFocusFromFloating', handleStopFromFloating);
-            return () => {
-                window.removeEventListener('stopFocusFromFloating', handleStopFromFloating);
-            };
-        };
+      if (sessionsToStop.length === 0) {
+        return;
+      }
 
-        const platform = Capacitor.getPlatform();
-        if (platform === 'android') {
-            const cleanup = setupFloatingWindowListener();
-            return cleanup;
+      sessionsToStop.forEach((session) => {
+        if (session.source === 'widget' && sessionId) {
+          cancelSession(session.id);
+          return;
         }
-    }, [activeSessions]);
+
+        handleStopActivity(session.id);
+      });
+
+      addToast('success', '已从悬浮球结束计时');
+    };
+
+    window.addEventListener('stopFocusFromFloating', handleStopFromFloating);
+    return () => {
+      window.removeEventListener('stopFocusFromFloating', handleStopFromFloating);
+    };
+  }, [activeSessions, addToast, cancelSession, handleStopActivity]);
 };

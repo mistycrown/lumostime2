@@ -31,6 +31,7 @@ object WidgetStores {
     private const val KEY_TAP_ANIMATION = "tap_animation_v1"
     private const val KEY_TODO_PIN_REFRESH_ANIMATION = "todo_pin_refresh_animation_v1"
     private const val KEY_LAST_WIDGET_STOP_AT = "last_widget_stop_at_v1"
+    private const val KEY_LOG_TAIL_STATE = "log_tail_state_v1"
     private const val KEY_LEGACY_CONFIG = "shared_slots_v1"
     private const val KEY_LEGACY_AUTO_BIND_PENDING = "legacy_auto_bind_pending_v1"
     const val LEGACY_TEMPLATE_ID = "widget-template-legacy-default"
@@ -373,6 +374,42 @@ object WidgetStores {
         editor.putLong(KEY_LAST_WIDGET_STOP_AT, stoppedAt).commit()
     }
 
+    fun loadLogTailState(context: Context): WidgetLogTailState? {
+        val raw = prefs(context).getString(KEY_LOG_TAIL_STATE, null)
+        if (raw.isNullOrBlank()) {
+            return null
+        }
+
+        return runCatching {
+            val json = JSONObject(raw)
+            WidgetLogTailState(
+                latestLogEndTime = if (json.has("latestLogEndTime")) {
+                    val latestLogEndTime = json.optLong("latestLogEndTime", -1L)
+                    if (latestLogEndTime > 0L) latestLogEndTime else null
+                } else {
+                    null
+                }
+            )
+        }.getOrNull()
+    }
+
+    fun saveLogTailState(context: Context, state: WidgetLogTailState?) {
+        val editor = prefs(context).edit()
+        if (state == null) {
+            editor.remove(KEY_LOG_TAIL_STATE).commit()
+            return
+        }
+
+        val json = JSONObject().apply {
+            if (state.latestLogEndTime != null && state.latestLogEndTime > 0L) {
+                put("latestLogEndTime", state.latestLogEndTime)
+            } else {
+                put("latestLogEndTime", JSONObject.NULL)
+            }
+        }
+        editor.putString(KEY_LOG_TAIL_STATE, json.toString()).commit()
+    }
+
     fun loadPendingActions(context: Context): List<WidgetPendingAction> {
         val raw = prefs(context).getString(KEY_PENDING_ACTIONS, null)
         if (raw.isNullOrBlank()) {
@@ -397,7 +434,8 @@ object WidgetStores {
                             endedAt = item.getLong("endedAt"),
                             createdAt = item.getLong("createdAt"),
                             linkedTodoId = parseNullableString(item.optString("linkedTodoId")),
-                            scopeIds = item.optJSONArray("scopeIds").toStringList()
+                            scopeIds = item.optJSONArray("scopeIds").toStringList(),
+                            note = parseNullableString(item.optString("note"))
                         )
                     )
                 }
@@ -981,6 +1019,9 @@ object WidgetStores {
                 }
                 if (action.scopeIds.isNotEmpty()) {
                     put("scopeIds", action.scopeIds.toJsonArray())
+                }
+                if (!action.note.isNullOrBlank()) {
+                    put("note", action.note)
                 }
             })
         }

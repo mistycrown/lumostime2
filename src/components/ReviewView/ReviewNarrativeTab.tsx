@@ -87,7 +87,7 @@ export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
     }, []);
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 min-w-0 max-w-full">
             {/* Section 1: 手动叙事（一句话总结） */}
             <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -122,12 +122,12 @@ export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
                     )
                 ) : (
                     // 编辑模式：显示输入框和心情选择器按钮
-                    <div className="flex items-center gap-3">
+                    <div className="flex min-w-0 max-w-full items-center gap-3">
                         <input
                             type="text"
                             value={summary}
                             onChange={(e) => handleSummaryChange(e.target.value)}
-                            className="flex-1 bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-stone-800 outline-none text-[15px] leading-relaxed shadow-sm focus:border-stone-400 transition-colors h-[42px]"
+                            className="min-w-0 max-w-full flex-1 bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-stone-800 outline-none text-[15px] leading-relaxed shadow-sm focus:border-stone-400 transition-colors h-[42px]"
                             placeholder="用一句话总结..."
                         />
                         {onMoodChange && (
@@ -202,7 +202,7 @@ export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
                 {isReadingMode ? (
                     // 阅读模式：显示 Markdown 内容或空状态
                     narrative ? (
-                        <div className="px-1 prose prose-stone max-w-none text-[15px] leading-relaxed prose-headings:font-bold prose-headings:text-stone-800 prose-headings:my-5 prose-strong:text-stone-900">
+                        <div className="min-w-0 px-1 prose prose-stone max-w-none text-[15px] leading-relaxed prose-headings:font-bold prose-headings:text-stone-800 prose-headings:my-5 prose-strong:text-stone-900">
                             <ReactMarkdown
                                 remarkPlugins={[remarkGfm, remarkBreaks]}
                                 components={{
@@ -230,7 +230,7 @@ export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
                     <textarea
                         value={narrative}
                         onChange={(e) => handleNarrativeChange(e.target.value)}
-                        className="w-full bg-white border border-stone-200 rounded-2xl p-6 text-stone-800 outline-none resize-none text-[15px] leading-relaxed shadow-sm block focus:border-stone-400 transition-colors"
+                        className="block w-full min-w-0 max-w-full bg-white border border-stone-200 rounded-2xl p-6 text-stone-800 outline-none resize-none text-[15px] leading-relaxed shadow-sm focus:border-stone-400 transition-colors"
                         rows={16}
                         placeholder="在此开始写作..."
                     />

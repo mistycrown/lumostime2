@@ -85,6 +85,9 @@ describe('assistantTurnService', () => {
     await assistantTurnService.runUnifiedTurn(createInput());
 
     const request = vi.mocked(aiService.requestAssistantUnifiedTurnWithDebug).mock.calls[0]?.[0];
+    expect(request?.systemPrompt).toContain('=== Structured Output Contract ===');
+    expect(request?.systemPrompt).toContain('You must return exactly one strict JSON object.');
+    expect(request?.systemPrompt).toContain('Your entire response must be valid JSON parsable by JSON.parse with no cleanup step.');
     expect(request?.systemPrompt).toContain('=== Memory Update Rules ===');
     expect(request?.systemPrompt).toContain('memory rules prompt');
     expect(request?.systemPrompt).toContain('=== Memory Snapshot ===');
@@ -100,6 +103,8 @@ describe('assistantTurnService', () => {
     }));
 
     const request = vi.mocked(aiService.requestAssistantUnifiedTurnWithDebug).mock.calls[0]?.[0];
+    expect(request?.systemPrompt).toContain('=== Structured Output Contract ===');
+    expect(request?.systemPrompt).toContain('Do not return any text before or after the JSON object.');
     expect(vi.mocked(assistantPromptService.getMemoryRulesPrompt)).not.toHaveBeenCalled();
     expect(request?.systemPrompt).not.toContain('=== Memory Update Rules ===');
     expect(request?.systemPrompt).not.toContain('=== Memory Snapshot ===');

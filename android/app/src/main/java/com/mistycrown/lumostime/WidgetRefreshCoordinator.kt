@@ -10,10 +10,11 @@ import android.os.Looper
  * Refreshes every registered widget provider so runtime state stays in sync across sizes.
  * Updated 2026-05-02: Added the dedicated scene 4x3 widget provider to global refresh routing.
  * Updated 2026-05-03: Added widget-family refresh helpers so bridge sync calls can refresh only the providers that depend on each payload.
+ * Updated 2026-05-05: Extended tap-feedback refresh frames so shortcut success states can animate back after one second.
  */
 object WidgetRefreshCoordinator {
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val tapFeedbackFrameDelays = longArrayOf(0L, 48L, 108L, 176L, 244L)
+    private val tapFeedbackFrameDelays = longArrayOf(0L, 48L, 108L, 176L, 244L, 520L, 1000L)
     private val sceneRefreshFrameDelays = longArrayOf(0L, 70L, 140L, 210L, 280L, 350L, 420L)
     private val todoPinRefreshFrameDelays = longArrayOf(0L, 72L, 144L, 216L, 288L, 360L)
 
