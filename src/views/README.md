@@ -29,6 +29,10 @@ The views are designed as "dumb" or "presentational" components where possible, 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
 > Last updated: 2026-05-05
+- `TodoView.tsx`: Category lists now keep incomplete todos ahead of completed ones, place arranged/due todos ahead of unscheduled ones, and keep compact inline symbol-based date suffixes like `(05.06)[05.09]` fully visible by truncating the title before the dates.
+- `TodoView.tsx`: Completed todo rows now undo on the same left-swipe path as incomplete-row completion toggles, while right swipe still keeps `DETAIL / DUPLICATE` and lower-row taps still pass through the shared quick-actions open guard.
+- `TodoView.tsx`, `TodoQuickActionsModal.tsx`: Lower todo rows now pass the quick-actions open timestamp into the shared sheet so the same touch cannot immediately hit a freshly mounted quick-action button.
+- `TodoView.tsx`: List mode now reserves the fixed footer's height just like week mode, so lower todo rows no longer sit underneath the bottom navigation hit area.
 - `TodoView.tsx`: Completed todo rows no longer undo via left swipe, and ambiguous light drifts now still fall back to opening quick actions instead of landing in a no-op gap.
 - `SceneView.tsx`, `RecordView.tsx`, `TodoView.tsx`: Reworked the custom-background layout stack so each page now uses one shared whole-page warm scrim plus a second right-panel overlay, giving the left rail its own tint without separate sidebar patches and removing the visible seam between the sidebar and the rounded content panel.
 - `TodoView.tsx`: Todo rows now use a conservative axis-locked gesture classifier, so light lower-list taps keep opening quick actions while diagonal scrolls no longer misfire into completion toggles or swallowed presses.

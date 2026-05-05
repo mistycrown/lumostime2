@@ -4,7 +4,8 @@
  * @output Regression coverage for tap-vs-swipe classification in the todo list
  * @pos Test
  * @description Verifies that small drifts still open quick actions while diagonal scrolling no longer triggers accidental completion toggles.
- * @updated 2026-05-05: Added coverage for the no-op tap dead zone and for blocking completed-row undo swipes.
+ * @updated 2026-05-05: Added coverage for completed-row left-swipe undo while keeping right-swipe detail and deeper duplicate pulls.
+ * @updated 2026-05-05: Added coverage for the no-op tap dead zone and for directional quick-toggle swipes.
  * @updated 2026-05-05: Added regression tests for swallowed taps and scroll-locked diagonal gestures.
  */
 
@@ -85,6 +86,7 @@ describe('todoRowInteraction', () => {
       diffX: 44,
       diffY: 10,
       canQuickToggle: true,
+      quickToggleDirection: 'left',
       gestureIntent: 'swipe',
       detailSwipeDistance: 36,
       duplicateSwipeDistance: 100,
@@ -95,6 +97,7 @@ describe('todoRowInteraction', () => {
       diffX: 118,
       diffY: 12,
       canQuickToggle: true,
+      quickToggleDirection: 'left',
       gestureIntent: 'swipe',
       detailSwipeDistance: 36,
       duplicateSwipeDistance: 100,
@@ -102,25 +105,51 @@ describe('todoRowInteraction', () => {
     })).toBe('duplicate');
   });
 
-  test('preserves deliberate left-swipe completion only for eligible todos', () => {
+  test('preserves deliberate left-swipe completion for incomplete todos', () => {
     expect(getTodoRowReleaseAction({
       diffX: -118,
       diffY: 8,
       canQuickToggle: true,
+      quickToggleDirection: 'left',
       gestureIntent: 'swipe',
       detailSwipeDistance: 36,
       duplicateSwipeDistance: 100,
       completeSwipeDistance: 100
     })).toBe('toggleComplete');
+  });
 
+  test('keeps completed-row right swipe on detail/duplicate and restores left-swipe undo', () => {
     expect(getTodoRowReleaseAction({
-      diffX: -118,
+      diffX: 44,
       diffY: 8,
-      canQuickToggle: false,
+      canQuickToggle: true,
+      quickToggleDirection: 'left',
       gestureIntent: 'swipe',
       detailSwipeDistance: 36,
       duplicateSwipeDistance: 100,
       completeSwipeDistance: 100
-    })).toBe('none');
+    })).toBe('openDetail');
+
+    expect(getTodoRowReleaseAction({
+      diffX: 118,
+      diffY: 8,
+      canQuickToggle: true,
+      quickToggleDirection: 'left',
+      gestureIntent: 'swipe',
+      detailSwipeDistance: 36,
+      duplicateSwipeDistance: 100,
+      completeSwipeDistance: 100
+    })).toBe('duplicate');
+
+    expect(getTodoRowReleaseAction({
+      diffX: -118,
+      diffY: 8,
+      canQuickToggle: true,
+      quickToggleDirection: 'left',
+      gestureIntent: 'swipe',
+      detailSwipeDistance: 36,
+      duplicateSwipeDistance: 100,
+      completeSwipeDistance: 100
+    })).toBe('toggleComplete');
   });
 });

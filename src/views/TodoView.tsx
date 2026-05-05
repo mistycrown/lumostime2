@@ -4,9 +4,11 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
- * @updated 2026-05-05: Stopped list-row left drags from changing completion state at all, so bottom-edge taps now stay on the quick-actions/detail path instead of mutating todos.
+ * @updated 2026-05-05: Compact rows now keep symbol-only date suffixes fully visible by truncating the todo title first, while still attaching the dates directly after the title with no extra spacing.
+ * @updated 2026-05-05: Restored completed-row undo on a left swipe, while still passing the quick-actions open timestamp into the shared bottom sheet so lower-row taps cannot instantly trigger a mounted quick action.
  * @updated 2026-05-05: Stopped completed rows from undoing via left swipe, so accidental lower-list taps no longer reopen finished todos by mistake.
- * @updated 2026-05-05: Restored recurring and normal incomplete rows onto the same tap/right-swipe gesture path, while moving completion changes into quick actions.
+ * @updated 2026-05-05: Reserved bottom navigation space in list mode too, so lower todo rows no longer sit underneath the fixed footer hit area.
+ * @updated 2026-05-05: Restored recurring and normal incomplete rows onto the same swipe/tap gesture path while keeping completed rows out of left-swipe undo.
  * @updated 2026-05-05: Replaced todo-row tap/swipe heuristics with an axis-locked gesture classifier so lower-list taps no longer get swallowed or accidentally toggle completion during scrolling.
  * @updated 2026-05-05: Reworked the custom-background surface stack so the whole todo page gets one shared base scrim and the right content panel adds a second warm overlay, eliminating sidebar seams without separate left-rail patches.
  * @updated 2026-05-05: Softened the custom-background sidebar scrim with a warm bridge into the main panel so the todo layout no longer shows a visible wallpaper seam.
@@ -102,6 +104,7 @@ import { TodoQuickActionsModal } from '../components/TodoQuickActionsModal';
 import { useTodoQuickActions } from '../hooks/useTodoQuickActions';
 import { getTodoRowGestureIntent, getTodoRowReleaseAction, TodoRowGestureIntent } from '../utils/todoRowInteraction';
 import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodosForDisplay, getParentTodo, isIncompleteSubtaskHiddenByCompletedParent } from '../utils/todoHierarchyUtils';
+import { compareCategoryListTodos, formatTodoCompactScheduleSummary, formatTodoInlineDate } from '../utils/todoListDisplayUtils';
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
 import { UnreadCountBadge } from '../components/UnreadCountBadge';
 
@@ -165,11 +168,13 @@ const SwipeableTodoItem: React.FC<{
   isLast = false
 }) => {
   const [translateX, setTranslateX] = useState(0);
-  const canQuickToggle = false;
+  const canQuickToggle = true;
+  const quickToggleDirection: 'left' = 'left';
   const visibleScheduleMatchLabels = scheduleMatchLabels.slice(0, VIRTUAL_SCHEDULE_MATCH_LIMIT);
   const hiddenScheduleMatchCount = Math.max(0, scheduleMatchLabels.length - visibleScheduleMatchLabels.length);
   const scheduledDateLabel = formatTodoInlineDate(todo.scheduledDate);
   const deadlineDateLabel = formatTodoInlineDate(todo.deadlineDate);
+  const compactScheduleSummary = viewMode === 'compact' ? formatTodoCompactScheduleSummary(todo) : null;
   const hasLooseDateMarkers = viewMode === 'loose' && Boolean(scheduledDateLabel || deadlineDateLabel);
   const progressRatio = (todo.completedUnits || 0) / (todo.totalAmount || 1);
   const progressPercentage = Math.round(progressRatio * 100);
@@ -222,7 +227,8 @@ const SwipeableTodoItem: React.FC<{
       gestureIntentRef.current = getTodoRowGestureIntent({
         diffX,
         diffY,
-        canQuickToggle
+        canQuickToggle,
+        quickToggleDirection
       });
     }
 
@@ -231,7 +237,7 @@ const SwipeableTodoItem: React.FC<{
       return;
     }
 
-    if (diffX < 0 && !canQuickToggle) {
+    if (diffX < 0 && quickToggleDirection !== 'left') {
       setTranslateX(0);
       return;
     }
@@ -263,6 +269,7 @@ const SwipeableTodoItem: React.FC<{
       diffX,
       diffY,
       canQuickToggle,
+      quickToggleDirection,
       gestureIntent: gestureIntentRef.current,
       detailSwipeDistance,
       duplicateSwipeDistance,
@@ -342,7 +349,9 @@ const SwipeableTodoItem: React.FC<{
   };
 
   const isDuplicateSwipeState = translateX > duplicateSwipeDistance;
-  const rightSwipeActionLabel = isDuplicateSwipeState ? 'DUPLICATE' : 'DETAIL';
+  const rightSwipeActionLabel = isDuplicateSwipeState
+    ? 'DUPLICATE'
+    : 'DETAIL';
   const rightSwipeActionIcon = isDuplicateSwipeState
     ? <Plus size={20} />
     : <PanelRightOpen size={20} />;
@@ -401,7 +410,7 @@ const SwipeableTodoItem: React.FC<{
       {/* Background Actions (Left Swipe -> Complete/Uncomplete) */}
       <div
         className={`absolute inset-0 flex items-center justify-end pr-6 text-white font-bold tracking-wider z-0 transition-opacity duration-200 ${todo.isCompleted ? 'bg-stone-400' : 'bg-green-500'} ${viewMode === 'compact' ? getRoundedClass() : 'rounded-2xl'}`}
-        style={{ opacity: canQuickToggle && translateX < 0 ? 1 : 0 }}
+        style={{ opacity: quickToggleDirection === 'left' && translateX < 0 ? 1 : 0 }}
       >
         <span className="flex items-center gap-2">
           {todo.isCompleted ? 'UNDO' : 'COMPLETE'} <CheckCircle2 size={20} />
@@ -431,8 +440,23 @@ const SwipeableTodoItem: React.FC<{
         {/* Content (Click to Open Quick Actions) */}
         <div className={`flex-1 cursor-pointer ${todo.isCompleted ? 'opacity-60' : ''} ${viewMode === 'compact' ? 'flex items-center gap-2 min-w-0' : 'py-0.5'}`}>
           <div className={`flex gap-2 flex-1 min-w-0 ${viewMode === 'compact' ? 'items-center' : 'items-start'}`}>
-            <div className={`min-w-0 flex-1 font-bold ${todo.isCompleted ? 'text-stone-400 line-through' : 'text-stone-800'} ${viewMode === 'compact' ? 'text-sm truncate leading-tight' : 'text-base leading-snug line-clamp-2'} transition-all duration-500`}>
-              {todo.title}
+            <div className={`min-w-0 flex-1 font-bold ${viewMode === 'compact' ? 'text-sm leading-tight' : 'text-base leading-snug line-clamp-2'} transition-all duration-500`}>
+              {viewMode === 'compact' ? (
+                <span className="flex min-w-0 items-baseline">
+                  <span className={`min-w-0 flex-1 truncate ${todo.isCompleted ? 'text-stone-400 line-through' : 'text-stone-800'}`}>
+                    {todo.title}
+                  </span>
+                  {compactScheduleSummary && (
+                    <span className="shrink-0 text-[11px] font-medium leading-none text-stone-400">
+                      {compactScheduleSummary}
+                    </span>
+                  )}
+                </span>
+              ) : (
+                <span className={todo.isCompleted ? 'text-stone-400 line-through' : 'text-stone-800'}>
+                  {todo.title}
+                </span>
+              )}
             </div>
 
             {/* Progress Circle - Only in Compact Mode for Progress Tasks */}
@@ -624,15 +648,6 @@ const VIRTUAL_SCHEDULE_CATEGORY_ID = '__virtual_schedule__';
 const VIRTUAL_SCHEDULE_CATEGORY_NAME = '排期';
 const VIRTUAL_SCHEDULE_MATCH_LIMIT = 4;
 
-const formatTodoInlineDate = (dateKey?: string): string | null => {
-  if (!dateKey) return null;
-  const date = parseDateKey(dateKey);
-  if (!date) return dateKey;
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${month}.${day}`;
-};
-
 const truncateHierarchyLabel = (value: string, maxLength = 4): string => {
   const characters = Array.from(value);
   if (characters.length <= maxLength) {
@@ -778,15 +793,7 @@ const sortTodoListEntries = (
 };
 
 const sortCategoryTodoEntries = (left: TodoListEntry, right: TodoListEntry): number => {
-  if (Boolean(left.todo.pin) !== Boolean(right.todo.pin)) {
-    return Number(Boolean(right.todo.pin)) - Number(Boolean(left.todo.pin));
-  }
-
-  if (left.todo.isCompleted !== right.todo.isCompleted) {
-    return Number(left.todo.isCompleted) - Number(right.todo.isCompleted);
-  }
-
-  return left.todo.title.localeCompare(right.todo.title, 'zh-CN');
+  return compareCategoryListTodos(left.todo, right.todo);
 };
 
 const buildFallbackChildTodoEntry = (todo: TodoItem): TodoListEntry => ({
@@ -995,6 +1002,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   const weekSwipeEligibleRef = useRef(false);
   const {
     quickActionTodo,
+    quickActionOpenedAt,
     openQuickActions,
     closeQuickActions,
     handleQuickActionMove,
@@ -1866,6 +1874,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       onDelete={handleQuickActionDelete}
       onClose={closeQuickActions}
       onForceClose={() => closeQuickActions(true)}
+      openedAt={quickActionOpenedAt}
     />
   );
 
@@ -2078,7 +2087,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
   return (
     <div 
-      className="flex h-full relative"
+      className="flex h-full relative pb-[calc(3rem+env(safe-area-inset-bottom))] md:pb-16"
       style={{
         backgroundColor: hasBackground ? 'transparent' : '#faf9f6'
       }}
@@ -2259,7 +2268,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto pb-[calc(8.5rem+env(safe-area-inset-bottom))] no-scrollbar">
+        <div className="flex-1 overflow-y-auto pb-[calc(6.5rem+env(safe-area-inset-bottom))] no-scrollbar">
           {isVirtualScheduleCategory && (selectedScheduleFilter === 'thisWeek' || selectedScheduleFilter === 'today')
             ? selectedTodoSectionsForRender.map((section) => (
               <section key={section.dateKey} className="mb-6">

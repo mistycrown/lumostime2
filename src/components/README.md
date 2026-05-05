@@ -10,6 +10,7 @@ Components that form the structural or global UI elements.
 - `Toast.tsx`: Notification system.
 
 ## Modals
+- Update 2026-05-05: `AIBackfillChatModal.tsx` now runs a dedicated reopen-time scroll-to-latest pass, so entering the AI chat returns to the newest turn by default while exact notification-linked message jumps still win.
 - Update 2026-05-05: `AIBackfillChatModal.tsx` now keeps applied-result, memory-update, reminder-update, and retry blocks inside the main message column, so narrow mobile layouts no longer squeeze assistant bubbles into single-character vertical text.
 - Update 2026-05-05: `ImmersiveTimer.tsx` now leaves Android EdgeToEdge inset tracking enabled during immersive enter/exit and only lets system-bar visibility change, because manually disabling and re-enabling the native inset listener could leave the app header stack shifted downward after returning.
 - Update 2026-05-05: `ImmersiveTimer.tsx` now lets the Android immersive plugin own system-bar visibility during fullscreen entry/exit, avoiding the extra status-bar show/hide toggles that could leave app headers shifted after tapping the immersive close button.
@@ -118,7 +119,8 @@ Components for theme and appearance customization.
 - `ScheduleStyleSelector.tsx`: 日程图样式卡片选择器，提供默认、经典、极简、实色四种轻量预览。
 - `achievement/AchievementBottleIconPackSelector.tsx`: 已改为成就瓶图标包卡片选择器，支持更紧凑的预览式切换。
 - `achievement/AchievementBottleStyleSelector.tsx`: 已改为成就瓶样式卡片选择器，使用玻璃瓶身小预览区分不同气质。
-> Last updated: 2026-04-27
+> Last updated: 2026-05-05
+- `TodoQuickActionsModal.tsx`: The shared quick-actions sheet now ignores the same touch-generated follow-up click that opened it, so tapping a lower todo row no longer flashes the sheet and instantly fires `完成 / 取消完成 / Pin` actions under the finger.
 - `TodoQuickActionsModal.tsx`: Added an inline `删除任务 -> 确认删除？` two-step action so shared todo quick actions can remove a task directly from the sheet without opening the full detail editor first.
 - `TodoQuickActionsModal.tsx`: Android back now dismisses the shared quick-actions sheet before app-level navigation runs, and tapping the blurred backdrop closes the sheet without leaking the tap through to the todo row underneath.
 - `TodoQuickActionsModal.tsx`: Backdrop dismissal now happens on the backdrop click itself, so tapping the blurred outside area closes the current quick-actions sheet without click-through opening the todo row underneath, while the existing open-time guard still blocks same-tap flash closes.
