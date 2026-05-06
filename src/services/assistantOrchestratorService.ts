@@ -5,6 +5,8 @@
  * @pos Service (Assistant Orchestrator)
  * @description Orchestrates Android-first assistant system turns by loading structured memory, assembling a prompt, calling the existing AI service, and applying the resulting silent/message/reminder/memory actions back into local state.
  *
+ * @updated 2026-05-06: Passed through explicit `yesterdayTimelineSummary` alongside today's activity records so background turns see both recent days in state context.
+ * @updated 2026-05-06: Passed through optional `timelineReviewSummary`, dropped the stale recent-log turn input, and treat any background reply text as a surfaced message even if the model drifts from the expected outcome label.
  * @updated 2026-05-04: Linked persisted background messages back to their source call-history entries so debug mode can open the right request trace directly from the message bubble.
  * @updated 2026-05-01: Added native-background reply hydration so Android-side completed check-ins can be surfaced back into persisted Web chat sessions instead of living only in diagnostics.
  * @updated 2026-04-27: Persisted background message memory/reminder update metadata so chat history can render the same expand controls as foreground assistant turns.
@@ -54,12 +56,13 @@ interface AssistantSystemTurnRequest {
   currentDateTime: string;
   defaultDate: string;
   todayTimelineSummary: string;
+  yesterdayTimelineSummary?: string;
+  timelineReviewSummary?: string;
   activeSessionSummary?: string;
   todayScheduledTodoSummary?: string;
   pinnedTodoSummary?: string;
   overdueTodoSummary?: string;
   reminderSummary?: string;
-  recentLogsDigest?: string;
   userPersonaPrompt?: string;
   dictionaryContext?: AssistantTurnDictionaryContext;
   conversationHistory?: AIConversationTurn[];
@@ -803,14 +806,15 @@ export const assistantOrchestratorService = {
           currentDateTime: request.currentDateTime,
           defaultDate: request.defaultDate,
           todayTimelineSummary: request.todayTimelineSummary,
+          ...(request.yesterdayTimelineSummary ? { yesterdayTimelineSummary: request.yesterdayTimelineSummary } : {}),
+          ...(request.timelineReviewSummary ? { timelineReviewSummary: request.timelineReviewSummary } : {}),
           ...(request.activeSessionSummary ? { activeSessionSummary: request.activeSessionSummary } : {}),
           ...(request.todayScheduledTodoSummary ? { todayScheduledTodoSummary: request.todayScheduledTodoSummary } : {}),
           ...(request.pinnedTodoSummary ? { pinnedTodoSummary: request.pinnedTodoSummary } : {}),
           ...(request.overdueTodoSummary ? { overdueTodoSummary: request.overdueTodoSummary } : {}),
           ...(request.reminderSummary ? { reminderSummary: request.reminderSummary } : {})
         },
-        dictionaryContext: request.dictionaryContext || {},
-        ...(request.recentLogsDigest ? { recentLogsDigest: request.recentLogsDigest } : {})
+        dictionaryContext: request.dictionaryContext || {}
       });
       output = turnResult.output;
       debug = turnResult.debug;
@@ -838,8 +842,9 @@ export const assistantOrchestratorService = {
       ? buildAssistantDisplayParts(output.assistantReply, output.assistantReplyParts)
       : undefined;
     let memoryUpdates: PersistedAIChatMemoryUpdateSection[] = [];
+    const hasVisibleReply = Boolean(output.assistantReply);
     const decision: AssistantSystemTurnDecision = {
-      action: output.outcome === 'reply' && output.assistantReply ? 'send_message' : 'silent',
+      action: hasVisibleReply ? 'send_message' : 'silent',
       memoryAction: output.memoryAction,
       ...(output.assistantReply ? { message: output.assistantReply } : {}),
       ...(messageParts?.length ? { messageParts } : {}),
@@ -884,7 +889,7 @@ export const assistantOrchestratorService = {
     let surfacedMessageLocation: PersistedAssistantMessageLocation | null = null;
     const reminderUpdates = buildPersistedReminderUpdates(appliedReminders);
     const shouldRecordDecisionSummary = assistantConfig.longTermMemoryEnabled;
-    if (output.outcome === 'reply' && output.assistantReply) {
+    if (hasVisibleReply && output.assistantReply) {
       surfacedMessage = output.assistantReply;
       surfacedMessageLocation = persistAssistantMessage(surfacedMessage, request.targetSessionId, {
         ...(messageParts?.length ? { displayParts: messageParts } : {}),

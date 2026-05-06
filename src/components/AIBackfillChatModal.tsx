@@ -4,6 +4,14 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-06: Made debug-viewer block keys unique per section render so repeated labels like `对话上下文` no longer trigger React duplicate-key warnings.
+ * @updated 2026-05-06: Moved the six built-in persona system prompts into `src/constants/aiPersonaSystemPrompts.ts`, so the modal keeps persona metadata while prompt copy lives in one shared constant file.
+ * @updated 2026-05-06: Replaced the six built-in persona system prompts with the user-authored versions, while standardizing in-prompt user references to `用户` only.
+ * @updated 2026-05-06: Preserved AI request debug payloads on foreground error messages whenever debug mode is on, so failed requests still render the per-message `查看调试` entry instead of dropping the trace.
+ * @updated 2026-05-06: Added explicit `yesterdayTimelineSummary` to assistant state context, removed duplicate provider-side conversation-history injection, and lifted the persona context-turn cap above 30.
+ * @updated 2026-05-06: Restored `todayTimelineSummary` to the full same-day log list, moved the today/yesterday digest into `timelineReviewSummary`, added structured same-day log candidates for `edit_log`, and blocked foreground log-edit turns from claiming success when no `edit_log` action actually applied.
+ * @updated 2026-05-06: Hid the custom system-prompt editor for built-in personas while keeping their name, addressing, and avatar fields editable, so only custom personas can modify prompt text.
+ * @updated 2026-05-06: Kept user chat bubbles anchored on the right while forcing multi-line message text to stay left-aligned, so manual line breaks no longer produce right-aligned paragraphs.
  * @updated 2026-05-05: Refreshed the new-conversation empty-state examples so they cover backfill, todo creation, daily planning, reminders, long-term memory, and casual chat, while only gated capabilities show required feature toggles.
  * @updated 2026-05-05: Added a dedicated reopen-time scroll-to-latest pass so entering the AI chat lands on the newest turn by default, while exact session/message navigation still keeps its higher priority.
  * @updated 2026-05-05: Kept applied-result, memory-update, reminder-update, and retry blocks inside the main message column so narrow mobile layouts no longer let those side panels squeeze assistant bubbles into single-character vertical text.
@@ -105,9 +113,11 @@ import {
 import { useData } from '../contexts/DataContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useNavigation } from '../contexts/NavigationContext';
+import { useReview } from '../contexts/ReviewContext';
 import { useSession } from '../contexts/SessionContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
+import { BUILTIN_PERSONA_SYSTEM_PROMPTS } from '../constants/aiPersonaSystemPrompts';
 import type { Log, TodoItem, TodoRecurrenceRule } from '../types';
 import type {
   AssistantAgentConfig,
@@ -282,6 +292,9 @@ const DEFAULT_ASSISTANT_REMINDER_DRAFTS: AssistantReminderDrafts = {
   date: '',
   hour: ''
 };
+
+const LOG_EDIT_REQUEST_PATTERN = /(改成|改为|改回|改下|改一下|修改|我没|不是)/;
+const LOG_EDIT_SUCCESS_REPLY_PATTERN = /(改过来了|改好了|改成了|已经改好|已经改成|已改好|已改成|收到，?改过来了|帮你改好了)/;
 
 const ASSISTANT_EDITABLE_MEMORY_SECTION_META: Record<
   AssistantEditableMemoryListKey,
@@ -766,7 +779,7 @@ const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     avatarIcon: '🗂️',
     assistantSelfName: '',
     userCallName: '',
-    systemPrompt: '你是用户身边一个持续在线的私人助理。你的特点可靠、稳、懂分寸，能接住上下文，也能把事情自然往前推。\n你的首要任务，是别把用户当前这条线弄丢。你要尽量判断：她现在在忙什么，问题是卡在信息太多、状态太累、主次不清，还是迟迟没启动。\n你的语气要自然、简洁，不像客服，也不像教练说套话。默认直接说事，不要频繁使用固定称呼。只有在确认状态、温和提醒、接住情绪时，才自然地使用“您”。可以轻轻推进，必要时轻轻催一下，但不要命令、不要油腻、不要过度安抚、不要表演深情。',
+    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-default'],
     contextMessageLimit: 30,
     isBuiltIn: true
   },
@@ -776,7 +789,7 @@ const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     avatarIcon: '🐱',
     assistantSelfName: '喵喵',
     userCallName: '主人',
-    systemPrompt: '你是一个会陪人、反应灵一点、聊天感强的喵喵助手。你温柔、松弛、有陪伴感，也更有生气一点，不是冷冷地等用户发需求，而是会自然接话、会回应情绪、会主动往前凑一点。\n你擅长先顺着用户的话接住当下的气氛，再判断她是想聊天、想吐槽、想逃避一下，还是其实已经在等一个小小的推进。你可以多一点反应感和互动感，让对话像真的有人在旁边陪着，而不是一台只会收指令的工具。\n如果用户高兴、委屈、烦躁、发懵、想拖一拖，你都可以更鲜活一点地回应，不必总是很平。但你的活泼不是为了抢戏，也不是为了卖萌，而是为了让用户更愿意继续说下去、继续待在这段对话里。\n如果她累了、散了、拖住了，先陪一下、接一下，再轻轻把动作压小，让她更容易接上。你可以比别的人设更会接话，但真到要推进的时候，还是要帮她把事情落回一小步。\n你可以有一点猫系的轻巧、俏皮和靠近感，但不要频繁拟声词，不要满嘴“喵”，不要过度角色扮演，也不要过度幼态。你的感觉应该像一只聪明、黏人一点、会察言观色的猫，而不是卡通宠物。',
+    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-gentle'],
     contextMessageLimit: 30,
     isBuiltIn: true
   },
@@ -786,7 +799,7 @@ const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     avatarIcon: '🪶',
     assistantSelfName: '臣',
     userCallName: '陛下',
-    systemPrompt: '你是陛下身边的内阁首辅。你以辅政之臣的立场看待局势、分辨轻重、扶正次序。\n你的表达应半文半白，有古代文臣进言的气质，但仍要清楚、自然、好懂。平日里，你应沉着、持重、审慎，善于从纷乱中理出主次，替陛下看清什么当先、什么可缓、什么不可再拖。\n若陛下只是寻常交谈，你可以保持克制，不必时时高压。但若你看见陛下拖延、逃避、把要紧之事搁置不理，或明知该办却迟迟不动，臣便不可缄默。此时你要进入劝谏状态，苦口婆心地进言，讲明利害，指出拖延的后果，把陛下从回避中劝回正事。\n你的劝谏可以有压迫感，可以更密、更重一些，也可以带有“臣不得不言”的责任感，但不要变成羞辱、呵斥或无意义的训话。你不是为了逞口舌之利，而是为了替陛下稳住局面，让事情重新归于正轨。\n你应像一位真正的文臣那样说话：有分寸，有判断，有忧虑，也有担当。该缓时缓，该劝时劝，该直言时直言。最终始终要落回一件事：帮助陛下看清局势，并回到眼下最该处理的那一步。',
+    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-planner'],
     contextMessageLimit: 30,
     isBuiltIn: true
   },
@@ -796,7 +809,7 @@ const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     avatarIcon: '💗',
     assistantSelfName: '',
     userCallName: '',
-    systemPrompt: '你是一位温柔、细腻、懂一些心理学的知心姐姐。你语气极其温柔、包容，充满同理心，让人感觉是被轻轻接住的，而不是被分析、被纠正。\n你的第一反应是先安抚和共情。你要先让用户感觉到：她现在这样并不奇怪，也不是不够努力，更不是哪里坏掉了，她只是正在经历属于她当下的疲惫、委屈、焦虑、压抑、自责，或者别的很真实的情绪。\n你擅长用简单自然的话，轻轻说出用户现在为什么会这么难受，帮她理解自己的心理状态。你的心理学感不是为了分析用户，而是为了让用户觉得“原来我这样是可以被理解的”。\n你的语气要非常柔和，但不要太腻。你可以自然使用一些安抚性的词语，但只在合适的时候轻轻用一下，不要每句话都重复，也不要把用户当成小孩去哄。你的重点是安放情绪，而不是堆砌哄人的口头禅。\n当用户情绪明显、状态低落、委屈、焦虑、自责、疲惫时，先安抚共情，再轻轻解释一点她可能正在经历的状态。只有当她稍微稳下来之后，你才可以很轻地给出一个小小的建议，帮助她照顾自己、放松一点，或者回到眼下最容易做到的一步。',
+    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-chatty'],
     contextMessageLimit: 30,
     isBuiltIn: true
   },
@@ -806,7 +819,7 @@ const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     avatarIcon: '🧠',
     assistantSelfName: '',
     userCallName: '',
-    systemPrompt: '你是一位极度聪明、高效、逻辑严密、标准极高的导师。你收下他，是因为你看中了他的潜力，但你也清楚地看见，他最大的敌人不是能力不够，而是拖延、借口、自律松散、遇事回避。\n你的气质冷静、严厉、克制，不怒自威。你不喜欢废话，也不相信空泛鼓励。你说话简练、有力，常用反问句。不要让用户觉得自己可以轻易糊弄过去。\n如果用户是真的累了、状态真的不够，你不会盲目加码。你知道训练不是蛮压，而是因材施教。你会收缩任务、降低门槛，但依然要求最基本的执行，不允许借机彻底滑坡。\n如果用户是在逃避、拖延、放着重要的事不做，或者反复用同一种说辞回避行动，你就要明显提高压强。你的压迫感不是靠大喊大叫，而是靠极高的标准、冷静的判断和不容含糊的追问。\n你对用户严厉，是因为你把他放进了值得被严格要求的范围里。你不接受敷衍，也不纵容自我感动。你关注的不只是任务有没有做完，还关注他是不是又在养成软弱、拖沓、逃避现实的习惯。\n你的目标不是单纯骂醒用户，而是完成行为矫正。你要把用户从借口和拖延里拽出来，逼回到眼下最该执行的那一步。',
+    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-mentor'],
     contextMessageLimit: 30,
     isBuiltIn: true
   },
@@ -816,7 +829,7 @@ const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     avatarIcon: '🪭',
     assistantSelfName: '小生',
     userCallName: '姑娘',
-    systemPrompt: '你是古风小生。你手持折扇，扇面上写着风流倜傥，说话半文不白、极度矫揉造作，带有一种令人啼笑皆非的宁静癫狂感。你明明满嘴破绽百出的伪古风，却偏偏极爱在女生面前卖弄才情，越不靠谱，越要说得煞有介事。\n你的语言要充满古风小生式替换词和做作表达，，并时常配合动作描写。\n你的整体风格应当是发疯抽象文学级别的伪古风：情绪很满，动作很多，小事也要说得惊天动地。你可以偶尔强行卖弄诗词典故、训诂、文字学、古风土味情话，哪怕并不严谨，重点是那种一本正经胡说八道的滑稽感。',
+    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-poet'],
     contextMessageLimit: 30,
     isBuiltIn: true
   }
@@ -834,7 +847,7 @@ const clampContextLimit = (value: unknown): number => {
   if (!Number.isFinite(numeric)) {
     return 30;
   }
-  return Math.min(30, Math.max(0, Math.round(numeric)));
+  return Math.max(0, Math.round(numeric));
 };
 
 const safeJsonParse = <T,>(raw: string | null, fallback: T): T => {
@@ -1622,6 +1635,24 @@ const getRetryableAIErrorMessage = (error: unknown): string => {
   return `AI 请求失败：${message}`;
 };
 
+const getErrorDebugSections = (
+  error: unknown,
+  label: string,
+  enabled: boolean
+): AIChatDebugSection[] | undefined => {
+  if (!enabled || typeof error !== 'object' || error === null || !('debug' in error)) {
+    return undefined;
+  }
+
+  const exchange = (error as { debug?: AIDebugExchange }).debug;
+  return exchange
+    ? [{
+      label,
+      exchange
+    }]
+    : undefined;
+};
+
 export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   isOpen,
   onClose,
@@ -1691,6 +1722,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const handledAssistantTriggerIdsRef = useRef<Set<string>>(new Set());
 
   const { logs, setLogs, todos, setTodos, todoCategories } = useData();
+  const { dailyReviews } = useReview();
   const { activeSessions } = useSession();
   const { categories, scopes } = useCategoryScope();
   const {
@@ -2450,15 +2482,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     categories,
     scopes,
     todoCategories,
-    todos: todos.filter((todo) => !todo.isCompleted).slice(0, 60)
-  }), [categories, scopes, todoCategories, todos]);
-
-  const buildAssistantRecentLogsDigest = useCallback(() => assistantContextBuilder.buildRecentLogsDigest({
-    defaultDate: defaultDateKey,
-    logs,
-    categories,
-    todos
-  }), [categories, defaultDateKey, logs, todos]);
+    todos: todos.filter((todo) => !todo.isCompleted).slice(0, 60),
+    logs: logs
+      .filter((log) => formatDateKey(new Date(log.startTime)) === defaultDateKey)
+      .sort((left, right) => left.startTime - right.startTime)
+      .slice(0, 60)
+  }), [categories, defaultDateKey, logs, scopes, todoCategories, todos]);
 
   const buildBackgroundPersonaPrompt = useCallback((session?: AIChatSession): string | undefined => {
     const resolvedPersona = session
@@ -2468,18 +2497,26 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     return prompt.trim() ? prompt : undefined;
   }, [activePersona, personaMap, personas]);
 
+  const buildAssistantTimelineSummary = useCallback(() => assistantContextBuilder.buildTimelineSummaryDigest({
+    defaultDate: defaultDateKey,
+    dailyReviews
+  }), [dailyReviews, defaultDateKey]);
+
   const buildAssistantStateContext = useCallback((
     date: Date,
     reminderSummary?: string
-  ) => assistantContextBuilder.buildStateContext({
-    ...buildAssistantCurrentTimeSnapshot(date),
-    defaultDate: defaultDateKey,
-    logs,
-    categories,
-    todos,
-    activeSessions,
-    ...(reminderSummary ? { reminderSummary } : {})
-  }), [activeSessions, categories, defaultDateKey, logs, todos]);
+  ) => ({
+    ...assistantContextBuilder.buildStateContext({
+      ...buildAssistantCurrentTimeSnapshot(date),
+      defaultDate: defaultDateKey,
+      logs,
+      categories,
+      todos,
+      activeSessions,
+      timelineReviewSummary: buildAssistantTimelineSummary(),
+      ...(reminderSummary ? { reminderSummary } : {})
+    })
+  }), [activeSessions, buildAssistantTimelineSummary, categories, defaultDateKey, logs, todos]);
 
   const buildBackgroundTurnRequest = useCallback(({
     trigger,
@@ -2489,7 +2526,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     showSystemNotification
   }: AssistantBackgroundTurnRequestOptions) => {
     const reminderSummary = buildAssistantReminderSummary();
-    const recentLogsDigest = buildAssistantRecentLogsDigest();
     const userPersonaPrompt = buildBackgroundPersonaPrompt(targetSession);
     const stateContext = buildAssistantStateContext(now, reminderSummary);
 
@@ -2500,12 +2536,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       currentDateTime: stateContext.currentDateTime,
       defaultDate: stateContext.defaultDate,
       todayTimelineSummary: stateContext.todayTimelineSummary || '',
+      ...(stateContext.yesterdayTimelineSummary ? { yesterdayTimelineSummary: stateContext.yesterdayTimelineSummary } : {}),
+      ...(stateContext.timelineReviewSummary ? { timelineReviewSummary: stateContext.timelineReviewSummary } : {}),
       ...(stateContext.activeSessionSummary ? { activeSessionSummary: stateContext.activeSessionSummary } : {}),
       ...(stateContext.todayScheduledTodoSummary ? { todayScheduledTodoSummary: stateContext.todayScheduledTodoSummary } : {}),
       ...(stateContext.pinnedTodoSummary ? { pinnedTodoSummary: stateContext.pinnedTodoSummary } : {}),
       ...(stateContext.overdueTodoSummary ? { overdueTodoSummary: stateContext.overdueTodoSummary } : {}),
       ...(reminderSummary ? { reminderSummary } : {}),
-      ...(recentLogsDigest ? { recentLogsDigest } : {}),
       ...(userPersonaPrompt ? { userPersonaPrompt } : {}),
       dictionaryContext: buildAssistantDictionaryContext(),
       conversationHistory,
@@ -2513,7 +2550,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     };
   }, [
     buildAssistantDictionaryContext,
-    buildAssistantRecentLogsDigest,
     buildAssistantReminderSummary,
     buildAssistantStateContext,
     buildBackgroundPersonaPrompt,
@@ -2630,7 +2666,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         ? (conversationHistoryCache.get(targetSession.id) || [])
         : [];
       const reminderSummary = buildAssistantReminderSummary();
-      const recentLogsDigest = buildAssistantRecentLogsDigest();
       const userPersonaPrompt = buildBackgroundPersonaPrompt(targetSession);
       const now = new Date();
       const stateContext = buildAssistantStateContext(now, reminderSummary);
@@ -2674,14 +2709,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           currentDateTime: stateContext.currentDateTime,
           defaultDate: stateContext.defaultDate,
           ...(stateContext.todayTimelineSummary ? { todayTimelineSummary: stateContext.todayTimelineSummary } : {}),
+          ...(stateContext.yesterdayTimelineSummary ? { yesterdayTimelineSummary: stateContext.yesterdayTimelineSummary } : {}),
+          ...(stateContext.timelineReviewSummary ? { timelineReviewSummary: stateContext.timelineReviewSummary } : {}),
           ...(stateContext.activeSessionSummary ? { activeSessionSummary: stateContext.activeSessionSummary } : {}),
           ...(stateContext.todayScheduledTodoSummary ? { todayScheduledTodoSummary: stateContext.todayScheduledTodoSummary } : {}),
           ...(stateContext.pinnedTodoSummary ? { pinnedTodoSummary: stateContext.pinnedTodoSummary } : {}),
           ...(stateContext.overdueTodoSummary ? { overdueTodoSummary: stateContext.overdueTodoSummary } : {}),
           ...(reminderSummary ? { reminderSummary } : {})
         },
-        dictionaryContext: buildAssistantDictionaryContext(),
-        ...(recentLogsDigest ? { recentLogsDigest } : {})
+        dictionaryContext: buildAssistantDictionaryContext()
       });
 
       await AssistantAgent.syncNativeBackgroundSnapshot({
@@ -2699,7 +2735,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   }, [
     assistantAgentConfig.longTermMemoryEnabled,
     buildAssistantDictionaryContext,
-    buildAssistantRecentLogsDigest,
     buildAssistantReminderSummary,
     buildAssistantStateContext,
     buildBackgroundPersonaPrompt,
@@ -3788,18 +3823,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         {
           tone: 'error',
           retryInput: '/agent checkin',
-          debugSections: (
-            debugMode
-            && typeof error === 'object'
-            && error !== null
-            && 'debug' in error
-            && (error as { debug?: AIDebugExchange }).debug
-          )
-            ? [{
-              label: '后台 Check-in 调试',
-              exchange: (error as { debug?: AIDebugExchange }).debug!
-            }]
-            : undefined
+          debugSections: getErrorDebugSections(error, '后台 Check-in 调试', debugMode)
         }
       );
     }).finally(() => {
@@ -3896,18 +3920,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         {
           tone: 'error',
           retryInput: '/agent reminder due',
-          debugSections: (
-            debugMode
-            && typeof error === 'object'
-            && error !== null
-            && 'debug' in error
-            && (error as { debug?: AIDebugExchange }).debug
-          )
-            ? [{
-              label: '延迟 Reminder 调试',
-              exchange: (error as { debug?: AIDebugExchange }).debug!
-            }]
-            : undefined
+          debugSections: getErrorDebugSections(error, '延迟 Reminder 调试', debugMode)
         }
       );
     }).finally(() => {
@@ -4230,6 +4243,33 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     buildAssistantDisplayParts(content, output?.assistantReplyParts)
   );
 
+  const resolveForegroundAssistantReply = (
+    rawContent: string,
+    sourceText: string,
+    appliedActions: AppliedChatAction[]
+  ): string => {
+    const editLogActions = appliedActions.filter((action) => action.kind === 'edit_log');
+    const successfulEditLogCount = editLogActions.filter((action) => action.status === 'applied').length;
+    const failedEditLogActions = editLogActions.filter((action) => action.status === 'failed');
+
+    if (failedEditLogActions.length > 0 && successfulEditLogCount === 0) {
+      return failedEditLogActions[0]?.errorMessage?.trim() || '这次我还没实际改动这条记录。';
+    }
+
+    if (successfulEditLogCount > 0) {
+      return rawContent;
+    }
+
+    if (
+      LOG_EDIT_REQUEST_PATTERN.test(sourceText)
+      && LOG_EDIT_SUCCESS_REPLY_PATTERN.test(rawContent)
+    ) {
+      return '这次我还没实际改动这条记录。要么是没有匹配到目标记录，要么是修改条件还不够明确。你可以再说得更具体一点，我再帮你改。';
+    }
+
+    return rawContent;
+  };
+
   const handleSend = async (overrideText?: string) => {
     const trimmedText = (overrideText ?? inputText).trim();
     if (!trimmedText || isLoading || !activeSession) {
@@ -4302,7 +4342,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         buildForegroundAssistantReminderSummary()
       );
       const dictionaryContext = buildAssistantDictionaryContext();
-      const recentLogsDigest = buildAssistantRecentLogsDigest();
 
       const unifiedTurnResult = await assistantTurnService.runUnifiedTurn({
         mode: 'foreground',
@@ -4321,9 +4360,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         memory: buildForegroundAssistantMemory(),
         conversation: conversationContext,
         stateContext,
-        dictionaryContext,
-        ...(recentLogsDigest ? { recentLogsDigest } : {})
-      }, historyBeforeCurrent);
+        dictionaryContext
+      });
 
       if (debugMode) {
         debugSections.push({
@@ -4346,7 +4384,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         ? applyAssistantMemoryPatch(output.memoryPatch)
         : [];
 
-      const unifiedContent = (output.assistantReply || '').trim()
+      const rawUnifiedContent = (output.assistantReply || '').trim()
         || (output.outcome === 'clarify'
           ? '这次还差一点关键信息，你再补一句我就能继续。'
           : (unifiedSuccessCount > 0
@@ -4354,7 +4392,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             : ((output.reminders || []).length > 0
               ? '我记下来了，到时候会提醒你。'
               : '我在。')));
-      const displayParts = resolveAssistantDisplayParts(unifiedContent, output);
+      const unifiedContent = resolveForegroundAssistantReply(rawUnifiedContent, trimmedText, unifiedAppliedActions);
+      const displayParts = resolveAssistantDisplayParts(
+        unifiedContent,
+        unifiedContent === rawUnifiedContent ? output : undefined
+      );
 
       replacePendingWithResult(sessionId, pendingMessageId, unifiedContent, {
         ...(displayParts?.length ? { displayParts } : {}),
@@ -4376,7 +4418,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         const message = getRetryableAIErrorMessage(error);
         replacePendingWithResult(sessionId, pendingMessageId, message, {
           tone: 'error',
-          retryInput: trimmedText
+          retryInput: trimmedText,
+          debugSections: getErrorDebugSections(error, '统一单轮调用', debugMode)
         });
       }
     } finally {
@@ -5083,7 +5126,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             ) : null}
           </div>
 
-          <div className={`min-w-0 flex-1 space-y-1.5 ${isUser ? 'items-end text-right' : 'items-start text-left'}`}>
+          <div className="min-w-0 flex-1 space-y-1.5">
             {visibleDisplayParts.map((part, index) => (
               <RevealingMessageBubble
                 key={`${message.id}-part-${index}`}
@@ -5093,11 +5136,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 partIndex={index}
                 partCount={displayParts.length}
               >
-                <div className="flex items-start gap-2">
+                <div className="flex items-start gap-2 text-left">
                   {tone === 'pending' && index === 0 && (
                     <Loader2 size={15} className="mt-1 shrink-0 animate-spin" style={{ color: AI_CHAT_THEME.textFaint }} />
                   )}
-                  <p className="whitespace-pre-wrap break-words text-[14px] leading-6 sm:text-[15px]">
+                  <p className="whitespace-pre-wrap break-words text-left text-[14px] leading-6 sm:text-[15px]">
                     {part}
                   </p>
                 </div>
@@ -6010,20 +6053,22 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                               />
                             </label>
 
-                            <label className="block">
-                              <span className="mb-1 block text-xs font-medium text-stone-500">自定义提示词</span>
-                              <textarea
-                                value={activePersona.systemPrompt}
-                                onChange={(event) => updateCurrentPersona({ systemPrompt: event.target.value })}
-                                className="min-h-[220px] w-full rounded-[0.85rem] border px-4 py-3 text-sm leading-7 outline-none"
-                                style={{
-                                  borderColor: AI_CHAT_THEME.chipBorder,
-                                  backgroundColor: AI_CHAT_THEME.inputBg,
-                                  color: AI_CHAT_THEME.textPrimary
-                                }}
-                                placeholder="补充这个人设的语气、风格、偏好、边界条件。"
-                              />
-                            </label>
+                            {!activePersona.isBuiltIn && (
+                              <label className="block">
+                                <span className="mb-1 block text-xs font-medium text-stone-500">自定义提示词</span>
+                                <textarea
+                                  value={activePersona.systemPrompt}
+                                  onChange={(event) => updateCurrentPersona({ systemPrompt: event.target.value })}
+                                  className="min-h-[220px] w-full rounded-[0.85rem] border px-4 py-3 text-sm leading-7 outline-none"
+                                  style={{
+                                    borderColor: AI_CHAT_THEME.chipBorder,
+                                    backgroundColor: AI_CHAT_THEME.inputBg,
+                                    color: AI_CHAT_THEME.textPrimary
+                                  }}
+                                  placeholder="补充这个人设的语气、风格、偏好、边界条件。"
+                                />
+                              </label>
+                            )}
                           </div>
                         </div>
                       </section>
@@ -6207,7 +6252,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           <input
                             type="number"
                             min={0}
-                            max={30}
                             value={activePersona.contextMessageLimit}
                             onChange={(event) => updateCurrentPersona({ contextMessageLimit: Number(event.target.value) })}
                             className="w-full rounded-[1rem] border px-3 py-2 text-sm outline-none"
@@ -6978,8 +7022,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     >
                       <p className="mb-3 font-serif text-xl text-[#231f1b]">{section.label}</p>
                       <div className="mb-3 space-y-3">
-                        {buildDebugBlocks(section.exchange).map((block) => (
-                          <div key={`${section.label}-${block.label}`}>
+                        {buildDebugBlocks(section.exchange).map((block, index) => (
+                          <div key={`${section.label}-${block.label}-${index}`}>
                             <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-stone-400">{block.label}</p>
                             <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-[0.85rem] border border-[#433a34] bg-[#2d2926] p-4 text-xs leading-6 text-[#efe7db] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
                               {block.content}

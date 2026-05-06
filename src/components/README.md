@@ -10,6 +10,13 @@ Components that form the structural or global UI elements.
 - `Toast.tsx`: Notification system.
 
 ## Modals
+- Update 2026-05-06: `AIBackfillChatModal.tsx` now imports its six built-in persona system prompts from `src/constants/aiPersonaSystemPrompts.ts`, so prompt copy no longer lives inline inside the modal component.
+- Update 2026-05-06: `AIBackfillChatModal.tsx` now sends concrete activity-log summaries for both today and yesterday in assistant state context, stops duplicating cached conversation history into the provider message list, and removes the old 30-turn cap from persona context settings.
+- Update 2026-05-06: `AIBackfillChatModal.tsx` now replaces the six built-in persona system prompts with the user-authored versions and standardizes in-prompt user references to `用户`.
+- Update 2026-05-06: `AIBackfillChatModal.tsx` now sends the assistant-facing `todayTimelineSummary` as the concrete same-day log list, passes the broader today/yesterday digest separately as `timelineReviewSummary`, includes structured same-day log candidates for `edit_log`, and blocks foreground log-edit replies from claiming success when no `edit_log` action actually applied.
+- Update 2026-05-06: `AIBackfillChatModal.tsx` now preserves foreground AI failure debug payloads on the errored assistant message whenever debug mode is on, so failed requests still render the per-message `查看调试` entry instead of losing the trace.
+- Update 2026-05-06: `AIBackfillChatModal.tsx` now hides the custom prompt editor for built-in personas while still allowing their name, addressing, and avatar fields to be edited; only custom personas can edit prompt text.
+- Update 2026-05-06: `AIBackfillChatModal.tsx` now keeps user chat bubbles on the right while forcing wrapped or manually line-broken user text to stay left-aligned inside the bubble.
 - Update 2026-05-05: `AIBackfillChatModal.tsx` now runs a dedicated reopen-time scroll-to-latest pass, so entering the AI chat returns to the newest turn by default while exact notification-linked message jumps still win.
 - Update 2026-05-05: `AIBackfillChatModal.tsx` now keeps applied-result, memory-update, reminder-update, and retry blocks inside the main message column, so narrow mobile layouts no longer squeeze assistant bubbles into single-character vertical text.
 - Update 2026-05-05: `ImmersiveTimer.tsx` now leaves Android EdgeToEdge inset tracking enabled during immersive enter/exit and only lets system-bar visibility change, because manually disabling and re-enabling the native inset listener could leave the app header stack shifted downward after returning.
@@ -119,7 +126,11 @@ Components for theme and appearance customization.
 - `ScheduleStyleSelector.tsx`: 日程图样式卡片选择器，提供默认、经典、极简、实色四种轻量预览。
 - `achievement/AchievementBottleIconPackSelector.tsx`: 已改为成就瓶图标包卡片选择器，支持更紧凑的预览式切换。
 - `achievement/AchievementBottleStyleSelector.tsx`: 已改为成就瓶样式卡片选择器，使用玻璃瓶身小预览区分不同气质。
-> Last updated: 2026-05-05
+> Last updated: 2026-05-06
+- `TodoAssociation.tsx`: Shared todo pickers now hide completed todos by default, but keep the currently linked completed todo visible so edit flows do not lose their existing association mid-session.
+- `WidgetSlotEditorModal.tsx`: Timer widget slots now opt into the shared hierarchical todo picker so parent/subtask rows match Add Log instead of flattening child tasks.
+- `TodoAssociation.tsx`: Standalone subtasks inside the virtual `今天` picker now show an `@parent` hint when the parent row is outside the current visible picker pool, while expanded child rows still avoid repeating that badge.
+- `WidgetSlotEditorModal.tsx`: Timer widget slots now inherit the selected todo's linked tag and default scopes inside the editor, overwriting prior tag/scope picks when the todo carries that metadata and clearing scopes when it does not.
 - `TodoDisplaySettingsModal.tsx`: Added a dedicated Todo display-settings modal that groups completed-task visibility with compact-row metadata toggles and closes cleanly on backdrop tap or Android back.
 - `TodoQuickActionsModal.tsx`: The shared quick-actions sheet now ignores the same touch-generated follow-up click that opened it, so tapping a lower todo row no longer flashes the sheet and instantly fires `完成 / 取消完成 / Pin` actions under the finger.
 - `TodoQuickActionsModal.tsx`: Added an inline `删除任务 -> 确认删除？` two-step action so shared todo quick actions can remove a task directly from the sheet without opening the full detail editor first.

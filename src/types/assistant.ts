@@ -5,6 +5,8 @@
  * @pos Type Definitions (Assistant Agent)
  * @description Defines the structured contracts used by the Android-first assistant agent layer so background triggers, memory updates, reminder queues, and AI system-turn decisions can stay typed and stable across services and plugins.
  *
+ * @updated 2026-05-06: Added explicit `yesterdayTimelineSummary` support to assistant state context so unified turns can see concrete activity records for both today and yesterday.
+ * @updated 2026-05-06: Added optional `timelineReviewSummary` plus structured log candidates to assistant prompt context, removed the stale unified-turn recent-log input, and aligned todo creation so `linkedCategoryId` can be inferred from `linkedActivityId`.
  * @updated 2026-04-27: Simplified assistant-facing state time context to one local-offset ISO anchor so prompts no longer need to reinterpret UTC `Z` timestamps.
  * @updated 2026-04-27: Added structured silent-reason, decision-summary, side-effect, and multi-bubble reply fields so background turns can explain quiet decisions and foreground/background replies can render as grouped short bubbles.
  * @updated 2026-04-27: Added native assistant diagnostic entry types so Android poll ticks, skips, and dispatches can be surfaced separately from web AI call history.
@@ -170,15 +172,6 @@ export interface AssistantSystemTurnDecision {
   silentSideEffects?: string[];
 }
 
-export interface AssistantSystemTurnContext {
-  currentDateTime: string;
-  defaultDate: string;
-  todayTimelineSummary: string;
-  activeSessionSummary?: string;
-  memory: AssistantMemory;
-  trigger: AssistantSystemTrigger;
-}
-
 export interface AssistantOrchestratorResult {
   decision: AssistantSystemTurnDecision;
   appliedReminders?: AssistantReminder[];
@@ -222,6 +215,8 @@ export interface AssistantTurnStateContext {
   currentDateTime: string;
   defaultDate: string;
   todayTimelineSummary?: string;
+  yesterdayTimelineSummary?: string;
+  timelineReviewSummary?: string;
   activeSessionSummary?: string;
   todayScheduledTodoSummary?: string;
   pinnedTodoSummary?: string;
@@ -268,11 +263,25 @@ export interface AssistantTodoDictionaryItem {
   pin?: boolean;
 }
 
+export interface AssistantLogDictionaryItem {
+  id: string;
+  date: string;
+  timeRange: string;
+  categoryId?: string;
+  categoryName?: string;
+  activityId?: string;
+  activityName?: string;
+  linkedTodoId?: string;
+  linkedTodoTitle?: string;
+  note?: string;
+}
+
 export interface AssistantTurnDictionaryContext {
   activityCategories?: AssistantActivityCategoryDictionaryItem[];
   scopes?: AssistantScopeDictionaryItem[];
   todoCategories?: AssistantTodoCategoryDictionaryItem[];
   todos?: AssistantTodoDictionaryItem[];
+  logs?: AssistantLogDictionaryItem[];
 }
 
 export interface AssistantUnifiedTurnInput {
@@ -284,7 +293,6 @@ export interface AssistantUnifiedTurnInput {
   conversation: AssistantTurnConversationContext;
   stateContext: AssistantTurnStateContext;
   dictionaryContext: AssistantTurnDictionaryContext;
-  recentLogsDigest?: string;
 }
 
 export interface AssistantReminderDraft {
@@ -316,7 +324,7 @@ export interface AssistantCreateTodoToolCall {
   args: {
     title: string;
     categoryId: string;
-    linkedCategoryId: string;
+    linkedCategoryId?: string;
     linkedActivityId: string;
     defaultScopeIds?: string[];
     note?: string;

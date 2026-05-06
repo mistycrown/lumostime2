@@ -5,6 +5,9 @@
  * @pos Service (Assistant Unified Turn)
  * @description Builds the single-turn prompt payload for the converged assistant architecture and forwards it through aiService so foreground and background flows can gradually migrate off the older multi-prompt planner stack.
  *
+ * @updated 2026-05-06: Tightened the foreground unified-turn schema so front-chat turns no longer advertise unsupported `silent` outcomes.
+ * @updated 2026-05-06: Stopped forwarding provider-native `conversationHistory` for unified turns so session context is injected only once through the structured conversation block.
+ * @updated 2026-05-06: Added mode-specific output schemas so background turns no longer advertise foreground-only `clarify` or `toolCalls`, and removed the stale recent-log block from unified prompt assembly.
  * @updated 2026-04-27: Re-serialized assistant-facing memory and trigger timestamps into local-offset ISO strings so prompt debug views no longer surface backend UTC `Z` forms.
  * @updated 2026-04-27: Added structured silent-reason, decision-summary, side-effect, and multi-bubble reply-part guidance to the unified output prompt schema.
  * @updated 2026-04-27: Made long-term-memory prompt sections optional so turns can skip memory rules and snapshots entirely when the feature is disabled.
@@ -14,7 +17,7 @@
  * @updated 2026-04-26: Added the first unified assistant-turn service with layered prompt assembly, shared context serialization, and a single structured aiService gateway call.
  */
 
-import type { AIDebugExchange, AIConversationTurn } from './aiService';
+import type { AIDebugExchange } from './aiService';
 import { aiService } from './aiService';
 import { assistantContextBuilder } from './assistantContextBuilder';
 import { assistantPromptService } from './assistantPromptService';
@@ -131,32 +134,55 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
   const dictionaryDigest = assistantContextBuilder.buildDictionaryDigest(input.dictionaryContext);
   const modePromptLabel = input.mode === 'background' ? 'Background Mode Prompt' : 'Foreground Mode Prompt';
   const toolPromptLabel = input.mode === 'background' ? 'Background Tool Prompt' : 'Foreground Tool Prompt';
-  const outputSchema = memoryEnabled
-    ? {
-      mode: input.mode,
-      outcome: 'reply | clarify | silent',
-      assistantReply: 'string',
-      assistantReplyParts: ['string'],
-      toolCalls: [],
-      reminders: [],
-      memoryAction: 'no_update | update_memory',
-      memoryPatch: {},
-      decisionSummary: 'string',
-      silentReason: 'active_focus_protection | likely_do_not_disturb | state_still_clear | insufficient_confidence | waiting_for_stronger_signal | followup_already_scheduled',
-      silentSideEffects: ['string']
-    }
-    : {
-      mode: input.mode,
-      outcome: 'reply | clarify | silent',
-      assistantReply: 'string',
-      assistantReplyParts: ['string'],
-      toolCalls: [],
-      reminders: [],
-      memoryAction: 'no_update',
-      decisionSummary: 'string',
-      silentReason: 'active_focus_protection | likely_do_not_disturb | state_still_clear | insufficient_confidence | waiting_for_stronger_signal | followup_already_scheduled',
-      silentSideEffects: ['string']
-    };
+  const outputSchema = input.mode === 'background'
+    ? (
+      memoryEnabled
+        ? {
+          mode: input.mode,
+          outcome: 'reply | silent',
+          assistantReply: 'string',
+          assistantReplyParts: ['string'],
+          reminders: [],
+          memoryAction: 'no_update | update_memory',
+          memoryPatch: {},
+          decisionSummary: 'string',
+          silentReason: 'active_focus_protection | likely_do_not_disturb | state_still_clear | insufficient_confidence | waiting_for_stronger_signal | followup_already_scheduled',
+          silentSideEffects: ['string']
+        }
+        : {
+          mode: input.mode,
+          outcome: 'reply | silent',
+          assistantReply: 'string',
+          assistantReplyParts: ['string'],
+          reminders: [],
+          memoryAction: 'no_update',
+          decisionSummary: 'string',
+          silentReason: 'active_focus_protection | likely_do_not_disturb | state_still_clear | insufficient_confidence | waiting_for_stronger_signal | followup_already_scheduled',
+          silentSideEffects: ['string']
+        }
+    )
+    : (
+      memoryEnabled
+        ? {
+          mode: input.mode,
+          outcome: 'reply | clarify',
+          assistantReply: 'string',
+          assistantReplyParts: ['string'],
+          toolCalls: [],
+          reminders: [],
+          memoryAction: 'no_update | update_memory',
+          memoryPatch: {}
+        }
+        : {
+          mode: input.mode,
+          outcome: 'reply | clarify',
+          assistantReply: 'string',
+          assistantReplyParts: ['string'],
+          toolCalls: [],
+          reminders: [],
+          memoryAction: 'no_update'
+        }
+    );
   return [
     '=== Assistant Base Prompt ===',
     input.promptLayers.basePrompt,
@@ -177,7 +203,6 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
     '=== State Context ===',
     stringifyJson(input.stateContext),
     '',
-    ...(input.recentLogsDigest ? ['=== Recent Logs Digest ===', input.recentLogsDigest, ''] : []),
     '=== Dictionary Context ===',
     dictionaryDigest
   ].filter(Boolean).join('\n');
@@ -196,16 +221,12 @@ const buildUserPrompt = (input: AssistantUnifiedTurnInput): string => [
 export const assistantTurnService = {
   buildSystemPrompt,
   buildUserPrompt,
-  async runUnifiedTurn(
-    input: AssistantUnifiedTurnInput,
-    conversationHistory?: AIConversationTurn[]
-  ): Promise<AssistantUnifiedTurnResult> {
+  async runUnifiedTurn(input: AssistantUnifiedTurnInput): Promise<AssistantUnifiedTurnResult> {
     const systemPrompt = await buildSystemPrompt(input);
     const { output, debug } = await aiService.requestAssistantUnifiedTurnWithDebug({
       mode: input.mode,
       systemPrompt,
-      userPrompt: buildUserPrompt(input),
-      conversationHistory
+      userPrompt: buildUserPrompt(input)
     });
 
     return {
