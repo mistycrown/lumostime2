@@ -4,6 +4,7 @@
  * @output Slot editor modal for timer, daily-check, and shortcut widget slots
  * @pos Component
  * @description Unified widget slot editor that lets each slot choose its own type, icon mode, source binding, and background color.
+ * @updated 2026-05-06: Timer slots now inherit the selected todo's linked tag and default scopes inside the editor, and their shared todo picker now uses the same hierarchical parent/subtask view as Add Log.
  * @updated 2026-05-03: Rewrote the file in UTF-8, cleaned all mojibake copy, and let daily UI icon mode follow the currently selected daily item.
  * @updated 2026-05-03: Added an explicit "follow default UI icon" action inside the UI icon picker so daily widget bindings expose the fallback entry more clearly.
  * @updated 2026-05-03: Moved timer icon-style editing below tag, todo, and scope binding so the source comes first.
@@ -124,6 +125,42 @@ const applyIconSupportRules = (
     ...draft,
     iconMode: 'emoji',
     uiIcon: null
+  };
+};
+
+const cloneScopeIds = (scopeIds?: string[] | null): string[] | null => {
+  const normalizedScopeIds = scopeIds?.filter(Boolean) ?? [];
+  return normalizedScopeIds.length > 0 ? normalizedScopeIds : null;
+};
+
+export const applyLinkedTodoToTimerWidgetDraft = (
+  draft: WidgetSlotEditorDraft,
+  todoId: string | undefined,
+  todos: TodoItem[]
+): WidgetSlotEditorDraft => {
+  if (!todoId) {
+    return {
+      ...draft,
+      linkedTodoId: null
+    };
+  }
+
+  const selectedTodo = todos.find((todo) => todo.id === todoId);
+  if (!selectedTodo) {
+    return {
+      ...draft,
+      linkedTodoId: todoId
+    };
+  }
+
+  const hasLinkedTag = Boolean(selectedTodo.linkedCategoryId && selectedTodo.linkedActivityId);
+
+  return {
+    ...draft,
+    linkedTodoId: todoId,
+    categoryId: hasLinkedTag ? selectedTodo.linkedCategoryId || null : draft.categoryId,
+    activityId: hasLinkedTag ? selectedTodo.linkedActivityId || null : draft.activityId,
+    scopeIds: cloneScopeIds(selectedTodo.defaultScopeIds)
   };
 };
 
@@ -648,7 +685,12 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
                 todos={todos}
                 todoCategories={todoCategories}
                 linkedTodoId={localDraft.linkedTodoId || undefined}
-                onChange={(todoId) => setDraftField('linkedTodoId', todoId || null)}
+                enableHierarchy={true}
+                onChange={(todoId) => {
+                  updateDraft((previousDraft) =>
+                    applyLinkedTodoToTimerWidgetDraft(previousDraft, todoId, todos)
+                  );
+                }}
               />
 
               <ScopeAssociation

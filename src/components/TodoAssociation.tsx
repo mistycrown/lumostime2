@@ -4,6 +4,8 @@
  * @output Todo Selection UI
  * @pos Component (Input)
  * @description A specialized selector for linking a log entry to a specific Todo item, grouped by category and optionally rendered as a collapsible parent/subtask tree.
+ * @updated 2026-05-06: Shared todo pickers now hide completed todos by default while preserving the currently linked completed todo so edit flows remain stable.
+ * @updated 2026-05-06: Standalone subtasks in the virtual today picker now show an `@parent` hint when their parent row is not visible, matching the schedule view's hierarchy cue.
  * @updated 2026-04-25: Shared pickers now hide unfinished subtasks whenever their parent todo is completed, so completed parents never leave orphan child rows behind.
  * @updated 2026-04-22: Let pinned or today-arranged parent todos in the virtual today category expand to their full direct-subtask set.
  * @updated 2026-04-22: Made the picker default to the virtual today category and added a visible `Pin` badge for pinned rows inside that bucket.
@@ -16,7 +18,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, ChevronDown, ChevronRight, Circle, TrendingUp } from 'lucide-react';
 import { TodoCategory, TodoItem } from '../types';
-import { buildTodoAssociationRows, getInitialExpandedTodoParentIds } from '../utils/todoAssociationUtils';
+import {
+  buildTodoAssociationRows,
+  filterTodoAssociationPickerTodos,
+  getInitialExpandedTodoParentIds
+} from '../utils/todoAssociationUtils';
 import {
   getTodoAssociationTodayTodos,
   isTodoInAssociationTodayCategory,
@@ -37,6 +43,15 @@ const VIRTUAL_TODAY_CATEGORY: TodoCategory = {
   id: TODO_ASSOCIATION_TODAY_CATEGORY_ID,
   name: '\u4eca\u5929',
   icon: '\uD83D\uDCC5'
+};
+
+const truncateHierarchyLabel = (value: string, maxLength = 4): string => {
+  const characters = Array.from(value);
+  if (characters.length <= maxLength) {
+    return value;
+  }
+
+  return `${characters.slice(0, maxLength).join('')}…`;
 };
 
 const resolveSelectedCategoryId = (todos: TodoItem[], linkedTodoId?: string): string => {
@@ -67,10 +82,13 @@ export const TodoAssociation: React.FC<TodoAssociationProps> = ({
     getInitialExpandedTodoParentIds(todos, linkedTodoId)
   ));
   const categoryOptions = useMemo(() => [VIRTUAL_TODAY_CATEGORY, ...todoCategories], [todoCategories]);
-  const todayCategoryTodos = useMemo(() => getTodoAssociationTodayTodos(todos), [todos]);
   const todayCategoryAllTodos = useMemo(
     () => getTodoAssociationTodayTodos(todos, new Date(), { includeCompleted: true }),
     [todos]
+  );
+  const todayCategoryTodos = useMemo(
+    () => filterTodoAssociationPickerTodos(todayCategoryAllTodos, linkedTodoId),
+    [linkedTodoId, todayCategoryAllTodos]
   );
 
   useEffect(() => {
@@ -98,17 +116,15 @@ export const TodoAssociation: React.FC<TodoAssociationProps> = ({
     });
   }, [linkedTodoId, todos]);
 
-  const selectedCategoryTodos = useMemo(() => (
-    selectedCatId === TODO_ASSOCIATION_TODAY_CATEGORY_ID
-      ? todayCategoryTodos
-      : todos.filter((todo) => todo.categoryId === selectedCatId && !todo.isCompleted)
-  ), [selectedCatId, todos, todayCategoryTodos]);
-
   const selectedCategoryAllTodos = useMemo(() => (
     selectedCatId === TODO_ASSOCIATION_TODAY_CATEGORY_ID
       ? todayCategoryAllTodos
       : todos.filter((todo) => todo.categoryId === selectedCatId)
   ), [selectedCatId, todos, todayCategoryAllTodos]);
+  const selectedCategoryTodos = useMemo(
+    () => filterTodoAssociationPickerTodos(selectedCategoryAllTodos, linkedTodoId),
+    [linkedTodoId, selectedCategoryAllTodos]
+  );
   const selectedCategoryCountSourceTodos = useMemo(() => (
     selectedCatId === TODO_ASSOCIATION_TODAY_CATEGORY_ID
       ? todos
@@ -116,9 +132,9 @@ export const TodoAssociation: React.FC<TodoAssociationProps> = ({
   ), [selectedCatId, todos, selectedCategoryAllTodos]);
   const selectedCategoryChildSourceTodos = useMemo(() => (
     selectedCatId === TODO_ASSOCIATION_TODAY_CATEGORY_ID
-      ? todos
-      : selectedCategoryAllTodos
-  ), [selectedCatId, todos, selectedCategoryAllTodos]);
+      ? filterTodoAssociationPickerTodos(todos, linkedTodoId)
+      : selectedCategoryTodos
+  ), [linkedTodoId, selectedCatId, selectedCategoryTodos, todos]);
 
   const todoRows = useMemo(() => (
     buildTodoAssociationRows(
@@ -208,6 +224,11 @@ export const TodoAssociation: React.FC<TodoAssociationProps> = ({
                   >
                     {row.todo.title}
                   </span>
+                  {row.parentTitle && (
+                    <span className="flex-shrink-0 rounded-full border border-stone-200 bg-stone-50 px-1.5 py-0.5 text-[10px] font-medium text-stone-400">
+                      @{truncateHierarchyLabel(row.parentTitle)}
+                    </span>
+                  )}
                   {isTodayCategorySelected && row.todo.pin && (
                     <span className="flex-shrink-0 rounded-full border border-stone-200 bg-stone-50 px-1.5 py-0.5 text-[10px] font-medium text-stone-400">
                       Pin

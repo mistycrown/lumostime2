@@ -4,6 +4,8 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
+ * @updated 2026-05-06: Captured active touch pointers for todo-row swipes and stopped release-target filtering so left-swipe complete and undo actions no longer intermittently fail when the finger drifts off the row or lifts over a child element.
+ * @updated 2026-05-06: Removed the display-settings button dot indicator so the left sidebar utility icons now share the same clean Lucide-only appearance.
  * @updated 2026-05-05: Replaced the completed-visibility eye button with a dedicated display-settings modal, added compact-mode metadata toggles, and lowered the sidebar utility controls closer to the fixed bottom navigation.
  * @updated 2026-05-05: Category lists now only group incomplete todos before completed ones and otherwise preserve the incoming todo order from batch-management saves, while compact rows keep symbol-only date suffixes fully visible.
  * @updated 2026-05-05: Restored completed-row undo on a left swipe, while still passing the quick-actions open timestamp into the shared bottom sheet so lower-row taps cannot instantly trigger a mounted quick action.
@@ -208,6 +210,20 @@ const SwipeableTodoItem: React.FC<{
   const activePointerIdRef = useRef<number | null>(null);
   const gestureIntentRef = useRef<TodoRowGestureIntent>('pending');
 
+  const releaseCapturedPointer = (target: HTMLDivElement, pointerId: number | null) => {
+    if (pointerId === null) {
+      return;
+    }
+
+    try {
+      if (target.hasPointerCapture(pointerId)) {
+        target.releasePointerCapture(pointerId);
+      }
+    } catch {
+      // Some touch environments can report stale capture state during teardown.
+    }
+  };
+
   const resetPointerGesture = () => {
     pointerStartPointRef.current = null;
     activePointerIdRef.current = null;
@@ -226,6 +242,11 @@ const SwipeableTodoItem: React.FC<{
     pointerStartPointRef.current = { x: event.clientX, y: event.clientY };
     activePointerIdRef.current = event.pointerId;
     gestureIntentRef.current = 'pending';
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Ignore environments that do not support capture for this pointer type.
+    }
   };
 
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -264,11 +285,7 @@ const SwipeableTodoItem: React.FC<{
 
   const onPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== 'touch') return;
-    if (shouldIgnoreTodoPrimaryInteraction(event.target)) {
-      resetPointerGesture();
-      shouldSuppressClickRef.current = false;
-      return;
-    }
+    releaseCapturedPointer(event.currentTarget, activePointerIdRef.current);
     if (activePointerIdRef.current !== event.pointerId || pointerStartPointRef.current === null) {
       resetPointerGesture();
       return;
@@ -309,6 +326,7 @@ const SwipeableTodoItem: React.FC<{
 
   const onPointerCancel = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== 'touch') return;
+    releaseCapturedPointer(event.currentTarget, activePointerIdRef.current);
     resetPointerGesture();
   };
 
@@ -730,8 +748,6 @@ const DEFAULT_TODO_COMPACT_DISPLAY_SETTINGS: TodoCompactDisplaySettings = {
   showScheduleTime: true
 };
 
-const TODO_COMPACT_DISPLAY_SETTING_KEYS = Object.keys(DEFAULT_TODO_COMPACT_DISPLAY_SETTINGS) as Array<keyof TodoCompactDisplaySettings>;
-
 const normalizeTodoCompactDisplaySettings = (value: unknown): TodoCompactDisplaySettings => {
   if (!value || typeof value !== 'object') {
     return { ...DEFAULT_TODO_COMPACT_DISPLAY_SETTINGS };
@@ -747,10 +763,6 @@ const normalizeTodoCompactDisplaySettings = (value: unknown): TodoCompactDisplay
     showScheduleTime: typeof candidate.showScheduleTime === 'boolean' ? candidate.showScheduleTime : DEFAULT_TODO_COMPACT_DISPLAY_SETTINGS.showScheduleTime
   };
 };
-
-const hasCompactDisplaySettingOverrides = (settings: TodoCompactDisplaySettings): boolean => (
-  TODO_COMPACT_DISPLAY_SETTING_KEYS.some((key) => settings[key] !== DEFAULT_TODO_COMPACT_DISPLAY_SETTINGS[key])
-);
 
 const filterVisibleTodos = (todos: TodoItem[], showCompletedTodos: boolean): TodoItem[] =>
   todos.filter((todo) => (showCompletedTodos || !todo.isCompleted) && !isIncompleteSubtaskHiddenByCompletedParent(todos, todo));
@@ -1417,7 +1429,6 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
   const hasSectionedTodoEntries = selectedTodoSectionsForRender.some((section) => section.entries.length > 0);
   const hasVisibleTodoEntries = hasSectionedTodoEntries || (isVirtualScheduleCategory ? selectedTodoEntriesForRender.length > 0 : selectedCategoryTreeGroups.length > 0);
-  const hasDisplaySettingsOverrides = !showCompletedTodos || hasCompactDisplaySettingOverrides(compactDisplaySettings);
 
   const handleAddTodoClick = () => {
     const targetCategoryId = isVirtualScheduleCategory ? primaryCategoryId : selectedCategoryId;
@@ -2268,9 +2279,6 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
             className="relative flex h-10 w-10 items-center justify-center rounded-full text-stone-400 transition-all hover:bg-white/50 hover:text-stone-500 active:scale-95"
             title="显示设置"
           >
-            {hasDisplaySettingsOverrides && (
-              <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-stone-500/80" />
-            )}
             <SlidersHorizontal size={20} />
           </button>
 

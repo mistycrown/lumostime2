@@ -3,7 +3,7 @@
  * @description AI API 配置页面
  */
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Save, CheckCircle2, AlertCircle, Bot } from 'lucide-react';
+import { ChevronLeft, Save, CheckCircle2, AlertCircle, Bot, Eye, EyeOff } from 'lucide-react';
 import { aiService, AIConfig } from '../../services/aiService';
 import { ToastType } from '../../components/Toast';
 
@@ -35,6 +35,7 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({ onBack, onToast 
     const [aiConfigForm, setAiConfigForm] = useState<AIConfig>({ provider: 'openai', apiKey: '', baseUrl: '', modelName: '' });
     const [activePreset, setActivePreset] = useState<string>('openai');
     const [aiTestStatus, setAiTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+    const [showApiKey, setShowApiKey] = useState(false);
 
     useEffect(() => {
         const aiConfig = aiService.getConfig();
@@ -118,13 +119,23 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({ onBack, onToast 
                     <div className="space-y-3 pt-4">
                         <div>
                             <label className="text-xs font-bold text-stone-400 uppercase ml-1">API 密钥</label>
-                            <input
-                                type="password"
-                                placeholder="请输入 API 密钥"
-                                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-sm text-stone-700 outline-none focus:border-stone-400 mt-1"
-                                value={aiConfigForm.apiKey}
-                                onChange={e => setAiConfigForm(prev => ({ ...prev, apiKey: e.target.value }))}
-                            />
+                            <div className="mt-1 flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 focus-within:border-stone-400">
+                                <input
+                                    type={showApiKey ? 'text' : 'password'}
+                                    placeholder="请输入 API 密钥"
+                                    className="flex-1 bg-transparent text-sm text-stone-700 outline-none placeholder:text-stone-300"
+                                    value={aiConfigForm.apiKey}
+                                    onChange={e => setAiConfigForm(prev => ({ ...prev, apiKey: e.target.value }))}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowApiKey(prev => !prev)}
+                                    className="p-1 text-stone-400 transition-colors hover:text-stone-600"
+                                    aria-label={showApiKey ? '隐藏 API 密钥' : '显示 API 密钥'}
+                                >
+                                    {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                            </div>
                         </div>
 
                         <div>

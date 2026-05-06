@@ -5,6 +5,8 @@
  * @pos Service (Assistant Context Builder)
  * @description Builds the minimal structured context payloads used by the unified assistant-turn architecture so foreground and background flows can share the same state summaries and full candidate dictionaries without duplicating formatting logic in UI components.
  *
+ * @updated 2026-05-06: Added explicit `yesterdayTimelineSummary` alongside `todayTimelineSummary` so assistant state context carries concrete activity records for both recent days.
+ * @updated 2026-05-06: Kept `todayTimelineSummary` as the full same-day log list, exposed a separate `timelineReviewSummary` digest, and added structured same-day log candidates to the assistant dictionary context for reliable `edit_log` targeting.
  * @updated 2026-04-27: Simplified prompt state time snapshots to one local-offset ISO current-time anchor and stopped exposing assistant-facing UTC `Z` variants.
  * @updated 2026-04-26: Replaced raw recent-log dictionary payloads with a compact digest builder that excludes today's logs and caps history length for lower token use.
  * @updated 2026-04-26: Added a lossless table-style dictionary digest so candidate dictionaries keep their original fields and structural relationships while still avoiding bulky pretty-printed JSON.
@@ -15,6 +17,7 @@
 import type {
   ActiveSession,
   Category,
+  DailyReview,
   Log,
   Scope,
   TodoCategory,
@@ -23,6 +26,7 @@ import type {
 import type {
   AssistantActivityCategoryDictionaryItem,
   AssistantConversationEntry,
+  AssistantLogDictionaryItem,
   AssistantScopeDictionaryItem,
   AssistantTodoCategoryDictionaryItem,
   AssistantTodoDictionaryItem,
@@ -39,6 +43,7 @@ interface BuildStateContextParams {
   todos: TodoItem[];
   activeSessions?: ActiveSession[];
   reminderSummary?: string;
+  timelineReviewSummary?: string;
   timelineLimit?: number;
   todoLimit?: number;
 }
@@ -48,6 +53,7 @@ interface BuildDictionaryContextParams {
   scopes?: Scope[];
   todoCategories?: TodoCategory[];
   todos?: TodoItem[];
+  logs?: Log[];
 }
 
 interface BuildRecentLogsDigestParams {
@@ -56,6 +62,11 @@ interface BuildRecentLogsDigestParams {
   categories: Category[];
   todos: TodoItem[];
   limit?: number;
+}
+
+interface BuildTimelineSummaryDigestParams {
+  defaultDate: string;
+  dailyReviews: DailyReview[];
 }
 
 const DEFAULT_TIMELINE_LIMIT = 12;
@@ -75,6 +86,17 @@ const formatTimeRange = (startTime: number, endTime: number): string => {
   const startLabel = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
   const endLabel = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`;
   return `${startLabel}-${endLabel}`;
+};
+
+const shiftDateKey = (dateKey: string, offsetDays: number): string => {
+  const [year, month, day] = dateKey.split('-').map((value) => Number.parseInt(value, 10));
+  if ([year, month, day].some((value) => Number.isNaN(value))) {
+    return dateKey;
+  }
+
+  const date = new Date(year, month - 1, day, 12, 0, 0, 0);
+  date.setDate(date.getDate() + offsetDays);
+  return formatDateKey(date);
 };
 
 const getActivityById = (categories: Category[], activityId?: string) => (
@@ -148,6 +170,33 @@ const buildLogDigestLine = (
   ].filter(Boolean).join(' | ');
 };
 
+const buildTimelineSummaryLine = (label: string, dateKey: string, summary?: string): string => {
+  const trimmedSummary = summary?.trim();
+  return trimmedSummary
+    ? `${label}（${dateKey}）的 timelineSummary：${trimmedSummary}`
+    : `${label}（${dateKey}）还没有填写 timelineSummary。`;
+};
+
+const buildDayTimelineSummary = (
+  logs: Log[],
+  categories: Category[],
+  dateKey: string,
+  timelineLimit: number
+): string => (
+  logs
+    .filter((log) => formatDateKey(new Date(log.startTime)) === dateKey)
+    .sort((left, right) => left.startTime - right.startTime)
+    .slice(-timelineLimit)
+    .map((log) => {
+      const category = categories.find((item) => item.id === log.categoryId);
+      const activity = category?.activities.find((item) => item.id === log.activityId)
+        || getActivityById(categories, log.activityId);
+      const label = [category?.name, activity?.name || log.title].filter(Boolean).join(' / ');
+      return `${formatTimeRange(log.startTime, log.endTime)} ${label}${log.note ? `：${log.note}` : ''}`;
+    })
+    .join('\n')
+);
+
 export const assistantContextBuilder = {
   summarizeConversationTurns(turns: AssistantConversationEntry[], limit = 30): string {
     return turns
@@ -180,19 +229,9 @@ export const assistantContextBuilder = {
   buildStateContext(params: BuildStateContextParams): AssistantTurnStateContext {
     const timelineLimit = params.timelineLimit ?? DEFAULT_TIMELINE_LIMIT;
     const todoLimit = params.todoLimit ?? DEFAULT_TODO_LIMIT;
-
-    const todayTimelineSummary = params.logs
-      .filter((log) => formatDateKey(new Date(log.startTime)) === params.defaultDate)
-      .sort((left, right) => left.startTime - right.startTime)
-      .slice(-timelineLimit)
-      .map((log) => {
-        const category = params.categories.find((item) => item.id === log.categoryId);
-        const activity = category?.activities.find((item) => item.id === log.activityId)
-          || getActivityById(params.categories, log.activityId);
-        const label = [category?.name, activity?.name || log.title].filter(Boolean).join(' / ');
-        return `${formatTimeRange(log.startTime, log.endTime)} ${label}${log.note ? `：${log.note}` : ''}`;
-      })
-      .join('\n');
+    const yesterdayDate = shiftDateKey(params.defaultDate, -1);
+    const todayTimelineSummary = buildDayTimelineSummary(params.logs, params.categories, params.defaultDate, timelineLimit);
+    const yesterdayTimelineSummary = buildDayTimelineSummary(params.logs, params.categories, yesterdayDate, timelineLimit);
 
     const activeSessionSummary = (params.activeSessions || []).length === 0
       ? ''
@@ -225,6 +264,8 @@ export const assistantContextBuilder = {
       currentDateTime: params.currentDateTime,
       defaultDate: params.defaultDate,
       ...(todayTimelineSummary ? { todayTimelineSummary } : {}),
+      ...(yesterdayTimelineSummary ? { yesterdayTimelineSummary } : {}),
+      ...(params.timelineReviewSummary ? { timelineReviewSummary: params.timelineReviewSummary } : {}),
       ...(activeSessionSummary ? { activeSessionSummary } : {}),
       ...(todayScheduledTodoSummary ? { todayScheduledTodoSummary: `以下是安排在今天的待办：\n${todayScheduledTodoSummary}` } : {}),
       ...(pinnedTodoSummary ? { pinnedTodoSummary: `以下是已 Pin 的待办：\n${pinnedTodoSummary}` } : {}),
@@ -247,6 +288,18 @@ export const assistantContextBuilder = {
     return [
       `以下是最近日志摘要：已排除今天（${params.defaultDate}）的记录；当前提供 ${recentLogs.length} 条；最多保留 ${limit} 条；按时间倒序排列。`,
       ...recentLogs.map((log) => buildLogDigestLine(log, params.categories, params.todos))
+    ].join('\n');
+  },
+
+  buildTimelineSummaryDigest(params: BuildTimelineSummaryDigestParams): string {
+    const yesterdayDate = shiftDateKey(params.defaultDate, -1);
+    const todaySummary = params.dailyReviews.find((review) => review.date === params.defaultDate)?.summary;
+    const yesterdaySummary = params.dailyReviews.find((review) => review.date === yesterdayDate)?.summary;
+
+    return [
+      '以下是应用状态上下文。',
+      buildTimelineSummaryLine('今天', params.defaultDate, todaySummary),
+      buildTimelineSummaryLine('昨天', yesterdayDate, yesterdaySummary)
     ].join('\n');
   },
 
@@ -292,13 +345,27 @@ export const assistantContextBuilder = {
       todo.isCompleted
     ]));
 
+    const logRows = (context.logs || []).map((log) => ([
+      log.id,
+      log.date,
+      log.timeRange,
+      log.categoryId,
+      log.categoryName,
+      log.activityId,
+      log.activityName,
+      log.linkedTodoId,
+      log.linkedTodoTitle,
+      log.note
+    ]));
+
     return [
-      '以下是候选词典无损表。字段与应用词典一一对应；活动通过 categoryId 关联分类；子任务通过 parentTodoId 关联父任务；数组字段保持 JSON 数组；空值记为 - 。',
+      '以下是候选词典无损表。字段与应用词典一一对应；活动通过 categoryId 关联分类；子任务通过 parentTodoId 关联父任务；日志候选中的 id 可直接用于 edit_log；数组字段保持 JSON 数组；空值记为 - 。',
       buildExactTableSection('ActivityCategories', ['id', 'name'], activityCategoryRows),
       buildExactTableSection('Activities', ['categoryId', 'id', 'name'], activityRows),
       buildExactTableSection('Scopes', ['id', 'name'], scopeRows),
       buildExactTableSection('TodoCategories', ['id', 'name'], todoCategoryRows),
-      buildExactTableSection('Todos', ['id', 'title', 'path', 'parentTodoId', 'parentTodoTitle', 'categoryId', 'categoryName', 'linkedCategoryId', 'linkedActivityId', 'linkedActivityName', 'defaultScopeIds', 'scheduledDate', 'deadlineDate', 'pin', 'isCompleted'], todoRows)
+      buildExactTableSection('Todos', ['id', 'title', 'path', 'parentTodoId', 'parentTodoTitle', 'categoryId', 'categoryName', 'linkedCategoryId', 'linkedActivityId', 'linkedActivityName', 'defaultScopeIds', 'scheduledDate', 'deadlineDate', 'pin', 'isCompleted'], todoRows),
+      buildExactTableSection('Logs', ['id', 'date', 'timeRange', 'categoryId', 'categoryName', 'activityId', 'activityName', 'linkedTodoId', 'linkedTodoTitle', 'note'], logRows)
     ].join('\n\n');
   },
 
@@ -347,11 +414,33 @@ export const assistantContextBuilder = {
       };
     });
 
+    const logs: AssistantLogDictionaryItem[] = (params.logs || []).map((log) => {
+      const category = (params.categories || []).find((candidate) => candidate.id === log.categoryId);
+      const activity = category?.activities.find((candidate) => candidate.id === log.activityId)
+        || getActivityById(params.categories || [], log.activityId);
+      const linkedTodo = log.linkedTodoId
+        ? (params.todos || []).find((candidate) => candidate.id === log.linkedTodoId)
+        : undefined;
+
+      return {
+        id: log.id,
+        date: formatDateKey(new Date(log.startTime)),
+        timeRange: formatTimeRange(log.startTime, log.endTime),
+        ...(log.categoryId ? { categoryId: log.categoryId } : {}),
+        ...(category?.name ? { categoryName: category.name } : {}),
+        ...(log.activityId ? { activityId: log.activityId } : {}),
+        ...(activity?.name || log.title ? { activityName: activity?.name || log.title || '' } : {}),
+        ...(linkedTodo?.id ? { linkedTodoId: linkedTodo.id, linkedTodoTitle: linkedTodo.title } : {}),
+        ...(typeof log.note === 'string' && log.note.trim() ? { note: log.note.trim() } : {})
+      };
+    });
+
     return {
       ...(activityCategories.length > 0 ? { activityCategories } : {}),
       ...(scopes.length > 0 ? { scopes } : {}),
       ...(todoCategories.length > 0 ? { todoCategories } : {}),
-      ...(todos.length > 0 ? { todos } : {})
+      ...(todos.length > 0 ? { todos } : {}),
+      ...(logs.length > 0 ? { logs } : {})
     };
   }
 };

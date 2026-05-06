@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Category, Log, Scope, TodoCategory, TodoItem } from '../types';
+import type { Category, DailyReview, Log, Scope, TodoCategory, TodoItem } from '../types';
 import { assistantContextBuilder } from './assistantContextBuilder';
 
 const categories: Category[] = [{
@@ -51,6 +51,25 @@ const todoCategories: TodoCategory[] = [{
   icon: 'G'
 }];
 
+const dailyReviews: DailyReview[] = [
+  {
+    id: 'review-today',
+    date: '2026-04-27',
+    createdAt: 1,
+    updatedAt: 1,
+    answers: [],
+    summary: '今天主要在推进论文草稿，整体状态还算稳。'
+  },
+  {
+    id: 'review-yesterday',
+    date: '2026-04-26',
+    createdAt: 1,
+    updatedAt: 1,
+    answers: [],
+    summary: '昨天把资料和结构重新理了一遍。'
+  }
+];
+
 const createLog = (
   id: string,
   year: number,
@@ -89,6 +108,26 @@ describe('assistantContextBuilder', () => {
     expect(stateContext.currentDateTime).toBe('2026-04-27T18:00:00+08:00');
     expect('currentDateTimeLocal' in stateContext).toBe(false);
     expect('currentDateTimeUtc' in stateContext).toBe(false);
+  });
+
+  it('buildStateContext keeps full today and yesterday logs separate from the broader review digest', () => {
+    const stateContext = assistantContextBuilder.buildStateContext({
+      currentDateTime: '2026-04-27T18:00:00+08:00',
+      defaultDate: '2026-04-27',
+      categories,
+      todos,
+      logs: [
+        createLog('yesterday-log', 2026, 3, 26, 14, 15, 'draft note', 'todo-draft'),
+        createLog('today-log', 2026, 3, 27, 9, 10, 'outline note', 'todo-draft')
+      ],
+      timelineReviewSummary: 'today and yesterday review digest'
+    });
+
+    expect(stateContext.todayTimelineSummary).toContain('09:00-10:00 Work / Writing');
+    expect(stateContext.todayTimelineSummary).toContain('outline note');
+    expect(stateContext.yesterdayTimelineSummary).toContain('14:00-15:00 Work / Writing');
+    expect(stateContext.yesterdayTimelineSummary).toContain('draft note');
+    expect(stateContext.timelineReviewSummary).toBe('today and yesterday review digest');
   });
 
   it('buildRecentLogsDigest excludes the default date and keeps log lines compact', () => {
@@ -136,30 +175,67 @@ describe('assistantContextBuilder', () => {
     expect(digest).not.toContain('log-22');
   });
 
-  it('buildDictionaryContext no longer includes raw log objects', () => {
+  it('buildTimelineSummaryDigest renders today and yesterday as Chinese app-state text', () => {
+    const digest = assistantContextBuilder.buildTimelineSummaryDigest({
+      defaultDate: '2026-04-27',
+      dailyReviews
+    });
+
+    expect(digest).toContain('以下是应用状态上下文。');
+    expect(digest).toContain('今天（2026-04-27）的 timelineSummary：今天主要在推进论文草稿，整体状态还算稳。');
+    expect(digest).toContain('昨天（2026-04-26）的 timelineSummary：昨天把资料和结构重新理了一遍。');
+  });
+
+  it('buildTimelineSummaryDigest keeps missing day summaries explicit', () => {
+    const digest = assistantContextBuilder.buildTimelineSummaryDigest({
+      defaultDate: '2026-04-28',
+      dailyReviews
+    });
+
+    expect(digest).toContain('今天（2026-04-28）还没有填写 timelineSummary。');
+    expect(digest).toContain('昨天（2026-04-27）的 timelineSummary：今天主要在推进论文草稿，整体状态还算稳。');
+  });
+
+  it('buildDictionaryContext includes structured log candidates with ids for edit targeting', () => {
     const dictionaryContext = assistantContextBuilder.buildDictionaryContext({
       categories,
       scopes,
       todoCategories,
-      todos
+      todos,
+      logs: [
+        createLog('log-1', 2026, 3, 27, 9, 10, 'outline note', 'todo-draft')
+      ]
     });
 
-    expect('logs' in dictionaryContext).toBe(false);
+    expect(dictionaryContext.logs).toHaveLength(1);
+    expect(dictionaryContext.logs?.[0]).toMatchObject({
+      id: 'log-1',
+      date: '2026-04-27',
+      timeRange: '09:00-10:00',
+      activityId: 'act-writing',
+      activityName: 'Writing',
+      linkedTodoId: 'todo-draft',
+      linkedTodoTitle: 'Draft chapter',
+      note: 'outline note'
+    });
     expect(dictionaryContext.todos).toHaveLength(2);
     expect(dictionaryContext.todos?.find((todo) => todo.id === 'todo-draft')?.parentTodoId).toBe('todo-parent');
   });
 
-  it('buildDictionaryDigest renders all candidate groups as compact tables', () => {
+  it('buildDictionaryDigest renders all candidate groups as compact tables including logs', () => {
     const dictionaryContext = assistantContextBuilder.buildDictionaryContext({
       categories,
       scopes,
       todoCategories,
-      todos
+      todos,
+      logs: [
+        createLog('log-1', 2026, 3, 27, 9, 10, 'outline note', 'todo-draft')
+      ]
     });
 
     const digest = assistantContextBuilder.buildDictionaryDigest(dictionaryContext);
 
-    expect(digest).toContain('以下是候选词典无损表。字段与应用词典一一对应；活动通过 categoryId 关联分类；子任务通过 parentTodoId 关联父任务；数组字段保持 JSON 数组；空值记为 - 。');
+    expect(digest).toContain('日志候选中的 id 可直接用于 edit_log');
     expect(digest).toContain('[ActivityCategories] rows=1');
     expect(digest).toContain('id\tname');
     expect(digest).toContain('"cat-work"\t"Work"');
@@ -174,5 +250,8 @@ describe('assistantContextBuilder', () => {
     expect(digest).toContain('id\ttitle\tpath\tparentTodoId\tparentTodoTitle\tcategoryId\tcategoryName\tlinkedCategoryId\tlinkedActivityId\tlinkedActivityName\tdefaultScopeIds\tscheduledDate\tdeadlineDate\tpin\tisCompleted');
     expect(digest).toContain('"todo-parent"\t"Thesis"\t-\t-\t-\t"todo-general"\t"General"\t-\t-\t-\t-\t-\t-\tfalse\tfalse');
     expect(digest).toContain('"todo-draft"\t"Draft chapter"\t"Thesis / Draft chapter"\t"todo-parent"\t"Thesis"\t"todo-general"\t"General"\t-\t"act-writing"\t"Writing"\t["scope-research"]\t"2026-04-27"\t"2026-04-30"\ttrue\tfalse');
+    expect(digest).toContain('[Logs] rows=1');
+    expect(digest).toContain('id\tdate\ttimeRange\tcategoryId\tcategoryName\tactivityId\tactivityName\tlinkedTodoId\tlinkedTodoTitle\tnote');
+    expect(digest).toContain('"log-1"\t"2026-04-27"\t"09:00-10:00"\t"cat-work"\t"Work"\t"act-writing"\t"Writing"\t"todo-draft"\t"Draft chapter"\t"outline note"');
   });
 });

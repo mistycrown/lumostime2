@@ -2,6 +2,7 @@
 
 This directory contains application-wide constants, configuration, and static data.
 
+Update 2026-05-06: `aiPersonaSystemPrompts.ts` now centralizes the six built-in AI chat persona system prompts so `AIBackfillChatModal.tsx` can reference shared long-form prompt copy instead of inlining it.
 Update 2026-03-12: `storageKeys.ts` now includes timeline appearance storage keys for normal timeline record nodes.
 Update 2026-03-21: `redemptionHashes.ts` now normalizes legacy `Xor` / `xor` fields so key-index-0 redemption codes validate correctly.
 
@@ -62,6 +63,9 @@ const emoji = getTimePalEmoji('cat');
 2. **类型安全**：使用 TypeScript 类型定义确保类型安全
 3. **易于维护**：修改常量只需在一处进行
 4. **清晰分类**：按功能模块分类组织
+
+## Recently Added (2026-05)
+- `aiPersonaSystemPrompts.ts`: 新增 - 统一维护六个内置 AI 聊天 persona 的长文 system prompt，供 `AIBackfillChatModal.tsx` 直接引用。
 
 ## Recently Added (2026-02)
 - `storageKeys.ts`: 新增 - 统一管理所有 localStorage 键名，提供类型安全的工具函数
