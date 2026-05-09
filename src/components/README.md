@@ -10,6 +10,8 @@ Components that form the structural or global UI elements.
 - `Toast.tsx`: Notification system.
 
 ## Modals
+- Update 2026-05-09: `AIBackfillChatModal.tsx` now retries failed assistant turns in place, reusing the original errored bubble and replacing it with the second attempt result instead of appending a duplicate assistant block.
+- Update 2026-05-09: `AIBackfillChatModal.tsx` now adds a `定时任务` subsection under AI call settings, reuses shared todo recurrence rules for recurring assistant schedules, and keeps one next native reminder seeded per enabled task so reminder_due stays on the existing assistant trigger path.
 - Update 2026-05-09: `WidgetTrackingCalendarEditorModal.tsx` now sorts scope-source options with the shared scope-order helper so widget scope pickers stay aligned with scope management and batch scope tools.
 - Update 2026-05-06: `AIBackfillChatModal.tsx` now imports its six built-in persona system prompts from `src/constants/aiPersonaSystemPrompts.ts`, so prompt copy no longer lives inline inside the modal component.
 - Update 2026-05-06: `AIBackfillChatModal.tsx` now sends concrete activity-log summaries for both today and yesterday in assistant state context, stops duplicating cached conversation history into the provider message list, and removes the old 30-turn cap from persona context settings.

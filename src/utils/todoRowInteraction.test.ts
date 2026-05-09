@@ -4,6 +4,7 @@
  * @output Regression coverage for tap-vs-swipe classification in the todo list
  * @pos Test
  * @description Verifies that small drifts still open quick actions while diagonal scrolling no longer triggers accidental completion toggles.
+ * @updated 2026-05-09: Added regression coverage for release-time long left swipes that should still toggle completion even if swipe intent never latched during move.
  * @updated 2026-05-05: Added coverage for completed-row left-swipe undo while keeping right-swipe detail and deeper duplicate pulls.
  * @updated 2026-05-05: Added coverage for the no-op tap dead zone and for directional quick-toggle swipes.
  * @updated 2026-05-05: Added regression tests for swallowed taps and scroll-locked diagonal gestures.
@@ -69,10 +70,22 @@ describe('todoRowInteraction', () => {
     })).toBe('none');
   });
 
-  test('does not allow release-only drift to trigger swipe actions before swipe intent is established', () => {
+  test('allows a release-only long left swipe to toggle completion when the final motion is clearly horizontal', () => {
     expect(getTodoRowReleaseAction({
       diffX: -140,
       diffY: 4,
+      canQuickToggle: true,
+      gestureIntent: 'pending',
+      detailSwipeDistance: 36,
+      duplicateSwipeDistance: 100,
+      completeSwipeDistance: 100
+    })).toBe('toggleComplete');
+  });
+
+  test('keeps release-only diagonal drags from toggling completion before swipe intent is established', () => {
+    expect(getTodoRowReleaseAction({
+      diffX: -140,
+      diffY: 48,
       canQuickToggle: true,
       gestureIntent: 'pending',
       detailSwipeDistance: 36,

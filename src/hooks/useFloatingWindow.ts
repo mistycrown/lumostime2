@@ -8,7 +8,7 @@
  * @updated 2026-05-05: Honors native session ids and cancels widget-origin sessions locally after native-side shutdown so floating-window stops work for widget-started focus.
  */
 import { App as CapacitorApp } from '@capacitor/app';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useSession } from '../contexts/SessionContext';
 import { useToast } from '../contexts/ToastContext';
@@ -24,6 +24,26 @@ export const useFloatingWindow = (
 ) => {
   const { activeSessions, cancelSession } = useSession();
   const { addToast } = useToast();
+  const recentStopTokensRef = useRef<Map<string, number>>(new Map());
+
+  const claimStopToken = (token: string) => {
+    const now = Date.now();
+    const recentStopTokens = recentStopTokensRef.current;
+
+    recentStopTokens.forEach((timestamp, existingToken) => {
+      if (now - timestamp > 3000) {
+        recentStopTokens.delete(existingToken);
+      }
+    });
+
+    const existingTimestamp = recentStopTokens.get(token);
+    if (existingTimestamp && now - existingTimestamp < 1500) {
+      return false;
+    }
+
+    recentStopTokens.set(token, now);
+    return true;
+  };
 
   useEffect(() => {
     if (Capacitor.getPlatform() !== 'android') {
@@ -45,6 +65,22 @@ export const useFloatingWindow = (
             await FocusNotification.consumePendingStopRequest();
           } catch (error) {
             console.error('[useFloatingWindow] Failed to drain stale pending stop request', error);
+          }
+        }
+        return;
+      }
+
+      const stopToken = stopActions
+        .map((action) => `${action.mode}:${action.sessionId}`)
+        .sort()
+        .join('|');
+
+      if (!claimStopToken(stopToken)) {
+        if (options?.shouldDrainPending) {
+          try {
+            await FocusNotification.consumePendingStopRequest();
+          } catch (error) {
+            console.error('[useFloatingWindow] Failed to clear duplicate pending stop request', error);
           }
         }
         return;

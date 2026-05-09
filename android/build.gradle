@@ -30,6 +30,11 @@ allprojects {
 }
 
 subprojects { subproject ->
+    if (subproject.projectDir.toString().contains("${File.separator}node_modules${File.separator}")) {
+        // Keep plugin build outputs out of node_modules to avoid Windows/OneDrive file locks.
+        subproject.layout.buildDirectory.set(rootProject.layout.buildDirectory.dir("plugin-build/${subproject.name}"))
+    }
+
     afterEvaluate {
         if (subproject.plugins.hasPlugin('com.android.application') || subproject.plugins.hasPlugin('com.android.library')) {
             subproject.android {

@@ -4,6 +4,8 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-09: Retrying a failed foreground assistant turn now reuses the original error bubble in place, so successful retry content replaces the failure instead of appending a duplicate assistant block.
+ * @updated 2026-05-09: Added recurring `定时任务` management under AI call settings, backed by shared todo recurrence rules and continuously seeded native reminders.
  * @updated 2026-05-06: Made debug-viewer block keys unique per section render so repeated labels like `对话上下文` no longer trigger React duplicate-key warnings.
  * @updated 2026-05-06: Moved the six built-in persona system prompts into `src/constants/aiPersonaSystemPrompts.ts`, so the modal keeps persona metadata while prompt copy lives in one shared constant file.
  * @updated 2026-05-06: Replaced the six built-in persona system prompts with the user-authored versions, while standardizing in-prompt user references to `用户` only.
@@ -125,6 +127,7 @@ import type {
   AssistantMemory,
   AssistantNativeDiagnosticEntry,
   AssistantReminder,
+  AssistantScheduledTask,
   AssistantSystemTrigger
 } from '../types/assistant';
 import { formatDateKey } from '../utils/aiBackfillUtils';
@@ -143,6 +146,7 @@ import { assistantAgentConfigService } from '../services/assistantAgentConfigSer
 import { assistantMemoryService } from '../services/assistantMemoryService';
 import { assistantPromptService } from '../services/assistantPromptService';
 import { assistantReminderQueueService } from '../services/assistantReminderQueueService';
+import { assistantScheduledTaskService } from '../services/assistantScheduledTaskService';
 import {
   assistantOrchestratorService,
   type AssistantBackgroundCallHistoryEntry
@@ -202,6 +206,7 @@ interface AIChatMessage {
   memoryUpdates?: AIChatMemoryUpdateSection[];
   reminderUpdates?: string[];
   retryInput?: string;
+  retrySourceUserMessageId?: string;
 }
 
 interface AIChatMemoryUpdateSection {
@@ -221,6 +226,19 @@ interface AssistantReminderDrafts {
 }
 
 interface AssistantReminderDeleteTarget {
+  id: string;
+}
+
+interface AssistantScheduledTaskDrafts {
+  text: string;
+  time: string;
+  frequency: TodoRecurrenceRule['frequency'];
+  interval: string;
+  weekdays: number[];
+  monthDay: string;
+}
+
+interface AssistantScheduledTaskDeleteTarget {
   id: string;
 }
 
@@ -291,6 +309,25 @@ const DEFAULT_ASSISTANT_REMINDER_DRAFTS: AssistantReminderDrafts = {
   text: '',
   date: '',
   hour: ''
+};
+
+const ASSISTANT_SCHEDULED_TASK_WEEKDAY_OPTIONS = [
+  { value: 1, label: '一' },
+  { value: 2, label: '二' },
+  { value: 3, label: '三' },
+  { value: 4, label: '四' },
+  { value: 5, label: '五' },
+  { value: 6, label: '六' },
+  { value: 0, label: '日' }
+] as const;
+
+const DEFAULT_ASSISTANT_SCHEDULED_TASK_DRAFTS: AssistantScheduledTaskDrafts = {
+  text: '',
+  time: '0800',
+  frequency: 'daily',
+  interval: '1',
+  weekdays: [1],
+  monthDay: '1'
 };
 
 const LOG_EDIT_REQUEST_PATTERN = /(改成|改为|改回|改下|改一下|修改|我没|不是)/;
@@ -436,6 +473,104 @@ const buildManualAssistantReminderDueAt = (
   }
 
   return { dueAt };
+};
+
+const buildAssistantScheduledTaskRecurrenceRule = (
+  drafts: AssistantScheduledTaskDrafts,
+  startDate: string
+): { recurrenceRule?: TodoRecurrenceRule; error?: string } => {
+  const normalizedInterval = Number(drafts.interval.trim() || '1');
+  if (!Number.isInteger(normalizedInterval) || normalizedInterval < 1 || normalizedInterval > 365) {
+    return { error: '循环间隔需要填写 1 到 365 之间的整数。' };
+  }
+
+  if (drafts.frequency === 'weekly' && drafts.weekdays.length === 0) {
+    return { error: '每周循环至少要选择一天。' };
+  }
+
+  if (drafts.frequency === 'monthly') {
+    const monthDay = Number(drafts.monthDay.trim() || '0');
+    if (!Number.isInteger(monthDay) || monthDay < 1 || monthDay > 31) {
+      return { error: '每月日期需要填写 1 到 31。' };
+    }
+
+    return {
+      recurrenceRule: {
+        frequency: 'monthly',
+        startDate,
+        ...(normalizedInterval > 1 ? { interval: normalizedInterval } : {}),
+        monthDays: [monthDay]
+      }
+    };
+  }
+
+  if (drafts.frequency === 'weekly') {
+    return {
+      recurrenceRule: {
+        frequency: 'weekly',
+        startDate,
+        ...(normalizedInterval > 1 ? { interval: normalizedInterval } : {}),
+        weekdays: [...drafts.weekdays].sort((left, right) => left - right)
+      }
+    };
+  }
+
+  return {
+    recurrenceRule: {
+      frequency: 'daily',
+      startDate,
+      ...(normalizedInterval > 1 ? { interval: normalizedInterval } : {})
+    }
+  };
+};
+
+const buildAssistantScheduledTaskTime = (value: string): { time?: string; error?: string } => {
+  const normalized = value.trim();
+  if (!/^\d{4}$/.test(normalized)) {
+    return { error: '触发时间需要填写 4 位数字，例如 0800。' };
+  }
+
+  const hours = Number(normalized.slice(0, 2));
+  const minutes = Number(normalized.slice(2, 4));
+  if (!Number.isInteger(hours) || hours < 0 || hours > 23) {
+    return { error: '小时需要在 00 到 23 之间。' };
+  }
+  if (!Number.isInteger(minutes) || minutes < 0 || minutes > 59) {
+    return { error: '分钟需要在 00 到 59 之间。' };
+  }
+
+  return {
+    time: `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+  };
+};
+
+const formatAssistantScheduledTaskRecurrence = (task: AssistantScheduledTask): string => {
+  const interval = Math.max(1, task.recurrenceRule.interval || 1);
+
+  if (task.recurrenceRule.frequency === 'weekly') {
+    const weekdayLabels = (task.recurrenceRule.weekdays?.length
+      ? task.recurrenceRule.weekdays
+      : [new Date(task.recurrenceRule.startDate).getDay()]
+    )
+      .map((weekday) => ASSISTANT_SCHEDULED_TASK_WEEKDAY_OPTIONS.find((option) => option.value === weekday)?.label || '')
+      .filter(Boolean)
+      .join('、');
+    return interval > 1
+      ? `每${interval}周 ${weekdayLabels || '指定日期'} ${task.time}`
+      : `每周${weekdayLabels || '指定日期'} ${task.time}`;
+  }
+
+  if (task.recurrenceRule.frequency === 'monthly') {
+    const monthDay = task.recurrenceRule.monthDays?.[0]
+      || Number(task.recurrenceRule.startDate.split('-')[2] || '1');
+    return interval > 1
+      ? `每${interval}个月 ${monthDay}号 ${task.time}`
+      : `每月${monthDay}号 ${task.time}`;
+  }
+
+  return interval > 1
+    ? `每${interval}天 ${task.time}`
+    : `每天 ${task.time}`;
 };
 
 const PersonaAvatar: React.FC<{
@@ -628,6 +763,11 @@ interface ActiveRequestRef {
   controller: AbortController;
   sessionId: string;
   pendingMessageId: string;
+}
+
+interface ForegroundSendOptions {
+  replaceMessageId?: string;
+  retrySourceUserMessageId?: string;
 }
 
 interface DebugViewerState {
@@ -926,6 +1066,12 @@ const normalizeRetryInput = (value: unknown): string | undefined => (
     : undefined
 );
 
+const normalizeRetrySourceUserMessageId = (value: unknown): string | undefined => (
+  typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : undefined
+);
+
 const normalizeMessageContent = (value: unknown): string | undefined => {
   if (typeof value !== 'string') {
     return undefined;
@@ -988,7 +1134,10 @@ const normalizeMessages = (value: unknown): AIChatMessage[] => {
       ...(candidate.appliedActions ? { appliedActions: normalizeAppliedActions(candidate.appliedActions) } : {}),
       ...(candidate.memoryUpdates ? { memoryUpdates: normalizeMemoryUpdates(candidate.memoryUpdates) } : {}),
       ...(candidate.reminderUpdates ? { reminderUpdates: normalizeReminderUpdates(candidate.reminderUpdates) } : {}),
-      ...(normalizeRetryInput(candidate.retryInput) ? { retryInput: normalizeRetryInput(candidate.retryInput) } : {})
+      ...(normalizeRetryInput(candidate.retryInput) ? { retryInput: normalizeRetryInput(candidate.retryInput) } : {}),
+      ...(normalizeRetrySourceUserMessageId(candidate.retrySourceUserMessageId)
+        ? { retrySourceUserMessageId: normalizeRetrySourceUserMessageId(candidate.retrySourceUserMessageId) }
+        : {})
     };
 
     if (normalizedMessage.tone === 'pending') {
@@ -1691,6 +1840,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   ));
   const [assistantMemorySnapshot, setAssistantMemorySnapshot] = useState<AssistantMemory>(() => assistantMemoryService.getMemory());
   const [assistantReminderSnapshot, setAssistantReminderSnapshot] = useState<AssistantReminder[]>(() => assistantReminderQueueService.listReminders());
+  const [assistantScheduledTaskSnapshot, setAssistantScheduledTaskSnapshot] = useState<AssistantScheduledTask[]>(
+    () => assistantScheduledTaskService.listTasks()
+  );
   const [isAssistantMemoryViewerOpen, setIsAssistantMemoryViewerOpen] = useState(false);
   const [assistantEditableMemoryDrafts, setAssistantEditableMemoryDrafts] = useState<Record<AssistantEditableMemoryListKey, string>>(
     DEFAULT_ASSISTANT_EDITABLE_MEMORY_DRAFTS
@@ -1700,6 +1852,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [assistantReminderDrafts, setAssistantReminderDrafts] = useState<AssistantReminderDrafts>(DEFAULT_ASSISTANT_REMINDER_DRAFTS);
   const [isAssistantReminderComposerOpen, setIsAssistantReminderComposerOpen] = useState(false);
   const [assistantReminderDeleteTarget, setAssistantReminderDeleteTarget] = useState<AssistantReminderDeleteTarget | null>(null);
+  const [assistantScheduledTaskDrafts, setAssistantScheduledTaskDrafts] = useState<AssistantScheduledTaskDrafts>(
+    DEFAULT_ASSISTANT_SCHEDULED_TASK_DRAFTS
+  );
+  const [isAssistantScheduledTaskComposerOpen, setIsAssistantScheduledTaskComposerOpen] = useState(false);
+  const [assistantScheduledTaskDeleteTarget, setAssistantScheduledTaskDeleteTarget] = useState<AssistantScheduledTaskDeleteTarget | null>(null);
   const [assistantBackgroundCallHistory, setAssistantBackgroundCallHistory] = useState<AssistantBackgroundCallHistoryEntry[]>(() => assistantOrchestratorService.listBackgroundCallHistory());
   const [assistantNativeDiagnostics, setAssistantNativeDiagnostics] = useState<AssistantNativeDiagnosticEntry[]>([]);
   const [isAssistantBackgroundHistoryViewerOpen, setIsAssistantBackgroundHistoryViewerOpen] = useState(false);
@@ -2320,13 +2477,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     [sessions]
   );
 
-  const buildConversationHistory = (session: AIChatSession): AIConversationTurn[] => {
+  const buildConversationHistoryFromMessages = (
+    session: AIChatSession,
+    messages: AIChatMessage[]
+  ): AIConversationTurn[] => {
     const sessionPersona = personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0];
     if (!session.contextCacheEnabled || sessionPersona.contextMessageLimit <= 0) {
       return [];
     }
 
-    const turns = session.messages
+    const turns = messages
       .filter((message) => message.tone !== 'system' && message.tone !== 'pending')
       .map((message) => ({
         role: message.role,
@@ -2366,6 +2526,36 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     return rounds.slice(-sessionPersona.contextMessageLimit).flat();
   };
 
+  const buildConversationHistory = (session: AIChatSession): AIConversationTurn[] => (
+    buildConversationHistoryFromMessages(session, session.messages)
+  );
+
+  const buildRetryConversationHistory = (
+    sessionId: string,
+    retrySourceUserMessageId?: string
+  ): AIConversationTurn[] => {
+    if (!retrySourceUserMessageId) {
+      return conversationHistoryCache.get(sessionId) || [];
+    }
+
+    const session = sessions.find((candidate) => candidate.id === sessionId);
+    if (!session) {
+      return conversationHistoryCache.get(sessionId) || [];
+    }
+
+    const retryUserMessageIndex = session.messages.findIndex((message) => (
+      message.id === retrySourceUserMessageId && message.role === 'user'
+    ));
+    if (retryUserMessageIndex < 0) {
+      return conversationHistoryCache.get(sessionId) || [];
+    }
+
+    return buildConversationHistoryFromMessages(
+      session,
+      session.messages.slice(0, retryUserMessageIndex)
+    );
+  };
+
   const conversationHistoryCache = useMemo(
     () => new Map(
       sessions.map((session) => [session.id, buildConversationHistory(session)])
@@ -2384,15 +2574,27 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setAssistantMemorySnapshot(assistantMemoryService.getMemory());
   };
 
+  const refreshAssistantScheduledTaskSnapshot = () => {
+    setAssistantScheduledTaskSnapshot(assistantScheduledTaskService.listTasks());
+  };
+
   const refreshAssistantReminderSnapshot = () => {
     setAssistantReminderSnapshot(assistantReminderQueueService.listReminders());
   };
 
-  const hydrateAssistantReminderSnapshotFromNative = useCallback(async () => {
-    const reminders = await assistantReminderQueueService.hydrateFromNative();
-    setAssistantReminderSnapshot(reminders);
-    return reminders;
+  const syncAssistantScheduledTasks = useCallback((referenceNow = new Date()) => {
+    const result = assistantScheduledTaskService.syncScheduledTaskReminders(referenceNow);
+    setAssistantScheduledTaskSnapshot(result.tasks);
+    setAssistantReminderSnapshot(assistantReminderQueueService.listReminders());
+    setAssistantMemorySnapshot(assistantMemoryService.getMemory());
+    return result;
   }, []);
+
+  const hydrateAssistantReminderSnapshotFromNative = useCallback(async () => {
+    await assistantReminderQueueService.hydrateFromNative();
+    syncAssistantScheduledTasks(new Date());
+    return assistantReminderQueueService.listReminders();
+  }, [syncAssistantScheduledTasks]);
 
   const refreshAssistantBackgroundCallHistory = () => {
     setAssistantBackgroundCallHistory(assistantOrchestratorService.listBackgroundCallHistory());
@@ -2427,12 +2629,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         refreshAssistantMemorySnapshot();
       }
       if (hydrationResult.didUpdateReminders) {
-        refreshAssistantReminderSnapshot();
+        syncAssistantScheduledTasks(new Date());
       }
     } catch (error) {
       console.error('[AIBackfillChatModal] Failed to load native assistant diagnostics', error);
     }
-  }, [activeSession, addToast, onUnreadAssistantMessage, shouldShowBackgroundSystemNotification, sortedSessions]);
+  }, [activeSession, addToast, onUnreadAssistantMessage, shouldShowBackgroundSystemNotification, sortedSessions, syncAssistantScheduledTasks]);
 
   const resetAssistantEditableMemoryUi = () => {
     setAssistantEditableMemoryDrafts(DEFAULT_ASSISTANT_EDITABLE_MEMORY_DRAFTS);
@@ -2444,6 +2646,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setAssistantReminderDrafts(DEFAULT_ASSISTANT_REMINDER_DRAFTS);
     setIsAssistantReminderComposerOpen(false);
     setAssistantReminderDeleteTarget(null);
+  };
+
+  const resetAssistantScheduledTaskUi = () => {
+    setAssistantScheduledTaskDrafts(DEFAULT_ASSISTANT_SCHEDULED_TASK_DRAFTS);
+    setIsAssistantScheduledTaskComposerOpen(false);
+    setAssistantScheduledTaskDeleteTarget(null);
   };
 
   const notifyAssistantTaskStateChanged = useCallback(() => {
@@ -2845,7 +3053,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       showSystemNotification: shouldShowBackgroundSystemNotification()
     })).then((result) => {
       assistantReminderQueueService.markDispatched(reminder.id, new Date().toISOString());
-      refreshAssistantMemorySnapshot();
+      syncAssistantScheduledTasks(new Date());
       reloadPersistedChatSessions();
       if (result.surfacedMessage && !isOpenRef.current) {
         onUnreadAssistantMessage?.(1);
@@ -2871,12 +3079,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   };
 
   useEffect(() => {
+    syncAssistantScheduledTasks(new Date());
+  }, [syncAssistantScheduledTasks]);
+
+  useEffect(() => {
     if (!isPersonaPanelOpen) {
       return;
     }
 
     refreshAssistantMemorySnapshot();
     refreshAssistantReminderSnapshot();
+    refreshAssistantScheduledTaskSnapshot();
   }, [assistantAgentConfig.longTermMemoryEnabled, isPersonaPanelOpen]);
 
   useEffect(() => {
@@ -2886,6 +3099,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
     refreshAssistantMemorySnapshot();
     refreshAssistantReminderSnapshot();
+    refreshAssistantScheduledTaskSnapshot();
   }, [isAssistantMemoryViewerOpen]);
 
   useEffect(() => {
@@ -3619,8 +3833,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   const handleConfirmAssistantReminderDelete = (id: string) => {
     const removedReminder = assistantReminderQueueService.removeReminder(id);
-    refreshAssistantReminderSnapshot();
-    refreshAssistantMemorySnapshot();
+    syncAssistantScheduledTasks(new Date());
     setAssistantReminderDeleteTarget((current) => (current?.id === id ? null : current));
     notifyAssistantTaskStateChanged();
 
@@ -3630,6 +3843,110 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
 
     addToast('success', '已删除这条 reminder');
+  };
+
+  const updateAssistantScheduledTaskDraft = <K extends keyof AssistantScheduledTaskDrafts>(
+    key: K,
+    value: AssistantScheduledTaskDrafts[K]
+  ) => {
+    setAssistantScheduledTaskDrafts((current) => ({
+      ...current,
+      [key]: value
+    }));
+  };
+
+  const toggleAssistantScheduledTaskWeekday = (weekday: number) => {
+    setAssistantScheduledTaskDrafts((current) => {
+      const hasWeekday = current.weekdays.includes(weekday);
+      return {
+        ...current,
+        weekdays: hasWeekday
+          ? current.weekdays.filter((item) => item !== weekday)
+          : [...current.weekdays, weekday].sort((left, right) => left - right)
+      };
+    });
+  };
+
+  const handleOpenAssistantScheduledTaskComposer = () => {
+    setIsAssistantScheduledTaskComposerOpen(true);
+    setAssistantScheduledTaskDeleteTarget(null);
+  };
+
+  const handleCancelAssistantScheduledTaskComposer = () => {
+    resetAssistantScheduledTaskUi();
+  };
+
+  const handleSaveAssistantScheduledTask = () => {
+    const text = assistantScheduledTaskDrafts.text.trim();
+    if (!text) {
+      addToast('warning', '先写一点任务内容再保存吧。');
+      return;
+    }
+
+    const timeResult = buildAssistantScheduledTaskTime(assistantScheduledTaskDrafts.time);
+    if (!timeResult.time) {
+      addToast('warning', timeResult.error || '触发时间无效，请检查后重试。');
+      return;
+    }
+
+    const recurrenceResult = buildAssistantScheduledTaskRecurrenceRule(
+      assistantScheduledTaskDrafts,
+      defaultDateKey
+    );
+    if (!recurrenceResult.recurrenceRule) {
+      addToast('warning', recurrenceResult.error || '循环规则无效，请检查后重试。');
+      return;
+    }
+
+    try {
+      assistantScheduledTaskService.createTask({
+        id: crypto.randomUUID(),
+        text,
+        time: timeResult.time,
+        recurrenceRule: recurrenceResult.recurrenceRule
+      });
+      syncAssistantScheduledTasks(new Date());
+      resetAssistantScheduledTaskUi();
+      notifyAssistantTaskStateChanged();
+      addToast('success', '已新增定时任务');
+    } catch (error) {
+      console.error('[AIBackfillChatModal] Failed to save assistant scheduled task', error);
+      addToast('error', '保存定时任务失败，请稍后重试。');
+    }
+  };
+
+  const handleToggleAssistantScheduledTaskEnabled = (task: AssistantScheduledTask) => {
+    try {
+      assistantScheduledTaskService.updateTask(task.id, {
+        enabled: !task.enabled
+      });
+      syncAssistantScheduledTasks(new Date());
+      notifyAssistantTaskStateChanged();
+      addToast('success', task.enabled ? '已停用定时任务' : '已启用定时任务');
+    } catch (error) {
+      console.error('[AIBackfillChatModal] Failed to toggle assistant scheduled task', error);
+      addToast('error', '切换定时任务状态失败，请稍后重试。');
+    }
+  };
+
+  const handleToggleAssistantScheduledTaskDelete = (id: string) => {
+    setAssistantScheduledTaskDeleteTarget((current) => (
+      current?.id === id ? null : { id }
+    ));
+  };
+
+  const handleConfirmAssistantScheduledTaskDelete = (id: string) => {
+    const removedTask = assistantScheduledTaskService.removeTask(id);
+    syncAssistantScheduledTasks(new Date());
+    setAssistantScheduledTaskDeleteTarget((current) => (current?.id === id ? null : current));
+    notifyAssistantTaskStateChanged();
+
+    if (!removedTask) {
+      addToast('info', '这条定时任务已经不存在了。');
+      return;
+    }
+
+    addToast('success', '已删除定时任务');
   };
 
   const handleAIInternalBack = useCallback((): boolean => {
@@ -3650,6 +3967,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     if (isAssistantMemoryViewerOpen) {
       if (assistantReminderDeleteTarget) {
         setAssistantReminderDeleteTarget(null);
+        return true;
+      }
+
+      if (assistantScheduledTaskDeleteTarget) {
+        setAssistantScheduledTaskDeleteTarget(null);
+        return true;
+      }
+
+      if (isAssistantScheduledTaskComposerOpen) {
+        resetAssistantScheduledTaskUi();
         return true;
       }
 
@@ -3713,6 +4040,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     assistantEditableMemoryComposerKey,
     assistantEditableMemoryDeleteTarget,
     assistantReminderDeleteTarget,
+    assistantScheduledTaskDeleteTarget,
     debugViewer,
     deleteConfirmPersonaId,
     deleteConfirmSessionId,
@@ -3724,11 +4052,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     isAssistantBackgroundHistoryViewerOpen,
     isAssistantMemoryViewerOpen,
     isAssistantReminderComposerOpen,
+    isAssistantScheduledTaskComposerOpen,
     isEmojiEditorOpen,
     isHistoryPanelOpen,
     isOpen,
     isPersonaPanelOpen,
     isUserEmojiEditorOpen,
+    resetAssistantScheduledTaskUi,
     onClose
   ]);
 
@@ -3744,38 +4074,65 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     };
   }, [handleAIInternalBack, isOpen, registerBackHandler]);
 
-  const runManualAssistantCheckinDebug = () => {
+  const runManualAssistantCheckinDebug = (options?: ForegroundSendOptions) => {
     if (!activeSession || isLoading) {
       return;
     }
 
     const sessionId = activeSession.id;
     const now = Date.now();
-    const userMessageId = crypto.randomUUID();
-    const pendingMessageId = crypto.randomUUID();
-    const historyBeforeCurrent = conversationHistoryCache.get(sessionId) || [];
+    const retryMessageId = options?.replaceMessageId;
+    const canRetryInPlace = Boolean(
+      retryMessageId && activeSession.messages.some((message) => message.id === retryMessageId)
+    );
+    const userMessageId = options?.retrySourceUserMessageId || crypto.randomUUID();
+    const pendingMessageId = canRetryInPlace && retryMessageId
+      ? retryMessageId
+      : crypto.randomUUID();
+    const historyBeforeCurrent = canRetryInPlace
+      ? buildRetryConversationHistory(sessionId, options?.retrySourceUserMessageId)
+      : (conversationHistoryCache.get(sessionId) || []);
 
-    mutateSession(sessionId, (session) => ({
-      ...session,
-      messages: [
-        ...session.messages,
-        {
-          id: userMessageId,
-          role: 'user',
-          content: '/agent checkin',
-          createdAt: now
-        },
-        {
-          id: pendingMessageId,
-          role: 'assistant',
-          content: '我先模拟一轮后台 check-in…',
-          createdAt: now + 1,
-          tone: 'pending'
-        }
-      ]
-    }));
+    if (canRetryInPlace) {
+      mutateSession(sessionId, (session) => ({
+        ...session,
+        messages: session.messages.map((message) => (
+          message.id === pendingMessageId
+            ? {
+              id: pendingMessageId,
+              role: 'assistant',
+              content: '我先模拟一轮后台 check-in…',
+              createdAt: now,
+              tone: 'pending'
+            }
+            : message
+        ))
+      }));
+    } else {
+      mutateSession(sessionId, (session) => ({
+        ...session,
+        messages: [
+          ...session.messages,
+          {
+            id: userMessageId,
+            role: 'user',
+            content: '/agent checkin',
+            createdAt: now
+          },
+          {
+            id: pendingMessageId,
+            role: 'assistant',
+            content: '我先模拟一轮后台 check-in…',
+            createdAt: now + 1,
+            tone: 'pending'
+          }
+        ]
+      }));
+    }
 
-    setInputText('');
+    if (!canRetryInPlace) {
+      setInputText('');
+    }
     setIsLoading(true);
 
     void assistantOrchestratorService.runSystemTurn(buildBackgroundTurnRequest({
@@ -3823,6 +4180,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         {
           tone: 'error',
           retryInput: '/agent checkin',
+          retrySourceUserMessageId: userMessageId,
           debugSections: getErrorDebugSections(error, '后台 Check-in 调试', debugMode)
         }
       );
@@ -3834,7 +4192,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     });
   };
 
-  const runManualAssistantReminderDebug = () => {
+  const runManualAssistantReminderDebug = (options?: ForegroundSendOptions) => {
     if (!activeSession || isLoading) {
       return;
     }
@@ -3843,31 +4201,58 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const now = Date.now();
     const scheduledDueAt = formatAssistantLocalDateTime(new Date(now - (30 * 60 * 1000)));
     const actualDispatchAt = formatAssistantLocalDateTime(new Date(now));
-    const pendingMessageId = crypto.randomUUID();
-    const userMessageId = crypto.randomUUID();
-    const historyBeforeCurrent = conversationHistoryCache.get(sessionId) || [];
+    const retryMessageId = options?.replaceMessageId;
+    const canRetryInPlace = Boolean(
+      retryMessageId && activeSession.messages.some((message) => message.id === retryMessageId)
+    );
+    const pendingMessageId = canRetryInPlace && retryMessageId
+      ? retryMessageId
+      : crypto.randomUUID();
+    const userMessageId = options?.retrySourceUserMessageId || crypto.randomUUID();
+    const historyBeforeCurrent = canRetryInPlace
+      ? buildRetryConversationHistory(sessionId, options?.retrySourceUserMessageId)
+      : (conversationHistoryCache.get(sessionId) || []);
 
-    mutateSession(sessionId, (session) => ({
-      ...session,
-      messages: [
-        ...session.messages,
-        {
-          id: userMessageId,
-          role: 'user',
-          content: '/agent reminder due',
-          createdAt: now
-        },
-        {
-          id: pendingMessageId,
-          role: 'assistant',
-          content: '我先模拟一轮延迟 reminder 补发…',
-          createdAt: now + 1,
-          tone: 'pending'
-        }
-      ]
-    }));
+    if (canRetryInPlace) {
+      mutateSession(sessionId, (session) => ({
+        ...session,
+        messages: session.messages.map((message) => (
+          message.id === pendingMessageId
+            ? {
+              id: pendingMessageId,
+              role: 'assistant',
+              content: '我先模拟一轮延迟 reminder 补发…',
+              createdAt: now,
+              tone: 'pending'
+            }
+            : message
+        ))
+      }));
+    } else {
+      mutateSession(sessionId, (session) => ({
+        ...session,
+        messages: [
+          ...session.messages,
+          {
+            id: userMessageId,
+            role: 'user',
+            content: '/agent reminder due',
+            createdAt: now
+          },
+          {
+            id: pendingMessageId,
+            role: 'assistant',
+            content: '我先模拟一轮延迟 reminder 补发…',
+            createdAt: now + 1,
+            tone: 'pending'
+          }
+        ]
+      }));
+    }
 
-    setInputText('');
+    if (!canRetryInPlace) {
+      setInputText('');
+    }
     setIsLoading(true);
 
     void assistantOrchestratorService.runSystemTurn(buildBackgroundTurnRequest({
@@ -3920,6 +4305,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         {
           tone: 'error',
           retryInput: '/agent reminder due',
+          retrySourceUserMessageId: userMessageId,
           debugSections: getErrorDebugSections(error, '延迟 Reminder 调试', debugMode)
         }
       );
@@ -3931,15 +4317,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     });
   };
 
-  const handleDebugCommand = (trimmedText: string): boolean => {
+  const handleDebugCommand = (trimmedText: string, options?: ForegroundSendOptions): boolean => {
     const normalized = trimmedText.toLowerCase();
     if (normalized === '/agent checkin' && activeSession) {
-      runManualAssistantCheckinDebug();
+      runManualAssistantCheckinDebug(options);
       return true;
     }
 
     if (normalized === '/agent reminder due' && activeSession) {
-      runManualAssistantReminderDebug();
+      runManualAssistantReminderDebug(options);
       return true;
     }
 
@@ -4202,6 +4588,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       memoryUpdates?: AIChatMemoryUpdateSection[];
       reminderUpdates?: string[];
       retryInput?: string;
+      retrySourceUserMessageId?: string;
     }
   ) => {
     replaceMessage(sessionId, pendingMessageId, {
@@ -4215,7 +4602,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       ...(options?.appliedActions && options.appliedActions.length > 0 ? { appliedActions: options.appliedActions } : {}),
       ...(options?.memoryUpdates && options.memoryUpdates.length > 0 ? { memoryUpdates: options.memoryUpdates } : {}),
       ...(options?.reminderUpdates && options.reminderUpdates.length > 0 ? { reminderUpdates: options.reminderUpdates } : {}),
-      ...(options?.retryInput ? { retryInput: options.retryInput } : {})
+      ...(options?.retryInput ? { retryInput: options.retryInput } : {}),
+      ...(options?.retrySourceUserMessageId ? { retrySourceUserMessageId: options.retrySourceUserMessageId } : {})
     });
 
     if (!isOpenRef.current) {
@@ -4270,52 +4658,81 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     return rawContent;
   };
 
-  const handleSend = async (overrideText?: string) => {
+  const handleSend = async (overrideText?: string, options?: ForegroundSendOptions) => {
     const trimmedText = (overrideText ?? inputText).trim();
     if (!trimmedText || isLoading || !activeSession) {
       return;
     }
 
-    if (handleDebugCommand(trimmedText)) {
+    if (handleDebugCommand(trimmedText, options)) {
       return;
     }
 
     const sessionId = activeSession.id;
-    const userMessageId = crypto.randomUUID();
-    const pendingMessageId = crypto.randomUUID();
+    const retryMessageId = options?.replaceMessageId;
+    const canRetryInPlace = Boolean(
+      retryMessageId && activeSession.messages.some((message) => message.id === retryMessageId)
+    );
+    const userMessageId = options?.retrySourceUserMessageId || crypto.randomUUID();
+    const pendingMessageId = canRetryInPlace && retryMessageId
+      ? retryMessageId
+      : crypto.randomUUID();
     const now = Date.now();
-    const historyBeforeCurrent = conversationHistoryCache.get(sessionId) || [];
-    const shouldRenameTitle = !activeSession.messages.some((message) => message.role === 'user');
+    const historyBeforeCurrent = canRetryInPlace
+      ? buildRetryConversationHistory(sessionId, options?.retrySourceUserMessageId)
+      : (conversationHistoryCache.get(sessionId) || []);
+    const shouldRenameTitle = !canRetryInPlace && !activeSession.messages.some((message) => message.role === 'user');
 
-    mutateSession(sessionId, (session) => ({
-      ...session,
-      title: shouldRenameTitle ? createSessionTitleFromUserMessage(trimmedText) : session.title,
-      messages: [
-        ...session.messages,
-        {
-          id: userMessageId,
-          role: 'user',
-          content: trimmedText,
-          createdAt: now
-        },
-        {
-          id: pendingMessageId,
-          role: 'assistant',
-          content: '我先想一下。',
-          createdAt: now + 1,
-          tone: 'pending'
-        }
-      ]
-    }));
+    if (canRetryInPlace) {
+      mutateSession(sessionId, (session) => ({
+        ...session,
+        messages: session.messages.map((message) => (
+          message.id === pendingMessageId
+            ? {
+              id: pendingMessageId,
+              role: 'assistant',
+              content: '我先想一下。',
+              createdAt: now,
+              tone: 'pending'
+            }
+            : message
+        ))
+      }));
+    } else {
+      mutateSession(sessionId, (session) => ({
+        ...session,
+        title: shouldRenameTitle ? createSessionTitleFromUserMessage(trimmedText) : session.title,
+        messages: [
+          ...session.messages,
+          {
+            id: userMessageId,
+            role: 'user',
+            content: trimmedText,
+            createdAt: now
+          },
+          {
+            id: pendingMessageId,
+            role: 'assistant',
+            content: '我先想一下。',
+            createdAt: now + 1,
+            tone: 'pending'
+          }
+        ]
+      }));
+    }
 
-    void AssistantAgent.notifyUserTurn({
-      text: trimmedText,
-      at: new Date(now).toISOString()
-    }).catch((error) => {
-      console.error('[AIBackfillChatModal] Failed to notify assistant agent about user turn', error);
-    });
+    if (!canRetryInPlace) {
+      void AssistantAgent.notifyUserTurn({
+        text: trimmedText,
+        at: new Date(now).toISOString()
+      }).catch((error) => {
+        console.error('[AIBackfillChatModal] Failed to notify assistant agent about user turn', error);
+      });
+    }
 
-    setInputText('');
+    if (!canRetryInPlace) {
+      setInputText('');
+    }
     setIsLoading(true);
     setIsHistoryPanelOpen(false);
     setIsPersonaPanelOpen(false);
@@ -4419,6 +4836,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         replacePendingWithResult(sessionId, pendingMessageId, message, {
           tone: 'error',
           retryInput: trimmedText,
+          retrySourceUserMessageId: userMessageId,
           debugSections: getErrorDebugSections(error, '统一单轮调用', debugMode)
         });
       }
@@ -4434,12 +4852,38 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     activeRequestRef.current?.controller.abort();
   };
 
-  const handleRetryMessage = (retryInput?: string) => {
-    if (!retryInput || isLoading) {
+  const resolveRetrySourceUserMessageId = (message: AIChatMessage): string | undefined => {
+    if (message.retrySourceUserMessageId) {
+      return message.retrySourceUserMessageId;
+    }
+
+    if (!activeSession) {
+      return undefined;
+    }
+
+    const messageIndex = activeSession.messages.findIndex((candidate) => candidate.id === message.id);
+    if (messageIndex <= 0) {
+      return undefined;
+    }
+
+    for (let cursor = messageIndex - 1; cursor >= 0; cursor -= 1) {
+      if (activeSession.messages[cursor].role === 'user') {
+        return activeSession.messages[cursor].id;
+      }
+    }
+
+    return undefined;
+  };
+
+  const handleRetryMessage = (message: AIChatMessage) => {
+    if (!message.retryInput || isLoading) {
       return;
     }
 
-    void handleSend(retryInput);
+    void handleSend(message.retryInput, {
+      replaceMessageId: message.id,
+      retrySourceUserMessageId: resolveRetrySourceUserMessageId(message)
+    });
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -5265,7 +5709,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             {!isUser && tone === 'error' && message.retryInput && (
               <div className="pl-1">
                 <button
-                  onClick={() => handleRetryMessage(message.retryInput)}
+                  onClick={() => handleRetryMessage(message)}
                   disabled={isLoading}
                   className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                   style={{
@@ -6442,6 +6886,283 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                             >
                               {assistantAgentConfig.longTermMemoryEnabled ? '已开启' : '未开启'}
                             </button>
+                          </div>
+
+                          <div className="border-t pt-4" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>定时任务</p>
+                              </div>
+                              <button
+                                onClick={handleOpenAssistantScheduledTaskComposer}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-[0.75rem] border text-xs font-medium transition-colors hover:bg-white"
+                                style={{
+                                  borderColor: AI_CHAT_THEME.chipBorder,
+                                  backgroundColor: AI_CHAT_THEME.panelBg,
+                                  color: AI_CHAT_THEME.textSecondary
+                                }}
+                                title="新增定时任务"
+                              >
+                                <Plus size={14} />
+                              </button>
+                            </div>
+
+                            {isAssistantScheduledTaskComposerOpen && (
+                              <div className="mt-4 border-t pt-4" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
+                                <textarea
+                                  value={assistantScheduledTaskDrafts.text}
+                                  onChange={(event) => updateAssistantScheduledTaskDraft('text', event.target.value)}
+                                  placeholder="比如：每周一提醒我交周报。"
+                                  rows={3}
+                                  className="w-full resize-none rounded-[0.75rem] border px-3 py-3 text-sm leading-6 outline-none"
+                                  style={{
+                                    borderColor: AI_CHAT_THEME.chipBorder,
+                                    backgroundColor: AI_CHAT_THEME.inputBg,
+                                    color: AI_CHAT_THEME.textPrimary
+                                  }}
+                                />
+
+                                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                  <label className="space-y-1.5">
+                                    <span className="text-xs font-medium text-stone-500">触发时间（HHMM）</span>
+                                    <input
+                                      type="text"
+                                      value={assistantScheduledTaskDrafts.time}
+                                      onChange={(event) => updateAssistantScheduledTaskDraft('time', event.target.value.replace(/[^\d]/g, '').slice(0, 4))}
+                                      placeholder="0800"
+                                      inputMode="numeric"
+                                      className="w-full rounded-[0.75rem] border px-3 py-2 text-sm outline-none"
+                                      style={{
+                                        borderColor: AI_CHAT_THEME.chipBorder,
+                                        backgroundColor: AI_CHAT_THEME.inputBg,
+                                        color: AI_CHAT_THEME.textPrimary
+                                      }}
+                                    />
+                                  </label>
+                                  <label className="space-y-1.5">
+                                    <span className="text-xs font-medium text-stone-500">循环间隔</span>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={365}
+                                      value={assistantScheduledTaskDrafts.interval}
+                                      onChange={(event) => updateAssistantScheduledTaskDraft('interval', event.target.value.replace(/[^\d]/g, '').slice(0, 3) || '1')}
+                                      className="w-full rounded-[0.75rem] border px-3 py-2 text-sm outline-none"
+                                      style={{
+                                        borderColor: AI_CHAT_THEME.chipBorder,
+                                        backgroundColor: AI_CHAT_THEME.inputBg,
+                                        color: AI_CHAT_THEME.textPrimary
+                                      }}
+                                    />
+                                  </label>
+                                </div>
+
+                                <div className="mt-3">
+                                  <span className="mb-2 block text-xs font-medium text-stone-500">循环模式</span>
+                                  <div className="grid grid-cols-3 gap-2">
+                                    {[
+                                      { value: 'daily' as const, label: '每天' },
+                                      { value: 'weekly' as const, label: '每周' },
+                                      { value: 'monthly' as const, label: '每月' }
+                                    ].map((option) => {
+                                      const isSelected = assistantScheduledTaskDrafts.frequency === option.value;
+                                      return (
+                                        <button
+                                          key={option.value}
+                                          type="button"
+                                          onClick={() => updateAssistantScheduledTaskDraft('frequency', option.value)}
+                                          className="rounded-[0.75rem] border px-2 py-2 text-xs font-medium transition-colors"
+                                          style={isSelected
+                                            ? {
+                                              borderColor: AI_CHAT_THEME.activeBorder,
+                                              backgroundColor: AI_CHAT_THEME.activeBg,
+                                              color: AI_CHAT_THEME.textPrimary
+                                            }
+                                            : {
+                                              borderColor: AI_CHAT_THEME.chipBorder,
+                                              backgroundColor: AI_CHAT_THEME.inputBg,
+                                              color: AI_CHAT_THEME.textMuted
+                                            }}
+                                        >
+                                          {option.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
+                                {assistantScheduledTaskDrafts.frequency === 'weekly' && (
+                                  <div className="mt-3">
+                                    <span className="mb-2 block text-xs font-medium text-stone-500">每周日期</span>
+                                    <div className="grid grid-cols-7 gap-2">
+                                      {ASSISTANT_SCHEDULED_TASK_WEEKDAY_OPTIONS.map((weekday) => {
+                                        const isSelected = assistantScheduledTaskDrafts.weekdays.includes(weekday.value);
+                                        return (
+                                          <button
+                                            key={weekday.value}
+                                            type="button"
+                                            onClick={() => toggleAssistantScheduledTaskWeekday(weekday.value)}
+                                            className="rounded-[0.75rem] border px-0 py-2 text-xs font-bold transition-colors"
+                                            style={isSelected
+                                              ? {
+                                                borderColor: AI_CHAT_THEME.activeBorder,
+                                                backgroundColor: AI_CHAT_THEME.activeBg,
+                                                color: AI_CHAT_THEME.textPrimary
+                                              }
+                                              : {
+                                                borderColor: AI_CHAT_THEME.chipBorder,
+                                                backgroundColor: AI_CHAT_THEME.inputBg,
+                                                color: AI_CHAT_THEME.textMuted
+                                              }}
+                                          >
+                                            {weekday.label}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {assistantScheduledTaskDrafts.frequency === 'monthly' && (
+                                  <label className="mt-3 block space-y-1.5">
+                                    <span className="text-xs font-medium text-stone-500">每月日期</span>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={31}
+                                      value={assistantScheduledTaskDrafts.monthDay}
+                                      onChange={(event) => updateAssistantScheduledTaskDraft('monthDay', event.target.value.replace(/[^\d]/g, '').slice(0, 2) || '1')}
+                                      className="w-full rounded-[0.75rem] border px-3 py-2 text-sm outline-none"
+                                      style={{
+                                        borderColor: AI_CHAT_THEME.chipBorder,
+                                        backgroundColor: AI_CHAT_THEME.inputBg,
+                                        color: AI_CHAT_THEME.textPrimary
+                                      }}
+                                    />
+                                  </label>
+                                )}
+
+                                <div className="mt-3 flex items-center justify-end gap-2">
+                                  <button
+                                    onClick={handleCancelAssistantScheduledTaskComposer}
+                                    className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
+                                    style={{
+                                      borderColor: AI_CHAT_THEME.chipBorder,
+                                      backgroundColor: AI_CHAT_THEME.inputBg,
+                                      color: AI_CHAT_THEME.textMuted
+                                    }}
+                                  >
+                                    取消
+                                  </button>
+                                  <button
+                                    onClick={handleSaveAssistantScheduledTask}
+                                    className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:brightness-[0.98]"
+                                    style={{
+                                      borderColor: AI_CHAT_THEME.activeBorder,
+                                      backgroundColor: AI_CHAT_THEME.activeBg,
+                                      color: AI_CHAT_THEME.textPrimary
+                                    }}
+                                  >
+                                    保存
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="mt-4 space-y-3">
+                              {assistantScheduledTaskSnapshot.length === 0 ? (
+                                <div
+                                  className="rounded-[0.85rem] border border-dashed px-4 py-4 text-sm leading-6 text-stone-500"
+                                  style={{
+                                    borderColor: AI_CHAT_THEME.panelBorder,
+                                    backgroundColor: AI_CHAT_THEME.panelBg
+                                  }}
+                                >
+                                  暂无定时任务。
+                                </div>
+                              ) : (
+                                assistantScheduledTaskSnapshot.map((task) => {
+                                  const isDeleteConfirming = assistantScheduledTaskDeleteTarget?.id === task.id;
+                                  const linkedReminder = task.pendingReminderId
+                                    ? assistantReminderSnapshot.find((reminder) => reminder.id === task.pendingReminderId)
+                                    : undefined;
+                                  const upcomingDueAt = linkedReminder?.dueAt || task.nextTriggerAt;
+
+                                  return (
+                                    <div
+                                      key={task.id}
+                                      className="rounded-[0.85rem] border px-4 py-3"
+                                      style={{
+                                        borderColor: AI_CHAT_THEME.panelBorder,
+                                        backgroundColor: 'rgba(255,255,255,0.84)'
+                                      }}
+                                    >
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0 flex-1">
+                                          <p className="whitespace-pre-wrap break-words text-sm leading-6 text-stone-700">
+                                            {task.text}
+                                          </p>
+                                          <p className="mt-1 text-xs leading-5 text-stone-500">
+                                            {formatAssistantScheduledTaskRecurrence(task)}
+                                          </p>
+                                          <p className="mt-1 text-xs leading-5 text-stone-500">
+                                            下次触发：{formatAssistantDateTimeForDisplay(upcomingDueAt)}
+                                          </p>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                          <button
+                                            onClick={() => handleToggleAssistantScheduledTaskEnabled(task)}
+                                            className="inline-flex min-w-[60px] items-center justify-center rounded-[0.7rem] border px-2.5 py-1.5 text-[11px] font-medium transition-colors"
+                                            style={task.enabled
+                                              ? {
+                                                borderColor: AI_CHAT_THEME.activeBorder,
+                                                backgroundColor: AI_CHAT_THEME.activeBg,
+                                                color: AI_CHAT_THEME.textPrimary
+                                              }
+                                              : {
+                                                borderColor: AI_CHAT_THEME.chipBorder,
+                                                backgroundColor: AI_CHAT_THEME.inputBg,
+                                                color: AI_CHAT_THEME.textMuted
+                                              }}
+                                          >
+                                            {task.enabled ? '已开启' : '未开启'}
+                                          </button>
+                                          <button
+                                            onClick={() => handleToggleAssistantScheduledTaskDelete(task.id)}
+                                            className="rounded-[0.7rem] p-2 text-[#897f75] transition-colors hover:bg-[#f8e9e6] hover:text-[#b35b50]"
+                                            title="删除这条定时任务"
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      {isDeleteConfirming && (
+                                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#e4c1bc] pt-3 text-xs text-[#9d544d]">
+                                          <span>确认删除这条定时任务？</span>
+                                          <div className="flex items-center gap-1.5">
+                                            <button
+                                              onClick={() => setAssistantScheduledTaskDeleteTarget(null)}
+                                              className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#ddd6ce] bg-transparent text-[#71685f] transition-colors hover:bg-[#fffaf3]"
+                                              title="取消删除"
+                                            >
+                                              <X size={14} />
+                                            </button>
+                                            <button
+                                              onClick={() => handleConfirmAssistantScheduledTaskDelete(task.id)}
+                                              className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#ba6256] bg-[#c46f4f] text-[#fff8f2] transition-colors hover:bg-[#b95f43]"
+                                              title="确认删除"
+                                            >
+                                              <Check size={14} />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
                           </div>
 
                           <div className="flex flex-wrap gap-2 pt-1">

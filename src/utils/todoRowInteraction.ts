@@ -4,6 +4,7 @@
  * @output Gesture intent classification and release actions for todo-row interactions
  * @pos Utility
  * @description Helps TodoView distinguish taps, scrolls, and deliberate horizontal swipes so list rows do not accidentally swallow taps or toggle completion during scrolling.
+ * @updated 2026-05-09: Adds a release-time fallback for deliberate long left swipes so touch completion still triggers even when the move phase never latched swipe intent, while preserving scroll lock protection.
  * @updated 2026-05-05: Keeps completion toggles on left swipes for both complete and incomplete rows, while preserving right-swipe detail and deeper duplicate swipes.
  * @updated 2026-05-05: Removed the tap-vs-swipe dead zone and only allows directional quick-toggle swipes after a clear horizontal intent.
  * @updated 2026-05-05: Added conservative axis-locking helpers for todo-row quick actions.
@@ -119,6 +120,14 @@ export const getTodoRowReleaseAction = ({
   }
 
   if (gestureIntent !== 'swipe') {
+    if (
+      toggleDirection === 'left'
+      && diffX < -completeSwipeDistance
+      && isHorizontalSwipeCandidate({ diffX, diffY, canQuickToggle, quickToggleDirection })
+    ) {
+      return 'toggleComplete';
+    }
+
     return 'none';
   }
 

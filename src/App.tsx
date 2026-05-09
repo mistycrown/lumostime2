@@ -388,6 +388,20 @@ const AppContent: React.FC = () => {
       }
     };
   }, [activeSessions, shouldAutoOpenFocus, setFocusDetailSessionId]);
+
+  React.useEffect(() => {
+    if (!focusDetailSessionId) {
+      return;
+    }
+
+    const hasFocusedSession = activeSessions.some((session) => session.id === focusDetailSessionId);
+    if (hasFocusedSession) {
+      return;
+    }
+
+    setFocusDetailSessionId(null);
+    setShouldAutoEnterImmersive(false);
+  }, [activeSessions, focusDetailSessionId, setFocusDetailSessionId]);
   
   // Wrappers for Session Actions to match original signature (injecting autoLinkRules)
   const handleStartActivityWrapper = (activity: any, categoryId: string, todoId?: string, scopeIdOrIds?: string | string[], note?: string, autoEnterFocus?: boolean) => {
