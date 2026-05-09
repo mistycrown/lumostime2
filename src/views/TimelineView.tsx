@@ -287,8 +287,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             onClick: () => setIsGalleryViewOpen(true)
         },
         achievement: {
-            label: '成就屏',
-            title: '成就屏',
+            label: '成就瓶',
+            title: '成就瓶',
             icon: <FlaskConical size={20} />,
             onClick: () => setIsAchievementOpen(true)
         },

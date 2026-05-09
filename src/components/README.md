@@ -10,6 +10,7 @@ Components that form the structural or global UI elements.
 - `Toast.tsx`: Notification system.
 
 ## Modals
+- Update 2026-05-09: `WidgetTrackingCalendarEditorModal.tsx` now sorts scope-source options with the shared scope-order helper so widget scope pickers stay aligned with scope management and batch scope tools.
 - Update 2026-05-06: `AIBackfillChatModal.tsx` now imports its six built-in persona system prompts from `src/constants/aiPersonaSystemPrompts.ts`, so prompt copy no longer lives inline inside the modal component.
 - Update 2026-05-06: `AIBackfillChatModal.tsx` now sends concrete activity-log summaries for both today and yesterday in assistant state context, stops duplicating cached conversation history into the provider message list, and removes the old 30-turn cap from persona context settings.
 - Update 2026-05-06: `AIBackfillChatModal.tsx` now replaces the six built-in persona system prompts with the user-authored versions and standardizes in-prompt user references to `用户`.
@@ -77,7 +78,7 @@ Specialized input controls.
 - `CustomSelect.tsx`: Styled dropdown.
 - `TagAssociation.tsx`: Single tag selector with custom HEX soft-color support.
 - `TagMultipleAssociation.tsx`: Multi-tag selector with custom HEX soft-color support.
-- `ScopeAssociation.tsx`: Tag selection grid.
+- `ScopeAssociation.tsx`: Scope selection grid that follows the shared scope-order helper so scope chips match management ordering.
 - `TodoAssociation.tsx`: Todo linking selector with a virtual today category for pinned and today-arranged tasks.
 - `CommentSection.tsx`: Comment system for focus logs.
 - `RecommendedNoteTemplates.tsx`: Inline recommendation strip that lets note fields insert context-aware templates without opening a selector modal.

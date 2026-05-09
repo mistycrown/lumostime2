@@ -4,14 +4,16 @@
  * @output User Interaction (Rules Configuration)
  * @pos View (Settings Sub-page)
  * @description Provides a UI for managing automatic association rules between Tags (Activities) and Scopes (Domains), allowing users to define default scopes for specific activities.
- * 
+ * @updated 2026-05-09: Sorted selectable scopes by shared scope order so auto-link scope buttons match scope-management ordering.
+ *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ChevronLeft, Plus, Trash2, Link, X, RotateCcw } from 'lucide-react';
 import { AutoLinkRule, Category, Scope, Activity } from '../types';
 import { getSoftColorCircleStyle } from '../utils/colorAdapterUtils';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { sortActiveScopesByOrder } from '../utils/scopeSortUtils';
 
 interface AutoLinkViewProps {
     onClose: () => void;
@@ -33,6 +35,7 @@ export const AutoLinkView: React.FC<AutoLinkViewProps> = ({
     const [selectedActivityId, setSelectedActivityId] = useState<string>('');
     const [selectedScopeId, setSelectedScopeId] = useState<string>('');
     const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
+    const activeScopes = useMemo(() => sortActiveScopesByOrder(scopes), [scopes]);
 
     // 获取 Activity 信息
     const getActivityInfo = (activityId: string) => {
@@ -219,9 +222,7 @@ export const AutoLinkView: React.FC<AutoLinkViewProps> = ({
                                         自动关联到领域
                                     </label>
                                     <div className="flex flex-wrap gap-2">
-                                        {scopes
-                                            .filter(s => !s.isArchived)
-                                            .map(scope => (
+                                        {activeScopes.map(scope => (
                                                 <button
                                                     key={scope.id}
                                                     onClick={() => setSelectedScopeId(scope.id)}
@@ -233,7 +234,7 @@ export const AutoLinkView: React.FC<AutoLinkViewProps> = ({
                                                     <span>{scope.icon}</span>
                                                     <span>{scope.name}</span>
                                                 </button>
-                                            ))}
+                                        ))}
                                     </div>
                                 </div>
                             )}

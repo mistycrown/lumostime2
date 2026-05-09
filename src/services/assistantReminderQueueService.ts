@@ -5,6 +5,7 @@
  * @pos Service (Assistant Reminders)
  * @description Provides a small durable reminder queue for the Android-first AI agent so it can leave follow-up instructions for future background turns without depending on the chat session history.
  *
+ * @updated 2026-05-09: Delayed failed due-reminder retries for at least one minute in the web queue so failed dispatches stay pending instead of being re-fired immediately.
  * @updated 2026-04-26: Canonicalized reminder timestamps before storage so due checks, delay math, and debug output all run against one normalized timeline.
  * @updated 2026-04-26: Added persistent assistant reminder queue helpers, due-reminder lookup, dispatch-attempt tracking, and memory synchronization for the new background AI agent.
  */
@@ -20,6 +21,7 @@ import {
 } from '../utils/assistantTime';
 
 const ASSISTANT_REMINDER_QUEUE_KEY = 'lumostime_assistant_reminders_v1';
+const REMINDER_RETRY_DELAY_MS = 60_000;
 
 const normalizeReminder = (value: unknown): AssistantReminder | null => {
   if (!value || typeof value !== 'object') {
@@ -148,9 +150,19 @@ export const assistantReminderQueueService = {
   },
 
   listDueReminders(now = new Date()): AssistantReminder[] {
-    return assistantReminderQueueService.listReminders().filter((reminder) => (
-      reminder.status === 'pending' && isAssistantDateTimeDue(reminder.dueAt, now)
-    ));
+    const nowMs = now.getTime();
+    return assistantReminderQueueService.listReminders().filter((reminder) => {
+      if (reminder.status !== 'pending' || !isAssistantDateTimeDue(reminder.dueAt, now)) {
+        return false;
+      }
+
+      if (!reminder.lastDispatchAttemptAt) {
+        return true;
+      }
+
+      const lastAttemptMs = parseAssistantDateTime(reminder.lastDispatchAttemptAt);
+      return !Number.isFinite(lastAttemptMs) || nowMs - lastAttemptMs >= REMINDER_RETRY_DELAY_MS;
+    });
   },
 
   peekNextDueAt(): string {

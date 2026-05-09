@@ -4,6 +4,7 @@
  * @output Web Console Logs
  * @pos Plugin Implementation (Web)
  * @description A no-op web implementation of the FocusNotification plugin to prevent errors when running in a browser environment.
+ * @updated 2026-05-09: Added web no-op support for pending floating-stop recovery and session-id sync payloads.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -35,16 +36,21 @@ export class FocusNotificationWeb extends WebPlugin implements FocusNotification
         return { granted: true };
     }
 
-    async startFloatingWindow(options?: { icon?: string, isFocusing?: boolean, startTime?: string }): Promise<void> {
+    async startFloatingWindow(options?: { icon?: string, isFocusing?: boolean, startTime?: string, sessionId?: string }): Promise<void> {
         console.log('FocusNotification.startFloatingWindow (Web - No-op)', options);
     }
 
-    async updateFloatingWindow(options: { icon?: string, isFocusing: boolean, startTime?: string }): Promise<void> {
+    async updateFloatingWindow(options: { icon?: string, isFocusing: boolean, startTime?: string, sessionId?: string }): Promise<void> {
         console.log('FocusNotification.updateFloatingWindow (Web - No-op)', options);
     }
 
     async stopFloatingWindow(): Promise<void> {
         console.log('FocusNotification.stopFloatingWindow (Web - No-op)');
+    }
+
+    async consumePendingStopRequest(): Promise<{ hasPending: boolean, sessionId?: string | null, stoppedAt?: number | null }> {
+        console.log('FocusNotification.consumePendingStopRequest (Web - No-op)');
+        return { hasPending: false, sessionId: null, stoppedAt: null };
     }
 
     addListener(

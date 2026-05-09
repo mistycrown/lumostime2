@@ -4,13 +4,14 @@
  * @output Scope Selection Grid
  * @pos Component (Input)
  * @description A grid of toggleable buttons for associating scopes (tags) with a log or todo item.
- * 
+ * @updated 2026-05-09: Sorted scopes by shared selection order so scope pickers match scope-management ordering.
+ *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Scope } from '../types';
-import { Target } from 'lucide-react';
 import { IconRenderer } from './IconRenderer';
+import { sortScopesForSelection } from '../utils/scopeSortUtils';
 
 interface ScopeAssociationProps {
     scopes: Scope[];
@@ -19,6 +20,8 @@ interface ScopeAssociationProps {
 }
 
 export const ScopeAssociation: React.FC<ScopeAssociationProps> = ({ scopes, selectedScopeIds = [], onSelect }) => {
+    const sortedScopes = useMemo(() => sortScopesForSelection(scopes), [scopes]);
+
     const handleToggle = (scopeId: string) => {
         const currentIds = selectedScopeIds || [];
         const isSelected = currentIds.includes(scopeId);
@@ -48,7 +51,7 @@ export const ScopeAssociation: React.FC<ScopeAssociationProps> = ({ scopes, sele
             </div>
 
             <div className="grid grid-cols-4 gap-2">
-                {scopes.map(scope => {
+                {sortedScopes.map(scope => {
                     const isSelected = selectedScopeIds?.includes(scope.id) || false;
                     return (
                         <button

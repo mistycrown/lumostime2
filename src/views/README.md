@@ -28,7 +28,8 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
-> Last updated: 2026-05-06
+> Last updated: 2026-05-09
+- `BatchFocusRecordManageView.tsx`, `AutoLinkView.tsx`, `MemoirSettingsView.tsx`: Scope pickers and filter chips now share one saved scope-order helper so batch tools and scope selectors stay aligned.
 - `TodoView.tsx`: Removed the small top-right status dot from the display-settings sidebar button so it now matches the other Lucide icon controls in the left utility stack.
 - `SettingsView.tsx`: Moved the Android `小组件` entry below the `开启悬浮球` toggle while keeping both items in the same settings group.
 - `TodoView.tsx`, `TodoDisplaySettingsModal.tsx`: Lowered the Todo sidebar utility cluster closer to the fixed footer, replaced the old eye toggle with a display-settings modal, and added persisted compact-mode toggles for linked tag, scope, schedule-type, progress-ring, and date-suffix visibility.

@@ -4,6 +4,7 @@
  * @output Floating UI Overlay and Foreground Notification
  * @pos Native Service
  * @description Foreground Android service managing the "LumosTime Island" floating window, including overlay rendering, touch interaction, runtime state updates, and a shared persistent status notification with the AI assistant service.
+ * @updated 2026-05-09: Tracks the current app session id inside the floating service so app-origin stops can reconcile precisely after background resume.
  * @updated 2026-05-04: Routed floating-window foreground startup through the shared runtime notification manager so Android 8+ no longer depends on the removed legacy notification channel.
  * @updated 2026-04-26: Switched the floating-window foreground notification onto the shared runtime-status manager so Android only shows one persistent LumosTime service notification.
  */
@@ -57,6 +58,7 @@ public class FloatingWindowService extends Service {
     private boolean isMoving = false;
     private boolean isFocusing = false;
     private long startTime = 0;
+    private String currentSessionId = null;
     private android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
     private static final long CYCLE_DURATION = 9000; // 5s Time + 2s Emoji + 2s Icon
     private static final long SHOW_TIME_DURATION = 5000;
@@ -166,9 +168,10 @@ public class FloatingWindowService extends Service {
             String icon = intent.getStringExtra("icon");
             boolean focusing = intent.getBooleanExtra("isFocusing", false);
             long start = intent.getLongExtra("startTime", 0);
+            String sessionId = intent.getStringExtra("sessionId");
 
-            Log.d(TAG, "📥 Service onStartCommand: focus=" + focusing + ", start=" + start + ", icon=" + icon);
-            updateContent(icon, focusing, start);
+            Log.d(TAG, "📥 Service onStartCommand: focus=" + focusing + ", start=" + start + ", icon=" + icon + ", sessionId=" + sessionId);
+            updateContent(icon, focusing, start, sessionId);
         }
         return START_STICKY;
     }
@@ -246,7 +249,7 @@ public class FloatingWindowService extends Service {
         }
 
         new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
-            instance.updateContent(icon, focusing, startTime);
+            instance.updateContent(icon, focusing, startTime, null);
         });
     }
 
@@ -472,12 +475,13 @@ public class FloatingWindowService extends Service {
         }
     }
 
-    private void updateContent(String icon, boolean focusing, long start) {
+    private void updateContent(String icon, boolean focusing, long start, String sessionId) {
         if (containerView == null)
             return;
 
         this.isFocusing = focusing;
         this.startTime = start;
+        this.currentSessionId = normalizeSessionId(sessionId);
 
         if (focusing) {
             // Start Focusing Mode
@@ -499,6 +503,7 @@ public class FloatingWindowService extends Service {
         } else {
             // Stop Focusing Mode -> Show App Icon
             handler.removeCallbacks(updateRunnable);
+            currentSessionId = null;
 
             // Clean up animations
             emojiView.animate().cancel();
@@ -601,7 +606,12 @@ public class FloatingWindowService extends Service {
                 if (stoppedWidgetRuntime != null) {
                     FocusNotificationPlugin.triggerStopFocusFromFloating(stoppedWidgetRuntime.getId());
                 } else {
-                    FocusNotificationPlugin.triggerStopFocusFromFloating();
+                    String normalizedSessionId = normalizeSessionId(currentSessionId);
+                    if (normalizedSessionId != null) {
+                        FocusNotificationPlugin.triggerStopFocusFromFloating(normalizedSessionId);
+                    } else {
+                        FocusNotificationPlugin.triggerStopFocusFromFloating();
+                    }
                 }
                 return;
             }
@@ -634,5 +644,14 @@ public class FloatingWindowService extends Service {
         } catch (Exception e) {
             Log.e(TAG, "Open app failed", e);
         }
+    }
+
+    private String normalizeSessionId(String sessionId) {
+        if (sessionId == null) {
+            return null;
+        }
+
+        String trimmed = sessionId.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }
