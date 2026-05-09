@@ -4,6 +4,7 @@
  * @output Immersive fullscreen timer display and session submit trigger
  * @pos Component (View)
  * @description A fixed black-and-white immersive timer with large numeric digits, static masked art visuals, session-only orientation toggles, display-source and display-format toggles, white-noise controls, and Android immersive fullscreen handling that temporarily removes WebView insets.
+ * @updated 2026-05-09: Rotated the immersive orientation-toggle icon 90 degrees counterclockwise in landscape so the visual direction matches the actual toggle.
  * @updated 2026-05-05: Stopped manually toggling the Android EdgeToEdge inset listener during immersive enter/exit because the native plugin already tracks system-bar visibility and double-toggling could leave headers pushed downward after returning.
  * @updated 2026-05-05: Stopped issuing extra Android status-bar show/hide calls during immersive transitions so exiting fullscreen no longer risks leaving the app header shifted downward.
  * @updated 2026-05-05: Restored Android immersive system bars before unmounting the fullscreen timer so exiting immersive mode no longer leaves the app header shifted downward.
@@ -762,7 +763,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
                 <MonitorSmartphone
                   size={18}
                   strokeWidth={2}
-                  style={{ transform: effectiveOrientation === 'landscape' ? 'rotate(90deg)' : 'none' }}
+                  style={{ transform: effectiveOrientation === 'landscape' ? 'rotate(-90deg)' : 'none' }}
                 />
               </button>
 
