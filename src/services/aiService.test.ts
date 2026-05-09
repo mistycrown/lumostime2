@@ -84,4 +84,27 @@ describe('aiService unified turn normalization', () => {
 
     expect(result.output.toolCalls).toBeUndefined();
   });
+
+  it('treats empty unified-turn content as a failed decision instead of a silent success', async () => {
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{
+            message: {
+              content: ''
+            }
+          }]
+        })
+      }),
+      configurable: true
+    });
+
+    await expect(aiService.requestAssistantUnifiedTurnWithDebug({
+      mode: 'background',
+      systemPrompt: 'system',
+      userPrompt: 'user'
+    })).rejects.toThrow('AI returned no assistant decision.');
+  });
 });

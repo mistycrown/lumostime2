@@ -4,6 +4,7 @@
  * @output Immediate Android-side background AI request execution plus diagnostic events
  * @pos Native Helper
  * @description Executes a minimal unified background AI turn directly from Android so check-in requests no longer depend on the Web runtime being awake at dispatch time.
+ * @updated 2026-05-09: Rejects empty or content-free unified background decisions so due reminders stay pending for retry instead of being deleted after blank model responses.
  * @updated 2026-05-01: Normalized JSON null-like assistant reply fields so native background diagnostics no longer persist literal "null" bubbles into chat history.
  * @updated 2026-04-30: Added direct native OpenAI/Gemini background execution for check-in-style triggers with diagnostic request lifecycle events.
  */
@@ -188,6 +189,10 @@ public final class AssistantNativeBackgroundExecutor {
     }
 
     private static JSONObject normalizeResponse(JSONObject rawOutput) throws JSONException {
+        if (!hasMeaningfulAssistantDecision(rawOutput)) {
+            throw new IllegalStateException("AI returned no assistant decision.");
+        }
+
         String assistantReply = safeModelString(rawOutput.opt("assistantReply"));
         if (assistantReply.isEmpty()) {
             JSONArray assistantReplyParts = rawOutput.optJSONArray("assistantReplyParts");
@@ -231,6 +236,54 @@ public final class AssistantNativeBackgroundExecutor {
             normalized.put("silentReason", silentReason);
         }
         return normalized;
+    }
+
+    private static boolean hasMeaningfulAssistantDecision(JSONObject rawOutput) {
+        if (rawOutput == null || rawOutput.length() == 0) {
+            return false;
+        }
+
+        if (!safeModelString(rawOutput.opt("outcome")).isEmpty()) {
+            return true;
+        }
+
+        if (!safeModelString(rawOutput.opt("assistantReply")).isEmpty()) {
+            return true;
+        }
+
+        JSONArray assistantReplyParts = rawOutput.optJSONArray("assistantReplyParts");
+        if (assistantReplyParts != null && assistantReplyParts.length() > 0) {
+            for (int index = 0; index < assistantReplyParts.length(); index += 1) {
+                if (!safeModelString(assistantReplyParts.opt(index)).isEmpty()) {
+                    return true;
+                }
+            }
+        }
+
+        JSONArray reminders = rawOutput.optJSONArray("reminders");
+        if (reminders != null && reminders.length() > 0) {
+            return true;
+        }
+
+        if ("update_memory".equals(safeModelString(rawOutput.opt("memoryAction")))) {
+            return true;
+        }
+
+        JSONObject memoryPatch = normalizeJsonObject(rawOutput.opt("memoryPatch"));
+        if (memoryPatch != null && memoryPatch.length() > 0) {
+            return true;
+        }
+
+        if (!safeModelString(rawOutput.opt("decisionSummary")).isEmpty()) {
+            return true;
+        }
+
+        if (!safeModelString(rawOutput.opt("silentReason")).isEmpty()) {
+            return true;
+        }
+
+        JSONArray silentSideEffects = rawOutput.optJSONArray("silentSideEffects");
+        return silentSideEffects != null && silentSideEffects.length() > 0;
     }
 
     private static JSONObject postJson(String url, JSONObject body, Map<String, String> headers) throws Exception {

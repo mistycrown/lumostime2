@@ -4,7 +4,8 @@
  * @output Batch operations on focus records
  * @pos View (Batch Management)
  * @description Batch management interface for focus records. Allows filtering, selecting, and performing batch operations on time logs.
- * 
+ * @updated 2026-05-09: Switched scope operation pickers to the shared scope-order helper so batch scope order matches other selectors.
+ *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useMemo, useEffect } from 'react';
@@ -16,6 +17,7 @@ import { CustomSelect } from '../components/CustomSelect';
 import { parseFilterExpression, matchesFilter, FilterContext } from '../utils/filterUtils';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { toCssColor } from '../utils/colorUtils';
+import { sortActiveScopesByOrder } from '../utils/scopeSortUtils';
 
 interface BatchFocusRecordManageViewProps {
     onBack: () => void;
@@ -590,10 +592,7 @@ const ScopeSelector: React.FC<ScopeSelectorProps> = ({
         }
     };
 
-    // Filter out archived scopes and sort by order
-    const activeScopes = scopes
-        .filter(scope => !scope.isArchived)
-        .sort((a, b) => a.order - b.order);
+    const activeScopes = sortActiveScopesByOrder(scopes);
 
     return (
         <div className="space-y-3">
@@ -655,10 +654,7 @@ const ScopeReplaceSelector: React.FC<ScopeReplaceSelectorProps> = ({
     onSourceChange,
     onTargetChange
 }) => {
-    // Filter out archived scopes and sort by order
-    const activeScopes = scopes
-        .filter(scope => !scope.isArchived)
-        .sort((a, b) => a.order - b.order);
+    const activeScopes = sortActiveScopesByOrder(scopes);
 
     // Create options for CustomSelect
     const sourceOptions = activeScopes.map(scope => ({

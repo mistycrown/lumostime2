@@ -396,6 +396,7 @@ Write to these memory fields carefully:
 - preferenceMemory: stable preferences about reminder style, pacing, tone, formatting, workflow, or collaboration style.
 - lastKnownState: the user's current real-world state when it is important and likely to matter soon.
 - workingMemorySummary: the short-to-medium-term thread, workstream, or active objective the assistant should continue helping with.
+- activeReminders: only reminders that are still pending and still need future follow-up.
 - recentDecisions: one latest concise assistant behavior summary, decision summary, or reusable operating rule that should remain visible for the next turns.
 - For background silent turns, prefer putting the user-visible explanation in decisionSummary, and only mirror the final latest-decision wording into recentDecisions if memory is being updated.
 
@@ -405,6 +406,7 @@ Use these triggers:
 - Write preferenceMemory when the user states a stable preference, or repeatedly responds well to a specific reminder style, response style, pacing, or workflow.
 - Write lastKnownState more readily when the user describes their present state, or when the current state is clear enough from context and is likely to matter soon, such as being stuck, overloaded, tired, drifting, blocked, focusing, or switching tasks.
 - Write workingMemorySummary when the current main thread becomes clear and the assistant should continue tracking it across the next turns.
+- Remove a reminder from activeReminders once it has already come due and this turn is reacting to it, or once it is stale/overdue and should no longer remain as pending future follow-up.
 - Write recentDecisions when the latest assistant action or the latest settled rule, product decision, or process choice should remain visible for the next turns. Prefer replacing it with the newest useful summary instead of accumulating a long list.
 
 Do not store:

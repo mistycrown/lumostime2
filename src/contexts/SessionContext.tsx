@@ -115,7 +115,8 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
                 FocusNotification.updateFloatingWindow({
                     icon: activity.icon,
                     isFocusing: true,
-                    startTime: newSession.startTime.toString()
+                    startTime: newSession.startTime.toString(),
+                    sessionId: newSession.id
                 }).catch((e) => console.error("Update FW failed", e));
             }
         }

@@ -13,7 +13,9 @@ Contains pure utility functions for data processing and business logic calculati
 - `filterUtils.ts`: [Active] - Parses custom filter expressions, computes stats, and normalizes saved custom filter order.
 - `noteTemplateUtils.ts`: [Active] - Sorts note templates, builds context-aware note template recommendations, and appends template text into notes consistently.
 - `scopeStatsUtils.ts`: [Active] - Centralizes scope duration aggregation and counts full duration for every linked scope on a log.
+- `scopeSortUtils.ts`: [Active] - Centralizes scope selection ordering so batch tools, pickers, and scope-related filter chips all follow the saved scope-management order.
 - `floatingWindowStartup.ts`: [Active] - Guards Android floating-window startup, keeps the overlay launchable when notifications are disabled, and reports whether permission-return recovery is needed.
+- `floatingWindowStopUtils.ts`: [Active] - Normalizes live/persisted floating-window stop payloads and resolves which sessions should stop or cancel during Android resume reconciliation.
 - `todoScheduleUtils.ts`: [Active] - Derives week-view todo badges plus today/tomorrow/this-week virtual-category matches, and now also provides shared today-category helpers for `today + pin` views that include arrange-today, due-today, and recurring-today todos without storing standalone occurrences.
 - `todoScheduleAssignUtils.ts`: [Active] - Filters, sorts, and builds hierarchy rows for arrange/due picker todos, including the rule that unfinished subtasks disappear when their parent todo is already completed.
 - `todoListDisplayUtils.ts`: [Active] - Formats compact inline symbol-based date suffixes like `(05.06)[05.09]` and applies the shared category-list grouping rule that keeps incomplete todos ahead of completed ones while preserving incoming order inside each group.

@@ -4,6 +4,7 @@
  * @output Native Methods
  * @pos Plugin
  * @description Defines the interface for the FocusNotification capacitor plugin, managing the persistent notification bar and floating window overlay on Android.
+ * @updated 2026-05-09: Added pending floating-stop recovery hooks and session-id sync so Android background stops can reconcile after resume without duplicate logs.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -30,17 +31,19 @@ export interface FocusNotificationPlugin {
     /**
      * 启动悬浮窗服务
      */
-    startFloatingWindow(options?: { icon?: string, isFocusing?: boolean, startTime?: string }): Promise<void>;
+    startFloatingWindow(options?: { icon?: string, isFocusing?: boolean, startTime?: string, sessionId?: string }): Promise<void>;
 
     /**
      * 更新悬浮窗内容
      */
-    updateFloatingWindow(options: { icon?: string, isFocusing: boolean, startTime?: string }): Promise<void>;
+    updateFloatingWindow(options: { icon?: string, isFocusing: boolean, startTime?: string, sessionId?: string }): Promise<void>;
 
     /**
      * 停止悬浮窗服务
      */
     stopFloatingWindow(): Promise<void>;
+
+    consumePendingStopRequest(): Promise<{ hasPending: boolean, sessionId?: string | null, stoppedAt?: number | null }>;
 
     /**
      * Add a listener for a plugin event

@@ -4,6 +4,7 @@
  * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
  * @pos Service (AI Integration Layer)
  * @description AI 闂備礁鎼悧鍡欑矓鐎涙ɑ鍙?- 濠电姰鍨煎▔娑氣偓姘煎櫍楠炲啯绻濋崘顏佹灃?AI 闂備礁婀辩划顖炲礉閹烘梹顐介柣銏㈩焾閻ゎ噣鏌涢埥鍡楀箻缂佲偓閸戠晝enAI/Gemini闂備焦瀵х粙鎴λ囬崡鐐╂灁闁硅揪绠戠粻銉╂煃瑜滈崜鐔奉嚕閸偄绶炲璺侯儏閺€顓熺箾鐎涙鐭嬮悽顖ｄ簽濡cljs劕鈹戠€ｎ亞顦遍梺鍛婁緱閸犳牠顢旈鍫熲拺闁哄娉曡倴闂佹眹鍊曞Λ娑氬垝婵犳碍鏅柛鏇ㄥ墮閳ь剛鍋ら弻鏇㈠幢閺囩喓銈扮紓浣虹帛閻╊垶鐛幒妤€唯闁挎柧鍕橀崑鐐烘煟閻樺弶澶勬繛鍙夌墵楠炲繑瀵奸弶鎴狀唽闂佸綊鍋婇崰鎾寸濞戙垺鐓欑紒妤佺☉濡參寮? * @updated 2026-04-27: Extended unified assistant-turn normalization with decision summaries, silent reasons, side effects, and structured multi-bubble reply parts.
+ * @updated 2026-05-09: Treat empty or content-free unified assistant-turn outputs as failures so reminder dispatchers keep pending reminders for retry instead of deleting them on blank model responses.
  * @updated 2026-05-06: Tightened unified foreground tool normalization so `create_todo` now requires `linkedActivityId` before the tool call is accepted.
  * @updated 2026-04-27: Normalized malformed unified-turn memoryPatch fields such as single-string recentDecisions so durable memory updates are not silently dropped downstream.
  * @updated 2026-04-27: Removed retired intent-router and multi-planner assistant endpoints so the service now centers on the shared unified-turn path plus still-used parsing and narrative helpers.
@@ -674,6 +675,57 @@ const cleanAndParseJSONObjectContent = (content: string): any => {
     }
 };
 
+const hasMeaningfulAssistantUnifiedTurnSignal = (mode: AssistantTurnMode, rawOutput: unknown): boolean => {
+    if (!rawOutput || typeof rawOutput !== 'object' || Array.isArray(rawOutput)) {
+        return false;
+    }
+
+    const candidate = rawOutput as Record<string, unknown>;
+    const outcome = typeof candidate.outcome === 'string' ? candidate.outcome.trim() : '';
+    if (outcome) {
+        return true;
+    }
+
+    const assistantReply = typeof candidate.assistantReply === 'string' ? candidate.assistantReply.trim() : '';
+    if (assistantReply && !['null', 'undefined'].includes(assistantReply.toLowerCase())) {
+        return true;
+    }
+
+    if (normalizeStringList(candidate.assistantReplyParts).length > 0) {
+        return true;
+    }
+
+    if (normalizeAssistantReminderDrafts(candidate.reminders).length > 0) {
+        return true;
+    }
+
+    if (mode === 'foreground' && normalizeAssistantToolCalls(candidate.toolCalls).length > 0) {
+        return true;
+    }
+
+    if (candidate.memoryAction === 'update_memory') {
+        return true;
+    }
+
+    if (normalizeAssistantMemoryPatch(candidate.memoryPatch)) {
+        return true;
+    }
+
+    if (typeof candidate.decisionSummary === 'string' && candidate.decisionSummary.trim()) {
+        return true;
+    }
+
+    if (normalizeAssistantSilentReason(candidate.silentReason)) {
+        return true;
+    }
+
+    if (normalizeStringList(candidate.silentSideEffects).length > 0) {
+        return true;
+    }
+
+    return false;
+};
+
 const requestJsonObjectWithDebug = async <T>(
     config: AIConfig,
     fetchFn: any,
@@ -1085,6 +1137,10 @@ Output:
         }
 
         const normalizeOutput = (rawOutput: any): AssistantUnifiedTurnOutput => {
+            if (!hasMeaningfulAssistantUnifiedTurnSignal(params.mode, rawOutput)) {
+                throw new Error('AI returned no assistant decision.');
+            }
+
             const mode = params.mode;
             const rawOutcome = typeof rawOutput?.outcome === 'string' ? rawOutput.outcome.trim() : '';
             const outcome = rawOutcome === 'clarify'

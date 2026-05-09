@@ -11,6 +11,7 @@
  * @updated 2026-05-03: Normalized tracking-color selection comparisons so preset palette colors and custom color-group entries share the same selected outline state.
  * @updated 2026-05-04: Switched the theme-color palette to an auto-fit grid so mobile sheets distribute swatches evenly without leaving a large right-side gap.
  * @updated 2026-05-04: Expanded daily tracking bindings to include all enabled daily checks instead of only manual punchable items.
+ * @updated 2026-05-09: Sorted scope source options by the shared scope-order helper so widget scope pickers match management order.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
@@ -23,6 +24,7 @@ import { Category, CheckTemplate, Scope } from '../types';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 import { normalizeHexColor } from '../utils/colorUtils';
 import { getEligibleTrackingCalendarDailyCheckItems } from '../utils/dailyCheckUtils';
+import { sortActiveScopesByOrder } from '../utils/scopeSortUtils';
 import { CustomSelect } from './CustomSelect';
 import { IconRenderer } from './IconRenderer';
 import { TagAssociation } from './TagAssociation';
@@ -178,6 +180,7 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
     () => scopes.find((scope) => scope.id === localDraft?.scopeId) || null,
     [localDraft?.scopeId, scopes]
   );
+  const activeScopes = useMemo(() => sortActiveScopesByOrder(scopes), [scopes]);
   const selectedDailyItem = useMemo(
     () => dailyItems.find((item) => item.checkItemId === localDraft?.checkItemId) || null,
     [dailyItems, localDraft?.checkItemId]
@@ -564,7 +567,7 @@ export const WidgetTrackingCalendarEditorModal: React.FC<WidgetTrackingCalendarE
               </div>
               <CustomSelect
                 value={localDraft.scopeId || ''}
-                options={scopes.map((scope) => ({
+                options={activeScopes.map((scope) => ({
                   value: scope.id,
                   label: scope.name
                 }))}

@@ -4,12 +4,14 @@
  * @output Global Memoir Filter Updates
  * @pos View (Settings Sub-page)
  * @description Provides a UI to configure global filters for the Memoir (Journal) view: Has Image, Min Length, Related Tags, Related Domains.
+ * @updated 2026-05-09: Sorted related-scope filter chips by shared scope selection order so they match scope-management ordering.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ImageIcon, AlignLeft, Tag, Crosshair, Check, X, Sparkles } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { CustomSelect } from '../components/CustomSelect'; // Assuming this exists or using native select if not suitable
+import { sortScopesForSelection } from '../utils/scopeSortUtils';
 
 interface MemoirSettingsViewProps {
     onBack: () => void;
@@ -18,6 +20,7 @@ interface MemoirSettingsViewProps {
 export const MemoirSettingsView: React.FC<MemoirSettingsViewProps> = ({ onBack }) => {
     const { memoirFilterConfig, setMemoirFilterConfig } = useSettings();
     const { categories, scopes } = useCategoryScope();
+    const sortedScopes = useMemo(() => sortScopesForSelection(scopes), [scopes]);
 
     // Local state for immediate feedback, though we sync directly to context
     const [config, setConfig] = useState(memoirFilterConfig);
@@ -236,7 +239,7 @@ export const MemoirSettingsView: React.FC<MemoirSettingsViewProps> = ({ onBack }
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                        {scopes.map(scope => {
+                        {sortedScopes.map(scope => {
                             const isSelected = config.relatedScopeIds.includes(scope.id);
                             return (
                                 <button

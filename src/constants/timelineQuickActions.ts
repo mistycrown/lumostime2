@@ -45,7 +45,7 @@ export const TIMELINE_QUICK_ACTION_OPTIONS: TimelineQuickActionOption[] = [
   },
   {
     key: 'achievement',
-    label: '成就屏',
+    label: '成就瓶',
     description: '打开成就页。'
   },
   {

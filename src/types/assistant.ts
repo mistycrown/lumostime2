@@ -5,6 +5,7 @@
  * @pos Type Definitions (Assistant Agent)
  * @description Defines the structured contracts used by the Android-first assistant agent layer so background triggers, memory updates, reminder queues, and AI system-turn decisions can stay typed and stable across services and plugins.
  *
+ * @updated 2026-05-09: Added assistant scheduled-task template types so recurring AI task rules can materialize native reminders without overloading one-shot reminder records.
  * @updated 2026-05-06: Added explicit `yesterdayTimelineSummary` support to assistant state context so unified turns can see concrete activity records for both today and yesterday.
  * @updated 2026-05-06: Added optional `timelineReviewSummary` plus structured log candidates to assistant prompt context, removed the stale unified-turn recent-log input, and aligned todo creation so `linkedCategoryId` can be inferred from `linkedActivityId`.
  * @updated 2026-04-27: Simplified assistant-facing state time context to one local-offset ISO anchor so prompts no longer need to reinterpret UTC `Z` timestamps.
@@ -18,6 +19,8 @@
  * @updated 2026-04-26: Split compressed recent-log context out of the dictionary payload so debug views and prompt assembly can show it as its own block.
  * @updated 2026-04-26: Added Android-first assistant agent memory, reminder, trigger, config, and system-turn decision types for the new background AI architecture.
  */
+
+import type { TodoRecurrenceRule } from '../types';
 
 export type AssistantTriggerSource = 'user' | 'agent' | 'system';
 
@@ -54,11 +57,25 @@ export interface AssistantReminder {
   status: AssistantReminderStatus;
   text: string;
   todoId?: string;
+  scheduledTaskId?: string;
   source: AssistantTriggerSource;
   createdAt: string;
   dispatchAttemptCount?: number;
   lastDispatchAttemptAt?: string;
   lastDispatchedAt?: string;
+}
+
+export interface AssistantScheduledTask {
+  id: string;
+  text: string;
+  time: string; // HH:mm
+  recurrenceRule: TodoRecurrenceRule;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  nextTriggerAt: string;
+  lastTriggeredAt?: string;
+  pendingReminderId?: string;
 }
 
 export interface AssistantMemory {
@@ -316,8 +333,6 @@ export interface AssistantCreateLogToolCall {
     progressIncrement?: number;
   };
 }
-
-import type { TodoRecurrenceRule } from '../types';
 
 export interface AssistantCreateTodoToolCall {
   toolName: 'create_todo';
