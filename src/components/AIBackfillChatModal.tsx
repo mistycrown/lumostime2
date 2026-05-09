@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-09: Added mobile visual-viewport keyboard tracking so the chat list and composer rise together above the soft keyboard and the latest messages stay visible while typing.
  * @updated 2026-05-09: Retrying a failed foreground assistant turn now reuses the original error bubble in place, so successful retry content replaces the failure instead of appending a duplicate assistant block.
  * @updated 2026-05-09: Added recurring `定时任务` management under AI call settings, backed by shared todo recurrence rules and continuously seeded native reminders.
  * @updated 2026-05-06: Made debug-viewer block keys unique per section render so repeated labels like `对话上下文` no longer trigger React duplicate-key warnings.
@@ -218,6 +219,8 @@ interface AssistantEditableMemoryDeleteTarget {
   key: AssistantEditableMemoryListKey;
   value: string;
 }
+
+const MOBILE_KEYBOARD_INSET_THRESHOLD = 120;
 
 interface AssistantReminderDrafts {
   text: string;
@@ -1863,6 +1866,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [expandedMemoryUpdateMessageIds, setExpandedMemoryUpdateMessageIds] = useState<Set<string>>(() => new Set());
   const [expandedReminderUpdateMessageIds, setExpandedReminderUpdateMessageIds] = useState<Set<string>>(() => new Set());
   const [revealedAssistantPartCounts, setRevealedAssistantPartCounts] = useState<Record<string, number>>({});
+  const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
   const activeRequestRef = useRef<ActiveRequestRef | null>(null);
   const isOpenRef = useRef(isOpen);
   const wasOpenRef = useRef(isOpen);
@@ -1873,10 +1877,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const assistantRevealTargetCountsRef = useRef<Map<string, number>>(new Map());
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const userAvatarInputRef = useRef<HTMLInputElement | null>(null);
+  const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messageElementRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const handledNavigationKeyRef = useRef('');
   const handledAssistantTriggerIdsRef = useRef<Set<string>>(new Set());
+  const visualViewportBaselineRef = useRef<{ height: number; width: number }>({ height: 0, width: 0 });
 
   const { logs, setLogs, todos, setTodos, todoCategories } = useData();
   const { dailyReviews } = useReview();
@@ -1917,6 +1923,35 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   );
   const scrollToLatestMessage = useCallback((behavior: ScrollBehavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
+  }, []);
+  const getKeyboardBottomInset = useCallback(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) {
+      return 0;
+    }
+
+    const viewport = window.visualViewport;
+    const currentVisibleHeight = viewport.height + viewport.offsetTop;
+    const currentViewportWidth = viewport.width;
+
+    if (currentVisibleHeight <= 0 || currentViewportWidth <= 0) {
+      return 0;
+    }
+
+    const baseline = visualViewportBaselineRef.current;
+    const widthDelta = Math.abs(currentViewportWidth - baseline.width);
+
+    if (baseline.height === 0 || widthDelta > 120) {
+      visualViewportBaselineRef.current = { height: currentVisibleHeight, width: currentViewportWidth };
+      return 0;
+    }
+
+    if (currentVisibleHeight > baseline.height) {
+      visualViewportBaselineRef.current = { height: currentVisibleHeight, width: currentViewportWidth };
+      return 0;
+    }
+
+    const inset = Math.round(baseline.height - currentVisibleHeight);
+    return inset > MOBILE_KEYBOARD_INSET_THRESHOLD ? inset : 0;
   }, []);
   const clearAssistantPartRevealTimeouts = useCallback((messageId?: string) => {
     if (messageId) {
@@ -2360,6 +2395,47 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       window.cancelAnimationFrame(frameId);
     };
   }, [hasResolvablePendingNavigation, isOpen, scrollToLatestMessage]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      visualViewportBaselineRef.current = { height: 0, width: 0 };
+      setKeyboardBottomInset(0);
+      return;
+    }
+
+    if (typeof window === 'undefined' || !window.visualViewport) {
+      return;
+    }
+
+    const viewport = window.visualViewport;
+    let frameId: number | null = null;
+
+    const syncKeyboardBottomInset = () => {
+      const nextInset = getKeyboardBottomInset();
+      setKeyboardBottomInset((current) => (current === nextInset ? current : nextInset));
+
+      if (nextInset > 0 && document.activeElement === composerTextareaRef.current) {
+        if (frameId !== null) {
+          window.cancelAnimationFrame(frameId);
+        }
+        frameId = window.requestAnimationFrame(() => {
+          scrollToLatestMessage('auto');
+        });
+      }
+    };
+
+    syncKeyboardBottomInset();
+    viewport.addEventListener('resize', syncKeyboardBottomInset);
+    viewport.addEventListener('scroll', syncKeyboardBottomInset);
+
+    return () => {
+      viewport.removeEventListener('resize', syncKeyboardBottomInset);
+      viewport.removeEventListener('scroll', syncKeyboardBottomInset);
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, [getKeyboardBottomInset, isOpen, scrollToLatestMessage]);
 
   useEffect(() => {
     localStorage.setItem(CHAT_PERSONAS_KEY, JSON.stringify(personas));
@@ -5742,7 +5818,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         style={{
           backgroundColor: AI_CHAT_THEME.shellLayerBg,
           paddingTop: 'env(safe-area-inset-top)',
-          paddingBottom: 'env(safe-area-inset-bottom)'
+          paddingBottom: `calc(env(safe-area-inset-bottom) + ${keyboardBottomInset}px)`,
+          transition: 'padding-bottom 180ms ease-out'
         }}
       >
         <div
@@ -5884,9 +5961,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             }}
           >
             <textarea
+              ref={composerTextareaRef}
               value={inputText}
               onChange={(event) => setInputText(event.target.value)}
               onKeyDown={handleKeyDown}
+              onFocus={() => {
+                window.requestAnimationFrame(() => {
+                  scrollToLatestMessage('auto');
+                });
+              }}
               placeholder={`和 ${activePersona.assistantSelfName || 'AI'} 说点什么...`}
               className="min-h-[42px] max-h-[68px] w-full resize-none bg-transparent px-0.5 py-0.5 text-[15px] leading-6 outline-none"
               style={{ color: AI_CHAT_THEME.textPrimary }}

@@ -10,6 +10,7 @@ Components that form the structural or global UI elements.
 - `Toast.tsx`: Notification system.
 
 ## Modals
+- Update 2026-05-09: `AIBackfillChatModal.tsx` now tracks the mobile visual viewport and adds a keyboard bottom inset to the shared AI shell, so the composer and latest messages rise together above the soft keyboard while typing.
 - Update 2026-05-09: `AIBackfillChatModal.tsx` now retries failed assistant turns in place, reusing the original errored bubble and replacing it with the second attempt result instead of appending a duplicate assistant block.
 - Update 2026-05-09: `AIBackfillChatModal.tsx` now adds a `定时任务` subsection under AI call settings, reuses shared todo recurrence rules for recurring assistant schedules, and keeps one next native reminder seeded per enabled task so reminder_due stays on the existing assistant trigger path.
 - Update 2026-05-09: `WidgetTrackingCalendarEditorModal.tsx` now sorts scope-source options with the shared scope-order helper so widget scope pickers stay aligned with scope management and batch scope tools.
