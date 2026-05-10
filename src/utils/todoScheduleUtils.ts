@@ -1,9 +1,10 @@
 /**
  * @file todoScheduleUtils.ts
  * @input Todo items with optional schedule fields, reference dates
- * @output Week buckets and schedule badge metadata for the todo week view
+ * @output Week buckets, daily schedule entries, and badge metadata for todo planning views
  * @pos Utility (Todo planning)
- * @description Shared helpers for deriving scheduled, deadline, and recurring todo visibility without creating standalone occurrence records.
+ * @description Shared helpers for deriving scheduled, deadline, recurring, completed, and in-progress todo visibility without creating standalone occurrence records.
+ * @updated 2026-05-10: Added shared day-entry builders for the new reference-style month schedule so the month grid and week planner now read the same real per-day todo data.
  * @updated 2026-04-27: Expanded the shared today-selector helpers so widget and picker `today + pin` views include todos that match today via arrange, due, or recurrence rules.
  * @updated 2026-04-22: Added shared today-selector helpers so todo pickers can reuse the same `pin or arranged today` virtual category.
  * @updated 2026-04-20 19:08: Added reusable today/tomorrow/this-week schedule match helpers for the todo list virtual category.
@@ -34,10 +35,17 @@ export interface WeekDayBucket {
 
 export type TodoScheduleMatchKind = 'deadline' | 'scheduled' | 'recurring';
 export type TodoScheduleRange = 'today' | 'tomorrow' | 'thisWeek';
+export type TodoScheduleEntryKind = 'deadline' | 'scheduled' | 'recurring' | 'completed' | 'inProgress';
 
 export interface TodoScheduleMatch {
   dateKey: string;
   kind: TodoScheduleMatchKind;
+}
+
+export interface TodoDateEntry {
+  todo: TodoItem;
+  badges: TodoDateBadges;
+  primaryKind: TodoScheduleEntryKind;
 }
 
 export const TODO_ASSOCIATION_TODAY_CATEGORY_ID = '__todo_association_today__';
@@ -264,7 +272,7 @@ export const getTodoScheduleMatches = (
   });
 };
 
-const getWeekEntryPriority = (badges: TodoDateBadges): number => {
+const getTodoEntryPriority = (badges: TodoDateBadges): number => {
   if (badges.deadline) return 0;
   if (badges.scheduled) return 1;
   if (badges.recurring) return 2;
@@ -273,22 +281,70 @@ const getWeekEntryPriority = (badges: TodoDateBadges): number => {
   return 6;
 };
 
-export const buildWeekTodoBuckets = (todos: TodoItem[], logs: Log[], referenceDate: Date): WeekDayBucket[] => {
-  const inProgressLookup = buildInProgressLookup(logs);
+export const getPrimaryTodoScheduleEntryKind = (badges: TodoDateBadges): TodoScheduleEntryKind => {
+  if (badges.deadline) return 'deadline';
+  if (badges.scheduled) return 'scheduled';
+  if (badges.recurring) return 'recurring';
+  if (badges.completed) return 'completed';
+  return 'inProgress';
+};
 
-  return getWeekDates(referenceDate).map((date) => {
+const buildTodoDateEntriesWithLookup = (
+  todos: TodoItem[],
+  targetDateKey: string,
+  inProgressLookup?: Map<string, Set<string>>
+): TodoDateEntry[] => todos
+  .map((todo) => {
+    const badges = getTodoDateBadges(todo, targetDateKey, inProgressLookup);
+
+    if (!badges.scheduled && !badges.deadline && !badges.recurring && !badges.completed && !badges.inProgress) {
+      return null;
+    }
+
+    return {
+      todo,
+      badges,
+      primaryKind: getPrimaryTodoScheduleEntryKind(badges)
+    } satisfies TodoDateEntry;
+  })
+  .filter((entry): entry is TodoDateEntry => entry !== null)
+  .sort((left, right) => {
+    const priorityDiff = getTodoEntryPriority(left.badges) - getTodoEntryPriority(right.badges);
+    if (priorityDiff !== 0) return priorityDiff;
+    return left.todo.title.localeCompare(right.todo.title, 'zh-CN');
+  });
+
+export const buildTodoDateEntries = (
+  todos: TodoItem[],
+  logs: Log[],
+  targetDateKey: string
+): TodoDateEntry[] => {
+  const inProgressLookup = buildInProgressLookup(logs);
+  return buildTodoDateEntriesWithLookup(todos, targetDateKey, inProgressLookup);
+};
+
+export const buildTodoDateEntryMap = (
+  todos: TodoItem[],
+  logs: Log[],
+  targetDateKeys: string[]
+): Record<string, TodoDateEntry[]> => {
+  const inProgressLookup = buildInProgressLookup(logs);
+  const uniqueDateKeys = Array.from(new Set(targetDateKeys));
+
+  return uniqueDateKeys.reduce<Record<string, TodoDateEntry[]>>((accumulator, dateKey) => {
+    accumulator[dateKey] = buildTodoDateEntriesWithLookup(todos, dateKey, inProgressLookup);
+    return accumulator;
+  }, {});
+};
+
+export const buildWeekTodoBuckets = (todos: TodoItem[], logs: Log[], referenceDate: Date): WeekDayBucket[] => {
+  const weekDates = getWeekDates(referenceDate);
+  const weekDateKeys = weekDates.map((date) => formatDateKey(date));
+  const entriesByDate = buildTodoDateEntryMap(todos, logs, weekDateKeys);
+
+  return weekDates.map((date) => {
     const dateKey = formatDateKey(date);
-    const items = todos
-      .map((todo) => ({
-        todo,
-        badges: getTodoDateBadges(todo, dateKey, inProgressLookup)
-      }))
-      .filter(({ badges }) => badges.scheduled || badges.deadline || badges.recurring || badges.completed || badges.inProgress)
-      .sort((a, b) => {
-        const priorityDiff = getWeekEntryPriority(a.badges) - getWeekEntryPriority(b.badges);
-        if (priorityDiff !== 0) return priorityDiff;
-        return a.todo.title.localeCompare(b.todo.title, 'zh-CN');
-      });
+    const items = (entriesByDate[dateKey] || []).map(({ todo, badges }) => ({ todo, badges }));
 
     return {
       date: dateKey,

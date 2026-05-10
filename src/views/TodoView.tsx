@@ -4,6 +4,8 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
+ * @updated 2026-05-10: Let the monthly schedule view go edge-to-edge inside the schedule page and inherit the same custom-background rendering as the week planner instead of locking the month grid to white boxed surfaces.
+ * @updated 2026-05-10: Replaced the monthly placeholder with a reference-style rolling month schedule backed by the same real Arrange / Due / Repeat / Done / Trace data as the week planner, and added month-view-specific type marker colors for each daily item.
  * @updated 2026-05-06: Captured active touch pointers for todo-row swipes and stopped release-target filtering so left-swipe complete and undo actions no longer intermittently fail when the finger drifts off the row or lifts over a child element.
  * @updated 2026-05-06: Removed the display-settings button dot indicator so the left sidebar utility icons now share the same clean Lucide-only appearance.
  * @updated 2026-05-05: Replaced the completed-visibility eye button with a dedicated display-settings modal, added compact-mode metadata toggles, and lowered the sidebar utility controls closer to the fixed bottom navigation.
@@ -82,7 +84,7 @@
  */
 import React, { useState, useMemo, useRef } from 'react';
 import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log, TodoDuplicateOptions } from '../types';
-import { PlayCircle, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, LayoutList, Rows, Sparkles, SlidersHorizontal, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo, CircleAlert, PanelRightOpen, Pin } from 'lucide-react';
+import { PlayCircle, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, ChevronDown, LayoutList, Rows, Sparkles, SlidersHorizontal, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo, CircleAlert, PanelRightOpen, Pin } from 'lucide-react';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { useToast } from '../contexts/ToastContext';
 import { IconRenderer } from '../components/IconRenderer';
@@ -105,6 +107,7 @@ import { TodoDatePickerModal } from '../components/TodoDatePickerModal';
 import { TodoDisplaySettingsModal, type TodoCompactDisplaySettings } from '../components/TodoDisplaySettingsModal';
 import { TodoDuplicateModal } from '../components/TodoDuplicateModal';
 import { TodoQuickActionsModal } from '../components/TodoQuickActionsModal';
+import { TodoMonthView } from '../components/TodoMonthView';
 import { useTodoQuickActions } from '../hooks/useTodoQuickActions';
 import { getTodoRowGestureIntent, getTodoRowReleaseAction, TodoRowGestureIntent } from '../utils/todoRowInteraction';
 import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodosForDisplay, getParentTodo, isIncompleteSubtaskHiddenByCompletedParent } from '../utils/todoHierarchyUtils';
@@ -732,6 +735,8 @@ interface TodoListSection {
   entries: TodoListEntry[];
 }
 
+type TodoScheduleViewMode = 'week' | 'month';
+
 interface TodoTreeEntryGroup {
   parentEntry: TodoListEntry;
   childEntries: TodoListEntry[];
@@ -740,6 +745,7 @@ interface TodoTreeEntryGroup {
 }
 
 const TODO_COMPACT_DISPLAY_SETTINGS_STORAGE_KEY = 'todoCompactDisplaySettings';
+const TODO_SCHEDULE_VIEW_MODE_STORAGE_KEY = 'todoScheduleViewMode';
 const DEFAULT_TODO_COMPACT_DISPLAY_SETTINGS: TodoCompactDisplaySettings = {
   showLinkedTag: true,
   showLinkedScope: true,
@@ -1043,8 +1049,14 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   const [assignModalDate, setAssignModalDate] = useState<string | null>(null);
   const [assignModalType, setAssignModalType] = useState<'scheduled' | 'deadline'>('scheduled');
   const [isWeekJumpPickerOpen, setIsWeekJumpPickerOpen] = useState(false);
+  const [scheduleViewMode, setScheduleViewMode] = useState<TodoScheduleViewMode>(() => {
+    const saved = localStorage.getItem(TODO_SCHEDULE_VIEW_MODE_STORAGE_KEY);
+    return saved === 'month' ? 'month' : 'week';
+  });
+  const [isScheduleViewMenuOpen, setIsScheduleViewMenuOpen] = useState(false);
   const [duplicatingTodo, setDuplicatingTodo] = useState<TodoItem | null>(null);
   const weekScrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const scheduleViewMenuRef = useRef<HTMLDivElement | null>(null);
   const touchDragActivatedRef = useRef(false);
   const touchDraggingWeekEntryRef = useRef<WeekTodoEntry | null>(null);
   const touchDragTargetDateRef = useRef<string | null>(null);
@@ -1108,6 +1120,10 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   }, [compactDisplaySettings]);
 
   React.useEffect(() => {
+    localStorage.setItem(TODO_SCHEDULE_VIEW_MODE_STORAGE_KEY, scheduleViewMode);
+  }, [scheduleViewMode]);
+
+  React.useEffect(() => {
     localStorage.setItem('todoScreenMode', screenMode);
     window.dispatchEvent(new CustomEvent('todo-schedule-mode-changed', {
       detail: { isWeekMode: screenMode === 'week' }
@@ -1121,6 +1137,42 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
   // 闁告帗绻傞～鎰板礌閺嶎厸鍋撴径澶庡幀闁汇劌瀚崹搴ｇ尵娴兼瑧绐楀┑鈥冲€归悘澶娾柦閳╁啯绠掗梺顐㈩槷閼垫垶绂掔拋宕囩Э闁告帒妫涚悮顐︽晬瀹€鍕笡閻犱降鍊濋埀顒€顦懙鎴犵箔椤戣法顏卞☉?
   React.useEffect(() => {
+    if (scheduleViewMode === 'week') {
+      return;
+    }
+
+    if (isWeekJumpPickerOpen) {
+      setIsWeekJumpPickerOpen(false);
+    }
+  }, [isWeekJumpPickerOpen, scheduleViewMode]);
+
+  React.useEffect(() => {
+    if (!isScheduleViewMenuOpen) {
+      return;
+    }
+
+    const handlePointerDownOutside = (event: MouseEvent | TouchEvent) => {
+      if (!(event.target instanceof Node)) {
+        return;
+      }
+
+      if (scheduleViewMenuRef.current?.contains(event.target)) {
+        return;
+      }
+
+      setIsScheduleViewMenuOpen(false);
+    };
+
+    document.addEventListener('mousedown', handlePointerDownOutside);
+    document.addEventListener('touchstart', handlePointerDownOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDownOutside);
+      document.removeEventListener('touchstart', handlePointerDownOutside);
+    };
+  }, [isScheduleViewMenuOpen]);
+
+  React.useEffect(() => {
     if (selectedCategoryId === VIRTUAL_SCHEDULE_CATEGORY_ID) {
       return;
     }
@@ -1131,6 +1183,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   }, [categories, selectedCategoryId]);
 
   const isVirtualScheduleCategory = selectedCategoryId === VIRTUAL_SCHEDULE_CATEGORY_ID;
+  const isWeekScheduleView = scheduleViewMode === 'week';
   const selectedCategory = categories.find((category) => category.id === selectedCategoryId) || null;
   const primaryCategoryId = categories[0]?.id || '';
   const todayDateKey = getTodayDateKey();
@@ -1972,6 +2025,53 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     />
   );
 
+  const selectScheduleViewMode = (mode: TodoScheduleViewMode) => {
+    setScheduleViewMode(mode);
+    setIsScheduleViewMenuOpen(false);
+  };
+
+  const scheduleViewMenuNode = (
+    <div ref={scheduleViewMenuRef} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setIsScheduleViewMenuOpen((previous) => !previous)}
+        className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-white/60 hover:text-slate-700"
+        title="切换排期视图"
+        aria-label="切换排期视图"
+        aria-expanded={isScheduleViewMenuOpen}
+      >
+        <ChevronDown size={15} />
+      </button>
+
+      {isScheduleViewMenuOpen && (
+        <div className="absolute right-0 top-full z-30 mt-2 min-w-[7.25rem] overflow-hidden rounded-2xl border border-stone-200/80 bg-[#faf9f6]/95 p-1 shadow-[0_12px_30px_rgba(28,25,23,0.12)] backdrop-blur-sm">
+          {([
+            { id: 'week', label: '周视图' },
+            { id: 'month', label: '月视图' }
+          ] as Array<{ id: TodoScheduleViewMode; label: string }>).map((option) => {
+            const isSelected = scheduleViewMode === option.id;
+
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => selectScheduleViewMode(option.id)}
+                className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[12px] tracking-[0.08em] transition-colors ${
+                  isSelected
+                    ? 'bg-stone-100 text-slate-700'
+                    : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
+                }`}
+              >
+                <span>{option.label}</span>
+                <span className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-slate-500' : 'bg-transparent'}`}></span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
   if (screenMode === 'week') {
     return (
       <div
@@ -1995,135 +2095,150 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
         <div className="absolute inset-0 -z-10" style={{ backgroundColor: 'rgba(250, 249, 246, 0.92)' }}></div>
 
-        <div className={`relative z-10 flex h-full flex-col px-4 pb-[calc(3rem+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] md:px-8 ${useReducedEffects ? '' : 'backdrop-blur-[2px]'}`}>
-          <div className="shrink-0 border-b border-stone-300/70">
-            <div className="flex h-14 items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2 text-slate-500">
-                <button
-                  type="button"
-                  onClick={goToPreviousWeek}
-                  className="rounded-full p-1.5 transition-colors hover:bg-white/60 hover:text-slate-700"
-                  title="上一周"
-                >
-                  <ChevronLeft size={15} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsWeekJumpPickerOpen(true)}
-                  className="rounded-full px-2 py-1 text-[13px] tracking-[0.16em] text-slate-500 transition-colors hover:bg-white/60 hover:text-slate-700"
-                >
-                  {currentWeekLabel}
-                </button>
-                <button
-                  type="button"
-                  onClick={goToNextWeek}
-                  className="rounded-full p-1.5 transition-colors hover:bg-white/60 hover:text-slate-700"
-                  title="下一周"
-                >
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => setWeekReferenceDate(new Date())}
-                className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] tracking-[0.14em] transition-colors ${
-                  isCurrentWeek
-                    ? 'bg-stone-100 text-slate-600'
-                    : 'text-slate-400 hover:bg-white/50 hover:text-slate-600'
-                }`}
-              >
-                本周
-              </button>
-            </div>
-          </div>
-
-          <div
-            ref={weekScrollContainerRef}
-            className="min-h-0 flex-1 overflow-y-auto no-scrollbar"
-            onTouchStart={handleWeekViewTouchStart}
-            onTouchMove={handleWeekViewTouchMove}
-            onTouchEnd={handleWeekViewTouchEnd}
-            onTouchCancel={resetWeekSwipeGesture}
-          >
-            <div className="border-t border-stone-300/70 pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
-              {weekBuckets.map((bucket, index) => {
-                const bucketDate = parseDateKey(bucket.date);
-                const isToday = bucket.date === getTodayDateKey();
-
-                return (
-                  <section
-                    key={bucket.date}
-                    data-week-drop-date={bucket.date}
-                    className="grid min-h-[5.5rem] grid-cols-[4.25rem_minmax(0,1fr)] border-b border-stone-300/70 md:grid-cols-[4.75rem_minmax(0,1fr)]"
-                    onDragOver={(event) => {
-                      if (!draggingWeekTodoId) return;
-                      event.preventDefault();
-                      if (dragTargetDate !== bucket.date) {
-                        setDragTargetDate(bucket.date);
-                      }
-                    }}
-                    onDragLeave={() => {
-                      if (dragTargetDate === bucket.date) {
-                        setDragTargetDate(null);
-                      }
-                    }}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      handleWeekDrop(bucket.date);
-                    }}
-                  >
+        <div className={`relative z-10 flex h-full flex-col pb-[calc(3rem+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] ${isWeekScheduleView ? 'px-4 md:px-8' : ''} ${useReducedEffects ? '' : 'backdrop-blur-[2px]'}`}>
+          {isWeekScheduleView ? (
+            <>
+              <div className="shrink-0 border-b border-stone-300/70">
+                <div className="flex h-14 items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2 text-slate-500">
                     <button
                       type="button"
-                      data-week-date-trigger="true"
-                      data-week-swipe-ignore="true"
-                      onClick={() => {
-                        setAssignModalDate(bucket.date);
-                        setAssignModalType('scheduled');
-                      }}
-                      className="flex flex-col justify-center border-r border-stone-300/70 px-2 py-3 text-center transition-colors hover:bg-white/40 md:px-3"
+                      onClick={goToPreviousWeek}
+                      className="rounded-full p-1.5 transition-colors hover:bg-white/60 hover:text-slate-700"
+                      title="上一周"
                     >
-                      <div className={`text-[12px] tracking-[0.02em] ${isToday ? 'text-stone-600' : 'text-stone-500'}`}>
-                        {WEEKDAY_ROW_LABELS[index]}
-                      </div>
-                      <div
-                        className={`mt-1 text-[19px] leading-none md:text-[22px] ${isToday ? 'font-semibold text-stone-800' : 'font-medium text-stone-700'}`}
-                        style={{ fontFamily: "'Bilbo Swash Caps', 'Georgia', 'Times New Roman', cursive, serif" }}
-                      >
-                        {bucketDate?.getDate() || '--'}
-                      </div>
-                      <div className="mt-1 text-[10px] tracking-[0.02em] text-stone-400">
-                        {bucketDate ? `${bucketDate.getMonth() + 1}月` : ''}
-                      </div>
+                      <ChevronLeft size={15} />
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsWeekJumpPickerOpen(true)}
+                      className="rounded-full px-2 py-1 text-[13px] tracking-[0.16em] text-slate-500 transition-colors hover:bg-white/60 hover:text-slate-700"
+                    >
+                      {currentWeekLabel}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={goToNextWeek}
+                      className="rounded-full p-1.5 transition-colors hover:bg-white/60 hover:text-slate-700"
+                      title="下一周"
+                    >
+                      <ChevronRight size={15} />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setWeekReferenceDate(new Date())}
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] tracking-[0.14em] transition-colors ${
+                        isCurrentWeek
+                          ? 'bg-stone-100 text-slate-600'
+                          : 'text-slate-400 hover:bg-white/50 hover:text-slate-600'
+                      }`}
+                    >
+                      本周
+                    </button>
+                    {scheduleViewMenuNode}
+                  </div>
+                </div>
+              </div>
 
-                    <div className={`flex min-w-0 items-stretch px-4 py-3 md:px-5 ${dragTargetDate === bucket.date ? 'bg-stone-100/30' : ''}`}>
-                      <div className="flex min-h-full w-full items-center">
-                        {bucket.items.length > 0 ? (
-                          <div className="w-full space-y-0.5">
-                            {bucket.items.map((entry) => (
-                              <WeekTodoLineItem
-                                key={`${bucket.date}-${entry.todo.id}`}
-                                entry={entry}
-                                isDragging={draggingWeekTodoId === entry.todo.id}
-                                onDragStart={handleWeekItemDragStart}
-                                onDragEnd={handleWeekItemDragEnd}
-                                onTouchDragStart={handleTouchWeekItemDragStart}
-                                onBadgeClick={handleWeekBadgeClick}
-                              />
-                            ))}
+              <div
+                ref={weekScrollContainerRef}
+                className="min-h-0 flex-1 overflow-y-auto no-scrollbar"
+                onTouchStart={handleWeekViewTouchStart}
+                onTouchMove={handleWeekViewTouchMove}
+                onTouchEnd={handleWeekViewTouchEnd}
+                onTouchCancel={resetWeekSwipeGesture}
+              >
+                <div className="border-t border-stone-300/70 pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
+                  {weekBuckets.map((bucket, index) => {
+                    const bucketDate = parseDateKey(bucket.date);
+                    const isToday = bucket.date === getTodayDateKey();
+
+                    return (
+                      <section
+                        key={bucket.date}
+                        data-week-drop-date={bucket.date}
+                        className="grid min-h-[5.5rem] grid-cols-[4.25rem_minmax(0,1fr)] border-b border-stone-300/70 md:grid-cols-[4.75rem_minmax(0,1fr)]"
+                        onDragOver={(event) => {
+                          if (!draggingWeekTodoId) return;
+                          event.preventDefault();
+                          if (dragTargetDate !== bucket.date) {
+                            setDragTargetDate(bucket.date);
+                          }
+                        }}
+                        onDragLeave={() => {
+                          if (dragTargetDate === bucket.date) {
+                            setDragTargetDate(null);
+                          }
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          handleWeekDrop(bucket.date);
+                        }}
+                      >
+                        <button
+                          type="button"
+                          data-week-date-trigger="true"
+                          data-week-swipe-ignore="true"
+                          onClick={() => {
+                            setAssignModalDate(bucket.date);
+                            setAssignModalType('scheduled');
+                          }}
+                          className="flex flex-col justify-center border-r border-stone-300/70 px-2 py-3 text-center transition-colors hover:bg-white/40 md:px-3"
+                        >
+                          <div className={`text-[12px] tracking-[0.02em] ${isToday ? 'text-stone-600' : 'text-stone-500'}`}>
+                            {WEEKDAY_ROW_LABELS[index]}
                           </div>
-                        ) : (
-                          <div className="w-full py-2 text-[18px] italic tracking-[0.2em] text-slate-300">
-                            ...
+                          <div
+                            className={`mt-1 text-[19px] leading-none md:text-[22px] ${isToday ? 'font-semibold text-stone-800' : 'font-medium text-stone-700'}`}
+                            style={{ fontFamily: "'Bilbo Swash Caps', 'Georgia', 'Times New Roman', cursive, serif" }}
+                          >
+                            {bucketDate?.getDate() || '--'}
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  </section>
-                );
-              })}
-            </div>
-          </div>
+                          <div className="mt-1 text-[10px] tracking-[0.02em] text-stone-400">
+                            {bucketDate ? `${bucketDate.getMonth() + 1}月` : ''}
+                          </div>
+                        </button>
+
+                        <div className={`flex min-w-0 items-stretch px-4 py-3 md:px-5 ${dragTargetDate === bucket.date ? 'bg-stone-100/30' : ''}`}>
+                          <div className="flex min-h-full w-full items-center">
+                            {bucket.items.length > 0 ? (
+                              <div className="w-full space-y-0.5">
+                                {bucket.items.map((entry) => (
+                                  <WeekTodoLineItem
+                                    key={`${bucket.date}-${entry.todo.id}`}
+                                    entry={entry}
+                                    isDragging={draggingWeekTodoId === entry.todo.id}
+                                    onDragStart={handleWeekItemDragStart}
+                                    onDragEnd={handleWeekItemDragEnd}
+                                    onTouchDragStart={handleTouchWeekItemDragStart}
+                                    onBadgeClick={handleWeekBadgeClick}
+                                  />
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="w-full py-2 text-[18px] italic tracking-[0.2em] text-slate-300">
+                                ...
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </section>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          ) : (
+            <TodoMonthView
+              todos={todos}
+              logs={logs}
+              referenceDate={weekReferenceDate}
+              viewMenuNode={scheduleViewMenuNode}
+              onOpenTodo={openQuickActions}
+            />
+          )}
         </div>
 
         <FloatingButton
@@ -2584,8 +2699,8 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
       <FloatingButton
         onClick={() => setScreenMode((prev) => prev === 'list' ? 'week' : 'list')}
-        title={screenMode === 'list' ? '切换到周视图' : '切换回列表'}
-        ariaLabel={screenMode === 'list' ? '切换到周视图' : '切换回列表'}
+        title={screenMode === 'list' ? '切换到排期' : '切换回列表'}
+        ariaLabel={screenMode === 'list' ? '切换到排期' : '切换回列表'}
       >
         {screenMode === 'list' ? (
           <UIIcon type="manage" fallbackIcon={CalendarDays} size={24} />

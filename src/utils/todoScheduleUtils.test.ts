@@ -1,17 +1,19 @@
 /**
  * @file todoScheduleUtils.test.ts
  * @input Todo schedule helpers with fixed reference dates
- * @output Regression coverage for virtual-category date matching and week-view badge normalization
+ * @output Regression coverage for virtual-category date matching, shared day entries, and week-view badge normalization
  * @pos Test (todo planning utilities)
- * @description Verifies today/tomorrow/this-week filtering against Arrange, Due, and recurrence rules without creating occurrence records.
+ * @description Verifies today/tomorrow/this-week filtering and shared per-day entry building against Arrange, Due, and recurrence rules without creating occurrence records.
+ * @updated 2026-05-10: Added regression coverage for shared real-data day entries so month view and week view stay aligned on daily inclusion and priority ordering.
  * @updated 2026-04-27: Added regression coverage for the shared today-category helper so `today + pin` widget and picker views keep due-today and recurring-today todos.
  * @updated 2026-04-22: Added regression coverage for the shared todo-picker today category that mixes pinned todos with todos arranged for today.
  * @updated 2026-04-20: Added tests for virtual todo category schedule matches and deadline-over-scheduled normalization.
  */
 
 import { describe, expect, test } from 'vitest';
-import { TodoItem } from '../types';
+import { Log, TodoItem } from '../types';
 import {
+  buildTodoDateEntries,
   getTodoAssociationTodayTodos,
   getTodoScheduleMatches,
   getTodoScheduleRangeDateKeys,
@@ -25,6 +27,16 @@ const buildTodo = (overrides: Partial<TodoItem>): TodoItem => ({
   categoryId: 'cat-1',
   title: '测试待办',
   isCompleted: false,
+  ...overrides
+});
+
+const buildLog = (overrides: Partial<Log>): Log => ({
+  id: 'log-1',
+  activityId: 'activity-1',
+  categoryId: 'category-1',
+  startTime: new Date('2026-04-20T09:00:00+08:00').getTime(),
+  endTime: new Date('2026-04-20T10:00:00+08:00').getTime(),
+  duration: 3600,
   ...overrides
 });
 
@@ -112,6 +124,41 @@ describe('todoScheduleUtils virtual category helpers', () => {
       'recurring',
       'scheduled',
       'due'
+    ]);
+  });
+
+  test('builds shared per-day entries with the same priority order used by the week planner', () => {
+    const todos: TodoItem[] = [
+      buildTodo({ id: 'completed', title: 'Echo', completedAt: new Date('2026-04-20T20:00:00+08:00').getTime() }),
+      buildTodo({ id: 'scheduled', title: 'Bravo', scheduledDate: '2026-04-20' }),
+      buildTodo({ id: 'in-progress', title: 'Foxtrot' }),
+      buildTodo({ id: 'deadline', title: 'Alpha', deadlineDate: '2026-04-20' }),
+      buildTodo({
+        id: 'recurring',
+        title: 'Charlie',
+        recurrenceRule: {
+          frequency: 'daily',
+          startDate: '2026-04-18'
+        }
+      })
+    ];
+    const logs: Log[] = [
+      buildLog({
+        id: 'log-in-progress',
+        linkedTodoId: 'in-progress',
+        startTime: new Date('2026-04-20T14:00:00+08:00').getTime(),
+        endTime: new Date('2026-04-20T15:00:00+08:00').getTime()
+      })
+    ];
+
+    const entries = buildTodoDateEntries(todos, logs, '2026-04-20');
+
+    expect(entries.map((entry) => `${entry.todo.id}:${entry.primaryKind}`)).toEqual([
+      'deadline:deadline',
+      'scheduled:scheduled',
+      'recurring:recurring',
+      'completed:completed',
+      'in-progress:inProgress'
     ]);
   });
 });

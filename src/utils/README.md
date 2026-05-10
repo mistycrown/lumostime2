@@ -3,6 +3,8 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- `sceneCardFlipUtils.ts`: [Active] - Resolves persisted vs. forced scene-card back-side state so timer/todo cards can lock swipe-back only when a current-slot timeline record is forcing the flip.
+- `sceneTimelineMatchUtils.ts`: [Active] - Computes the active scene-slot time window, including overnight slots, and checks whether timer/todo cards have matching logs in the current timeline interval.
 - `assistantMessageParts.ts`: [Active] - Normalizes structured assistant reply parts and applies conservative fallback splitting so one assistant turn can render as grouped multi-bubble chat bursts without fragmenting persistence.
 - `goalUtils.ts`: [Active] - Calculates progress for Goals (duration, count, frequency).
 - `logUtils.ts`: [Active] - Handles time log manipulation, specifically splitting cross-day logs.
@@ -16,7 +18,7 @@ Contains pure utility functions for data processing and business logic calculati
 - `scopeSortUtils.ts`: [Active] - Centralizes scope selection ordering so batch tools, pickers, and scope-related filter chips all follow the saved scope-management order.
 - `floatingWindowStartup.ts`: [Active] - Guards Android floating-window startup, keeps the overlay launchable when notifications are disabled, and reports whether permission-return recovery is needed.
 - `floatingWindowStopUtils.ts`: [Active] - Normalizes live/persisted floating-window stop payloads and resolves which sessions should stop or cancel during Android resume reconciliation.
-- `todoScheduleUtils.ts`: [Active] - Derives week-view todo badges plus today/tomorrow/this-week virtual-category matches, and now also provides shared today-category helpers for `today + pin` views that include arrange-today, due-today, and recurring-today todos without storing standalone occurrences.
+- `todoScheduleUtils.ts`: [Active] - Derives week-view todo badges, shared per-day schedule entries for the new rolling month view, plus today/tomorrow/this-week virtual-category matches; it also provides shared today-category helpers for `today + pin` views that include arrange-today, due-today, recurring-today, completed-today, and in-progress-today visibility without storing standalone occurrences.
 - `todoScheduleAssignUtils.ts`: [Active] - Filters, sorts, and builds hierarchy rows for arrange/due picker todos, including the rule that unfinished subtasks disappear when their parent todo is already completed.
 - `todoListDisplayUtils.ts`: [Active] - Formats compact inline symbol-based date suffixes like `(05.06)[05.09]` and applies the shared category-list grouping rule that keeps incomplete todos ahead of completed ones while preserving incoming order inside each group.
 - `todoRowInteraction.ts`: [Active] - Classifies todo-row taps, scrolls, and swipe releases, including a touch-safe long-left-swipe fallback that preserves completion toggles when move events fail to latch swipe intent while still keeping diagonal scrolls protected.

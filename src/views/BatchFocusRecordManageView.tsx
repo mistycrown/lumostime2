@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file BatchFocusRecordManageView.tsx
  * @input Logs, Categories, Scopes, Todos
  * @output Batch operations on focus records
@@ -52,6 +52,8 @@ interface OperationParams {
     activityId?: string;
     categoryId?: string;
     noteText?: string;
+    noteSearchText?: string;
+    noteReplaceText?: string;
 }
 
 /**
@@ -339,16 +341,16 @@ export function appendNoteToLogs(
 export function replaceNoteInLogs(
     logs: Log[],
     selectedIds: Set<string>,
-    noteText: string
+    searchText: string,
+    replaceText: string
 ): Log[] {
-    const normalizedNote = noteText.trim() ? noteText : '';
-
     return logs.map(log => {
         if (!selectedIds.has(log.id)) return log;
+        if (typeof log.note !== 'string' || !searchText) return log;
 
         return {
             ...log,
-            note: normalizedNote
+            note: log.note.split(searchText).join(replaceText)
         };
     });
 }
@@ -379,6 +381,10 @@ export function canExecuteBatchOperation(
     }
 
     if (operationType === 'append_note' && !operationParams?.noteText?.trim()) {
+        return false;
+    }
+
+    if (operationType === 'replace_note' && !operationParams?.noteSearchText) {
         return false;
     }
 
@@ -895,6 +901,52 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     );
 };
 
+interface NoteReplaceEditorProps {
+    searchText: string;
+    replaceText: string;
+    onSearchTextChange: (searchText: string) => void;
+    onReplaceTextChange: (replaceText: string) => void;
+}
+
+const NoteReplaceEditor: React.FC<NoteReplaceEditorProps> = ({
+    searchText,
+    replaceText,
+    onSearchTextChange,
+    onReplaceTextChange
+}) => {
+    return (
+        <div className="space-y-3">
+            <div className="space-y-1">
+                <label className="block text-sm font-medium text-stone-700">
+                    原文本
+                </label>
+                <input
+                    type="text"
+                    value={searchText}
+                    onChange={(e) => onSearchTextChange(e.target.value)}
+                    placeholder="输入要被替换的文本"
+                    className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stone-300"
+                />
+            </div>
+            <div className="space-y-1">
+                <label className="block text-sm font-medium text-stone-700">
+                    新文本
+                </label>
+                <textarea
+                    value={replaceText}
+                    onChange={(e) => onReplaceTextChange(e.target.value)}
+                    placeholder="输入替换后的文本；留空表示删除匹配内容"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stone-300 resize-none"
+                />
+            </div>
+            <p className="text-xs text-stone-500">
+                会在每条选中记录的备注中，把所有匹配到的原文本替换成新文本。
+            </p>
+        </div>
+    );
+};
+
 /**
  * ActivitySelector component - single-select activity picker
  */
@@ -1108,6 +1160,9 @@ const OperationSection: React.FC<OperationSectionProps> = ({
                             categoryId
                         })}
                     />
+                    <p className="text-xs text-stone-500 mt-3">
+                        会把每条选中记录备注中的所有“原文本”替换成这里的新文本。
+                    </p>
                 </div>
             )}
 
@@ -1133,12 +1188,17 @@ const OperationSection: React.FC<OperationSectionProps> = ({
 
             {operationType === 'replace_note' && (
                 <div className="pt-3 border-t border-stone-100">
-                    <NoteEditor
-                        label="新的备注内容"
-                        value={operationParams?.noteText ?? ''}
-                        onChange={(noteText) => onOperationParamsChange({ noteText })}
-                        placeholder="输入新的备注内容；留空会改为空字符串"
-                        helperText="会直接覆盖选中记录的备注。留空也可以执行，此时备注会被改为空字符串。"
+                    <NoteReplaceEditor
+                        searchText={operationParams?.noteSearchText || ''}
+                        replaceText={operationParams?.noteReplaceText || ''}
+                        onSearchTextChange={(noteSearchText) => onOperationParamsChange({
+                            ...operationParams,
+                            noteSearchText
+                        })}
+                        onReplaceTextChange={(noteReplaceText) => onOperationParamsChange({
+                            ...operationParams,
+                            noteReplaceText
+                        })}
                     />
                 </div>
             )}
@@ -1241,8 +1301,16 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
     // Operation handlers (Task 6)
     const handleOperationTypeChange = (type: OperationType) => {
         setOperationType(type);
-        if (type === 'append_note' || type === 'replace_note') {
+        if (type === 'append_note') {
             setOperationParams({ noteText: '' });
+            return;
+        }
+
+        if (type === 'replace_note') {
+            setOperationParams({
+                noteSearchText: '',
+                noteReplaceText: ''
+            });
             return;
         }
 
@@ -1286,7 +1354,12 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
             } else if (operationType === 'append_note' && operationParams.noteText) {
                 updatedLogs = appendNoteToLogs(logs, selectedLogIds, operationParams.noteText);
             } else if (operationType === 'replace_note') {
-                updatedLogs = replaceNoteInLogs(logs, selectedLogIds, operationParams.noteText ?? '');
+                updatedLogs = replaceNoteInLogs(
+                    logs,
+                    selectedLogIds,
+                    operationParams.noteSearchText || '',
+                    operationParams.noteReplaceText || ''
+                );
             }
 
             // Update logs in DataContext
@@ -1323,10 +1396,7 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
             } else if (operationType === 'append_note') {
                 successMessage = `成功为 ${selectedLogIds.size} 条记录追加备注`;
             } else if (operationType === 'replace_note') {
-                const replacedWithEmpty = !(operationParams?.noteText ?? '').trim();
-                successMessage = replacedWithEmpty
-                    ? `成功将 ${selectedLogIds.size} 条记录的备注修改为空字符串`
-                    : `成功修改 ${selectedLogIds.size} 条记录的备注`;
+                successMessage = `成功批量替换 ${selectedLogIds.size} 条记录中的备注文本`;
             }
 
             onToast('success', successMessage);
@@ -1538,6 +1608,12 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
                                                 return activity ? `${category?.name} / ${activity.name}` : '未知标签';
                                             })()
                                             }`
+                                            : operationType === 'delete_note'
+                                                ? `即将删除 ${selectedLogIds.size} 条记录的备注`
+                                                : operationType === 'append_note'
+                                                    ? `即将为 ${selectedLogIds.size} 条记录追加备注`
+                                                    : operationType === 'replace_note'
+                                                        ? `即将把 ${selectedLogIds.size} 条记录备注中的“${operationParams?.noteSearchText || ''}”替换为“${operationParams?.noteReplaceText || ''}”`
                                             : `即将对 ${selectedLogIds.size} 条记录执行操作，是否继续？`
                 }
                 confirmText="确认执行"
@@ -1547,3 +1623,4 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
         </div>
     );
 };
+

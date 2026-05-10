@@ -1,6 +1,7 @@
 ﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * @file SceneCard.tsx
  * @description 场景卡片组件 - 支持正反面翻转和滑动交互
+ * @updated 2026-05-10: Split timer/todo back-side locking from manual flips so timeline-forced backs block swipe return without persisting that forced state.
  * @updated 2026-04-25: Replaced scene card borders with inset outlines so flipped cards keep their full stroke on mobile WebViews.
  * @updated 2026-05-05: Added parent-driven flip synchronization so scene timer/todo cards can react to widget-started sessions.
  */
@@ -10,6 +11,7 @@ import { SceneCardData, DailyReview, Log } from '../types';
 import { CardStatsBadge } from './CardStatsBadge';
 import { AppLauncherService } from '../services/AppLauncherService';
 import { getSceneCardColorPresentation, type SceneCardColorPresentation } from '../utils/colorAdapterUtils';
+import { getSceneCardFlipInteractionState } from '../utils/sceneCardFlipUtils';
 
 // 莫兰迪色系默认颜色映射
 const DEFAULT_COLORS = {
@@ -32,7 +34,7 @@ interface SceneCardProps {
   logs?: Log[]; // 用于计算计时和待办的时长统计
   onAction?: (action: SceneCardData['action'], autoEnterFocus?: boolean) => void;
   sceneCardTimerMode?: 'realtime' | 'backfill'; // 场景卡片计时模式
-  externalFlipped?: boolean;
+  forceBackSide?: boolean;
 }
 
 export const SceneCard: React.FC<SceneCardProps> = ({
@@ -41,7 +43,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
   logs = [],
   onAction,
   sceneCardTimerMode = 'realtime',
-  externalFlipped
+  forceBackSide = false
 }) => {
   // 获取卡片颜色（优先使用自定义颜色，否则使用默认颜色）
   const cardColor = data.color || DEFAULT_COLORS[data.type];
@@ -164,7 +166,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
     return data.type === 'checklist' && !isCountChecklistCard && !!data.isCompleted;
   };
 
-  const [isFlipped, setIsFlipped] = useState(getStoredFlipState());
+  const [persistedFlipped, setPersistedFlipped] = useState(getStoredFlipState());
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [swipeOffset, setSwipeOffset] = useState(0);
@@ -172,6 +174,11 @@ export const SceneCard: React.FC<SceneCardProps> = ({
   const cardRef = useRef<HTMLDivElement>(null);
   const frontRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
+  const { isFlipped, swipeBackDisabled } = getSceneCardFlipInteractionState({
+    cardType: data.type,
+    persistedFlipped,
+    forceBackSide,
+  });
 
   // 当 isCompleted 状态变化时，更新翻转状态
   React.useEffect(() => {
@@ -180,22 +187,11 @@ export const SceneCard: React.FC<SceneCardProps> = ({
         return;
       }
       const newFlipState = !!data.isCompleted;
-      setIsFlipped(newFlipState);
+      setPersistedFlipped(newFlipState);
       // 同步到 localStorage
       localStorage.setItem(`scene_card_flipped_${data.id}`, String(newFlipState));
     }
   }, [data.isCompleted, data.type, data.id, isCountChecklistCard]);
-
-  React.useEffect(() => {
-    if ((data.type !== 'timer' && data.type !== 'todo') || typeof externalFlipped !== 'boolean') {
-      return;
-    }
-    if (externalFlipped === isFlipped) {
-      return;
-    }
-    setIsFlipped(externalFlipped);
-    localStorage.setItem(`scene_card_flipped_${data.id}`, String(externalFlipped));
-  }, [data.id, data.type, externalFlipped, isFlipped]);
 
   // 保存翻转状态到 localStorage
   const saveFlipState = (flipped: boolean) => {
@@ -208,7 +204,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
 
   const handleTouchStart = (e: React.TouchEvent) => {
     // 只在反面时才响应触摸
-    if (!isFlipped) return;
+    if (!isFlipped || swipeBackDisabled) return;
     
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
@@ -216,7 +212,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!touchStart || !isFlipped) return;
+    if (!touchStart || !isFlipped || swipeBackDisabled) return;
     
     const currentTouch = e.targetTouches[0].clientX;
     const diff = currentTouch - touchStart;
@@ -230,9 +226,11 @@ export const SceneCard: React.FC<SceneCardProps> = ({
   };
 
   const handleTouchEnd = () => {
-    if (!touchStart || !isFlipped) {
+    if (!touchStart || !isFlipped || swipeBackDisabled) {
       setSwipeOffset(0);
       setIsSwiping(false);
+      setTouchStart(null);
+      setTouchEnd(null);
       return;
     }
     
@@ -241,7 +239,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
     // 判断是否达到翻转阈值
     if (swipeDistance > minSwipeDistance) {
       // 翻转回正面
-      setIsFlipped(false);
+      setPersistedFlipped(false);
       saveFlipState(false);
       
       // 如果是日课卡片，右滑表示取消完成
@@ -264,7 +262,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
   const handleCardClick = async () => {
     if (!isFlipped) {
       // 正面点击 - 翻转到反面并执行动作
-      setIsFlipped(true);
+      setPersistedFlipped(true);
       saveFlipState(true);
       
       // 只在正计时模式下启动应用（补记模式下不启动应用）
@@ -345,7 +343,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
       className="relative select-none touch-pan-y"
     >
       {/* 滑动背景提示 - 只在反面显示，使用卡片颜色 */}
-      {isFlipped && (
+      {isFlipped && !swipeBackDisabled && (
         <div
           className="absolute inset-0 flex items-center justify-end pr-6 text-white font-medium tracking-wide z-0 transition-opacity duration-200 rounded-2xl overflow-hidden"
           style={{ 
@@ -397,6 +395,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
             isSwiping={isSwiping} 
             swipeProgress={swipeOffset / maxSwipeDistance}
             isClickable={data.type === 'timer' || data.type === 'todo' || data.type === 'navigation'}
+            swipeBackDisabled={swipeBackDisabled}
           />
         </div>
       </div>
@@ -553,7 +552,8 @@ const CardBack: React.FC<{
   isSwiping?: boolean; 
   swipeProgress?: number;
   isClickable?: boolean;
-}> = ({ data, displayData, cardPresentation, dailyReviews = [], logs = [], isSwiping, swipeProgress = 0, isClickable = false }) => {
+  swipeBackDisabled?: boolean;
+}> = ({ data, displayData, cardPresentation, dailyReviews = [], logs = [], isSwiping, swipeProgress = 0, isClickable = false, swipeBackDisabled = false }) => {
   // 根据文字长度获取字号
   const getFontSize = (text: string) => {
     const length = text.length;
