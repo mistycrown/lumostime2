@@ -13,6 +13,7 @@
  * - 2026-04-19: Added a separate compatible S3 sync path alongside the existing Tencent Cloud COS flow.
  * - 2026-04-25: Passed timeline quick-action preferences through to the preferences settings page.
  * - 2026-05-05: Moved the widget settings entry below the floating-window toggle in the Android features section.
+ * - 2026-05-10: Upgraded the post-start timer jump preference to a three-mode dropdown and passed the new mode setter into PreferencesSettingsView.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -224,7 +225,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     // Hooks for full data access during backup
     const { logs: ctxLogs, todos: ctxTodos, todoCategories: ctxTodoCategories } = useData();
     const { categories: ctxCategories, scopes: ctxScopes, goals: ctxGoals, majorGoals: ctxMajorGoals } = useCategoryScope();
-    const { autoLinkRules: ctxAutoLinkRules, autoApplyAutoLinkRules, setAutoApplyAutoLinkRules, autoApplyTodoLink, setAutoApplyTodoLink, autoOpenFocusDetail, setAutoOpenFocusDetail, userPersonalInfo: ctxUserPersonalInfo, filters: ctxFilters, customNarrativeTemplates: ctxCustomNarrativeTemplates, sceneCardTimerMode, setSceneCardTimerMode, immersiveTimerDefaultOrientation, setImmersiveTimerDefaultOrientation } = useSettings();
+    const { autoLinkRules: ctxAutoLinkRules, autoApplyAutoLinkRules, setAutoApplyAutoLinkRules, autoApplyTodoLink, setAutoApplyTodoLink, autoStartTimerJumpMode, setAutoStartTimerJumpMode, userPersonalInfo: ctxUserPersonalInfo, filters: ctxFilters, customNarrativeTemplates: ctxCustomNarrativeTemplates, sceneCardTimerMode, setSceneCardTimerMode, immersiveTimerDefaultOrientation, setImmersiveTimerDefaultOrientation } = useSettings();
     const { dailyReviews: ctxDailyReviews, weeklyReviews: ctxWeeklyReviews, monthlyReviews: ctxMonthlyReviews, reviewTemplates: ctxReviewTemplates, checkTemplates: ctxCheckTemplates } = useReview();
     const {
         settingsSubmenu: activeSubmenu,
@@ -1155,8 +1156,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 onToggleAutoGenerateMonthlyReview={onToggleAutoGenerateMonthlyReview}
                 autoFocusNote={autoFocusNote}
                 onToggleAutoFocusNote={onToggleAutoFocusNote}
-                autoOpenFocusDetail={autoOpenFocusDetail}
-                onToggleAutoOpenFocusDetail={() => setAutoOpenFocusDetail(!autoOpenFocusDetail)}
+                autoStartTimerJumpMode={autoStartTimerJumpMode}
+                onSetAutoStartTimerJumpMode={setAutoStartTimerJumpMode}
                 autoApplyAutoLinkRules={autoApplyAutoLinkRules}
                 onToggleAutoApplyAutoLinkRules={() => setAutoApplyAutoLinkRules(!autoApplyAutoLinkRules)}
                 autoApplyTodoLink={autoApplyTodoLink}

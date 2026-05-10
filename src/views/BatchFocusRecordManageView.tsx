@@ -4,7 +4,7 @@
  * @output Batch operations on focus records
  * @pos View (Batch Management)
  * @description Batch management interface for focus records. Allows filtering, selecting, and performing batch operations on time logs.
- * @updated 2026-05-09: Switched scope operation pickers to the shared scope-order helper so batch scope order matches other selectors.
+ * @updated 2026-05-10: Added batch note delete/append/replace actions so selected records can update remarks in one pass.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -18,6 +18,7 @@ import { parseFilterExpression, matchesFilter, FilterContext } from '../utils/fi
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { toCssColor } from '../utils/colorUtils';
 import { sortActiveScopesByOrder } from '../utils/scopeSortUtils';
+import { appendTemplateToNote } from '../utils/noteTemplateUtils';
 
 interface BatchFocusRecordManageViewProps {
     onBack: () => void;
@@ -31,7 +32,16 @@ interface BatchFocusRecordManageViewProps {
 }
 
 // Operation types for batch operations
-type OperationType = 'add_scope' | 'remove_scope' | 'replace_scope' | 'link_todo' | 'unlink_todo' | 'change_activity';
+type OperationType =
+    | 'add_scope'
+    | 'remove_scope'
+    | 'replace_scope'
+    | 'link_todo'
+    | 'unlink_todo'
+    | 'change_activity'
+    | 'delete_note'
+    | 'append_note'
+    | 'replace_note';
 
 // Operation parameters
 interface OperationParams {
@@ -41,6 +51,7 @@ interface OperationParams {
     todoId?: string;
     activityId?: string;
     categoryId?: string;
+    noteText?: string;
 }
 
 /**
@@ -297,6 +308,81 @@ function changeActivityInLogs(
             categoryId: categoryId
         };
     });
+}
+
+export function deleteNoteFromLogs(
+    logs: Log[],
+    selectedIds: Set<string>
+): Log[] {
+    return logs.map(log => {
+        if (!selectedIds.has(log.id)) return log;
+
+        return { ...log, note: undefined };
+    });
+}
+
+export function appendNoteToLogs(
+    logs: Log[],
+    selectedIds: Set<string>,
+    noteText: string
+): Log[] {
+    return logs.map(log => {
+        if (!selectedIds.has(log.id)) return log;
+
+        return {
+            ...log,
+            note: appendTemplateToNote(log.note || '', noteText)
+        };
+    });
+}
+
+export function replaceNoteInLogs(
+    logs: Log[],
+    selectedIds: Set<string>,
+    noteText: string
+): Log[] {
+    const normalizedNote = noteText.trim() ? noteText : '';
+
+    return logs.map(log => {
+        if (!selectedIds.has(log.id)) return log;
+
+        return {
+            ...log,
+            note: normalizedNote
+        };
+    });
+}
+
+export function canExecuteBatchOperation(
+    operationType: OperationType | null,
+    operationParams: OperationParams | null,
+    selectedCount: number
+): boolean {
+    if (!operationType || selectedCount === 0) {
+        return false;
+    }
+
+    if ((operationType === 'add_scope' || operationType === 'remove_scope') && (!operationParams?.scopeIds || operationParams.scopeIds.length === 0)) {
+        return false;
+    }
+
+    if (operationType === 'replace_scope' && (!operationParams?.sourceScopeId || !operationParams?.targetScopeId)) {
+        return false;
+    }
+
+    if (operationType === 'link_todo' && !operationParams?.todoId) {
+        return false;
+    }
+
+    if (operationType === 'change_activity' && (!operationParams?.activityId || !operationParams?.categoryId)) {
+        return false;
+    }
+
+    if (operationType === 'append_note' && !operationParams?.noteText?.trim()) {
+        return false;
+    }
+
+    return true;
 }
 
 /**
@@ -775,6 +861,40 @@ const TodoSelector: React.FC<TodoSelectorProps> = ({
     );
 };
 
+interface NoteEditorProps {
+    label: string;
+    value: string;
+    placeholder: string;
+    helperText: string;
+    onChange: (noteText: string) => void;
+}
+
+const NoteEditor: React.FC<NoteEditorProps> = ({
+    label,
+    value,
+    placeholder,
+    helperText,
+    onChange
+}) => {
+    return (
+        <div className="space-y-3">
+            <label className="block text-sm font-medium text-stone-700">
+                {label}
+            </label>
+            <textarea
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder={placeholder}
+                rows={4}
+                className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stone-300 resize-none"
+            />
+            <p className="text-xs text-stone-500">
+                {helperText}
+            </p>
+        </div>
+    );
+};
+
 /**
  * ActivitySelector component - single-select activity picker
  */
@@ -889,8 +1009,13 @@ const OperationSection: React.FC<OperationSectionProps> = ({
     todos,
     todoCategories
 }) => {
+    const canExecute = canExecuteBatchOperation(operationType, operationParams, selectedCount);
+
     // Create options for operation type selector
     const operationOptions = [
+        { value: 'delete_note', label: '删除备注', icon: <span>🗑️</span> },
+        { value: 'append_note', label: '增加备注', icon: <span>📝</span> },
+        { value: 'replace_note', label: '修改备注', icon: <span>✏️</span> },
         { value: 'add_scope', label: '添加领域', icon: <span>➕</span> },
         { value: 'remove_scope', label: '移除领域', icon: <span>➖</span> },
         { value: 'replace_scope', label: '替换领域', icon: <span>🔄</span> },
@@ -986,28 +1111,46 @@ const OperationSection: React.FC<OperationSectionProps> = ({
                 </div>
             )}
 
+            {operationType === 'delete_note' && (
+                <div className="pt-3 border-t border-stone-100">
+                    <div className="text-sm text-stone-600 bg-stone-50 p-3 rounded-lg">
+                        <p>将删除所有选中记录的备注内容。</p>
+                    </div>
+                </div>
+            )}
+
+            {operationType === 'append_note' && (
+                <div className="pt-3 border-t border-stone-100">
+                    <NoteEditor
+                        label="追加内容"
+                        value={operationParams?.noteText || ''}
+                        onChange={(noteText) => onOperationParamsChange({ noteText })}
+                        placeholder="输入要追加到备注末尾的内容"
+                        helperText="会追加到已有备注后面；若原备注非空，会自动先换行再追加。"
+                    />
+                </div>
+            )}
+
+            {operationType === 'replace_note' && (
+                <div className="pt-3 border-t border-stone-100">
+                    <NoteEditor
+                        label="新的备注内容"
+                        value={operationParams?.noteText ?? ''}
+                        onChange={(noteText) => onOperationParamsChange({ noteText })}
+                        placeholder="输入新的备注内容；留空会改为空字符串"
+                        helperText="会直接覆盖选中记录的备注。留空也可以执行，此时备注会被改为空字符串。"
+                    />
+                </div>
+            )}
+
             {/* Execute Button */}
             <div className="pt-3 border-t border-stone-100">
                 <button
                     onClick={onExecute}
-                    disabled={
-                        !operationType ||
-                        selectedCount === 0 ||
-                        ((operationType === 'add_scope' || operationType === 'remove_scope') && (!operationParams?.scopeIds || operationParams.scopeIds.length === 0)) ||
-                        (operationType === 'replace_scope' && (!operationParams?.sourceScopeId || !operationParams?.targetScopeId)) ||
-                        (operationType === 'link_todo' && !operationParams?.todoId) ||
-                        (operationType === 'change_activity' && (!operationParams?.activityId || !operationParams?.categoryId))
-                        // unlink_todo doesn't need any parameters, so no additional condition needed
-                    }
-                    className={`w-full py-3 rounded-xl font-medium transition-colors ${!operationType ||
-                        selectedCount === 0 ||
-                        ((operationType === 'add_scope' || operationType === 'remove_scope') && (!operationParams?.scopeIds || operationParams.scopeIds.length === 0)) ||
-                        (operationType === 'replace_scope' && (!operationParams?.sourceScopeId || !operationParams?.targetScopeId)) ||
-                        (operationType === 'link_todo' && !operationParams?.todoId) ||
-                        (operationType === 'change_activity' && (!operationParams?.activityId || !operationParams?.categoryId))
-                        // unlink_todo doesn't need any parameters, so no additional condition needed
-                        ? 'bg-stone-100 text-stone-400 cursor-not-allowed'
-                        : 'bg-stone-600 text-white hover:bg-stone-700'
+                    disabled={!canExecute}
+                    className={`w-full py-3 rounded-xl font-medium transition-colors ${canExecute
+                        ? 'bg-stone-600 text-white hover:bg-stone-700'
+                        : 'bg-stone-100 text-stone-400 cursor-not-allowed'
                         }`}
                 >
                     执行操作 ({selectedCount} 条记录)
@@ -1098,6 +1241,11 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
     // Operation handlers (Task 6)
     const handleOperationTypeChange = (type: OperationType) => {
         setOperationType(type);
+        if (type === 'append_note' || type === 'replace_note') {
+            setOperationParams({ noteText: '' });
+            return;
+        }
+
         setOperationParams(null); // Reset params when changing operation type
     };
 
@@ -1112,33 +1260,10 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
 
     const handleConfirmOperation = () => {
         // Execute the batch operation (Task 6.4)
-        if (!operationType) {
+        if (!operationType || !canExecuteBatchOperation(operationType, operationParams, selectedLogIds.size)) {
             setShowConfirmModal(false);
             return;
         }
-
-        // Check if required parameters are present for operations that need them
-        if ((operationType === 'add_scope' || operationType === 'remove_scope') && (!operationParams?.scopeIds || operationParams.scopeIds.length === 0)) {
-            setShowConfirmModal(false);
-            return;
-        }
-
-        if (operationType === 'replace_scope' && (!operationParams?.sourceScopeId || !operationParams?.targetScopeId)) {
-            setShowConfirmModal(false);
-            return;
-        }
-
-        if (operationType === 'link_todo' && !operationParams?.todoId) {
-            setShowConfirmModal(false);
-            return;
-        }
-
-        if (operationType === 'change_activity' && (!operationParams?.activityId || !operationParams?.categoryId)) {
-            setShowConfirmModal(false);
-            return;
-        }
-
-        // unlink_todo doesn't need any parameters, so no check needed
 
         try {
             let updatedLogs = logs;
@@ -1156,6 +1281,12 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
                 updatedLogs = unlinkTodoFromLogs(logs, selectedLogIds);
             } else if (operationType === 'change_activity' && operationParams.activityId && operationParams.categoryId) {
                 updatedLogs = changeActivityInLogs(logs, selectedLogIds, operationParams.activityId, operationParams.categoryId);
+            } else if (operationType === 'delete_note') {
+                updatedLogs = deleteNoteFromLogs(logs, selectedLogIds);
+            } else if (operationType === 'append_note' && operationParams.noteText) {
+                updatedLogs = appendNoteToLogs(logs, selectedLogIds, operationParams.noteText);
+            } else if (operationType === 'replace_note') {
+                updatedLogs = replaceNoteInLogs(logs, selectedLogIds, operationParams.noteText ?? '');
             }
 
             // Update logs in DataContext
@@ -1185,6 +1316,17 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
                 const activity = category?.activities.find(a => a.id === operationParams.activityId);
                 const activityName = activity ? `${category?.name} / ${activity.name}` : '未知标签';
                 successMessage = `成功为 ${selectedLogIds.size} 条记录更改标签为: ${activityName}`;
+            }
+
+            if (operationType === 'delete_note') {
+                successMessage = `成功删除 ${selectedLogIds.size} 条记录的备注`;
+            } else if (operationType === 'append_note') {
+                successMessage = `成功为 ${selectedLogIds.size} 条记录追加备注`;
+            } else if (operationType === 'replace_note') {
+                const replacedWithEmpty = !(operationParams?.noteText ?? '').trim();
+                successMessage = replacedWithEmpty
+                    ? `成功将 ${selectedLogIds.size} 条记录的备注修改为空字符串`
+                    : `成功修改 ${selectedLogIds.size} 条记录的备注`;
             }
 
             onToast('success', successMessage);

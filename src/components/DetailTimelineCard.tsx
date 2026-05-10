@@ -1,8 +1,9 @@
 /**
  * @file DetailTimelineCard.tsx
  * @input Filtered logs, display date, entity info
- * @output Timeline UI with calendar, stats, history, and shared custom timeline styling with per-day rail termination, English day-total duration labels, plus month-based quick navigation in all-record mode
+ * @output Timeline UI with detail-page month heatmap duration captions, stats, history, and shared custom timeline styling with per-day rail termination, English day-total duration labels, plus month-based quick navigation in all-record mode
  * @pos Component (Shared Detail View UI)
+ * @updated 2026-05-10: Added compact `4H5M`-style duration captions beneath day numbers in the detail-page month heatmap only, with automatic white-text switching on darker heatmap cells.
  * @updated 2026-04-16: Added English `h`/`m` formatting for detail-page day-total duration labels.
  * @description 详情页面共享的时间线卡片组件，包括月历热图、统计信息、历史记录列表，以及与主时间线同步且在每个分组末端及时收线的自定义轨道样式；每日总时长支持按中文显示为“X小时Y分钟”
  * @updated 2026-04-15: 每日时间线总和超过 60 分钟时改为显示“X小时Y分钟”，整小时仅显示“X小时”
@@ -11,7 +12,6 @@
  */
 import React, { useMemo } from 'react';
 import { Log, Category } from '../types';
-import { CalendarWidget } from './CalendarWidget';
 import { Clock, Zap, Heart, MessageCircle, ChevronLeft, ChevronRight, Grid, Image as ImageIcon, Hash } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
 import { IconRenderer } from './IconRenderer';
@@ -58,6 +58,38 @@ const formatDayTotalDurationShort = (totalSeconds: number): string => {
     }
 
     return `${hours}h ${minutes}m`;
+};
+
+const formatHeatmapDurationCaption = (totalSeconds: number): string => {
+    const totalMinutes = Math.floor(totalSeconds / 60);
+
+    if (totalMinutes <= 0) {
+        return '';
+    }
+
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (hours === 0) {
+        return `${totalMinutes}M`;
+    }
+
+    if (minutes === 0) {
+        return `${hours}H`;
+    }
+
+    return `${hours}H${minutes}M`;
+};
+
+const getHeatmapTextStyle = (
+    useTheme: boolean,
+    opacity?: number
+): React.CSSProperties | undefined => {
+    if (useTheme && typeof opacity === 'number' && opacity >= 0.7) {
+        return { color: '#ffffff' };
+    }
+
+    return { color: 'var(--icon-button-icon)' };
 };
 
 interface DetailTimelineCardProps {
@@ -615,17 +647,35 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                     } else {
                                         // 热力图视图
                                         const colors = getHeatmapColor(data?.duration || 0);
+                                        const heatmapDurationCaption = formatHeatmapDurationCaption(data?.duration || 0);
+                                        const heatmapTextStyle = getHeatmapTextStyle(
+                                            colors.useTheme,
+                                            'opacity' in colors ? colors.opacity : undefined
+                                        );
                                         
                                         cells.push(
                                             <div
                                                 key={day}
-                                                className={`aspect-square rounded-lg flex items-center justify-center transition-colors cursor-pointer ${colors.useTheme ? '' : colors.bg} ${colors.text}`}
+                                                className={`aspect-square rounded-lg flex flex-col items-center justify-center transition-colors cursor-pointer ${colors.useTheme ? '' : colors.bg}`}
                                                 style={colors.useTheme ? {
                                                     backgroundColor: `color-mix(in srgb, var(--progress-bar-fill) ${colors.opacity * 100}%, transparent)`
                                                 } : undefined}
                                                 onClick={() => handleDayClick(new Date(year, month, day))}
                                             >
-                                                <span className="text-sm font-medium">{day}</span>
+                                                <span
+                                                    className={`font-medium leading-none ${heatmapDurationCaption ? 'text-[13px]' : 'text-sm'}`}
+                                                    style={heatmapTextStyle}
+                                                >
+                                                    {day}
+                                                </span>
+                                                {heatmapDurationCaption && (
+                                                    <span
+                                                        className="mt-1 text-[8px] font-semibold leading-none tracking-[0.02em]"
+                                                        style={heatmapTextStyle}
+                                                    >
+                                                        {heatmapDurationCaption}
+                                                    </span>
+                                                )}
                                             </div>
                                         );
                                     }

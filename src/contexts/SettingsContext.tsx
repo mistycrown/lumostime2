@@ -1,6 +1,7 @@
 /**
  * @file SettingsContext.tsx
  * @description 管理应用设置和用户偏好（不包括 Review 系统，Review 由 ReviewContext 管理），并兼容自定义筛选器排序。
+ * @updated 2026-05-10: Replaced the old boolean timer auto-open flag with a three-state post-start jump mode and legacy storage migration.
  * @updated 2026-04-25: Added configurable timeline quick-action preferences for the timeline header.
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
@@ -51,6 +52,12 @@ import {
     normalizeTimelineQuickActions,
     type TimelineQuickActionKey
 } from '../constants/timelineQuickActions';
+import {
+    AUTO_START_TIMER_JUMP_MODE_STORAGE_KEY,
+    LEGACY_AUTO_OPEN_FOCUS_DETAIL_STORAGE_KEY,
+    readStoredAutoStartTimerJumpMode,
+    type AutoStartTimerJumpMode
+} from '../utils/autoStartTimerJumpMode';
 
 export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
 export type DefaultIndexView = 'TAGS' | 'SCOPE';
@@ -62,6 +69,7 @@ export type DefaultSelectorPage = 'emoji' | string; // 'emoji' 或 sticker set I
 export type SceneCardTimerMode = 'realtime' | 'backfill'; // 'realtime' 正计时, 'backfill' 补记
 export type { ImmersiveTimerOrientation } from '../utils/immersiveOrientation';
 export type { TimelineQuickActionKey } from '../constants/timelineQuickActions';
+export type { AutoStartTimerJumpMode } from '../utils/autoStartTimerJumpMode';
 
 interface SettingsContextType {
     // 基础偏好设置
@@ -98,8 +106,8 @@ interface SettingsContextType {
     autoFocusNote: boolean;
     setAutoFocusNote: React.Dispatch<React.SetStateAction<boolean>>;
 
-    autoOpenFocusDetail: boolean;
-    setAutoOpenFocusDetail: React.Dispatch<React.SetStateAction<boolean>>;
+    autoStartTimerJumpMode: AutoStartTimerJumpMode;
+    setAutoStartTimerJumpMode: React.Dispatch<React.SetStateAction<AutoStartTimerJumpMode>>;
 
     timelineGalleryMode: boolean;
     setTimelineGalleryMode: React.Dispatch<React.SetStateAction<boolean>>;
@@ -405,14 +413,17 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         localStorage.setItem('lumostime_auto_focus_note', autoFocusNote.toString());
     }, [autoFocusNote]);
 
-    const [autoOpenFocusDetail, setAutoOpenFocusDetail] = useState<boolean>(() => {
-        const stored = localStorage.getItem('lumostime_auto_open_focus_detail');
-        return stored === 'true'; // Default to false
+    const [autoStartTimerJumpMode, setAutoStartTimerJumpMode] = useState<AutoStartTimerJumpMode>(() => {
+        return readStoredAutoStartTimerJumpMode(localStorage);
     });
 
     useEffect(() => {
-        localStorage.setItem('lumostime_auto_open_focus_detail', autoOpenFocusDetail.toString());
-    }, [autoOpenFocusDetail]);
+        localStorage.setItem(AUTO_START_TIMER_JUMP_MODE_STORAGE_KEY, autoStartTimerJumpMode);
+        localStorage.setItem(
+            LEGACY_AUTO_OPEN_FOCUS_DETAIL_STORAGE_KEY,
+            String(autoStartTimerJumpMode !== 'none')
+        );
+    }, [autoStartTimerJumpMode]);
 
     const [timelineGalleryMode, setTimelineGalleryMode] = useState<boolean>(() => {
         const stored = localStorage.getItem('lumostime_timeline_gallery_mode');
@@ -669,8 +680,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setAutoApplyTodoLink,
             autoFocusNote,
             setAutoFocusNote,
-            autoOpenFocusDetail,
-            setAutoOpenFocusDetail,
+            autoStartTimerJumpMode,
+            setAutoStartTimerJumpMode,
             timelineGalleryMode,
             setTimelineGalleryMode,
             timelineSortOrder,

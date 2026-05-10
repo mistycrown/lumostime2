@@ -5,6 +5,7 @@
  * @pos Repository (Application Data)
  * @description Loads and persists large core datasets through a single async repository and migrates legacy localStorage payloads into IndexedDB on first run.
  *
+ * @updated 2026-05-10: Flagged fallback-seeded core snapshots so background assistant flows can refuse demo logs/todos when real user data is unavailable.
  * @updated 2026-04-07: Keeps default achievement bottle metadata synced with the latest preset names, descriptions, and archive labels.
  */
 import {
@@ -93,6 +94,7 @@ export interface DataContextSnapshot {
   logs: Log[];
   todos: TodoItem[];
   todoCategories: TodoCategory[];
+  usesFallbackSeedData: boolean;
 }
 
 export interface ReviewEntriesSnapshot {
@@ -215,7 +217,8 @@ export class DataRepository {
   async loadDataContextSnapshot(): Promise<DataContextSnapshot> {
     await this.initialize();
 
-    const logs = (await this.repository.getData<Log[]>(REPOSITORY_KEYS.LOGS)) ?? INITIAL_LOGS;
+    const storedLogs = await this.repository.getData<Log[]>(REPOSITORY_KEYS.LOGS);
+    const logs = storedLogs ?? INITIAL_LOGS;
     const storedTodos = await this.repository.getData<TodoItem[]>(REPOSITORY_KEYS.TODOS);
     const todos = storedTodos ?? this.buildDefaultTodos(logs);
     const todoCategories =
@@ -224,7 +227,8 @@ export class DataRepository {
     return {
       logs,
       todos,
-      todoCategories
+      todoCategories,
+      usesFallbackSeedData: storedLogs === null || storedTodos === null
     };
   }
 

@@ -5,6 +5,7 @@
  * @pos Hook (System Integration)
  * @description Keeps the Android floating window aligned with the latest active session, regardless of whether the session started in-app or from the widget bridge.
  * @updated 2026-05-09: Includes the active app session id in Android sync payloads so floating-window stops can reconcile precisely after background resume.
+ * @updated 2026-05-09: Serves as the single floating-window sync path so stopping one session falls back cleanly to the latest remaining session.
  * @updated 2026-04-13: Added unified floating window sync based on the latest active session.
  */
 import { useEffect, useRef } from 'react';

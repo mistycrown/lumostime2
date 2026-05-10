@@ -16,6 +16,7 @@ import {
 
 interface DataContextType {
   isReady: boolean;
+  usesFallbackSeedData: boolean;
 
   logs: Log[];
   setLogs: React.Dispatch<React.SetStateAction<Log[]>>;
@@ -43,6 +44,7 @@ export const useData = () => {
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isReady, setIsReady] = useState(false);
   const [canPersist, setCanPersist] = useState(false);
+  const [usesFallbackSeedData, setUsesFallbackSeedData] = useState(true);
   const [logs, setLogs] = useState<Log[]>(INITIAL_LOGS);
   const [todos, setTodos] = useState<TodoItem[]>(INITIAL_TODOS);
   const [todoCategories, setTodoCategories] = useState<TodoCategory[]>(MOCK_TODO_CATEGORIES);
@@ -81,8 +83,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setLogs(snapshot.logs);
         setTodos(snapshot.todos);
         setTodoCategories(snapshot.todoCategories);
+        setUsesFallbackSeedData(snapshot.usesFallbackSeedData);
       } catch (error) {
         console.error('[DataContext] Failed to hydrate core data from repository', error);
+        setUsesFallbackSeedData(true);
       } finally {
         if (!cancelled) {
           setCanPersist(hydratedSuccessfully);
@@ -154,6 +158,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     <DataContext.Provider
       value={{
         isReady,
+        usesFallbackSeedData,
         logs,
         setLogs,
         todos,

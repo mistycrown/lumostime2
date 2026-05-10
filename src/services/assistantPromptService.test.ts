@@ -36,4 +36,11 @@ describe('assistantPromptService', () => {
     expect(prompt).toContain('Hard safety rules:');
     expect(prompt).toContain('Never invent ids.');
   });
+
+  it('fallback memory rules keep fired-reminder cleanup in runtime instead of the model', async () => {
+    const prompt = await assistantPromptService.getMemoryRulesPrompt();
+
+    expect(prompt).toContain('the runtime will reconcile fired reminders after successful consumption');
+    expect(prompt).not.toContain('Remove a reminder from activeReminders once it has already come due and this turn is reacting to it');
+  });
 });

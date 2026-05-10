@@ -4,6 +4,7 @@
  * @output Persistent Android agent loop, shared runtime notification state, and bridge-triggered assistant events
  * @pos Native Service
  * @description Minimal Android foreground service scaffold for the background AI agent. Maintains a lightweight polling loop, shares one persistent Android status notification with the floating-window service, and emits assistant system-trigger events through the Capacitor plugin bridge.
+ * @updated 2026-05-09: Refreshes the shared persistent notification title once per second while active focus timers exist so timer durations stay live during assistant-only foreground runtime.
  * @updated 2026-04-27: Added persistent native diagnostics for poll ticks, skip reasons, and trigger dispatches so missed background calls can be traced from the shared AI history UI.
  * @updated 2026-04-27: Tracked recent user/task activity plus quiet hours and minimum nudge gaps so native random check-ins stop interrupting immediately after foreground activity.
  * @updated 2026-04-26: Re-schedules the next random check-in whenever runtime config changes so shorter intervals take effect immediately instead of waiting for an older long-delay schedule to expire.
@@ -54,6 +55,17 @@ public class AssistantAgentService extends Service {
     private long lastUserTurnAtMs = 0L;
     private long lastTaskStateChangedAtMs = 0L;
     private long lastAssistantNudgeAtMs = 0L;
+    private final Runnable notificationRefreshRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!UnifiedServiceNotificationManager.hasActiveFocusSessions(AssistantAgentService.this)) {
+                return;
+            }
+
+            UnifiedServiceNotificationManager.reconcileNotificationState(AssistantAgentService.this);
+            handler.postDelayed(this, 1000L);
+        }
+    };
 
     private final Runnable pollRunnable = new Runnable() {
         @Override
@@ -158,7 +170,7 @@ public class AssistantAgentService extends Service {
             stopAgentLoop();
             UnifiedServiceNotificationManager.clearAssistantState(this);
             stopForeground(false);
-            UnifiedServiceNotificationManager.refreshStatusNotification(this);
+            UnifiedServiceNotificationManager.reconcileNotificationState(this);
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -263,7 +275,7 @@ public class AssistantAgentService extends Service {
         stopAgentLoop();
         UnifiedServiceNotificationManager.clearAssistantState(this);
         stopForeground(false);
-        UnifiedServiceNotificationManager.refreshStatusNotification(this);
+        UnifiedServiceNotificationManager.reconcileNotificationState(this);
         super.onDestroy();
     }
 
@@ -275,6 +287,7 @@ public class AssistantAgentService extends Service {
     private void stopAgentLoop() {
         loopStarted = false;
         handler.removeCallbacks(pollRunnable);
+        handler.removeCallbacks(notificationRefreshRunnable);
     }
 
     private void dispatchDueNativeReminders(long nowMs) {
@@ -585,6 +598,14 @@ public class AssistantAgentService extends Service {
             basePollMinutes,
             nextRandomCheckinAtMs
         );
-        UnifiedServiceNotificationManager.refreshStatusNotification(this);
+        UnifiedServiceNotificationManager.reconcileNotificationState(this);
+        syncNotificationRefreshLoop();
+    }
+
+    private void syncNotificationRefreshLoop() {
+        handler.removeCallbacks(notificationRefreshRunnable);
+        if (UnifiedServiceNotificationManager.hasActiveFocusSessions(this)) {
+            handler.postDelayed(notificationRefreshRunnable, 1000L);
+        }
     }
 }

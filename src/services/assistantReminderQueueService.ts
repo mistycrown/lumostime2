@@ -5,6 +5,7 @@
  * @pos Service (Assistant Reminders)
  * @description Provides a small durable reminder queue for the Android-first AI agent so it can leave follow-up instructions for future background turns without depending on the chat session history.
  *
+ * @updated 2026-05-10: Preserved scheduled-task linkage ids during queue normalization so recurring assistant tasks can reliably reconcile and dedupe pending reminders.
  * @updated 2026-05-09: Delayed failed due-reminder retries for at least one minute in the web queue so failed dispatches stay pending instead of being re-fired immediately.
  * @updated 2026-04-26: Canonicalized reminder timestamps before storage so due checks, delay math, and debug output all run against one normalized timeline.
  * @updated 2026-04-26: Added persistent assistant reminder queue helpers, due-reminder lookup, dispatch-attempt tracking, and memory synchronization for the new background AI agent.
@@ -48,6 +49,9 @@ const normalizeReminder = (value: unknown): AssistantReminder | null => {
     status: candidate.status!,
     text,
     ...(typeof candidate.todoId === 'string' && candidate.todoId.trim() ? { todoId: candidate.todoId.trim() } : {}),
+    ...(typeof candidate.scheduledTaskId === 'string' && candidate.scheduledTaskId.trim()
+      ? { scheduledTaskId: candidate.scheduledTaskId.trim() }
+      : {}),
     source: candidate.source!,
     createdAt,
     ...(Number.isFinite(candidate.dispatchAttemptCount) ? { dispatchAttemptCount: Number(candidate.dispatchAttemptCount) } : {}),

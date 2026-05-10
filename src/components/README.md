@@ -65,7 +65,7 @@ Overlay components for complex interactions.
 ## Visualization
 Charts and visual data representations.
 
-- `DetailTimelineCard.tsx`: Shared detail-page timeline card with day navigation in month view, month quick-switch navigation in all-record view, and English daily-total duration labels using `h`/`m` abbreviations.
+- `DetailTimelineCard.tsx`: Shared detail-page timeline card with month heatmap duration captions under each active day, automatic white text on darker heatmap cells, day navigation in month view, month quick-switch navigation in all-record view, and English daily-total duration labels using `h`/`m` abbreviations.
 - `FocusCharts.tsx`: Focus score analytics.
 - `HeatmapCalendar.tsx`: Month-view intensity heatmap.
 - `MatrixAnalysisChart.tsx`: Bar charts for activity ranking.

@@ -1,13 +1,18 @@
 /**
  * @file PreferencesSettingsView.tsx
  * @description 偏好设置页面
+ * @updated 2026-05-10: Replaced the old timer auto-open toggle with a three-option dropdown that reuses the existing settings selector style.
  * @updated 2026-04-25: Added timeline quick-action customization controls under display preferences.
  */
 import React, { useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus, X } from 'lucide-react';
 import { ToastType } from '../../components/Toast';
-import { DefaultArchiveView, DefaultIndexView, DefaultRecordView, ImmersiveTimerOrientation, SceneCardTimerMode, TimelineQuickActionKey, TimelineSortOrder } from '../../contexts/SettingsContext';
+import { AutoStartTimerJumpMode, DefaultArchiveView, DefaultIndexView, DefaultRecordView, ImmersiveTimerOrientation, SceneCardTimerMode, TimelineQuickActionKey, TimelineSortOrder } from '../../contexts/SettingsContext';
 import { TIMELINE_QUICK_ACTION_MAX, TIMELINE_QUICK_ACTION_OPTIONS } from '../../constants/timelineQuickActions';
+import {
+    AUTO_START_TIMER_JUMP_MODE_OPTIONS,
+    getAutoStartTimerJumpModeLabel
+} from '../../utils/autoStartTimerJumpMode';
 
 interface PreferencesSettingsViewProps {
     onBack: () => void;
@@ -28,8 +33,8 @@ interface PreferencesSettingsViewProps {
     onToggleAutoGenerateMonthlyReview?: () => void;
     autoFocusNote?: boolean;
     onToggleAutoFocusNote?: () => void;
-    autoOpenFocusDetail?: boolean;
-    onToggleAutoOpenFocusDetail?: () => void;
+    autoStartTimerJumpMode?: AutoStartTimerJumpMode;
+    onSetAutoStartTimerJumpMode?: (mode: AutoStartTimerJumpMode) => void;
     autoApplyAutoLinkRules?: boolean;
     onToggleAutoApplyAutoLinkRules?: () => void;
     autoApplyTodoLink?: boolean;
@@ -79,8 +84,8 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     onToggleAutoGenerateMonthlyReview,
     autoFocusNote,
     onToggleAutoFocusNote,
-    autoOpenFocusDetail = false,
-    onToggleAutoOpenFocusDetail,
+    autoStartTimerJumpMode = 'none',
+    onSetAutoStartTimerJumpMode,
     autoApplyAutoLinkRules = true,
     onToggleAutoApplyAutoLinkRules,
     autoApplyTodoLink = true,
@@ -111,6 +116,7 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     onSetSceneCardTimerMode
 }) => {
     const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
+    const [isAutoStartTimerJumpModeDropdownOpen, setIsAutoStartTimerJumpModeDropdownOpen] = useState(false);
     const [isTimelineQuickActionsExpanded, setIsTimelineQuickActionsExpanded] = useState(false);
     const selectedQuickActionOptions = timelineQuickActions
         .map((key) => TIMELINE_QUICK_ACTION_OPTIONS.find((option) => option.key === key))
@@ -334,7 +340,7 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                 {/* 记录与关联 */}
                 <div className="space-y-3">
                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">记录与关联</h3>
-                    <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
+                    <div className="bg-white rounded-2xl overflow-visible shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
                         {/* Auto-focus Note Toggle */}
                         <div className="flex items-center justify-between gap-3 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
                             <div className="flex-1 min-w-0">
@@ -355,24 +361,49 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                             </button>
                         </div>
 
-                        {/* Auto Open Focus Detail Toggle */}
-                        <div className="flex items-center justify-between gap-3 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                        {/* Auto Start Timer Jump Mode */}
+                        <div className="flex items-center justify-between gap-3 p-4 border-b border-stone-100 relative z-20 hover:bg-stone-50 transition-colors">
                             <div className="flex-1 min-w-0">
                                 <h4 className="font-bold text-stone-700">开始计时后自动跳转</h4>
-                                <p className="text-xs text-stone-400 mt-1">开启后开始计时将直接进入正在计时页面</p>
+                                <p className="text-xs text-stone-400 mt-1">控制开始计时后保持当前页面、进入正在计时，或直接进入沉浸式计时</p>
                             </div>
-                            <button
-                                onClick={onToggleAutoOpenFocusDetail}
-                                className={`flex-shrink-0 w-12 h-7 rounded-full transition-colors flex items-center px-1 ${
-                                    autoOpenFocusDetail ? 'bg-stone-800' : 'bg-stone-200'
-                                }`}
-                            >
-                                <div
-                                    className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
-                                        autoOpenFocusDetail ? 'translate-x-5' : 'translate-x-0'
-                                    }`}
-                                />
-                            </button>
+                            <div className="relative">
+                                <button
+                                    onClick={() => setIsAutoStartTimerJumpModeDropdownOpen(!isAutoStartTimerJumpModeDropdownOpen)}
+                                    className="flex items-center gap-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-bold px-4 py-2 rounded-lg transition-colors"
+                                >
+                                    <span>{getAutoStartTimerJumpModeLabel(autoStartTimerJumpMode)}</span>
+                                    <ChevronDown
+                                        size={14}
+                                        className={`transition-transform ${isAutoStartTimerJumpModeDropdownOpen ? 'rotate-180' : ''}`}
+                                    />
+                                </button>
+
+                                {isAutoStartTimerJumpModeDropdownOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-[100]" onClick={() => setIsAutoStartTimerJumpModeDropdownOpen(false)} />
+                                        <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-stone-100 overflow-hidden z-[110] flex flex-col py-1 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                                            {AUTO_START_TIMER_JUMP_MODE_OPTIONS.map((option) => (
+                                                <button
+                                                    key={option.value}
+                                                    onClick={() => {
+                                                        onSetAutoStartTimerJumpMode?.(option.value);
+                                                        setIsAutoStartTimerJumpModeDropdownOpen(false);
+                                                    }}
+                                                    className={`px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-stone-50 flex items-center justify-between ${
+                                                        autoStartTimerJumpMode === option.value ? 'text-stone-900 bg-stone-50' : 'text-stone-500'
+                                                    }`}
+                                                >
+                                                    {option.label}
+                                                    {autoStartTimerJumpMode === option.value && (
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-stone-800" />
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         </div>
 
                         {/* Auto Apply Auto Link Rules Toggle */}

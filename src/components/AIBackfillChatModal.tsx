@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-10: Blocked background assistant execution while core logs/todos are still fallback-seeded and now directly clears locally queued reminder_due items after successful system-turn completion.
  * @updated 2026-05-09: Added mobile visual-viewport keyboard tracking so the chat list and composer rise together above the soft keyboard and the latest messages stay visible while typing.
  * @updated 2026-05-09: Retrying a failed foreground assistant turn now reuses the original error bubble in place, so successful retry content replaces the failure instead of appending a duplicate assistant block.
  * @updated 2026-05-09: Added recurring `定时任务` management under AI call settings, backed by shared todo recurrence rules and continuously seeded native reminders.
@@ -1884,10 +1885,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const handledAssistantTriggerIdsRef = useRef<Set<string>>(new Set());
   const visualViewportBaselineRef = useRef<{ height: number; width: number }>({ height: 0, width: 0 });
 
-  const { logs, setLogs, todos, setTodos, todoCategories } = useData();
-  const { dailyReviews } = useReview();
+  const { logs, setLogs, todos, setTodos, todoCategories, isReady: isDataReady, usesFallbackSeedData } = useData();
+  const { dailyReviews, isReady: isReviewReady } = useReview();
   const { activeSessions } = useSession();
-  const { categories, scopes } = useCategoryScope();
+  const { categories, scopes, isReady: isCategoryScopeReady } = useCategoryScope();
   const {
     setEditingLog,
     setInitialLogTimes,
@@ -1912,6 +1913,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   }, [targetDate]);
 
   const defaultDateKey = useMemo(() => formatDateKey(defaultTargetDate), [defaultTargetDate]);
+  const isAssistantBackgroundContextReady = isDataReady
+    && isReviewReady
+    && isCategoryScopeReady
+    && !usesFallbackSeedData;
   const personaMap = useMemo(() => new Map(personas.map((persona) => [persona.id, persona])), [personas]);
   const assistantAgentIntervalErrors = useMemo(
     () => validateAssistantAgentIntervalDrafts(assistantAgentIntervalDrafts),
@@ -2840,9 +2845,29 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     debugMode
   ]);
 
+  const completeReminderDueTrigger = useCallback((trigger: AssistantSystemTrigger) => {
+    if (trigger.type !== 'reminder_due') {
+      return;
+    }
+
+    const reminderId = typeof trigger.metadata?.reminderId === 'string'
+      ? trigger.metadata.reminderId.trim()
+      : '';
+    if (!reminderId) {
+      return;
+    }
+
+    assistantReminderQueueService.markDispatched(reminderId, new Date().toISOString());
+    syncAssistantScheduledTasks(new Date());
+  }, [syncAssistantScheduledTasks]);
+
   const handleAssistantSystemTrigger = useCallback(async (trigger: AssistantSystemTrigger): Promise<void> => {
     const triggerId = trigger.id?.trim();
     if (!triggerId) {
+      return;
+    }
+
+    if (!assistantAgentConfig.enabled || !isAssistantBackgroundContextReady) {
       return;
     }
 
@@ -2852,10 +2877,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       } catch (error) {
         console.error('[AIBackfillChatModal] Failed to acknowledge duplicate assistant trigger', error);
       }
-      return;
-    }
-
-    if (!assistantAgentConfig.enabled) {
       return;
     }
 
@@ -2882,6 +2903,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         showSystemNotification: shouldShowBackgroundSystemNotification()
       }));
 
+      completeReminderDueTrigger(trigger);
       refreshAssistantMemorySnapshot();
       reloadPersistedChatSessions();
       if (result.surfacedMessage && !isOpenRef.current) {
@@ -2895,8 +2917,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     addToast,
     assistantAgentConfig.enabled,
     buildBackgroundTurnRequest,
+    completeReminderDueTrigger,
     conversationHistoryCache,
     getBackgroundTargetSession,
+    isAssistantBackgroundContextReady,
     onUnreadAssistantMessage,
     refreshAssistantNativeDiagnostics,
     shouldShowBackgroundSystemNotification
@@ -2944,6 +2968,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   }, [handleAssistantSystemTrigger]);
 
   const syncNativeBackgroundExecutionSnapshot = useCallback(async () => {
+    if (!isAssistantBackgroundContextReady) {
+      return;
+    }
+
     try {
       const targetSession = getBackgroundTargetSession();
       const conversationHistory = targetSession
@@ -3023,7 +3051,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     buildAssistantStateContext,
     buildBackgroundPersonaPrompt,
     conversationHistoryCache,
-    getBackgroundTargetSession
+    getBackgroundTargetSession,
+    isAssistantBackgroundContextReady
   ]);
 
   useEffect(() => {
@@ -3103,6 +3132,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   };
 
   const dispatchDueReminder = (reminder: AssistantReminder) => {
+    if (!isAssistantBackgroundContextReady) {
+      return;
+    }
+
     if (processingDueReminderIdsRef.current.has(reminder.id)) {
       return;
     }
@@ -3144,7 +3177,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   };
 
   const flushDueReminders = () => {
-    if (!assistantAgentConfig.enabled) {
+    if (!assistantAgentConfig.enabled || !isAssistantBackgroundContextReady) {
       return;
     }
 
@@ -3329,7 +3362,22 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     assistantAgentConfig.enabled,
     buildBackgroundTurnRequest,
     conversationHistoryCache,
-    getBackgroundTargetSession
+    getBackgroundTargetSession,
+    isAssistantBackgroundContextReady
+  ]);
+
+  useEffect(() => {
+    if (!assistantAgentConfig.enabled || !isAssistantBackgroundContextReady) {
+      return;
+    }
+
+    void hydrateAssistantReminderSnapshotFromNative();
+    void drainPendingAssistantSystemTriggers();
+  }, [
+    assistantAgentConfig.enabled,
+    drainPendingAssistantSystemTriggers,
+    hydrateAssistantReminderSnapshotFromNative,
+    isAssistantBackgroundContextReady
   ]);
 
   const mutateSession = (sessionId: string, updater: (session: AIChatSession) => AIChatSession) => {
