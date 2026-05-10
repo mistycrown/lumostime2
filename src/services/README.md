@@ -2,6 +2,8 @@
 
 Contains business logic and external integrations.
 
+Update 2026-05-10: `assistantTurnService.ts` now orders dictionary and stable state summaries ahead of volatile anchors like current time and reminder/session snapshots, while `aiService.ts` adds provider-aware prompt-cache routing hints, explicit `cache_control` support for DashScope plus supported OpenRouter models, and normalized cache-hit metrics in debug payloads so repeated unified assistant turns can reuse longer provider-side prefixes more reliably.
+Update 2026-05-10: `assistantTurnService.ts` now forwards request options into `aiService`, and `aiService.ts` now bridges AbortSignal onto native `cordova-plugin-advanced-http` request ids so the shared AI chat stop button can actually cancel in-flight Android model requests instead of only flipping local UI state.
 Update 2026-05-06: `assistantPromptService.ts` now structures the foreground assistant fallback prompts around explicit intent recognition and intent-to-action routing, so front-chat turns classify the request before deciding whether to reply, clarify, create reminders, or emit tool calls.
 Update 2026-05-09: `assistantScheduledTaskService.ts` now stores recurring AI scheduled-task templates, keeps one next native reminder seeded per enabled task using shared todo recurrence rules, and advances each template after the linked reminder is consumed.
 Update 2026-05-06: Foreground assistant contracts are now tighter end-to-end: `assistantTurnService.ts` no longer advertises foreground `silent`, `aiService.ts` now rejects `create_todo` tool calls that omit `linkedActivityId`, and the foreground prompt guidance now explicitly states the real `edit_log` and `create_subtask` execution boundaries.

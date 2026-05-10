@@ -11,6 +11,7 @@
  * @updated 2026-05-03: Added regression coverage for shortcut action default colors and Unicode-safe scene card title truncation.
  * @updated 2026-05-03: Added regression coverage for targeted native widget refresh routing in the Capacitor bridge.
  * @updated 2026-05-05: Added scene widget launch-app regression coverage so native scene cards can mirror in-app third-party app launches.
+ * @updated 2026-05-10: Added native scene-card title layout regression coverage so widget launchers keep mixed-language labels centered and use ASCII ellipsis truncation.
  */
 
 import { describe, expect, it, vi } from 'vitest';
@@ -32,6 +33,7 @@ import widgetSceneProviderSupportSource from '../../android/app/src/main/java/co
 import widgetStoresSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetStores.kt?raw';
 import widgetTimerControllerSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetTimerController.kt?raw';
 import widgetTodoPinProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetTodoPinProviderSupport.java?raw';
+import widgetSceneCardItemLayoutSource from '../../android/app/src/main/res/layout/widget_scene_card_item.xml?raw';
 import widgetSceneLayoutSource from '../../android/app/src/main/res/layout/widget_layout_scene_4x3.xml?raw';
 
 const REFERENCE_DATE = new Date('2026-04-26T09:30:00+08:00');
@@ -557,6 +559,14 @@ describe('WidgetSceneCardsRemoteViewsService', () => {
     expect(widgetSceneCardsRemoteViewsServiceSource).toContain('codePointCount');
     expect(widgetSceneCardsRemoteViewsServiceSource).toContain('offsetByCodePoints');
     expect(widgetSceneCardsRemoteViewsServiceSource).not.toContain('substring(0, maxChars)');
+    expect(widgetSceneCardsRemoteViewsServiceSource).toContain('CARD_TITLE_ELLIPSIS = "..."');
+  });
+
+  it('pins scene card titles to a centered single-line layout for launcher consistency', () => {
+    expect(widgetSceneCardItemLayoutSource).toContain('android:layout_gravity="center_horizontal"');
+    expect(widgetSceneCardItemLayoutSource).toContain('android:includeFontPadding="false"');
+    expect(widgetSceneCardItemLayoutSource).toContain('android:singleLine="true"');
+    expect(widgetSceneCardItemLayoutSource).toContain('android:textAlignment="center"');
   });
 });
 

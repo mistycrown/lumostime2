@@ -4,6 +4,11 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
+ * @updated 2026-05-10: Rebuilt schedule-week navigation around one parent-owned Monday `weekStart` so the standard week view and `八宫格` now share the same source of truth for labels and switching.
+ * @updated 2026-05-10: Unified schedule-week navigation around a Monday-based week reference so the header range, week picker, and bento week pages stay in sync while switching dates.
+ * @updated 2026-05-10: Week schedule rows now append inline `@父任务` context for visible subtasks and keep the combined title on a single truncating line.
+ * @updated 2026-05-10: Added a third `八宫格` schedule mode that reuses the real todo schedule data and drag-to-move rules inside a one-screen-per-week 2x4 bento layout with mini-calendar linking.
+ * @updated 2026-05-10: Passed the schedule page's reduced-effects preference into the monthly calendar path so month-view rendering can dial back heavy visuals together with the rest of the Todo background shell.
  * @updated 2026-05-10: Let the monthly schedule view go edge-to-edge inside the schedule page and inherit the same custom-background rendering as the week planner instead of locking the month grid to white boxed surfaces.
  * @updated 2026-05-10: Replaced the monthly placeholder with a reference-style rolling month schedule backed by the same real Arrange / Due / Repeat / Done / Trace data as the week planner, and added month-view-specific type marker colors for each daily item.
  * @updated 2026-05-06: Captured active touch pointers for todo-row swipes and stopped release-target filtering so left-swipe complete and undo actions no longer intermittently fail when the finger drifts off the row or lifts over a child element.
@@ -92,11 +97,14 @@ import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 import { FloatingButton } from '../components/FloatingButton';
 import { UIIcon } from '../components/UIIcon';
 import {
+  TodoDateEntry,
   TodoScheduleMatch,
   TodoScheduleRange,
   WeekTodoEntry,
   buildWeekTodoBuckets,
+  formatWeekTodoLineTitle,
   formatDateKey,
+  getStartOfWeek,
   getTodayDateKey,
   getTodoScheduleMatches,
   getWeekDates,
@@ -108,6 +116,7 @@ import { TodoDisplaySettingsModal, type TodoCompactDisplaySettings } from '../co
 import { TodoDuplicateModal } from '../components/TodoDuplicateModal';
 import { TodoQuickActionsModal } from '../components/TodoQuickActionsModal';
 import { TodoMonthView } from '../components/TodoMonthView';
+import { TodoBentoWeekView } from '../components/TodoBentoWeekView';
 import { useTodoQuickActions } from '../hooks/useTodoQuickActions';
 import { getTodoRowGestureIntent, getTodoRowReleaseAction, TodoRowGestureIntent } from '../utils/todoRowInteraction';
 import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodosForDisplay, getParentTodo, isIncompleteSubtaskHiddenByCompletedParent } from '../utils/todoHierarchyUtils';
@@ -735,7 +744,7 @@ interface TodoListSection {
   entries: TodoListEntry[];
 }
 
-type TodoScheduleViewMode = 'week' | 'month';
+type TodoScheduleViewMode = 'week' | 'month' | 'bento';
 
 interface TodoTreeEntryGroup {
   parentEntry: TodoListEntry;
@@ -933,11 +942,12 @@ const WeekTodoLineItem: React.FC<{
   onTouchDragStart: (entry: WeekTodoEntry, event: React.TouchEvent<HTMLDivElement>) => void;
   onBadgeClick: (entry: WeekTodoEntry, badgeKey: WeekQuickActionBadgeKey) => void;
 }> = ({ entry, isDragging, onDragStart, onDragEnd, onTouchDragStart, onBadgeClick }) => {
-  const { todo, badges } = entry;
+  const { todo, badges, parentTitle } = entry;
   const isHistoricalOnly = !badges.scheduled && !badges.deadline && !badges.recurring && (badges.completed || badges.inProgress);
   const iconClassName = isHistoricalOnly ? 'text-stone-300' : 'text-stone-400';
   const titleClassName = isHistoricalOnly ? 'text-stone-400' : 'text-stone-700';
-  const noteClassName = isHistoricalOnly ? 'text-stone-300' : 'text-stone-400';
+  const parentTitleClassName = isHistoricalOnly ? 'text-stone-300' : 'text-stone-400';
+  const fullTitle = formatWeekTodoLineTitle(entry);
   const todayDateKey = getTodayDateKey();
   const completedDateKey = todo.completedAt ? formatDateKey(new Date(todo.completedAt)) : null;
   const isScheduledOverdue = Boolean(
@@ -990,8 +1000,11 @@ const WeekTodoLineItem: React.FC<{
         onTouchStart={(event) => dragBadgeKey && onTouchDragStart(entry, event)}
         className={`min-w-0 flex-1 ${dragBadgeKey ? 'cursor-grab active:cursor-grabbing' : ''}`}
       >
-        <div className={`truncate text-[14px] font-medium leading-5 ${titleClassName}`}>
-          {todo.title}
+        <div className={`truncate text-[14px] font-medium leading-5 ${titleClassName}`} title={fullTitle}>
+          <span>{todo.title}</span>
+          {parentTitle && (
+            <span className={parentTitleClassName}>{` @${parentTitle}`}</span>
+          )}
         </div>
       </div>
       <div className={`shrink-0 flex items-center justify-end gap-1 whitespace-nowrap text-[9px] uppercase leading-none ${hasMultipleBadges ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
@@ -1040,7 +1053,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     const saved = localStorage.getItem('todoScreenMode');
     return saved === 'week' ? 'week' : 'list';
   });
-  const [weekReferenceDate, setWeekReferenceDate] = useState<Date>(new Date());
+  const [scheduleWeekStart, setScheduleWeekStart] = useState<Date>(() => getStartOfWeek(new Date()));
   const [draggingWeekTodoId, setDraggingWeekTodoId] = useState<string | null>(null);
   const [draggingWeekEntry, setDraggingWeekEntry] = useState<WeekTodoEntry | null>(null);
   const [dragTargetDate, setDragTargetDate] = useState<string | null>(null);
@@ -1051,7 +1064,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   const [isWeekJumpPickerOpen, setIsWeekJumpPickerOpen] = useState(false);
   const [scheduleViewMode, setScheduleViewMode] = useState<TodoScheduleViewMode>(() => {
     const saved = localStorage.getItem(TODO_SCHEDULE_VIEW_MODE_STORAGE_KEY);
-    return saved === 'month' ? 'month' : 'week';
+    return saved === 'month' || saved === 'bento' ? saved : 'week';
   });
   const [isScheduleViewMenuOpen, setIsScheduleViewMenuOpen] = useState(false);
   const [duplicatingTodo, setDuplicatingTodo] = useState<TodoItem | null>(null);
@@ -1137,14 +1150,14 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
   // 闁告帗绻傞～鎰板礌閺嶎厸鍋撴径澶庡幀闁汇劌瀚崹搴ｇ尵娴兼瑧绐楀┑鈥冲€归悘澶娾柦閳╁啯绠掗梺顐㈩槷閼垫垶绂掔拋宕囩Э闁告帒妫涚悮顐︽晬瀹€鍕笡閻犱降鍊濋埀顒€顦懙鎴犵箔椤戣法顏卞☉?
   React.useEffect(() => {
-    if (scheduleViewMode === 'week') {
+    if (screenMode === 'week') {
       return;
     }
 
     if (isWeekJumpPickerOpen) {
       setIsWeekJumpPickerOpen(false);
     }
-  }, [isWeekJumpPickerOpen, scheduleViewMode]);
+  }, [isWeekJumpPickerOpen, screenMode]);
 
   React.useEffect(() => {
     if (!isScheduleViewMenuOpen) {
@@ -1507,11 +1520,11 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   const weekTodos = useMemo(() => todos, [todos]);
 
   const weekBuckets = useMemo(
-    () => buildWeekTodoBuckets(weekTodos, logs, weekReferenceDate),
-    [weekReferenceDate, weekTodos, logs]
+    () => buildWeekTodoBuckets(weekTodos, logs, scheduleWeekStart),
+    [scheduleWeekStart, weekTodos, logs]
   );
 
-  const weekDates = useMemo(() => getWeekDates(weekReferenceDate), [weekReferenceDate]);
+  const weekDates = useMemo(() => getWeekDates(scheduleWeekStart), [scheduleWeekStart]);
   const isCurrentWeek = useMemo(
     () => weekDates.some((date) => getTodayDateKey() === formatDateKey(date)),
     [weekDates]
@@ -1526,25 +1539,29 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       ? `${startMonth}.${start.getDate()} - ${end.getDate()}`
       : `${startMonth}.${start.getDate()} - ${endMonth}.${end.getDate()}`;
   }, [weekDates]);
-  const weekJumpDateValue = formatDateKey(weekReferenceDate);
+  const weekJumpDateValue = formatDateKey(scheduleWeekStart);
   const weekSwipeLockDistance = 18;
   const weekSwipeTriggerDistance = 112;
   const weekSwipeDominanceRatio = 1.6;
 
-  const shiftWeekReferenceDate = (dayOffset: number) => {
-    setWeekReferenceDate((prev) => {
+  const shiftScheduleWeekStart = (dayOffset: number) => {
+    setScheduleWeekStart((prev) => {
       const next = new Date(prev);
       next.setDate(prev.getDate() + dayOffset);
-      return next;
+      return getStartOfWeek(next);
     });
   };
 
   const goToPreviousWeek = () => {
-    shiftWeekReferenceDate(-7);
+    shiftScheduleWeekStart(-7);
   };
 
   const goToNextWeek = () => {
-    shiftWeekReferenceDate(7);
+    shiftScheduleWeekStart(7);
+  };
+
+  const goToCurrentWeek = () => {
+    setScheduleWeekStart(getStartOfWeek(new Date()));
   };
 
   const handleOpenDuplicateModal = (todo: TodoItem) => {
@@ -1640,6 +1657,36 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
     onSaveTodo(nextTodo);
     handleWeekItemDragEnd();
+  };
+
+  const commitMonthDrop = (entryDate: string, entry: Pick<TodoDateEntry, 'todo' | 'badges'> | null) => {
+    if (!entry) return;
+    const targetTodo = todos.find((todo) => todo.id === entry.todo.id);
+
+    if (!targetTodo) {
+      return;
+    }
+
+    const shouldMoveDeadline = entry.badges.deadline;
+    const shouldMoveScheduled = entry.badges.scheduled;
+    if (!shouldMoveDeadline && !shouldMoveScheduled) {
+      return;
+    }
+
+    const nextTodo: TodoItem = {
+      ...targetTodo,
+      deadlineDate: shouldMoveDeadline ? entryDate : targetTodo.deadlineDate,
+      scheduledDate: shouldMoveScheduled ? entryDate : targetTodo.scheduledDate
+    };
+
+    onSaveTodo(nextTodo);
+  };
+
+  const handleScheduleEntryMove = (
+    entry: Pick<TodoDateEntry, 'todo' | 'badges'>,
+    targetDateKey: string
+  ) => {
+    commitMonthDrop(targetDateKey, entry);
   };
 
   const handleWeekDrop = (entryDate: string) => {
@@ -2026,6 +2073,12 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   );
 
   const selectScheduleViewMode = (mode: TodoScheduleViewMode) => {
+    const currentWeekStart = getStartOfWeek(new Date());
+
+    if (mode === 'bento' || mode === 'month') {
+      setScheduleWeekStart(currentWeekStart);
+    }
+
     setScheduleViewMode(mode);
     setIsScheduleViewMenuOpen(false);
   };
@@ -2046,7 +2099,8 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       {isScheduleViewMenuOpen && (
         <div className="absolute right-0 top-full z-30 mt-2 min-w-[7.25rem] overflow-hidden rounded-2xl border border-stone-200/80 bg-[#faf9f6]/95 p-1 shadow-[0_12px_30px_rgba(28,25,23,0.12)] backdrop-blur-sm">
           {([
-            { id: 'week', label: '周视图' },
+            { id: 'week', label: '周视图-一列' },
+            { id: 'bento', label: '周视图-两列' },
             { id: 'month', label: '月视图' }
           ] as Array<{ id: TodoScheduleViewMode; label: string }>).map((option) => {
             const isSelected = scheduleViewMode === option.id;
@@ -2128,7 +2182,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => setWeekReferenceDate(new Date())}
+                      onClick={goToCurrentWeek}
                       className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] tracking-[0.14em] transition-colors ${
                         isCurrentWeek
                           ? 'bg-stone-100 text-slate-600'
@@ -2231,13 +2285,41 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
               </div>
             </>
           ) : (
-            <TodoMonthView
-              todos={todos}
-              logs={logs}
-              referenceDate={weekReferenceDate}
-              viewMenuNode={scheduleViewMenuNode}
-              onOpenTodo={openQuickActions}
-            />
+            scheduleViewMode === 'bento' ? (
+              <TodoBentoWeekView
+                todos={todos}
+                todoCategories={categories}
+                logs={logs}
+                weekStartDate={scheduleWeekStart}
+                headerWeekLabel={currentWeekLabel}
+                isCurrentWeek={isCurrentWeek}
+                onGoToPreviousWeek={goToPreviousWeek}
+                onGoToNextWeek={goToNextWeek}
+                onGoToCurrentWeek={goToCurrentWeek}
+                onOpenWeekPicker={() => setIsWeekJumpPickerOpen(true)}
+                onWeekStartChange={(weekStart) => setScheduleWeekStart(getStartOfWeek(weekStart))}
+                onMoveScheduleEntry={handleScheduleEntryMove}
+                useReducedEffects={useReducedEffects}
+                viewMenuNode={scheduleViewMenuNode}
+                onOpenTodo={openQuickActions}
+                onOpenDay={(dateKey) => {
+                  setAssignModalDate(dateKey);
+                  setAssignModalType('scheduled');
+                }}
+              />
+            ) : (
+              <TodoMonthView
+                todos={todos}
+                todoCategories={categories}
+                logs={logs}
+                referenceDate={scheduleWeekStart}
+                onMoveScheduleEntry={handleScheduleEntryMove}
+                onOpenDatePicker={() => setIsWeekJumpPickerOpen(true)}
+                useReducedEffects={useReducedEffects}
+                viewMenuNode={scheduleViewMenuNode}
+                onOpenTodo={openQuickActions}
+              />
+            )
           )}
         </div>
 
@@ -2272,7 +2354,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           onSelect={(value) => {
             const nextDate = parseDateKey(value);
             if (nextDate) {
-              setWeekReferenceDate(nextDate);
+              setScheduleWeekStart(getStartOfWeek(nextDate));
             }
           }}
           onClose={() => setIsWeekJumpPickerOpen(false)}

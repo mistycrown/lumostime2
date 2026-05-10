@@ -3,14 +3,21 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-05-10: `TodoBentoWeekView.tsx` now replaces its inline `单页 / 全部` toggle with a unified `显示设置` popup, and the popup controls both the bento display mode plus whether entry marker colors follow schedule type or todo category.
+- Update 2026-05-10: `TodoBentoWeekView.tsx` now offers `单页 / 全部` modes, caps each day cell to the measured visible-entry count in single-page mode with a compact `+N` overflow badge, and lets the whole bento page grow into a vertically scrollable full-content layout in all-items mode.
+- Update 2026-05-10: `TodoBentoWeekView.tsx` now lets its header range and previous/next/current-week controls follow the parent reference week directly, matching the standard week-view title-bar switching behavior.
+- Update 2026-05-10: `TodoBentoWeekView.tsx` now reports week changes back to the parent using the visible week's Monday, keeping the bento header range, week picker, and mini-calendar on one shared week anchor.
+- Update 2026-05-10: `TodoBentoWeekView.tsx` no longer shows the old `本月 / 本周 / 今天` footer shortcut buttons inside the mini-calendar cell, so that space now belongs fully to the calendar itself.
 Components that form the structural or global UI elements.
 
-- `TodoMonthView.tsx`: Reference-style rolling monthly todo schedule that mirrors the minimalist demo UI while reading real Arrange / Due / Repeat / Done / Trace day entries from shared schedule utilities and showing month-view-specific colored marker lines per schedule type.
+- `TodoBentoWeekView.tsx`: One-screen-per-week `八宫格` planner that mirrors the 2x4 editorial reference layout, keeps a linked mini month navigator in the top-left cell, reads the same real Arrange / Due / Repeat / Done / Trace entries as the other schedule views, and supports desktop plus touch drag-to-move with horizontal edge auto-scroll.
+- `TodoMonthView.tsx`: Reference-style rolling monthly todo schedule that mirrors the minimalist demo UI while reading real Arrange / Due / Repeat / Done / Trace day entries from shared schedule utilities, showing month-view-specific colored marker lines per schedule type, exposing inline expanded-row type tags where clickable tags reopen the shared todo quick editor, tuning density/typography dynamically so mobile cells show more readable text without wasting vertical space, supporting Arrange / Due drag-and-drop with edge auto-scroll in the expanded day list, letting users persist a `2/3/4/5 行/屏` month-row density plus font-size choice from the header controls, switching the in-cell left marker between schedule-type colors and native todo-category colors, and now allowing a slightly longer truncated `@父任务` hint before the ellipsis in expanded subtask rows.
 - `CalendarWidget.tsx`: Versatile calendar component with heatmap display, animated expand/collapse, and week/month picker modes.
 - `TimerFloating.tsx`: Global floating timer for active sessions.
 - `Toast.tsx`: Notification system.
 
 ## Modals
+- Update 2026-05-10: `AIBackfillChatModal.tsx` now skips the extra visual-viewport keyboard inset on native Android, because the Capacitor WebView already resizes with the soft keyboard and the additional shell padding was leaving a large blank gap above the composer on real devices.
 - Update 2026-05-09: `AIBackfillChatModal.tsx` now tracks the mobile visual viewport and adds a keyboard bottom inset to the shared AI shell, so the composer and latest messages rise together above the soft keyboard while typing.
 - Update 2026-05-09: `AIBackfillChatModal.tsx` now retries failed assistant turns in place, reusing the original errored bubble and replacing it with the second attempt result instead of appending a duplicate assistant block.
 - Update 2026-05-09: `AIBackfillChatModal.tsx` now adds a `定时任务` subsection under AI call settings, reuses shared todo recurrence rules for recurring assistant schedules, and keeps one next native reminder seeded per enabled task so reminder_due stays on the existing assistant trigger path.

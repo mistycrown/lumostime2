@@ -4,6 +4,7 @@
  * @output Week buckets, daily schedule entries, and badge metadata for todo planning views
  * @pos Utility (Todo planning)
  * @description Shared helpers for deriving scheduled, deadline, recurring, completed, and in-progress todo visibility without creating standalone occurrence records.
+ * @updated 2026-05-10: Week planner buckets now carry resolved parent-task titles for subtasks so the week schedule can render inline `@parent` context without re-looking up hierarchy in the view.
  * @updated 2026-05-10: Added shared day-entry builders for the new reference-style month schedule so the month grid and week planner now read the same real per-day todo data.
  * @updated 2026-04-27: Expanded the shared today-selector helpers so widget and picker `today + pin` views include todos that match today via arrange, due, or recurrence rules.
  * @updated 2026-04-22: Added shared today-selector helpers so todo pickers can reuse the same `pin or arranged today` virtual category.
@@ -26,6 +27,7 @@ export interface TodoDateBadges {
 export interface WeekTodoEntry {
   todo: TodoItem;
   badges: TodoDateBadges;
+  parentTitle?: string;
 }
 
 export interface WeekDayBucket {
@@ -341,10 +343,22 @@ export const buildWeekTodoBuckets = (todos: TodoItem[], logs: Log[], referenceDa
   const weekDates = getWeekDates(referenceDate);
   const weekDateKeys = weekDates.map((date) => formatDateKey(date));
   const entriesByDate = buildTodoDateEntryMap(todos, logs, weekDateKeys);
+  const todoMap = new Map(todos.map((todo) => [todo.id, todo]));
 
   return weekDates.map((date) => {
     const dateKey = formatDateKey(date);
-    const items = (entriesByDate[dateKey] || []).map(({ todo, badges }) => ({ todo, badges }));
+    const items = (entriesByDate[dateKey] || []).map(({ todo, badges }) => {
+      const parentTodo = todo.parentTodoId ? todoMap.get(todo.parentTodoId) : null;
+      const parentTitle = parentTodo && !parentTodo.parentTodoId && parentTodo.id !== todo.id
+        ? parentTodo.title
+        : undefined;
+
+      return {
+        todo,
+        badges,
+        parentTitle
+      };
+    });
 
     return {
       date: dateKey,
@@ -352,3 +366,9 @@ export const buildWeekTodoBuckets = (todos: TodoItem[], logs: Log[], referenceDa
     };
   });
 };
+
+export const formatWeekTodoLineTitle = (
+  entry: Pick<WeekTodoEntry, 'todo' | 'parentTitle'>
+): string => (
+  entry.parentTitle ? `${entry.todo.title} @${entry.parentTitle}` : entry.todo.title
+);
