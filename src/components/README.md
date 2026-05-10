@@ -5,6 +5,7 @@ This directory contains the reusable React components for the application. They 
 ## Core UI
 Components that form the structural or global UI elements.
 
+- `TodoMonthView.tsx`: Reference-style rolling monthly todo schedule that mirrors the minimalist demo UI while reading real Arrange / Due / Repeat / Done / Trace day entries from shared schedule utilities and showing month-view-specific colored marker lines per schedule type.
 - `CalendarWidget.tsx`: Versatile calendar component with heatmap display, animated expand/collapse, and week/month picker modes.
 - `TimerFloating.tsx`: Global floating timer for active sessions.
 - `Toast.tsx`: Notification system.

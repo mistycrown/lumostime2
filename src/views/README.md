@@ -29,7 +29,10 @@ The views are designed as "dumb" or "presentational" components where possible, 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
 > Last updated: 2026-05-10
-- `BatchFocusRecordManageView.tsx`: Batch record management now supports note deletion, note appends with automatic newline separation, and note replacement that can intentionally set remarks to the empty string.
+- `SceneView.tsx`, `SceneCard.tsx`: Timer and todo scene cards now auto-flip only when the current slot already has a matching timeline record, while those timeline-forced backs block swipe-to-front and purely manual flips still swipe back normally.
+- `TodoView.tsx`, `TodoMonthView.tsx`, `todoScheduleUtils.ts`: The Todo schedule `月视图` now uses a rolling editorial calendar adapted from the minimalist reference demo, replaces all seeded fake entries with the same real Arrange / Due / Repeat / Done / Trace day data used by the week planner, and marks each item with a month-view-specific colored left rule by schedule type.
+- `TodoView.tsx`: The Todo schedule screen now remembers its nested `周视图 / 月视图` choice, adds a small dropdown trigger beside `本周`, and routes `月视图` into a blank placeholder surface so the monthly demo can be integrated in later steps without changing the existing week planner.
+- `BatchFocusRecordManageView.tsx`: Batch record management now supports note deletion, note appends with automatic newline separation, and note text find-and-replace across selected records.
 - `SettingsView.tsx`, `settings/PreferencesSettingsView.tsx`: Replaced the old boolean `开始计时后自动跳转` toggle with a three-option selector that can keep the current page, open the active timer detail, or enter immersive timer immediately while preserving existing scene-card immersive overrides.
 - `BatchFocusRecordManageView.tsx`, `AutoLinkView.tsx`, `MemoirSettingsView.tsx`: Scope pickers and filter chips now share one saved scope-order helper so batch tools and scope selectors stay aligned.
 - `TodoView.tsx`: Removed the small top-right status dot from the display-settings sidebar button so it now matches the other Lucide icon controls in the left utility stack.

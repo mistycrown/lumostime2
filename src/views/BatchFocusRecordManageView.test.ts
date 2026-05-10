@@ -61,17 +61,18 @@ describe('batch note helpers', () => {
     expect(result[2].note).toBe('untouched note');
   });
 
-  it('replaces selected notes and normalizes whitespace-only input to an empty string', () => {
-    const result = replaceNoteInLogs(logs, new Set(['log-1', 'log-2']), '   ');
+  it('replaces all matching note text occurrences inside selected logs', () => {
+    const result = replaceNoteInLogs(logs, new Set(['log-1', 'log-2']), 'note', 'memo');
 
-    expect(result[0].note).toBe('');
-    expect(result[1].note).toBe('');
+    expect(result[0].note).toBe('existing memo');
+    expect(result[1].note).toBeUndefined();
     expect(result[2].note).toBe('untouched note');
   });
 
-  it('allows replace-note execution with an empty string but blocks append-note without real content', () => {
-    expect(canExecuteBatchOperation('replace_note', { noteText: '' }, 2)).toBe(true);
-    expect(canExecuteBatchOperation('replace_note', null, 2)).toBe(true);
+  it('allows replace-note execution with a search string and an optional empty replacement, but blocks append-note without real content', () => {
+    expect(canExecuteBatchOperation('replace_note', { noteSearchText: 'old', noteReplaceText: '' }, 2)).toBe(true);
+    expect(canExecuteBatchOperation('replace_note', { noteSearchText: '', noteReplaceText: 'new' }, 2)).toBe(false);
+    expect(canExecuteBatchOperation('replace_note', null, 2)).toBe(false);
     expect(canExecuteBatchOperation('append_note', { noteText: '   ' }, 2)).toBe(false);
     expect(canExecuteBatchOperation('append_note', { noteText: 'new content' }, 2)).toBe(true);
   });
