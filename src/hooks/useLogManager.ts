@@ -6,6 +6,7 @@
  * @description 日志数据管理 Hook - 处理日志的增删改查、快速打点、批量添加、图片管理等操作，并统一维护 NFC 快速打点的文案与时间补记逻辑。时间戳由 DataContext 自动管理。
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-05-10: Let callers override the date used for backfill defaults so widget supplement-log launches can force today even when the timeline was left on an older day.
  */
 import { useState } from 'react';
 import { Log, TodoItem, ParsedTimeEntry, ActiveSession } from '../types';
@@ -195,14 +196,20 @@ export const useLogManager = () => {
         addToast('success', `Successfully backfilled ${newLogs.length} logs!`);
     };
 
-    const openAddModal = (startTime?: number, endTime?: number, prefilledData?: { categoryId?: string; activityId?: string; linkedTodoId?: string }) => {
+    const openAddModal = (
+        startTime?: number,
+        endTime?: number,
+        prefilledData?: { categoryId?: string; activityId?: string; linkedTodoId?: string },
+        referenceDate?: Date
+    ) => {
         setEditingLog(null);
         if (startTime && endTime) {
             // Gap filling or backfill: use provided times
             setInitialLogTimes({ start: startTime, end: endTime, prefilledData });
         } else {
             // New log from button: calculate smart defaults
-            const dayStart = new Date(currentDate);
+            const effectiveDate = referenceDate || currentDate;
+            const dayStart = new Date(effectiveDate);
             dayStart.setHours(0, 0, 0, 0);
 
             const now = new Date();
@@ -214,7 +221,7 @@ export const useLogManager = () => {
             if (isToday) {
                 dayEnd = now;
             } else {
-                dayEnd = new Date(currentDate);
+                dayEnd = new Date(effectiveDate);
                 dayEnd.setHours(23, 59, 59, 999);
             }
 

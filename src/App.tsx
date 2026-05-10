@@ -4,6 +4,8 @@
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
+ * @updated 2026-05-10: Upgraded the post-start timer auto-jump flow to support none, focus-detail, and immersive entry modes while preserving scene-card immersive overrides.
+ * @updated 2026-05-10: Made the widget supplement-log shortcut snap the timeline date back to today before opening the backfill modal.
  * @updated 2026-04-27: Passed todo delete callbacks into the shared quick-actions sheet path so list and week todo action bars can trigger task removal.
  * @updated 2026-04-22: Mounted the shared AI chat window at the app level so it can keep running in the background after the modal UI is closed.
  * @updated 2026-04-25: Added AI assistant widget shortcut handling so Android widget shortcut slots can open the shared AI chat window.
@@ -62,6 +64,11 @@ import { getLocalDataTimestamp, setLocalDataTimestampValue } from './utils/local
 import { validateAndFixData } from './utils/dataValidation';
 import { STORAGE_WRITE_ERROR_EVENT, StorageWriteErrorDetail } from './constants/storageKeys';
 import {
+  resolveAutoStartTimerJumpMode,
+  shouldEnterImmersiveForAutoStartTimerJumpMode,
+  shouldOpenFocusDetailForAutoStartTimerJumpMode
+} from './utils/autoStartTimerJumpMode';
+import {
   AutoLinkViewLazy as AutoLinkView,
   FiltersSettingsViewLazy as FiltersSettingsView,
   FocusDetailViewLazy as FocusDetailView,
@@ -116,7 +123,7 @@ const AppContent: React.FC = () => {
     customStickers, setCustomStickers,
     filters, setFilters,
     autoFocusNote, setAutoFocusNote,
-    autoOpenFocusDetail, setAutoOpenFocusDetail,
+    autoStartTimerJumpMode,
     timelineGalleryMode, setTimelineGalleryMode,
     timelineSortOrder, setTimelineSortOrder,
     timelineQuickActions, setTimelineQuickActions,
@@ -236,6 +243,7 @@ const AppContent: React.FC = () => {
     sharingLog,
     statsTitle, setStatsTitle,
     currentView, setCurrentView,
+    setCurrentDate,
     initialLogTimes,
     setReturnToSearch,
     setIsSearchOpenedFromSettings,
@@ -405,23 +413,18 @@ const AppContent: React.FC = () => {
   
   // Wrappers for Session Actions to match original signature (injecting autoLinkRules)
   const handleStartActivityWrapper = (activity: any, categoryId: string, todoId?: string, scopeIdOrIds?: string | string[], note?: string, autoEnterFocus?: boolean) => {
-    // 如果明确指定了 autoEnterFocus，使用指定的值；否则使用全局设置
-    const shouldAutoOpen = autoEnterFocus !== undefined ? autoEnterFocus : autoOpenFocusDetail;
-    
-    if (shouldAutoOpen) {
-      setShouldAutoOpenFocus(true);
-      setShouldAutoEnterImmersive(true);
-    }
-    
+    const resolvedJumpMode = resolveAutoStartTimerJumpMode(autoStartTimerJumpMode, autoEnterFocus);
+    setShouldAutoOpenFocus(shouldOpenFocusDetailForAutoStartTimerJumpMode(resolvedJumpMode));
+    setShouldAutoEnterImmersive(shouldEnterImmersiveForAutoStartTimerJumpMode(resolvedJumpMode));
+
     startActivity(activity, categoryId, autoLinkRules, todoId, scopeIdOrIds, note);
   };
   
   const handleStartTodoFocusWrapper = (todo: TodoItem, autoEnterFocus?: boolean) => {
-    if (autoEnterFocus) {
-      setShouldAutoOpenFocus(true);
-      setShouldAutoEnterImmersive(true);
-    }
-    
+    const resolvedJumpMode = resolveAutoStartTimerJumpMode(autoStartTimerJumpMode, autoEnterFocus);
+    setShouldAutoOpenFocus(shouldOpenFocusDetailForAutoStartTimerJumpMode(resolvedJumpMode));
+    setShouldAutoEnterImmersive(shouldEnterImmersiveForAutoStartTimerJumpMode(resolvedJumpMode));
+
     todoManager.handleStartTodoFocus(todo);
   };
   
@@ -467,12 +470,15 @@ const AppContent: React.FC = () => {
     setIsSearchOpenedFromSettings(false);
 
     switch (action) {
-      case 'open_supplement_log':
+      case 'open_supplement_log': {
+        const today = new Date();
         setCurrentView(AppView.TIMELINE);
         setIsSearchOpen(false);
         setIsGalleryViewOpen(false);
-        logManager.openAddModal();
+        setCurrentDate(today);
+        logManager.openAddModal(undefined, undefined, undefined, today);
         break;
+      }
       case 'quick_punch':
         setCurrentView(AppView.TIMELINE);
         setIsSearchOpen(false);
@@ -508,6 +514,7 @@ const AppContent: React.FC = () => {
     openAIChat,
     reviewManager,
     setCurrentView,
+    setCurrentDate,
     setIsAutoLinkOpen,
     setIsGalleryViewOpen,
     setIsSearchOpen,

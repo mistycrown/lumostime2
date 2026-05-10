@@ -5,6 +5,7 @@
  * @pos Native Plugin
  * @description Capacitor plugin implementation for controlling the Floating Window (LumosTime Island) feature and starting its Android foreground service safely across API levels.
  * @updated 2026-05-09: Persisted floating-window stop requests and exposed a consume hook so background stops can reconcile after the Web runtime resumes.
+ * @updated 2026-05-09: Added active focus-session syncing so native Android can render app timer labels inside the shared persistent notification title.
  * @updated 2026-04-15: Switched floating-window launches to foreground-service startup on Android 8+.
  */
 package com.mistycrown.lumostime;
@@ -213,6 +214,13 @@ public class FocusNotificationPlugin extends Plugin {
         Intent intent = new Intent(context, FloatingWindowService.class);
         context.stopService(intent);
         Log.d(TAG, "✅ Stopped floating window service");
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void syncActiveSessions(PluginCall call) {
+        UnifiedServiceNotificationManager.setActiveFocusSessions(getContext(), call.getArray("sessions"));
+        UnifiedServiceNotificationManager.reconcileNotificationState(getContext());
         call.resolve();
     }
 

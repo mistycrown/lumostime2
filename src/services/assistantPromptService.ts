@@ -5,6 +5,7 @@
  * @pos Service (Assistant Prompt Builder)
  * @description Loads or falls back to shared assistant-base and mode-specific prompt assets, then assembles layered prompts for the unified assistant flow without duplicating prompt logic across the app.
  *
+ * @updated 2026-05-10: Removed assistant-side due-reminder deletion guidance so runtime reminder cleanup, not model judgment, owns consumption of fired reminders.
  * @updated 2026-05-06: Aligned fallback foreground tool guidance with live execution boundaries for `edit_log`, `create_todo`, and `create_subtask`.
  * @updated 2026-05-06: Restructured the fallback foreground prompts around explicit intent recognition and intent-to-action routing so front-chat turns decide behavior more consistently.
  * @updated 2026-05-06: Added assistant-facing `yesterdayTimelineSummary` guidance and aligned unified-turn context wording around concrete two-day activity records.
@@ -406,7 +407,7 @@ Use these triggers:
 - Write preferenceMemory when the user states a stable preference, or repeatedly responds well to a specific reminder style, response style, pacing, or workflow.
 - Write lastKnownState more readily when the user describes their present state, or when the current state is clear enough from context and is likely to matter soon, such as being stuck, overloaded, tired, drifting, blocked, focusing, or switching tasks.
 - Write workingMemorySummary when the current main thread becomes clear and the assistant should continue tracking it across the next turns.
-- Remove a reminder from activeReminders once it has already come due and this turn is reacting to it, or once it is stale/overdue and should no longer remain as pending future follow-up.
+- Do not remove a reminder from activeReminders merely because this turn is reacting to it; the runtime will reconcile fired reminders after successful consumption. Only omit or clear a reminder when it is clearly stale/overdue and should no longer remain as pending future follow-up.
 - Write recentDecisions when the latest assistant action or the latest settled rule, product decision, or process choice should remain visible for the next turns. Prefer replacing it with the newest useful summary instead of accumulating a long list.
 
 Do not store:

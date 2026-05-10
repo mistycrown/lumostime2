@@ -28,7 +28,9 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
-> Last updated: 2026-05-09
+> Last updated: 2026-05-10
+- `BatchFocusRecordManageView.tsx`: Batch record management now supports note deletion, note appends with automatic newline separation, and note replacement that can intentionally set remarks to the empty string.
+- `SettingsView.tsx`, `settings/PreferencesSettingsView.tsx`: Replaced the old boolean `开始计时后自动跳转` toggle with a three-option selector that can keep the current page, open the active timer detail, or enter immersive timer immediately while preserving existing scene-card immersive overrides.
 - `BatchFocusRecordManageView.tsx`, `AutoLinkView.tsx`, `MemoirSettingsView.tsx`: Scope pickers and filter chips now share one saved scope-order helper so batch tools and scope selectors stay aligned.
 - `TodoView.tsx`: Removed the small top-right status dot from the display-settings sidebar button so it now matches the other Lucide icon controls in the left utility stack.
 - `SettingsView.tsx`: Moved the Android `小组件` entry below the `开启悬浮球` toggle while keeping both items in the same settings group.

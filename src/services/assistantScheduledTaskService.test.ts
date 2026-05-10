@@ -5,6 +5,7 @@
  * @pos Service Tests (Assistant Scheduled Tasks)
  * @description Verifies that recurring assistant task templates reuse todo recurrence rules correctly and always keep one next native reminder seeded per enabled task.
  *
+ * @updated 2026-05-10: Added regression coverage for stale-linked reminder healing and duplicate pending-reminder collapse.
  * @updated 2026-05-09: Added first-pass coverage for recurring assistant scheduled-task persistence and reminder materialization.
  */
 
@@ -152,6 +153,92 @@ describe('assistantScheduledTaskService', () => {
     expect(result.createdReminders[0].dueAt).toBe('2026-05-18T00:00:00.000Z');
     expect(result.tasks[0].nextTriggerAt).toBe('2026-05-18T00:00:00.000Z');
     expect(result.tasks[0].pendingReminderId).toBe(result.createdReminders[0].id);
+  });
+
+  it('recreates the same pending occurrence instead of advancing early when a future linked reminder disappears', () => {
+    assistantScheduledTaskService.saveTasks([
+      {
+        id: 'task-1',
+        text: '姣忓懆涓€鎻愰啋鎴戜氦鍛ㄦ姤',
+        time: '08:00',
+        recurrenceRule: {
+          frequency: 'weekly',
+          startDate: '2026-05-01',
+          weekdays: [1]
+        },
+        enabled: true,
+        createdAt: '2026-05-09T00:00:00.000Z',
+        updatedAt: '2026-05-09T00:00:00.000Z',
+        nextTriggerAt: '2026-05-11T00:00:00.000Z',
+        pendingReminderId: 'reminder-missing'
+      }
+    ]);
+    assistantReminderQueueService.saveReminders([]);
+
+    const result = assistantScheduledTaskService.syncScheduledTaskReminders(new Date('2026-05-10T00:05:00.000Z'));
+
+    expect(result.createdReminders).toHaveLength(1);
+    expect(result.createdReminders[0].dueAt).toBe('2026-05-11T00:00:00.000Z');
+    expect(result.tasks[0].nextTriggerAt).toBe('2026-05-11T00:00:00.000Z');
+    expect(result.tasks[0].pendingReminderId).toBe(result.createdReminders[0].id);
+  });
+
+  it('keeps only the earliest pending reminder when duplicate scheduled-task reminders exist', () => {
+    assistantReminderQueueService.saveReminders([
+      {
+        id: 'reminder-1',
+        type: 'self_followup',
+        dueAt: '2026-05-10T01:00:00.000Z',
+        status: 'pending',
+        text: '姣忓ぉ鏃╀笂涔濈偣鎻愰啋鎴戣捣搴?',
+        scheduledTaskId: 'task-1',
+        source: 'system',
+        createdAt: '2026-05-09T00:00:00.000Z'
+      },
+      {
+        id: 'reminder-2',
+        type: 'self_followup',
+        dueAt: '2026-05-12T01:00:00.000Z',
+        status: 'pending',
+        text: '姣忓ぉ鏃╀笂涔濈偣鎻愰啋鎴戣捣搴?',
+        scheduledTaskId: 'task-1',
+        source: 'system',
+        createdAt: '2026-05-09T00:01:00.000Z'
+      },
+      {
+        id: 'reminder-3',
+        type: 'self_followup',
+        dueAt: '2026-05-14T01:00:00.000Z',
+        status: 'pending',
+        text: '姣忓ぉ鏃╀笂涔濈偣鎻愰啋鎴戣捣搴?',
+        scheduledTaskId: 'task-1',
+        source: 'system',
+        createdAt: '2026-05-09T00:02:00.000Z'
+      }
+    ]);
+    assistantScheduledTaskService.saveTasks([
+      {
+        id: 'task-1',
+        text: '姣忓ぉ鏃╀笂涔濈偣鎻愰啋鎴戣捣搴?',
+        time: '09:00',
+        recurrenceRule: {
+          frequency: 'daily',
+          startDate: '2026-05-10'
+        },
+        enabled: true,
+        createdAt: '2026-05-09T00:00:00.000Z',
+        updatedAt: '2026-05-09T00:00:00.000Z',
+        nextTriggerAt: '2026-05-14T01:00:00.000Z',
+        pendingReminderId: 'reminder-3'
+      }
+    ]);
+
+    const result = assistantScheduledTaskService.syncScheduledTaskReminders(new Date('2026-05-10T01:26:00.000Z'));
+
+    expect(result.createdReminders).toEqual([]);
+    expect(result.tasks[0].pendingReminderId).toBe('reminder-1');
+    expect(result.tasks[0].nextTriggerAt).toBe('2026-05-10T01:00:00.000Z');
+    expect(assistantReminderQueueService.listReminders().map((reminder) => reminder.id)).toEqual(['reminder-1']);
   });
 
   it('removes a linked pending reminder when the scheduled task is deleted', () => {

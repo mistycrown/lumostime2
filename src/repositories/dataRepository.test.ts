@@ -90,6 +90,7 @@ describe('DataRepository', () => {
     expect(snapshot.logs).toEqual(logs);
     expect(snapshot.todos).toEqual(todos);
     expect(snapshot.todoCategories).toEqual(todoCategories);
+    expect(snapshot.usesFallbackSeedData).toBe(false);
     expect(await repository.getData(REPOSITORY_KEYS.LOGS)).toEqual(logs);
     expect(await repository.getData(REPOSITORY_KEYS.TODOS)).toEqual(todos);
     expect(await repository.getData(REPOSITORY_KEYS.TODO_CATEGORIES)).toEqual(todoCategories);
@@ -132,7 +133,19 @@ describe('DataRepository', () => {
     const snapshot = await dataRepository.loadDataContextSnapshot();
 
     expect(snapshot.logs).toEqual(existingLogs);
+    expect(snapshot.usesFallbackSeedData).toBe(true);
     expect(await repository.getData(REPOSITORY_KEYS.LOGS)).toEqual(existingLogs);
+  });
+
+  it('marks a core snapshot as fallback-seeded when heavy user data is missing', async () => {
+    const repository = new InMemoryStorageRepository();
+    const dataRepository = new DataRepository(repository, createLegacyStorageAdapter(new Map()).adapter);
+
+    const snapshot = await dataRepository.loadDataContextSnapshot();
+
+    expect(snapshot.usesFallbackSeedData).toBe(true);
+    expect(snapshot.logs.length).toBeGreaterThan(0);
+    expect(snapshot.todos.length).toBeGreaterThan(0);
   });
 
   it('reruns migration for newer repository keys even if an older migration flag exists', async () => {

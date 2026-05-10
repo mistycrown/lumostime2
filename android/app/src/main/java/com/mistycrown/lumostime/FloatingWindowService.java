@@ -5,6 +5,7 @@
  * @pos Native Service
  * @description Foreground Android service managing the "LumosTime Island" floating window, including overlay rendering, touch interaction, runtime state updates, and a shared persistent status notification with the AI assistant service.
  * @updated 2026-05-09: Tracks the current app session id inside the floating service so app-origin stops can reconcile precisely after background resume.
+ * @updated 2026-05-09: Refreshes the shared persistent notification title once per second while floating-window focus timers are active so elapsed times stay live.
  * @updated 2026-05-04: Routed floating-window foreground startup through the shared runtime notification manager so Android 8+ no longer depends on the removed legacy notification channel.
  * @updated 2026-04-26: Switched the floating-window foreground notification onto the shared runtime-status manager so Android only shows one persistent LumosTime service notification.
  */
@@ -58,6 +59,7 @@ public class FloatingWindowService extends Service {
     private boolean isMoving = false;
     private boolean isFocusing = false;
     private long startTime = 0;
+    private long lastNotificationElapsedSeconds = -1L;
     private String currentSessionId = null;
     private android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
     private static final long CYCLE_DURATION = 9000; // 5s Time + 2s Emoji + 2s Icon
@@ -96,12 +98,18 @@ public class FloatingWindowService extends Service {
             if (startTime <= 0 || elapsed > 24 * 60 * 60 * 1000L) {
                 elapsed = 0;
             }
+            long elapsedSeconds = elapsed / 1000L;
             String timeText = formatDuration(elapsed);
             timeView.setText(timeText);
             if (timeText.length() > 5) {
                 timeView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 9);
             } else {
                 timeView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 11);
+            }
+
+            if (elapsedSeconds != lastNotificationElapsedSeconds) {
+                lastNotificationElapsedSeconds = elapsedSeconds;
+                updateNotification("\u60ac\u6d6e\u7403\u8ba1\u65f6\u4e2d\uff0c\u70b9\u51fb\u53ef\u7ed3\u675f\u5f53\u524d\u4e13\u6ce8");
             }
 
             // Handle State Transitions
@@ -182,7 +190,7 @@ public class FloatingWindowService extends Service {
         instance = null;
         UnifiedServiceNotificationManager.clearFloatingWindowState(this);
         stopForeground(false);
-        UnifiedServiceNotificationManager.refreshStatusNotification(this);
+        UnifiedServiceNotificationManager.reconcileNotificationState(this);
         Log.d(TAG, "🔴 悬浮窗服务销毁, instance已清空");
         if (floatingView != null) {
             try {
@@ -212,7 +220,7 @@ public class FloatingWindowService extends Service {
         createNotificationChannel();
         UnifiedServiceNotificationManager.setFloatingWindowState(this, true, false);
         startForeground(NOTIFICATION_ID, createNotification("悬浮球已开启，点击可返回 LumosTime"));
-        UnifiedServiceNotificationManager.refreshStatusNotification(this);
+        UnifiedServiceNotificationManager.reconcileNotificationState(this);
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         initView();
@@ -481,6 +489,7 @@ public class FloatingWindowService extends Service {
 
         this.isFocusing = focusing;
         this.startTime = start;
+        this.lastNotificationElapsedSeconds = -1L;
         this.currentSessionId = normalizeSessionId(sessionId);
 
         if (focusing) {
@@ -503,6 +512,7 @@ public class FloatingWindowService extends Service {
         } else {
             // Stop Focusing Mode -> Show App Icon
             handler.removeCallbacks(updateRunnable);
+            lastNotificationElapsedSeconds = -1L;
             currentSessionId = null;
 
             // Clean up animations
@@ -555,7 +565,7 @@ public class FloatingWindowService extends Service {
 
     private void updateNotification(String contentText) {
         UnifiedServiceNotificationManager.setFloatingWindowState(this, true, this.isFocusing);
-        UnifiedServiceNotificationManager.refreshStatusNotification(this);
+        UnifiedServiceNotificationManager.reconcileNotificationState(this);
     }
 
     private void setupTouchListener() {

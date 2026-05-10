@@ -1,6 +1,8 @@
 /**
  * @file SessionContext.tsx
  * @description 管理活动计时会话的状态和逻辑
+ * @updated 2026-05-09: Syncs app-origin active sessions into the native notification plugin so Android can render timer labels in the persistent status notification.
+ * @updated 2026-05-09: Removed direct floating-window mutations so the shared sync hook remains the single source of truth for Android focus-state reconciliation.
  */
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { ActiveSession, Activity, AutoLinkRule } from '../types';
@@ -68,6 +70,24 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
         savePersistedActiveSessions(activeSessions);
     }, [activeSessions]);
 
+    useEffect(() => {
+        if (Capacitor.getPlatform() !== 'android') {
+            return;
+        }
+
+        const sessions = activeSessions
+            .filter(session => session.source !== 'widget')
+            .map(session => ({
+                id: session.id,
+                label: session.activityName,
+                startTime: session.startTime
+            }));
+
+        FocusNotification.syncActiveSessions({ sessions }).catch(error => {
+            console.error('Sync active sessions failed', error);
+        });
+    }, [activeSessions]);
+
     const startActivity = (
         activity: Activity,
         categoryId: string,
@@ -109,17 +129,6 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
         setActiveSessions(prev => [...prev, newSession]);
 
         // Android 浮动窗口更新
-        if (Capacitor.getPlatform() === 'android') {
-            const floatingWindowEnabled = localStorage.getItem('floating_window_enabled') === 'true';
-            if (floatingWindowEnabled && newSession && newSession.startTime) {
-                FocusNotification.updateFloatingWindow({
-                    icon: activity.icon,
-                    isFocusing: true,
-                    startTime: newSession.startTime.toString(),
-                    sessionId: newSession.id
-                }).catch((e) => console.error("Update FW failed", e));
-            }
-        }
     };
 
     const stopActivity = (
@@ -183,12 +192,6 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
         }
 
         // Android 浮动窗口恢复 - 仅在用户启用悬浮球时更新
-        if (Capacitor.getPlatform() === 'android') {
-            const floatingWindowEnabled = localStorage.getItem('floating_window_enabled') === 'true';
-            if (floatingWindowEnabled) {
-                FocusNotification.updateFloatingWindow({ isFocusing: false }).catch(() => { });
-            }
-        }
     };
 
     const cancelSession = (sessionId: string) => {
@@ -198,12 +201,6 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
         }
 
         // Android 浮动窗口恢复 - 仅在用户启用悬浮球时更新
-        if (Capacitor.getPlatform() === 'android') {
-            const floatingWindowEnabled = localStorage.getItem('floating_window_enabled') === 'true';
-            if (floatingWindowEnabled) {
-                FocusNotification.updateFloatingWindow({ isFocusing: false }).catch(() => { });
-            }
-        }
     };
 
     return (
