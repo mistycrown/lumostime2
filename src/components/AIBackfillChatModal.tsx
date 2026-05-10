@@ -4,6 +4,8 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-10: Wired the chat stop action through the unified-turn AbortSignal path and blocked late native replies from writing back after the user cancels an in-flight AI request.
+ * @updated 2026-05-10: Disabled the extra visual-viewport keyboard inset on native Android so the shared AI chat no longer double-lifts above the soft keyboard inside the Capacitor WebView.
  * @updated 2026-05-10: Blocked background assistant execution while core logs/todos are still fallback-seeded and now directly clears locally queued reminder_due items after successful system-turn completion.
  * @updated 2026-05-09: Added mobile visual-viewport keyboard tracking so the chat list and composer rise together above the soft keyboard and the latest messages stay visible while typing.
  * @updated 2026-05-09: Retrying a failed foreground assistant turn now reuses the original error bubble in place, so successful retry content replaces the failure instead of appending a duplicate assistant block.
@@ -86,6 +88,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import {
   Check,
   History,
@@ -1495,6 +1498,25 @@ const buildDebugBlocks = (exchange: AIDebugExchange): DebugTextBlock[] => {
     ].join('\n')
   });
 
+  if (exchange.cache) {
+    const cacheLines = [
+      `providerFamily: ${exchange.cache.providerFamily}`,
+      `strategy: ${exchange.cache.strategy}`,
+      ...(exchange.cache.key ? [`key: ${exchange.cache.key}`] : []),
+      ...(exchange.cache.metrics?.cachedTokens !== undefined ? [`cachedTokens: ${exchange.cache.metrics.cachedTokens}`] : []),
+      ...(exchange.cache.metrics?.promptCacheHitTokens !== undefined ? [`promptCacheHitTokens: ${exchange.cache.metrics.promptCacheHitTokens}`] : []),
+      ...(exchange.cache.metrics?.promptCacheMissTokens !== undefined ? [`promptCacheMissTokens: ${exchange.cache.metrics.promptCacheMissTokens}`] : []),
+      ...(exchange.cache.metrics?.cacheCreationInputTokens !== undefined ? [`cacheCreationInputTokens: ${exchange.cache.metrics.cacheCreationInputTokens}`] : []),
+      ...(exchange.cache.metrics?.cacheReadInputTokens !== undefined ? [`cacheReadInputTokens: ${exchange.cache.metrics.cacheReadInputTokens}`] : []),
+      ...(exchange.cache.metrics?.cacheWriteTokens !== undefined ? [`cacheWriteTokens: ${exchange.cache.metrics.cacheWriteTokens}`] : [])
+    ];
+
+    blocks.push({
+      label: '缓存信息',
+      content: cacheLines.join('\n')
+    });
+  }
+
   const modelValue = typeof requestBody?.model === 'string'
     ? requestBody.model
     : typeof requestBody?.['model'] === 'string'
@@ -1929,8 +1951,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const scrollToLatestMessage = useCallback((behavior: ScrollBehavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
   }, []);
+  const shouldUseVisualViewportKeyboardInset = !(Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android');
   const getKeyboardBottomInset = useCallback(() => {
-    if (typeof window === 'undefined' || !window.visualViewport) {
+    if (!shouldUseVisualViewportKeyboardInset || typeof window === 'undefined' || !window.visualViewport) {
       return 0;
     }
 
@@ -1957,7 +1980,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
     const inset = Math.round(baseline.height - currentVisibleHeight);
     return inset > MOBILE_KEYBOARD_INSET_THRESHOLD ? inset : 0;
-  }, []);
+  }, [shouldUseVisualViewportKeyboardInset]);
   const clearAssistantPartRevealTimeouts = useCallback((messageId?: string) => {
     if (messageId) {
       const handles = assistantPartRevealTimeoutsRef.current.get(messageId) || [];
@@ -2408,7 +2431,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return;
     }
 
-    if (typeof window === 'undefined' || !window.visualViewport) {
+    if (!shouldUseVisualViewportKeyboardInset || typeof window === 'undefined' || !window.visualViewport) {
+      setKeyboardBottomInset(0);
       return;
     }
 
@@ -2440,7 +2464,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         window.cancelAnimationFrame(frameId);
       }
     };
-  }, [getKeyboardBottomInset, isOpen, scrollToLatestMessage]);
+  }, [getKeyboardBottomInset, isOpen, scrollToLatestMessage, shouldUseVisualViewportKeyboardInset]);
 
   useEffect(() => {
     localStorage.setItem(CHAT_PERSONAS_KEY, JSON.stringify(personas));
@@ -4902,7 +4926,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         conversation: conversationContext,
         stateContext,
         dictionaryContext
+      }, {
+        signal: controller.signal
       });
+
+      if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
+        return;
+      }
 
       if (debugMode) {
         debugSections.push({
@@ -4951,29 +4981,48 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       }
       return;
     } catch (error) {
+      const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
+
       if (isAbortError(error)) {
-        replacePendingWithResult(sessionId, pendingMessageId, '已停止这次请求。', {
-          tone: 'system'
-        });
-      } else {
-        const message = getRetryableAIErrorMessage(error);
-        replacePendingWithResult(sessionId, pendingMessageId, message, {
-          tone: 'error',
-          retryInput: trimmedText,
-          retrySourceUserMessageId: userMessageId,
-          debugSections: getErrorDebugSections(error, '统一单轮调用', debugMode)
-        });
+        if (isCurrentPendingRequest) {
+          replacePendingWithResult(sessionId, pendingMessageId, '已停止这次请求。', {
+            tone: 'system'
+          });
+        }
+        return;
       }
+
+      if (!isCurrentPendingRequest || controller.signal.aborted) {
+        return;
+      }
+
+      const message = getRetryableAIErrorMessage(error);
+      replacePendingWithResult(sessionId, pendingMessageId, message, {
+        tone: 'error',
+        retryInput: trimmedText,
+        retrySourceUserMessageId: userMessageId,
+        debugSections: getErrorDebugSections(error, '统一单轮调用', debugMode)
+      });
     } finally {
       if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
         activeRequestRef.current = null;
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }
   };
 
   const handleStopRequest = () => {
-    activeRequestRef.current?.controller.abort();
+    const activeRequest = activeRequestRef.current;
+    if (!activeRequest) {
+      return;
+    }
+
+    activeRequest.controller.abort();
+    activeRequestRef.current = null;
+    setIsLoading(false);
+    replacePendingWithResult(activeRequest.sessionId, activeRequest.pendingMessageId, '已停止这次请求。', {
+      tone: 'system'
+    });
   };
 
   const resolveRetrySourceUserMessageId = (message: AIChatMessage): string | undefined => {

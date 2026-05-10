@@ -5,6 +5,8 @@
  * @pos Service (Assistant Unified Turn)
  * @description Builds the single-turn prompt payload for the converged assistant architecture and forwards it through aiService so foreground and background flows can gradually migrate off the older multi-prompt planner stack.
  *
+ * @updated 2026-05-10: Reordered unified assistant prompt assembly so long-lived dictionary/state sections sit ahead of volatile anchors, improving provider-side prompt-cache reuse across repeated turns.
+ * @updated 2026-05-10: Added request-option passthrough so foreground chat can propagate AbortSignal all the way into the unified AI transport and actually stop in-flight turns.
  * @updated 2026-05-06: Tightened the foreground unified-turn schema so front-chat turns no longer advertise unsupported `silent` outcomes.
  * @updated 2026-05-06: Stopped forwarding provider-native `conversationHistory` for unified turns so session context is injected only once through the structured conversation block.
  * @updated 2026-05-06: Added mode-specific output schemas so background turns no longer advertise foreground-only `clarify` or `toolCalls`, and removed the stale recent-log block from unified prompt assembly.
@@ -17,7 +19,7 @@
  * @updated 2026-04-26: Added the first unified assistant-turn service with layered prompt assembly, shared context serialization, and a single structured aiService gateway call.
  */
 
-import type { AIDebugExchange } from './aiService';
+import type { AIDebugExchange, AIRequestOptions } from './aiService';
 import { aiService } from './aiService';
 import { assistantContextBuilder } from './assistantContextBuilder';
 import { assistantPromptService } from './assistantPromptService';
@@ -36,6 +38,22 @@ export interface AssistantUnifiedTurnResult {
 }
 
 const stringifyJson = (value: unknown): string => JSON.stringify(value, null, 2);
+
+const STABLE_STATE_CONTEXT_KEYS = [
+  'todayTimelineSummary',
+  'yesterdayTimelineSummary',
+  'timelineReviewSummary',
+  'todayScheduledTodoSummary',
+  'pinnedTodoSummary',
+  'overdueTodoSummary'
+] as const;
+
+const VOLATILE_STATE_CONTEXT_KEYS = [
+  'currentDateTime',
+  'defaultDate',
+  'activeSessionSummary',
+  'reminderSummary'
+] as const;
 
 const MEMORY_DISABLED_RULE = '- Long-term memory is disabled for this turn. Set memoryAction to "no_update" and omit memoryPatch.';
 const STRICT_JSON_OUTPUT_RULES = [
@@ -125,6 +143,33 @@ const buildToolSchemaPrompt = async (input: AssistantUnifiedTurnInput): Promise<
     : [foregroundToolsPrompt, MEMORY_DISABLED_RULE].join('\n');
 };
 
+const pickPromptSection = <
+  TSource extends Record<string, unknown>,
+  TKey extends keyof TSource
+>(
+  source: TSource,
+  keys: readonly TKey[]
+): Partial<Pick<TSource, TKey>> => (
+  Object.fromEntries(
+    keys.flatMap((key) => (
+      source[key] === undefined
+        ? []
+        : [[key, source[key]] as const]
+    ))
+  ) as Partial<Pick<TSource, TKey>>
+);
+
+const buildPromptCacheKeySeed = (systemPrompt: string, userPrompt: string, mode: AssistantUnifiedTurnInput['mode']): string => {
+  const stableSystemPrefix = systemPrompt.split('\n=== Volatile State Anchors ===\n')[0]?.trim() || systemPrompt.trim();
+  const stableUserPrefix = userPrompt.split('\n=== Trigger ===\n')[0]?.trim() || userPrompt.trim();
+
+  return [
+    `mode:${mode}`,
+    stableSystemPrefix,
+    stableUserPrefix
+  ].filter(Boolean).join('\n\n');
+};
+
 const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<string> => {
   const memoryEnabled = input.memoryEnabled !== false;
   const [toolSchemaPrompt, memoryRulesPrompt] = await Promise.all([
@@ -132,6 +177,8 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
     memoryEnabled ? assistantPromptService.getMemoryRulesPrompt() : Promise.resolve(undefined)
   ]);
   const dictionaryDigest = assistantContextBuilder.buildDictionaryDigest(input.dictionaryContext);
+  const stableStateContext = pickPromptSection(input.stateContext, STABLE_STATE_CONTEXT_KEYS);
+  const volatileStateContext = pickPromptSection(input.stateContext, VOLATILE_STATE_CONTEXT_KEYS);
   const modePromptLabel = input.mode === 'background' ? 'Background Mode Prompt' : 'Foreground Mode Prompt';
   const toolPromptLabel = input.mode === 'background' ? 'Background Tool Prompt' : 'Foreground Tool Prompt';
   const outputSchema = input.mode === 'background'
@@ -195,25 +242,28 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
     toolSchemaPrompt,
     '',
     STRICT_JSON_OUTPUT_RULES,
-    ...(memoryEnabled && memoryRulesPrompt ? ['', '=== Memory Update Rules ===', memoryRulesPrompt] : []),
     '=== Unified Turn Output Schema ===',
     stringifyJson(outputSchema),
-    ...(memoryEnabled ? ['', '=== Memory Snapshot ===', stringifyJson(buildPromptMemorySnapshot(input.memory))] : []),
-    '',
-    '=== State Context ===',
-    stringifyJson(input.stateContext),
     '',
     '=== Dictionary Context ===',
-    dictionaryDigest
+    dictionaryDigest,
+    ...(Object.keys(stableStateContext).length > 0
+      ? ['', '=== Stable State Context ===', stringifyJson(stableStateContext)]
+      : []),
+    ...(memoryEnabled && memoryRulesPrompt ? ['', '=== Memory Update Rules ===', memoryRulesPrompt] : []),
+    ...(Object.keys(volatileStateContext).length > 0
+      ? ['', '=== Volatile State Anchors ===', stringifyJson(volatileStateContext)]
+      : []),
+    ...(memoryEnabled ? ['', '=== Memory Snapshot ===', stringifyJson(buildPromptMemorySnapshot(input.memory))] : [])
   ].filter(Boolean).join('\n');
 };
 
 const buildUserPrompt = (input: AssistantUnifiedTurnInput): string => [
-  '=== Trigger ===',
-  stringifyJson(buildPromptTrigger(input.trigger)),
-  '',
   '=== Conversation Context ===',
   stringifyJson(input.conversation),
+  '',
+  '=== Trigger ===',
+  stringifyJson(buildPromptTrigger(input.trigger)),
   '',
   'Return one JSON object only.'
 ].join('\n');
@@ -221,13 +271,21 @@ const buildUserPrompt = (input: AssistantUnifiedTurnInput): string => [
 export const assistantTurnService = {
   buildSystemPrompt,
   buildUserPrompt,
-  async runUnifiedTurn(input: AssistantUnifiedTurnInput): Promise<AssistantUnifiedTurnResult> {
+  async runUnifiedTurn(
+    input: AssistantUnifiedTurnInput,
+    options: AIRequestOptions = {}
+  ): Promise<AssistantUnifiedTurnResult> {
     const systemPrompt = await buildSystemPrompt(input);
+    const userPrompt = buildUserPrompt(input);
     const { output, debug } = await aiService.requestAssistantUnifiedTurnWithDebug({
       mode: input.mode,
       systemPrompt,
-      userPrompt: buildUserPrompt(input)
-    });
+      userPrompt,
+      cacheHint: {
+        keySeed: buildPromptCacheKeySeed(systemPrompt, userPrompt, input.mode),
+        scope: 'assistant_unified_turn'
+      }
+    }, options);
 
     return {
       output,

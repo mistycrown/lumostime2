@@ -20,11 +20,15 @@
         android:id="@+id/widget_scene_card_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
         android:layout_marginTop="2dp"
         android:ellipsize="end"
         android:gravity="center"
+        android:includeFontPadding="false"
         android:maxLines="1"
+        android:singleLine="true"
         android:text=""
+        android:textAlignment="center"
         android:textColor="#6C6359"
         android:textSize="8sp" />
 </LinearLayout>

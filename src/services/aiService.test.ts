@@ -59,7 +59,7 @@ describe('aiService unified turn normalization', () => {
             message: {
               content: JSON.stringify({
                 outcome: 'reply',
-                assistantReply: '好的',
+                assistantReply: 'ok',
                 memoryAction: 'no_update',
                 toolCalls: [{
                   toolName: 'create_todo',
@@ -106,5 +106,187 @@ describe('aiService unified turn normalization', () => {
       systemPrompt: 'system',
       userPrompt: 'user'
     })).rejects.toThrow('AI returned no assistant decision.');
+  });
+
+  it('adds provider-aware prompt cache hints and captures cached-token metrics from OpenAI-compatible responses', async () => {
+    localStorage.setItem('lumostime_ai_config', JSON.stringify({
+      provider: 'openai',
+      apiKey: 'test-key',
+      baseUrl: 'https://api.openai.com/v1',
+      modelName: 'test-model'
+    }));
+
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        usage: {
+          prompt_tokens_details: {
+            cached_tokens: 512
+          }
+        },
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              outcome: 'reply',
+              assistantReply: 'cache hit',
+              memoryAction: 'no_update'
+            })
+          }
+        }]
+      })
+    });
+
+    Object.defineProperty(globalThis, 'fetch', {
+      value: fetchSpy,
+      configurable: true
+    });
+
+    const result = await aiService.requestAssistantUnifiedTurnWithDebug({
+      mode: 'foreground',
+      systemPrompt: '=== Stable ===\nshared prefix\n=== Volatile State Anchors ===\ncurrent time',
+      userPrompt: '=== Conversation Context ===\nshared thread\n=== Trigger ===\nright now',
+      cacheHint: {
+        keySeed: 'shared-prefix',
+        scope: 'assistant_unified_turn'
+      }
+    });
+
+    const requestInit = fetchSpy.mock.calls[0]?.[1] as { body?: string } | undefined;
+    const requestBody = requestInit?.body ? JSON.parse(requestInit.body) : {};
+
+    expect(requestBody.prompt_cache_key).toContain('lumostime:openai:assistant_unified_turn:test-model:');
+    expect(result.debug.cache).toEqual({
+      providerFamily: 'openai',
+      strategy: 'prompt_cache_key',
+      key: requestBody.prompt_cache_key,
+      metrics: {
+        cachedTokens: 512
+      }
+    });
+  });
+
+  it('adds explicit cache_control blocks for DashScope-compatible prompts and reads cache creation metrics', async () => {
+    localStorage.setItem('lumostime_ai_config', JSON.stringify({
+      provider: 'openai',
+      apiKey: 'test-key',
+      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      modelName: 'qwen-plus'
+    }));
+
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        usage: {
+          prompt_tokens_details: {
+            cached_tokens: 256,
+            cache_creation_input_tokens: 1024
+          }
+        },
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              outcome: 'reply',
+              assistantReply: 'dashscope cache',
+              memoryAction: 'no_update'
+            })
+          }
+        }]
+      })
+    });
+
+    Object.defineProperty(globalThis, 'fetch', {
+      value: fetchSpy,
+      configurable: true
+    });
+
+    const result = await aiService.requestAssistantUnifiedTurnWithDebug({
+      mode: 'foreground',
+      systemPrompt: 'system prompt',
+      userPrompt: '=== Conversation Context ===\nshared thread\n=== Trigger ===\nturn-specific trigger',
+      cacheHint: {
+        keySeed: 'shared-prefix',
+        scope: 'assistant_unified_turn'
+      }
+    });
+
+    const requestInit = fetchSpy.mock.calls[0]?.[1] as { body?: string } | undefined;
+    const requestBody = requestInit?.body ? JSON.parse(requestInit.body) : {};
+    const userMessage = requestBody.messages?.[requestBody.messages.length - 1];
+
+    expect(Array.isArray(userMessage?.content)).toBe(true);
+    expect(userMessage.content[0]).toMatchObject({
+      type: 'text',
+      text: '=== Conversation Context ===\nshared thread',
+      cache_control: { type: 'ephemeral' }
+    });
+    expect(result.debug.cache).toMatchObject({
+      providerFamily: 'dashscope',
+      strategy: 'explicit_cache_control',
+      metrics: {
+        cachedTokens: 256,
+        cacheCreationInputTokens: 1024
+      }
+    });
+    expect(result.debug.cache?.key).toContain('lumostime:dashscope:assistant_unified_turn:qwen-plus:');
+  });
+
+  it('adds top-level cache_control for OpenRouter Anthropic models', async () => {
+    localStorage.setItem('lumostime_ai_config', JSON.stringify({
+      provider: 'openai',
+      apiKey: 'test-key',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      modelName: 'anthropic/claude-3.7-sonnet'
+    }));
+
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        usage: {
+          prompt_tokens_details: {
+            cache_write_tokens: 2048
+          }
+        },
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              outcome: 'reply',
+              assistantReply: 'openrouter cache',
+              memoryAction: 'no_update'
+            })
+          }
+        }]
+      })
+    });
+
+    Object.defineProperty(globalThis, 'fetch', {
+      value: fetchSpy,
+      configurable: true
+    });
+
+    const result = await aiService.requestAssistantUnifiedTurnWithDebug({
+      mode: 'foreground',
+      systemPrompt: 'system prompt',
+      userPrompt: 'user prompt',
+      cacheHint: {
+        keySeed: 'shared-prefix',
+        scope: 'assistant_unified_turn'
+      }
+    });
+
+    const requestInit = fetchSpy.mock.calls[0]?.[1] as { body?: string } | undefined;
+    const requestBody = requestInit?.body ? JSON.parse(requestInit.body) : {};
+
+    expect(requestBody.cache_control).toEqual({ type: 'ephemeral' });
+    expect(result.debug.cache).toMatchObject({
+      providerFamily: 'openrouter',
+      strategy: 'top_level_cache_control',
+      metrics: {
+        cacheWriteTokens: 2048
+      }
+    });
+    expect(result.debug.cache?.key).toContain('lumostime:openrouter:assistant_unified_turn:anthropic/claude-3.7-sonnet:');
   });
 });

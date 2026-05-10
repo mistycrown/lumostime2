@@ -4,6 +4,8 @@
  * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
  * @pos Service (AI Integration Layer)
  * @description AI 闂備礁鎼悧鍡欑矓鐎涙ɑ鍙?- 濠电姰鍨煎▔娑氣偓姘煎櫍楠炲啯绻濋崘顏佹灃?AI 闂備礁婀辩划顖炲礉閹烘梹顐介柣銏㈩焾閻ゎ噣鏌涢埥鍡楀箻缂佲偓閸戠晝enAI/Gemini闂備焦瀵х粙鎴λ囬崡鐐╂灁闁硅揪绠戠粻銉╂煃瑜滈崜鐔奉嚕閸偄绶炲璺侯儏閺€顓熺箾鐎涙鐭嬮悽顖ｄ簽濡cljs劕鈹戠€ｎ亞顦遍梺鍛婁緱閸犳牠顢旈鍫熲拺闁哄娉曡倴闂佹眹鍊曞Λ娑氬垝婵犳碍鏅柛鏇ㄥ墮閳ь剛鍋ら弻鏇㈠幢閺囩喓銈扮紓浣虹帛閻╊垶鐛幒妤€唯闁挎柧鍕橀崑鐐烘煟閻樺弶澶勬繛鍙夌墵楠炲繑瀵奸弶鎴狀唽闂佸綊鍋婇崰鎾寸濞戙垺鐓欑紒妤佺☉濡參寮? * @updated 2026-04-27: Extended unified assistant-turn normalization with decision summaries, silent reasons, side effects, and structured multi-bubble reply parts.
+ * @updated 2026-05-10: Added provider-aware prompt-cache routing hints plus normalized cache debug metrics for OpenAI-compatible assistant turns, while keeping unsupported providers on the existing transport path.
+ * @updated 2026-05-10: Taught native AI requests to honor AbortSignal by bridging unified-turn cancellation onto `cordova-plugin-advanced-http` request ids, so Android stop actions can actually terminate in-flight model calls.
  * @updated 2026-05-09: Treat empty or content-free unified assistant-turn outputs as failures so reminder dispatchers keep pending reminders for retry instead of deleting them on blank model responses.
  * @updated 2026-05-06: Tightened unified foreground tool normalization so `create_todo` now requires `linkedActivityId` before the tool call is accepted.
  * @updated 2026-04-27: Normalized malformed unified-turn memoryPatch fields such as single-string recentDecisions so durable memory updates are not silently dropped downstream.
@@ -77,6 +79,19 @@ export interface AIDebugExchange {
         status: number;
         ok: boolean;
         body: unknown;
+    };
+    cache?: {
+        providerFamily: string;
+        strategy: 'none' | 'automatic' | 'prompt_cache_key' | 'session_affinity' | 'explicit_cache_control' | 'top_level_cache_control';
+        key?: string;
+        metrics?: {
+            cachedTokens?: number;
+            promptCacheHitTokens?: number;
+            promptCacheMissTokens?: number;
+            cacheCreationInputTokens?: number;
+            cacheReadInputTokens?: number;
+            cacheWriteTokens?: number;
+        };
     };
 }
 
@@ -186,6 +201,23 @@ export interface AIConversationTurn {
     content: string;
 }
 
+interface AIPromptCacheHint {
+    keySeed: string;
+    scope?: string;
+}
+
+type OpenAICompatibleProviderFamily =
+    | 'openai'
+    | 'deepseek'
+    | 'mistral'
+    | 'fireworks'
+    | 'groq'
+    | 'xai'
+    | 'dashscope'
+    | 'moonshot'
+    | 'openrouter'
+    | 'unknown';
+
 const AI_CONFIG_KEY = 'lumostime_ai_config';
 const AI_PROFILES_KEY = 'lumostime_ai_profiles';
 
@@ -193,22 +225,133 @@ import { HTTP } from '@awesome-cordova-plugins/http';
 import { Capacitor } from '@capacitor/core';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
 
+const createAbortError = (): Error => {
+    const error = new Error('The operation was aborted.');
+    error.name = 'AbortError';
+    return error;
+};
+
+const normalizeNativeFetchError = (error: any) => {
+    console.error('Native AI Request Error', error);
+
+    let errMsg = error?.error || error?.message || JSON.stringify(error);
+    if (typeof errMsg === 'string' && errMsg.startsWith('{')) {
+        try {
+            errMsg = JSON.parse(errMsg).error || errMsg;
+        } catch (_parseError) {
+            // Keep the original string when the native payload is not valid JSON.
+        }
+    }
+
+    // Expose to global for UI alerts
+    // @ts-ignore
+    if (typeof window !== 'undefined') window.webdavLastError = `NativeAI: ${error?.status || 'Err'} - ${errMsg}`;
+
+    if (error?.status) {
+        let errorBody = {};
+        if (error.error) {
+            try {
+                errorBody = JSON.parse(error.error);
+            } catch (_parseError) {
+                errorBody = { error: error.error };
+            }
+        }
+
+        return {
+            ok: false,
+            status: error.status,
+            json: async () => errorBody
+        };
+    }
+
+    throw error;
+};
+
 // Helper for Native Requests
 const nativeFetch = async (url: string, options: any) => {
-    try {
-        // HTTP plugin expects headers in 'headers', data in 'data'
-        // fetch options puts body in 'body'
-        const method = (options.method || 'GET').toLowerCase();
-        const data = options.body ? JSON.parse(options.body) : {};
+    const signal = options?.signal as AbortSignal | undefined;
+    const requestOptions = {
+        method: (options.method || 'GET').toLowerCase(),
+        data: options.body ? JSON.parse(options.body) : {},
+        headers: options.headers,
+        timeout: 60000 // 60s timeout for AI
+    };
 
+    if (signal?.aborted) {
+        throw createAbortError();
+    }
+
+    try {
         HTTP.setDataSerializer('json');
 
-        const response = await HTTP.sendRequest(url, {
-            method: method,
-            data: data,
-            headers: options.headers,
-            timeout: 60000 // 60s timeout for AI
-        });
+        if (signal) {
+            return await new Promise((resolve, reject) => {
+                let settled = false;
+                let requestId = '';
+
+                const cleanup = () => {
+                    signal.removeEventListener('abort', handleAbort);
+                };
+
+                const resolveOnce = (value: unknown) => {
+                    if (settled) {
+                        return;
+                    }
+                    settled = true;
+                    cleanup();
+                    resolve(value);
+                };
+
+                const rejectOnce = (reason: unknown) => {
+                    if (settled) {
+                        return;
+                    }
+                    settled = true;
+                    cleanup();
+                    reject(reason);
+                };
+
+                const handleAbort = () => {
+                    if (settled) {
+                        return;
+                    }
+
+                    if (requestId) {
+                        void HTTP.abort(requestId).catch((abortFailure) => {
+                            console.warn('[aiService] Failed to abort native AI request', abortFailure);
+                        });
+                    }
+                    rejectOnce(createAbortError());
+                };
+
+                signal.addEventListener('abort', handleAbort, { once: true });
+
+                requestId = HTTP.sendRequestSync(
+                    url,
+                    requestOptions,
+                    (response) => {
+                        resolveOnce({
+                            ok: response.status >= 200 && response.status < 300,
+                            status: response.status,
+                            json: async () => JSON.parse(response.data)
+                        });
+                    },
+                    (error) => {
+                        try {
+                            resolveOnce(normalizeNativeFetchError(error));
+                        } catch (normalizedError) {
+                            rejectOnce(normalizedError);
+                        }
+                    }
+                );
+
+                if (signal.aborted) {
+                    handleAbort();
+                }
+            });
+        }
+
+        const response = await HTTP.sendRequest(url, requestOptions);
 
         return {
             ok: response.status >= 200 && response.status < 300,
@@ -216,28 +359,10 @@ const nativeFetch = async (url: string, options: any) => {
             json: async () => JSON.parse(response.data)
         };
     } catch (error: any) {
-        console.error("Native AI Request Error", error);
-
-        // Try parsing inner JSON error from native HTTP plugin
-        let errMsg = error.error || error.message || JSON.stringify(error);
-        if (typeof errMsg === 'string' && errMsg.startsWith('{')) {
-            try { errMsg = JSON.parse(errMsg).error || errMsg; } catch (e) { }
+        if (signal?.aborted) {
+            throw createAbortError();
         }
-
-        // Expose to global for UI alerts
-        // @ts-ignore
-        if (typeof window !== 'undefined') window.webdavLastError = `NativeAI: ${error.status || 'Err'} - ${errMsg}`;
-
-        // Normalize error to resemble fetch response if possible, or throw
-        if (error.status) {
-            const errorBody = error.error ? JSON.parse(error.error) : {};
-            return {
-                ok: false,
-                status: error.status,
-                json: async () => errorBody
-            };
-        }
-        throw error;
+        return normalizeNativeFetchError(error);
     }
 };
 
@@ -327,6 +452,112 @@ const buildOpenAIJsonMessageList = (
     ];
 };
 
+const buildCacheControlContentParts = (
+    stablePrefix: string,
+    volatileSuffix: string
+): Array<Record<string, unknown>> => {
+    const parts: Array<Record<string, unknown>> = [];
+    const trimmedStablePrefix = stablePrefix.trim();
+    const trimmedVolatileSuffix = volatileSuffix.trim();
+
+    if (trimmedStablePrefix) {
+        parts.push({
+            type: 'text',
+            text: trimmedStablePrefix,
+            cache_control: { type: 'ephemeral' }
+        });
+    }
+
+    if (trimmedVolatileSuffix) {
+        parts.push({
+            type: 'text',
+            text: trimmedVolatileSuffix
+        });
+    }
+
+    return parts;
+};
+
+const splitExplicitCacheUserPrompt = (userPrompt: string): { stablePrefix: string; volatileSuffix: string } => {
+    const marker = '\n=== Trigger ===\n';
+    const markerIndex = userPrompt.indexOf(marker);
+
+    if (markerIndex < 0) {
+        return {
+            stablePrefix: userPrompt.trim(),
+            volatileSuffix: ''
+        };
+    }
+
+    return {
+        stablePrefix: userPrompt.slice(0, markerIndex).trim(),
+        volatileSuffix: userPrompt.slice(markerIndex).trim()
+    };
+};
+
+const supportsExplicitOpenAICompatibleCacheControl = (
+    config: AIConfig,
+    providerFamily: OpenAICompatibleProviderFamily
+): boolean => {
+    const modelName = (config.modelName || '').trim().toLowerCase();
+
+    if (providerFamily === 'dashscope') {
+        return true;
+    }
+
+    if (providerFamily === 'openrouter') {
+        return modelName.startsWith('google/') || modelName.includes('gemini');
+    }
+
+    return false;
+};
+
+const supportsOpenRouterTopLevelCacheControl = (
+    config: AIConfig,
+    providerFamily: OpenAICompatibleProviderFamily
+): boolean => {
+    if (providerFamily !== 'openrouter') {
+        return false;
+    }
+
+    const modelName = (config.modelName || '').trim().toLowerCase();
+    return modelName.startsWith('anthropic/') || modelName.includes('claude');
+};
+
+const buildOpenAICompatibleJsonMessages = (
+    config: AIConfig,
+    systemPrompt: string,
+    userPrompt: string,
+    conversationHistory?: AIConversationTurn[]
+) => {
+    const providerFamily = detectOpenAICompatibleProviderFamily(config);
+    const messages = buildOpenAIJsonMessageList(systemPrompt, userPrompt, conversationHistory);
+
+    if (!supportsExplicitOpenAICompatibleCacheControl(config, providerFamily) || messages.length === 0) {
+        return messages;
+    }
+
+    const latestMessage = messages[messages.length - 1];
+    if (!latestMessage || latestMessage.role !== 'user' || typeof latestMessage.content !== 'string') {
+        return messages;
+    }
+
+    const { stablePrefix, volatileSuffix } = splitExplicitCacheUserPrompt(latestMessage.content);
+    const contentParts = buildCacheControlContentParts(stablePrefix, volatileSuffix);
+
+    if (contentParts.length === 0) {
+        return messages;
+    }
+
+    return [
+        ...messages.slice(0, -1),
+        {
+            ...latestMessage,
+            content: contentParts
+        }
+    ];
+};
+
 const buildGeminiContents = (
     userPrompt: string,
     conversationHistory?: AIConversationTurn[]
@@ -337,6 +568,240 @@ const buildGeminiContents = (
     })),
     { role: 'user', parts: [{ text: userPrompt.trim() }] }
 ]);
+
+const getBaseUrlHost = (baseUrl?: string): string => {
+    if (!baseUrl?.trim()) {
+        return '';
+    }
+
+    try {
+        return new URL(baseUrl).host.toLowerCase();
+    } catch (_error) {
+        return '';
+    }
+};
+
+const detectOpenAICompatibleProviderFamily = (config: AIConfig): OpenAICompatibleProviderFamily => {
+    const host = getBaseUrlHost(config.baseUrl);
+    const modelName = (config.modelName || '').trim().toLowerCase();
+
+    if (host.includes('openai.com')) {
+        return 'openai';
+    }
+
+    if (host.includes('deepseek.com') || modelName.startsWith('deepseek')) {
+        return 'deepseek';
+    }
+
+    if (host.includes('mistral.ai') || modelName.startsWith('mistral')) {
+        return 'mistral';
+    }
+
+    if (host.includes('fireworks.ai')) {
+        return 'fireworks';
+    }
+
+    if (host.includes('groq.com') || modelName.startsWith('llama-') || modelName.startsWith('mixtral-')) {
+        return 'groq';
+    }
+
+    if (host.includes('x.ai') || modelName.startsWith('grok-')) {
+        return 'xai';
+    }
+
+    if (host.includes('aliyuncs.com') || host.includes('dashscope') || modelName.startsWith('qwen-')) {
+        return 'dashscope';
+    }
+
+    if (host.includes('moonshot') || host.includes('kimi') || modelName.startsWith('kimi-')) {
+        return 'moonshot';
+    }
+
+    if (host.includes('openrouter.ai')) {
+        return 'openrouter';
+    }
+
+    return 'unknown';
+};
+
+const hashPromptCacheSeed = (value: string): string => {
+    let hash = 2166136261;
+
+    for (let index = 0; index < value.length; index += 1) {
+        hash ^= value.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+    }
+
+    return (hash >>> 0).toString(16).padStart(8, '0');
+};
+
+const buildPromptCacheKey = (
+    config: AIConfig,
+    providerFamily: OpenAICompatibleProviderFamily,
+    cacheHint?: AIPromptCacheHint
+): string | undefined => {
+    if (!cacheHint?.keySeed.trim()) {
+        return undefined;
+    }
+
+    const scope = cacheHint.scope?.trim() || 'default';
+    const normalizedModel = (config.modelName || 'unknown-model').trim().toLowerCase();
+
+    return `lumostime:${providerFamily}:${scope}:${normalizedModel}:${hashPromptCacheSeed(cacheHint.keySeed)}`;
+};
+
+const buildOpenAICompatiblePromptCacheConfig = (
+    config: AIConfig,
+    cacheHint?: AIPromptCacheHint
+): {
+    bodyExtras: Record<string, unknown>;
+    headerExtras: Record<string, string>;
+    debugCache: AIDebugExchange['cache'];
+} => {
+    const providerFamily = detectOpenAICompatibleProviderFamily(config);
+    const cacheKey = buildPromptCacheKey(config, providerFamily, cacheHint);
+    const debugCacheBase: AIDebugExchange['cache'] = {
+        providerFamily,
+        strategy: 'none',
+        ...(cacheKey ? { key: cacheKey } : {})
+    };
+
+    if (!cacheKey) {
+        return {
+            bodyExtras: {},
+            headerExtras: {},
+            debugCache: debugCacheBase
+        };
+    }
+
+    if (providerFamily === 'openai' || providerFamily === 'mistral') {
+        return {
+            bodyExtras: {
+                prompt_cache_key: cacheKey
+            },
+            headerExtras: {},
+            debugCache: {
+                ...debugCacheBase,
+                strategy: 'prompt_cache_key'
+            }
+        };
+    }
+
+    if (providerFamily === 'xai') {
+        return {
+            bodyExtras: {},
+            headerExtras: {
+                'x-grok-conv-id': cacheKey
+            },
+            debugCache: {
+                ...debugCacheBase,
+                strategy: 'session_affinity'
+            }
+        };
+    }
+
+    if (providerFamily === 'fireworks') {
+        return {
+            bodyExtras: {},
+            headerExtras: {
+                'x-session-affinity': cacheKey
+            },
+            debugCache: {
+                ...debugCacheBase,
+                strategy: 'session_affinity'
+            }
+        };
+    }
+
+    if (providerFamily === 'deepseek' || providerFamily === 'groq' || providerFamily === 'moonshot') {
+        return {
+            bodyExtras: {},
+            headerExtras: {},
+            debugCache: {
+                ...debugCacheBase,
+                strategy: 'automatic'
+            }
+        };
+    }
+
+    if (providerFamily === 'dashscope') {
+        return {
+            bodyExtras: {},
+            headerExtras: {},
+            debugCache: {
+                ...debugCacheBase,
+                strategy: 'explicit_cache_control'
+            }
+        };
+    }
+
+    if (supportsOpenRouterTopLevelCacheControl(config, providerFamily)) {
+        return {
+            bodyExtras: {
+                cache_control: {
+                    type: 'ephemeral'
+                }
+            },
+            headerExtras: {},
+            debugCache: {
+                ...debugCacheBase,
+                strategy: 'top_level_cache_control'
+            }
+        };
+    }
+
+    if (supportsExplicitOpenAICompatibleCacheControl(config, providerFamily)) {
+        return {
+            bodyExtras: {},
+            headerExtras: {},
+            debugCache: {
+                ...debugCacheBase,
+                strategy: 'explicit_cache_control'
+            }
+        };
+    }
+
+    return {
+        bodyExtras: {},
+        headerExtras: {},
+        debugCache: debugCacheBase
+    };
+};
+
+const readNumericMetric = (container: Record<string, unknown> | null | undefined, key: string): number | undefined => {
+    if (!container || typeof container[key] !== 'number' || !Number.isFinite(container[key] as number)) {
+        return undefined;
+    }
+
+    return container[key] as number;
+};
+
+const extractPromptCacheMetrics = (responseBody: unknown): AIDebugExchange['cache']['metrics'] | undefined => {
+    const root = responseBody && typeof responseBody === 'object'
+        ? responseBody as Record<string, unknown>
+        : undefined;
+    const usage = root?.usage && typeof root.usage === 'object'
+        ? root.usage as Record<string, unknown>
+        : undefined;
+    const promptTokenDetails = usage?.prompt_tokens_details && typeof usage.prompt_tokens_details === 'object'
+        ? usage.prompt_tokens_details as Record<string, unknown>
+        : undefined;
+    const metrics = {
+        cachedTokens: readNumericMetric(promptTokenDetails, 'cached_tokens'),
+        promptCacheHitTokens: readNumericMetric(usage, 'prompt_cache_hit_tokens') ?? readNumericMetric(root, 'prompt_cache_hit_tokens'),
+        promptCacheMissTokens: readNumericMetric(usage, 'prompt_cache_miss_tokens') ?? readNumericMetric(root, 'prompt_cache_miss_tokens'),
+        cacheCreationInputTokens: readNumericMetric(promptTokenDetails, 'cache_creation_input_tokens') ?? readNumericMetric(usage, 'cache_creation_input_tokens') ?? readNumericMetric(root, 'cache_creation_input_tokens'),
+        cacheReadInputTokens: readNumericMetric(promptTokenDetails, 'cache_read_input_tokens') ?? readNumericMetric(usage, 'cache_read_input_tokens') ?? readNumericMetric(root, 'cache_read_input_tokens'),
+        cacheWriteTokens: readNumericMetric(promptTokenDetails, 'cache_write_tokens') ?? readNumericMetric(usage, 'cache_write_tokens') ?? readNumericMetric(root, 'cache_write_tokens')
+    };
+    const filteredMetrics = Object.fromEntries(
+        Object.entries(metrics).filter(([, value]) => value !== undefined)
+    ) as AIDebugExchange['cache']['metrics'];
+
+    return Object.keys(filteredMetrics).length > 0
+        ? filteredMetrics
+        : undefined;
+};
 
 const normalizeTodoRecurrenceRule = (value: unknown): TodoRecurrenceRule | undefined => {
     if (!value || typeof value !== 'object') {
@@ -733,20 +1198,24 @@ const requestJsonObjectWithDebug = async <T>(
         systemPrompt: string;
         userPrompt: string;
         conversationHistory?: AIConversationTurn[];
+        cacheHint?: AIPromptCacheHint;
         normalizeResult: (rawValue: any) => T;
         options?: AIRequestOptions;
     }
 ): Promise<{ result: T; debug: AIDebugExchange }> => {
     if (config.provider === 'openai') {
         const url = `${config.baseUrl}/chat/completions`;
+        const promptCacheConfig = buildOpenAICompatiblePromptCacheConfig(config, params.cacheHint);
         const headers = {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${config.apiKey}`
+            'Authorization': `Bearer ${config.apiKey}`,
+            ...promptCacheConfig.headerExtras
         };
         const body = {
             model: config.modelName,
-            messages: buildOpenAIJsonMessageList(params.systemPrompt, params.userPrompt, params.conversationHistory),
-            response_format: { type: 'json_object' }
+            messages: buildOpenAICompatibleJsonMessages(config, params.systemPrompt, params.userPrompt, params.conversationHistory),
+            response_format: { type: 'json_object' },
+            ...promptCacheConfig.bodyExtras
         };
         const requestedAt = new Date().toISOString();
         let responseStatus = 0;
@@ -778,6 +1247,10 @@ const requestJsonObjectWithDebug = async <T>(
                     status: responseStatus,
                     ok: responseOk,
                     body: responseBody
+                },
+                cache: {
+                    ...promptCacheConfig.debugCache,
+                    ...(extractPromptCacheMetrics(responseBody) ? { metrics: extractPromptCacheMetrics(responseBody) } : {})
                 }
             };
 
@@ -809,7 +1282,8 @@ const requestJsonObjectWithDebug = async <T>(
                     body: responseBody || {
                         transportError: error instanceof Error ? error.message : String(error)
                     }
-                }
+                },
+                cache: promptCacheConfig.debugCache
             };
 
             const finalError = error instanceof Error ? error : new Error(String(error));
@@ -1126,6 +1600,7 @@ Output:
             systemPrompt: string;
             userPrompt: string;
             conversationHistory?: AIConversationTurn[];
+            cacheHint?: AIPromptCacheHint;
         },
         options: AIRequestOptions = {}
     ): Promise<AIAssistantUnifiedTurnResult> => {
@@ -1213,6 +1688,7 @@ Output:
             systemPrompt: params.systemPrompt,
             userPrompt: params.userPrompt,
             conversationHistory: params.conversationHistory,
+            cacheHint: params.cacheHint,
             normalizeResult: normalizeOutput,
             options
         });

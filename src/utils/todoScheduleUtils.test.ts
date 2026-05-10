@@ -4,6 +4,7 @@
  * @output Regression coverage for virtual-category date matching, shared day entries, and week-view badge normalization
  * @pos Test (todo planning utilities)
  * @description Verifies today/tomorrow/this-week filtering and shared per-day entry building against Arrange, Due, and recurrence rules without creating occurrence records.
+ * @updated 2026-05-10: Added regression coverage for week-view subtask parent labels so shared week buckets expose inline `@parent` context only for child rows.
  * @updated 2026-05-10: Added regression coverage for shared real-data day entries so month view and week view stay aligned on daily inclusion and priority ordering.
  * @updated 2026-04-27: Added regression coverage for the shared today-category helper so `today + pin` widget and picker views keep due-today and recurring-today todos.
  * @updated 2026-04-22: Added regression coverage for the shared todo-picker today category that mixes pinned todos with todos arranged for today.
@@ -13,7 +14,9 @@
 import { describe, expect, test } from 'vitest';
 import { Log, TodoItem } from '../types';
 import {
+  buildWeekTodoBuckets,
   buildTodoDateEntries,
+  formatWeekTodoLineTitle,
   getTodoAssociationTodayTodos,
   getTodoScheduleMatches,
   getTodoScheduleRangeDateKeys,
@@ -160,5 +163,31 @@ describe('todoScheduleUtils virtual category helpers', () => {
       'completed:completed',
       'in-progress:inProgress'
     ]);
+  });
+
+  test('carries parent titles into week buckets so subtask rows can render inline @parent context', () => {
+    const todos: TodoItem[] = [
+      buildTodo({ id: 'parent', title: 'Parent Atlas' }),
+      buildTodo({
+        id: 'child',
+        title: 'Dataset Draft',
+        parentTodoId: 'parent',
+        scheduledDate: '2026-04-20'
+      }),
+      buildTodo({
+        id: 'root',
+        title: 'Root Item',
+        scheduledDate: '2026-04-20'
+      })
+    ];
+
+    const [firstBucket] = buildWeekTodoBuckets(todos, [], REFERENCE_DATE);
+    const childEntry = firstBucket?.items.find((entry) => entry.todo.id === 'child');
+    const rootEntry = firstBucket?.items.find((entry) => entry.todo.id === 'root');
+
+    expect(childEntry?.parentTitle).toBe('Parent Atlas');
+    expect(rootEntry?.parentTitle).toBeUndefined();
+    expect(childEntry ? formatWeekTodoLineTitle(childEntry) : null).toBe('Dataset Draft @Parent Atlas');
+    expect(rootEntry ? formatWeekTodoLineTitle(rootEntry) : null).toBe('Root Item');
   });
 });

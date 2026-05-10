@@ -90,12 +90,16 @@ describe('assistantTurnService', () => {
     expect(request?.systemPrompt).toContain('Your entire response must be valid JSON parsable by JSON.parse with no cleanup step.');
     expect(request?.systemPrompt).toContain('=== Memory Update Rules ===');
     expect(request?.systemPrompt).toContain('memory rules prompt');
+    expect(request?.systemPrompt).toContain('=== Volatile State Anchors ===');
     expect(request?.systemPrompt).toContain('=== Memory Snapshot ===');
     expect(request?.systemPrompt).toContain('"profileMemory": [');
     expect(request?.systemPrompt).toContain('"updatedAt": "2026-04-27T17:00:00+08:00"');
     expect(request?.systemPrompt).not.toContain('"updatedAt": "2026-04-27T09:00:00.000Z"');
     expect(request?.systemPrompt).not.toContain('=== Recent Logs Digest ===');
+    expect((request?.userPrompt.indexOf('=== Conversation Context ===') || 0)).toBeLessThan(request?.userPrompt.indexOf('=== Trigger ===') || 0);
     expect(request?.userPrompt).toContain('"createdAt": "2026-04-27T17:00:00+08:00"');
+    expect(request?.cacheHint?.scope).toBe('assistant_unified_turn');
+    expect(typeof request?.cacheHint?.keySeed).toBe('string');
   });
 
   it('serializes the optional timeline review digest without replacing the concrete same-day log list', async () => {
@@ -119,11 +123,15 @@ describe('assistantTurnService', () => {
     }));
 
     const request = vi.mocked(aiService.requestAssistantUnifiedTurnWithDebug).mock.calls[0]?.[0];
+    const dictionaryIndex = request?.systemPrompt.indexOf('=== Dictionary Context ===') || -1;
+    const volatileStateIndex = request?.systemPrompt.indexOf('=== Volatile State Anchors ===') || -1;
     expect(request?.systemPrompt).toContain('"todayTimelineSummary": "09:00-10:00 Work / Writing"');
     expect(request?.systemPrompt).toContain('"yesterdayTimelineSummary": "14:00-15:00 Work / Writing"');
     expect(request?.systemPrompt).toContain('"timelineReviewSummary": "today and yesterday review digest"');
     expect(request?.systemPrompt).toContain('[Logs] rows=1');
     expect(request?.systemPrompt).toContain('"log-1"\t"2026-04-27"\t"09:00-10:00"');
+    expect(dictionaryIndex).toBeGreaterThanOrEqual(0);
+    expect(volatileStateIndex).toBeGreaterThan(dictionaryIndex);
     expect(request).not.toHaveProperty('conversationHistory');
   });
 
@@ -169,5 +177,18 @@ describe('assistantTurnService', () => {
     expect(request?.systemPrompt).not.toContain('=== Memory Snapshot ===');
     expect(request?.systemPrompt).toContain('Long-term memory is disabled for this turn. Set memoryAction to "no_update" and omit memoryPatch.');
     expect(request?.systemPrompt).toContain('"memoryAction": "no_update"');
+  });
+
+  it('passes request options through to aiService so callers can cancel in-flight turns', async () => {
+    const controller = new AbortController();
+
+    await assistantTurnService.runUnifiedTurn(createInput(), {
+      signal: controller.signal
+    });
+
+    const forwardedOptions = vi.mocked(aiService.requestAssistantUnifiedTurnWithDebug).mock.calls[0]?.[1];
+    expect(forwardedOptions).toEqual({
+      signal: controller.signal
+    });
   });
 });
