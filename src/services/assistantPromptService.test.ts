@@ -37,6 +37,13 @@ describe('assistantPromptService', () => {
     expect(prompt).toContain('Never invent ids.');
   });
 
+  it('fallback foreground tools prompt prefers a small lead time for punctual attendance reminders', async () => {
+    const prompt = await assistantPromptService.getForegroundToolsPrompt();
+
+    expect(prompt).toContain('punctual attendance event');
+    expect(prompt).toContain('use 5 minutes early as the default');
+  });
+
   it('fallback memory rules keep fired-reminder cleanup in runtime instead of the model', async () => {
     const prompt = await assistantPromptService.getMemoryRulesPrompt();
 

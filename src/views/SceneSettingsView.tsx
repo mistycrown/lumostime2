@@ -2,6 +2,7 @@
  * @file SceneSettingsView.tsx
  * @description 场景设置页面 - 管理场景组、时间段和快捷方式
  *
+ * @updated 2026-05-11: Added manual-mode scene-group ordering controls via a shared order-list component.
  * 修改历史:
  * - 2026-03-19: 调整根布局为全屏覆盖层，修复页面白屏无法打开的问题。
  */
@@ -17,6 +18,7 @@ import { CheckItemAssociation } from '../components/CheckItemAssociation';
 import { TagMultipleAssociation } from '../components/TagMultipleAssociation';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { AppSelector } from '../components/AppSelector';
+import { SceneGroupOrderList } from '../components/SceneGroupOrderList';
 import { uiIconService } from '../services/uiIconService';
 import { useData } from '../contexts/DataContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
@@ -26,7 +28,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useCustomColors } from '../hooks/useCustomColors';
 import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
 import { COLOR_OPTIONS } from '../constants';
-import { findAutoSwitchTargetGroup, getActiveSceneGroup, isSceneGroupAutoSwitchMatched, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from '../utils/sceneGroupStorage';
+import { findAutoSwitchTargetGroup, getActiveSceneGroup, isSceneGroupAutoSwitchMatched, loadSceneGroupStateFromStorage, moveSceneGroup, saveSceneGroupStateToStorage } from '../utils/sceneGroupStorage';
 import { updateLocalDataTimestamp } from '../utils/localDataTimestamp';
 import { isStoredColorSelected } from '../utils/colorUtils';
 
@@ -268,6 +270,14 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
       ...sceneGroupState,
       switchMode: mode
     });
+  };
+
+  const handleMoveGroup = (groupId: string, direction: 'up' | 'down') => {
+    const nextState = moveSceneGroup(sceneGroupState, groupId, direction);
+    if (nextState === sceneGroupState) {
+      return;
+    }
+    persistSceneGroupState(nextState);
   };
 
   const updateGroupAutoSwitch = (
@@ -1241,9 +1251,6 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
             <div className="p-4 sm:p-6 pb-3 border-b border-stone-200">
               <h2 className="text-lg sm:text-xl font-bold">切换模式管理</h2>
-              <p className="text-xs text-stone-500 mt-1">
-                场景组管理包含两部分：场景组内容管理与切换模式管理。这里仅配置切换模式与规则。
-              </p>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
@@ -1271,9 +1278,6 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
                     自动模式
                   </button>
                 </div>
-                <p className="text-xs text-stone-500 mt-2">
-                  请先选择模式：手动模式只展示一个场景组；自动模式按每个场景组的规则匹配展示。
-                </p>
               </div>
 
               {switchMode === 'manual' ? (
@@ -1286,9 +1290,14 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
                       value: group.id,
                       label: group.name
                     }))}
-                    dropdownPosition="top"
+                    dropdownPosition="bottom"
                   />
                   <p className="text-xs text-stone-500 mt-2">手动模式下，场景视图仅渲染当前选中的场景组。</p>
+                  <SceneGroupOrderList
+                    groups={sceneGroupState.groups}
+                    activeGroupId={sceneGroupState.activeGroupId}
+                    onMoveGroup={handleMoveGroup}
+                  />
                 </div>
               ) : (
                 <div className="space-y-3">

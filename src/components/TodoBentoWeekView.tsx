@@ -4,6 +4,10 @@
  * @output Single-week 2x4 bento schedule UI backed by real todo data
  * @pos Component (Todo scheduling)
  * @description Renders one selected week at a time in the bento layout so the mini calendar, header range, and visible day cells always describe the same week.
+ * @updated 2026-05-11: Removed the background blur transition from the display-settings open state so the softened calendar and popup appear on the same frame.
+ * @updated 2026-05-11: Aligned the display-settings popup glass treatment and control sizing with the schedule shortcut menu so blur strength, fill, and typography now match.
+ * @updated 2026-05-11: Added a dedicated full-screen blur scrim behind the display-settings popup and made the card fill more opaque so the wallpaper stays soft without making the text glow.
+ * @updated 2026-05-11: Moved the display-settings frosted blur onto the popup card background layer so Android/WebView no longer adds a false glow to popup text and buttons.
  * @updated 2026-05-10: Added `单页 / 全部` bento display modes, per-cell visible-entry limits with `+N` overflow badges, and an all-items layout that expands row heights so every task in the selected week can be rendered.
  * @updated 2026-05-10: Replaced the unstable multi-page horizontal week strip with a single-week bento renderer so mini-calendar taps, header navigation, and rendered tasks stay locked to one parent-owned Monday `weekStart`.
  * @updated 2026-05-10: Rebuilt bento week navigation around one parent-owned Monday `weekStart` so the header, week picker, and mini-calendar stop competing with each other.
@@ -460,7 +464,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
   return (
     <div className="flex min-h-0 flex-1 w-full">
       <div className="relative flex min-h-0 flex-1 overflow-hidden bg-transparent">
-        <div className={`flex min-h-0 flex-1 flex-col transition-[filter,opacity] duration-200 ${isDisplaySettingsOpen ? 'pointer-events-none blur-[6px] opacity-90' : ''}`}>
+        <div className={`flex min-h-0 flex-1 flex-col ${isDisplaySettingsOpen ? 'pointer-events-none blur-[6px] opacity-90' : ''}`}>
           <div className="shrink-0 border-b border-stone-300/70">
             <div className="flex h-14 items-center justify-between gap-3 px-3 md:px-5">
               <div className="flex min-w-0 items-center gap-2 text-slate-500">
@@ -758,10 +762,9 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
             <div className="max-w-[12rem] truncate">{touchDragPreview.title}</div>
           </div>
         )}
-        </div>
         {isDisplaySettingsOpen && (
           <div
-            className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(15,23,42,0.16)] px-4 py-8"
+            className="fixed inset-0 z-[120] flex items-center justify-center px-4 py-8"
             onPointerDown={(event) => {
               if (event.target !== event.currentTarget) {
                 return;
@@ -780,26 +783,30 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
             }}
           >
             <div
-              className="w-full max-w-[22rem] overflow-hidden rounded-[2rem] border border-stone-200 bg-[#faf9f6] shadow-[0_26px_70px_rgba(15,23,42,0.14)]"
+              className="relative w-full max-w-[22rem] overflow-hidden rounded-[2rem] border border-stone-200/80 shadow-[0_12px_30px_rgba(28,25,23,0.12)]"
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="max-h-[min(82vh,42rem)] overflow-y-auto p-4">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-[#faf9f6]/95 backdrop-blur-sm"
+              />
+              <div className="relative z-10 max-h-[min(82vh,42rem)] overflow-y-auto p-4">
               <div className="mb-4 flex items-center justify-between border-b border-stone-200/80 pb-3">
-                <span className="text-[0.72rem] font-bold uppercase tracking-[0.18em] text-stone-500">
+                <span className="text-[0.82rem] font-medium tracking-[0.08em] text-stone-500">
                   显示设置
                 </span>
                 <button
                   type="button"
                   onClick={() => setIsDisplaySettingsOpen(false)}
-                  className="text-[0.72rem] tracking-[0.12em] text-stone-400 transition-colors hover:text-stone-600"
+                  className="rounded-full px-2 py-1.5 text-[0.82rem] text-stone-400 transition-colors hover:bg-stone-100/70 hover:text-stone-600"
                 >
                   关闭
                 </button>
               </div>
 
               <div className="mb-4">
-                <div className="mb-2 text-[0.62rem] font-bold uppercase tracking-[0.18em] text-stone-400">
+                <div className="mb-2 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
                   显示模式
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
@@ -811,7 +818,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                         key={option.key}
                         type="button"
                         onClick={() => setDisplayMode(option.key)}
-                        className={`rounded-xl px-3 py-2 text-center text-[12px] tracking-[0.08em] transition-colors ${
+                        className={`rounded-xl px-3 py-2.5 text-center text-[14px] tracking-[0.04em] transition-colors ${
                           isSelected
                             ? 'bg-stone-100 text-slate-700'
                             : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
@@ -825,7 +832,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
               </div>
 
               <div>
-                <div className="mb-2 text-[0.62rem] font-bold uppercase tracking-[0.18em] text-stone-400">
+                <div className="mb-2 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
                   颜色类型
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
@@ -837,7 +844,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                         key={option.key}
                         type="button"
                         onClick={() => setMarkerColorMode(option.key)}
-                        className={`rounded-xl px-3 py-2 text-center text-[12px] tracking-[0.08em] transition-colors ${
+                        className={`rounded-xl px-3 py-2.5 text-center text-[14px] tracking-[0.04em] transition-colors ${
                           isSelected
                             ? 'bg-stone-100 text-slate-700'
                             : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'

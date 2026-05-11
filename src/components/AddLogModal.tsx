@@ -4,8 +4,8 @@
  * @output Modal Interaction (Save/Delete Log)
  * @pos Component (Modal)
  * @description A complex modal for creating or editing time logs. Handles duration calculation, activity selection, todo association, focus scoring, segmented time entry, and inline note template recommendations.
- * @lastModified 2026-04-22
- * @change Auto-advance across hour/minute inputs and continue from start time to end time after segmented time entry. Added direct camera capture functionality using Capacitor Camera plugin and native camera-path persistence fallback for Android photo attachments. Enabled hierarchical todo selection in the backfill picker so subtasks stay nested under collapsed parent tasks.
+ * @lastModified 2026-05-11
+ * @change Added click-to-focus behavior on the existing Total Time summary so tapping it jumps to the note field, while preserving the original two-line header layout. Auto-advance across hour/minute inputs and continue from start time to end time after segmented time entry. Added direct camera capture functionality using Capacitor Camera plugin and native camera-path persistence fallback for Android photo attachments. Enabled hierarchical todo selection in the backfill picker so subtasks stay nested under collapsed parent tasks.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -302,6 +302,17 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     }
   };
 
+  const focusNoteInput = () => {
+    window.setTimeout(() => {
+      const noteElement = noteRef.current;
+      if (!noteElement) return;
+      noteElement.focus();
+      const noteLength = noteElement.value.length;
+      noteElement.setSelectionRange(noteLength, noteLength);
+      noteElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 0);
+  };
+
   const handleSetStartToNow = () => {
     const now = timeCalc.setToNow('start', formState.currentStartTime);
     updateField('currentStartTime', now);
@@ -577,13 +588,9 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     formState.linkedTodoId
   ]);
   const hasSuggestions = suggestions.activity || suggestions.scopes.length > 0;
-
   const handleApplyNoteTemplate = (template: RecommendedNoteTemplate) => {
     updateField('note', appendTemplateToNote(formState.note, template.content));
-    window.setTimeout(() => {
-      noteRef.current?.focus();
-      noteRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 0);
+    focusNoteInput();
   };
 
   return (
@@ -603,10 +610,11 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
             <X size={24} />
           </button>
           <div className="flex flex-col items-center">
-            <span className="text-[10px] uppercase tracking-widest text-stone-400 font-bold mb-1">Total Time</span>
-            <span className="text-2xl font-bold text-stone-900 tabular-nums font-mono">{timeCalc.durationDisplay}</span>
+            <span className="text-[10px] uppercase tracking-widest text-stone-400 font-bold mb-1" onClick={focusNoteInput}>Total Time</span>
+            <span className="text-2xl font-bold text-stone-900 tabular-nums font-mono" onClick={focusNoteInput}>{timeCalc.durationDisplay}</span>
             {!initialLog && hasDraft && (
               <button
+                type="button"
                 onClick={handleClearDraft}
                 className="mt-1 text-[10px] text-stone-400 hover:text-red-500 transition-colors"
                 title="清除草稿并重置表单"

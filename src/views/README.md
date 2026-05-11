@@ -28,7 +28,8 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
-> Last updated: 2026-05-10
+> Last updated: 2026-05-11
+- `SceneSettingsView.tsx`, `SceneView.tsx`, `sceneGroupStorage.ts`: Manual switch-mode management now lets users move scene groups up and down, and that saved order also drives the Scene page's top-right manual quick-switch dropdown.
 - `TodoView.tsx`, `TodoBentoWeekView.tsx`: The Todo schedule week navigation now uses one parent-owned Monday week start as the single source of truth, so the standard week view and `八宫格` share the same header range, week picker date, and explicit week-switch actions.
 - `TodoView.tsx`, `TodoBentoWeekView.tsx`: Unified week navigation around a Monday-based reference date so the Todo schedule header, week picker, and `八宫格` mini-calendar all switch the same week without drifting to an internal midweek anchor.
 - `TodoView.tsx`, `TodoBentoWeekView.tsx`, `TodoMonthView.tsx`: The Todo schedule screen now offers `周视图 / 八宫格 / 月视图`, with the new `八宫格` mode using a one-screen-per-week 2x4 editorial layout, linked mini-calendar navigation, and the same real Arrange / Due / Repeat / Done / Trace data plus drag-to-move rules as the other planning views.

@@ -4,6 +4,17 @@
  * @output Reference-style rolling month schedule UI backed by real daily todo data
  * @pos Component (Todo scheduling)
  * @description Renders the editorial monthly schedule view adapted from the minimalist demo, using shared todo schedule utilities so each day shows the same real Arrange / Due / Repeat / Done / Trace data as the week planner.
+ * @updated 2026-05-11: Limited month-title retargeting to first entry plus explicit external date jumps, and now freeze the `YYYY.M` header during programmatic month scrolls until the animation settles so edge-loading no longer snaps back to today and arrow-based month changes stop flickering.
+ * @updated 2026-05-11: Switched the rolling month grid to an edge-loaded window that starts at current month minus/plus two months and appends another two months whenever scrolling nears either edge, reducing enter-time schedule recompute work without changing the visible interaction model.
+ * @updated 2026-05-11: Removed the fixed-width split between expanded-row todo titles and `@parent` hints so both text pieces now stay visually adjacent and only compress when space actually runs out.
+ * @updated 2026-05-11: Kept expanded-row todo titles and `@parent` hints as one adjacent truncation group, and let in-cell month strips run flush to the grid edges so the marker line and tinted fill fully align with each day tile.
+ * @updated 2026-05-11: Added a same-color translucent fill behind each in-cell month entry so the marker line now has a soft tinted label background without changing the minimal mobile density.
+ * @updated 2026-05-11: Tightened in-cell task left padding and switched month-cell titles from ellipsis to hard clipping so each calendar tile can reveal more characters on narrow mobile screens.
+ * @updated 2026-05-11: Truncated expanded-day row titles to a single line with ellipsis and kept the right-side status tags fixed so long task names no longer overflow the month view on mobile.
+ * @updated 2026-05-11: Removed the background blur transition from the month-settings open state so the softened calendar and popup appear on the same frame.
+ * @updated 2026-05-11: Aligned the month-settings popup glass treatment and control sizing with the schedule shortcut menu so blur strength, fill, and typography now match.
+ * @updated 2026-05-11: Added a dedicated full-screen blur scrim behind the month-settings popup and made the card fill more opaque so the wallpaper stays soft without making the text glow.
+ * @updated 2026-05-11: Moved the month-settings frosted blur onto the popup card background layer so Android/WebView no longer adds a false glow to popup text and buttons.
  * @updated 2026-05-10: Expanded month-view rows now append truncated `@父任务` context for subtasks so the monthly detail list matches the week planner's parent-hint treatment.
  * @updated 2026-05-10: Added a top-right `本月` jump action so the month view can quickly snap back to today's month without using the title link or month arrows.
  * @updated 2026-05-10: Replaced the inline month-view settings dropdown with a standalone modal panel so density, font-size, and marker-color controls have more room without crowding the header.
@@ -37,10 +48,12 @@ import { Log, TodoCategory, TodoItem } from '../types';
 import {
   buildTodoDateEntryMap,
   formatDateKey,
+  parseDateKey,
   TodoDateEntry
 } from '../utils/todoScheduleUtils';
 import { getParentTodo } from '../utils/todoHierarchyUtils';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
+import { hexToRgba } from '../utils/colorUtils';
 
 interface TodoMonthViewProps {
   todos: TodoItem[];
@@ -60,10 +73,20 @@ interface TodoMonthWeek {
   days: Date[];
 }
 
+interface LoadedMonthRange {
+  startMonth: Date;
+  endMonth: Date;
+}
+
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTH_VIEW_ROWS_PER_SCREEN_STORAGE_KEY = 'todoMonthViewRowsPerScreen';
 const MONTH_VIEW_FONT_SIZE_STORAGE_KEY = 'todoMonthViewFontSize';
 const MONTH_VIEW_MARKER_COLOR_MODE_STORAGE_KEY = 'todoMonthViewMarkerColorMode';
+const MONTH_VIEW_INITIAL_MONTHS_BEFORE = 2;
+const MONTH_VIEW_INITIAL_MONTHS_AFTER = 2;
+const MONTH_VIEW_LOAD_CHUNK_MONTHS = 2;
+const MONTH_VIEW_EDGE_LOAD_THRESHOLD_PX = 280;
+const MONTH_VIEW_PROGRAMMATIC_SCROLL_SETTLE_MS = 140;
 const MONTH_VIEW_ROW_OPTIONS = [2, 3, 4, 5] as const;
 const MONTH_VIEW_FONT_SIZE_OPTIONS = [
   { key: 'small', label: '小' },
@@ -88,6 +111,41 @@ const MONTH_VIEW_TYPE_COLORS: Record<TodoDateEntry['primaryKind'], string> = {
 const buildMonthLabelDate = (value: string): Date => {
   const [year, month] = value.split('-').map(Number);
   return new Date(year, (month || 1) - 1, 1);
+};
+
+const getMonthKey = (date: Date): string => format(startOfMonth(date), 'yyyy-MM-01');
+
+const createLoadedMonthRange = (
+  centerMonth: Date,
+  beforeCount = MONTH_VIEW_INITIAL_MONTHS_BEFORE,
+  afterCount = MONTH_VIEW_INITIAL_MONTHS_AFTER
+): LoadedMonthRange => ({
+  startMonth: startOfMonth(subMonths(centerMonth, beforeCount)),
+  endMonth: startOfMonth(addMonths(centerMonth, afterCount))
+});
+
+const buildWeeksForMonthRange = (range: LoadedMonthRange): TodoMonthWeek[] => {
+  const start = startOfWeek(range.startMonth, { weekStartsOn: 1 });
+  const end = endOfWeek(endOfMonth(range.endMonth), { weekStartsOn: 1 });
+  const weekIntervals = eachWeekOfInterval({ start, end }, { weekStartsOn: 1 });
+
+  return weekIntervals.map((weekStart) => {
+    const days = eachDayOfInterval({
+      start: weekStart,
+      end: endOfWeek(weekStart, { weekStartsOn: 1 })
+    });
+
+    return {
+      id: weekStart.toISOString(),
+      monthKey: format(startOfMonth(days[3]), 'yyyy-MM-01'),
+      days
+    };
+  });
+};
+
+const isMonthWithinLoadedRange = (date: Date, range: LoadedMonthRange): boolean => {
+  const monthTime = startOfMonth(date).getTime();
+  return monthTime >= range.startMonth.getTime() && monthTime <= range.endMonth.getTime();
 };
 
 const isSameCalendarDay = (left: Date, right: Date): boolean =>
@@ -159,12 +217,24 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   onOpenTodo
 }) => {
   const today = useMemo(() => new Date(), []);
+  const initialMonthRange = useMemo(
+    () => createLoadedMonthRange(startOfMonth(today)),
+    [today]
+  );
   const todayDateKey = useMemo(() => formatDateKey(today), [today]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const headerRef = useRef<HTMLDivElement | null>(null);
   const observerRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const monthAnchorRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const hasInitialScrollRef = useRef(false);
+  const pendingMonthJumpRef = useRef<string | null>(null);
+  const pendingReferenceDateKeyRef = useRef<string | null>(null);
+  const pendingPrependMetricsRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
+  const isExtendingRangeRef = useRef(false);
+  const lastAppliedReferenceDateKeyRef = useRef<string | null>(null);
+  const latestObservedMonthRef = useRef<string>(getMonthKey(today));
+  const activeMonthFreezeTargetRef = useRef<string | null>(null);
+  const activeMonthFreezeTimeoutRef = useRef<number | null>(null);
   const touchDragActivatedRef = useRef(false);
   const touchDraggingEntryRef = useRef<TodoDateEntry | null>(null);
   const touchDragTargetDateRef = useRef<string | null>(null);
@@ -173,9 +243,10 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   const touchAutoScrollFrameRef = useRef<number | null>(null);
   const touchAutoScrollSpeedRef = useRef(0);
   const desktopAutoScrollIntervalRef = useRef<number | null>(null);
-  const [activeMonth, setActiveMonth] = useState<string>(() => format(referenceDate, 'yyyy-MM-01'));
+  const [activeMonth, setActiveMonth] = useState<string>(() => format(startOfMonth(today), 'yyyy-MM-01'));
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [containerHeight, setContainerHeight] = useState(600);
+  const [loadedRange, setLoadedRange] = useState<LoadedMonthRange>(initialMonthRange);
   const [monthRowsPerScreen, setMonthRowsPerScreen] = useState<number>(() => {
     const saved = localStorage.getItem(MONTH_VIEW_ROWS_PER_SCREEN_STORAGE_KEY);
     const parsed = saved ? Number(saved) : NaN;
@@ -200,24 +271,10 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   const [touchDragPreview, setTouchDragPreview] = useState<{ x: number; y: number; title: string } | null>(null);
   const [isTouchDragging, setIsTouchDragging] = useState(false);
 
-  const weeks = useMemo<TodoMonthWeek[]>(() => {
-    const start = startOfWeek(startOfMonth(subMonths(referenceDate, 6)), { weekStartsOn: 1 });
-    const end = endOfWeek(endOfMonth(addMonths(referenceDate, 12)), { weekStartsOn: 1 });
-    const weekIntervals = eachWeekOfInterval({ start, end }, { weekStartsOn: 1 });
-
-    return weekIntervals.map((weekStart) => {
-      const days = eachDayOfInterval({
-        start: weekStart,
-        end: endOfWeek(weekStart, { weekStartsOn: 1 })
-      });
-
-      return {
-        id: weekStart.toISOString(),
-        monthKey: format(startOfMonth(days[3]), 'yyyy-MM-01'),
-        days
-      };
-    });
-  }, [referenceDate]);
+  const weeks = useMemo<TodoMonthWeek[]>(
+    () => buildWeeksForMonthRange(loadedRange),
+    [loadedRange]
+  );
 
   const dateKeys = useMemo(
     () => weeks.flatMap((week) => week.days.map((day) => formatDateKey(day))),
@@ -228,6 +285,59 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
     [dateKeys, logs, todos]
   );
 
+  const clearActiveMonthFreezeTimeout = () => {
+    if (activeMonthFreezeTimeoutRef.current !== null) {
+      window.clearTimeout(activeMonthFreezeTimeoutRef.current);
+      activeMonthFreezeTimeoutRef.current = null;
+    }
+  };
+
+  const finishActiveMonthFreeze = () => {
+    const nextMonth = activeMonthFreezeTargetRef.current || latestObservedMonthRef.current;
+    if (nextMonth) {
+      latestObservedMonthRef.current = nextMonth;
+      setActiveMonth((previous) => (previous === nextMonth ? previous : nextMonth));
+    }
+    activeMonthFreezeTargetRef.current = null;
+    clearActiveMonthFreezeTimeout();
+  };
+
+  const freezeActiveMonthUntilScrollSettles = (targetMonthKey: string) => {
+    activeMonthFreezeTargetRef.current = targetMonthKey;
+    clearActiveMonthFreezeTimeout();
+  };
+
+  const scheduleActiveMonthFreezeSettle = () => {
+    if (!activeMonthFreezeTargetRef.current) {
+      return;
+    }
+
+    clearActiveMonthFreezeTimeout();
+    activeMonthFreezeTimeoutRef.current = window.setTimeout(() => {
+      finishActiveMonthFreeze();
+    }, MONTH_VIEW_PROGRAMMATIC_SCROLL_SETTLE_MS);
+  };
+
+  const scrollToLoadedMonth = (date: Date) => {
+    const monthKey = format(startOfMonth(date), 'yyyy-MM-01');
+    const targetElement = monthAnchorRefs.current[monthKey];
+
+    if (scrollRef.current && targetElement) {
+      scrollRef.current.scrollTop = targetElement.offsetTop - (headerRef.current?.offsetHeight || 0);
+      return true;
+    }
+
+    const targetWeek = weeks.find((week) => week.days.some((day) => isSameCalendarDay(day, date)));
+    const targetWeekElement = targetWeek ? observerRefs.current[targetWeek.id] : null;
+
+    if (scrollRef.current && targetWeekElement) {
+      scrollRef.current.scrollTop = targetWeekElement.offsetTop - (headerRef.current?.offsetHeight || 0);
+      return true;
+    }
+
+    return false;
+  };
+
   const scrollToWeekContainingDate = (date: Date) => {
     const targetWeek = weeks.find((week) => week.days.some((day) => isSameCalendarDay(day, date)));
     const targetElement = targetWeek ? observerRefs.current[targetWeek.id] : null;
@@ -237,16 +347,77 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
     }
   };
 
-  const scrollToMonth = (date: Date) => {
-    const monthKey = format(startOfMonth(date), 'yyyy-MM-01');
-    const targetElement = monthAnchorRefs.current[monthKey];
-
-    if (scrollRef.current && targetElement) {
-      scrollRef.current.scrollTop = targetElement.offsetTop - (headerRef.current?.offsetHeight || 0);
+  const extendLoadedRange = (direction: 'prepend' | 'append') => {
+    if (!scrollRef.current || isExtendingRangeRef.current) {
       return;
     }
 
-    scrollToWeekContainingDate(date);
+    if (direction === 'prepend') {
+      pendingPrependMetricsRef.current = {
+        scrollHeight: scrollRef.current.scrollHeight,
+        scrollTop: scrollRef.current.scrollTop
+      };
+    }
+
+    isExtendingRangeRef.current = true;
+    setLoadedRange((previous) => (
+      direction === 'prepend'
+        ? {
+          startMonth: startOfMonth(subMonths(previous.startMonth, MONTH_VIEW_LOAD_CHUNK_MONTHS)),
+          endMonth: previous.endMonth
+        }
+        : {
+          startMonth: previous.startMonth,
+          endMonth: startOfMonth(addMonths(previous.endMonth, MONTH_VIEW_LOAD_CHUNK_MONTHS))
+        }
+    ));
+  };
+
+  const ensureMonthLoaded = (date: Date): boolean => {
+    if (isMonthWithinLoadedRange(date, loadedRange)) {
+      return true;
+    }
+
+    pendingMonthJumpRef.current = format(startOfMonth(date), 'yyyy-MM-01');
+    isExtendingRangeRef.current = true;
+    setLoadedRange((previous) => ({
+      startMonth: date < previous.startMonth
+        ? startOfMonth(subMonths(date, MONTH_VIEW_INITIAL_MONTHS_BEFORE))
+        : previous.startMonth,
+      endMonth: date > previous.endMonth
+        ? startOfMonth(addMonths(date, MONTH_VIEW_INITIAL_MONTHS_AFTER))
+        : previous.endMonth
+    }));
+    return false;
+  };
+
+  const scrollToMonth = (date: Date) => {
+    freezeActiveMonthUntilScrollSettles(getMonthKey(date));
+    if (!ensureMonthLoaded(date)) {
+      return;
+    }
+
+    scrollToLoadedMonth(date);
+    scheduleActiveMonthFreezeSettle();
+  };
+
+  const handleMonthScroll = () => {
+    const container = scrollRef.current;
+    if (!container || isExtendingRangeRef.current) {
+      return;
+    }
+
+    scheduleActiveMonthFreezeSettle();
+
+    if (container.scrollTop <= MONTH_VIEW_EDGE_LOAD_THRESHOLD_PX) {
+      extendLoadedRange('prepend');
+      return;
+    }
+
+    const distanceFromBottom = container.scrollHeight - (container.scrollTop + container.clientHeight);
+    if (distanceFromBottom <= MONTH_VIEW_EDGE_LOAD_THRESHOLD_PX) {
+      extendLoadedRange('append');
+    }
   };
 
   const startDesktopAutoScroll = (direction: 'up' | 'down') => {
@@ -514,11 +685,45 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
     () => {
       stopDesktopAutoScroll();
       stopTouchAutoScroll();
+      clearActiveMonthFreezeTimeout();
       if (touchDragFrameRef.current !== null) {
         window.cancelAnimationFrame(touchDragFrameRef.current);
       }
     }
   ), []);
+
+  useEffect(() => {
+    const pendingPrependMetrics = pendingPrependMetricsRef.current;
+    if (pendingPrependMetrics && scrollRef.current) {
+      const nextScrollHeight = scrollRef.current.scrollHeight;
+      const appendedHeight = nextScrollHeight - pendingPrependMetrics.scrollHeight;
+      scrollRef.current.scrollTop = pendingPrependMetrics.scrollTop + appendedHeight;
+      pendingPrependMetricsRef.current = null;
+    }
+
+    const pendingMonthKey = pendingMonthJumpRef.current;
+    if (pendingMonthKey) {
+      const pendingMonthDate = buildMonthLabelDate(pendingMonthKey);
+      const jumpWorked = scrollToLoadedMonth(pendingMonthDate);
+      if (jumpWorked) {
+        pendingMonthJumpRef.current = null;
+        scheduleActiveMonthFreezeSettle();
+      }
+    }
+
+    const pendingReferenceDateKey = pendingReferenceDateKeyRef.current;
+    if (pendingReferenceDateKey) {
+      const pendingReferenceDate = parseDateKey(pendingReferenceDateKey);
+      if (pendingReferenceDate && isMonthWithinLoadedRange(pendingReferenceDate, loadedRange)) {
+        scrollToWeekContainingDate(pendingReferenceDate);
+        pendingReferenceDateKeyRef.current = null;
+        lastAppliedReferenceDateKeyRef.current = pendingReferenceDateKey;
+        scheduleActiveMonthFreezeSettle();
+      }
+    }
+
+    isExtendingRangeRef.current = false;
+  }, [loadedRange, weeks]);
 
   useEffect(() => {
     if (containerHeight === 0 || hasInitialScrollRef.current) {
@@ -527,7 +732,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
 
     const currentMonthDate = today;
     scrollToMonth(currentMonthDate);
-    setActiveMonth(format(startOfMonth(currentMonthDate), 'yyyy-MM-01'));
+    setActiveMonth(getMonthKey(currentMonthDate));
     hasInitialScrollRef.current = true;
   }, [containerHeight, today, weeks]);
 
@@ -536,9 +741,23 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
       return;
     }
 
+    const referenceDateKey = formatDateKey(referenceDate);
+    if (lastAppliedReferenceDateKeyRef.current === referenceDateKey) {
+      return;
+    }
+
+    pendingReferenceDateKeyRef.current = referenceDateKey;
+    freezeActiveMonthUntilScrollSettles(getMonthKey(referenceDate));
+
+    if (!ensureMonthLoaded(referenceDate)) {
+      return;
+    }
+
     scrollToWeekContainingDate(referenceDate);
-    setActiveMonth(format(startOfMonth(referenceDate), 'yyyy-MM-01'));
-  }, [referenceDate, weeks]);
+    pendingReferenceDateKeyRef.current = null;
+    lastAppliedReferenceDateKeyRef.current = referenceDateKey;
+    scheduleActiveMonthFreezeSettle();
+  }, [referenceDate]);
 
   useEffect(() => {
     localStorage.setItem(MONTH_VIEW_ROWS_PER_SCREEN_STORAGE_KEY, String(monthRowsPerScreen));
@@ -553,7 +772,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   }, [monthMarkerColorMode]);
 
   useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
+        const observer = new IntersectionObserver((entries) => {
       let nextMonth: string | null = null;
       let maxRatio = 0;
 
@@ -572,6 +791,10 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
       });
 
       if (maxRatio > 0.12 && nextMonth) {
+        latestObservedMonthRef.current = nextMonth;
+        if (activeMonthFreezeTargetRef.current) {
+          return;
+        }
         setActiveMonth((previous) => (previous === nextMonth ? previous : nextMonth));
       }
     }, {
@@ -722,9 +945,17 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
     return MONTH_VIEW_TYPE_COLORS[entry.primaryKind];
   };
 
+  const getTodoMarkerStyle = (entry: TodoDateEntry): React.CSSProperties => {
+    const markerColor = getTodoMarkerColor(entry);
+    return {
+      borderLeftColor: markerColor,
+      backgroundColor: hexToRgba(markerColor, 0.08)
+    };
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className={`flex min-h-0 flex-1 flex-col transition-[filter,opacity] duration-200 ${isDensityMenuOpen ? 'pointer-events-none blur-[6px] opacity-90' : ''}`}>
+      <div className={`flex min-h-0 flex-1 flex-col ${isDensityMenuOpen ? 'pointer-events-none blur-[6px] opacity-90' : ''}`}>
       <div
         ref={headerRef}
         className={`shrink-0 bg-[rgba(250,249,246,0.34)] ${useReducedEffects ? '' : ''}`}
@@ -817,6 +1048,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
         ref={scrollRef}
         className="min-h-0 flex-1 overflow-y-auto bg-transparent pb-[10vh] no-scrollbar"
         style={{ scrollBehavior: 'smooth' }}
+        onScroll={handleMonthScroll}
         onDragOver={handleMonthContainerDragOver}
         onDragLeave={stopDesktopAutoScroll}
         onDrop={stopDesktopAutoScroll}
@@ -871,14 +1103,14 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                         handleMonthDrop(dateKey);
                       }}
                       className={[
-                        'relative flex cursor-pointer flex-col border-b border-r border-stone-200/35 px-2 py-1.5 text-left transition-colors duration-200',
+                        'relative flex cursor-pointer flex-col border-b border-r border-stone-200/35 py-1.5 text-left transition-colors duration-200',
                         !isCurrentMonth ? 'bg-[rgba(245,244,240,0.14)] opacity-30' : 'bg-transparent',
                         isToday ? 'z-10 ring-1 ring-inset ring-stone-400' : '',
                         isSelected && !isToday ? 'bg-[rgba(255,255,255,0.22)]' : '',
                         dragTargetDate === dateKey ? 'bg-[rgba(250,249,246,0.32)] ring-2 ring-inset ring-stone-800/75' : ''
                       ].join(' ')}
                     >
-                      <div className="flex justify-start">
+                      <div className="flex justify-start px-2">
                         <span
                           className="text-[1.02rem] leading-none text-stone-800"
                           style={{ fontFamily: "'Bilbo Swash Caps', 'Georgia', 'Times New Roman', cursive, serif" }}
@@ -891,15 +1123,15 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                         {visibleEntries.map((entry) => (
                           <div
                             key={`${dateKey}-${entry.todo.id}-${entry.primaryKind}`}
-                            className={`truncate border-l-[1.5px] pl-1 font-medium leading-[1.2] text-stone-800 ${monthCellTaskClassName}`}
-                            style={{ borderLeftColor: getTodoMarkerColor(entry) }}
+                            className={`overflow-hidden text-clip whitespace-nowrap border-l-[1.5px] pl-[3px] font-medium leading-[1.2] text-stone-800 ${monthCellTaskClassName}`}
+                            style={getTodoMarkerStyle(entry)}
                           >
                             {entry.todo.title}
                           </div>
                         ))}
 
                         {hiddenCount > 0 && (
-                          <div className="pl-[7px] pt-0.5 text-[0.53rem] font-bold uppercase tracking-[0.14em] text-stone-300">
+                          <div className="pl-[5px] pt-0.5 text-[0.53rem] font-bold uppercase tracking-[0.14em] text-stone-300">
                             +{hiddenCount}
                           </div>
                         )}
@@ -955,6 +1187,10 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                             entry.todo.deadlineDate < todayDateKey &&
                             !completedDateKey
                           );
+                          const titleSegmentClassName = parentTitle
+                            ? 'min-w-0 max-w-[58%] flex-[0_1_auto] truncate'
+                            : 'min-w-0 flex-1 truncate';
+                          const parentSegmentClassName = 'min-w-0 max-w-[42%] flex-[0_1_auto] truncate';
 
                           if (onOpenTodo) {
                             return (
@@ -971,21 +1207,21 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                                 </span>
                                 <div className="flex min-w-0 flex-1 items-start gap-2">
                                   {isMonthEntryDraggable(entry) ? (
-                                    <span className={`min-w-0 flex flex-1 items-baseline gap-1 font-medium uppercase tracking-[0.12em] text-left ${monthDetailTaskClassName} ${draggingTodoId === entry.todo.id ? 'cursor-grabbing opacity-40' : 'cursor-grab active:cursor-grabbing'} ${titleClassName}`}>
-                                      <span className="shrink-0">{entry.todo.title}</span>
+                                    <span className={`min-w-0 flex flex-1 items-baseline gap-0 overflow-hidden font-medium uppercase tracking-[0.12em] text-left ${monthDetailTaskClassName} ${draggingTodoId === entry.todo.id ? 'cursor-grabbing opacity-40' : 'cursor-grab active:cursor-grabbing'} ${titleClassName}`}>
+                                      <span className={titleSegmentClassName}>{entry.todo.title}</span>
                                       {parentTitle && (
-                                        <span className={`min-w-0 flex-1 truncate ${parentTitleClassName}`}>{` @${parentTitle}`}</span>
+                                        <span className={`${parentSegmentClassName} ${parentTitleClassName}`}>{` @${parentTitle}`}</span>
                                       )}
                                     </span>
                                   ) : (
                                     <button
                                       type="button"
                                       onClick={() => onOpenTodo(entry.todo)}
-                                      className={`min-w-0 flex flex-1 items-baseline gap-1 font-medium uppercase tracking-[0.12em] text-left ${monthDetailTaskClassName} ${titleClassName}`}
+                                      className={`min-w-0 flex flex-1 items-baseline gap-0 overflow-hidden font-medium uppercase tracking-[0.12em] text-left ${monthDetailTaskClassName} ${titleClassName}`}
                                     >
-                                      <span className="shrink-0">{entry.todo.title}</span>
+                                      <span className={titleSegmentClassName}>{entry.todo.title}</span>
                                       {parentTitle && (
-                                        <span className={`min-w-0 flex-1 truncate ${parentTitleClassName}`}>{` @${parentTitle}`}</span>
+                                        <span className={`${parentSegmentClassName} ${parentTitleClassName}`}>{` @${parentTitle}`}</span>
                                       )}
                                     </button>
                                   )}
@@ -1031,10 +1267,10 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                                 {getMonthEntryLeadingIcon(entry)}
                               </span>
                               <div className="flex min-w-0 flex-1 items-start gap-2">
-                                <span className={`min-w-0 flex flex-1 items-baseline gap-1 font-medium uppercase tracking-[0.12em] ${monthDetailTaskClassName} ${titleClassName}`}>
-                                  <span className="shrink-0">{entry.todo.title}</span>
+                                <span className={`min-w-0 flex flex-1 items-baseline gap-0 overflow-hidden font-medium uppercase tracking-[0.12em] ${monthDetailTaskClassName} ${titleClassName}`}>
+                                  <span className={titleSegmentClassName}>{entry.todo.title}</span>
                                   {parentTitle && (
-                                    <span className={`min-w-0 flex-1 truncate ${parentTitleClassName}`}>{` @${parentTitle}`}</span>
+                                    <span className={`${parentSegmentClassName} ${parentTitleClassName}`}>{` @${parentTitle}`}</span>
                                   )}
                                 </span>
                                 <div className={`flex shrink-0 flex-wrap items-center justify-end gap-1 whitespace-nowrap text-[9px] uppercase leading-none ${activeTagCount > 1 ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
@@ -1068,6 +1304,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
           );
         })}
       </div>
+      </div>
       {touchDragPreview && (
         <div
           className="pointer-events-none fixed z-[140] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-stone-200 bg-white/92 px-3 py-2 text-sm text-stone-700 shadow-[0_18px_40px_rgba(15,23,42,0.12)]"
@@ -1076,10 +1313,9 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
           <div className="max-w-[12rem] truncate">{touchDragPreview.title}</div>
         </div>
       )}
-      </div>
       {isDensityMenuOpen && (
         <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(15,23,42,0.16)] px-4 py-8"
+          className="fixed inset-0 z-[120] flex items-center justify-center px-4 py-8"
           onPointerDown={(event) => {
             if (event.target !== event.currentTarget) {
               return;
@@ -1098,26 +1334,30 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
           }}
         >
           <div
-            className="w-full max-w-[24rem] overflow-hidden rounded-[2rem] border border-stone-200 bg-[#faf9f6] shadow-[0_26px_70px_rgba(15,23,42,0.14)]"
+            className="relative w-full max-w-[24rem] overflow-hidden rounded-[2rem] border border-stone-200/80 shadow-[0_12px_30px_rgba(28,25,23,0.12)]"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="max-h-[min(82vh,42rem)] overflow-y-auto p-4">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 bg-[#faf9f6]/95 backdrop-blur-sm"
+            />
+            <div className="relative z-10 max-h-[min(82vh,42rem)] overflow-y-auto p-4">
             <div className="mb-4 flex items-center justify-between border-b border-stone-200/80 pb-3">
-              <span className="text-[0.72rem] font-bold uppercase tracking-[0.18em] text-stone-500">
+              <span className="text-[0.82rem] font-medium tracking-[0.08em] text-stone-500">
                 月视图设置
               </span>
               <button
                 type="button"
                 onClick={() => setIsDensityMenuOpen(false)}
-                className="text-[0.72rem] tracking-[0.12em] text-stone-400 transition-colors hover:text-stone-600"
+                className="rounded-full px-2 py-1.5 text-[0.82rem] text-stone-400 transition-colors hover:bg-stone-100/70 hover:text-stone-600"
               >
                 关闭
               </button>
             </div>
 
             <div className="mb-4">
-              <div className="mb-2 text-[0.62rem] font-bold uppercase tracking-[0.18em] text-stone-400">
+              <div className="mb-2 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
                 格子高度
               </div>
               <div className="grid grid-cols-2 gap-1.5">
@@ -1129,7 +1369,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                       key={option}
                       type="button"
                       onClick={() => setMonthRowsPerScreen(option)}
-                      className={`rounded-xl px-3 py-2 text-left text-[12px] tracking-[0.08em] transition-colors ${
+                      className={`rounded-xl px-3 py-2.5 text-left text-[14px] tracking-[0.04em] transition-colors ${
                         isSelected
                           ? 'bg-stone-100 text-slate-700'
                           : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
@@ -1143,7 +1383,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
             </div>
 
             <div className="mb-4">
-              <div className="mb-2 text-[0.62rem] font-bold uppercase tracking-[0.18em] text-stone-400">
+              <div className="mb-2 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
                 字体大小
               </div>
               <div className="grid grid-cols-3 gap-1.5">
@@ -1155,7 +1395,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                       key={option.key}
                       type="button"
                       onClick={() => setMonthFontSize(option.key)}
-                      className={`rounded-xl px-3 py-2 text-center text-[12px] tracking-[0.08em] transition-colors ${
+                      className={`rounded-xl px-3 py-2.5 text-center text-[14px] tracking-[0.04em] transition-colors ${
                         isSelected
                           ? 'bg-stone-100 text-slate-700'
                           : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
@@ -1169,7 +1409,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
             </div>
 
             <div>
-              <div className="mb-2 text-[0.62rem] font-bold uppercase tracking-[0.18em] text-stone-400">
+              <div className="mb-2 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
                 着色类型
               </div>
               <div className="grid grid-cols-2 gap-1.5">
@@ -1181,7 +1421,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                       key={option.key}
                       type="button"
                       onClick={() => setMonthMarkerColorMode(option.key)}
-                      className={`rounded-xl px-3 py-2 text-center text-[12px] tracking-[0.08em] transition-colors ${
+                      className={`rounded-xl px-3 py-2.5 text-center text-[14px] tracking-[0.04em] transition-colors ${
                         isSelected
                           ? 'bg-stone-100 text-slate-700'
                           : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
