@@ -5,6 +5,7 @@ Contains pure utility functions for data processing and business logic calculati
 ## Files
 - `sceneGroupStorage.ts`: [Active] - Loads, migrates, saves, auto-matches, and now reorders scene groups so one persisted group sequence can drive both settings management and the SceneView quick-switch list.
 - `sceneCardFlipUtils.ts`: [Active] - Resolves persisted vs. forced scene-card back-side state so timer/todo cards can lock swipe-back only when a current-slot timeline record is forcing the flip.
+- `sceneCardStoredFlipUtils.ts`: [Active] - Separates manual timer/todo flip persistence from legacy auto-flip booleans so stale cached backs no longer override current-slot timeline matching.
 - `sceneTimelineMatchUtils.ts`: [Active] - Computes the active scene-slot time window, including overnight slots, and checks whether timer/todo cards have matching logs in the current timeline interval.
 - `assistantMessageParts.ts`: [Active] - Normalizes structured assistant reply parts and applies conservative fallback splitting so one assistant turn can render as grouped multi-bubble chat bursts without fragmenting persistence.
 - `goalUtils.ts`: [Active] - Calculates progress for Goals (duration, count, frequency).
@@ -26,6 +27,7 @@ Contains pure utility functions for data processing and business logic calculati
 - `todoHierarchyUtils.ts`: [Active] - Centralizes one-level parent/subtask helpers for inheritance syncing, cascade deletion, sibling ordering, collapsed tree rendering, expanded-subtask display ordering with unfinished items first, visibility rules that hide unfinished subtasks beneath completed parents in todo-list views, preserves incoming root order so upstream pin-first schedule/picker sorting survives hierarchy rendering, and plain-text completed-subtask labels like `子任务 @父任务` for timeline done lists.
 - `aiBackfillUtils.ts`: [Active] - Normalizes AI backfill tool-call dates, splits cross-midnight records into per-day segments, dedupes repeated tool calls, and provides shared date/time parsing helpers for the AI backfill flow.
 - `todoAssociationUtils.ts`: [Active] - Builds collapsed parent/subtask row models for todo pickers, auto-expands the selected child's parent when hierarchy mode is enabled, hides finished todos by default while preserving the current linked completed todo, hides unfinished subtasks whose parent todo is already completed, and tags standalone subtasks with hidden-parent context when the parent row is outside the current picker pool.
+- `todoCompletionModeUtils.ts`: [Active] - Gates one-shot completion mode for unfinished linked todos and sequences save-first, complete-second follow-up actions for focus-log submission flows.
 - `lumosTimeUrlParser.ts`: [Active] - Normalizes LumosTime NFC/deep-link URIs across custom-scheme parsing differences, old action aliases, and legacy parameter names.
 
 > Once the folder I belong to changes, please update me.

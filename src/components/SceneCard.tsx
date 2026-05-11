@@ -1,6 +1,7 @@
 ﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * @file SceneCard.tsx
  * @description 场景卡片组件 - 支持正反面翻转和滑动交互
+ * @updated 2026-05-11: Timer/todo cards now restore only manual flip storage and ignore legacy auto-flip booleans so out-of-slot logs cannot keep cards stuck on the back side.
  * @updated 2026-05-10: Split timer/todo back-side locking from manual flips so timeline-forced backs block swipe return without persisting that forced state.
  * @updated 2026-04-25: Replaced scene card borders with inset outlines so flipped cards keep their full stroke on mobile WebViews.
  * @updated 2026-05-05: Added parent-driven flip synchronization so scene timer/todo cards can react to widget-started sessions.
@@ -12,6 +13,11 @@ import { CardStatsBadge } from './CardStatsBadge';
 import { AppLauncherService } from '../services/AppLauncherService';
 import { getSceneCardColorPresentation, type SceneCardColorPresentation } from '../utils/colorAdapterUtils';
 import { getSceneCardFlipInteractionState } from '../utils/sceneCardFlipUtils';
+import {
+  getSceneCardLegacyFlipStorageKey,
+  getSceneCardManualFlipStorageKey,
+  resolveStoredSceneCardFlipState,
+} from '../utils/sceneCardStoredFlipUtils';
 
 // 莫兰迪色系默认颜色映射
 const DEFAULT_COLORS = {
@@ -146,7 +152,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
       // 新的一天，清除所有卡片翻转状态
       const allKeys = Object.keys(localStorage);
       allKeys.forEach(key => {
-        if (key.startsWith('scene_card_flipped_')) {
+        if (key.startsWith('scene_card_flipped_') || key.startsWith('scene_card_manual_flipped_')) {
           localStorage.removeItem(key);
         }
       });
@@ -158,12 +164,22 @@ export const SceneCard: React.FC<SceneCardProps> = ({
   // 从 localStorage 读取翻转状态
   const getStoredFlipState = (): boolean => {
     checkAndResetDailyState();
-    const stored = localStorage.getItem(`scene_card_flipped_${data.id}`);
-    if (stored !== null) {
-      return stored === 'true';
+    const legacyKey = getSceneCardLegacyFlipStorageKey(data.id);
+    const manualKey = getSceneCardManualFlipStorageKey(data.id);
+    const legacyStoredValue = localStorage.getItem(legacyKey);
+    const manualStoredValue = localStorage.getItem(manualKey);
+    const resolvedState = resolveStoredSceneCardFlipState({
+      cardType: data.type,
+      legacyStoredValue,
+      manualStoredValue,
+      checklistCompletedByDefault: data.type === 'checklist' && !isCountChecklistCard && !!data.isCompleted,
+    });
+
+    if ((data.type === 'timer' || data.type === 'todo') && legacyStoredValue !== null) {
+      localStorage.removeItem(legacyKey);
     }
-    // 对于二值日课卡片，如果已完成则初始状态为翻转
-    return data.type === 'checklist' && !isCountChecklistCard && !!data.isCompleted;
+
+    return resolvedState;
   };
 
   const [persistedFlipped, setPersistedFlipped] = useState(getStoredFlipState());
@@ -189,13 +205,24 @@ export const SceneCard: React.FC<SceneCardProps> = ({
       const newFlipState = !!data.isCompleted;
       setPersistedFlipped(newFlipState);
       // 同步到 localStorage
-      localStorage.setItem(`scene_card_flipped_${data.id}`, String(newFlipState));
+      localStorage.setItem(getSceneCardLegacyFlipStorageKey(data.id), String(newFlipState));
     }
   }, [data.isCompleted, data.type, data.id, isCountChecklistCard]);
 
   // 保存翻转状态到 localStorage
   const saveFlipState = (flipped: boolean) => {
-    localStorage.setItem(`scene_card_flipped_${data.id}`, String(flipped));
+    if (data.type === 'timer' || data.type === 'todo') {
+      const manualKey = getSceneCardManualFlipStorageKey(data.id);
+      localStorage.removeItem(getSceneCardLegacyFlipStorageKey(data.id));
+      if (flipped) {
+        localStorage.setItem(manualKey, 'true');
+      } else {
+        localStorage.removeItem(manualKey);
+      }
+      return;
+    }
+
+    localStorage.setItem(getSceneCardLegacyFlipStorageKey(data.id), String(flipped));
   };
 
   // 最小滑动距离（像素）

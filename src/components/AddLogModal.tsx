@@ -5,7 +5,7 @@
  * @pos Component (Modal)
  * @description A complex modal for creating or editing time logs. Handles duration calculation, activity selection, todo association, focus scoring, segmented time entry, and inline note template recommendations.
  * @lastModified 2026-05-11
- * @change Added click-to-focus behavior on the existing Total Time summary so tapping it jumps to the note field, while preserving the original two-line header layout. Auto-advance across hour/minute inputs and continue from start time to end time after segmented time entry. Added direct camera capture functionality using Capacitor Camera plugin and native camera-path persistence fallback for Android photo attachments. Enabled hierarchical todo selection in the backfill picker so subtasks stay nested under collapsed parent tasks.
+ * @change Added a one-shot completion-mode toggle beside the associated todo picker so saving a log can also complete the linked unfinished task after the record is stored. Added click-to-focus behavior on the existing Total Time summary so tapping it jumps to the note field, while preserving the original two-line header layout. Auto-advance across hour/minute inputs and continue from start time to end time after segmented time entry. Added direct camera capture functionality using Capacitor Camera plugin and native camera-path persistence fallback for Android photo attachments. Enabled hierarchical todo selection in the backfill picker so subtasks stay nested under collapsed parent tasks.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -30,6 +30,11 @@ import { useToast } from '../contexts/ToastContext';
 import { imageService } from '../services/imageService';
 import { appendTemplateToNote, getRecommendedNoteTemplates, RecommendedNoteTemplate } from '../utils/noteTemplateUtils';
 import { getTodoProgressSnapshot, shouldTodoUseManualProgressInput } from '../utils/todoProgressUtils';
+import {
+  getCompletionModeTodoId,
+  isTodoEligibleForCompletionMode,
+  runPrimaryActionWithOptionalTodoCompletion
+} from '../utils/todoCompletionModeUtils';
 
 interface AddLogModalProps {
   initialLog?: Log | null;
@@ -38,6 +43,7 @@ interface AddLogModalProps {
   prefilledData?: { categoryId?: string; activityId?: string; linkedTodoId?: string };
   onClose: () => void;
   onSave: (log: Log) => void;
+  onCompleteLinkedTodo?: (todoId: string) => boolean;
 
   onDelete?: (id: string) => void;
   onImageRemove?: (logId: string, filename: string) => void;
@@ -53,7 +59,7 @@ interface AddLogModalProps {
   allLogs?: Log[]; // 添加所有日志用于计算上一条记录
 }
 
-export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, prefilledData, onClose, onSave, onDelete, onImageRemove, categories, todos, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
+export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, prefilledData, onClose, onSave, onCompleteLinkedTodo, onDelete, onImageRemove, categories, todos, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
   // 使用自定义 Hooks 管理状态
   const { setIsShareViewOpen, setSharingLog } = useNavigation();
   const { addToast } = useToast();
@@ -152,6 +158,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   const [isDraggingStart, setIsDraggingStart] = useState(false);
   const [isDraggingEnd, setIsDraggingEnd] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
+  const [completeLinkedTodoOnSave, setCompleteLinkedTodoOnSave] = useState(false);
 
   // Refs
   const sliderRef = useRef<HTMLDivElement>(null);
@@ -191,6 +198,12 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       updateField('progressIncrement', 0);
     }
   }, [canUseManualProgressIncrement, formState.progressIncrement, updateField]);
+
+  useEffect(() => {
+    if (!isTodoEligibleForCompletionMode(linkedTodo) && completeLinkedTodoOnSave) {
+      setCompleteLinkedTodoOnSave(false);
+    }
+  }, [completeLinkedTodoOnSave, linkedTodo]);
 
   // 同步图片状态到 formState
   useEffect(() => {
@@ -454,7 +467,16 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     // 保存成功后清除草稿
     clearDraft();
     
-    onSave(newLog);
+    const linkedTodoIdToComplete = getCompletionModeTodoId(completeLinkedTodoOnSave, linkedTodo);
+    const submitResult = runPrimaryActionWithOptionalTodoCompletion({
+      runPrimaryAction: () => onSave(newLog),
+      linkedTodoId: linkedTodoIdToComplete,
+      completeLinkedTodo: onCompleteLinkedTodo
+    });
+
+    if (submitResult.attemptedTodoCompletion && !submitResult.todoCompletionSucceeded) {
+      addToast('warning', '记录已保存，但关联待办未完成');
+    }
   };
   
   // 在关闭时保存草稿（如果有内容）
@@ -811,6 +833,36 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
               todos={todos}
               todoCategories={todoCategories}
               linkedTodoId={formState.linkedTodoId}
+              headerActions={(
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isTodoEligibleForCompletionMode(linkedTodo)) {
+                      return;
+                    }
+                    setCompleteLinkedTodoOnSave((current) => !current);
+                  }}
+                  disabled={!isTodoEligibleForCompletionMode(linkedTodo)}
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                    isTodoEligibleForCompletionMode(linkedTodo)
+                      ? completeLinkedTodoOnSave
+                        ? 'text-stone-900'
+                        : 'bg-stone-100 text-stone-500 hover:bg-stone-200/80 hover:text-stone-700'
+                      : 'bg-stone-100 text-stone-300 cursor-not-allowed'
+                  }`}
+                  style={completeLinkedTodoOnSave && isTodoEligibleForCompletionMode(linkedTodo)
+                    ? {
+                        color: 'var(--accent-color)',
+                        backgroundColor: 'color-mix(in srgb, var(--accent-color) 12%, white)'
+                      }
+                    : undefined}
+                  aria-pressed={completeLinkedTodoOnSave}
+                  title={isTodoEligibleForCompletionMode(linkedTodo) ? '提交时同时完成关联待办' : '请选择一个未完成待办'}
+                >
+                  <CheckCircle2 size={12} className={completeLinkedTodoOnSave ? 'fill-current' : ''} />
+                  <span>完成模式</span>
+                </button>
+              )}
               enableHierarchy={true}
               onChange={(id) => {
                 updateFields({

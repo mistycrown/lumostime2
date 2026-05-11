@@ -20,13 +20,6 @@ buildscript {
 
 apply from: "variables.gradle"
 
-def androidBuildRootPath = hasProperty('lumostime.androidBuildDir')
-    ? property('lumostime.androidBuildDir')
-    : 'E:/tmp/lumostime-android-build'
-
-// Keep Android build outputs out of the OneDrive-synced repo tree to reduce file-lock churn.
-rootProject.layout.buildDirectory.set(file("${androidBuildRootPath}/root"))
-
 allprojects {
     repositories {
         maven { url 'https://maven.aliyun.com/repository/google' }
@@ -37,30 +30,29 @@ allprojects {
 }
 
 subprojects { subproject ->
-    def subprojectBuildFolder = subproject.projectDir.toString().contains("${File.separator}node_modules${File.separator}")
-        ? "plugin-build/${subproject.name}"
-        : "modules/${subproject.name}"
-
-    subproject.layout.buildDirectory.set(rootProject.layout.buildDirectory.dir(subprojectBuildFolder))
+    if (subproject.projectDir.toString().contains("${File.separator}node_modules${File.separator}")) {
+        // Keep plugin build outputs out of node_modules to avoid Windows/OneDrive file locks.
+        subproject.layout.buildDirectory.set(rootProject.layout.buildDirectory.dir("plugin-build/${subproject.name}"))
+    }
 
     afterEvaluate {
         if (subproject.plugins.hasPlugin('com.android.application') || subproject.plugins.hasPlugin('com.android.library')) {
             subproject.android {
                 compileOptions {
-                    sourceCompatibility JavaVersion.VERSION_17
-                    targetCompatibility JavaVersion.VERSION_17
+                    sourceCompatibility JavaVersion.VERSION_21
+                    targetCompatibility JavaVersion.VERSION_21
                 }
             }
         }
 
         subproject.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
             kotlinOptions {
-                jvmTarget = '17'
+                jvmTarget = '21'
             }
         }
     }
 }
 
 task clean(type: Delete) {
-    delete rootProject.layout.buildDirectory
+    delete rootProject.buildDir
 }

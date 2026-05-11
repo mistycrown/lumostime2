@@ -3,6 +3,10 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-05-11: `TodoMonthView.tsx` now waits for the real scroll-container height before doing its first auto-position and uses the parent-provided reference week as the initial target, so opening month view lands on the intended current week more reliably instead of loosely snapping around today's month.
+- Update 2026-05-11: `TodoMonthView.tsx` now dims only the cross-month date numerals instead of the whole off-month cell, so 30/31 next to 1/2 can keep their task strips readable, and the expanded-row schedule tags sit a touch lower for better vertical centering with the title line.
+- Update 2026-05-11: `TodoMonthView.tsx` now leaves a hairline left/right inset around the weekday-and-grid calendar block, keeps completed month-view task titles on the same text color as the other schedule types, and shares one vertical row baseline between regular entries and `Trace` overlays so mixed rows stop looking slightly offset.
+- Update 2026-05-11: `SceneCard.tsx` now restores timer/todo backs only from a dedicated manual-flip cache, so stale legacy auto-flip booleans no longer keep out-of-slot scene cards stuck on their back side while current-slot timeline forcing still locks swipe-back.
 - Update 2026-05-11: `TodoMonthView.tsx` now treats each in-cell date numeral as a dedicated quick-add trigger wired to the same fast task-creation flow as the week planner, while taps on the rest of the month cell still expand that day's details.
 - Update 2026-05-11: `TodoMonthView.tsx` now adds one persisted `隐藏筛选式` field inside the month-view settings popup, using the custom-filter syntax to hide matching todo entries by todo title/category, linked activity/category, scope, and note without affecting week or list views.
 - Update 2026-05-11: `TodoMonthView.tsx` now squares off its week-row `Trace` overlay bars so they keep the left marker line plus a pale fill, but drop the rounded pill ends and sit flush against the covered day cells.
@@ -35,6 +39,7 @@ Components that form the structural or global UI elements.
 - `Toast.tsx`: Notification system.
 
 ## Modals
+- Update 2026-05-11: `AIBackfillChatModal.tsx` now lets `新建对话` branch into `通用默认对话` or `模板对话`, adds the first `周复盘` template with non-AI week-range selection (`本周` / `上周` / `YYYYMMDD`), routes weekly-review sessions through a dedicated prompt/data package instead of the generic assistant prompt stack, and handles exact `写入 AI 叙事` writeback plus strict `是 / 否` overwrite confirmation through local modal control.
 - Update 2026-05-10: `AIBackfillChatModal.tsx` now skips the extra visual-viewport keyboard inset on native Android, because the Capacitor WebView already resizes with the soft keyboard and the additional shell padding was leaving a large blank gap above the composer on real devices.
 - Update 2026-05-09: `AIBackfillChatModal.tsx` now tracks the mobile visual viewport and adds a keyboard bottom inset to the shared AI shell, so the composer and latest messages rise together above the soft keyboard while typing.
 - Update 2026-05-09: `AIBackfillChatModal.tsx` now retries failed assistant turns in place, reusing the original errored bubble and replacing it with the second attempt result instead of appending a duplicate assistant block.
@@ -77,6 +82,7 @@ Components that form the structural or global UI elements.
 - Update 2026-04-27: `AIBackfillChatModal.tsx` now uses plus-only icon buttons for adding long-term-memory notes and reminders, replacing the repeated `新增一条` labels in that management view.
 Overlay components for complex interactions.
 
+- `AIBackfillChatModal.tsx`: Shared AI workspace for generic chat plus the first weekly-review template conversation flow, now supporting session-type selection on `新建对话`, week-bound template sessions, template-specific weekly data/context injection, and local `写入 AI 叙事` overwrite/merge gating before Weekly Review narrative writeback.
 - `AIBackfillChatModal.tsx`: The long-term-memory viewer now renders `用户画像记忆`, `偏好记忆`, and `活跃 reminders` as readable note/reminder cards with manual add/delete controls; reminder due-times stay normalized onto a single canonical timeline, foreground turns receive explicit local/UTC current-time anchors for reminder math, background assistant replies can persist per-message debug payloads, the check-in interval inputs keep editable draft text with inline validation so invalid intermediate states never auto-save, and the built-in persona roster ships with six richer voices while allowing AI self-address and user-address fields to stay intentionally empty.
 - `AddLogModal.tsx`: Main modal for logging time, including segmented start/end time inputs that auto-advance from hour to minute after two digits.
 - `TodoDatePickerModal.tsx`: Lightweight planning picker shared by todo scheduling and Memoir, supporting both full date selection and a centered month-only modal with the duplicate footer close action removed.
@@ -157,6 +163,7 @@ Components for theme and appearance customization.
 - `achievement/AchievementBottleIconPackSelector.tsx`: 已改为成就瓶图标包卡片选择器，支持更紧凑的预览式切换。
 - `achievement/AchievementBottleStyleSelector.tsx`: 已改为成就瓶样式卡片选择器，使用玻璃瓶身小预览区分不同气质。
 > Last updated: 2026-05-06
+- `AddLogModal.tsx`, `TodoAssociation.tsx`: Backfill logging now exposes a one-shot `完成模式` pill beside `Associated Todo`, letting the current save also complete the linked unfinished task while still saving the record first and only warning if the follow-up completion fails.
 - `TodoAssociation.tsx`: Shared todo pickers now hide completed todos by default, but keep the currently linked completed todo visible so edit flows do not lose their existing association mid-session.
 - `WidgetSlotEditorModal.tsx`: Timer widget slots now opt into the shared hierarchical todo picker so parent/subtask rows match Add Log instead of flattening child tasks.
 - `TodoAssociation.tsx`: Standalone subtasks inside the virtual `今天` picker now show an `@parent` hint when the parent row is outside the current visible picker pool, while expanded child rows still avoid repeating that badge.

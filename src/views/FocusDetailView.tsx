@@ -4,6 +4,7 @@
  * @output Session Updates (Note, Association), Completion Event
  * @pos View (Active Focus Overlay)
  * @description The main interface displayed during an active focus session. Shows the timer, allows associating the session with a Todo or Scope, editing the note, completing the session, and applying inline note templates.
+ * @updated 2026-05-11: Added a one-shot completion-mode toggle beside the associated todo picker so finishing a focus session can also complete the linked unfinished task after the log is saved.
  * @updated 2026-05-05: Registered immersive focus mode with the shared Android back-handler stack so system back exits fullscreen before dismissing the focus detail overlay.
  * @updated 2026-04-22: Enabled hierarchical todo selection so focus-session todo pickers can expand subtasks beneath collapsed parent tasks.
  *
@@ -20,9 +21,15 @@ import { ImmersiveTimer } from '../components/ImmersiveTimer';
 import { IconRenderer } from '../components/IconRenderer';
 import { ReactionPicker, ReactionList } from '../components/ReactionComponents';
 import { RecommendedNoteTemplates } from '../components/RecommendedNoteTemplates';
+import { useToast } from '../contexts/ToastContext';
 import { appendTemplateToNote, getRecommendedNoteTemplates, RecommendedNoteTemplate } from '../utils/noteTemplateUtils';
 import { getTodoProgressSnapshot, shouldTodoUseManualProgressInput } from '../utils/todoProgressUtils';
 import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
+import {
+    getCompletionModeTodoId,
+    isTodoEligibleForCompletionMode,
+    runPrimaryActionWithOptionalTodoCompletion
+} from '../utils/todoCompletionModeUtils';
 
 interface FocusDetailViewProps {
     session: ActiveSession;
@@ -36,15 +43,18 @@ interface FocusDetailViewProps {
     onClose: () => void;
     onCancel?: (sessionId: string) => void;
     onComplete: (session: ActiveSession) => void;
+    onCompleteLinkedTodo?: (todoId: string) => boolean;
     onUpdate: (session: ActiveSession) => void;
     autoFocusNote?: boolean;
     autoEnterImmersive?: boolean; // 新增：是否自动进入沉浸式模式
 }
 
-export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, onClose, onCancel, onComplete, onUpdate, autoFocusNote = true, autoEnterImmersive = false }) => {
+export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, onClose, onCancel, onComplete, onCompleteLinkedTodo, onUpdate, autoFocusNote = true, autoEnterImmersive = false }) => {
     const [elapsed, setElapsed] = useState(0);
     const [note, setNote] = useState(session.note || '');
     const [isActivitySelectorOpen, setIsActivitySelectorOpen] = useState(false);
+    const [completeLinkedTodoOnSubmit, setCompleteLinkedTodoOnSubmit] = useState(false);
+    const { addToast } = useToast();
     const [isImmersiveMode, setIsImmersiveMode] = useState(autoEnterImmersive); // 根据 autoEnterImmersive 初始化
 
     // Progress Increment State
@@ -75,6 +85,12 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
             setProgressAmount(0);
         }
     }, [canUseManualProgressIncrement, progressAmount]);
+
+    useEffect(() => {
+        if (!isTodoEligibleForCompletionMode(linkedTodo) && completeLinkedTodoOnSubmit) {
+            setCompleteLinkedTodoOnSubmit(false);
+        }
+    }, [completeLinkedTodoOnSubmit, linkedTodo]);
 
     useEffect(() => {
         if (!isImmersiveMode) {
@@ -353,12 +369,23 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
     }, [reactions]);
 
     const handleComplete = () => {
-        onComplete({
+        const linkedTodoIdToComplete = getCompletionModeTodoId(completeLinkedTodoOnSubmit, linkedTodo);
+        const finalSession = {
             ...session,
             note,
             progressIncrement: canUseManualProgressIncrement ? progressAmount : undefined,
             reactions: reactions.length > 0 ? reactions : undefined
+        };
+
+        const submitResult = runPrimaryActionWithOptionalTodoCompletion({
+            runPrimaryAction: () => onComplete(finalSession),
+            linkedTodoId: linkedTodoIdToComplete,
+            completeLinkedTodo: onCompleteLinkedTodo
         });
+
+        if (submitResult.attemptedTodoCompletion && !submitResult.todoCompletionSucceeded) {
+            addToast('warning', '记录已保存，但关联待办未完成');
+        }
     };
 
     const handleCancel = () => {
@@ -472,6 +499,36 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                         todos={todos}
                         todoCategories={todoCategories}
                         linkedTodoId={session.linkedTodoId}
+                        headerActions={(
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (!isTodoEligibleForCompletionMode(linkedTodo)) {
+                                        return;
+                                    }
+                                    setCompleteLinkedTodoOnSubmit((current) => !current);
+                                }}
+                                disabled={!isTodoEligibleForCompletionMode(linkedTodo)}
+                                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                                    isTodoEligibleForCompletionMode(linkedTodo)
+                                        ? completeLinkedTodoOnSubmit
+                                            ? 'text-stone-900'
+                                            : 'bg-stone-100 text-stone-500 hover:bg-stone-200/80 hover:text-stone-700'
+                                        : 'bg-stone-100 text-stone-300 cursor-not-allowed'
+                                }`}
+                                style={completeLinkedTodoOnSubmit && isTodoEligibleForCompletionMode(linkedTodo)
+                                    ? {
+                                        color: 'var(--accent-color)',
+                                        backgroundColor: 'color-mix(in srgb, var(--accent-color) 12%, white)'
+                                    }
+                                    : undefined}
+                                aria-pressed={completeLinkedTodoOnSubmit}
+                                title={isTodoEligibleForCompletionMode(linkedTodo) ? '提交时同时完成关联待办' : '请选择一个未完成待办'}
+                            >
+                                <CheckCircle2 size={12} className={completeLinkedTodoOnSubmit ? 'fill-current' : ''} />
+                                <span>完成模式</span>
+                            </button>
+                        )}
                         enableHierarchy={true}
                         onChange={handleTodoSelect}
                         renderExtraContent={(tId) => {
