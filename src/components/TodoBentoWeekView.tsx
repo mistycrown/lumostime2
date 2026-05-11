@@ -4,6 +4,7 @@
  * @output Single-week 2x4 bento schedule UI backed by real todo data
  * @pos Component (Todo scheduling)
  * @description Renders one selected week at a time in the bento layout so the mini calendar, header range, and visible day cells always describe the same week.
+ * @updated 2026-05-11: Added a shared default/custom schedule-type color editor to the display popup so Arrange / Due / Repeat / Done / Trace colors can be customized whenever marker coloring follows schedule type.
  * @updated 2026-05-11: Removed the background blur transition from the display-settings open state so the softened calendar and popup appear on the same frame.
  * @updated 2026-05-11: Aligned the display-settings popup glass treatment and control sizing with the schedule shortcut menu so blur strength, fill, and typography now match.
  * @updated 2026-05-11: Added a dedicated full-screen blur scrim behind the display-settings popup and made the card fill more opaque so the wallpaper stays soft without making the text glow.
@@ -37,6 +38,13 @@ import {
   WeekTodoEntry
 } from '../utils/todoScheduleUtils';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
+import { TodoScheduleTypeColorSettings as TodoScheduleTypeColorSettingsPanel } from './TodoScheduleTypeColorSettings';
+import {
+  getResolvedTodoScheduleTypeColors,
+  todoScheduleColorService,
+  type TodoScheduleTypeColorKey,
+  type TodoScheduleTypeColorSettings
+} from '../services/todoScheduleColorService';
 
 interface TodoBentoWeekViewProps {
   todos: TodoItem[];
@@ -88,20 +96,12 @@ interface BentoBadgeDescriptor {
   overdue?: boolean;
 }
 
-const BENTO_ENTRY_COLORS = {
-  scheduled: '#1f2937',
-  deadline: '#d97745',
-  recurring: '#7a8460',
-  completed: '#a8a29e',
-  inProgress: '#667b92'
-};
-
-const getWeekEntryColor = (entry: WeekTodoEntry): string => {
-  if (entry.badges.deadline) return BENTO_ENTRY_COLORS.deadline;
-  if (entry.badges.scheduled) return BENTO_ENTRY_COLORS.scheduled;
-  if (entry.badges.recurring) return BENTO_ENTRY_COLORS.recurring;
-  if (entry.badges.completed) return BENTO_ENTRY_COLORS.completed;
-  return BENTO_ENTRY_COLORS.inProgress;
+const getWeekEntryColorKey = (entry: WeekTodoEntry): TodoScheduleTypeColorKey => {
+  if (entry.badges.deadline) return 'deadline';
+  if (entry.badges.scheduled) return 'scheduled';
+  if (entry.badges.recurring) return 'recurring';
+  if (entry.badges.completed) return 'completed';
+  return 'inProgress';
 };
 
 const getMonthGridWeeks = (date: Date): Date[] => eachWeekOfInterval({
@@ -196,6 +196,9 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
       ? (saved as TodoBentoMarkerColorMode)
       : 'schedule';
   });
+  const [scheduleTypeColorSettings, setScheduleTypeColorSettings] = useState<TodoScheduleTypeColorSettings>(() => (
+    todoScheduleColorService.getSettings()
+  ));
   const [visibleEntryCounts, setVisibleEntryCounts] = useState<Record<string, number>>({});
   const [isDisplaySettingsOpen, setIsDisplaySettingsOpen] = useState(false);
 
@@ -227,6 +230,10 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
   const todoCategoryColorMap = useMemo(
     () => new Map(todoCategories.map((category) => [category.id, getColorHexForCharts(category.color || '')])),
     [todoCategories]
+  );
+  const resolvedScheduleTypeColors = useMemo(
+    () => getResolvedTodoScheduleTypeColors(scheduleTypeColorSettings),
+    [scheduleTypeColorSettings]
   );
 
   useEffect(() => {
@@ -302,11 +309,12 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
   };
 
   const getEntryMarkerColor = (entry: WeekTodoEntry): string => {
+    const scheduleTypeColor = resolvedScheduleTypeColors[getWeekEntryColorKey(entry)];
     if (markerColorMode === 'category') {
-      return todoCategoryColorMap.get(entry.todo.categoryId) || getWeekEntryColor(entry);
+      return todoCategoryColorMap.get(entry.todo.categoryId) || scheduleTypeColor;
     }
 
-    return getWeekEntryColor(entry);
+    return scheduleTypeColor;
   };
 
   const resetDragState = () => {
@@ -839,22 +847,32 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                   {TODO_BENTO_MARKER_COLOR_OPTIONS.map((option) => {
                     const isSelected = markerColorMode === option.key;
 
-                    return (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => setMarkerColorMode(option.key)}
-                        className={`rounded-xl px-3 py-2.5 text-center text-[14px] tracking-[0.04em] transition-colors ${
-                          isSelected
-                            ? 'bg-stone-100 text-slate-700'
-                            : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    );
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => setMarkerColorMode(option.key)}
+                          className={`rounded-xl px-3 py-2.5 text-center text-[14px] tracking-[0.04em] transition-colors ${
+                            isSelected
+                              ? 'bg-stone-100 text-slate-700'
+                              : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      );
                   })}
                 </div>
+
+                {markerColorMode === 'schedule' && (
+                  <TodoScheduleTypeColorSettingsPanel
+                    settings={scheduleTypeColorSettings}
+                    onChange={(nextSettings) => {
+                      setScheduleTypeColorSettings(nextSettings);
+                      todoScheduleColorService.saveSettings(nextSettings);
+                    }}
+                  />
+                )}
               </div>
               </div>
             </div>

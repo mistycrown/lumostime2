@@ -4,6 +4,7 @@
  * @output Week buckets, daily schedule entries, and badge metadata for todo planning views
  * @pos Utility (Todo planning)
  * @description Shared helpers for deriving scheduled, deadline, recurring, completed, and in-progress todo visibility without creating standalone occurrence records.
+ * @updated 2026-05-11: Added week-scoped month-layout helpers that reserve stable per-row lanes for continuous `Trace` entries, so month cells can render cross-day in-progress bars without breaking the expanded-day order model.
  * @updated 2026-05-10: Week planner buckets now carry resolved parent-task titles for subtasks so the week schedule can render inline `@parent` context without re-looking up hierarchy in the view.
  * @updated 2026-05-10: Added shared day-entry builders for the new reference-style month schedule so the month grid and week planner now read the same real per-day todo data.
  * @updated 2026-04-27: Expanded the shared today-selector helpers so widget and picker `today + pin` views include todos that match today via arrange, due, or recurrence rules.
@@ -48,6 +49,23 @@ export interface TodoDateEntry {
   todo: TodoItem;
   badges: TodoDateBadges;
   primaryKind: TodoScheduleEntryKind;
+}
+
+export interface TodoWeekTraceSegment {
+  todoId: string;
+  entry: TodoDateEntry;
+  laneIndex: number;
+  startDayIndex: number;
+  endDayIndex: number;
+  dateKeys: string[];
+}
+
+export interface TodoMonthWeekLayout {
+  rowEntriesByDate: Record<string, Array<TodoDateEntry | null>>;
+  sortedEntriesByDate: Record<string, TodoDateEntry[]>;
+  traceSegments: TodoWeekTraceSegment[];
+  visibleRowCount: number;
+  hiddenCountByDate: Record<string, number>;
 }
 
 export const TODO_ASSOCIATION_TODAY_CATEGORY_ID = '__todo_association_today__';
@@ -291,6 +309,163 @@ export const getPrimaryTodoScheduleEntryKind = (badges: TodoDateBadges): TodoSch
   return 'inProgress';
 };
 
+const isTraceEntry = (entry: TodoDateEntry | null | undefined): entry is TodoDateEntry =>
+  Boolean(entry) && entry.primaryKind === 'inProgress';
+
+interface TodoWeekTraceDayPoint {
+  dayIndex: number;
+  dateKey: string;
+  entry: TodoDateEntry;
+  originalIndex: number;
+}
+
+interface TodoWeekTraceSegmentDraft {
+  todoId: string;
+  entry: TodoDateEntry;
+  startDayIndex: number;
+  endDayIndex: number;
+  dateKeys: string[];
+  preferredRow: number;
+  spanLength: number;
+}
+
+const getMedianNumber = (values: number[]): number => {
+  if (values.length === 0) {
+    return 0;
+  }
+
+  const sorted = [...values].sort((left, right) => left - right);
+  return sorted[Math.floor((sorted.length - 1) / 2)] ?? 0;
+};
+
+const buildTodoWeekTraceSegmentDrafts = (
+  weekDateKeys: string[],
+  entriesByDate: Record<string, TodoDateEntry[]>
+): TodoWeekTraceSegmentDraft[] => {
+  const tracePointsByTodo = new Map<string, TodoWeekTraceDayPoint[]>();
+
+  weekDateKeys.forEach((dateKey, dayIndex) => {
+    (entriesByDate[dateKey] || []).forEach((entry, originalIndex) => {
+      if (!isTraceEntry(entry)) {
+        return;
+      }
+
+      const current = tracePointsByTodo.get(entry.todo.id) || [];
+      current.push({
+        dayIndex,
+        dateKey,
+        entry,
+        originalIndex
+      });
+      tracePointsByTodo.set(entry.todo.id, current);
+    });
+  });
+
+  const segments: TodoWeekTraceSegmentDraft[] = [];
+
+  tracePointsByTodo.forEach((points, todoId) => {
+    const sortedPoints = [...points].sort((left, right) => left.dayIndex - right.dayIndex);
+    let run: TodoWeekTraceDayPoint[] = [];
+
+    const flushRun = () => {
+      if (run.length === 0) {
+        return;
+      }
+
+      segments.push({
+        todoId,
+        entry: run[0].entry,
+        startDayIndex: run[0].dayIndex,
+        endDayIndex: run[run.length - 1].dayIndex,
+        dateKeys: run.map((point) => point.dateKey),
+        preferredRow: getMedianNumber(run.map((point) => point.originalIndex)),
+        spanLength: run.length
+      });
+      run = [];
+    };
+
+    sortedPoints.forEach((point, index) => {
+      if (index === 0) {
+        run = [point];
+        return;
+      }
+
+      const previousPoint = sortedPoints[index - 1];
+      if (point.dayIndex === previousPoint.dayIndex + 1) {
+        run.push(point);
+        return;
+      }
+
+      flushRun();
+      run = [point];
+    });
+
+    flushRun();
+  });
+
+  return segments;
+};
+
+const assignTodoWeekTraceSegmentLanes = (
+  segmentDrafts: TodoWeekTraceSegmentDraft[],
+  weekLength: number
+): TodoWeekTraceSegment[] => {
+  const occupiedLanesByDay = Array.from({ length: weekLength }, () => new Set<number>());
+  const sortedDrafts = [...segmentDrafts].sort((left, right) => {
+    if (left.spanLength !== right.spanLength) {
+      return right.spanLength - left.spanLength;
+    }
+
+    if (left.startDayIndex !== right.startDayIndex) {
+      return left.startDayIndex - right.startDayIndex;
+    }
+
+    if (left.preferredRow !== right.preferredRow) {
+      return left.preferredRow - right.preferredRow;
+    }
+
+    return left.todoId.localeCompare(right.todoId, 'zh-CN');
+  });
+
+  return sortedDrafts
+    .map((draft) => {
+      let laneIndex = 0;
+
+      while (
+        Array.from(
+          { length: draft.endDayIndex - draft.startDayIndex + 1 },
+          (_, offset) => draft.startDayIndex + offset
+        ).some((dayIndex) => occupiedLanesByDay[dayIndex]?.has(laneIndex))
+      ) {
+        laneIndex += 1;
+      }
+
+      for (let dayIndex = draft.startDayIndex; dayIndex <= draft.endDayIndex; dayIndex += 1) {
+        occupiedLanesByDay[dayIndex]?.add(laneIndex);
+      }
+
+      return {
+        todoId: draft.todoId,
+        entry: draft.entry,
+        laneIndex,
+        startDayIndex: draft.startDayIndex,
+        endDayIndex: draft.endDayIndex,
+        dateKeys: draft.dateKeys
+      } satisfies TodoWeekTraceSegment;
+    })
+    .sort((left, right) => {
+      if (left.laneIndex !== right.laneIndex) {
+        return left.laneIndex - right.laneIndex;
+      }
+
+      if (left.startDayIndex !== right.startDayIndex) {
+        return left.startDayIndex - right.startDayIndex;
+      }
+
+      return left.todoId.localeCompare(right.todoId, 'zh-CN');
+    });
+};
+
 const buildTodoDateEntriesWithLookup = (
   todos: TodoItem[],
   targetDateKey: string,
@@ -337,6 +512,81 @@ export const buildTodoDateEntryMap = (
     accumulator[dateKey] = buildTodoDateEntriesWithLookup(todos, dateKey, inProgressLookup);
     return accumulator;
   }, {});
+};
+
+export const buildTodoMonthWeekLayout = (
+  weekDateKeys: string[],
+  entriesByDate: Record<string, TodoDateEntry[]>,
+  visibleEntryCount: number
+): TodoMonthWeekLayout => {
+  const segmentDrafts = buildTodoWeekTraceSegmentDrafts(weekDateKeys, entriesByDate);
+  const traceSegments = assignTodoWeekTraceSegmentLanes(segmentDrafts, weekDateKeys.length);
+  const segmentLaneByDateAndTodo = new Map<string, number>();
+
+  traceSegments.forEach((segment) => {
+    segment.dateKeys.forEach((dateKey) => {
+      segmentLaneByDateAndTodo.set(`${dateKey}::${segment.todoId}`, segment.laneIndex);
+    });
+  });
+
+  let visibleRowCount = 0;
+  const rowEntriesByDate = weekDateKeys.reduce<Record<string, Array<TodoDateEntry | null>>>((accumulator, dateKey) => {
+    const originalEntries = entriesByDate[dateKey] || [];
+    const rowEntries: Array<TodoDateEntry | null | undefined> = [];
+
+    originalEntries.forEach((entry) => {
+      if (!isTraceEntry(entry)) {
+        return;
+      }
+
+      const laneIndex = segmentLaneByDateAndTodo.get(`${dateKey}::${entry.todo.id}`);
+      if (laneIndex === undefined) {
+        return;
+      }
+
+      rowEntries[laneIndex] = entry;
+    });
+
+    let nextOpenRowIndex = 0;
+    originalEntries.forEach((entry) => {
+      if (isTraceEntry(entry)) {
+        return;
+      }
+
+      while (rowEntries[nextOpenRowIndex] !== undefined) {
+        nextOpenRowIndex += 1;
+      }
+
+      rowEntries[nextOpenRowIndex] = entry;
+      nextOpenRowIndex += 1;
+    });
+
+    const normalizedRows = Array.from({ length: rowEntries.length }, (_, index) => rowEntries[index] ?? null);
+    visibleRowCount = Math.max(visibleRowCount, normalizedRows.length);
+    accumulator[dateKey] = normalizedRows;
+    return accumulator;
+  }, {});
+
+  const sortedEntriesByDate = weekDateKeys.reduce<Record<string, TodoDateEntry[]>>((accumulator, dateKey) => {
+    accumulator[dateKey] = (rowEntriesByDate[dateKey] || []).filter((entry): entry is TodoDateEntry => entry !== null);
+    return accumulator;
+  }, {});
+
+  const hiddenCountByDate = weekDateKeys.reduce<Record<string, number>>((accumulator, dateKey) => {
+    accumulator[dateKey] = Math.max(
+      0,
+      (rowEntriesByDate[dateKey] || []).slice(visibleEntryCount).filter((entry) => entry !== null).length
+    );
+    return accumulator;
+  }, {});
+
+  return {
+    rowEntriesByDate,
+    sortedEntriesByDate,
+    traceSegments,
+    visibleRowCount,
+    hiddenCountByDate
+  };
 };
 
 export const buildWeekTodoBuckets = (todos: TodoItem[], logs: Log[], referenceDate: Date): WeekDayBucket[] => {
