@@ -107,6 +107,7 @@ export const SETTINGS_KEYS = {
     IMMERSIVE_TIMER_DISPLAY_SOURCE: 'immersiveTimerDisplaySource',
     /** 沉浸式计时显示格式 */
     IMMERSIVE_TIMER_DISPLAY_FORMAT: 'immersiveTimerDisplayFormat',
+    TODO_SCHEDULE_TYPE_COLORS: 'lumostime_todo_schedule_type_colors',
 } as const;
 
 /**

@@ -4,6 +4,7 @@
  * @output Regression coverage for virtual-category date matching, shared day entries, and week-view badge normalization
  * @pos Test (todo planning utilities)
  * @description Verifies today/tomorrow/this-week filtering and shared per-day entry building against Arrange, Due, and recurrence rules without creating occurrence records.
+ * @updated 2026-05-11: Added regression coverage for week-scoped month trace layouts so overlapping `Trace` segments keep stable lanes, preserve non-trace order, split on non-trace days, and keep hidden counts aligned with sparse lane rows.
  * @updated 2026-05-10: Added regression coverage for week-view subtask parent labels so shared week buckets expose inline `@parent` context only for child rows.
  * @updated 2026-05-10: Added regression coverage for shared real-data day entries so month view and week view stay aligned on daily inclusion and priority ordering.
  * @updated 2026-04-27: Added regression coverage for the shared today-category helper so `today + pin` widget and picker views keep due-today and recurring-today todos.
@@ -15,7 +16,9 @@ import { describe, expect, test } from 'vitest';
 import { Log, TodoItem } from '../types';
 import {
   buildWeekTodoBuckets,
+  buildTodoDateEntryMap,
   buildTodoDateEntries,
+  buildTodoMonthWeekLayout,
   formatWeekTodoLineTitle,
   getTodoAssociationTodayTodos,
   getTodoScheduleMatches,
@@ -189,5 +192,197 @@ describe('todoScheduleUtils virtual category helpers', () => {
     expect(rootEntry?.parentTitle).toBeUndefined();
     expect(childEntry ? formatWeekTodoLineTitle(childEntry) : null).toBe('Dataset Draft @Parent Atlas');
     expect(rootEntry ? formatWeekTodoLineTitle(rootEntry) : null).toBe('Root Item');
+  });
+
+  test('keeps overlapping week-row trace segments in stable relative order', () => {
+    const weekDateKeys = getTodoScheduleRangeDateKeys('thisWeek', REFERENCE_DATE);
+    const todos: TodoItem[] = [
+      buildTodo({ id: 'alpha-trace', title: 'Alpha trace' }),
+      buildTodo({ id: 'beta-trace', title: 'Beta trace' }),
+      buildTodo({ id: 'due-day-4', title: 'Due day 4', deadlineDate: '2026-04-23' })
+    ];
+    const logs: Log[] = [
+      buildLog({ id: 'alpha-1', linkedTodoId: 'alpha-trace', startTime: new Date('2026-04-20T09:00:00+08:00').getTime() }),
+      buildLog({ id: 'alpha-2', linkedTodoId: 'alpha-trace', startTime: new Date('2026-04-21T09:00:00+08:00').getTime() }),
+      buildLog({ id: 'alpha-3', linkedTodoId: 'alpha-trace', startTime: new Date('2026-04-22T09:00:00+08:00').getTime() }),
+      buildLog({ id: 'beta-1', linkedTodoId: 'beta-trace', startTime: new Date('2026-04-21T12:00:00+08:00').getTime() }),
+      buildLog({ id: 'beta-2', linkedTodoId: 'beta-trace', startTime: new Date('2026-04-22T12:00:00+08:00').getTime() }),
+      buildLog({ id: 'beta-3', linkedTodoId: 'beta-trace', startTime: new Date('2026-04-23T12:00:00+08:00').getTime() })
+    ];
+
+    const entriesByDate = buildTodoDateEntryMap(todos, logs, weekDateKeys);
+    const layout = buildTodoMonthWeekLayout(weekDateKeys, entriesByDate, 6);
+
+    expect(layout.traceSegments.map((segment) => ({
+      todoId: segment.todoId,
+      laneIndex: segment.laneIndex,
+      startDayIndex: segment.startDayIndex,
+      endDayIndex: segment.endDayIndex
+    }))).toEqual([
+      { todoId: 'alpha-trace', laneIndex: 0, startDayIndex: 0, endDayIndex: 2 },
+      { todoId: 'beta-trace', laneIndex: 1, startDayIndex: 1, endDayIndex: 3 }
+    ]);
+    expect(layout.sortedEntriesByDate['2026-04-21']?.map((entry) => entry.todo.id)).toEqual([
+      'alpha-trace',
+      'beta-trace'
+    ]);
+    expect(layout.sortedEntriesByDate['2026-04-22']?.map((entry) => entry.todo.id)).toEqual([
+      'alpha-trace',
+      'beta-trace'
+    ]);
+    expect(layout.sortedEntriesByDate['2026-04-23']?.map((entry) => entry.todo.id)).toEqual([
+      'due-day-4',
+      'beta-trace'
+    ]);
+  });
+
+  test('moves non-trace rows below reserved trace lanes while preserving their internal order', () => {
+    const weekDateKeys = getTodoScheduleRangeDateKeys('thisWeek', REFERENCE_DATE);
+    const todos: TodoItem[] = [
+      buildTodo({ id: 'trace-row', title: 'Trace row' }),
+      buildTodo({ id: 'due-row', title: 'Due row', deadlineDate: '2026-04-21' }),
+      buildTodo({ id: 'scheduled-row', title: 'Scheduled row', scheduledDate: '2026-04-21' }),
+      buildTodo({ id: 'done-row', title: 'Done row', completedAt: new Date('2026-04-21T20:00:00+08:00').getTime() })
+    ];
+    const logs: Log[] = [
+      buildLog({ id: 'trace-log', linkedTodoId: 'trace-row', startTime: new Date('2026-04-21T09:00:00+08:00').getTime() })
+    ];
+
+    const entriesByDate = buildTodoDateEntryMap(todos, logs, weekDateKeys);
+    const layout = buildTodoMonthWeekLayout(weekDateKeys, entriesByDate, 6);
+
+    expect(layout.sortedEntriesByDate['2026-04-21']?.map((entry) => entry.todo.id)).toEqual([
+      'trace-row',
+      'due-row',
+      'scheduled-row',
+      'done-row'
+    ]);
+  });
+
+  test('treats each rendered week row independently when building trace segments', () => {
+    const firstWeekDateKeys = [
+      '2026-04-20',
+      '2026-04-21',
+      '2026-04-22',
+      '2026-04-23',
+      '2026-04-24',
+      '2026-04-25',
+      '2026-04-26'
+    ];
+    const secondWeekDateKeys = [
+      '2026-04-27',
+      '2026-04-28',
+      '2026-04-29',
+      '2026-04-30',
+      '2026-05-01',
+      '2026-05-02',
+      '2026-05-03'
+    ];
+    const todos: TodoItem[] = [
+      buildTodo({ id: 'cross-week-trace', title: 'Cross week trace' })
+    ];
+    const logs: Log[] = [
+      buildLog({ id: 'trace-sun', linkedTodoId: 'cross-week-trace', startTime: new Date('2026-04-26T09:00:00+08:00').getTime() }),
+      buildLog({ id: 'trace-mon', linkedTodoId: 'cross-week-trace', startTime: new Date('2026-04-27T09:00:00+08:00').getTime() })
+    ];
+
+    const firstLayout = buildTodoMonthWeekLayout(
+      firstWeekDateKeys,
+      buildTodoDateEntryMap(todos, logs, firstWeekDateKeys),
+      6
+    );
+    const secondLayout = buildTodoMonthWeekLayout(
+      secondWeekDateKeys,
+      buildTodoDateEntryMap(todos, logs, secondWeekDateKeys),
+      6
+    );
+
+    expect(firstLayout.traceSegments).toHaveLength(1);
+    expect(firstLayout.traceSegments[0]).toMatchObject({
+      startDayIndex: 6,
+      endDayIndex: 6,
+      laneIndex: 0
+    });
+    expect(secondLayout.traceSegments).toHaveLength(1);
+    expect(secondLayout.traceSegments[0]).toMatchObject({
+      startDayIndex: 0,
+      endDayIndex: 0,
+      laneIndex: 0
+    });
+  });
+
+  test('splits a trace segment when the todo becomes a non-trace entry in the middle of the week', () => {
+    const weekDateKeys = getTodoScheduleRangeDateKeys('thisWeek', REFERENCE_DATE);
+    const todos: TodoItem[] = [
+      buildTodo({
+        id: 'mixed-entry',
+        title: 'Mixed entry',
+        scheduledDate: '2026-04-22'
+      })
+    ];
+    const logs: Log[] = [
+      buildLog({ id: 'mixed-1', linkedTodoId: 'mixed-entry', startTime: new Date('2026-04-20T09:00:00+08:00').getTime() }),
+      buildLog({ id: 'mixed-2', linkedTodoId: 'mixed-entry', startTime: new Date('2026-04-21T09:00:00+08:00').getTime() }),
+      buildLog({ id: 'mixed-3', linkedTodoId: 'mixed-entry', startTime: new Date('2026-04-22T09:00:00+08:00').getTime() }),
+      buildLog({ id: 'mixed-4', linkedTodoId: 'mixed-entry', startTime: new Date('2026-04-23T09:00:00+08:00').getTime() })
+    ];
+
+    const layout = buildTodoMonthWeekLayout(
+      weekDateKeys,
+      buildTodoDateEntryMap(todos, logs, weekDateKeys),
+      6
+    );
+
+    expect(layout.traceSegments.map((segment) => ({
+      startDayIndex: segment.startDayIndex,
+      endDayIndex: segment.endDayIndex,
+      dateKeys: segment.dateKeys
+    }))).toEqual([
+      {
+        startDayIndex: 0,
+        endDayIndex: 1,
+        dateKeys: ['2026-04-20', '2026-04-21']
+      },
+      {
+        startDayIndex: 3,
+        endDayIndex: 3,
+        dateKeys: ['2026-04-23']
+      }
+    ]);
+  });
+
+  test('computes hidden counts from sparse trace lanes instead of compacted day arrays', () => {
+    const weekDateKeys = getTodoScheduleRangeDateKeys('thisWeek', REFERENCE_DATE);
+    const todos: TodoItem[] = [
+      buildTodo({ id: 'trace-a', title: 'Trace A' }),
+      buildTodo({ id: 'trace-b', title: 'Trace B' }),
+      buildTodo({ id: 'trace-c', title: 'Trace C' })
+    ];
+    const logs: Log[] = [
+      buildLog({ id: 'a-20', linkedTodoId: 'trace-a', startTime: new Date('2026-04-20T09:00:00+08:00').getTime() }),
+      buildLog({ id: 'a-21', linkedTodoId: 'trace-a', startTime: new Date('2026-04-21T09:00:00+08:00').getTime() }),
+      buildLog({ id: 'a-22', linkedTodoId: 'trace-a', startTime: new Date('2026-04-22T09:00:00+08:00').getTime() }),
+      buildLog({ id: 'a-23', linkedTodoId: 'trace-a', startTime: new Date('2026-04-23T09:00:00+08:00').getTime() }),
+      buildLog({ id: 'a-24', linkedTodoId: 'trace-a', startTime: new Date('2026-04-24T09:00:00+08:00').getTime() }),
+      buildLog({ id: 'b-20', linkedTodoId: 'trace-b', startTime: new Date('2026-04-20T12:00:00+08:00').getTime() }),
+      buildLog({ id: 'b-21', linkedTodoId: 'trace-b', startTime: new Date('2026-04-21T12:00:00+08:00').getTime() }),
+      buildLog({ id: 'b-22', linkedTodoId: 'trace-b', startTime: new Date('2026-04-22T12:00:00+08:00').getTime() }),
+      buildLog({ id: 'c-22', linkedTodoId: 'trace-c', startTime: new Date('2026-04-22T15:00:00+08:00').getTime() }),
+      buildLog({ id: 'c-23', linkedTodoId: 'trace-c', startTime: new Date('2026-04-23T15:00:00+08:00').getTime() }),
+      buildLog({ id: 'c-24', linkedTodoId: 'trace-c', startTime: new Date('2026-04-24T15:00:00+08:00').getTime() })
+    ];
+
+    const layout = buildTodoMonthWeekLayout(
+      weekDateKeys,
+      buildTodoDateEntryMap(todos, logs, weekDateKeys),
+      2
+    );
+
+    expect(layout.rowEntriesByDate['2026-04-23']?.map((entry) => entry?.todo.id ?? null)).toEqual([
+      'trace-a',
+      null,
+      'trace-c'
+    ]);
+    expect(layout.hiddenCountByDate['2026-04-23']).toBe(1);
   });
 });

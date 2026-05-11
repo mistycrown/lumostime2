@@ -2,6 +2,7 @@
 
 Contains business logic and external integrations.
 
+Update 2026-05-11: `todoScheduleColorService.ts` now persists one shared default/custom five-color palette for Todo schedule-type markers, so both the bento week and month display popups can edit and reuse the same Arrange / Due / Repeat / Done / Trace colors with built-in or custom-group swatches.
 Update 2026-05-10: `assistantTurnService.ts` now orders dictionary and stable state summaries ahead of volatile anchors like current time and reminder/session snapshots, while `aiService.ts` adds provider-aware prompt-cache routing hints, explicit `cache_control` support for DashScope plus supported OpenRouter models, and normalized cache-hit metrics in debug payloads so repeated unified assistant turns can reuse longer provider-side prefixes more reliably.
 Update 2026-05-10: `assistantTurnService.ts` now forwards request options into `aiService`, and `aiService.ts` now bridges AbortSignal onto native `cordova-plugin-advanced-http` request ids so the shared AI chat stop button can actually cancel in-flight Android model requests instead of only flipping local UI state.
 Update 2026-05-06: `assistantPromptService.ts` now structures the foreground assistant fallback prompts around explicit intent recognition and intent-to-action routing, so front-chat turns classify the request before deciding whether to reply, clarify, create reminders, or emit tool calls.
@@ -57,6 +58,7 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 - `obsidianExportService.ts`: [Active] - Exports data to Obsidian markdown files.
 - `settingsImageReferenceService.ts`: [Active] - Collects settings-level image references, including custom TimePal assets plus persisted AI assistant/user avatar images, for cleanup protection and sync manifests.
 - `syncService.ts`: [Active] - Orchestrates image synchronization between local storage and WebDAV server. Handles deletions and bidirectional sync.
+- `todoScheduleColorService.ts`: [Active] - Persists the shared `默认 / 自定义` schedule-type marker palette for Todo schedule views, normalizes per-type HEX overrides, and resolves the five Arrange / Due / Repeat / Done / Trace colors consumed by week and month displays.
 - `widgetService.ts`: [Active] - Centralizes widget payload and template helpers, including the TODAY + PIN list payload that stays aligned with shared today-category matching for pinned, due-today, arranged-today, and recurring-today todos while also mirroring source todo/category snapshots for native refresh rebuilding.
 - `achievementBottleStyleService.ts`: [Active] - Defines achievement bottle skin options, including lighter glass palettes and the extended neutral bottle set.
 - `timelineStyleService.ts`: [Active] - Manages timeline style themes, defaults, Memoir-specific offset values, and config normalization for shared timeline nodes.

@@ -4,6 +4,8 @@
  * @output Reference-style rolling month schedule UI backed by real daily todo data
  * @pos Component (Todo scheduling)
  * @description Renders the editorial monthly schedule view adapted from the minimalist demo, using shared todo schedule utilities so each day shows the same real Arrange / Due / Repeat / Done / Trace data as the week planner.
+ * @updated 2026-05-11: Added a shared default/custom schedule-type color editor to the month display popup so Arrange / Due / Repeat / Done / Trace colors can be customized whenever marker coloring follows schedule type.
+ * @updated 2026-05-11: Added week-scoped `Trace` lane layout plus per-week overlay bars, so consecutive in-progress entries can render as one continuous strip across adjacent day cells while the day-detail list keeps the same sorted order.
  * @updated 2026-05-11: Limited month-title retargeting to first entry plus explicit external date jumps, and now freeze the `YYYY.M` header during programmatic month scrolls until the animation settles so edge-loading no longer snaps back to today and arrow-based month changes stop flickering.
  * @updated 2026-05-11: Switched the rolling month grid to an edge-loaded window that starts at current month minus/plus two months and appends another two months whenever scrolling nears either edge, reducing enter-time schedule recompute work without changing the visible interaction model.
  * @updated 2026-05-11: Removed the fixed-width split between expanded-row todo titles and `@parent` hints so both text pieces now stay visually adjacent and only compress when space actually runs out.
@@ -47,13 +49,22 @@ import {
 import { Log, TodoCategory, TodoItem } from '../types';
 import {
   buildTodoDateEntryMap,
+  buildTodoMonthWeekLayout,
   formatDateKey,
   parseDateKey,
-  TodoDateEntry
+  TodoDateEntry,
+  TodoMonthWeekLayout,
+  TodoWeekTraceSegment
 } from '../utils/todoScheduleUtils';
 import { getParentTodo } from '../utils/todoHierarchyUtils';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 import { hexToRgba } from '../utils/colorUtils';
+import { TodoScheduleTypeColorSettings as TodoScheduleTypeColorSettingsPanel } from './TodoScheduleTypeColorSettings';
+import {
+  getResolvedTodoScheduleTypeColors,
+  todoScheduleColorService,
+  type TodoScheduleTypeColorSettings
+} from '../services/todoScheduleColorService';
 
 interface TodoMonthViewProps {
   todos: TodoItem[];
@@ -87,6 +98,8 @@ const MONTH_VIEW_INITIAL_MONTHS_AFTER = 2;
 const MONTH_VIEW_LOAD_CHUNK_MONTHS = 2;
 const MONTH_VIEW_EDGE_LOAD_THRESHOLD_PX = 280;
 const MONTH_VIEW_PROGRAMMATIC_SCROLL_SETTLE_MS = 140;
+const MONTH_VIEW_ENTRY_TOP_OFFSET_PX = 28;
+const MONTH_VIEW_ENTRY_ROW_GAP_PX = 2;
 const MONTH_VIEW_ROW_OPTIONS = [2, 3, 4, 5] as const;
 const MONTH_VIEW_FONT_SIZE_OPTIONS = [
   { key: 'small', label: '小' },
@@ -99,14 +112,6 @@ const MONTH_VIEW_MARKER_COLOR_OPTIONS = [
   { key: 'category', label: '按分类' }
 ] as const;
 type MonthViewMarkerColorMode = typeof MONTH_VIEW_MARKER_COLOR_OPTIONS[number]['key'];
-
-const MONTH_VIEW_TYPE_COLORS: Record<TodoDateEntry['primaryKind'], string> = {
-  scheduled: '#141414',
-  deadline: '#c86a4c',
-  recurring: '#768252',
-  completed: '#a4a09a',
-  inProgress: '#60758b'
-};
 
 const buildMonthLabelDate = (value: string): Date => {
   const [year, month] = value.split('-').map(Number);
@@ -264,6 +269,9 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
       ? (saved as MonthViewMarkerColorMode)
       : 'schedule';
   });
+  const [scheduleTypeColorSettings, setScheduleTypeColorSettings] = useState<TodoScheduleTypeColorSettings>(() => (
+    todoScheduleColorService.getSettings()
+  ));
   const [isDensityMenuOpen, setIsDensityMenuOpen] = useState(false);
   const [draggingTodoId, setDraggingTodoId] = useState<string | null>(null);
   const [draggingEntry, setDraggingEntry] = useState<TodoDateEntry | null>(null);
@@ -283,6 +291,25 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   const entriesByDate = useMemo(
     () => buildTodoDateEntryMap(todos, logs, dateKeys),
     [dateKeys, logs, todos]
+  );
+  const weekLayouts = useMemo<Record<string, TodoMonthWeekLayout>>(
+    () => weeks.reduce<Record<string, TodoMonthWeekLayout>>((accumulator, week) => {
+      const weekDateKeys = week.days.map((day) => formatDateKey(day));
+      accumulator[week.id] = buildTodoMonthWeekLayout(weekDateKeys, entriesByDate, visibleEntryCount);
+      return accumulator;
+    }, {}),
+    [entriesByDate, visibleEntryCount, weeks]
+  );
+  const sortedEntriesByDate = useMemo(
+    () => weeks.reduce<Record<string, TodoDateEntry[]>>((accumulator, week) => {
+      const weekLayout = weekLayouts[week.id];
+      week.days.forEach((day) => {
+        const dateKey = formatDateKey(day);
+        accumulator[dateKey] = weekLayout?.sortedEntriesByDate[dateKey] || entriesByDate[dateKey] || [];
+      });
+      return accumulator;
+    }, {}),
+    [entriesByDate, weekLayouts, weeks]
   );
 
   const clearActiveMonthFreezeTimeout = () => {
@@ -900,8 +927,8 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
     [monthCellLineHeightPx, topRowHeight]
   );
   const selectedDateEntries = useMemo(
-    () => (selectedDate ? entriesByDate[selectedDate] || [] : []),
-    [entriesByDate, selectedDate]
+    () => (selectedDate ? sortedEntriesByDate[selectedDate] || [] : []),
+    [selectedDate, sortedEntriesByDate]
   );
   const todoCategoryColorMap = useMemo(
     () => new Map(todoCategories.map((category) => [category.id, getColorHexForCharts(category.color || '')])),
@@ -937,12 +964,16 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
 
     return 'text-[0.82rem]';
   }, [monthFontSize]);
+  const resolvedScheduleTypeColors = useMemo(
+    () => getResolvedTodoScheduleTypeColors(scheduleTypeColorSettings),
+    [scheduleTypeColorSettings]
+  );
   const getTodoMarkerColor = (entry: TodoDateEntry): string => {
     if (monthMarkerColorMode === 'category') {
-      return todoCategoryColorMap.get(entry.todo.categoryId) || MONTH_VIEW_TYPE_COLORS[entry.primaryKind];
+      return todoCategoryColorMap.get(entry.todo.categoryId) || resolvedScheduleTypeColors[entry.primaryKind];
     }
 
-    return MONTH_VIEW_TYPE_COLORS[entry.primaryKind];
+    return resolvedScheduleTypeColors[entry.primaryKind];
   };
 
   const getTodoMarkerStyle = (entry: TodoDateEntry): React.CSSProperties => {
@@ -950,6 +981,26 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
     return {
       borderLeftColor: markerColor,
       backgroundColor: hexToRgba(markerColor, 0.08)
+    };
+  };
+  const monthCellRowStyle = useMemo<React.CSSProperties>(
+    () => ({
+      height: `${monthCellLineHeightPx}px`,
+      minHeight: `${monthCellLineHeightPx}px`
+    }),
+    [monthCellLineHeightPx]
+  );
+  const getTraceSegmentStyle = (segment: TodoWeekTraceSegment): React.CSSProperties => {
+    const markerColor = getTodoMarkerColor(segment.entry);
+    const spanDayCount = segment.endDayIndex - segment.startDayIndex + 1;
+    return {
+      left: `calc(${(segment.startDayIndex / 7) * 100}% + 1px)`,
+      width: `calc(${(spanDayCount / 7) * 100}% - 2px)`,
+      top: `${MONTH_VIEW_ENTRY_TOP_OFFSET_PX + (segment.laneIndex * (monthCellLineHeightPx + MONTH_VIEW_ENTRY_ROW_GAP_PX))}px`,
+      height: `${monthCellLineHeightPx}px`,
+      backgroundColor: hexToRgba(markerColor, 0.12),
+      border: `1px solid ${hexToRgba(markerColor, 0.26)}`,
+      boxShadow: `inset 1.5px 0 0 ${markerColor}`
     };
   };
 
@@ -1057,6 +1108,8 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
           const middleDayOfWeek = week.days[3];
           const firstMonthDay = week.days.find((day) => getDate(day) === 1);
           const firstMonthKey = firstMonthDay ? format(startOfMonth(firstMonthDay), 'yyyy-MM-01') : null;
+          const weekLayout = weekLayouts[week.id];
+          const visibleTraceSegments = (weekLayout?.traceSegments || []).filter((segment) => segment.laneIndex < visibleEntryCount);
 
           return (
             <div
@@ -1069,88 +1122,136 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                 }
               }}
             >
-              <div className="grid grid-cols-7" style={{ height: `${topRowHeight}px` }}>
-                {week.days.map((day) => {
-                  const dateKey = formatDateKey(day);
-                  const entries = entriesByDate[dateKey] || [];
-                  const visibleEntries = entries.slice(0, visibleEntryCount);
-                  const hiddenCount = Math.max(0, entries.length - visibleEntries.length);
-                  const isCurrentMonth = isSameMonth(day, middleDayOfWeek);
-                  const isToday = dateKey === todayDateKey;
-                  const isSelected = selectedDate === dateKey;
-                  const isFirst = getDate(day) === 1;
-
-                  return (
-                    <button
-                      key={day.toISOString()}
-                      type="button"
-                      data-month-drop-date={dateKey}
-                      onClick={() => setSelectedDate((previous) => previous === dateKey ? null : dateKey)}
-                      onDragOver={(event) => {
-                        if (!draggingEntry) return;
-                        event.preventDefault();
-                        if (dragTargetDate !== dateKey) {
-                          setDragTargetDate(dateKey);
-                        }
-                      }}
-                      onDragLeave={() => {
-                        if (dragTargetDate === dateKey) {
-                          setDragTargetDate(null);
-                        }
-                      }}
-                      onDrop={(event) => {
-                        event.preventDefault();
-                        handleMonthDrop(dateKey);
-                      }}
-                      className={[
-                        'relative flex cursor-pointer flex-col border-b border-r border-stone-200/35 py-1.5 text-left transition-colors duration-200',
-                        !isCurrentMonth ? 'bg-[rgba(245,244,240,0.14)] opacity-30' : 'bg-transparent',
-                        isToday ? 'z-10 ring-1 ring-inset ring-stone-400' : '',
-                        isSelected && !isToday ? 'bg-[rgba(255,255,255,0.22)]' : '',
-                        dragTargetDate === dateKey ? 'bg-[rgba(250,249,246,0.32)] ring-2 ring-inset ring-stone-800/75' : ''
-                      ].join(' ')}
+              <div className="relative" style={{ height: `${topRowHeight}px` }}>
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-[1] overflow-hidden" style={{ height: `${topRowHeight}px` }}>
+                  {visibleTraceSegments.map((segment) => (
+                    <div
+                      key={`${week.id}-${segment.todoId}-${segment.startDayIndex}-${segment.endDayIndex}`}
+                      className={`absolute flex items-center overflow-hidden rounded-[0.48rem] px-[3px] font-medium leading-[1.2] text-stone-800 ${monthCellTaskClassName}`}
+                      style={getTraceSegmentStyle(segment)}
                     >
-                      <div className="flex justify-start px-2">
-                        <span
-                          className="text-[1.02rem] leading-none text-stone-800"
-                          style={{ fontFamily: "'Bilbo Swash Caps', 'Georgia', 'Times New Roman', cursive, serif" }}
-                        >
-                          {format(day, 'dd')}
-                        </span>
-                      </div>
+                      <span className="truncate whitespace-nowrap">{segment.entry.todo.title}</span>
+                    </div>
+                  ))}
+                </div>
 
-                      <div className="mt-1.5 flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
-                        {visibleEntries.map((entry) => (
-                          <div
-                            key={`${dateKey}-${entry.todo.id}-${entry.primaryKind}`}
-                            className={`overflow-hidden text-clip whitespace-nowrap border-l-[1.5px] pl-[3px] font-medium leading-[1.2] text-stone-800 ${monthCellTaskClassName}`}
-                            style={getTodoMarkerStyle(entry)}
+                <div className="grid grid-cols-7" style={{ height: `${topRowHeight}px` }}>
+                  {week.days.map((day) => {
+                    const dateKey = formatDateKey(day);
+                    const rowEntries = weekLayout?.rowEntriesByDate[dateKey] || (entriesByDate[dateKey] || []).map((entry) => entry);
+                    const visibleRowEntries = rowEntries.slice(0, visibleEntryCount);
+                    const hiddenCount = weekLayout?.hiddenCountByDate[dateKey] ?? Math.max(
+                      0,
+                      (entriesByDate[dateKey] || []).length - visibleRowEntries.length
+                    );
+                    const isCurrentMonth = isSameMonth(day, middleDayOfWeek);
+                    const isToday = dateKey === todayDateKey;
+                    const isSelected = selectedDate === dateKey;
+                    const isFirst = getDate(day) === 1;
+
+                    return (
+                      <button
+                        key={day.toISOString()}
+                        type="button"
+                        data-month-drop-date={dateKey}
+                        onClick={() => setSelectedDate((previous) => previous === dateKey ? null : dateKey)}
+                        onDragOver={(event) => {
+                          if (!draggingEntry) return;
+                          event.preventDefault();
+                          if (dragTargetDate !== dateKey) {
+                            setDragTargetDate(dateKey);
+                          }
+                        }}
+                        onDragLeave={() => {
+                          if (dragTargetDate === dateKey) {
+                            setDragTargetDate(null);
+                          }
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          handleMonthDrop(dateKey);
+                        }}
+                        className={[
+                          'relative z-0 flex cursor-pointer flex-col border-b border-r border-stone-200/35 py-1.5 text-left transition-colors duration-200',
+                          !isCurrentMonth ? 'bg-[rgba(245,244,240,0.14)] opacity-30' : 'bg-transparent',
+                          isToday ? 'z-10 ring-1 ring-inset ring-stone-400' : '',
+                          isSelected && !isToday ? 'bg-[rgba(255,255,255,0.22)]' : '',
+                          dragTargetDate === dateKey ? 'bg-[rgba(250,249,246,0.32)] ring-2 ring-inset ring-stone-800/75' : ''
+                        ].join(' ')}
+                      >
+                        <div className="flex justify-start px-2">
+                          <span
+                            className="text-[1.02rem] leading-none text-stone-800"
+                            style={{ fontFamily: "'Bilbo Swash Caps', 'Georgia', 'Times New Roman', cursive, serif" }}
                           >
-                            {entry.todo.title}
-                          </div>
-                        ))}
+                            {format(day, 'dd')}
+                          </span>
+                        </div>
 
-                        {hiddenCount > 0 && (
-                          <div className="pl-[5px] pt-0.5 text-[0.53rem] font-bold uppercase tracking-[0.14em] text-stone-300">
-                            +{hiddenCount}
+                        <div className="mt-1.5 flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
+                          {visibleRowEntries.map((entry, rowIndex) => {
+                            if (!entry) {
+                              return (
+                                <div
+                                  key={`${dateKey}-empty-${rowIndex}`}
+                                  aria-hidden="true"
+                                  style={monthCellRowStyle}
+                                />
+                              );
+                            }
+
+                            if (entry.primaryKind === 'inProgress') {
+                              return (
+                                <div
+                                  key={`${dateKey}-${entry.todo.id}-${entry.primaryKind}`}
+                                  aria-hidden="true"
+                                  className={`invisible overflow-hidden text-clip whitespace-nowrap border-l-[1.5px] pl-[3px] font-medium leading-[1.2] ${monthCellTaskClassName}`}
+                                  style={{
+                                    ...getTodoMarkerStyle(entry),
+                                    ...monthCellRowStyle
+                                  }}
+                                >
+                                  {entry.todo.title}
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div
+                                key={`${dateKey}-${entry.todo.id}-${entry.primaryKind}`}
+                                className={`overflow-hidden text-clip whitespace-nowrap border-l-[1.5px] pl-[3px] font-medium leading-[1.2] text-stone-800 ${monthCellTaskClassName}`}
+                                style={{
+                                  ...getTodoMarkerStyle(entry),
+                                  ...monthCellRowStyle
+                                }}
+                              >
+                                {entry.todo.title}
+                              </div>
+                            );
+                          })}
+
+                          {hiddenCount > 0 && (
+                            <div className="pl-[5px] pt-0.5 text-[0.53rem] font-bold uppercase tracking-[0.14em] text-stone-300">
+                              +{hiddenCount}
+                            </div>
+                          )}
+                        </div>
+
+                        {isToday && (
+                          <div className="absolute bottom-1 right-1.5 text-[0.45rem] font-bold uppercase tracking-widest opacity-50">
+                            TODAY
                           </div>
                         )}
-                      </div>
 
-                      {isToday && (
-                        <div className="absolute bottom-1 right-1.5 text-[0.45rem] font-bold uppercase tracking-widest opacity-50">
-                          TODAY
-                        </div>
-                      )}
-
-                      {isFirst && !isToday && (
-                        <div className="absolute bottom-1 right-1.5 text-[0.45rem] font-bold uppercase tracking-widest opacity-30">
-                          {format(day, 'MMM')}
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
+                        {isFirst && !isToday && (
+                          <div className="absolute bottom-1 right-1.5 text-[0.45rem] font-bold uppercase tracking-widest opacity-30">
+                            {format(day, 'MMM')}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <AnimatePresence initial={false}>
@@ -1432,6 +1533,16 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                   );
                 })}
               </div>
+
+              {monthMarkerColorMode === 'schedule' && (
+                <TodoScheduleTypeColorSettingsPanel
+                  settings={scheduleTypeColorSettings}
+                  onChange={(nextSettings) => {
+                    setScheduleTypeColorSettings(nextSettings);
+                    todoScheduleColorService.saveSettings(nextSettings);
+                  }}
+                />
+              )}
             </div>
             </div>
           </div>
