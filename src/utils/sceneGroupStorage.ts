@@ -3,6 +3,7 @@
  * @input localStorage sceneGroupState / sceneTimeSlots
  * @output SceneGroupState helpers for load/save/migrate
  * @description 场景组存储工具：统一读写场景组，并兼容旧版 sceneTimeSlots 数据。
+ * @updated 2026-05-11: Added a shared scene-group move helper so saved group order can drive both manual-mode management and the SceneView quick-switch menu.
  */
 import { DEFAULT_SCENE_PRESETS } from '../constants/scenePresets';
 import { SceneGroup, SceneGroupAutoSwitchConfig, SceneGroupState, SceneGroupSwitchMode, TimeSlot } from '../types';
@@ -178,6 +179,31 @@ export const findAutoSwitchTargetGroup = (state: SceneGroupState, date: Date = n
     }
   }
   return null;
+};
+
+export const moveSceneGroup = (
+  state: SceneGroupState,
+  groupId: string,
+  direction: 'up' | 'down'
+): SceneGroupState => {
+  const currentIndex = state.groups.findIndex(group => group.id === groupId);
+  if (currentIndex < 0) {
+    return state;
+  }
+
+  const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+  if (targetIndex < 0 || targetIndex >= state.groups.length) {
+    return state;
+  }
+
+  const nextGroups = [...state.groups];
+  const [movingGroup] = nextGroups.splice(currentIndex, 1);
+  nextGroups.splice(targetIndex, 0, movingGroup);
+
+  return {
+    ...state,
+    groups: nextGroups
+  };
 };
 
 export const saveSceneGroupStateToStorage = (state: SceneGroupState): SceneGroupState => {

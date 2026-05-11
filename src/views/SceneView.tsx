@@ -1,6 +1,7 @@
 /**
  * @file SceneView.tsx
  * @description 闂傚倷绶氬缁樹繆閸ヮ剙纾块柕鍫濇噳閺嬪秵绻涢崱妯诲碍缂佲偓瀹€鍕厸鐎广儱鍟俊鑺ャ亜锜婚崶銊㈡嫽闂佺鏈銊╁箺閻樼偨浜滈柡鍌濇硶閻忛亶鏌熼崣澶嬪唉鐎规洖宕灃濞达絼璀﹀ú?- 闂傚倷鑳剁涵鍫曞疾閻愬樊娴栭柕濞у棗小濡炪倖甯掗崯銊︾瑜版帗鐓欓柟顖嗗啯姣愬銈冨€曢幊蹇曟崲濠靛牆鏋堟俊顖濇〃婢规洘绻濋悽闈涗哗閻忓浚浜、姘愁槻闁崇懓鍟撮崺鈧い鎺戝閻撴盯鏌涘鈧粈渚€鎮橀敐鍥╃＜妞ゆ棁鍋愯倴婵炲濯寸粻鎾愁嚕閹绢喗鍋愭い鏃囧吹妞规娊姊绘担鍛婂暈妞ゃ劍鍔楀Σ鎰板即閻斿憡鐝烽梺鍝勮癁鐏炶姤顓块梻濠庡亜濞诧箑顫忚ぐ鎹ゅ洩顦规慨濠傤煼瀹曟帒顫濇潏銊﹀枛婵＄偑鍊栭弻銊╂儗閸屾氨鏆︽慨妞诲亾鐎规洏鍔戦、妯款槻闁?
+ * @updated 2026-05-11: Manual scene-group quick switching now follows the saved group order from SceneSettingsView.
  * @updated 2026-05-10: Timer and todo scene cards now auto-flip only when the current slot has a matching timeline record, and that forced back side disables swipe-to-front until the record condition clears.
  * @updated 2026-05-05: Reworked the custom-background surface stack so the whole scene page gets one shared base scrim and the right content panel adds a second warm overlay, matching TodoView and RecordView without a center seam.
  * @updated 2026-05-05: Fixed SceneView widget-session matching by reading active sessions from SessionContext instead of DataContext, preventing undefined access crashes in scene cards.

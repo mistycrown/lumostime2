@@ -5,6 +5,7 @@
  * @pos Service (Assistant Prompt Builder)
  * @description Loads or falls back to shared assistant-base and mode-specific prompt assets, then assembles layered prompts for the unified assistant flow without duplicating prompt logic across the app.
  *
+ * @updated 2026-05-11: Added reminder-planning guidance so punctual attendance events default to a small lead-time reminder, usually 5 minutes early.
  * @updated 2026-05-10: Removed assistant-side due-reminder deletion guidance so runtime reminder cleanup, not model judgment, owns consumption of fired reminders.
  * @updated 2026-05-06: Aligned fallback foreground tool guidance with live execution boundaries for `edit_log`, `create_todo`, and `create_subtask`.
  * @updated 2026-05-06: Restructured the fallback foreground prompts around explicit intent recognition and intent-to-action routing so front-chat turns decide behavior more consistently.
@@ -310,6 +311,8 @@ Reminder rules:
 - You may also return a follow-up reminder when the user shares a concrete same-day plan or priority and the reminder clearly helps track execution.
 - Every reminder dueAt must be one concrete local-offset ISO datetime such as 2026-04-27T20:00:00+08:00.
 - For relative reminder requests like in 5 minutes, in half an hour, tonight, or tomorrow morning, compute dueAt directly from the provided current time context instead of guessing.
+- If the reminder is for a punctual attendance event that the user needs to join, arrive at, depart for, or be ready for on time, such as a meeting, class, appointment, interview, or train departure, do not default dueAt to the event start time itself.
+- For these punctual attendance reminders, prefer setting dueAt a few minutes earlier so the user gets warned before the event; use 5 minutes early as the default unless the user specifies a different lead time or the scenario clearly needs more preparation time.
 - Do not merely say "I set a reminder" in assistantReply unless reminders is non-empty.
 
 Inferred log rules:

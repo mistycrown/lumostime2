@@ -3,6 +3,7 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- `sceneGroupStorage.ts`: [Active] - Loads, migrates, saves, auto-matches, and now reorders scene groups so one persisted group sequence can drive both settings management and the SceneView quick-switch list.
 - `sceneCardFlipUtils.ts`: [Active] - Resolves persisted vs. forced scene-card back-side state so timer/todo cards can lock swipe-back only when a current-slot timeline record is forcing the flip.
 - `sceneTimelineMatchUtils.ts`: [Active] - Computes the active scene-slot time window, including overnight slots, and checks whether timer/todo cards have matching logs in the current timeline interval.
 - `assistantMessageParts.ts`: [Active] - Normalizes structured assistant reply parts and applies conservative fallback splitting so one assistant turn can render as grouped multi-bubble chat bursts without fragmenting persistence.

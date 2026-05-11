@@ -4,6 +4,7 @@
  * @output SharedPreferences-backed native reminder queue for background reminder_due execution
  * @pos Native Helper
  * @description Mirrors the assistant reminder queue onto Android so the foreground service can dispatch due reminders without relying on the Web runtime.
+ * @updated 2026-05-11: Added next-eligible reminder lookup so the native assistant service can schedule exact due-reminder wakeups instead of waiting for the next coarse poll cycle.
  * @updated 2026-04-30: Added native reminder queue persistence, due lookup, dispatch-attempt tracking, and completion helpers.
  */
 package com.mistycrown.lumostime;
@@ -20,6 +21,7 @@ public final class AssistantNativeReminderStore {
     private static final String TAG = "AssistantNativeReminder";
     private static final String PREFS_NAME = "lumostime_assistant_native_reminders";
     private static final String KEY_REMINDERS_JSON = "reminders_json";
+    private static final long REMINDER_RETRY_DELAY_MS = 60_000L;
 
     private AssistantNativeReminderStore() {
     }
@@ -44,29 +46,36 @@ public final class AssistantNativeReminderStore {
         JSONArray reminders = read(context);
         JSONArray due = new JSONArray();
         for (int index = 0; index < reminders.length(); index += 1) {
-          JSONObject reminder = reminders.optJSONObject(index);
-          if (reminder == null) {
-            continue;
-          }
+            JSONObject reminder = reminders.optJSONObject(index);
+            long eligibleAtMs = resolveNextEligibleAt(reminder);
+            if (reminder == null || eligibleAtMs <= 0L || eligibleAtMs > nowMs) {
+                continue;
+            }
 
-          if (!"pending".equals(reminder.optString("status", "").trim())) {
-            continue;
-          }
-
-          long dueAtMs = AssistantTimeParser.parseIsoDateTime(reminder.optString("dueAt", ""));
-          if (dueAtMs <= 0L || dueAtMs > nowMs) {
-            continue;
-          }
-
-          String lastAttempt = reminder.optString("lastDispatchAttemptAt", "").trim();
-          long lastAttemptMs = AssistantTimeParser.parseIsoDateTime(lastAttempt);
-          if (lastAttemptMs > 0L && nowMs - lastAttemptMs < 60_000L) {
-            continue;
-          }
-
-          due.put(reminder);
+            due.put(reminder);
         }
         return due;
+    }
+
+    public static long findNextEligibleAt(Context context) {
+        if (context == null) {
+            return -1L;
+        }
+
+        JSONArray reminders = read(context);
+        long nextEligibleAtMs = -1L;
+        for (int index = 0; index < reminders.length(); index += 1) {
+            long eligibleAtMs = resolveNextEligibleAt(reminders.optJSONObject(index));
+            if (eligibleAtMs <= 0L) {
+                continue;
+            }
+
+            if (nextEligibleAtMs <= 0L || eligibleAtMs < nextEligibleAtMs) {
+                nextEligibleAtMs = eligibleAtMs;
+            }
+        }
+
+        return nextEligibleAtMs;
     }
 
     public static void recordDispatchAttempt(Context context, String reminderId, String attemptedAt) {
@@ -139,5 +148,30 @@ public final class AssistantNativeReminderStore {
 
     private static SharedPreferences prefs(Context context) {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+    }
+
+    private static long resolveNextEligibleAt(JSONObject reminder) {
+        if (reminder == null) {
+            return -1L;
+        }
+
+        if (!"pending".equals(reminder.optString("status", "").trim())) {
+            return -1L;
+        }
+
+        long dueAtMs = AssistantTimeParser.parseIsoDateTime(reminder.optString("dueAt", ""));
+        if (dueAtMs <= 0L) {
+            return -1L;
+        }
+
+        long eligibleAtMs = dueAtMs;
+        long lastAttemptMs = AssistantTimeParser.parseIsoDateTime(
+            reminder.optString("lastDispatchAttemptAt", "").trim()
+        );
+        if (lastAttemptMs > 0L) {
+            eligibleAtMs = Math.max(eligibleAtMs, lastAttemptMs + REMINDER_RETRY_DELAY_MS);
+        }
+
+        return eligibleAtMs;
     }
 }

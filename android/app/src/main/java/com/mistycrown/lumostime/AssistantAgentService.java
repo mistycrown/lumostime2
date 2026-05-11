@@ -4,6 +4,7 @@
  * @output Persistent Android agent loop, shared runtime notification state, and bridge-triggered assistant events
  * @pos Native Service
  * @description Minimal Android foreground service scaffold for the background AI agent. Maintains a lightweight polling loop, shares one persistent Android status notification with the floating-window service, and emits assistant system-trigger events through the Capacitor plugin bridge.
+ * @updated 2026-05-11: Split due-reminder scheduling off the coarse base poll so reminders can fire at their exact next eligible time instead of waiting for the next 5-minute sweep.
  * @updated 2026-05-09: Refreshes the shared persistent notification title once per second while active focus timers exist so timer durations stay live during assistant-only foreground runtime.
  * @updated 2026-04-27: Added persistent native diagnostics for poll ticks, skip reasons, and trigger dispatches so missed background calls can be traced from the shared AI history UI.
  * @updated 2026-04-27: Tracked recent user/task activity plus quiet hours and minimum nudge gaps so native random check-ins stop interrupting immediately after foreground activity.
@@ -52,6 +53,7 @@ public class AssistantAgentService extends Service {
     private int minimumNudgeGapMinutes = 45;
     private boolean loopStarted = false;
     private long nextRandomCheckinAtMs = 0L;
+    private long nextReminderDispatchAtMs = 0L;
     private long lastUserTurnAtMs = 0L;
     private long lastTaskStateChangedAtMs = 0L;
     private long lastAssistantNudgeAtMs = 0L;
@@ -133,6 +135,29 @@ public class AssistantAgentService extends Service {
 
             syncUnifiedStatusNotification();
             handler.postDelayed(this, Math.max(1, basePollMinutes) * 60_000L);
+        }
+    };
+
+    private final Runnable reminderDispatchRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!enabled) {
+                return;
+            }
+
+            long now = System.currentTimeMillis();
+            appendDiagnostic(
+                "reminder_tick",
+                "info",
+                "Assistant reminder timer fired",
+                null,
+                "reminder_due",
+                null,
+                buildPollDiagnosticContext(now)
+            );
+            dispatchDueNativeReminders(now);
+            scheduleNextReminderDispatch(System.currentTimeMillis());
+            syncUnifiedStatusNotification();
         }
     };
 
@@ -261,6 +286,7 @@ public class AssistantAgentService extends Service {
         if (!loopStarted) {
             loopStarted = true;
             scheduleNextRandomCheckin(System.currentTimeMillis());
+            scheduleNextReminderDispatch(System.currentTimeMillis());
             handler.post(pollRunnable);
         } else {
             rescheduleAgentLoop();
@@ -287,7 +313,9 @@ public class AssistantAgentService extends Service {
     private void stopAgentLoop() {
         loopStarted = false;
         handler.removeCallbacks(pollRunnable);
+        handler.removeCallbacks(reminderDispatchRunnable);
         handler.removeCallbacks(notificationRefreshRunnable);
+        nextReminderDispatchAtMs = 0L;
     }
 
     private void dispatchDueNativeReminders(long nowMs) {
@@ -344,10 +372,18 @@ public class AssistantAgentService extends Service {
                 @Override
                 public void onCompleted() {
                     AssistantNativeReminderStore.markDispatched(AssistantAgentService.this, reminderId, isoNow());
+                    handler.post(() -> {
+                        scheduleNextReminderDispatch(System.currentTimeMillis());
+                        syncUnifiedStatusNotification();
+                    });
                 }
 
                 @Override
                 public void onFailed() {
+                    handler.post(() -> {
+                        scheduleNextReminderDispatch(System.currentTimeMillis());
+                        syncUnifiedStatusNotification();
+                    });
                 }
             });
         }
@@ -355,7 +391,9 @@ public class AssistantAgentService extends Service {
 
     private void rescheduleAgentLoop() {
         handler.removeCallbacks(pollRunnable);
+        handler.removeCallbacks(reminderDispatchRunnable);
         scheduleNextRandomCheckin(System.currentTimeMillis());
+        scheduleNextReminderDispatch(System.currentTimeMillis());
         if (enabled) {
             handler.postDelayed(pollRunnable, Math.max(1, basePollMinutes) * 60_000L);
         }
@@ -407,6 +445,29 @@ public class AssistantAgentService extends Service {
         int spread = maxMinutes - minMinutes;
         int pickedMinutes = spread <= 0 ? minMinutes : minMinutes + random.nextInt(spread + 1);
         nextRandomCheckinAtMs = nowMs + (pickedMinutes * 60_000L);
+    }
+
+    private void scheduleNextReminderDispatch(long nowMs) {
+        handler.removeCallbacks(reminderDispatchRunnable);
+        nextReminderDispatchAtMs = 0L;
+
+        if (!enabled || !AssistantNativeBackgroundExecutor.canExecute(this)) {
+            return;
+        }
+
+        long nextEligibleAtMs = AssistantNativeReminderStore.findNextEligibleAt(this);
+        if (nextEligibleAtMs <= 0L) {
+            return;
+        }
+
+        nextReminderDispatchAtMs = nextEligibleAtMs;
+        long delayMs = Math.max(0L, nextEligibleAtMs - nowMs);
+        if (delayMs <= 0L) {
+            handler.post(reminderDispatchRunnable);
+            return;
+        }
+
+        handler.postDelayed(reminderDispatchRunnable, delayMs);
     }
 
     private boolean shouldDispatchRandomCheckin(long nowMs) {
@@ -565,6 +626,8 @@ public class AssistantAgentService extends Service {
         context.put("nowLocal", formatTimestamp(nowMs));
         context.put("nextRandomCheckinAtMs", String.valueOf(nextRandomCheckinAtMs));
         context.put("nextRandomCheckinAtLocal", formatTimestamp(nextRandomCheckinAtMs));
+        context.put("nextReminderDispatchAtMs", String.valueOf(nextReminderDispatchAtMs));
+        context.put("nextReminderDispatchAtLocal", formatTimestamp(nextReminderDispatchAtMs));
         context.put("lastUserTurnAtMs", String.valueOf(lastUserTurnAtMs));
         context.put("lastUserTurnAtLocal", formatTimestamp(lastUserTurnAtMs));
         context.put("lastTaskStateChangedAtMs", String.valueOf(lastTaskStateChangedAtMs));
