@@ -4,6 +4,9 @@
  * @output Reference-style rolling month schedule UI backed by real daily todo data
  * @pos Component (Todo scheduling)
  * @description Renders the editorial monthly schedule view adapted from the minimalist demo, using shared todo schedule utilities so each day shows the same real Arrange / Due / Repeat / Done / Trace data as the week planner.
+ * @updated 2026-05-11: Fixed month-view open-time auto-positioning so the first scroll waits for the measured container height and targets the parent-provided reference week instead of jumping loosely around today's month.
+ * @updated 2026-05-11: Limited cross-month dimming to the date numerals instead of the whole cell, and nudged expanded-row schedule tags slightly downward to better center against the task title line.
+ * @updated 2026-05-11: Added a hairline side inset for the month grid, removed gray completed-task text treatment, and unified regular-entry and Trace row baselines so mixed rows stay vertically aligned.
  * @updated 2026-05-11: Made each month-cell date numeral a dedicated quick-add trigger, matching week view while leaving the rest of the cell focused on expanding that day's detail rows.
  * @updated 2026-05-11: Froze the month-view settings title bar so the title and close button stay pinned while the settings body scrolls underneath.
  * @updated 2026-05-11: Added a draft-based `隐藏 Trace 类型` toggle in month-view settings so Trace rows only disappear after the popup closes instead of recomputing while the user is still editing.
@@ -114,7 +117,11 @@ const MONTH_VIEW_INITIAL_MONTHS_AFTER = 2;
 const MONTH_VIEW_LOAD_CHUNK_MONTHS = 2;
 const MONTH_VIEW_EDGE_LOAD_THRESHOLD_PX = 280;
 const MONTH_VIEW_PROGRAMMATIC_SCROLL_SETTLE_MS = 140;
-const MONTH_VIEW_ENTRY_TOP_OFFSET_PX = 28;
+const MONTH_VIEW_CALENDAR_SIDE_INSET_CLASS_NAME = 'px-px';
+const MONTH_VIEW_CELL_VERTICAL_PADDING_PX = 6;
+const MONTH_VIEW_DAY_NUMBER_ROW_HEIGHT_PX = 16;
+const MONTH_VIEW_ENTRY_TOP_MARGIN_PX = 6;
+const MONTH_VIEW_ENTRY_TOP_OFFSET_PX = MONTH_VIEW_CELL_VERTICAL_PADDING_PX + MONTH_VIEW_DAY_NUMBER_ROW_HEIGHT_PX + MONTH_VIEW_ENTRY_TOP_MARGIN_PX;
 const MONTH_VIEW_ENTRY_ROW_GAP_PX = 2;
 const TODO_DISPLAY_POPUP_MAX_HEIGHT = 'min(calc(100vh - 14rem - env(safe-area-inset-bottom)), 42rem)';
 const MONTH_VIEW_ROW_OPTIONS = [2, 3, 4, 5] as const;
@@ -177,8 +184,7 @@ const isSameCalendarDay = (left: Date, right: Date): boolean =>
 
 const getMonthEntryLeadingIcon = (entry: TodoDateEntry): React.ReactNode => {
   const { badges } = entry;
-  const isHistoricalOnly = !badges.scheduled && !badges.deadline && !badges.recurring && (badges.completed || badges.inProgress);
-  const iconClassName = isHistoricalOnly ? 'text-stone-300' : 'text-stone-400';
+  const iconClassName = 'text-stone-400';
 
   if (badges.completed) {
     return <CheckCircle2 size={12} className={iconClassName} />;
@@ -270,7 +276,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   const desktopAutoScrollIntervalRef = useRef<number | null>(null);
   const [activeMonth, setActiveMonth] = useState<string>(() => format(startOfMonth(today), 'yyyy-MM-01'));
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [containerHeight, setContainerHeight] = useState(600);
+  const [containerHeight, setContainerHeight] = useState(0);
   const [loadedRange, setLoadedRange] = useState<LoadedMonthRange>(initialMonthRange);
   const [monthRowsPerScreen, setMonthRowsPerScreen] = useState<number>(() => {
     const saved = localStorage.getItem(MONTH_VIEW_ROWS_PER_SCREEN_STORAGE_KEY);
@@ -797,11 +803,23 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
       return;
     }
 
-    const currentMonthDate = today;
-    scrollToMonth(currentMonthDate);
-    setActiveMonth(getMonthKey(currentMonthDate));
+    const initialReferenceDateKey = formatDateKey(referenceDate);
+    const initialReferenceMonthKey = getMonthKey(referenceDate);
+
+    pendingReferenceDateKeyRef.current = initialReferenceDateKey;
+    freezeActiveMonthUntilScrollSettles(initialReferenceMonthKey);
+
+    if (!ensureMonthLoaded(referenceDate)) {
+      return;
+    }
+
+    scrollToWeekContainingDate(referenceDate);
+    pendingReferenceDateKeyRef.current = null;
+    lastAppliedReferenceDateKeyRef.current = initialReferenceDateKey;
+    setActiveMonth(initialReferenceMonthKey);
+    scheduleActiveMonthFreezeSettle();
     hasInitialScrollRef.current = true;
-  }, [containerHeight, today, weeks]);
+  }, [containerHeight, referenceDate]);
 
   useEffect(() => {
     if (!hasInitialScrollRef.current) {
@@ -1082,6 +1100,8 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   };
   const monthCellRowStyle = useMemo<React.CSSProperties>(
     () => ({
+      display: 'flex',
+      alignItems: 'center',
       height: `${monthCellLineHeightPx}px`,
       minHeight: `${monthCellLineHeightPx}px`
     }),
@@ -1183,7 +1203,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-7 border-b border-black/90 bg-[rgba(250,249,246,0.16)] py-1.5 text-[0.6rem] font-bold uppercase tracking-widest">
+        <div className={`${MONTH_VIEW_CALENDAR_SIDE_INSET_CLASS_NAME} grid grid-cols-7 border-b border-black/90 bg-[rgba(250,249,246,0.16)] py-1.5 text-[0.6rem] font-bold uppercase tracking-widest`}>
           {WEEKDAY_LABELS.map((label) => (
             <div key={label} className="text-center opacity-40">
               {label}
@@ -1194,7 +1214,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
 
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-y-auto bg-transparent pb-[10vh] no-scrollbar"
+        className={`min-h-0 flex-1 overflow-y-auto bg-transparent pb-[10vh] no-scrollbar ${MONTH_VIEW_CALENDAR_SIDE_INSET_CLASS_NAME}`}
         style={{ scrollBehavior: 'smooth' }}
         onScroll={handleMonthScroll}
         onDragOver={handleMonthContainerDragOver}
@@ -1242,6 +1262,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                       (entriesByDate[dateKey] || []).length - visibleRowEntries.length
                     );
                     const isCurrentMonth = isSameMonth(day, middleDayOfWeek);
+                    const dayNumberTextClassName = isCurrentMonth ? 'text-stone-800 hover:text-stone-950' : 'text-stone-400 hover:text-stone-500';
                     const isToday = dateKey === todayDateKey;
                     const isSelected = selectedDate === dateKey;
                     const isFirst = getDate(day) === 1;
@@ -1282,26 +1303,42 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                           handleMonthDrop(dateKey);
                         }}
                         className={[
-                          'relative z-0 flex cursor-pointer flex-col border-b border-r border-stone-200/35 py-1.5 text-left transition-colors duration-200',
-                          !isCurrentMonth ? 'bg-[rgba(245,244,240,0.14)] opacity-30' : 'bg-transparent',
+                          'relative z-0 flex cursor-pointer flex-col border-b border-r border-stone-200/35 text-left transition-colors duration-200',
+                          !isCurrentMonth ? 'bg-[rgba(245,244,240,0.14)]' : 'bg-transparent',
                           isToday ? 'z-10 ring-1 ring-inset ring-stone-400' : '',
                           isSelected && !isToday ? 'bg-[rgba(255,255,255,0.22)]' : '',
                           dragTargetDate === dateKey ? 'bg-[rgba(250,249,246,0.32)] ring-2 ring-inset ring-stone-800/75' : ''
                         ].join(' ')}
+                        style={{
+                          paddingTop: `${MONTH_VIEW_CELL_VERTICAL_PADDING_PX}px`,
+                          paddingBottom: `${MONTH_VIEW_CELL_VERTICAL_PADDING_PX}px`
+                        }}
                       >
-                        <div className="flex justify-start px-2">
+                        <div
+                          className="flex justify-start px-2"
+                          style={{ minHeight: `${MONTH_VIEW_DAY_NUMBER_ROW_HEIGHT_PX}px` }}
+                        >
                           <button
                             type="button"
                             onClick={(event) => handleMonthDayNumberClick(event, dateKey)}
-                            className="rounded-sm text-[1.02rem] leading-none text-stone-800 transition-colors hover:text-stone-950 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-500/70"
-                            style={{ fontFamily: "'Bilbo Swash Caps', 'Georgia', 'Times New Roman', cursive, serif" }}
+                            className={`rounded-sm text-[1.02rem] leading-none transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-500/70 ${dayNumberTextClassName}`}
+                            style={{
+                              fontFamily: "'Bilbo Swash Caps', 'Georgia', 'Times New Roman', cursive, serif",
+                              lineHeight: `${MONTH_VIEW_DAY_NUMBER_ROW_HEIGHT_PX}px`
+                            }}
                             aria-label={`Quick add task for ${format(day, 'yyyy-MM-dd')}`}
                           >
                             {format(day, 'dd')}
                           </button>
                         </div>
 
-                        <div className="mt-1.5 flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
+                        <div
+                          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+                          style={{
+                            marginTop: `${MONTH_VIEW_ENTRY_TOP_MARGIN_PX}px`,
+                            rowGap: `${MONTH_VIEW_ENTRY_ROW_GAP_PX}px`
+                          }}
+                        >
                           {visibleRowEntries.map((entry, rowIndex) => {
                             if (!entry) {
                               return (
@@ -1384,11 +1421,10 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                           const activeTags = MONTH_VIEW_ENTRY_TAGS.filter(({ key }) => entry.badges[key]);
                           const activeTagCount = activeTags.length;
                           const completedDateKey = entry.todo.completedAt ? formatDateKey(new Date(entry.todo.completedAt)) : null;
-                          const isHistoricalOnly = !entry.badges.scheduled && !entry.badges.deadline && !entry.badges.recurring && (entry.badges.completed || entry.badges.inProgress);
-                          const titleClassName = isHistoricalOnly ? 'text-stone-400' : 'text-stone-800';
+                          const titleClassName = 'text-stone-800';
                           const parentTodo = getParentTodo(todos, entry.todo);
                           const parentTitle = parentTodo?.title || null;
-                          const parentTitleClassName = isHistoricalOnly ? 'text-stone-300' : 'text-stone-400';
+                          const parentTitleClassName = 'text-stone-400';
                           const isScheduledOverdue = Boolean(
                             entry.badges.scheduled &&
                             entry.todo.scheduledDate &&
@@ -1439,7 +1475,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                                       )}
                                     </button>
                                   )}
-                                  <div className={`flex shrink-0 flex-wrap items-center justify-end gap-1 whitespace-nowrap text-[9px] uppercase leading-none ${activeTagCount > 1 ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
+                                  <div className={`flex shrink-0 self-center translate-y-px flex-wrap items-center justify-end gap-1 whitespace-nowrap text-[9px] uppercase leading-none ${activeTagCount > 1 ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
                                     {activeTags.map((tag) => (
                                       tag.clickable ? (
                                         <button
@@ -1487,7 +1523,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                                     <span className={`${parentSegmentClassName} ${parentTitleClassName}`}>{` @${parentTitle}`}</span>
                                   )}
                                 </span>
-                                <div className={`flex shrink-0 flex-wrap items-center justify-end gap-1 whitespace-nowrap text-[9px] uppercase leading-none ${activeTagCount > 1 ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
+                                <div className={`flex shrink-0 self-center translate-y-px flex-wrap items-center justify-end gap-1 whitespace-nowrap text-[9px] uppercase leading-none ${activeTagCount > 1 ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
                                   {activeTags.map((tag) => (
                                     <span
                                       key={tag.key}

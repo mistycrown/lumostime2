@@ -680,6 +680,7 @@ const AppContent: React.FC = () => {
           lastLogEndTime={lastLogEndTime}
           onClose={logManager.closeModal}
           onSave={logManager.handleSaveLog}
+          onCompleteLinkedTodo={todoManager.handleCompleteTodo}
           onDelete={logManager.handleDeleteLog}
           onImageRemove={logManager.handleLogImageRemove}
           categories={categories}
@@ -785,6 +786,7 @@ const AppContent: React.FC = () => {
                 setFocusDetailSessionId(null);
                 setShouldAutoEnterImmersive(false);
               }}
+              onCompleteLinkedTodo={todoManager.handleCompleteTodo}
               onUpdate={(updated) => {
                 setActiveSessions(prev => prev.map(s =>
                   s.id === updated.id ? updated : s

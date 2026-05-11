@@ -4,6 +4,7 @@
  * @output Todo CRUD Operations (handleSaveTodo, handleDeleteTodo, handleToggleTodo, handleDuplicateTodo, handleBatchAddTodos), Modal Control (openAddTodoModal, openEditTodoModal, closeTodoModal), Focus Management (handleStartTodoFocus), Progress Update (updateTodoProgress)
  * @pos Hook (Data Manager)
  * @description Todo data manager hook for CRUD, focus launch, child-task inheritance sync, and cascade delete behavior.
+ * @updated 2026-05-11: Added an idempotent complete-only helper so focus-log flows can save first and then finish the linked todo without reopening already completed tasks.
  * @updated 2026-04-21: Blocked subtask creation for recurring parent todos so recurrence and child-task management stay mutually exclusive.
  * @updated 2026-04-21: Added one-level subtask support with inherited parent fields, cascade delete, and child draft helpers.
  * @updated 2026-04-21: Reset duplicated and newly created todos to `pin: false` unless explicitly toggled later.
@@ -72,6 +73,29 @@ export const useTodoManager = () => {
         completedAt: isCompleted ? new Date().toISOString() : undefined
       };
     })));
+  };
+
+  const handleCompleteTodo = (id: string) => {
+    const targetTodo = todos.find((todo) => todo.id === id);
+    if (!targetTodo) {
+      return false;
+    }
+
+    if (targetTodo.isCompleted) {
+      return true;
+    }
+
+    const completedAt = new Date().toISOString();
+    setTodos((prev) => syncSubtaskProgressToParentTodos(prev.map((todo) => (
+      todo.id === id
+        ? {
+            ...todo,
+            isCompleted: true,
+            completedAt: todo.completedAt || completedAt
+          }
+        : todo
+    ))));
+    return true;
   };
 
   const handleStartTodoFocus = (todo: TodoItem) => {
@@ -263,6 +287,7 @@ export const useTodoManager = () => {
 
   return {
     handleToggleTodo,
+    handleCompleteTodo,
     handleStartTodoFocus,
     openAddTodoModal,
     openAddSubtaskModal,

@@ -4,6 +4,7 @@
  * @output Todo Selection UI
  * @pos Component (Input)
  * @description A specialized selector for linking a log entry to a specific Todo item, grouped by category and optionally rendered as a collapsible parent/subtask tree.
+ * @updated 2026-05-11: Added an optional header action slot so one-shot completion-mode toggles can sit beside the shared associated-todo picker title without changing picker logic.
  * @updated 2026-05-06: Shared todo pickers now hide completed todos by default while preserving the currently linked completed todo so edit flows remain stable.
  * @updated 2026-05-06: Standalone subtasks in the virtual today picker now show an `@parent` hint when their parent row is not visible, matching the schedule view's hierarchy cue.
  * @updated 2026-04-25: Shared pickers now hide unfinished subtasks whenever their parent todo is completed, so completed parents never leave orphan child rows behind.
@@ -36,6 +37,7 @@ interface TodoAssociationProps {
   linkedTodoId: string | undefined;
   onChange: (todoId: string | undefined) => void;
   renderExtraContent?: (todoId: string) => React.ReactNode;
+  headerActions?: React.ReactNode;
   enableHierarchy?: boolean;
 }
 
@@ -75,6 +77,7 @@ export const TodoAssociation: React.FC<TodoAssociationProps> = ({
   linkedTodoId,
   onChange,
   renderExtraContent,
+  headerActions,
   enableHierarchy = false
 }) => {
   const [selectedCatId, setSelectedCatId] = useState<string>(() => resolveSelectedCategoryId(todos, linkedTodoId));
@@ -160,17 +163,20 @@ export const TodoAssociation: React.FC<TodoAssociationProps> = ({
     <div className="w-full">
       <div className="flex items-center justify-between mb-4 px-1">
         <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Associated Todo</span>
-        {!!linkedTodoId && (
-          <button
-            onClick={(event) => {
-              event.stopPropagation();
-              onChange(undefined);
-            }}
-            className="text-xs font-medium text-stone-400 hover:text-red-400 transition-colors"
-          >
-            Clear
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {!!linkedTodoId && (
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                onChange(undefined);
+              }}
+              className="text-xs font-medium text-stone-400 hover:text-red-400 transition-colors"
+            >
+              Clear
+            </button>
+          )}
+          {headerActions}
+        </div>
       </div>
 
       <div className="grid grid-cols-4 gap-2 mb-2">

@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-11: Added weekly-review template conversations with non-AI week selection, template-specific weekly review prompts/context, and exact `写入 AI 叙事` narrative writeback handling with local overwrite confirmation.
  * @updated 2026-05-10: Wired the chat stop action through the unified-turn AbortSignal path and blocked late native replies from writing back after the user cancels an in-flight AI request.
  * @updated 2026-05-10: Disabled the extra visual-viewport keyboard inset on native Android so the shared AI chat no longer double-lifts above the soft keyboard inside the Capacitor WebView.
  * @updated 2026-05-10: Blocked background assistant execution while core logs/todos are still fallback-seeded and now directly clears locally queued reminder_due items after successful system-turn completion.
@@ -125,7 +126,7 @@ import { useSession } from '../contexts/SessionContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { BUILTIN_PERSONA_SYSTEM_PROMPTS } from '../constants/aiPersonaSystemPrompts';
-import type { Log, TodoItem, TodoRecurrenceRule } from '../types';
+import type { Log, TodoItem, TodoRecurrenceRule, WeeklyReview } from '../types';
 import type {
   AssistantAgentConfig,
   AssistantEditableMemoryListKey,
@@ -171,8 +172,13 @@ import {
   type AppliedUpdateTodoAction,
   type AppliedActionStatus
 } from '../services/assistantActionExecutor';
+import {
+  weeklyReviewTemplateService,
+  type WeeklyReviewTemplateSessionMeta
+} from '../services/weeklyReviewTemplateService';
 import type { AssistantToolCall, AssistantUnifiedTurnOutput } from '../types/assistant';
 import { CustomSelect } from './CustomSelect';
+import { InputModal } from './InputModal';
 
 type ChatTone = 'normal' | 'system' | 'error' | 'pending';
 
@@ -265,6 +271,16 @@ interface AIChatSession {
   personaId: string;
   contextCacheEnabled: boolean;
   messages: AIChatMessage[];
+  templateMeta?: WeeklyReviewTemplateSessionMeta;
+}
+
+type NewSessionDialogStep = 'entry' | 'template';
+
+interface WeeklyReviewNarrativeConfirmState {
+  sessionId: string;
+  weeklyReviewId: string;
+  weekDataText: string;
+  existingNarrative: string;
 }
 
 interface AIBackfillChatModalProps {
@@ -1079,6 +1095,40 @@ const normalizeRetrySourceUserMessageId = (value: unknown): string | undefined =
     : undefined
 );
 
+const normalizeTemplateMeta = (value: unknown): WeeklyReviewTemplateSessionMeta | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const candidate = value as Partial<WeeklyReviewTemplateSessionMeta>;
+  if (
+    candidate.templateType !== 'weekly_review'
+    || typeof candidate.weekStartDate !== 'string'
+    || typeof candidate.weekEndDate !== 'string'
+  ) {
+    return undefined;
+  }
+
+  const selectedRangeLabel = (
+    candidate.selectedRangeLabel === '本周'
+    || candidate.selectedRangeLabel === '上周'
+    || candidate.selectedRangeLabel === 'custom_date'
+  )
+    ? candidate.selectedRangeLabel
+    : 'custom_date';
+
+  return {
+    templateType: 'weekly_review',
+    stage: candidate.stage === 'awaiting_narrative_overwrite_confirm'
+      ? 'ready'
+      : 'ready',
+    weekStartDate: candidate.weekStartDate.trim(),
+    weekEndDate: candidate.weekEndDate.trim(),
+    selectedRangeLabel,
+    ...(candidate.pendingWriteIntent ? { pendingWriteIntent: true } : {})
+  };
+};
+
 const normalizeMessageContent = (value: unknown): string | undefined => {
   if (typeof value !== 'string') {
     return undefined;
@@ -1232,16 +1282,24 @@ const normalizeUserProfile = (value: unknown): AIChatUserProfile => {
   };
 };
 
-const createDefaultSession = (personaId: string): AIChatSession => {
+const createDefaultSession = (
+  personaId: string,
+  options?: {
+    title?: string;
+    messages?: AIChatMessage[];
+    templateMeta?: WeeklyReviewTemplateSessionMeta;
+  }
+): AIChatSession => {
   const now = Date.now();
   return {
     id: crypto.randomUUID(),
-    title: '新对话',
+    title: options?.title || '新对话',
     createdAt: now,
     updatedAt: now,
     personaId,
     contextCacheEnabled: true,
-    messages: []
+    messages: options?.messages || [],
+    ...(options?.templateMeta ? { templateMeta: options.templateMeta } : {})
   };
 };
 
@@ -1274,7 +1332,10 @@ const normalizeSessions = (value: unknown, personas: AIChatPersona[]): AIChatSes
         ? candidate.personaId
         : fallbackPersonaId,
       contextCacheEnabled: candidate.contextCacheEnabled !== false,
-      messages: normalizeMessages(candidate.messages)
+      messages: normalizeMessages(candidate.messages),
+      ...(normalizeTemplateMeta(candidate.templateMeta)
+        ? { templateMeta: normalizeTemplateMeta(candidate.templateMeta) }
+        : {})
     };
 
     return [normalized];
@@ -1848,6 +1909,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
   const [isPersonaPanelOpen, setIsPersonaPanelOpen] = useState(false);
+  const [isNewSessionDialogOpen, setIsNewSessionDialogOpen] = useState(false);
+  const [newSessionDialogStep, setNewSessionDialogStep] = useState<NewSessionDialogStep>('entry');
+  const [isWeeklyReviewWeekSelectionModalOpen, setIsWeeklyReviewWeekSelectionModalOpen] = useState(false);
+  const [weeklyReviewNarrativeConfirmState, setWeeklyReviewNarrativeConfirmState] = useState<WeeklyReviewNarrativeConfirmState | null>(null);
   const [activeSettingsMainTab, setActiveSettingsMainTab] = useState<AISettingsMainTab>('persona');
   const [debugViewer, setDebugViewer] = useState<DebugViewerState | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -1908,7 +1973,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const visualViewportBaselineRef = useRef<{ height: number; width: number }>({ height: 0, width: 0 });
 
   const { logs, setLogs, todos, setTodos, todoCategories, isReady: isDataReady, usesFallbackSeedData } = useData();
-  const { dailyReviews, isReady: isReviewReady } = useReview();
+  const {
+    dailyReviews,
+    weeklyReviews,
+    setWeeklyReviews,
+    reviewTemplates,
+    isReady: isReviewReady
+  } = useReview();
   const { activeSessions } = useSession();
   const { categories, scopes, isReady: isCategoryScopeReady } = useCategoryScope();
   const {
@@ -2831,6 +2902,31 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     })
   }), [activeSessions, buildAssistantTimelineSummary, categories, defaultDateKey, logs, todos]);
 
+  const buildWeeklyReviewTemplateWeekDataText = useCallback((session: AIChatSession): string | null => {
+    if (session.templateMeta?.templateType !== 'weekly_review') {
+      return null;
+    }
+
+    const weeklyReview = weeklyReviewTemplateService.findWeeklyReview(
+      weeklyReviews,
+      session.templateMeta.weekStartDate,
+      session.templateMeta.weekEndDate
+    );
+
+    return weeklyReviewTemplateService.buildWeekDataText({
+      weekStartDate: session.templateMeta.weekStartDate,
+      weekEndDate: session.templateMeta.weekEndDate,
+      selectedRangeLabel: session.templateMeta.selectedRangeLabel,
+      logs,
+      categories,
+      todos,
+      todoCategories,
+      scopes,
+      dailyReviews,
+      weeklyReview
+    });
+  }, [categories, dailyReviews, logs, scopes, todoCategories, todos, weeklyReviews]);
+
   const buildBackgroundTurnRequest = useCallback(({
     trigger,
     now,
@@ -3449,6 +3545,54 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }));
   };
 
+  const appendSystemMessage = (
+    sessionId: string,
+    content: string,
+    options?: {
+      debugSections?: AIChatDebugSection[];
+      tone?: ChatTone;
+    }
+  ) => {
+    const trimmed = content.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    mutateSession(sessionId, (session) => ({
+      ...session,
+      messages: [
+        ...session.messages,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: trimmed,
+          createdAt: Date.now(),
+          tone: options?.tone || 'system',
+          ...(options?.debugSections?.length ? { debugSections: options.debugSections } : {})
+        }
+      ]
+    }));
+  };
+
+  const updateWeeklyReviewTemplateStage = (
+    sessionId: string,
+    stage: WeeklyReviewTemplateSessionMeta['stage'],
+    pendingWriteIntent = false
+  ) => {
+    mutateSession(sessionId, (session) => ({
+      ...session,
+      ...(session.templateMeta
+        ? {
+          templateMeta: {
+            ...session.templateMeta,
+            stage,
+            pendingWriteIntent
+          }
+        }
+        : {})
+    }));
+  };
+
   const appendDebugSectionToMessage = (
     sessionId: string,
     messageId: string,
@@ -3470,7 +3614,23 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }));
   };
 
-  const handleCreateSession = () => {
+  const handleCloseNewSessionDialog = () => {
+    setIsNewSessionDialogOpen(false);
+    setNewSessionDialogStep('entry');
+  };
+
+  const handleOpenNewSessionDialog = () => {
+    if (!activeSession) {
+      return;
+    }
+
+    setEditingSessionId(null);
+    setEditingSessionTitle('');
+    setDeleteConfirmSessionId(null);
+    setIsNewSessionDialogOpen(true);
+  };
+
+  const handleCreateGenericSession = () => {
     if (!activeSession) {
       return;
     }
@@ -3478,9 +3638,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const nextSession = createDefaultSession(activeSession.personaId);
     setSessions((prev) => [nextSession, ...prev]);
     setActiveSessionId(nextSession.id);
-    setEditingSessionId(null);
-    setEditingSessionTitle('');
-    setDeleteConfirmSessionId(null);
+    handleCloseNewSessionDialog();
     setIsHistoryPanelOpen(false);
   };
 
@@ -3488,11 +3646,51 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const nextSession = createDefaultSession(personaId);
     setSessions((prev) => [nextSession, ...prev]);
     setActiveSessionId(nextSession.id);
+    handleCloseNewSessionDialog();
     setEditingSessionId(null);
     setEditingSessionTitle('');
     setDeleteConfirmSessionId(null);
     setDeleteConfirmPersonaId(null);
     setIsHistoryPanelOpen(false);
+  };
+
+  const handleOpenWeeklyReviewTemplateSelection = () => {
+    setIsNewSessionDialogOpen(false);
+    setIsWeeklyReviewWeekSelectionModalOpen(true);
+  };
+
+  const handleCloseWeeklyReviewTemplateSelection = () => {
+    setIsWeeklyReviewWeekSelectionModalOpen(false);
+  };
+
+  const handleConfirmWeeklyReviewTemplateSelection = (value: string) => {
+    if (!activeSession) {
+      return;
+    }
+
+    const selection = weeklyReviewTemplateService.parseWeekSelectionInput(value, new Date());
+    if (!selection) {
+      return;
+    }
+
+    const templateSession = createDefaultSession(activeSession.personaId, {
+      title: weeklyReviewTemplateService.getSessionTitle(selection),
+      templateMeta: weeklyReviewTemplateService.createSessionMeta(selection),
+      messages: [{
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: weeklyReviewTemplateService.getIntroMessage(selection),
+        createdAt: Date.now(),
+        tone: 'system'
+      }]
+    });
+
+    setSessions((prev) => [templateSession, ...prev]);
+    setActiveSessionId(templateSession.id);
+    handleCloseWeeklyReviewTemplateSelection();
+    handleCloseNewSessionDialog();
+    setIsHistoryPanelOpen(false);
+    setInputText('');
   };
 
   const handleStartRenameSession = (session: AIChatSession) => {
@@ -4152,6 +4350,22 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return true;
     }
 
+    if (weeklyReviewNarrativeConfirmState) {
+      updateWeeklyReviewTemplateStage(weeklyReviewNarrativeConfirmState.sessionId, 'ready');
+      setWeeklyReviewNarrativeConfirmState(null);
+      return true;
+    }
+
+    if (isWeeklyReviewWeekSelectionModalOpen) {
+      handleCloseWeeklyReviewTemplateSelection();
+      return true;
+    }
+
+    if (isNewSessionDialogOpen) {
+      handleCloseNewSessionDialog();
+      return true;
+    }
+
     if (isEmojiEditorOpen) {
       setIsEmojiEditorOpen(false);
       return true;
@@ -4203,10 +4417,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     isAssistantScheduledTaskComposerOpen,
     isEmojiEditorOpen,
     isHistoryPanelOpen,
+    isNewSessionDialogOpen,
     isOpen,
     isPersonaPanelOpen,
     isUserEmojiEditorOpen,
+    isWeeklyReviewWeekSelectionModalOpen,
     resetAssistantScheduledTaskUi,
+    handleCloseNewSessionDialog,
+    handleCloseWeeklyReviewTemplateSelection,
+    weeklyReviewNarrativeConfirmState,
     onClose
   ]);
 
@@ -4806,6 +5025,180 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     return rawContent;
   };
 
+  const runWeeklyReviewNarrativeWriteback = async (
+    session: AIChatSession,
+    params: {
+      weeklyReview: WeeklyReview;
+      workingWeeklyReviews: WeeklyReview[];
+      weekDataText: string;
+      mergeMode: 'create' | 'overwrite' | 'merge';
+      createdReview: boolean;
+      existingNarrative?: string;
+    }
+  ) => {
+    const sessionId = session.id;
+    const pendingMessageId = crypto.randomUUID();
+    const now = Date.now();
+    const sessionPersona = personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0];
+    const conversationSummary = assistantContextBuilder.summarizeConversationTurns(
+      conversationHistoryCache.get(session.id) || [],
+      24
+    );
+
+    mutateSession(sessionId, (currentSession) => ({
+      ...currentSession,
+      messages: [
+        ...currentSession.messages,
+        {
+          id: pendingMessageId,
+          role: 'assistant',
+          content: '我来整理成这周的 AI 叙事。',
+          createdAt: now,
+          tone: 'pending'
+        }
+      ]
+    }));
+
+    setInputText('');
+    setIsLoading(true);
+    setIsHistoryPanelOpen(false);
+    setIsPersonaPanelOpen(false);
+
+    const controller = new AbortController();
+    activeRequestRef.current = {
+      controller,
+      sessionId,
+      pendingMessageId
+    };
+
+    try {
+      const { systemPrompt, userPrompt } = weeklyReviewTemplateService.buildNarrativeWritebackPrompts({
+        personaPrompt: buildPersonaPrompt(sessionPersona),
+        weekDataText: params.weekDataText,
+        conversationSummary,
+        existingNarrative: params.existingNarrative,
+        mergeMode: params.mergeMode
+      });
+
+      const writebackResult = await aiService.requestAssistantUnifiedTurnWithDebug({
+        mode: 'foreground',
+        systemPrompt,
+        userPrompt,
+        cacheHint: {
+          keySeed: `weekly_review_narrative:${params.weeklyReview.weekStartDate}:${params.weeklyReview.weekEndDate}:${params.mergeMode}`,
+          scope: 'weekly_review_template'
+        }
+      }, {
+        signal: controller.signal
+      });
+
+      if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
+        return;
+      }
+
+      const narrative = (writebackResult.output.assistantReply || '').trim();
+      if (!narrative) {
+        throw new Error('AI 没有返回可写入的周叙事内容。');
+      }
+
+      setWeeklyReviews(
+        weeklyReviewTemplateService.updateWeeklyReviewNarrative(
+          params.workingWeeklyReviews,
+          params.weeklyReview.id,
+          narrative
+        )
+      );
+
+      const successMessage = params.mergeMode === 'merge'
+        ? '已结合原有内容，重新写入这周的 AI 叙事。'
+        : params.createdReview
+          ? '已新建本周 Weekly Review，并写入 AI 叙事。'
+          : '已写入这周的 AI 叙事。';
+
+      replacePendingWithResult(sessionId, pendingMessageId, successMessage, {
+        tone: 'system',
+        ...(debugMode
+          ? {
+            debugSections: [{
+              label: '周复盘写入 AI 叙事',
+              exchange: writebackResult.debug
+            }]
+          }
+          : {})
+      });
+      updateWeeklyReviewTemplateStage(sessionId, 'ready');
+      setWeeklyReviewNarrativeConfirmState(null);
+      addToast('success', 'AI 叙事已写入周回顾');
+    } catch (error) {
+      const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
+
+      if (isAbortError(error)) {
+        if (isCurrentPendingRequest) {
+          replacePendingWithResult(sessionId, pendingMessageId, '已停止这次写入。', {
+            tone: 'system'
+          });
+        }
+        return;
+      }
+
+      if (!isCurrentPendingRequest || controller.signal.aborted) {
+        return;
+      }
+
+      replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), {
+        tone: 'error',
+        debugSections: getErrorDebugSections(error, '周复盘写入 AI 叙事', debugMode)
+      });
+      updateWeeklyReviewTemplateStage(sessionId, 'ready');
+      setWeeklyReviewNarrativeConfirmState(null);
+    } finally {
+      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
+        activeRequestRef.current = null;
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const handleWeeklyReviewNarrativeWritebackCommand = async (session: AIChatSession) => {
+    if (session.templateMeta?.templateType !== 'weekly_review') {
+      return;
+    }
+
+    const weekDataText = buildWeeklyReviewTemplateWeekDataText(session);
+    if (!weekDataText) {
+      addToast('error', '这段对话还没有可用的周复盘数据。');
+      return;
+    }
+
+    const ensuredReview = weeklyReviewTemplateService.ensureWeeklyReview(
+      weeklyReviews,
+      reviewTemplates,
+      session.templateMeta.weekStartDate,
+      session.templateMeta.weekEndDate
+    );
+
+    if (ensuredReview.weeklyReview.narrative?.trim()) {
+      updateWeeklyReviewTemplateStage(session.id, 'awaiting_narrative_overwrite_confirm', true);
+      setWeeklyReviewNarrativeConfirmState({
+        sessionId: session.id,
+        weeklyReviewId: ensuredReview.weeklyReview.id,
+        weekDataText,
+        existingNarrative: ensuredReview.weeklyReview.narrative
+      });
+      appendSystemMessage(session.id, '检测到本周已经有 AI 叙事。请在弹框中输入“是”覆盖，输入“否”整合。');
+      setInputText('');
+      return;
+    }
+
+    await runWeeklyReviewNarrativeWriteback(session, {
+      weeklyReview: ensuredReview.weeklyReview,
+      workingWeeklyReviews: ensuredReview.weeklyReviews,
+      weekDataText,
+      mergeMode: 'create',
+      createdReview: ensuredReview.created
+    });
+  };
+
   const handleSend = async (overrideText?: string, options?: ForegroundSendOptions) => {
     const trimmedText = (overrideText ?? inputText).trim();
     if (!trimmedText || isLoading || !activeSession) {
@@ -4813,6 +5206,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
 
     if (handleDebugCommand(trimmedText, options)) {
+      return;
+    }
+
+    const isWeeklyReviewTemplateSession = activeSession.templateMeta?.templateType === 'weekly_review';
+    if (isWeeklyReviewTemplateSession && weeklyReviewTemplateService.isWriteNarrativeCommand(trimmedText)) {
+      await handleWeeklyReviewNarrativeWritebackCommand(activeSession);
       return;
     }
 
@@ -4829,7 +5228,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const historyBeforeCurrent = canRetryInPlace
       ? buildRetryConversationHistory(sessionId, options?.retrySourceUserMessageId)
       : (conversationHistoryCache.get(sessionId) || []);
-    const shouldRenameTitle = !canRetryInPlace && !activeSession.messages.some((message) => message.role === 'user');
+    const shouldRenameTitle = !isWeeklyReviewTemplateSession
+      && !canRetryInPlace
+      && !activeSession.messages.some((message) => message.role === 'user');
 
     if (canRetryInPlace) {
       mutateSession(sessionId, (session) => ({
@@ -4893,6 +5294,55 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     };
 
     try {
+      if (isWeeklyReviewTemplateSession) {
+        const weekDataText = buildWeeklyReviewTemplateWeekDataText(activeSession);
+        if (!weekDataText) {
+          throw new Error('周复盘上下文还没有准备好。');
+        }
+
+        const templatePrompt = weeklyReviewTemplateService.buildChatPrompts({
+          personaPrompt: buildPersonaPrompt(activePersona),
+          weekDataText,
+          userMessage: trimmedText
+        });
+        const templateTurnResult = await aiService.requestAssistantUnifiedTurnWithDebug({
+          mode: 'foreground',
+          systemPrompt: templatePrompt.systemPrompt,
+          userPrompt: templatePrompt.userPrompt,
+          conversationHistory: historyBeforeCurrent,
+          cacheHint: {
+            keySeed: `weekly_review_chat:${activeSession.templateMeta?.weekStartDate}:${activeSession.templateMeta?.weekEndDate}`,
+            scope: 'weekly_review_template'
+          }
+        }, {
+          signal: controller.signal
+        });
+
+        if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
+          return;
+        }
+
+        const output = templateTurnResult.output;
+        const templateContent = (output.assistantReply || '').trim()
+          || (output.outcome === 'clarify'
+            ? '这块我还差一点关键信息，你再补一句我就能继续。'
+            : '我在。');
+        const displayParts = resolveAssistantDisplayParts(templateContent, output);
+
+        replacePendingWithResult(sessionId, pendingMessageId, templateContent, {
+          ...(displayParts?.length ? { displayParts } : {}),
+          ...(debugMode
+            ? {
+              debugSections: [{
+                label: '周复盘模板对话',
+                exchange: templateTurnResult.debug
+              }]
+            }
+            : {})
+        });
+        return;
+      }
+
       const currentTurnDate = new Date();
       const debugSections: AIChatDebugSection[] = [];
 
@@ -5022,6 +5472,41 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setIsLoading(false);
     replacePendingWithResult(activeRequest.sessionId, activeRequest.pendingMessageId, '已停止这次请求。', {
       tone: 'system'
+    });
+  };
+
+  const handleCloseWeeklyReviewNarrativeConfirm = () => {
+    if (weeklyReviewNarrativeConfirmState) {
+      updateWeeklyReviewTemplateStage(weeklyReviewNarrativeConfirmState.sessionId, 'ready');
+    }
+    setWeeklyReviewNarrativeConfirmState(null);
+  };
+
+  const handleConfirmWeeklyReviewNarrativeConfirm = async (value: string) => {
+    if (!weeklyReviewNarrativeConfirmState) {
+      return;
+    }
+
+    const session = sessions.find((candidate) => candidate.id === weeklyReviewNarrativeConfirmState.sessionId);
+    const weeklyReview = weeklyReviews.find((candidate) => candidate.id === weeklyReviewNarrativeConfirmState.weeklyReviewId);
+    if (!session || !weeklyReview) {
+      handleCloseWeeklyReviewNarrativeConfirm();
+      addToast('error', '没有找到要写入的周回顾。');
+      return;
+    }
+
+    const mergeMode = value === '否' ? 'merge' : 'overwrite';
+    const existingNarrative = mergeMode === 'merge'
+      ? weeklyReviewNarrativeConfirmState.existingNarrative
+      : undefined;
+
+    await runWeeklyReviewNarrativeWriteback(session, {
+      weeklyReview,
+      workingWeeklyReviews: weeklyReviews,
+      weekDataText: weeklyReviewNarrativeConfirmState.weekDataText,
+      mergeMode,
+      createdReview: false,
+      existingNarrative
     });
   };
 
@@ -6163,7 +6648,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
               <div className="border-b px-5 py-4" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
                 <button
-                  onClick={handleCreateSession}
+                  onClick={handleOpenNewSessionDialog}
                   className="inline-flex w-full items-center justify-center gap-2 rounded-[0.8rem] border px-4 py-2.5 text-sm font-semibold transition-colors"
                   style={{
                     borderColor: AI_CHAT_THEME.primaryButtonBorder,
@@ -6334,6 +6819,92 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     );
                   })}
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isNewSessionDialogOpen && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/20 p-5 backdrop-blur-sm">
+            <div
+              className="w-full max-w-sm overflow-hidden rounded-[1.4rem] border"
+              style={{
+                borderColor: AI_CHAT_THEME.panelBorder,
+                backgroundColor: AI_CHAT_THEME.panelBg,
+                boxShadow: AI_CHAT_THEME.cardShadowStrong
+              }}
+            >
+              <div className="flex items-start justify-between border-b px-5 py-4" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
+                <div>
+                  <h3 className="text-base font-bold text-stone-800">
+                    {newSessionDialogStep === 'entry' ? '新建对话' : '选择模板'}
+                  </h3>
+                </div>
+                <button
+                  onClick={handleCloseNewSessionDialog}
+                  className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] border transition-colors"
+                  style={{
+                    borderColor: AI_CHAT_THEME.chipBorder,
+                    backgroundColor: AI_CHAT_THEME.panelBg,
+                    color: AI_CHAT_THEME.textMuted
+                  }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-3 px-5 py-5">
+                {newSessionDialogStep === 'entry' ? (
+                  <>
+                    <button
+                      onClick={handleCreateGenericSession}
+                      className="w-full rounded-[0.95rem] border px-4 py-3 text-left transition-colors"
+                      style={{
+                        borderColor: AI_CHAT_THEME.panelBorder,
+                        backgroundColor: AI_CHAT_THEME.panelBgStrong,
+                        color: AI_CHAT_THEME.textPrimary
+                      }}
+                    >
+                      <div className="text-sm font-semibold">通用默认对话</div>
+                    </button>
+                    <button
+                      onClick={() => setNewSessionDialogStep('template')}
+                      className="w-full rounded-[0.95rem] border px-4 py-3 text-left transition-colors"
+                      style={{
+                        borderColor: AI_CHAT_THEME.panelBorder,
+                        backgroundColor: AI_CHAT_THEME.panelBgStrong,
+                        color: AI_CHAT_THEME.textPrimary
+                      }}
+                    >
+                      <div className="text-sm font-semibold">模板对话</div>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleOpenWeeklyReviewTemplateSelection}
+                      className="w-full rounded-[0.95rem] border px-4 py-3 text-left transition-colors"
+                      style={{
+                        borderColor: AI_CHAT_THEME.panelBorder,
+                        backgroundColor: AI_CHAT_THEME.panelBgStrong,
+                        color: AI_CHAT_THEME.textPrimary
+                      }}
+                    >
+                      <div className="text-sm font-semibold">周复盘</div>
+                    </button>
+                    <button
+                      onClick={() => setNewSessionDialogStep('entry')}
+                      className="w-full rounded-[0.95rem] border px-4 py-3 text-left transition-colors"
+                      style={{
+                        borderColor: AI_CHAT_THEME.chipBorder,
+                        backgroundColor: AI_CHAT_THEME.panelBg,
+                        color: AI_CHAT_THEME.textSecondary
+                      }}
+                    >
+                      <div className="text-sm font-medium">返回</div>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -7939,6 +8510,36 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             </div>
           </div>
         )}
+
+        <InputModal
+          isOpen={isWeeklyReviewWeekSelectionModalOpen}
+          onClose={handleCloseWeeklyReviewTemplateSelection}
+          onConfirm={handleConfirmWeeklyReviewTemplateSelection}
+          title="选择周范围"
+          placeholder="本周 / 上周 / 20260511"
+          maxLength={8}
+          validateFn={(value) => (
+            weeklyReviewTemplateService.parseWeekSelectionInput(value, new Date())
+              ? null
+              : '请输入“本周”“上周”或 8 位日期 YYYYMMDD'
+          )}
+        />
+
+        <InputModal
+          isOpen={Boolean(weeklyReviewNarrativeConfirmState)}
+          onClose={handleCloseWeeklyReviewNarrativeConfirm}
+          onConfirm={(value) => {
+            void handleConfirmWeeklyReviewNarrativeConfirm(value);
+          }}
+          title="已有 AI 叙事"
+          placeholder="是 / 否"
+          maxLength={1}
+          validateFn={(value) => (
+            weeklyReviewTemplateService.isOverwriteConfirmation(value)
+              ? null
+              : '这里只接受“是”或“否”'
+          )}
+        />
       </div>
     </div>
   );

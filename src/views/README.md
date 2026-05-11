@@ -88,6 +88,7 @@ The views are designed as "dumb" or "presentational" components where possible, 
 - `TodoView.tsx`, `TodoQuickActionsModal.tsx`: Stopped todo-row open clicks from bubbling and switched quick-actions backdrop dismissal to pointer-down handling so desktop taps no longer flash the sheet open and closed.
 - `TodoView.tsx`: Shortened the virtual `排期` filter chips under the header from `今天 / 明天 / 本周` to `今 / 明 / 周` for a tighter mobile layout.
 - `TodoView.tsx`: Unified todo-row tap targets across the full foreground card and only suppresses follow-up clicks after real touch gestures, fixing mobile quick-actions taps that were intermittently swallowed on active items.
+- `FocusDetailView.tsx`: Added a one-shot `完成模式` pill beside the shared associated-todo picker so finishing a focus session can also complete the linked unfinished task after the session log is saved, while failed follow-up completion only surfaces as a toast.
 - `TodoView.tsx`: Added conservative left/right week-switch swipes inside the week planning scroll area, with stronger horizontal thresholds and explicit opt-outs for row drag handles, badge taps, and date buttons to reduce accidental switches.
 - `TodoView.tsx`: Moved the week-view `本周` action into the header's top-right corner so it reads as a separate jump-to-current-week control.
 - `TodoView.tsx`: Split the right-swipe background styling so the light detail-open state and deeper duplicate state now use clearly different colors.

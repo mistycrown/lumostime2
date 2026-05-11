@@ -34,6 +34,12 @@ vi.mock('../components/ReactionComponents', () => ({
   ReactionList: () => null,
 }));
 
+vi.mock('../contexts/ToastContext', () => ({
+  useToast: () => ({
+    addToast: () => undefined,
+  }),
+}));
+
 const baseSession = {
   id: 'session-1',
   startTime: 1710000000000,
