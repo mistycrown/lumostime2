@@ -517,10 +517,16 @@ export const buildTodoDateEntryMap = (
 export const buildTodoMonthWeekLayout = (
   weekDateKeys: string[],
   entriesByDate: Record<string, TodoDateEntry[]>,
-  visibleEntryCount: number
+  visibleEntryCount: number,
+  options?: { includeTraceSegments?: boolean }
 ): TodoMonthWeekLayout => {
-  const segmentDrafts = buildTodoWeekTraceSegmentDrafts(weekDateKeys, entriesByDate);
-  const traceSegments = assignTodoWeekTraceSegmentLanes(segmentDrafts, weekDateKeys.length);
+  const shouldIncludeTraceSegments = options?.includeTraceSegments ?? true;
+  const segmentDrafts = shouldIncludeTraceSegments
+    ? buildTodoWeekTraceSegmentDrafts(weekDateKeys, entriesByDate)
+    : [];
+  const traceSegments = shouldIncludeTraceSegments
+    ? assignTodoWeekTraceSegmentLanes(segmentDrafts, weekDateKeys.length)
+    : [];
   const segmentLaneByDateAndTodo = new Map<string, number>();
 
   traceSegments.forEach((segment) => {

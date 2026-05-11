@@ -4,6 +4,8 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
+ * @updated 2026-05-11: Routed month-view date numeral taps into the shared quick-add schedule modal so monthly and weekly planners now open the same fast create flow for a chosen day.
+ * @updated 2026-05-11: Passed activity-category, todo-category, and scope metadata into the month planner so its display-settings hidden filter can reuse custom-filter syntax against rendered todo entries.
  * @updated 2026-05-10: Rebuilt schedule-week navigation around one parent-owned Monday `weekStart` so the standard week view and `八宫格` now share the same source of truth for labels and switching.
  * @updated 2026-05-10: Unified schedule-week navigation around a Monday-based week reference so the header range, week picker, and bento week pages stay in sync while switching dates.
  * @updated 2026-05-10: Week schedule rows now append inline `@父任务` context for visible subtasks and keep the combined title on a single truncating line.
@@ -2311,9 +2313,15 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
               <TodoMonthView
                 todos={todos}
                 todoCategories={categories}
+                activityCategories={activityCategories}
+                scopes={scopes}
                 logs={logs}
                 referenceDate={scheduleWeekStart}
                 onMoveScheduleEntry={handleScheduleEntryMove}
+                onOpenDay={(dateKey) => {
+                  setAssignModalDate(dateKey);
+                  setAssignModalType('scheduled');
+                }}
                 onOpenDatePicker={() => setIsWeekJumpPickerOpen(true)}
                 useReducedEffects={useReducedEffects}
                 viewMenuNode={scheduleViewMenuNode}

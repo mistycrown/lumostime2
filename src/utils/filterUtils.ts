@@ -133,6 +133,120 @@ export interface FilterContext {
     todoCategories: TodoCategory[];
 }
 
+export type TodoFilterContext = Pick<FilterContext, 'categories' | 'scopes' | 'todoCategories'>;
+
+const matchesGroupedKeywords = (
+    groups: string[][],
+    values: string[]
+): boolean => {
+    if (groups.length === 0) {
+        return true;
+    }
+
+    const normalizedValues = values
+        .map((value) => value.trim().toLowerCase())
+        .filter((value) => value.length > 0);
+
+    if (normalizedValues.length === 0) {
+        return false;
+    }
+
+    return groups.every((group) => group.some((keyword) => {
+        const normalizedKeyword = keyword.trim().toLowerCase();
+        if (!normalizedKeyword) {
+            return false;
+        }
+
+        return normalizedValues.some((value) => value.includes(normalizedKeyword));
+    }));
+};
+
+const resolveLinkedTodoActivityNames = (
+    todo: TodoItem,
+    categories: Category[]
+): { linkedActivityName: string; linkedCategoryName: string } => {
+    let linkedCategoryName = '';
+    let linkedActivityName = '';
+
+    if (todo.linkedCategoryId) {
+        linkedCategoryName = categories.find((category) => category.id === todo.linkedCategoryId)?.name || '';
+    }
+
+    if (!todo.linkedActivityId) {
+        return { linkedActivityName, linkedCategoryName };
+    }
+
+    if (todo.linkedCategoryId) {
+        const linkedCategory = categories.find((category) => category.id === todo.linkedCategoryId);
+        const linkedActivity = linkedCategory?.activities.find((activity) => activity.id === todo.linkedActivityId);
+
+        if (linkedActivity) {
+            return {
+                linkedActivityName: linkedActivity.name,
+                linkedCategoryName: linkedCategoryName || linkedCategory?.name || ''
+            };
+        }
+    }
+
+    for (const category of categories) {
+        const linkedActivity = category.activities.find((activity) => activity.id === todo.linkedActivityId);
+        if (linkedActivity) {
+            return {
+                linkedActivityName: linkedActivity.name,
+                linkedCategoryName: linkedCategoryName || category.name
+            };
+        }
+    }
+
+    return { linkedActivityName, linkedCategoryName };
+};
+
+export function matchesTodoFilter(
+    todo: TodoItem,
+    condition: ParsedFilterCondition,
+    context: TodoFilterContext
+): boolean {
+    if (condition.reactions.length > 0) {
+        return false;
+    }
+
+    const todoCategoryName = context.todoCategories.find((category) => category.id === todo.categoryId)?.name || '';
+    const { linkedActivityName, linkedCategoryName } = resolveLinkedTodoActivityNames(todo, context.categories);
+    const scopeNames = (todo.defaultScopeIds || [])
+        .map((scopeId) => context.scopes.find((scope) => scope.id === scopeId)?.name || '')
+        .filter((scopeName) => scopeName.length > 0);
+
+    if (!matchesGroupedKeywords(condition.todos, [todo.title, todoCategoryName])) {
+        return false;
+    }
+
+    if (!matchesGroupedKeywords(condition.tags, [linkedActivityName, linkedCategoryName])) {
+        return false;
+    }
+
+    if (!matchesGroupedKeywords(condition.scopes, scopeNames)) {
+        return false;
+    }
+
+    if (!matchesGroupedKeywords(condition.notes, [todo.note || ''])) {
+        return false;
+    }
+
+    return true;
+}
+
+export function matchesTodoFilterExpression(
+    todo: TodoItem,
+    expression: string,
+    context: TodoFilterContext
+): boolean {
+    if (!expression.trim()) {
+        return false;
+    }
+
+    return matchesTodoFilter(todo, parseFilterExpression(expression), context);
+}
+
 /**
  * 检查单条 Log 是否匹配筛选条件
  * - 不同条件之间: AND 关系 (所有条件必须满足)
