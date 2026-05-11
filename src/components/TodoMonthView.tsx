@@ -4,7 +4,16 @@
  * @output Reference-style rolling month schedule UI backed by real daily todo data
  * @pos Component (Todo scheduling)
  * @description Renders the editorial monthly schedule view adapted from the minimalist demo, using shared todo schedule utilities so each day shows the same real Arrange / Due / Repeat / Done / Trace data as the week planner.
+ * @updated 2026-05-11: Made each month-cell date numeral a dedicated quick-add trigger, matching week view while leaving the rest of the cell focused on expanding that day's detail rows.
+ * @updated 2026-05-11: Froze the month-view settings title bar so the title and close button stay pinned while the settings body scrolls underneath.
+ * @updated 2026-05-11: Added a draft-based `隐藏 Trace 类型` toggle in month-view settings so Trace rows only disappear after the popup closes instead of recomputing while the user is still editing.
+ * @updated 2026-05-11: Stopped month-view hidden-filter typing from recomputing live; the popup now edits a draft expression and only applies the filter once the settings panel closes.
+ * @updated 2026-05-11: Added a persisted hidden-filter expression field inside the month-view settings popup, reusing custom-filter syntax to hide matching todo entries by title/category, linked activity/category, scope, and note.
+ * @updated 2026-05-11: Raised the month display popup above the schedule floating button and restored a full-screen blur scrim so the button now sits underneath the softened overlay instead of peeking above it.
+ * @updated 2026-05-11: Kept the month display popup vertically centered while tightening its symmetric top/bottom clearance so the sheet no longer overlaps the bottom-right floating action button.
+ * @updated 2026-05-11: Capped the month display popup's scrollable height with extra bottom clearance so longer settings content no longer reaches the bottom-right floating action button.
  * @updated 2026-05-11: Added a shared default/custom schedule-type color editor to the month display popup so Arrange / Due / Repeat / Done / Trace colors can be customized whenever marker coloring follows schedule type.
+ * @updated 2026-05-11: Squared off the week-row `Trace` overlay bars so they now keep only the left marker line plus a pale fill, with straight ends that sit flush against the covered day cells instead of using rounded pills.
  * @updated 2026-05-11: Added week-scoped `Trace` lane layout plus per-week overlay bars, so consecutive in-progress entries can render as one continuous strip across adjacent day cells while the day-detail list keeps the same sorted order.
  * @updated 2026-05-11: Limited month-title retargeting to first entry plus explicit external date jumps, and now freeze the `YYYY.M` header during programmatic month scrolls until the animation settles so edge-loading no longer snaps back to today and arrow-based month changes stop flickering.
  * @updated 2026-05-11: Switched the rolling month grid to an edge-loaded window that starts at current month minus/plus two months and appends another two months whenever scrolling nears either edge, reducing enter-time schedule recompute work without changing the visible interaction model.
@@ -33,6 +42,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CheckCircle2, ChevronLeft, ChevronRight, CircleAlert, Flag, Repeat2, SlidersHorizontal, TrendingUp } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import {
   addMonths,
   eachDayOfInterval,
@@ -46,7 +56,7 @@ import {
   startOfWeek,
   subMonths
 } from 'date-fns';
-import { Log, TodoCategory, TodoItem } from '../types';
+import { Category, Log, Scope, TodoCategory, TodoItem } from '../types';
 import {
   buildTodoDateEntryMap,
   buildTodoMonthWeekLayout,
@@ -59,6 +69,7 @@ import {
 import { getParentTodo } from '../utils/todoHierarchyUtils';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 import { hexToRgba } from '../utils/colorUtils';
+import { matchesTodoFilterExpression } from '../utils/filterUtils';
 import { TodoScheduleTypeColorSettings as TodoScheduleTypeColorSettingsPanel } from './TodoScheduleTypeColorSettings';
 import {
   getResolvedTodoScheduleTypeColors,
@@ -69,9 +80,12 @@ import {
 interface TodoMonthViewProps {
   todos: TodoItem[];
   todoCategories: TodoCategory[];
+  activityCategories: Category[];
+  scopes: Scope[];
   logs: Log[];
   referenceDate: Date;
   onMoveScheduleEntry?: (entry: TodoDateEntry, targetDateKey: string) => void;
+  onOpenDay?: (dateKey: string) => void;
   onOpenDatePicker?: () => void;
   useReducedEffects?: boolean;
   viewMenuNode: React.ReactNode;
@@ -93,6 +107,8 @@ const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTH_VIEW_ROWS_PER_SCREEN_STORAGE_KEY = 'todoMonthViewRowsPerScreen';
 const MONTH_VIEW_FONT_SIZE_STORAGE_KEY = 'todoMonthViewFontSize';
 const MONTH_VIEW_MARKER_COLOR_MODE_STORAGE_KEY = 'todoMonthViewMarkerColorMode';
+const MONTH_VIEW_HIDDEN_FILTER_EXPRESSION_STORAGE_KEY = 'todoMonthViewHiddenFilterExpression';
+const MONTH_VIEW_HIDE_TRACE_TYPES_STORAGE_KEY = 'todoMonthViewHideTraceTypes';
 const MONTH_VIEW_INITIAL_MONTHS_BEFORE = 2;
 const MONTH_VIEW_INITIAL_MONTHS_AFTER = 2;
 const MONTH_VIEW_LOAD_CHUNK_MONTHS = 2;
@@ -100,6 +116,7 @@ const MONTH_VIEW_EDGE_LOAD_THRESHOLD_PX = 280;
 const MONTH_VIEW_PROGRAMMATIC_SCROLL_SETTLE_MS = 140;
 const MONTH_VIEW_ENTRY_TOP_OFFSET_PX = 28;
 const MONTH_VIEW_ENTRY_ROW_GAP_PX = 2;
+const TODO_DISPLAY_POPUP_MAX_HEIGHT = 'min(calc(100vh - 14rem - env(safe-area-inset-bottom)), 42rem)';
 const MONTH_VIEW_ROW_OPTIONS = [2, 3, 4, 5] as const;
 const MONTH_VIEW_FONT_SIZE_OPTIONS = [
   { key: 'small', label: '小' },
@@ -213,9 +230,12 @@ const getMonthEntryTagLabel = (
 export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   todos,
   todoCategories,
+  activityCategories,
+  scopes,
   logs,
   referenceDate,
   onMoveScheduleEntry,
+  onOpenDay,
   onOpenDatePicker,
   useReducedEffects = false,
   viewMenuNode,
@@ -269,6 +289,18 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
       ? (saved as MonthViewMarkerColorMode)
       : 'schedule';
   });
+  const [hiddenFilterExpression, setHiddenFilterExpression] = useState<string>(() => (
+    localStorage.getItem(MONTH_VIEW_HIDDEN_FILTER_EXPRESSION_STORAGE_KEY) || ''
+  ));
+  const [hiddenFilterExpressionDraft, setHiddenFilterExpressionDraft] = useState<string>(() => (
+    localStorage.getItem(MONTH_VIEW_HIDDEN_FILTER_EXPRESSION_STORAGE_KEY) || ''
+  ));
+  const [hideTraceTypes, setHideTraceTypes] = useState<boolean>(() => (
+    localStorage.getItem(MONTH_VIEW_HIDE_TRACE_TYPES_STORAGE_KEY) === 'true'
+  ));
+  const [hideTraceTypesDraft, setHideTraceTypesDraft] = useState<boolean>(() => (
+    localStorage.getItem(MONTH_VIEW_HIDE_TRACE_TYPES_STORAGE_KEY) === 'true'
+  ));
   const [scheduleTypeColorSettings, setScheduleTypeColorSettings] = useState<TodoScheduleTypeColorSettings>(() => (
     todoScheduleColorService.getSettings()
   ));
@@ -288,28 +320,36 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
     () => weeks.flatMap((week) => week.days.map((day) => formatDateKey(day))),
     [weeks]
   );
-  const entriesByDate = useMemo(
+  const rawEntriesByDate = useMemo(
     () => buildTodoDateEntryMap(todos, logs, dateKeys),
     [dateKeys, logs, todos]
   );
-  const weekLayouts = useMemo<Record<string, TodoMonthWeekLayout>>(
-    () => weeks.reduce<Record<string, TodoMonthWeekLayout>>((accumulator, week) => {
-      const weekDateKeys = week.days.map((day) => formatDateKey(day));
-      accumulator[week.id] = buildTodoMonthWeekLayout(weekDateKeys, entriesByDate, visibleEntryCount);
-      return accumulator;
-    }, {}),
-    [entriesByDate, visibleEntryCount, weeks]
-  );
-  const sortedEntriesByDate = useMemo(
-    () => weeks.reduce<Record<string, TodoDateEntry[]>>((accumulator, week) => {
-      const weekLayout = weekLayouts[week.id];
-      week.days.forEach((day) => {
-        const dateKey = formatDateKey(day);
-        accumulator[dateKey] = weekLayout?.sortedEntriesByDate[dateKey] || entriesByDate[dateKey] || [];
-      });
-      return accumulator;
-    }, {}),
-    [entriesByDate, weekLayouts, weeks]
+  const entriesByDate = useMemo(
+    () => {
+      const expression = hiddenFilterExpression.trim();
+
+      if (!expression && !hideTraceTypes) {
+        return rawEntriesByDate;
+      }
+
+      return Object.fromEntries(
+        Object.entries(rawEntriesByDate).map(([dateKey, entries]) => ([
+          dateKey,
+          entries.filter((entry) => {
+            if (hideTraceTypes && entry.primaryKind === 'inProgress') {
+              return false;
+            }
+
+            return !matchesTodoFilterExpression(entry.todo, expression, {
+              categories: activityCategories,
+              scopes,
+              todoCategories
+            });
+          })
+        ]))
+      );
+    },
+    [activityCategories, hiddenFilterExpression, hideTraceTypes, rawEntriesByDate, scopes, todoCategories]
   );
 
   const clearActiveMonthFreezeTimeout = () => {
@@ -799,6 +839,26 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   }, [monthMarkerColorMode]);
 
   useEffect(() => {
+    localStorage.setItem(MONTH_VIEW_HIDDEN_FILTER_EXPRESSION_STORAGE_KEY, hiddenFilterExpression);
+  }, [hiddenFilterExpression]);
+
+  useEffect(() => {
+    localStorage.setItem(MONTH_VIEW_HIDE_TRACE_TYPES_STORAGE_KEY, hideTraceTypes ? 'true' : 'false');
+  }, [hideTraceTypes]);
+
+  const openDensityMenu = () => {
+    setHiddenFilterExpressionDraft(hiddenFilterExpression);
+    setHideTraceTypesDraft(hideTraceTypes);
+    setIsDensityMenuOpen(true);
+  };
+
+  const closeDensityMenu = () => {
+    setHiddenFilterExpression(hiddenFilterExpressionDraft);
+    setHideTraceTypes(hideTraceTypesDraft);
+    setIsDensityMenuOpen(false);
+  };
+
+  useEffect(() => {
         const observer = new IntersectionObserver((entries) => {
       let nextMonth: string | null = null;
       let maxRatio = 0;
@@ -926,10 +986,47 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
     },
     [monthCellLineHeightPx, topRowHeight]
   );
+  const weekLayouts = useMemo<Record<string, TodoMonthWeekLayout>>(
+    () => weeks.reduce<Record<string, TodoMonthWeekLayout>>((accumulator, week) => {
+      const weekDateKeys = week.days.map((day) => formatDateKey(day));
+      accumulator[week.id] = buildTodoMonthWeekLayout(weekDateKeys, entriesByDate, visibleEntryCount, {
+        includeTraceSegments: !hideTraceTypes
+      });
+      return accumulator;
+    }, {}),
+    [entriesByDate, hideTraceTypes, visibleEntryCount, weeks]
+  );
+  const sortedEntriesByDate = useMemo(
+    () => weeks.reduce<Record<string, TodoDateEntry[]>>((accumulator, week) => {
+      const weekLayout = weekLayouts[week.id];
+      week.days.forEach((day) => {
+        const dateKey = formatDateKey(day);
+        accumulator[dateKey] = weekLayout?.sortedEntriesByDate[dateKey] || entriesByDate[dateKey] || [];
+      });
+      return accumulator;
+    }, {}),
+    [entriesByDate, weekLayouts, weeks]
+  );
   const selectedDateEntries = useMemo(
     () => (selectedDate ? sortedEntriesByDate[selectedDate] || [] : []),
     [selectedDate, sortedEntriesByDate]
   );
+  const toggleSelectedDate = (dateKey: string) => {
+    setSelectedDate((previous) => previous === dateKey ? null : dateKey);
+  };
+  const handleMonthDayNumberClick = (
+    event: React.MouseEvent<HTMLButtonElement>,
+    dateKey: string
+  ) => {
+    event.stopPropagation();
+
+    if (onOpenDay) {
+      onOpenDay(dateKey);
+      return;
+    }
+
+    toggleSelectedDate(dateKey);
+  };
   const todoCategoryColorMap = useMemo(
     () => new Map(todoCategories.map((category) => [category.id, getColorHexForCharts(category.color || '')])),
     [todoCategories]
@@ -994,12 +1091,12 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
     const markerColor = getTodoMarkerColor(segment.entry);
     const spanDayCount = segment.endDayIndex - segment.startDayIndex + 1;
     return {
-      left: `calc(${(segment.startDayIndex / 7) * 100}% + 1px)`,
-      width: `calc(${(spanDayCount / 7) * 100}% - 2px)`,
+      left: `${(segment.startDayIndex / 7) * 100}%`,
+      width: `${(spanDayCount / 7) * 100}%`,
       top: `${MONTH_VIEW_ENTRY_TOP_OFFSET_PX + (segment.laneIndex * (monthCellLineHeightPx + MONTH_VIEW_ENTRY_ROW_GAP_PX))}px`,
       height: `${monthCellLineHeightPx}px`,
-      backgroundColor: hexToRgba(markerColor, 0.12),
-      border: `1px solid ${hexToRgba(markerColor, 0.26)}`,
+      paddingLeft: '3px',
+      backgroundColor: hexToRgba(markerColor, 0.08),
       boxShadow: `inset 1.5px 0 0 ${markerColor}`
     };
   };
@@ -1074,7 +1171,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => setIsDensityMenuOpen(true)}
+              onClick={openDensityMenu}
               className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-white/60 hover:text-slate-700"
               title="月视图设置"
               aria-label="月视图设置"
@@ -1127,7 +1224,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                   {visibleTraceSegments.map((segment) => (
                     <div
                       key={`${week.id}-${segment.todoId}-${segment.startDayIndex}-${segment.endDayIndex}`}
-                      className={`absolute flex items-center overflow-hidden rounded-[0.48rem] px-[3px] font-medium leading-[1.2] text-stone-800 ${monthCellTaskClassName}`}
+                      className={`absolute flex items-center overflow-hidden font-medium leading-[1.2] text-stone-800 ${monthCellTaskClassName}`}
                       style={getTraceSegmentStyle(segment)}
                     >
                       <span className="truncate whitespace-nowrap">{segment.entry.todo.title}</span>
@@ -1150,11 +1247,24 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                     const isFirst = getDate(day) === 1;
 
                     return (
-                      <button
+                      <div
                         key={day.toISOString()}
-                        type="button"
                         data-month-drop-date={dateKey}
-                        onClick={() => setSelectedDate((previous) => previous === dateKey ? null : dateKey)}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={isSelected}
+                        aria-label={`Open ${format(day, 'yyyy-MM-dd')} details`}
+                        onClick={() => toggleSelectedDate(dateKey)}
+                        onKeyDown={(event) => {
+                          if (event.target !== event.currentTarget) {
+                            return;
+                          }
+
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            toggleSelectedDate(dateKey);
+                          }
+                        }}
                         onDragOver={(event) => {
                           if (!draggingEntry) return;
                           event.preventDefault();
@@ -1180,12 +1290,15 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                         ].join(' ')}
                       >
                         <div className="flex justify-start px-2">
-                          <span
-                            className="text-[1.02rem] leading-none text-stone-800"
+                          <button
+                            type="button"
+                            onClick={(event) => handleMonthDayNumberClick(event, dateKey)}
+                            className="rounded-sm text-[1.02rem] leading-none text-stone-800 transition-colors hover:text-stone-950 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-500/70"
                             style={{ fontFamily: "'Bilbo Swash Caps', 'Georgia', 'Times New Roman', cursive, serif" }}
+                            aria-label={`Quick add task for ${format(day, 'yyyy-MM-dd')}`}
                           >
                             {format(day, 'dd')}
-                          </span>
+                          </button>
                         </div>
 
                         <div className="mt-1.5 flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
@@ -1248,7 +1361,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                             {format(day, 'MMM')}
                           </div>
                         )}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -1414,9 +1527,9 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
           <div className="max-w-[12rem] truncate">{touchDragPreview.title}</div>
         </div>
       )}
-      {isDensityMenuOpen && (
+      {isDensityMenuOpen && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[120] flex items-center justify-center px-4 py-8"
+          className="fixed inset-0 z-[160] flex items-center justify-center bg-[rgba(250,249,246,0.14)] px-4 py-[calc(4.5rem+env(safe-area-inset-bottom))] backdrop-blur-[3px]"
           onPointerDown={(event) => {
             if (event.target !== event.currentTarget) {
               return;
@@ -1431,7 +1544,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
 
             event.preventDefault();
             event.stopPropagation();
-            setIsDensityMenuOpen(false);
+            closeDensityMenu();
           }}
         >
           <div
@@ -1443,20 +1556,26 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
               aria-hidden="true"
               className="pointer-events-none absolute inset-0 bg-[#faf9f6]/95 backdrop-blur-sm"
             />
-            <div className="relative z-10 max-h-[min(82vh,42rem)] overflow-y-auto p-4">
-            <div className="mb-4 flex items-center justify-between border-b border-stone-200/80 pb-3">
-              <span className="text-[0.82rem] font-medium tracking-[0.08em] text-stone-500">
-                月视图设置
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsDensityMenuOpen(false)}
-                className="rounded-full px-2 py-1.5 text-[0.82rem] text-stone-400 transition-colors hover:bg-stone-100/70 hover:text-stone-600"
-              >
-                关闭
-              </button>
+            <div
+              className="relative z-10 flex flex-col"
+              style={{ maxHeight: TODO_DISPLAY_POPUP_MAX_HEIGHT }}
+            >
+            <div className="shrink-0 border-b border-stone-200/80 px-4 pb-3 pt-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[0.82rem] font-medium tracking-[0.08em] text-stone-500">
+                  月视图设置
+                </span>
+                <button
+                  type="button"
+                  onClick={closeDensityMenu}
+                  className="rounded-full px-2 py-1.5 text-[0.82rem] text-stone-400 transition-colors hover:bg-stone-100/70 hover:text-stone-600"
+                >
+                  关闭
+                </button>
+              </div>
             </div>
 
+            <div className="min-h-0 overflow-y-auto px-4 pb-4 pt-4">
             <div className="mb-4">
               <div className="mb-2 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
                 格子高度
@@ -1544,9 +1663,54 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                 />
               )}
             </div>
+
+            <div className="mt-4">
+              <div className="mb-2 flex items-center justify-between gap-3 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
+                <span>隐藏筛选式</span>
+                {hiddenFilterExpressionDraft.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => setHiddenFilterExpressionDraft('')}
+                    className="rounded-full px-2 py-1 text-[0.68rem] tracking-[0.04em] text-stone-400 transition-colors hover:bg-stone-100/70 hover:text-stone-600"
+                  >
+                    清空
+                  </button>
+                )}
+              </div>
+              <textarea
+                value={hiddenFilterExpressionDraft}
+                onChange={(event) => setHiddenFilterExpressionDraft(event.target.value)}
+                rows={3}
+                spellCheck={false}
+                placeholder="@写作 #阅读 %健康 复盘 OR 总结"
+                className="w-full resize-none rounded-2xl border border-stone-200 bg-white/88 px-3 py-2.5 text-[13px] leading-5 text-stone-700 outline-none transition-colors placeholder:text-stone-300 focus:border-stone-300"
+              />
+              <p className="mt-2 text-[11px] leading-5 text-stone-400">
+                语法同自定义筛选器：空格=与，OR=或，@待办/分类，#活动/分类，%领域，无前缀=备注。
+              </p>
+            </div>
+
+            <button
+              type="button"
+              role="switch"
+              aria-checked={hideTraceTypesDraft}
+              onClick={() => setHideTraceTypesDraft((previous) => !previous)}
+              className="mt-4 flex w-full items-center justify-between gap-3 px-1 py-3 text-left transition-colors hover:text-stone-900"
+            >
+              <span className="text-sm font-medium text-stone-700">隐藏 Trace 类型</span>
+              <span
+                className={`flex h-7 w-12 shrink-0 items-center rounded-full px-1 transition-colors ${hideTraceTypesDraft ? 'bg-stone-800' : 'bg-stone-200'}`}
+              >
+                <span
+                  className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${hideTraceTypesDraft ? 'translate-x-5' : 'translate-x-0'}`}
+                />
+              </span>
+            </button>
+            </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

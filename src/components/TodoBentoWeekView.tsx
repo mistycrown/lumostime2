@@ -4,6 +4,9 @@
  * @output Single-week 2x4 bento schedule UI backed by real todo data
  * @pos Component (Todo scheduling)
  * @description Renders one selected week at a time in the bento layout so the mini calendar, header range, and visible day cells always describe the same week.
+ * @updated 2026-05-11: Raised the display popup above the schedule floating button and restored a full-screen blur scrim so the button now sits underneath the softened overlay instead of peeking above it.
+ * @updated 2026-05-11: Kept the display popup vertically centered while tightening its symmetric top/bottom clearance so the sheet no longer overlaps the bottom-right floating action button.
+ * @updated 2026-05-11: Capped the display popup's scrollable height with extra bottom clearance so longer settings content no longer reaches the bottom-right floating action button.
  * @updated 2026-05-11: Added a shared default/custom schedule-type color editor to the display popup so Arrange / Due / Repeat / Done / Trace colors can be customized whenever marker coloring follows schedule type.
  * @updated 2026-05-11: Removed the background blur transition from the display-settings open state so the softened calendar and popup appear on the same frame.
  * @updated 2026-05-11: Aligned the display-settings popup glass treatment and control sizing with the schedule shortcut menu so blur strength, fill, and typography now match.
@@ -29,6 +32,7 @@ import {
   startOfWeek,
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, CircleAlert, SlidersHorizontal } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { Log, TodoCategory, TodoItem } from '../types';
 import {
   buildWeekTodoBuckets,
@@ -76,6 +80,7 @@ const TODO_BENTO_MARKER_COLOR_MODE_STORAGE_KEY = 'todoBentoMarkerColorMode';
 const DEFAULT_BENTO_VISIBLE_ENTRY_COUNT = 4;
 const BENTO_ENTRY_ROW_HEIGHT = 24;
 const BENTO_ENTRY_GAP = 6;
+const TODO_DISPLAY_POPUP_MAX_HEIGHT = 'min(calc(100vh - 14rem - env(safe-area-inset-bottom)), 42rem)';
 const TODO_BENTO_DISPLAY_MODE_OPTIONS = [
   { key: 'single', label: '单页' },
   { key: 'all', label: '全部' }
@@ -770,9 +775,9 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
             <div className="max-w-[12rem] truncate">{touchDragPreview.title}</div>
           </div>
         )}
-        {isDisplaySettingsOpen && (
+        {isDisplaySettingsOpen && typeof document !== 'undefined' && createPortal(
           <div
-            className="fixed inset-0 z-[120] flex items-center justify-center px-4 py-8"
+            className="fixed inset-0 z-[160] flex items-center justify-center bg-[rgba(250,249,246,0.14)] px-4 py-[calc(4.5rem+env(safe-area-inset-bottom))] backdrop-blur-[3px]"
             onPointerDown={(event) => {
               if (event.target !== event.currentTarget) {
                 return;
@@ -799,20 +804,26 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-0 bg-[#faf9f6]/95 backdrop-blur-sm"
               />
-              <div className="relative z-10 max-h-[min(82vh,42rem)] overflow-y-auto p-4">
-              <div className="mb-4 flex items-center justify-between border-b border-stone-200/80 pb-3">
-                <span className="text-[0.82rem] font-medium tracking-[0.08em] text-stone-500">
-                  显示设置
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setIsDisplaySettingsOpen(false)}
-                  className="rounded-full px-2 py-1.5 text-[0.82rem] text-stone-400 transition-colors hover:bg-stone-100/70 hover:text-stone-600"
-                >
-                  关闭
-                </button>
+              <div
+                className="relative z-10 flex flex-col"
+                style={{ maxHeight: TODO_DISPLAY_POPUP_MAX_HEIGHT }}
+              >
+              <div className="shrink-0 border-b border-stone-200/80 px-4 pb-3 pt-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[0.82rem] font-medium tracking-[0.08em] text-stone-500">
+                    显示设置
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsDisplaySettingsOpen(false)}
+                    className="rounded-full px-2 py-1.5 text-[0.82rem] text-stone-400 transition-colors hover:bg-stone-100/70 hover:text-stone-600"
+                  >
+                    关闭
+                  </button>
+                </div>
               </div>
 
+              <div className="min-h-0 overflow-y-auto px-4 pb-4 pt-4">
               <div className="mb-4">
                 <div className="mb-2 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
                   显示模式
@@ -875,8 +886,10 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                 )}
               </div>
               </div>
+              </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </div>
