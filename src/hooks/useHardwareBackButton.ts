@@ -1,5 +1,6 @@
 /**
  * @file useHardwareBackButton.ts
+ * @updated 2026-05-12: Routed todo-detail hardware back presses through the shared nested detail-history stack so child-task pages return to their parent detail before leaving the todo surface.
  * @input NavigationContext (all modal/view states including settings submenu hierarchy, search origin state, and custom filter overlay state)
  * @output Hardware Back Button Handler (backButton event listener)
  * @pos Hook (System Integration)
@@ -26,12 +27,13 @@ export const useHardwareBackButton = () => {
     const { isAIChatOpen, handleAIChatBack } = useAIChatWindow();
     const {
         isSettingsOpen, setIsSettingsOpen, settingsSubmenu, setSettingsSubmenu,
+        settingsSubmenuBackCloses, setSettingsSubmenuBackCloses,
         isAutoLinkOpen, setIsAutoLinkOpen,
         isSearchOpen, setIsSearchOpen, isSearchOpenedFromSettings, setIsSearchOpenedFromSettings,
         isFiltersOpen, setIsFiltersOpen, activeFilterId, setActiveFilterId,
         focusDetailSessionId, setFocusDetailSessionId,
         isAddModalOpen, setIsAddModalOpen,
-        isTodoModalOpen, setIsTodoModalOpen,
+        isTodoModalOpen, closeTodoDetail,
         isDailyReviewOpen, setIsDailyReviewOpen, setCurrentReviewDate,
         isOnThisDayOpen, setIsOnThisDayOpen, setCurrentOnThisDayDate,
         isWeeklyReviewOpen, setIsWeeklyReviewOpen, setCurrentWeeklyReviewStart, setCurrentWeeklyReviewEnd,
@@ -78,9 +80,6 @@ export const useHardwareBackButton = () => {
     const closeModal = () => {
         setIsAddModalOpen(false);
     };
-    const closeTodoModal = () => {
-        setIsTodoModalOpen(false);
-    };
     const closeSearch = () => {
         setIsSearchOpen(false);
 
@@ -113,6 +112,12 @@ export const useHardwareBackButton = () => {
             // 1. Modals (High Priority)
             if (isSettingsOpen) {
                 if (settingsSubmenu !== 'main') {
+                    if (settingsSubmenuBackCloses) {
+                        setSettingsSubmenuBackCloses(false);
+                        setSettingsSubmenu('main');
+                        setIsSettingsOpen(false);
+                        return;
+                    }
                     setSettingsSubmenu('main');
                     return;
                 }
@@ -152,7 +157,7 @@ export const useHardwareBackButton = () => {
                 return;
             }
             if (isTodoModalOpen) {
-                closeTodoModal();
+                closeTodoDetail();
                 return;
             }
 
@@ -226,10 +231,10 @@ export const useHardwareBackButton = () => {
             listener.then(l => l.remove());
         };
     }, [
-        handleAIChatBack, isAIChatOpen,
+        closeTodoDetail, handleAIChatBack, isAIChatOpen,
         isSettingsOpen, isAutoLinkOpen, isSearchOpen, isFiltersOpen, isExportViewOpen, isGalleryViewOpen, isShareViewOpen, focusDetailSessionId, isAddModalOpen, isTodoModalOpen,
         isDailyReviewOpen, isOnThisDayOpen, isWeeklyReviewOpen, isMonthlyReviewOpen, isAchievementOpen,
         isStatsFullScreen, isTodoManaging, isTagsManaging, isScopeManaging,
-        currentView, selectedTagId, selectedCategoryId, selectedScopeId, settingsSubmenu, isSearchOpenedFromSettings, activeFilterId
+        currentView, selectedTagId, selectedCategoryId, selectedScopeId, settingsSubmenu, settingsSubmenuBackCloses, isSearchOpenedFromSettings, activeFilterId
     ]);
 };

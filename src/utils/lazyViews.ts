@@ -44,6 +44,7 @@ const loadNarrativeSettingsView = () => import('../views/settings/NarrativeSetti
 const loadNFCSettingsView = () => import('../views/settings/NFCSettingsView').then((module) => ({ default: module.NFCSettingsView }));
 const loadUserGuideView = () => import('../views/settings/UserGuideView').then((module) => ({ default: module.UserGuideView }));
 const loadFiltersSettingsView = () => import('../views/settings/FiltersSettingsView').then((module) => ({ default: module.FiltersSettingsView }));
+const loadCollectionSettingsView = () => import('../views/settings/CollectionSettingsView').then((module) => ({ default: module.CollectionSettingsView }));
 const loadCloudSyncSettingsView = () => import('../views/settings/CloudSyncSettingsView').then((module) => ({ default: module.CloudSyncSettingsView }));
 const loadS3SyncSettingsView = () => import('../views/settings/S3SyncSettingsView').then((module) => ({ default: module.S3SyncSettingsView }));
 const loadDataManagementView = () => import('../views/settings/DataManagementView').then((module) => ({ default: module.DataManagementView }));
@@ -71,6 +72,7 @@ export const NarrativeSettingsViewLazy = lazyWithPreload(loadNarrativeSettingsVi
 export const NFCSettingsViewLazy = lazyWithPreload(loadNFCSettingsView);
 export const UserGuideViewLazy = lazyWithPreload(loadUserGuideView);
 export const FiltersSettingsViewLazy = lazyWithPreload(loadFiltersSettingsView);
+export const CollectionSettingsViewLazy = lazyWithPreload(loadCollectionSettingsView);
 export const CloudSyncSettingsViewLazy = lazyWithPreload(loadCloudSyncSettingsView);
 export const S3SyncSettingsViewLazy = lazyWithPreload(loadS3SyncSettingsView);
 export const DataManagementViewLazy = lazyWithPreload(loadDataManagementView);
@@ -105,6 +107,7 @@ const secondaryPreloaders: Preloader[] = [
   NFCSettingsViewLazy.preload,
   UserGuideViewLazy.preload,
   FiltersSettingsViewLazy.preload,
+  CollectionSettingsViewLazy.preload,
   S3SyncSettingsViewLazy.preload,
   WidgetSettingsViewLazy.preload
 ];

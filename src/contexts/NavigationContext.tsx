@@ -1,10 +1,12 @@
 /**
  * @file NavigationContext.tsx
+ * @updated 2026-05-12: Added nested todo-detail history state so detail-to-detail navigation can unwind back to the previous task page instead of closing straight to the root view.
  * @description 统一管理应用的所有导航和模态状态（含设置子页层级）
  */
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { AppView, Log, TodoItem, Goal, SearchType } from '../types';
 import { useSettings } from './SettingsContext';
+import { popTodoDetailHistory } from '../utils/todoDetailNavigation';
 
 export type SettingsSubmenu =
     | 'main'
@@ -24,6 +26,7 @@ export type SettingsSubmenu =
     | 'filters'
     | 'memoir_filter'
     | 'batch_manage'
+    | 'collections'
     | 'sponsorship_preview'
     | 'scene'
     | 'emoji'
@@ -65,6 +68,9 @@ interface NavigationContextType {
     setIsAddModalOpen: (open: boolean) => void;
     isTodoModalOpen: boolean;
     setIsTodoModalOpen: (open: boolean) => void;
+    todoDetailHistory: TodoItem[];
+    setTodoDetailHistory: React.Dispatch<React.SetStateAction<TodoItem[]>>;
+    closeTodoDetail: () => void;
     isTodoManaging: boolean;
     setIsTodoManaging: (managing: boolean) => void;
 
@@ -235,6 +241,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [isStatsFullScreen, setIsStatsFullScreen] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isTodoModalOpen, setIsTodoModalOpen] = useState(false);
+    const [todoDetailHistory, setTodoDetailHistory] = useState<TodoItem[]>([]);
     const [isTodoManaging, setIsTodoManaging] = useState(false);
     const [isGoalBatchManaging, setIsGoalBatchManaging] = useState(false);
     const [isGoalEditorOpen, setIsGoalEditorOpen] = useState(false);
@@ -300,6 +307,31 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [isExportViewOpen, setIsExportViewOpen] = useState(false);
     const [currentDate, setCurrentDate] = useState<Date>(new Date());
     const [previousView, setPreviousView] = useState<AppView | null>(null);
+
+    useEffect(() => {
+        if (!isTodoModalOpen && !editingTodo && !newTodoDraft && todoDetailHistory.length > 0) {
+            setTodoDetailHistory([]);
+        }
+    }, [editingTodo, isTodoModalOpen, newTodoDraft, todoDetailHistory.length]);
+
+    const closeTodoDetail = () => {
+        const { previousTodo, nextHistory } = popTodoDetailHistory(todoDetailHistory);
+
+        if (previousTodo) {
+            setTodoDetailHistory(nextHistory);
+            setEditingTodo(previousTodo);
+            setNewTodoDraft(null);
+            setTodoCategoryToAdd(previousTodo.categoryId);
+            setIsTodoModalOpen(true);
+            return;
+        }
+
+        setTodoDetailHistory([]);
+        setIsTodoModalOpen(false);
+        setEditingTodo(null);
+        setNewTodoDraft(null);
+    };
+
     const handleSetIsSettingsOpen = (open: boolean) => {
         if (open) {
             setSettingsSubmenu('main');
@@ -340,6 +372,9 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setIsAddModalOpen,
             isTodoModalOpen,
             setIsTodoModalOpen,
+            todoDetailHistory,
+            setTodoDetailHistory,
+            closeTodoDetail,
             isTodoManaging,
             setIsTodoManaging,
             isGoalBatchManaging,

@@ -4,6 +4,10 @@
  * @output Modal Interaction (Edit Todo, View History)
  * @pos Component (Modal)
  * @description Displays detailed information for a specific Todo item, including its progress, planning fields, associated history logs, and focus stats.
+ * @updated 2026-05-12: Made subtask detail pages resolve inherited category, linked activity, and scope data from the live parent todo, and infer missing activity-category links from the activity id so stale child metadata no longer renders as unlinked.
+ * @updated 2026-05-12: Fixed detail-page auto-save loops by comparing against the latest live todo record instead of a stale open-time snapshot.
+ * @updated 2026-05-12: Replaced the nested child-todo row button structure with an accessible clickable container so subtask rows no longer render invalid button-in-button markup.
+ * @updated 2026-05-12: Added an inline detail-level `Collection` selector so todos can join themed collections without opening a separate modal.
  * @updated 2026-04-22: Parent todo timeline tabs now aggregate direct child-task logs for shared history and duration stats while keeping manual progress recalculation scoped to the current todo's own logs.
  * @updated 2026-04-22: Parent todo timelines now show an `@subtask` badge on entries contributed by direct child tasks.
  * @updated 2026-04-22: Styled the inherited parent-task link with a dashed underline so clickable parent navigation reads like a link.
@@ -32,6 +36,7 @@ import { IconRenderer } from './IconRenderer';
 import { useToast } from '../contexts/ToastContext';
 import { getTodayDateKey, parseDateKey } from '../utils/todoScheduleUtils';
 import { TodoDatePickerModal } from './TodoDatePickerModal';
+import { DataCollectionSelector } from './DataCollectionSelector';
 import {
   getCompletedDirectChildCount,
   getDirectChildCount,
@@ -81,6 +86,33 @@ const formatDateFieldValue = (value?: string): string => {
   const month = `${parsed.getMonth() + 1}`.padStart(2, '0');
   const day = `${parsed.getDate()}`.padStart(2, '0');
   return `${parsed.getFullYear()}.${month}.${day}`;
+};
+
+const normalizeOptionalText = (value?: string): string => value || '';
+
+const normalizeOptionalScopeIds = (value?: string[]): string[] => (
+  value && value.length > 0 ? [...value].sort() : []
+);
+
+const normalizeRecurrenceRuleForComparison = (value?: TodoRecurrenceRule): string => JSON.stringify(value ?? null);
+
+const resolveLinkedActivityCategory = (
+  categories: Category[],
+  linkedCategoryId?: string,
+  linkedActivityId?: string
+): Category | null => {
+  if (!linkedActivityId) {
+    return null;
+  }
+
+  if (linkedCategoryId) {
+    const explicitCategory = categories.find((category) => category.id === linkedCategoryId);
+    if (explicitCategory?.activities.some((activity) => activity.id === linkedActivityId)) {
+      return explicitCategory;
+    }
+  }
+
+  return categories.find((category) => category.activities.some((activity) => activity.id === linkedActivityId)) || null;
 };
 
 export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
@@ -235,6 +267,44 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const tabItems: Tab[] = showSubtaskTab
     ? ['\u7EC6\u8282', '\u5B50\u4EFB\u52A1', '\u65F6\u95F4\u7EBF']
     : ['\u7EC6\u8282', '\u65F6\u95F4\u7EBF'];
+  const persistedTodo = useMemo(
+    () => (initialTodo ? todos.find((todo) => todo.id === todoId) || initialTodo : null),
+    [initialTodo, todoId, todos]
+  );
+  const persistedProgressTrackingMode = useMemo(
+    () => getTodoProgressTrackingMode(persistedTodo, todos),
+    [persistedTodo, todos]
+  );
+  const resolvedCategoryId = isSubtask
+    ? normalizeOptionalText(parentTodo?.categoryId) || selectedCategoryId
+    : selectedCategoryId;
+  const resolvedLinkedCategoryId = isSubtask
+    ? normalizeOptionalText(parentTodo?.linkedCategoryId)
+    : linkedCategoryId;
+  const resolvedLinkedActivityId = isSubtask
+    ? normalizeOptionalText(parentTodo?.linkedActivityId)
+    : linkedActivityId;
+  const resolvedDefaultScopeIds = useMemo(
+    () => (
+      isSubtask
+        ? (parentTodo?.defaultScopeIds && parentTodo.defaultScopeIds.length > 0 ? [...parentTodo.defaultScopeIds] : undefined)
+        : defaultScopeIds
+    ),
+    [defaultScopeIds, isSubtask, parentTodo]
+  );
+  const resolvedLinkedActivityCategory = useMemo(
+    () => resolveLinkedActivityCategory(categories, resolvedLinkedCategoryId, resolvedLinkedActivityId),
+    [categories, resolvedLinkedActivityId, resolvedLinkedCategoryId]
+  );
+  const effectiveLinkedCategoryId = resolvedLinkedActivityCategory?.id || resolvedLinkedCategoryId;
+  const resolvedLinkedActivity = useMemo(
+    () => (
+      resolvedLinkedActivityId
+        ? resolvedLinkedActivityCategory?.activities.find((activity) => activity.id === resolvedLinkedActivityId) || null
+        : null
+    ),
+    [resolvedLinkedActivityCategory, resolvedLinkedActivityId]
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -438,18 +508,18 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
 
   const buildTodoPayload = (overrides?: Partial<TodoItem>): TodoItem => ({
     id: todoId,
-    categoryId: selectedCategoryId,
+    categoryId: resolvedCategoryId,
     parentTodoId,
     childOrder,
     title: title.trim(),
     isCompleted,
     completedAt: isCompleted
-      ? (initialTodo?.isCompleted ? initialTodo.completedAt : new Date().toISOString())
+      ? (persistedTodo?.isCompleted ? persistedTodo.completedAt : new Date().toISOString())
       : undefined,
     note: note.trim(),
-    linkedCategoryId: linkedCategoryId || undefined,
-    linkedActivityId: linkedActivityId || undefined,
-    defaultScopeIds,
+    linkedCategoryId: effectiveLinkedCategoryId || undefined,
+    linkedActivityId: resolvedLinkedActivityId || undefined,
+    defaultScopeIds: resolvedDefaultScopeIds,
     isProgress,
     progressTrackingMode: resolvedProgressTrackingMode,
     totalAmount: isManualProgress ? totalAmount : (isSubtaskAutoProgress ? progressSnapshot.totalAmount : undefined),
@@ -470,28 +540,28 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     if (!title.trim()) return; // 不保存空标题
 
     // 检查是否有实际变化
-    if (initialTodo) {
+    if (persistedTodo) {
       const hasChanges = 
-        selectedCategoryId !== initialTodo.categoryId ||
-        title.trim() !== initialTodo.title ||
-        note.trim() !== initialTodo.note ||
-        isCompleted !== initialTodo.isCompleted ||
-        linkedCategoryId !== (initialTodo.linkedCategoryId || '') ||
-        linkedActivityId !== (initialTodo.linkedActivityId || '') ||
-        JSON.stringify(defaultScopeIds) !== JSON.stringify(initialTodo.defaultScopeIds) ||
-        resolvedProgressTrackingMode !== getTodoProgressTrackingMode(initialTodo, todos) ||
-        (isManualProgress && totalAmount !== initialTodo.totalAmount) ||
-        (isManualProgress && unitAmount !== initialTodo.unitAmount) ||
-        (isManualProgress && completedUnits !== initialTodo.completedUnits) ||
-        heatmapMin !== initialTodo.heatmapMin ||
-        heatmapMax !== initialTodo.heatmapMax ||
-        pin !== Boolean(initialTodo.pin) ||
-        coverImage !== initialTodo.coverImage ||
-        parentTodoId !== initialTodo.parentTodoId ||
-        childOrder !== initialTodo.childOrder ||
-        scheduledDate !== (initialTodo.scheduledDate || '') ||
-        deadlineDate !== (initialTodo.deadlineDate || '') ||
-        JSON.stringify(isSubtask ? undefined : recurrenceRule) !== JSON.stringify(initialTodo.recurrenceRule);
+        resolvedCategoryId !== persistedTodo.categoryId ||
+        title.trim() !== persistedTodo.title ||
+        note.trim() !== normalizeOptionalText(persistedTodo.note) ||
+        isCompleted !== persistedTodo.isCompleted ||
+        effectiveLinkedCategoryId !== normalizeOptionalText(persistedTodo.linkedCategoryId) ||
+        resolvedLinkedActivityId !== normalizeOptionalText(persistedTodo.linkedActivityId) ||
+        JSON.stringify(normalizeOptionalScopeIds(resolvedDefaultScopeIds)) !== JSON.stringify(normalizeOptionalScopeIds(persistedTodo.defaultScopeIds)) ||
+        resolvedProgressTrackingMode !== persistedProgressTrackingMode ||
+        (isManualProgress && totalAmount !== persistedTodo.totalAmount) ||
+        (isManualProgress && unitAmount !== persistedTodo.unitAmount) ||
+        (isManualProgress && completedUnits !== persistedTodo.completedUnits) ||
+        heatmapMin !== persistedTodo.heatmapMin ||
+        heatmapMax !== persistedTodo.heatmapMax ||
+        pin !== Boolean(persistedTodo.pin) ||
+        coverImage !== persistedTodo.coverImage ||
+        parentTodoId !== persistedTodo.parentTodoId ||
+        childOrder !== persistedTodo.childOrder ||
+        scheduledDate !== normalizeOptionalText(persistedTodo.scheduledDate) ||
+        deadlineDate !== normalizeOptionalText(persistedTodo.deadlineDate) ||
+        normalizeRecurrenceRuleForComparison(isSubtask ? undefined : recurrenceRule) !== normalizeRecurrenceRuleForComparison(persistedTodo.recurrenceRule);
       
       if (!hasChanges) return;
     }
@@ -499,15 +569,10 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     onSave(buildTodoPayload());
   }, [selectedCategoryId, title, note, isCompleted, linkedCategoryId, linkedActivityId, defaultScopeIds, resolvedProgressTrackingMode, isManualProgress, totalAmount, unitAmount, completedUnits, heatmapMin, heatmapMax, pin, coverImage, parentTodoId, childOrder, scheduledDate, deadlineDate, isSubtask, recurrenceRule, initialTodo, onSave, todos]); // 监听所有状态变化
 
-  const selectedCategory = todoCategories?.find(c => c.id === selectedCategoryId) || currentCategory;
+  const selectedCategory = todoCategories?.find(c => c.id === resolvedCategoryId) || currentCategory;
 
   const handleTogglePin = () => {
-    const nextPin = !pin;
-    setPin(nextPin);
-
-    if (!title.trim()) return;
-
-    onSave(buildTodoPayload({ pin: nextPin }));
+    setPin((prev) => !prev);
   };
 
   const openInlineSubtaskComposer = () => {
@@ -539,17 +604,19 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
       return;
     }
 
+    const parentTodoForInheritance = buildTodoPayload();
+
     onSave({
       id: crypto.randomUUID(),
-      categoryId: initialTodo.categoryId,
-      parentTodoId: initialTodo.id,
-      childOrder: getNextChildOrder(todos, initialTodo.id),
+      categoryId: parentTodoForInheritance.categoryId,
+      parentTodoId: parentTodoForInheritance.id,
+      childOrder: getNextChildOrder(todos, parentTodoForInheritance.id),
       title: nextTitle,
       isCompleted: false,
       note: undefined,
-      linkedCategoryId: initialTodo.linkedCategoryId,
-      linkedActivityId: initialTodo.linkedActivityId,
-      defaultScopeIds: initialTodo.defaultScopeIds ? [...initialTodo.defaultScopeIds] : undefined,
+      linkedCategoryId: parentTodoForInheritance.linkedCategoryId,
+      linkedActivityId: parentTodoForInheritance.linkedActivityId,
+      defaultScopeIds: parentTodoForInheritance.defaultScopeIds ? [...parentTodoForInheritance.defaultScopeIds] : undefined,
       isProgress: false,
       progressTrackingMode: 'none',
       completedUnits: 0,
@@ -635,16 +702,15 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     });
   };
 
-  const selectedLinkCategory = categories?.find(c => c.id === linkedCategoryId);
-  const linkedActivityLabel = linkedCategoryId && linkedActivityId
+  const linkedActivityLabel = resolvedLinkedActivityCategory && resolvedLinkedActivity
     ? (() => {
-      const category = categories.find((item) => item.id === linkedCategoryId);
-      const activity = category?.activities.find((item) => item.id === linkedActivityId);
+      const category = resolvedLinkedActivityCategory;
+      const activity = resolvedLinkedActivity;
       return activity && category ? `${category.name} / ${activity.name}` : '未关联活动';
     })()
     : '未关联活动';
-  const inheritedScopeLabel = defaultScopeIds && defaultScopeIds.length > 0
-    ? defaultScopeIds
+  const inheritedScopeLabel = resolvedDefaultScopeIds && resolvedDefaultScopeIds.length > 0
+    ? resolvedDefaultScopeIds
       .map((scopeId) => scopes.find((scope) => scope.id === scopeId)?.name)
       .filter(Boolean)
       .join(' · ')
@@ -683,12 +749,8 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const totalMins = Math.floor((totalSeconds % 3600) / 60);
 
   // Check if linked activity has focus enabled
-  const linkedActivity = linkedCategoryId && linkedActivityId
-    ? categories?.find(c => c.id === linkedCategoryId)?.activities.find(a => a.id === linkedActivityId)
-    : null;
-  const linkedActivityCategory = linkedCategoryId
-    ? categories?.find(c => c.id === linkedCategoryId)
-    : null;
+  const linkedActivity = resolvedLinkedActivity;
+  const linkedActivityCategory = resolvedLinkedActivityCategory;
   
   // 检查是否应该显示专注打分：
   // 1. 首先检查日志中是否有专注打分数据（最直接的判断）
@@ -860,6 +922,15 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                   placeholder="添加备注..."
                 />
               </div>
+
+              {initialTodo && (
+                <div className="pt-1">
+                  <DataCollectionSelector
+                    itemType="todo"
+                    itemId={initialTodo.id}
+                  />
+                </div>
+              )}
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
@@ -1270,6 +1341,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
               </div>
             </div>
 
+
             {initialTodo && onDelete && (
               <button onClick={handleDelete} className="w-full py-4 text-red-500 font-bold text-sm hover:bg-red-50 rounded-xl transition-colors">
                 删除待办
@@ -1357,11 +1429,18 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                 {childTodos.length > 0 ? (
                   <div className="border-t border-stone-200/80">
                     {childTodos.map((childTodo) => (
-                      <button
+                      <div
                         key={childTodo.id}
-                        type="button"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => onOpenTodo?.(childTodo)}
-                        className="group flex w-full items-start justify-between gap-4 border-b border-stone-200/70 py-4 text-left transition-colors"
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            onOpenTodo?.(childTodo);
+                          }
+                        }}
+                        className="group flex w-full cursor-pointer items-start justify-between gap-4 border-b border-stone-200/70 py-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-300"
                       >
                         <div className="min-w-0">
                           <div className={`truncate text-base font-semibold transition-colors ${childTodo.isCompleted ? 'text-stone-400 line-through' : 'text-stone-700 group-hover:text-stone-900'}`}>
@@ -1392,7 +1471,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                           </button>
                           <ChevronRight size={14} className="mt-0.5 shrink-0 text-stone-300 transition-colors group-hover:text-stone-500" />
                         </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 ) : (

@@ -3,6 +3,7 @@
  * @input Stored timeline quick-action preference payloads
  * @output Shared quick-action definitions and normalization helpers for timeline header buttons
  * @description Centralizes the configurable quick actions shown at the top of the timeline view.
+ * @updated 2026-05-12: Added the Collection shortcut key so timeline quick actions can deep-link into the settings collection subpage.
  * @updated 2026-04-25: Added shared quick-action metadata and normalization helpers for timeline header customization.
  * @updated 2026-04-25: Shortened timeline quick-action labels for the preferences UI.
  */
@@ -13,6 +14,7 @@ export type TimelineQuickActionKey =
   | 'stats'
   | 'gallery'
   | 'achievement'
+  | 'collections'
   | 'principle'
   | 'sync';
 
@@ -47,6 +49,11 @@ export const TIMELINE_QUICK_ACTION_OPTIONS: TimelineQuickActionOption[] = [
     key: 'achievement',
     label: '成就瓶',
     description: '打开成就页。'
+  },
+  {
+    key: 'collections',
+    label: 'Collections',
+    description: '打开设置中的 Collection 子页。'
   },
   {
     key: 'principle',

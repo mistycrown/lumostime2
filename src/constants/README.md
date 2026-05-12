@@ -2,6 +2,8 @@
 
 This directory contains application-wide constants, configuration, and static data.
 
+Update 2026-05-12: `timelineQuickActions.ts` now includes a `collections` quick-action key so the timeline header can deep-link into `设置 > 内容 > Collections`.
+Update 2026-05-12: `dreamModePrompt.ts` now centralizes the shared Dream workflow system prompt, and `dreamTopicPresets.ts` now centralizes the built-in Dream concern-topic presets so the Dream system can seed default tabs from one shared constants definition.
 Update 2026-05-06: `aiPersonaSystemPrompts.ts` now centralizes the six built-in AI chat persona system prompts so `AIBackfillChatModal.tsx` can reference shared long-form prompt copy instead of inlining it.
 Update 2026-03-12: `storageKeys.ts` now includes timeline appearance storage keys for normal timeline record nodes.
 Update 2026-03-21: `redemptionHashes.ts` now normalizes legacy `Xor` / `xor` fields so key-index-0 redemption codes validate correctly.
@@ -24,6 +26,11 @@ Update 2026-03-21: `redemptionHashes.ts` now normalizes legacy `Xor` / `xor` fie
 - `timePalQuotes.ts`: 时光小友名言库
   - 内置激励名言
   - 自定义名言支持
+
+### AI & Dream
+- `aiPersonaSystemPrompts.ts`: 内置 AI 聊天 persona 的共享 system prompt 文案
+- `dreamModePrompt.ts`: Dream 工作流共享 system prompt 文案
+- `dreamTopicPresets.ts`: Dream 默认关注领域预设，供 Dream 首次初始化与后续统一维护
 
 ### Security
 - `redemptionHashes.ts`: 兑换码哈希值（用于投喂功能验证）

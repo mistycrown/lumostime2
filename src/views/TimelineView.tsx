@@ -6,6 +6,7 @@
  * @description The primary daily view. Visualizes time usage on a timeline, supports adding/editing logs, gap detection, gesture and lightweight calendar date-switch animation, quick search and custom filter entry points, and integrates Daily/Weekly/Monthly review plus achievement bottle entry points.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-05-12: Swapped the Collection quick action icon to a star and kept its deep-link into the settings Collection subpage.
  * @updated 2026-04-30: Timeline done nodes now append `@parent` context to completed subtask titles using plain text.
  * @updated 2026-04-25: Replaced the fixed five timeline header buttons with user-configurable quick actions.
  * @updated 2026-04-22: The floating AI button now opens the app-level shared AI window so closing the modal does not interrupt an in-flight request.
@@ -17,7 +18,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule, Goal } from '../types';
 import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
-import { Plus, MoreHorizontal, BarChart2, BookOpen, FlaskConical, RefreshCw, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon } from 'lucide-react';
+import { Plus, MoreHorizontal, BarChart2, BookOpen, FlaskConical, RefreshCw, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon, Star } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { ParsedTimeEntry } from '../services/aiService';
 import { ToastType } from '../components/Toast';
@@ -291,6 +292,16 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             title: '成就瓶',
             icon: <FlaskConical size={20} />,
             onClick: () => setIsAchievementOpen(true)
+        },
+        collections: {
+            label: 'Collections',
+            title: 'Collections',
+            icon: <Star size={20} />,
+            onClick: () => {
+                setIsSettingsOpen(true);
+                setSettingsSubmenu('collections');
+                setSettingsSubmenuBackCloses(true);
+            }
         },
         principle: {
             label: '原则库',

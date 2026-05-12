@@ -28,7 +28,10 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
-> Last updated: 2026-05-11
+> Last updated: 2026-05-12
+- `SettingsView.tsx`, `TimelineView.tsx`: Swapped the `Collections` entry icon in both settings and the timeline quick-action bar from archive/book styling to a star for a consistent shortcut cue.
+- `TimelineView.tsx`, `timelineQuickActions.ts`: Added a `Collections` quick-action route so the timeline header can open `设置 > 内容 > Collections` through the same settings-subpage deep-link pattern already used by `原则库`.
+- `SettingsView.tsx`, `CollectionSettingsView.tsx`, and `DataCollectionSelector.tsx`: Moved the `Collection` feature entrance under `设置 > 内容`, then rebuilt the page around compact `◬`-led rows and a true mixed-item detail timeline that follows the app's detail-page timeline structure instead of oversized archive mock layouts.
 - `TodoView.tsx`, `TodoMonthView.tsx`: The Todo month planner now opens the shared quick-add schedule modal when users tap a day numeral, matching the week planner while preserving full-cell taps for expanding that day's detail rows.
 - `TodoView.tsx`, `TodoMonthView.tsx`: Entering the Todo `月视图` now sends an explicit post-mount `本月` jump signal from the parent schedule screen, so the rolling calendar snaps to the current month on entry instead of sometimes staying at the loaded window's top month.
 - `TodoView.tsx`, `TodoMonthView.tsx`, `filterUtils.ts`: The Todo month-view display settings now include one persisted `隐藏筛选式` field that reuses custom-filter syntax to hide matching entries by todo title/category, linked activity/category, scope, and note without changing week or list views.

@@ -206,6 +206,17 @@ interface AIPromptCacheHint {
     scope?: string;
 }
 
+export interface AIStructuredJsonRequestParams<T> {
+    systemPrompt: string;
+    userPrompt: string;
+    conversationHistory?: AIConversationTurn[];
+    cacheHint?: {
+        keySeed: string;
+        scope?: string;
+    };
+    normalizeResult: (rawValue: any) => T;
+}
+
 type OpenAICompatibleProviderFamily =
     | 'openai'
     | 'deepseek'
@@ -1701,6 +1712,27 @@ Output:
 
 
     // 闂佽绻愮换鎰板箰濞ｆ岸鏌℃径鍡樻珕闁哄被鍔岀叅闁哄稁鍘介崕宥夋煕閺囥劌澧い蟻鍥ㄢ拻闁稿本绻冭ぐ褏绱掓潏銊㈡敜H:mm闂備焦瀵х粙鎴λ囬鍓х當鐎光偓閸曨剙浠洪梺闈涱煭缁犳垿鎮￠弴銏♀拺妞ゆ劑鍩勫Σ褰掓倵濮樸儱濮傞柟顖氬暣瀹曠喖顢楁笟濠勭闂備礁鎼悧蹇涘窗閹捐泛鍨濈€广儱顦憴锕傛煕椤愩倕鏋庨柣蹇撴喘閹鎮烽悧鍫熸嫳闂佸搫妫寸紞渚€骞嗛崘顔肩妞ゃ劎鐡岄梺璇插缁嬫帡銆冮崼銉晞濞达絽婀遍埢?
+    requestStructuredJsonWithDebug: async <T>(
+        params: AIStructuredJsonRequestParams<T>,
+        options: AIRequestOptions = {}
+    ): Promise<{ result: T; debug: AIDebugExchange }> => {
+        const config = aiService.getConfig();
+        const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
+
+        if (!config.apiKey?.trim()) {
+            throw new Error('Please configure AI settings first.');
+        }
+
+        return requestJsonObjectWithDebug(config, fetchFn, {
+            systemPrompt: params.systemPrompt,
+            userPrompt: params.userPrompt,
+            conversationHistory: params.conversationHistory,
+            cacheHint: params.cacheHint,
+            normalizeResult: params.normalizeResult,
+            options
+        });
+    },
+
     combineWithDate: (rawEntries: AIRawTimeEntry[], targetDate: string): ParsedTimeEntry[] => {
         return rawEntries.map(entry => {
             // targetDate闂備礁鎼粔鍫曞储瑜忓Σ? YYYY-MM-DD

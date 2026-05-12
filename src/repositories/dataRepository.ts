@@ -5,6 +5,7 @@
  * @pos Repository (Application Data)
  * @description Loads and persists large core datasets through a single async repository and migrates legacy localStorage payloads into IndexedDB on first run.
  *
+ * @updated 2026-05-12: Added repository-backed `DataCollection` and `DataCollectionEntry` persistence to the core data snapshot.
  * @updated 2026-05-10: Flagged fallback-seeded core snapshots so background assistant flows can refuse demo logs/todos when real user data is unavailable.
  * @updated 2026-04-07: Keeps default achievement bottle metadata synced with the latest preset names, descriptions, and archive labels.
  */
@@ -26,6 +27,8 @@ import {
   AchievementReward,
   AchievementRule,
   Category,
+  DataCollection,
+  DataCollectionEntry,
   DailyReview,
   Goal,
   Log,
@@ -46,6 +49,8 @@ export const REPOSITORY_KEYS = {
   LOGS: 'logs',
   TODOS: 'todos',
   TODO_CATEGORIES: 'todoCategories',
+  DATA_COLLECTIONS: 'dataCollections',
+  DATA_COLLECTION_ENTRIES: 'dataCollectionEntries',
   CATEGORIES: 'categories',
   SCOPES: 'scopes',
   GOALS: 'goals',
@@ -94,6 +99,8 @@ export interface DataContextSnapshot {
   logs: Log[];
   todos: TodoItem[];
   todoCategories: TodoCategory[];
+  collections: DataCollection[];
+  collectionEntries: DataCollectionEntry[];
   usesFallbackSeedData: boolean;
 }
 
@@ -223,11 +230,17 @@ export class DataRepository {
     const todos = storedTodos ?? this.buildDefaultTodos(logs);
     const todoCategories =
       (await this.repository.getData<TodoCategory[]>(REPOSITORY_KEYS.TODO_CATEGORIES)) ?? MOCK_TODO_CATEGORIES;
+    const collections =
+      (await this.repository.getData<DataCollection[]>(REPOSITORY_KEYS.DATA_COLLECTIONS)) ?? [];
+    const collectionEntries =
+      (await this.repository.getData<DataCollectionEntry[]>(REPOSITORY_KEYS.DATA_COLLECTION_ENTRIES)) ?? [];
 
     return {
       logs,
       todos,
       todoCategories,
+      collections,
+      collectionEntries,
       usesFallbackSeedData: storedLogs === null || storedTodos === null
     };
   }
@@ -337,6 +350,16 @@ export class DataRepository {
   async saveTodoCategories(todoCategories: TodoCategory[]): Promise<void> {
     await this.initialize();
     await this.repository.setData(REPOSITORY_KEYS.TODO_CATEGORIES, todoCategories);
+  }
+
+  async saveDataCollections(collections: DataCollection[]): Promise<void> {
+    await this.initialize();
+    await this.repository.setData(REPOSITORY_KEYS.DATA_COLLECTIONS, collections);
+  }
+
+  async saveDataCollectionEntries(collectionEntries: DataCollectionEntry[]): Promise<void> {
+    await this.initialize();
+    await this.repository.setData(REPOSITORY_KEYS.DATA_COLLECTION_ENTRIES, collectionEntries);
   }
 
   async getCategories(): Promise<Category[]> {

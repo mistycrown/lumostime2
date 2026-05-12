@@ -1,11 +1,11 @@
 /**
  * @file DataContext.tsx
- * @description Manages core application data state (logs, todos, todoCategories) with async repository hydration and persistence.
+ * @description Manages core application data state (logs, todos, todoCategories, and data collections) with async repository hydration and persistence.
  */
 import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES } from '../constants';
 import { dataRepository } from '../repositories/dataRepository';
-import { Log, TodoCategory, TodoItem } from '../types';
+import { DataCollection, DataCollectionEntry, Log, TodoCategory, TodoItem } from '../types';
 import {
   getLocalDataTimestamp,
   isLocalDataTimestampUpdateLocked,
@@ -26,6 +26,12 @@ interface DataContextType {
 
   todoCategories: TodoCategory[];
   setTodoCategories: React.Dispatch<React.SetStateAction<TodoCategory[]>>;
+
+  collections: DataCollection[];
+  setCollections: React.Dispatch<React.SetStateAction<DataCollection[]>>;
+
+  collectionEntries: DataCollectionEntry[];
+  setCollectionEntries: React.Dispatch<React.SetStateAction<DataCollectionEntry[]>>;
 
   localDataTimestamp: number;
   setLocalDataTimestamp: React.Dispatch<React.SetStateAction<number>>;
@@ -48,6 +54,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [logs, setLogs] = useState<Log[]>(INITIAL_LOGS);
   const [todos, setTodos] = useState<TodoItem[]>(INITIAL_TODOS);
   const [todoCategories, setTodoCategories] = useState<TodoCategory[]>(MOCK_TODO_CATEGORIES);
+  const [collections, setCollections] = useState<DataCollection[]>([]);
+  const [collectionEntries, setCollectionEntries] = useState<DataCollectionEntry[]>([]);
   const [localDataTimestamp, setLocalDataTimestamp] = useState<number>(() => getLocalDataTimestamp());
 
   const isHydratingRef = useRef(true);
@@ -83,6 +91,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setLogs(snapshot.logs);
         setTodos(snapshot.todos);
         setTodoCategories(snapshot.todoCategories);
+        setCollections(snapshot.collections);
+        setCollectionEntries(snapshot.collectionEntries);
         setUsesFallbackSeedData(snapshot.usesFallbackSeedData);
       } catch (error) {
         console.error('[DataContext] Failed to hydrate core data from repository', error);
@@ -138,6 +148,26 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [canPersist, isReady, todoCategories]);
 
   useEffect(() => {
+    if (!isReady || !canPersist) {
+      return;
+    }
+
+    void dataRepository.saveDataCollections(collections).catch((error) => {
+      console.error('[DataContext] Failed to persist data collections', error);
+    });
+  }, [canPersist, collections, isReady]);
+
+  useEffect(() => {
+    if (!isReady || !canPersist) {
+      return;
+    }
+
+    void dataRepository.saveDataCollectionEntries(collectionEntries).catch((error) => {
+      console.error('[DataContext] Failed to persist data collection entries', error);
+    });
+  }, [canPersist, collectionEntries, isReady]);
+
+  useEffect(() => {
     if (!isReady || !canPersist || isHydratingRef.current) {
       return;
     }
@@ -152,7 +182,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     console.log(
       `[DataContext] Data changed, updated local timestamp: ${previous} -> ${now} (${new Date(now).toLocaleTimeString()})`
     );
-  }, [canPersist, isReady, logs, todos, todoCategories]);
+  }, [canPersist, isReady, logs, todos, todoCategories, collections, collectionEntries]);
 
   return (
     <DataContext.Provider
@@ -165,6 +195,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setTodos,
         todoCategories,
         setTodoCategories,
+        collections,
+        setCollections,
+        collectionEntries,
+        setCollectionEntries,
         localDataTimestamp,
         setLocalDataTimestamp
       }}

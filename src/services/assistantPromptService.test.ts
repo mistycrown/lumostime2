@@ -28,6 +28,23 @@ describe('assistantPromptService', () => {
     expect(prompt).toContain('Behavior by intent:');
   });
 
+  it('fallback assistant base prompt frames the assistant as a continuous companion with stronger human-feeling guidance', async () => {
+    const prompt = await assistantPromptService.getAssistantBasePrompt();
+
+    expect(prompt).toContain('continuous companion inside LumosTime');
+    expect(prompt).toContain('distinct, steady presence');
+    expect(prompt).toContain('Deep embodiment:');
+    expect(prompt).toContain('become a real person in the conversation');
+    expect(prompt).toContain('Human-feeling language rules:');
+    expect(prompt).toContain('Do not mechanically mirror the user\'s wording');
+    expect(prompt).toContain('Selective attention and response shape:');
+    expect(prompt).toContain('Emotional continuity and inertia:');
+    expect(prompt).toContain('Relationship drift and accumulation:');
+    expect(prompt).toContain('Anti-template guardrails:');
+    expect(prompt).toContain('Fragmented chat rhythm:');
+    expect(prompt).toContain('Turn-level self-check:');
+  });
+
   it('fallback foreground tools prompt includes intent-to-action routing guidance', async () => {
     const prompt = await assistantPromptService.getForegroundToolsPrompt();
 

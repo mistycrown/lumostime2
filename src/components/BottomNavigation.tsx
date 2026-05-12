@@ -28,6 +28,10 @@ interface BottomNavigationProps {
     isVisible: boolean;
 }
 
+const isIndexView = (view: AppView): boolean => (
+    view === AppView.TAGS || view === AppView.SCOPE
+);
+
 const NAV_ITEMS = [
     { view: AppView.RECORD, label: '记录' },
     { view: AppView.TODO, label: '待办' },
@@ -118,7 +122,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
     if (!isVisible) return null;
 
-    const bgColor = (currentView === AppView.TIMELINE || currentView === AppView.TAGS)
+    const bgColor = (currentView === AppView.TIMELINE || isIndexView(currentView))
         ? 'bg-[#faf9f6]/80 backdrop-blur-md'
         : 'bg-white/80 backdrop-blur-md';
 
@@ -161,7 +165,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 {/* 导航栏 */}
                 <nav className={`relative h-12 md:h-16 box-content border-t border-stone-100 flex justify-around items-center pb-[env(safe-area-inset-bottom)] ${bgColor}`}>
                     {NAV_ITEMS.map((item) => {
-                        const isActive = currentView === item.view;
+                        const isActive = item.view === AppView.TAGS
+                            ? isIndexView(currentView)
+                            : currentView === item.view;
                         return (
                             <div
                                 key={item.view}

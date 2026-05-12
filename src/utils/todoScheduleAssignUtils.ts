@@ -4,6 +4,7 @@
  * @output Shared pure filtering and ordering helpers for the schedule assignment picker
  * @pos Utility (Todo schedule assignment)
  * @description Keeps the week-plan arrange/due picker aligned with todo hierarchy visibility rules by hiding unfinished subtasks whose parent todo is already completed.
+ * @updated 2026-05-12: Added title search filtering that keeps matched subtasks attached to their visible parent rows inside the schedule assignment picker.
  * @updated 2026-04-25: Added hierarchy row builders so schedule assignment pickers can render subtasks beneath their parent rows while preserving completed-parent visibility rules.
  * @updated 2026-04-25: Added shared filtering so schedule assignment pickers can resolve completed-parent visibility from the full todo source.
  *
@@ -46,22 +47,60 @@ const compareScheduleAssignTodos = (
   return left.title.localeCompare(right.title, 'zh-CN');
 };
 
+const normalizeSearchValue = (value: string): string => value.trim().toLocaleLowerCase('zh-CN');
+
+const buildMatchedTodoSet = (todos: TodoItem[], sourceTodos: TodoItem[], searchQuery: string): Set<string> | null => {
+  const normalizedQuery = normalizeSearchValue(searchQuery);
+  if (!normalizedQuery) {
+    return null;
+  }
+
+  const sourceTodoMap = new Map(sourceTodos.map((todo) => [todo.id, todo]));
+  const matchedTodoIds = new Set<string>();
+
+  todos.forEach((todo) => {
+    if (!normalizeSearchValue(todo.title).includes(normalizedQuery)) {
+      return;
+    }
+
+    matchedTodoIds.add(todo.id);
+
+    let currentParentId = todo.parentTodoId;
+    while (currentParentId) {
+      const parentTodo = sourceTodoMap.get(currentParentId);
+      if (!parentTodo) {
+        break;
+      }
+      matchedTodoIds.add(parentTodo.id);
+      currentParentId = parentTodo.parentTodoId;
+    }
+  });
+
+  return matchedTodoIds;
+};
+
 export const getVisibleScheduleAssignTodos = (
   todos: TodoItem[],
   sourceTodos: TodoItem[],
   selectedCategoryId: string,
   activeType: 'scheduled' | 'deadline' | 'new',
-  assignType: 'scheduled' | 'deadline'
+  assignType: 'scheduled' | 'deadline',
+  searchQuery = ''
 ): TodoItem[] => {
   const nextTodos = selectedCategoryId === 'all'
     ? [...todos]
     : todos.filter((todo) => todo.categoryId === selectedCategoryId);
 
   const visibleTodos = nextTodos.filter((todo) => !isIncompleteSubtaskHiddenByCompletedParent(sourceTodos, todo));
+  const matchedTodoIds = buildMatchedTodoSet(visibleTodos, sourceTodos, searchQuery);
 
-  visibleTodos.sort((left, right) => compareScheduleAssignTodos(left, right, activeType, assignType));
+  const searchedTodos = matchedTodoIds
+    ? visibleTodos.filter((todo) => matchedTodoIds.has(todo.id))
+    : visibleTodos;
 
-  return visibleTodos;
+  searchedTodos.sort((left, right) => compareScheduleAssignTodos(left, right, activeType, assignType));
+
+  return searchedTodos;
 };
 
 export const getInitialExpandedScheduleAssignParentIds = (todos: TodoItem[], sourceTodos: TodoItem[]): string[] => {

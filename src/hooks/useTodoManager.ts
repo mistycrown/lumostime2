@@ -3,7 +3,9 @@
  * @input DataContext (todos, setTodos, todoCategories, setTodoCategories, logs, setLogs), NavigationContext (modal states), CategoryScopeContext (categories), ToastContext (addToast), SessionContext (startActivity), SettingsContext (autoLinkRules)
  * @output Todo CRUD Operations (handleSaveTodo, handleDeleteTodo, handleToggleTodo, handleDuplicateTodo, handleBatchAddTodos), Modal Control (openAddTodoModal, openEditTodoModal, closeTodoModal), Focus Management (handleStartTodoFocus), Progress Update (updateTodoProgress)
  * @pos Hook (Data Manager)
- * @description Todo data manager hook for CRUD, focus launch, child-task inheritance sync, and cascade delete behavior.
+ * @description Todo data manager hook for CRUD, focus launch, child-task inheritance sync, cascade delete behavior, and nested detail-page return state.
+ * @updated 2026-05-12: Prefer live todo records when opening detail pages so auto-save comparisons do not loop on stale snapshots.
+ * @updated 2026-05-12: Added todo-detail history stacking so opening a child task from a parent detail page returns back to the parent detail instead of closing to the root todo view.
  * @updated 2026-05-11: Added an idempotent complete-only helper so focus-log flows can save first and then finish the linked todo without reopening already completed tasks.
  * @updated 2026-04-21: Blocked subtask creation for recurring parent todos so recurrence and child-task management stay mutually exclusive.
  * @updated 2026-04-21: Added one-level subtask support with inherited parent fields, cascade delete, and child draft helpers.
@@ -29,17 +31,22 @@ import {
   syncDirectChildTodosWithParent
 } from '../utils/todoHierarchyUtils';
 import { getTodoProgressTrackingMode, syncSubtaskProgressToParentTodos } from '../utils/todoProgressUtils';
+import { pushTodoDetailHistory } from '../utils/todoDetailNavigation';
 
 export const useTodoManager = () => {
   const { todos, setTodos, todoCategories, setTodoCategories, logs, setLogs } = useData();
   const { categories } = useCategoryScope();
   const {
+    isTodoModalOpen,
     setIsTodoModalOpen,
+    editingTodo,
     setEditingTodo,
     todoCategoryToAdd,
     setTodoCategoryToAdd,
     setNewTodoDraft,
-    setIsTodoManaging
+    setIsTodoManaging,
+    setTodoDetailHistory,
+    closeTodoDetail
   } = useNavigation();
   const { addToast } = useToast();
   const { startActivity } = useSession();
@@ -114,6 +121,7 @@ export const useTodoManager = () => {
   };
 
   const openAddTodoModal = (categoryId: string, draft?: Partial<TodoItem>) => {
+    setTodoDetailHistory([]);
     setEditingTodo(null);
     setTodoCategoryToAdd(categoryId);
     setNewTodoDraft(draft ?? null);
@@ -130,16 +138,24 @@ export const useTodoManager = () => {
   };
 
   const openEditTodoModal = (todo: TodoItem) => {
-    setEditingTodo(todo);
-    setTodoCategoryToAdd(todo.categoryId);
+    const liveTodo = todos.find((item) => item.id === todo.id) || todo;
+
+    setTodoDetailHistory((previousHistory) => {
+      if (!isTodoModalOpen || !editingTodo) {
+        return [];
+      }
+
+      const currentLiveTodo = todos.find((item) => item.id === editingTodo.id) || editingTodo;
+      return pushTodoDetailHistory(previousHistory, currentLiveTodo, liveTodo);
+    });
+    setEditingTodo(liveTodo);
+    setTodoCategoryToAdd(liveTodo.categoryId);
     setNewTodoDraft(null);
     setIsTodoModalOpen(true);
   };
 
   const closeTodoModal = () => {
-    setIsTodoModalOpen(false);
-    setEditingTodo(null);
-    setNewTodoDraft(null);
+    closeTodoDetail();
   };
 
   const handleSaveTodo = (todo: TodoItem) => {
@@ -156,6 +172,12 @@ export const useTodoManager = () => {
 
       return syncSubtaskProgressToParentTodos(nextTodos);
     });
+
+    if (editingTodo?.id === todo.id) {
+      const normalizedTodo = normalizeTodoHierarchy(todo, todos);
+      setEditingTodo(normalizedTodo);
+      setTodoCategoryToAdd(normalizedTodo.categoryId);
+    }
   };
 
   const handleDeleteTodo = (id: string) => {

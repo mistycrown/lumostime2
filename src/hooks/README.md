@@ -4,6 +4,7 @@
 > `useDeepLink.ts` now keeps a stable NFC/deep-link listener registration, consumes launch URLs for NFC actions on cold start, and surfaces native NFC read errors to toasts.
 > `useDeepLink.ts` now also routes NFC scans and LumosTime app links through a shared compatibility parser so older tags and WebView-specific custom-scheme variations still execute reliably.
 > `useLogManager.ts` now lets callers override the date used for new backfill defaults, so the Android widget supplement-log shortcut can always open against today even if the timeline was last left on a past date.
+> `useTodoManager.ts` now keeps a nested todo-detail history stack, and `useHardwareBackButton.ts` now consumes Android back presses through that same stack so child-task details return to their parent detail page before closing back to the main todo surface.
 > `useTodoManager.ts` now exposes an idempotent complete-only helper so focus-log flows can save first and then mark the linked unfinished todo done without toggling completed tasks back open.
 > `useWidgetBridgeSync.ts` now mirrors TODAY + PIN source todos/categories alongside the rendered payload so Android-side refresh actions and cross-day first-open rebuilds can recompute the widget list natively.
 > `useHardwareBackButton.ts` now exposes a shared overlay back-handler stack so transient sheets can consume Android hardware back before the app-level navigation ladder reaches view changes or `exitApp()`.
