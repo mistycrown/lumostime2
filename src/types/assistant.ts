@@ -6,6 +6,7 @@
  * @description Defines the structured contracts used by the Android-first assistant agent layer so background triggers, memory updates, reminder queues, and AI system-turn decisions can stay typed and stable across services and plugins.
  *
  * @updated 2026-05-09: Added assistant scheduled-task template types so recurring AI task rules can materialize native reminders without overloading one-shot reminder records.
+ * @updated 2026-05-12: Added Dream topic, entry, patch, and update-card types for the new explicit-only long-horizon attention system, plus optional read-only Dream context injection for unified assistant turns.
  * @updated 2026-05-06: Added explicit `yesterdayTimelineSummary` support to assistant state context so unified turns can see concrete activity records for both today and yesterday.
  * @updated 2026-05-06: Added optional `timelineReviewSummary` plus structured log candidates to assistant prompt context, removed the stale unified-turn recent-log input, and aligned todo creation so `linkedCategoryId` can be inferred from `linkedActivityId`.
  * @updated 2026-04-27: Simplified assistant-facing state time context to one local-offset ISO anchor so prompts no longer need to reinterpret UTC `Z` timestamps.
@@ -101,6 +102,56 @@ export interface AssistantMemoryPatch {
 }
 
 export type AssistantEditableMemoryListKey = 'profileMemory' | 'preferenceMemory';
+
+export interface DreamTopic {
+  id: string;
+  title: string;
+  note?: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type DreamEntryStatus = 'stable' | 'watch' | 'risk' | 'archived';
+
+export interface DreamEntry {
+  id: string;
+  topicId: string;
+  content: string;
+  observedRangeStart: string;
+  observedRangeEnd: string;
+  observedAt: string;
+  sourceSummary?: string;
+  status: DreamEntryStatus;
+  updatedAt: string;
+}
+
+export interface DreamState {
+  version: 1;
+  updatedAt: string;
+  lastDreamRunAt?: string;
+  topics: DreamTopic[];
+  entries: DreamEntry[];
+}
+
+export interface DreamPatch {
+  updatedAt: string;
+  createdEntries?: DreamEntry[];
+  updatedEntries?: DreamEntry[];
+  deletedEntryIds?: string[];
+}
+
+export type DreamUpdateAction = 'created' | 'updated' | 'deleted';
+
+export interface DreamUpdateCard {
+  topicId: string;
+  topicTitle: string;
+  action: DreamUpdateAction;
+  content: string;
+  observedRangeStart?: string;
+  observedRangeEnd?: string;
+  updatedAt: string;
+}
 
 export interface AssistantAgentConfig {
   enabled: boolean;
@@ -310,6 +361,7 @@ export interface AssistantUnifiedTurnInput {
   conversation: AssistantTurnConversationContext;
   stateContext: AssistantTurnStateContext;
   dictionaryContext: AssistantTurnDictionaryContext;
+  dreamContext?: string;
 }
 
 export interface AssistantReminderDraft {

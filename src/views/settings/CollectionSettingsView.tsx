@@ -1,0 +1,744 @@
+/**
+ * @file CollectionSettingsView.tsx
+ * @input Collection data from DataContext plus edit handlers for logs and todos
+ * @output A settings-level Collection list plus mixed-item detail timeline
+ * @pos View (Settings sub-page)
+ * @description Presents collections with compact title-led rows and a detail page that uses its own lightweight timeline cards instead of reusing the shared memoir timeline UI.
+ * @updated 2026-05-12: Rebuilt Collection detail items as a standalone UI, tightened the create-row controls, compressed the header summary into a single line, switched entry media to a wrapped right-aligned preview layout, and aligned todo metadata with memoir/task tag rendering.
+ */
+import React, { useEffect, useMemo, useState } from 'react';
+import { Check, ChevronLeft, PencilLine, Plus, Save, X } from 'lucide-react';
+import { DataCollection, Log, Scope, TodoItem } from '../../types';
+import { useData } from '../../contexts/DataContext';
+import { useCategoryScope } from '../../contexts/CategoryScopeContext';
+import { buildDataCollectionCountMap, resolveDataCollectionItems } from '../../utils/dataCollectionUtils';
+import { getDisplayIcon } from '../../utils/iconUtils';
+import { useSettings } from '../../contexts/SettingsContext';
+import { imageService } from '../../services/imageService';
+import { ImagePreviewModal } from '../../components/ImagePreviewModal';
+import { usePrivacy } from '../../contexts/PrivacyContext';
+import { CollapsibleText } from '../../components/CollapsibleText';
+import { IconRenderer } from '../../components/IconRenderer';
+import { registerHardwareBackHandler } from '../../utils/hardwareBackHandlerStack';
+
+interface CollectionSettingsViewProps {
+  onBack: () => void;
+  onEditLog?: (log: Log) => void;
+  onEditTodo?: (todo: TodoItem) => void;
+}
+
+interface CollectionDirectoryRowProps {
+  collection: DataCollection;
+  totalCount: number;
+  logCount: number;
+  todoCount: number;
+  onOpen: () => void;
+}
+
+interface CollectionTimelineMediaItem {
+  type: 'image';
+  url: string;
+}
+
+interface CollectionTimelineRelatedTodo {
+  title: string;
+  isProgress?: boolean;
+  progressIncrement?: number;
+}
+
+interface CollectionTimelineEntry {
+  id: string;
+  itemType: 'log' | 'task';
+  date: string;
+  endDate?: string;
+  title: string;
+  content: string;
+  metaLabel: string;
+  media?: CollectionTimelineMediaItem[];
+  tags?: string[];
+  relatedTodos?: CollectionTimelineRelatedTodo[];
+  domains?: string[];
+}
+
+const formatCountBadge = (count: number): string => String(count).padStart(2, '0');
+
+const formatUpdatedAt = (timestamp: number): string => new Intl.DateTimeFormat('zh-CN', {
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false
+}).format(timestamp);
+
+const formatDateGroupLabel = (timestamp: number): { dateLabel: string; weekLabel: string } => {
+  const date = new Date(timestamp);
+
+  return {
+    dateLabel: date.getDate().toString(),
+    weekLabel: date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()
+  };
+};
+
+const getStartOfDay = (timestamp: number): number => {
+  const date = new Date(timestamp);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+};
+
+const formatEntryTime = (date: string, endDate?: string): string => {
+  const format = (value: string) => new Date(value).toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+
+  const start = format(date);
+  return endDate ? `${start} - ${format(endDate)}` : start;
+};
+
+const formatAccumulatedDurationCompact = (totalSeconds: number): string => {
+  const normalizedSeconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(normalizedSeconds / 3600);
+  const minutes = Math.floor((normalizedSeconds % 3600) / 60);
+
+  if (hours > 0 && minutes > 0) {
+    return `${hours}H${minutes}M`;
+  }
+
+  if (hours > 0) {
+    return `${hours}H`;
+  }
+
+  return `${minutes}M`;
+};
+
+const renderCollectionTagContent = (tagText: string) => {
+  const parts = tagText.split(' / ');
+
+  return parts.map((part, index) => {
+    const match = part.match(/^(ui:\w+|[^\s]+)\s+(.+)$/);
+
+    if (match) {
+      const [, icon, text] = match;
+      return (
+        <React.Fragment key={`${tagText}-${index}`}>
+          {index > 0 && <span className="mx-1 text-stone-300">/</span>}
+          <IconRenderer icon={icon} className="text-xs" />
+          <span className="ml-1">{text}</span>
+        </React.Fragment>
+      );
+    }
+
+    return (
+      <React.Fragment key={`${tagText}-${index}`}>
+        {index > 0 && <span className="mx-1 text-stone-300">/</span>}
+        <span>{part}</span>
+      </React.Fragment>
+    );
+  });
+};
+
+const CollectionTimelineImage: React.FC<{ src: string; alt: string; className: string }> = ({ src, alt, className }) => {
+  const [imgUrl, setImgUrl] = useState('');
+  const { isPrivacyMode } = usePrivacy();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const load = async () => {
+      if (src.startsWith('http') || src.startsWith('data:')) {
+        if (isMounted) {
+          setImgUrl(src);
+        }
+        return;
+      }
+
+      try {
+        const url = await imageService.getImageUrl(src, 'thumbnail');
+        if (isMounted && url) {
+          setImgUrl(url);
+        }
+      } catch (error) {
+        console.error('Failed to load collection timeline image:', src, error);
+      }
+    };
+
+    void load();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [src]);
+
+  if (!imgUrl) {
+    return <div className={`min-h-[160px] w-full animate-pulse bg-stone-100 ${className}`} />;
+  }
+
+  return (
+    <img
+      src={imgUrl}
+      alt={alt}
+      className={`${className} ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
+      loading="lazy"
+    />
+  );
+};
+
+const CollectionTimelineEntryCard: React.FC<{ entry: CollectionTimelineEntry }> = ({ entry }) => {
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const { isPrivacyMode } = usePrivacy();
+  const hasMetadata = (entry.relatedTodos?.length || 0) + (entry.tags?.length || 0) + (entry.domains?.length || 0) > 0;
+  const previewMedia = entry.media?.[0];
+  const extraImageCount = Math.max(0, (entry.media?.length || 0) - 1);
+
+  const handlePreviewImage = async (imageUrl: string) => {
+    if (imageUrl.startsWith('http') || imageUrl.startsWith('data:')) {
+      setPreviewImage(imageUrl);
+      return;
+    }
+
+    const resolvedUrl = await imageService.getImageUrl(imageUrl, 'original');
+    if (resolvedUrl) {
+      setPreviewImage(resolvedUrl);
+    }
+  };
+
+  const renderMedia = () => {
+    if (!previewMedia) {
+      return null;
+    }
+
+    return (
+      <button
+        type="button"
+        className="relative h-24 w-24 overflow-hidden rounded-xl border border-stone-200/80 bg-white shadow-[0_1px_0_rgba(28,25,23,0.03)] sm:h-28 sm:w-28"
+        onClick={() => void handlePreviewImage(previewMedia.url)}
+      >
+        <CollectionTimelineImage
+          src={previewMedia.url}
+          alt={entry.title}
+          className="h-full w-full object-cover transition-transform duration-500 hover:scale-[1.03]"
+        />
+        {extraImageCount > 0 ? (
+          <span className="absolute right-2 top-2 inline-flex min-w-7 items-center justify-center rounded-full bg-stone-900/78 px-2 py-1 text-[10px] font-semibold tracking-[0.08em] text-white backdrop-blur-sm">
+            +{extraImageCount}
+          </span>
+        ) : null}
+      </button>
+    );
+  };
+
+  return (
+    <div className="relative pl-6">
+      <div className="absolute left-[-6px] top-2 h-2.5 w-2.5 rounded-full border-2 border-[#faf9f6] bg-stone-900" />
+      <div className="pb-8">
+        {previewMedia ? (
+          <div className="float-right mb-2 ml-3">
+            {renderMedia()}
+          </div>
+        ) : null}
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-[11px] tracking-[0.08em] text-stone-400">
+            <span className="inline-flex items-center rounded border border-stone-200/80 px-1.5 py-[1px] text-[8px] font-medium tracking-[0.14em] text-stone-400">
+              {entry.itemType === 'log' ? 'LOG' : 'TASK'}
+            </span>
+            <span>{entry.metaLabel}</span>
+          </div>
+          <h3 className="mt-1 text-[16px] font-bold leading-tight text-stone-900">
+            {entry.title}
+          </h3>
+          {entry.content ? (
+            <CollapsibleText
+              text={entry.content}
+              threshold={140}
+              className={`mt-2 text-[13px] leading-relaxed text-stone-500 ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
+            />
+          ) : null}
+          {hasMetadata ? (
+            <div className="mt-2 flex flex-wrap items-center gap-1">
+              {entry.relatedTodos?.map((todo, index) => (
+                <span
+                  key={`${entry.id}-todo-${index}`}
+                  className="flex items-center gap-1 rounded border border-stone-200 bg-stone-50/30 px-2 py-0.5 text-[10px] font-medium text-stone-500"
+                >
+                  <span className="font-bold text-stone-400">@</span>
+                  <span className="line-clamp-1">{todo.title}</span>
+                  {todo.isProgress && todo.progressIncrement ? (
+                    <span className="ml-0.5 font-mono text-stone-400">+{todo.progressIncrement}</span>
+                  ) : null}
+                </span>
+              ))}
+              {entry.tags?.map((tag, index) => (
+                <span
+                  key={`${entry.id}-tag-${index}`}
+                  className="flex items-center gap-1 rounded border border-stone-200 bg-stone-50/30 px-2 py-0.5 text-[10px] font-medium text-stone-500"
+                >
+                  <span className="font-bold">#</span>
+                  {renderCollectionTagContent(tag)}
+                </span>
+              ))}
+              {entry.domains?.map((domain, index) => (
+                <span
+                  key={`${entry.id}-domain-${index}`}
+                  className="flex items-center gap-1 rounded border border-stone-200 bg-stone-50/30 px-2 py-0.5 text-[10px] font-medium text-stone-500"
+                >
+                  <span className="font-bold text-stone-400">%</span>
+                  {renderCollectionTagContent(domain)}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <div className="clear-both" />
+      </div>
+      <ImagePreviewModal imageUrl={previewImage} onClose={() => setPreviewImage(null)} />
+    </div>
+  );
+};
+
+const CollectionDirectoryRow: React.FC<CollectionDirectoryRowProps> = ({
+  collection,
+  totalCount,
+  logCount,
+  todoCount,
+  onOpen
+}) => (
+  <button
+    type="button"
+    onClick={onOpen}
+    className="flex w-full items-center justify-between gap-4 border-b border-stone-200 py-4 text-left transition-colors hover:bg-stone-50/60"
+  >
+    <div className="min-w-0 flex-1">
+      <div className="flex items-center gap-2 text-lg font-bold text-stone-900">
+        <span className="text-sm font-normal text-stone-300">◬</span>
+        <span className="truncate">{collection.name}</span>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] uppercase tracking-[0.16em] text-stone-400">
+        <span>{formatCountBadge(logCount)} Log</span>
+        <span>{formatCountBadge(todoCount)} Task</span>
+        <span>{formatUpdatedAt(collection.updatedAt)}</span>
+      </div>
+    </div>
+
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-stone-100 text-sm text-stone-500">
+      {formatCountBadge(totalCount)}
+    </div>
+  </button>
+);
+
+export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
+  onBack
+}) => {
+  const { collections, setCollections, collectionEntries, logs, todos } = useData();
+  const { categories, scopes } = useCategoryScope();
+  const { uiTheme } = useSettings();
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [draftName, setDraftName] = useState('');
+  const [isEditingCollection, setIsEditingCollection] = useState(false);
+  const [editName, setEditName] = useState('');
+
+  const sortedCollections = useMemo(
+    () => [...collections].sort((left, right) => right.updatedAt - left.updatedAt),
+    [collections]
+  );
+  const countMap = useMemo(
+    () => buildDataCollectionCountMap(collections, collectionEntries, logs, todos),
+    [collections, collectionEntries, logs, todos]
+  );
+  const selectedCollection = useMemo(
+    () => collections.find((item) => item.id === selectedCollectionId) || null,
+    [collections, selectedCollectionId]
+  );
+  const resolvedItems = useMemo(
+    () => selectedCollectionId
+      ? resolveDataCollectionItems(selectedCollectionId, collectionEntries, logs, todos)
+      : [],
+    [collectionEntries, logs, selectedCollectionId, todos]
+  );
+  const selectedSummary = selectedCollection ? countMap.get(selectedCollection.id) : undefined;
+
+  useEffect(() => {
+    if (!selectedCollection) {
+      return;
+    }
+
+    setEditName(selectedCollection.name);
+  }, [selectedCollection]);
+
+  useEffect(() => {
+    if (!selectedCollectionId) {
+      return;
+    }
+
+    return registerHardwareBackHandler(() => {
+      setSelectedCollectionId(null);
+      return true;
+    });
+  }, [selectedCollectionId]);
+
+  const buildTagString = (
+    categoryName: string | undefined,
+    categoryIcon: string | undefined,
+    categoryUiIcon: string | undefined,
+    childName?: string,
+    childIcon?: string,
+    childUiIcon?: string
+  ): string | undefined => {
+    if (!categoryName) {
+      return undefined;
+    }
+
+    const categoryDisplayIcon = categoryIcon
+      ? getDisplayIcon(categoryIcon, categoryUiIcon, uiTheme)
+      : '';
+    const categoryLabel = `${categoryDisplayIcon} ${categoryName}`.trim();
+
+    if (!childName) {
+      return categoryLabel;
+    }
+
+    const childDisplayIcon = childIcon
+      ? getDisplayIcon(childIcon, childUiIcon, uiTheme)
+      : '';
+    const childLabel = `${childDisplayIcon} ${childName}`.trim();
+
+    return `${categoryLabel} / ${childLabel}`;
+  };
+
+  const buildScopeDomainStrings = (scopeIds: string[] | undefined): string[] | undefined => {
+    const linkedScopes = (scopeIds || [])
+      .map((scopeId) => scopes.find((scope) => scope.id === scopeId))
+      .filter((value): value is Scope => Boolean(value));
+
+    if (linkedScopes.length === 0) {
+      return undefined;
+    }
+
+    return linkedScopes.map((scope) => {
+      const scopeIcon = getDisplayIcon(scope.icon, scope.uiIcon, uiTheme);
+      return `${scopeIcon} ${scope.name}`.trim();
+    });
+  };
+
+  const timelineEntries = useMemo<CollectionTimelineEntry[]>(() => {
+    return resolvedItems
+      .map((item) => {
+        if (item.itemType === 'log') {
+          const category = (categories || []).find((candidate) => candidate.id === item.log.categoryId);
+          const activity = category?.activities.find((candidate) => candidate.id === item.log.activityId);
+          const linkedTodo = item.log.linkedTodoId
+            ? (todos || []).find((todo) => todo.id === item.log.linkedTodoId)
+            : null;
+          const fallbackTitle = [
+            category?.name,
+            activity?.name
+          ].filter(Boolean).join(' / ') || '记录';
+
+          const tagString = buildTagString(
+            category?.name,
+            category?.icon,
+            category?.uiIcon,
+            activity?.name,
+            activity?.icon,
+            activity?.uiIcon
+          );
+
+          return {
+            id: item.log.id,
+            itemType: 'log',
+            date: new Date(item.log.startTime).toISOString(),
+            endDate: new Date(item.log.endTime).toISOString(),
+            title: item.log.title?.trim() || fallbackTitle,
+            content: item.log.note?.trim() || '',
+            metaLabel: formatEntryTime(
+              new Date(item.log.startTime).toISOString(),
+              new Date(item.log.endTime).toISOString()
+            ),
+            media: item.log.images?.map((image) => ({ type: 'image' as const, url: image })),
+            tags: tagString ? [tagString] : undefined,
+            relatedTodos: linkedTodo ? [{
+              title: linkedTodo.title,
+              isProgress: linkedTodo.isProgress,
+              progressIncrement: item.log.progressIncrement
+            }] : undefined,
+            domains: buildScopeDomainStrings(item.log.scopeIds)
+          } satisfies CollectionTimelineEntry;
+        }
+
+        const todoTimestamp = item.todo.completedAt
+          ? new Date(item.todo.completedAt).getTime()
+          : item.todo.scheduledDate
+            ? new Date(`${item.todo.scheduledDate}T12:00:00`).getTime()
+            : item.entry.addedAt;
+        const linkedCategory = item.todo.linkedCategoryId
+          ? (categories || []).find((candidate) => candidate.id === item.todo.linkedCategoryId)
+          : undefined;
+        const linkedActivity = item.todo.linkedActivityId
+          ? linkedCategory?.activities.find((candidate) => candidate.id === item.todo.linkedActivityId)
+          : undefined;
+        const investedSeconds = logs
+          .filter((log) => log.linkedTodoId === item.todo.id)
+          .reduce((total, log) => total + (Number.isFinite(log.duration) ? log.duration : Math.max(0, (log.endTime - log.startTime) / 1000)), 0);
+        const tagString = buildTagString(
+          linkedCategory?.name,
+          linkedCategory?.icon,
+          linkedCategory?.uiIcon,
+          linkedActivity?.name,
+          linkedActivity?.icon,
+          linkedActivity?.uiIcon
+        );
+
+        return {
+          id: `todo-${item.todo.id}`,
+          itemType: 'task',
+          date: new Date(todoTimestamp).toISOString(),
+          title: item.todo.title,
+          content: item.todo.note?.trim() || '',
+          metaLabel: formatAccumulatedDurationCompact(investedSeconds),
+          media: item.todo.coverImage ? [{ type: 'image' as const, url: item.todo.coverImage }] : undefined,
+          tags: tagString ? [tagString] : undefined,
+          domains: buildScopeDomainStrings(item.todo.defaultScopeIds)
+        } satisfies CollectionTimelineEntry;
+      })
+      .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
+  }, [resolvedItems, categories, uiTheme, scopes, logs]);
+
+  const groupedTimeline = useMemo(() => {
+    const dayMap = new Map<number, CollectionTimelineEntry[]>();
+
+    timelineEntries.forEach((entry) => {
+      const timestamp = new Date(entry.date).getTime();
+      const dayKey = getStartOfDay(timestamp);
+      const bucket = dayMap.get(dayKey) || [];
+      bucket.push(entry);
+      dayMap.set(dayKey, bucket);
+    });
+
+    return Array.from(dayMap.entries())
+      .sort((first, second) => second[0] - first[0])
+      .map(([dayKey, items]) => ({
+        dayKey,
+        ...formatDateGroupLabel(dayKey),
+        items: items.sort((first, second) => new Date(second.date).getTime() - new Date(first.date).getTime())
+      }));
+  }, [timelineEntries]);
+
+  const handleCreateCollection = () => {
+    const trimmedName = draftName.trim();
+    if (!trimmedName) {
+      return;
+    }
+
+    const now = Date.now();
+    const nextCollection: DataCollection = {
+      id: crypto.randomUUID(),
+      name: trimmedName,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    setCollections((prev) => [nextCollection, ...prev].sort((left, right) => right.updatedAt - left.updatedAt));
+    setDraftName('');
+    setIsCreating(false);
+    setSelectedCollectionId(nextCollection.id);
+  };
+
+  const handleSaveCollectionMeta = () => {
+    if (!selectedCollection) {
+      return;
+    }
+
+    const trimmedName = editName.trim();
+    if (!trimmedName) {
+      return;
+    }
+
+    const now = Date.now();
+    setCollections((prev) => prev.map((item) => (
+      item.id === selectedCollection.id
+        ? {
+            ...item,
+            name: trimmedName,
+            updatedAt: now
+          }
+        : item
+    )));
+    setIsEditingCollection(false);
+  };
+
+  const renderList = () => (
+    <div className="min-h-full bg-[#faf9f6] px-7 pb-24 pt-4">
+      <div className="space-y-0">
+        {sortedCollections.length === 0 ? (
+          <div className="border-b border-stone-200 py-4 text-sm text-stone-400">
+            No collections yet
+          </div>
+        ) : (
+          sortedCollections.map((collection) => {
+            const countSummary = countMap.get(collection.id);
+
+            return (
+              <CollectionDirectoryRow
+                key={collection.id}
+                collection={collection}
+                totalCount={countSummary?.total || 0}
+                logCount={countSummary?.logCount || 0}
+                todoCount={countSummary?.todoCount || 0}
+                onOpen={() => setSelectedCollectionId(collection.id)}
+              />
+            );
+          })
+        )}
+
+        {isCreating ? (
+          <div className="border-b border-stone-200 py-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-normal text-stone-300">◬</span>
+              <input
+                value={draftName}
+                onChange={(event) => setDraftName(event.target.value)}
+                placeholder="新建 Collection"
+                className="min-w-0 flex-1 border-b border-stone-200 bg-transparent pb-2 text-lg font-bold text-stone-900 outline-none placeholder:text-stone-300"
+              />
+            </div>
+            <div className="mt-3 flex items-center justify-end gap-2 text-stone-400">
+              <button
+                type="button"
+                onClick={() => setIsCreating(false)}
+                aria-label="取消新建 Collection"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 bg-stone-50/70 transition-colors hover:border-stone-300 hover:text-stone-700"
+              >
+                <X size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateCollection}
+                aria-label="确认新建 Collection"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 bg-stone-50/70 transition-colors hover:border-stone-300 hover:text-stone-700"
+              >
+                <Check size={14} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setIsCreating(true)}
+            className="flex w-full items-center justify-between gap-4 border-b border-stone-200 py-4 text-left transition-colors hover:bg-stone-50/60"
+          >
+            <div className="flex items-center gap-2 text-lg font-bold text-stone-900">
+              <span className="text-sm font-normal text-stone-300">◬</span>
+              <span>新建 Collection</span>
+            </div>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-stone-100 text-stone-300">
+              <Plus size={15} />
+            </div>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderDetail = () => {
+    if (!selectedCollection) {
+      return null;
+    }
+
+    return (
+      <div className="h-full bg-[#faf9f6] overflow-y-auto no-scrollbar pb-24 px-7 pt-4">
+        <div className="mb-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              {isEditingCollection ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-normal text-stone-300">◬</span>
+                  <input
+                    value={editName}
+                    onChange={(event) => setEditName(event.target.value)}
+                    className="min-w-0 flex-1 border-b border-stone-200 bg-transparent pb-2 text-2xl font-bold text-stone-900 outline-none"
+                  />
+                </div>
+              ) : (
+                <h1 className="flex items-center gap-2 text-2xl font-bold text-stone-900">
+                  <span className="text-sm font-normal text-stone-300">◬</span>
+                  <span className="truncate">{selectedCollection.name}</span>
+                </h1>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={isEditingCollection ? handleSaveCollectionMeta : () => setIsEditingCollection(true)}
+              className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-stone-400 transition-colors hover:text-stone-700"
+            >
+              {isEditingCollection ? <Save size={14} /> : <PencilLine size={14} />}
+              {isEditingCollection ? 'Save' : 'Edit'}
+            </button>
+          </div>
+
+          <div className="mt-3 overflow-hidden text-ellipsis whitespace-nowrap text-[10px] uppercase tracking-[0.12em] text-stone-400">
+            <span>Upd {formatUpdatedAt(selectedCollection.updatedAt)}</span>
+            <span className="mx-3">{formatCountBadge(resolvedItems.length)} Items</span>
+            <span className="mr-3">{formatCountBadge(selectedSummary?.logCount || 0)} Log</span>
+            <span>{formatCountBadge(selectedSummary?.todoCount || 0)} Task</span>
+          </div>
+        </div>
+
+        {groupedTimeline.length === 0 ? (
+          <div className="border border-dashed border-stone-200 rounded-2xl py-10 text-center text-sm italic text-stone-400">
+            No items yet
+          </div>
+        ) : (
+          <div className="flex flex-col">
+            {groupedTimeline.map((group) => (
+              <div key={group.dayKey} className="flex w-full mb-6">
+                <div className="relative w-12 flex-shrink-0">
+                  <div className="sticky top-6 pr-3 text-right">
+                    <span className="block font-serif text-xl md:text-2xl text-gray-900 font-semibold leading-none">
+                      {group.dateLabel}
+                    </span>
+                    <span className="block font-sans text-[10px] font-bold text-stone-400 tracking-widest mt-1">
+                      {group.weekLabel}
+                    </span>
+                  </div>
+                  <div className="absolute top-0 right-0 w-px bg-gray-200 h-full" />
+                </div>
+
+                <div className="flex-1 flex flex-col min-w-0">
+                  {group.items.map((entry) => (
+                    <CollectionTimelineEntryCard
+                      key={entry.id}
+                      entry={entry}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[#faf9f6] animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      <div className="sticky top-0 z-10 border-b border-stone-200 bg-[#faf9f6]/96 backdrop-blur-sm">
+        <div className="relative mx-auto flex h-14 max-w-5xl items-center px-5">
+          <button
+            type="button"
+            onClick={selectedCollectionId ? () => setSelectedCollectionId(null) : onBack}
+            className="inline-flex items-center gap-2 text-stone-400 transition-colors hover:text-stone-700"
+            aria-label={selectedCollectionId ? '返回 Collection 列表' : '返回设置'}
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <div className="pointer-events-none absolute left-1/2 max-w-[70%] -translate-x-1/2 truncate text-center text-[1.15rem] font-medium text-stone-900">
+            {selectedCollectionId ? 'Collection Detail' : 'Collection'}
+          </div>
+        </div>
+      </div>
+
+      {selectedCollectionId ? renderDetail() : renderList()}
+    </div>
+  );
+};

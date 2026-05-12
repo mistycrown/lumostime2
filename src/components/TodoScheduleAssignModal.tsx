@@ -4,6 +4,7 @@
  * @output Lightweight modal for assigning or quickly creating todos for a specific week-view day
  * @pos Component (Modal)
  * @description Lets users assign unfinished todos to a selected day as either Arrange or Due, or create a linked todo, without leaving the week schedule view.
+ * @updated 2026-05-12: Added instant title search above the assignable todo list and keep matched subtasks attached to their parent rows.
  * @updated 2026-04-25: Rendered assignable subtasks in a parent-child hierarchy so schedule pickers show child tasks nested beneath their parent rows instead of as flat standalone cards.
  * @updated 2026-04-25: Hid unfinished subtasks from the schedule assignment picker whenever their parent todo is completed, using the full todo source so completed parents can still suppress orphan child rows.
  * @updated 2026-04-20 18:21: Fixed the schedule assign modal to a stable three-quarter viewport height and kept the inner content scrollable.
@@ -11,8 +12,8 @@
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useEffect, useMemo, useState } from 'react';
-import { X, CalendarDays, ChevronDown, ChevronRight, Flag } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { X, CalendarDays, ChevronDown, ChevronRight, Flag, Search } from 'lucide-react';
 import { Category, TodoCategory, TodoItem } from '../types';
 import { IconRenderer } from './IconRenderer';
 import { parseDateKey } from '../utils/todoScheduleUtils';
@@ -66,6 +67,8 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'scheduled' | 'deadline' | 'new'>(assignType);
   const [expandedParentIds, setExpandedParentIds] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [newTodoCategoryId, setNewTodoCategoryId] = useState<string>(todoCategories[0]?.id || '');
   const [newLinkedCategoryId, setNewLinkedCategoryId] = useState<string>(activityCategories[0]?.id || '');
@@ -76,6 +79,7 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
       setSelectedCategoryId('all');
       setActiveTab(assignType);
       setExpandedParentIds([]);
+      setSearchQuery('');
       setNewTitle('');
       setNewTodoCategoryId(todoCategories[0]?.id || '');
       setNewLinkedCategoryId(activityCategories[0]?.id || '');
@@ -95,9 +99,10 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
       allTodos || todos,
       selectedCategoryId,
       activeTab,
-      assignType
+      assignType,
+      searchQuery
     )
-  ), [activeTab, allTodos, assignType, selectedCategoryId, todos]);
+  ), [activeTab, allTodos, assignType, searchQuery, selectedCategoryId, todos]);
 
   useEffect(() => {
     if (activeTab === 'new') {
@@ -185,44 +190,44 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
           </div>
 
           {activeTab !== 'new' && (
-            <div className="mt-4 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-              <button
-                type="button"
-                onClick={() => setSelectedCategoryId('all')}
-                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                  selectedCategoryId === 'all'
-                    ? 'text-white'
-                    : 'bg-white/70 text-stone-500 border-stone-200 hover:border-stone-300'
-                }`}
-                style={selectedCategoryId === 'all' ? {
-                  backgroundColor: 'var(--accent-color)',
-                  borderColor: 'var(--accent-color)'
-                } : undefined}
-              >
-                全部
-              </button>
-              {todoCategories.map((category) => {
-                const isSelected = selectedCategoryId === category.id;
-                return (
-                  <button
-                    key={category.id}
-                    type="button"
-                    onClick={() => setSelectedCategoryId(category.id)}
-                    className={`shrink-0 rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                      isSelected
-                        ? 'text-white'
-                        : 'bg-white/70 text-stone-500 border-stone-200 hover:border-stone-300'
-                    }`}
-                    style={isSelected ? {
-                      backgroundColor: 'var(--accent-color)',
-                      borderColor: 'var(--accent-color)'
-                    } : undefined}
-                  >
-                    {category.name}
-                  </button>
-                );
-              })}
-            </div>
+              <div className="mt-4 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategoryId('all')}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                    selectedCategoryId === 'all'
+                      ? 'text-white'
+                      : 'bg-white/70 text-stone-500 border-stone-200 hover:border-stone-300'
+                  }`}
+                  style={selectedCategoryId === 'all' ? {
+                    backgroundColor: 'var(--accent-color)',
+                    borderColor: 'var(--accent-color)'
+                  } : undefined}
+                >
+                  全部
+                </button>
+                {todoCategories.map((category) => {
+                  const isSelected = selectedCategoryId === category.id;
+                  return (
+                    <button
+                      key={category.id}
+                      type="button"
+                      onClick={() => setSelectedCategoryId(category.id)}
+                      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                        isSelected
+                          ? 'text-white'
+                          : 'bg-white/70 text-stone-500 border-stone-200 hover:border-stone-300'
+                      }`}
+                      style={isSelected ? {
+                        backgroundColor: 'var(--accent-color)',
+                        borderColor: 'var(--accent-color)'
+                      } : undefined}
+                    >
+                      {category.name}
+                    </button>
+                  );
+                })}
+              </div>
           )}
         </div>
 
@@ -289,9 +294,30 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
                 快速新建任务
               </button>
             </div>
-          ) : scheduleRows.length > 0 ? (
-            <div className="space-y-2">
-              {scheduleRows.map((row) => {
+          ) : (
+            <div className="space-y-3">
+              <label className="flex items-center gap-2.5 rounded-xl border border-stone-200 bg-white/85 px-3 py-2 transition-colors focus-within:border-stone-300">
+                <button
+                  type="button"
+                  onClick={() => searchInputRef.current?.focus()}
+                  aria-label="搜索任务"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-stone-50 text-stone-400 transition-colors hover:border-stone-300 hover:text-stone-500"
+                >
+                  <Search size={13} />
+                </button>
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="搜索任务"
+                  className="min-w-0 flex-1 bg-transparent text-[13px] text-stone-700 outline-none placeholder:text-stone-400"
+                />
+              </label>
+
+              {scheduleRows.length > 0 ? (
+                <div className="space-y-2">
+                  {scheduleRows.map((row) => {
                 const { todo } = row;
                 const category = todoCategories.find((item) => item.id === todo.categoryId);
                 const currentStatus = activeTab === 'scheduled'
@@ -357,12 +383,14 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
                       )}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="py-10 text-center text-sm italic text-stone-400">
-              No available tasks in this category.
+                  );
+                })}
+                </div>
+              ) : (
+                <div className="py-10 text-center text-sm italic text-stone-400">
+                  {searchQuery.trim() ? '没有匹配的任务。' : '当前分类下没有可选任务。'}
+                </div>
+              )}
             </div>
           )}
         </div>

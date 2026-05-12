@@ -4,8 +4,9 @@
  * @output Modal Interaction (Save/Delete Log)
  * @pos Component (Modal)
  * @description A complex modal for creating or editing time logs. Handles duration calculation, activity selection, todo association, focus scoring, segmented time entry, and inline note template recommendations.
- * @lastModified 2026-05-11
+ * @lastModified 2026-05-12
  * @change Added a one-shot completion-mode toggle beside the associated todo picker so saving a log can also complete the linked unfinished task after the record is stored. Added click-to-focus behavior on the existing Total Time summary so tapping it jumps to the note field, while preserving the original two-line header layout. Auto-advance across hour/minute inputs and continue from start time to end time after segmented time entry. Added direct camera capture functionality using Capacitor Camera plugin and native camera-path persistence fallback for Android photo attachments. Enabled hierarchical todo selection in the backfill picker so subtasks stay nested under collapsed parent tasks.
+ * @change Added an inline log-detail `Collection` selector so saved records can join themed collections without opening a separate modal.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -24,6 +25,7 @@ import { ImagePreviewModal } from './ImagePreviewModal';
 import { ReactionPicker, ReactionList } from './ReactionComponents';
 import { IconRenderer } from './IconRenderer';
 import { RecommendedNoteTemplates } from './RecommendedNoteTemplates';
+import { DataCollectionSelector } from './DataCollectionSelector';
 import { useLogForm, useTimeCalculation, useImageManager, useSuggestions, LogFormState } from '../hooks';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useToast } from '../contexts/ToastContext';
@@ -63,6 +65,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   // 使用自定义 Hooks 管理状态
   const { setIsShareViewOpen, setSharingLog } = useNavigation();
   const { addToast } = useToast();
+  const [logId] = useState(() => initialLog?.id || crypto.randomUUID());
   
   // 草稿保存的key
   const DRAFT_KEY = 'lumostime_addlog_draft';
@@ -447,7 +450,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     if (duration <= 0) return;
 
     const newLog: Log = {
-      id: initialLog ? initialLog.id : crypto.randomUUID(),
+      id: logId,
       categoryId: formState.selectedCategoryId,
       activityId: formState.selectedActivityId,
       startTime: formState.currentStartTime,
@@ -1067,6 +1070,13 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
               templates={recommendedNoteTemplates}
               onApply={handleApplyNoteTemplate}
               className="mt-3"
+            />
+          </div>
+
+          <div>
+            <DataCollectionSelector
+              itemType="log"
+              itemId={logId}
             />
           </div>
 

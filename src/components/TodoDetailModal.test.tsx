@@ -4,6 +4,7 @@
  * @output Regression coverage for parent-task detail rendering from subtask navigation
  * @pos Test
  * @description Ensures parent todo detail pages render safely so subtask inheritance links can open their parent without crashing.
+ * @updated 2026-05-12: Added regression coverage so subtask detail pages show inherited linked activity and scope data from the live parent todo even when the child record itself is stale.
  * @updated 2026-04-22: Added regression coverage for parent timeline subtask badges and direct child-task log aggregation.
  */
 
@@ -79,6 +80,64 @@ const activityCategories = [
 ] as any;
 
 describe('TodoDetailModal parent navigation regression', () => {
+  test('shows inherited parent link metadata for subtask drafts even when the child record is stale', () => {
+    detailTimelineCardProps = null;
+
+    const parentTodo = {
+      id: 'parent-1',
+      categoryId: 'cat-1',
+      title: 'Parent task',
+      isCompleted: false,
+      linkedActivityId: 'activity-1',
+      defaultScopeIds: ['scope-1']
+    } as any;
+
+    const html = renderToStaticMarkup(
+      <TodoDetailModal
+        initialDraft={{
+          categoryId: 'cat-1',
+          parentTodoId: 'parent-1',
+          title: 'Draft child'
+        }}
+        currentCategory={todoCategories[0]}
+        displayMode="page"
+        onClose={() => {}}
+        onSave={() => {}}
+        onOpenTodo={() => {}}
+        logs={[]}
+        todoCategories={todoCategories}
+        categories={[
+          {
+            id: 'activity-category-1',
+            name: 'Study',
+            activities: [
+              {
+                id: 'activity-1',
+                name: 'Deep Work',
+                icon: 'clock',
+                uiIcon: 'clock'
+              }
+            ]
+          }
+        ] as any}
+        scopes={[
+          {
+            id: 'scope-1',
+            name: 'Major Input',
+            icon: 'target',
+            isArchived: false,
+            order: 0,
+            themeColor: '#000000'
+          }
+        ] as any}
+        todos={[parentTodo]}
+      />
+    );
+
+    expect(html).toContain('Study / Deep Work');
+    expect(html).toContain('Major Input');
+  });
+
   test('aggregates direct child logs into the parent timeline tab', () => {
     detailTimelineCardProps = null;
 

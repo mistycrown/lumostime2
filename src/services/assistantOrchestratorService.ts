@@ -46,6 +46,7 @@ import { assistantMemoryService } from './assistantMemoryService';
 import { assistantPromptService } from './assistantPromptService';
 import { assistantReminderQueueService } from './assistantReminderQueueService';
 import { assistantTurnService } from './assistantTurnService';
+import { dreamService } from './dreamService';
 import { formatAssistantDateTimeForDisplay, normalizeAssistantDateTime } from '../utils/assistantTime';
 import { resolveLatestOrdinaryAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
 import { buildAssistantDisplayParts } from '../utils/assistantMessageParts';
@@ -793,6 +794,7 @@ export const assistantOrchestratorService = {
     let output: AssistantUnifiedTurnOutput;
     let debug: AIDebugExchange;
     try {
+      const dreamContext = dreamService.buildContext({ query: request.trigger.text });
       const turnResult = await assistantTurnService.runUnifiedTurn({
         mode: 'background',
         trigger,
@@ -821,7 +823,8 @@ export const assistantOrchestratorService = {
           ...(request.overdueTodoSummary ? { overdueTodoSummary: request.overdueTodoSummary } : {}),
           ...(request.reminderSummary ? { reminderSummary: request.reminderSummary } : {})
         },
-        dictionaryContext: request.dictionaryContext || {}
+        dictionaryContext: request.dictionaryContext || {},
+        ...(dreamContext ? { dreamContext } : {})
       });
       output = turnResult.output;
       debug = turnResult.debug;

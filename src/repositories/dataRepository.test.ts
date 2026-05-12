@@ -146,6 +146,55 @@ describe('DataRepository', () => {
     expect(snapshot.usesFallbackSeedData).toBe(true);
     expect(snapshot.logs.length).toBeGreaterThan(0);
     expect(snapshot.todos.length).toBeGreaterThan(0);
+    expect(snapshot.collections).toEqual([]);
+    expect(snapshot.collectionEntries).toEqual([]);
+  });
+
+  it('hydrates persisted data collections alongside the core log/todo snapshot', async () => {
+    const repository = new InMemoryStorageRepository();
+    repository.data.set(REPOSITORY_KEYS.LOGS, []);
+    repository.data.set(REPOSITORY_KEYS.TODOS, []);
+    repository.data.set(REPOSITORY_KEYS.TODO_CATEGORIES, []);
+    repository.data.set(REPOSITORY_KEYS.DATA_COLLECTIONS, [
+      {
+        id: 'collection-social',
+        name: '绀句氦澶嶇洏',
+        description: '鑱氬悎楂樹环鍊肩殑绀句氦浜嬩欢',
+        createdAt: 1,
+        updatedAt: 2
+      }
+    ]);
+    repository.data.set(REPOSITORY_KEYS.DATA_COLLECTION_ENTRIES, [
+      {
+        id: 'entry-1',
+        collectionId: 'collection-social',
+        itemType: 'log',
+        itemId: 'log-1',
+        addedAt: 3
+      }
+    ]);
+
+    const dataRepository = new DataRepository(repository, createLegacyStorageAdapter(new Map()).adapter);
+    const snapshot = await dataRepository.loadDataContextSnapshot();
+
+    expect(snapshot.collections).toEqual([
+      {
+        id: 'collection-social',
+        name: '绀句氦澶嶇洏',
+        description: '鑱氬悎楂樹环鍊肩殑绀句氦浜嬩欢',
+        createdAt: 1,
+        updatedAt: 2
+      }
+    ]);
+    expect(snapshot.collectionEntries).toEqual([
+      {
+        id: 'entry-1',
+        collectionId: 'collection-social',
+        itemType: 'log',
+        itemId: 'log-1',
+        addedAt: 3
+      }
+    ]);
   });
 
   it('reruns migration for newer repository keys even if an older migration flag exists', async () => {

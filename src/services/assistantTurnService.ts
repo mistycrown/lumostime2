@@ -6,6 +6,7 @@
  * @description Builds the single-turn prompt payload for the converged assistant architecture and forwards it through aiService so foreground and background flows can gradually migrate off the older multi-prompt planner stack.
  *
  * @updated 2026-05-10: Reordered unified assistant prompt assembly so long-lived dictionary/state sections sit ahead of volatile anchors, improving provider-side prompt-cache reuse across repeated turns.
+ * @updated 2026-05-12: Added an optional read-only Dream context section so foreground and background assistant turns can reference explicit Dream observations without mutating them.
  * @updated 2026-05-10: Added request-option passthrough so foreground chat can propagate AbortSignal all the way into the unified AI transport and actually stop in-flight turns.
  * @updated 2026-05-06: Tightened the foreground unified-turn schema so front-chat turns no longer advertise unsupported `silent` outcomes.
  * @updated 2026-05-06: Stopped forwarding provider-native `conversationHistory` for unified turns so session context is injected only once through the structured conversation block.
@@ -254,7 +255,8 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
     ...(Object.keys(volatileStateContext).length > 0
       ? ['', '=== Volatile State Anchors ===', stringifyJson(volatileStateContext)]
       : []),
-    ...(memoryEnabled ? ['', '=== Memory Snapshot ===', stringifyJson(buildPromptMemorySnapshot(input.memory))] : [])
+    ...(memoryEnabled ? ['', '=== Memory Snapshot ===', stringifyJson(buildPromptMemorySnapshot(input.memory))] : []),
+    ...(input.dreamContext?.trim() ? ['', '=== Dream Context ===', input.dreamContext.trim()] : [])
   ].filter(Boolean).join('\n');
 };
 

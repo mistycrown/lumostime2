@@ -945,6 +945,7 @@ const AppContent: React.FC = () => {
               customStickers,
               filters
             }}
+            onEditTodo={todoManager.openEditTodoModal}
 
             // Settings Props
             onOpenAutoLink={() => setIsAutoLinkOpen(true)}

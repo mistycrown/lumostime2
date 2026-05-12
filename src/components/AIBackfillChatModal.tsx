@@ -4,6 +4,9 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-12: Added inline manual edit/delete controls for individual Dream entries so users can refine or remove AI-written observations directly from the Dream page.
+ * @updated 2026-05-12: Restyled the Dream viewer into a flatter editorial layout with a split topic index, inline actions, and divider-led entry presentation instead of nested cards.
+ * @updated 2026-05-12: Added the first Dream viewer, explicit `dream` command workflow, topic tabs, and Dream update cards, while keeping Dream read-only for ordinary chat and background assistant turns.
  * @updated 2026-05-12: Background assistant messages now always expose a debug entry in debug mode, synthesizing a readable summary-style debug view when a native-only background run has no full request/response exchange payload.
  * @updated 2026-05-12: Exposed user-editable four-digit random-check-in protection windows in the background assistant settings, wiring them into the existing quiet-hours config without affecting reminder_due dispatch.
  * @updated 2026-05-12: Cold app startup now hydrates native reminders first and immediately flushes any overdue reminder_due items once, so reminders that expired while the app was fully closed get replayed on launch.
@@ -140,10 +143,15 @@ import type {
   AssistantNativeDiagnosticEntry,
   AssistantReminder,
   AssistantScheduledTask,
-  AssistantSystemTrigger
+  AssistantSystemTrigger,
+  DreamEntry,
+  DreamState,
+  DreamTopic,
+  DreamUpdateCard
 } from '../types/assistant';
 import { formatDateKey } from '../utils/aiBackfillUtils';
 import { parseNarrative } from '../utils/narrativeUtils';
+import { getLocalDateStr, getWeekRange } from '../utils/dateUtils';
 import {
   formatAssistantDateTimeForDisplay,
   formatAssistantLocalDateTime,
@@ -159,6 +167,7 @@ import { imageService } from '../services/imageService';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
 import { assistantAgentConfigService } from '../services/assistantAgentConfigService';
 import { assistantMemoryService } from '../services/assistantMemoryService';
+import { dreamService } from '../services/dreamService';
 import { assistantPromptService } from '../services/assistantPromptService';
 import { assistantReminderQueueService } from '../services/assistantReminderQueueService';
 import { assistantScheduledTaskService } from '../services/assistantScheduledTaskService';
@@ -226,10 +235,12 @@ interface AIChatMessage {
   debugSections?: AIChatDebugSection[];
   appliedActions?: AppliedChatAction[];
   memoryUpdates?: AIChatMemoryUpdateSection[];
+  dreamUpdates?: AIChatDreamUpdateCard[];
   reminderUpdates?: string[];
   weeklyReviewWriteback?: AIChatWeeklyReviewWritebackResult;
   retryInput?: string;
   retrySourceUserMessageId?: string;
+  dreamRetryRangeOptionId?: DreamRangeOptionId;
 }
 
 interface AIChatWeeklyReviewWritebackResult {
@@ -246,6 +257,8 @@ interface AIChatMemoryUpdateSection {
   label: string;
   items: string[];
 }
+
+interface AIChatDreamUpdateCard extends DreamUpdateCard {}
 
 interface AssistantEditableMemoryDeleteTarget {
   key: AssistantEditableMemoryListKey;
@@ -275,6 +288,21 @@ interface AssistantScheduledTaskDrafts {
 
 interface AssistantScheduledTaskDeleteTarget {
   id: string;
+}
+
+interface DreamTopicDrafts {
+  title: string;
+  note: string;
+}
+
+interface DreamEntryDrafts {
+  content: string;
+}
+
+type DreamRangeOptionId = 'yesterday' | 'this_week' | 'this_month' | 'this_year';
+
+interface DreamRangeSelectionState {
+  sessionId: string;
 }
 
 interface AssistantBackgroundTurnRequestOptions {
@@ -355,6 +383,22 @@ const DEFAULT_ASSISTANT_REMINDER_DRAFTS: AssistantReminderDrafts = {
   text: '',
   date: '',
   hour: ''
+};
+
+const DEFAULT_DREAM_TOPIC_DRAFTS: DreamTopicDrafts = {
+  title: '',
+  note: ''
+};
+
+const DEFAULT_DREAM_ENTRY_DRAFTS: DreamEntryDrafts = {
+  content: ''
+};
+
+const DREAM_RANGE_OPTION_LABELS: Record<DreamRangeOptionId, string> = {
+  yesterday: '昨天',
+  this_week: '本周',
+  this_month: '本月',
+  this_year: '本年'
 };
 
 const ASSISTANT_SCHEDULED_TASK_WEEKDAY_OPTIONS = [
@@ -1153,6 +1197,41 @@ const normalizeReminderUpdates = (value: unknown): string[] => (
     : []
 );
 
+const normalizeDreamUpdates = (value: unknown): AIChatDreamUpdateCard[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+
+    const candidate = item as Partial<AIChatDreamUpdateCard>;
+    const topicId = typeof candidate.topicId === 'string' ? candidate.topicId.trim() : '';
+    const topicTitle = typeof candidate.topicTitle === 'string' ? candidate.topicTitle.trim() : '';
+    const content = typeof candidate.content === 'string' ? candidate.content.trim() : '';
+    const updatedAt = typeof candidate.updatedAt === 'string' ? candidate.updatedAt.trim() : '';
+    if (!topicId || !topicTitle || !content || !updatedAt) {
+      return [];
+    }
+
+    return [{
+      topicId,
+      topicTitle,
+      action: candidate.action === 'created' || candidate.action === 'deleted' ? candidate.action : 'updated',
+      content,
+      ...(typeof candidate.observedRangeStart === 'string' && candidate.observedRangeStart.trim()
+        ? { observedRangeStart: candidate.observedRangeStart.trim() }
+        : {}),
+      ...(typeof candidate.observedRangeEnd === 'string' && candidate.observedRangeEnd.trim()
+        ? { observedRangeEnd: candidate.observedRangeEnd.trim() }
+        : {}),
+      updatedAt
+    }];
+  });
+};
+
 const normalizeRetryInput = (value: unknown): string | undefined => (
   typeof value === 'string' && value.trim().length > 0
     ? value.trim()
@@ -1162,6 +1241,12 @@ const normalizeRetryInput = (value: unknown): string | undefined => (
 const normalizeRetrySourceUserMessageId = (value: unknown): string | undefined => (
   typeof value === 'string' && value.trim().length > 0
     ? value.trim()
+    : undefined
+);
+
+const normalizeDreamRetryRangeOptionId = (value: unknown): DreamRangeOptionId | undefined => (
+  value === 'yesterday' || value === 'this_week' || value === 'this_month' || value === 'this_year'
+    ? value
     : undefined
 );
 
@@ -1298,6 +1383,7 @@ const normalizeMessages = (value: unknown): AIChatMessage[] => {
       ...(candidate.debugSections ? { debugSections: normalizeDebugSections(candidate.debugSections) } : {}),
       ...(candidate.appliedActions ? { appliedActions: normalizeAppliedActions(candidate.appliedActions) } : {}),
       ...(candidate.memoryUpdates ? { memoryUpdates: normalizeMemoryUpdates(candidate.memoryUpdates) } : {}),
+      ...(candidate.dreamUpdates ? { dreamUpdates: normalizeDreamUpdates(candidate.dreamUpdates) } : {}),
       ...(candidate.reminderUpdates ? { reminderUpdates: normalizeReminderUpdates(candidate.reminderUpdates) } : {}),
       ...(normalizeWeeklyReviewWritebackResult(candidate.weeklyReviewWriteback)
         ? { weeklyReviewWriteback: normalizeWeeklyReviewWritebackResult(candidate.weeklyReviewWriteback) }
@@ -1305,6 +1391,9 @@ const normalizeMessages = (value: unknown): AIChatMessage[] => {
       ...(normalizeRetryInput(candidate.retryInput) ? { retryInput: normalizeRetryInput(candidate.retryInput) } : {}),
       ...(normalizeRetrySourceUserMessageId(candidate.retrySourceUserMessageId)
         ? { retrySourceUserMessageId: normalizeRetrySourceUserMessageId(candidate.retrySourceUserMessageId) }
+        : {}),
+      ...(normalizeDreamRetryRangeOptionId(candidate.dreamRetryRangeOptionId)
+        ? { dreamRetryRangeOptionId: normalizeDreamRetryRangeOptionId(candidate.dreamRetryRangeOptionId) }
         : {})
     };
 
@@ -2109,11 +2198,22 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     buildAssistantAgentQuietHoursDrafts(assistantAgentConfigService.getConfig())
   ));
   const [assistantMemorySnapshot, setAssistantMemorySnapshot] = useState<AssistantMemory>(() => assistantMemoryService.getMemory());
+  const [dreamSnapshot, setDreamSnapshot] = useState<DreamState>(() => dreamService.getState());
   const [assistantReminderSnapshot, setAssistantReminderSnapshot] = useState<AssistantReminder[]>(() => assistantReminderQueueService.listReminders());
   const [assistantScheduledTaskSnapshot, setAssistantScheduledTaskSnapshot] = useState<AssistantScheduledTask[]>(
     () => assistantScheduledTaskService.listTasks()
   );
   const [isAssistantMemoryViewerOpen, setIsAssistantMemoryViewerOpen] = useState(false);
+  const [isDreamViewerOpen, setIsDreamViewerOpen] = useState(false);
+  const [dreamRangeSelectionState, setDreamRangeSelectionState] = useState<DreamRangeSelectionState | null>(null);
+  const [selectedDreamTopicId, setSelectedDreamTopicId] = useState('');
+  const [dreamTopicDrafts, setDreamTopicDrafts] = useState<DreamTopicDrafts>(DEFAULT_DREAM_TOPIC_DRAFTS);
+  const [isDreamTopicComposerOpen, setIsDreamTopicComposerOpen] = useState(false);
+  const [editingDreamTopicId, setEditingDreamTopicId] = useState<string | null>(null);
+  const [dreamTopicDeleteTargetId, setDreamTopicDeleteTargetId] = useState<string | null>(null);
+  const [editingDreamEntryId, setEditingDreamEntryId] = useState<string | null>(null);
+  const [dreamEntryDrafts, setDreamEntryDrafts] = useState<DreamEntryDrafts>(DEFAULT_DREAM_ENTRY_DRAFTS);
+  const [dreamEntryDeleteTargetId, setDreamEntryDeleteTargetId] = useState<string | null>(null);
   const [assistantEditableMemoryDrafts, setAssistantEditableMemoryDrafts] = useState<Record<AssistantEditableMemoryListKey, string>>(
     DEFAULT_ASSISTANT_EDITABLE_MEMORY_DRAFTS
   );
@@ -2131,6 +2231,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [assistantNativeDiagnostics, setAssistantNativeDiagnostics] = useState<AssistantNativeDiagnosticEntry[]>([]);
   const [isAssistantBackgroundHistoryViewerOpen, setIsAssistantBackgroundHistoryViewerOpen] = useState(false);
   const [expandedMemoryUpdateMessageIds, setExpandedMemoryUpdateMessageIds] = useState<Set<string>>(() => new Set());
+  const [expandedDreamUpdateMessageIds, setExpandedDreamUpdateMessageIds] = useState<Set<string>>(() => new Set());
   const [expandedReminderUpdateMessageIds, setExpandedReminderUpdateMessageIds] = useState<Set<string>>(() => new Set());
   const [revealedAssistantPartCounts, setRevealedAssistantPartCounts] = useState<Record<string, number>>({});
   const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
@@ -2215,6 +2316,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     () => sessions.find((session) => session.id === activeSessionId) || sessions[0] || null,
     [activeSessionId, sessions]
   );
+  const activeDreamTopic = useMemo<DreamTopic | null>(() => (
+    dreamSnapshot.topics.find((topic) => topic.id === selectedDreamTopicId)
+    || dreamSnapshot.topics[0]
+    || null
+  ), [dreamSnapshot.topics, selectedDreamTopicId]);
+  const activeDreamEntries = useMemo(() => (
+    activeDreamTopic
+      ? dreamSnapshot.entries.filter((entry) => entry.topicId === activeDreamTopic.id)
+      : []
+  ), [activeDreamTopic, dreamSnapshot.entries]);
   const scrollToLatestMessage = useCallback((behavior: ScrollBehavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
   }, []);
@@ -2272,6 +2383,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return next;
     });
   }, []);
+  const toggleDreamUpdateExpansion = useCallback((messageId: string) => {
+    setExpandedDreamUpdateMessageIds((current) => {
+      const next = new Set(current);
+      if (next.has(messageId)) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
+      }
+      return next;
+    });
+  }, []);
   const toggleReminderUpdateExpansion = useCallback((messageId: string) => {
     setExpandedReminderUpdateMessageIds((current) => {
       const next = new Set(current);
@@ -2283,6 +2405,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return next;
     });
   }, []);
+
+  useEffect(() => {
+    if (!dreamSnapshot.topics.some((topic) => topic.id === selectedDreamTopicId)) {
+      setSelectedDreamTopicId(dreamSnapshot.topics[0]?.id || '');
+    }
+  }, [dreamSnapshot.topics, selectedDreamTopicId]);
+
+  useEffect(() => {
+    if (editingDreamEntryId && !dreamSnapshot.entries.some((entry) => entry.id === editingDreamEntryId)) {
+      resetDreamEntryUi();
+    }
+  }, [dreamSnapshot.entries, editingDreamEntryId]);
   const activePersona = useMemo(
     () => (activeSession ? personaMap.get(activeSession.personaId) : undefined) || personas[0] || DEFAULT_AI_PERSONAS[0],
     [activeSession, personaMap, personas]
@@ -2942,6 +3076,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setAssistantMemorySnapshot(assistantMemoryService.getMemory());
   };
 
+  const refreshDreamSnapshot = () => {
+    setDreamSnapshot(dreamService.getState());
+  };
+
   const refreshAssistantScheduledTaskSnapshot = () => {
     setAssistantScheduledTaskSnapshot(assistantScheduledTaskService.listTasks());
   };
@@ -3053,6 +3191,81 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         recentDecisions: []
       }
   ), [assistantAgentConfig.longTermMemoryEnabled]);
+
+  const buildDreamContext = useCallback((query?: string): string | undefined => (
+    dreamService.buildContext({ query })
+  ), []);
+
+  const resolveDreamRange = useCallback((optionId: DreamRangeOptionId, referenceDate: Date = new Date()) => {
+    const anchor = new Date(referenceDate);
+    anchor.setHours(12, 0, 0, 0);
+
+    if (optionId === 'yesterday') {
+      const start = new Date(anchor);
+      start.setDate(start.getDate() - 1);
+      return {
+        optionId,
+        label: DREAM_RANGE_OPTION_LABELS[optionId],
+        startDate: getLocalDateStr(start),
+        endDate: getLocalDateStr(start)
+      };
+    }
+
+    if (optionId === 'this_week') {
+      const { start, end } = getWeekRange(anchor);
+      return {
+        optionId,
+        label: DREAM_RANGE_OPTION_LABELS[optionId],
+        startDate: getLocalDateStr(start),
+        endDate: getLocalDateStr(end)
+      };
+    }
+
+    if (optionId === 'this_month') {
+      const start = new Date(anchor.getFullYear(), anchor.getMonth(), 1, 12, 0, 0, 0);
+      const end = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0, 12, 0, 0, 0);
+      return {
+        optionId,
+        label: DREAM_RANGE_OPTION_LABELS[optionId],
+        startDate: getLocalDateStr(start),
+        endDate: getLocalDateStr(end)
+      };
+    }
+
+    const start = new Date(anchor.getFullYear(), 0, 1, 12, 0, 0, 0);
+    const end = new Date(anchor.getFullYear(), 11, 31, 12, 0, 0, 0);
+    return {
+      optionId,
+      label: DREAM_RANGE_OPTION_LABELS[optionId],
+      startDate: getLocalDateStr(start),
+      endDate: getLocalDateStr(end)
+    };
+  }, []);
+
+  const buildDreamRangeDictionaryContext = useCallback((rangeStartDate: string, rangeEndDate: string) => (
+    assistantContextBuilder.buildDictionaryContext({
+      categories,
+      scopes,
+      todoCategories,
+      todos: todos
+        .filter((todo) => (
+          !todo.isCompleted
+          || (typeof todo.completedAt === 'string'
+            && getLocalDateStr(new Date(todo.completedAt)) >= rangeStartDate
+            && getLocalDateStr(new Date(todo.completedAt)) <= rangeEndDate)
+          || (typeof todo.scheduledDate === 'string' && todo.scheduledDate >= rangeStartDate && todo.scheduledDate <= rangeEndDate)
+          || (typeof todo.deadlineDate === 'string' && todo.deadlineDate >= rangeStartDate && todo.deadlineDate <= rangeEndDate)
+        ))
+        .slice(0, 120),
+      logs: logs
+        .filter((log) => {
+          const logDate = formatDateKey(new Date(log.startTime));
+          return logDate >= rangeStartDate && logDate <= rangeEndDate;
+        })
+        .sort((left, right) => left.startTime - right.startTime)
+        .slice(0, 200)
+    })
+  ), [categories, logs, scopes, todoCategories, todos]);
 
   const buildAssistantDictionaryContext = useCallback(() => assistantContextBuilder.buildDictionaryContext({
     categories,
@@ -4328,6 +4541,159 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setIsUserEmojiEditorOpen(false);
   };
 
+  const resetDreamTopicUi = () => {
+    setDreamTopicDrafts(DEFAULT_DREAM_TOPIC_DRAFTS);
+    setIsDreamTopicComposerOpen(false);
+    setEditingDreamTopicId(null);
+    setDreamTopicDeleteTargetId(null);
+  };
+
+  const resetDreamEntryUi = () => {
+    setDreamEntryDrafts(DEFAULT_DREAM_ENTRY_DRAFTS);
+    setEditingDreamEntryId(null);
+    setDreamEntryDeleteTargetId(null);
+  };
+
+  const updateDreamTopicDraft = (key: keyof DreamTopicDrafts, value: string) => {
+    setDreamTopicDrafts((current) => ({
+      ...current,
+      [key]: value
+    }));
+  };
+
+  const handleOpenDreamViewer = () => {
+    refreshDreamSnapshot();
+    resetDreamTopicUi();
+    resetDreamEntryUi();
+    setIsDreamViewerOpen(true);
+  };
+
+  const handleCloseDreamViewer = () => {
+    resetDreamTopicUi();
+    resetDreamEntryUi();
+    setIsDreamViewerOpen(false);
+  };
+
+  const handleOpenDreamTopicComposer = (topic?: DreamTopic) => {
+    setDreamTopicDrafts({
+      title: topic?.title || '',
+      note: topic?.note || ''
+    });
+    setEditingDreamTopicId(topic?.id || null);
+    setDreamTopicDeleteTargetId(null);
+    setIsDreamTopicComposerOpen(true);
+  };
+
+  const handleCancelDreamTopicComposer = () => {
+    resetDreamTopicUi();
+  };
+
+  const handleOpenDreamEntryEditor = (entry: DreamEntry) => {
+    setDreamEntryDrafts({
+      content: entry.content
+    });
+    setEditingDreamEntryId(entry.id);
+    setDreamEntryDeleteTargetId(null);
+  };
+
+  const handleCancelDreamEntryEditor = () => {
+    resetDreamEntryUi();
+  };
+
+  const handleUpdateDreamEntryDraft = (value: string) => {
+    setDreamEntryDrafts({ content: value });
+  };
+
+  const handleSaveDreamEntry = (entryId: string) => {
+    const content = dreamEntryDrafts.content.trim();
+    if (!content) {
+      addToast('warning', '先写一点条目内容再保存吧。');
+      return;
+    }
+
+    dreamService.updateEntry(entryId, { content });
+    refreshDreamSnapshot();
+    resetDreamEntryUi();
+    addToast('success', '已更新 Dream 条目');
+  };
+
+  const handleSaveDreamTopic = () => {
+    const title = dreamTopicDrafts.title.trim();
+    const note = dreamTopicDrafts.note.trim();
+    if (!title) {
+      addToast('warning', '先写一个 Dream 领域标题再保存吧。');
+      return;
+    }
+
+    if (
+      dreamSnapshot.topics.some((topic) => (
+        topic.id !== editingDreamTopicId
+        && topic.title.trim().toLowerCase() === title.toLowerCase()
+      ))
+    ) {
+      addToast('info', '这个 Dream 领域已经存在了。');
+      return;
+    }
+
+    if (editingDreamTopicId) {
+      dreamService.updateTopic(editingDreamTopicId, {
+        title,
+        note
+      });
+      addToast('success', '已更新 Dream 领域');
+    } else {
+      dreamService.createTopic({
+        title,
+        note
+      });
+      addToast('success', '已新增 Dream 领域');
+    }
+
+    refreshDreamSnapshot();
+    resetDreamTopicUi();
+  };
+
+  const handleToggleDreamTopicDelete = (topicId: string) => {
+    setDreamTopicDeleteTargetId((current) => (current === topicId ? null : topicId));
+  };
+
+  const handleToggleDreamEntryDelete = (entryId: string) => {
+    setDreamEntryDeleteTargetId((current) => (current === entryId ? null : entryId));
+    setEditingDreamEntryId((current) => (current === entryId ? null : current));
+    setDreamEntryDrafts(DEFAULT_DREAM_ENTRY_DRAFTS);
+  };
+
+  const handleConfirmDreamTopicDelete = (topicId: string) => {
+    dreamService.deleteTopic(topicId);
+    refreshDreamSnapshot();
+    setDreamTopicDeleteTargetId((current) => (current === topicId ? null : current));
+    addToast('success', '已删除 Dream 领域');
+  };
+
+  const handleConfirmDreamEntryDelete = (entryId: string) => {
+    dreamService.deleteEntry(entryId);
+    refreshDreamSnapshot();
+    setDreamEntryDeleteTargetId((current) => (current === entryId ? null : current));
+    setEditingDreamEntryId((current) => (current === entryId ? null : current));
+    setDreamEntryDrafts(DEFAULT_DREAM_ENTRY_DRAFTS);
+    addToast('success', '已删除 Dream 条目');
+  };
+
+  const handleToggleDreamTopicEnabled = (topic: DreamTopic) => {
+    dreamService.updateTopic(topic.id, {
+      enabled: !topic.enabled
+    });
+    refreshDreamSnapshot();
+  };
+
+  const handleOpenDreamRangeSelection = (sessionId: string) => {
+    setDreamRangeSelectionState({ sessionId });
+  };
+
+  const handleCloseDreamRangeSelection = () => {
+    setDreamRangeSelectionState(null);
+  };
+
   const handleOpenAssistantMemoryViewer = () => {
     refreshAssistantMemorySnapshot();
     refreshAssistantReminderSnapshot();
@@ -4667,6 +5033,36 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return true;
     }
 
+    if (dreamRangeSelectionState) {
+      handleCloseDreamRangeSelection();
+      return true;
+    }
+
+    if (isDreamViewerOpen) {
+      if (dreamEntryDeleteTargetId) {
+        setDreamEntryDeleteTargetId(null);
+        return true;
+      }
+
+      if (editingDreamEntryId) {
+        resetDreamEntryUi();
+        return true;
+      }
+
+      if (dreamTopicDeleteTargetId) {
+        setDreamTopicDeleteTargetId(null);
+        return true;
+      }
+
+      if (isDreamTopicComposerOpen) {
+        resetDreamTopicUi();
+        return true;
+      }
+
+      handleCloseDreamViewer();
+      return true;
+    }
+
     if (isUserEmojiEditorOpen) {
       setIsUserEmojiEditorOpen(false);
       return true;
@@ -4736,11 +5132,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     handleCancelAssistantEditableMemoryComposer,
     handleCancelRenameSession,
     handleCloseAssistantBackgroundHistoryViewer,
+    handleCloseDreamRangeSelection,
+    handleCloseDreamViewer,
     handleCloseAssistantMemoryViewer,
+    dreamRangeSelectionState,
+    dreamEntryDeleteTargetId,
+    editingDreamEntryId,
     isAssistantBackgroundHistoryViewerOpen,
+    isDreamViewerOpen,
     isAssistantMemoryViewerOpen,
     isAssistantReminderComposerOpen,
     isAssistantScheduledTaskComposerOpen,
+    isDreamTopicComposerOpen,
     isEmojiEditorOpen,
     isHistoryPanelOpen,
     isNewSessionDialogOpen,
@@ -4750,7 +5153,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     isWeeklyReviewDateInputModalOpen,
     isWeeklyReviewWeekSelectionModalOpen,
     pendingWeeklyReviewTemplateSetup,
+    dreamTopicDeleteTargetId,
     resetAssistantScheduledTaskUi,
+    resetDreamEntryUi,
+    resetDreamTopicUi,
     handleCloseNewSessionDialog,
     handleCloseWeeklyReviewDateInputModal,
     handleCloseWeeklyReviewMethodSelection,
@@ -5298,10 +5704,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       debugSections?: AIChatDebugSection[];
       appliedActions?: AppliedChatAction[];
       memoryUpdates?: AIChatMemoryUpdateSection[];
+      dreamUpdates?: AIChatDreamUpdateCard[];
       reminderUpdates?: string[];
       weeklyReviewWriteback?: AIChatWeeklyReviewWritebackResult;
       retryInput?: string;
       retrySourceUserMessageId?: string;
+      dreamRetryRangeOptionId?: DreamRangeOptionId;
     }
   ) => {
     replaceMessage(sessionId, pendingMessageId, {
@@ -5314,11 +5722,21 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       ...(options?.debugSections && options.debugSections.length > 0 ? { debugSections: options.debugSections } : {}),
       ...(options?.appliedActions && options.appliedActions.length > 0 ? { appliedActions: options.appliedActions } : {}),
       ...(options?.memoryUpdates && options.memoryUpdates.length > 0 ? { memoryUpdates: options.memoryUpdates } : {}),
+      ...(options?.dreamUpdates && options.dreamUpdates.length > 0 ? { dreamUpdates: options.dreamUpdates } : {}),
       ...(options?.reminderUpdates && options.reminderUpdates.length > 0 ? { reminderUpdates: options.reminderUpdates } : {}),
       ...(options?.weeklyReviewWriteback ? { weeklyReviewWriteback: options.weeklyReviewWriteback } : {}),
       ...(options?.retryInput ? { retryInput: options.retryInput } : {}),
-      ...(options?.retrySourceUserMessageId ? { retrySourceUserMessageId: options.retrySourceUserMessageId } : {})
+      ...(options?.retrySourceUserMessageId ? { retrySourceUserMessageId: options.retrySourceUserMessageId } : {}),
+      ...(options?.dreamRetryRangeOptionId ? { dreamRetryRangeOptionId: options.dreamRetryRangeOptionId } : {})
     });
+
+    if (options?.dreamUpdates && options.dreamUpdates.length > 0) {
+      setExpandedDreamUpdateMessageIds((current) => {
+        const next = new Set(current);
+        next.add(pendingMessageId);
+        return next;
+      });
+    }
 
     if (!isOpenRef.current) {
       onUnreadAssistantMessage?.(1);
@@ -5532,6 +5950,174 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     });
   };
 
+  const handleDreamCommand = async (
+    session: AIChatSession,
+    rangeOptionId: DreamRangeOptionId,
+    userMessageId?: string,
+    options?: {
+      replaceMessageId?: string;
+      retrySourceUserMessageId?: string;
+    }
+  ) => {
+    const sessionId = session.id;
+    const retryMessageId = options?.replaceMessageId;
+    const canRetryInPlace = Boolean(
+      retryMessageId && session.messages.some((message) => message.id === retryMessageId)
+    );
+    const pendingMessageId = canRetryInPlace && retryMessageId
+      ? retryMessageId
+      : crypto.randomUUID();
+    const now = Date.now();
+    const historyBeforeCurrent = canRetryInPlace
+      ? buildRetryConversationHistory(sessionId, options?.retrySourceUserMessageId)
+      : (conversationHistoryCache.get(sessionId) || []);
+    const nextUserMessageId = options?.retrySourceUserMessageId || userMessageId || crypto.randomUUID();
+    const dreamRange = resolveDreamRange(rangeOptionId, new Date(now));
+    const dreamUserMessage = `dream · ${dreamRange.label}`;
+
+    if (canRetryInPlace) {
+      mutateSession(sessionId, (currentSession) => ({
+        ...currentSession,
+        messages: currentSession.messages.map((message) => (
+          message.id === pendingMessageId
+            ? {
+              id: pendingMessageId,
+              role: 'assistant',
+              content: `我先按${dreamRange.label}整理一下 Dream。`,
+              createdAt: now,
+              tone: 'pending'
+            }
+            : message
+        ))
+      }));
+    } else {
+      mutateSession(sessionId, (currentSession) => ({
+        ...currentSession,
+        messages: [
+          ...currentSession.messages,
+          {
+            id: nextUserMessageId,
+            role: 'user',
+            content: dreamUserMessage,
+            createdAt: now
+          },
+          {
+            id: pendingMessageId,
+            role: 'assistant',
+            content: `我先按${dreamRange.label}整理一下 Dream。`,
+            createdAt: now + 1,
+            tone: 'pending'
+          }
+        ]
+      }));
+    }
+
+    setInputText('');
+    setIsLoading(true);
+    setIsHistoryPanelOpen(false);
+    setIsPersonaPanelOpen(false);
+
+    const controller = new AbortController();
+    activeRequestRef.current = {
+      controller,
+      sessionId,
+      pendingMessageId
+    };
+
+    try {
+      const currentTurnDate = new Date(now);
+      const reminderSummary = buildForegroundAssistantReminderSummary();
+      const stateContext = {
+        ...assistantContextBuilder.buildStateContext({
+          ...buildAssistantCurrentTimeSnapshot(currentTurnDate),
+          defaultDate: dreamRange.endDate,
+          logs: logs.filter((log) => {
+            const logDate = formatDateKey(new Date(log.startTime));
+            return logDate >= dreamRange.startDate && logDate <= dreamRange.endDate;
+          }),
+          categories,
+          todos,
+          activeSessions,
+          timelineReviewSummary: buildAssistantTimelineSummary(),
+          ...(reminderSummary ? { reminderSummary } : {})
+        }),
+        dreamRangeLabel: dreamRange.label,
+        dreamRangeStart: dreamRange.startDate,
+        dreamRangeEnd: dreamRange.endDate
+      };
+      const dictionaryContext = buildDreamRangeDictionaryContext(dreamRange.startDate, dreamRange.endDate);
+      const dictionaryDigestText = assistantContextBuilder.buildDictionaryDigest(dictionaryContext);
+      const conversationSummary = assistantContextBuilder.summarizeConversationTurns(historyBeforeCurrent, 24);
+      const dreamResult = await dreamService.runDreamWorkflow({
+        rangeLabel: dreamRange.label,
+        rangeStartDate: dreamRange.startDate,
+        rangeEndDate: dreamRange.endDate,
+        currentDateTime: formatAssistantLocalDateTime(currentTurnDate),
+        currentDate: dreamRange.endDate,
+        conversationSummary,
+        stateContextText: JSON.stringify(stateContext, null, 2),
+        dictionaryDigestText
+      });
+
+      if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
+        return;
+      }
+
+      if (
+        (dreamResult.patch.createdEntries && dreamResult.patch.createdEntries.length > 0)
+        || (dreamResult.patch.updatedEntries && dreamResult.patch.updatedEntries.length > 0)
+        || (dreamResult.patch.deletedEntryIds && dreamResult.patch.deletedEntryIds.length > 0)
+      ) {
+        dreamService.applyPatch(dreamResult.patch);
+        refreshDreamSnapshot();
+        const firstUpdatedTopicId = dreamResult.cards[0]?.topicId;
+        if (firstUpdatedTopicId) {
+          setSelectedDreamTopicId(firstUpdatedTopicId);
+        }
+      }
+
+      replacePendingWithResult(sessionId, pendingMessageId, dreamResult.assistantReply, {
+        ...(debugMode && dreamResult.debug
+          ? {
+            debugSections: [{
+              label: 'Dream 整理',
+              exchange: dreamResult.debug
+            }]
+          }
+          : {}),
+        dreamUpdates: dreamResult.cards
+      });
+    } catch (error) {
+      const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
+
+      if (isAbortError(error)) {
+        if (isCurrentPendingRequest) {
+          replacePendingWithResult(sessionId, pendingMessageId, '已停止这次 Dream 整理。', {
+            tone: 'system'
+          });
+        }
+        return;
+      }
+
+      if (!isCurrentPendingRequest || controller.signal.aborted) {
+        return;
+      }
+
+      replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), {
+        tone: 'error',
+        retryInput: 'dream',
+        retrySourceUserMessageId: nextUserMessageId,
+        dreamRetryRangeOptionId: rangeOptionId,
+        debugSections: getErrorDebugSections(error, 'Dream 整理', debugMode)
+      });
+    } finally {
+      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
+        activeRequestRef.current = null;
+        setIsLoading(false);
+      }
+    }
+  };
+
   const handleSend = async (overrideText?: string, options?: ForegroundSendOptions) => {
     const trimmedText = (overrideText ?? inputText).trim();
     if (!trimmedText || isLoading || !activeSession) {
@@ -5539,6 +6125,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
 
     if (handleDebugCommand(trimmedText, options)) {
+      return;
+    }
+
+    if (trimmedText === 'dream' && !options?.replaceMessageId) {
+      setInputText('');
+      handleOpenDreamRangeSelection(activeSession.id);
       return;
     }
 
@@ -5691,6 +6283,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         buildForegroundAssistantReminderSummary()
       );
       const dictionaryContext = buildAssistantDictionaryContext();
+      const dreamContext = buildDreamContext(trimmedText);
 
       const unifiedTurnResult = await assistantTurnService.runUnifiedTurn({
         mode: 'foreground',
@@ -5709,7 +6302,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         memory: buildForegroundAssistantMemory(),
         conversation: conversationContext,
         stateContext,
-        dictionaryContext
+        dictionaryContext,
+        ...(dreamContext ? { dreamContext } : {})
       }, {
         signal: controller.signal
       });
@@ -5834,6 +6428,19 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   const handleRetryMessage = (message: AIChatMessage) => {
     if (!message.retryInput || isLoading) {
+      return;
+    }
+
+    if (message.retryInput === 'dream' && message.dreamRetryRangeOptionId && activeSession) {
+      void handleDreamCommand(
+        activeSession,
+        message.dreamRetryRangeOptionId,
+        undefined,
+        {
+          replaceMessageId: message.id,
+          retrySourceUserMessageId: resolveRetrySourceUserMessageId(message)
+        }
+      );
       return;
     }
 
@@ -6477,6 +7084,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const visibleDisplayParts = displayParts.slice(0, visibleDisplayPartCount);
     const allDisplayPartsRevealed = visibleDisplayPartCount >= displayParts.length;
     const isMemoryUpdatesExpanded = expandedMemoryUpdateMessageIds.has(message.id);
+    const isDreamUpdatesExpanded = expandedDreamUpdateMessageIds.has(message.id);
     const isReminderUpdatesExpanded = expandedReminderUpdateMessageIds.has(message.id);
     const previousMessage = index > 0 ? messages[index - 1] : null;
     const showAvatar = !previousMessage || previousMessage.role !== message.role;
@@ -6612,6 +7220,19 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                       </button>
                     </>
                   )}
+                  {message.dreamUpdates && message.dreamUpdates.length > 0 && (
+                    <>
+                      <span className="hidden text-[#b4a79a] sm:inline">·</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleDreamUpdateExpansion(message.id)}
+                        className="transition-colors hover:opacity-100"
+                        style={{ color: AI_CHAT_THEME.textMuted }}
+                      >
+                        Dream 更新 {message.dreamUpdates.length}项 · {isDreamUpdatesExpanded ? '收起' : '展开'}
+                      </button>
+                    </>
+                  )}
                   {message.reminderUpdates && message.reminderUpdates.length > 0 && (
                     <>
                       <span className="hidden text-[#b4a79a] sm:inline">·</span>
@@ -6680,6 +7301,40 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         {section.items.map((item) => (
                           <p key={`${message.id}-memory-item-${section.label}-${item}`}>{item}</p>
                         ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {allDisplayPartsRevealed && message.dreamUpdates && message.dreamUpdates.length > 0 && isDreamUpdatesExpanded && (
+              <div
+                className="space-y-2 border-l pl-3 pr-1 py-1"
+                style={{
+                  borderColor: AI_CHAT_THEME.activeBorder
+                }}
+              >
+                <div className="space-y-2">
+                  {message.dreamUpdates.map((card, cardIndex) => (
+                    <div
+                      key={`${message.id}-dream-${card.topicId}-${cardIndex}`}
+                      className="border-l-2 pl-3 pr-1 py-1"
+                      style={{ borderColor: AI_CHAT_THEME.activeBorder }}
+                    >
+                      <p className="text-[11px] font-semibold" style={{ color: AI_CHAT_THEME.textSecondary }}>
+                        {card.topicTitle} · {card.action === 'created' ? '新增' : card.action === 'deleted' ? '删除' : '改写'}
+                      </p>
+                      <div className="mt-1.5 space-y-1 text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textPrimary }}>
+                        <p>{card.content}</p>
+                        {(card.observedRangeStart && card.observedRangeEnd) && (
+                          <p className="text-[12px]" style={{ color: AI_CHAT_THEME.textSecondary }}>
+                            观察窗口：{card.observedRangeStart} 至 {card.observedRangeEnd}
+                          </p>
+                        )}
+                        <p className="text-[12px]" style={{ color: AI_CHAT_THEME.textSecondary }}>
+                          更新时间：{formatAssistantDateTimeForDisplay(card.updatedAt)}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -8465,6 +9120,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
                           <div className="flex flex-wrap gap-2 pt-1">
                             <button
+                              onClick={handleOpenDreamViewer}
+                              className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
+                              style={{
+                                borderColor: AI_CHAT_THEME.chipBorder,
+                                backgroundColor: AI_CHAT_THEME.panelBg,
+                                color: AI_CHAT_THEME.textSecondary
+                              }}
+                            >
+                              打开 Dream
+                            </button>
+                            <button
                               onClick={handleOpenAssistantMemoryViewer}
                               className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
                               style={{
@@ -8492,6 +9158,487 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isDreamViewerOpen && (
+          <div className="absolute inset-0 z-20 bg-[rgba(15,23,42,0.12)] backdrop-blur-[10px]">
+            <div
+              className="flex h-full flex-col bg-[linear-gradient(180deg,#f7f5f1_0%,#f3f1ec_100%)]"
+              style={{
+                paddingTop: 'env(safe-area-inset-top)',
+                paddingBottom: 'env(safe-area-inset-bottom)'
+              }}
+            >
+              <div className="flex h-14 items-center justify-between border-b border-[rgba(32,28,25,0.12)] bg-[rgba(247,245,241,0.92)] px-4 backdrop-blur-md">
+                <div>
+                  <h3 className="font-serif text-[1.02rem] font-bold leading-none text-[#201c19]">Dream</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleOpenDreamTopicComposer()}
+                    className="rounded-[0.65rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white/70"
+                    style={{
+                      borderColor: 'rgba(32,28,25,0.14)',
+                      backgroundColor: 'rgba(255,255,255,0.38)',
+                      color: AI_CHAT_THEME.textSecondary
+                    }}
+                  >
+                    新增领域
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!isLoading && activeSession) {
+                        handleOpenDreamRangeSelection(activeSession.id);
+                      }
+                    }}
+                    className="rounded-[0.65rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white/80"
+                    style={{
+                      borderColor: 'color-mix(in srgb, var(--accent-color) 22%, rgba(32,28,25,0.14))',
+                      backgroundColor: 'color-mix(in srgb, var(--accent-color) 5%, rgba(255,255,255,0.55))',
+                      color: AI_CHAT_THEME.textPrimary
+                    }}
+                  >
+                    运行 dream
+                  </button>
+                  <button
+                    onClick={handleCloseDreamViewer}
+                    className="flex h-9 w-9 items-center justify-center rounded-[0.7rem] border transition-colors hover:bg-white/70"
+                    style={{
+                      borderColor: 'rgba(32,28,25,0.14)',
+                      backgroundColor: 'rgba(255,255,255,0.38)',
+                      color: '#5f5a54'
+                    }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="min-h-0 flex flex-1 flex-col px-4 py-5 sm:px-6 sm:py-6">
+                <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-6">
+                  {isDreamTopicComposerOpen && (
+                    <div
+                      className="border-y px-0 py-5"
+                      style={{ borderColor: 'rgba(32,28,25,0.12)' }}
+                    >
+                      <div className="grid gap-4 lg:grid-cols-[minmax(0,11rem)_minmax(0,1fr)] lg:gap-6">
+                        <div>
+                          <p className="font-serif text-[1.02rem] leading-7 text-[#231f1b]">
+                            {editingDreamTopicId ? '编辑 Dream 领域' : '新增 Dream 领域'}
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-stone-500">
+                            保持标题简洁，用备注补充长期关注重点。
+                          </p>
+                        </div>
+                        <div className="grid gap-3">
+                          <label className="space-y-1.5">
+                            <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-stone-500">领域标题</span>
+                            <input
+                              value={dreamTopicDrafts.title}
+                              onChange={(event) => updateDreamTopicDraft('title', event.target.value)}
+                              placeholder="比如：作息"
+                              className="w-full rounded-[0.6rem] border px-3 py-2 text-[13px] outline-none"
+                              style={{
+                                borderColor: 'rgba(32,28,25,0.14)',
+                                backgroundColor: 'rgba(255,255,255,0.56)',
+                                color: AI_CHAT_THEME.textPrimary
+                              }}
+                            />
+                          </label>
+                          <label className="space-y-1.5">
+                            <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-stone-500">备注</span>
+                            <textarea
+                              value={dreamTopicDrafts.note}
+                              onChange={(event) => updateDreamTopicDraft('note', event.target.value)}
+                              placeholder="比如：重点关注晚睡、起床过晚、白天恢复情况。"
+                              rows={3}
+                              className="w-full resize-none rounded-[0.6rem] border px-3 py-3 text-[13px] leading-6 outline-none"
+                              style={{
+                                borderColor: 'rgba(32,28,25,0.14)',
+                                backgroundColor: 'rgba(255,255,255,0.56)',
+                                color: AI_CHAT_THEME.textPrimary
+                              }}
+                            />
+                          </label>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={handleCancelDreamTopicComposer}
+                              className="rounded-[0.65rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white/70"
+                              style={{
+                                borderColor: 'rgba(32,28,25,0.14)',
+                                backgroundColor: 'rgba(255,255,255,0.3)',
+                                color: AI_CHAT_THEME.textMuted
+                              }}
+                            >
+                              取消
+                            </button>
+                            <button
+                              onClick={handleSaveDreamTopic}
+                              className="rounded-[0.65rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white/80"
+                              style={{
+                                borderColor: 'color-mix(in srgb, var(--accent-color) 22%, rgba(32,28,25,0.14))',
+                                backgroundColor: 'color-mix(in srgb, var(--accent-color) 5%, rgba(255,255,255,0.55))',
+                                color: AI_CHAT_THEME.textPrimary
+                              }}
+                            >
+                              保存
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {dreamSnapshot.topics.length === 0 ? (
+                    <div
+                      className="border-y py-10 text-[13px] leading-7 text-stone-500"
+                      style={{ borderColor: 'rgba(32,28,25,0.12)' }}
+                    >
+                      还没有 Dream 领域。先新增几个你希望我长期关注的主题，再运行 `dream`。
+                    </div>
+                  ) : (
+                    <div className="min-h-0 flex flex-1 flex-col gap-6 lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-10">
+                      <aside
+                        className="min-h-0 lg:border-r lg:pr-8"
+                        style={{ borderColor: 'rgba(32,28,25,0.12)' }}
+                      >
+                        <div className="border-b pb-3" style={{ borderColor: 'rgba(32,28,25,0.12)' }}>
+                          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-stone-500">领域目录</p>
+                        </div>
+                        <div className="mt-2 flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-1 lg:overflow-visible">
+                          {dreamSnapshot.topics.map((topic) => {
+                            const isActive = activeDreamTopic?.id === topic.id;
+                            return (
+                              <button
+                                key={topic.id}
+                                type="button"
+                                onClick={() => setSelectedDreamTopicId(topic.id)}
+                                className="group min-w-fit border-b px-0 py-3 text-left transition-colors lg:flex lg:w-full lg:min-w-0 lg:items-start lg:justify-between"
+                                style={{
+                                  borderColor: isActive
+                                    ? 'color-mix(in srgb, var(--accent-color) 30%, rgba(32,28,25,0.18))'
+                                    : 'rgba(32,28,25,0.1)',
+                                  color: isActive
+                                    ? '#201c19'
+                                    : (topic.enabled ? AI_CHAT_THEME.textSecondary : AI_CHAT_THEME.textMuted)
+                                }}
+                              >
+                                <span className="truncate font-serif text-[0.95rem] leading-6">{topic.title}</span>
+                                <span
+                                  className="ml-3 mt-1 hidden text-[10px] uppercase tracking-[0.16em] lg:block"
+                                  style={{
+                                    color: topic.enabled
+                                      ? (isActive ? '#7b6756' : '#9b948b')
+                                      : '#b0a79e'
+                                  }}
+                                >
+                                  {topic.enabled ? 'on' : 'off'}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </aside>
+
+                      {activeDreamTopic && (
+                        <section className="min-w-0">
+                          <div className="border-b pb-5" style={{ borderColor: 'rgba(32,28,25,0.12)' }}>
+                            <div className="flex flex-wrap items-start justify-between gap-4">
+                              <div className="min-w-0 flex-1">
+                                <p className="font-serif text-[1.5rem] leading-[1.2] text-[#231f1b]">{activeDreamTopic.title}</p>
+                                <p className="mt-2 max-w-3xl text-[0.92rem] leading-[1.95] text-stone-500">
+                                  {activeDreamTopic.note || '暂无备注'}
+                                </p>
+                              </div>
+                              <div className="flex shrink-0 flex-col items-center gap-2 text-xs">
+                                <button
+                                  onClick={() => handleToggleDreamTopicEnabled(activeDreamTopic)}
+                                  className="flex h-9 w-9 items-center justify-center rounded-[0.65rem] border transition-colors hover:bg-white/70"
+                                  style={{
+                                    borderColor: activeDreamTopic.enabled
+                                      ? 'color-mix(in srgb, var(--accent-color) 24%, rgba(32,28,25,0.14))'
+                                      : 'rgba(32,28,25,0.14)',
+                                    backgroundColor: activeDreamTopic.enabled
+                                      ? 'color-mix(in srgb, var(--accent-color) 5%, rgba(255,255,255,0.5))'
+                                      : 'rgba(255,255,255,0.26)',
+                                    color: activeDreamTopic.enabled ? AI_CHAT_THEME.textPrimary : AI_CHAT_THEME.textMuted
+                                  }}
+                                  title={activeDreamTopic.enabled ? '停用领域' : '启用领域'}
+                                  aria-label={activeDreamTopic.enabled ? '停用领域' : '启用领域'}
+                                >
+                                  {activeDreamTopic.enabled ? <Check size={14} /> : <XCircle size={14} />}
+                                </button>
+                                <button
+                                  onClick={() => handleOpenDreamTopicComposer(activeDreamTopic)}
+                                  className="flex h-9 w-9 items-center justify-center rounded-[0.65rem] border transition-colors hover:bg-white/70"
+                                  style={{
+                                    borderColor: 'rgba(32,28,25,0.14)',
+                                    backgroundColor: 'rgba(255,255,255,0.26)',
+                                    color: AI_CHAT_THEME.textSecondary
+                                  }}
+                                  title="编辑领域"
+                                  aria-label="编辑领域"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleToggleDreamTopicDelete(activeDreamTopic.id)}
+                                  className="flex h-9 w-9 items-center justify-center rounded-[0.65rem] border transition-colors hover:bg-white/70"
+                                  style={{
+                                    borderColor: 'rgba(157,84,77,0.22)',
+                                    backgroundColor: 'rgba(196,111,79,0.07)',
+                                    color: '#9d544d'
+                                  }}
+                                  title="删除领域"
+                                  aria-label="删除领域"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          {dreamTopicDeleteTargetId === activeDreamTopic.id && (
+                            <div
+                              className="flex flex-wrap items-center justify-between gap-3 border-b py-4 text-xs"
+                              style={{
+                                borderColor: 'rgba(157,84,77,0.22)',
+                                color: '#9d544d'
+                              }}
+                            >
+                              <span>确认删除这个 Dream 领域以及下面的所有观察条目？</span>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setDreamTopicDeleteTargetId(null)}
+                                  className="flex h-8 min-w-8 items-center justify-center rounded-[0.65rem] border px-2 transition-colors hover:bg-white/70"
+                                  style={{
+                                    borderColor: 'rgba(32,28,25,0.14)',
+                                    backgroundColor: 'rgba(255,255,255,0.26)',
+                                    color: '#71685f'
+                                  }}
+                                  title="取消删除"
+                                >
+                                  <X size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleConfirmDreamTopicDelete(activeDreamTopic.id)}
+                                  className="flex h-8 min-w-8 items-center justify-center rounded-[0.65rem] border px-2 transition-colors hover:bg-white/70"
+                                  style={{
+                                    borderColor: 'rgba(157,84,77,0.24)',
+                                    backgroundColor: 'rgba(196,111,79,0.09)',
+                                    color: '#9d544d'
+                                  }}
+                                  title="确认删除"
+                                >
+                                  <Check size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          <div
+                            className="divide-y"
+                            style={{ borderColor: 'rgba(32,28,25,0.1)' }}
+                          >
+                            {activeDreamEntries.length === 0 ? (
+                              <div className="py-10 text-[13px] leading-7 text-stone-500">
+                                这个领域下面还没有 Dream 观察。运行一次 `dream` 之后，我会把整理出来的内容放在这里。
+                              </div>
+                            ) : (
+                              activeDreamEntries.map((entry) => (
+                                <article key={entry.id} className="py-5 first:pt-6">
+                                  <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div className="min-w-0 flex-1">
+                                      {editingDreamEntryId === entry.id ? (
+                                        <div className="space-y-3">
+                                          <textarea
+                                            value={dreamEntryDrafts.content}
+                                            onChange={(event) => handleUpdateDreamEntryDraft(event.target.value)}
+                                            rows={4}
+                                            className="w-full resize-none rounded-[0.6rem] border px-3 py-3 text-[13px] leading-7 outline-none"
+                                            style={{
+                                              borderColor: 'rgba(32,28,25,0.14)',
+                                              backgroundColor: 'rgba(255,255,255,0.56)',
+                                              color: AI_CHAT_THEME.textPrimary
+                                            }}
+                                          />
+                                          <div className="flex flex-wrap items-center justify-end gap-2">
+                                            <button
+                                              onClick={handleCancelDreamEntryEditor}
+                                              className="rounded-[0.65rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white/70"
+                                              style={{
+                                                borderColor: 'rgba(32,28,25,0.14)',
+                                                backgroundColor: 'rgba(255,255,255,0.3)',
+                                                color: AI_CHAT_THEME.textMuted
+                                              }}
+                                            >
+                                              取消
+                                            </button>
+                                            <button
+                                              onClick={() => handleSaveDreamEntry(entry.id)}
+                                              className="rounded-[0.65rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white/80"
+                                              style={{
+                                                borderColor: 'color-mix(in srgb, var(--accent-color) 22%, rgba(32,28,25,0.14))',
+                                                backgroundColor: 'color-mix(in srgb, var(--accent-color) 5%, rgba(255,255,255,0.55))',
+                                                color: AI_CHAT_THEME.textPrimary
+                                              }}
+                                            >
+                                              保存
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <p className="whitespace-pre-wrap break-words text-[0.94rem] leading-[1.95] text-stone-700">
+                                          {entry.content}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="flex shrink-0 flex-col items-center gap-2 text-xs">
+                                      <button
+                                        onClick={() => handleOpenDreamEntryEditor(entry)}
+                                        disabled={editingDreamEntryId === entry.id}
+                                        className="flex h-9 w-9 items-center justify-center rounded-[0.65rem] border transition-colors hover:bg-white/70 disabled:cursor-default disabled:opacity-45"
+                                        style={{
+                                          borderColor: 'rgba(32,28,25,0.14)',
+                                          backgroundColor: 'rgba(255,255,255,0.26)',
+                                          color: AI_CHAT_THEME.textSecondary
+                                        }}
+                                        title="编辑条目"
+                                        aria-label="编辑条目"
+                                      >
+                                        <Pencil size={14} />
+                                      </button>
+                                      <button
+                                        onClick={() => handleToggleDreamEntryDelete(entry.id)}
+                                        className="flex h-9 w-9 items-center justify-center rounded-[0.65rem] border transition-colors hover:bg-white/70"
+                                        style={{
+                                          borderColor: 'rgba(157,84,77,0.22)',
+                                          backgroundColor: 'rgba(196,111,79,0.07)',
+                                          color: '#9d544d'
+                                        }}
+                                        title="删除条目"
+                                        aria-label="删除条目"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] uppercase tracking-[0.12em] text-stone-500">
+                                    <span>观察窗口 {entry.observedRangeStart} - {entry.observedRangeEnd}</span>
+                                    <span>状态 {entry.status}</span>
+                                    <span>更新于 {formatAssistantDateTimeForDisplay(entry.updatedAt)}</span>
+                                  </div>
+                                  {entry.sourceSummary && (
+                                    <p className="mt-2 text-xs leading-6 text-stone-500">
+                                      来源：{entry.sourceSummary}
+                                    </p>
+                                  )}
+                                  {dreamEntryDeleteTargetId === entry.id && (
+                                    <div
+                                      className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-3 text-xs"
+                                      style={{
+                                        borderColor: 'rgba(157,84,77,0.22)',
+                                        color: '#9d544d'
+                                      }}
+                                    >
+                                      <span>确认删除这一条 Dream 观察？</span>
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={() => setDreamEntryDeleteTargetId(null)}
+                                          className="rounded-[0.65rem] border px-3 py-2 font-medium transition-colors hover:bg-white/70"
+                                          style={{
+                                            borderColor: 'rgba(32,28,25,0.14)',
+                                            backgroundColor: 'rgba(255,255,255,0.26)',
+                                            color: '#71685f'
+                                          }}
+                                        >
+                                          取消
+                                        </button>
+                                        <button
+                                          onClick={() => handleConfirmDreamEntryDelete(entry.id)}
+                                          className="rounded-[0.65rem] border px-3 py-2 font-medium transition-colors hover:bg-white/70"
+                                          style={{
+                                            borderColor: 'rgba(157,84,77,0.24)',
+                                            backgroundColor: 'rgba(196,111,79,0.09)',
+                                            color: '#9d544d'
+                                          }}
+                                        >
+                                          确认删除
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </article>
+                              ))
+                            )}
+                          </div>
+                        </section>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {dreamRangeSelectionState && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/20 p-5 backdrop-blur-sm">
+            <div
+              className="w-full max-w-sm overflow-hidden rounded-[1.4rem] border"
+              style={{
+                borderColor: AI_CHAT_THEME.panelBorder,
+                backgroundColor: AI_CHAT_THEME.panelBg,
+                boxShadow: AI_CHAT_THEME.cardShadowStrong
+              }}
+            >
+              <div className="flex items-start justify-between border-b px-5 py-4" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
+                <div>
+                  <h3 className="text-base font-bold text-stone-800">Dream 要整理哪段记录？</h3>
+                  <p className="mt-1 text-xs leading-5 text-stone-500">先选时间范围，我再按这段窗口整理 Dream。</p>
+                </div>
+                <button
+                  onClick={handleCloseDreamRangeSelection}
+                  className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] border transition-colors"
+                  style={{
+                    borderColor: AI_CHAT_THEME.chipBorder,
+                    backgroundColor: AI_CHAT_THEME.panelBg,
+                    color: AI_CHAT_THEME.textMuted
+                  }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-3 px-5 py-5">
+                {([
+                  'yesterday',
+                  'this_week',
+                  'this_month',
+                  'this_year'
+                ] as DreamRangeOptionId[]).map((optionId) => (
+                  <button
+                    key={optionId}
+                    onClick={() => {
+                      const targetSession = sessions.find((session) => session.id === dreamRangeSelectionState.sessionId);
+                      handleCloseDreamRangeSelection();
+                      if (targetSession) {
+                        void handleDreamCommand(targetSession, optionId);
+                      }
+                    }}
+                    className="w-full rounded-[0.95rem] border px-4 py-3 text-left transition-colors"
+                    style={{
+                      borderColor: AI_CHAT_THEME.panelBorder,
+                      backgroundColor: AI_CHAT_THEME.panelBgStrong,
+                      color: AI_CHAT_THEME.textPrimary
+                    }}
+                  >
+                    <div className="text-sm font-semibold">{DREAM_RANGE_OPTION_LABELS[optionId]}</div>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
