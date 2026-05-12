@@ -4,6 +4,7 @@
  * @output Review Updates, Narrative Generation
  * @pos View (Review Modal)
  * @description The interface for conducting Weekly Reviews. Integrates statistics visualization, guided reflection templates, and AI-assisted narrative generation.
+ * @updated 2026-05-11: Added optional initial-tab support so external jumps can open Weekly Review directly on the `叙事` tab after AI writeback.
  * @updated 2026-04-25: Let floating read-edit toggles inherit button theme colors so default UI icons remain visible on accent-theme white buttons.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -49,6 +50,7 @@ interface WeeklyReviewViewProps {
     onGenerateNarrative: (review: WeeklyReview, statsText: string, promptTemplate?: string) => Promise<string>;
     onClose: () => void;
     addToast: (type: 'success' | 'error' | 'info', message: string) => void;
+    initialTab?: TabType;
 }
 
 type TabType = 'data' | 'guide' | 'narrative';
@@ -77,9 +79,10 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
     onUpdateReview,
     onGenerateNarrative,
     onClose,
-    addToast
+    addToast,
+    initialTab
 }) => {
-    const [activeTab, setActiveTab] = useState<TabType>('data');
+    const [activeTab, setActiveTab] = useState<TabType>(initialTab || 'data');
     
     // Use shared review state hook
     const {
@@ -109,6 +112,12 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
 
     const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
     const [isClearGuideConfirmOpen, setIsClearGuideConfirmOpen] = useState(false);
+
+    useEffect(() => {
+        if (initialTab) {
+            setActiveTab(initialTab);
+        }
+    }, [initialTab]);
 
     // 当切换到引导或叙事标签时，根据内容自动切换阅读/编辑模式（仅在标签切换时触发）
     useEffect(() => {

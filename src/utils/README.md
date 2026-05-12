@@ -3,6 +3,8 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- `assistantQuietHours.ts`: [Active] - Normalizes assistant quiet-hours values entered as `HHMM` or legacy `HH:MM`, so background random-check-in protection windows stay valid across UI drafts, persisted config, and native sync.
+- `assistantBackgroundSessionUtils.ts`: [Active] - Resolves the one background-eligible AI chat session by excluding template conversations and ranking ordinary chats only by their latest user-authored message timestamp.
 - `sceneGroupStorage.ts`: [Active] - Loads, migrates, saves, auto-matches, and now reorders scene groups so one persisted group sequence can drive both settings management and the SceneView quick-switch list.
 - `sceneCardFlipUtils.ts`: [Active] - Resolves persisted vs. forced scene-card back-side state so timer/todo cards can lock swipe-back only when a current-slot timeline record is forcing the flip.
 - `sceneCardStoredFlipUtils.ts`: [Active] - Separates manual timer/todo flip persistence from legacy auto-flip booleans so stale cached backs no longer override current-slot timeline matching.

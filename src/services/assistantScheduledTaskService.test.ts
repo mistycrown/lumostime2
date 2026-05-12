@@ -5,6 +5,7 @@
  * @pos Service Tests (Assistant Scheduled Tasks)
  * @description Verifies that recurring assistant task templates reuse todo recurrence rules correctly and always keep one next native reminder seeded per enabled task.
  *
+ * @updated 2026-05-12: Added regression coverage for atomic reminder consumption so one scheduled task cannot keep multiple pending reminders after a successful trigger handoff.
  * @updated 2026-05-10: Added regression coverage for stale-linked reminder healing and duplicate pending-reminder collapse.
  * @updated 2026-05-09: Added first-pass coverage for recurring assistant scheduled-task persistence and reminder materialization.
  */
@@ -276,5 +277,65 @@ describe('assistantScheduledTaskService', () => {
     expect(removed?.id).toBe('task-1');
     expect(assistantScheduledTaskService.listTasks()).toEqual([]);
     expect(assistantReminderQueueService.listReminders()).toEqual([]);
+  });
+
+  it('removes the previous reminder before seeding the next one for the same scheduled task', () => {
+    assistantReminderQueueService.saveReminders([
+      {
+        id: 'reminder-1',
+        type: 'self_followup',
+        dueAt: '2026-05-11T00:00:00.000Z',
+        status: 'pending',
+        text: '每周一提醒我交周报',
+        scheduledTaskId: 'task-1',
+        source: 'system',
+        createdAt: '2026-05-09T00:00:00.000Z'
+      },
+      {
+        id: 'reminder-duplicate',
+        type: 'self_followup',
+        dueAt: '2026-05-11T00:00:00.000Z',
+        status: 'pending',
+        text: '每周一提醒我交周报',
+        scheduledTaskId: 'task-1',
+        source: 'system',
+        createdAt: '2026-05-09T00:01:00.000Z'
+      }
+    ]);
+
+    assistantScheduledTaskService.saveTasks([
+      {
+        id: 'task-1',
+        text: '每周一提醒我交周报',
+        time: '08:00',
+        recurrenceRule: {
+          frequency: 'weekly',
+          startDate: '2026-05-01',
+          weekdays: [1]
+        },
+        enabled: true,
+        createdAt: '2026-05-09T00:00:00.000Z',
+        updatedAt: '2026-05-09T00:00:00.000Z',
+        nextTriggerAt: '2026-05-11T00:00:00.000Z',
+        pendingReminderId: 'reminder-1'
+      }
+    ]);
+
+    const result = assistantScheduledTaskService.consumeTriggeredReminder(
+      'reminder-1',
+      '2026-05-11T00:05:00.000Z'
+    );
+
+    expect(result.removedReminderIds).toEqual(['reminder-1', 'reminder-duplicate']);
+    expect(result.createdReminders).toHaveLength(1);
+    expect(result.createdReminders[0].dueAt).toBe('2026-05-18T00:00:00.000Z');
+    expect(result.tasks[0].pendingReminderId).toBe(result.createdReminders[0].id);
+    expect(result.tasks[0].nextTriggerAt).toBe('2026-05-18T00:00:00.000Z');
+
+    const pendingTaskReminders = assistantReminderQueueService.listReminders().filter((reminder) => (
+      reminder.scheduledTaskId === 'task-1' && reminder.status === 'pending'
+    ));
+    expect(pendingTaskReminders).toHaveLength(1);
+    expect(pendingTaskReminders[0].id).toBe(result.createdReminders[0].id);
   });
 });

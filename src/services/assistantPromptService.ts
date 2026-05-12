@@ -5,6 +5,7 @@
  * @pos Service (Assistant Prompt Builder)
  * @description Loads or falls back to shared assistant-base and mode-specific prompt assets, then assembles layered prompts for the unified assistant flow without duplicating prompt logic across the app.
  *
+ * @updated 2026-05-12: Strengthened reminder guidance so ongoing work can trigger timed follow-up reminders that wake the background agent, while active reminder text stays free of relative time wording like "tomorrow".
  * @updated 2026-05-11: Added reminder-planning guidance so punctual attendance events default to a small lead-time reminder, usually 5 minutes early.
  * @updated 2026-05-10: Removed assistant-side due-reminder deletion guidance so runtime reminder cleanup, not model judgment, owns consumption of fired reminders.
  * @updated 2026-05-06: Aligned fallback foreground tool guidance with live execution boundaries for `edit_log`, `create_todo`, and `create_subtask`.
@@ -309,8 +310,11 @@ Reminder rules:
 
 - If the user explicitly asks for a reminder, return it in reminders instead of only describing it in prose.
 - You may also return a follow-up reminder when the user shares a concrete same-day plan or priority and the reminder clearly helps track execution.
+- If a matter is ongoing, spans multiple sessions, or requires checking the user's later implementation and progress, proactively set a timed follow-up reminder so the background agent can wake up and check status instead of relying only on static memory.
 - Every reminder dueAt must be one concrete local-offset ISO datetime such as 2026-04-27T20:00:00+08:00.
 - For relative reminder requests like in 5 minutes, in half an hour, tonight, or tomorrow morning, compute dueAt directly from the provided current time context instead of guessing.
+- Reminder text must stay purely descriptive and must not include relative time adverbs such as today, tomorrow, or the day after tomorrow.
+- Write only the thing to remind the user about, such as "remind the user to stretch" or "remind the user to submit the weekly report", not "tomorrow remind the user to stretch".
 - If the reminder is for a punctual attendance event that the user needs to join, arrive at, depart for, or be ready for on time, such as a meeting, class, appointment, interview, or train departure, do not default dueAt to the event start time itself.
 - For these punctual attendance reminders, prefer setting dueAt a few minutes earlier so the user gets warned before the event; use 5 minutes early as the default unless the user specifies a different lead time or the scenario clearly needs more preparation time.
 - Do not merely say "I set a reminder" in assistantReply unless reminders is non-empty.
@@ -336,7 +340,7 @@ Todo rules:
 - For today's plan follow-up, prefer scheduledDate = today for newly created todos when that matches the user's request.
 - If the task is a single, near-term action that the user is trying to finish today, such as reading one paper or finishing one concrete deliverable, you may set scheduledDate = today.
 - If the task is project-like, ongoing, or naturally spans multiple sessions, such as thesis writing, project development, or long-running workstreams, do not default scheduledDate to today just because the user says they will work on it today.
-- For these project-like tasks, you may still set a follow-up reminder for later today so the assistant can keep tracking progress.
+- For these project-like tasks, you may still set one or more timed follow-up reminders when they would help the assistant keep tracking progress across later checkpoints.
 - When turning today's plan into todos, prefer a small number of clear actionable items over a long fuzzy task list.
 - If today's plan is still vague, keep toolCalls empty and ask one short follow-up question before creating todos.
 
@@ -401,6 +405,9 @@ Write to these memory fields carefully:
 - lastKnownState: the user's current real-world state when it is important and likely to matter soon.
 - workingMemorySummary: the short-to-medium-term thread, workstream, or active objective the assistant should continue helping with.
 - activeReminders: only reminders that are still pending and still need future follow-up.
+- When writing activeReminders, keep reminder text purely descriptive and do not include relative time adverbs such as today, tomorrow, or the day after tomorrow.
+- Reminder text should say only what to remind the user about, such as "remind the user to submit the weekly report", not "tomorrow remind the user to submit the weekly report".
+- If a matter is ongoing and requires continued attention to the user's execution or progress, proactively keep or create timed reminders so a future background turn can wake up and check how the user is progressing.
 - recentDecisions: one latest concise assistant behavior summary, decision summary, or reusable operating rule that should remain visible for the next turns.
 - For background silent turns, prefer putting the user-visible explanation in decisionSummary, and only mirror the final latest-decision wording into recentDecisions if memory is being updated.
 

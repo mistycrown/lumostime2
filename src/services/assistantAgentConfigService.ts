@@ -5,10 +5,12 @@
  * @pos Service (Assistant Agent Config)
  * @description Stores the background assistant agent's runtime configuration, including polling, random check-in, and long-term-memory toggles, so the shared AI window and native plugin can stay in sync.
  *
+ * @updated 2026-05-12: Normalized assistant quiet-hours values to compact `HHMM` strings so the UI can accept user-entered four-digit random-check-in protection windows while still migrating older `HH:MM` data.
  * @updated 2026-04-26: Added persistent assistant agent config storage for AI chat settings, native polling sync, and long-term-memory control.
  */
 
 import type { AssistantAgentConfig } from '../types/assistant';
+import { normalizeAssistantQuietHoursValue } from '../utils/assistantQuietHours';
 
 const ASSISTANT_AGENT_CONFIG_KEY = 'lumostime_assistant_agent_config_v1';
 
@@ -51,11 +53,11 @@ const normalizeConfig = (value: unknown): AssistantAgentConfig => {
     minCheckinMinutes,
     maxCheckinMinutes,
     quietHoursEnabled: candidate.quietHoursEnabled === true,
-    ...(typeof candidate.quietHoursStart === 'string' && candidate.quietHoursStart.trim()
-      ? { quietHoursStart: candidate.quietHoursStart.trim() }
+    ...(normalizeAssistantQuietHoursValue(candidate.quietHoursStart)
+      ? { quietHoursStart: normalizeAssistantQuietHoursValue(candidate.quietHoursStart) }
       : {}),
-    ...(typeof candidate.quietHoursEnd === 'string' && candidate.quietHoursEnd.trim()
-      ? { quietHoursEnd: candidate.quietHoursEnd.trim() }
+    ...(normalizeAssistantQuietHoursValue(candidate.quietHoursEnd)
+      ? { quietHoursEnd: normalizeAssistantQuietHoursValue(candidate.quietHoursEnd) }
       : {}),
     minimumNudgeGapMinutes: clampMinutes(
       candidate.minimumNudgeGapMinutes,

@@ -540,6 +540,10 @@ public class AssistantAgentService extends Service {
 
     private int parseTimeOfDayMinutes(String value) {
         String normalized = safeTrim(value);
+        if (normalized.matches("^\\d{4}$")) {
+            normalized = normalized.substring(0, 2) + ":" + normalized.substring(2, 4);
+        }
+
         if (!normalized.matches("^\\d{2}:\\d{2}$")) {
             return -1;
         }
