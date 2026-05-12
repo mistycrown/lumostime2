@@ -30,6 +30,7 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 > Last updated: 2026-05-11
 - `TodoView.tsx`, `TodoMonthView.tsx`: The Todo month planner now opens the shared quick-add schedule modal when users tap a day numeral, matching the week planner while preserving full-cell taps for expanding that day's detail rows.
+- `TodoView.tsx`, `TodoMonthView.tsx`: Entering the Todo `月视图` now sends an explicit post-mount `本月` jump signal from the parent schedule screen, so the rolling calendar snaps to the current month on entry instead of sometimes staying at the loaded window's top month.
 - `TodoView.tsx`, `TodoMonthView.tsx`, `filterUtils.ts`: The Todo month-view display settings now include one persisted `隐藏筛选式` field that reuses custom-filter syntax to hide matching entries by todo title/category, linked activity/category, scope, and note without changing week or list views.
 - `SceneSettingsView.tsx`, `SceneView.tsx`, `sceneGroupStorage.ts`: Manual switch-mode management now lets users move scene groups up and down, and that saved order also drives the Scene page's top-right manual quick-switch dropdown.
 - `TodoView.tsx`, `TodoBentoWeekView.tsx`: The Todo schedule week navigation now uses one parent-owned Monday week start as the single source of truth, so the standard week view and `八宫格` share the same header range, week picker date, and explicit week-switch actions.

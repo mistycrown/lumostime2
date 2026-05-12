@@ -5,6 +5,7 @@
  * @pos Service (Assistant Orchestrator)
  * @description Orchestrates Android-first assistant system turns by loading structured memory, assembling a prompt, calling the existing AI service, and applying the resulting silent/message/reminder/memory actions back into local state.
  *
+ * @updated 2026-05-12: Background message persistence now falls back only to the latest ordinary conversation with a real user-authored turn, so template sessions never receive native or web background replies by accident.
  * @updated 2026-05-06: Passed through explicit `yesterdayTimelineSummary` alongside today's activity records so background turns see both recent days in state context.
  * @updated 2026-05-06: Passed through optional `timelineReviewSummary`, dropped the stale recent-log turn input, and treat any background reply text as a surfaced message even if the model drifts from the expected outcome label.
  * @updated 2026-05-04: Linked persisted background messages back to their source call-history entries so debug mode can open the right request trace directly from the message bubble.
@@ -46,6 +47,7 @@ import { assistantPromptService } from './assistantPromptService';
 import { assistantReminderQueueService } from './assistantReminderQueueService';
 import { assistantTurnService } from './assistantTurnService';
 import { formatAssistantDateTimeForDisplay, normalizeAssistantDateTime } from '../utils/assistantTime';
+import { resolveLatestOrdinaryAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
 import { buildAssistantDisplayParts } from '../utils/assistantMessageParts';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
 
@@ -118,6 +120,9 @@ interface PersistedAIChatSession {
   personaId: string;
   contextCacheEnabled: boolean;
   messages: PersistedAIChatMessage[];
+  templateMeta?: {
+    templateType?: string;
+  };
 }
 
 interface PersistedAIChatPersonaSummary {
@@ -524,14 +529,16 @@ const persistAssistantMessage = (
   const sessions = persistedSessions.length > 0
     ? persistedSessions
     : [createFallbackPersistedSession()];
-
-  const sortedSessions = [...sessions].sort((left, right) => right.updatedAt - left.updatedAt);
   const resolvedTargetSessionId = (
     targetSessionId
     && sessions.some((session) => session.id === targetSessionId)
   )
     ? targetSessionId
-    : sortedSessions[0].id;
+    : resolveLatestOrdinaryAssistantBackgroundSession(sessions)?.id;
+  if (!resolvedTargetSessionId) {
+    return null;
+  }
+
   const now = Date.now();
   const nextMessage: PersistedAIChatMessage = {
     id: crypto.randomUUID(),

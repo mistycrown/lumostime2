@@ -4,7 +4,9 @@
  * @output Reference-style rolling month schedule UI backed by real daily todo data
  * @pos Component (Todo scheduling)
  * @description Renders the editorial monthly schedule view adapted from the minimalist demo, using shared todo schedule utilities so each day shows the same real Arrange / Due / Repeat / Done / Trace data as the week planner.
- * @updated 2026-05-11: Fixed month-view open-time auto-positioning so the first scroll waits for the measured container height and targets the parent-provided reference week instead of jumping loosely around today's month.
+ * @updated 2026-05-11: Prevented month-edge preloading from firing during programmatic entry jumps, so the smooth `本月` auto-scroll no longer prepends earlier months mid-animation and yanks the viewport back up to March.
+ * @updated 2026-05-11: Added an explicit parent-driven month-entry jump signal and replays the shared `本月` jump after mount, so opening the month planner no longer intermittently gets stuck at the rolling range's top month before the auto-scroll lands.
+ * @updated 2026-05-11: Reused the top-right `本月` jump path for month-view entry, so opening the month planner now lands on the same current-month position as tapping the header shortcut instead of inheriting the parent reference week's offset.
  * @updated 2026-05-11: Limited cross-month dimming to the date numerals instead of the whole cell, and nudged expanded-row schedule tags slightly downward to better center against the task title line.
  * @updated 2026-05-11: Added a hairline side inset for the month grid, removed gray completed-task text treatment, and unified regular-entry and Trace row baselines so mixed rows stay vertically aligned.
  * @updated 2026-05-11: Made each month-cell date numeral a dedicated quick-add trigger, matching week view while leaving the rest of the cell focused on expanding that day's detail rows.
@@ -87,6 +89,7 @@ interface TodoMonthViewProps {
   scopes: Scope[];
   logs: Log[];
   referenceDate: Date;
+  entryJumpSignal: number;
   onMoveScheduleEntry?: (entry: TodoDateEntry, targetDateKey: string) => void;
   onOpenDay?: (dateKey: string) => void;
   onOpenDatePicker?: () => void;
@@ -240,6 +243,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   scopes,
   logs,
   referenceDate,
+  entryJumpSignal,
   onMoveScheduleEntry,
   onOpenDay,
   onOpenDatePicker,
@@ -474,6 +478,10 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
     scheduleActiveMonthFreezeSettle();
   };
 
+  const jumpToCurrentMonth = () => {
+    scrollToMonth(today);
+  };
+
   const handleMonthScroll = () => {
     const container = scrollRef.current;
     if (!container || isExtendingRangeRef.current) {
@@ -481,6 +489,10 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
     }
 
     scheduleActiveMonthFreezeSettle();
+
+    if (activeMonthFreezeTargetRef.current) {
+      return;
+    }
 
     if (container.scrollTop <= MONTH_VIEW_EDGE_LOAD_THRESHOLD_PX) {
       extendLoadedRange('prepend');
@@ -799,27 +811,31 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   }, [loadedRange, weeks]);
 
   useEffect(() => {
-    if (containerHeight === 0 || hasInitialScrollRef.current) {
+    if (containerHeight === 0 || entryJumpSignal === 0) {
       return;
     }
 
-    const initialReferenceDateKey = formatDateKey(referenceDate);
-    const initialReferenceMonthKey = getMonthKey(referenceDate);
+    let secondFrameId: number | null = null;
+    const applyCurrentMonthEntryJump = () => {
+      scrollToMonth(today);
+      lastAppliedReferenceDateKeyRef.current = formatDateKey(referenceDate);
+      hasInitialScrollRef.current = true;
+    };
 
-    pendingReferenceDateKeyRef.current = initialReferenceDateKey;
-    freezeActiveMonthUntilScrollSettles(initialReferenceMonthKey);
+    const firstFrameId = window.requestAnimationFrame(() => {
+      applyCurrentMonthEntryJump();
+      secondFrameId = window.requestAnimationFrame(() => {
+        applyCurrentMonthEntryJump();
+      });
+    });
 
-    if (!ensureMonthLoaded(referenceDate)) {
-      return;
-    }
-
-    scrollToWeekContainingDate(referenceDate);
-    pendingReferenceDateKeyRef.current = null;
-    lastAppliedReferenceDateKeyRef.current = initialReferenceDateKey;
-    setActiveMonth(initialReferenceMonthKey);
-    scheduleActiveMonthFreezeSettle();
-    hasInitialScrollRef.current = true;
-  }, [containerHeight, referenceDate]);
+    return () => {
+      window.cancelAnimationFrame(firstFrameId);
+      if (secondFrameId !== null) {
+        window.cancelAnimationFrame(secondFrameId);
+      }
+    };
+  }, [containerHeight, entryJumpSignal, referenceDate, today]);
 
   useEffect(() => {
     if (!hasInitialScrollRef.current) {
@@ -1180,7 +1196,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
             </div>
             <button
               type="button"
-              onClick={() => scrollToMonth(today)}
+              onClick={jumpToCurrentMonth}
               className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] tracking-[0.14em] transition-colors ${
                 isCurrentMonthActive
                   ? 'bg-stone-100 text-slate-600'

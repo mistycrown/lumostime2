@@ -4,6 +4,7 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
+ * @updated 2026-05-11: Added an explicit month-view entry jump signal from the parent schedule screen so opening `月视图` now replays the same `本月` jump after the calendar mounts, instead of sometimes staying at the rolling window's top month.
  * @updated 2026-05-11: Routed month-view date numeral taps into the shared quick-add schedule modal so monthly and weekly planners now open the same fast create flow for a chosen day.
  * @updated 2026-05-11: Passed activity-category, todo-category, and scope metadata into the month planner so its display-settings hidden filter can reuse custom-filter syntax against rendered todo entries.
  * @updated 2026-05-10: Rebuilt schedule-week navigation around one parent-owned Monday `weekStart` so the standard week view and `八宫格` now share the same source of truth for labels and switching.
@@ -1068,6 +1069,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     const saved = localStorage.getItem(TODO_SCHEDULE_VIEW_MODE_STORAGE_KEY);
     return saved === 'month' || saved === 'bento' ? saved : 'week';
   });
+  const [monthViewEntryJumpSignal, setMonthViewEntryJumpSignal] = useState(0);
   const [isScheduleViewMenuOpen, setIsScheduleViewMenuOpen] = useState(false);
   const [duplicatingTodo, setDuplicatingTodo] = useState<TodoItem | null>(null);
   const weekScrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -1082,6 +1084,10 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   const weekSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
   const weekSwipeAxisRef = useRef<'x' | 'y' | null>(null);
   const weekSwipeEligibleRef = useRef(false);
+  const previousScheduleScreenStateRef = useRef<{
+    screenMode: 'list' | 'week';
+    scheduleViewMode: TodoScheduleViewMode;
+  } | null>(null);
   const {
     quickActionTodo,
     quickActionOpenedAt,
@@ -1160,6 +1166,27 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       setIsWeekJumpPickerOpen(false);
     }
   }, [isWeekJumpPickerOpen, screenMode]);
+
+  React.useEffect(() => {
+    const previousState = previousScheduleScreenStateRef.current;
+    const isEnteringMonthView = screenMode === 'week'
+      && scheduleViewMode === 'month'
+      && (
+        previousState === null
+        || previousState.screenMode !== 'week'
+        || previousState.scheduleViewMode !== 'month'
+      );
+
+    if (isEnteringMonthView) {
+      setScheduleWeekStart(getStartOfWeek(new Date()));
+      setMonthViewEntryJumpSignal((previous) => previous + 1);
+    }
+
+    previousScheduleScreenStateRef.current = {
+      screenMode,
+      scheduleViewMode
+    };
+  }, [scheduleViewMode, screenMode]);
 
   React.useEffect(() => {
     if (!isScheduleViewMenuOpen) {
@@ -2317,6 +2344,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                 scopes={scopes}
                 logs={logs}
                 referenceDate={scheduleWeekStart}
+                entryJumpSignal={monthViewEntryJumpSignal}
                 onMoveScheduleEntry={handleScheduleEntryMove}
                 onOpenDay={(dateKey) => {
                   setAssignModalDate(dateKey);

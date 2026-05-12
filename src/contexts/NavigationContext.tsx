@@ -119,6 +119,8 @@ interface NavigationContextType {
     setCurrentWeeklyReviewStart: (date: Date | null) => void;
     currentWeeklyReviewEnd: Date | null;
     setCurrentWeeklyReviewEnd: (date: Date | null) => void;
+    currentWeeklyReviewInitialTab: 'data' | 'guide' | 'narrative' | null;
+    setCurrentWeeklyReviewInitialTab: (tab: 'data' | 'guide' | 'narrative' | null) => void;
     currentMonthlyReviewStart: Date | null;
     setCurrentMonthlyReviewStart: (date: Date | null) => void;
     currentMonthlyReviewEnd: Date | null;
@@ -274,6 +276,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [currentOnThisDayDate, setCurrentOnThisDayDate] = useState<Date | null>(null);
     const [currentWeeklyReviewStart, setCurrentWeeklyReviewStart] = useState<Date | null>(null);
     const [currentWeeklyReviewEnd, setCurrentWeeklyReviewEnd] = useState<Date | null>(null);
+    const [currentWeeklyReviewInitialTab, setCurrentWeeklyReviewInitialTab] = useState<'data' | 'guide' | 'narrative' | null>(null);
     const [currentMonthlyReviewStart, setCurrentMonthlyReviewStart] = useState<Date | null>(null);
     const [currentMonthlyReviewEnd, setCurrentMonthlyReviewEnd] = useState<Date | null>(null);
 
@@ -379,6 +382,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setCurrentWeeklyReviewStart,
             currentWeeklyReviewEnd,
             setCurrentWeeklyReviewEnd,
+            currentWeeklyReviewInitialTab,
+            setCurrentWeeklyReviewInitialTab,
             currentMonthlyReviewStart,
             setCurrentMonthlyReviewStart,
             currentMonthlyReviewEnd,

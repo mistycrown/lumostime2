@@ -44,10 +44,32 @@ describe('assistantPromptService', () => {
     expect(prompt).toContain('use 5 minutes early as the default');
   });
 
+  it('fallback foreground tools prompt keeps reminder text free of relative time wording', async () => {
+    const prompt = await assistantPromptService.getForegroundToolsPrompt();
+
+    expect(prompt).toContain('must not include relative time adverbs such as today, tomorrow, or the day after tomorrow');
+    expect(prompt).toContain('not "tomorrow remind the user to stretch"');
+  });
+
+  it('fallback foreground tools prompt encourages timed follow-up reminders for ongoing progress tracking', async () => {
+    const prompt = await assistantPromptService.getForegroundToolsPrompt();
+
+    expect(prompt).toContain('requires checking the user\'s later implementation and progress');
+    expect(prompt).toContain('background agent can wake up and check status');
+  });
+
   it('fallback memory rules keep fired-reminder cleanup in runtime instead of the model', async () => {
     const prompt = await assistantPromptService.getMemoryRulesPrompt();
 
     expect(prompt).toContain('the runtime will reconcile fired reminders after successful consumption');
     expect(prompt).not.toContain('Remove a reminder from activeReminders once it has already come due and this turn is reacting to it');
+  });
+
+  it('fallback memory rules keep active reminder text descriptive instead of relative-time based', async () => {
+    const prompt = await assistantPromptService.getMemoryRulesPrompt();
+
+    expect(prompt).toContain('keep reminder text purely descriptive');
+    expect(prompt).toContain('not "tomorrow remind the user to submit the weekly report"');
+    expect(prompt).toContain('requires continued attention to the user\'s execution or progress');
   });
 });

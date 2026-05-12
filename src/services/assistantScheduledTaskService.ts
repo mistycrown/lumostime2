@@ -5,6 +5,7 @@
  * @pos Service (Assistant Scheduled Tasks)
  * @description Stores recurring assistant task templates, computes their next concrete trigger datetimes from shared todo recurrence rules, and continuously keeps one next native reminder per enabled task so Android can fire reminder_due at the correct time without waiting for check-in logic.
  *
+ * @updated 2026-05-12: Added atomic scheduled-task reminder consumption so a successfully triggered reminder is removed before the next occurrence is materialized, while duplicate pending reminders for the same task are purged during the same handoff.
  * @updated 2026-05-10: Reconciled duplicate scheduled-task reminders back down to one active occurrence and stopped advancing tasks before the current reminder was actually consumed.
  * @updated 2026-05-09: Added recurring assistant scheduled-task persistence, next-trigger calculation, linked-reminder reconciliation, and native reminder seeding for recurring assistant tasks.
  */
@@ -220,6 +221,11 @@ const buildInitialNextTriggerAt = (recurrenceRule: TodoRecurrenceRule, time: str
   return findNextTriggerAt(recurrenceRule, time, baseline);
 };
 
+const stripPendingReminderId = (task: AssistantScheduledTask): AssistantScheduledTask => {
+  const { pendingReminderId: _removed, ...rest } = task;
+  return rest;
+};
+
 export const assistantScheduledTaskService = {
   getStorageKey(): string {
     return ASSISTANT_SCHEDULED_TASKS_KEY;
@@ -347,6 +353,66 @@ export const assistantScheduledTaskService = {
     localStorage.removeItem(ASSISTANT_SCHEDULED_TASKS_KEY);
   },
 
+  consumeTriggeredReminder(
+    reminderId: string,
+    triggeredAt = new Date().toISOString()
+  ): { tasks: AssistantScheduledTask[]; createdReminders: AssistantReminder[]; removedReminderIds: string[] } {
+    const normalizedReminderId = reminderId.trim();
+    if (!normalizedReminderId) {
+      const result = assistantScheduledTaskService.syncScheduledTaskReminders(new Date(triggeredAt));
+      return { ...result, removedReminderIds: [] };
+    }
+
+    const reminderQueue = assistantReminderQueueService.listReminders();
+    const tasks = assistantScheduledTaskService.listTasks();
+    const triggeringReminder = reminderQueue.find((reminder) => reminder.id === normalizedReminderId) || null;
+    const targetTask = tasks.find((task) => (
+      task.pendingReminderId === normalizedReminderId
+      || (triggeringReminder?.scheduledTaskId ? task.id === triggeringReminder.scheduledTaskId : false)
+    )) || null;
+
+    if (!targetTask) {
+      const removedReminder = assistantReminderQueueService.markDispatched(normalizedReminderId, triggeredAt);
+      const result = assistantScheduledTaskService.syncScheduledTaskReminders(new Date(triggeredAt));
+      return {
+        ...result,
+        removedReminderIds: removedReminder ? [removedReminder.id] : []
+      };
+    }
+
+    const removedReminderIds = Array.from(new Set(
+      reminderQueue
+        .filter((reminder) => reminder.status === 'pending' && reminder.scheduledTaskId === targetTask.id)
+        .map((reminder) => reminder.id)
+        .concat(normalizedReminderId)
+    ));
+    assistantReminderQueueService.saveReminders(
+      reminderQueue.filter((reminder) => !removedReminderIds.includes(reminder.id))
+    );
+
+    const targetTriggerMs = parseAssistantDateTime(targetTask.nextTriggerAt);
+    const followingTriggerAt = Number.isFinite(targetTriggerMs)
+      ? findNextTriggerAt(targetTask.recurrenceRule, targetTask.time, new Date(targetTriggerMs + 1_000))
+      : null;
+    const normalizedTriggeredAt = normalizeAssistantDateTime(triggeredAt) || new Date().toISOString();
+    const nextTask: AssistantScheduledTask = {
+      ...stripPendingReminderId(targetTask),
+      enabled: Boolean(followingTriggerAt),
+      nextTriggerAt: followingTriggerAt || targetTask.nextTriggerAt,
+      lastTriggeredAt: normalizedTriggeredAt,
+      updatedAt: normalizedTriggeredAt
+    };
+
+    assistantScheduledTaskService.saveTasks(tasks.map((task) => (
+      task.id === targetTask.id ? nextTask : task
+    )));
+    const result = assistantScheduledTaskService.syncScheduledTaskReminders(new Date(normalizedTriggeredAt));
+    return {
+      ...result,
+      removedReminderIds
+    };
+  },
+
   syncScheduledTaskReminders(now = new Date()): { tasks: AssistantScheduledTask[]; createdReminders: AssistantReminder[] } {
     const tasks = assistantScheduledTaskService.listTasks();
     const reminderQueue = assistantReminderQueueService.listReminders();
@@ -375,9 +441,8 @@ export const assistantScheduledTaskService = {
         }
 
         if (task.pendingReminderId) {
-          const { pendingReminderId: _removed, ...rest } = task;
           nextTask = {
-            ...rest,
+            ...stripPendingReminderId(task),
             updatedAt: nowIso
           };
           tasksChanged = true;
@@ -417,13 +482,12 @@ export const assistantScheduledTaskService = {
         if (Number.isFinite(nextTriggerMs) && nextTriggerMs <= nowMs) {
           const followingTriggerAt = findNextTriggerAt(task.recurrenceRule, task.time, new Date(nextTriggerMs + 1_000));
           nextTask = {
-            ...task,
+            ...stripPendingReminderId(task),
             enabled: Boolean(followingTriggerAt),
             nextTriggerAt: followingTriggerAt || task.nextTriggerAt,
             lastTriggeredAt: nowIso,
             updatedAt: nowIso
           };
-          delete nextTask.pendingReminderId;
           tasksChanged = true;
         }
       }

@@ -311,6 +311,91 @@ describe('assistantOrchestratorService', () => {
     expect(history[0].debugExchange).toEqual(debugExchange);
   });
 
+  it('falls back only to the latest ordinary conversation with a real user turn', async () => {
+    localStorage.setItem('lumostime_ai_chat_sessions_v1', JSON.stringify([
+      {
+        id: 'template-session',
+        title: '周复盘',
+        createdAt: 1,
+        updatedAt: 999,
+        personaId: 'persona-template',
+        contextCacheEnabled: true,
+        templateMeta: {
+          templateType: 'weekly_review'
+        },
+        messages: [
+          {
+            id: 'template-user',
+            role: 'user',
+            content: '写一下这周复盘',
+            createdAt: 999
+          }
+        ]
+      },
+      {
+        id: 'assistant-only-session',
+        title: '系统回灌',
+        createdAt: 1,
+        updatedAt: 800,
+        personaId: 'persona-assistant-only',
+        contextCacheEnabled: true,
+        messages: [
+          {
+            id: 'assistant-only',
+            role: 'assistant',
+            content: '我在。',
+            createdAt: 800
+          }
+        ]
+      },
+      {
+        id: 'ordinary-session',
+        title: '普通对话',
+        createdAt: 1,
+        updatedAt: 700,
+        personaId: 'persona-normal',
+        contextCacheEnabled: true,
+        messages: [
+          {
+            id: 'ordinary-user',
+            role: 'user',
+            content: '我先去写方案',
+            createdAt: 700
+          }
+        ]
+      }
+    ]));
+
+    vi.mocked(assistantTurnService.runUnifiedTurn).mockResolvedValue({
+      output: {
+        mode: 'background',
+        outcome: 'reply',
+        assistantReply: '写完了回来告诉我。',
+        memoryAction: 'no_update'
+      },
+      debug: debugExchange
+    });
+
+    await assistantOrchestratorService.runSystemTurn({
+      trigger: {
+        id: 'trigger-fallback-session',
+        type: 'checkin',
+        source: 'system',
+        createdAt: '2026-04-27T10:00:00.000Z',
+        text: 'check in'
+      },
+      currentDateTime: '2026-04-27T18:00:00+08:00',
+      defaultDate: '2026-04-27',
+      todayTimelineSummary: 'timeline'
+    });
+
+    const persistedSessions = JSON.parse(localStorage.getItem('lumostime_ai_chat_sessions_v1') || '[]');
+    expect(persistedSessions.find((session: any) => session.id === 'ordinary-session')?.messages).toHaveLength(2);
+    expect(persistedSessions.find((session: any) => session.id === 'ordinary-session')?.messages[1]?.content).toBe('写完了回来告诉我。');
+    expect(persistedSessions.find((session: any) => session.id === 'template-session')?.messages).toHaveLength(1);
+    expect(persistedSessions.find((session: any) => session.id === 'assistant-only-session')?.messages).toHaveLength(1);
+  });
+
   it('hydrates native completed replies into persisted chat sessions only once', () => {
     localStorage.setItem('lumostime_ai_chat_sessions_v1', JSON.stringify([{
       id: 'session-1',

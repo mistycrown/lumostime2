@@ -35,6 +35,7 @@ export const useReviewManager = () => {
         setCurrentWeeklyReviewStart,
         currentWeeklyReviewEnd,
         setCurrentWeeklyReviewEnd,
+        setCurrentWeeklyReviewInitialTab,
         setIsWeeklyReviewOpen,
         currentMonthlyReviewStart,
         setCurrentMonthlyReviewStart,
@@ -132,6 +133,7 @@ export const useReviewManager = () => {
 
         setCurrentWeeklyReviewStart(weekStart);
         setCurrentWeeklyReviewEnd(weekEnd);
+        setCurrentWeeklyReviewInitialTab(null);
         setIsWeeklyReviewOpen(true);
     };
 
@@ -139,6 +141,7 @@ export const useReviewManager = () => {
         setIsWeeklyReviewOpen(false);
         setCurrentWeeklyReviewStart(null);
         setCurrentWeeklyReviewEnd(null);
+        setCurrentWeeklyReviewInitialTab(null);
     };
 
     const handleUpdateWeeklyReview = (updatedReview: WeeklyReview) => {
