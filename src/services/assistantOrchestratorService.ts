@@ -814,17 +814,23 @@ export const assistantOrchestratorService = {
         conversation: assistantContextBuilder.buildConversationContext(
           (request.conversationHistory || []).map((turn) => ({
             role: turn.role,
-            content: turn.content
+            content: turn.content,
+            ...(typeof turn.createdAt === 'string' && turn.createdAt.trim()
+              ? { createdAt: turn.createdAt.trim() }
+              : {})
           }))
         ),
         stateContext: {
           currentDateTime: request.currentDateTime,
-          defaultDate: request.defaultDate,
-          todayTimelineSummary: request.todayTimelineSummary,
-          ...(request.yesterdayTimelineSummary ? { yesterdayTimelineSummary: request.yesterdayTimelineSummary } : {}),
+          stateContextDate: request.defaultDate,
+          currentLocalDate: request.defaultDate,
+          todayTimelineSummary: undefined,
+          yesterdayTimelineSummary: undefined,
+          timelineSummaryForDate: request.todayTimelineSummary,
+          ...(request.yesterdayTimelineSummary ? { timelineSummaryForPreviousDate: request.yesterdayTimelineSummary } : {}),
           ...(request.timelineReviewSummary ? { timelineReviewSummary: request.timelineReviewSummary } : {}),
           ...(request.activeSessionSummary ? { activeSessionSummary: request.activeSessionSummary } : {}),
-          ...(request.todayScheduledTodoSummary ? { todayScheduledTodoSummary: request.todayScheduledTodoSummary } : {}),
+          ...(request.todayScheduledTodoSummary ? { scheduledTodosForDateSummary: request.todayScheduledTodoSummary } : {}),
           ...(request.pinnedTodoSummary ? { pinnedTodoSummary: request.pinnedTodoSummary } : {}),
           ...(request.overdueTodoSummary ? { overdueTodoSummary: request.overdueTodoSummary } : {}),
           ...(request.reminderSummary ? { reminderSummary: request.reminderSummary } : {})
@@ -854,15 +860,16 @@ export const assistantOrchestratorService = {
 
     let updatedMemory: AssistantMemory = memory;
     const reminders = output.reminders || [];
-    const messageParts = output.assistantReply
-      ? buildAssistantDisplayParts(output.assistantReply, output.assistantReplyParts)
+    const replyContent = output.assistantReply?.trim() || '';
+    const messageParts = replyContent
+      ? buildAssistantDisplayParts(replyContent)
       : undefined;
     let memoryUpdates: PersistedAIChatMemoryUpdateSection[] = [];
-    const hasVisibleReply = Boolean(output.assistantReply);
+    const hasVisibleReply = Boolean(replyContent);
     const decision: AssistantSystemTurnDecision = {
       action: hasVisibleReply ? 'send_message' : 'silent',
       memoryAction: output.memoryAction,
-      ...(output.assistantReply ? { message: output.assistantReply } : {}),
+      ...(replyContent ? { message: replyContent } : {}),
       ...(messageParts?.length ? { messageParts } : {}),
       ...(reminders.length > 0 ? { reminders } : {}),
       ...(output.memoryAction === 'update_memory' && output.memoryPatch ? { memoryPatch: output.memoryPatch } : {}),
@@ -905,8 +912,8 @@ export const assistantOrchestratorService = {
     let surfacedMessageLocation: PersistedAssistantMessageLocation | null = null;
     const reminderUpdates = buildPersistedReminderUpdates(appliedReminders);
     const shouldRecordDecisionSummary = assistantConfig.longTermMemoryEnabled;
-    if (hasVisibleReply && output.assistantReply) {
-      surfacedMessage = output.assistantReply;
+    if (hasVisibleReply && replyContent) {
+      surfacedMessage = replyContent;
       surfacedMessageLocation = persistAssistantMessage(surfacedMessage, request.targetSessionId, {
         ...(messageParts?.length ? { displayParts: messageParts } : {}),
         backgroundDebugHistoryId: backgroundCallId,

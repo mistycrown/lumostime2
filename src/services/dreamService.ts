@@ -5,6 +5,7 @@
  * @pos Service (Dream)
  * @description Stores the explicit-only Dream attention system separately from assistant memory, including user-maintained concern topics, AI-maintained observation entries, and the manual `dream` workflow that can add, rewrite, or delete entries while normal chat and background turns remain read-only consumers.
  *
+ * @updated 2026-05-13: Flattened built-in and custom Dream topics into one unified prompt task list so every enabled topic reaches the Dream model at the same priority level.
  * @updated 2026-05-13: Preserved existing Dream topic notes and titles when toggling unrelated fields so enable/disable no longer clears long user-facing prompt copy.
  * @updated 2026-05-13: Added a one-way built-in Dream-topic migration so legacy preset groups automatically reconcile into the newer inner-traits, life-rhythm, wellbeing, and execution-pressure defaults without disturbing custom topics.
  * @updated 2026-05-12: Added direct single-entry edit/delete helpers so users can manually refine or remove individual Dream observations without rerunning the whole workflow.
@@ -72,6 +73,12 @@ interface RawDreamWorkflowResult {
   dreamCards?: unknown;
 }
 
+interface DreamPromptTopicTask {
+  topicId: string;
+  title: string;
+  instruction: string;
+}
+
 const hasMeaningfulDreamWorkflowResult = (value: RawDreamWorkflowResult | null | undefined): boolean => {
   if (!value || typeof value !== 'object') {
     return false;
@@ -132,6 +139,17 @@ const normalizeString = (value: unknown, maxLength = 400): string => (
     ? value.trim().replace(/\s+/g, ' ').slice(0, maxLength).trim()
     : ''
 );
+
+const buildDreamPromptTopicTask = (topic: DreamTopic): DreamPromptTopicTask => {
+  const title = normalizeString(topic.title, DREAM_TOPIC_TITLE_LIMIT);
+  const note = normalizeString(topic.note, DREAM_TOPIC_NOTE_LIMIT);
+
+  return {
+    topicId: topic.id,
+    title,
+    instruction: note || `Please use the topic title ${title || 'this topic'} as the main scope, and write long-horizon observations about recurring patterns, stable needs, repeating pressures, or ongoing tendencies rather than isolated events.`
+  };
+};
 
 const isIsoDate = (value: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(value);
 
@@ -571,7 +589,7 @@ const buildFallbackDreamCards = (
 ]);
 
 const buildSummaryDreamCard = (
-  assistantReply: string,
+  summaryText: string,
   rangeLabel: string,
   rangeStartDate: string,
   rangeEndDate: string,
@@ -824,7 +842,7 @@ export const dreamService = {
     const enabledTopics = state.topics.filter((topic) => topic.enabled);
     if (enabledTopics.length === 0) {
       const updatedAt = new Date().toISOString();
-      const assistantReply = '现在还没有启用中的 Dream 关注领域。你先去 Dream 里加几个想让我持续关注的主题，我再帮你整理。';
+      const assistantReply = '现在还没有启用中的 Dream 关注领域。\n\n你先去 Dream 里加几个想让我持续关注的主题，我再帮你整理。';
       return {
         assistantReply,
         patch: {
@@ -844,6 +862,7 @@ export const dreamService = {
 
     const topicMap = new Map(state.topics.map((topic) => [topic.id, topic]));
     const systemPrompt = DREAM_MODE_SYSTEM_PROMPT;
+    const dreamTopicTasks = enabledTopics.map(buildDreamPromptTopicTask);
 
     const userPrompt = [
       'Return exactly one JSON object with this shape:',
@@ -874,8 +893,8 @@ export const dreamService = {
       `Selected Dream range start: ${params.rangeStartDate}`,
       `Selected Dream range end: ${params.rangeEndDate}`,
       '',
-      'Dream topics:',
-      JSON.stringify(enabledTopics, null, 2),
+      'Dream topic tasks:',
+      JSON.stringify(dreamTopicTasks, null, 2),
       '',
       'Existing Dream entries:',
       JSON.stringify(state.entries.filter((entry) => topicMap.has(entry.topicId)), null, 2),
@@ -884,6 +903,9 @@ export const dreamService = {
       params.conversationSummary || '暂无',
       '',
       'Important:',
+      '- Treat every enabled Dream topic above as a first-class task at the same level, whether it is built-in or user-defined.',
+      '- For each topic, use its title and instruction as the direct scope for what belongs in that topic.',
+      '- Try to produce or revise at least one useful observation for every enabled topic that has any meaningful signal, and do not skip user-defined topics just because they are custom.',
       '- Recent conversation context is a first-class source for Dream整理, not just a side note.',
       '- Do not rely only on logs; if recent chat reveals meaningful ongoing issues or themes, include them in Dream when they match a topic.',
       '- If logs and recent chat together support multiple semantically distinct observations, split them into multiple Dream entries.',

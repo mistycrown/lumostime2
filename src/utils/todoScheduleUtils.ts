@@ -4,6 +4,7 @@
  * @output Week buckets, daily schedule entries, and badge metadata for todo planning views
  * @pos Utility (Todo planning)
  * @description Shared helpers for deriving scheduled, deadline, recurring, completed, and in-progress todo visibility without creating standalone occurrence records.
+ * @updated 2026-05-13: Added a shared compact recurrence-summary formatter so quick-actions and other lightweight todo surfaces can describe repeating rules with one consistent short label.
  * @updated 2026-05-13: Added shared monthly day-list parsing plus optional month-end fallback matching so monthly recurrence rules can target multiple days while limiting short-month fallback to day 31 when explicitly enabled.
  * @updated 2026-05-11: Added week-scoped month-layout helpers that reserve stable per-row lanes for continuous `Trace` entries, so month cells can render cross-day in-progress bars without breaking the expanded-day order model.
  * @updated 2026-05-10: Week planner buckets now carry resolved parent-task titles for subtasks so the week schedule can render inline `@parent` context without re-looking up hierarchy in the view.
@@ -72,6 +73,7 @@ export interface TodoMonthWeekLayout {
 export const TODO_ASSOCIATION_TODAY_CATEGORY_ID = '__todo_association_today__';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const TODO_RECURRENCE_WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'] as const;
 const TODO_SCHEDULE_MATCH_PRIORITY: Record<TodoScheduleMatchKind, number> = {
   deadline: 0,
   scheduled: 1,
@@ -119,6 +121,44 @@ export const formatMonthlyDayInput = (monthDays?: number[], fallbackDay?: number
     : (Number.isInteger(fallbackDay) && fallbackDay! >= 1 && fallbackDay! <= 31 ? [fallbackDay!] : []);
 
   return normalizedDays.join(' ');
+};
+
+export const formatTodoRecurrenceSummary = (rule?: TodoRecurrenceRule): string | null => {
+  if (!rule) {
+    return null;
+  }
+
+  const interval = Math.max(1, rule.interval || 1);
+  const prefix = rule.frequency === 'daily'
+    ? (interval > 1 ? `每${interval}天` : '每天')
+    : rule.frequency === 'weekly'
+      ? (interval > 1 ? `每${interval}周` : '每周')
+      : (interval > 1 ? `每${interval}月` : '每月');
+
+  if (rule.frequency === 'daily') {
+    return prefix;
+  }
+
+  const startDate = parseDateKey(rule.startDate);
+
+  if (rule.frequency === 'weekly') {
+    const weekdays = (rule.weekdays?.length ? rule.weekdays : (startDate ? [startDate.getDay()] : []))
+      .filter((weekday) => Number.isInteger(weekday) && weekday >= 0 && weekday <= 6);
+    const weekdaySummary = Array.from(new Set(weekdays))
+      .sort((left, right) => left - right)
+      .map((weekday) => TODO_RECURRENCE_WEEKDAY_LABELS[weekday])
+      .join('');
+
+    return weekdaySummary ? `${prefix}${weekdaySummary}` : prefix;
+  }
+
+  const fallbackDay = startDate?.getDate();
+  const monthDaySummary = formatMonthlyDayInput(rule.monthDays, fallbackDay)
+    .split(' ')
+    .filter(Boolean)
+    .join(',');
+
+  return monthDaySummary ? `${prefix} ${monthDaySummary}` : prefix;
 };
 
 export const formatDateKey = (date: Date): string => {

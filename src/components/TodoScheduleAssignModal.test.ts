@@ -4,6 +4,7 @@
  * @output Regression coverage for schedule picker todo filtering
  * @pos Test
  * @description Ensures the schedule assignment picker can hide unfinished subtasks when their parent todo is completed, even if the visible picker pool excludes completed parents.
+ * @updated 2026-05-13: Added regression coverage so recurring todos never appear inside the quick arrange/due picker pool.
  * @updated 2026-05-12: Added search coverage so matching subtasks keep their parent row visible inside the schedule assignment picker hierarchy.
  * @updated 2026-04-25: Added coverage for resolving completed-parent visibility from the full todo source instead of the unfinished picker subset.
  */
@@ -135,6 +136,35 @@ describe('getVisibleScheduleAssignTodos', () => {
     expect(rows.map((row) => `${row.level}:${row.todo.id}`)).toEqual([
       '0:parent-open',
       '1:child-match'
+    ]);
+  });
+
+  it('excludes recurring todos from the quick arrange and due picker pool', () => {
+    const allTodos: TodoItem[] = [
+      {
+        id: 'recurring',
+        categoryId: 'cat-1',
+        title: 'Recurring task',
+        isCompleted: false,
+        recurrenceRule: {
+          frequency: 'weekly',
+          startDate: '2026-05-01',
+          weekdays: [1]
+        }
+      } as TodoItem,
+      {
+        id: 'one-shot',
+        categoryId: 'cat-1',
+        title: 'One-shot task',
+        isCompleted: false
+      } as TodoItem
+    ];
+
+    expect(getVisibleScheduleAssignTodos(allTodos, allTodos, 'all', 'scheduled', 'scheduled').map((todo) => todo.id)).toEqual([
+      'one-shot'
+    ]);
+    expect(getVisibleScheduleAssignTodos(allTodos, allTodos, 'all', 'deadline', 'deadline').map((todo) => todo.id)).toEqual([
+      'one-shot'
     ]);
   });
 });

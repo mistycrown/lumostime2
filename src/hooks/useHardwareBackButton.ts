@@ -1,5 +1,6 @@
 /**
  * @file useHardwareBackButton.ts
+ * @updated 2026-05-13: Reordered overlay back priority so collection-launched log/todo details close before the underlying settings stack unwinds, keeping Android back aligned with on-screen close buttons.
  * @updated 2026-05-12: Routed todo-detail hardware back presses through the shared nested detail-history stack so child-task pages return to their parent detail before leaving the todo surface.
  * @input NavigationContext (all modal/view states including settings submenu hierarchy, search origin state, and custom filter overlay state)
  * @output Hardware Back Button Handler (backButton event listener)
@@ -110,6 +111,18 @@ export const useHardwareBackButton = () => {
             }
 
             // 1. Modals (High Priority)
+            if (focusDetailSessionId) {
+                setFocusDetailSessionId(null);
+                return;
+            }
+            if (isAddModalOpen) {
+                closeModal();
+                return;
+            }
+            if (isTodoModalOpen) {
+                closeTodoDetail();
+                return;
+            }
             if (isSettingsOpen) {
                 if (settingsSubmenu !== 'main') {
                     if (settingsSubmenuBackCloses) {
@@ -146,18 +159,6 @@ export const useHardwareBackButton = () => {
             }
             if (isShareViewOpen) {
                 setIsShareViewOpen(false);
-                return;
-            }
-            if (focusDetailSessionId) {
-                setFocusDetailSessionId(null);
-                return;
-            }
-            if (isAddModalOpen) {
-                closeModal();
-                return;
-            }
-            if (isTodoModalOpen) {
-                closeTodoDetail();
                 return;
             }
 

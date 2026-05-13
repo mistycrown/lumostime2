@@ -4,6 +4,7 @@
  * @output Session Updates (Note, Association), Completion Event
  * @pos View (Active Focus Overlay)
  * @description The main interface displayed during an active focus session. Shows the timer, allows associating the session with a Todo or Scope, editing the note, completing the session, and applying inline note templates.
+ * @updated 2026-05-13: Kept the focus detail overlay on the shared topmost `z-[100]` layer so collection-launched detail flows still cover the underlying settings stack cleanly.
  * @updated 2026-05-11: Added a one-shot completion-mode toggle beside the associated todo picker so finishing a focus session can also complete the linked unfinished task after the log is saved.
  * @updated 2026-05-05: Registered immersive focus mode with the shared Android back-handler stack so system back exits fullscreen before dismissing the focus detail overlay.
  * @updated 2026-04-22: Enabled hierarchical todo selection so focus-session todo pickers can expand subtasks beneath collapsed parent tasks.

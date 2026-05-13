@@ -3,9 +3,9 @@
  * @input Weekly review range selection text, local logs/todos/reviews, and optional existing weekly review content
  * @output Parsed weekly-review template targets, structured weekly context digests, and dedicated weekly-review AI prompt text
  * @pos Service (Weekly Review Template)
- * @description Centralizes the weekly-review template workflow, including strict week-range parsing, method selection metadata, Weekly Review lookup/creation helpers, compact per-week data packaging, and markdown-backed prompt composition for both weekly-review chat and weekly-review narrative writeback.
+ * @description Centralizes the weekly-review template workflow, including strict week-range parsing, method selection metadata, Weekly Review lookup/creation helpers, compact per-week data packaging, and prompt composition for both weekly-review chat and weekly-review narrative writeback.
  *
- * @updated 2026-05-12: Simplified the markdown hierarchy so each method now maps directly to one chat prompt section, while narrative writeback uses only the shared writeback-common prompt.
+ * @updated 2026-05-13: Moved weekly-review prompt copy into a typed TS constant so the template flow no longer depends on a markdown asset or runtime fetch/parse path.
  */
 
 import type {
@@ -18,34 +18,9 @@ import type {
   TodoItem,
   WeeklyReview
 } from '../types';
+import { WEEKLY_REVIEW_TEMPLATE_PROMPTS } from '../constants/weeklyReviewTemplatePrompts';
 import { calculateMonthlyStats, formatDuration, generateCheckItemStatsText } from '../utils/reviewStatsUtils';
 import { getLocalDateStr, getLocalTimeStr, getWeekRange } from '../utils/dateUtils';
-
-const WEEKLY_REVIEW_TEMPLATE_PROMPT_URL = '/assistant/weekly-review-template.md';
-
-const FALLBACK_WEEKLY_REVIEW_TEMPLATE_PROMPT = `
-# 周复盘模板
-
-## 通用提示词
-### 对话通用提示词
-你是 LumosTime 的周复盘助手，帮助用户围绕选定的这一周做具体、诚实、有行动意义的复盘。
-
-### 写入 AI 叙事通用提示词
-当用户要求写入 AI 叙事时，你要为本地工具 write_weekly_review_narrative 生成完整的 narrativeMarkdown。这个 Markdown 必须包含标题、正文和最后的引用金句。
-
-## 分类提示词
-### PDCA
-采用 PDCA 视角分析这一周。
-
-### 系统复盘
-采用系统复盘视角分析这一周。
-
-### CBT
-采用 CBT（认知行为）视角分析这一周。
-
-### 叙事疗法
-采用叙事疗法视角分析这一周。
-`.trim();
 
 const STRICT_JSON_OUTPUT_RULES = [
   '=== Structured Output Contract ===',
@@ -59,14 +34,11 @@ const WEEKLY_REVIEW_CHAT_OUTPUT_SCHEMA = {
   mode: 'foreground',
   outcome: 'reply | clarify',
   assistantReply: 'string',
-  assistantReplyParts: ['string'],
   memoryAction: 'no_update'
 };
 
-const promptCache = new Map<string, string>();
-
 export type WeeklyReviewTemplateSelectionLabel = '本周' | '上周' | 'custom_date';
-export type WeeklyReviewTemplateStage = 'ready';
+export type WeeklyReviewTemplateStage = 'select_range' | 'select_method' | 'ready';
 export type WeeklyReviewMethodId = 'pdca' | 'systems' | 'cbt' | 'narrative';
 
 const WEEKLY_REVIEW_METHOD_TITLES: Record<WeeklyReviewMethodId, string> = {
@@ -92,11 +64,11 @@ export interface WeeklyReviewTemplateMethodOption {
 export interface WeeklyReviewTemplateSessionMeta {
   templateType: 'weekly_review';
   stage: WeeklyReviewTemplateStage;
-  weekStartDate: string;
-  weekEndDate: string;
-  selectedRangeLabel: WeeklyReviewTemplateSelectionLabel;
-  methodId: WeeklyReviewMethodId;
-  methodLabel: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  selectedRangeLabel?: WeeklyReviewTemplateSelectionLabel;
+  methodId?: WeeklyReviewMethodId;
+  methodLabel?: string;
   pendingWriteIntent?: boolean;
 }
 
@@ -132,6 +104,7 @@ interface BuildWeeklyReviewNarrativePromptParams {
   conversationSummary: string;
   existingNarrative?: string;
   mergeMode: 'create' | 'overwrite';
+  methodId?: WeeklyReviewMethodId;
 }
 
 export interface WeeklyReviewNarrativeToolCall {
@@ -143,125 +116,6 @@ export interface WeeklyReviewNarrativeToolCall {
     narrativeMarkdown: string;
   };
 }
-
-interface WeeklyReviewPromptAsset {
-  chatCommonPrompt: string;
-  writebackCommonPrompt: string;
-  chatMethodPrompts: Partial<Record<WeeklyReviewMethodId, string>>;
-}
-
-interface MarkdownSectionNode {
-  title: string;
-  level: number;
-  contentLines: string[];
-  children: MarkdownSectionNode[];
-}
-
-const loadPromptAsset = async (url: string, fallback: string): Promise<string> => {
-  if (promptCache.has(url)) {
-    return promptCache.get(url)!;
-  }
-
-  if (typeof fetch !== 'function') {
-    promptCache.set(url, fallback);
-    return fallback;
-  }
-
-  try {
-    const response = await fetch(url, { cache: 'no-cache' });
-    if (!response.ok) {
-      promptCache.set(url, fallback);
-      return fallback;
-    }
-
-    const text = (await response.text()).trim();
-    const resolved = text || fallback;
-    promptCache.set(url, resolved);
-    return resolved;
-  } catch (error) {
-    console.warn('[weeklyReviewTemplateService] Failed to load prompt asset, using fallback', url, error);
-    promptCache.set(url, fallback);
-    return fallback;
-  }
-};
-
-const normalizeSectionBody = (value: string): string => (
-  value
-    .replace(/\r\n/g, '\n')
-    .trim()
-);
-
-const buildMarkdownTree = (raw: string): MarkdownSectionNode => {
-  const root: MarkdownSectionNode = {
-    title: '__root__',
-    level: 0,
-    contentLines: [],
-    children: []
-  };
-  const stack: MarkdownSectionNode[] = [root];
-
-  raw.replace(/\r\n/g, '\n').split('\n').forEach((line) => {
-    const headingMatch = line.match(/^(#{1,6})\s+(.+?)\s*$/);
-    if (!headingMatch) {
-      stack[stack.length - 1].contentLines.push(line);
-      return;
-    }
-
-    const level = headingMatch[1].length;
-    const title = headingMatch[2].trim();
-    const node: MarkdownSectionNode = {
-      title,
-      level,
-      contentLines: [],
-      children: []
-    };
-
-    while (stack.length > 1 && stack[stack.length - 1].level >= level) {
-      stack.pop();
-    }
-
-    stack[stack.length - 1].children.push(node);
-    stack.push(node);
-  });
-
-  return root;
-};
-
-const findSectionPath = (root: MarkdownSectionNode, path: string[]): MarkdownSectionNode | null => {
-  let current: MarkdownSectionNode | null = root;
-  for (const part of path) {
-    current = current?.children.find((node) => node.title === part) || null;
-    if (!current) {
-      return null;
-    }
-  }
-
-  return current;
-};
-
-const parsePromptAsset = (raw: string): WeeklyReviewPromptAsset => {
-  const tree = buildMarkdownTree(raw);
-  const chatMethodPrompts: Partial<Record<WeeklyReviewMethodId, string>> = {};
-
-  (Object.entries(WEEKLY_REVIEW_METHOD_TITLES) as Array<[WeeklyReviewMethodId, string]>).forEach(([methodId, title]) => {
-    const node = findSectionPath(tree, ['分类提示词', title]);
-    chatMethodPrompts[methodId] = normalizeSectionBody((node?.contentLines || []).join('\n'));
-  });
-
-  return {
-    chatCommonPrompt: normalizeSectionBody(
-      (findSectionPath(tree, ['通用提示词', '对话通用提示词'])?.contentLines || []).join('\n')
-    ),
-    writebackCommonPrompt: normalizeSectionBody(
-      (findSectionPath(tree, ['通用提示词', '写入 AI 叙事通用提示词'])?.contentLines || []).join('\n')
-    ),
-    chatMethodPrompts
-  };
-};
-
-const getPromptAsset = async (): Promise<WeeklyReviewPromptAsset> => (
-  parsePromptAsset(await loadPromptAsset(WEEKLY_REVIEW_TEMPLATE_PROMPT_URL, FALLBACK_WEEKLY_REVIEW_TEMPLATE_PROMPT))
-);
 
 const compactText = (value?: string, maxLength = 90): string => {
   const normalized = (value || '').replace(/\s+/g, ' ').trim();
@@ -525,6 +379,63 @@ export const weeklyReviewTemplateService = {
     }));
   },
 
+  parseMethodSelectionInput(input: string): WeeklyReviewMethodId | null {
+    const trimmed = input.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const normalized = trimmed.toLowerCase().replace(/\s+/g, '');
+    if (normalized === 'pdca') {
+      return 'pdca';
+    }
+
+    if (normalized === 'cbt') {
+      return 'cbt';
+    }
+
+    if (['系统复盘', '绯荤粺澶嶇洏'].includes(trimmed)) {
+      return 'systems';
+    }
+
+    if (['叙事疗法', '鍙欎簨鐤楁硶'].includes(trimmed)) {
+      return 'narrative';
+    }
+
+    return null;
+  },
+
+  createSetupSessionMeta(): WeeklyReviewTemplateSessionMeta {
+    return {
+      templateType: 'weekly_review',
+      stage: 'select_range'
+    };
+  },
+
+  getRangeSelectionPrompt(): string {
+    return [
+      '这次我们先一步一步来。',
+      '你想复盘哪一周？',
+      '可以直接回复：本周、上周，或者输入一个 8 位日期 YYYYMMDD 来指定那一天所在的一周。'
+    ].join('\n');
+  },
+
+  getRangeSelectionInvalidPrompt(): string {
+    return '我暂时只能识别“本周”“上周”或 8 位日期 YYYYMMDD，你重新输入一次就行。';
+  },
+
+  getMethodSelectionPrompt(selection: WeeklyReviewTemplateSelectionResult): string {
+    return [
+      `即将复盘 ${selection.weekStartDate} ~ ${selection.weekEndDate}。`,
+      '要采用哪一种分析方式呢？',
+      `可以回复：${weeklyReviewTemplateService.listMethodOptions().map((item) => item.title).join(' / ')}`
+    ].join('\n');
+  },
+
+  getMethodSelectionInvalidPrompt(): string {
+    return `暂时只支持这四种方法：${weeklyReviewTemplateService.listMethodOptions().map((item) => item.title).join(' / ')}。请重新输入一种方法。`;
+  },
+
   parseWeekSelectionInput(input: string, now: Date = new Date()): WeeklyReviewTemplateSelectionResult | null {
     const trimmed = input.trim();
     if (!trimmed) {
@@ -691,8 +602,7 @@ export const weeklyReviewTemplateService = {
   async buildChatPrompts(
     params: BuildWeeklyReviewTemplateChatPromptParams
   ): Promise<{ systemPrompt: string; userPrompt: string }> {
-    const promptAsset = await getPromptAsset();
-    const methodPrompt = promptAsset.chatMethodPrompts[params.methodId] || '';
+    const methodPrompt = WEEKLY_REVIEW_TEMPLATE_PROMPTS.chatMethodPrompts[params.methodId] || '';
 
     const systemPrompt = [
       'You are LumosTime\'s weekly review discussion assistant.',
@@ -704,7 +614,7 @@ export const weeklyReviewTemplateService = {
       buildPersonaStyleLayer(params.personaPrompt),
       '',
       '=== Weekly Review Common Prompt ===',
-      promptAsset.chatCommonPrompt,
+      WEEKLY_REVIEW_TEMPLATE_PROMPTS.chatCommonPrompt,
       '',
       `=== Weekly Review Method Prompt (${WEEKLY_REVIEW_METHOD_TITLES[params.methodId]}) ===`,
       methodPrompt,
@@ -734,7 +644,6 @@ export const weeklyReviewTemplateService = {
   async buildNarrativeWritebackPrompts(
     params: BuildWeeklyReviewNarrativePromptParams
   ): Promise<{ systemPrompt: string; userPrompt: string }> {
-    const promptAsset = await getPromptAsset();
     const weekStartDate = params.weekDataText.match(/weekStartDate:\s*(.+)/)?.[1]?.trim() || '';
     const weekEndDate = params.weekDataText.match(/weekEndDate:\s*(.+)/)?.[1]?.trim() || '';
 
@@ -752,7 +661,7 @@ export const weeklyReviewTemplateService = {
       buildPersonaStyleLayer(params.personaPrompt),
       '',
       '=== Weekly Review Writeback Common Prompt ===',
-      promptAsset.writebackCommonPrompt,
+      WEEKLY_REVIEW_TEMPLATE_PROMPTS.writebackCommonPrompt,
       '',
       STRICT_JSON_OUTPUT_RULES,
       '=== Output Schema ===',

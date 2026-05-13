@@ -16,6 +16,7 @@
  * - 2026-05-10: Upgraded the post-start timer jump preference to a three-mode dropdown and passed the new mode setter into PreferencesSettingsView.
  * - 2026-05-12: Added a `Collection` subpage under the content section and moved the Collection entrance there with a minimalist archive-style browser.
  * - 2026-05-12: Swapped the Collection entry icon in settings from archive to star to match the timeline quick action.
+ * - 2026-05-13: Kept `Settings > Collections` mounted underneath shared log/todo detail overlays so closing those details returns directly to the current collection page.
  * - 2026-05-13: Fixed the garbled loading label shown while opening the Collection settings subpage.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -1020,14 +1021,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         return renderLazySettingsSubview(
             <CollectionSettingsView
                 onBack={settingsSubmenuBackCloses ? handleBackFromShortcutSubview : handleBackToMain}
-                onEditLog={onEditLog ? (log) => {
-                    onClose();
-                    window.setTimeout(() => onEditLog(log), 0);
-                } : undefined}
-                onEditTodo={onEditTodo ? (todo) => {
-                    onClose();
-                    window.setTimeout(() => onEditTodo(todo), 0);
-                } : undefined}
+                onEditLog={onEditLog}
+                onEditTodo={onEditTodo}
             />,
             '正在加载 Collection...'
         );

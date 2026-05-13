@@ -4,7 +4,8 @@
  * @output Regression coverage for virtual-category date matching, shared day entries, and week-view badge normalization
  * @pos Test (todo planning utilities)
  * @description Verifies today/tomorrow/this-week filtering and shared per-day entry building against Arrange, Due, and recurrence rules without creating occurrence records.
- * @updated 2026-05-13: Added monthly recurrence fallback coverage so explicit 31st-to-month-end rules match short months without changing legacy skip semantics.
+ * @updated 2026-05-13: Added compact recurrence-summary coverage so lightweight todo surfaces can reuse one short repeating-rule label format.
+ * @updated 2026-05-13: Added monthly multi-day parsing plus 31-only fallback coverage so monthly recurrence rules can target multiple dates without changing legacy short-month semantics for other days.
  * @updated 2026-05-11: Added regression coverage for week-scoped month trace layouts so overlapping `Trace` segments keep stable lanes, preserve non-trace order, split on non-trace days, and keep hidden counts aligned with sparse lane rows.
  * @updated 2026-05-10: Added regression coverage for week-view subtask parent labels so shared week buckets expose inline `@parent` context only for child rows.
  * @updated 2026-05-10: Added regression coverage for shared real-data day entries so month view and week view stay aligned on daily inclusion and priority ordering.
@@ -20,12 +21,16 @@ import {
   buildTodoDateEntryMap,
   buildTodoDateEntries,
   buildTodoMonthWeekLayout,
+  formatMonthlyDayInput,
+  formatTodoRecurrenceSummary,
   formatWeekTodoLineTitle,
   getTodoAssociationTodayTodos,
   getTodoScheduleMatches,
   getTodoScheduleRangeDateKeys,
   isTodoInAssociationTodayCategory,
-  matchesRecurrenceRule
+  matchesRecurrenceRule,
+  normalizeMonthlyDayInput,
+  parseMonthlyDayInput
 } from './todoScheduleUtils';
 
 const REFERENCE_DATE = new Date('2026-04-20T12:00:00+08:00');
@@ -115,6 +120,58 @@ describe('todoScheduleUtils virtual category helpers', () => {
       monthDays: [31],
       fallbackToMonthEnd: true
     }, '2026-04-30')).toBe(true);
+
+    expect(matchesRecurrenceRule({
+      frequency: 'monthly',
+      startDate: '2026-01-31',
+      monthDays: [29, 30, 31],
+      fallbackToMonthEnd: true
+    }, '2026-02-28')).toBe(true);
+
+    expect(matchesRecurrenceRule({
+      frequency: 'monthly',
+      startDate: '2026-01-31',
+      monthDays: [29, 30, 31],
+      fallbackToMonthEnd: true
+    }, '2026-02-27')).toBe(false);
+  });
+
+  test('parses monthly multi-day input as sorted unique day numbers', () => {
+    expect(normalizeMonthlyDayInput('1,15  31a')).toBe('1 15 31 ');
+    expect(parseMonthlyDayInput('31 1 15 31')).toEqual([1, 15, 31]);
+    expect(formatMonthlyDayInput([31, 1, 15, 31])).toBe('1 15 31');
+  });
+
+  test('formats compact recurrence summaries for daily, weekly, and monthly rules', () => {
+    expect(formatTodoRecurrenceSummary({
+      frequency: 'daily',
+      startDate: '2026-04-20'
+    })).toBe('每天');
+
+    expect(formatTodoRecurrenceSummary({
+      frequency: 'daily',
+      startDate: '2026-04-20',
+      interval: 2
+    })).toBe('每2天');
+
+    expect(formatTodoRecurrenceSummary({
+      frequency: 'weekly',
+      startDate: '2026-04-20',
+      weekdays: [1, 3, 5]
+    })).toBe('每周一三五');
+
+    expect(formatTodoRecurrenceSummary({
+      frequency: 'weekly',
+      startDate: '2026-04-20',
+      interval: 2,
+      weekdays: [1, 3, 5]
+    })).toBe('每2周一三五');
+
+    expect(formatTodoRecurrenceSummary({
+      frequency: 'monthly',
+      startDate: '2026-01-31',
+      monthDays: [31, 1, 15, 31]
+    })).toBe('每月 1,15,31');
   });
 
   test('matches the picker today category for pinned, arranged, due, or recurring todos that hit today', () => {

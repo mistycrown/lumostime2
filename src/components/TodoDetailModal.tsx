@@ -30,7 +30,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { TodoItem, TodoCategory, Log, Category, Scope, TodoProgressTrackingMode, TodoRecurrenceFrequency, TodoRecurrenceRule } from '../types';
 import { ScopeAssociation } from './ScopeAssociation';
 import { TagAssociation } from './TagAssociation';
-import { Trash2, CheckCircle2, TrendingUp, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Pin, RotateCcw, CalendarDays, Flag, Repeat2, Plus } from 'lucide-react';
+import { Trash2, Check, CheckCircle2, TrendingUp, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Pin, RotateCcw, CalendarDays, Flag, Repeat2, Plus } from 'lucide-react';
 import { DetailTimelineCard } from './DetailTimelineCard';
 import { TimelineImage } from './TimelineImage';
 import { imageService } from '../services/imageService';
@@ -99,6 +99,14 @@ const normalizeOptionalScopeIds = (value?: string[]): string[] => (
 );
 
 const normalizeRecurrenceRuleForComparison = (value?: TodoRecurrenceRule): string => JSON.stringify(value ?? null);
+
+export const resolvePersistedTodoForDetail = (
+  todoId: string,
+  todos: TodoItem[],
+  initialTodo?: TodoItem | null
+): TodoItem | null => (
+  todos.find((todo) => todo.id === todoId) || initialTodo || null
+);
 
 const resolveLinkedActivityCategory = (
   categories: Category[],
@@ -217,7 +225,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     initialRecurrenceRule?.startDate || initialScheduledDate || getTodayDateKey()
   );
   const [recurrenceEndDate, setRecurrenceEndDate] = useState(initialRecurrenceRule?.endDate || '');
-  const [recurrenceInterval, setRecurrenceInterval] = useState(initialRecurrenceRule?.interval || 1);
+  const [recurrenceIntervalInput, setRecurrenceIntervalInput] = useState(String(initialRecurrenceRule?.interval || 1));
   const [recurrenceWeekdays, setRecurrenceWeekdays] = useState<number[]>(initialRecurrenceRule?.weekdays || []);
   const [recurrenceMonthDaysInput, setRecurrenceMonthDaysInput] = useState(
     formatMonthlyDayInput(
@@ -233,6 +241,19 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     () => parseMonthlyDayInput(recurrenceMonthDaysInput),
     [recurrenceMonthDaysInput]
   );
+  const parsedRecurrenceInterval = useMemo(() => {
+    const normalized = recurrenceIntervalInput.trim();
+    if (!normalized) {
+      return null;
+    }
+
+    const parsed = Number(normalized);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      return null;
+    }
+
+    return parsed;
+  }, [recurrenceIntervalInput]);
 
   // Timeline / Calendar State
   const [displayDate, setDisplayDate] = useState(new Date());
@@ -284,7 +305,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     ? ['\u7EC6\u8282', '\u5B50\u4EFB\u52A1', '\u65F6\u95F4\u7EBF']
     : ['\u7EC6\u8282', '\u65F6\u95F4\u7EBF'];
   const persistedTodo = useMemo(
-    () => (initialTodo ? todos.find((todo) => todo.id === todoId) || initialTodo : null),
+    () => resolvePersistedTodoForDetail(todoId, todos, initialTodo),
     [initialTodo, todoId, todos]
   );
   const persistedProgressTrackingMode = useMemo(
@@ -378,7 +399,11 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     if (isSubtask || isQuickReminder) return undefined;
     if (recurrenceFrequency === 'none' || !recurrenceStartDate) return undefined;
 
-    const normalizedInterval = Math.max(1, recurrenceInterval || 1);
+    if (parsedRecurrenceInterval === null) {
+      return undefined;
+    }
+
+    const normalizedInterval = parsedRecurrenceInterval;
     const baseRule: TodoRecurrenceRule = {
       frequency: recurrenceFrequency,
       startDate: recurrenceStartDate,
@@ -413,7 +438,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     recurrenceEndDate,
     recurrenceFrequency,
     recurrenceFallbackToMonthEnd,
-    recurrenceInterval,
+    parsedRecurrenceInterval,
     recurrenceStartDate,
     recurrenceWeekdays
   ]);
@@ -460,7 +485,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const clearRecurrence = () => {
     setRecurrenceFrequency('none');
     setRecurrenceEndDate('');
-    setRecurrenceInterval(1);
+    setRecurrenceIntervalInput('1');
     setRecurrenceWeekdays([]);
     setRecurrenceMonthDaysInput(String(parseDateKey(recurrenceStartDate)?.getDate() || new Date().getDate()));
   };
@@ -1347,10 +1372,10 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                           <div className="space-y-1.5">
                             <label className="text-[11px] text-stone-400 font-medium">间隔</label>
                             <input
-                              type="number"
-                              min={1}
-                              value={recurrenceInterval}
-                              onChange={(e) => setRecurrenceInterval(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                              type="text"
+                              inputMode="numeric"
+                              value={recurrenceIntervalInput}
+                              onChange={(e) => setRecurrenceIntervalInput(e.target.value.replace(/[^\d]/g, '').slice(0, 3))}
                               className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2.5 text-stone-700 text-sm outline-none focus:border-stone-400 transition-colors"
                             />
                           </div>
@@ -1383,23 +1408,32 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
 
                         {recurrenceFrequency === 'monthly' && (
                           <div className="space-y-1.5">
-                            <label className="text-[11px] text-stone-400 font-medium">每月日期</label>
+                            <label className="text-[11px] text-stone-400 font-medium">每月日期（多天用空格隔开）</label>
                             <input
-                              type="number"
-                              min={1}
-                              max={31}
-                              value={recurrenceMonthDay}
-                              onChange={(e) => setRecurrenceMonthDay(Math.min(31, Math.max(1, parseInt(e.target.value, 10) || 1)))}
+                              type="text"
+                              inputMode="numeric"
+                              value={recurrenceMonthDaysInput}
+                              onChange={(e) => setRecurrenceMonthDaysInput(normalizeMonthlyDayInput(e.target.value))}
+                              placeholder="例如 1 15 31"
                               className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2.5 text-stone-700 text-sm outline-none focus:border-stone-400 transition-colors"
                             />
-                            {recurrenceMonthDay === 31 && (
-                              <label className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50/70 px-3 py-2 text-xs font-medium text-stone-600">
+                            {parsedRecurrenceMonthDays.includes(31) && (
+                              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-stone-200 bg-stone-50/70 px-3 py-2 text-xs font-medium text-stone-600 transition-colors hover:border-stone-300">
                                 <input
                                   type="checkbox"
                                   checked={recurrenceFallbackToMonthEnd}
                                   onChange={(event) => setRecurrenceFallbackToMonthEnd(event.target.checked)}
-                                  className="h-3.5 w-3.5 rounded border-stone-300 text-stone-900 focus:ring-stone-400"
+                                  className="sr-only"
                                 />
+                                <span
+                                  className={`flex h-4 w-4 items-center justify-center rounded-[0.35rem] border transition-colors ${
+                                    recurrenceFallbackToMonthEnd
+                                      ? 'border-stone-900 bg-stone-900 text-white'
+                                      : 'border-stone-300 bg-white text-transparent'
+                                  }`}
+                                >
+                                  <Check size={10} strokeWidth={3} />
+                                </span>
                                 <span>若当月没有 31 号，则自动定位到最后一天</span>
                               </label>
                             )}

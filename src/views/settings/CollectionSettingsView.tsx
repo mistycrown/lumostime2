@@ -4,6 +4,7 @@
  * @output A settings-level Collection list plus mixed-item detail timeline
  * @pos View (Settings sub-page)
  * @description Presents collections with compact title-led rows and a detail page that uses its own lightweight timeline cards instead of reusing the shared memoir timeline UI.
+ * @updated 2026-05-13: Made mixed collection timeline entries clickable so linked logs/todos can open their shared detail overlays while leaving the collection page underneath for return navigation.
  * @updated 2026-05-12: Rebuilt Collection detail items as a standalone UI, tightened the create-row controls, compressed the header summary into a single line, switched entry media to a wrapped right-aligned preview layout, and aligned todo metadata with memoir/task tag rendering.
  */
 import React, { useEffect, useMemo, useState } from 'react';
@@ -49,6 +50,7 @@ interface CollectionTimelineRelatedTodo {
 interface CollectionTimelineEntry {
   id: string;
   itemType: 'log' | 'task';
+  sourceId: string;
   date: string;
   endDate?: string;
   title: string;
@@ -183,7 +185,7 @@ const CollectionTimelineImage: React.FC<{ src: string; alt: string; className: s
   );
 };
 
-const CollectionTimelineEntryCard: React.FC<{ entry: CollectionTimelineEntry }> = ({ entry }) => {
+const CollectionTimelineEntryCard: React.FC<{ entry: CollectionTimelineEntry; onOpen?: () => void }> = ({ entry, onOpen }) => {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const { isPrivacyMode } = usePrivacy();
   const hasMetadata = (entry.relatedTodos?.length || 0) + (entry.tags?.length || 0) + (entry.domains?.length || 0) > 0;
@@ -227,10 +229,25 @@ const CollectionTimelineEntryCard: React.FC<{ entry: CollectionTimelineEntry }> 
     );
   };
 
+  const handleOpenEntry = () => {
+    onOpen?.();
+  };
+
   return (
-    <div className="relative pl-6">
+    <div
+      className={`relative pl-6 ${onOpen ? 'group cursor-pointer' : ''}`}
+      role={onOpen ? 'button' : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      onClick={onOpen ? handleOpenEntry : undefined}
+      onKeyDown={onOpen ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          handleOpenEntry();
+        }
+      } : undefined}
+    >
       <div className="absolute left-[-6px] top-2 h-2.5 w-2.5 rounded-full border-2 border-[#faf9f6] bg-stone-900" />
-      <div className="pb-8">
+      <div className={`pb-8 ${onOpen ? 'transition-opacity group-hover:opacity-90' : ''}`}>
         {previewMedia ? (
           <div className="float-right mb-2 ml-3">
             {renderMedia()}
@@ -326,7 +343,9 @@ const CollectionDirectoryRow: React.FC<CollectionDirectoryRowProps> = ({
 );
 
 export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
-  onBack
+  onBack,
+  onEditLog,
+  onEditTodo
 }) => {
   const { collections, setCollections, collectionEntries, logs, todos } = useData();
   const { categories, scopes } = useCategoryScope();
@@ -446,6 +465,7 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
           return {
             id: item.log.id,
             itemType: 'log',
+            sourceId: item.log.id,
             date: new Date(item.log.startTime).toISOString(),
             endDate: new Date(item.log.endTime).toISOString(),
             title: item.log.title?.trim() || fallbackTitle,
@@ -491,6 +511,7 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
         return {
           id: `todo-${item.todo.id}`,
           itemType: 'task',
+          sourceId: item.todo.id,
           date: new Date(todoTimestamp).toISOString(),
           title: item.todo.title,
           content: item.todo.note?.trim() || '',
@@ -564,6 +585,21 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
         : item
     )));
     setIsEditingCollection(false);
+  };
+
+  const handleOpenTimelineEntry = (entry: CollectionTimelineEntry) => {
+    if (entry.itemType === 'log') {
+      const targetLog = logs.find((log) => log.id === entry.sourceId);
+      if (targetLog) {
+        onEditLog?.(targetLog);
+      }
+      return;
+    }
+
+    const targetTodo = todos.find((todo) => todo.id === entry.sourceId);
+    if (targetTodo) {
+      onEditTodo?.(targetTodo);
+    }
   };
 
   const renderList = () => (
@@ -709,6 +745,7 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
                     <CollectionTimelineEntryCard
                       key={entry.id}
                       entry={entry}
+                      onOpen={(onEditLog || onEditTodo) ? () => handleOpenTimelineEntry(entry) : undefined}
                     />
                   ))}
                 </div>

@@ -4,6 +4,7 @@
  * @output Regression coverage for parent-task detail rendering from subtask navigation
  * @pos Test
  * @description Ensures parent todo detail pages render safely so subtask inheritance links can open their parent without crashing.
+ * @updated 2026-05-13: Added persisted-todo resolution coverage so draft-created detail pages stop auto-saving in a loop after the first save.
  * @updated 2026-05-12: Added regression coverage so subtask detail pages show inherited linked activity and scope data from the live parent todo even when the child record itself is stale.
  * @updated 2026-04-22: Added regression coverage for parent timeline subtask badges and direct child-task log aggregation.
  */
@@ -11,7 +12,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test, vi } from 'vitest';
-import { TodoDetailModal } from './TodoDetailModal';
+import { resolvePersistedTodoForDetail, TodoDetailModal } from './TodoDetailModal';
 
 let detailTimelineCardProps: any = null;
 
@@ -80,6 +81,28 @@ const activityCategories = [
 ] as any;
 
 describe('TodoDetailModal parent navigation regression', () => {
+  test('prefers the live saved todo for draft-created detail sessions', () => {
+    const savedTodo = {
+      id: 'draft-1',
+      categoryId: 'cat-1',
+      title: 'Saved draft task',
+      isCompleted: false
+    } as any;
+
+    expect(resolvePersistedTodoForDetail('draft-1', [savedTodo], null)).toEqual(savedTodo);
+  });
+
+  test('falls back to the initial todo when no live saved record exists yet', () => {
+    const initialTodo = {
+      id: 'todo-1',
+      categoryId: 'cat-1',
+      title: 'Initial task',
+      isCompleted: false
+    } as any;
+
+    expect(resolvePersistedTodoForDetail('todo-1', [], initialTodo)).toEqual(initialTodo);
+  });
+
   test('shows inherited parent link metadata for subtask drafts even when the child record is stale', () => {
     detailTimelineCardProps = null;
 

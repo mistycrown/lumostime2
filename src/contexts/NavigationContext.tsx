@@ -131,6 +131,8 @@ interface NavigationContextType {
     setCurrentMonthlyReviewStart: (date: Date | null) => void;
     currentMonthlyReviewEnd: Date | null;
     setCurrentMonthlyReviewEnd: (date: Date | null) => void;
+    currentMonthlyReviewInitialTab: 'data' | 'guide' | 'narrative' | 'cite' | null;
+    setCurrentMonthlyReviewInitialTab: (tab: 'data' | 'guide' | 'narrative' | 'cite' | null) => void;
 
     // 其他导航状态
     returnToSearch: boolean;
@@ -286,6 +288,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [currentWeeklyReviewInitialTab, setCurrentWeeklyReviewInitialTab] = useState<'data' | 'guide' | 'narrative' | null>(null);
     const [currentMonthlyReviewStart, setCurrentMonthlyReviewStart] = useState<Date | null>(null);
     const [currentMonthlyReviewEnd, setCurrentMonthlyReviewEnd] = useState<Date | null>(null);
+    const [currentMonthlyReviewInitialTab, setCurrentMonthlyReviewInitialTab] = useState<'data' | 'guide' | 'narrative' | 'cite' | null>(null);
 
     // 其他导航状态
     const [returnToSearch, setReturnToSearch] = useState(false);
@@ -423,6 +426,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setCurrentMonthlyReviewStart,
             currentMonthlyReviewEnd,
             setCurrentMonthlyReviewEnd,
+            currentMonthlyReviewInitialTab,
+            setCurrentMonthlyReviewInitialTab,
             returnToSearch,
             setReturnToSearch,
             isOpenedFromSearch,

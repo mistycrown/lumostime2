@@ -4,6 +4,8 @@
  * @output Shared quick-actions state and handlers for todo list rows and week-view badges
  * @pos Hook
  * @description Centralizes todo quick-actions sheet state so multiple entry points can open the same modal without duplicating move/complete/detail logic inside the view.
+ * @updated 2026-05-13: Changed the quick `升级为项目` flow to require picking a target standard category instead of silently falling back to the default project bucket.
+ * @updated 2026-05-13: Added a shared move-category quick action so non-subtask todos can jump between standard todo categories without opening the detail editor.
  * @updated 2026-05-13: Added a shared quick-to-project upgrade action so lightweight reminders can graduate into full project todos from shared entry points.
  * @updated 2026-05-05: Exposes the quick-actions open timestamp plus a shared interaction guard so bottom-edge touch openings cannot immediately trigger a newly mounted action button.
  * @updated 2026-04-27: Routed shared quick-actions delete requests into the existing todo deletion flow.
@@ -22,14 +24,42 @@ export const isTodoQuickActionInteractionGuardActive = (
   now = Date.now()
 ): boolean => openedAt > 0 && now - openedAt < QUICK_ACTION_INTERACTION_GUARD_MS;
 
+export const buildQuickActionCategoryMoveTodo = (
+  todo: TodoItem | null,
+  categoryId: string
+): TodoItem | null => {
+  if (!todo || !categoryId || todo.parentTodoId || todo.categoryId === categoryId) {
+    return null;
+  }
+
+  return {
+    ...todo,
+    categoryId
+  };
+};
+
+export const buildQuickActionUpgradeToProjectTodo = (
+  todo: TodoItem | null,
+  categoryId: string
+): TodoItem | null => {
+  if (!todo || !categoryId || !isQuickTodo(todo)) {
+    return null;
+  }
+
+  return {
+    ...todo,
+    kind: 'project',
+    categoryId
+  };
+};
+
 interface UseTodoQuickActionsOptions {
   onSaveTodo: (todo: TodoItem) => void;
   onEditTodo: (todo: TodoItem) => void;
   onDeleteTodo: (id: string) => void;
-  projectCategoryId?: string;
 }
 
-export const useTodoQuickActions = ({ onSaveTodo, onEditTodo, onDeleteTodo, projectCategoryId }: UseTodoQuickActionsOptions) => {
+export const useTodoQuickActions = ({ onSaveTodo, onEditTodo, onDeleteTodo }: UseTodoQuickActionsOptions) => {
   const [quickActionTodo, setQuickActionTodo] = useState<TodoItem | null>(null);
   const quickActionOpenedAtRef = useRef(0);
 
@@ -120,16 +150,25 @@ export const useTodoQuickActions = ({ onSaveTodo, onEditTodo, onDeleteTodo, proj
     closeQuickActions(true);
   };
 
-  const handleQuickActionUpgradeToProject = () => {
-    if (!quickActionTodo) return;
+  const handleQuickActionMoveCategory = (categoryId: string) => {
+    const movedTodo = buildQuickActionCategoryMoveTodo(quickActionTodo, categoryId);
 
-    if (!isQuickTodo(quickActionTodo)) return;
+    if (!movedTodo) {
+      return;
+    }
 
-    onSaveTodo({
-      ...quickActionTodo,
-      kind: 'project',
-      categoryId: projectCategoryId || quickActionTodo.categoryId
-    });
+    onSaveTodo(movedTodo);
+    closeQuickActions(true);
+  };
+
+  const handleQuickActionUpgradeToProject = (categoryId: string) => {
+    const upgradedTodo = buildQuickActionUpgradeToProjectTodo(quickActionTodo, categoryId);
+
+    if (!upgradedTodo) {
+      return;
+    }
+
+    onSaveTodo(upgradedTodo);
     closeQuickActions(true);
   };
 
@@ -151,6 +190,7 @@ export const useTodoQuickActions = ({ onSaveTodo, onEditTodo, onDeleteTodo, proj
     handleQuickActionUndoComplete,
     handleQuickActionClearDate,
     handleQuickActionTogglePin,
+    handleQuickActionMoveCategory,
     handleQuickActionUpgradeToProject,
     handleQuickActionDelete
   };
