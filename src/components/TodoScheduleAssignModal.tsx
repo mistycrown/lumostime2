@@ -4,6 +4,7 @@
  * @output Lightweight modal for assigning or quickly creating todos for a specific week-view day
  * @pos Component (Modal)
  * @description Lets users assign unfinished todos to a selected day as either Arrange or Due, or create a linked todo, without leaving the week schedule view.
+ * @updated 2026-05-13: Hid the reserved `未来` category from quick schedule assignment and quick-create options so its backlog stays out of day-number arrange popups.
  * @updated 2026-05-12: Added instant title search above the assignable todo list and keep matched subtasks attached to their parent rows.
  * @updated 2026-04-25: Rendered assignable subtasks in a parent-child hierarchy so schedule pickers show child tasks nested beneath their parent rows instead of as flat standalone cards.
  * @updated 2026-04-25: Hid unfinished subtasks from the schedule assignment picker whenever their parent todo is completed, using the full todo source so completed parents can still suppress orphan child rows.
@@ -24,6 +25,7 @@ import {
 } from '../utils/todoScheduleAssignUtils';
 import { CustomSelect } from './CustomSelect';
 import { TagAssociation } from './TagAssociation';
+import { getSchedulableTodoCategories } from '../utils/todoQuickCategoryUtils';
 
 interface TodoScheduleAssignModalProps {
   isOpen: boolean;
@@ -64,13 +66,14 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
   onCreate,
   onClose
 }) => {
+  const schedulableTodoCategories = useMemo(() => getSchedulableTodoCategories(todoCategories), [todoCategories]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'scheduled' | 'deadline' | 'new'>(assignType);
   const [expandedParentIds, setExpandedParentIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [newTitle, setNewTitle] = useState('');
-  const [newTodoCategoryId, setNewTodoCategoryId] = useState<string>(todoCategories[0]?.id || '');
+  const [newTodoCategoryId, setNewTodoCategoryId] = useState<string>(schedulableTodoCategories[0]?.id || '');
   const [newLinkedCategoryId, setNewLinkedCategoryId] = useState<string>(activityCategories[0]?.id || '');
   const [newLinkedActivityId, setNewLinkedActivityId] = useState<string>('');
 
@@ -81,11 +84,11 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
       setExpandedParentIds([]);
       setSearchQuery('');
       setNewTitle('');
-      setNewTodoCategoryId(todoCategories[0]?.id || '');
+      setNewTodoCategoryId(schedulableTodoCategories[0]?.id || '');
       setNewLinkedCategoryId(activityCategories[0]?.id || '');
       setNewLinkedActivityId('');
     }
-  }, [isOpen, assignType, dateLabel, todoCategories, activityCategories]);
+  }, [isOpen, assignType, dateLabel, schedulableTodoCategories, activityCategories]);
 
   useEffect(() => {
     if (activeTab !== 'new') {
@@ -206,7 +209,7 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
                 >
                   全部
                 </button>
-                {todoCategories.map((category) => {
+                {schedulableTodoCategories.map((category) => {
                   const isSelected = selectedCategoryId === category.id;
                   return (
                     <button
@@ -248,7 +251,7 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
               <CustomSelect
                 label="待办分类"
                 value={newTodoCategoryId}
-                options={todoCategories.map((category) => ({
+                options={schedulableTodoCategories.map((category) => ({
                   value: category.id,
                   label: category.name
                 }))}

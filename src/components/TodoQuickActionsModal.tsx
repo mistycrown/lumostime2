@@ -4,6 +4,7 @@
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
  * @pos Component
  * @description A reusable bottom sheet that exposes lightweight todo planning and completion actions without opening the full todo detail editor first.
+ * @updated 2026-05-13: Hide the detail-editor shortcut for quick reminder todos so small-task interactions stay lightweight and inline-first.
  * @updated 2026-05-05: Ignores the same just-opened touch click for action buttons too, so tapping a bottom todo row no longer flashes the sheet and instantly fires a quick action underneath the finger.
  * @updated 2026-05-05: Moved backdrop dismissal onto the backdrop click itself so outside taps close the current sheet without click-through opening the todo row underneath, while the existing open-time close guard still blocks same-tap flash-closes.
  * @updated 2026-05-05: Split normal backdrop dismissal from forced hardware-back dismissal so row taps can still open the sheet without the same click instantly closing it.
@@ -19,6 +20,7 @@ import { TodoItem } from '../types';
 import { parseDateKey } from '../utils/todoScheduleUtils';
 import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
 import { isTodoQuickActionInteractionGuardActive } from '../hooks/useTodoQuickActions';
+import { isQuickTodo } from '../utils/todoKindUtils';
 
 interface TodoQuickActionsModalProps {
   isOpen: boolean;
@@ -29,10 +31,12 @@ interface TodoQuickActionsModalProps {
   onComplete: () => void;
   onUndoComplete: () => void;
   onTogglePin: () => void;
+  onUpgradeToProject?: () => void;
   onDelete: () => void;
   onClose: () => void;
   onForceClose?: () => void;
   openedAt?: number;
+  showUpgradeToProject?: boolean;
 }
 
 export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
@@ -44,10 +48,12 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   onComplete,
   onUndoComplete,
   onTogglePin,
+  onUpgradeToProject,
   onDelete,
   onClose,
   onForceClose,
-  openedAt = 0
+  openedAt = 0,
+  showUpgradeToProject = false
 }) => {
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
 
@@ -77,6 +83,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
 
   if (!isOpen || !todo) return null;
 
+  const showDetailShortcut = !isQuickTodo(todo);
   const formatQuickActionDate = (dateKey?: string) => {
     if (!dateKey) return null;
     const date = parseDateKey(dateKey);
@@ -158,14 +165,16 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
             </div>
           )}
           <div className="absolute right-5 top-4 flex items-center gap-2">
-            <button
+            {showDetailShortcut && (
+              <button
               type="button"
               onClick={withActionGuard(onOpenDetail)}
               className="rounded-full p-2 text-stone-400 transition-colors hover:bg-white hover:text-stone-600"
               title="打开详情"
             >
               <PanelRightOpen size={16} />
-            </button>
+              </button>
+            )}
             {!todo.isCompleted && (
               <button
                 type="button"
@@ -271,6 +280,17 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
               <Pin size={13} className={`${todo.pin ? 'text-stone-600' : 'text-stone-400'} rotate-[28deg]`} />
               <span>{todo.pin ? '取消 Pin' : 'Pin'}</span>
             </button>
+
+            {showUpgradeToProject && onUpgradeToProject && (
+              <button
+                type="button"
+                onClick={withActionGuard(onUpgradeToProject)}
+                className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
+              >
+                <PanelRightOpen size={15} className="text-stone-400" />
+                <span>升级为项目</span>
+              </button>
+            )}
 
             {todo.isCompleted && (
               <button

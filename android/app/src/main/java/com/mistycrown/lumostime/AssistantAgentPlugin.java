@@ -4,6 +4,7 @@
  * @output Android foreground-service control and assistant system-trigger events
  * @pos Native Plugin
  * @description Capacitor plugin bridge for the Android-first background assistant agent. Starts and stops the foreground agent service, updates lightweight polling config, relays native system-trigger events back into the web layer, and surfaces assistant notification navigation.
+ * @updated 2026-05-13: Re-pokes the running native assistant service after AI-config and background-snapshot syncs so reminder alarms are rescheduled as soon as native execution becomes ready.
  * @updated 2026-05-11: Re-pokes the running native assistant service after reminder-queue syncs so newly added reminders can reschedule their exact next due wakeup immediately.
  * @updated 2026-04-27: Added native diagnostic list, clear, and live-update bridge methods so Android poll decisions can be inspected from the shared AI history UI.
  * @updated 2026-04-28: Added pending-trigger queue list and acknowledge methods so Web can recover native assistant triggers after resume.
@@ -176,13 +177,15 @@ public class AssistantAgentPlugin extends Plugin {
 
     @PluginMethod
     public void syncNativeAIConfig(PluginCall call) {
+        Context context = getContext();
         AssistantNativeAIConfigStore.save(
-            getContext(),
+            context,
             call.getString("provider", ""),
             call.getString("apiKey", ""),
             call.getString("baseUrl", ""),
             call.getString("modelName", "")
         );
+        repokeRunningAgentService(context);
         call.resolve();
     }
 
@@ -194,12 +197,14 @@ public class AssistantAgentPlugin extends Plugin {
 
     @PluginMethod
     public void syncNativeBackgroundSnapshot(PluginCall call) {
+        Context context = getContext();
         JSObject conversation = call.getObject("conversation");
         AssistantNativeBackgroundSnapshotStore.save(
-            getContext(),
+            context,
             call.getString("systemPrompt", ""),
             conversation == null ? "" : conversation.toString()
         );
+        repokeRunningAgentService(context);
         call.resolve();
     }
 
@@ -306,6 +311,16 @@ public class AssistantAgentPlugin extends Plugin {
         }
 
         context.startService(intent);
+    }
+
+    private void repokeRunningAgentService(Context context) {
+        if (context == null || !UnifiedServiceNotificationManager.isAssistantActive(context)) {
+            return;
+        }
+
+        Intent intent = new Intent(context, AssistantAgentService.class);
+        intent.setAction(AssistantAgentService.ACTION_UPDATE_CONFIG);
+        startAgentService(context, intent);
     }
 
     private void putConfigExtras(Intent intent, PluginCall call) {

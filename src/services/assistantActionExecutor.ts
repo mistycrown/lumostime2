@@ -5,6 +5,7 @@
  * @pos Service (Assistant Action Executor)
  * @description Executes AI-planned log/todo/subtask/edit tool calls against local app data using pure helpers so the UI can reuse one shared execution layer instead of keeping tool application logic inside a modal component.
  *
+ * @updated 2026-05-13: Added explicit todo kind handling so assistant-created quick reminders can skip activity linkage while still resolving into the reserved 小事 category.
  * @updated 2026-04-26: Extracted local assistant tool-call execution, save/delete helpers, action snapshots, and subtask-date stripping into a shared service for the unified AI assistant architecture.
  */
 
@@ -27,6 +28,12 @@ import type {
 import { formatDateKey, normalizeAIBackfillToolCalls, parseTimeOnDateKey } from '../utils/aiBackfillUtils';
 import { getTodoProgressTrackingMode, syncSubtaskProgressToParentTodos } from '../utils/todoProgressUtils';
 import { getNextChildOrder, normalizeTodoHierarchy, syncDirectChildTodosWithParent } from '../utils/todoHierarchyUtils';
+import { getTodoKind, isQuickTodo } from '../utils/todoKindUtils';
+import {
+  ensureQuickTodoCategory,
+  getQuickTodoCategory,
+  QUICK_TODO_CATEGORY_ID
+} from '../utils/todoQuickCategoryUtils';
 
 export type AppliedActionStatus = 'applied' | 'undone' | 'failed';
 
@@ -57,6 +64,7 @@ export interface AppliedCreateLogAction {
 export interface AppliedCreateTodoSnapshot {
   todoId?: string;
   title: string;
+  kind?: TodoItem['kind'];
   categoryId: string;
   categoryName: string;
   linkedCategoryId?: string;
@@ -467,7 +475,14 @@ export const assistantActionExecutor = {
 
     toolCalls.forEach((toolCall) => {
       const { args } = toolCall;
-      const resolvedTodoCategory = context.todoCategories.find((category) => category.id === args.categoryId) || context.todoCategories[0];
+      const todoKind = getTodoKind(args);
+      const normalizedTodoCategories = ensureQuickTodoCategory(context.todoCategories);
+      const quickTodoCategory = getQuickTodoCategory(normalizedTodoCategories);
+      const resolvedTodoCategory = todoKind === 'quick'
+        ? quickTodoCategory
+        : normalizedTodoCategories.find((category) => category.id === args.categoryId && category.id !== QUICK_TODO_CATEGORY_ID)
+          || normalizedTodoCategories.find((category) => category.id !== QUICK_TODO_CATEGORY_ID)
+          || quickTodoCategory;
       const resolvedLinkedCategoryId = args.linkedCategoryId
         || (args.linkedActivityId
           ? context.categories.find((category) => category.activities.some((activity) => activity.id === args.linkedActivityId))?.id
@@ -480,7 +495,8 @@ export const assistantActionExecutor = {
           || getActivityById(context, args.linkedActivityId)
         : undefined;
 
-      if (!resolvedTodoCategory || !args.title.trim() || !args.linkedActivityId || !resolvedActivity || !resolvedLinkedCategoryId) {
+      const requiresLinkedActivity = todoKind !== 'quick';
+      if (!resolvedTodoCategory || !args.title.trim() || (requiresLinkedActivity && (!args.linkedActivityId || !resolvedActivity || !resolvedLinkedCategoryId))) {
         actions.push({
           actionId: buildActionId(),
           kind: 'create_todo',
@@ -497,25 +513,28 @@ export const assistantActionExecutor = {
         return;
       }
 
-      const defaultScopeIds = dedupeStringArray([
-        ...(args.defaultScopeIds || []),
-        ...getRuleScopeIdsForActivity(context, args.linkedActivityId)
-      ]).filter((scopeId) => context.scopes.some((scope) => scope.id === scopeId));
+      const defaultScopeIds = todoKind === 'quick'
+        ? []
+        : dedupeStringArray([
+            ...(args.defaultScopeIds || []),
+            ...getRuleScopeIdsForActivity(context, args.linkedActivityId)
+          ]).filter((scopeId) => context.scopes.some((scope) => scope.id === scopeId));
 
       const newTodo: TodoItem = {
         id: crypto.randomUUID(),
-        categoryId: resolvedTodoCategory.id,
+        kind: todoKind,
+        categoryId: todoKind === 'quick' ? QUICK_TODO_CATEGORY_ID : resolvedTodoCategory.id,
         title: args.title.trim(),
         isCompleted: false,
         pin: false,
         completedUnits: 0,
-        ...(resolvedLinkedCategoryId ? { linkedCategoryId: resolvedLinkedCategoryId } : {}),
-        ...(args.linkedActivityId ? { linkedActivityId: args.linkedActivityId } : {}),
-        ...(defaultScopeIds.length > 0 ? { defaultScopeIds } : {}),
+        ...(todoKind !== 'quick' && resolvedLinkedCategoryId ? { linkedCategoryId: resolvedLinkedCategoryId } : {}),
+        ...(todoKind !== 'quick' && args.linkedActivityId ? { linkedActivityId: args.linkedActivityId } : {}),
+        ...(todoKind !== 'quick' && defaultScopeIds.length > 0 ? { defaultScopeIds } : {}),
         ...(args.note ? { note: args.note } : {}),
         ...(args.scheduledDate ? { scheduledDate: args.scheduledDate } : {}),
         ...(args.deadlineDate ? { deadlineDate: args.deadlineDate } : {}),
-        ...(args.recurrenceRule ? { recurrenceRule: args.recurrenceRule } : {})
+        ...(todoKind !== 'quick' && args.recurrenceRule ? { recurrenceRule: args.recurrenceRule } : {})
       };
 
       nextTodos = applyTodoSave(nextTodos, newTodo);
@@ -526,18 +545,19 @@ export const assistantActionExecutor = {
         snapshot: {
           todoId: newTodo.id,
           title: newTodo.title,
+          kind: todoKind,
           categoryId: newTodo.categoryId,
           categoryName: resolvedTodoCategory.name,
-          ...(resolvedLinkedCategoryId ? { linkedCategoryId: resolvedLinkedCategoryId } : {}),
-          ...(resolvedLinkedCategory ? { linkedCategoryName: resolvedLinkedCategory.name } : {}),
-          ...(args.linkedActivityId ? { linkedActivityId: args.linkedActivityId } : {}),
-          ...(resolvedActivity ? { linkedActivityName: resolvedActivity.name } : {}),
+          ...(todoKind !== 'quick' && resolvedLinkedCategoryId ? { linkedCategoryId: resolvedLinkedCategoryId } : {}),
+          ...(todoKind !== 'quick' && resolvedLinkedCategory ? { linkedCategoryName: resolvedLinkedCategory.name } : {}),
+          ...(todoKind !== 'quick' && args.linkedActivityId ? { linkedActivityId: args.linkedActivityId } : {}),
+          ...(todoKind !== 'quick' && resolvedActivity ? { linkedActivityName: resolvedActivity.name } : {}),
           defaultScopeIds,
           defaultScopeNames: getScopeNames(context, defaultScopeIds),
           ...(args.note ? { note: args.note } : {}),
           ...(args.scheduledDate ? { scheduledDate: args.scheduledDate } : {}),
           ...(args.deadlineDate ? { deadlineDate: args.deadlineDate } : {}),
-          ...(args.recurrenceRule ? { recurrenceRule: args.recurrenceRule } : {})
+          ...(todoKind !== 'quick' && args.recurrenceRule ? { recurrenceRule: args.recurrenceRule } : {})
         }
       });
     });
@@ -573,6 +593,9 @@ export const assistantActionExecutor = {
       }
 
       const patch = args.patch;
+      const normalizedTodoCategories = ensureQuickTodoCategory(context.todoCategories);
+      const quickTodoCategory = getQuickTodoCategory(normalizedTodoCategories);
+      const nextKind = patch.kind || getTodoKind(currentTodo);
       const resolvedActivity = patch.linkedActivityId === undefined
         ? undefined
         : patch.linkedActivityId === null
@@ -628,6 +651,13 @@ export const assistantActionExecutor = {
       const nextLinkedActivityId = patch.linkedActivityId === undefined
         ? currentTodo.linkedActivityId
         : patch.linkedActivityId || undefined;
+      const nextCategoryId = patch.categoryId !== undefined
+        ? patch.categoryId
+        : nextKind === 'quick'
+          ? QUICK_TODO_CATEGORY_ID
+          : isQuickTodo(currentTodo)
+            ? (normalizedTodoCategories.find((category) => category.id !== QUICK_TODO_CATEGORY_ID)?.id || quickTodoCategory.id)
+            : currentTodo.categoryId;
 
       const shouldClearRecurrence = !currentTodo.parentTodoId
         && (patch.scheduledDate !== undefined || patch.deadlineDate !== undefined)
@@ -635,16 +665,37 @@ export const assistantActionExecutor = {
 
       const nextTodo: TodoItem = {
         ...currentTodo,
+        kind: nextKind,
         title: nextTitle,
         ...(patch.note !== undefined ? { note: patch.note || undefined } : {}),
-        ...(patch.categoryId !== undefined ? { categoryId: patch.categoryId } : {}),
-        ...(patch.linkedCategoryId !== undefined || patch.linkedActivityId !== undefined ? { linkedCategoryId: nextLinkedCategoryId } : {}),
-        ...(patch.linkedActivityId !== undefined ? { linkedActivityId: nextLinkedActivityId } : {}),
-        ...(patch.defaultScopeIds !== undefined ? { defaultScopeIds: nextDefaultScopeIds } : {}),
+        categoryId: nextCategoryId,
+        ...(
+          nextKind === 'quick'
+            ? {
+                linkedCategoryId: undefined,
+                linkedActivityId: undefined,
+                defaultScopeIds: undefined,
+                isProgress: false,
+                progressTrackingMode: 'none',
+                totalAmount: undefined,
+                unitAmount: undefined,
+                completedUnits: 0,
+                heatmapMin: undefined,
+                heatmapMax: undefined,
+                coverImage: undefined,
+                recurrenceRule: undefined,
+                parentTodoId: undefined,
+                childOrder: undefined
+              }
+            : {}
+        ),
+        ...(nextKind !== 'quick' && (patch.linkedCategoryId !== undefined || patch.linkedActivityId !== undefined) ? { linkedCategoryId: nextLinkedCategoryId } : {}),
+        ...(nextKind !== 'quick' && patch.linkedActivityId !== undefined ? { linkedActivityId: nextLinkedActivityId } : {}),
+        ...(nextKind !== 'quick' && patch.defaultScopeIds !== undefined ? { defaultScopeIds: nextDefaultScopeIds } : {}),
         ...(patch.scheduledDate !== undefined ? { scheduledDate: patch.scheduledDate || undefined } : {}),
         ...(patch.deadlineDate !== undefined ? { deadlineDate: patch.deadlineDate || undefined } : {}),
-        ...(!currentTodo.parentTodoId && patch.recurrenceRule !== undefined ? { recurrenceRule: patch.recurrenceRule || undefined } : {}),
-        ...(!currentTodo.parentTodoId && shouldClearRecurrence ? { recurrenceRule: undefined } : {}),
+        ...(nextKind !== 'quick' && !currentTodo.parentTodoId && patch.recurrenceRule !== undefined ? { recurrenceRule: patch.recurrenceRule || undefined } : {}),
+        ...(nextKind !== 'quick' && !currentTodo.parentTodoId && shouldClearRecurrence ? { recurrenceRule: undefined } : {}),
         ...(typeof patch.pin === 'boolean' ? { pin: patch.pin } : {}),
         ...(typeof patch.isCompleted === 'boolean'
           ? {

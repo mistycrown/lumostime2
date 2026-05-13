@@ -4,6 +4,7 @@
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
+ * @updated 2026-05-13: Normalized reserved todo categories before passing them into UI editors and pickers so the system `未来` bucket behaves like a first-class category even when older saved data has not persisted it yet.
  * @updated 2026-05-10: Upgraded the post-start timer auto-jump flow to support none, focus-detail, and immersive entry modes while preserving scene-card immersive overrides.
  * @updated 2026-05-10: Made the widget supplement-log shortcut snap the timeline date back to today before opening the backfill modal.
  * @updated 2026-04-27: Passed todo delete callbacks into the shared quick-actions sheet path so list and week todo action bars can trigger task removal.
@@ -13,7 +14,7 @@
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Buffer } from 'buffer';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -62,6 +63,7 @@ import { splitLogByDays } from './utils/logUtils';
 import { buildSceneGroupStateFromLegacySlots, getActiveSceneGroup, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from './utils/sceneGroupStorage';
 import { getLocalDataTimestamp, setLocalDataTimestampValue } from './utils/localDataTimestamp';
 import { validateAndFixData } from './utils/dataValidation';
+import { ensureQuickTodoCategory } from './utils/todoQuickCategoryUtils';
 import { STORAGE_WRITE_ERROR_EVENT, StorageWriteErrorDetail } from './constants/storageKeys';
 import {
   resolveAutoStartTimerJumpMode,
@@ -252,6 +254,7 @@ const AppContent: React.FC = () => {
   const { categories, scopes, goals, majorGoals, setCategories, setScopes, setGoals, setMajorGoals } = useCategoryScope();
   const { startActivity, stopActivity, cancelSession, activeSessions, setActiveSessions } = useSession();
   const { logs, todos, todoCategories, setLogs, setTodos, setTodoCategories } = useData();
+  const normalizedTodoCategories = useMemo(() => ensureQuickTodoCategory(todoCategories), [todoCategories]);
   const {
     dailyReviews, weeklyReviews, monthlyReviews, onThisDayEntries, setDailyReviews, setWeeklyReviews, setMonthlyReviews, setOnThisDayEntries,
     reviewTemplates, setReviewTemplates,
@@ -567,7 +570,7 @@ const AppContent: React.FC = () => {
       key={editingTodo?.id || `draft-${newTodoDraft?.parentTodoId || 'root'}-${newTodoDraft?.childOrder || 'new'}-${todoManager.todoCategoryToAdd || 'category'}`}
       initialTodo={editingTodo}
       initialDraft={editingTodo ? null : newTodoDraft}
-      currentCategory={todoCategories.find(c => c.id === todoManager.todoCategoryToAdd) || todoCategories[0]}
+      currentCategory={normalizedTodoCategories.find(c => c.id === todoManager.todoCategoryToAdd) || normalizedTodoCategories[0]}
       displayMode={showTodoDetailPage ? 'page' : 'overlay'}
       onClose={todoManager.closeTodoModal}
       onSave={todoManager.handleSaveTodo}
@@ -577,7 +580,7 @@ const AppContent: React.FC = () => {
       logs={logs}
       onLogUpdate={logManager.handleSaveLog}
       onEditLog={logManager.openEditModal}
-      todoCategories={todoCategories}
+      todoCategories={normalizedTodoCategories}
       categories={categories}
       scopes={scopes}
       todos={todos}
@@ -685,7 +688,7 @@ const AppContent: React.FC = () => {
           onImageRemove={logManager.handleLogImageRemove}
           categories={categories}
           todos={todos}
-          todoCategories={todoCategories}
+          todoCategories={normalizedTodoCategories}
           scopes={scopes}
           autoLinkRules={autoLinkRules}
           autoApplyAutoLinkRules={autoApplyAutoLinkRules}
@@ -719,7 +722,7 @@ const AppContent: React.FC = () => {
           goal={editingGoal || undefined}
           scopeId={goalScopeId || ''}
           categories={categories}
-          todoCategories={todoCategories}
+          todoCategories={normalizedTodoCategories}
           mode="independent"
           majorGoals={majorGoals}
         />
@@ -749,7 +752,7 @@ const AppContent: React.FC = () => {
           }}
           scopeId={majorGoalScopeId}
           categories={categories}
-          todoCategories={todoCategories}
+          todoCategories={normalizedTodoCategories}
           mode="majorGoal"
           majorGoal={editingMajorGoal || undefined}
         />
@@ -766,7 +769,7 @@ const AppContent: React.FC = () => {
               session={session}
               todos={todos}
               categories={categories}
-              todoCategories={todoCategories}
+              todoCategories={normalizedTodoCategories}
               scopes={scopes}
               autoLinkRules={autoLinkRules}
               autoApplyAutoLinkRules={autoApplyAutoLinkRules}
@@ -805,7 +808,7 @@ const AppContent: React.FC = () => {
             logs={logs}
             categories={categories}
             todos={todos}
-            todoCategories={todoCategories}
+            todoCategories={normalizedTodoCategories}
             scopes={scopes}
             goals={goals}
             dailyReviews={dailyReviews}
@@ -836,7 +839,7 @@ const AppContent: React.FC = () => {
             categories={categories}
             scopes={scopes}
             todos={todos}
-            todoCategories={todoCategories}
+            todoCategories={normalizedTodoCategories}
             onEditLog={logManager.openEditModal}
             selectedFilterId={activeFilterId}
             onSelectedFilterIdChange={setActiveFilterId}
@@ -919,7 +922,7 @@ const AppContent: React.FC = () => {
             logs={logs}
             todos={todos}
             categoriesData={categories}
-            todoCategories={todoCategories}
+            todoCategories={normalizedTodoCategories}
             scopes={scopes}
             dailyReviews={dailyReviews}
             weeklyReviews={weeklyReviews}

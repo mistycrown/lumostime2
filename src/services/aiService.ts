@@ -4,9 +4,11 @@
  * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
  * @pos Service (AI Integration Layer)
  * @description AI 闂備礁鎼悧鍡欑矓鐎涙ɑ鍙?- 濠电姰鍨煎▔娑氣偓姘煎櫍楠炲啯绻濋崘顏佹灃?AI 闂備礁婀辩划顖炲礉閹烘梹顐介柣銏㈩焾閻ゎ噣鏌涢埥鍡楀箻缂佲偓閸戠晝enAI/Gemini闂備焦瀵х粙鎴λ囬崡鐐╂灁闁硅揪绠戠粻銉╂煃瑜滈崜鐔奉嚕閸偄绶炲璺侯儏閺€顓熺箾鐎涙鐭嬮悽顖ｄ簽濡cljs劕鈹戠€ｎ亞顦遍梺鍛婁緱閸犳牠顢旈鍫熲拺闁哄娉曡倴闂佹眹鍊曞Λ娑氬垝婵犳碍鏅柛鏇ㄥ墮閳ь剛鍋ら弻鏇㈠幢閺囩喓銈扮紓浣虹帛閻╊垶鐛幒妤€唯闁挎柧鍕橀崑鐐烘煟閻樺弶澶勬繛鍙夌墵楠炲繑瀵奸弶鎴狀唽闂佸綊鍋婇崰鎾寸濞戙垺鐓欑紒妤佺☉濡參寮? * @updated 2026-04-27: Extended unified assistant-turn normalization with decision summaries, silent reasons, side effects, and structured multi-bubble reply parts.
+ * @updated 2026-05-13: Extended recurrence-rule normalization with an explicit month-end fallback flag for monthly 31st-style schedules.
  * @updated 2026-05-10: Added provider-aware prompt-cache routing hints plus normalized cache debug metrics for OpenAI-compatible assistant turns, while keeping unsupported providers on the existing transport path.
  * @updated 2026-05-10: Taught native AI requests to honor AbortSignal by bridging unified-turn cancellation onto `cordova-plugin-advanced-http` request ids, so Android stop actions can actually terminate in-flight model calls.
  * @updated 2026-05-09: Treat empty or content-free unified assistant-turn outputs as failures so reminder dispatchers keep pending reminders for retry instead of deleting them on blank model responses.
+ * @updated 2026-05-13: Extended todo tool normalization with explicit `kind` support so AI can create lightweight quick todos without forcing linked activity tags onto reminder-style items.
  * @updated 2026-05-06: Tightened unified foreground tool normalization so `create_todo` now requires `linkedActivityId` before the tool call is accepted.
  * @updated 2026-04-27: Normalized malformed unified-turn memoryPatch fields such as single-string recentDecisions so durable memory updates are not silently dropped downstream.
  * @updated 2026-04-27: Removed retired intent-router and multi-planner assistant endpoints so the service now centers on the shared unified-turn path plus still-used parsing and narrative helpers.
@@ -29,7 +31,7 @@
  * 
  * 闂備礁鐤囧▔鏇熷垔鐎靛摜绠?Once I am updated, be sure to update my header comment and the folder's md.
  */
-import { Scope, TodoRecurrenceRule } from '../types';
+import { Scope, TodoKind, TodoRecurrenceRule } from '../types';
 import type {
     AssistantMemoryPatch,
     AssistantReminderDraft,
@@ -120,6 +122,7 @@ export interface AIBackfillToolCall {
 export interface AITodoCreateArgs {
     title: string;
     categoryId: string;
+    kind?: TodoKind;
     linkedCategoryId?: string;
     linkedActivityId?: string;
     defaultScopeIds?: string[];
@@ -137,6 +140,7 @@ export interface AITodoToolCall {
 export interface AITodoUpdatePatch {
     title?: string;
     note?: string | null;
+    kind?: TodoKind;
     categoryId?: string;
     linkedCategoryId?: string | null;
     linkedActivityId?: string | null;
@@ -858,6 +862,10 @@ const normalizeTodoRecurrenceRule = (value: unknown): TodoRecurrenceRule | undef
         }
     }
 
+    if (candidate.fallbackToMonthEnd === true) {
+        normalized.fallbackToMonthEnd = true;
+    }
+
     return normalized;
 };
 
@@ -951,6 +959,10 @@ const normalizeFlexibleStringList = (value: unknown): string[] => {
     return normalizeStringList(value);
 };
 
+const normalizeTodoKind = (value: unknown): TodoKind | undefined => (
+    value === 'quick' || value === 'project' ? value : undefined
+);
+
 const normalizeAssistantMemoryPatch = (value: unknown): AssistantMemoryPatch | undefined => {
     if (!value || typeof value !== 'object') {
         return undefined;
@@ -1041,11 +1053,13 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
 
         if (toolName === 'create_todo') {
             const normalizedRecurrenceRule = normalizeTodoRecurrenceRule(args.recurrenceRule);
+            const normalizedKind = normalizeTodoKind(args.kind) || 'project';
             const normalized = {
                 toolName: 'create_todo' as const,
                 args: {
                     title: typeof args.title === 'string' ? args.title.trim() : '',
                     categoryId: typeof args.categoryId === 'string' ? args.categoryId.trim() : '',
+                    kind: normalizedKind,
                     ...(normalizeNullableString(args.linkedCategoryId) ? { linkedCategoryId: normalizeNullableString(args.linkedCategoryId)! } : {}),
                     ...(normalizeNullableString(args.linkedActivityId) ? { linkedActivityId: normalizeNullableString(args.linkedActivityId)! } : {}),
                     ...(Array.isArray(args.defaultScopeIds) ? { defaultScopeIds: args.defaultScopeIds.map((scopeId: unknown) => String(scopeId).trim()).filter(Boolean) } : {}),
@@ -1055,7 +1069,10 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
                     ...(normalizedRecurrenceRule ? { recurrenceRule: normalizedRecurrenceRule } : {})
                 }
             };
-            return normalized.args.title && normalized.args.categoryId && normalized.args.linkedActivityId ? [normalized] : [];
+            const isValid = normalized.args.title
+                && normalized.args.categoryId
+                && (normalizedKind === 'quick' || normalized.args.linkedActivityId);
+            return isValid ? [normalized] : [];
         }
 
         if (toolName === 'update_todo') {
@@ -1064,6 +1081,7 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
             const normalizedPatch = {
                 ...(typeof patch.title === 'string' ? { title: patch.title.trim() } : {}),
                 ...(normalizeNullableString(patch.note) !== undefined ? { note: normalizeNullableString(patch.note) } : {}),
+                ...(normalizeTodoKind(patch.kind) ? { kind: normalizeTodoKind(patch.kind)! } : {}),
                 ...(typeof patch.categoryId === 'string' && patch.categoryId.trim() ? { categoryId: patch.categoryId.trim() } : {}),
                 ...(normalizeNullableString(patch.linkedCategoryId) !== undefined ? { linkedCategoryId: normalizeNullableString(patch.linkedCategoryId) } : {}),
                 ...(normalizeNullableString(patch.linkedActivityId) !== undefined ? { linkedActivityId: normalizeNullableString(patch.linkedActivityId) } : {}),

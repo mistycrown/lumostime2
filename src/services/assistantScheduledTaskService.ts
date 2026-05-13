@@ -5,6 +5,7 @@
  * @pos Service (Assistant Scheduled Tasks)
  * @description Stores recurring assistant task templates, computes their next concrete trigger datetimes from shared todo recurrence rules, and continuously keeps one next native reminder per enabled task so Android can fire reminder_due at the correct time without waiting for check-in logic.
  *
+ * @updated 2026-05-13: Added optional monthly month-end fallback normalization so scheduled 31st tasks can explicitly fire on shorter months' final day instead of skipping them.
  * @updated 2026-05-12: Added atomic scheduled-task reminder consumption so a successfully triggered reminder is removed before the next occurrence is materialized, while duplicate pending reminders for the same task are purged during the same handoff.
  * @updated 2026-05-10: Reconciled duplicate scheduled-task reminders back down to one active occurrence and stopped advancing tasks before the current reminder was actually consumed.
  * @updated 2026-05-09: Added recurring assistant scheduled-task persistence, next-trigger calculation, linked-reminder reconciliation, and native reminder seeding for recurring assistant tasks.
@@ -50,7 +51,8 @@ const normalizeRecurrenceRule = (value: unknown): TodoRecurrenceRule | null => {
     ...(parseDateKey(endDate) ? { endDate } : {}),
     ...(interval > 1 ? { interval } : {}),
     ...(weekdays.length > 0 ? { weekdays: Array.from(new Set(weekdays)).sort((a, b) => a - b) } : {}),
-    ...(monthDays.length > 0 ? { monthDays: Array.from(new Set(monthDays)).sort((a, b) => a - b) } : {})
+    ...(monthDays.length > 0 ? { monthDays: Array.from(new Set(monthDays)).sort((a, b) => a - b) } : {}),
+    ...(candidate.fallbackToMonthEnd === true ? { fallbackToMonthEnd: true } : {})
   };
 };
 

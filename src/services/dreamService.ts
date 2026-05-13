@@ -5,6 +5,8 @@
  * @pos Service (Dream)
  * @description Stores the explicit-only Dream attention system separately from assistant memory, including user-maintained concern topics, AI-maintained observation entries, and the manual `dream` workflow that can add, rewrite, or delete entries while normal chat and background turns remain read-only consumers.
  *
+ * @updated 2026-05-13: Preserved existing Dream topic notes and titles when toggling unrelated fields so enable/disable no longer clears long user-facing prompt copy.
+ * @updated 2026-05-13: Added a one-way built-in Dream-topic migration so legacy preset groups automatically reconcile into the newer inner-traits, life-rhythm, wellbeing, and execution-pressure defaults without disturbing custom topics.
  * @updated 2026-05-12: Added direct single-entry edit/delete helpers so users can manually refine or remove individual Dream observations without rerunning the whole workflow.
  * @updated 2026-05-12: Moved the Dream-mode prompt into a dedicated constants file, relaxed the fallback rules so sparse windows can still yield provisional observations, and kept the structured AI workflow runner for manual Dream refreshes.
  * @updated 2026-05-12: Added the first Dream persistence, topic CRUD, scoped read-only context builder, and structured AI workflow runner for manual Dream refreshes.
@@ -26,8 +28,16 @@ const DREAM_STORAGE_KEY = 'lumostime_dream_state_v1';
 const DREAM_STATE_VERSION = 1;
 const MAX_DREAM_CONTEXT_ENTRIES = 6;
 const DREAM_TOPIC_TITLE_LIMIT = 40;
-const DREAM_TOPIC_NOTE_LIMIT = 240;
+const DREAM_TOPIC_NOTE_LIMIT = 420;
 const DREAM_RELATIVE_TIME_PATTERN = /最近几天|最近一周|最近7天|这段时间|近来|近期/;
+const CURRENT_DREAM_PRESET_IDS = new Set(DREAM_TOPIC_PRESETS.map((preset) => preset.id));
+const LEGACY_DREAM_PRESET_TOPIC_ID_MAP: Record<string, string> = {
+  'preset-schedule': 'preset-life-rhythm',
+  'preset-health': 'preset-wellbeing',
+  'preset-energy': 'preset-wellbeing',
+  'preset-execution': 'preset-execution-pressure',
+  'preset-pressure': 'preset-execution-pressure'
+};
 
 interface DreamTopicDraftInput {
   title: string;
@@ -101,6 +111,21 @@ const createDefaultDreamState = (): DreamState => {
     entries: []
   };
 };
+
+const createPresetTopicFromDefinition = (
+  preset: (typeof DREAM_TOPIC_PRESETS)[number],
+  now: string,
+  legacyTopics: DreamTopic[] = []
+): DreamTopic => ({
+  id: preset.id,
+  title: preset.title,
+  note: preset.note,
+  enabled: legacyTopics.length > 0
+    ? legacyTopics.some((topic) => topic.enabled)
+    : true,
+  createdAt: legacyTopics[0]?.createdAt || now,
+  updatedAt: now
+});
 
 const normalizeString = (value: unknown, maxLength = 400): string => (
   typeof value === 'string'
@@ -233,12 +258,60 @@ const normalizeDreamState = (value: unknown): DreamState => {
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
     : [];
 
-  return {
+  const normalizedState: DreamState = {
     version: DREAM_STATE_VERSION,
     updatedAt: normalizeString(candidate.updatedAt, 80) || new Date().toISOString(),
     ...(normalizeString(candidate.lastDreamRunAt, 80) ? { lastDreamRunAt: normalizeString(candidate.lastDreamRunAt, 80) } : {}),
     topics,
     entries
+  };
+
+  const hasCurrentPresetTopic = normalizedState.topics.some((topic) => CURRENT_DREAM_PRESET_IDS.has(topic.id));
+  const legacyPresetTopics = normalizedState.topics.filter((topic) => LEGACY_DREAM_PRESET_TOPIC_ID_MAP[topic.id]);
+  if (hasCurrentPresetTopic || legacyPresetTopics.length === 0) {
+    return normalizedState;
+  }
+
+  const now = new Date().toISOString();
+  const legacyTopicsByNextId = new Map<string, DreamTopic[]>();
+  legacyPresetTopics.forEach((topic) => {
+    const nextTopicId = LEGACY_DREAM_PRESET_TOPIC_ID_MAP[topic.id];
+    const existing = legacyTopicsByNextId.get(nextTopicId) || [];
+    existing.push(topic);
+    legacyTopicsByNextId.set(nextTopicId, existing);
+  });
+
+  const nextTopics = [
+    ...normalizedState.topics.filter((topic) => !LEGACY_DREAM_PRESET_TOPIC_ID_MAP[topic.id]),
+    ...DREAM_TOPIC_PRESETS.map((preset) => createPresetTopicFromDefinition(
+      preset,
+      now,
+      legacyTopicsByNextId.get(preset.id) || []
+    ))
+  ];
+
+  const seenEntryKeys = new Set<string>();
+  const nextEntries = normalizedState.entries.flatMap((entry) => {
+    const migratedTopicId = LEGACY_DREAM_PRESET_TOPIC_ID_MAP[entry.topicId] || entry.topicId;
+    const nextEntry = migratedTopicId === entry.topicId
+      ? entry
+      : {
+        ...entry,
+        topicId: migratedTopicId
+      };
+    const matchKey = buildDreamEntryMatchKey(nextEntry);
+    if (seenEntryKeys.has(matchKey)) {
+      return [];
+    }
+    seenEntryKeys.add(matchKey);
+    return [nextEntry];
+  });
+
+  return {
+    ...normalizedState,
+    updatedAt: now,
+    topics: nextTopics,
+    entries: nextEntries
   };
 };
 
@@ -603,13 +676,19 @@ export const dreamService = {
         return topic;
       }
 
-      const nextTitle = normalizeString(patch.title, DREAM_TOPIC_TITLE_LIMIT) || topic.title;
-      const nextNote = normalizeString(patch.note, DREAM_TOPIC_NOTE_LIMIT);
+      const hasTitlePatch = Object.prototype.hasOwnProperty.call(patch, 'title');
+      const hasNotePatch = Object.prototype.hasOwnProperty.call(patch, 'note');
+      const nextTitle = hasTitlePatch
+        ? normalizeString(patch.title, DREAM_TOPIC_TITLE_LIMIT) || topic.title
+        : topic.title;
+      const nextNote = hasNotePatch
+        ? normalizeString(patch.note, DREAM_TOPIC_NOTE_LIMIT)
+        : topic.note;
       return {
         ...topic,
         title: nextTitle,
         ...(nextNote ? { note: nextNote } : {}),
-        ...(nextNote ? {} : { note: undefined }),
+        ...(nextNote ? {} : (hasNotePatch ? { note: undefined } : {})),
         enabled: patch.enabled ?? topic.enabled,
         updatedAt: new Date().toISOString()
       };

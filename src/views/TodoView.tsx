@@ -3,7 +3,12 @@
  * @input Todos, Categories, Scopes
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
- * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes a week planning view with schedule and history badges.
+ * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes reserved `小事` / `未来` buckets plus a week planning view with schedule and history badges.
+ * @updated 2026-05-13: Reworded the empty-state copy for the reserved `小事` and `未来` buckets so each system list explains its scheduling constraints when empty.
+ * @updated 2026-05-13: Added a reserved `未来` project bucket alongside `小事`, rendered it as a dedicated sidebar system category, and hid its todos from the quick schedule popup opened from week/month day numbers.
+ * @updated 2026-05-13: Lowered the Todo sidebar utility trio again so the bottom expand/collapse button sits closer to the Record view reference position above the fixed navigation.
+ * @updated 2026-05-13: Nudged the Todo sidebar utility buttons lower by trimming the left rail's bottom reserve so the bottom trio sits closer to the fixed navigation.
+ * @updated 2026-05-13: Added a bottom-pinned virtual `小事` group with inline quick capture, while keeping quick reminders visible in shared schedule views and blocking their timer affordances.
  * @updated 2026-05-11: Added an explicit month-view entry jump signal from the parent schedule screen so opening `月视图` now replays the same `本月` jump after the calendar mounts, instead of sometimes staying at the rolling window's top month.
  * @updated 2026-05-11: Routed month-view date numeral taps into the shared quick-add schedule modal so monthly and weekly planners now open the same fast create flow for a chosen day.
  * @updated 2026-05-11: Passed activity-category, todo-category, and scope metadata into the month planner so its display-settings hidden filter can reuse custom-filter syntax against rendered todo entries.
@@ -126,6 +131,17 @@ import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, 
 import { formatTodoCompactScheduleSummary, formatTodoInlineDate, orderTodoItemsByCompletionGroups } from '../utils/todoListDisplayUtils';
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
 import { UnreadCountBadge } from '../components/UnreadCountBadge';
+import { isQuickTodo } from '../utils/todoKindUtils';
+import {
+  ensureQuickTodoCategory,
+  FUTURE_TODO_CATEGORY_ID,
+  FUTURE_TODO_CATEGORY_NAME,
+  getRealTodoCategories,
+  getStandardTodoCategories,
+  isFutureTodoCategoryId,
+  QUICK_TODO_CATEGORY_ID,
+  QUICK_TODO_CATEGORY_NAME
+} from '../utils/todoQuickCategoryUtils';
 
 
 interface TodoViewProps {
@@ -189,6 +205,7 @@ const SwipeableTodoItem: React.FC<{
   compactDisplaySettings
 }) => {
   const [translateX, setTranslateX] = useState(0);
+  const isQuickReminder = isQuickTodo(todo);
   const canQuickToggle = true;
   const quickToggleDirection: 'left' = 'left';
   const shouldShowCompactScheduleLabels = viewMode !== 'compact' || compactDisplaySettings.showScheduleType;
@@ -207,7 +224,9 @@ const SwipeableTodoItem: React.FC<{
   const progressRatio = (todo.completedUnits || 0) / (todo.totalAmount || 1);
   const progressPercentage = Math.round(progressRatio * 100);
   const progressBarWidth = Math.min(100, Math.max(0, progressRatio * 100));
-  const showLooseRightActions = viewMode === 'loose' && (hasLooseDateMarkers || !todo.isCompleted);
+  const canStartFocus = !todo.isCompleted && !isQuickReminder;
+  const canSwipeRightActions = !isQuickReminder;
+  const showLooseRightActions = viewMode === 'loose' && (hasLooseDateMarkers || canStartFocus);
   const completedProgressOpacity = todo.isCompleted ? 0.38 : 1;
   const baseLooseBadgeClass = 'inline-flex min-h-[1.5rem] max-w-full items-center gap-1 whitespace-nowrap rounded-md border border-stone-200 bg-white/50 px-1.5 py-0.5 text-[11px] font-medium leading-none text-stone-500 align-middle';
   const baseCompactBadgeClass = 'inline-flex max-w-full items-center gap-1 whitespace-nowrap';
@@ -216,8 +235,8 @@ const SwipeableTodoItem: React.FC<{
     : 'inline-flex min-h-[1.5rem] max-w-full items-center gap-1 whitespace-nowrap rounded-full border border-stone-200 bg-white/80 px-2 py-0.5 font-medium leading-none text-stone-500 text-[11px] align-middle';
 
   // Constants
-  const detailSwipeDistance = 36;
-  const duplicateSwipeDistance = 100;
+  const detailSwipeDistance = canSwipeRightActions ? 36 : Number.MAX_SAFE_INTEGER;
+  const duplicateSwipeDistance = canSwipeRightActions ? 100 : Number.MAX_SAFE_INTEGER;
   const minSwipeDistance = 100;
   const maxSwipeDistance = 150; // Limit drag visual
   const shouldSuppressClickRef = useRef(false);
@@ -280,6 +299,11 @@ const SwipeableTodoItem: React.FC<{
     }
 
     if (gestureIntentRef.current !== 'swipe') {
+      setTranslateX(0);
+      return;
+    }
+
+    if (!canSwipeRightActions && diffX > 0) {
       setTranslateX(0);
       return;
     }
@@ -646,7 +670,7 @@ const SwipeableTodoItem: React.FC<{
             )}
 
             {/* Bottom Right: Start Focus */}
-            {!todo.isCompleted && (
+            {canStartFocus && (
               <button
                 data-todo-primary-ignore="true"
                 onClick={(e) => { e.stopPropagation(); onStartFocus(todo); }}
@@ -784,6 +808,9 @@ const normalizeTodoCompactDisplaySettings = (value: unknown): TodoCompactDisplay
 
 const filterVisibleTodos = (todos: TodoItem[], showCompletedTodos: boolean): TodoItem[] =>
   todos.filter((todo) => (showCompletedTodos || !todo.isCompleted) && !isIncompleteSubtaskHiddenByCompletedParent(todos, todo));
+
+const filterQuickTodos = (todos: TodoItem[]): TodoItem[] => todos.filter((todo) => isQuickTodo(todo));
+const filterProjectTodos = (todos: TodoItem[]): TodoItem[] => todos.filter((todo) => !isQuickTodo(todo));
 
 const buildScheduleMatchLabels = (matches: TodoScheduleMatch[]): string[] => {
   const labels: string[] = [];
@@ -1037,6 +1064,14 @@ const WeekTodoLineItem: React.FC<{
 };
 
 export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo, onSaveTodo, onDeleteTodo, autoLinkRules = [] }) => {
+  const normalizedTodoCategories = useMemo(() => ensureQuickTodoCategory(categories), [categories]);
+  const projectTodoCategories = useMemo(() => getRealTodoCategories(normalizedTodoCategories), [normalizedTodoCategories]);
+  const standardTodoCategories = useMemo(() => getStandardTodoCategories(normalizedTodoCategories), [normalizedTodoCategories]);
+  const futureTodoCategory = useMemo(
+    () => projectTodoCategories.find((category) => category.id === FUTURE_TODO_CATEGORY_ID) || null,
+    [projectTodoCategories]
+  );
+  const defaultProjectCategoryId = projectTodoCategories[0]?.id || '';
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(VIRTUAL_SCHEDULE_CATEGORY_ID);
   const [selectedScheduleFilter, setSelectedScheduleFilter] = useState<TodoScheduleRange>('today');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -1072,8 +1107,11 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   const [monthViewEntryJumpSignal, setMonthViewEntryJumpSignal] = useState(0);
   const [isScheduleViewMenuOpen, setIsScheduleViewMenuOpen] = useState(false);
   const [duplicatingTodo, setDuplicatingTodo] = useState<TodoItem | null>(null);
+  const [isQuickAddInputVisible, setIsQuickAddInputVisible] = useState(false);
+  const [quickAddTitle, setQuickAddTitle] = useState('');
   const weekScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const scheduleViewMenuRef = useRef<HTMLDivElement | null>(null);
+  const quickAddInputRef = useRef<HTMLInputElement | null>(null);
   const touchDragActivatedRef = useRef(false);
   const touchDraggingWeekEntryRef = useRef<WeekTodoEntry | null>(null);
   const touchDragTargetDateRef = useRef<string | null>(null);
@@ -1099,8 +1137,9 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     handleQuickActionUndoComplete,
     handleQuickActionClearDate,
     handleQuickActionTogglePin,
+    handleQuickActionUpgradeToProject,
     handleQuickActionDelete
-  } = useTodoQuickActions({ onSaveTodo, onEditTodo, onDeleteTodo });
+  } = useTodoQuickActions({ onSaveTodo, onEditTodo, onDeleteTodo, projectCategoryId: defaultProjectCategoryId });
 
   // 濞?localStorage 閻犲洩顕цぐ鍥偨閵婏箑鐓曞☉鎾筹攻椤愬ジ鏌呮径瀣仴闁汇劌瀚～瀣炊閻愵儫浣割嚕?
   const [viewMode, setViewMode] = useState<'loose' | 'compact'>(() => {
@@ -1126,6 +1165,18 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     }
   });
   const { openAIChat, unreadCount } = useAIChatWindow();
+
+  React.useEffect(() => {
+    if (selectedCategoryId !== QUICK_TODO_CATEGORY_ID) {
+      setIsQuickAddInputVisible(false);
+      setQuickAddTitle('');
+      return;
+    }
+
+    if (isQuickAddInputVisible) {
+      quickAddInputRef.current?.focus();
+    }
+  }, [isQuickAddInputVisible, selectedCategoryId]);
 
   // 鐟?viewMode 闁衡偓閻熸澘缍侀柡鍐啇缁辨繃绌卞┑鍡欐憼闁?localStorage
   React.useEffect(() => {
@@ -1215,19 +1266,21 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   }, [isScheduleViewMenuOpen]);
 
   React.useEffect(() => {
-    if (selectedCategoryId === VIRTUAL_SCHEDULE_CATEGORY_ID) {
+    if (selectedCategoryId === VIRTUAL_SCHEDULE_CATEGORY_ID || selectedCategoryId === QUICK_TODO_CATEGORY_ID) {
       return;
     }
 
-    if (!categories.some((category) => category.id === selectedCategoryId)) {
+    if (!projectTodoCategories.some((category) => category.id === selectedCategoryId)) {
       setSelectedCategoryId(VIRTUAL_SCHEDULE_CATEGORY_ID);
     }
-  }, [categories, selectedCategoryId]);
+  }, [projectTodoCategories, selectedCategoryId]);
 
   const isVirtualScheduleCategory = selectedCategoryId === VIRTUAL_SCHEDULE_CATEGORY_ID;
+  const isVirtualQuickCategory = selectedCategoryId === QUICK_TODO_CATEGORY_ID;
+  const isVirtualCategory = isVirtualScheduleCategory || isVirtualQuickCategory;
   const isWeekScheduleView = scheduleViewMode === 'week';
-  const selectedCategory = categories.find((category) => category.id === selectedCategoryId) || null;
-  const primaryCategoryId = categories[0]?.id || '';
+  const selectedCategory = projectTodoCategories.find((category) => category.id === selectedCategoryId) || null;
+  const primaryCategoryId = defaultProjectCategoryId;
   const todayDateKey = getTodayDateKey();
   const todayDate = parseDateKey(todayDateKey) || new Date();
   const tomorrowDate = new Date(todayDate);
@@ -1235,7 +1288,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   const tomorrowDateKey = formatDateKey(tomorrowDate);
 
   // 濠碘€冲€归悘澶娾柦閳╁啯绠掗柛鎺戞鐞氼偊鏁嶇仦鐐枖缂佲偓閾忓厜鏁勯柣妯垮煐閳ь兛娴囬埀顒€濂旂粭澶愬及椤栨氨鈹涙繝?
-  if (categories.length === 0) {
+  if (projectTodoCategories.length === 0) {
     return (
       <div className="flex h-full items-center justify-center bg-[#faf9f6] flex-col gap-4">
         <div className="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center text-stone-300">
@@ -1338,19 +1391,24 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
   const selectedTodoEntries: TodoListEntry[] = isVirtualScheduleCategory
     ? scheduleEntriesByFilter[selectedScheduleFilter]
-    : orderTodoItemsByCompletionGroups(
-        todos
-          .filter((todo) => todo.categoryId === selectedCategoryId)
-          .filter((todo) => showCompletedTodos || !todo.isCompleted)
-      )
-      .map((todo) => buildTodoListEntry(todo, [], { includePinLabel: true }));
+    : isVirtualQuickCategory
+      ? orderTodoItemsByCompletionGroups(filterVisibleTodos(filterQuickTodos(todos), showCompletedTodos))
+          .map((todo) => buildTodoListEntry(todo, [], { includePinLabel: true }))
+      : orderTodoItemsByCompletionGroups(
+          filterProjectTodos(
+            todos
+              .filter((todo) => todo.categoryId === selectedCategoryId)
+              .filter((todo) => showCompletedTodos || !todo.isCompleted)
+          )
+        )
+        .map((todo) => buildTodoListEntry(todo, [], { includePinLabel: true }));
 
   const selectedCategoryTreeGroups = useMemo<TodoTreeEntryGroup[]>(() => {
-    if (isVirtualScheduleCategory) {
+    if (isVirtualCategory) {
       return [];
     }
 
-    const categoryTodos = todos.filter((todo) => todo.categoryId === selectedCategoryId);
+    const categoryTodos = filterProjectTodos(todos.filter((todo) => todo.categoryId === selectedCategoryId));
     const visibleCategoryTodos = orderTodoItemsByCompletionGroups(
       filterVisibleTodos(categoryTodos, showCompletedTodos)
     );
@@ -1377,7 +1435,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         };
       })
       .filter(Boolean) as TodoTreeEntryGroup[];
-  }, [isVirtualScheduleCategory, selectedCategoryId, showCompletedTodos, todos]);
+  }, [isVirtualCategory, selectedCategoryId, showCompletedTodos, todos]);
 
   const virtualScheduleEntriesForHierarchy = useMemo<TodoListEntry[]>(
     () => (
@@ -1444,7 +1502,9 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
   const selectedCategoryName = isVirtualScheduleCategory
     ? VIRTUAL_SCHEDULE_CATEGORY_NAME
-    : (selectedCategory?.name || categories[0].name);
+    : isVirtualQuickCategory
+      ? QUICK_TODO_CATEGORY_NAME
+    : (selectedCategory?.name || projectTodoCategories[0].name);
   const selectedScheduleFilterMeta = VIRTUAL_SCHEDULE_FILTERS.find((filter) => filter.id === selectedScheduleFilter) || VIRTUAL_SCHEDULE_FILTERS[0];
   const selectedTodoSections = useMemo<TodoListSection[]>(() => {
     if (!isVirtualScheduleCategory) {
@@ -1523,11 +1583,20 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   );
 
   const hasSectionedTodoEntries = selectedTodoSectionsForRender.some((section) => section.entries.length > 0);
-  const hasVisibleTodoEntries = hasSectionedTodoEntries || (isVirtualScheduleCategory ? selectedTodoEntriesForRender.length > 0 : selectedCategoryTreeGroups.length > 0);
+  const hasVisibleTodoEntries = hasSectionedTodoEntries || (
+    isVirtualCategory
+      ? selectedTodoEntriesForRender.length > 0
+      : selectedCategoryTreeGroups.length > 0
+  );
 
   const handleAddTodoClick = () => {
     const targetCategoryId = isVirtualScheduleCategory ? primaryCategoryId : selectedCategoryId;
     if (!targetCategoryId) {
+      return;
+    }
+
+    if (isVirtualQuickCategory) {
+      setIsQuickAddInputVisible(true);
       return;
     }
 
@@ -1544,6 +1613,27 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     }
 
     onAddTodo(targetCategoryId);
+  };
+
+  const handleSubmitQuickTodo = () => {
+    const title = quickAddTitle.trim();
+    if (!title) {
+      return;
+    }
+
+    const newTodo: TodoItem = {
+      id: crypto.randomUUID(),
+      categoryId: QUICK_TODO_CATEGORY_ID,
+      kind: 'quick',
+      title,
+      isCompleted: false,
+      pin: false,
+      completedUnits: 0
+    };
+
+    onSaveTodo(newTodo);
+    setQuickAddTitle('');
+    setIsQuickAddInputVisible(true);
   };
 
   const weekTodos = useMemo(() => todos, [todos]);
@@ -2005,6 +2095,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     return todos.filter((todo) => {
       if (todo.isCompleted) return false;
       if (todo.recurrenceRule) return false;
+      if (isFutureTodoCategoryId(todo.categoryId)) return false;
       return true;
     });
   }, [assignModalDate, assignModalType, todos]);
@@ -2094,10 +2185,12 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       onComplete={handleQuickActionComplete}
       onUndoComplete={handleQuickActionUndoComplete}
       onTogglePin={handleQuickActionTogglePin}
+      onUpgradeToProject={handleQuickActionUpgradeToProject}
       onDelete={handleQuickActionDelete}
       onClose={closeQuickActions}
       onForceClose={() => closeQuickActions(true)}
       openedAt={quickActionOpenedAt}
+      showUpgradeToProject={Boolean(quickActionTodo && isQuickTodo(quickActionTodo))}
     />
   );
 
@@ -2375,7 +2468,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           onAssignTypeChange={setAssignModalType}
           todos={assignableTodos}
           allTodos={todos}
-          todoCategories={categories}
+          todoCategories={normalizedTodoCategories}
           activityCategories={activityCategories}
           onAssign={handleAssignTodoToDate}
           onCreate={handleCreateTodoForDate}
@@ -2440,7 +2533,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       
       {/* Left Sidebar - Todo Categories */}
       <div
-        className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-[calc(3.5rem+env(safe-area-inset-bottom))] pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative md:pb-[4.5rem] ${isSidebarOpen ? 'w-auto md:min-w-[12rem]' : 'w-16 items-center'}`}
+        className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-4 pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative md:pb-6 ${isSidebarOpen ? 'w-auto md:min-w-[12rem]' : 'w-16 items-center'}`}
       >
         <div className="relative z-10 flex-1 w-full">
           <button
@@ -2471,7 +2564,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
           <div className={`${isSidebarOpen ? 'mx-4 my-3' : 'mx-auto my-3 w-8'} border-t border-stone-200/80`}></div>
 
-          {categories.map((category) => {
+          {standardTodoCategories.map((category) => {
             const isSelected = selectedCategoryId === category.id;
             return (
               <button
@@ -2504,6 +2597,59 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
               </button>
             );
           })}
+
+          <div className={`${isSidebarOpen ? 'mx-4 my-3' : 'mx-auto my-3 w-8'} border-t border-stone-200/80`}></div>
+
+          <button
+            onClick={() => setSelectedCategoryId(FUTURE_TODO_CATEGORY_ID)}
+            className={`
+              flex items-center gap-2 mb-1 transition-all duration-200 text-left relative rounded-r-2xl group
+              ${selectedCategoryId === FUTURE_TODO_CATEGORY_ID
+                ? 'text-stone-900 font-bold bg-white shadow-[2px_2px_10px_rgba(0,0,0,0.02)] z-10'
+                : 'text-stone-600 hover:text-stone-800'
+              }
+              ${!isSidebarOpen ? 'justify-center w-12 h-12 md:w-14 md:h-14' : 'w-full min-h-[3.5rem] px-4 py-3'}
+            `}
+            title={!isSidebarOpen ? FUTURE_TODO_CATEGORY_NAME : undefined}
+          >
+            {selectedCategoryId === FUTURE_TODO_CATEGORY_ID && (
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full" style={{ backgroundColor: 'var(--accent-color)' }}></div>
+            )}
+            <IconRenderer
+              icon={futureTodoCategory?.icon || '🔭'}
+              uiIcon={futureTodoCategory?.uiIcon}
+              size={20}
+              className="flex-shrink-0"
+            />
+            {isSidebarOpen && (
+              <div className={`min-w-0 text-sm md:text-base whitespace-nowrap transition-all ${selectedCategoryId === FUTURE_TODO_CATEGORY_ID ? 'font-bold' : 'font-medium'}`}>
+                {FUTURE_TODO_CATEGORY_NAME}
+              </div>
+            )}
+          </button>
+
+          <button
+            onClick={() => setSelectedCategoryId(QUICK_TODO_CATEGORY_ID)}
+            className={`
+              flex items-center gap-2 mb-1 transition-all duration-200 text-left relative rounded-r-2xl group
+              ${isVirtualQuickCategory
+                ? 'text-stone-900 font-bold bg-white shadow-[2px_2px_10px_rgba(0,0,0,0.02)] z-10'
+                : 'text-stone-600 hover:text-stone-800'
+              }
+              ${!isSidebarOpen ? 'justify-center w-12 h-12 md:w-14 md:h-14' : 'w-full min-h-[3.5rem] px-4 py-3'}
+            `}
+            title={!isSidebarOpen ? QUICK_TODO_CATEGORY_NAME : undefined}
+          >
+            {isVirtualQuickCategory && (
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full" style={{ backgroundColor: 'var(--accent-color)' }}></div>
+            )}
+            <IconRenderer icon="🧾" uiIcon="ui:bill" size={20} className="flex-shrink-0" />
+            {isSidebarOpen && (
+              <div className={`min-w-0 text-sm md:text-base whitespace-nowrap transition-all ${isVirtualQuickCategory ? 'font-bold' : 'font-medium'}`}>
+                {QUICK_TODO_CATEGORY_NAME}
+              </div>
+            )}
+          </button>
         </div>
 
         <div className={`relative z-10 mt-3 flex flex-col gap-2 ${isSidebarOpen ? 'items-end pr-4' : 'items-center'}`}>
@@ -2599,6 +2745,55 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         </div>
 
         <div className="flex-1 overflow-y-auto pb-[calc(6.5rem+env(safe-area-inset-bottom))] no-scrollbar">
+          {isVirtualQuickCategory && isQuickAddInputVisible && (
+            <div className="mb-4 px-1">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">Quick Add</div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsQuickAddInputVisible(false);
+                    setQuickAddTitle('');
+                  }}
+                  className="text-xs text-stone-400 transition-colors hover:text-stone-600"
+                >
+                  收起
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={quickAddInputRef}
+                  type="text"
+                  value={quickAddTitle}
+                  onChange={(event) => setQuickAddTitle(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      handleSubmitQuickTodo();
+                    } else if (event.key === 'Escape') {
+                      setIsQuickAddInputVisible(false);
+                      setQuickAddTitle('');
+                    }
+                  }}
+                  placeholder="输入一个小事标题"
+                  className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-white/92 px-4 py-3 text-sm text-stone-700 outline-none transition-colors focus:border-stone-300"
+                />
+                <button
+                  type="button"
+                  onClick={handleSubmitQuickTodo}
+                  disabled={!quickAddTitle.trim()}
+                  className={`shrink-0 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
+                    quickAddTitle.trim()
+                      ? 'bg-stone-900 text-white hover:bg-stone-800'
+                      : 'bg-stone-100 text-stone-300'
+                  }`}
+                >
+                  添加
+                </button>
+              </div>
+            </div>
+          )}
+
           {isVirtualScheduleCategory && (selectedScheduleFilter === 'thisWeek' || selectedScheduleFilter === 'today')
             ? selectedTodoSectionsForRender.map((section) => (
               <section key={section.dateKey} className="mb-6">
@@ -2741,6 +2936,26 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                   </React.Fragment>
                 );
               })
+              : isVirtualQuickCategory
+                ? selectedTodoEntriesForRender.map((entry, index) => (
+                  <SwipeableTodoItem
+                    key={entry.todo.id}
+                    todo={entry.todo}
+                    categories={categories}
+                    activityCategories={activityCategories}
+                    scopes={scopes}
+                    onToggle={onToggleTodo}
+                    onOpenDetail={onEditTodo}
+                    onOpenQuickActions={openQuickActions}
+                    onStartFocus={onStartFocus}
+                    onDuplicate={handleOpenDuplicateModal}
+                    viewMode={viewMode}
+                    scheduleMatchLabels={entry.scheduleMatchLabels}
+                    isFirst={index === 0}
+                    isLast={index === selectedTodoEntriesForRender.length - 1}
+                    compactDisplaySettings={compactDisplaySettings}
+                  />
+                ))
               : selectedCategoryTreeGroups.map((group, groupIndex) => {
                 const isExpanded = Boolean(expandedParentIds[group.parentEntry.todo.id]);
 
@@ -2808,7 +3023,11 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
               <p className="text-sm font-serif italic">
                 {isVirtualScheduleCategory
                   ? `${selectedScheduleFilterMeta.label}没有排期任务。`
-                  : 'No tasks yet.'}
+                  : isVirtualQuickCategory
+                    ? '小事无类型不可计时，可排期。在这里添加可快速完成的事件备忘'
+                    : selectedCategoryId === FUTURE_TODO_CATEGORY_ID
+                      ? '未来事项不在排期中展示，可存档未来可能做的事情'
+                      : 'No tasks yet.'}
               </p>
             </div>
           )}

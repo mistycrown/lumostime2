@@ -4,6 +4,8 @@
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
+ * @updated 2026-05-13: Added optional monthly recurrence fallback support so 31st-style rules can land on the last day in shorter months when explicitly enabled.
+ * @updated 2026-05-13: Added optional todo `kind` support so lightweight quick reminders can share the Todo pipeline while opting out of project-only behavior.
  * @updated 2026-05-12: Added first-pass `DataCollection` and `DataCollectionEntry` types for grouping logs and todos into themed review collections.
  * @updated 2026-05-05: Added optional scene-widget source metadata to active sessions so scene card syncing can stay scoped to one scene group and time slot.
  * @updated 2026-04-25: Added global check streak multiplier config plus category-level streak toggles for achievement weighting.
@@ -215,6 +217,7 @@ export interface TodoRecurrenceRule {
   interval?: number;
   weekdays?: number[]; // weekly: 0-6
   monthDays?: number[]; // monthly: 1-31
+  fallbackToMonthEnd?: boolean; // monthly only: when the target day does not exist, use that month's last day
 }
 
 export interface TodoDuplicateOptions {
@@ -225,10 +228,12 @@ export interface TodoDuplicateOptions {
 }
 
 export type TodoProgressTrackingMode = 'none' | 'manual' | 'subtasks';
+export type TodoKind = 'project' | 'quick';
 
 export interface TodoItem {
   id: string;
   categoryId: string; // Belongs to a TodoCategory
+  kind?: TodoKind; // Missing values are treated as `project` for backward compatibility
   parentTodoId?: string; // Optional direct parent todo reference for one-level subtasks
   childOrder?: number; // Stable order among siblings under the same parent
   title: string;
