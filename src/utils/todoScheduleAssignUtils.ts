@@ -5,6 +5,7 @@
  * @pos Utility (Todo schedule assignment)
  * @description Keeps the week-plan arrange/due picker aligned with todo hierarchy visibility rules by hiding unfinished subtasks whose parent todo is already completed and suppressing the reserved `未来` bucket from quick scheduling.
  * @updated 2026-05-13: Excluded the reserved `未来` category from arrange/due picker pools so future-only project backlogs stay out of quick scheduling popups.
+ * @updated 2026-05-13: Excluded recurring todos from arrange/due picker pools so quick scheduling only offers one-shot tasks that can legally carry arrange or due dates.
  * @updated 2026-05-12: Added title search filtering that keeps matched subtasks attached to their visible parent rows inside the schedule assignment picker.
  * @updated 2026-04-25: Added hierarchy row builders so schedule assignment pickers can render subtasks beneath their parent rows while preserving completed-parent visibility rules.
  * @updated 2026-04-25: Added shared filtering so schedule assignment pickers can resolve completed-parent visibility from the full todo source.
@@ -92,7 +93,7 @@ export const getVisibleScheduleAssignTodos = (
   const nextTodos = selectedCategoryId === 'all'
     ? [...todos]
     : todos.filter((todo) => todo.categoryId === selectedCategoryId);
-  const schedulableTodos = nextTodos.filter((todo) => !isFutureTodoCategoryId(todo.categoryId));
+  const schedulableTodos = nextTodos.filter((todo) => !isFutureTodoCategoryId(todo.categoryId) && !todo.recurrenceRule);
 
   const visibleTodos = schedulableTodos.filter((todo) => !isIncompleteSubtaskHiddenByCompletedParent(sourceTodos, todo));
   const matchedTodoIds = buildMatchedTodoSet(visibleTodos, sourceTodos, searchQuery);

@@ -13,6 +13,7 @@
  * @updated 2026-05-13: Added explicit quick-vs-project todo guidance so assistant prompts now teach the reserved `小事` path, the new `kind` field, and the different linkage requirements for quick reminders versus timer-oriented project todos.
  * @updated 2026-05-06: Aligned fallback foreground tool guidance with live execution boundaries for `edit_log`, `create_todo`, and `create_subtask`.
  * @updated 2026-05-06: Restructured the fallback foreground prompts around explicit intent recognition and intent-to-action routing so front-chat turns decide behavior more consistently.
+ * @updated 2026-05-13: Added explicit absolute-date reference guidance, timestamped conversation-turn expectations, and absolute state-context field names so foreground/background turns stop leaning on ambiguous today/yesterday wording.
  * @updated 2026-05-06: Added assistant-facing `yesterdayTimelineSummary` guidance and aligned unified-turn context wording around concrete two-day activity records.
  * @updated 2026-05-06: Restored assistant-facing `todayTimelineSummary`, added structured same-day log candidates for `edit_log`, cleaned prompt fallback mojibake, and aligned foreground/background guidance with the live execution contract.
  * @updated 2026-04-27: Strengthened memory-writing guidance so normal informative turns prefer updating memory, tool calls no longer imply skipping memory, and fallback prompts stay aligned with the shipped prompt assets.
@@ -170,14 +171,17 @@ State and continuity awareness:
 
 - A core part of your job is to stay aware of what time it is now, what the user is likely doing now, and what the latest app-state summary says about their continuity.
 - currentDateTime is the authoritative current local datetime and includes an explicit timezone offset such as +08:00. Use it directly instead of converting it to trailing Z / UTC timestamps in reasoning or structured outputs.
-- todayTimelineSummary is the most concrete same-day activity log summary available in the current turn context, usually rendered as ordered time ranges plus activity labels and optional notes.
-- yesterdayTimelineSummary, when present, is the same concrete activity-log summary for the previous day.
-- timelineReviewSummary, when present, is a higher-level Chinese continuity digest built from today's and yesterday's timelineSummary text.
+- stateContextDate is the authoritative local calendar date for the current turn's date-sensitive app summaries.
+- currentLocalDate, currentWeekday, tomorrowDate, dayAfterTomorrowDate, currentWeekRange, and nextWeekdayDates together form an absolute time reference table. Use these explicit values instead of mentally inferring what "tomorrow", "next Tuesday", or "this week" should mean.
+- timelineSummaryForDate is the most concrete activity-log summary for stateContextDate, usually rendered as ordered time ranges plus activity labels and optional notes.
+- timelineSummaryForPreviousDate, when present, is the same concrete activity-log summary for the previous calendar date.
+- timelineReviewSummary, when present, is a higher-level Chinese continuity digest built from the stateContextDate / previousDate timelineSummary text.
 - activeSessionSummary is a strong signal about the user's current focus.
 - Use current time, app-state summaries, and recent conversation together to understand likely current state.
 - You may make light same-day continuity inferences when the signal is strong enough.
 - If an important detail is unclear, ask one short clarifying question instead of guessing.
-- Use todayTimelineSummary and yesterdayTimelineSummary as the primary concrete recent-activity sources for continuity and likely target-record matching, while treating timelineReviewSummary as broader state context instead of exact minute-level proof.
+- Use timelineSummaryForDate and timelineSummaryForPreviousDate as the primary concrete recent-activity sources for continuity and likely target-record matching, while treating timelineReviewSummary as broader state context instead of exact minute-level proof.
+- When you mention a future date in assistantReply, anchor it to the absolute reference table first. Prefer "2026-05-19（周二）" over a bare "下周二"; if you also mention a relative label like "明天", it must match the explicit absolute date in the current turn's reference table.
 - Do not turn weak summaries into precise timestamps, exact overlaps, or overconfident narratives.
 - Use LumosTime context to understand the user more like a person in motion, not like a database row.
 
@@ -280,15 +284,16 @@ Rules:
 4. If the user request is ambiguous, ask one short targeted follow-up question instead of guessing.
 5. Do not claim that logs, todos, reminders, or edits have already been applied unless they are returned as structured actions for the app.
 6. Keep replies short, natural, and practical, like a real chat thread instead of a formal assistant script.
-7. If several short bursts would feel more natural than one long block, you may also return assistantReplyParts as 2 to 4 short Chinese message bubbles that match assistantReply.
-8. If your reply would otherwise become a medium or long paragraph, strongly prefer returning assistantReplyParts and break it into short bursts instead of one dense block.
-9. If the user explicitly asks to be reminded at a specific time or after a delay, return a structured reminders item instead of only mentioning it in prose.
-10. Do not say a reminder has been set unless you returned it in the structured reminders field.
-11. If the thread depends on the user's current real-world state, it is okay to ask one short "what are you doing now" style question instead of assuming.
-12. If the user sounds stuck, tired, or scattered, first reduce cognitive load and offer the smallest useful next step.
-13. If the user is describing today's plan, today's priorities, or what they want to push forward today, treat that as a strong signal that you should help turn it into actionable follow-up instead of only chatting abstractly.
-14. If today's plan is already concrete enough, you may directly create or update the relevant todos and add a helpful follow-up reminder.
-15. If today's plan is still too vague, ask one short targeted follow-up question before creating todos.
+7. When you send a visible message, return one complete assistantReply string.
+8. If several short bubbles would feel more natural, separate assistantReply into paragraphs with blank lines or line breaks at natural boundaries.
+9. Do not return another duplicate field that rewrites or summarizes the same visible message.
+10. If the user explicitly asks to be reminded at a specific time or after a delay, return a structured reminders item instead of only mentioning it in prose.
+11. Do not say a reminder has been set unless you returned it in the structured reminders field.
+12. If the thread depends on the user's current real-world state, it is okay to ask one short "what are you doing now" style question instead of assuming.
+13. If the user sounds stuck, tired, or scattered, first reduce cognitive load and offer the smallest useful next step.
+14. If the user is describing today's plan, today's priorities, or what they want to push forward today, treat that as a strong signal that you should help turn it into actionable follow-up instead of only chatting abstractly.
+15. If today's plan is already concrete enough, you may directly create or update the relevant todos and add a helpful follow-up reminder.
+16. If today's plan is still too vague, ask one short targeted follow-up question before creating todos.
 
 Behavior by intent:
 
@@ -344,8 +349,9 @@ Rules:
 16. Treat scheduledDueAt and actualDispatchAt as the same local timezone timeline. They use local-offset ISO strings such as 2026-04-27T20:00:00+08:00, not trailing Z timestamps.
 17. If you choose silent, still return a short Chinese decisionSummary, a silentReason, and any silentSideEffects.
 18. silentReason should be one of: active_focus_protection, likely_do_not_disturb, state_still_clear, insufficient_confidence, waiting_for_stronger_signal, followup_already_scheduled.
-19. If you send a message, you may also return assistantReplyParts as 2 to 4 short Chinese message bubbles when that feels more natural than one long block.
-20. If your message would otherwise become a medium or long paragraph, strongly prefer short bubble-sized bursts instead of one dense block.
+19. If you send a visible message, return one complete assistantReply string.
+20. If several short bubbles would feel more natural, separate assistantReply into paragraphs with blank lines or line breaks.
+21. Do not duplicate the same visible message in another field.
 `.trim();
 
 const FALLBACK_FOREGROUND_TOOLS_PROMPT = `

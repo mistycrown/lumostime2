@@ -3,6 +3,8 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- `todoScheduleUtils.ts`: [Active] - Shared todo planning helpers for Arrange / Due / Repeat / Done / Trace surfaces, including compact recurrence summaries like `每天`, `每周一三五`, and `每月 1,15,31` for lightweight UI metadata.
+- `todoScheduleAssignUtils.ts`: [Active] - Filters, sorts, and builds hierarchy rows for arrange/due picker todos, including the rules that unfinished subtasks disappear when their parent todo is already completed, recurring todos and the reserved `鏈潵` category stay out of quick scheduling, and title search keeps matched subtasks attached to their parent rows.
 - `todoQuickCategoryUtils.ts`: [Active] - Synthesizes the reserved `未来` and `小事` buckets, separates project-available categories from quick-schedule-available ones, and keeps quick reminders normalized onto the `小事` category id.
 - `dataCollectionUtils.ts`: [Active] - Centralizes themed-collection membership updates, item resolution, and mixed log/todo count summaries for the first Collection list/detail and picker flows.
 - `assistantNativeDebug.ts`: [Active] - Rebuilds foreground-style debug exchanges from native Android assistant diagnostics so background history and hydrated messages can reveal the actual assembled prompts and raw payloads.

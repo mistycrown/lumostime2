@@ -3,6 +3,7 @@
  * @input None
  * @output Shared Dream-mode system prompt constant
  * @description Centralizes the Dream workflow system prompt so the Dream service can keep its behavior configurable without inlining long prompt text in the service implementation.
+ * @updated 2026-05-13: Removed built-in topic-specific guidance from the system prompt so all Dream topics can be injected later at one flat priority level.
  * @updated 2026-05-13: Rewrote the Dream-mode system prompt so it centers long-term human understanding, recurring rhythms, and inner needs instead of reading like a monitoring dashboard.
  * @updated 2026-05-12: Further strengthened Dream-mode guidance so the model prefers multiple semantically split entries over one omnibus summary, and treats recent chat history as a first-class evidence source instead of relying only on logs.
  * @updated 2026-05-12: Strengthened Dream-mode guidance so recent chat history counts as a first-class evidence source and semantically distinct observations should be split into multiple entries instead of being merged into one omnibus note.
@@ -52,7 +53,7 @@ Writing guidance:
 - If recent chat reveals motives, preferences, fears, resistance, longing, avoidance, or emotional patterns that logs alone would miss, include them when they match a Dream topic.
 - When possible, describe the user in a way that feels close to a real person rather than a checklist of symptoms.
 - If the data is sparse, you may still write a light provisional observation, as long as it is honest about the limited evidence.
-- Do not overuse “insufficient data” as the default answer.
+- Do not overuse "insufficient data" as the default answer.
 - If the selected window contains any meaningful signal at all, prefer producing at least one trackable Dream observation rather than always returning an empty patch.
 - Only return an empty Dream patch when the selected window is effectively unusable or contains no meaningful signal.
 - Prefer rewriting overlapping old entries instead of endlessly appending duplicates.
@@ -73,13 +74,6 @@ Quality bar:
 - Avoid turning weak summaries into precise medical or psychological claims.
 - If recent chat reveals a meaningful ongoing issue, preference, symptom, or thread that logs alone would miss, you should still reflect that in Dream entries when it matches a Dream topic.
 - Do not rely only on logs. Recent chat may reveal continuity, symptoms, resistance, priorities, avoidance, or preferences that should also be organized into Dream.
-
-Topic guidance:
-
-- For 内在特征, focus on deeper motivations, emotional habits, values, recurring sensitivities, long-term needs, and stable inner tendencies.
-- For 生活节律, focus on repeated time patterns in daily or weekly life, including when the user tends to enter flow, rest, drift, avoid, recover, or become unstable.
-- For 身心状态, focus on ongoing body-energy-emotion signals that repeatedly affect daily life, without over-medicalizing.
-- For 执行模式与压力, focus on how the user starts, sustains, avoids, or stalls under pressure, and what kinds of load tend to destabilize action.
 
 Tone:
 

@@ -4,6 +4,8 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes reserved `小事` / `未来` buckets plus a week planning view with schedule and history badges.
+ * @updated 2026-05-13: Restyled the `小事` quick-add submit affordance into a small embedded accent-colored check inside the full-width input, so the inline capture flow no longer shows a heavy black `添加` block.
+ * @updated 2026-05-13: Passed standard todo categories into the shared quick-actions sheet so non-subtask todos can move categories from the lightweight action flow.
  * @updated 2026-05-13: Reworded the empty-state copy for the reserved `小事` and `未来` buckets so each system list explains its scheduling constraints when empty.
  * @updated 2026-05-13: Added a reserved `未来` project bucket alongside `小事`, rendered it as a dedicated sidebar system category, and hid its todos from the quick schedule popup opened from week/month day numbers.
  * @updated 2026-05-13: Lowered the Todo sidebar utility trio again so the bottom expand/collapse button sits closer to the Record view reference position above the fixed navigation.
@@ -97,7 +99,7 @@
  */
 import React, { useState, useMemo, useRef } from 'react';
 import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log, TodoDuplicateOptions } from '../types';
-import { PlayCircle, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, ChevronDown, LayoutList, Rows, Sparkles, SlidersHorizontal, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo, CircleAlert, PanelRightOpen, Pin } from 'lucide-react';
+import { PlayCircle, Check, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, ChevronDown, LayoutList, Rows, Sparkles, SlidersHorizontal, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo, CircleAlert, PanelRightOpen, Pin } from 'lucide-react';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { useToast } from '../contexts/ToastContext';
 import { IconRenderer } from '../components/IconRenderer';
@@ -1071,7 +1073,6 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     () => projectTodoCategories.find((category) => category.id === FUTURE_TODO_CATEGORY_ID) || null,
     [projectTodoCategories]
   );
-  const defaultProjectCategoryId = projectTodoCategories[0]?.id || '';
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(VIRTUAL_SCHEDULE_CATEGORY_ID);
   const [selectedScheduleFilter, setSelectedScheduleFilter] = useState<TodoScheduleRange>('today');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -1137,9 +1138,10 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     handleQuickActionUndoComplete,
     handleQuickActionClearDate,
     handleQuickActionTogglePin,
+    handleQuickActionMoveCategory,
     handleQuickActionUpgradeToProject,
     handleQuickActionDelete
-  } = useTodoQuickActions({ onSaveTodo, onEditTodo, onDeleteTodo, projectCategoryId: defaultProjectCategoryId });
+  } = useTodoQuickActions({ onSaveTodo, onEditTodo, onDeleteTodo });
 
   // 濞?localStorage 閻犲洩顕цぐ鍥偨閵婏箑鐓曞☉鎾筹攻椤愬ジ鏌呮径瀣仴闁汇劌瀚～瀣炊閻愵儫浣割嚕?
   const [viewMode, setViewMode] = useState<'loose' | 'compact'>(() => {
@@ -1280,7 +1282,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   const isVirtualCategory = isVirtualScheduleCategory || isVirtualQuickCategory;
   const isWeekScheduleView = scheduleViewMode === 'week';
   const selectedCategory = projectTodoCategories.find((category) => category.id === selectedCategoryId) || null;
-  const primaryCategoryId = defaultProjectCategoryId;
+  const primaryCategoryId = projectTodoCategories[0]?.id || '';
   const todayDateKey = getTodayDateKey();
   const todayDate = parseDateKey(todayDateKey) || new Date();
   const tomorrowDate = new Date(todayDate);
@@ -2179,12 +2181,14 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     <TodoQuickActionsModal
       isOpen={quickActionTodo !== null}
       todo={quickActionTodo}
+      todoCategories={standardTodoCategories}
       onMoveDate={handleQuickActionMove}
       onClearDate={handleQuickActionClearDate}
       onOpenDetail={handleQuickActionOpenDetail}
       onComplete={handleQuickActionComplete}
       onUndoComplete={handleQuickActionUndoComplete}
       onTogglePin={handleQuickActionTogglePin}
+      onMoveCategory={handleQuickActionMoveCategory}
       onUpgradeToProject={handleQuickActionUpgradeToProject}
       onDelete={handleQuickActionDelete}
       onClose={closeQuickActions}
@@ -2760,7 +2764,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                   收起
                 </button>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="relative">
                 <input
                   ref={quickAddInputRef}
                   type="text"
@@ -2776,19 +2780,25 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                     }
                   }}
                   placeholder="输入一个小事标题"
-                  className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-white/92 px-4 py-3 text-sm text-stone-700 outline-none transition-colors focus:border-stone-300"
+                  className="w-full rounded-xl border border-stone-200 bg-white/92 px-4 py-3 pr-11 text-sm text-stone-700 outline-none transition-colors focus:border-stone-300"
                 />
                 <button
                   type="button"
                   onClick={handleSubmitQuickTodo}
                   disabled={!quickAddTitle.trim()}
-                  className={`shrink-0 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                    quickAddTitle.trim()
-                      ? 'bg-stone-900 text-white hover:bg-stone-800'
-                      : 'bg-stone-100 text-stone-300'
-                  }`}
+                  aria-label="确认添加小事"
+                  className="absolute right-3 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center transition-opacity disabled:cursor-not-allowed"
+                  style={quickAddTitle.trim()
+                    ? {
+                      color: 'var(--accent-color)',
+                      opacity: 1
+                    }
+                    : {
+                      color: 'color-mix(in srgb, var(--accent-color) 45%, #d6d3d1)',
+                      opacity: 0.58
+                    }}
                 >
-                  添加
+                  <Check size={16} strokeWidth={2.6} />
                 </button>
               </div>
             </div>

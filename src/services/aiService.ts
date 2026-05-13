@@ -203,6 +203,7 @@ export interface AIRequestOptions {
 export interface AIConversationTurn {
     role: 'user' | 'assistant';
     content: string;
+    createdAt?: string;
 }
 
 interface AIPromptCacheHint {
@@ -1185,10 +1186,6 @@ const hasMeaningfulAssistantUnifiedTurnSignal = (mode: AssistantTurnMode, rawOut
         return true;
     }
 
-    if (normalizeStringList(candidate.assistantReplyParts).length > 0) {
-        return true;
-    }
-
     if (normalizeAssistantReminderDrafts(candidate.reminders).length > 0) {
         return true;
     }
@@ -1664,19 +1661,12 @@ Output:
                     : 'no_update'
             };
 
-            const assistantReplyParts = normalizeStringList(rawOutput?.assistantReplyParts);
-            if (assistantReplyParts.length > 0) {
-                normalized.assistantReplyParts = assistantReplyParts;
-            }
-
             if (
                 typeof rawOutput?.assistantReply === 'string'
                 && rawOutput.assistantReply.trim()
                 && !['null', 'undefined'].includes(rawOutput.assistantReply.trim().toLowerCase())
             ) {
                 normalized.assistantReply = rawOutput.assistantReply.trim();
-            } else if (assistantReplyParts.length > 0) {
-                normalized.assistantReply = assistantReplyParts.join('\n');
             }
 
             const reminders = normalizeAssistantReminderDrafts(rawOutput?.reminders);

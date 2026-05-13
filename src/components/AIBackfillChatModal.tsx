@@ -4,11 +4,19 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-13: Rendered chat bubbles through Markdown with GFM and hard line-break support, so AI replies can keep one complete `assistantReply` body while still showing headings, emphasis, lists, blockquotes, code, and newline-based paragraph breaks correctly inside the conversation UI.
+ * @updated 2026-05-13: Made the Dream viewer body its own vertical scroll container so long topic notes and entry lists can be scrolled on mobile instead of getting clipped inside the fixed full-screen overlay.
+ * @updated 2026-05-13: Replaced weekly-review's popup-based week/method setup with a staged in-chat flow, so the template session now asks for range and method through fake-AI turns plus composer shortcut buttons before entering the real review conversation.
+ * @updated 2026-05-13: Flattened every shared `查看调试` viewer section by removing the outer grouped card shell, so debug pages no longer render card-inside-card nesting above the expandable request blocks.
  * @updated 2026-05-13: Monthly assistant scheduled tasks now reveal an optional `31 号无则月末` toggle only when the user enters day 31, and both summaries and trigger rules honor that explicit fallback.
  * @updated 2026-05-13: Debug-viewer prompt groups now default to collapsed and expand per block on demand, so long assembled request payloads stay scannable without losing the detailed prompt breakdown.
  * @updated 2026-05-13: Native background request diagnostics now rebuild the exact assembled prompt/request payload into the shared debug viewer, so background history and hydrated messages expose the same prompt-level detail as foreground calls.
  * @updated 2026-05-13: Replaced Dream's old range-picker flow with a conversational month prompt that waits for a user-supplied `YYYYMM` reply (with tolerant parsing for common month formats) before running the Dream refresh.
  * @updated 2026-05-13: Updated Dream topic copy toward longer person-understanding prompts and now truncates long Dream topic notes with an ellipsis in the narrow viewer header instead of expanding them full width.
+ * @updated 2026-05-13: Replaced the Dream topic directory cards with a TagDetail-style horizontal tab rail so switching among many topics no longer creates multi-row overlap with the active topic content on mobile.
+ * @updated 2026-05-13: Reworked the Dream mobile topic directory into a stable two-column grid with its own bottom divider so wrapped topic chips no longer collide visually with the active topic detail when long entry lists follow below.
+ * @updated 2026-05-13: Collapsed the Dream topic directory and detail/list columns while the topic editor is open so mobile edit mode shows only one focused editing surface instead of competing layers.
+ * @updated 2026-05-13: Hid the duplicate Dream topic detail pane while the topic editor is open so mobile edit mode no longer shows the same topic as both an active preview and a live form at once.
  * @updated 2026-05-13: Separated the Dream mobile topic directory into wrapped chip buttons and a dedicated prompt-preview block so long topic guidance no longer visually blends into the content column on narrow screens.
  * @updated 2026-05-13: Reflowed the Dream viewer for narrow mobile screens so topic and entry action buttons stack below content during long lists and edit states instead of squeezing text into misaligned layouts.
  * @updated 2026-05-12: Added inline manual edit/delete controls for individual Dream entries so users can refine or remove AI-written observations directly from the Dream page.
@@ -105,6 +113,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
+import ReactMarkdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
 import {
   ChevronDown,
   ChevronRight,
@@ -144,7 +155,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { BUILTIN_PERSONA_SYSTEM_PROMPTS } from '../constants/aiPersonaSystemPrompts';
 import { AppView } from '../types';
-import type { Log, TodoItem, TodoRecurrenceRule, WeeklyReview } from '../types';
+import type { Log, MonthlyReview, TodoItem, TodoRecurrenceRule, WeeklyReview } from '../types';
 import type {
   AssistantAgentConfig,
   AssistantEditableMemoryListKey,
@@ -173,6 +184,7 @@ import { buildNativeDiagnosticDebugExchange } from '../utils/assistantNativeDebu
 import { normalizeAssistantQuietHoursValue } from '../utils/assistantQuietHours';
 import { resolveLatestOrdinaryAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
 import { getTodoProgressTrackingMode } from '../utils/todoProgressUtils';
+import { normalizeMonthlyDayInput, parseMonthlyDayInput } from '../utils/todoScheduleUtils';
 import { imageService } from '../services/imageService';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
 import { assistantAgentConfigService } from '../services/assistantAgentConfigService';
@@ -206,11 +218,63 @@ import {
   type WeeklyReviewTemplateSelectionResult,
   type WeeklyReviewTemplateSessionMeta
 } from '../services/weeklyReviewTemplateService';
+import {
+  monthlyReviewTemplateService,
+  type MonthlyReviewMethodId,
+  type MonthlyReviewTemplateSelectionResult,
+  type MonthlyReviewTemplateSessionMeta
+} from '../services/monthlyReviewTemplateService';
 import type { AssistantToolCall, AssistantUnifiedTurnOutput } from '../types/assistant';
 import { CustomSelect } from './CustomSelect';
-import { InputModal } from './InputModal';
 
 type ChatTone = 'normal' | 'system' | 'error' | 'pending';
+
+const CHAT_MARKDOWN_COMPONENTS = {
+  h1: ({ node, ...props }: any) => <h1 className="mb-3 mt-1 text-[1.05rem] font-bold leading-7" {...props} />,
+  h2: ({ node, ...props }: any) => <h2 className="mb-3 mt-1 text-base font-bold leading-7" {...props} />,
+  h3: ({ node, ...props }: any) => <h3 className="mb-2 mt-1 text-[15px] font-semibold leading-6" {...props} />,
+  p: ({ node, ...props }: any) => <p className="mb-3 last:mb-0 leading-6" {...props} />,
+  strong: ({ node, ...props }: any) => (
+    <strong
+      className="rounded-[0.25rem] bg-[rgba(180,138,82,0.14)] px-1 py-[0.05rem] font-black text-[1.02em] text-stone-950"
+      {...props}
+    />
+  ),
+  em: ({ node, ...props }: any) => <em className="italic" {...props} />,
+  ul: ({ node, ...props }: any) => <ul className="my-3 list-disc space-y-1 pl-5" {...props} />,
+  ol: ({ node, ...props }: any) => <ol className="my-3 list-decimal space-y-1 pl-5" {...props} />,
+  li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
+  blockquote: ({ node, ...props }: any) => (
+    <blockquote
+      className="my-3 rounded-r-[0.7rem] border-l-[3px] border-[rgba(120,113,108,0.38)] bg-[rgba(0,0,0,0.03)] py-1.5 pl-3 pr-2 italic"
+      {...props}
+    />
+  ),
+  code: ({ node, inline, className, children, ...props }: any) => (
+    inline
+      ? (
+        <code
+          className="rounded-[0.35rem] bg-[rgba(0,0,0,0.08)] px-1.5 py-0.5 text-[0.92em]"
+          {...props}
+        >
+          {children}
+        </code>
+      )
+      : (
+        <code className={className} {...props}>
+          {children}
+        </code>
+      )
+  ),
+  pre: ({ node, ...props }: any) => (
+    <pre
+      className="my-3 overflow-x-auto rounded-[0.75rem] bg-[rgba(0,0,0,0.08)] px-3 py-2 text-[13px] leading-6"
+      {...props}
+    />
+  ),
+  hr: ({ node, ...props }: any) => <hr className="my-4 border-[rgba(120,113,108,0.22)]" {...props} />,
+  a: ({ node, ...props }: any) => <a className="underline underline-offset-2" {...props} />
+};
 
 interface AIChatDebugSection {
   label: string;
@@ -248,6 +312,7 @@ interface AIChatMessage {
   dreamUpdates?: AIChatDreamUpdateCard[];
   reminderUpdates?: string[];
   weeklyReviewWriteback?: AIChatWeeklyReviewWritebackResult;
+  monthlyReviewWriteback?: AIChatMonthlyReviewWritebackResult;
   retryInput?: string;
   retrySourceUserMessageId?: string;
   dreamRetryYearMonth?: string;
@@ -257,6 +322,16 @@ interface AIChatWeeklyReviewWritebackResult {
   weeklyReviewId: string;
   weekStartDate: string;
   weekEndDate: string;
+  title: string;
+  preview: string;
+  createdReview: boolean;
+  mergeMode: 'create' | 'overwrite';
+}
+
+interface AIChatMonthlyReviewWritebackResult {
+  monthlyReviewId: string;
+  monthStartDate: string;
+  monthEndDate: string;
   title: string;
   preview: string;
   createdReview: boolean;
@@ -293,7 +368,7 @@ interface AssistantScheduledTaskDrafts {
   frequency: TodoRecurrenceRule['frequency'];
   interval: string;
   weekdays: number[];
-  monthDay: string;
+  monthDaysInput: string;
   fallbackToMonthEnd: boolean;
 }
 
@@ -339,11 +414,7 @@ interface AIChatSession {
   personaId: string;
   contextCacheEnabled: boolean;
   messages: AIChatMessage[];
-  templateMeta?: WeeklyReviewTemplateSessionMeta;
-}
-
-interface PendingWeeklyReviewTemplateSetup {
-  selection: WeeklyReviewTemplateSelectionResult;
+  templateMeta?: WeeklyReviewTemplateSessionMeta | MonthlyReviewTemplateSessionMeta;
 }
 
 interface AIBackfillChatModalProps {
@@ -431,7 +502,7 @@ const DEFAULT_ASSISTANT_SCHEDULED_TASK_DRAFTS: AssistantScheduledTaskDrafts = {
   frequency: 'daily',
   interval: '1',
   weekdays: [1],
-  monthDay: '1',
+  monthDaysInput: '1',
   fallbackToMonthEnd: false
 };
 
@@ -641,9 +712,9 @@ const buildAssistantScheduledTaskRecurrenceRule = (
   }
 
   if (drafts.frequency === 'monthly') {
-    const monthDay = Number(drafts.monthDay.trim() || '0');
-    if (!Number.isInteger(monthDay) || monthDay < 1 || monthDay > 31) {
-      return { error: '每月日期需要填写 1 到 31。' };
+    const monthDays = parseMonthlyDayInput(drafts.monthDaysInput);
+    if (monthDays.length === 0) {
+      return { error: '每月日期需要填写 1 到 31，可用空格分隔多个数字。' };
     }
 
     return {
@@ -651,8 +722,8 @@ const buildAssistantScheduledTaskRecurrenceRule = (
         frequency: 'monthly',
         startDate,
         ...(normalizedInterval > 1 ? { interval: normalizedInterval } : {}),
-        monthDays: [monthDay],
-        ...(monthDay === 31 && drafts.fallbackToMonthEnd ? { fallbackToMonthEnd: true } : {})
+        monthDays,
+        ...(monthDays.includes(31) && drafts.fallbackToMonthEnd ? { fallbackToMonthEnd: true } : {})
       }
     };
   }
@@ -714,14 +785,16 @@ const formatAssistantScheduledTaskRecurrence = (task: AssistantScheduledTask): s
   }
 
   if (task.recurrenceRule.frequency === 'monthly') {
-    const monthDay = task.recurrenceRule.monthDays?.[0]
-      || Number(task.recurrenceRule.startDate.split('-')[2] || '1');
-    const fallbackSuffix = monthDay === 31 && task.recurrenceRule.fallbackToMonthEnd
+    const monthDays = task.recurrenceRule.monthDays?.length
+      ? task.recurrenceRule.monthDays
+      : [Number(task.recurrenceRule.startDate.split('-')[2] || '1')];
+    const fallbackSuffix = monthDays.includes(31) && task.recurrenceRule.fallbackToMonthEnd
       ? '，无则月末'
       : '';
+    const monthDayLabel = monthDays.map((monthDay) => `${monthDay}号`).join('/');
     return interval > 1
-      ? `每${interval}个月 ${monthDay}号${fallbackSuffix} ${task.time}`
-      : `每月${monthDay}号${fallbackSuffix} ${task.time}`;
+      ? `每${interval}个月 ${monthDayLabel}${fallbackSuffix} ${task.time}`
+      : `每月${monthDayLabel}${fallbackSuffix} ${task.time}`;
   }
 
   return interval > 1
@@ -1339,49 +1412,136 @@ const normalizeWeeklyReviewWritebackResult = (value: unknown): AIChatWeeklyRevie
   };
 };
 
-const normalizeTemplateMeta = (value: unknown): WeeklyReviewTemplateSessionMeta | undefined => {
+const normalizeMonthlyReviewWritebackResult = (value: unknown): AIChatMonthlyReviewWritebackResult | undefined => {
   if (!value || typeof value !== 'object') {
     return undefined;
   }
 
-  const candidate = value as Partial<WeeklyReviewTemplateSessionMeta>;
+  const candidate = value as Partial<AIChatMonthlyReviewWritebackResult>;
   if (
-    candidate.templateType !== 'weekly_review'
-    || typeof candidate.weekStartDate !== 'string'
-    || typeof candidate.weekEndDate !== 'string'
+    typeof candidate.monthlyReviewId !== 'string'
+    || typeof candidate.monthStartDate !== 'string'
+    || typeof candidate.monthEndDate !== 'string'
+    || typeof candidate.title !== 'string'
+    || typeof candidate.preview !== 'string'
   ) {
     return undefined;
   }
 
-  const selectedRangeLabel = (
-    candidate.selectedRangeLabel === '本周'
-    || candidate.selectedRangeLabel === '上周'
-    || candidate.selectedRangeLabel === 'custom_date'
-  )
-    ? candidate.selectedRangeLabel
-    : 'custom_date';
-  const methodId = (
-    candidate.methodId === 'pdca'
-    || candidate.methodId === 'systems'
-    || candidate.methodId === 'cbt'
-    || candidate.methodId === 'narrative'
-  )
-    ? candidate.methodId
-    : 'systems';
-  const methodLabel = typeof candidate.methodLabel === 'string' && candidate.methodLabel.trim()
-    ? candidate.methodLabel.trim()
-    : weeklyReviewTemplateService.listMethodOptions().find((item) => item.id === methodId)?.title || '系统复盘';
-
   return {
-    templateType: 'weekly_review',
-    stage: 'ready',
-    weekStartDate: candidate.weekStartDate.trim(),
-    weekEndDate: candidate.weekEndDate.trim(),
-    selectedRangeLabel,
-    methodId,
-    methodLabel,
-    ...(candidate.pendingWriteIntent ? { pendingWriteIntent: true } : {})
+    monthlyReviewId: candidate.monthlyReviewId.trim(),
+    monthStartDate: candidate.monthStartDate.trim(),
+    monthEndDate: candidate.monthEndDate.trim(),
+    title: candidate.title.trim(),
+    preview: candidate.preview.trim(),
+    createdReview: candidate.createdReview === true,
+    mergeMode: candidate.mergeMode === 'overwrite' ? 'overwrite' : 'create'
   };
+};
+
+const normalizeTemplateMeta = (value: unknown): AIChatSession['templateMeta'] | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  if (candidate.templateType === 'weekly_review') {
+    const normalizedWeekStartDate = typeof candidate.weekStartDate === 'string'
+      ? candidate.weekStartDate.trim()
+      : '';
+    const normalizedWeekEndDate = typeof candidate.weekEndDate === 'string'
+      ? candidate.weekEndDate.trim()
+      : '';
+    const hasResolvedWeek = Boolean(normalizedWeekStartDate && normalizedWeekEndDate);
+    const selectedRangeLabel = (
+      candidate.selectedRangeLabel === '本周'
+      || candidate.selectedRangeLabel === '上周'
+      || candidate.selectedRangeLabel === 'custom_date'
+    )
+      ? candidate.selectedRangeLabel
+      : undefined;
+    const methodId = (
+      candidate.methodId === 'pdca'
+      || candidate.methodId === 'systems'
+      || candidate.methodId === 'cbt'
+      || candidate.methodId === 'narrative'
+    )
+      ? candidate.methodId
+      : undefined;
+    const methodLabel = typeof candidate.methodLabel === 'string' && candidate.methodLabel.trim()
+      ? candidate.methodLabel.trim()
+      : (methodId
+        ? weeklyReviewTemplateService.listMethodOptions().find((item) => item.id === methodId)?.title || '系统复盘'
+        : undefined);
+    const stage = (
+      candidate.stage === 'select_range'
+      || candidate.stage === 'select_method'
+      || candidate.stage === 'ready'
+    )
+      ? candidate.stage
+      : (hasResolvedWeek && methodId ? 'ready' : 'select_range');
+
+    return {
+      templateType: 'weekly_review',
+      stage,
+      ...(normalizedWeekStartDate ? { weekStartDate: normalizedWeekStartDate } : {}),
+      ...(normalizedWeekEndDate ? { weekEndDate: normalizedWeekEndDate } : {}),
+      ...(selectedRangeLabel ? { selectedRangeLabel } : {}),
+      ...(methodId ? { methodId } : {}),
+      ...(methodLabel ? { methodLabel } : {}),
+      ...(candidate.pendingWriteIntent ? { pendingWriteIntent: true } : {})
+    };
+  }
+
+  if (candidate.templateType === 'monthly_review') {
+    const normalizedMonthStartDate = typeof candidate.monthStartDate === 'string'
+      ? candidate.monthStartDate.trim()
+      : '';
+    const normalizedMonthEndDate = typeof candidate.monthEndDate === 'string'
+      ? candidate.monthEndDate.trim()
+      : '';
+    const hasResolvedMonth = Boolean(normalizedMonthStartDate && normalizedMonthEndDate);
+    const selectedRangeLabel = (
+      candidate.selectedRangeLabel === '本月'
+      || candidate.selectedRangeLabel === '上月'
+      || candidate.selectedRangeLabel === 'custom_date'
+    )
+      ? candidate.selectedRangeLabel
+      : undefined;
+    const methodId = (
+      candidate.methodId === 'pdca'
+      || candidate.methodId === 'systems'
+      || candidate.methodId === 'cbt'
+      || candidate.methodId === 'narrative'
+    )
+      ? candidate.methodId
+      : undefined;
+    const methodLabel = typeof candidate.methodLabel === 'string' && candidate.methodLabel.trim()
+      ? candidate.methodLabel.trim()
+      : (methodId
+        ? monthlyReviewTemplateService.listMethodOptions().find((item) => item.id === methodId)?.title || '系统复盘'
+        : undefined);
+    const stage = (
+      candidate.stage === 'select_range'
+      || candidate.stage === 'select_method'
+      || candidate.stage === 'ready'
+    )
+      ? candidate.stage
+      : (hasResolvedMonth && methodId ? 'ready' : 'select_range');
+
+    return {
+      templateType: 'monthly_review',
+      stage,
+      ...(normalizedMonthStartDate ? { monthStartDate: normalizedMonthStartDate } : {}),
+      ...(normalizedMonthEndDate ? { monthEndDate: normalizedMonthEndDate } : {}),
+      ...(selectedRangeLabel ? { selectedRangeLabel } : {}),
+      ...(methodId ? { methodId } : {}),
+      ...(methodLabel ? { methodLabel } : {}),
+      ...(candidate.pendingWriteIntent ? { pendingWriteIntent: true } : {})
+    };
+  }
+
+  return undefined;
 };
 
 const normalizeMessageContent = (value: unknown): string | undefined => {
@@ -1449,6 +1609,9 @@ const normalizeMessages = (value: unknown): AIChatMessage[] => {
       ...(candidate.reminderUpdates ? { reminderUpdates: normalizeReminderUpdates(candidate.reminderUpdates) } : {}),
       ...(normalizeWeeklyReviewWritebackResult(candidate.weeklyReviewWriteback)
         ? { weeklyReviewWriteback: normalizeWeeklyReviewWritebackResult(candidate.weeklyReviewWriteback) }
+        : {}),
+      ...(normalizeMonthlyReviewWritebackResult(candidate.monthlyReviewWriteback)
+        ? { monthlyReviewWriteback: normalizeMonthlyReviewWritebackResult(candidate.monthlyReviewWriteback) }
         : {}),
       ...(normalizeRetryInput(candidate.retryInput) ? { retryInput: normalizeRetryInput(candidate.retryInput) } : {}),
       ...(normalizeRetrySourceUserMessageId(candidate.retrySourceUserMessageId)
@@ -1680,10 +1843,20 @@ const truncateText = (value: string, maxLength: number): string => (
     : value
 );
 
+const TIME_SENSITIVE_MESSAGE_PATTERN = /今天|明天|后天|昨天|今晚|今早|明早|下午|晚上|下周|本周|这周|周[一二三四五六日天]|星期[一二三四五六日天]|月底|月初|\d{4}-\d{1,2}-\d{1,2}|\d{1,2}月\d{1,2}日|\d{1,2}:\d{2}/;
+
 const formatLocalDateTimeContext = (date: Date): string => formatAssistantLocalDateTime(date);
 
+const formatAssistantDateKey = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const buildAssistantCurrentTimeSnapshot = (date: Date) => ({
-  currentDateTime: formatLocalDateTimeContext(date)
+  currentDateTime: formatLocalDateTimeContext(date),
+  stateContextDate: formatAssistantDateKey(date)
 });
 
 const stringifyDebugSection = (value: unknown): string => {
@@ -2243,9 +2416,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
   const [isPersonaPanelOpen, setIsPersonaPanelOpen] = useState(false);
   const [isNewSessionDialogOpen, setIsNewSessionDialogOpen] = useState(false);
-  const [isWeeklyReviewWeekSelectionModalOpen, setIsWeeklyReviewWeekSelectionModalOpen] = useState(false);
-  const [isWeeklyReviewDateInputModalOpen, setIsWeeklyReviewDateInputModalOpen] = useState(false);
-  const [pendingWeeklyReviewTemplateSetup, setPendingWeeklyReviewTemplateSetup] = useState<PendingWeeklyReviewTemplateSetup | null>(null);
   const [activeSettingsMainTab, setActiveSettingsMainTab] = useState<AISettingsMainTab>('persona');
   const [debugViewer, setDebugViewer] = useState<DebugViewerState | null>(null);
   const [expandedDebugBlockKeys, setExpandedDebugBlockKeys] = useState<Set<string>>(new Set());
@@ -2328,6 +2498,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     dailyReviews,
     weeklyReviews,
     setWeeklyReviews,
+    monthlyReviews,
+    setMonthlyReviews,
     reviewTemplates,
     isReady: isReviewReady
   } = useReview();
@@ -2345,7 +2517,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setCurrentWeeklyReviewStart,
     setCurrentWeeklyReviewEnd,
     setCurrentWeeklyReviewInitialTab,
-    setIsWeeklyReviewOpen
+    setIsWeeklyReviewOpen,
+    setCurrentMonthlyReviewStart,
+    setCurrentMonthlyReviewEnd,
+    setCurrentMonthlyReviewInitialTab,
+    setIsMonthlyReviewOpen
   } = useNavigation();
   const { addToast } = useToast();
   const { autoLinkRules, autoApplyAutoLinkRules, colorScheme } = useSettings();
@@ -2382,10 +2558,58 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     () => weeklyReviewTemplateService.listMethodOptions(),
     []
   );
+  const monthlyReviewMethodOptions = useMemo(
+    () => monthlyReviewTemplateService.listMethodOptions(),
+    []
+  );
   const activeSession = useMemo(
     () => sessions.find((session) => session.id === activeSessionId) || sessions[0] || null,
     [activeSessionId, sessions]
   );
+  const activeWeeklyReviewShortcutOptions = useMemo(() => {
+    if (activeSession?.templateMeta?.templateType !== 'weekly_review') {
+      return [];
+    }
+
+    if (activeSession.templateMeta.stage === 'select_range') {
+      return [
+        { key: 'current', label: '本周', value: '本周' },
+        { key: 'previous', label: '上周', value: '上周' }
+      ];
+    }
+
+    if (activeSession.templateMeta.stage === 'select_method') {
+      return weeklyReviewMethodOptions.map((method) => ({
+        key: method.id,
+        label: method.title,
+        value: method.title
+      }));
+    }
+
+    return [];
+  }, [activeSession, weeklyReviewMethodOptions]);
+  const activeMonthlyReviewShortcutOptions = useMemo(() => {
+    if (activeSession?.templateMeta?.templateType !== 'monthly_review') {
+      return [];
+    }
+
+    if (activeSession.templateMeta.stage === 'select_range') {
+      return [
+        { key: 'current', label: '本月', value: '本月' },
+        { key: 'previous', label: '上月', value: '上月' }
+      ];
+    }
+
+    if (activeSession.templateMeta.stage === 'select_method') {
+      return monthlyReviewMethodOptions.map((method) => ({
+        key: method.id,
+        label: method.title,
+        value: method.title
+      }));
+    }
+
+    return [];
+  }, [activeSession, monthlyReviewMethodOptions]);
   const activeDreamTopic = useMemo<DreamTopic | null>(() => (
     dreamSnapshot.topics.find((topic) => topic.id === selectedDreamTopicId)
     || dreamSnapshot.topics[0]
@@ -3080,7 +3304,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       .filter((message) => message.tone !== 'system' && message.tone !== 'pending')
       .map((message) => ({
         role: message.role,
-        content: message.content.trim()
+        content: message.content.trim(),
+        createdAt: formatAssistantLocalDateTime(new Date(message.createdAt))
       }))
       .filter((turn): turn is AIConversationTurn => Boolean(turn.content));
 
@@ -3119,6 +3344,34 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const buildConversationHistory = (session: AIChatSession): AIConversationTurn[] => (
     buildConversationHistoryFromMessages(session, session.messages)
   );
+
+  const narrowConversationHistoryForTimeSensitiveTurn = useCallback((
+    history: AIConversationTurn[],
+    sourceText: string
+  ): AIConversationTurn[] => {
+    if (!TIME_SENSITIVE_MESSAGE_PATTERN.test(sourceText)) {
+      return history;
+    }
+
+    const recentUserTurns = history
+      .filter((turn) => turn.role === 'user')
+      .slice(-4);
+    if (recentUserTurns.length === 0) {
+      return history.slice(-6);
+    }
+
+    const earliestKeptCreatedAt = recentUserTurns[0]?.createdAt
+      ? Date.parse(recentUserTurns[0].createdAt)
+      : Number.NaN;
+    if (!Number.isFinite(earliestKeptCreatedAt)) {
+      return history.slice(-6);
+    }
+
+    return history.filter((turn) => {
+      const turnCreatedAt = typeof turn.createdAt === 'string' ? Date.parse(turn.createdAt) : Number.NaN;
+      return Number.isFinite(turnCreatedAt) && turnCreatedAt >= earliestKeptCreatedAt;
+    });
+  }, []);
 
   const buildRetryConversationHistory = (
     sessionId: string,
@@ -3337,7 +3590,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   }, [personaMap, personas]);
 
   const buildAssistantTimelineSummary = useCallback(() => assistantContextBuilder.buildTimelineSummaryDigest({
-    defaultDate: defaultDateKey,
+    stateContextDate: defaultDateKey,
     dailyReviews
   }), [dailyReviews, defaultDateKey]);
 
@@ -3346,8 +3599,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     reminderSummary?: string
   ) => ({
     ...assistantContextBuilder.buildStateContext({
-      ...buildAssistantCurrentTimeSnapshot(date),
-      defaultDate: defaultDateKey,
+      currentDateTime: formatLocalDateTimeContext(date),
+      stateContextDate: defaultDateKey,
       logs,
       categories,
       todos,
@@ -3358,20 +3611,21 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   }), [activeSessions, buildAssistantTimelineSummary, categories, defaultDateKey, logs, todos]);
 
   const buildWeeklyReviewTemplateWeekDataText = useCallback((session: AIChatSession): string | null => {
-    if (session.templateMeta?.templateType !== 'weekly_review') {
+    const templateMeta = resolveWeeklyReviewTemplateSessionMeta(session);
+    if (!templateMeta) {
       return null;
     }
 
     const weeklyReview = weeklyReviewTemplateService.findWeeklyReview(
       weeklyReviews,
-      session.templateMeta.weekStartDate,
-      session.templateMeta.weekEndDate
+      templateMeta.weekStartDate,
+      templateMeta.weekEndDate
     );
 
     return weeklyReviewTemplateService.buildWeekDataText({
-      weekStartDate: session.templateMeta.weekStartDate,
-      weekEndDate: session.templateMeta.weekEndDate,
-      selectedRangeLabel: session.templateMeta.selectedRangeLabel,
+      weekStartDate: templateMeta.weekStartDate,
+      weekEndDate: templateMeta.weekEndDate,
+      selectedRangeLabel: templateMeta.selectedRangeLabel,
       logs,
       categories,
       todos,
@@ -3381,6 +3635,32 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       weeklyReview
     });
   }, [categories, dailyReviews, logs, scopes, todoCategories, todos, weeklyReviews]);
+  const buildMonthlyReviewTemplateMonthDataText = useCallback((session: AIChatSession): string | null => {
+    const templateMeta = resolveMonthlyReviewTemplateSessionMeta(session);
+    if (!templateMeta) {
+      return null;
+    }
+
+    const monthlyReview = monthlyReviewTemplateService.findMonthlyReview(
+      monthlyReviews,
+      templateMeta.monthStartDate,
+      templateMeta.monthEndDate
+    );
+
+    return monthlyReviewTemplateService.buildMonthDataText({
+      monthStartDate: templateMeta.monthStartDate,
+      monthEndDate: templateMeta.monthEndDate,
+      selectedRangeLabel: templateMeta.selectedRangeLabel,
+      logs,
+      categories,
+      todos,
+      todoCategories,
+      scopes,
+      dailyReviews,
+      weeklyReviews,
+      monthlyReview
+    });
+  }, [categories, dailyReviews, logs, monthlyReviews, scopes, todoCategories, todos, weeklyReviews]);
 
   const buildBackgroundTurnRequest = useCallback(({
     trigger,
@@ -3398,12 +3678,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       ...(targetSession ? { targetSessionId: targetSession.id } : {}),
       showSystemNotification,
       currentDateTime: stateContext.currentDateTime,
-      defaultDate: stateContext.defaultDate,
-      todayTimelineSummary: stateContext.todayTimelineSummary || '',
-      ...(stateContext.yesterdayTimelineSummary ? { yesterdayTimelineSummary: stateContext.yesterdayTimelineSummary } : {}),
+      defaultDate: stateContext.stateContextDate,
+      todayTimelineSummary: stateContext.timelineSummaryForDate || '',
+      ...(stateContext.timelineSummaryForPreviousDate ? { yesterdayTimelineSummary: stateContext.timelineSummaryForPreviousDate } : {}),
       ...(stateContext.timelineReviewSummary ? { timelineReviewSummary: stateContext.timelineReviewSummary } : {}),
       ...(stateContext.activeSessionSummary ? { activeSessionSummary: stateContext.activeSessionSummary } : {}),
-      ...(stateContext.todayScheduledTodoSummary ? { todayScheduledTodoSummary: stateContext.todayScheduledTodoSummary } : {}),
+      ...(stateContext.scheduledTodosForDateSummary ? { todayScheduledTodoSummary: stateContext.scheduledTodosForDateSummary } : {}),
       ...(stateContext.pinnedTodoSummary ? { pinnedTodoSummary: stateContext.pinnedTodoSummary } : {}),
       ...(stateContext.overdueTodoSummary ? { overdueTodoSummary: stateContext.overdueTodoSummary } : {}),
       ...(reminderSummary ? { reminderSummary } : {}),
@@ -3598,17 +3878,26 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         conversation: assistantContextBuilder.buildConversationContext(
           conversationHistory.map((turn) => ({
             role: turn.role,
-            content: turn.content
+            content: turn.content,
+            ...(typeof turn.createdAt === 'string' && turn.createdAt.trim()
+              ? { createdAt: turn.createdAt.trim() }
+              : {})
           }))
         ),
         stateContext: {
           currentDateTime: stateContext.currentDateTime,
-          defaultDate: stateContext.defaultDate,
-          ...(stateContext.todayTimelineSummary ? { todayTimelineSummary: stateContext.todayTimelineSummary } : {}),
-          ...(stateContext.yesterdayTimelineSummary ? { yesterdayTimelineSummary: stateContext.yesterdayTimelineSummary } : {}),
+          stateContextDate: stateContext.stateContextDate,
+          ...(stateContext.currentLocalDate ? { currentLocalDate: stateContext.currentLocalDate } : {}),
+          ...(stateContext.currentWeekday ? { currentWeekday: stateContext.currentWeekday } : {}),
+          ...(stateContext.tomorrowDate ? { tomorrowDate: stateContext.tomorrowDate } : {}),
+          ...(stateContext.dayAfterTomorrowDate ? { dayAfterTomorrowDate: stateContext.dayAfterTomorrowDate } : {}),
+          ...(stateContext.currentWeekRange ? { currentWeekRange: stateContext.currentWeekRange } : {}),
+          ...(stateContext.nextWeekdayDates ? { nextWeekdayDates: stateContext.nextWeekdayDates } : {}),
+          ...(stateContext.timelineSummaryForDate ? { timelineSummaryForDate: stateContext.timelineSummaryForDate } : {}),
+          ...(stateContext.timelineSummaryForPreviousDate ? { timelineSummaryForPreviousDate: stateContext.timelineSummaryForPreviousDate } : {}),
           ...(stateContext.timelineReviewSummary ? { timelineReviewSummary: stateContext.timelineReviewSummary } : {}),
           ...(stateContext.activeSessionSummary ? { activeSessionSummary: stateContext.activeSessionSummary } : {}),
-          ...(stateContext.todayScheduledTodoSummary ? { todayScheduledTodoSummary: stateContext.todayScheduledTodoSummary } : {}),
+          ...(stateContext.scheduledTodosForDateSummary ? { scheduledTodosForDateSummary: stateContext.scheduledTodosForDateSummary } : {}),
           ...(stateContext.pinnedTodoSummary ? { pinnedTodoSummary: stateContext.pinnedTodoSummary } : {}),
           ...(stateContext.overdueTodoSummary ? { overdueTodoSummary: stateContext.overdueTodoSummary } : {}),
           ...(reminderSummary ? { reminderSummary } : {})
@@ -4150,6 +4439,318 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }));
   };
 
+  const resolveWeeklyReviewTemplateSessionMeta = (
+    session: AIChatSession
+  ): Required<Pick<WeeklyReviewTemplateSessionMeta, 'weekStartDate' | 'weekEndDate' | 'selectedRangeLabel' | 'methodId' | 'methodLabel'>> | null => {
+    const meta = session.templateMeta;
+    if (
+      meta?.templateType !== 'weekly_review'
+      || typeof meta.weekStartDate !== 'string'
+      || !meta.weekStartDate.trim()
+      || typeof meta.weekEndDate !== 'string'
+      || !meta.weekEndDate.trim()
+      || (meta.selectedRangeLabel !== '本周' && meta.selectedRangeLabel !== '上周' && meta.selectedRangeLabel !== 'custom_date')
+      || (meta.methodId !== 'pdca' && meta.methodId !== 'systems' && meta.methodId !== 'cbt' && meta.methodId !== 'narrative')
+    ) {
+      return null;
+    }
+
+    return {
+      weekStartDate: meta.weekStartDate.trim(),
+      weekEndDate: meta.weekEndDate.trim(),
+      selectedRangeLabel: meta.selectedRangeLabel,
+      methodId: meta.methodId,
+      methodLabel: typeof meta.methodLabel === 'string' && meta.methodLabel.trim()
+        ? meta.methodLabel.trim()
+        : weeklyReviewTemplateService.listMethodOptions().find((item) => item.id === meta.methodId)?.title || '系统复盘'
+    };
+  };
+
+  const resolveMonthlyReviewTemplateSessionMeta = (
+    session: AIChatSession
+  ): Required<Pick<MonthlyReviewTemplateSessionMeta, 'monthStartDate' | 'monthEndDate' | 'selectedRangeLabel' | 'methodId' | 'methodLabel'>> | null => {
+    const meta = session.templateMeta;
+    if (
+      meta?.templateType !== 'monthly_review'
+      || typeof meta.monthStartDate !== 'string'
+      || !meta.monthStartDate.trim()
+      || typeof meta.monthEndDate !== 'string'
+      || !meta.monthEndDate.trim()
+      || (meta.selectedRangeLabel !== '本月' && meta.selectedRangeLabel !== '上月' && meta.selectedRangeLabel !== 'custom_date')
+      || (meta.methodId !== 'pdca' && meta.methodId !== 'systems' && meta.methodId !== 'cbt' && meta.methodId !== 'narrative')
+    ) {
+      return null;
+    }
+
+    return {
+      monthStartDate: meta.monthStartDate.trim(),
+      monthEndDate: meta.monthEndDate.trim(),
+      selectedRangeLabel: meta.selectedRangeLabel,
+      methodId: meta.methodId,
+      methodLabel: typeof meta.methodLabel === 'string' && meta.methodLabel.trim()
+        ? meta.methodLabel.trim()
+        : monthlyReviewTemplateService.listMethodOptions().find((item) => item.id === meta.methodId)?.title || '系统复盘'
+    };
+  };
+
+  const resolveWeeklyReviewTemplateRangeMeta = (
+    session: AIChatSession
+  ): Required<Pick<WeeklyReviewTemplateSessionMeta, 'weekStartDate' | 'weekEndDate' | 'selectedRangeLabel'>> | null => {
+    const meta = session.templateMeta;
+    if (
+      meta?.templateType !== 'weekly_review'
+      || typeof meta.weekStartDate !== 'string'
+      || !meta.weekStartDate.trim()
+      || typeof meta.weekEndDate !== 'string'
+      || !meta.weekEndDate.trim()
+      || (meta.selectedRangeLabel !== '本周' && meta.selectedRangeLabel !== '上周' && meta.selectedRangeLabel !== 'custom_date')
+    ) {
+      return null;
+    }
+
+    return {
+      weekStartDate: meta.weekStartDate.trim(),
+      weekEndDate: meta.weekEndDate.trim(),
+      selectedRangeLabel: meta.selectedRangeLabel
+    };
+  };
+
+  const resolveMonthlyReviewTemplateRangeMeta = (
+    session: AIChatSession
+  ): Required<Pick<MonthlyReviewTemplateSessionMeta, 'monthStartDate' | 'monthEndDate' | 'selectedRangeLabel'>> | null => {
+    const meta = session.templateMeta;
+    if (
+      meta?.templateType !== 'monthly_review'
+      || typeof meta.monthStartDate !== 'string'
+      || !meta.monthStartDate.trim()
+      || typeof meta.monthEndDate !== 'string'
+      || !meta.monthEndDate.trim()
+      || (meta.selectedRangeLabel !== '本月' && meta.selectedRangeLabel !== '上月' && meta.selectedRangeLabel !== 'custom_date')
+    ) {
+      return null;
+    }
+
+    return {
+      monthStartDate: meta.monthStartDate.trim(),
+      monthEndDate: meta.monthEndDate.trim(),
+      selectedRangeLabel: meta.selectedRangeLabel
+    };
+  };
+
+  const handleWeeklyReviewTemplateGuidedSelection = async (
+    session: AIChatSession,
+    userInput: string
+  ): Promise<boolean> => {
+    const sessionId = session.id;
+    const trimmedInput = userInput.trim();
+    if (!trimmedInput || session.templateMeta?.templateType !== 'weekly_review') {
+      return false;
+    }
+
+    const now = Date.now();
+    mutateSession(sessionId, (currentSession) => ({
+      ...currentSession,
+      messages: [
+        ...currentSession.messages,
+        {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: trimmedInput,
+          createdAt: now
+        }
+      ]
+    }));
+    setInputText('');
+    setIsHistoryPanelOpen(false);
+    setIsPersonaPanelOpen(false);
+
+    if (session.templateMeta.stage === 'select_range') {
+      const selection = weeklyReviewTemplateService.parseWeekSelectionInput(trimmedInput, new Date());
+      if (!selection) {
+        appendSystemMessage(sessionId, weeklyReviewTemplateService.getRangeSelectionInvalidPrompt());
+        return true;
+      }
+
+      mutateSession(sessionId, (currentSession) => ({
+        ...currentSession,
+        title: weeklyReviewTemplateService.getSessionTitle(selection),
+        ...(currentSession.templateMeta
+          ? {
+            templateMeta: {
+              ...currentSession.templateMeta,
+              stage: 'select_method',
+              weekStartDate: selection.weekStartDate,
+              weekEndDate: selection.weekEndDate,
+              selectedRangeLabel: selection.selectedRangeLabel,
+              methodId: undefined,
+              methodLabel: undefined,
+              pendingWriteIntent: false
+            }
+          }
+          : {})
+      }));
+      appendSystemMessage(sessionId, weeklyReviewTemplateService.getMethodSelectionPrompt(selection));
+      return true;
+    }
+
+    if (session.templateMeta.stage === 'select_method') {
+      const methodId = weeklyReviewTemplateService.parseMethodSelectionInput(trimmedInput);
+      if (!methodId) {
+        appendSystemMessage(sessionId, weeklyReviewTemplateService.getMethodSelectionInvalidPrompt());
+        return true;
+      }
+
+      const selectionMeta = resolveWeeklyReviewTemplateRangeMeta(session);
+      if (!selectionMeta) {
+        appendSystemMessage(sessionId, weeklyReviewTemplateService.getRangeSelectionPrompt());
+        mutateSession(sessionId, (currentSession) => ({
+          ...currentSession,
+          title: '周复盘模板对话',
+          ...(currentSession.templateMeta
+            ? {
+              templateMeta: weeklyReviewTemplateService.createSetupSessionMeta()
+            }
+            : {})
+        }));
+        return true;
+      }
+
+      const methodLabel = weeklyReviewTemplateService.listMethodOptions().find((item) => item.id === methodId)?.title || '系统复盘';
+      const readySession: AIChatSession = {
+        ...session,
+        title: weeklyReviewTemplateService.getSessionTitle(selectionMeta),
+        templateMeta: {
+          ...(session.templateMeta || weeklyReviewTemplateService.createSetupSessionMeta()),
+          templateType: 'weekly_review',
+          stage: 'ready',
+          weekStartDate: selectionMeta.weekStartDate,
+          weekEndDate: selectionMeta.weekEndDate,
+          selectedRangeLabel: selectionMeta.selectedRangeLabel,
+          methodId,
+          methodLabel,
+          pendingWriteIntent: false
+        }
+      };
+
+      mutateSession(sessionId, (currentSession) => ({
+        ...currentSession,
+        title: readySession.title,
+        templateMeta: readySession.templateMeta
+      }));
+      await handleWeeklyReviewTemplateOpeningTurn(readySession);
+      return true;
+    }
+
+    return false;
+  };
+
+  const handleMonthlyReviewTemplateGuidedSelection = async (
+    session: AIChatSession,
+    userInput: string
+  ): Promise<boolean> => {
+    const sessionId = session.id;
+    const trimmedInput = userInput.trim();
+    if (!trimmedInput || session.templateMeta?.templateType !== 'monthly_review') {
+      return false;
+    }
+
+    const now = Date.now();
+    mutateSession(sessionId, (currentSession) => ({
+      ...currentSession,
+      messages: [
+        ...currentSession.messages,
+        {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: trimmedInput,
+          createdAt: now
+        }
+      ]
+    }));
+    setInputText('');
+    setIsHistoryPanelOpen(false);
+    setIsPersonaPanelOpen(false);
+
+    if (session.templateMeta.stage === 'select_range') {
+      const selection = monthlyReviewTemplateService.parseMonthSelectionInput(trimmedInput, new Date());
+      if (!selection) {
+        appendSystemMessage(sessionId, monthlyReviewTemplateService.getRangeSelectionInvalidPrompt());
+        return true;
+      }
+
+      mutateSession(sessionId, (currentSession) => ({
+        ...currentSession,
+        title: monthlyReviewTemplateService.getSessionTitle(selection),
+        ...(currentSession.templateMeta
+          ? {
+            templateMeta: {
+              ...currentSession.templateMeta,
+              stage: 'select_method',
+              monthStartDate: selection.monthStartDate,
+              monthEndDate: selection.monthEndDate,
+              selectedRangeLabel: selection.selectedRangeLabel,
+              methodId: undefined,
+              methodLabel: undefined,
+              pendingWriteIntent: false
+            }
+          }
+          : {})
+      }));
+      appendSystemMessage(sessionId, monthlyReviewTemplateService.getMethodSelectionPrompt(selection));
+      return true;
+    }
+
+    if (session.templateMeta.stage === 'select_method') {
+      const methodId = monthlyReviewTemplateService.parseMethodSelectionInput(trimmedInput);
+      if (!methodId) {
+        appendSystemMessage(sessionId, monthlyReviewTemplateService.getMethodSelectionInvalidPrompt());
+        return true;
+      }
+
+      const selectionMeta = resolveMonthlyReviewTemplateRangeMeta(session);
+      if (!selectionMeta) {
+        appendSystemMessage(sessionId, monthlyReviewTemplateService.getRangeSelectionPrompt());
+        mutateSession(sessionId, (currentSession) => ({
+          ...currentSession,
+          title: '月复盘模板对话',
+          ...(currentSession.templateMeta
+            ? {
+              templateMeta: monthlyReviewTemplateService.createSetupSessionMeta()
+            }
+            : {})
+        }));
+        return true;
+      }
+
+      const methodLabel = monthlyReviewTemplateService.listMethodOptions().find((item) => item.id === methodId)?.title || '系统复盘';
+      const readySession: AIChatSession = {
+        ...session,
+        title: monthlyReviewTemplateService.getSessionTitle(selectionMeta),
+        templateMeta: {
+          ...(session.templateMeta || monthlyReviewTemplateService.createSetupSessionMeta()),
+          templateType: 'monthly_review',
+          stage: 'ready',
+          monthStartDate: selectionMeta.monthStartDate,
+          monthEndDate: selectionMeta.monthEndDate,
+          selectedRangeLabel: selectionMeta.selectedRangeLabel,
+          methodId,
+          methodLabel,
+          pendingWriteIntent: false
+        }
+      };
+
+      mutateSession(sessionId, (currentSession) => ({
+        ...currentSession,
+        title: readySession.title,
+        templateMeta: readySession.templateMeta
+      }));
+      await handleMonthlyReviewTemplateOpeningTurn(readySession);
+      return true;
+    }
+
+    return false;
+  };
+
   const appendDebugSectionToMessage = (
     sessionId: string,
     messageId: string,
@@ -4211,51 +4812,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   };
 
   const handleOpenWeeklyReviewTemplateSelection = () => {
-    setIsNewSessionDialogOpen(false);
-    setIsWeeklyReviewWeekSelectionModalOpen(true);
-  };
-
-  const handleCloseWeeklyReviewTemplateSelection = () => {
-    setIsWeeklyReviewWeekSelectionModalOpen(false);
-  };
-
-  const handleOpenWeeklyReviewDateInputModal = () => {
-    setIsWeeklyReviewWeekSelectionModalOpen(false);
-    setIsWeeklyReviewDateInputModalOpen(true);
-  };
-
-  const handleCloseWeeklyReviewDateInputModal = () => {
-    setIsWeeklyReviewDateInputModalOpen(false);
-  };
-
-  const handleConfirmWeeklyReviewTemplateSelection = (value: string) => {
-    const selection = weeklyReviewTemplateService.parseWeekSelectionInput(value, new Date());
-    if (!selection) {
+    if (!activeSession) {
       return;
     }
 
-    handleCloseWeeklyReviewTemplateSelection();
-    handleCloseWeeklyReviewDateInputModal();
-    setPendingWeeklyReviewTemplateSetup({ selection });
-  };
-
-  const handleCloseWeeklyReviewMethodSelection = () => {
-    setPendingWeeklyReviewTemplateSetup(null);
-  };
-
-  const handleConfirmWeeklyReviewMethodSelection = (methodId: WeeklyReviewMethodId) => {
-    if (!activeSession || !pendingWeeklyReviewTemplateSetup) {
-      return;
-    }
-
-    const selection = pendingWeeklyReviewTemplateSetup.selection;
     const templateSession = createDefaultSession(activeSession.personaId, {
-      title: weeklyReviewTemplateService.getSessionTitle(selection),
-      templateMeta: weeklyReviewTemplateService.createSessionMeta(selection, methodId),
+      title: '周复盘模板对话',
+      templateMeta: weeklyReviewTemplateService.createSetupSessionMeta(),
       messages: [{
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: weeklyReviewTemplateService.getIntroMessage(selection, methodId),
+        content: weeklyReviewTemplateService.getRangeSelectionPrompt(),
         createdAt: Date.now(),
         tone: 'system'
       }]
@@ -4264,12 +4831,42 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setSessions((prev) => [templateSession, ...prev]);
     setActiveSessionId(templateSession.id);
     handleCloseNewSessionDialog();
-    handleCloseWeeklyReviewMethodSelection();
+    setIsHistoryPanelOpen(false);
+    setInputText('');
+  };
+
+  const handleOpenMonthlyReviewTemplateSelection = () => {
+    if (!activeSession) {
+      return;
+    }
+
+    const templateSession = createDefaultSession(activeSession.personaId, {
+      title: '月复盘模板对话',
+      messages: [{
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: monthlyReviewTemplateService.getRangeSelectionPrompt(),
+        createdAt: Date.now(),
+        tone: 'system'
+      }],
+      templateMeta: monthlyReviewTemplateService.createSetupSessionMeta()
+    });
+
+    setSessions((prev) => [templateSession, ...prev]);
+    setActiveSessionId(templateSession.id);
+    handleCloseNewSessionDialog();
     setIsHistoryPanelOpen(false);
     setInputText('');
   };
 
   const handleFillWriteWeeklyNarrativeCommand = () => {
+    setInputText('写入 AI 叙事');
+    window.requestAnimationFrame(() => {
+      composerTextareaRef.current?.focus();
+    });
+  };
+
+  const handleFillWriteMonthlyNarrativeCommand = () => {
     setInputText('写入 AI 叙事');
     window.requestAnimationFrame(() => {
       composerTextareaRef.current?.focus();
@@ -5183,21 +5780,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return true;
     }
 
-    if (isWeeklyReviewWeekSelectionModalOpen) {
-      handleCloseWeeklyReviewTemplateSelection();
-      return true;
-    }
-
-    if (isWeeklyReviewDateInputModalOpen) {
-      handleCloseWeeklyReviewDateInputModal();
-      return true;
-    }
-
-    if (pendingWeeklyReviewTemplateSetup) {
-      handleCloseWeeklyReviewMethodSelection();
-      return true;
-    }
-
     if (isNewSessionDialogOpen) {
       handleCloseNewSessionDialog();
       return true;
@@ -5263,17 +5845,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     isOpen,
     isPersonaPanelOpen,
     isUserEmojiEditorOpen,
-    isWeeklyReviewDateInputModalOpen,
-    isWeeklyReviewWeekSelectionModalOpen,
-    pendingWeeklyReviewTemplateSetup,
     dreamTopicDeleteTargetId,
     resetAssistantScheduledTaskUi,
     resetDreamEntryUi,
     resetDreamTopicUi,
     handleCloseNewSessionDialog,
-    handleCloseWeeklyReviewDateInputModal,
-    handleCloseWeeklyReviewMethodSelection,
-    handleCloseWeeklyReviewTemplateSelection,
     onClose
   ]);
 
@@ -5307,6 +5883,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const historyBeforeCurrent = canRetryInPlace
       ? buildRetryConversationHistory(sessionId, options?.retrySourceUserMessageId)
       : (conversationHistoryCache.get(sessionId) || []);
+    const promptHistory = narrowConversationHistoryForTimeSensitiveTurn(historyBeforeCurrent, trimmedText);
 
     if (canRetryInPlace) {
       mutateSession(sessionId, (session) => ({
@@ -5807,6 +6384,22 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     onClose();
   };
 
+  const handleOpenMonthlyReviewNarrative = (monthStartDate: string, monthEndDate: string) => {
+    const monthStart = new Date(`${monthStartDate}T12:00:00`);
+    const monthEnd = new Date(`${monthEndDate}T12:00:00`);
+    if (Number.isNaN(monthStart.getTime()) || Number.isNaN(monthEnd.getTime())) {
+      addToast('info', '这个月回顾的日期范围无效。');
+      return;
+    }
+
+    setCurrentView(AppView.REVIEW);
+    setCurrentMonthlyReviewInitialTab('narrative');
+    setCurrentMonthlyReviewStart(monthStart);
+    setCurrentMonthlyReviewEnd(monthEnd);
+    setIsMonthlyReviewOpen(true);
+    onClose();
+  };
+
   const replacePendingWithResult = (
     sessionId: string,
     pendingMessageId: string,
@@ -5820,6 +6413,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       dreamUpdates?: AIChatDreamUpdateCard[];
       reminderUpdates?: string[];
       weeklyReviewWriteback?: AIChatWeeklyReviewWritebackResult;
+      monthlyReviewWriteback?: AIChatMonthlyReviewWritebackResult;
       retryInput?: string;
       retrySourceUserMessageId?: string;
       dreamRetryYearMonth?: string;
@@ -5838,6 +6432,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       ...(options?.dreamUpdates && options.dreamUpdates.length > 0 ? { dreamUpdates: options.dreamUpdates } : {}),
       ...(options?.reminderUpdates && options.reminderUpdates.length > 0 ? { reminderUpdates: options.reminderUpdates } : {}),
       ...(options?.weeklyReviewWriteback ? { weeklyReviewWriteback: options.weeklyReviewWriteback } : {}),
+      ...(options?.monthlyReviewWriteback ? { monthlyReviewWriteback: options.monthlyReviewWriteback } : {}),
       ...(options?.retryInput ? { retryInput: options.retryInput } : {}),
       ...(options?.retrySourceUserMessageId ? { retrySourceUserMessageId: options.retrySourceUserMessageId } : {}),
       ...(options?.dreamRetryYearMonth ? { dreamRetryYearMonth: options.dreamRetryYearMonth } : {})
@@ -5870,11 +6465,26 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   };
 
   const resolveAssistantDisplayParts = (
-    content: string,
-    output?: Pick<AssistantUnifiedTurnOutput, 'assistantReplyParts'>
+    content: string
   ): string[] | undefined => (
-    buildAssistantDisplayParts(content, output?.assistantReplyParts)
+    buildAssistantDisplayParts(content)
   );
+
+  const resolveAssistantReplyContent = (
+    output?: Pick<AssistantUnifiedTurnOutput, 'assistantReply' | 'outcome'>,
+    fallbackReply?: string
+  ): string => {
+    const assistantReply = output?.assistantReply?.trim() || '';
+    if (assistantReply) {
+      return assistantReply;
+    }
+
+    return fallbackReply?.trim() || (
+      output?.outcome === 'clarify'
+        ? '这次还差一点关键信息，你再补一句我就能继续。'
+        : '我在。'
+    );
+  };
 
   const resolveForegroundAssistantReply = (
     rawContent: string,
@@ -5958,12 +6568,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
 
     try {
+      const templateMeta = resolveWeeklyReviewTemplateSessionMeta(session);
+      if (!templateMeta) {
+        throw new Error('周复盘上下文还没有准备好。');
+      }
+
       const { systemPrompt, userPrompt } = await weeklyReviewTemplateService.buildNarrativeWritebackPrompts({
         personaPrompt: buildPersonaPrompt(sessionPersona),
         weekDataText: params.weekDataText,
         conversationSummary,
         mergeMode: params.mergeMode,
-        methodId: session.templateMeta?.methodId || 'systems'
+        methodId: templateMeta.methodId
       });
 
       const rawToolCallResponse = await aiService.generateNarrative(userPrompt, systemPrompt);
@@ -6037,8 +6652,147 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
   };
 
+  const runMonthlyReviewNarrativeWriteback = async (
+    session: AIChatSession,
+    params: {
+      monthlyReview: MonthlyReview;
+      monthDataText: string;
+      mergeMode: 'create' | 'overwrite';
+      createdReview: boolean;
+    }
+  ) => {
+    const sessionId = session.id;
+    const pendingMessageId = crypto.randomUUID();
+    const now = Date.now();
+    const sessionPersona = personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0];
+    const conversationSummary = assistantContextBuilder.summarizeConversationTurns(
+      conversationHistoryCache.get(session.id) || [],
+      24
+    );
+
+    mutateSession(sessionId, (currentSession) => ({
+      ...currentSession,
+      messages: [
+        ...currentSession.messages,
+        {
+          id: pendingMessageId,
+          role: 'assistant',
+          content: '我来整理成本月的 AI 叙事。',
+          createdAt: now,
+          tone: 'pending'
+        }
+      ]
+    }));
+
+    setInputText('');
+    setIsLoading(true);
+    setIsHistoryPanelOpen(false);
+    setIsPersonaPanelOpen(false);
+
+    const controller = new AbortController();
+    activeRequestRef.current = {
+      controller,
+      sessionId,
+      pendingMessageId
+    };
+
+    if (params.createdReview) {
+      setMonthlyReviews((previousReviews) => {
+        if (previousReviews.some((review) => review.id === params.monthlyReview.id)) {
+          return previousReviews;
+        }
+
+        return [...previousReviews, params.monthlyReview];
+      });
+    }
+
+    try {
+      const templateMeta = resolveMonthlyReviewTemplateSessionMeta(session);
+      if (!templateMeta) {
+        throw new Error('月复盘上下文还没有准备好。');
+      }
+
+      const { systemPrompt, userPrompt } = await monthlyReviewTemplateService.buildNarrativeWritebackPrompts({
+        personaPrompt: buildPersonaPrompt(sessionPersona),
+        monthDataText: params.monthDataText,
+        conversationSummary,
+        mergeMode: params.mergeMode
+      });
+
+      const rawToolCallResponse = await aiService.generateNarrative(userPrompt, systemPrompt);
+
+      if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
+        return;
+      }
+
+      const toolCall = monthlyReviewTemplateService.parseNarrativeToolCallResponse(
+        rawToolCallResponse,
+        params.monthlyReview.monthStartDate,
+        params.monthlyReview.monthEndDate,
+        params.mergeMode
+      );
+      const narrative = monthlyReviewTemplateService.buildNarrativeFromToolCall(toolCall);
+
+      setMonthlyReviews((previousReviews) => (
+        monthlyReviewTemplateService.updateMonthlyReviewNarrative(
+          previousReviews,
+          params.monthlyReview.id,
+          narrative
+        )
+      ));
+
+      const parsedNarrative = parseNarrative(narrative, `月复盘 ${params.monthlyReview.monthStartDate}`);
+      const writebackResultCard: AIChatMonthlyReviewWritebackResult = {
+        monthlyReviewId: params.monthlyReview.id,
+        monthStartDate: params.monthlyReview.monthStartDate,
+        monthEndDate: params.monthlyReview.monthEndDate,
+        title: parsedNarrative.title,
+        preview: parsedNarrative.content,
+        createdReview: params.createdReview,
+        mergeMode: params.mergeMode
+      };
+
+      const successMessage = params.createdReview
+        ? '已新建本月 Monthly Review，并写入 AI 叙事。'
+        : '已覆盖写入这个月的 AI 叙事。';
+
+      replacePendingWithResult(sessionId, pendingMessageId, successMessage, {
+        tone: 'system',
+        monthlyReviewWriteback: writebackResultCard
+      });
+      updateWeeklyReviewTemplateStage(sessionId, 'ready');
+      addToast('success', 'AI 叙事已写入月回顾');
+    } catch (error) {
+      const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
+
+      if (isAbortError(error)) {
+        if (isCurrentPendingRequest) {
+          replacePendingWithResult(sessionId, pendingMessageId, '已停止这次写入。', {
+            tone: 'system'
+          });
+        }
+        return;
+      }
+
+      if (!isCurrentPendingRequest || controller.signal.aborted) {
+        return;
+      }
+
+      replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), {
+        tone: 'error'
+      });
+      updateWeeklyReviewTemplateStage(sessionId, 'ready');
+    } finally {
+      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
+        activeRequestRef.current = null;
+        setIsLoading(false);
+      }
+    }
+  };
+
   const handleWeeklyReviewNarrativeWritebackCommand = async (session: AIChatSession) => {
-    if (session.templateMeta?.templateType !== 'weekly_review') {
+    const templateMeta = resolveWeeklyReviewTemplateSessionMeta(session);
+    if (!templateMeta) {
       return;
     }
 
@@ -6051,14 +6805,41 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const ensuredReview = weeklyReviewTemplateService.ensureWeeklyReview(
       weeklyReviews,
       reviewTemplates,
-      session.templateMeta.weekStartDate,
-      session.templateMeta.weekEndDate
+      templateMeta.weekStartDate,
+      templateMeta.weekEndDate
     );
 
     await runWeeklyReviewNarrativeWriteback(session, {
       weeklyReview: ensuredReview.weeklyReview,
       weekDataText,
       mergeMode: ensuredReview.weeklyReview.narrative?.trim() ? 'overwrite' : 'create',
+      createdReview: ensuredReview.created
+    });
+  };
+
+  const handleMonthlyReviewNarrativeWritebackCommand = async (session: AIChatSession) => {
+    const templateMeta = resolveMonthlyReviewTemplateSessionMeta(session);
+    if (!templateMeta) {
+      return;
+    }
+
+    const monthDataText = buildMonthlyReviewTemplateMonthDataText(session);
+    if (!monthDataText) {
+      addToast('error', '这段对话还没有可用的月复盘数据。');
+      return;
+    }
+
+    const ensuredReview = monthlyReviewTemplateService.ensureMonthlyReview(
+      monthlyReviews,
+      reviewTemplates,
+      templateMeta.monthStartDate,
+      templateMeta.monthEndDate
+    );
+
+    await runMonthlyReviewNarrativeWriteback(session, {
+      monthlyReview: ensuredReview.monthlyReview,
+      monthDataText,
+      mergeMode: ensuredReview.monthlyReview.narrative?.trim() ? 'overwrite' : 'create',
       createdReview: ensuredReview.created
     });
   };
@@ -6234,6 +7015,228 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
   };
 
+  const handleWeeklyReviewTemplateOpeningTurn = async (session: AIChatSession) => {
+    const sessionId = session.id;
+    const templateMeta = resolveWeeklyReviewTemplateSessionMeta(session);
+    if (!templateMeta) {
+      throw new Error('周复盘上下文还没有准备好。');
+    }
+
+    const weekDataText = buildWeeklyReviewTemplateWeekDataText(session);
+    if (!weekDataText) {
+      throw new Error('周复盘上下文还没有准备好。');
+    }
+
+    const pendingMessageId = crypto.randomUUID();
+    const now = Date.now();
+    mutateSession(sessionId, (currentSession) => ({
+      ...currentSession,
+      messages: [
+        ...currentSession.messages,
+        {
+          id: pendingMessageId,
+          role: 'assistant',
+          content: '我先整理一下这周的脉络。',
+          createdAt: now,
+          tone: 'pending'
+        }
+      ]
+    }));
+
+    setIsLoading(true);
+    setIsHistoryPanelOpen(false);
+    setIsPersonaPanelOpen(false);
+
+    const controller = new AbortController();
+    activeRequestRef.current = {
+      controller,
+      sessionId,
+      pendingMessageId
+    };
+
+    try {
+      const templatePrompt = await weeklyReviewTemplateService.buildChatPrompts({
+        personaPrompt: buildPersonaPrompt(activePersona),
+        weekDataText,
+        userMessage: '请先根据这一周的数据，主动开始这次周复盘，对这一周做一个有结构的开场，并带着我继续往下聊。',
+        methodId: templateMeta.methodId
+      });
+      const templateTurnResult = await aiService.requestAssistantUnifiedTurnWithDebug({
+        mode: 'foreground',
+        systemPrompt: templatePrompt.systemPrompt,
+        userPrompt: templatePrompt.userPrompt,
+        conversationHistory: buildConversationHistory(session),
+        cacheHint: {
+          keySeed: `weekly_review_chat:${templateMeta.weekStartDate}:${templateMeta.weekEndDate}:${templateMeta.methodId}`,
+          scope: 'weekly_review_template'
+        }
+      }, {
+        signal: controller.signal
+      });
+
+      if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
+        return;
+      }
+
+      const output = templateTurnResult.output;
+      const templateContent = resolveAssistantReplyContent(
+        output,
+        output.outcome === 'clarify'
+          ? '我已经把这一周的大体情况理出来了，我们继续往下拆。'
+          : undefined
+      );
+      const displayParts = resolveAssistantDisplayParts(templateContent);
+
+      replacePendingWithResult(sessionId, pendingMessageId, templateContent, {
+        ...(displayParts?.length ? { displayParts } : {}),
+        ...(debugMode
+          ? {
+            debugSections: [{
+              label: '周复盘模板对话',
+              exchange: templateTurnResult.debug
+            }]
+          }
+          : {})
+      });
+    } catch (error) {
+      const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
+
+      if (isAbortError(error)) {
+        if (isCurrentPendingRequest) {
+          replacePendingWithResult(sessionId, pendingMessageId, '已停止这次周复盘开场。', {
+            tone: 'system'
+          });
+        }
+        return;
+      }
+
+      if (!isCurrentPendingRequest || controller.signal.aborted) {
+        return;
+      }
+
+      replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), {
+        tone: 'error',
+        debugSections: getErrorDebugSections(error, '周复盘模板对话', debugMode)
+      });
+    } finally {
+      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
+        activeRequestRef.current = null;
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const handleMonthlyReviewTemplateOpeningTurn = async (session: AIChatSession) => {
+    const sessionId = session.id;
+    const templateMeta = resolveMonthlyReviewTemplateSessionMeta(session);
+    if (!templateMeta) {
+      throw new Error('月复盘上下文还没有准备好。');
+    }
+
+    const monthDataText = buildMonthlyReviewTemplateMonthDataText(session);
+    if (!monthDataText) {
+      throw new Error('月复盘上下文还没有准备好。');
+    }
+
+    const pendingMessageId = crypto.randomUUID();
+    const now = Date.now();
+    mutateSession(sessionId, (currentSession) => ({
+      ...currentSession,
+      messages: [
+        ...currentSession.messages,
+        {
+          id: pendingMessageId,
+          role: 'assistant',
+          content: '我先整理一下这个月的脉络。',
+          createdAt: now,
+          tone: 'pending'
+        }
+      ]
+    }));
+
+    setIsLoading(true);
+    setIsHistoryPanelOpen(false);
+    setIsPersonaPanelOpen(false);
+
+    const controller = new AbortController();
+    activeRequestRef.current = {
+      controller,
+      sessionId,
+      pendingMessageId
+    };
+
+    try {
+      const templatePrompt = await monthlyReviewTemplateService.buildChatPrompts({
+        personaPrompt: buildPersonaPrompt(activePersona),
+        monthDataText,
+        userMessage: '请先根据这一个月的数据，主动开始这次月复盘，对这一个月做一个有结构的开场，并带着我继续往下聊。',
+        methodId: templateMeta.methodId
+      });
+      const templateTurnResult = await aiService.requestAssistantUnifiedTurnWithDebug({
+        mode: 'foreground',
+        systemPrompt: templatePrompt.systemPrompt,
+        userPrompt: templatePrompt.userPrompt,
+        conversationHistory: buildConversationHistory(session),
+        cacheHint: {
+          keySeed: `monthly_review_chat:${templateMeta.monthStartDate}:${templateMeta.monthEndDate}:${templateMeta.methodId}`,
+          scope: 'monthly_review_template'
+        }
+      }, {
+        signal: controller.signal
+      });
+
+      if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
+        return;
+      }
+
+      const output = templateTurnResult.output;
+      const templateContent = resolveAssistantReplyContent(
+        output,
+        output.outcome === 'clarify'
+          ? '我已经把这个月的大体情况理出来了，我们继续往下拆。'
+          : undefined
+      );
+      const displayParts = resolveAssistantDisplayParts(templateContent);
+
+      replacePendingWithResult(sessionId, pendingMessageId, templateContent, {
+        ...(displayParts?.length ? { displayParts } : {}),
+        ...(debugMode
+          ? {
+            debugSections: [{
+              label: '月复盘模板对话',
+              exchange: templateTurnResult.debug
+            }]
+          }
+          : {})
+      });
+    } catch (error) {
+      const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
+
+      if (isAbortError(error)) {
+        if (isCurrentPendingRequest) {
+          replacePendingWithResult(sessionId, pendingMessageId, '已停止这次月复盘开场。', {
+            tone: 'system'
+          });
+        }
+        return;
+      }
+
+      if (!isCurrentPendingRequest || controller.signal.aborted) {
+        return;
+      }
+
+      replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), {
+        tone: 'error',
+        debugSections: getErrorDebugSections(error, '月复盘模板对话', debugMode)
+      });
+    } finally {
+      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
+        activeRequestRef.current = null;
+        setIsLoading(false);
+      }
+    }
+  };
+
   const handleSend = async (overrideText?: string, options?: ForegroundSendOptions) => {
     const trimmedText = (overrideText ?? inputText).trim();
     if (!trimmedText || isLoading || !activeSession) {
@@ -6255,8 +7258,32 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
 
     const isWeeklyReviewTemplateSession = activeSession.templateMeta?.templateType === 'weekly_review';
+    const isMonthlyReviewTemplateSession = activeSession.templateMeta?.templateType === 'monthly_review';
+    if (
+      isWeeklyReviewTemplateSession
+      && activeSession.templateMeta?.stage !== 'ready'
+      && !options?.replaceMessageId
+    ) {
+      await handleWeeklyReviewTemplateGuidedSelection(activeSession, trimmedText);
+      return;
+    }
+
+    if (
+      isMonthlyReviewTemplateSession
+      && activeSession.templateMeta?.stage !== 'ready'
+      && !options?.replaceMessageId
+    ) {
+      await handleMonthlyReviewTemplateGuidedSelection(activeSession, trimmedText);
+      return;
+    }
+
     if (isWeeklyReviewTemplateSession && weeklyReviewTemplateService.isWriteNarrativeCommand(trimmedText)) {
       await handleWeeklyReviewNarrativeWritebackCommand(activeSession);
+      return;
+    }
+
+    if (isMonthlyReviewTemplateSession && monthlyReviewTemplateService.isWriteNarrativeCommand(trimmedText)) {
+      await handleMonthlyReviewNarrativeWritebackCommand(activeSession);
       return;
     }
 
@@ -6273,7 +7300,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const historyBeforeCurrent = canRetryInPlace
       ? buildRetryConversationHistory(sessionId, options?.retrySourceUserMessageId)
       : (conversationHistoryCache.get(sessionId) || []);
+    const promptHistory = narrowConversationHistoryForTimeSensitiveTurn(historyBeforeCurrent, trimmedText);
     const shouldRenameTitle = !isWeeklyReviewTemplateSession
+      && !isMonthlyReviewTemplateSession
       && !canRetryInPlace
       && !activeSession.messages.some((message) => message.role === 'user');
 
@@ -6345,11 +7374,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           throw new Error('周复盘上下文还没有准备好。');
         }
 
+        const templateMeta = resolveWeeklyReviewTemplateSessionMeta(activeSession);
+        if (!templateMeta) {
+          throw new Error('周复盘上下文还没有准备好。');
+        }
+
         const templatePrompt = await weeklyReviewTemplateService.buildChatPrompts({
           personaPrompt: buildPersonaPrompt(activePersona),
           weekDataText,
           userMessage: trimmedText,
-          methodId: activeSession.templateMeta?.methodId || 'systems'
+          methodId: templateMeta.methodId
         });
         const templateTurnResult = await aiService.requestAssistantUnifiedTurnWithDebug({
           mode: 'foreground',
@@ -6357,7 +7391,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           userPrompt: templatePrompt.userPrompt,
           conversationHistory: historyBeforeCurrent,
           cacheHint: {
-            keySeed: `weekly_review_chat:${activeSession.templateMeta?.weekStartDate}:${activeSession.templateMeta?.weekEndDate}:${activeSession.templateMeta?.methodId || 'systems'}`,
+            keySeed: `weekly_review_chat:${templateMeta.weekStartDate}:${templateMeta.weekEndDate}:${templateMeta.methodId}`,
             scope: 'weekly_review_template'
           }
         }, {
@@ -6369,11 +7403,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         }
 
         const output = templateTurnResult.output;
-        const templateContent = (output.assistantReply || '').trim()
-          || (output.outcome === 'clarify'
-            ? '这块我还差一点关键信息，你再补一句我就能继续。'
-            : '我在。');
-        const displayParts = resolveAssistantDisplayParts(templateContent, output);
+        const templateContent = resolveAssistantReplyContent(output);
+        const displayParts = resolveAssistantDisplayParts(templateContent);
 
         replacePendingWithResult(sessionId, pendingMessageId, templateContent, {
           ...(displayParts?.length ? { displayParts } : {}),
@@ -6381,6 +7412,58 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             ? {
               debugSections: [{
                 label: '周复盘模板对话',
+                exchange: templateTurnResult.debug
+              }]
+            }
+            : {})
+        });
+        return;
+      }
+
+      if (isMonthlyReviewTemplateSession) {
+        const monthDataText = buildMonthlyReviewTemplateMonthDataText(activeSession);
+        if (!monthDataText) {
+          throw new Error('月复盘上下文还没有准备好。');
+        }
+
+        const templateMeta = resolveMonthlyReviewTemplateSessionMeta(activeSession);
+        if (!templateMeta) {
+          throw new Error('月复盘上下文还没有准备好。');
+        }
+
+        const templatePrompt = await monthlyReviewTemplateService.buildChatPrompts({
+          personaPrompt: buildPersonaPrompt(activePersona),
+          monthDataText,
+          userMessage: trimmedText,
+          methodId: templateMeta.methodId
+        });
+        const templateTurnResult = await aiService.requestAssistantUnifiedTurnWithDebug({
+          mode: 'foreground',
+          systemPrompt: templatePrompt.systemPrompt,
+          userPrompt: templatePrompt.userPrompt,
+          conversationHistory: historyBeforeCurrent,
+          cacheHint: {
+            keySeed: `monthly_review_chat:${templateMeta.monthStartDate}:${templateMeta.monthEndDate}:${templateMeta.methodId}`,
+            scope: 'monthly_review_template'
+          }
+        }, {
+          signal: controller.signal
+        });
+
+        if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
+          return;
+        }
+
+        const output = templateTurnResult.output;
+        const templateContent = resolveAssistantReplyContent(output);
+        const displayParts = resolveAssistantDisplayParts(templateContent);
+
+        replacePendingWithResult(sessionId, pendingMessageId, templateContent, {
+          ...(displayParts?.length ? { displayParts } : {}),
+          ...(debugMode
+            ? {
+              debugSections: [{
+                label: '月复盘模板对话',
                 exchange: templateTurnResult.debug
               }]
             }
@@ -6397,7 +7480,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         assistantPromptService.getForegroundModePrompt()
       ]);
 
-      const conversationContext = assistantContextBuilder.buildConversationContext(historyBeforeCurrent);
+      const narrowedConversationContext = assistantContextBuilder.buildConversationContext(promptHistory);
       const stateContext = buildAssistantStateContext(
         currentTurnDate,
         buildForegroundAssistantReminderSummary()
@@ -6420,7 +7503,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         },
         memoryEnabled: assistantAgentConfig.longTermMemoryEnabled,
         memory: buildForegroundAssistantMemory(),
-        conversation: conversationContext,
+        conversation: narrowedConversationContext,
         stateContext,
         dictionaryContext,
         ...(dreamContext ? { dreamContext } : {})
@@ -6453,19 +7536,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         ? applyAssistantMemoryPatch(output.memoryPatch)
         : [];
 
-      const rawUnifiedContent = (output.assistantReply || '').trim()
-        || (output.outcome === 'clarify'
-          ? '这次还差一点关键信息，你再补一句我就能继续。'
-          : (unifiedSuccessCount > 0
-            ? `我先帮你处理好了 ${successCount} 项。`
-            : ((output.reminders || []).length > 0
-              ? '我记下来了，到时候会提醒你。'
-              : '我在。')));
-      const unifiedContent = resolveForegroundAssistantReply(rawUnifiedContent, trimmedText, unifiedAppliedActions);
-      const displayParts = resolveAssistantDisplayParts(
-        unifiedContent,
-        unifiedContent === rawUnifiedContent ? output : undefined
+      const rawUnifiedContent = resolveAssistantReplyContent(
+        output,
+        unifiedSuccessCount > 0
+          ? `我先帮你处理好了 ${successCount} 项。`
+          : ((output.reminders || []).length > 0
+            ? '我记下来了，到时候会提醒你。'
+            : undefined)
       );
+      const unifiedContent = resolveForegroundAssistantReply(rawUnifiedContent, trimmedText, unifiedAppliedActions);
+      const displayParts = resolveAssistantDisplayParts(unifiedContent);
 
       replacePendingWithResult(sessionId, pendingMessageId, unifiedContent, {
         ...(displayParts?.length ? { displayParts } : {}),
@@ -7163,6 +8243,52 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     </div>
   );
 
+  const renderMonthlyReviewWritebackResult = (result: AIChatMonthlyReviewWritebackResult) => (
+    <div
+      className="border-l-2 pl-3 pr-1 py-1"
+      style={{ borderColor: AI_CHAT_THEME.activeBorder }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <button
+            type="button"
+            onClick={() => handleOpenMonthlyReviewNarrative(result.monthStartDate, result.monthEndDate)}
+            className="block w-full truncate text-left font-serif text-[1rem] leading-6 transition-colors hover:opacity-80"
+            style={{ color: AI_CHAT_THEME.textPrimary }}
+            title="打开对应月回顾的 AI 叙事"
+          >
+            {result.title || 'AI 叙事'}
+          </button>
+          <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textSecondary }}>
+            {result.preview || '点击查看完整叙事'}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
+        <span>{`${result.monthStartDate} ~ ${result.monthEndDate}`}</span>
+        <span>{result.createdReview ? '已新建月回顾' : '已写入月回顾'}</span>
+        <span>{result.mergeMode === 'overwrite' ? '覆盖写入' : '首次写入'}</span>
+      </div>
+
+      <div className="mt-2.5 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => handleOpenMonthlyReviewNarrative(result.monthStartDate, result.monthEndDate)}
+          className="inline-flex h-8 items-center justify-center rounded-full border px-3 text-xs transition-colors"
+          style={{
+            borderColor: AI_CHAT_THEME.chipBorder,
+            backgroundColor: AI_CHAT_THEME.inputBg,
+            color: AI_CHAT_THEME.textSecondary
+          }}
+          title="打开月回顾叙事"
+        >
+          打开
+        </button>
+      </div>
+    </div>
+  );
+
   const emptyPromptExampleGroups: Array<{
     title: string;
     prompt: string;
@@ -7321,9 +8447,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   {tone === 'pending' && index === 0 && (
                     <Loader2 size={15} className="mt-1 shrink-0 animate-spin" style={{ color: AI_CHAT_THEME.textFaint }} />
                   )}
-                  <p className="whitespace-pre-wrap break-words text-left text-[14px] leading-6 sm:text-[15px]">
-                    {part}
-                  </p>
+                  <div className="min-w-0 flex-1 break-words text-left text-[14px] leading-6 sm:text-[15px]">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm, remarkBreaks]}
+                      components={CHAT_MARKDOWN_COMPONENTS}
+                    >
+                      {part}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               </RevealingMessageBubble>
             ))}
@@ -7389,7 +8520,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               </div>
             )}
 
-            {allDisplayPartsRevealed && ((message.appliedActions && message.appliedActions.length > 0) || message.weeklyReviewWriteback) && (
+            {allDisplayPartsRevealed && ((message.appliedActions && message.appliedActions.length > 0) || message.weeklyReviewWriteback || message.monthlyReviewWriteback) && (
               <div
                 className="space-y-2 border-l pl-3 pr-1 py-1"
                 style={{
@@ -7402,6 +8533,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 <div className="space-y-2">
                   {message.appliedActions?.map((action) => renderAppliedAction(message.id, action))}
                   {message.weeklyReviewWriteback && renderWeeklyReviewWritebackResult(message.weeklyReviewWriteback)}
+                  {message.monthlyReviewWriteback && renderMonthlyReviewWritebackResult(message.monthlyReviewWriteback)}
                 </div>
               </div>
             )}
@@ -7669,6 +8801,31 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               boxShadow: AI_CHAT_THEME.cardShadow
             }}
           >
+            {(activeWeeklyReviewShortcutOptions.length > 0 || activeMonthlyReviewShortcutOptions.length > 0) && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {[...activeWeeklyReviewShortcutOptions, ...activeMonthlyReviewShortcutOptions].map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => {
+                      if (!isLoading) {
+                        void handleSend(option.value);
+                      }
+                    }}
+                    disabled={isLoading}
+                    className="inline-flex h-8 items-center rounded-[0.75rem] border px-3 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                    style={{
+                      borderColor: AI_CHAT_THEME.chipBorder,
+                      backgroundColor: AI_CHAT_THEME.chipBg,
+                      color: AI_CHAT_THEME.textPrimary
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <textarea
               ref={composerTextareaRef}
               value={inputText}
@@ -7712,6 +8869,21 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               {activeSession?.templateMeta?.templateType === 'weekly_review' && (
                 <button
                   onClick={handleFillWriteWeeklyNarrativeCommand}
+                  disabled={isLoading}
+                  className="inline-flex h-8 shrink-0 items-center rounded-[0.75rem] border px-2.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{
+                    borderColor: AI_CHAT_THEME.panelBorder,
+                    backgroundColor: AI_CHAT_THEME.panelBgStrong,
+                    color: AI_CHAT_THEME.textSecondary
+                  }}
+                  title="填充写入 AI 叙事"
+                >
+                  写入 AI 叙事
+                </button>
+              )}
+              {activeSession?.templateMeta?.templateType === 'monthly_review' && (
+                <button
+                  onClick={handleFillWriteMonthlyNarrativeCommand}
                   disabled={isLoading}
                   className="inline-flex h-8 shrink-0 items-center rounded-[0.75rem] border px-2.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   style={{
@@ -8016,41 +9188,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 >
                   <div className="text-sm font-semibold">模板对话：周复盘</div>
                 </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isWeeklyReviewWeekSelectionModalOpen && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/20 p-5 backdrop-blur-sm">
-            <div
-              className="w-full max-w-sm overflow-hidden rounded-[1.4rem] border"
-              style={{
-                borderColor: AI_CHAT_THEME.panelBorder,
-                backgroundColor: AI_CHAT_THEME.panelBg,
-                boxShadow: AI_CHAT_THEME.cardShadowStrong
-              }}
-            >
-              <div className="flex items-start justify-between border-b px-5 py-4" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
-                <div>
-                  <h3 className="text-base font-bold text-stone-800">选择周范围</h3>
-                </div>
                 <button
-                  onClick={handleCloseWeeklyReviewTemplateSelection}
-                  className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] border transition-colors"
-                  style={{
-                    borderColor: AI_CHAT_THEME.chipBorder,
-                    backgroundColor: AI_CHAT_THEME.panelBg,
-                    color: AI_CHAT_THEME.textMuted
-                  }}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="space-y-3 px-5 py-5">
-                <button
-                  onClick={() => handleConfirmWeeklyReviewTemplateSelection('上周')}
+                  onClick={handleOpenMonthlyReviewTemplateSelection}
                   className="w-full rounded-[0.95rem] border px-4 py-3 text-left transition-colors"
                   style={{
                     borderColor: AI_CHAT_THEME.panelBorder,
@@ -8058,80 +9197,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     color: AI_CHAT_THEME.textPrimary
                   }}
                 >
-                  <div className="text-sm font-semibold">上周</div>
+                  <div className="text-sm font-semibold">模板对话：月复盘</div>
                 </button>
-                <button
-                  onClick={() => handleConfirmWeeklyReviewTemplateSelection('本周')}
-                  className="w-full rounded-[0.95rem] border px-4 py-3 text-left transition-colors"
-                  style={{
-                    borderColor: AI_CHAT_THEME.panelBorder,
-                    backgroundColor: AI_CHAT_THEME.panelBgStrong,
-                    color: AI_CHAT_THEME.textPrimary
-                  }}
-                >
-                  <div className="text-sm font-semibold">本周</div>
-                </button>
-                <button
-                  onClick={handleOpenWeeklyReviewDateInputModal}
-                  className="w-full rounded-[0.95rem] border px-4 py-3 text-left transition-colors"
-                  style={{
-                    borderColor: AI_CHAT_THEME.panelBorder,
-                    backgroundColor: AI_CHAT_THEME.panelBgStrong,
-                    color: AI_CHAT_THEME.textPrimary
-                  }}
-                >
-                  <div className="text-sm font-semibold">输入数字</div>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {pendingWeeklyReviewTemplateSetup && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/20 p-5 backdrop-blur-sm">
-            <div
-              className="w-full max-w-sm overflow-hidden rounded-[1.4rem] border"
-              style={{
-                borderColor: AI_CHAT_THEME.panelBorder,
-                backgroundColor: AI_CHAT_THEME.panelBg,
-                boxShadow: AI_CHAT_THEME.cardShadowStrong
-              }}
-            >
-              <div className="flex items-start justify-between border-b px-5 py-4" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
-                <div>
-                  <h3 className="text-base font-bold text-stone-800">选择分析方法</h3>
-                </div>
-                <button
-                  onClick={handleCloseWeeklyReviewMethodSelection}
-                  className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] border transition-colors"
-                  style={{
-                    borderColor: AI_CHAT_THEME.chipBorder,
-                    backgroundColor: AI_CHAT_THEME.panelBg,
-                    color: AI_CHAT_THEME.textMuted
-                  }}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="space-y-3 px-5 py-5">
-                {weeklyReviewMethodOptions.map((method) => (
-                  <button
-                    key={method.id}
-                    onClick={() => handleConfirmWeeklyReviewMethodSelection(method.id)}
-                    className="w-full rounded-[0.95rem] border px-4 py-3 text-left transition-colors"
-                    style={{
-                      borderColor: AI_CHAT_THEME.panelBorder,
-                      backgroundColor: AI_CHAT_THEME.panelBgStrong,
-                      color: AI_CHAT_THEME.textPrimary
-                    }}
-                  >
-                    <div className="text-sm font-semibold">{method.title}</div>
-                    <div className="mt-1 text-xs leading-5" style={{ color: AI_CHAT_THEME.textMuted }}>
-                      {method.description}
-                    </div>
-                  </button>
-                ))}
               </div>
             </div>
           </div>
@@ -9021,11 +10088,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                   <label className="space-y-1.5">
                                     <span className="text-xs font-medium text-stone-500">循环间隔</span>
                                     <input
-                                      type="number"
-                                      min={1}
-                                      max={365}
+                                      type="text"
+                                      inputMode="numeric"
                                       value={assistantScheduledTaskDrafts.interval}
-                                      onChange={(event) => updateAssistantScheduledTaskDraft('interval', event.target.value.replace(/[^\d]/g, '').slice(0, 3) || '1')}
+                                      onChange={(event) => updateAssistantScheduledTaskDraft('interval', event.target.value.replace(/[^\d]/g, '').slice(0, 3))}
                                       className="w-full rounded-[0.75rem] border px-3 py-2 text-sm outline-none"
                                       style={{
                                         borderColor: AI_CHAT_THEME.chipBorder,
@@ -9107,11 +10173,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                     <label className="block space-y-1.5">
                                       <span className="text-xs font-medium text-stone-500">每月日期</span>
                                       <input
-                                        type="number"
-                                        min={1}
-                                        max={31}
-                                        value={assistantScheduledTaskDrafts.monthDay}
-                                        onChange={(event) => updateAssistantScheduledTaskDraft('monthDay', event.target.value.replace(/[^\d]/g, '').slice(0, 2) || '1')}
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={assistantScheduledTaskDrafts.monthDaysInput}
+                                        onChange={(event) => updateAssistantScheduledTaskDraft('monthDaysInput', normalizeMonthlyDayInput(event.target.value))}
+                                        placeholder="例如 1 15 31"
                                         className="w-full rounded-[0.75rem] border px-3 py-2 text-sm outline-none"
                                         style={{
                                           borderColor: AI_CHAT_THEME.chipBorder,
@@ -9120,9 +10186,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                         }}
                                       />
                                     </label>
-                                    {assistantScheduledTaskDrafts.monthDay === '31' && (
+                                    {parseMonthlyDayInput(assistantScheduledTaskDrafts.monthDaysInput).includes(31) && (
                                       <label
-                                        className="flex items-center gap-2 rounded-[0.75rem] border px-3 py-2 text-xs font-medium"
+                                        className="flex cursor-pointer items-center gap-2 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors"
                                         style={{
                                           borderColor: AI_CHAT_THEME.chipBorder,
                                           backgroundColor: AI_CHAT_THEME.inputBg,
@@ -9133,8 +10199,24 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                           type="checkbox"
                                           checked={assistantScheduledTaskDrafts.fallbackToMonthEnd}
                                           onChange={(event) => updateAssistantScheduledTaskDraft('fallbackToMonthEnd', event.target.checked)}
-                                          className="h-3.5 w-3.5 rounded border-stone-300 text-stone-900 focus:ring-stone-400"
+                                          className="sr-only"
                                         />
+                                        <span
+                                          className="flex h-4 w-4 items-center justify-center rounded-[0.35rem] border transition-colors"
+                                          style={assistantScheduledTaskDrafts.fallbackToMonthEnd
+                                            ? {
+                                              borderColor: AI_CHAT_THEME.activeBorder,
+                                              backgroundColor: AI_CHAT_THEME.activeBorder,
+                                              color: AI_CHAT_THEME.activeBg
+                                            }
+                                            : {
+                                              borderColor: AI_CHAT_THEME.chipBorder,
+                                              backgroundColor: '#ffffff',
+                                              color: 'transparent'
+                                            }}
+                                        >
+                                          <Check size={10} strokeWidth={3} />
+                                        </span>
                                         <span>若当月没有 31 号，则自动定位到最后一天</span>
                                       </label>
                                     )}
@@ -9364,8 +10446,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 </div>
               </div>
 
-              <div className="min-h-0 flex flex-1 flex-col px-4 py-5 sm:px-6 sm:py-6">
-                <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-6">
+              <div
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6 sm:py-6"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
+                <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-6">
                   {isDreamTopicComposerOpen && (
                     <div
                       className="border-y px-0 py-5"
@@ -9400,7 +10485,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                             <textarea
                               value={dreamTopicDrafts.note}
                               onChange={(event) => updateDreamTopicDraft('note', event.target.value)}
-                              placeholder="比如：长期关注他的价值取向、情绪习惯和内在需求。"
+                              placeholder="比如：长期关注用户的价值取向、情绪习惯和内在需求。"
                               rows={3}
                               className="w-full resize-none rounded-[0.6rem] border px-3 py-3 text-[13px] leading-6 outline-none"
                               style={{
@@ -9439,23 +10524,23 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     </div>
                   )}
 
-                  {dreamSnapshot.topics.length === 0 ? (
+                  {!isDreamTopicComposerOpen && dreamSnapshot.topics.length === 0 ? (
                     <div
                       className="border-y py-10 text-[13px] leading-7 text-stone-500"
                       style={{ borderColor: 'rgba(32,28,25,0.12)' }}
                     >
                       还没有 Dream 领域。先新增几个你希望我长期关注的主题，再运行 `dream`。
                     </div>
-                  ) : (
-                    <div className="min-h-0 flex flex-1 flex-col gap-6 lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-10">
-                      <aside
-                        className="min-h-0 lg:border-r lg:pr-8"
+                  ) : !isDreamTopicComposerOpen ? (
+                    <div className="min-h-0 flex flex-1 flex-col">
+                      <div className="pb-3" style={{ borderColor: 'rgba(32,28,25,0.12)' }}>
+                        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-stone-500">领域目录</p>
+                      </div>
+                      <div
+                        className="overflow-x-auto border-b pb-px"
                         style={{ borderColor: 'rgba(32,28,25,0.12)' }}
                       >
-                        <div className="border-b pb-3" style={{ borderColor: 'rgba(32,28,25,0.12)' }}>
-                          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-stone-500">领域目录</p>
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2 pb-1 lg:mt-2 lg:block lg:space-y-1">
+                        <div className="flex min-w-max items-end gap-5">
                           {dreamSnapshot.topics.map((topic) => {
                             const isActive = activeDreamTopic?.id === topic.id;
                             return (
@@ -9463,38 +10548,29 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                 key={topic.id}
                                 type="button"
                                 onClick={() => setSelectedDreamTopicId(topic.id)}
-                                className="group max-w-full rounded-[0.85rem] border px-3 py-2 text-left transition-colors lg:flex lg:w-full lg:min-w-0 lg:items-start lg:justify-between lg:rounded-none lg:border-x-0 lg:border-t-0 lg:px-0 lg:py-3"
+                                className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors border-b-2 ${
+                                  isActive
+                                    ? 'font-bold'
+                                    : 'hover:text-stone-600'
+                                }`}
                                 style={{
-                                  borderColor: isActive
-                                    ? 'color-mix(in srgb, var(--accent-color) 30%, rgba(32,28,25,0.18))'
-                                    : 'rgba(32,28,25,0.1)',
-                                  backgroundColor: isActive
-                                    ? 'color-mix(in srgb, var(--accent-color) 4%, rgba(255,255,255,0.56))'
-                                    : 'rgba(255,255,255,0.26)',
+                                  borderBottomColor: isActive
+                                    ? '#201c19'
+                                    : 'transparent',
                                   color: isActive
                                     ? '#201c19'
-                                    : (topic.enabled ? AI_CHAT_THEME.textSecondary : AI_CHAT_THEME.textMuted)
+                                    : (topic.enabled ? '#78716c' : '#b0a79e')
                                 }}
                               >
-                                <span className="block max-w-full whitespace-nowrap font-serif text-[0.95rem] leading-6 lg:truncate">{topic.title}</span>
-                                <span
-                                  className="mt-1 text-[10px] uppercase tracking-[0.16em] lg:ml-3 lg:block"
-                                  style={{
-                                    color: topic.enabled
-                                      ? (isActive ? '#7b6756' : '#9b948b')
-                                      : '#b0a79e'
-                                  }}
-                                >
-                                  {topic.enabled ? 'on' : 'off'}
-                                </span>
+                                {topic.title}
                               </button>
                             );
                           })}
                         </div>
-                      </aside>
+                      </div>
 
                       {activeDreamTopic && (
-                        <section className="min-w-0">
+                        <section className="min-w-0 pt-5">
                           <div className="border-b pb-5" style={{ borderColor: 'rgba(32,28,25,0.12)' }}>
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                               <div className="min-w-0 flex-1">
@@ -9747,7 +10823,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         </section>
                       )}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -10286,17 +11362,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-                <div className="mx-auto max-w-4xl space-y-4">
-                  {debugViewer.sections.map((section) => (
-                    <div
-                      key={section.label}
-                      className="rounded-[0.95rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4"
-                      style={{
-                        borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
-                        backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
-                      }}
+                <div className="mx-auto max-w-4xl space-y-5">
+                  {debugViewer.sections.map((section, sectionIndex) => (
+                    <section
+                      key={`${section.label}-${sectionIndex}`}
+                      className="space-y-3 border-b border-[#e5e7eb] pb-5 last:border-b-0 last:pb-0"
                     >
-                      <p className="mb-3 font-serif text-xl text-[#231f1b]">{section.label}</p>
+                      <p className="px-1 font-serif text-xl text-[#231f1b]">{section.label}</p>
                       <div className="mb-3 space-y-3">
                         {buildDebugBlocks(section.exchange).map((block, index) => {
                           const blockKey = `${section.label}-${block.label}-${index}`;
@@ -10337,28 +11409,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           );
                         })}
                       </div>
-                    </div>
+                    </section>
                   ))}
                 </div>
               </div>
             </div>
           </div>
         )}
-
-        <InputModal
-          isOpen={isWeeklyReviewDateInputModalOpen}
-          onClose={handleCloseWeeklyReviewDateInputModal}
-          onConfirm={handleConfirmWeeklyReviewTemplateSelection}
-          title="选择周范围"
-          placeholder="20260511"
-          maxLength={8}
-          validateFn={(value) => (
-            weeklyReviewTemplateService.parseWeekSelectionInput(value, new Date())
-              ? null
-              : '请输入 8 位日期 YYYYMMDD'
-          )}
-        />
-
       </div>
     </div>
   );

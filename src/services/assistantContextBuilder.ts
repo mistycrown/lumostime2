@@ -5,6 +5,7 @@
  * @pos Service (Assistant Context Builder)
  * @description Builds the minimal structured context payloads used by the unified assistant-turn architecture so foreground and background flows can share the same state summaries and full candidate dictionaries without duplicating formatting logic in UI components.
  *
+ * @updated 2026-05-13: Added an absolute time reference table, renamed machine-facing state fields away from ambiguous today/yesterday labels, and timestamped serialized conversation turns so relative-date reasoning can anchor to explicit dates.
  * @updated 2026-05-06: Added explicit `yesterdayTimelineSummary` alongside `todayTimelineSummary` so assistant state context carries concrete activity records for both recent days.
  * @updated 2026-05-06: Kept `todayTimelineSummary` as the full same-day log list, exposed a separate `timelineReviewSummary` digest, and added structured same-day log candidates to the assistant dictionary context for reliable `edit_log` targeting.
  * @updated 2026-04-27: Simplified prompt state time snapshots to one local-offset ISO current-time anchor and stopped exposing assistant-facing UTC `Z` variants.
@@ -39,7 +40,7 @@ import { ensureQuickTodoCategory } from '../utils/todoQuickCategoryUtils';
 
 interface BuildStateContextParams {
   currentDateTime: string;
-  defaultDate: string;
+  stateContextDate: string;
   logs: Log[];
   categories: Category[];
   todos: TodoItem[];
@@ -59,7 +60,7 @@ interface BuildDictionaryContextParams {
 }
 
 interface BuildRecentLogsDigestParams {
-  defaultDate: string;
+  stateContextDate: string;
   logs: Log[];
   categories: Category[];
   todos: TodoItem[];
@@ -67,13 +68,15 @@ interface BuildRecentLogsDigestParams {
 }
 
 interface BuildTimelineSummaryDigestParams {
-  defaultDate: string;
+  stateContextDate: string;
   dailyReviews: DailyReview[];
 }
 
 const DEFAULT_TIMELINE_LIMIT = 12;
 const DEFAULT_TODO_LIMIT = 8;
 const DEFAULT_RECENT_LOG_LIMIT = 20;
+const WEEKDAY_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'] as const;
+const NEXT_WEEKDAY_KEYS = ['nextSunday', 'nextMonday', 'nextTuesday', 'nextWednesday', 'nextThursday', 'nextFriday', 'nextSaturday'] as const;
 
 const formatDateKey = (date: Date): string => {
   const year = date.getFullYear();
@@ -99,6 +102,49 @@ const shiftDateKey = (dateKey: string, offsetDays: number): string => {
   const date = new Date(year, month - 1, day, 12, 0, 0, 0);
   date.setDate(date.getDate() + offsetDays);
   return formatDateKey(date);
+};
+
+const parseDateKeyAtNoon = (dateKey: string): Date | null => {
+  const [year, month, day] = dateKey.split('-').map((value) => Number.parseInt(value, 10));
+  if ([year, month, day].some((value) => Number.isNaN(value))) {
+    return null;
+  }
+
+  const date = new Date(year, month - 1, day, 12, 0, 0, 0);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const formatWeekRange = (dateKey: string): string | undefined => {
+  const date = parseDateKeyAtNoon(dateKey);
+  if (!date) {
+    return undefined;
+  }
+
+  const start = new Date(date);
+  const day = start.getDay();
+  start.setDate(start.getDate() - day);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  return `${formatDateKey(start)}..${formatDateKey(end)}`;
+};
+
+const buildNextWeekdayDates = (dateKey: string): Record<string, string> | undefined => {
+  const date = parseDateKeyAtNoon(dateKey);
+  if (!date) {
+    return undefined;
+  }
+
+  return Object.fromEntries(
+    NEXT_WEEKDAY_KEYS.map((key, weekday) => {
+      const candidate = new Date(date);
+      let delta = (weekday - candidate.getDay() + 7) % 7;
+      if (delta === 0) {
+        delta = 7;
+      }
+      candidate.setDate(candidate.getDate() + delta);
+      return [key, formatDateKey(candidate)] as const;
+    })
+  );
 };
 
 const getActivityById = (categories: Category[], activityId?: string) => (
@@ -208,7 +254,11 @@ export const assistantContextBuilder = {
         if (!content) {
           return '';
         }
-        return `${turn.role === 'assistant' ? 'Assistant' : 'User'}: ${content}`;
+        const roleLabel = turn.role === 'assistant' ? 'Assistant' : 'User';
+        const createdAtLabel = typeof turn.createdAt === 'string' && turn.createdAt.trim()
+          ? ` @ ${turn.createdAt.trim()}`
+          : '';
+        return `${roleLabel}${createdAtLabel}: ${content}`;
       })
       .filter(Boolean)
       .join('\n');
@@ -218,7 +268,10 @@ export const assistantContextBuilder = {
     const trimmedTurns = turns
       .map((turn) => ({
         role: turn.role,
-        content: turn.content.trim()
+        content: turn.content.trim(),
+        ...(typeof turn.createdAt === 'string' && turn.createdAt.trim()
+          ? { createdAt: turn.createdAt.trim() }
+          : {})
       }))
       .filter((turn) => turn.content.length > 0);
 
@@ -231,9 +284,12 @@ export const assistantContextBuilder = {
   buildStateContext(params: BuildStateContextParams): AssistantTurnStateContext {
     const timelineLimit = params.timelineLimit ?? DEFAULT_TIMELINE_LIMIT;
     const todoLimit = params.todoLimit ?? DEFAULT_TODO_LIMIT;
-    const yesterdayDate = shiftDateKey(params.defaultDate, -1);
-    const todayTimelineSummary = buildDayTimelineSummary(params.logs, params.categories, params.defaultDate, timelineLimit);
-    const yesterdayTimelineSummary = buildDayTimelineSummary(params.logs, params.categories, yesterdayDate, timelineLimit);
+    const previousDate = shiftDateKey(params.stateContextDate, -1);
+    const stateDateObject = parseDateKeyAtNoon(params.stateContextDate);
+    const timelineSummaryForDate = buildDayTimelineSummary(params.logs, params.categories, params.stateContextDate, timelineLimit);
+    const timelineSummaryForPreviousDate = buildDayTimelineSummary(params.logs, params.categories, previousDate, timelineLimit);
+    const currentWeekday = stateDateObject ? WEEKDAY_LABELS[stateDateObject.getDay()] : undefined;
+    const nextWeekdayDates = buildNextWeekdayDates(params.stateContextDate);
 
     const activeSessionSummary = (params.activeSessions || []).length === 0
       ? ''
@@ -244,8 +300,8 @@ export const assistantContextBuilder = {
         return `${session.activityName}${linkedTodo ? ` @${linkedTodo.title}` : ''}`;
       }).join('；');
 
-    const todayScheduledTodoSummary = params.todos
-      .filter((todo) => !todo.isCompleted && todo.scheduledDate === params.defaultDate)
+    const scheduledTodosForDateSummary = params.todos
+      .filter((todo) => !todo.isCompleted && todo.scheduledDate === params.stateContextDate)
       .slice(0, todoLimit)
       .map((todo) => `- ${formatTodoPath(todo, params.todos)}`)
       .join('\n');
@@ -257,19 +313,25 @@ export const assistantContextBuilder = {
       .join('\n');
 
     const overdueTodoSummary = params.todos
-      .filter((todo) => !todo.isCompleted && typeof todo.deadlineDate === 'string' && todo.deadlineDate < params.defaultDate)
+      .filter((todo) => !todo.isCompleted && typeof todo.deadlineDate === 'string' && todo.deadlineDate < params.stateContextDate)
       .slice(0, todoLimit)
       .map((todo) => `- ${formatTodoPath(todo, params.todos)}（截止 ${todo.deadlineDate}）`)
       .join('\n');
 
     return {
       currentDateTime: params.currentDateTime,
-      defaultDate: params.defaultDate,
-      ...(todayTimelineSummary ? { todayTimelineSummary } : {}),
-      ...(yesterdayTimelineSummary ? { yesterdayTimelineSummary } : {}),
+      stateContextDate: params.stateContextDate,
+      currentLocalDate: params.stateContextDate,
+      ...(currentWeekday ? { currentWeekday } : {}),
+      tomorrowDate: shiftDateKey(params.stateContextDate, 1),
+      dayAfterTomorrowDate: shiftDateKey(params.stateContextDate, 2),
+      ...(formatWeekRange(params.stateContextDate) ? { currentWeekRange: formatWeekRange(params.stateContextDate)! } : {}),
+      ...(nextWeekdayDates ? { nextWeekdayDates } : {}),
+      ...(timelineSummaryForDate ? { timelineSummaryForDate } : {}),
+      ...(timelineSummaryForPreviousDate ? { timelineSummaryForPreviousDate } : {}),
       ...(params.timelineReviewSummary ? { timelineReviewSummary: params.timelineReviewSummary } : {}),
       ...(activeSessionSummary ? { activeSessionSummary } : {}),
-      ...(todayScheduledTodoSummary ? { todayScheduledTodoSummary: `以下是安排在今天的待办：\n${todayScheduledTodoSummary}` } : {}),
+      ...(scheduledTodosForDateSummary ? { scheduledTodosForDateSummary: `以下是安排在 stateContextDate=${params.stateContextDate} 的待办：\n${scheduledTodosForDateSummary}` } : {}),
       ...(pinnedTodoSummary ? { pinnedTodoSummary: `以下是已 Pin 的待办：\n${pinnedTodoSummary}` } : {}),
       ...(overdueTodoSummary ? { overdueTodoSummary: `以下是已经过期但仍未完成的待办：\n${overdueTodoSummary}` } : {}),
       ...(params.reminderSummary ? { reminderSummary: params.reminderSummary } : {})
@@ -279,7 +341,7 @@ export const assistantContextBuilder = {
   buildRecentLogsDigest(params: BuildRecentLogsDigestParams): string | undefined {
     const limit = params.limit ?? DEFAULT_RECENT_LOG_LIMIT;
     const recentLogs = params.logs
-      .filter((log) => formatDateKey(new Date(log.startTime)) !== params.defaultDate)
+      .filter((log) => formatDateKey(new Date(log.startTime)) !== params.stateContextDate)
       .sort((left, right) => right.startTime - left.startTime)
       .slice(0, limit);
 
@@ -288,20 +350,20 @@ export const assistantContextBuilder = {
     }
 
     return [
-      `以下是最近日志摘要：已排除今天（${params.defaultDate}）的记录；当前提供 ${recentLogs.length} 条；最多保留 ${limit} 条；按时间倒序排列。`,
+      `以下是最近日志摘要：已排除 stateContextDate=${params.stateContextDate} 的记录；当前提供 ${recentLogs.length} 条；最多保留 ${limit} 条；按时间倒序排列。`,
       ...recentLogs.map((log) => buildLogDigestLine(log, params.categories, params.todos))
     ].join('\n');
   },
 
   buildTimelineSummaryDigest(params: BuildTimelineSummaryDigestParams): string {
-    const yesterdayDate = shiftDateKey(params.defaultDate, -1);
-    const todaySummary = params.dailyReviews.find((review) => review.date === params.defaultDate)?.summary;
-    const yesterdaySummary = params.dailyReviews.find((review) => review.date === yesterdayDate)?.summary;
+    const previousDate = shiftDateKey(params.stateContextDate, -1);
+    const currentSummary = params.dailyReviews.find((review) => review.date === params.stateContextDate)?.summary;
+    const previousSummary = params.dailyReviews.find((review) => review.date === previousDate)?.summary;
 
     return [
       '以下是应用状态上下文。',
-      buildTimelineSummaryLine('今天', params.defaultDate, todaySummary),
-      buildTimelineSummaryLine('昨天', yesterdayDate, yesterdaySummary)
+      buildTimelineSummaryLine('stateContextDate', params.stateContextDate, currentSummary),
+      buildTimelineSummaryLine('previousDate', previousDate, previousSummary)
     ].join('\n');
   },
 

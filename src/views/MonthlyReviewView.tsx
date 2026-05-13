@@ -4,6 +4,7 @@
  * @output Update Review Data, Generate Narrative
  * @pos View (Review System)
  * @description A comprehensive view for conducting monthly reviews. Includes tabs for statistical data, guided questions (Review Guide), and an AI-assisted narrative editor.
+ * @updated 2026-05-13: Added optional `initialTab` support so external entry points like AI template writeback cards can jump directly into the monthly narrative tab.
  * @updated 2026-04-25: Let floating read-edit toggles inherit button theme colors so default UI icons remain visible on accent-theme white buttons.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -49,6 +50,7 @@ interface MonthlyReviewViewProps {
     onGenerateNarrative: (review: MonthlyReview, statsText: string, promptTemplate?: string) => Promise<string>;
     addToast: (type: 'success' | 'error' | 'info', message: string) => void;
     onClose?: () => void;
+    initialTab?: TabType;
 }
 
 type TabType = 'data' | 'guide' | 'narrative' | 'cite';
@@ -77,9 +79,10 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
     onUpdateReview,
     onGenerateNarrative,
     addToast,
-    onClose
+    onClose,
+    initialTab
 }) => {
-    const [activeTab, setActiveTab] = useState<TabType>('data');
+    const [activeTab, setActiveTab] = useState<TabType>(initialTab || 'data');
     const [cite, setCite] = useState(review.cite || '');
     
     // Use shared review state hook
@@ -111,6 +114,12 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
     const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
     const [isClearGuideConfirmOpen, setIsClearGuideConfirmOpen] = useState(false);
     const [isAIQuoteGeneratorOpen, setIsAIQuoteGeneratorOpen] = useState(false);
+
+    useEffect(() => {
+        if (initialTab) {
+            setActiveTab(initialTab);
+        }
+    }, [initialTab]);
 
     // 当切换到引导或叙事标签时，根据内容自动切换阅读/编辑模式（仅在标签切换时触发）
     useEffect(() => {

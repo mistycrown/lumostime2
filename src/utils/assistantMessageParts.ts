@@ -1,10 +1,11 @@
 /**
  * @file assistantMessageParts.ts
- * @input Optional structured assistant reply parts plus fallback full-text content
+ * @input Assistant full-text reply content plus optional legacy structured parts
  * @output Normalized multi-bubble display parts for assistant chat rendering
  * @pos Utility (Assistant Message Parts)
- * @description Centralizes normalization and conservative fallback splitting for assistant replies so foreground and background messages can share one grouped multi-bubble rendering path.
+ * @description Centralizes newline-first and sentence-aware fallback splitting for assistant replies so one complete assistant message can be rendered as several short chat bubbles without requiring a separate duplicate parts field.
  *
+ * @updated 2026-05-13: Prioritized paragraph and line breaks from the single assistant reply body, keeping structured parts only as a legacy fallback input for older persisted messages.
  * @updated 2026-05-01: Filtered null-like placeholder strings out of structured assistant reply parts so malformed model arrays no longer surface literal "null" bubbles.
  * @updated 2026-04-27: Added clause-aware fallback splitting and chunk rebalancing so longer assistant paragraphs render more like several short chat bursts.
  * @updated 2026-04-27: Added structured-part normalization and conservative fallback sentence splitting for grouped assistant chat bubbles.

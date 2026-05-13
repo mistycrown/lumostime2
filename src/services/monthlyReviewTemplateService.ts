@@ -1,26 +1,26 @@
 /**
- * @file weeklyReviewTemplateService.ts
- * @input Weekly review range selection text, local logs/todos/reviews, and optional existing weekly review content
- * @output Parsed weekly-review template targets, structured weekly context digests, and dedicated weekly-review AI prompt text
- * @pos Service (Weekly Review Template)
- * @description Centralizes the weekly-review template workflow, including strict week-range parsing, method selection metadata, Weekly Review lookup/creation helpers, compact per-week data packaging, and prompt composition for both weekly-review chat and weekly-review narrative writeback.
- *
- * @updated 2026-05-13: Moved weekly-review prompt copy into a typed TS constant so the template flow no longer depends on a markdown asset or runtime fetch/parse path.
+ * @file monthlyReviewTemplateService.ts
+ * @input Monthly review range selection text, local logs/todos/reviews, and optional existing monthly review content
+ * @output Parsed monthly-review template targets, structured monthly context digests, and dedicated monthly-review AI prompt text
+ * @pos Service (Monthly Review Template)
+ * @description Centralizes the monthly-review template workflow, including strict month-range parsing, method selection metadata, Monthly Review lookup/creation helpers, compact per-month data packaging, and prompt composition for both monthly-review chat and monthly-review narrative writeback.
+ * @updated 2026-05-13: Added the first monthly-review template service by mirroring the weekly-review template flow with month-based range selection and writeback.
  */
 
 import type {
   Category,
   DailyReview,
   Log,
+  MonthlyReview,
   ReviewTemplate,
   Scope,
   TodoCategory,
   TodoItem,
   WeeklyReview
 } from '../types';
-import { WEEKLY_REVIEW_TEMPLATE_PROMPTS } from '../constants/weeklyReviewTemplatePrompts';
+import { MONTHLY_REVIEW_TEMPLATE_PROMPTS } from '../constants/monthlyReviewTemplatePrompts';
 import { calculateMonthlyStats, formatDuration, generateCheckItemStatsText } from '../utils/reviewStatsUtils';
-import { getLocalDateStr, getLocalTimeStr, getWeekRange } from '../utils/dateUtils';
+import { getLocalDateStr, getLocalTimeStr } from '../utils/dateUtils';
 
 const STRICT_JSON_OUTPUT_RULES = [
   '=== Structured Output Contract ===',
@@ -30,88 +30,88 @@ const STRICT_JSON_OUTPUT_RULES = [
   'Your entire response must be valid JSON parsable by JSON.parse with no cleanup step.'
 ].join('\n');
 
-const WEEKLY_REVIEW_CHAT_OUTPUT_SCHEMA = {
+const MONTHLY_REVIEW_CHAT_OUTPUT_SCHEMA = {
   mode: 'foreground',
   outcome: 'reply | clarify',
   assistantReply: 'string',
   memoryAction: 'no_update'
 };
 
-export type WeeklyReviewTemplateSelectionLabel = '本周' | '上周' | 'custom_date';
-export type WeeklyReviewTemplateStage = 'select_range' | 'select_method' | 'ready';
-export type WeeklyReviewMethodId = 'pdca' | 'systems' | 'cbt' | 'narrative';
+export type MonthlyReviewTemplateSelectionLabel = '本月' | '上月' | 'custom_date';
+export type MonthlyReviewTemplateStage = 'select_range' | 'select_method' | 'ready';
+export type MonthlyReviewMethodId = 'pdca' | 'systems' | 'cbt' | 'narrative';
 
-const WEEKLY_REVIEW_METHOD_TITLES: Record<WeeklyReviewMethodId, string> = {
+const MONTHLY_REVIEW_METHOD_TITLES: Record<MonthlyReviewMethodId, string> = {
   pdca: 'PDCA',
   systems: '系统复盘',
   cbt: 'CBT',
   narrative: '叙事疗法'
 };
 
-const WEEKLY_REVIEW_METHOD_DESCRIPTIONS: Record<WeeklyReviewMethodId, string> = {
+const MONTHLY_REVIEW_METHOD_DESCRIPTIONS: Record<MonthlyReviewMethodId, string> = {
   pdca: '适合行动改进，围绕计划、执行、检查、调整来复盘。',
-  systems: '适合看模式、瓶颈和杠杆点，关注整周系统如何运转。',
+  systems: '适合看模式、瓶颈和杠杆点，关注整月系统如何运转。',
   cbt: '适合纠正过度自责或偏差解释，区分事实、想法、情绪和行为。',
-  narrative: '适合梳理这一周的主线、冲突、例外时刻和价值感。'
+  narrative: '适合梳理这个月的主线、冲突、例外时刻和价值感。'
 };
 
-export interface WeeklyReviewTemplateMethodOption {
-  id: WeeklyReviewMethodId;
+export interface MonthlyReviewTemplateMethodOption {
+  id: MonthlyReviewMethodId;
   title: string;
   description: string;
 }
 
-export interface WeeklyReviewTemplateSessionMeta {
-  templateType: 'weekly_review';
-  stage: WeeklyReviewTemplateStage;
-  weekStartDate?: string;
-  weekEndDate?: string;
-  selectedRangeLabel?: WeeklyReviewTemplateSelectionLabel;
-  methodId?: WeeklyReviewMethodId;
+export interface MonthlyReviewTemplateSessionMeta {
+  templateType: 'monthly_review';
+  stage: MonthlyReviewTemplateStage;
+  monthStartDate?: string;
+  monthEndDate?: string;
+  selectedRangeLabel?: MonthlyReviewTemplateSelectionLabel;
+  methodId?: MonthlyReviewMethodId;
   methodLabel?: string;
   pendingWriteIntent?: boolean;
 }
 
-export interface WeeklyReviewTemplateSelectionResult {
-  weekStartDate: string;
-  weekEndDate: string;
-  selectedRangeLabel: WeeklyReviewTemplateSelectionLabel;
+export interface MonthlyReviewTemplateSelectionResult {
+  monthStartDate: string;
+  monthEndDate: string;
+  selectedRangeLabel: MonthlyReviewTemplateSelectionLabel;
 }
 
-interface BuildWeeklyReviewTemplateDataParams {
-  weekStartDate: string;
-  weekEndDate: string;
-  selectedRangeLabel: WeeklyReviewTemplateSelectionLabel;
+interface BuildMonthlyReviewTemplateDataParams {
+  monthStartDate: string;
+  monthEndDate: string;
+  selectedRangeLabel: MonthlyReviewTemplateSelectionLabel;
   logs: Log[];
   categories: Category[];
   todos: TodoItem[];
   todoCategories: TodoCategory[];
   scopes: Scope[];
   dailyReviews: DailyReview[];
-  weeklyReview?: WeeklyReview;
+  weeklyReviews: WeeklyReview[];
+  monthlyReview?: MonthlyReview;
 }
 
-interface BuildWeeklyReviewTemplateChatPromptParams {
+interface BuildMonthlyReviewTemplateChatPromptParams {
   personaPrompt?: string;
-  weekDataText: string;
+  monthDataText: string;
   userMessage: string;
-  methodId: WeeklyReviewMethodId;
+  methodId: MonthlyReviewMethodId;
 }
 
-interface BuildWeeklyReviewNarrativePromptParams {
+interface BuildMonthlyReviewNarrativePromptParams {
   personaPrompt?: string;
-  weekDataText: string;
+  monthDataText: string;
   conversationSummary: string;
   existingNarrative?: string;
   mergeMode: 'create' | 'overwrite';
-  methodId?: WeeklyReviewMethodId;
 }
 
-export interface WeeklyReviewNarrativeToolCall {
-  toolName: 'write_weekly_review_narrative';
+export interface MonthlyReviewNarrativeToolCall {
+  toolName: 'write_monthly_review_narrative';
   args: {
-    weekStartDate: string;
-    weekEndDate: string;
+    monthStartDate: string;
+    monthEndDate: string;
     mode: 'create' | 'overwrite';
     narrativeMarkdown: string;
   };
@@ -147,22 +147,27 @@ const parseEightDigitDate = (value: string): Date | null => {
     : null;
 };
 
-const toWeekSelectionResult = (
+const getMonthRange = (date: Date): { start: Date; end: Date } => {
+  const start = new Date(date.getFullYear(), date.getMonth(), 1, 0, 0, 0, 0);
+  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+  return { start, end };
+};
+
+const toMonthSelectionResult = (
   date: Date,
-  selectedRangeLabel: WeeklyReviewTemplateSelectionLabel
-): WeeklyReviewTemplateSelectionResult => {
-  const { start, end } = getWeekRange(date);
+  selectedRangeLabel: MonthlyReviewTemplateSelectionLabel
+): MonthlyReviewTemplateSelectionResult => {
+  const { start, end } = getMonthRange(date);
   return {
-    weekStartDate: getLocalDateStr(start),
-    weekEndDate: getLocalDateStr(end),
+    monthStartDate: getLocalDateStr(start),
+    monthEndDate: getLocalDateStr(end),
     selectedRangeLabel
   };
 };
 
-const formatWeekRangeLabel = (weekStartDate: string, weekEndDate: string): string => {
-  const start = new Date(`${weekStartDate}T12:00:00`);
-  const end = new Date(`${weekEndDate}T12:00:00`);
-  return `${start.getMonth() + 1}/${start.getDate()}-${end.getMonth() + 1}/${end.getDate()}`;
+const formatMonthRangeLabel = (monthStartDate: string): string => {
+  const start = new Date(`${monthStartDate}T12:00:00`);
+  return `${start.getFullYear()}/${start.getMonth() + 1}`;
 };
 
 const toDayKey = (timestamp: number): string => getLocalDateStr(new Date(timestamp));
@@ -187,13 +192,13 @@ const buildLogLabel = (log: Log, categories: Category[], todos: TodoItem[]): str
   ].filter(Boolean).join(' | ');
 };
 
-const buildTimelineDigest = (weekLogs: Log[], categories: Category[], todos: TodoItem[]): string => {
-  if (weekLogs.length === 0) {
-    return '本周没有时间轴记录。';
+const buildTimelineDigest = (monthLogs: Log[], categories: Category[], todos: TodoItem[]): string => {
+  if (monthLogs.length === 0) {
+    return '本月没有时间轴记录。';
   }
 
   const logsByDay = new Map<string, Log[]>();
-  weekLogs.forEach((log) => {
+  monthLogs.forEach((log) => {
     const dayKey = toDayKey(log.startTime);
     const nextLogs = logsByDay.get(dayKey) || [];
     nextLogs.push(log);
@@ -211,13 +216,13 @@ const buildTimelineDigest = (weekLogs: Log[], categories: Category[], todos: Tod
     .join('\n\n');
 };
 
-const buildDailyDurationDigest = (weekLogs: Log[]): string => {
-  if (weekLogs.length === 0) {
-    return '本周没有按天可汇总的日志。';
+const buildDailyDurationDigest = (monthLogs: Log[]): string => {
+  if (monthLogs.length === 0) {
+    return '本月没有按天可汇总的日志。';
   }
 
   const totals = new Map<string, number>();
-  weekLogs.forEach((log) => {
+  monthLogs.forEach((log) => {
     const dayKey = toDayKey(log.startTime);
     const nextDuration = (totals.get(dayKey) || 0) + ((log.endTime - log.startTime) / 1000);
     totals.set(dayKey, nextDuration);
@@ -230,21 +235,21 @@ const buildDailyDurationDigest = (weekLogs: Log[]): string => {
 };
 
 const buildTodoResultDigest = (
-  weekLogs: Log[],
+  monthLogs: Log[],
   todos: TodoItem[],
-  weekStartDate: string,
-  weekEndDate: string
+  monthStartDate: string,
+  monthEndDate: string
 ): string => {
   const completedTodos = todos.filter((todo) => (
     todo.isCompleted
     && typeof todo.completedAt === 'string'
     && todo.completedAt.trim()
-    && getLocalDateStr(new Date(todo.completedAt)) >= weekStartDate
-    && getLocalDateStr(new Date(todo.completedAt)) <= weekEndDate
+    && getLocalDateStr(new Date(todo.completedAt)) >= monthStartDate
+    && getLocalDateStr(new Date(todo.completedAt)) <= monthEndDate
   ));
 
   const loggedTodoIds = new Set(
-    weekLogs
+    monthLogs
       .map((log) => log.linkedTodoId || '')
       .filter(Boolean)
   );
@@ -255,17 +260,17 @@ const buildTodoResultDigest = (
   ));
 
   const completedLines = completedTodos.length === 0
-    ? ['- 本周没有已完成待办记录。']
+    ? ['- 本月没有已完成待办记录。']
     : completedTodos.map((todo) => (
       `- ${todo.title}${todo.completedAt ? `（完成于 ${getLocalDateStr(new Date(todo.completedAt))}）` : ''}`
     ));
 
   const activeLines = activeTodos.length === 0
-    ? ['- 本周没有“有投入但未完成”的待办。']
+    ? ['- 本月没有“有投入但未完成”的待办。']
     : activeTodos.map((todo) => `- ${todo.title}`);
 
   return [
-    '[本周待办结果]',
+    '[本月待办结果]',
     '已完成待办：',
     ...completedLines,
     '',
@@ -276,7 +281,7 @@ const buildTodoResultDigest = (
 
 const buildDailyReviewDigest = (dailyReviews: DailyReview[]): string => {
   if (dailyReviews.length === 0) {
-    return '本周没有 Daily Review。';
+    return '本月没有 Daily Review。';
   }
 
   return dailyReviews
@@ -297,42 +302,66 @@ const buildDailyReviewDigest = (dailyReviews: DailyReview[]): string => {
     .join('\n\n');
 };
 
-const buildWeeklyReviewDigest = (weeklyReview?: WeeklyReview): string => {
-  if (!weeklyReview) {
-    return '本周还没有 Weekly Review。';
+const buildWeeklyReviewDigest = (weeklyReviews: WeeklyReview[]): string => {
+  if (weeklyReviews.length === 0) {
+    return '本月没有 Weekly Review。';
   }
 
-  const answers = weeklyReview.answers.length === 0
+  return weeklyReviews
+    .sort((left, right) => left.weekStartDate.localeCompare(right.weekStartDate))
+    .map((review) => {
+      const summary = compactText(review.summary, 100);
+      const narrative = compactText(review.narrative, 120);
+      const answerText = review.answers.length > 0
+        ? review.answers.map((answer) => `- ${answer.question}: ${compactText(answer.answer, 70)}`).join('\n')
+        : '- 暂无引导回答。';
+
+      return [
+        `${review.weekStartDate} ~ ${review.weekEndDate}`,
+        answerText,
+        summary ? `- Weekly summary：${summary}` : '',
+        narrative ? `- Weekly narrative：${narrative}` : ''
+      ].filter(Boolean).join('\n');
+    })
+    .join('\n\n');
+};
+
+const buildMonthlyReviewDigest = (monthlyReview?: MonthlyReview): string => {
+  if (!monthlyReview) {
+    return '本月还没有 Monthly Review。';
+  }
+
+  const answers = monthlyReview.answers.length === 0
     ? '暂无引导回答。'
-    : weeklyReview.answers.map((answer) => `- ${answer.question}: ${compactText(answer.answer, 120)}`).join('\n');
+    : monthlyReview.answers.map((answer) => `- ${answer.question}: ${compactText(answer.answer, 120)}`).join('\n');
 
   return [
-    '已有 Weekly Review：',
+    '已有 Monthly Review：',
     answers,
-    weeklyReview.summary ? `现有 summary：${compactText(weeklyReview.summary, 140)}` : '现有 summary：无',
-    weeklyReview.narrative ? `现有 narrative：${compactText(weeklyReview.narrative, 180)}` : '现有 narrative：无'
+    monthlyReview.summary ? `现有 summary：${compactText(monthlyReview.summary, 140)}` : '现有 summary：无',
+    monthlyReview.narrative ? `现有 narrative：${compactText(monthlyReview.narrative, 180)}` : '现有 narrative：无'
   ].join('\n');
 };
 
 const buildStatsDigest = (
-  weekLogs: Log[],
+  monthLogs: Log[],
   categories: Category[],
   todos: TodoItem[],
   todoCategories: TodoCategory[],
   scopes: Scope[],
   dailyReviews: DailyReview[],
-  weekStartDate: string,
-  weekEndDate: string
+  monthStartDate: string,
+  monthEndDate: string
 ): string => {
-  const stats = calculateMonthlyStats(weekLogs, categories, todos, todoCategories, scopes);
+  const stats = calculateMonthlyStats(monthLogs, categories, todos, todoCategories, scopes);
   const checkDigest = generateCheckItemStatsText(
     dailyReviews,
-    new Date(`${weekStartDate}T00:00:00`),
-    new Date(`${weekEndDate}T23:59:59`)
+    new Date(`${monthStartDate}T00:00:00`),
+    new Date(`${monthEndDate}T23:59:59`)
   );
 
   return [
-    '[本周统计]',
+    '[本月统计]',
     `总时长：${formatDuration(stats.totalDuration)}`,
     '',
     '分类分布：',
@@ -350,8 +379,8 @@ const buildStatsDigest = (
       ? stats.todoStats.map((item) => `- ${item.name}: ${formatDuration(item.duration)} (${item.percentage.toFixed(1)}%)`)
       : ['- 无']),
     '',
-    '[本周每日时长]',
-    buildDailyDurationDigest(weekLogs),
+    '[本月每日时长]',
+    buildDailyDurationDigest(monthLogs),
     ...(checkDigest ? ['', checkDigest.trim()] : [])
   ].join('\n');
 };
@@ -370,16 +399,16 @@ const buildPersonaStyleLayer = (personaPrompt?: string): string => {
   ].join('\n');
 };
 
-export const weeklyReviewTemplateService = {
-  listMethodOptions(): WeeklyReviewTemplateMethodOption[] {
-    return (Object.entries(WEEKLY_REVIEW_METHOD_TITLES) as Array<[WeeklyReviewMethodId, string]>).map(([id, title]) => ({
+export const monthlyReviewTemplateService = {
+  listMethodOptions(): MonthlyReviewTemplateMethodOption[] {
+    return (Object.entries(MONTHLY_REVIEW_METHOD_TITLES) as Array<[MonthlyReviewMethodId, string]>).map(([id, title]) => ({
       id,
       title,
-      description: WEEKLY_REVIEW_METHOD_DESCRIPTIONS[id]
+      description: MONTHLY_REVIEW_METHOD_DESCRIPTIONS[id]
     }));
   },
 
-  parseMethodSelectionInput(input: string): WeeklyReviewMethodId | null {
+  parseMethodSelectionInput(input: string): MonthlyReviewMethodId | null {
     const trimmed = input.trim();
     if (!trimmed) {
       return null;
@@ -394,20 +423,20 @@ export const weeklyReviewTemplateService = {
       return 'cbt';
     }
 
-    if (['系统复盘', '绯荤粺澶嶇洏'].includes(trimmed)) {
+    if (trimmed === '系统复盘') {
       return 'systems';
     }
 
-    if (['叙事疗法', '鍙欎簨鐤楁硶'].includes(trimmed)) {
+    if (trimmed === '叙事疗法') {
       return 'narrative';
     }
 
     return null;
   },
 
-  createSetupSessionMeta(): WeeklyReviewTemplateSessionMeta {
+  createSetupSessionMeta(): MonthlyReviewTemplateSessionMeta {
     return {
-      templateType: 'weekly_review',
+      templateType: 'monthly_review',
       stage: 'select_range'
     };
   },
@@ -415,75 +444,74 @@ export const weeklyReviewTemplateService = {
   getRangeSelectionPrompt(): string {
     return [
       '这次我们先一步一步来。',
-      '你想复盘哪一周？',
-      '可以直接回复：本周、上周，或者输入一个 8 位日期 YYYYMMDD 来指定那一天所在的一周。'
+      '你想复盘哪一个月？',
+      '可以直接回复：本月、上月，或者输入一个 8 位日期 YYYYMMDD 来定位那一天所在的整个月。'
     ].join('\n');
   },
 
   getRangeSelectionInvalidPrompt(): string {
-    return '我暂时只能识别“本周”“上周”或 8 位日期 YYYYMMDD，你重新输入一次就行。';
+    return '我暂时只能识别“本月”“上月”或 8 位日期 YYYYMMDD，你重新输入一次就行。';
   },
 
-  getMethodSelectionPrompt(selection: WeeklyReviewTemplateSelectionResult): string {
+  getMethodSelectionPrompt(selection: MonthlyReviewTemplateSelectionResult): string {
     return [
-      `即将复盘 ${selection.weekStartDate} ~ ${selection.weekEndDate}。`,
+      `即将复盘 ${selection.monthStartDate} ~ ${selection.monthEndDate}。`,
       '要采用哪一种分析方式呢？',
-      `可以回复：${weeklyReviewTemplateService.listMethodOptions().map((item) => item.title).join(' / ')}`
+      `可以回复：${monthlyReviewTemplateService.listMethodOptions().map((item) => item.title).join(' / ')}`
     ].join('\n');
   },
 
   getMethodSelectionInvalidPrompt(): string {
-    return `暂时只支持这四种方法：${weeklyReviewTemplateService.listMethodOptions().map((item) => item.title).join(' / ')}。请重新输入一种方法。`;
+    return `暂时只支持这四种方法：${monthlyReviewTemplateService.listMethodOptions().map((item) => item.title).join(' / ')}。请重新输入一种方法。`;
   },
 
-  parseWeekSelectionInput(input: string, now: Date = new Date()): WeeklyReviewTemplateSelectionResult | null {
+  parseMonthSelectionInput(input: string, now: Date = new Date()): MonthlyReviewTemplateSelectionResult | null {
     const trimmed = input.trim();
     if (!trimmed) {
       return null;
     }
 
-    if (trimmed === '本周') {
-      return toWeekSelectionResult(now, '本周');
+    if (trimmed === '本月') {
+      return toMonthSelectionResult(now, '本月');
     }
 
-    if (trimmed === '上周') {
-      const lastWeek = new Date(now);
-      lastWeek.setDate(lastWeek.getDate() - 7);
-      return toWeekSelectionResult(lastWeek, '上周');
+    if (trimmed === '上月') {
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 15, 12, 0, 0, 0);
+      return toMonthSelectionResult(lastMonth, '上月');
     }
 
     const parsedDate = parseEightDigitDate(trimmed);
-    return parsedDate ? toWeekSelectionResult(parsedDate, 'custom_date') : null;
+    return parsedDate ? toMonthSelectionResult(parsedDate, 'custom_date') : null;
   },
 
   createSessionMeta(
-    selection: WeeklyReviewTemplateSelectionResult,
-    methodId: WeeklyReviewMethodId
-  ): WeeklyReviewTemplateSessionMeta {
+    selection: MonthlyReviewTemplateSelectionResult,
+    methodId: MonthlyReviewMethodId
+  ): MonthlyReviewTemplateSessionMeta {
     return {
-      templateType: 'weekly_review',
+      templateType: 'monthly_review',
       stage: 'ready',
-      weekStartDate: selection.weekStartDate,
-      weekEndDate: selection.weekEndDate,
+      monthStartDate: selection.monthStartDate,
+      monthEndDate: selection.monthEndDate,
       selectedRangeLabel: selection.selectedRangeLabel,
       methodId,
-      methodLabel: WEEKLY_REVIEW_METHOD_TITLES[methodId]
+      methodLabel: MONTHLY_REVIEW_METHOD_TITLES[methodId]
     };
   },
 
-  getSessionTitle(selection: WeeklyReviewTemplateSelectionResult): string {
-    return `周复盘 ${formatWeekRangeLabel(selection.weekStartDate, selection.weekEndDate)}`;
+  getSessionTitle(selection: MonthlyReviewTemplateSelectionResult): string {
+    return `月复盘 ${formatMonthRangeLabel(selection.monthStartDate)}`;
   },
 
-  getIntroMessage(selection: WeeklyReviewTemplateSelectionResult, methodId: WeeklyReviewMethodId): string {
+  getIntroMessage(selection: MonthlyReviewTemplateSelectionResult, methodId: MonthlyReviewMethodId): string {
     const sourceLabel = selection.selectedRangeLabel === 'custom_date'
-      ? '自定义日期所在周'
+      ? '自定义日期所在月'
       : selection.selectedRangeLabel;
     return [
-      `已进入周复盘：${selection.weekStartDate} ~ ${selection.weekEndDate}（${sourceLabel}）。`,
-      `当前分析方法：${WEEKLY_REVIEW_METHOD_TITLES[methodId]}。`,
-      '接下来你可以直接和我讨论这一周的节奏、推进、卡点和收获。',
-      '如果最后要落到周报里，请发送：写入 AI 叙事'
+      `已进入月复盘：${selection.monthStartDate} ~ ${selection.monthEndDate}（${sourceLabel}）。`,
+      `当前分析方法：${MONTHLY_REVIEW_METHOD_TITLES[methodId]}。`,
+      '接下来你可以直接和我讨论这个月的节奏、推进、卡点和收获。',
+      '如果最后要落到月报里，请发送：写入 AI 叙事'
     ].join('\n');
   },
 
@@ -491,29 +519,29 @@ export const weeklyReviewTemplateService = {
     return input.trim() === '写入 AI 叙事';
   },
 
-  findWeeklyReview(
-    weeklyReviews: WeeklyReview[],
-    weekStartDate: string,
-    weekEndDate: string
-  ): WeeklyReview | undefined {
-    return weeklyReviews.find((review) => (
-      review.weekStartDate === weekStartDate && review.weekEndDate === weekEndDate
+  findMonthlyReview(
+    monthlyReviews: MonthlyReview[],
+    monthStartDate: string,
+    monthEndDate: string
+  ): MonthlyReview | undefined {
+    return monthlyReviews.find((review) => (
+      review.monthStartDate === monthStartDate && review.monthEndDate === monthEndDate
     ));
   },
 
-  ensureWeeklyReview(
-    weeklyReviews: WeeklyReview[],
+  ensureMonthlyReview(
+    monthlyReviews: MonthlyReview[],
     reviewTemplates: ReviewTemplate[],
-    weekStartDate: string,
-    weekEndDate: string
-  ): { weeklyReviews: WeeklyReview[]; weeklyReview: WeeklyReview; created: boolean } {
-    const existing = weeklyReviewTemplateService.findWeeklyReview(weeklyReviews, weekStartDate, weekEndDate);
+    monthStartDate: string,
+    monthEndDate: string
+  ): { monthlyReviews: MonthlyReview[]; monthlyReview: MonthlyReview; created: boolean } {
+    const existing = monthlyReviewTemplateService.findMonthlyReview(monthlyReviews, monthStartDate, monthEndDate);
     if (existing) {
-      return { weeklyReviews, weeklyReview: existing, created: false };
+      return { monthlyReviews, monthlyReview: existing, created: false };
     }
 
     const templateSnapshot = reviewTemplates
-      .filter((template) => template.isWeeklyTemplate)
+      .filter((template) => template.isMonthlyTemplate)
       .sort((left, right) => left.order - right.order)
       .map((template) => ({
         id: template.id,
@@ -524,10 +552,10 @@ export const weeklyReviewTemplateService = {
       }));
 
     const now = Date.now();
-    const createdReview: WeeklyReview = {
+    const createdReview: MonthlyReview = {
       id: crypto.randomUUID(),
-      weekStartDate,
-      weekEndDate,
+      monthStartDate,
+      monthEndDate,
       createdAt: now,
       updatedAt: now,
       answers: [],
@@ -535,19 +563,19 @@ export const weeklyReviewTemplateService = {
     };
 
     return {
-      weeklyReviews: [...weeklyReviews, createdReview],
-      weeklyReview: createdReview,
+      monthlyReviews: [...monthlyReviews, createdReview],
+      monthlyReview: createdReview,
       created: true
     };
   },
 
-  updateWeeklyReviewNarrative(
-    weeklyReviews: WeeklyReview[],
+  updateMonthlyReviewNarrative(
+    monthlyReviews: MonthlyReview[],
     reviewId: string,
     narrative: string
-  ): WeeklyReview[] {
+  ): MonthlyReview[] {
     const updatedAt = Date.now();
-    return weeklyReviews.map((review) => (
+    return monthlyReviews.map((review) => (
       review.id === reviewId
         ? {
           ...review,
@@ -559,69 +587,75 @@ export const weeklyReviewTemplateService = {
     ));
   },
 
-  buildWeekDataText(params: BuildWeeklyReviewTemplateDataParams): string {
-    const weekStart = new Date(`${params.weekStartDate}T00:00:00`);
-    const weekEnd = new Date(`${params.weekEndDate}T23:59:59`);
-    const weekLogs = params.logs
-      .filter((log) => log.startTime >= weekStart.getTime() && log.endTime <= weekEnd.getTime())
+  buildMonthDataText(params: BuildMonthlyReviewTemplateDataParams): string {
+    const monthStart = new Date(`${params.monthStartDate}T00:00:00`);
+    const monthEnd = new Date(`${params.monthEndDate}T23:59:59`);
+    const monthLogs = params.logs
+      .filter((log) => log.startTime >= monthStart.getTime() && log.endTime <= monthEnd.getTime())
       .sort((left, right) => left.startTime - right.startTime);
-    const weekDailyReviews = params.dailyReviews.filter((review) => (
-      review.date >= params.weekStartDate && review.date <= params.weekEndDate
+    const monthDailyReviews = params.dailyReviews.filter((review) => (
+      review.date >= params.monthStartDate && review.date <= params.monthEndDate
+    ));
+    const monthWeeklyReviews = params.weeklyReviews.filter((review) => (
+      review.weekStartDate <= params.monthEndDate && review.weekEndDate >= params.monthStartDate
     ));
 
     return [
-      '[周范围]',
-      `weekStartDate: ${params.weekStartDate}`,
-      `weekEndDate: ${params.weekEndDate}`,
+      '[月范围]',
+      `monthStartDate: ${params.monthStartDate}`,
+      `monthEndDate: ${params.monthEndDate}`,
       `selection: ${params.selectedRangeLabel}`,
       '',
       buildStatsDigest(
-        weekLogs,
+        monthLogs,
         params.categories,
         params.todos,
         params.todoCategories,
         params.scopes,
-        weekDailyReviews,
-        params.weekStartDate,
-        params.weekEndDate
+        monthDailyReviews,
+        params.monthStartDate,
+        params.monthEndDate
       ),
       '',
-      '[本周时间轴]',
-      buildTimelineDigest(weekLogs, params.categories, params.todos),
+      '[本月时间轴]',
+      buildTimelineDigest(monthLogs, params.categories, params.todos),
       '',
-      buildTodoResultDigest(weekLogs, params.todos, params.weekStartDate, params.weekEndDate),
+      buildTodoResultDigest(monthLogs, params.todos, params.monthStartDate, params.monthEndDate),
       '',
-      '[本周 Daily Review]',
-      buildDailyReviewDigest(weekDailyReviews),
+      '[本月 Daily Review]',
+      buildDailyReviewDigest(monthDailyReviews),
       '',
-      '[本周 Weekly Review]',
-      buildWeeklyReviewDigest(params.weeklyReview)
+      '[本月 Weekly Review]',
+      buildWeeklyReviewDigest(monthWeeklyReviews),
+      '',
+      '[本月 Monthly Review]',
+      buildMonthlyReviewDigest(params.monthlyReview)
     ].join('\n');
   },
 
   async buildChatPrompts(
-    params: BuildWeeklyReviewTemplateChatPromptParams
+    params: BuildMonthlyReviewTemplateChatPromptParams
   ): Promise<{ systemPrompt: string; userPrompt: string }> {
-    const methodPrompt = WEEKLY_REVIEW_TEMPLATE_PROMPTS.chatMethodPrompts[params.methodId] || '';
+    const methodPrompt = MONTHLY_REVIEW_TEMPLATE_PROMPTS.chatMethodPrompts[params.methodId] || '';
 
     const systemPrompt = [
-      'You are LumosTime\'s weekly review discussion assistant.',
-      'This is a template conversation dedicated to one selected week.',
-      'Your job is to help the user review that week using only the provided weekly data package.',
+      'You are LumosTime\'s monthly review discussion assistant.',
+      'This is a template conversation dedicated to one selected month.',
+      'Your job is to help the user review that month using only the provided monthly data package.',
       'Stay in discussion mode. Do not act like the generic log/todo assistant.',
       'Do not propose tool calls, reminders, or memory updates.',
       'Reply in natural Chinese unless the user clearly wants another language.',
       buildPersonaStyleLayer(params.personaPrompt),
       '',
-      '=== Weekly Review Common Prompt ===',
-      WEEKLY_REVIEW_TEMPLATE_PROMPTS.chatCommonPrompt,
+      '=== Monthly Review Common Prompt ===',
+      MONTHLY_REVIEW_TEMPLATE_PROMPTS.chatCommonPrompt,
       '',
-      `=== Weekly Review Method Prompt (${WEEKLY_REVIEW_METHOD_TITLES[params.methodId]}) ===`,
+      `=== Monthly Review Method Prompt (${MONTHLY_REVIEW_METHOD_TITLES[params.methodId]}) ===`,
       methodPrompt,
       '',
       STRICT_JSON_OUTPUT_RULES,
       '=== Output Schema ===',
-      JSON.stringify(WEEKLY_REVIEW_CHAT_OUTPUT_SCHEMA, null, 2),
+      JSON.stringify(MONTHLY_REVIEW_CHAT_OUTPUT_SCHEMA, null, 2),
       'Always set "mode" to "foreground".',
       'Use "reply" when you can answer directly and "clarify" only when key information is genuinely missing.',
       'Always set "memoryAction" to "no_update".',
@@ -629,8 +663,8 @@ export const weeklyReviewTemplateService = {
     ].filter(Boolean).join('\n\n');
 
     const userPrompt = [
-      '=== Weekly Review Data ===',
-      params.weekDataText,
+      '=== Monthly Review Data ===',
+      params.monthDataText,
       '',
       '=== User Message ===',
       params.userMessage,
@@ -642,14 +676,14 @@ export const weeklyReviewTemplateService = {
   },
 
   async buildNarrativeWritebackPrompts(
-    params: BuildWeeklyReviewNarrativePromptParams
+    params: BuildMonthlyReviewNarrativePromptParams
   ): Promise<{ systemPrompt: string; userPrompt: string }> {
-    const weekStartDate = params.weekDataText.match(/weekStartDate:\s*(.+)/)?.[1]?.trim() || '';
-    const weekEndDate = params.weekDataText.match(/weekEndDate:\s*(.+)/)?.[1]?.trim() || '';
+    const monthStartDate = params.monthDataText.match(/monthStartDate:\s*(.+)/)?.[1]?.trim() || '';
+    const monthEndDate = params.monthDataText.match(/monthEndDate:\s*(.+)/)?.[1]?.trim() || '';
 
     const systemPrompt = [
       'You are preparing one local tool call for LumosTime.',
-      'The tool name is exactly "write_weekly_review_narrative".',
+      'The tool name is exactly "write_monthly_review_narrative".',
       'Your job is to return one complete narrativeMarkdown string for that tool.',
       'Write in Chinese.',
       'The narrativeMarkdown must already be fully formatted Markdown and must contain exactly these three parts:',
@@ -660,16 +694,16 @@ export const weeklyReviewTemplateService = {
       'Do not output prose outside the JSON tool-call object.',
       buildPersonaStyleLayer(params.personaPrompt),
       '',
-      '=== Weekly Review Writeback Common Prompt ===',
-      WEEKLY_REVIEW_TEMPLATE_PROMPTS.writebackCommonPrompt,
+      '=== Monthly Review Writeback Common Prompt ===',
+      MONTHLY_REVIEW_TEMPLATE_PROMPTS.writebackCommonPrompt,
       '',
       STRICT_JSON_OUTPUT_RULES,
       '=== Output Schema ===',
       JSON.stringify({
-        toolName: 'write_weekly_review_narrative',
+        toolName: 'write_monthly_review_narrative',
         args: {
-          weekStartDate: 'string',
-          weekEndDate: 'string',
+          monthStartDate: 'string',
+          monthEndDate: 'string',
           mode: 'create | overwrite',
           narrativeMarkdown: 'string'
         }
@@ -677,12 +711,12 @@ export const weeklyReviewTemplateService = {
     ].filter(Boolean).join('\n\n');
 
     const userPrompt = [
-      '=== Weekly Review Data ===',
-      params.weekDataText,
+      '=== Monthly Review Data ===',
+      params.monthDataText,
       '',
       params.existingNarrative
         ? [
-          '=== Existing Weekly Narrative ===',
+          '=== Existing Monthly Narrative ===',
           params.existingNarrative
         ].join('\n')
         : '',
@@ -694,11 +728,11 @@ export const weeklyReviewTemplateService = {
         : '',
       '',
       '=== Required Tool Arguments ===',
-      `weekStartDate: ${weekStartDate}`,
-      `weekEndDate: ${weekEndDate}`,
+      `monthStartDate: ${monthStartDate}`,
+      `monthEndDate: ${monthEndDate}`,
       `mode: ${params.mergeMode}`,
       '',
-      'Return exactly one write_weekly_review_narrative tool-call JSON object now.',
+      'Return exactly one write_monthly_review_narrative tool-call JSON object now.',
       'Return one JSON object only.'
     ].filter(Boolean).join('\n');
 
@@ -707,10 +741,10 @@ export const weeklyReviewTemplateService = {
 
   parseNarrativeToolCallResponse(
     raw: string,
-    expectedWeekStartDate: string,
-    expectedWeekEndDate: string,
+    expectedMonthStartDate: string,
+    expectedMonthEndDate: string,
     expectedMode: 'create' | 'overwrite'
-  ): WeeklyReviewNarrativeToolCall {
+  ): MonthlyReviewNarrativeToolCall {
     const cleaned = raw
       .replace(/```json\s*|\s*```/gi, '')
       .replace(/```\s*|\s*```/g, '')
@@ -720,31 +754,31 @@ export const weeklyReviewTemplateService = {
     const jsonText = objectStart >= 0 && objectEnd > objectStart
       ? cleaned.slice(objectStart, objectEnd + 1)
       : cleaned;
-    const parsed = JSON.parse(jsonText) as Partial<WeeklyReviewNarrativeToolCall>;
+    const parsed = JSON.parse(jsonText) as Partial<MonthlyReviewNarrativeToolCall>;
 
-    if (parsed.toolName !== 'write_weekly_review_narrative' || !parsed.args) {
-      throw new Error('AI 没有返回 write_weekly_review_narrative 工具调用。');
+    if (parsed.toolName !== 'write_monthly_review_narrative' || !parsed.args) {
+      throw new Error('AI 没有返回 write_monthly_review_narrative 工具调用。');
     }
 
     const narrativeMarkdown = typeof parsed.args.narrativeMarkdown === 'string'
       ? parsed.args.narrativeMarkdown.trim()
       : '';
     if (!narrativeMarkdown) {
-      throw new Error('AI 返回的周叙事 Markdown 为空。');
+      throw new Error('AI 返回的月叙事 Markdown 为空。');
     }
 
     return {
-      toolName: 'write_weekly_review_narrative',
+      toolName: 'write_monthly_review_narrative',
       args: {
-        weekStartDate: expectedWeekStartDate,
-        weekEndDate: expectedWeekEndDate,
+        monthStartDate: expectedMonthStartDate,
+        monthEndDate: expectedMonthEndDate,
         mode: expectedMode,
         narrativeMarkdown
       }
     };
   },
 
-  buildNarrativeFromToolCall(toolCall: WeeklyReviewNarrativeToolCall): string {
+  buildNarrativeFromToolCall(toolCall: MonthlyReviewNarrativeToolCall): string {
     return toolCall.args.narrativeMarkdown.trim();
   }
 };

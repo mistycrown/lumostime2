@@ -94,6 +94,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         isSettingsOpen,
         isDailyReviewOpen, isOnThisDayOpen, setIsOnThisDayOpen, currentReviewDate, currentOnThisDayDate, setCurrentOnThisDayDate,
         isWeeklyReviewOpen, currentWeeklyReviewStart, currentWeeklyReviewEnd, currentWeeklyReviewInitialTab,
+        currentMonthlyReviewInitialTab,
         isMonthlyReviewOpen, currentMonthlyReviewStart, currentMonthlyReviewEnd,
         isAchievementOpen,
         isStatsFullScreen, setIsStatsFullScreen,
@@ -283,6 +284,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 review={review}
                 monthStartDate={currentMonthlyReviewStart}
                 monthEndDate={currentMonthlyReviewEnd}
+                initialTab={currentMonthlyReviewInitialTab || undefined}
                 templates={reviewTemplates}
                 categories={categories}
                 logs={logs}

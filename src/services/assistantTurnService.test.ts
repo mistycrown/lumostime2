@@ -39,12 +39,24 @@ const createInput = (patch?: Partial<AssistantUnifiedTurnInput>): AssistantUnifi
     recentDecisions: ['Keep tracking today plan']
   },
   conversation: {
-    recentTurns: [],
+    recentTurns: [{
+      role: 'user',
+      content: '下周二帮我安排讲座',
+      createdAt: '2026-05-13T21:47:00+08:00'
+    }],
     summary: 'No history yet'
   },
   stateContext: {
     currentDateTime: '2026-04-27T17:00:00+08:00',
-    defaultDate: '2026-04-27'
+    stateContextDate: '2026-04-27',
+    currentLocalDate: '2026-04-27',
+    currentWeekday: '周一',
+    tomorrowDate: '2026-04-28',
+    dayAfterTomorrowDate: '2026-04-29',
+    currentWeekRange: '2026-04-26..2026-05-02',
+    nextWeekdayDates: {
+      nextTuesday: '2026-04-28'
+    }
   },
   dictionaryContext: {},
   ...patch
@@ -96,8 +108,15 @@ describe('assistantTurnService', () => {
     expect(request?.systemPrompt).toContain('"updatedAt": "2026-04-27T17:00:00+08:00"');
     expect(request?.systemPrompt).not.toContain('"updatedAt": "2026-04-27T09:00:00.000Z"');
     expect(request?.systemPrompt).not.toContain('=== Recent Logs Digest ===');
+    expect(request?.systemPrompt).toContain('"currentLocalDate": "2026-04-27"');
+    expect(request?.systemPrompt).toContain('"currentWeekday": "周一"');
+    expect(request?.systemPrompt).toContain('"tomorrowDate": "2026-04-28"');
+    expect(request?.systemPrompt).toContain('"dayAfterTomorrowDate": "2026-04-29"');
+    expect(request?.systemPrompt).toContain('"currentWeekRange": "2026-04-26..2026-05-02"');
+    expect(request?.systemPrompt).toContain('"nextTuesday": "2026-04-28"');
     expect((request?.userPrompt.indexOf('=== Conversation Context ===') || 0)).toBeLessThan(request?.userPrompt.indexOf('=== Trigger ===') || 0);
     expect(request?.userPrompt).toContain('"createdAt": "2026-04-27T17:00:00+08:00"');
+    expect(request?.userPrompt).toContain('"createdAt": "2026-05-13T21:47:00+08:00"');
     expect(request?.cacheHint?.scope).toBe('assistant_unified_turn');
     expect(typeof request?.cacheHint?.keySeed).toBe('string');
   });
@@ -106,9 +125,9 @@ describe('assistantTurnService', () => {
     await assistantTurnService.runUnifiedTurn(createInput({
       stateContext: {
         currentDateTime: '2026-04-27T17:00:00+08:00',
-        defaultDate: '2026-04-27',
-        todayTimelineSummary: '09:00-10:00 Work / Writing',
-        yesterdayTimelineSummary: '14:00-15:00 Work / Writing',
+        stateContextDate: '2026-04-27',
+        timelineSummaryForDate: '09:00-10:00 Work / Writing',
+        timelineSummaryForPreviousDate: '14:00-15:00 Work / Writing',
         timelineReviewSummary: 'today and yesterday review digest'
       },
       dictionaryContext: {
@@ -125,8 +144,8 @@ describe('assistantTurnService', () => {
     const request = vi.mocked(aiService.requestAssistantUnifiedTurnWithDebug).mock.calls[0]?.[0];
     const dictionaryIndex = request?.systemPrompt.indexOf('=== Dictionary Context ===') || -1;
     const volatileStateIndex = request?.systemPrompt.indexOf('=== Volatile State Anchors ===') || -1;
-    expect(request?.systemPrompt).toContain('"todayTimelineSummary": "09:00-10:00 Work / Writing"');
-    expect(request?.systemPrompt).toContain('"yesterdayTimelineSummary": "14:00-15:00 Work / Writing"');
+    expect(request?.systemPrompt).toContain('"timelineSummaryForDate": "09:00-10:00 Work / Writing"');
+    expect(request?.systemPrompt).toContain('"timelineSummaryForPreviousDate": "14:00-15:00 Work / Writing"');
     expect(request?.systemPrompt).toContain('"timelineReviewSummary": "today and yesterday review digest"');
     expect(request?.systemPrompt).toContain('[Logs] rows=1');
     expect(request?.systemPrompt).toContain('"log-1"\t"2026-04-27"\t"09:00-10:00"');

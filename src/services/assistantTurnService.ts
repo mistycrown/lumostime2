@@ -5,6 +5,7 @@
  * @pos Service (Assistant Unified Turn)
  * @description Builds the single-turn prompt payload for the converged assistant architecture and forwards it through aiService so foreground and background flows can gradually migrate off the older multi-prompt planner stack.
  *
+ * @updated 2026-05-13: Unified visible-message output back around `assistantReply`, while instructing the model to use newline-separated paragraphs inside that single reply so the UI can split one complete answer into multiple bubbles without a second duplicate field.
  * @updated 2026-05-10: Reordered unified assistant prompt assembly so long-lived dictionary/state sections sit ahead of volatile anchors, improving provider-side prompt-cache reuse across repeated turns.
  * @updated 2026-05-12: Added an optional read-only Dream context section so foreground and background assistant turns can reference explicit Dream observations without mutating them.
  * @updated 2026-05-10: Added request-option passthrough so foreground chat can propagate AbortSignal all the way into the unified AI transport and actually stop in-flight turns.
@@ -41,17 +42,23 @@ export interface AssistantUnifiedTurnResult {
 const stringifyJson = (value: unknown): string => JSON.stringify(value, null, 2);
 
 const STABLE_STATE_CONTEXT_KEYS = [
-  'todayTimelineSummary',
-  'yesterdayTimelineSummary',
+  'currentLocalDate',
+  'currentWeekday',
+  'tomorrowDate',
+  'dayAfterTomorrowDate',
+  'currentWeekRange',
+  'nextWeekdayDates',
+  'timelineSummaryForDate',
+  'timelineSummaryForPreviousDate',
   'timelineReviewSummary',
-  'todayScheduledTodoSummary',
+  'scheduledTodosForDateSummary',
   'pinnedTodoSummary',
   'overdueTodoSummary'
 ] as const;
 
 const VOLATILE_STATE_CONTEXT_KEYS = [
   'currentDateTime',
-  'defaultDate',
+  'stateContextDate',
   'activeSessionSummary',
   'reminderSummary'
 ] as const;
@@ -130,8 +137,8 @@ const buildToolSchemaPrompt = async (input: AssistantUnifiedTurnInput): Promise<
       '- If outcome is "silent", provide decisionSummary whenever possible.',
       '- If outcome is "silent", silentReason should be one of: active_focus_protection, likely_do_not_disturb, state_still_clear, insufficient_confidence, waiting_for_stronger_signal, followup_already_scheduled.',
       '- If outcome is "silent", silentSideEffects may list any state, memory, or reminder updates in short Chinese phrases.',
-      '- If you send a message, you may optionally provide assistantReplyParts as 2 to 4 short Chinese message bubbles.',
-      '- If a visible message would otherwise become a medium or long paragraph, strongly prefer assistantReplyParts over one dense block.',
+      '- If you send a visible message, return one complete assistantReply string.',
+      '- When the message should appear as multiple chat bubbles, split assistantReply with blank lines or line breaks at natural boundaries instead of using another duplicate field.',
       '- memoryAction must always be "no_update" or "update_memory".',
       '- Only include memoryPatch when memoryAction is "update_memory".',
       ...(memoryEnabled ? [] : [MEMORY_DISABLED_RULE])
@@ -189,7 +196,6 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
           mode: input.mode,
           outcome: 'reply | silent',
           assistantReply: 'string',
-          assistantReplyParts: ['string'],
           reminders: [],
           memoryAction: 'no_update | update_memory',
           memoryPatch: {},
@@ -201,7 +207,6 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
           mode: input.mode,
           outcome: 'reply | silent',
           assistantReply: 'string',
-          assistantReplyParts: ['string'],
           reminders: [],
           memoryAction: 'no_update',
           decisionSummary: 'string',
@@ -215,7 +220,6 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
           mode: input.mode,
           outcome: 'reply | clarify',
           assistantReply: 'string',
-          assistantReplyParts: ['string'],
           toolCalls: [],
           reminders: [],
           memoryAction: 'no_update | update_memory',
@@ -225,7 +229,6 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
           mode: input.mode,
           outcome: 'reply | clarify',
           assistantReply: 'string',
-          assistantReplyParts: ['string'],
           toolCalls: [],
           reminders: [],
           memoryAction: 'no_update'

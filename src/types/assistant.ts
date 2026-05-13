@@ -7,6 +7,7 @@
  *
  * @updated 2026-05-09: Added assistant scheduled-task template types so recurring AI task rules can materialize native reminders without overloading one-shot reminder records.
  * @updated 2026-05-12: Added Dream topic, entry, patch, and update-card types for the new explicit-only long-horizon attention system, plus optional read-only Dream context injection for unified assistant turns.
+ * @updated 2026-05-13: Reframed assistant time context around absolute reference fields, timestamped conversation turns, and explicit per-date timeline labels so prompt-time relative-date reasoning has less room to drift.
  * @updated 2026-05-06: Added explicit `yesterdayTimelineSummary` support to assistant state context so unified turns can see concrete activity records for both today and yesterday.
  * @updated 2026-05-06: Added optional `timelineReviewSummary` plus structured log candidates to assistant prompt context, removed the stale unified-turn recent-log input, and aligned todo creation so `linkedCategoryId` can be inferred from `linkedActivityId`.
  * @updated 2026-04-27: Simplified assistant-facing state time context to one local-offset ISO anchor so prompts no longer need to reinterpret UTC `Z` timestamps.
@@ -272,6 +273,7 @@ export interface AssistantPromptLayers {
 export interface AssistantConversationEntry {
   role: 'user' | 'assistant';
   content: string;
+  createdAt?: string;
 }
 
 export interface AssistantTurnConversationContext {
@@ -281,12 +283,18 @@ export interface AssistantTurnConversationContext {
 
 export interface AssistantTurnStateContext {
   currentDateTime: string;
-  defaultDate: string;
-  todayTimelineSummary?: string;
-  yesterdayTimelineSummary?: string;
+  stateContextDate: string;
+  currentLocalDate?: string;
+  currentWeekday?: string;
+  tomorrowDate?: string;
+  dayAfterTomorrowDate?: string;
+  currentWeekRange?: string;
+  nextWeekdayDates?: Record<string, string>;
+  timelineSummaryForDate?: string;
+  timelineSummaryForPreviousDate?: string;
   timelineReviewSummary?: string;
   activeSessionSummary?: string;
-  todayScheduledTodoSummary?: string;
+  scheduledTodosForDateSummary?: string;
   pinnedTodoSummary?: string;
   overdueTodoSummary?: string;
   reminderSummary?: string;
@@ -463,7 +471,6 @@ export interface AssistantUnifiedTurnOutput {
   mode: AssistantTurnMode;
   outcome: AssistantTurnOutcome;
   assistantReply?: string;
-  assistantReplyParts?: string[];
   toolCalls?: AssistantToolCall[];
   reminders?: AssistantReminderDraft[];
   memoryAction: AssistantMemoryAction;

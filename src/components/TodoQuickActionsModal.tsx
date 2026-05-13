@@ -4,6 +4,11 @@
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
  * @pos Component
  * @description A reusable bottom sheet that exposes lightweight todo planning and completion actions without opening the full todo detail editor first.
+ * @updated 2026-05-13: Changed quick `升级为项目` to reuse the centered category picker so quick reminders must choose a target standard category before upgrading.
+ * @updated 2026-05-13: Matched the centered move-category picker width to the parent quick-actions sheet so the nested dialog feels aligned instead of detached.
+ * @updated 2026-05-13: Added a centered `移动分类` picker for non-subtask todos so category changes can stay inside the shared quick-actions flow.
+ * @updated 2026-05-13: Added a compact recurrence-rule summary under the title so recurring todos still expose their repeat cadence after arrange/due metadata is hidden.
+ * @updated 2026-05-13: Hide arrange/due quick actions for recurring todos so date-mutually-exclusive tasks no longer expose conflicting schedule shortcuts.
  * @updated 2026-05-13: Hide the detail-editor shortcut for quick reminder todos so small-task interactions stay lightweight and inline-first.
  * @updated 2026-05-05: Ignores the same just-opened touch click for action buttons too, so tapping a bottom todo row no longer flashes the sheet and instantly fires a quick action underneath the finger.
  * @updated 2026-05-05: Moved backdrop dismissal onto the backdrop click itself so outside taps close the current sheet without click-through opening the todo row underneath, while the existing open-time close guard still blocks same-tap flash-closes.
@@ -15,23 +20,28 @@
  * @updated 2026-04-20: Extracted from TodoView so todo-list taps and week badges can share one quick-actions sheet implementation.
  */
 import React, { useEffect, useState } from 'react';
-import { CalendarDays, Check, CheckCircle2, Flag, PanelRightOpen, Pin, Trash2, X } from 'lucide-react';
-import { TodoItem } from '../types';
-import { parseDateKey } from '../utils/todoScheduleUtils';
+import { ArrowRightLeft, CalendarDays, Check, CheckCircle2, Flag, PanelRightOpen, Pin, Trash2, X } from 'lucide-react';
+import { TodoCategory, TodoItem } from '../types';
+import { formatTodoRecurrenceSummary, parseDateKey } from '../utils/todoScheduleUtils';
 import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
 import { isTodoQuickActionInteractionGuardActive } from '../hooks/useTodoQuickActions';
 import { isQuickTodo } from '../utils/todoKindUtils';
+import { IconRenderer } from './IconRenderer';
+
+type CategoryPickerMode = 'move' | 'upgrade' | null;
 
 interface TodoQuickActionsModalProps {
   isOpen: boolean;
   todo: TodoItem | null;
+  todoCategories: TodoCategory[];
   onMoveDate: (type: 'scheduled' | 'deadline', mode: 'today' | 'tomorrow' | 'nextWeek') => void;
   onClearDate: (type: 'scheduled' | 'deadline') => void;
   onOpenDetail: () => void;
   onComplete: () => void;
   onUndoComplete: () => void;
   onTogglePin: () => void;
-  onUpgradeToProject?: () => void;
+  onMoveCategory: (categoryId: string) => void;
+  onUpgradeToProject?: (categoryId: string) => void;
   onDelete: () => void;
   onClose: () => void;
   onForceClose?: () => void;
@@ -42,12 +52,14 @@ interface TodoQuickActionsModalProps {
 export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   isOpen,
   todo,
+  todoCategories,
   onMoveDate,
   onClearDate,
   onOpenDetail,
   onComplete,
   onUndoComplete,
   onTogglePin,
+  onMoveCategory,
   onUpgradeToProject,
   onDelete,
   onClose,
@@ -56,9 +68,11 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   showUpgradeToProject = false
 }) => {
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
+  const [categoryPickerMode, setCategoryPickerMode] = useState<CategoryPickerMode>(null);
 
   useEffect(() => {
     setIsDeleteConfirming(false);
+    setCategoryPickerMode(null);
   }, [isOpen, todo?.id]);
 
   useEffect(() => {
@@ -67,6 +81,11 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
     }
 
     return registerHardwareBackHandler(() => {
+      if (categoryPickerMode) {
+        setCategoryPickerMode(null);
+        return true;
+      }
+
       if (isDeleteConfirming) {
         setIsDeleteConfirming(false);
         return true;
@@ -79,11 +98,14 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
       }
       return true;
     });
-  }, [isDeleteConfirming, isOpen, onClose, onForceClose]);
+  }, [categoryPickerMode, isDeleteConfirming, isOpen, onClose, onForceClose]);
 
   if (!isOpen || !todo) return null;
 
   const showDetailShortcut = !isQuickTodo(todo);
+  const isRecurringTodo = Boolean(todo.recurrenceRule);
+  const canMoveCategory = !todo.parentTodoId && todoCategories.length > 1;
+  const canUpgradeToProject = Boolean(showUpgradeToProject && onUpgradeToProject && isQuickTodo(todo) && todoCategories.length > 0);
   const formatQuickActionDate = (dateKey?: string) => {
     if (!dateKey) return null;
     const date = parseDateKey(dateKey);
@@ -102,12 +124,20 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
     })}`;
   };
 
+  const scheduledQuickActionValue = formatQuickActionDate(todo.scheduledDate);
+  const deadlineQuickActionValue = formatQuickActionDate(todo.deadlineDate);
+  const recurrenceSummary = formatTodoRecurrenceSummary(todo.recurrenceRule);
+
   const quickActionDateRows = [
     { label: 'Pin', value: todo.pin ? 'On' : null },
+    { label: '', value: recurrenceSummary },
     { label: '安排', value: formatQuickActionDate(todo.scheduledDate) },
     { label: '截止', value: formatQuickActionDate(todo.deadlineDate) },
     { label: '完成', value: formatQuickActionDateTime(todo.completedAt) }
   ].filter((item): item is { label: string; value: string } => Boolean(item.value));
+  const visibleQuickActionDateRows = isRecurringTodo
+    ? quickActionDateRows.filter((item) => item.value !== scheduledQuickActionValue && item.value !== deadlineQuickActionValue)
+    : quickActionDateRows;
 
   const handleBackdropPointerDown: React.PointerEventHandler<HTMLDivElement> = (event) => {
     if (event.target !== event.currentTarget) {
@@ -124,6 +154,12 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
 
     event.preventDefault();
     event.stopPropagation();
+
+    if (categoryPickerMode) {
+      setCategoryPickerMode(null);
+      return;
+    }
+
     onClose();
   };
 
@@ -140,6 +176,9 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
     action();
   };
 
+  const categoryPickerTitle = categoryPickerMode === 'upgrade' ? '升级到哪个分类？' : '移动到哪个分类？';
+  const categoryPickerLabel = categoryPickerMode === 'upgrade' ? 'Upgrade Project' : 'Move Category';
+
   return (
     <div
       className="fixed inset-0 z-[130] flex items-end justify-center bg-[rgba(15,23,42,0.12)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-12 backdrop-blur-sm md:items-center md:pb-4"
@@ -154,11 +193,11 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
         <div className="relative border-b border-stone-200 px-5 py-4 pr-24">
           <div className="text-[11px] uppercase tracking-[0.22em] text-stone-400">Quick Actions</div>
           <div className="mt-1 text-lg font-medium text-stone-800">{todo.title}</div>
-          {quickActionDateRows.length > 0 && (
+          {visibleQuickActionDateRows.length > 0 && (
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-stone-400">
-              {quickActionDateRows.map((item) => (
-                <span key={item.label} className="inline-flex min-w-0 items-center gap-1.5">
-                  <span className="shrink-0 uppercase tracking-[0.18em] text-stone-400">{item.label}</span>
+              {visibleQuickActionDateRows.map((item) => (
+                <span key={`${item.label}-${item.value}`} className="inline-flex min-w-0 items-center gap-1.5">
+                  {item.label && <span className="shrink-0 uppercase tracking-[0.18em] text-stone-400">{item.label}</span>}
                   <span className="text-stone-500">{item.value}</span>
                 </span>
               ))}
@@ -190,7 +229,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
 
         <div className="px-4 py-4">
           <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
+            <div className={isRecurringTodo ? 'hidden' : 'grid grid-cols-2 gap-2'}>
               <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white/80">
                 <div className="flex items-center gap-1.5 border-b border-stone-100 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-stone-400">
                   <CalendarDays size={12} className="text-stone-400" />
@@ -252,7 +291,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className={isRecurringTodo ? 'hidden' : 'grid grid-cols-2 gap-2'}>
               <button
                 type="button"
                 onClick={withActionGuard(() => onClearDate('scheduled'))}
@@ -281,10 +320,21 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
               <span>{todo.pin ? '取消 Pin' : 'Pin'}</span>
             </button>
 
-            {showUpgradeToProject && onUpgradeToProject && (
+            {canMoveCategory && (
               <button
                 type="button"
-                onClick={withActionGuard(onUpgradeToProject)}
+                onClick={withActionGuard(() => setCategoryPickerMode('move'))}
+                className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
+              >
+                <ArrowRightLeft size={15} className="text-stone-400" />
+                <span>移动分类</span>
+              </button>
+            )}
+
+            {canUpgradeToProject && (
+              <button
+                type="button"
+                onClick={withActionGuard(() => setCategoryPickerMode('upgrade'))}
                 className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
               >
                 <PanelRightOpen size={15} className="text-stone-400" />
@@ -325,6 +375,65 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
           </div>
         </div>
       </div>
+
+      {categoryPickerMode && (
+        <div
+          className="absolute inset-0 z-[131] flex items-center justify-center bg-[rgba(15,23,42,0.08)] px-4"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="w-full max-w-[26rem] rounded-[1.75rem] border border-stone-200 bg-[#faf9f6] p-4 shadow-[0_22px_60px_rgba(15,23,42,0.18)]">
+            <div className="mb-3 px-1">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-stone-400">{categoryPickerLabel}</div>
+              <div className="mt-1 text-base font-medium text-stone-800">{categoryPickerTitle}</div>
+            </div>
+
+            <div className="space-y-2">
+              {todoCategories.map((category) => {
+                const isCurrentCategory = category.id === todo.categoryId;
+                const isDisabled = categoryPickerMode === 'move' ? isCurrentCategory : false;
+
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    disabled={isDisabled}
+                    onClick={withActionGuard(() => {
+                      if (categoryPickerMode === 'upgrade' && onUpgradeToProject) {
+                        onUpgradeToProject(category.id);
+                        return;
+                      }
+
+                      onMoveCategory(category.id);
+                    })}
+                    className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition-colors ${
+                      isDisabled
+                        ? 'cursor-default border-stone-200 bg-stone-100/80 text-stone-400'
+                        : 'border-stone-200 bg-white/85 text-stone-700 hover:border-stone-300 hover:bg-white'
+                    }`}
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <IconRenderer icon={category.icon} uiIcon={category.uiIcon} className="text-sm text-stone-500" />
+                      <span className="truncate text-sm">{category.name}</span>
+                    </span>
+                    <span className="shrink-0 text-[11px] uppercase tracking-[0.18em] text-stone-400">
+                      {isCurrentCategory ? '当前' : ''}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={withActionGuard(() => setCategoryPickerMode(null))}
+              className="mt-3 w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm text-stone-500 transition-colors hover:border-stone-300 hover:bg-white"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

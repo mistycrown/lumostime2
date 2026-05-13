@@ -5,6 +5,7 @@
 > `useDeepLink.ts` now also routes NFC scans and LumosTime app links through a shared compatibility parser so older tags and WebView-specific custom-scheme variations still execute reliably.
 > `useLogManager.ts` now lets callers override the date used for new backfill defaults, so the Android widget supplement-log shortcut can always open against today even if the timeline was last left on a past date.
 > `useTodoManager.ts` now keeps a nested todo-detail history stack, and `useHardwareBackButton.ts` now consumes Android back presses through that same stack so child-task details return to their parent detail page before closing back to the main todo surface.
+> `useHardwareBackButton.ts` now also lets collection-launched log/todo details consume Android back before the underlying settings stack unwinds, so `设置 > Collections` stays in place beneath those topmost overlays.
 > `useTodoManager.ts` now exposes an idempotent complete-only helper so focus-log flows can save first and then mark the linked unfinished todo done without toggling completed tasks back open.
 > `useWidgetBridgeSync.ts` now mirrors TODAY + PIN source todos/categories alongside the rendered payload so Android-side refresh actions and cross-day first-open rebuilds can recompute the widget list natively.
 > `useHardwareBackButton.ts` now exposes a shared overlay back-handler stack so transient sheets can consume Android hardware back before the app-level navigation ladder reaches view changes or `exitApp()`.
@@ -20,6 +21,8 @@
 > `useTodoQuickActions.ts` now centralizes lightweight todo quick-actions state so todo-list taps and week-plan badges open the same scheduling/completion sheet behavior.
 > `useTodoQuickActions.ts` now also routes shared delete requests into the existing todo deletion flow, so the quick-actions sheet can trigger the same task-removal rules as the detail editor.
 > `useTodoQuickActions.ts` also exposes a shared pin/unpin action, and `useTodoManager.ts` now initializes duplicated/new todos with `pin: false` by default.
+> `useTodoQuickActions.ts` now also requires quick reminders to choose a target standard todo category before `升级为项目`, instead of silently falling back to a default project bucket.
+> `useTodoQuickActions.ts` now also exposes a shared category-move action for non-subtask todos, so the quick-actions sheet can switch a task into another standard todo category without opening the full detail editor.
 > `useTodoQuickActions.ts` now also exposes the sheet open timestamp plus a shared guard helper, so the bottom-sheet actions can ignore the same synthetic touch click that opened them from a lower todo row.
 
 > `useTodoStats.ts` 优先使用 `TodoCategory.color` 作为待办环形图颜色；旧分类没有保存颜色时，继续回退到历史默认调色板。
