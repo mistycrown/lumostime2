@@ -5,6 +5,7 @@
  * @pos Service Tests (Assistant Scheduled Tasks)
  * @description Verifies that recurring assistant task templates reuse todo recurrence rules correctly and always keep one next native reminder seeded per enabled task.
  *
+ * @updated 2026-05-13: Added monthly month-end fallback coverage so explicit 31st scheduled tasks can target short months' final day without changing the legacy skip path.
  * @updated 2026-05-12: Added regression coverage for atomic reminder consumption so one scheduled task cannot keep multiple pending reminders after a successful trigger handoff.
  * @updated 2026-05-10: Added regression coverage for stale-linked reminder healing and duplicate pending-reminder collapse.
  * @updated 2026-05-09: Added first-pass coverage for recurring assistant scheduled-task persistence and reminder materialization.
@@ -82,7 +83,7 @@ describe('assistantScheduledTaskService', () => {
     expect(result).toBe('2026-05-11T00:00:00.000Z');
   });
 
-  it('skips missing monthly dates and lands on the next real calendar match', () => {
+  it('keeps legacy monthly 31st schedules skipping short months when fallback is off', () => {
     const result = assistantScheduledTaskService.computeNextTriggerAt(
       {
         frequency: 'monthly',
@@ -94,6 +95,21 @@ describe('assistantScheduledTaskService', () => {
     );
 
     expect(result).toBe('2026-03-31T00:00:00.000Z');
+  });
+
+  it('lets monthly 31st schedules fall back to the short month end when explicitly enabled', () => {
+    const result = assistantScheduledTaskService.computeNextTriggerAt(
+      {
+        frequency: 'monthly',
+        startDate: '2026-01-31',
+        monthDays: [31],
+        fallbackToMonthEnd: true
+      },
+      '08:00',
+      new Date('2026-02-01T00:00:00.000Z')
+    );
+
+    expect(result).toBe('2026-02-28T00:00:00.000Z');
   });
 
   it('seeds the next reminder for an enabled scheduled task immediately', () => {

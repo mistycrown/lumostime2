@@ -4,6 +4,7 @@
  * @output Week buckets, daily schedule entries, and badge metadata for todo planning views
  * @pos Utility (Todo planning)
  * @description Shared helpers for deriving scheduled, deadline, recurring, completed, and in-progress todo visibility without creating standalone occurrence records.
+ * @updated 2026-05-13: Added shared monthly day-list parsing plus optional month-end fallback matching so monthly recurrence rules can target multiple days while limiting short-month fallback to day 31 when explicitly enabled.
  * @updated 2026-05-11: Added week-scoped month-layout helpers that reserve stable per-row lanes for continuous `Trace` entries, so month cells can render cross-day in-progress bars without breaking the expanded-day order model.
  * @updated 2026-05-10: Week planner buckets now carry resolved parent-task titles for subtasks so the week schedule can render inline `@parent` context without re-looking up hierarchy in the view.
  * @updated 2026-05-10: Added shared day-entry builders for the new reference-style month schedule so the month grid and week planner now read the same real per-day todo data.
@@ -78,6 +79,47 @@ const TODO_SCHEDULE_MATCH_PRIORITY: Record<TodoScheduleMatchKind, number> = {
 };
 
 const normalizeDate = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+export const normalizeMonthlyDayInput = (value: string): string => {
+  const sanitized = value.replace(/[^\d]+/g, ' ');
+  const hasTrailingSpace = /\s$/.test(sanitized);
+  const compact = sanitized
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .join(' ');
+
+  if (!compact) {
+    return '';
+  }
+
+  return hasTrailingSpace ? `${compact} ` : compact;
+};
+
+export const parseMonthlyDayInput = (value: string): number[] => {
+  if (!value.trim()) {
+    return [];
+  }
+
+  const monthDays = value
+    .trim()
+    .split(/\s+/)
+    .map((item) => Number(item))
+    .filter((item) => Number.isInteger(item) && item >= 1 && item <= 31);
+
+  return Array.from(new Set(monthDays)).sort((left, right) => left - right);
+};
+
+export const formatMonthlyDayInput = (monthDays?: number[], fallbackDay?: number): string => {
+  const normalizedDays = Array.isArray(monthDays) && monthDays.length > 0
+    ? Array.from(new Set(monthDays
+      .map((item) => Number(item))
+      .filter((item) => Number.isInteger(item) && item >= 1 && item <= 31)))
+      .sort((left, right) => left - right)
+    : (Number.isInteger(fallbackDay) && fallbackDay! >= 1 && fallbackDay! <= 31 ? [fallbackDay!] : []);
+
+  return normalizedDays.join(' ');
+};
 
 export const formatDateKey = (date: Date): string => {
   const normalized = normalizeDate(date);
@@ -173,6 +215,9 @@ const getDayDiff = (start: Date, end: Date): number =>
 const getMonthDiff = (start: Date, end: Date): number =>
   (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
 
+const getLastDayOfMonth = (date: Date): number =>
+  new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+
 const matchesDailyRule = (rule: TodoRecurrenceRule, targetDate: Date, startDate: Date): boolean => {
   const interval = Math.max(1, rule.interval || 1);
   return getDayDiff(startDate, targetDate) % interval === 0;
@@ -194,7 +239,14 @@ const matchesMonthlyRule = (rule: TodoRecurrenceRule, targetDate: Date, startDat
   const monthDays = rule.monthDays?.length ? rule.monthDays : [startDate.getDate()];
   const monthDiff = getMonthDiff(startDate, targetDate);
   if (monthDiff % interval !== 0) return false;
-  return monthDays.includes(targetDate.getDate());
+  const matchDays = rule.fallbackToMonthEnd
+    ? monthDays.map((monthDay) => (
+      monthDay === 31
+        ? Math.min(monthDay, getLastDayOfMonth(targetDate))
+        : monthDay
+    ))
+    : monthDays;
+  return matchDays.includes(targetDate.getDate());
 };
 
 export const matchesRecurrenceRule = (rule: TodoRecurrenceRule | undefined, targetDateKey: string): boolean => {

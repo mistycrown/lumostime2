@@ -4,6 +4,7 @@
  * @output Todo CRUD Operations (handleSaveTodo, handleDeleteTodo, handleToggleTodo, handleDuplicateTodo, handleBatchAddTodos), Modal Control (openAddTodoModal, openEditTodoModal, closeTodoModal), Focus Management (handleStartTodoFocus), Progress Update (updateTodoProgress)
  * @pos Hook (Data Manager)
  * @description Todo data manager hook for CRUD, focus launch, child-task inheritance sync, cascade delete behavior, and nested detail-page return state.
+ * @updated 2026-05-13: Blocked focus starts and subtask creation for quick reminder todos so lightweight memo items stay reminder-only even if they reach shared manager paths.
  * @updated 2026-05-12: Prefer live todo records when opening detail pages so auto-save comparisons do not loop on stale snapshots.
  * @updated 2026-05-12: Added todo-detail history stacking so opening a child task from a parent detail page returns back to the parent detail instead of closing to the root todo view.
  * @updated 2026-05-11: Added an idempotent complete-only helper so focus-log flows can save first and then finish the linked todo without reopening already completed tasks.
@@ -32,6 +33,8 @@ import {
 } from '../utils/todoHierarchyUtils';
 import { getTodoProgressTrackingMode, syncSubtaskProgressToParentTodos } from '../utils/todoProgressUtils';
 import { pushTodoDetailHistory } from '../utils/todoDetailNavigation';
+import { isQuickTodo } from '../utils/todoKindUtils';
+import { getRealTodoCategories } from '../utils/todoQuickCategoryUtils';
 
 export const useTodoManager = () => {
   const { todos, setTodos, todoCategories, setTodoCategories, logs, setLogs } = useData();
@@ -106,6 +109,11 @@ export const useTodoManager = () => {
   };
 
   const handleStartTodoFocus = (todo: TodoItem) => {
+    if (isQuickTodo(todo)) {
+      addToast('info', '小事仅用于备忘与排期，不支持计时。');
+      return;
+    }
+
     if (todo.linkedCategoryId && todo.linkedActivityId) {
       const category = categories.find((item) => item.id === todo.linkedCategoryId);
       const activity = category?.activities.find((item) => item.id === todo.linkedActivityId);
@@ -129,6 +137,11 @@ export const useTodoManager = () => {
   };
 
   const openAddSubtaskModal = (parentTodo: TodoItem) => {
+    if (isQuickTodo(parentTodo)) {
+      addToast('info', '小事不支持子任务。');
+      return;
+    }
+
     if (parentTodo.recurrenceRule) {
       addToast('info', '循环任务不能添加子任务');
       return;
@@ -265,10 +278,11 @@ export const useTodoManager = () => {
   };
 
   const handleBatchAddTodos = (newTodosData: Partial<TodoItem>[]) => {
+    const realTodoCategories = getRealTodoCategories(todoCategories);
     const newTodos: TodoItem[] = newTodosData.map((data) => {
       const baseTodo: TodoItem = {
         id: crypto.randomUUID(),
-        categoryId: data.categoryId || todoCategories[0].id,
+        categoryId: data.categoryId || realTodoCategories[0]?.id || todoCategories[0].id,
         title: data.title || 'New Task',
         isCompleted: false,
         pin: false,

@@ -28,7 +28,12 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 > ⚠️ **Note**: When modifying views, ensure that new state requirements are coordinated with `App.tsx` if they affect global data (Logs, Categories, Todos).
 
-> Last updated: 2026-05-12
+> Last updated: 2026-05-13
+- `TodoBatchManageView.tsx`: Todo batch management now supports touch drag-and-drop between category panels with live target highlighting and edge auto-scroll, so moving tasks across lists works again on mobile/WebView instead of relying on desktop-only HTML5 dragging.
+- `TodoView.tsx`: Updated the reserved `小事` and `未来` empty-state copy so each list now explains its intended use and scheduling behavior when no items exist yet.
+- `TodoView.tsx`, `TodoBatchManageView.tsx`, `todoQuickCategoryUtils.ts`, `todoScheduleAssignUtils.ts`: Added a reserved `未来` todo bucket alongside `小事`; it behaves like a normal project category for timing and subtasks, stays visible in Todo lists/batch management, and is filtered out of the quick arrange popup opened from week/month day numbers.
+- `TodoView.tsx`: Trimmed the left sidebar's bottom reserve so the three utility buttons at the bottom sit a bit closer to the fixed navigation without overlapping its tap area.
+- `TodoView.tsx`: Lowered the Todo sidebar utility trio again so its bottom expand/collapse button lands closer to the Record page's left-rail toggle position above the fixed navigation.
 - `SettingsView.tsx`, `TimelineView.tsx`: Swapped the `Collections` entry icon in both settings and the timeline quick-action bar from archive/book styling to a star for a consistent shortcut cue.
 - `TimelineView.tsx`, `timelineQuickActions.ts`: Added a `Collections` quick-action route so the timeline header can open `设置 > 内容 > Collections` through the same settings-subpage deep-link pattern already used by `原则库`.
 - `SettingsView.tsx`, `CollectionSettingsView.tsx`, and `DataCollectionSelector.tsx`: Moved the `Collection` feature entrance under `设置 > 内容`, then rebuilt the page around compact `◬`-led rows and a true mixed-item detail timeline that follows the app's detail-page timeline structure instead of oversized archive mock layouts.

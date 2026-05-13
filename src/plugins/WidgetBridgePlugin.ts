@@ -4,6 +4,7 @@
  * @output Typed Capacitor widget bridge methods
  * @pos Plugin
  * @description Exposes the Android widget template, instance binding state, and runtime bridge to the React application.
+ * @updated 2026-05-13: Expanded mirrored todo recurrence contracts with optional month-end fallback metadata for monthly schedules.
  * @updated 2026-04-25: Added dedicated DAILY_RUNTIME category/activity dual-view payload sync types for native heatmap widgets.
  * @updated 2026-04-26: Added TODAY + PIN widget payload sync types for the dedicated scrollable 4x2 todo widget.
  * @updated 2026-05-01: Added tracking-calendar template/config contracts and payload sync types for the dedicated 2x2 tracking calendar widget.
@@ -208,6 +209,7 @@ export interface WidgetBridgeTodoPinSourceRecurrenceRule {
   interval?: number | null;
   weekdays?: number[] | null;
   monthDays?: number[] | null;
+  fallbackToMonthEnd?: boolean | null;
 }
 
 export interface WidgetBridgeTodoPinSourceTodo {

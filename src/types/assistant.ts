@@ -21,7 +21,7 @@
  * @updated 2026-04-26: Added Android-first assistant agent memory, reminder, trigger, config, and system-turn decision types for the new background AI architecture.
  */
 
-import type { TodoRecurrenceRule } from '../types';
+import type { TodoKind, TodoRecurrenceRule } from '../types';
 
 export type AssistantTriggerSource = 'user' | 'agent' | 'system';
 
@@ -316,6 +316,7 @@ export interface AssistantTodoCategoryDictionaryItem {
 export interface AssistantTodoDictionaryItem {
   id: string;
   title: string;
+  kind?: TodoKind;
   path?: string;
   categoryId?: string;
   categoryName?: string;
@@ -391,8 +392,9 @@ export interface AssistantCreateTodoToolCall {
   args: {
     title: string;
     categoryId: string;
+    kind?: TodoKind;
     linkedCategoryId?: string;
-    linkedActivityId: string;
+    linkedActivityId?: string;
     defaultScopeIds?: string[];
     note?: string;
     scheduledDate?: string;
@@ -408,6 +410,7 @@ export interface AssistantUpdateTodoToolCall {
     patch: {
       title?: string;
       note?: string | null;
+      kind?: TodoKind;
       categoryId?: string;
       linkedCategoryId?: string | null;
       linkedActivityId?: string | null;

@@ -5,6 +5,8 @@
  * @pos Service (Assistant Orchestrator)
  * @description Orchestrates Android-first assistant system turns by loading structured memory, assembling a prompt, calling the existing AI service, and applying the resulting silent/message/reminder/memory actions back into local state.
  *
+ * @updated 2026-05-13: Native reminder_due hydrations now respect the diagnostic `nativeNotificationShown` flag so Web-side catch-up does not replay a second system notification for the same reminder.
+ * @updated 2026-05-13: Native completed-request hydrations now rebuild and persist a foreground-style debug exchange from Android diagnostics, so background prompt assembly can be inspected from the same debug UI as Web-run turns.
  * @updated 2026-05-12: Background message persistence now falls back only to the latest ordinary conversation with a real user-authored turn, so template sessions never receive native or web background replies by accident.
  * @updated 2026-05-06: Passed through explicit `yesterdayTimelineSummary` alongside today's activity records so background turns see both recent days in state context.
  * @updated 2026-05-06: Passed through optional `timelineReviewSummary`, dropped the stale recent-log turn input, and treat any background reply text as a surfaced message even if the model drifts from the expected outcome label.
@@ -50,6 +52,7 @@ import { dreamService } from './dreamService';
 import { formatAssistantDateTimeForDisplay, normalizeAssistantDateTime } from '../utils/assistantTime';
 import { resolveLatestOrdinaryAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
 import { buildAssistantDisplayParts } from '../utils/assistantMessageParts';
+import { buildNativeDiagnosticDebugExchange } from '../utils/assistantNativeDebug';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
 
 interface AssistantSystemTurnRequest {
@@ -634,6 +637,7 @@ export const assistantOrchestratorService = {
         const decisionSummary = normalizeAssistantText(entry.context?.decisionSummary);
         const requestedAt = normalizeAssistantText(entry.context?.requestedAt) || entry.createdAt;
         const completedAt = normalizeAssistantText(entry.context?.completedAt) || entry.createdAt;
+        const nativeDebugExchange = buildNativeDiagnosticDebugExchange(entry);
         const memoryAction = parseNativeMemoryAction(entry.context?.memoryAction);
         const memoryPatch = parseNativeMemoryPatch(entry.context?.memoryPatch);
         const reminderDrafts = parseNativeReminderDrafts(entry.context?.reminders);
@@ -700,7 +704,8 @@ export const assistantOrchestratorService = {
           memoryAction,
           reminderCount: appliedReminders.length,
           ...(assistantReply ? { message: assistantReply } : {}),
-          decisionSummary: finalDecisionSummary
+          decisionSummary: finalDecisionSummary,
+          ...(nativeDebugExchange ? { debugExchange: nativeDebugExchange } : {})
         };
 
         upsertBackgroundCallHistory(baseHistoryEntry);
@@ -727,7 +732,8 @@ export const assistantOrchestratorService = {
           });
         }
 
-        if (options?.showSystemNotification && persistedLocation) {
+        const nativeNotificationShown = normalizeAssistantText(entry.context?.nativeNotificationShown) === 'true';
+        if (options?.showSystemNotification && persistedLocation && !nativeNotificationShown) {
           const persistedSessions = loadPersistedSessions();
           const personaNameMap = loadPersistedPersonaNameMap();
           const targetSession = persistedSessions.find((session) => session.id === persistedLocation.sessionId);

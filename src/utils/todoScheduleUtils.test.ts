@@ -4,6 +4,7 @@
  * @output Regression coverage for virtual-category date matching, shared day entries, and week-view badge normalization
  * @pos Test (todo planning utilities)
  * @description Verifies today/tomorrow/this-week filtering and shared per-day entry building against Arrange, Due, and recurrence rules without creating occurrence records.
+ * @updated 2026-05-13: Added monthly recurrence fallback coverage so explicit 31st-to-month-end rules match short months without changing legacy skip semantics.
  * @updated 2026-05-11: Added regression coverage for week-scoped month trace layouts so overlapping `Trace` segments keep stable lanes, preserve non-trace order, split on non-trace days, and keep hidden counts aligned with sparse lane rows.
  * @updated 2026-05-10: Added regression coverage for week-view subtask parent labels so shared week buckets expose inline `@parent` context only for child rows.
  * @updated 2026-05-10: Added regression coverage for shared real-data day entries so month view and week view stay aligned on daily inclusion and priority ordering.
@@ -23,7 +24,8 @@ import {
   getTodoAssociationTodayTodos,
   getTodoScheduleMatches,
   getTodoScheduleRangeDateKeys,
-  isTodoInAssociationTodayCategory
+  isTodoInAssociationTodayCategory,
+  matchesRecurrenceRule
 } from './todoScheduleUtils';
 
 const REFERENCE_DATE = new Date('2026-04-20T12:00:00+08:00');
@@ -91,6 +93,28 @@ describe('todoScheduleUtils virtual category helpers', () => {
       { dateKey: '2026-04-22', kind: 'recurring' },
       { dateKey: '2026-04-24', kind: 'recurring' }
     ]);
+  });
+
+  test('keeps legacy monthly 31st rules skipping short months unless fallback is enabled', () => {
+    expect(matchesRecurrenceRule({
+      frequency: 'monthly',
+      startDate: '2026-01-31',
+      monthDays: [31]
+    }, '2026-02-28')).toBe(false);
+
+    expect(matchesRecurrenceRule({
+      frequency: 'monthly',
+      startDate: '2026-01-31',
+      monthDays: [31],
+      fallbackToMonthEnd: true
+    }, '2026-02-28')).toBe(true);
+
+    expect(matchesRecurrenceRule({
+      frequency: 'monthly',
+      startDate: '2026-01-31',
+      monthDays: [31],
+      fallbackToMonthEnd: true
+    }, '2026-04-30')).toBe(true);
   });
 
   test('matches the picker today category for pinned, arranged, due, or recurring todos that hit today', () => {

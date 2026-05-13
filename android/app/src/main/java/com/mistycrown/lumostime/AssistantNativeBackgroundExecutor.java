@@ -4,6 +4,8 @@
  * @output Immediate Android-side background AI request execution plus diagnostic events
  * @pos Native Helper
  * @description Executes a minimal unified background AI turn directly from Android so check-in requests no longer depend on the Web runtime being awake at dispatch time.
+ * @updated 2026-05-13: Captures native background request payloads plus raw provider responses inside diagnostics so the shared Web debug viewer can reconstruct the exact assembled prompts for Android-run turns.
+ * @updated 2026-05-13: Reminder_due completions now raise a native high-priority reminder notification immediately and mark that notification in diagnostics so Web hydration does not double-alert.
  * @updated 2026-05-09: Rejects empty or content-free unified background decisions so due reminders stay pending for retry instead of being deleted after blank model responses.
  * @updated 2026-05-01: Normalized JSON null-like assistant reply fields so native background diagnostics no longer persist literal "null" bubbles into chat history.
  * @updated 2026-04-30: Added direct native OpenAI/Gemini background execution for check-in-style triggers with diagnostic request lifecycle events.
@@ -32,6 +34,50 @@ import java.util.Map;
 
 public final class AssistantNativeBackgroundExecutor {
     private static final String TAG = "AssistantNativeExec";
+
+    private static final class NativeRequestEnvelope {
+        private final String provider;
+        private final String modelName;
+        private final String apiKey;
+        private final String url;
+        private final String method;
+        private final JSONObject body;
+
+        private NativeRequestEnvelope(String provider, String modelName, String apiKey, String url, String method, JSONObject body) {
+            this.provider = safeTrim(provider);
+            this.modelName = safeTrim(modelName);
+            this.apiKey = safeTrim(apiKey);
+            this.url = safeTrim(url);
+            this.method = safeTrim(method);
+            this.body = body == null ? new JSONObject() : body;
+        }
+    }
+
+    private static final class NativeHttpJsonResponse {
+        private final int status;
+        private final JSONObject body;
+
+        private NativeHttpJsonResponse(int status, JSONObject body) {
+            this.status = status;
+            this.body = body == null ? new JSONObject() : body;
+        }
+    }
+
+    private static final class NativeRequestExecutionResult {
+        private final NativeRequestEnvelope request;
+        private final NativeHttpJsonResponse response;
+        private final JSONObject parsedOutput;
+
+        private NativeRequestExecutionResult(
+            NativeRequestEnvelope request,
+            NativeHttpJsonResponse response,
+            JSONObject parsedOutput
+        ) {
+            this.request = request;
+            this.response = response;
+            this.parsedOutput = parsedOutput == null ? new JSONObject() : parsedOutput;
+        }
+    }
 
     public interface ExecutionCallback {
         void onCompleted();
@@ -73,6 +119,7 @@ public final class AssistantNativeBackgroundExecutor {
         String triggerId = safeTrim(triggerPayload.optString("id", ""));
         String triggerType = safeTrim(triggerPayload.optString("type", ""));
         String requestedAt = isoNow();
+        NativeRequestEnvelope request = null;
         appendDiagnostic(
             context,
             "native_request_started",
@@ -90,9 +137,15 @@ public final class AssistantNativeBackgroundExecutor {
                 AssistantNativeBackgroundSnapshotStore.load(context);
 
             String userPrompt = buildUserPrompt(triggerPayload, snapshot.conversationJson);
-            JSONObject responseBody = requestJsonObject(config, snapshot.systemPrompt, userPrompt);
-            JSONObject normalized = normalizeResponse(responseBody);
+            request = buildRequestEnvelope(config, snapshot.systemPrompt, userPrompt);
+            NativeRequestExecutionResult requestResult = requestJsonObject(request);
+            JSONObject normalized = normalizeResponse(requestResult.parsedOutput);
             String completedAt = isoNow();
+            boolean nativeNotificationShown = maybeShowReminderNotification(
+                context,
+                triggerPayload,
+                normalized
+            );
 
             appendDiagnostic(
                 context,
@@ -105,7 +158,9 @@ public final class AssistantNativeBackgroundExecutor {
                 buildResultContextMap(
                     requestedAt,
                     completedAt,
-                    normalized
+                    requestResult,
+                    normalized,
+                    nativeNotificationShown
                 )
             );
             if (callback != null) {
@@ -123,6 +178,11 @@ public final class AssistantNativeBackgroundExecutor {
                 null,
                 buildContextMap(
                     "requestedAt", requestedAt,
+                    "requestProvider", request == null ? "" : request.provider,
+                    "requestModel", request == null ? "" : request.modelName,
+                    "requestUrl", request == null ? "" : request.url,
+                    "requestMethod", request == null ? "" : request.method,
+                    "requestBodyJson", request == null ? "" : request.body.toString(),
                     "error", safeTrim(error.getMessage())
                 )
             );
@@ -132,7 +192,7 @@ public final class AssistantNativeBackgroundExecutor {
         }
     }
 
-    private static JSONObject requestJsonObject(
+    private static NativeRequestEnvelope buildRequestEnvelope(
         AssistantNativeAIConfigStore.NativeAIConfig config,
         String systemPrompt,
         String userPrompt
@@ -148,15 +208,7 @@ public final class AssistantNativeBackgroundExecutor {
             messages.put(new JSONObject().put("role", "user").put("content", userPrompt));
             body.put("messages", messages);
             body.put("response_format", new JSONObject().put("type", "json_object"));
-            Map<String, String> headers = new HashMap<>();
-            headers.put("Content-Type", "application/json");
-            headers.put("Authorization", "Bearer " + config.apiKey);
-            JSONObject response = postJson(url, body, headers);
-            JSONArray choices = response.optJSONArray("choices");
-            JSONObject firstChoice = choices == null ? null : choices.optJSONObject(0);
-            JSONObject message = firstChoice == null ? null : firstChoice.optJSONObject("message");
-            String rawContent = message == null ? "{}" : message.optString("content", "{}");
-            return cleanAndParseJsonObject(rawContent);
+            return new NativeRequestEnvelope(config.provider, config.modelName, config.apiKey, url, "POST", body);
         }
 
         if ("gemini".equals(config.provider)) {
@@ -173,19 +225,49 @@ public final class AssistantNativeBackgroundExecutor {
             body.put("system_instruction", new JSONObject()
                 .put("parts", new JSONArray().put(new JSONObject().put("text", systemPrompt))));
             body.put("generationConfig", new JSONObject().put("response_mime_type", "application/json"));
-            Map<String, String> headers = new HashMap<>();
-            headers.put("Content-Type", "application/json");
-            JSONObject response = postJson(url, body, headers);
-            JSONArray candidates = response.optJSONArray("candidates");
+            return new NativeRequestEnvelope(config.provider, config.modelName, config.apiKey, url, "POST", body);
+        }
+
+        throw new IllegalStateException("Unsupported AI provider: " + config.provider);
+    }
+
+    private static NativeRequestExecutionResult requestJsonObject(
+        NativeRequestEnvelope request
+    ) throws Exception {
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Content-Type", "application/json");
+        if ("openai".equals(request.provider) && !request.apiKey.isEmpty()) {
+            headers.put("Authorization", "Bearer " + request.apiKey);
+        }
+
+        NativeHttpJsonResponse response = postJson(request.url, request.body, headers);
+        if ("openai".equals(request.provider)) {
+            JSONArray choices = response.body.optJSONArray("choices");
+            JSONObject firstChoice = choices == null ? null : choices.optJSONObject(0);
+            JSONObject message = firstChoice == null ? null : firstChoice.optJSONObject("message");
+            String rawContent = message == null ? "{}" : message.optString("content", "{}");
+            return new NativeRequestExecutionResult(
+                request,
+                response,
+                cleanAndParseJsonObject(rawContent)
+            );
+        }
+
+        if ("gemini".equals(request.provider)) {
+            JSONArray candidates = response.body.optJSONArray("candidates");
             JSONObject firstCandidate = candidates == null ? null : candidates.optJSONObject(0);
             JSONObject content = firstCandidate == null ? null : firstCandidate.optJSONObject("content");
             JSONArray parts = content == null ? null : content.optJSONArray("parts");
             JSONObject firstPart = parts == null ? null : parts.optJSONObject(0);
             String rawContent = firstPart == null ? "{}" : firstPart.optString("text", "{}");
-            return cleanAndParseJsonObject(rawContent);
+            return new NativeRequestExecutionResult(
+                request,
+                response,
+                cleanAndParseJsonObject(rawContent)
+            );
         }
 
-        throw new IllegalStateException("Unsupported AI provider: " + config.provider);
+        throw new IllegalStateException("Unsupported AI provider: " + request.provider);
     }
 
     private static JSONObject normalizeResponse(JSONObject rawOutput) throws JSONException {
@@ -286,7 +368,7 @@ public final class AssistantNativeBackgroundExecutor {
         return silentSideEffects != null && silentSideEffects.length() > 0;
     }
 
-    private static JSONObject postJson(String url, JSONObject body, Map<String, String> headers) throws Exception {
+    private static NativeHttpJsonResponse postJson(String url, JSONObject body, Map<String, String> headers) throws Exception {
         HttpURLConnection connection = null;
         try {
             connection = (HttpURLConnection) new URL(url).openConnection();
@@ -315,7 +397,7 @@ public final class AssistantNativeBackgroundExecutor {
                     : responseText;
                 throw new IllegalStateException("HTTP " + status + ": " + errorMessage);
             }
-            return responseJson;
+            return new NativeHttpJsonResponse(status, responseJson);
         } finally {
             if (connection != null) {
                 connection.disconnect();
@@ -454,12 +536,21 @@ public final class AssistantNativeBackgroundExecutor {
     private static Map<String, String> buildResultContextMap(
         String requestedAt,
         String completedAt,
-        JSONObject normalized
+        NativeRequestExecutionResult requestResult,
+        JSONObject normalized,
+        boolean nativeNotificationShown
     ) {
         Map<String, String> context = buildContextMap(
             "requestedAt", requestedAt,
             "completedAt", completedAt,
-            "outcome", safeModelString(normalized.opt("outcome"))
+            "outcome", safeModelString(normalized.opt("outcome")),
+            "requestProvider", requestResult.request.provider,
+            "requestModel", requestResult.request.modelName,
+            "requestUrl", requestResult.request.url,
+            "requestMethod", requestResult.request.method,
+            "requestBodyJson", requestResult.request.body.toString(),
+            "responseStatus", String.valueOf(requestResult.response.status),
+            "responseBodyJson", requestResult.response.body.toString()
         );
         String assistantReply = safeModelString(normalized.opt("assistantReply"));
         if (!safeTrim(assistantReply).isEmpty()) {
@@ -485,7 +576,44 @@ public final class AssistantNativeBackgroundExecutor {
         if (!silentReason.isEmpty()) {
             context.put("silentReason", silentReason);
         }
+        if (nativeNotificationShown) {
+            context.put("nativeNotificationShown", "true");
+        }
         return context;
+    }
+
+    private static boolean maybeShowReminderNotification(
+        Context context,
+        JSONObject triggerPayload,
+        JSONObject normalized
+    ) {
+        if (context == null || triggerPayload == null || normalized == null) {
+            return false;
+        }
+
+        if (!"reminder_due".equals(safeTrim(triggerPayload.optString("type", "")))) {
+            return false;
+        }
+
+        String notificationBody = safeModelString(normalized.opt("assistantReply"));
+        if (notificationBody.isEmpty()) {
+            notificationBody = safeModelString(normalized.opt("decisionSummary"));
+        }
+        if (notificationBody.isEmpty()) {
+            notificationBody = safeTrim(triggerPayload.optString("text", ""));
+        }
+        if (notificationBody.isEmpty()) {
+            notificationBody = "A reminder is due now.";
+        }
+
+        AssistantMessageNotificationManager.showReminderNotification(
+            context,
+            "AI Reminder",
+            notificationBody,
+            "",
+            ""
+        );
+        return true;
     }
 
     private static void appendDiagnostic(

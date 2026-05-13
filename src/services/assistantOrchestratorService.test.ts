@@ -419,7 +419,31 @@ describe('assistantOrchestratorService', () => {
         requestedAt: '2026-05-01T09:34:50.519+08:00',
         completedAt: '2026-05-01T09:34:54.830+08:00',
         assistantReply: '距离上次说话已经过去 9 小时了。还在吗？',
-        decisionSummary: '用户 9 小时未回复，发送简短确认消息。'
+        decisionSummary: '用户 9 小时未回复，发送简短确认消息。',
+        requestProvider: 'openai',
+        requestModel: 'gpt-test',
+        requestUrl: 'https://example.test/v1/chat/completions',
+        requestMethod: 'POST',
+        requestBodyJson: JSON.stringify({
+          model: 'gpt-test',
+          messages: [
+            { role: 'system', content: '=== Assistant Base Prompt ===\nbase prompt' },
+            { role: 'user', content: '=== Trigger ===\n{\n  "type": "checkin"\n}' }
+          ],
+          response_format: { type: 'json_object' }
+        }),
+        responseStatus: '200',
+        responseBodyJson: JSON.stringify({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                outcome: 'reply',
+                assistantReply: '距离上次说话已经过去 9 小时了。还在吗？',
+                decisionSummary: '用户 9 小时未回复，发送简短确认消息。'
+              })
+            }
+          }]
+        })
       }
     }];
 
@@ -444,6 +468,9 @@ describe('assistantOrchestratorService', () => {
     expect(history[0].targetSessionId).toBe('session-1');
     expect(history[0].action).toBe('send_message');
     expect(history[0].message).toBe('距离上次说话已经过去 9 小时了。还在吗？');
+    expect(history[0].debugExchange?.provider).toBe('openai');
+    expect(history[0].debugExchange?.request.url).toBe('https://example.test/v1/chat/completions');
+    expect((history[0].debugExchange?.request.body as any)?.messages?.[0]?.content).toContain('=== Assistant Base Prompt ===');
   });
 
   it('shows a system notification for hydrated native replies when requested', () => {

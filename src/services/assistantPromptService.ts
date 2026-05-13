@@ -10,6 +10,7 @@
  * @updated 2026-05-12: Strengthened reminder guidance so ongoing work can trigger timed follow-up reminders that wake the background agent, while active reminder text stays free of relative time wording like "tomorrow".
  * @updated 2026-05-11: Added reminder-planning guidance so punctual attendance events default to a small lead-time reminder, usually 5 minutes early.
  * @updated 2026-05-10: Removed assistant-side due-reminder deletion guidance so runtime reminder cleanup, not model judgment, owns consumption of fired reminders.
+ * @updated 2026-05-13: Added explicit quick-vs-project todo guidance so assistant prompts now teach the reserved `小事` path, the new `kind` field, and the different linkage requirements for quick reminders versus timer-oriented project todos.
  * @updated 2026-05-06: Aligned fallback foreground tool guidance with live execution boundaries for `edit_log`, `create_todo`, and `create_subtask`.
  * @updated 2026-05-06: Restructured the fallback foreground prompts around explicit intent recognition and intent-to-action routing so front-chat turns decide behavior more consistently.
  * @updated 2026-05-06: Added assistant-facing `yesterdayTimelineSummary` guidance and aligned unified-turn context wording around concrete two-day activity records.
@@ -425,8 +426,16 @@ Inferred log rules:
 
 Todo rules:
 
-- Every create_todo must be linked to an existing activity tag.
-- For create_todo, linkedActivityId is required. linkedCategoryId should match the activity category when provided, and may be omitted if it can be safely inferred from linkedActivityId.
+- Every create_todo should explicitly choose todo kind through args.kind:
+  - use kind = project for long-running, timer-oriented, multi-session, or activity-linked work;
+  - use kind = quick for small reminder-style items, errands, and scattered low-overhead tasks that should not be timed.
+- For create_todo with kind = project:
+  - linkedActivityId is required;
+  - linkedCategoryId should match the activity category when provided, and may be omitted if it can be safely inferred from linkedActivityId.
+- For create_todo with kind = quick:
+  - do not force linkedActivityId, linkedCategoryId, or defaultScopeIds;
+  - use the reserved 小事 todo category from the provided todo category candidates;
+  - prefer quick for trivial chores, short reminders, or memo-like tasks that mainly need title plus optional schedule/deadline.
 - Before creating a new todo, compare it against the provided todo candidates. If the task already clearly exists, prefer reusing or updating the existing todo instead of creating a duplicate.
 - If the user is describing a recurring task, configure recurrenceRule instead of scheduledDate or deadlineDate.
 - recurrenceRule is mutually exclusive with scheduledDate and deadlineDate. Do not return them together for the same todo.
@@ -438,6 +447,7 @@ Todo rules:
 - For these project-like tasks, you may still set one or more timed follow-up reminders when they would help the assistant keep tracking progress across later checkpoints.
 - When turning today's plan into todos, prefer a small number of clear actionable items over a long fuzzy task list.
 - If today's plan is still vague, keep toolCalls empty and ask one short follow-up question before creating todos.
+- For update_todo, only switch patch.kind from quick to project when the user clearly wants to promote a small item into a fuller project task. Do not convert project todos into quick todos.
 
 Subtask rules:
 

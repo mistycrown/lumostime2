@@ -4,6 +4,7 @@
  * @output Shared quick-actions state and handlers for todo list rows and week-view badges
  * @pos Hook
  * @description Centralizes todo quick-actions sheet state so multiple entry points can open the same modal without duplicating move/complete/detail logic inside the view.
+ * @updated 2026-05-13: Added a shared quick-to-project upgrade action so lightweight reminders can graduate into full project todos from shared entry points.
  * @updated 2026-05-05: Exposes the quick-actions open timestamp plus a shared interaction guard so bottom-edge touch openings cannot immediately trigger a newly mounted action button.
  * @updated 2026-04-27: Routed shared quick-actions delete requests into the existing todo deletion flow.
  * @updated 2026-04-21: Added a shared pin/unpin quick action so schedule-list rows and week badges can toggle the today-top flag consistently.
@@ -12,6 +13,7 @@
 import { useRef, useState } from 'react';
 import { TodoItem } from '../types';
 import { formatDateKey, parseDateKey } from '../utils/todoScheduleUtils';
+import { isQuickTodo } from '../utils/todoKindUtils';
 
 export const QUICK_ACTION_INTERACTION_GUARD_MS = 280;
 
@@ -24,9 +26,10 @@ interface UseTodoQuickActionsOptions {
   onSaveTodo: (todo: TodoItem) => void;
   onEditTodo: (todo: TodoItem) => void;
   onDeleteTodo: (id: string) => void;
+  projectCategoryId?: string;
 }
 
-export const useTodoQuickActions = ({ onSaveTodo, onEditTodo, onDeleteTodo }: UseTodoQuickActionsOptions) => {
+export const useTodoQuickActions = ({ onSaveTodo, onEditTodo, onDeleteTodo, projectCategoryId }: UseTodoQuickActionsOptions) => {
   const [quickActionTodo, setQuickActionTodo] = useState<TodoItem | null>(null);
   const quickActionOpenedAtRef = useRef(0);
 
@@ -117,6 +120,19 @@ export const useTodoQuickActions = ({ onSaveTodo, onEditTodo, onDeleteTodo }: Us
     closeQuickActions(true);
   };
 
+  const handleQuickActionUpgradeToProject = () => {
+    if (!quickActionTodo) return;
+
+    if (!isQuickTodo(quickActionTodo)) return;
+
+    onSaveTodo({
+      ...quickActionTodo,
+      kind: 'project',
+      categoryId: projectCategoryId || quickActionTodo.categoryId
+    });
+    closeQuickActions(true);
+  };
+
   const handleQuickActionDelete = () => {
     if (!quickActionTodo) return;
     const todoId = quickActionTodo.id;
@@ -135,6 +151,7 @@ export const useTodoQuickActions = ({ onSaveTodo, onEditTodo, onDeleteTodo }: Us
     handleQuickActionUndoComplete,
     handleQuickActionClearDate,
     handleQuickActionTogglePin,
+    handleQuickActionUpgradeToProject,
     handleQuickActionDelete
   };
 };

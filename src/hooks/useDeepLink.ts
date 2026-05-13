@@ -4,6 +4,7 @@
  * @output Deep Link Listener (appUrlOpen event handler), NFC Listener (nfcTagScanned event handler)
  * @pos Hook (System Integration)
  * @description Handles app deep links and NFC scans with stable listeners, launch-url fallback, shared LumosTime URI compatibility parsing, retained NFC error handling, NFC read-test interception, and stop-confirm routing for repeated activity tags.
+ * @updated 2026-05-13: Added a short same-activity restart guard so duplicate NFC deliveries after a stop do not immediately start a fresh timer.
  */
 import { useEffect, useRef } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -22,6 +23,11 @@ import { useToast } from '../contexts/ToastContext';
 import { getLocalDateStr } from '../utils/dateUtils';
 import { applyDailyCheckActionForDate } from '../utils/dailyCheckUtils';
 import { parseLumosTimeUrl } from '../utils/lumosTimeUrlParser';
+import {
+  buildNfcActivityKey,
+  RecentNfcActivityStop,
+  shouldSuppressNfcActivityRestart
+} from '../utils/nfcActivityRestartGuard';
 import { ShortcutWidgetAction, normalizeShortcutWidgetAction } from '../services/widgetShortcutService';
 
 type DeepLinkStateSnapshot = {
@@ -65,6 +71,7 @@ export const useDeepLink = (
   const addToastRef = useRef(addToast);
   const setDailyReviewsRef = useRef(setDailyReviews);
   const lastHandledUrlRef = useRef<{ key: string; timestamp: number } | null>(null);
+  const lastNfcStoppedActivityRef = useRef<RecentNfcActivityStop | null>(null);
   const isReadTestModeRef = useRef(false);
 
   useEffect(() => {
@@ -172,10 +179,16 @@ export const useDeepLink = (
       }
     };
 
-    const handleStartAction = (catId: string, actId: string, toggleExisting: boolean) => {
+    const handleStartAction = (
+      catId: string,
+      actId: string,
+      toggleExisting: boolean
+    ) => {
       const { categories: currentCategories, activeSessions: currentActiveSessions } = latestStateRef.current;
       const category = currentCategories.find((entry) => entry.id === catId);
       const activity = category?.activities.find((entry) => entry.id === actId);
+      const activityKey = buildNfcActivityKey(catId, actId);
+      const now = Date.now();
 
       if (!category || !activity) {
         addToastRef.current('error', '未找到对应的活动，请重新写入标签');
@@ -184,7 +197,15 @@ export const useDeepLink = (
 
       const existingSession = currentActiveSessions.find((session) => session.activityId === actId);
       if (toggleExisting && existingSession) {
+        lastNfcStoppedActivityRef.current = {
+          activityKey,
+          timestamp: now
+        };
         requestStopActivityRef.current(existingSession.id);
+        return;
+      }
+
+      if (shouldSuppressNfcActivityRestart(lastNfcStoppedActivityRef.current, activityKey, now)) {
         return;
       }
 
@@ -196,7 +217,11 @@ export const useDeepLink = (
       addToastRef.current('success', `已开始：${activity.name}`);
     };
 
-    const handleParsedUrl = (urlString: string, toggleExistingActivity: boolean) => {
+    const handleParsedUrl = (
+      urlString: string,
+      toggleExistingActivity: boolean,
+      source: 'scan' | 'deeplink'
+    ) => {
       const parsedUrl = parseLumosTimeUrl(urlString);
       if (!parsedUrl) {
         return false;
@@ -260,7 +285,7 @@ export const useDeepLink = (
         return true;
       }
 
-      const handled = handleParsedUrl(urlString, toggleExistingActivity);
+      const handled = handleParsedUrl(urlString, toggleExistingActivity, source);
       if (handled) {
         lastHandledUrlRef.current = { key: dedupeKey, timestamp: now };
       }

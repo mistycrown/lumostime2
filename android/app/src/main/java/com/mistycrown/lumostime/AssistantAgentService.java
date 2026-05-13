@@ -4,6 +4,7 @@
  * @output Persistent Android agent loop, shared runtime notification state, and bridge-triggered assistant events
  * @pos Native Service
  * @description Minimal Android foreground service scaffold for the background AI agent. Maintains a lightweight polling loop, shares one persistent Android status notification with the floating-window service, and emits assistant system-trigger events through the Capacitor plugin bridge.
+ * @updated 2026-05-13: Moved next due-reminder wakeups onto AlarmManager-backed service wakeups so reminder_due dispatch no longer depends on in-process Handler delays while the device is idle.
  * @updated 2026-05-11: Split due-reminder scheduling off the coarse base poll so reminders can fire at their exact next eligible time instead of waiting for the next 5-minute sweep.
  * @updated 2026-05-09: Refreshes the shared persistent notification title once per second while active focus timers exist so timer durations stay live during assistant-only foreground runtime.
  * @updated 2026-04-27: Added persistent native diagnostics for poll ticks, skip reasons, and trigger dispatches so missed background calls can be traced from the shared AI history UI.
@@ -31,6 +32,7 @@ public class AssistantAgentService extends Service {
     public static final String ACTION_STOP = "com.mistycrown.lumostime.action.ASSISTANT_AGENT_STOP";
     public static final String ACTION_UPDATE_CONFIG = "com.mistycrown.lumostime.action.ASSISTANT_AGENT_UPDATE_CONFIG";
     public static final String ACTION_TRIGGER_IMMEDIATE = "com.mistycrown.lumostime.action.ASSISTANT_AGENT_TRIGGER_IMMEDIATE";
+    public static final String ACTION_TRIGGER_REMINDER_TIMER = "com.mistycrown.lumostime.action.ASSISTANT_TRIGGER_REMINDER_TIMER";
     public static final String ACTION_NOTIFY_USER_TURN = "com.mistycrown.lumostime.action.ASSISTANT_AGENT_NOTIFY_USER_TURN";
     public static final String ACTION_NOTIFY_TASK_STATE_CHANGED = "com.mistycrown.lumostime.action.ASSISTANT_AGENT_NOTIFY_TASK_STATE_CHANGED";
 
@@ -283,6 +285,20 @@ public class AssistantAgentService extends Service {
             );
         }
 
+        if (ACTION_TRIGGER_REMINDER_TIMER.equals(action)) {
+            long now = System.currentTimeMillis();
+            if (!loopStarted) {
+                loopStarted = true;
+                scheduleNextRandomCheckin(now);
+                scheduleNextReminderDispatch(now);
+                handler.post(pollRunnable);
+            }
+            handler.removeCallbacks(reminderDispatchRunnable);
+            handler.post(reminderDispatchRunnable);
+            syncUnifiedStatusNotification();
+            return START_STICKY;
+        }
+
         if (!loopStarted) {
             loopStarted = true;
             scheduleNextRandomCheckin(System.currentTimeMillis());
@@ -315,6 +331,7 @@ public class AssistantAgentService extends Service {
         handler.removeCallbacks(pollRunnable);
         handler.removeCallbacks(reminderDispatchRunnable);
         handler.removeCallbacks(notificationRefreshRunnable);
+        AssistantReminderAlarmScheduler.cancel(this);
         nextReminderDispatchAtMs = 0L;
     }
 
@@ -449,6 +466,7 @@ public class AssistantAgentService extends Service {
 
     private void scheduleNextReminderDispatch(long nowMs) {
         handler.removeCallbacks(reminderDispatchRunnable);
+        AssistantReminderAlarmScheduler.cancel(this);
         nextReminderDispatchAtMs = 0L;
 
         if (!enabled || !AssistantNativeBackgroundExecutor.canExecute(this)) {
@@ -467,7 +485,7 @@ public class AssistantAgentService extends Service {
             return;
         }
 
-        handler.postDelayed(reminderDispatchRunnable, delayMs);
+        AssistantReminderAlarmScheduler.schedule(this, nextEligibleAtMs);
     }
 
     private boolean shouldDispatchRandomCheckin(long nowMs) {

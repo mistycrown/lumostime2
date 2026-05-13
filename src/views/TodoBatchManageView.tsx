@@ -4,11 +4,14 @@
  * @output Updated Categories/Todos (Reorder, CRUD)
  * @pos View (Modal/Page)
  * @description A specialized view for bulk management of To-Do items and categories. Supports drag-and-drop reordering and category color configuration for todo statistics.
+ * @updated 2026-05-13: Added touch drag-and-drop support plus more reliable category drop targeting so mobile batch management can move todos across categories again.
+ * @updated 2026-05-13: Added the reserved `未来` bucket alongside `小事`, keeping both system categories visible in batch management while locking their names and placement.
+ * @updated 2026-05-13: Added the reserved `小事` bucket to batch management so its color can be configured and quick-todo items can be manually ordered without exposing the bucket as a normal todo list category.
  * @updated 2026-04-23: Hid subtasks from the batch-management list while preserving hidden child todos and completed todos during save.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { TodoCategory, TodoItem } from '../types';
 import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check } from 'lucide-react';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
@@ -18,6 +21,17 @@ import { COLOR_OPTIONS } from '../constants';
 import { useCustomColors } from '../hooks/useCustomColors';
 import { getColorPreviewValue, isStoredColorSelected } from '../utils/colorUtils';
 import { applyParentTodoInheritance, isSubtask } from '../utils/todoHierarchyUtils';
+import { isQuickTodo } from '../utils/todoKindUtils';
+import {
+    ensureQuickTodoCategory,
+    FUTURE_TODO_CATEGORY_ID,
+    FUTURE_TODO_CATEGORY_NAME,
+    getRealTodoCategories,
+    isFutureTodoCategoryId,
+    isQuickTodoCategoryId,
+    QUICK_TODO_CATEGORY_ID,
+    QUICK_TODO_CATEGORY_NAME
+} from '../utils/todoQuickCategoryUtils';
 
 interface TodoBatchManageViewProps {
     onBack: () => void;
@@ -31,19 +45,45 @@ interface CategoryWithTodos extends TodoCategory {
 }
 
 const getVisibleBatchTodos = (todos: TodoItem[], categoryId: string): TodoItem[] => (
-    todos.filter((todo) => todo.categoryId === categoryId && !todo.isCompleted && !isSubtask(todo))
+    todos.filter((todo) => {
+        if (todo.isCompleted || isSubtask(todo)) {
+            return false;
+        }
+
+        if (isQuickTodoCategoryId(categoryId)) {
+            return isQuickTodo(todo);
+        }
+
+        return !isQuickTodo(todo) && todo.categoryId === categoryId;
+    })
+);
+
+const isSystemTodoCategoryId = (categoryId: string): boolean => (
+    isQuickTodoCategoryId(categoryId) || isFutureTodoCategoryId(categoryId)
 );
 
 export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack, categories: initialCategories, todos: initialTodos, onSave }) => {
+    const normalizedInitialCategories = React.useMemo(
+        () => ensureQuickTodoCategory(initialCategories),
+        [initialCategories]
+    );
+    const scrollRef = useRef<HTMLDivElement | null>(null);
+    const touchDragActivatedRef = useRef(false);
+    const touchDraggingItemRef = useRef<{ item: TodoItem, sourceCategoryId: string } | null>(null);
+    const touchDragTargetCategoryRef = useRef<string | null>(null);
+    const touchDragPointRef = useRef<{ x: number; y: number; title: string } | null>(null);
+    const touchDragFrameRef = useRef<number | null>(null);
+    const touchAutoScrollFrameRef = useRef<number | null>(null);
+    const touchAutoScrollSpeedRef = useRef(0);
     // Initialize state by merging categories and todos (only show uncompleted parent todos)
     const [data, setData] = useState<CategoryWithTodos[]>(() => {
-        return initialCategories.map(cat => ({
+        return normalizedInitialCategories.map(cat => ({
             ...cat,
             items: getVisibleBatchTodos(initialTodos, cat.id)
         }));
     });
 
-    const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set(initialCategories.map(c => c.id)));
+    const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set(normalizedInitialCategories.map(c => c.id)));
     
     // Icon selector state
     const [iconSelectorOpen, setIconSelectorOpen] = useState<string | null>(null);
@@ -55,6 +95,8 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
     // Drag state
     const [draggedItem, setDraggedItem] = useState<{ item: TodoItem, sourceCategoryId: string } | null>(null);
     const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
+    const [touchDragPreview, setTouchDragPreview] = useState<{ x: number; y: number; title: string } | null>(null);
+    const [isTouchDragging, setIsTouchDragging] = useState(false);
 
     const toggleExpand = (id: string) => {
         const newSet = new Set(expandedCats);
@@ -65,28 +107,46 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
 
     // --- Move Logic (Buttons) ---
     const moveCategory = (index: number, direction: 'up' | 'down') => {
+        if (isSystemTodoCategoryId(data[index]?.id)) {
+            return;
+        }
+
         if (direction === 'up' && index > 0) {
             const newData = [...data];
+            if (isSystemTodoCategoryId(newData[index - 1]?.id)) {
+                return;
+            }
             [newData[index], newData[index - 1]] = [newData[index - 1], newData[index]];
             setData(newData);
         } else if (direction === 'down' && index < data.length - 1) {
             const newData = [...data];
+            if (isSystemTodoCategoryId(newData[index + 1]?.id)) {
+                return;
+            }
             [newData[index], newData[index + 1]] = [newData[index + 1], newData[index]];
             setData(newData);
         }
     };
 
     const moveItem = (catIndex: number, itemIndex: number, direction: 'up' | 'down') => {
-        const newData = [...data];
-        const items = newData[catIndex].items;
+        setData(prev => prev.map((category, currentCatIndex) => {
+            if (currentCatIndex !== catIndex) {
+                return category;
+            }
 
-        if (direction === 'up' && itemIndex > 0) {
-            [items[itemIndex], items[itemIndex - 1]] = [items[itemIndex - 1], items[itemIndex]];
-            setData(newData);
-        } else if (direction === 'down' && itemIndex < items.length - 1) {
-            [items[itemIndex], items[itemIndex + 1]] = [items[itemIndex + 1], items[itemIndex]];
-            setData(newData);
-        }
+            const items = [...category.items];
+            if (direction === 'up' && itemIndex > 0) {
+                [items[itemIndex], items[itemIndex - 1]] = [items[itemIndex - 1], items[itemIndex]];
+                return { ...category, items };
+            }
+
+            if (direction === 'down' && itemIndex < items.length - 1) {
+                [items[itemIndex], items[itemIndex + 1]] = [items[itemIndex + 1], items[itemIndex]];
+                return { ...category, items };
+            }
+
+            return category;
+        }));
     };
 
     // --- CRUD Logic ---
@@ -98,11 +158,24 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
             color: undefined,
             items: []
         };
-        setData([...data, newCat]);
+        setData(prev => {
+            const firstSystemCategoryIndex = prev.findIndex(category => isSystemTodoCategoryId(category.id));
+            if (firstSystemCategoryIndex === -1) {
+                return [...prev, newCat];
+            }
+
+            const next = [...prev];
+            next.splice(firstSystemCategoryIndex, 0, newCat);
+            return next;
+        });
         setExpandedCats(prev => new Set(prev).add(newCat.id));
     };
 
     const handleDeleteCategory = (catId: string) => {
+        if (isSystemTodoCategoryId(catId)) {
+            return;
+        }
+
         setData(prev => prev.filter(c => c.id !== catId));
     };
 
@@ -110,6 +183,7 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
         const newItem: TodoItem = {
             id: crypto.randomUUID(),
             categoryId: catId,
+            kind: isQuickTodoCategoryId(catId) ? 'quick' : 'project',
             title: '新任务',
             isCompleted: false
         };
@@ -135,6 +209,14 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
         setData(prev => prev.map(c => {
             if (c.id === catId) {
                 if (itemId === null) {
+                    if (isQuickTodoCategoryId(catId)) {
+                        return c;
+                    }
+
+                    if (isFutureTodoCategoryId(catId)) {
+                        return c;
+                    }
+
                     // Edit Category Name & Icon
                     const firstChar = Array.from(newName)[0] || '';
                     const icon = firstChar;
@@ -177,6 +259,74 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
     };
 
     // --- Drag Logic ---
+    const resetDragState = () => {
+        setDraggedItem(null);
+        setDragOverCategory(null);
+        setTouchDragPreview(null);
+        setIsTouchDragging(false);
+        touchDragActivatedRef.current = false;
+        touchDraggingItemRef.current = null;
+        touchDragTargetCategoryRef.current = null;
+        touchDragPointRef.current = null;
+        touchAutoScrollSpeedRef.current = 0;
+
+        if (touchAutoScrollFrameRef.current !== null) {
+            window.cancelAnimationFrame(touchAutoScrollFrameRef.current);
+            touchAutoScrollFrameRef.current = null;
+        }
+
+        if (touchDragFrameRef.current !== null) {
+            window.cancelAnimationFrame(touchDragFrameRef.current);
+            touchDragFrameRef.current = null;
+        }
+    };
+
+    const moveDraggedItemToCategory = (
+        activeDraggedItem: { item: TodoItem, sourceCategoryId: string },
+        targetCategoryId: string
+    ) => {
+        const { item, sourceCategoryId } = activeDraggedItem;
+        if (sourceCategoryId === targetCategoryId) {
+            return;
+        }
+
+        if (isQuickTodoCategoryId(targetCategoryId) && !isQuickTodo(item)) {
+            return;
+        }
+
+        setData(prev => {
+            const sourceCat = prev.find(c => c.id === sourceCategoryId);
+            const targetCat = prev.find(c => c.id === targetCategoryId);
+            if (!sourceCat || !targetCat) {
+                return prev;
+            }
+
+            const movedItem = {
+                ...item,
+                categoryId: isQuickTodoCategoryId(targetCategoryId) ? QUICK_TODO_CATEGORY_ID : targetCategoryId,
+                kind: isQuickTodoCategoryId(targetCategoryId) ? 'quick' : 'project'
+            };
+
+            return prev.map((category) => {
+                if (category.id === sourceCategoryId) {
+                    return {
+                        ...category,
+                        items: category.items.filter(i => i.id !== item.id)
+                    };
+                }
+
+                if (category.id === targetCategoryId) {
+                    return {
+                        ...category,
+                        items: [...category.items, movedItem]
+                    };
+                }
+
+                return category;
+            });
+        });
+    };
+
     const handleDragStart = (e: React.DragEvent, item: TodoItem, categoryId: string) => {
         setDraggedItem({ item, sourceCategoryId: categoryId });
         e.dataTransfer.effectAllowed = 'move';
@@ -189,28 +339,192 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
 
     const handleDrop = (e: React.DragEvent, targetCategoryId: string) => {
         e.preventDefault();
-        setDragOverCategory(null);
         if (!draggedItem) return;
-        const { item, sourceCategoryId } = draggedItem;
-        if (sourceCategoryId === targetCategoryId) return;
-
-        setData(prev => {
-            const newData = [...prev];
-            const sourceCat = newData.find(c => c.id === sourceCategoryId);
-            const targetCat = newData.find(c => c.id === targetCategoryId);
-            if (sourceCat && targetCat) {
-                sourceCat.items = sourceCat.items.filter(i => i.id !== item.id);
-                // Update item's categoryId
-                const movedItem = { ...item, categoryId: targetCategoryId };
-                targetCat.items.push(movedItem);
-            }
-            return newData;
-        });
-        setDraggedItem(null);
+        moveDraggedItemToCategory(draggedItem, targetCategoryId);
+        resetDragState();
     };
 
+    const resolveDropCategoryFromPoint = (clientX: number, clientY: number): string | null => {
+        const targetElement = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+        const dropTarget = targetElement?.closest('[data-todo-batch-drop-category]') as HTMLElement | null;
+        return dropTarget?.dataset.todoBatchDropCategory || null;
+    };
+
+    const flushTouchDragPreview = () => {
+        const point = touchDragPointRef.current;
+        if (!point) {
+            touchDragFrameRef.current = null;
+            return;
+        }
+
+        const nextCategoryId = resolveDropCategoryFromPoint(point.x, point.y);
+        touchDragTargetCategoryRef.current = nextCategoryId;
+        setDragOverCategory((current) => current === nextCategoryId ? current : nextCategoryId);
+        setTouchDragPreview((current) => (
+            current
+            && current.x === point.x
+            && current.y === point.y
+            && current.title === point.title
+        )
+            ? current
+            : { ...point });
+        touchDragFrameRef.current = null;
+    };
+
+    const queueTouchDragPreviewUpdate = (point: { x: number; y: number; title: string }) => {
+        touchDragPointRef.current = point;
+        if (touchDragFrameRef.current === null) {
+            touchDragFrameRef.current = window.requestAnimationFrame(flushTouchDragPreview);
+        }
+    };
+
+    const stopTouchAutoScroll = () => {
+        touchAutoScrollSpeedRef.current = 0;
+        if (touchAutoScrollFrameRef.current !== null) {
+            window.cancelAnimationFrame(touchAutoScrollFrameRef.current);
+            touchAutoScrollFrameRef.current = null;
+        }
+    };
+
+    const stepTouchAutoScroll = () => {
+        const container = scrollRef.current;
+        const point = touchDragPointRef.current;
+        const speed = touchAutoScrollSpeedRef.current;
+
+        if (!container || !point || speed === 0) {
+            touchAutoScrollFrameRef.current = null;
+            return;
+        }
+
+        const previousScrollTop = container.scrollTop;
+        container.scrollTop += speed;
+        queueTouchDragPreviewUpdate(point);
+
+        if (container.scrollTop === previousScrollTop) {
+            stopTouchAutoScroll();
+            return;
+        }
+
+        touchAutoScrollFrameRef.current = window.requestAnimationFrame(stepTouchAutoScroll);
+    };
+
+    const updateTouchAutoScroll = (clientY: number) => {
+        const container = scrollRef.current;
+        if (!container) {
+            return;
+        }
+
+        const rect = container.getBoundingClientRect();
+        const threshold = Math.min(96, Math.max(56, rect.height * 0.16));
+        let nextSpeed = 0;
+
+        if (clientY < rect.top + threshold) {
+            const intensity = (rect.top + threshold - clientY) / threshold;
+            nextSpeed = -Math.max(6, intensity * 20);
+        } else if (clientY > rect.bottom - threshold) {
+            const intensity = (clientY - (rect.bottom - threshold)) / threshold;
+            nextSpeed = Math.max(6, intensity * 20);
+        }
+
+        if (nextSpeed === 0) {
+            stopTouchAutoScroll();
+            return;
+        }
+
+        touchAutoScrollSpeedRef.current = nextSpeed;
+        if (touchAutoScrollFrameRef.current === null) {
+            touchAutoScrollFrameRef.current = window.requestAnimationFrame(stepTouchAutoScroll);
+        }
+    };
+
+    const handleTouchDragStart = (item: TodoItem, categoryId: string, event: React.TouchEvent<HTMLDivElement>) => {
+        const touch = event.touches[0];
+        if (!touch) {
+            return;
+        }
+
+        const nextDraggedItem = { item, sourceCategoryId: categoryId };
+        setDraggedItem(nextDraggedItem);
+        setTouchDragPreview({
+            x: touch.clientX,
+            y: touch.clientY,
+            title: item.title
+        });
+        touchDragPointRef.current = {
+            x: touch.clientX,
+            y: touch.clientY,
+            title: item.title
+        };
+        setIsTouchDragging(true);
+        touchDragActivatedRef.current = true;
+        touchDraggingItemRef.current = nextDraggedItem;
+        touchDragTargetCategoryRef.current = null;
+    };
+
+    useEffect(() => {
+        if (!isTouchDragging) {
+            return;
+        }
+
+        const handleWindowTouchMove = (event: TouchEvent) => {
+            if (!touchDragActivatedRef.current) {
+                return;
+            }
+
+            const touch = event.touches[0];
+            const activeDraggedItem = touchDraggingItemRef.current;
+            if (!touch || !activeDraggedItem) {
+                return;
+            }
+
+            if (event.cancelable) {
+                event.preventDefault();
+            }
+
+            queueTouchDragPreviewUpdate({
+                x: touch.clientX,
+                y: touch.clientY,
+                title: activeDraggedItem.item.title
+            });
+            updateTouchAutoScroll(touch.clientY);
+        };
+
+        const handleWindowTouchEnd = () => {
+            if (!touchDragActivatedRef.current) {
+                return;
+            }
+
+            const activeDraggedItem = touchDraggingItemRef.current;
+            const targetCategoryId = touchDragTargetCategoryRef.current;
+            if (targetCategoryId && activeDraggedItem) {
+                moveDraggedItemToCategory(activeDraggedItem, targetCategoryId);
+            }
+
+            stopTouchAutoScroll();
+            resetDragState();
+        };
+
+        window.addEventListener('touchmove', handleWindowTouchMove, { passive: false });
+        window.addEventListener('touchend', handleWindowTouchEnd);
+        window.addEventListener('touchcancel', handleWindowTouchEnd);
+
+        return () => {
+            stopTouchAutoScroll();
+            if (touchDragFrameRef.current !== null) {
+                window.cancelAnimationFrame(touchDragFrameRef.current);
+                touchDragFrameRef.current = null;
+            }
+            window.removeEventListener('touchmove', handleWindowTouchMove);
+            window.removeEventListener('touchend', handleWindowTouchEnd);
+            window.removeEventListener('touchcancel', handleWindowTouchEnd);
+        };
+    }, [isTouchDragging]);
+
     const handleSave = () => {
-        const finalCategories: TodoCategory[] = data.map(({ id, name, icon, uiIcon, color }) => ({ id, name, icon, uiIcon, color }));
+        const finalCategories: TodoCategory[] = ensureQuickTodoCategory(
+            data.map(({ id, name, icon, uiIcon, color }) => ({ id, name, icon, uiIcon, color }))
+        );
+        const realCategoryIds = new Set(getRealTodoCategories(finalCategories).map((category) => category.id));
         const remainingCategoryIds = new Set(finalCategories.map((category) => category.id));
         const initialVisibleTodoIds = new Set(
             initialTodos
@@ -218,11 +532,23 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                 .map((todo) => todo.id)
         );
         const editedRootTodos: TodoItem[] = data.flatMap((category) => (
-            category.items.map((todo) => ({ ...todo, categoryId: category.id }))
+            category.items.map((todo) => ({
+                ...todo,
+                categoryId: isQuickTodoCategoryId(category.id) ? QUICK_TODO_CATEGORY_ID : category.id,
+                kind: isQuickTodoCategoryId(category.id) ? 'quick' : 'project'
+            }))
         ));
         const preservedHiddenTodos = initialTodos.filter((todo) => !initialVisibleTodoIds.has(todo.id));
         const preservedRootTodos = preservedHiddenTodos.filter((todo) => (
-            !isSubtask(todo) && remainingCategoryIds.has(todo.categoryId)
+            !isSubtask(todo) && (
+                isQuickTodo(todo)
+                    ? remainingCategoryIds.has(QUICK_TODO_CATEGORY_ID)
+                    : realCategoryIds.has(todo.categoryId)
+            )
+        )).map((todo) => (
+            isQuickTodo(todo)
+                ? { ...todo, categoryId: QUICK_TODO_CATEGORY_ID }
+                : todo
         ));
         const rootTodoMap = new Map<string, TodoItem>(
             [...editedRootTodos, ...preservedRootTodos].map((todo) => [todo.id, todo])
@@ -256,12 +582,23 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                 </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-40">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-6 pb-40">
                 {data.map((category, catIndex) => (
+                    (() => {
+                        const isQuickCategory = isQuickTodoCategoryId(category.id);
+                        const isFutureCategory = isFutureTodoCategoryId(category.id);
+                        const isSystemCategory = isQuickCategory || isFutureCategory;
+                        return (
                     <div
                         key={category.id}
+                        data-todo-batch-drop-category={category.id}
                         className={`bg-white rounded-2xl border transition-colors overflow-hidden ${dragOverCategory === category.id ? 'border-orange-500 ring-1 ring-orange-500 bg-orange-50' : 'border-stone-200'}`}
                         onDragOver={(e) => handleDragOver(e, category.id)}
+                        onDragLeave={() => {
+                            if (dragOverCategory === category.id) {
+                                setDragOverCategory(null);
+                            }
+                        }}
                         onDrop={(e) => handleDrop(e, category.id)}
                     >
                         {/* Category Header */}
@@ -271,11 +608,17 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                             </button>
 
                             {/* Category Input (Icon + Name) */}
-                            <input
-                                className="bg-transparent font-bold text-stone-800 flex-1 outline-none placeholder:text-stone-300 min-w-0"
-                                value={`${category.icon}${category.name}`}
-                                onChange={(e) => handleNameChange(category.id, null, e.target.value)}
-                            />
+                            {isSystemCategory ? (
+                                <div className="bg-transparent font-bold text-stone-800 flex-1 min-w-0">
+                                    {`${category.icon}${isFutureCategory ? FUTURE_TODO_CATEGORY_NAME : QUICK_TODO_CATEGORY_NAME}`}
+                                </div>
+                            ) : (
+                                <input
+                                    className="bg-transparent font-bold text-stone-800 flex-1 outline-none placeholder:text-stone-300 min-w-0"
+                                    value={`${category.icon}${category.name}`}
+                                    onChange={(e) => handleNameChange(category.id, null, e.target.value)}
+                                />
+                            )}
 
                             {/* Category Actions */}
                             <div className="flex items-center gap-1 shrink-0">
@@ -290,7 +633,7 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                                     />
                                 </button>
                                 {/* Icon Selector Button - Show current UI icon preview */}
-                                {isCustomIconEnabled && (
+                                {isCustomIconEnabled && !isSystemCategory && (
                                     <button 
                                         onClick={() => setIconSelectorOpen(iconSelectorOpen === category.id ? null : category.id)} 
                                         className={`w-8 h-8 rounded-md transition-all flex items-center justify-center ${iconSelectorOpen === category.id ? 'bg-[var(--accent-color)]/10' : 'border border-stone-200 hover:border-stone-300 bg-white'}`}
@@ -308,16 +651,16 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                                         )}
                                     </button>
                                 )}
-                                <button onClick={() => moveCategory(catIndex, 'up')} disabled={catIndex === 0} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
+                                <button onClick={() => moveCategory(catIndex, 'up')} disabled={catIndex === 0 || isSystemCategory} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
                                     <ArrowUp size={16} />
                                 </button>
-                                <button onClick={() => moveCategory(catIndex, 'down')} disabled={catIndex === data.length - 1} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
+                                <button onClick={() => moveCategory(catIndex, 'down')} disabled={catIndex === data.length - 1 || isSystemCategory} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
                                     <ArrowDown size={16} />
                                 </button>
                                 <button onClick={() => handleAddItem(category.id)} className="p-1 text-stone-400 hover:text-stone-700">
                                     <Plus size={18} />
                                 </button>
-                                <button onClick={() => handleDeleteCategory(category.id)} className="p-1 text-stone-300 hover:text-red-500">
+                                <button onClick={() => handleDeleteCategory(category.id)} disabled={isSystemCategory} className="p-1 text-stone-300 hover:text-red-500 disabled:opacity-20 disabled:hover:text-stone-300">
                                     <Trash2 size={16} />
                                 </button>
                             </div>
@@ -357,7 +700,7 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                         )}
 
                         {/* Icon Selector Dropdown */}
-                        {isCustomIconEnabled && iconSelectorOpen === category.id && (
+                        {isCustomIconEnabled && !isSystemCategory && iconSelectorOpen === category.id && (
                             <div className="p-4 border-b border-stone-100 bg-stone-50/30">
                                 <UIIconSelectorCompact
                                     currentIcon=""
@@ -375,9 +718,15 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                                         key={item.id}
                                         draggable
                                         onDragStart={(e) => handleDragStart(e, item, category.id)}
+                                        onDragEnd={resetDragState}
                                         className="flex items-center gap-3 p-2 bg-white border border-stone-100 rounded-xl hover:border-stone-300 group cursor-move active:shadow-lg active:scale-[1.02] transition-all"
                                     >
-                                        <GripVertical size={14} className="text-stone-300 shrink-0" />
+                                        <div
+                                            className="shrink-0 cursor-grab touch-none active:cursor-grabbing"
+                                            onTouchStart={(event) => handleTouchDragStart(item, category.id, event)}
+                                        >
+                                            <GripVertical size={14} className="text-stone-300" />
+                                        </div>
 
                                         {/* Item Title Input */}
                                         <div className="flex-1 flex items-center gap-2 min-w-0">
@@ -410,6 +759,8 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                             </div>
                         )}
                     </div>
+                        );
+                    })()
                 ))}
 
                 {/* Add Category Button */}
@@ -421,6 +772,15 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                     <span>添加新列表</span>
                 </button>
             </div>
+
+            {touchDragPreview && (
+                <div
+                    className="pointer-events-none fixed z-[140] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-stone-200 bg-white/92 px-3 py-2 text-sm text-stone-700 shadow-[0_18px_40px_rgba(15,23,42,0.12)]"
+                    style={{ left: touchDragPreview.x, top: touchDragPreview.y }}
+                >
+                    <div className="max-w-[12rem] truncate">{touchDragPreview.title}</div>
+                </div>
+            )}
         </div>
     );
 };

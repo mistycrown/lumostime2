@@ -34,6 +34,8 @@ import type {
   AssistantTurnDictionaryContext,
   AssistantTurnStateContext
 } from '../types/assistant';
+import { getTodoKind } from '../utils/todoKindUtils';
+import { ensureQuickTodoCategory } from '../utils/todoQuickCategoryUtils';
 
 interface BuildStateContextParams {
   currentDateTime: string;
@@ -322,7 +324,7 @@ export const assistantContextBuilder = {
       scope.name
     ]));
 
-    const todoCategoryRows = (context.todoCategories || []).map((category) => ([
+    const todoCategoryRows = ensureQuickTodoCategory(context.todoCategories || []).map((category) => ([
       category.id,
       category.name
     ]));
@@ -330,6 +332,7 @@ export const assistantContextBuilder = {
     const todoRows = (context.todos || []).map((todo) => ([
       todo.id,
       todo.title,
+      getTodoKind(todo),
       todo.path,
       todo.parentTodoId,
       todo.parentTodoTitle,
@@ -364,7 +367,7 @@ export const assistantContextBuilder = {
       buildExactTableSection('Activities', ['categoryId', 'id', 'name'], activityRows),
       buildExactTableSection('Scopes', ['id', 'name'], scopeRows),
       buildExactTableSection('TodoCategories', ['id', 'name'], todoCategoryRows),
-      buildExactTableSection('Todos', ['id', 'title', 'path', 'parentTodoId', 'parentTodoTitle', 'categoryId', 'categoryName', 'linkedCategoryId', 'linkedActivityId', 'linkedActivityName', 'defaultScopeIds', 'scheduledDate', 'deadlineDate', 'pin', 'isCompleted'], todoRows),
+      buildExactTableSection('Todos', ['id', 'title', 'kind', 'path', 'parentTodoId', 'parentTodoTitle', 'categoryId', 'categoryName', 'linkedCategoryId', 'linkedActivityId', 'linkedActivityName', 'defaultScopeIds', 'scheduledDate', 'deadlineDate', 'pin', 'isCompleted'], todoRows),
       buildExactTableSection('Logs', ['id', 'date', 'timeRange', 'categoryId', 'categoryName', 'activityId', 'activityName', 'linkedTodoId', 'linkedTodoTitle', 'note'], logRows)
     ].join('\n\n');
   },
@@ -384,7 +387,7 @@ export const assistantContextBuilder = {
       name: scope.name
     }));
 
-    const todoCategories: AssistantTodoCategoryDictionaryItem[] = (params.todoCategories || []).map((category) => ({
+    const todoCategories: AssistantTodoCategoryDictionaryItem[] = ensureQuickTodoCategory(params.todoCategories || []).map((category) => ({
       id: category.id,
       name: category.name
     }));
@@ -400,6 +403,7 @@ export const assistantContextBuilder = {
       return {
         id: todo.id,
         title: todo.title,
+        kind: getTodoKind(todo),
         ...(parentTodo ? { path: `${parentTodo.title} / ${todo.title}`, parentTodoId: parentTodo.id, parentTodoTitle: parentTodo.title } : {}),
         ...(todo.categoryId ? { categoryId: todo.categoryId } : {}),
         ...(category?.name ? { categoryName: category.name } : {}),

@@ -3,6 +3,7 @@
 This directory contains application-wide constants, configuration, and static data.
 
 Update 2026-05-12: `timelineQuickActions.ts` now includes a `collections` quick-action key so the timeline header can deep-link into `设置 > 内容 > Collections`.
+Update 2026-05-13: `dreamModePrompt.ts` now frames Dream as a long-horizon person-understanding workflow centered on inner traits, rhythms, wellbeing, and execution-pressure patterns, while `dreamTopicPresets.ts` now seeds those four newer built-in domains with longer prompt-style notes.
 Update 2026-05-12: `dreamModePrompt.ts` now centralizes the shared Dream workflow system prompt, and `dreamTopicPresets.ts` now centralizes the built-in Dream concern-topic presets so the Dream system can seed default tabs from one shared constants definition.
 Update 2026-05-06: `aiPersonaSystemPrompts.ts` now centralizes the six built-in AI chat persona system prompts so `AIBackfillChatModal.tsx` can reference shared long-form prompt copy instead of inlining it.
 Update 2026-03-12: `storageKeys.ts` now includes timeline appearance storage keys for normal timeline record nodes.

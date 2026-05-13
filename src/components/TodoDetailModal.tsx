@@ -4,6 +4,8 @@
  * @output Modal Interaction (Edit Todo, View History)
  * @pos Component (Modal)
  * @description Displays detailed information for a specific Todo item, including its progress, planning fields, associated history logs, and focus stats.
+ * @updated 2026-05-13: Monthly recurrence editing now accepts space-separated multiple days, and the optional `31 号无则月末` toggle only appears when the parsed day list includes 31.
+ * @updated 2026-05-13: Added a lightweight quick-reminder detail mode plus one-way quick-to-project upgrades so non-project todos no longer expose project-only fields through shared edit entry points.
  * @updated 2026-05-12: Made subtask detail pages resolve inherited category, linked activity, and scope data from the live parent todo, and infer missing activity-category links from the activity id so stale child metadata no longer renders as unlinked.
  * @updated 2026-05-12: Fixed detail-page auto-save loops by comparing against the latest live todo record instead of a stale open-time snapshot.
  * @updated 2026-05-12: Replaced the nested child-todo row button structure with an accessible clickable container so subtask rows no longer render invalid button-in-button markup.
@@ -34,7 +36,7 @@ import { TimelineImage } from './TimelineImage';
 import { imageService } from '../services/imageService';
 import { IconRenderer } from './IconRenderer';
 import { useToast } from '../contexts/ToastContext';
-import { getTodayDateKey, parseDateKey } from '../utils/todoScheduleUtils';
+import { formatMonthlyDayInput, getTodayDateKey, normalizeMonthlyDayInput, parseDateKey, parseMonthlyDayInput } from '../utils/todoScheduleUtils';
 import { TodoDatePickerModal } from './TodoDatePickerModal';
 import { DataCollectionSelector } from './DataCollectionSelector';
 import {
@@ -45,6 +47,8 @@ import {
   isSubtask as isSubtaskTodo
 } from '../utils/todoHierarchyUtils';
 import { canTodoUseSubtaskProgress, getTodoProgressSnapshot, getTodoProgressTrackingMode } from '../utils/todoProgressUtils';
+import { getTodoKind, isQuickTodo } from '../utils/todoKindUtils';
+import { getRealTodoCategories, QUICK_TODO_CATEGORY_ID } from '../utils/todoQuickCategoryUtils';
 
 interface TodoDetailModalProps {
   initialTodo?: TodoItem | null;
@@ -133,6 +137,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   scopes,
   todos = []
 }) => {
+  const realTodoCategories = useMemo(() => getRealTodoCategories(todoCategories), [todoCategories]);
   const { addToast } = useToast();
   const [isEntering, setIsEntering] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>(initialTodo ? '时间线' : '细节');
@@ -156,6 +161,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const initialRecurrenceRule = initialTodo?.recurrenceRule || initialDraft?.recurrenceRule;
   const initialParentTodoId = initialTodo?.parentTodoId || initialDraft?.parentTodoId;
   const initialChildOrder = initialTodo?.childOrder ?? initialDraft?.childOrder;
+  const initialTodoKind = getTodoKind(initialTodo || initialDraft);
 
   // Stable ID for the session
   const [todoId] = useState(initialTodo?.id || crypto.randomUUID());
@@ -166,6 +172,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
 
   // --- Detail State ---
   const [selectedCategoryId, setSelectedCategoryId] = useState(initialCategoryId);
+  const [todoKind, setTodoKind] = useState(initialTodoKind);
   const [title, setTitle] = useState(initialTitle);
 
   const [note, setNote] = useState(initialNote);
@@ -212,15 +219,24 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const [recurrenceEndDate, setRecurrenceEndDate] = useState(initialRecurrenceRule?.endDate || '');
   const [recurrenceInterval, setRecurrenceInterval] = useState(initialRecurrenceRule?.interval || 1);
   const [recurrenceWeekdays, setRecurrenceWeekdays] = useState<number[]>(initialRecurrenceRule?.weekdays || []);
-  const [recurrenceMonthDay, setRecurrenceMonthDay] = useState(
-    initialRecurrenceRule?.monthDays?.[0] ||
-    parseDateKey(initialRecurrenceRule?.startDate)?.getDate() ||
-    new Date().getDate()
+  const [recurrenceMonthDaysInput, setRecurrenceMonthDaysInput] = useState(
+    formatMonthlyDayInput(
+      initialRecurrenceRule?.monthDays,
+      parseDateKey(initialRecurrenceRule?.startDate)?.getDate() || new Date().getDate()
+    )
+  );
+  const [recurrenceFallbackToMonthEnd, setRecurrenceFallbackToMonthEnd] = useState(
+    initialRecurrenceRule?.fallbackToMonthEnd === true
   );
   const [activeDatePicker, setActiveDatePicker] = useState<DatePickerField>(null);
+  const parsedRecurrenceMonthDays = useMemo(
+    () => parseMonthlyDayInput(recurrenceMonthDaysInput),
+    [recurrenceMonthDaysInput]
+  );
 
   // Timeline / Calendar State
   const [displayDate, setDisplayDate] = useState(new Date());
+  const isQuickReminder = todoKind === 'quick';
   const isSubtask = isSubtaskTodo({ parentTodoId });
   const parentTodo = useMemo(
     () => (parentTodoId ? todos.find((todo) => todo.id === parentTodoId) || null : null),
@@ -262,8 +278,8 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     }, todos),
     [completedUnits, isProgress, parentTodoId, resolvedProgressTrackingMode, todoId, todos, totalAmount, unitAmount]
   );
-  const hasActiveRecurrence = !isSubtask && recurrenceFrequency !== 'none' && Boolean(recurrenceStartDate);
-  const showSubtaskTab = Boolean(initialTodo) && !isSubtask && !hasActiveRecurrence;
+  const hasActiveRecurrence = !isSubtask && !isQuickReminder && recurrenceFrequency !== 'none' && Boolean(recurrenceStartDate);
+  const showSubtaskTab = Boolean(initialTodo) && !isSubtask && !hasActiveRecurrence && !isQuickReminder;
   const tabItems: Tab[] = showSubtaskTab
     ? ['\u7EC6\u8282', '\u5B50\u4EFB\u52A1', '\u65F6\u95F4\u7EBF']
     : ['\u7EC6\u8282', '\u65F6\u95F4\u7EBF'];
@@ -359,7 +375,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   }, [canUseSubtaskProgress, progressTrackingMode]);
 
   const recurrenceRule = useMemo<TodoRecurrenceRule | undefined>(() => {
-    if (isSubtask) return undefined;
+    if (isSubtask || isQuickReminder) return undefined;
     if (recurrenceFrequency === 'none' || !recurrenceStartDate) return undefined;
 
     const normalizedInterval = Math.max(1, recurrenceInterval || 1);
@@ -379,18 +395,25 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     }
 
     if (recurrenceFrequency === 'monthly') {
+      if (parsedRecurrenceMonthDays.length === 0) {
+        return undefined;
+      }
+
       return {
         ...baseRule,
-        monthDays: [Math.min(31, Math.max(1, recurrenceMonthDay || 1))]
+        monthDays: parsedRecurrenceMonthDays,
+        ...(parsedRecurrenceMonthDays.includes(31) && recurrenceFallbackToMonthEnd ? { fallbackToMonthEnd: true } : {})
       };
     }
 
     return baseRule;
   }, [
+    isQuickReminder,
+    parsedRecurrenceMonthDays,
     recurrenceEndDate,
     recurrenceFrequency,
+    recurrenceFallbackToMonthEnd,
     recurrenceInterval,
-    recurrenceMonthDay,
     recurrenceStartDate,
     recurrenceWeekdays
   ]);
@@ -420,8 +443,8 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
       setRecurrenceWeekdays([fallbackWeekday]);
     }
 
-    if (nextFrequency === 'monthly' && !recurrenceMonthDay) {
-      setRecurrenceMonthDay(parseDateKey(recurrenceStartDate)?.getDate() || new Date().getDate());
+    if (nextFrequency === 'monthly' && !recurrenceMonthDaysInput.trim()) {
+      setRecurrenceMonthDaysInput(String(parseDateKey(recurrenceStartDate)?.getDate() || new Date().getDate()));
     }
   };
 
@@ -439,7 +462,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     setRecurrenceEndDate('');
     setRecurrenceInterval(1);
     setRecurrenceWeekdays([]);
-    setRecurrenceMonthDay(parseDateKey(recurrenceStartDate)?.getDate() || new Date().getDate());
+    setRecurrenceMonthDaysInput(String(parseDateKey(recurrenceStartDate)?.getDate() || new Date().getDate()));
   };
 
   const datePickerTitle = activeDatePicker === 'scheduledDate'
@@ -508,30 +531,31 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
 
   const buildTodoPayload = (overrides?: Partial<TodoItem>): TodoItem => ({
     id: todoId,
-    categoryId: resolvedCategoryId,
-    parentTodoId,
-    childOrder,
+    kind: todoKind,
+    categoryId: isQuickReminder ? QUICK_TODO_CATEGORY_ID : resolvedCategoryId,
+    parentTodoId: isQuickReminder ? undefined : parentTodoId,
+    childOrder: isQuickReminder ? undefined : childOrder,
     title: title.trim(),
     isCompleted,
     completedAt: isCompleted
       ? (persistedTodo?.isCompleted ? persistedTodo.completedAt : new Date().toISOString())
       : undefined,
     note: note.trim(),
-    linkedCategoryId: effectiveLinkedCategoryId || undefined,
-    linkedActivityId: resolvedLinkedActivityId || undefined,
-    defaultScopeIds: resolvedDefaultScopeIds,
-    isProgress,
-    progressTrackingMode: resolvedProgressTrackingMode,
-    totalAmount: isManualProgress ? totalAmount : (isSubtaskAutoProgress ? progressSnapshot.totalAmount : undefined),
-    unitAmount: isManualProgress ? unitAmount : (isSubtaskAutoProgress ? progressSnapshot.unitAmount : undefined),
-    completedUnits: isManualProgress ? completedUnits : (isSubtaskAutoProgress ? progressSnapshot.completedUnits : undefined),
+    linkedCategoryId: isQuickReminder ? undefined : (effectiveLinkedCategoryId || undefined),
+    linkedActivityId: isQuickReminder ? undefined : (resolvedLinkedActivityId || undefined),
+    defaultScopeIds: isQuickReminder ? undefined : resolvedDefaultScopeIds,
+    isProgress: isQuickReminder ? false : isProgress,
+    progressTrackingMode: isQuickReminder ? 'none' : resolvedProgressTrackingMode,
+    totalAmount: isQuickReminder ? undefined : (isManualProgress ? totalAmount : (isSubtaskAutoProgress ? progressSnapshot.totalAmount : undefined)),
+    unitAmount: isQuickReminder ? undefined : (isManualProgress ? unitAmount : (isSubtaskAutoProgress ? progressSnapshot.unitAmount : undefined)),
+    completedUnits: isQuickReminder ? 0 : (isManualProgress ? completedUnits : (isSubtaskAutoProgress ? progressSnapshot.completedUnits : undefined)),
     pin,
-    heatmapMin,
-    heatmapMax,
-    coverImage,
+    heatmapMin: isQuickReminder ? undefined : heatmapMin,
+    heatmapMax: isQuickReminder ? undefined : heatmapMax,
+    coverImage: isQuickReminder ? undefined : coverImage,
     scheduledDate: scheduledDate || undefined,
     deadlineDate: deadlineDate || undefined,
-    recurrenceRule: isSubtask ? undefined : recurrenceRule,
+    recurrenceRule: isSubtask || isQuickReminder ? undefined : recurrenceRule,
     ...overrides
   });
 
@@ -542,26 +566,27 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     // 检查是否有实际变化
     if (persistedTodo) {
       const hasChanges = 
+        todoKind !== getTodoKind(persistedTodo) ||
         resolvedCategoryId !== persistedTodo.categoryId ||
         title.trim() !== persistedTodo.title ||
         note.trim() !== normalizeOptionalText(persistedTodo.note) ||
         isCompleted !== persistedTodo.isCompleted ||
-        effectiveLinkedCategoryId !== normalizeOptionalText(persistedTodo.linkedCategoryId) ||
-        resolvedLinkedActivityId !== normalizeOptionalText(persistedTodo.linkedActivityId) ||
-        JSON.stringify(normalizeOptionalScopeIds(resolvedDefaultScopeIds)) !== JSON.stringify(normalizeOptionalScopeIds(persistedTodo.defaultScopeIds)) ||
-        resolvedProgressTrackingMode !== persistedProgressTrackingMode ||
-        (isManualProgress && totalAmount !== persistedTodo.totalAmount) ||
-        (isManualProgress && unitAmount !== persistedTodo.unitAmount) ||
-        (isManualProgress && completedUnits !== persistedTodo.completedUnits) ||
-        heatmapMin !== persistedTodo.heatmapMin ||
-        heatmapMax !== persistedTodo.heatmapMax ||
+        (isQuickReminder ? '' : effectiveLinkedCategoryId) !== normalizeOptionalText(persistedTodo.linkedCategoryId) ||
+        (isQuickReminder ? '' : resolvedLinkedActivityId) !== normalizeOptionalText(persistedTodo.linkedActivityId) ||
+        JSON.stringify(normalizeOptionalScopeIds(isQuickReminder ? undefined : resolvedDefaultScopeIds)) !== JSON.stringify(normalizeOptionalScopeIds(persistedTodo.defaultScopeIds)) ||
+        (isQuickReminder ? 'none' : resolvedProgressTrackingMode) !== persistedProgressTrackingMode ||
+        (!isQuickReminder && isManualProgress && totalAmount !== persistedTodo.totalAmount) ||
+        (!isQuickReminder && isManualProgress && unitAmount !== persistedTodo.unitAmount) ||
+        (!isQuickReminder && isManualProgress && completedUnits !== persistedTodo.completedUnits) ||
+        (isQuickReminder ? undefined : heatmapMin) !== persistedTodo.heatmapMin ||
+        (isQuickReminder ? undefined : heatmapMax) !== persistedTodo.heatmapMax ||
         pin !== Boolean(persistedTodo.pin) ||
-        coverImage !== persistedTodo.coverImage ||
-        parentTodoId !== persistedTodo.parentTodoId ||
-        childOrder !== persistedTodo.childOrder ||
+        (isQuickReminder ? undefined : coverImage) !== persistedTodo.coverImage ||
+        (isQuickReminder ? undefined : parentTodoId) !== persistedTodo.parentTodoId ||
+        (isQuickReminder ? undefined : childOrder) !== persistedTodo.childOrder ||
         scheduledDate !== normalizeOptionalText(persistedTodo.scheduledDate) ||
         deadlineDate !== normalizeOptionalText(persistedTodo.deadlineDate) ||
-        normalizeRecurrenceRuleForComparison(isSubtask ? undefined : recurrenceRule) !== normalizeRecurrenceRuleForComparison(persistedTodo.recurrenceRule);
+        normalizeRecurrenceRuleForComparison(isSubtask || isQuickReminder ? undefined : recurrenceRule) !== normalizeRecurrenceRuleForComparison(persistedTodo.recurrenceRule);
       
       if (!hasChanges) return;
     }
@@ -569,13 +594,32 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     onSave(buildTodoPayload());
   }, [selectedCategoryId, title, note, isCompleted, linkedCategoryId, linkedActivityId, defaultScopeIds, resolvedProgressTrackingMode, isManualProgress, totalAmount, unitAmount, completedUnits, heatmapMin, heatmapMax, pin, coverImage, parentTodoId, childOrder, scheduledDate, deadlineDate, isSubtask, recurrenceRule, initialTodo, onSave, todos]); // 监听所有状态变化
 
-  const selectedCategory = todoCategories?.find(c => c.id === resolvedCategoryId) || currentCategory;
+  const selectedCategory = realTodoCategories.find(c => c.id === resolvedCategoryId) || currentCategory;
 
   const handleTogglePin = () => {
     setPin((prev) => !prev);
   };
 
+  const handleUpgradeQuickTodoToProject = () => {
+    if (isSubtask || !isQuickReminder) {
+      return;
+    }
+
+    const nextProjectCategoryId = realTodoCategories[0]?.id || resolvedCategoryId;
+    setTodoKind('project');
+    setSelectedCategoryId(nextProjectCategoryId);
+    onSave(buildTodoPayload({
+      kind: 'project',
+      categoryId: nextProjectCategoryId
+    }));
+  };
+
   const openInlineSubtaskComposer = () => {
+    if (isQuickReminder) {
+      addToast('info', '小事不支持子任务。');
+      return;
+    }
+
     if (recurrenceRule) {
       addToast('info', '循环任务不能添加子任务');
       return;
@@ -591,7 +635,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   };
 
   const handleCreateInlineSubtask = () => {
-    if (!initialTodo || isSubtask || recurrenceRule) {
+    if (!initialTodo || isSubtask || recurrenceRule || isQuickReminder) {
       if (recurrenceRule) {
         addToast('info', '循环任务不能添加子任务');
       }
@@ -818,7 +862,10 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
               <IconRenderer icon={selectedCategory.icon} uiIcon={selectedCategory.uiIcon} className="text-sm" />
               <span>{selectedCategory.name}</span>
             </span>
-            {isProgress && (
+            {isQuickReminder && (
+              <span className="text-stone-500 text-sm font-medium bg-stone-100 px-3 py-1 rounded-full">小事</span>
+            )}
+            {!isQuickReminder && isProgress && (
               <span className="btn-template-filled text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1">
                 <TrendingUp size={12} />
                 进度追踪
@@ -829,6 +876,15 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                 <Pin size={10} className="rotate-[28deg]" />
                 Pin
               </span>
+            )}
+            {isQuickReminder && !isSubtask && (
+              <button
+                type="button"
+                onClick={handleUpgradeQuickTodoToProject}
+                className="px-2.5 py-1 rounded-md border border-stone-200 bg-white text-xs font-bold text-stone-500 transition-colors hover:border-stone-300 hover:text-stone-700"
+              >
+                升级为项目
+              </button>
             )}
           </div>
         </div>
@@ -885,7 +941,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                 <div>
                   <label className="text-xs text-stone-400 font-medium mb-1.5 block">分类</label>
                   <div className="grid grid-cols-4 gap-2">
-                    {todoCategories?.map(cat => (
+                    {realTodoCategories.map(cat => (
                       <button
                         key={cat.id}
                         onClick={() => setSelectedCategoryId(cat.id)}
@@ -923,7 +979,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                 />
               </div>
 
-              {initialTodo && (
+              {initialTodo && !isQuickReminder && (
                 <div className="pt-1">
                   <DataCollectionSelector
                     itemType="todo"
@@ -1004,6 +1060,8 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                 )}
               </div>
 
+              {!isQuickReminder && (
+                <>
               {/* Progress Tracking */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
@@ -1097,9 +1155,11 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                   </div>
                 </div>
               </div>
+                </>
+              )}
             </div>
 
-            {!isSubtask && (
+            {!isSubtask && !isQuickReminder && (
               <>
                 {/* Link Activity */}
                 <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
@@ -1212,7 +1272,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                   )}
                 </div>
 
-                {!isSubtask && (
+                {!isSubtask && !isQuickReminder && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="text-xs text-stone-400 font-medium flex items-center gap-1.5">
@@ -1259,7 +1319,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                         );
                       })}
                     </div>
-                    <p className="text-[11px] text-stone-400">循环规则与分配日期、截止日期互斥。开启循环后会自动清空这两个日期。</p>
+                    <p className="text-[11px] text-stone-400">循环规则与分配日期、截止日期互斥。开启循环后会自动清空这两个日期。循环任务是作为计时项存在的，在结束最后一次循环之前，请勿点击完成。</p>
 
                     {recurrenceFrequency !== 'none' && (
                       <div className="space-y-3 rounded-2xl border border-dashed border-stone-200 bg-stone-50/70 p-4 animate-in slide-in-from-top-2 fade-in">
@@ -1332,6 +1392,17 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                               onChange={(e) => setRecurrenceMonthDay(Math.min(31, Math.max(1, parseInt(e.target.value, 10) || 1)))}
                               className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2.5 text-stone-700 text-sm outline-none focus:border-stone-400 transition-colors"
                             />
+                            {recurrenceMonthDay === 31 && (
+                              <label className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50/70 px-3 py-2 text-xs font-medium text-stone-600">
+                                <input
+                                  type="checkbox"
+                                  checked={recurrenceFallbackToMonthEnd}
+                                  onChange={(event) => setRecurrenceFallbackToMonthEnd(event.target.checked)}
+                                  className="h-3.5 w-3.5 rounded border-stone-300 text-stone-900 focus:ring-stone-400"
+                                />
+                                <span>若当月没有 31 号，则自动定位到最后一天</span>
+                              </label>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1374,7 +1445,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
               </section>
             )}
 
-            {initialTodo && !isSubtask && (
+            {initialTodo && !isSubtask && !isQuickReminder && (
               <section>
                 <div className="mb-4 flex items-end justify-between gap-4">
                   <div>
