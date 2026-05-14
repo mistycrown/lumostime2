@@ -6,6 +6,7 @@
  * @description A journal-style view for daily entries, providing an alternative perspective to the ReviewHubView and reusing shared timeline styling behavior for archive rendering.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-05-14: Memoir log entries now inherit `◬ Collection` chips from data-collection membership so archive rows match the main timeline metadata treatment.
  * @updated 2026-04-20: Replaced the top-left Memoir month dropdown with the shared centered month picker modal used by todo scheduling.
  * @updated 2026-04-20: Enabled the mood calendar modal date title to jump directly into that day's daily review.
  */
@@ -125,7 +126,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
     collapseThreshold = 9999
 }) => {
     const { categories } = useCategoryScope();
-    const { setLogs } = useData();
+    const { setLogs, collections, collectionEntries } = useData();
     const { backgroundUrl, hasBackground, panelOverlayOpacity, useReducedEffects } = useBackgroundDisplay();
     const {
         memoirFilterConfig,
@@ -148,6 +149,37 @@ export const JournalView: React.FC<JournalViewProps> = ({
     // 性能优化：分页加载
     const [displayCount, setDisplayCount] = useState(30); // 初始显示30条
     const LOAD_MORE_COUNT = 20; // 每次加载20条
+
+    const logCollectionNames = useMemo(() => {
+        const collectionById = new Map(collections.map((collection) => [collection.id, collection]));
+        const collectionIdsByLogId = new Map<string, string[]>();
+
+        collectionEntries.forEach((entry) => {
+            if (entry.itemType !== 'log') {
+                return;
+            }
+
+            const current = collectionIdsByLogId.get(entry.itemId) || [];
+            current.push(entry.collectionId);
+            collectionIdsByLogId.set(entry.itemId, current);
+        });
+
+        const namesByLogId = new Map<string, string[]>();
+        collectionIdsByLogId.forEach((collectionIds, logId) => {
+            const orderedNames = Array.from(new Set(collectionIds))
+                .map((collectionId) => collectionById.get(collectionId))
+                .filter((collection): collection is NonNullable<typeof collection> => Boolean(collection))
+                .sort((left, right) => right.updatedAt - left.updatedAt)
+                .map((collection) => collection.name.trim())
+                .filter(Boolean);
+
+            if (orderedNames.length > 0) {
+                namesByLogId.set(logId, orderedNames);
+            }
+        });
+
+        return namesByLogId;
+    }, [collectionEntries, collections]);
 
     // Transform and Filter entries
     const filteredEntries = useMemo(() => {
@@ -182,6 +214,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
             // Get linked todo
             const linkedTodo = todos.find(t => t.id === log.linkedTodoId);
+            const collectionNames = logCollectionNames.get(log.id) || [];
             // Get linked scopes
             const linkedScopes = log.scopeIds?.map(id => scopes.find(s => s.id === id)).filter(Boolean) as Scope[] || [];
 
@@ -214,6 +247,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                     completedUnits: linkedTodo.completedUnits,
                     totalAmount: linkedTodo.totalAmount
                 }] : undefined,
+                collectionNames,
                 domains: linkedScopes.length > 0 ? linkedScopes.map(s => {
                     const scopeIcon = getDisplayIcon(s.icon, s.uiIcon, uiTheme);
                     return `${scopeIcon} ${s.name}`;
@@ -388,7 +422,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
         return groupedByDay;
 
-    }, [logs, dailyReviews, weeklyReviews, monthlyReviews, categories, selectedDate, memoirFilterConfig, todos, scopes, uiTheme]);
+    }, [logs, dailyReviews, weeklyReviews, monthlyReviews, categories, selectedDate, memoirFilterConfig, todos, scopes, uiTheme, logCollectionNames]);
 
     const memoirRailIndexMap = useMemo(() => {
         return filteredEntries

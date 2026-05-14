@@ -1,97 +1,40 @@
-# Settings Views 重构说明
+# Settings Views
 
-## 概述
-将原本 3493 行的 `SettingsView.tsx` 拆分成多个独立的设置子页面组件，提高代码可维护性和可读性。
+`src/views/settings/` contains full-screen settings subviews extracted from the main `SettingsView.tsx`.
 
-## 更新记录
+## Updates
 
-- 2026-05-10: `PreferencesSettingsView.tsx` 的“开始计时后自动跳转”已从布尔开关升级为三选项下拉，可在“不跳转 / 正在计时 / 沉浸式计时”之间切换，并与旧布尔本地存储兼容。
+- 2026-05-14: `AISettingsView.tsx` now supports named AI API presets with a built-in `默认预设`, custom preset create/rename/delete actions, provider-template switching, and per-preset `API Key / baseUrl / modelName` storage while switching the active preset immediately.
+- 2026-05-10: `PreferencesSettingsView.tsx` changed the post-start timer jump behavior from a boolean toggle into a three-option selector.
 
-## 已创建的子组件
+## Current Subviews
 
-### 1. CloudSyncSettingsView.tsx
-- **功能**: WebDAV 云同步配置
-- **路径**: `src/views/settings/CloudSyncSettingsView.tsx`
-- **主要功能**:
-  - WebDAV 服务器连接配置
-  - 上传/下载数据到云端
-  - 断开连接和清理配置
+### `CloudSyncSettingsView.tsx`
+- WebDAV connection settings
+- Upload/download data with cloud sync
+- Disconnect and clear sync config
 
-### 2. AISettingsView.tsx
-- **功能**: AI API 配置
-- **路径**: `src/views/settings/AISettingsView.tsx`
-- **主要功能**:
-  - AI 服务商预设选择（Gemini, DeepSeek, 硅基流动, OpenAI）
-  - API Key 配置
-  - 连接测试
+### `AISettingsView.tsx`
+- AI preset selection and quick switching
+- Built-in `默认预设` plus custom preset create/rename/delete
+- Provider template selection: Gemini, DeepSeek, 硅基流动, OpenAI 兼容, 自定义
+- Independent `API Key / API 地址 / 模型名称` storage per preset
+- Save and connection test
 
-### 3. S3SyncSettingsView.tsx
-- **功能**: S3 (腾讯云 COS) 云同步配置
-- **路径**: `src/views/settings/S3SyncSettingsView.tsx`
-- **主要功能**:
-  - S3 存储桶配置
-  - 上传/下载数据到 COS
-  - 断开连接和清理配置
+### `S3SyncSettingsView.tsx`
+- S3 / COS connection settings
+- Upload/download sync data
+- Disconnect and clear config
 
-### 4. DataManagementView.tsx
-- **功能**: 数据管理
-- **路径**: `src/views/settings/DataManagementView.tsx`
-- **主要功能**:
-  - 数据备份与恢复（JSON 导入/导出）
-  - Excel 导出
-  - 图片管理（检查、清理未引用图片）
-  - 云端备份清理
-  - 云端图片一致性检查与按本地状态修复
-  - 重置和清空数据
+### `DataManagementView.tsx`
+- JSON import/export
+- Excel export
+- Image cleanup and consistency tools
+- Cloud backup cleanup
+- Reset and clear data actions
 
-## 待创建的子组件
+## Integration Notes
 
-### 5. PreferencesSettingsView.tsx
-- 偏好设置（周开始日、回顾时间、默认页面等）
-
-### 6. NarrativeSettingsView.tsx
-- AI 叙事设定（个人信息、自定义叙事模板）
-
-### 7. NFCSettingsView.tsx
-- 补充：当前页包含快速打点、指定活动、日课项、读取测试、清除标签，并兼容缺少 `activities/items` 的旧数据
-- NFC 标签配置
-
-### 8. UserGuideView.tsx
-- 用户指南（Markdown 渲染）
-
-## 使用方式
-
-在主 `SettingsView.tsx` 中：
-
-```tsx
-import { CloudSyncSettingsView } from './settings/CloudSyncSettingsView';
-import { AISettingsView } from './settings/AISettingsView';
-import { S3SyncSettingsView } from './settings/S3SyncSettingsView';
-import { DataManagementView } from './settings/DataManagementView';
-
-// 在组件中根据 activeSubmenu 渲染对应的子组件
-if (activeSubmenu === 'cloud') {
-    return <CloudSyncSettingsView ... />;
-}
-
-if (activeSubmenu === 'ai') {
-    return <AISettingsView ... />;
-}
-
-// ... 其他子页面
-```
-
-## 优势
-
-1. **代码组织**: 每个设置页面独立管理，职责清晰
-2. **可维护性**: 修改某个设置页面不影响其他页面
-3. **可测试性**: 每个组件可以独立测试
-4. **性能**: 按需加载，减少初始包大小
-5. **协作**: 多人可以同时开发不同的设置页面
-
-## 注意事项
-
-- 所有子组件都接收 `onBack` 回调用于返回主设置页；其中 `FiltersSettingsView` 也可作为独立全屏入口复用，用于从脉络页直接打开并返回脉络页
-- `SettingsView` 会在本次打开设置页的会话内记住主列表滚动位置，子页通过软件返回或 Android 硬件返回主列表时都会自动恢复到进入前的位置
-- 共享的状态和方法通过 props 传递
-- 保持统一的 UI 风格和交互模式
+- Each subview receives `onBack` so it can return to the main settings page.
+- Shared state is still passed through props from `SettingsView.tsx`.
+- Keep visual language consistent with the rest of settings: full-screen layout, soft stone palette, and minimal controls.

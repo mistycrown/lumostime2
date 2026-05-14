@@ -7,6 +7,7 @@
  *
  * @updated 2026-05-09: Added assistant scheduled-task template types so recurring AI task rules can materialize native reminders without overloading one-shot reminder records.
  * @updated 2026-05-12: Added Dream topic, entry, patch, and update-card types for the new explicit-only long-horizon attention system, plus optional read-only Dream context injection for unified assistant turns.
+ * @updated 2026-05-14: Added shared assistant reasoning-summary types so provider-native thinking content can be normalized once and rendered consistently across foreground and background chat messages.
  * @updated 2026-05-13: Reframed assistant time context around absolute reference fields, timestamped conversation turns, and explicit per-date timeline labels so prompt-time relative-date reasoning has less room to drift.
  * @updated 2026-05-06: Added explicit `yesterdayTimelineSummary` support to assistant state context so unified turns can see concrete activity records for both today and yesterday.
  * @updated 2026-05-06: Added optional `timelineReviewSummary` plus structured log candidates to assistant prompt context, removed the stale unified-turn recent-log input, and aligned todo creation so `linkedCategoryId` can be inferred from `linkedActivityId`.
@@ -467,10 +468,20 @@ export type AssistantToolCall =
   | AssistantCreateSubtaskToolCall
   | AssistantEditLogToolCall;
 
+export interface AssistantReasoningPart {
+  text: string;
+}
+
+export interface AssistantReasoningSummary {
+  parts: AssistantReasoningPart[];
+  providerLabel?: string;
+}
+
 export interface AssistantUnifiedTurnOutput {
   mode: AssistantTurnMode;
   outcome: AssistantTurnOutcome;
   assistantReply?: string;
+  reasoning?: AssistantReasoningSummary;
   toolCalls?: AssistantToolCall[];
   reminders?: AssistantReminderDraft[];
   memoryAction: AssistantMemoryAction;

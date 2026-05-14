@@ -4,6 +4,7 @@
  * @output Shared helpers for collection membership updates and mixed-item resolution
  * @pos Utility (data collection helpers)
  * @description Keeps the new themed collection feature consistent across picker, list, and detail surfaces by centralizing membership updates and display joins.
+ * @updated 2026-05-14: Added a batch append helper so collection detail pages can add multiple logs or todos into one collection without duplicating existing memberships.
  * @updated 2026-05-12: Added first-pass helpers for mixed log/todo collection membership and display resolution.
  */
 import {
@@ -37,6 +38,14 @@ interface UpsertDataCollectionEntriesParams {
   collectionIds: string[];
   itemType: DataCollectionItemType;
   itemId: string;
+  addedAt: number;
+}
+
+interface AppendDataCollectionEntriesParams {
+  entries: DataCollectionEntry[];
+  collectionId: string;
+  itemType: DataCollectionItemType;
+  itemIds: string[];
   addedAt: number;
 }
 
@@ -101,6 +110,44 @@ export const upsertDataCollectionEntriesForItem = ({
   });
 
   return [...unrelatedEntries, ...nextEntries];
+};
+
+export const appendDataCollectionEntries = ({
+  entries,
+  collectionId,
+  itemType,
+  itemIds,
+  addedAt
+}: AppendDataCollectionEntriesParams): DataCollectionEntry[] => {
+  const normalizedItemIds = Array.from(new Set(itemIds));
+  if (normalizedItemIds.length === 0) {
+    return entries;
+  }
+
+  const existingEntryKeys = new Set(
+    entries
+      .filter((entry) => entry.collectionId === collectionId && entry.itemType === itemType)
+      .map((entry) => `${entry.itemType}:${entry.itemId}`)
+  );
+  const nextEntries = [...entries];
+
+  normalizedItemIds.forEach((itemId) => {
+    const entryKey = `${itemType}:${itemId}`;
+    if (existingEntryKeys.has(entryKey)) {
+      return;
+    }
+
+    nextEntries.push({
+      id: crypto.randomUUID(),
+      collectionId,
+      itemType,
+      itemId,
+      addedAt
+    });
+    existingEntryKeys.add(entryKey);
+  });
+
+  return nextEntries;
 };
 
 export const resolveDataCollectionItems = (

@@ -269,8 +269,12 @@ describe('assistantOrchestratorService', () => {
       output: {
         mode: 'background',
         outcome: 'reply',
-        assistantReply: '先去写提纲',
-        assistantReplyParts: ['先去写提纲', '写完再回来告诉我'],
+        assistantReply: '先去写提纲\n\n写完再回来告诉我',
+        reasoning: {
+          parts: [{
+            text: '先判断用户更需要一句短提醒。'
+          }]
+        },
         memoryAction: 'no_update'
       },
       debug: debugExchange
@@ -291,19 +295,24 @@ describe('assistantOrchestratorService', () => {
       todayTimelineSummary: 'timeline'
     });
 
-    expect(result.surfacedMessage).toBe('先去写提纲');
+    expect(result.surfacedMessage).toBe('先去写提纲\n\n写完再回来告诉我');
     expect(result.decision.messageParts).toEqual(['先去写提纲', '写完再回来告诉我']);
 
     const persistedSessions = JSON.parse(localStorage.getItem('lumostime_ai_chat_sessions_v1') || '[]');
     expect(persistedSessions).toHaveLength(1);
     expect(persistedSessions[0].messages).toHaveLength(1);
-    expect(persistedSessions[0].messages[0].content).toBe('先去写提纲');
+    expect(persistedSessions[0].messages[0].content).toBe('先去写提纲\n\n写完再回来告诉我');
+    expect(persistedSessions[0].messages[0].reasoning).toEqual({
+      parts: [{
+        text: '先判断用户更需要一句短提醒。'
+      }]
+    });
     expect(persistedSessions[0].messages[0].displayParts).toEqual(['先去写提纲', '写完再回来告诉我']);
 
     expect(AssistantAgent.showAssistantNotification).toHaveBeenCalledTimes(1);
     expect(AssistantAgent.showAssistantNotification).toHaveBeenCalledWith(expect.objectContaining({
       title: '赛博导师',
-      body: '先去写提纲',
+      body: '先去写提纲\n\n写完再回来告诉我',
       targetSessionId: 'session-1'
     }));
     const history = assistantOrchestratorService.listBackgroundCallHistory();

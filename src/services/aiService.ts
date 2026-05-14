@@ -3,6 +3,8 @@
  * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
  * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
  * @pos Service (AI Integration Layer)
+ * @updated 2026-05-14: Added provider-aware reasoning extraction so OpenAI-compatible and Gemini responses can surface native thinking content through the shared assistant message pipeline.
+ * @updated 2026-05-14: Added named AI preset storage with current-preset switching, migration from older single-config/profile keys, and preset CRUD helpers for multi-provider quick switching in settings.
  * @description AI 闂備礁鎼悧鍡欑矓鐎涙ɑ鍙?- 濠电姰鍨煎▔娑氣偓姘煎櫍楠炲啯绻濋崘顏佹灃?AI 闂備礁婀辩划顖炲礉閹烘梹顐介柣銏㈩焾閻ゎ噣鏌涢埥鍡楀箻缂佲偓閸戠晝enAI/Gemini闂備焦瀵х粙鎴λ囬崡鐐╂灁闁硅揪绠戠粻銉╂煃瑜滈崜鐔奉嚕閸偄绶炲璺侯儏閺€顓熺箾鐎涙鐭嬮悽顖ｄ簽濡cljs劕鈹戠€ｎ亞顦遍梺鍛婁緱閸犳牠顢旈鍫熲拺闁哄娉曡倴闂佹眹鍊曞Λ娑氬垝婵犳碍鏅柛鏇ㄥ墮閳ь剛鍋ら弻鏇㈠幢閺囩喓銈扮紓浣虹帛閻╊垶鐛幒妤€唯闁挎柧鍕橀崑鐐烘煟閻樺弶澶勬繛鍙夌墵楠炲繑瀵奸弶鎴狀唽闂佸綊鍋婇崰鎾寸濞戙垺鐓欑紒妤佺☉濡參寮? * @updated 2026-04-27: Extended unified assistant-turn normalization with decision summaries, silent reasons, side effects, and structured multi-bubble reply parts.
  * @updated 2026-05-13: Extended recurrence-rule normalization with an explicit month-end fallback flag for monthly 31st-style schedules.
  * @updated 2026-05-10: Added provider-aware prompt-cache routing hints plus normalized cache debug metrics for OpenAI-compatible assistant turns, while keeping unsupported providers on the existing transport path.
@@ -33,6 +35,7 @@
  */
 import { Scope, TodoKind, TodoRecurrenceRule } from '../types';
 import type {
+    AssistantReasoningSummary,
     AssistantMemoryPatch,
     AssistantReminderDraft,
     AssistantSilentReason,
@@ -41,11 +44,18 @@ import type {
     AssistantTurnMode
 } from '../types/assistant';
 import { normalizeAIBackfillToolCalls } from '../utils/aiBackfillUtils';
+import { buildAssistantReasoningSummary } from '../utils/assistantReasoning';
 export interface AIConfig {
     provider: 'openai' | 'gemini';
     apiKey: string;
     baseUrl?: string; // For OpenAI Compatible
     modelName: string;
+}
+
+export interface AIPreset {
+    id: string;
+    name: string;
+    config: AIConfig;
 }
 
 export interface ParsedTimeEntry {
@@ -219,7 +229,11 @@ export interface AIStructuredJsonRequestParams<T> {
         keySeed: string;
         scope?: string;
     };
-    normalizeResult: (rawValue: any) => T;
+    normalizeResult: (rawValue: any, meta?: AIResponseNormalizationMeta) => T;
+}
+
+interface AIResponseNormalizationMeta {
+    reasoning?: AssistantReasoningSummary;
 }
 
 type OpenAICompatibleProviderFamily =
@@ -236,10 +250,228 @@ type OpenAICompatibleProviderFamily =
 
 const AI_CONFIG_KEY = 'lumostime_ai_config';
 const AI_PROFILES_KEY = 'lumostime_ai_profiles';
+const AI_PRESETS_KEY = 'lumostime_ai_presets';
+const AI_CURRENT_PRESET_KEY = 'lumostime_ai_current_preset';
+const DEFAULT_AI_PRESET_ID = 'default';
+const DEFAULT_AI_PRESET_NAME = '默认预设';
 
 import { HTTP } from '@awesome-cordova-plugins/http';
 import { Capacitor } from '@capacitor/core';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
+
+const DEFAULT_AI_CONFIG: AIConfig = {
+    provider: 'openai',
+    apiKey: '',
+    baseUrl: 'https://api.openai.com/v1',
+    modelName: 'gpt-3.5-turbo'
+};
+
+const LEGACY_PROFILE_NAME_MAP: Record<string, string> = {
+    gemini: 'Gemini',
+    deepseek: 'DeepSeek',
+    siliconflow: '硅基流动',
+    openai: 'OpenAI'
+};
+
+interface AIPresetState {
+    presets: AIPreset[];
+    currentPresetId: string;
+}
+
+const cloneAIConfig = (config: AIConfig): AIConfig => ({
+    provider: config.provider,
+    apiKey: config.apiKey,
+    baseUrl: config.baseUrl,
+    modelName: config.modelName
+});
+
+const normalizeAIConfig = (value: unknown): AIConfig => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return { ...DEFAULT_AI_CONFIG };
+    }
+
+    const raw = value as Partial<AIConfig>;
+    const provider = raw.provider === 'gemini' ? 'gemini' : 'openai';
+    const apiKey = typeof raw.apiKey === 'string' ? raw.apiKey : '';
+    const baseUrl = typeof raw.baseUrl === 'string'
+        ? raw.baseUrl
+        : provider === 'gemini'
+            ? 'https://generativelanguage.googleapis.com/v1beta/models'
+            : DEFAULT_AI_CONFIG.baseUrl;
+    const modelName = typeof raw.modelName === 'string' && raw.modelName.trim()
+        ? raw.modelName
+        : provider === 'gemini'
+            ? 'gemini-2.5-flash'
+            : DEFAULT_AI_CONFIG.modelName;
+
+    return {
+        provider,
+        apiKey,
+        baseUrl,
+        modelName
+    };
+};
+
+const sanitizePresetName = (value: unknown, fallback: string): string => {
+    if (typeof value !== 'string') {
+        return fallback;
+    }
+
+    const trimmed = value.trim();
+    return trimmed || fallback;
+};
+
+const normalizeAIPreset = (
+    value: unknown,
+    fallbackId: string,
+    fallbackName: string
+): AIPreset | null => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return null;
+    }
+
+    const raw = value as Partial<AIPreset>;
+    const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : fallbackId;
+    return {
+        id,
+        name: sanitizePresetName(raw.name, fallbackName),
+        config: normalizeAIConfig(raw.config)
+    };
+};
+
+const areConfigsEqual = (left: AIConfig, right: AIConfig): boolean => {
+    return left.provider === right.provider
+        && left.apiKey === right.apiKey
+        && (left.baseUrl || '') === (right.baseUrl || '')
+        && left.modelName === right.modelName;
+};
+
+const createDefaultPreset = (config?: AIConfig): AIPreset => ({
+    id: DEFAULT_AI_PRESET_ID,
+    name: DEFAULT_AI_PRESET_NAME,
+    config: cloneAIConfig(config || DEFAULT_AI_CONFIG)
+});
+
+const buildPresetState = (
+    rawPresets: unknown[],
+    preferredCurrentPresetId?: string | null
+): AIPresetState => {
+    const dedupedPresets = new Map<string, AIPreset>();
+
+    rawPresets.forEach((rawPreset, index) => {
+        const normalizedPreset = normalizeAIPreset(
+            rawPreset,
+            `preset_${index + 1}`,
+            `预设 ${index + 1}`
+        );
+        if (!normalizedPreset) {
+            return;
+        }
+        dedupedPresets.set(normalizedPreset.id, normalizedPreset);
+    });
+
+    if (!dedupedPresets.has(DEFAULT_AI_PRESET_ID)) {
+        dedupedPresets.set(DEFAULT_AI_PRESET_ID, createDefaultPreset());
+    }
+
+    const presets = Array.from(dedupedPresets.values());
+    const currentPresetId = preferredCurrentPresetId && dedupedPresets.has(preferredCurrentPresetId)
+        ? preferredCurrentPresetId
+        : DEFAULT_AI_PRESET_ID;
+
+    return {
+        presets,
+        currentPresetId
+    };
+};
+
+const loadLegacyProfilePresets = (): AIPreset[] => {
+    const stored = localStorage.getItem(AI_PROFILES_KEY);
+    if (!stored) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(stored) as Record<string, unknown>;
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return [];
+        }
+
+        return Object.entries(parsed).map(([key, value], index) => ({
+            id: `legacy_${key}_${index + 1}`,
+            name: sanitizePresetName(LEGACY_PROFILE_NAME_MAP[key], `预设 ${index + 1}`),
+            config: normalizeAIConfig(value)
+        }));
+    } catch (error) {
+        console.error('[aiService] Failed to parse legacy AI profiles', error);
+        return [];
+    }
+};
+
+const readPresetState = (): AIPresetState => {
+    const storedPresets = localStorage.getItem(AI_PRESETS_KEY);
+    const storedCurrentPresetId = localStorage.getItem(AI_CURRENT_PRESET_KEY);
+
+    if (storedPresets) {
+        try {
+            const parsed = JSON.parse(storedPresets);
+            if (Array.isArray(parsed)) {
+                const state = buildPresetState(parsed, storedCurrentPresetId);
+                const currentPreset = state.presets.find(preset => preset.id === state.currentPresetId) || state.presets[0];
+                localStorage.setItem(AI_PRESETS_KEY, JSON.stringify(state.presets));
+                localStorage.setItem(AI_CURRENT_PRESET_KEY, state.currentPresetId);
+                localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(currentPreset.config));
+                return state;
+            }
+        } catch (error) {
+            console.error('[aiService] Failed to parse AI presets, falling back to migration', error);
+        }
+    }
+
+    let parsedLegacyConfig: unknown = DEFAULT_AI_CONFIG;
+    const storedLegacyConfig = localStorage.getItem(AI_CONFIG_KEY);
+    if (storedLegacyConfig) {
+        try {
+            parsedLegacyConfig = JSON.parse(storedLegacyConfig);
+        } catch (error) {
+            console.error('[aiService] Failed to parse legacy AI config, using defaults', error);
+        }
+    }
+
+    const legacyConfig = normalizeAIConfig(parsedLegacyConfig);
+    const legacyProfilePresets = loadLegacyProfilePresets()
+        .filter(preset => !areConfigsEqual(preset.config, legacyConfig));
+    const migratedState = buildPresetState(
+        [createDefaultPreset(legacyConfig), ...legacyProfilePresets],
+        DEFAULT_AI_PRESET_ID
+    );
+
+    localStorage.setItem(AI_PRESETS_KEY, JSON.stringify(migratedState.presets));
+    localStorage.setItem(AI_CURRENT_PRESET_KEY, migratedState.currentPresetId);
+    localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(legacyConfig));
+
+    return migratedState;
+};
+
+const persistPresetState = (
+    state: AIPresetState,
+    syncNativeConfig: boolean = false
+): AIPresetState => {
+    localStorage.setItem(AI_PRESETS_KEY, JSON.stringify(state.presets));
+    localStorage.setItem(AI_CURRENT_PRESET_KEY, state.currentPresetId);
+    const currentPreset = state.presets.find(preset => preset.id === state.currentPresetId) || state.presets[0];
+    localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(currentPreset.config));
+
+    if (syncNativeConfig && Capacitor.isNativePlatform()) {
+        void AssistantAgent.syncNativeAIConfig(currentPreset.config).catch((error) => {
+            console.error('[aiService] Failed to sync native AI config', error);
+        });
+    }
+
+    return state;
+};
+
+const createPresetId = (): string => `preset_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 const createAbortError = (): Error => {
     const error = new Error('The operation was aborted.');
@@ -1170,6 +1402,89 @@ const cleanAndParseJSONObjectContent = (content: string): any => {
     }
 };
 
+const isReasoningLikeType = (value: unknown): boolean => {
+    if (typeof value !== 'string') {
+        return false;
+    }
+
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'reasoning'
+        || normalized === 'thinking'
+        || normalized === 'thought'
+        || normalized === 'reasoning_content';
+};
+
+const extractOpenAICompatibleReasoning = (
+    responseBody: unknown,
+    providerLabel: string
+): AssistantReasoningSummary | undefined => {
+    const root = responseBody && typeof responseBody === 'object'
+        ? responseBody as Record<string, unknown>
+        : null;
+    const choice = Array.isArray(root?.choices) && root?.choices[0] && typeof root.choices[0] === 'object'
+        ? root.choices[0] as Record<string, unknown>
+        : null;
+    const message = choice?.message && typeof choice.message === 'object'
+        ? choice.message as Record<string, unknown>
+        : null;
+    const delta = choice?.delta && typeof choice.delta === 'object'
+        ? choice.delta as Record<string, unknown>
+        : null;
+    const messageContentParts = Array.isArray(message?.content)
+        ? (message?.content as unknown[])
+            .filter((part) => {
+                if (!part || typeof part !== 'object' || Array.isArray(part)) {
+                    return false;
+                }
+                return isReasoningLikeType((part as Record<string, unknown>).type);
+            })
+        : [];
+
+    return buildAssistantReasoningSummary([
+        message?.reasoning_content,
+        message?.reasoning,
+        message?.thinking,
+        ...messageContentParts.map((part) => {
+            const candidate = part as Record<string, unknown>;
+            return candidate.text ?? candidate.content ?? candidate.reasoning ?? candidate.thinking;
+        }),
+        delta?.reasoning_content,
+        delta?.reasoning,
+        delta?.thinking
+    ], providerLabel);
+};
+
+const extractGeminiReasoning = (
+    responseBody: unknown
+): AssistantReasoningSummary | undefined => {
+    const root = responseBody && typeof responseBody === 'object'
+        ? responseBody as Record<string, unknown>
+        : null;
+    const candidate = Array.isArray(root?.candidates) && root?.candidates[0] && typeof root.candidates[0] === 'object'
+        ? root.candidates[0] as Record<string, unknown>
+        : null;
+    const content = candidate?.content && typeof candidate.content === 'object'
+        ? candidate.content as Record<string, unknown>
+        : null;
+    const parts = Array.isArray(content?.parts)
+        ? content?.parts as unknown[]
+        : [];
+    const reasoningParts = parts.filter((part) => {
+        if (!part || typeof part !== 'object' || Array.isArray(part)) {
+            return false;
+        }
+
+        const candidatePart = part as Record<string, unknown>;
+        return candidatePart.thought === true || isReasoningLikeType(candidatePart.type);
+    });
+
+    return buildAssistantReasoningSummary([
+        candidate?.reasoning,
+        candidate?.thinking,
+        ...reasoningParts.map((part) => (part as Record<string, unknown>).text)
+    ], 'gemini');
+};
+
 const hasMeaningfulAssistantUnifiedTurnSignal = (mode: AssistantTurnMode, rawOutput: unknown): boolean => {
     if (!rawOutput || typeof rawOutput !== 'object' || Array.isArray(rawOutput)) {
         return false;
@@ -1287,8 +1602,14 @@ const requestJsonObjectWithDebug = async <T>(
             }
 
             const rawContent = (responseBody as any)?.choices?.[0]?.message?.content || '{}';
+            const reasoning = extractOpenAICompatibleReasoning(
+                responseBody,
+                detectOpenAICompatibleProviderFamily(config)
+            );
             return {
-                result: params.normalizeResult(cleanAndParseJSONObjectContent(rawContent)),
+                result: params.normalizeResult(cleanAndParseJSONObjectContent(rawContent), {
+                    ...(reasoning ? { reasoning } : {})
+                }),
                 debug
             };
         } catch (error) {
@@ -1371,8 +1692,11 @@ const requestJsonObjectWithDebug = async <T>(
             }
 
             const rawContent = (((responseBody as any)?.candidates?.[0]?.content?.parts?.[0]?.text) || '{}');
+            const reasoning = extractGeminiReasoning(responseBody);
             return {
-                result: params.normalizeResult(cleanAndParseJSONObjectContent(rawContent)),
+                result: params.normalizeResult(cleanAndParseJSONObjectContent(rawContent), {
+                    ...(reasoning ? { reasoning } : {})
+                }),
                 debug
             };
         } catch (error) {
@@ -1406,29 +1730,144 @@ const requestJsonObjectWithDebug = async <T>(
 
 export const aiService = {
     getConfig: (): AIConfig => {
-        const stored = localStorage.getItem(AI_CONFIG_KEY);
-        if (stored) {
-            return JSON.parse(stored);
-        }
+        const state = readPresetState();
+        const currentPreset = state.presets.find(preset => preset.id === state.currentPresetId);
+        return cloneAIConfig(currentPreset?.config || DEFAULT_AI_CONFIG);
+    },
+
+    getPresets: (): AIPreset[] => {
+        return readPresetState().presets.map(preset => ({
+            ...preset,
+            config: cloneAIConfig(preset.config)
+        }));
+    },
+
+    getCurrentPresetId: (): string => {
+        return readPresetState().currentPresetId;
+    },
+
+    getCurrentPreset: (): AIPreset => {
+        const state = readPresetState();
+        const currentPreset = state.presets.find(preset => preset.id === state.currentPresetId) || state.presets[0];
         return {
-            provider: 'openai',
-            apiKey: '',
-            baseUrl: 'https://api.openai.com/v1',
-            modelName: 'gpt-3.5-turbo'
+            ...currentPreset,
+            config: cloneAIConfig(currentPreset.config)
+        };
+    },
+
+    setCurrentPreset: (presetId: string): AIPreset | null => {
+        const state = readPresetState();
+        if (!state.presets.some(preset => preset.id === presetId)) {
+            return null;
+        }
+
+        const nextState = persistPresetState({
+            presets: state.presets,
+            currentPresetId: presetId
+        }, true);
+        const currentPreset = nextState.presets.find(preset => preset.id === presetId) || nextState.presets[0];
+        return {
+            ...currentPreset,
+            config: cloneAIConfig(currentPreset.config)
+        };
+    },
+
+    createPreset: (name: string, config?: AIConfig): AIPreset => {
+        const state = readPresetState();
+        const preset: AIPreset = {
+            id: createPresetId(),
+            name: sanitizePresetName(name, `预设 ${state.presets.length + 1}`),
+            config: cloneAIConfig(config || aiService.getConfig())
+        };
+
+        persistPresetState({
+            presets: [...state.presets, preset],
+            currentPresetId: preset.id
+        }, true);
+
+        return {
+            ...preset,
+            config: cloneAIConfig(preset.config)
+        };
+    },
+
+    updatePreset: (presetId: string, updates: Partial<Pick<AIPreset, 'name' | 'config'>>): AIPreset | null => {
+        const state = readPresetState();
+        const targetPreset = state.presets.find(preset => preset.id === presetId);
+        if (!targetPreset) {
+            return null;
+        }
+
+        const updatedPreset: AIPreset = {
+            ...targetPreset,
+            name: updates.name !== undefined
+                ? sanitizePresetName(updates.name, targetPreset.name)
+                : targetPreset.name,
+            config: updates.config ? normalizeAIConfig(updates.config) : targetPreset.config
+        };
+
+        const nextState = persistPresetState({
+            presets: state.presets.map(preset => preset.id === presetId ? updatedPreset : preset),
+            currentPresetId: state.currentPresetId
+        }, state.currentPresetId === presetId);
+        const persistedPreset = nextState.presets.find(preset => preset.id === presetId) || updatedPreset;
+
+        return {
+            ...persistedPreset,
+            config: cloneAIConfig(persistedPreset.config)
+        };
+    },
+
+    deletePreset: (presetId: string): { deleted: boolean; currentPreset: AIPreset } => {
+        const state = readPresetState();
+        if (presetId === DEFAULT_AI_PRESET_ID || !state.presets.some(preset => preset.id === presetId)) {
+            const currentPreset = state.presets.find(preset => preset.id === state.currentPresetId) || state.presets[0];
+            return {
+                deleted: false,
+                currentPreset: {
+                    ...currentPreset,
+                    config: cloneAIConfig(currentPreset.config)
+                }
+            };
+        }
+
+        const nextPresets = state.presets.filter(preset => preset.id !== presetId);
+        const nextCurrentPresetId = state.currentPresetId === presetId
+            ? DEFAULT_AI_PRESET_ID
+            : state.currentPresetId;
+        const nextState = persistPresetState({
+            presets: nextPresets,
+            currentPresetId: nextCurrentPresetId
+        }, true);
+        const currentPreset = nextState.presets.find(preset => preset.id === nextState.currentPresetId) || nextState.presets[0];
+
+        return {
+            deleted: true,
+            currentPreset: {
+                ...currentPreset,
+                config: cloneAIConfig(currentPreset.config)
+            }
         };
     },
 
     saveConfig: (config: AIConfig) => {
-        localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(config));
-        if (Capacitor.isNativePlatform()) {
-            void AssistantAgent.syncNativeAIConfig(config).catch((error) => {
-                console.error('[aiService] Failed to sync native AI config', error);
-            });
-        }
+        const normalizedConfig = normalizeAIConfig(config);
+        const state = readPresetState();
+        const nextPresets = state.presets.map((preset) => (
+            preset.id === state.currentPresetId
+                ? { ...preset, config: normalizedConfig }
+                : preset
+        ));
+        persistPresetState({
+            presets: nextPresets,
+            currentPresetId: state.currentPresetId
+        }, true);
     },
 
     clearConfig: () => {
         localStorage.removeItem(AI_CONFIG_KEY);
+        localStorage.removeItem(AI_PRESETS_KEY);
+        localStorage.removeItem(AI_CURRENT_PRESET_KEY);
         if (Capacitor.isNativePlatform()) {
             void AssistantAgent.clearNativeAIConfig().catch((error) => {
                 console.error('[aiService] Failed to clear native AI config', error);
@@ -1439,14 +1878,14 @@ export const aiService = {
     saveProfile: (key: string, config: AIConfig) => {
         const stored = localStorage.getItem(AI_PROFILES_KEY);
         const profiles = stored ? JSON.parse(stored) : {};
-        profiles[key] = config;
+        profiles[key] = normalizeAIConfig(config);
         localStorage.setItem(AI_PROFILES_KEY, JSON.stringify(profiles));
     },
 
     getProfile: (key: string): AIConfig | null => {
         const stored = localStorage.getItem(AI_PROFILES_KEY);
         const profiles = stored ? JSON.parse(stored) : {};
-        return profiles[key] || null;
+        return profiles[key] ? normalizeAIConfig(profiles[key]) : null;
     },
 
 
@@ -1636,7 +2075,7 @@ Output:
             throw new Error('Please configure AI settings first.');
         }
 
-        const normalizeOutput = (rawOutput: any): AssistantUnifiedTurnOutput => {
+        const normalizeOutput = (rawOutput: any, meta?: AIResponseNormalizationMeta): AssistantUnifiedTurnOutput => {
             if (!hasMeaningfulAssistantUnifiedTurnSignal(params.mode, rawOutput)) {
                 throw new Error('AI returned no assistant decision.');
             }
@@ -1666,6 +2105,10 @@ Output:
                 && !['null', 'undefined'].includes(rawOutput.assistantReply.trim().toLowerCase())
             ) {
                 normalized.assistantReply = rawOutput.assistantReply.trim();
+            }
+
+            if (meta?.reasoning) {
+                normalized.reasoning = meta.reasoning;
             }
 
             const reminders = normalizeAssistantReminderDrafts(rawOutput?.reminders);

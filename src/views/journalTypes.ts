@@ -31,6 +31,7 @@ export interface DiaryEntry {
     tags?: string[];          // # Tags
     domains?: string[];       // % Domains/Areas
     relatedTodos?: RelatedTodo[];  // @ Todos/Contexts
+    collectionNames?: string[]; // ◬ Collections
 
     // Internal IDs for filtering
     activityId?: string;

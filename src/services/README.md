@@ -2,6 +2,8 @@
 
 Contains business logic and external integrations.
 
+Update 2026-05-14: `aiService.ts` now persists named AI API presets plus the current preset id, migrates the older single-config/profile storage into the new shape, and keeps a mirrored current config so the app can quick-switch between saved providers without changing existing request call sites.
+
 Update 2026-05-14: `dailyReviewTemplateService.ts` now powers the ordinary-chat `日报` command by packaging one day's local logs/todos/review state, composing a strict AI narrative writeback prompt, and parsing a `write_daily_review_narrative` JSON tool call back into Daily Review narrative persistence.
 
 Update 2026-05-14: `todoScheduleColorService.ts` now includes a sixth persisted `Maybe` marker color so tentative future schedule dates can share the same palette editor as Arrange / Due / Repeat / Done / Trace.
@@ -55,7 +57,7 @@ Update 2026-04-09: `obsidianExportService.ts` now supports copying referenced lo
 Update 2026-03-12: timeline styling for normal timeline records is managed by `timelineStyleService.ts`.
 
 ## Files
-- `aiService.ts`: [Active] - Handles AI integration (OpenAI/Gemini) for text parsing, unified foreground/background assistant-turn requests, persona-aware chat replies, dated AI-planned backfill tool calls, root-todo creation, todo updates, subtask creation, log editing, abort-aware chat requests, and narrative generation, with subtask schedule fields emitted only when explicitly requested and monthly recurrence fallback flags normalized when present.
+- `aiService.ts`: [Active] - Handles AI integration (OpenAI/Gemini) for text parsing, unified foreground/background assistant-turn requests, persona-aware chat replies, dated AI-planned backfill tool calls, root-todo creation, todo updates, subtask creation, log editing, abort-aware chat requests, narrative generation, and named local AI preset persistence/migration for quick provider switching.
 - `assistantAgentConfigService.ts`: [Active] - Persists background assistant runtime settings such as polling enablement, long-term-memory enablement, and user-editable random check-in ranges so the AI chat settings panel and native Android service can stay aligned.
 - `assistantActionExecutor.ts`: [Active] - Executes assistant-planned create/edit tool calls for logs, todos, and subtasks against local app data, returning applied-action snapshots plus the next logs/todos state for UI reuse.
 - `assistantMemoryService.ts`: [Active] - Stores structured assistant memory for the Android-first background AI agent, including profile facts, open loops, working summaries, the latest readable decision summary, and active reminders, with explicit replacement semantics for the active reminder list plus narrow helpers for manually appending and removing profile/preference memory notes.

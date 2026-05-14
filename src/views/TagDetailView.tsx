@@ -614,7 +614,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   keywords={activity.keywords || []}
                   enableFocusScore={activity.enableFocusScore ?? category?.enableFocusScore ?? false}
                   enableMoodScore={activity.enableMoodScore ?? category?.enableMoodScore ?? false}
-                  renderLogMetadata={(log) => {
+                  renderLogMetadata={(log, { collectionNames }) => {
                      return (
                         <div className="flex flex-wrap items-center gap-2 mt-1">
                            {/* Linked Todo */}
@@ -633,6 +633,13 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                               }
                               return null;
                            })()}
+
+                           {collectionNames.map((collectionName) => (
+                              <span key={`${log.id}-collection-${collectionName}`} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
+                                 <span className="text-stone-400 font-bold">◬</span>
+                                 <span className="line-clamp-1">{collectionName}</span>
+                              </span>
+                           ))}
 
                            {/* Category Tag */}
                            <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">

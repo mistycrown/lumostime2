@@ -2,7 +2,7 @@
  * @file TimelineItem.tsx
  * @input DiaryEntry data, timeline callbacks, shared timeline style settings
  * @output Memoir/timeline entry cards with text, media, reactions, and comments
- * @description Renders a single timeline entry, including media grids that keep image containers and images aligned across different image counts.
+ * @description Renders a single timeline entry, including media grids that keep image containers and images aligned across different image counts, plus shared metadata chips such as todo, collection, tag, and domain badges.
  */
 import React, { useState, useEffect } from 'react';
 import { DiaryEntry } from '../views/journalTypes';
@@ -283,7 +283,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         ? "bg-paper-dark/60 rounded-xl p-5 border border-dashed border-gray-300 relative w-full"
         : "flex flex-col gap-1 w-full pl-[5px] min-w-0";
 
-    const hasMetadata = (entry.relatedTodos?.length || 0) + (entry.tags?.length || 0) + (entry.domains?.length || 0) > 0;
+    const hasMetadata = (entry.relatedTodos?.length || 0) + (entry.collectionNames?.length || 0) + (entry.tags?.length || 0) + (entry.domains?.length || 0) > 0;
 
     return (
         <div
@@ -363,6 +363,13 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                                 {todo.isProgress && todo.progressIncrement && todo.progressIncrement > 0 && (
                                     <span className="font-mono text-stone-400 ml-0.5">+{todo.progressIncrement}</span>
                                 )}
+                            </span>
+                        ))}
+
+                        {entry.collectionNames?.map((collectionName, i) => (
+                            <span key={`collection-${i}`} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
+                                <span className="text-stone-400 font-bold">◬</span>
+                                <span className="line-clamp-1">{collectionName}</span>
                             </span>
                         ))}
 

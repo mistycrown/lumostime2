@@ -1786,7 +1786,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
               unitAmount: progressSnapshot.unitAmount,
               completedUnits: progressSnapshot.completedUnits
             } : undefined}
-            renderLogMetadata={(log) => {
+            renderLogMetadata={(log, { collectionNames }) => {
               const category = categories?.find(c => c.id === log.categoryId);
               const activity = category?.activities.find(a => a.id === log.activityId);
               const linkedTodo = timelineTodos.find((todo) => todo.id === log.linkedTodoId);
@@ -1805,6 +1805,13 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                       <span className="text-stone-500">{activity?.name}</span>
                     </span>
                   </span>
+
+                  {collectionNames.map((collectionName) => (
+                    <span key={`${log.id}-collection-${collectionName}`} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
+                      <span className="text-stone-400 font-bold">◬</span>
+                      <span className="line-clamp-1">{collectionName}</span>
+                    </span>
+                  ))}
 
                   {isDirectChildLog && linkedTodo?.title && (
                     <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded bg-stone-50/30">

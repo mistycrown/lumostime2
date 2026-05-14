@@ -3,6 +3,7 @@
  * @input Filtered logs, display date, entity info
  * @output Timeline UI with detail-page month heatmap duration captions, stats, history, and shared custom timeline styling with per-day rail termination, English day-total duration labels, plus month-based quick navigation in all-record mode
  * @pos Component (Shared Detail View UI)
+ * @updated 2026-05-14: Detail timelines now resolve `◬ Collection` membership for each log and pass those names into both the default metadata row and custom metadata renderers shared by detail pages.
  * @updated 2026-05-10: Added compact `4H5M`-style duration captions beneath day numbers in the detail-page month heatmap only, with automatic white-text switching on darker heatmap cells.
  * @updated 2026-04-16: Added English `h`/`m` formatting for detail-page day-total duration labels.
  * @description 详情页面共享的时间线卡片组件，包括月历热图、统计信息、历史记录列表，以及与主时间线同步且在每个分组末端及时收线的自定义轨道样式；每日总时长支持按中文显示为“X小时Y分钟”
@@ -15,6 +16,7 @@ import { Log, Category } from '../types';
 import { Clock, Zap, Heart, MessageCircle, ChevronLeft, ChevronRight, Grid, Image as ImageIcon, Hash } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
 import { IconRenderer } from './IconRenderer';
+import { useData } from '../contexts/DataContext';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { TimelineStyleRail } from './TimelineStyleRail';
@@ -113,7 +115,7 @@ interface DetailTimelineCardProps {
     categories?: Category[];
 
     // 自定义元数据渲染（用于显示不同页面特定的标签）
-    renderLogMetadata?: (log: Log) => React.ReactNode;
+    renderLogMetadata?: (log: Log, context: { collectionNames: string[] }) => React.ReactNode;
     // 默认视图模式 (默认 'month')
     defaultViewMode?: 'month' | 'all';
     
@@ -154,6 +156,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     enableMoodScore = false,
     progressTracking
 }) => {
+    const { collections, collectionEntries } = useData();
     const { isPrivacyMode } = usePrivacy();
     const { timelineStyleTheme, timelineStyleConfigs } = useSettings();
     const activeConfig = timelineStyleConfigs[timelineStyleTheme];
@@ -170,6 +173,37 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
 
     const displayMonth = displayDate.getMonth();
     const displayYear = displayDate.getFullYear();
+
+    const logCollectionNames = useMemo(() => {
+        const collectionById = new Map(collections.map((collection) => [collection.id, collection]));
+        const collectionIdsByLogId = new Map<string, string[]>();
+
+        collectionEntries.forEach((entry) => {
+            if (entry.itemType !== 'log') {
+                return;
+            }
+
+            const current = collectionIdsByLogId.get(entry.itemId) || [];
+            current.push(entry.collectionId);
+            collectionIdsByLogId.set(entry.itemId, current);
+        });
+
+        const namesByLogId = new Map<string, string[]>();
+        collectionIdsByLogId.forEach((collectionIds, logId) => {
+            const orderedNames = Array.from(new Set(collectionIds))
+                .map((collectionId) => collectionById.get(collectionId))
+                .filter((collection): collection is NonNullable<typeof collection> => Boolean(collection))
+                .sort((left, right) => right.updatedAt - left.updatedAt)
+                .map((collection) => collection.name.trim())
+                .filter(Boolean);
+
+            if (orderedNames.length > 0) {
+                namesByLogId.set(logId, orderedNames);
+            }
+        });
+
+        return namesByLogId;
+    }, [collectionEntries, collections]);
 
     const getSidebarKey = React.useCallback((timestamp: number) => {
         const date = new Date(timestamp);
@@ -1175,6 +1209,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                         // 查找对应的category和activity
                                         const category = categories?.find(c => c.id === log.categoryId);
                                         const activity = category?.activities.find(a => a.id === log.activityId);
+                                        const collectionNames = logCollectionNames.get(log.id) || [];
 
                                         const d = new Date(log.startTime);
                                         const timeStr = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
@@ -1254,9 +1289,15 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
 
                                                     {/* 自定义元数据渲染 */}
                                                     {renderLogMetadata ? (
-                                                        renderLogMetadata(log)
+                                                        renderLogMetadata(log, { collectionNames })
                                                     ) : (
                                                         <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                            {collectionNames.map((collectionName) => (
+                                                                <span key={`${log.id}-collection-${collectionName}`} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
+                                                                    <span className="font-bold text-stone-400">◬</span>
+                                                                    <span>{collectionName}</span>
+                                                                </span>
+                                                            ))}
                                                             <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                                                                 <span className="font-bold text-stone-400">
                                                                     {entityInfo.type === 'category' ? '#' : entityInfo.type === 'activity' ? '#' : '%'}
