@@ -4,6 +4,7 @@
  * @output Normalized LumosTime target/action metadata for runtime execution and read-test display
  * @pos Utility (Deep Link Parsing)
  * @description Normalizes LumosTime custom-scheme URLs across WebView parsing differences so NFC scans and app deep links share one compatible parser.
+ * @updated 2026-05-14: Added normalized execution keys so NFC scans and app deep links that resolve to the same action can share one dedupe path.
  */
 
 export type LumosTimeRecordAction = 'quick_punch' | 'start' | 'daily_check' | 'unknown';
@@ -166,4 +167,20 @@ export const parseLumosTimeUrl = (value: string | null | undefined): ParsedLumos
     actId: getFirstParam(params, ['act_id', 'actId', 'activityId', 'activity_id']),
     checkItemId: getFirstParam(params, ['check_item_id', 'checkItemId'])
   };
+};
+
+export const buildLumosTimeExecutionKey = (parsedUrl: ParsedLumosTimeUrl): string => {
+  if (parsedUrl.type === 'widget') {
+    return `widget:${parsedUrl.action || 'unknown'}`;
+  }
+
+  if (parsedUrl.action === 'start') {
+    return `record:start:${parsedUrl.catId || ''}:${parsedUrl.actId || ''}`;
+  }
+
+  if (parsedUrl.action === 'daily_check') {
+    return `record:daily_check:${parsedUrl.checkItemId || ''}`;
+  }
+
+  return `record:${parsedUrl.action}:${parsedUrl.rawAction || ''}`;
 };

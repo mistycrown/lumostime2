@@ -3,6 +3,7 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-05-14: `AIBackfillChatModal.tsx` now intercepts the ordinary-chat command `日报`, confirms overwrite when today's Daily Review already has an AI narrative, writes back the new daily narrative through `dailyReviewTemplateService.ts`, and renders the same inline result-card style used by weekly/monthly review writebacks.
 - Update 2026-05-14: `TodoDetailModal.tsx` now removes the extra nested recurrence-rule frame inside `时间安排`, so recurring fields render directly within the outer planning card instead of inside a second dashed box.
 - Update 2026-05-14: `TodoQuickActionsModal.tsx` now keeps the main `Maybe` picker button but splits out adjacent `今天 / 明天 / +7` shortcut chips for faster tentative-date assignment, while the arrange/due shortcut label also shortens from `下周` to `+7`.
 - Update 2026-05-14: `TodoBentoWeekView.tsx` now lets the 2x4 day-grid switch to the previous/next week with the same conservative horizontal swipe thresholds as the standard week planner, while explicitly ignoring the mini calendar, date buttons, badge buttons, and drag handles to avoid accidental flips.

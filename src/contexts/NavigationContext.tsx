@@ -119,6 +119,8 @@ interface NavigationContextType {
     // Review 编辑状态
     currentReviewDate: Date | null;
     setCurrentReviewDate: (date: Date | null) => void;
+    currentDailyReviewInitialTab: 'check' | 'data' | 'guide' | 'narrative' | null;
+    setCurrentDailyReviewInitialTab: (tab: 'check' | 'data' | 'guide' | 'narrative' | null) => void;
     currentOnThisDayDate: Date | null;
     setCurrentOnThisDayDate: (date: Date | null) => void;
     currentWeeklyReviewStart: Date | null;
@@ -282,6 +284,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
 
     // Review 编辑状态
     const [currentReviewDate, setCurrentReviewDate] = useState<Date | null>(null);
+    const [currentDailyReviewInitialTab, setCurrentDailyReviewInitialTab] = useState<'check' | 'data' | 'guide' | 'narrative' | null>(null);
     const [currentOnThisDayDate, setCurrentOnThisDayDate] = useState<Date | null>(null);
     const [currentWeeklyReviewStart, setCurrentWeeklyReviewStart] = useState<Date | null>(null);
     const [currentWeeklyReviewEnd, setCurrentWeeklyReviewEnd] = useState<Date | null>(null);
@@ -414,6 +417,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setEditingGoal,
             currentReviewDate,
             setCurrentReviewDate,
+            currentDailyReviewInitialTab,
+            setCurrentDailyReviewInitialTab,
             currentOnThisDayDate,
             setCurrentOnThisDayDate,
             currentWeeklyReviewStart,

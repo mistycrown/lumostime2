@@ -4,6 +4,7 @@
  * @output Modal Interaction (Edit Todo, View History)
  * @pos Component (Modal)
  * @description Displays detailed information for a specific Todo item, including its progress, planning fields, associated history logs, and focus stats.
+ * @updated 2026-05-14: Restricted recurrence `Skip Date` selection to dates that actually belong to the active recurrence rule and fixed damaged UTF-8 picker labels.
  * @updated 2026-05-14: Removed the extra nested recurrence card chrome so recurring-rule fields render directly inside the outer planning card without a second dashed frame.
  * @updated 2026-05-14: Added multi-select `Maybe Date` editing plus recurrence `Skip Date` editing under time planning, reusing the shared date picker in future-only and today-or-future multi-date modes and persisting both candidate and skipped dates alongside arrange/due/recurrence fields.
  * @updated 2026-05-13: Monthly recurrence editing now accepts space-separated multiple days, and the optional `31 号无则月末` toggle only appears when the parsed day list includes 31.
@@ -38,7 +39,7 @@ import { TimelineImage } from './TimelineImage';
 import { imageService } from '../services/imageService';
 import { IconRenderer } from './IconRenderer';
 import { useToast } from '../contexts/ToastContext';
-import { formatMonthlyDayInput, getTodayDateKey, normalizeMaybeDates, normalizeMonthlyDayInput, parseDateKey, parseMonthlyDayInput } from '../utils/todoScheduleUtils';
+import { formatMonthlyDayInput, getTodayDateKey, matchesRecurrenceRule, normalizeMaybeDates, normalizeMonthlyDayInput, parseDateKey, parseMonthlyDayInput } from '../utils/todoScheduleUtils';
 import { TodoDatePickerModal } from './TodoDatePickerModal';
 import { DataCollectionSelector } from './DataCollectionSelector';
 import {
@@ -1842,11 +1843,14 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
 
       <TodoDatePickerModal
         isOpen={activeDatePicker !== null}
-        title={activeDatePicker === 'skipDates' ? '閫夋嫨 Skip Date' : resolvedDatePickerTitle}
+        title={activeDatePicker === 'skipDates' ? '选择 Skip Date' : resolvedDatePickerTitle}
         value={activeDatePicker === 'skipDates' ? undefined : (resolvedDatePickerValue || undefined)}
         values={activeDatePicker === 'skipDates' ? skipDates : resolvedDatePickerValues}
         mode={activeDatePicker === 'maybeDates' || activeDatePicker === 'skipDates' ? 'multi-date' : 'date'}
         minMultiDate={activeDatePicker === 'skipDates' ? 'today-or-future' : 'future'}
+        isDateSelectable={activeDatePicker === 'skipDates' && recurrenceRule
+          ? (dateKey) => matchesRecurrenceRule({ ...recurrenceRule, skipDates: [] }, dateKey)
+          : undefined}
         onSelect={handleResolvedDatePickerSelect}
         onSelectMultiple={(values) => {
           if (activeDatePicker === 'skipDates') {

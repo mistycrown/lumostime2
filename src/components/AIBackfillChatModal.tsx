@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-14: Added an ordinary-chat `日报` command that packages today's context, confirms overwrite when needed, writes back the current day's AI narrative, and returns a Daily Review result card inline.
  * @updated 2026-05-14: Added a full Dream reset action with inline confirmation so the Dream manager can restore built-in topic titles and notes while clearing all Dream observations in one guarded step.
  * @updated 2026-05-13: Rendered chat bubbles through Markdown with GFM and hard line-break support, so AI replies can keep one complete `assistantReply` body while still showing headings, emphasis, lists, blockquotes, code, and newline-based paragraph breaks correctly inside the conversation UI.
  * @updated 2026-05-13: Made the Dream viewer body its own vertical scroll container so long topic notes and entry lists can be scrolled on mobile instead of getting clipped inside the fixed full-screen overlay.
@@ -156,7 +157,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { BUILTIN_PERSONA_SYSTEM_PROMPTS } from '../constants/aiPersonaSystemPrompts';
 import { AppView } from '../types';
-import type { Log, MonthlyReview, TodoItem, TodoRecurrenceRule, WeeklyReview } from '../types';
+import type { DailyReview, Log, MonthlyReview, TodoItem, TodoRecurrenceRule, WeeklyReview } from '../types';
 import type {
   AssistantAgentConfig,
   AssistantEditableMemoryListKey,
@@ -225,6 +226,7 @@ import {
   type MonthlyReviewTemplateSelectionResult,
   type MonthlyReviewTemplateSessionMeta
 } from '../services/monthlyReviewTemplateService';
+import { dailyReviewTemplateService } from '../services/dailyReviewTemplateService';
 import type { AssistantToolCall, AssistantUnifiedTurnOutput } from '../types/assistant';
 import { CustomSelect } from './CustomSelect';
 
@@ -312,6 +314,7 @@ interface AIChatMessage {
   memoryUpdates?: AIChatMemoryUpdateSection[];
   dreamUpdates?: AIChatDreamUpdateCard[];
   reminderUpdates?: string[];
+  dailyReviewWriteback?: AIChatDailyReviewWritebackResult;
   weeklyReviewWriteback?: AIChatWeeklyReviewWritebackResult;
   monthlyReviewWriteback?: AIChatMonthlyReviewWritebackResult;
   retryInput?: string;
@@ -323,6 +326,15 @@ interface AIChatWeeklyReviewWritebackResult {
   weeklyReviewId: string;
   weekStartDate: string;
   weekEndDate: string;
+  title: string;
+  preview: string;
+  createdReview: boolean;
+  mergeMode: 'create' | 'overwrite';
+}
+
+interface AIChatDailyReviewWritebackResult {
+  dailyReviewId: string;
+  date: string;
   title: string;
   preview: string;
   createdReview: boolean;
@@ -388,6 +400,11 @@ interface DreamEntryDrafts {
 
 interface DreamMonthSelectionState {
   sessionId: string;
+}
+
+interface DailyReviewWritebackConfirmationState {
+  sessionId: string;
+  date: string;
 }
 
 interface DreamMonthRangeSelection {
@@ -1386,6 +1403,31 @@ const normalizeDreamRetryYearMonth = (value: unknown): string | undefined => {
   return parseDreamMonthSelection(value)?.yearMonth;
 };
 
+const normalizeDailyReviewWritebackResult = (value: unknown): AIChatDailyReviewWritebackResult | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const candidate = value as Partial<AIChatDailyReviewWritebackResult>;
+  if (
+    typeof candidate.dailyReviewId !== 'string'
+    || typeof candidate.date !== 'string'
+    || typeof candidate.title !== 'string'
+    || typeof candidate.preview !== 'string'
+  ) {
+    return undefined;
+  }
+
+  return {
+    dailyReviewId: candidate.dailyReviewId.trim(),
+    date: candidate.date.trim(),
+    title: candidate.title.trim(),
+    preview: candidate.preview.trim(),
+    createdReview: candidate.createdReview === true,
+    mergeMode: candidate.mergeMode === 'overwrite' ? 'overwrite' : 'create'
+  };
+};
+
 const normalizeWeeklyReviewWritebackResult = (value: unknown): AIChatWeeklyReviewWritebackResult | undefined => {
   if (!value || typeof value !== 'object') {
     return undefined;
@@ -1608,6 +1650,9 @@ const normalizeMessages = (value: unknown): AIChatMessage[] => {
       ...(candidate.memoryUpdates ? { memoryUpdates: normalizeMemoryUpdates(candidate.memoryUpdates) } : {}),
       ...(candidate.dreamUpdates ? { dreamUpdates: normalizeDreamUpdates(candidate.dreamUpdates) } : {}),
       ...(candidate.reminderUpdates ? { reminderUpdates: normalizeReminderUpdates(candidate.reminderUpdates) } : {}),
+      ...(normalizeDailyReviewWritebackResult(candidate.dailyReviewWriteback)
+        ? { dailyReviewWriteback: normalizeDailyReviewWritebackResult(candidate.dailyReviewWriteback) }
+        : {}),
       ...(normalizeWeeklyReviewWritebackResult(candidate.weeklyReviewWriteback)
         ? { weeklyReviewWriteback: normalizeWeeklyReviewWritebackResult(candidate.weeklyReviewWriteback) }
         : {}),
@@ -2446,6 +2491,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [isAssistantMemoryViewerOpen, setIsAssistantMemoryViewerOpen] = useState(false);
   const [isDreamViewerOpen, setIsDreamViewerOpen] = useState(false);
   const [dreamMonthSelectionState, setDreamMonthSelectionState] = useState<DreamMonthSelectionState | null>(null);
+  const [dailyReviewWritebackConfirmation, setDailyReviewWritebackConfirmation] = useState<DailyReviewWritebackConfirmationState | null>(null);
   const [selectedDreamTopicId, setSelectedDreamTopicId] = useState('');
   const [isDreamTopicNoteExpanded, setIsDreamTopicNoteExpanded] = useState(false);
   const [dreamTopicDrafts, setDreamTopicDrafts] = useState<DreamTopicDrafts>(DEFAULT_DREAM_TOPIC_DRAFTS);
@@ -2498,11 +2544,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const { logs, setLogs, todos, setTodos, todoCategories, isReady: isDataReady, usesFallbackSeedData } = useData();
   const {
     dailyReviews,
+    setDailyReviews,
     weeklyReviews,
     setWeeklyReviews,
     monthlyReviews,
     setMonthlyReviews,
     reviewTemplates,
+    checkTemplates,
     isReady: isReviewReady
   } = useReview();
   const { activeSessions } = useSession();
@@ -2516,6 +2564,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setNewTodoDraft,
     setIsTodoModalOpen,
     setTodoCategoryToAdd,
+    setCurrentReviewDate,
+    setCurrentDailyReviewInitialTab,
+    setIsDailyReviewOpen,
     setCurrentWeeklyReviewStart,
     setCurrentWeeklyReviewEnd,
     setCurrentWeeklyReviewInitialTab,
@@ -4422,6 +4473,26 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }));
   };
 
+  const appendUserMessage = (sessionId: string, content: string) => {
+    const trimmed = content.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    mutateSession(sessionId, (session) => ({
+      ...session,
+      messages: [
+        ...session.messages,
+        {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: trimmed,
+          createdAt: Date.now()
+        }
+      ]
+    }));
+  };
+
   const updateWeeklyReviewTemplateStage = (
     sessionId: string,
     stage: WeeklyReviewTemplateSessionMeta['stage'],
@@ -4870,6 +4941,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   const handleFillWriteMonthlyNarrativeCommand = () => {
     setInputText('写入 AI 叙事');
+    window.requestAnimationFrame(() => {
+      composerTextareaRef.current?.focus();
+    });
+  };
+
+  const handleFillDailyNarrativeCommand = () => {
+    setInputText('日报');
     window.requestAnimationFrame(() => {
       composerTextareaRef.current?.focus();
     });
@@ -6407,6 +6485,20 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     onClose();
   };
 
+  const handleOpenDailyReviewNarrative = (date: string) => {
+    const reviewDate = new Date(`${date}T12:00:00`);
+    if (Number.isNaN(reviewDate.getTime())) {
+      addToast('info', '这个日报日期无效。');
+      return;
+    }
+
+    setCurrentView(AppView.REVIEW);
+    setCurrentReviewDate(reviewDate);
+    setCurrentDailyReviewInitialTab('narrative');
+    setIsDailyReviewOpen(true);
+    onClose();
+  };
+
   const handleOpenMonthlyReviewNarrative = (monthStartDate: string, monthEndDate: string) => {
     const monthStart = new Date(`${monthStartDate}T12:00:00`);
     const monthEnd = new Date(`${monthEndDate}T12:00:00`);
@@ -6435,6 +6527,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       memoryUpdates?: AIChatMemoryUpdateSection[];
       dreamUpdates?: AIChatDreamUpdateCard[];
       reminderUpdates?: string[];
+      dailyReviewWriteback?: AIChatDailyReviewWritebackResult;
       weeklyReviewWriteback?: AIChatWeeklyReviewWritebackResult;
       monthlyReviewWriteback?: AIChatMonthlyReviewWritebackResult;
       retryInput?: string;
@@ -6454,6 +6547,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       ...(options?.memoryUpdates && options.memoryUpdates.length > 0 ? { memoryUpdates: options.memoryUpdates } : {}),
       ...(options?.dreamUpdates && options.dreamUpdates.length > 0 ? { dreamUpdates: options.dreamUpdates } : {}),
       ...(options?.reminderUpdates && options.reminderUpdates.length > 0 ? { reminderUpdates: options.reminderUpdates } : {}),
+      ...(options?.dailyReviewWriteback ? { dailyReviewWriteback: options.dailyReviewWriteback } : {}),
       ...(options?.weeklyReviewWriteback ? { weeklyReviewWriteback: options.weeklyReviewWriteback } : {}),
       ...(options?.monthlyReviewWriteback ? { monthlyReviewWriteback: options.monthlyReviewWriteback } : {}),
       ...(options?.retryInput ? { retryInput: options.retryInput } : {}),
@@ -6675,6 +6769,155 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
   };
 
+  const runDailyReviewNarrativeWriteback = async (
+    session: AIChatSession,
+    params: {
+      dailyReview: DailyReview;
+      dayDataText: string;
+      mergeMode: 'create' | 'overwrite';
+      createdReview: boolean;
+    }
+  ) => {
+    const sessionId = session.id;
+    const pendingMessageId = crypto.randomUUID();
+    const now = Date.now();
+    const sessionPersona = personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0];
+    const conversationSummary = assistantContextBuilder.summarizeConversationTurns(
+      conversationHistoryCache.get(session.id) || [],
+      24
+    );
+
+    mutateSession(sessionId, (currentSession) => ({
+      ...currentSession,
+      messages: [
+        ...currentSession.messages,
+        {
+          id: pendingMessageId,
+          role: 'assistant',
+          content: '我来整理今天的日报。',
+          createdAt: now,
+          tone: 'pending'
+        }
+      ]
+    }));
+
+    setInputText('');
+    setIsLoading(true);
+    setIsHistoryPanelOpen(false);
+    setIsPersonaPanelOpen(false);
+    setDailyReviewWritebackConfirmation(null);
+
+    const controller = new AbortController();
+    activeRequestRef.current = {
+      controller,
+      sessionId,
+      pendingMessageId
+    };
+
+    if (params.createdReview) {
+      setDailyReviews((previousReviews) => {
+        if (previousReviews.some((review) => review.id === params.dailyReview.id)) {
+          return previousReviews;
+        }
+
+        return [...previousReviews, params.dailyReview];
+      });
+    }
+
+    try {
+      const { systemPrompt, userPrompt } = await dailyReviewTemplateService.buildNarrativeWritebackPrompts({
+        personaPrompt: buildPersonaPrompt(sessionPersona),
+        dayDataText: params.dayDataText,
+        conversationSummary,
+        existingNarrative: params.dailyReview.narrative,
+        mergeMode: params.mergeMode
+      });
+
+      const dailyWritebackResult = await aiService.requestStructuredJsonWithDebug({
+        systemPrompt,
+        userPrompt,
+        conversationHistory: buildConversationHistory(session),
+        cacheHint: {
+          keySeed: `daily_review_writeback:${params.dailyReview.date}:${params.mergeMode}`,
+          scope: 'daily_review_writeback'
+        },
+        normalizeResult: (rawValue) => dailyReviewTemplateService.parseNarrativeToolCallResponse(
+          rawValue,
+          params.dailyReview.date,
+          params.mergeMode
+        )
+      }, {
+        signal: controller.signal
+      });
+
+      if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
+        return;
+      }
+
+      const narrative = dailyReviewTemplateService.buildNarrativeFromToolCall(dailyWritebackResult.result.toolCall);
+
+      setDailyReviews((previousReviews) => (
+        dailyReviewTemplateService.updateDailyReviewNarrative(
+          previousReviews,
+          params.dailyReview.id,
+          narrative
+        )
+      ));
+
+      const parsedNarrative = parseNarrative(narrative, `日报 ${params.dailyReview.date}`);
+      const writebackResultCard: AIChatDailyReviewWritebackResult = {
+        dailyReviewId: params.dailyReview.id,
+        date: params.dailyReview.date,
+        title: parsedNarrative.title,
+        preview: parsedNarrative.content,
+        createdReview: params.createdReview,
+        mergeMode: params.mergeMode
+      };
+
+      const successMessage = params.createdReview
+        ? dailyWritebackResult.result.assistantReply
+        : dailyWritebackResult.result.assistantReply;
+
+      replacePendingWithResult(sessionId, pendingMessageId, successMessage, {
+        tone: 'system',
+        dailyReviewWriteback: writebackResultCard,
+        ...(debugMode
+          ? {
+            debugSections: [{
+              label: '日报写入 AI 叙事',
+              exchange: dailyWritebackResult.debug
+            }]
+          }
+          : {})
+      });
+      addToast('success', 'AI 叙事已写入日报');
+    } catch (error) {
+      const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
+
+      if (isAbortError(error)) {
+        if (isCurrentPendingRequest) {
+          replacePendingWithResult(sessionId, pendingMessageId, '已停止这次写入。', {
+            tone: 'system'
+          });
+        }
+        return;
+      }
+
+      if (!isCurrentPendingRequest || controller.signal.aborted) {
+        return;
+      }
+
+      replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), {
+        tone: 'error'
+      });
+    } finally {
+      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
+        activeRequestRef.current = null;
+        setIsLoading(false);
+      }
+    }
+  };
+
   const runMonthlyReviewNarrativeWriteback = async (
     session: AIChatSession,
     params: {
@@ -6838,6 +7081,103 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       mergeMode: ensuredReview.weeklyReview.narrative?.trim() ? 'overwrite' : 'create',
       createdReview: ensuredReview.created
     });
+  };
+
+  const handleDailyReviewNarrativeCommand = async (session: AIChatSession) => {
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    const date = getLocalDateStr(today);
+    const ensuredReview = dailyReviewTemplateService.ensureDailyReview(
+      dailyReviews,
+      checkTemplates,
+      reviewTemplates,
+      date
+    );
+    const dayDataText = dailyReviewTemplateService.buildDayDataText({
+      date,
+      logs,
+      categories,
+      todos,
+      todoCategories,
+      scopes,
+      dailyReviews: ensuredReview.created ? [...dailyReviews, ensuredReview.dailyReview] : dailyReviews,
+      dailyReview: ensuredReview.dailyReview
+    });
+
+    if (ensuredReview.dailyReview.narrative?.trim()) {
+      setDailyReviewWritebackConfirmation({
+        sessionId: session.id,
+        date
+      });
+      appendSystemMessage(
+        session.id,
+        `今天（${date}）的日报已经有 AI 叙事了。回复“是”覆盖，回复“否”取消。`
+      );
+      return;
+    }
+
+    await runDailyReviewNarrativeWriteback(session, {
+      dailyReview: ensuredReview.dailyReview,
+      dayDataText,
+      mergeMode: 'create',
+      createdReview: ensuredReview.created
+    });
+  };
+
+  const handleDailyReviewNarrativeOverwriteConfirmation = async (
+    session: AIChatSession,
+    userInput: string
+  ): Promise<boolean> => {
+    if (!dailyReviewWritebackConfirmation || dailyReviewWritebackConfirmation.sessionId !== session.id) {
+      return false;
+    }
+
+    const trimmed = userInput.trim();
+    if (!trimmed) {
+      return true;
+    }
+
+    appendUserMessage(session.id, trimmed);
+    setInputText('');
+    setIsHistoryPanelOpen(false);
+    setIsPersonaPanelOpen(false);
+
+    if (trimmed === '否') {
+      setDailyReviewWritebackConfirmation(null);
+      appendSystemMessage(session.id, '这次日报写入已取消。');
+      return true;
+    }
+
+    if (trimmed !== '是') {
+      appendSystemMessage(session.id, '今天的日报已有 AI 叙事。请回复“是”覆盖，或回复“否”取消。');
+      return true;
+    }
+
+    const date = dailyReviewWritebackConfirmation.date;
+    const ensuredReview = dailyReviewTemplateService.ensureDailyReview(
+      dailyReviews,
+      checkTemplates,
+      reviewTemplates,
+      date
+    );
+    const dayDataText = dailyReviewTemplateService.buildDayDataText({
+      date,
+      logs,
+      categories,
+      todos,
+      todoCategories,
+      scopes,
+      dailyReviews: ensuredReview.created ? [...dailyReviews, ensuredReview.dailyReview] : dailyReviews,
+      dailyReview: ensuredReview.dailyReview
+    });
+
+    await runDailyReviewNarrativeWriteback(session, {
+      dailyReview: ensuredReview.dailyReview,
+      dayDataText,
+      mergeMode: 'overwrite',
+      createdReview: ensuredReview.created
+    });
+    return true;
   };
 
   const handleMonthlyReviewNarrativeWritebackCommand = async (session: AIChatSession) => {
@@ -7266,6 +7606,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return;
     }
 
+    const isWeeklyReviewTemplateSession = activeSession.templateMeta?.templateType === 'weekly_review';
+    const isMonthlyReviewTemplateSession = activeSession.templateMeta?.templateType === 'monthly_review';
+
+    if (!options?.replaceMessageId && await handleDailyReviewNarrativeOverwriteConfirmation(activeSession, trimmedText)) {
+      return;
+    }
+
     if (handleDebugCommand(trimmedText, options)) {
       return;
     }
@@ -7280,8 +7627,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return;
     }
 
-    const isWeeklyReviewTemplateSession = activeSession.templateMeta?.templateType === 'weekly_review';
-    const isMonthlyReviewTemplateSession = activeSession.templateMeta?.templateType === 'monthly_review';
     if (
       isWeeklyReviewTemplateSession
       && activeSession.templateMeta?.stage !== 'ready'
@@ -7307,6 +7652,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
     if (isMonthlyReviewTemplateSession && monthlyReviewTemplateService.isWriteNarrativeCommand(trimmedText)) {
       await handleMonthlyReviewNarrativeWritebackCommand(activeSession);
+      return;
+    }
+
+    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession && trimmedText === '日报' && !options?.replaceMessageId) {
+      appendUserMessage(activeSession.id, trimmedText);
+      await handleDailyReviewNarrativeCommand(activeSession);
       return;
     }
 
@@ -8220,6 +8571,52 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           : renderTodoAction(messageId, action)
   );
 
+  const renderDailyReviewWritebackResult = (result: AIChatDailyReviewWritebackResult) => (
+    <div
+      className="border-l-2 pl-3 pr-1 py-1"
+      style={{ borderColor: AI_CHAT_THEME.activeBorder }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <button
+            type="button"
+            onClick={() => handleOpenDailyReviewNarrative(result.date)}
+            className="block w-full truncate text-left font-serif text-[1rem] leading-6 transition-colors hover:opacity-80"
+            style={{ color: AI_CHAT_THEME.textPrimary }}
+            title="打开对应日报的 AI 叙事"
+          >
+            {result.title || 'AI 叙事'}
+          </button>
+          <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textSecondary }}>
+            {result.preview || '点击查看完整叙事'}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
+        <span>{result.date}</span>
+        <span>{result.createdReview ? '已新建日报' : '已写入日报'}</span>
+        <span>{result.mergeMode === 'overwrite' ? '覆盖写入' : '首次写入'}</span>
+      </div>
+
+      <div className="mt-2.5 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => handleOpenDailyReviewNarrative(result.date)}
+          className="inline-flex h-8 items-center justify-center rounded-full border px-3 text-xs transition-colors"
+          style={{
+            borderColor: AI_CHAT_THEME.chipBorder,
+            backgroundColor: AI_CHAT_THEME.inputBg,
+            color: AI_CHAT_THEME.textSecondary
+          }}
+          title="打开日报叙事"
+        >
+          打开
+        </button>
+      </div>
+    </div>
+  );
+
   const renderWeeklyReviewWritebackResult = (result: AIChatWeeklyReviewWritebackResult) => (
     <div
       className="border-l-2 pl-3 pr-1 py-1"
@@ -8543,7 +8940,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               </div>
             )}
 
-            {allDisplayPartsRevealed && ((message.appliedActions && message.appliedActions.length > 0) || message.weeklyReviewWriteback || message.monthlyReviewWriteback) && (
+            {allDisplayPartsRevealed && ((message.appliedActions && message.appliedActions.length > 0) || message.dailyReviewWriteback || message.weeklyReviewWriteback || message.monthlyReviewWriteback) && (
               <div
                 className="space-y-2 border-l pl-3 pr-1 py-1"
                 style={{
@@ -8555,6 +8952,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 </p>
                 <div className="space-y-2">
                   {message.appliedActions?.map((action) => renderAppliedAction(message.id, action))}
+                  {message.dailyReviewWriteback && renderDailyReviewWritebackResult(message.dailyReviewWriteback)}
                   {message.weeklyReviewWriteback && renderWeeklyReviewWritebackResult(message.weeklyReviewWriteback)}
                   {message.monthlyReviewWriteback && renderMonthlyReviewWritebackResult(message.monthlyReviewWriteback)}
                 </div>
@@ -8917,6 +9315,21 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   title="填充写入 AI 叙事"
                 >
                   写入 AI 叙事
+                </button>
+              )}
+              {!activeSession?.templateMeta && (
+                <button
+                  onClick={handleFillDailyNarrativeCommand}
+                  disabled={isLoading}
+                  className="inline-flex h-8 shrink-0 items-center rounded-[0.75rem] border px-2.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{
+                    borderColor: AI_CHAT_THEME.panelBorder,
+                    backgroundColor: AI_CHAT_THEME.panelBgStrong,
+                    color: AI_CHAT_THEME.textSecondary
+                  }}
+                  title="快速填充日报"
+                >
+                  日报
                 </button>
               )}
               <button

@@ -36,6 +36,7 @@ import { normalizeCheckItem } from '../utils/checkItemNormalizer';
 interface DailyReviewViewProps {
     review: DailyReview;
     date: Date;
+    initialTab?: TabType;
     templates: ReviewTemplate[];
     checkTemplates: CheckTemplate[];
     categories: Category[];
@@ -77,6 +78,7 @@ const getCountMetrics = (item: CheckItem) => {
 export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     review,
     date,
+    initialTab,
     templates,
     checkTemplates,
     categories,
@@ -91,7 +93,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     onGenerateNarrative,
     addToast
 }) => {
-    const [activeTab, setActiveTab] = useState<TabType>('check');
+    const [activeTab, setActiveTab] = useState<TabType>(initialTab || 'check');
     
     // Use shared review state hook
     const {
@@ -154,6 +156,12 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         setSummary(review.summary || '');
         setNarrative(review.narrative || '');
     }, [review]);
+
+    useEffect(() => {
+        if (initialTab) {
+            setActiveTab(initialTab);
+        }
+    }, [initialTab, review.id]);
 
     // 当切换到引导或叙事标签时，根据内容自动切换阅读/编辑模式（仅在标签切换时触发）
     useEffect(() => {
