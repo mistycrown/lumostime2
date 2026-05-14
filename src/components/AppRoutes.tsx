@@ -92,7 +92,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     const {
         currentView, setCurrentView,
         isSettingsOpen,
-        isDailyReviewOpen, isOnThisDayOpen, setIsOnThisDayOpen, currentReviewDate, currentOnThisDayDate, setCurrentOnThisDayDate,
+        isDailyReviewOpen, isOnThisDayOpen, setIsOnThisDayOpen, currentReviewDate, currentDailyReviewInitialTab, currentOnThisDayDate, setCurrentOnThisDayDate,
         isWeeklyReviewOpen, currentWeeklyReviewStart, currentWeeklyReviewEnd, currentWeeklyReviewInitialTab,
         currentMonthlyReviewInitialTab,
         isMonthlyReviewOpen, currentMonthlyReviewStart, currentMonthlyReviewEnd,
@@ -173,6 +173,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 onGenerateNarrative={handleGenerateNarrative}
                 addToast={addToast}
                 checkTemplates={checkTemplates}
+                initialTab={currentDailyReviewInitialTab || undefined}
             />
         );
     }

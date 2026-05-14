@@ -37,7 +37,7 @@ Contains pure utility functions for data processing and business logic calculati
 - `aiBackfillUtils.ts`: [Active] - Normalizes AI backfill tool-call dates, splits cross-midnight records into per-day segments, dedupes repeated tool calls, and provides shared date/time parsing helpers for the AI backfill flow.
 - `todoAssociationUtils.ts`: [Active] - Builds collapsed parent/subtask row models for todo pickers, auto-expands the selected child's parent when hierarchy mode is enabled, hides finished todos by default while preserving the current linked completed todo, hides unfinished subtasks whose parent todo is already completed, and tags standalone subtasks with hidden-parent context when the parent row is outside the current picker pool.
 - `todoCompletionModeUtils.ts`: [Active] - Gates one-shot completion mode for unfinished linked todos and sequences save-first, complete-second follow-up actions for focus-log submission flows.
-- `lumosTimeUrlParser.ts`: [Active] - Normalizes LumosTime NFC/deep-link URIs across custom-scheme parsing differences, old action aliases, and legacy parameter names.
-- `nfcActivityRestartGuard.ts`: [Active] - Builds per-activity NFC keys, suppresses same-tag timer restarts immediately after an NFC stop, and now keeps the just-stopped tag blocked until a different timer actually starts.
+- `lumosTimeUrlParser.ts`: [Active] - Normalizes LumosTime NFC/deep-link URIs across custom-scheme parsing differences, old action aliases, legacy parameter names, and shared execution keys used for cross-entry dedupe.
+- `nfcActivityRestartGuard.ts`: [Active] - Builds per-activity NFC keys, suppresses same-tag timer restarts only inside the short duplicate-delivery window right after an NFC stop, and blocks delayed cross-source `start` replays from reopening a timer that the NFC scan just stopped.
 
 > Once the folder I belong to changes, please update me.

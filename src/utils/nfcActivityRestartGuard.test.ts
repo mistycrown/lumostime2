@@ -1,15 +1,16 @@
 /**
  * @file nfcActivityRestartGuard.test.ts
- * @description Verifies that recent NFC stop metadata suppresses same-tag restarts both inside the duplicate-delivery window and while a stop marker is waiting for the next real timer start.
- * @updated 2026-05-14: Added coverage for persistent same-tag suppression and clearing after a different timer starts.
+ * @description Verifies that recent NFC stop metadata only suppresses same-tag restarts inside the short duplicate-delivery window, and that cross-source NFC/deep-link replays do not re-open the same timer.
+ * @updated 2026-05-14: Added cross-source start duplicate coverage so NFC timer toggles stay stopped when a matching deep-link replay arrives after the scan.
+ * @updated 2026-05-14: Removed the persistent stop-marker case and kept coverage focused on the short duplicate-delivery window.
  * @updated 2026-05-13: Added regression coverage for NFC stop-then-restart suppression.
  */
 import { describe, expect, test } from 'vitest';
 import {
-  ActiveSessionRestartCandidate,
   buildNfcActivityKey,
+  NFC_CROSS_SOURCE_START_DUPLICATE_GUARD_MS,
   NFC_ACTIVITY_RESTART_GUARD_MS,
-  shouldClearRecentNfcActivityStop,
+  shouldSuppressCrossSourceNfcStartDuplicate,
   shouldSuppressNfcActivityRestart,
 } from './nfcActivityRestartGuard';
 
@@ -44,36 +45,69 @@ describe('nfcActivityRestartGuard', () => {
     ).toBe(false);
   });
 
-  test('keeps suppressing the same tag until another timer start clears the stop marker', () => {
+  test('suppresses same-activity start replays when the other bridge source already handled the scan', () => {
     const activityKey = buildNfcActivityKey('life', 'commute');
 
     expect(
-      shouldSuppressNfcActivityRestart(
-        { activityKey, timestamp: 10_000, suppressUntilNextStart: true },
+      shouldSuppressCrossSourceNfcStartDuplicate(
+        {
+          activityKey,
+          source: 'scan',
+          timestamp: 10_000
+        },
         activityKey,
-        50_000
+        'deeplink',
+        10_000 + NFC_CROSS_SOURCE_START_DUPLICATE_GUARD_MS - 1
+      )
+    ).toBe(true);
+
+    expect(
+      shouldSuppressCrossSourceNfcStartDuplicate(
+        {
+          activityKey,
+          source: 'deeplink',
+          timestamp: 10_000
+        },
+        activityKey,
+        'scan',
+        10_000 + NFC_CROSS_SOURCE_START_DUPLICATE_GUARD_MS - 1
       )
     ).toBe(true);
   });
 
-  test('clears the recent NFC stop marker once a newer session has started', () => {
+  test('does not suppress same-source scans, other activities, or arrivals outside the cross-source guard window', () => {
     const activityKey = buildNfcActivityKey('life', 'commute');
-    const sessions: ActiveSessionRestartCandidate[] = [
-      { categoryId: 'life', activityId: 'commute', startTime: 9_000 },
-      { categoryId: 'work', activityId: 'writing', startTime: 11_000 },
-    ];
+    const otherActivityKey = buildNfcActivityKey('work', 'writing');
+    const recentExecution = {
+      activityKey,
+      source: 'scan' as const,
+      timestamp: 10_000
+    };
 
     expect(
-      shouldClearRecentNfcActivityStop(
-        { activityKey, timestamp: 10_000, suppressUntilNextStart: true },
-        sessions
+      shouldSuppressCrossSourceNfcStartDuplicate(
+        recentExecution,
+        activityKey,
+        'scan',
+        10_500
       )
-    ).toBe(true);
+    ).toBe(false);
 
     expect(
-      shouldClearRecentNfcActivityStop(
-        { activityKey, timestamp: 10_000, suppressUntilNextStart: true },
-        [{ categoryId: 'life', activityId: 'commute', startTime: 10_000 }]
+      shouldSuppressCrossSourceNfcStartDuplicate(
+        recentExecution,
+        otherActivityKey,
+        'deeplink',
+        10_500
+      )
+    ).toBe(false);
+
+    expect(
+      shouldSuppressCrossSourceNfcStartDuplicate(
+        recentExecution,
+        activityKey,
+        'deeplink',
+        10_000 + NFC_CROSS_SOURCE_START_DUPLICATE_GUARD_MS
       )
     ).toBe(false);
   });

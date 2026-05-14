@@ -1,6 +1,7 @@
 /**
  * @file SessionContext.tsx
  * @description 管理活动计时会话的状态和逻辑
+ * @updated 2026-05-14: Prevents duplicate active sessions for the same category/activity pair so repeated NFC/deep-link deliveries cannot leave one timer still running after the other is stopped.
  * @updated 2026-05-09: Syncs app-origin active sessions into the native notification plugin so Android can render timer labels in the persistent status notification.
  * @updated 2026-05-09: Removed direct floating-window mutations so the shared sync hook remains the single source of truth for Android focus-state reconciliation.
  */
@@ -126,7 +127,18 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
             source: 'app'
         };
 
-        setActiveSessions(prev => [...prev, newSession]);
+        setActiveSessions(prev => {
+            const hasExistingSameActivitySession = prev.some((session) =>
+                session.activityId === activity.id
+                && session.categoryId === categoryId
+            );
+
+            if (hasExistingSameActivitySession) {
+                return prev;
+            }
+
+            return [...prev, newSession];
+        });
 
         // Android 浮动窗口更新
     };

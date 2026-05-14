@@ -19,6 +19,7 @@ import android.nfc.tech.Ndef;
 import android.nfc.tech.NdefFormatable;
 import android.os.Build;
 import android.os.Parcelable;
+import android.util.Log;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -30,12 +31,14 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 public class LumosNfcPlugin extends Plugin {
 
     private static final String EVENT_TAG_SCANNED = "nfcTagScanned";
+    private static final String DEBUG_TAG = "LumosNfcDebug";
 
     private boolean isWriting = false;
     private PluginCall activeCall = null;
 
     @PluginMethod
     public void startWriteSession(PluginCall call) {
+        Log.d(DEBUG_TAG, "startWriteSession requested");
         NfcAdapter nfcAdapter = getActivity() == null ? null : NfcAdapter.getDefaultAdapter(getActivity());
         if (nfcAdapter == null) {
             call.reject("NFC is not supported on this device");
@@ -55,6 +58,7 @@ public class LumosNfcPlugin extends Plugin {
 
     @PluginMethod
     public void stopWriteSession(PluginCall call) {
+        Log.d(DEBUG_TAG, "stopWriteSession requested");
         if (activeCall != null) {
             activeCall.reject("Session stopped by user");
         }
@@ -99,11 +103,14 @@ public class LumosNfcPlugin extends Plugin {
     @Override
     protected void handleOnNewIntent(Intent intent) {
         super.handleOnNewIntent(intent);
+        Log.d(DEBUG_TAG, "handleOnNewIntent action=" + (intent == null ? "null" : intent.getAction()));
         if (!isNfcIntent(intent)) {
+            Log.d(DEBUG_TAG, "handleOnNewIntent ignored: not an NFC intent");
             return;
         }
 
         Tag tag = getTagFromIntent(intent);
+        Log.d(DEBUG_TAG, "handleOnNewIntent tagPresent=" + (tag != null) + ", isWriting=" + isWriting);
         if (isWriting) {
             writeTag(tag);
         } else {
@@ -136,19 +143,24 @@ public class LumosNfcPlugin extends Plugin {
 
     private void readTag(Intent intent, Tag tag) {
         try {
+            Log.d(DEBUG_TAG, "readTag begin");
             NdefMessage[] messages = extractMessagesFromIntent(intent);
             if (messages == null || messages.length == 0) {
+                Log.d(DEBUG_TAG, "readTag no intent messages, falling back to live tag read");
                 messages = readMessagesFromTag(tag);
             }
 
             Uri uri = extractUri(messages);
             if (uri != null) {
+                Log.d(DEBUG_TAG, "readTag resolved uri=" + uri);
                 emitScanPayload("uri", uri.toString(), null);
                 return;
             }
 
+            Log.d(DEBUG_TAG, "readTag no URI record found");
             emitScanPayload("unknown", null, "No URI record found on tag");
         } catch (Exception e) {
+            Log.e(DEBUG_TAG, "readTag failed", e);
             emitScanPayload("error", null, e.getMessage() != null ? e.getMessage() : "Unknown NFC read error");
         }
     }
@@ -231,6 +243,7 @@ public class LumosNfcPlugin extends Plugin {
     }
 
     private void emitScanPayload(String type, String value, String message) {
+        Log.d(DEBUG_TAG, "emitScanPayload type=" + type + ", value=" + value + ", message=" + message);
         JSObject payload = new JSObject();
         payload.put("type", type);
         if (value != null) {
@@ -246,6 +259,8 @@ public class LumosNfcPlugin extends Plugin {
         if (activeCall == null) {
             return;
         }
+
+        Log.d(DEBUG_TAG, "writeTag called tagPresent=" + (tag != null));
 
         if (tag == null) {
             rejectActiveCall("No NFC tag detected");
@@ -326,6 +341,7 @@ public class LumosNfcPlugin extends Plugin {
     }
 
     private void resolveActiveCall() {
+        Log.d(DEBUG_TAG, "resolveActiveCall success");
         if (activeCall != null) {
             JSObject payload = new JSObject();
             payload.put("status", "success");
@@ -335,6 +351,7 @@ public class LumosNfcPlugin extends Plugin {
     }
 
     private void rejectActiveCall(String message) {
+        Log.d(DEBUG_TAG, "rejectActiveCall message=" + message);
         if (activeCall != null) {
             activeCall.reject(message);
         }

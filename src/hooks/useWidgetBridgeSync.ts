@@ -4,6 +4,7 @@
  * @output Runtime reconciliation between the Android widget layer and the React app
  * @pos Hook
  * @description Imports completed timer widget actions into logs, mirrors timer runtime state, syncs daily widget progress to native, and replays queued daily taps back into review state.
+ * @updated 2026-05-14: Stops native app-sourced runtime echoes from restoring a just-stopped in-app session back into React state during NFC flows.
  * @updated 2026-04-25: Syncs today's DAILY_RUNTIME heatmap payload so the dedicated 4x4 widget reflects logs and live sessions.
  * @updated 2026-04-25: Strips unsupported widget UI icon assets on app startup so expired supporter access falls back to emoji rendering.
  * @updated 2026-04-26: Syncs today's TODAY + PIN todo payload so the dedicated scrollable 4x2 widget stays current.
@@ -241,6 +242,10 @@ export const useWidgetBridgeSync = () => {
             return withoutCompletedSessions.filter((session) => session.source !== 'widget');
           }
 
+          if (runtimeState.source !== 'widget') {
+            return withoutCompletedSessions;
+          }
+
           const nextNativeSession = buildWidgetSessionFromRuntimeState(runtimeState, categories);
           const existingSameSession = withoutCompletedSessions.find(
             (session) => session.id === nextNativeSession.id
@@ -259,7 +264,6 @@ export const useWidgetBridgeSync = () => {
             }
             return session.source !== 'widget';
           });
-
           return [...withoutDuplicateSessions, reconciledSession];
         });
 

@@ -5,7 +5,9 @@
 > `useAppInitialization.ts` now imports the Android EdgeToEdge plugin from its ESM entry instead of calling `require()`, so Capacitor production bundles can initialize edge-to-edge support inside the WebView without a browser-side `require is not defined` crash.
 > `useDeepLink.ts` now keeps a stable NFC/deep-link listener registration, consumes launch URLs for NFC actions on cold start, and surfaces native NFC read errors to toasts.
 > `useDeepLink.ts` now also routes NFC scans and LumosTime app links through a shared compatibility parser so older tags and WebView-specific custom-scheme variations still execute reliably.
-> `useDeepLink.ts` now keeps a just-stopped NFC timer tag suppressed until another timer really starts, so scanning the same tag again behaves like stop instead of accidentally starting a fresh session.
+> `useDeepLink.ts` now dedupes equivalent NFC and app-link timer URLs by their parsed action key, so `appUrlOpen` and `nfcTagScanned` can share one stop/start path without leaving behind duplicate same-activity sessions.
+> `useDeepLink.ts` now also suppresses cross-source replays of the same NFC `start` action, so a timer stopped by scanning its own tag cannot be immediately restarted by a delayed `appUrlOpen` or launch-url echo from that same scan.
+> `useDeepLink.ts` now ignores stale listener instances, so React StrictMode or delayed native listener cleanup in dev builds cannot leave an old NFC/deep-link callback around to process the same scan twice.
 > `useLogManager.ts` now lets callers override the date used for new backfill defaults, so the Android widget supplement-log shortcut can always open against today even if the timeline was last left on a past date.
 > `useTodoManager.ts` now keeps a nested todo-detail history stack, and `useHardwareBackButton.ts` now consumes Android back presses through that same stack so child-task details return to their parent detail page before closing back to the main todo surface.
 > `useHardwareBackButton.ts` now also lets collection-launched log/todo details consume Android back before the underlying settings stack unwinds, so `设置 > Collections` stays in place beneath those topmost overlays.
@@ -19,6 +21,7 @@
 > `useScopeStats.ts` now follows the shared scope aggregation rule: one log linked to multiple scopes contributes its full duration to each linked scope.
 > `useAppInitialization.ts` now uses the shared floating-window startup guard so Android can still restore the overlay when notification permission is disabled, while logging that notification-based stability is reduced.
 > `useTodoManager.ts` now supports configurable todo duplication so copy flows can rename the duplicate first and optionally clear dates, tags, or scopes before saving.
+> `useWidgetBridgeSync.ts` now ignores native runtime echoes whose source is already `app`, so NFC stop flows cannot clear a local timer and then have the stale app-owned native runtime immediately restore it.
 > `useTodoManager.ts` now supports one-level subtasks, including child draft creation, parent-field inheritance sync, and cascade delete for direct children.
 > `useTodoManager.ts` now blocks subtask creation for recurring parent todos, matching the detail-page rule that recurring tasks do not expose a child-task tab.
 > `useTodoQuickActions.ts` now centralizes lightweight todo quick-actions state so todo-list taps and week-plan badges open the same scheduling/completion sheet behavior.

@@ -130,6 +130,19 @@ describe('todoScheduleUtils virtual category helpers', () => {
     ]);
   });
 
+  test('matches only weekdays that belong to the weekly recurrence pattern', () => {
+    const weeklyRule = {
+      frequency: 'weekly' as const,
+      startDate: '2026-04-20',
+      weekdays: [2],
+      interval: 1
+    };
+
+    expect(matchesRecurrenceRule(weeklyRule, '2026-04-21')).toBe(true);
+    expect(matchesRecurrenceRule(weeklyRule, '2026-04-22')).toBe(false);
+    expect(matchesRecurrenceRule(weeklyRule, '2026-04-28')).toBe(true);
+  });
+
   test('normalizes maybe dates to today-or-future unique valid keys', () => {
     expect(normalizeMaybeDates([
       '2026-04-20',
@@ -216,6 +229,27 @@ describe('todoScheduleUtils virtual category helpers', () => {
       monthDays: [29, 30, 31],
       fallbackToMonthEnd: true
     }, '2026-02-27')).toBe(false);
+  });
+
+  test('matches only dates that belong to the monthly recurrence pattern', () => {
+    expect(matchesRecurrenceRule({
+      frequency: 'monthly',
+      startDate: '2026-01-15',
+      monthDays: [15]
+    }, '2026-05-15')).toBe(true);
+
+    expect(matchesRecurrenceRule({
+      frequency: 'monthly',
+      startDate: '2026-01-15',
+      monthDays: [15]
+    }, '2026-05-14')).toBe(false);
+
+    expect(matchesRecurrenceRule({
+      frequency: 'monthly',
+      startDate: '2026-01-31',
+      monthDays: [31],
+      fallbackToMonthEnd: true
+    }, '2026-04-30')).toBe(true);
   });
 
   test('parses monthly multi-day input as sorted unique day numbers', () => {

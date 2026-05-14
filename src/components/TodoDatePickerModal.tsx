@@ -4,6 +4,7 @@
  * @output Standalone date/month picker modal for todo planning fields, Maybe-date multi-select, and Memoir month jumping
  * @pos Component (Modal)
  * @description A lightweight print-style modal that supports single-date selection, configurable multi-date toggling, or a month-only picker with a fast year/month jump view.
+ * @updated 2026-05-14: Added optional per-date selectability rules so recurrence `Skip Date` can disable days that do not belong to the active recurrence pattern, while also restoring damaged Chinese picker copy.
  * @updated 2026-05-14: Added configurable multi-date minimum-date rules so `Maybe Date` can stay future-only while recurrence `Skip Date` allows today plus future dates without needing a second calendar component.
  * @updated 2026-05-14: Added a future-only `multi-date` mode with local draft selection plus confirm/clear actions so todo details can edit `Maybe Date` values without disturbing the existing single-date scheduling flow.
  * @updated 2026-04-20: Added a month-only picker mode for Memoir and removed the duplicate footer close action.
@@ -32,6 +33,7 @@ interface TodoDatePickerModalProps {
   mode?: 'date' | 'month' | 'multi-date';
   minDate?: 'future' | 'today-or-future';
   minMultiDate?: 'future' | 'today-or-future';
+  isDateSelectable?: (value: string) => boolean;
   onSelect: (value: string) => void;
   onSelectMultiple?: (values: string[]) => void;
   onClear?: () => void;
@@ -69,6 +71,7 @@ export const TodoDatePickerModal: React.FC<TodoDatePickerModalProps> = ({
   mode = 'date',
   minDate,
   minMultiDate = 'future',
+  isDateSelectable,
   onSelect,
   onSelectMultiple,
   onClear,
@@ -151,6 +154,10 @@ export const TodoDatePickerModal: React.FC<TodoDatePickerModalProps> = ({
   };
 
   const handleDaySelect = (dateKey: string) => {
+    if (isDateSelectable && !isDateSelectable(dateKey)) {
+      return;
+    }
+
     if (isMultiDate) {
       const isBeforeMinimum = minMultiDate === 'today-or-future'
         ? dateKey < minAllowedMultiDateKey
@@ -239,7 +246,7 @@ export const TodoDatePickerModal: React.FC<TodoDatePickerModalProps> = ({
                 isMonthOnly
                   ? '选择月份'
                   : pickerView === 'calendar'
-                    ? '快速跳转月份'
+                    ? '快速切换月份'
                     : '返回日期视图'
               }
             >
@@ -274,7 +281,8 @@ export const TodoDatePickerModal: React.FC<TodoDatePickerModalProps> = ({
                   ? selectedDateSet.has(dateKey)
                   : (selectedDate ? isSameDay(day, selectedDate) : false);
                 const todayMatch = isToday(day);
-                const isDisabled = isMultiDate
+                const isOutsideSelectableRule = isDateSelectable ? !isDateSelectable(dateKey) : false;
+                const isDisabledByMinimum = isMultiDate
                   ? (
                     minMultiDate === 'today-or-future'
                       ? dateKey < minAllowedMultiDateKey
@@ -285,6 +293,7 @@ export const TodoDatePickerModal: React.FC<TodoDatePickerModalProps> = ({
                       ? dateKey < minAllowedDateKey
                       : dateKey <= minAllowedDateKey)
                     : false);
+                const isDisabled = isDisabledByMinimum || isOutsideSelectableRule;
 
                 return (
                   <button
@@ -345,7 +354,7 @@ export const TodoDatePickerModal: React.FC<TodoDatePickerModalProps> = ({
               <>
                 <span className="text-stone-500">
                   {draftValues.length > 0
-                    ? `已选 ${draftValues.length} 天`
+                    ? `已选择 ${draftValues.length} 天`
                     : (minMultiDate === 'today-or-future' ? '仅可选择今天及未来日期' : '仅可选择未来日期')}
                 </span>
                 <div className="flex items-center gap-4">

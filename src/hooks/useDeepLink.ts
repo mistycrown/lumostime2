@@ -4,7 +4,9 @@
  * @output Deep Link Listener (appUrlOpen event handler), NFC Listener (nfcTagScanned event handler)
  * @pos Hook (System Integration)
  * @description Handles app deep links and NFC scans with stable listeners, launch-url fallback, shared LumosTime URI compatibility parsing, retained NFC error handling, NFC read-test interception, and stop-confirm routing for repeated activity tags.
- * @updated 2026-05-14: Changed repeated NFC timer scans to keep the just-stopped tag suppressed until a different timer actually starts, so scanning the same tag again behaves like stop instead of restart.
+ * @updated 2026-05-14: Ignores stale deep-link/NFC listener instances so React StrictMode or delayed native listener cleanup cannot process one scan twice.
+ * @updated 2026-05-14: Suppresses cross-source replays of the same NFC timer start so one physical scan cannot stop a running session and then immediately restart it through the app-link bridge.
+ * @updated 2026-05-14: Normalized equivalent NFC/deep-link start URLs onto one execution key so appUrlOpen and nfcTagScanned can share a single dedupe path without leaving duplicate same-activity timers behind.
  * @updated 2026-05-13: Added a short same-activity restart guard so duplicate NFC deliveries after a stop do not immediately start a fresh timer.
  */
 import { useEffect, useRef } from 'react';
@@ -23,11 +25,12 @@ import { useReview } from '../contexts/ReviewContext';
 import { useToast } from '../contexts/ToastContext';
 import { getLocalDateStr } from '../utils/dateUtils';
 import { applyDailyCheckActionForDate } from '../utils/dailyCheckUtils';
-import { parseLumosTimeUrl } from '../utils/lumosTimeUrlParser';
+import { buildLumosTimeExecutionKey, parseLumosTimeUrl, ParsedLumosTimeUrl } from '../utils/lumosTimeUrlParser';
 import {
   buildNfcActivityKey,
+  RecentNfcActivityStartExecution,
   RecentNfcActivityStop,
-  shouldClearRecentNfcActivityStop,
+  shouldSuppressCrossSourceNfcStartDuplicate,
   shouldSuppressNfcActivityRestart
 } from '../utils/nfcActivityRestartGuard';
 import { ShortcutWidgetAction, normalizeShortcutWidgetAction } from '../services/widgetShortcutService';
@@ -39,6 +42,9 @@ type DeepLinkStateSnapshot = {
   checkTemplates: ReturnType<typeof useReview>['checkTemplates'];
   reviewTemplates: ReturnType<typeof useReview>['reviewTemplates'];
 };
+
+let deepLinkHookInstanceSequence = 0;
+let activeDeepLinkHookInstanceId = 0;
 
 const dispatchReadTestResult = (payload: NfcReadTestResultPayload) => {
   window.dispatchEvent(new CustomEvent<NfcReadTestResultPayload>(NFC_READ_TEST_RESULT_EVENT, {
@@ -74,6 +80,7 @@ export const useDeepLink = (
   const setDailyReviewsRef = useRef(setDailyReviews);
   const lastHandledUrlRef = useRef<{ key: string; timestamp: number } | null>(null);
   const lastNfcStoppedActivityRef = useRef<RecentNfcActivityStop | null>(null);
+  const lastHandledStartExecutionRef = useRef<RecentNfcActivityStartExecution | null>(null);
   const isReadTestModeRef = useRef(false);
 
   useEffect(() => {
@@ -85,12 +92,6 @@ export const useDeepLink = (
       reviewTemplates
     };
   }, [activeSessions, categories, checkTemplates, dailyReviews, reviewTemplates]);
-
-  useEffect(() => {
-    if (shouldClearRecentNfcActivityStop(lastNfcStoppedActivityRef.current, activeSessions)) {
-      lastNfcStoppedActivityRef.current = null;
-    }
-  }, [activeSessions]);
 
   useEffect(() => {
     quickPunchRef.current = handleQuickPunch;
@@ -133,6 +134,10 @@ export const useDeepLink = (
   }, []);
 
   useEffect(() => {
+    const hookInstanceId = ++deepLinkHookInstanceSequence;
+    activeDeepLinkHookInstanceId = hookInstanceId;
+    const isCurrentHookInstance = () => activeDeepLinkHookInstanceId === hookInstanceId;
+
     const handleDailyCheck = (checkItemId: string) => {
       const {
         dailyReviews: currentDailyReviews,
@@ -203,14 +208,17 @@ export const useDeepLink = (
         return;
       }
 
-      const existingSession = currentActiveSessions.find((session) => session.activityId === actId);
-      if (toggleExisting && existingSession) {
+      const matchingSessions = currentActiveSessions.filter((session) =>
+        buildNfcActivityKey(session.categoryId, session.activityId) === activityKey
+      );
+      if (matchingSessions.length > 0) {
         lastNfcStoppedActivityRef.current = {
           activityKey,
-          timestamp: now,
-          suppressUntilNextStart: true
+          timestamp: now
         };
-        requestStopActivityRef.current(existingSession.id);
+        matchingSessions.forEach((session) => {
+          requestStopActivityRef.current(session.id);
+        });
         return;
       }
 
@@ -228,15 +236,10 @@ export const useDeepLink = (
     };
 
     const handleParsedUrl = (
-      urlString: string,
+      parsedUrl: ParsedLumosTimeUrl,
       toggleExistingActivity: boolean,
       source: 'scan' | 'deeplink'
     ) => {
-      const parsedUrl = parseLumosTimeUrl(urlString);
-      if (!parsedUrl) {
-        return false;
-      }
-
       if (parsedUrl.type === 'record' && parsedUrl.action === 'quick_punch') {
         quickPunchRef.current();
         return true;
@@ -278,26 +281,56 @@ export const useDeepLink = (
 
     const processUrl = (urlString: string, toggleExistingActivity: boolean, source: 'scan' | 'deeplink') => {
       const now = Date.now();
+      const parsedUrl = parseLumosTimeUrl(urlString);
+      const startActivityKey = parsedUrl?.type === 'record'
+        && parsedUrl.action === 'start'
+        && parsedUrl.catId
+        && parsedUrl.actId
+        ? buildNfcActivityKey(parsedUrl.catId, parsedUrl.actId)
+        : null;
+
+      if (!parsedUrl) {
+        return false;
+      }
 
       if (isReadTestModeRef.current) {
         dispatchReadTestResult({
           type: 'uri',
-          value: urlString,
+          value: parsedUrl.rawValue,
           source,
           scannedAt: now
         });
         return true;
       }
 
-      const dedupeKey = urlString;
+      if (
+        startActivityKey
+        && shouldSuppressCrossSourceNfcStartDuplicate(
+          lastHandledStartExecutionRef.current,
+          startActivityKey,
+          source,
+          now
+        )
+      ) {
+        return true;
+      }
+
+      const dedupeKey = buildLumosTimeExecutionKey(parsedUrl);
       const lastHandled = lastHandledUrlRef.current;
       if (lastHandled && lastHandled.key === dedupeKey && now - lastHandled.timestamp < 1000) {
         return true;
       }
 
-      const handled = handleParsedUrl(urlString, toggleExistingActivity, source);
+      const handled = handleParsedUrl(parsedUrl, toggleExistingActivity, source);
       if (handled) {
         lastHandledUrlRef.current = { key: dedupeKey, timestamp: now };
+        if (startActivityKey) {
+          lastHandledStartExecutionRef.current = {
+            activityKey: startActivityKey,
+            timestamp: now,
+            source
+          };
+        }
       }
       return handled;
     };
@@ -305,6 +338,9 @@ export const useDeepLink = (
     const handleLaunchUrl = async () => {
       try {
         const launchUrl = await CapacitorApp.getLaunchUrl();
+        if (!isCurrentHookInstance()) {
+          return;
+        }
         if (launchUrl?.url) {
           processUrl(launchUrl.url, false, 'deeplink');
         }
@@ -315,7 +351,9 @@ export const useDeepLink = (
 
     const setupDeepLink = async () => {
       const listener = await CapacitorApp.addListener('appUrlOpen', (data) => {
-        console.log('Deep Link received:', data.url);
+        if (!isCurrentHookInstance()) {
+          return;
+        }
         processUrl(data.url, false, 'deeplink');
       });
 
@@ -324,7 +362,9 @@ export const useDeepLink = (
 
     const setupNfcScanListener = async () => {
       const listener = await NfcService.addListener('nfcTagScanned', (data: NfcTagScannedPayload) => {
-        console.log('NFC Scanned:', data);
+        if (!isCurrentHookInstance()) {
+          return;
+        }
 
         if (isReadTestModeRef.current) {
           dispatchReadTestResult({
@@ -381,6 +421,9 @@ export const useDeepLink = (
 
     return () => {
       isDisposed = true;
+      if (activeDeepLinkHookInstanceId === hookInstanceId) {
+        activeDeepLinkHookInstanceId = 0;
+      }
       listenerHandle?.remove();
       scanListenerHandle?.remove();
     };
