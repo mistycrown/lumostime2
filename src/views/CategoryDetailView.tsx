@@ -427,7 +427,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                         todos={todos}
                         enableFocusScore={category.enableFocusScore ?? false}
                         enableMoodScore={category.enableMoodScore ?? false}
-                        renderLogMetadata={(log) => {
+                        renderLogMetadata={(log, { collectionNames }) => {
                             const category = categories.find(c => c.id === log.categoryId);
                             const activity = category?.activities.find(a => a.id === log.activityId);
                             const linkedTodo = todos.find(t => t.id === log.linkedTodoId);
@@ -441,6 +441,13 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                             <span className="line-clamp-1">{linkedTodo.title}</span>
                                         </span>
                                     )}
+
+                                    {collectionNames.map((collectionName) => (
+                                        <span key={`${log.id}-collection-${collectionName}`} className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
+                                            <span className="text-stone-400 font-bold">◬</span>
+                                            <span className="line-clamp-1">{collectionName}</span>
+                                        </span>
+                                    ))}
 
                                     {/* Category Tag */}
                                     <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">

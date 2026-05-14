@@ -4,6 +4,7 @@
  * @output Android foreground-service control and assistant system-trigger events
  * @pos Native Plugin
  * @description Capacitor plugin bridge for the Android-first background assistant agent. Starts and stops the foreground agent service, updates lightweight polling config, relays native system-trigger events back into the web layer, and surfaces assistant notification navigation.
+ * @updated 2026-05-14: Added metadata-aware native trigger dispatch so Android reminder alarms can wake the app and hand one local-offset `reminder_due` trigger to the Web layer without also running a duplicate native AI request.
  * @updated 2026-05-13: Re-pokes the running native assistant service after AI-config and background-snapshot syncs so reminder alarms are rescheduled as soon as native execution becomes ready.
  * @updated 2026-05-11: Re-pokes the running native assistant service after reminder-queue syncs so newly added reminders can reschedule their exact next due wakeup immediately.
  * @updated 2026-04-27: Added native diagnostic list, clear, and live-update bridge methods so Android poll decisions can be inspected from the shared AI history UI.
@@ -278,7 +279,21 @@ public class AssistantAgentPlugin extends Plugin {
     }
 
     public static String dispatchSystemTrigger(Context context, String triggerType, String text, String source) {
+        return dispatchSystemTrigger(context, triggerType, text, source, null, null);
+    }
+
+    public static String dispatchSystemTrigger(
+        Context context,
+        String triggerType,
+        String text,
+        String source,
+        String explicitTriggerId,
+        JSObject metadata
+    ) {
         String triggerId = java.util.UUID.randomUUID().toString();
+        if (explicitTriggerId != null && !explicitTriggerId.trim().isEmpty()) {
+            triggerId = explicitTriggerId.trim();
+        }
         JSObject payload = new JSObject();
         payload.put("id", triggerId);
         payload.put("type", triggerType);
@@ -286,6 +301,9 @@ public class AssistantAgentPlugin extends Plugin {
         payload.put("createdAt", new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", java.util.Locale.US)
             .format(new java.util.Date()));
         payload.put("text", text);
+        if (metadata != null) {
+            payload.put("metadata", metadata);
+        }
         AssistantPendingTriggerStore.append(context, payload);
 
         if (instance == null) {

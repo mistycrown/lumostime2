@@ -289,4 +289,171 @@ describe('aiService unified turn normalization', () => {
     });
     expect(result.debug.cache?.key).toContain('lumostime:openrouter:assistant_unified_turn:anthropic/claude-3.7-sonnet:');
   });
+
+  it('extracts reasoning_content from OpenAI-compatible unified-turn responses', async () => {
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                outcome: 'reply',
+                assistantReply: 'final answer',
+                memoryAction: 'no_update'
+              }),
+              reasoning_content: 'step one\nstep two'
+            }
+          }]
+        })
+      }),
+      configurable: true
+    });
+
+    const result = await aiService.requestAssistantUnifiedTurnWithDebug({
+      mode: 'foreground',
+      systemPrompt: 'system',
+      userPrompt: 'user'
+    });
+
+    expect(result.output.reasoning).toEqual({
+      parts: [{
+        text: 'step one\nstep two'
+      }],
+      providerLabel: 'unknown'
+    });
+  });
+
+  it('extracts Gemini thought parts into normalized reasoning summaries', async () => {
+    localStorage.setItem('lumostime_ai_config', JSON.stringify({
+      provider: 'gemini',
+      apiKey: 'test-key',
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models',
+      modelName: 'gemini-2.5-flash'
+    }));
+
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          candidates: [{
+            content: {
+              parts: [{
+                text: JSON.stringify({
+                  outcome: 'reply',
+                  assistantReply: 'gemini answer',
+                  memoryAction: 'no_update'
+                })
+              }, {
+                text: 'first thought',
+                thought: true
+              }, {
+                text: 'second thought',
+                type: 'reasoning'
+              }]
+            }
+          }]
+        })
+      }),
+      configurable: true
+    });
+
+    const result = await aiService.requestAssistantUnifiedTurnWithDebug({
+      mode: 'foreground',
+      systemPrompt: 'system',
+      userPrompt: 'user'
+    });
+
+    expect(result.output.reasoning).toEqual({
+      parts: [
+        { text: 'first thought' },
+        { text: 'second thought' }
+      ],
+      providerLabel: 'gemini'
+    });
+  });
+});
+
+describe('aiService preset storage', () => {
+  beforeEach(() => {
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: createLocalStorageMock(),
+      configurable: true
+    });
+    localStorage.setItem('lumostime_ai_config', JSON.stringify({
+      provider: 'openai',
+      apiKey: 'default-key',
+      baseUrl: 'https://api.openai.com/v1',
+      modelName: 'gpt-4o-mini'
+    }));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('migrates legacy single-config storage into the default preset and keeps extra legacy profiles', () => {
+    localStorage.setItem('lumostime_ai_profiles', JSON.stringify({
+      deepseek: {
+        provider: 'openai',
+        apiKey: 'deepseek-key',
+        baseUrl: 'https://api.deepseek.com',
+        modelName: 'deepseek-chat'
+      }
+    }));
+
+    const presets = aiService.getPresets();
+    const currentPreset = aiService.getCurrentPreset();
+
+    expect(currentPreset.id).toBe('default');
+    expect(currentPreset.name).toBe('默认预设');
+    expect(currentPreset.config).toEqual({
+      provider: 'openai',
+      apiKey: 'default-key',
+      baseUrl: 'https://api.openai.com/v1',
+      modelName: 'gpt-4o-mini'
+    });
+    expect(presets.map((preset) => preset.name)).toEqual(expect.arrayContaining(['默认预设', 'DeepSeek']));
+  });
+
+  it('creates, updates, switches, and deletes custom presets while syncing the current config', () => {
+    const createdPreset = aiService.createPreset('Gemini 备用', {
+      provider: 'gemini',
+      apiKey: 'gemini-key',
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models',
+      modelName: 'gemini-2.5-flash'
+    });
+
+    expect(aiService.getCurrentPresetId()).toBe(createdPreset.id);
+    expect(aiService.getConfig()).toEqual(createdPreset.config);
+
+    const renamedPreset = aiService.updatePreset(createdPreset.id, {
+      name: 'Gemini 工作流'
+    });
+    expect(renamedPreset?.name).toBe('Gemini 工作流');
+
+    aiService.saveConfig({
+      provider: 'gemini',
+      apiKey: 'gemini-key-2',
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models',
+      modelName: 'gemini-2.5-pro'
+    });
+
+    expect(aiService.getCurrentPreset().config).toEqual({
+      provider: 'gemini',
+      apiKey: 'gemini-key-2',
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models',
+      modelName: 'gemini-2.5-pro'
+    });
+
+    aiService.setCurrentPreset(createdPreset.id);
+    const deleteResult = aiService.deletePreset(createdPreset.id);
+
+    expect(deleteResult.deleted).toBe(true);
+    expect(deleteResult.currentPreset.id).toBe('default');
+    expect(aiService.getCurrentPresetId()).toBe('default');
+    expect(aiService.getPresets().some((preset) => preset.id === createdPreset.id)).toBe(false);
+  });
 });

@@ -5,6 +5,7 @@
  * @pos Service (Assistant Orchestrator)
  * @description Orchestrates Android-first assistant system turns by loading structured memory, assembling a prompt, calling the existing AI service, and applying the resulting silent/message/reminder/memory actions back into local state.
  *
+ * @updated 2026-05-14: Persisted provider-native reasoning summaries alongside surfaced background assistant messages so foreground and background chat entries share the same collapsible thinking payload shape.
  * @updated 2026-05-13: Native reminder_due hydrations now respect the diagnostic `nativeNotificationShown` flag so Web-side catch-up does not replay a second system notification for the same reminder.
  * @updated 2026-05-13: Native completed-request hydrations now rebuild and persist a foreground-style debug exchange from Android diagnostics, so background prompt assembly can be inspected from the same debug UI as Web-run turns.
  * @updated 2026-05-12: Background message persistence now falls back only to the latest ordinary conversation with a real user-authored turn, so template sessions never receive native or web background replies by accident.
@@ -32,6 +33,7 @@ import {
   type AssistantMemoryPatch,
   type AssistantNativeDiagnosticEntry,
   type AssistantOrchestratorResult,
+  type AssistantReasoningSummary,
   type AssistantReminder,
   type AssistantReminderDraft,
   type AssistantSilentReason,
@@ -104,6 +106,7 @@ interface PersistedAIChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  reasoning?: AssistantReasoningSummary;
   displayParts?: string[];
   createdAt: number;
   tone?: 'normal' | 'system' | 'error' | 'pending';
@@ -514,6 +517,7 @@ const persistAssistantMessage = (
   message: string,
   targetSessionId?: string,
   options?: {
+    reasoning?: AssistantReasoningSummary;
     displayParts?: string[];
     backgroundDebugHistoryId?: string;
     debugSections?: Array<{
@@ -548,6 +552,7 @@ const persistAssistantMessage = (
     id: crypto.randomUUID(),
     role: 'assistant',
     content: trimmed,
+    ...(options?.reasoning ? { reasoning: options.reasoning } : {}),
     ...(options?.displayParts?.length ? { displayParts: options.displayParts } : {}),
     createdAt: now,
     tone: 'system',
@@ -915,6 +920,7 @@ export const assistantOrchestratorService = {
     if (hasVisibleReply && replyContent) {
       surfacedMessage = replyContent;
       surfacedMessageLocation = persistAssistantMessage(surfacedMessage, request.targetSessionId, {
+        ...(output.reasoning ? { reasoning: output.reasoning } : {}),
         ...(messageParts?.length ? { displayParts: messageParts } : {}),
         backgroundDebugHistoryId: backgroundCallId,
         ...(memoryUpdates.length > 0 ? { memoryUpdates } : {}),

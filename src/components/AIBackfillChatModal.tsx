@@ -4,6 +4,8 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-14: Kept Android reminder alarms on the native wakeup path but routed `reminder_due` execution through the Web listener only, so native Android no longer produces a duplicate UTC-timestamped background request beside the local-offset run.
+ * @updated 2026-05-14: Added collapsible assistant reasoning blocks with persisted provider-native thinking summaries, so foreground and background chat messages can reveal model reasoning without polluting the main reply body.
  * @updated 2026-05-14: Added an ordinary-chat `日报` command that packages today's context, confirms overwrite when needed, writes back the current day's AI narrative, and returns a Daily Review result card inline.
  * @updated 2026-05-14: Added a full Dream reset action with inline confirmation so the Dream manager can restore built-in topic titles and notes while clearing all Dream observations in one guarded step.
  * @updated 2026-05-13: Rendered chat bubbles through Markdown with GFM and hard line-break support, so AI replies can keep one complete `assistantReply` body while still showing headings, emphasis, lists, blockquotes, code, and newline-based paragraph breaks correctly inside the conversation UI.
@@ -163,6 +165,7 @@ import type {
   AssistantEditableMemoryListKey,
   AssistantMemory,
   AssistantNativeDiagnosticEntry,
+  AssistantReasoningSummary,
   AssistantReminder,
   AssistantScheduledTask,
   AssistantSystemTrigger,
@@ -184,6 +187,7 @@ import {
 import { buildAssistantDisplayParts, normalizeAssistantDisplayParts } from '../utils/assistantMessageParts';
 import { buildNativeDiagnosticDebugExchange } from '../utils/assistantNativeDebug';
 import { normalizeAssistantQuietHoursValue } from '../utils/assistantQuietHours';
+import { normalizeAssistantReasoningSummary } from '../utils/assistantReasoning';
 import { resolveLatestOrdinaryAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
 import { getTodoProgressTrackingMode } from '../utils/todoProgressUtils';
 import { normalizeMonthlyDayInput, parseMonthlyDayInput } from '../utils/todoScheduleUtils';
@@ -305,6 +309,7 @@ interface AIChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  reasoning?: AssistantReasoningSummary;
   displayParts?: string[];
   createdAt: number;
   tone?: ChatTone;
@@ -1624,6 +1629,9 @@ const normalizeMessages = (value: unknown): AIChatMessage[] => {
     const normalizedDisplayParts = candidate.role === 'assistant'
       ? normalizeAssistantDisplayParts(candidate.displayParts, candidate.content)
       : undefined;
+    const normalizedReasoning = candidate.role === 'assistant'
+      ? normalizeAssistantReasoningSummary(candidate.reasoning)
+      : undefined;
     const normalizedContent = normalizeMessageContent(candidate.content)
       || (
         candidate.role === 'assistant'
@@ -1639,6 +1647,7 @@ const normalizeMessages = (value: unknown): AIChatMessage[] => {
       id: candidate.id,
       role: candidate.role,
       content: normalizedContent,
+      ...(normalizedReasoning ? { reasoning: normalizedReasoning } : {}),
       ...(normalizedDisplayParts ? { displayParts: normalizedDisplayParts } : {}),
       createdAt: candidate.createdAt,
       ...(candidate.tone ? { tone: candidate.tone } : {}),
@@ -2519,6 +2528,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [assistantNativeDiagnostics, setAssistantNativeDiagnostics] = useState<AssistantNativeDiagnosticEntry[]>([]);
   const [isAssistantBackgroundHistoryViewerOpen, setIsAssistantBackgroundHistoryViewerOpen] = useState(false);
   const [expandedMemoryUpdateMessageIds, setExpandedMemoryUpdateMessageIds] = useState<Set<string>>(() => new Set());
+  const [expandedReasoningMessageIds, setExpandedReasoningMessageIds] = useState<Set<string>>(() => new Set());
   const [expandedDreamUpdateMessageIds, setExpandedDreamUpdateMessageIds] = useState<Set<string>>(() => new Set());
   const [expandedReminderUpdateMessageIds, setExpandedReminderUpdateMessageIds] = useState<Set<string>>(() => new Set());
   const [revealedAssistantPartCounts, setRevealedAssistantPartCounts] = useState<Record<string, number>>({});
@@ -2730,6 +2740,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return next;
     });
   }, []);
+
+  const toggleReasoningExpansion = useCallback((messageId: string) => {
+    setExpandedReasoningMessageIds((current) => {
+      const next = new Set(current);
+      if (next.has(messageId)) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
+      }
+      return next;
+    });
+  }, []);
   const toggleDreamUpdateExpansion = useCallback((messageId: string) => {
     setExpandedDreamUpdateMessageIds((current) => {
       const next = new Set(current);
@@ -2772,6 +2794,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     () => (activeSession ? personaMap.get(activeSession.personaId) : undefined) || personas[0] || DEFAULT_AI_PERSONAS[0],
     [activeSession, personaMap, personas]
   );
+  const shouldUseNativeReminderTriggerDispatch = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
   const assistantBackgroundTimeline = useMemo<AssistantBackgroundTimelineEntry[]>(() => {
     const visibleNativeWakeEvents = assistantNativeDiagnostics.filter((entry) => (
       entry.type === 'checkin_dispatched'
@@ -4172,7 +4195,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   ]);
 
   const flushDueReminders = useCallback(() => {
-    if (!assistantAgentConfig.enabled || !isAssistantBackgroundContextReady) {
+    if (!assistantAgentConfig.enabled || !isAssistantBackgroundContextReady || shouldUseNativeReminderTriggerDispatch) {
       return;
     }
 
@@ -4180,7 +4203,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     dueReminders.forEach((reminder) => {
       dispatchDueReminder(reminder);
     });
-  }, [assistantAgentConfig.enabled, dispatchDueReminder, isAssistantBackgroundContextReady]);
+  }, [
+    assistantAgentConfig.enabled,
+    dispatchDueReminder,
+    isAssistantBackgroundContextReady,
+    shouldUseNativeReminderTriggerDispatch
+  ]);
 
   useEffect(() => {
     syncAssistantScheduledTasks(new Date());
@@ -6521,6 +6549,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     content: string,
     options?: {
       tone?: ChatTone;
+      reasoning?: AssistantReasoningSummary;
       displayParts?: string[];
       debugSections?: AIChatDebugSection[];
       appliedActions?: AppliedChatAction[];
@@ -6539,6 +6568,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       id: pendingMessageId,
       role: 'assistant',
       content,
+      ...(options?.reasoning ? { reasoning: options.reasoning } : {}),
       ...(options?.displayParts?.length ? { displayParts: options.displayParts } : {}),
       createdAt: Date.now(),
       ...(options?.tone ? { tone: options.tone } : {}),
@@ -7451,6 +7481,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       const displayParts = resolveAssistantDisplayParts(templateContent);
 
       replacePendingWithResult(sessionId, pendingMessageId, templateContent, {
+        ...(output.reasoning ? { reasoning: output.reasoning } : {}),
         ...(displayParts?.length ? { displayParts } : {}),
         ...(debugMode
           ? {
@@ -7562,6 +7593,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       const displayParts = resolveAssistantDisplayParts(templateContent);
 
       replacePendingWithResult(sessionId, pendingMessageId, templateContent, {
+        ...(output.reasoning ? { reasoning: output.reasoning } : {}),
         ...(displayParts?.length ? { displayParts } : {}),
         ...(debugMode
           ? {
@@ -7781,6 +7813,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         const displayParts = resolveAssistantDisplayParts(templateContent);
 
         replacePendingWithResult(sessionId, pendingMessageId, templateContent, {
+          ...(output.reasoning ? { reasoning: output.reasoning } : {}),
           ...(displayParts?.length ? { displayParts } : {}),
           ...(debugMode
             ? {
@@ -7833,6 +7866,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         const displayParts = resolveAssistantDisplayParts(templateContent);
 
         replacePendingWithResult(sessionId, pendingMessageId, templateContent, {
+          ...(output.reasoning ? { reasoning: output.reasoning } : {}),
           ...(displayParts?.length ? { displayParts } : {}),
           ...(debugMode
             ? {
@@ -7922,6 +7956,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       const displayParts = resolveAssistantDisplayParts(unifiedContent);
 
       replacePendingWithResult(sessionId, pendingMessageId, unifiedContent, {
+        ...(output.reasoning ? { reasoning: output.reasoning } : {}),
         ...(displayParts?.length ? { displayParts } : {}),
         debugSections,
         ...(unifiedAppliedActions.length > 0 ? { appliedActions: unifiedAppliedActions } : {}),
@@ -8755,6 +8790,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       : displayParts.length;
     const visibleDisplayParts = displayParts.slice(0, visibleDisplayPartCount);
     const allDisplayPartsRevealed = visibleDisplayPartCount >= displayParts.length;
+    const reasoningParts = message.reasoning?.parts || [];
+    const hasReasoning = !isUser && reasoningParts.length > 0;
+    const isReasoningExpanded = expandedReasoningMessageIds.has(message.id);
     const isMemoryUpdatesExpanded = expandedMemoryUpdateMessageIds.has(message.id);
     const isDreamUpdatesExpanded = expandedDreamUpdateMessageIds.has(message.id);
     const isReminderUpdatesExpanded = expandedReminderUpdateMessageIds.has(message.id);
@@ -8854,6 +8892,38 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           </div>
 
           <div className="min-w-0 flex-1 space-y-1.5">
+            {hasReasoning && (
+              <div className="px-1 pb-0.5 text-left">
+                <button
+                  type="button"
+                  onClick={() => toggleReasoningExpansion(message.id)}
+                  className="inline-flex items-center gap-1.5 text-[11px] transition-colors hover:opacity-100"
+                  style={{ color: AI_CHAT_THEME.textFaint }}
+                >
+                  {isReasoningExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                  <span>推理过程</span>
+                  <span>{isReasoningExpanded ? '收起' : '展开'}</span>
+                </button>
+                {isReasoningExpanded && (
+                  <div className="mt-1.5 space-y-2 pl-5">
+                    {reasoningParts.map((part, reasoningIndex) => (
+                      <div
+                        key={`${message.id}-reasoning-${reasoningIndex}`}
+                        className="text-[12px] leading-6"
+                        style={{ color: AI_CHAT_THEME.textMuted }}
+                      >
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm, remarkBreaks]}
+                          components={CHAT_MARKDOWN_COMPONENTS}
+                        >
+                          {part.text}
+                        </ReactMarkdown>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {visibleDisplayParts.map((part, index) => (
               <RevealingMessageBubble
                 key={`${message.id}-part-${index}`}

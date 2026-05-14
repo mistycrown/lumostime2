@@ -4,6 +4,7 @@
  * @output Persistent Android agent loop, shared runtime notification state, and bridge-triggered assistant events
  * @pos Native Service
  * @description Minimal Android foreground service scaffold for the background AI agent. Maintains a lightweight polling loop, shares one persistent Android status notification with the floating-window service, and emits assistant system-trigger events through the Capacitor plugin bridge.
+ * @updated 2026-05-14: Changed Android reminder alarms to dispatch one metadata-rich `reminder_due` trigger back to the Web layer, preserving the local-offset request path and preventing duplicate native-plus-web AI reminder runs.
  * @updated 2026-05-13: Moved next due-reminder wakeups onto AlarmManager-backed service wakeups so reminder_due dispatch no longer depends on in-process Handler delays while the device is idle.
  * @updated 2026-05-11: Split due-reminder scheduling off the coarse base poll so reminders can fire at their exact next eligible time instead of waiting for the next 5-minute sweep.
  * @updated 2026-05-09: Refreshes the shared persistent notification title once per second while active focus timers exist so timer durations stay live during assistant-only foreground runtime.
@@ -336,10 +337,6 @@ public class AssistantAgentService extends Service {
     }
 
     private void dispatchDueNativeReminders(long nowMs) {
-        if (!AssistantNativeBackgroundExecutor.canExecute(this)) {
-            return;
-        }
-
         org.json.JSONArray dueReminders = AssistantNativeReminderStore.listDue(this, nowMs);
         for (int index = 0; index < dueReminders.length(); index += 1) {
             org.json.JSONObject reminder = dueReminders.optJSONObject(index);
@@ -354,56 +351,39 @@ public class AssistantAgentService extends Service {
 
             String attemptedAt = formatTimestamp(nowMs);
             AssistantNativeReminderStore.recordDispatchAttempt(this, reminderId, attemptedAt);
-            org.json.JSONObject triggerPayload = AssistantNativeBackgroundExecutor.buildTriggerPayload(
-                "reminder_due:" + reminderId + ":" + nowMs,
+            String triggerId = "reminder_due:" + reminderId + ":" + nowMs;
+            com.getcapacitor.JSObject metadata = new com.getcapacitor.JSObject();
+            metadata.put("reminderId", reminderId);
+            metadata.put("reminderType", safeTrim(reminder.optString("type", "")));
+            metadata.put("scheduledDueAt", safeTrim(reminder.optString("dueAt", "")));
+            metadata.put("actualDispatchAt", attemptedAt);
+            metadata.put("dispatchAttemptCount", reminder.optInt("dispatchAttemptCount", 0));
+            long dueAtMs = AssistantTimeParser.parseIsoDateTime(reminder.optString("dueAt", ""));
+            if (dueAtMs > 0L) {
+                metadata.put("delayMinutes", Math.max(0L, Math.round((nowMs - dueAtMs) / 60000.0)));
+            }
+            triggerId = AssistantAgentPlugin.dispatchSystemTrigger(
+                this,
                 "reminder_due",
                 safeTrim(reminder.optString("text", "")),
-                "system"
+                "system",
+                triggerId,
+                metadata
             );
-            try {
-                org.json.JSONObject metadata = new org.json.JSONObject();
-                metadata.put("reminderId", reminderId);
-                metadata.put("reminderType", safeTrim(reminder.optString("type", "")));
-                metadata.put("scheduledDueAt", safeTrim(reminder.optString("dueAt", "")));
-                metadata.put("actualDispatchAt", attemptedAt);
-                metadata.put("dispatchAttemptCount", reminder.optInt("dispatchAttemptCount", 0));
-                long dueAtMs = AssistantTimeParser.parseIsoDateTime(reminder.optString("dueAt", ""));
-                if (dueAtMs > 0L) {
-                    metadata.put("delayMinutes", Math.max(0L, Math.round((nowMs - dueAtMs) / 60000.0)));
-                }
-                triggerPayload.put("metadata", metadata);
-            } catch (org.json.JSONException ignored) {
-            }
 
             appendDiagnostic(
                 "reminder_due_dispatched",
                 "success",
-                "Native poll dispatched a reminder_due trigger",
-                safeTrim(triggerPayload.optString("id", "")),
+                "Native poll dispatched a reminder_due trigger to the Web layer",
+                triggerId,
                 "reminder_due",
                 null,
                 buildPollDiagnosticContext(nowMs)
             );
-
-            AssistantNativeBackgroundExecutor.executeAsync(this, triggerPayload, new AssistantNativeBackgroundExecutor.ExecutionCallback() {
-                @Override
-                public void onCompleted() {
-                    AssistantNativeReminderStore.markDispatched(AssistantAgentService.this, reminderId, isoNow());
-                    handler.post(() -> {
-                        scheduleNextReminderDispatch(System.currentTimeMillis());
-                        syncUnifiedStatusNotification();
-                    });
-                }
-
-                @Override
-                public void onFailed() {
-                    handler.post(() -> {
-                        scheduleNextReminderDispatch(System.currentTimeMillis());
-                        syncUnifiedStatusNotification();
-                    });
-                }
-            });
         }
+
+        scheduleNextReminderDispatch(System.currentTimeMillis());
+        syncUnifiedStatusNotification();
     }
 
     private void rescheduleAgentLoop() {

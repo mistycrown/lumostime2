@@ -3,6 +3,7 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-05-14: `AIBackfillChatModal.tsx` now lets Android reminder alarms wake natively but routes `reminder_due` execution back through the shared Web listener only, preserving the local-offset `+08:00` request path and removing the duplicate UTC-flavored native reminder run.
 - Update 2026-05-14: `AIBackfillChatModal.tsx` now intercepts the ordinary-chat command `日报`, confirms overwrite when today's Daily Review already has an AI narrative, writes back the new daily narrative through `dailyReviewTemplateService.ts`, and renders the same inline result-card style used by weekly/monthly review writebacks.
 - Update 2026-05-14: `TodoDetailModal.tsx` now removes the extra nested recurrence-rule frame inside `时间安排`, so recurring fields render directly within the outer planning card instead of inside a second dashed box.
 - Update 2026-05-14: `TodoQuickActionsModal.tsx` now keeps the main `Maybe` picker button but splits out adjacent `今天 / 明天 / +7` shortcut chips for faster tentative-date assignment, while the arrange/due shortcut label also shortens from `下周` to `+7`.

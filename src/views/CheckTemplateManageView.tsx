@@ -475,7 +475,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
         )}
 
         {editingTemplateId && templateForm && (
-          <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="min-w-0 bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="p-4 border-b border-stone-100 flex justify-between items-center bg-stone-50/50">
               <h3 className="font-bold text-stone-800">
                 {editingTemplateId === 'NEW' ? '新建模板' : '编辑模板'}
@@ -488,7 +488,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
             <div className="p-4 space-y-6">
               <div>
                 <label className="block text-xs font-bold text-stone-500 mb-1.5 uppercase tracking-wider">模板名称</label>
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <input
                     type="text"
                     value={`${templateForm.icon || ''}${templateForm.title}`}
@@ -499,7 +499,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                       const title = value.slice(firstChar.length).trim();
                       setTemplateForm({ ...templateForm, icon, title });
                     }}
-                    className={`flex-1 bg-stone-50 border ${errors.title ? 'border-red-300 focus:border-red-500' : 'border-stone-200 focus:border-stone-400'} rounded-xl px-4 py-2.5 text-sm outline-none transition-colors`}
+                    className={`min-w-0 flex-1 bg-stone-50 border ${errors.title ? 'border-red-300 focus:border-red-500' : 'border-stone-200 focus:border-stone-400'} rounded-xl px-4 py-2.5 text-sm outline-none transition-colors`}
                     placeholder="🔵 输入模板名称（首字符作为 emoji 图标）..."
                   />
                   {canUseUiIcon && (
@@ -535,9 +535,9 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
               </div>
 
               <div>
-                <div className="flex justify-between items-end mb-2">
+                <div className="flex flex-wrap justify-between items-end gap-2 mb-2">
                   <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider">日课列表</label>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     <button
                       onClick={() => setSortingMode((prev) => !prev)}
                       className={`text-xs font-bold flex items-center gap-1 px-2 py-1 rounded-lg transition-colors ${
@@ -582,14 +582,14 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
               </div>
 
               <div className="pt-4 border-t border-stone-100">
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex flex-col">
                     <span className="text-sm font-bold text-stone-700">同步到时间轴</span>
-                    <span className="text-[10px] text-stone-400">开启后，这个日课分组会显示在时间轴底部。</span>
+                    <span className="text-[10px] text-stone-400 break-words">开启后，这个日课分组会显示在时间轴底部。</span>
                   </div>
                   <button
                     onClick={() => setTemplateForm({ ...templateForm, syncToTimeline: !templateForm.syncToTimeline })}
-                    className={`p-2 rounded-lg transition-colors ${templateForm.syncToTimeline ? 'text-[#2F4F4F]' : 'text-stone-300'}`}
+                    className={`shrink-0 p-2 rounded-lg transition-colors ${templateForm.syncToTimeline ? 'text-[#2F4F4F]' : 'text-stone-300'}`}
                   >
                     {templateForm.syncToTimeline ? <LucideIcons.ToggleRight size={28} /> : <LucideIcons.ToggleLeft size={28} />}
                   </button>

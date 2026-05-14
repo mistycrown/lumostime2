@@ -4,10 +4,12 @@
  * @output Regression coverage for collection membership updates and mixed-item resolution
  * @pos Test (data collection helpers)
  * @description Verifies that collection membership updates stay deduplicated and that collection detail resolution ignores stale item references.
+ * @updated 2026-05-14: Added regression coverage for batch appends into a single collection detail flow.
  * @updated 2026-05-12: Added first-pass coverage for data collection helper behavior.
  */
 import { describe, expect, test, vi } from 'vitest';
 import {
+  appendDataCollectionEntries,
   buildDataCollectionCountMap,
   getDataCollectionIdsForItem,
   hasDataCollectionMembershipChanged,
@@ -17,6 +19,63 @@ import {
 import { DataCollection, DataCollectionEntry, Log, TodoItem } from '../types';
 
 describe('dataCollectionUtils', () => {
+  test('appendDataCollectionEntries adds only missing item memberships for one collection', () => {
+    const entries: DataCollectionEntry[] = [
+      {
+        id: 'entry-log-1',
+        collectionId: 'social',
+        itemType: 'log',
+        itemId: 'log-1',
+        addedAt: 10
+      },
+      {
+        id: 'entry-todo-1',
+        collectionId: 'social',
+        itemType: 'todo',
+        itemId: 'todo-1',
+        addedAt: 20
+      }
+    ];
+
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce('entry-log-2')
+      .mockReturnValueOnce('entry-log-3');
+
+    const nextEntries = appendDataCollectionEntries({
+      entries,
+      collectionId: 'social',
+      itemType: 'log',
+      itemIds: ['log-1', 'log-2', 'log-2', 'log-3'],
+      addedAt: 88
+    });
+
+    expect(nextEntries).toHaveLength(4);
+    expect(nextEntries.filter((entry) => entry.collectionId === 'social' && entry.itemType === 'log')).toEqual([
+      {
+        id: 'entry-log-1',
+        collectionId: 'social',
+        itemType: 'log',
+        itemId: 'log-1',
+        addedAt: 10
+      },
+      {
+        id: 'entry-log-2',
+        collectionId: 'social',
+        itemType: 'log',
+        itemId: 'log-2',
+        addedAt: 88
+      },
+      {
+        id: 'entry-log-3',
+        collectionId: 'social',
+        itemType: 'log',
+        itemId: 'log-3',
+        addedAt: 88
+      }
+    ]);
+    expect(nextEntries.find((entry) => entry.id === 'entry-todo-1')).toBeTruthy();
+  });
+
   test('upsertDataCollectionEntriesForItem preserves existing entries and removes deselected memberships', () => {
     const entries: DataCollectionEntry[] = [
       {

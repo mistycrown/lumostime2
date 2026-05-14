@@ -4,6 +4,7 @@
  * @output UI row for editing one daily check template item
  * @pos Component (Check Template)
  * @description 日课模板条目编辑行，支持手动/自动模式切换、次数目标输入、自动规则配置，以及可选的 UI icon 选择。
+ * @updated 2026-05-14: Keep index and input on one line, move action buttons to a right-aligned second row on small screens.
  * @updated 2026-05-03: Rewrote the row in UTF-8 and added supporter-gated UI icon selection support.
  * @updated 2026-04-15: Added nightLatestStart summary rendering for auto rules.
  */
@@ -154,7 +155,7 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
     })();
 
     return (
-      <span className="font-mono text-[10px]">
+      <span className="min-w-0 break-words font-mono text-[10px]">
         {filterExpression || '(未设置筛选条件)'} {label} {operator} {formattedTarget}
       </span>
     );
@@ -163,85 +164,140 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
   return (
     <>
       <div className="space-y-2">
-        <div className="flex items-center gap-1.5 group">
-          <span className="text-stone-300 text-xs w-4 text-center">{index + 1}</span>
+        <div className="group space-y-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="w-4 shrink-0 text-center text-xs text-stone-300">{index + 1}</span>
+            <input
+              type="text"
+              value={displayValue}
+              onChange={(e) => handleContentChange(e.target.value)}
+              className="min-w-0 flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none transition-all font-serif focus:border-stone-400 focus:ring-2 focus:ring-stone-100"
+              placeholder={isAuto ? '⚡ 输入自动日课名称...' : '📝 输入日课名称（首字符作为 emoji 图标）...'}
+            />
+          </div>
 
-          <input
-            type="text"
-            value={displayValue}
-            onChange={(e) => handleContentChange(e.target.value)}
-            className="flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-100 transition-all font-serif"
-            placeholder={isAuto ? '⚡ 输入自动日课名称...' : '📝 输入日课名称（首字符作为 emoji 图标）...'}
-          />
+          {isCountManual && (
+            <div className="ml-6 flex flex-wrap items-center gap-2 text-xs text-stone-500">
+              <span>目标次数</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={targetCountText}
+                onFocus={(e) => e.currentTarget.select()}
+                onClick={(e) => e.currentTarget.select()}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (!/^\d*$/.test(raw)) return;
 
-          {canUseUiIcon && !sortingMode && (
-            <button
-              type="button"
-              onClick={() => setShowIconSelector((prev) => !prev)}
-              className={`w-9 h-9 rounded-lg transition-all flex items-center justify-center shrink-0 ${
-                showIconSelector
-                  ? 'bg-[var(--accent-color)]/10'
-                  : 'border border-stone-200 hover:border-stone-300 bg-white'
-              }`}
-              style={showIconSelector ? { border: '0.5px solid var(--accent-color)' } : undefined}
-              title="选择 UI 图标"
-            >
-              {item.uiIcon ? (
-                <IconRenderer icon={item.icon || '•'} uiIcon={item.uiIcon} size={16} />
-              ) : (
-                <span className="text-stone-300 text-xs">+</span>
-              )}
-            </button>
+                  setIsEditingTargetCount(true);
+                  setTargetCountText(raw);
+
+                  if (raw === '') {
+                    onUpdate(index, { ...item, targetCount: undefined, manualMode: 'count', type: 'manual' });
+                    return;
+                  }
+
+                  const parsed = Number(raw);
+                  if (!Number.isFinite(parsed) || parsed < 1) {
+                    onUpdate(index, { ...item, targetCount: undefined, manualMode: 'count', type: 'manual' });
+                    return;
+                  }
+
+                  onUpdate(index, { ...item, targetCount: Math.floor(parsed), manualMode: 'count', type: 'manual' });
+                }}
+                onBlur={() => setIsEditingTargetCount(false)}
+                className="w-20 rounded border border-stone-200 bg-white px-2 py-1 text-stone-700"
+              />
+              <span>次</span>
+            </div>
           )}
 
-          {!sortingMode && (
-            <button
-              type="button"
-              onClick={handleCycleMode}
-              className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors shrink-0 ${
-                isAuto
-                  ? 'text-blue-600 bg-blue-50'
-                  : isCountManual
-                    ? 'text-stone-700 bg-stone-100'
-                    : 'text-stone-500 bg-stone-100'
+          {isAuto && (
+            <div
+              onClick={() => setShowAutoEditor(true)}
+              className={`ml-6 min-w-0 cursor-pointer rounded-lg px-3 py-2 text-xs transition-colors active:opacity-80 flex items-center gap-2 ${
+                item.autoConfig
+                  ? 'bg-blue-50 text-blue-600'
+                  : 'bg-amber-50 text-amber-600 animate-pulse'
               }`}
-              title={`点击切换类型（当前：${isAuto ? '自动规则' : isCountManual ? '手动次数' : '手动勾选'}）`}
+              title="点击编辑自动规则"
             >
-              {isAuto ? <Zap size={16} /> : isCountManual ? <span className="text-sm font-bold leading-none">1</span> : <Circle size={16} />}
-            </button>
+              <Zap size={12} className="shrink-0" />
+              {renderAutoSummary()}
+            </div>
           )}
 
-          {sortingMode && (
-            <>
+          <div className="ml-[1.375rem] flex justify-end gap-1.5">
+            {canUseUiIcon && !sortingMode && (
               <button
                 type="button"
-                onClick={() => onMoveUp?.(index)}
-                className="w-9 h-9 flex items-center justify-center text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors shrink-0"
-                title="上移"
+                onClick={() => setShowIconSelector((prev) => !prev)}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all ${
+                  showIconSelector
+                    ? 'bg-[var(--accent-color)]/10'
+                    : 'border border-stone-200 bg-white hover:border-stone-300'
+                }`}
+                style={showIconSelector ? { border: '0.5px solid var(--accent-color)' } : undefined}
+                title="选择 UI 图标"
               >
-                <ChevronUp size={16} />
+                {item.uiIcon ? (
+                  <IconRenderer icon={item.icon || '🔵'} uiIcon={item.uiIcon} size={16} />
+                ) : (
+                  <span className="text-xs text-stone-300">+</span>
+                )}
               </button>
+            )}
+
+            {!sortingMode && (
               <button
                 type="button"
-                onClick={() => onMoveDown?.(index)}
-                className="w-9 h-9 flex items-center justify-center text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors shrink-0"
-                title="下移"
+                onClick={handleCycleMode}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                  isAuto
+                    ? 'bg-blue-50 text-blue-600'
+                    : isCountManual
+                      ? 'bg-stone-100 text-stone-700'
+                      : 'bg-stone-100 text-stone-500'
+                }`}
+                title={`点击切换类型（当前：${isAuto ? '自动规则' : isCountManual ? '手动次数' : '手动勾选'}）`}
               >
-                <ChevronDown size={16} />
+                {isAuto ? <Zap size={16} /> : isCountManual ? <span className="text-sm font-bold leading-none">1</span> : <Circle size={16} />}
               </button>
-            </>
-          )}
+            )}
 
-          {!sortingMode && (
-            <button
-              type="button"
-              onClick={() => onDelete(index)}
-              className="w-9 h-9 flex items-center justify-center text-stone-300 active:text-red-500 transition-colors shrink-0"
-              tabIndex={-1}
-            >
-              <X size={16} />
-            </button>
-          )}
+            {sortingMode && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onMoveUp?.(index)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-700"
+                  title="上移"
+                >
+                  <ChevronUp size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onMoveDown?.(index)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-700"
+                  title="下移"
+                >
+                  <ChevronDown size={16} />
+                </button>
+              </>
+            )}
+
+            {!sortingMode && (
+              <button
+                type="button"
+                onClick={() => onDelete(index)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center text-stone-300 transition-colors active:text-red-500"
+                tabIndex={-1}
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
         </div>
 
         {canUseUiIcon && showIconSelector && !sortingMode && (
@@ -251,58 +307,6 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
               currentUiIcon={item.uiIcon}
               onSelectDual={handleUiIconSelect}
             />
-          </div>
-        )}
-
-        {isCountManual && (
-          <div className="ml-6 flex items-center gap-2 text-xs text-stone-500">
-            <span>目标次数</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={targetCountText}
-              onFocus={(e) => e.currentTarget.select()}
-              onClick={(e) => e.currentTarget.select()}
-              onChange={(e) => {
-                const raw = e.target.value;
-                if (!/^\d*$/.test(raw)) return;
-
-                setIsEditingTargetCount(true);
-                setTargetCountText(raw);
-
-                if (raw === '') {
-                  onUpdate(index, { ...item, targetCount: undefined, manualMode: 'count', type: 'manual' });
-                  return;
-                }
-
-                const parsed = Number(raw);
-                if (!Number.isFinite(parsed) || parsed < 1) {
-                  onUpdate(index, { ...item, targetCount: undefined, manualMode: 'count', type: 'manual' });
-                  return;
-                }
-
-                onUpdate(index, { ...item, targetCount: Math.floor(parsed), manualMode: 'count', type: 'manual' });
-              }}
-              onBlur={() => setIsEditingTargetCount(false)}
-              className="w-20 px-2 py-1 rounded border border-stone-200 bg-white text-stone-700"
-            />
-            <span>次</span>
-          </div>
-        )}
-
-        {isAuto && (
-          <div
-            onClick={() => setShowAutoEditor(true)}
-            className={`ml-6 text-xs px-3 py-2 rounded-lg flex items-center gap-2 cursor-pointer transition-colors active:opacity-80 ${
-              item.autoConfig
-                ? 'text-blue-600 bg-blue-50'
-                : 'text-amber-600 bg-amber-50 animate-pulse'
-            }`}
-            title="点击编辑自动规则"
-          >
-            <Zap size={12} />
-            {renderAutoSummary()}
           </div>
         )}
       </div>
