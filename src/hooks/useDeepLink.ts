@@ -4,6 +4,7 @@
  * @output Deep Link Listener (appUrlOpen event handler), NFC Listener (nfcTagScanned event handler)
  * @pos Hook (System Integration)
  * @description Handles app deep links and NFC scans with stable listeners, launch-url fallback, shared LumosTime URI compatibility parsing, retained NFC error handling, NFC read-test interception, and stop-confirm routing for repeated activity tags.
+ * @updated 2026-05-14: Changed repeated NFC timer scans to keep the just-stopped tag suppressed until a different timer actually starts, so scanning the same tag again behaves like stop instead of restart.
  * @updated 2026-05-13: Added a short same-activity restart guard so duplicate NFC deliveries after a stop do not immediately start a fresh timer.
  */
 import { useEffect, useRef } from 'react';
@@ -26,6 +27,7 @@ import { parseLumosTimeUrl } from '../utils/lumosTimeUrlParser';
 import {
   buildNfcActivityKey,
   RecentNfcActivityStop,
+  shouldClearRecentNfcActivityStop,
   shouldSuppressNfcActivityRestart
 } from '../utils/nfcActivityRestartGuard';
 import { ShortcutWidgetAction, normalizeShortcutWidgetAction } from '../services/widgetShortcutService';
@@ -83,6 +85,12 @@ export const useDeepLink = (
       reviewTemplates
     };
   }, [activeSessions, categories, checkTemplates, dailyReviews, reviewTemplates]);
+
+  useEffect(() => {
+    if (shouldClearRecentNfcActivityStop(lastNfcStoppedActivityRef.current, activeSessions)) {
+      lastNfcStoppedActivityRef.current = null;
+    }
+  }, [activeSessions]);
 
   useEffect(() => {
     quickPunchRef.current = handleQuickPunch;
@@ -199,7 +207,8 @@ export const useDeepLink = (
       if (toggleExisting && existingSession) {
         lastNfcStoppedActivityRef.current = {
           activityKey,
-          timestamp: now
+          timestamp: now,
+          suppressUntilNextStart: true
         };
         requestStopActivityRef.current(existingSession.id);
         return;
@@ -214,6 +223,7 @@ export const useDeepLink = (
       }
 
       startActivityRef.current(activity, category.id);
+      lastNfcStoppedActivityRef.current = null;
       addToastRef.current('success', `已开始：${activity.name}`);
     };
 

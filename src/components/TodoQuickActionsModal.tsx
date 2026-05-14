@@ -4,6 +4,11 @@
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
  * @pos Component
  * @description A reusable bottom sheet that exposes lightweight todo planning and completion actions without opening the full todo detail editor first.
+ * @updated 2026-05-14: Reworked the `Maybe` quick-action row into one shared outer pill that contains the main `Maybe` picker plus inline `今 / 明 / +7` shortcuts, and renamed the arrange/due `下周` shortcuts to `+7`.
+ * @updated 2026-05-14: Expanded the `Maybe` summary text under the title to show every future candidate date in order instead of collapsing multiple dates into a `+n` count.
+ * @updated 2026-05-14: Moved the recurring skip icon into each skip action button so the shortcut row matches the shared quick-action button structure.
+ * @updated 2026-05-14: Added recurring `Skip 当前轮次 / Skip到` quick actions on one shared row, so recurring todos can skip the next occurrence directly or skip that next run while choosing one future `Maybe Date` destination.
+ * @updated 2026-05-14: Added a `Maybe` quick action that opens the shared multi-date picker with the current task's `maybeDates`, so list-row quick actions can edit tentative future dates for any task type, including recurring todos.
  * @updated 2026-05-13: Changed quick `升级为项目` to reuse the centered category picker so quick reminders must choose a target standard category before upgrading.
  * @updated 2026-05-13: Matched the centered move-category picker width to the parent quick-actions sheet so the nested dialog feels aligned instead of detached.
  * @updated 2026-05-13: Added a centered `移动分类` picker for non-subtask todos so category changes can stay inside the shared quick-actions flow.
@@ -20,13 +25,14 @@
  * @updated 2026-04-20: Extracted from TodoView so todo-list taps and week badges can share one quick-actions sheet implementation.
  */
 import React, { useEffect, useState } from 'react';
-import { ArrowRightLeft, CalendarDays, Check, CheckCircle2, Flag, PanelRightOpen, Pin, Trash2, X } from 'lucide-react';
+import { ArrowRightLeft, CalendarDays, Check, CheckCircle2, Flag, PanelRightOpen, Pin, SkipForward, Trash2, X } from 'lucide-react';
 import { TodoCategory, TodoItem } from '../types';
-import { formatTodoRecurrenceSummary, parseDateKey } from '../utils/todoScheduleUtils';
+import { formatDateKey, formatTodoRecurrenceSummary, normalizeMaybeDates, parseDateKey } from '../utils/todoScheduleUtils';
 import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
 import { isTodoQuickActionInteractionGuardActive } from '../hooks/useTodoQuickActions';
 import { isQuickTodo } from '../utils/todoKindUtils';
 import { IconRenderer } from './IconRenderer';
+import { TodoDatePickerModal } from './TodoDatePickerModal';
 
 type CategoryPickerMode = 'move' | 'upgrade' | null;
 
@@ -40,6 +46,9 @@ interface TodoQuickActionsModalProps {
   onComplete: () => void;
   onUndoComplete: () => void;
   onTogglePin: () => void;
+  onEditMaybeDates: (values: string[]) => void;
+  onSkipNextRecurrence: () => void;
+  onSkipToMaybeDate: (dateKey: string) => void;
   onMoveCategory: (categoryId: string) => void;
   onUpgradeToProject?: (categoryId: string) => void;
   onDelete: () => void;
@@ -59,6 +68,9 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   onComplete,
   onUndoComplete,
   onTogglePin,
+  onEditMaybeDates,
+  onSkipNextRecurrence,
+  onSkipToMaybeDate,
   onMoveCategory,
   onUpgradeToProject,
   onDelete,
@@ -69,10 +81,14 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
 }) => {
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
   const [categoryPickerMode, setCategoryPickerMode] = useState<CategoryPickerMode>(null);
+  const [isMaybePickerOpen, setIsMaybePickerOpen] = useState(false);
+  const [isSkipToPickerOpen, setIsSkipToPickerOpen] = useState(false);
 
   useEffect(() => {
     setIsDeleteConfirming(false);
     setCategoryPickerMode(null);
+    setIsMaybePickerOpen(false);
+    setIsSkipToPickerOpen(false);
   }, [isOpen, todo?.id]);
 
   useEffect(() => {
@@ -81,6 +97,16 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
     }
 
     return registerHardwareBackHandler(() => {
+      if (isMaybePickerOpen) {
+        setIsMaybePickerOpen(false);
+        return true;
+      }
+
+      if (isSkipToPickerOpen) {
+        setIsSkipToPickerOpen(false);
+        return true;
+      }
+
       if (categoryPickerMode) {
         setCategoryPickerMode(null);
         return true;
@@ -98,7 +124,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
       }
       return true;
     });
-  }, [categoryPickerMode, isDeleteConfirming, isOpen, onClose, onForceClose]);
+  }, [categoryPickerMode, isDeleteConfirming, isMaybePickerOpen, isOpen, isSkipToPickerOpen, onClose, onForceClose]);
 
   if (!isOpen || !todo) return null;
 
@@ -126,17 +152,28 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
 
   const scheduledQuickActionValue = formatQuickActionDate(todo.scheduledDate);
   const deadlineQuickActionValue = formatQuickActionDate(todo.deadlineDate);
+  const maybeQuickActionValue = (() => {
+    const normalizedMaybeDates = normalizeMaybeDates(todo.maybeDates);
+    if (!normalizedMaybeDates || normalizedMaybeDates.length === 0) {
+      return null;
+    }
+
+    return normalizedMaybeDates
+      .map((dateKey) => formatQuickActionDate(dateKey) || dateKey)
+      .join(', ');
+  })();
   const recurrenceSummary = formatTodoRecurrenceSummary(todo.recurrenceRule);
 
   const quickActionDateRows = [
-    { label: 'Pin', value: todo.pin ? 'On' : null },
-    { label: '', value: recurrenceSummary },
-    { label: '安排', value: formatQuickActionDate(todo.scheduledDate) },
-    { label: '截止', value: formatQuickActionDate(todo.deadlineDate) },
-    { label: '完成', value: formatQuickActionDateTime(todo.completedAt) }
-  ].filter((item): item is { label: string; value: string } => Boolean(item.value));
+    { key: 'pin', label: 'Pin', value: todo.pin ? 'On' : null },
+    { key: 'recurrence', label: '', value: recurrenceSummary },
+    { key: 'scheduled', label: '安排', value: formatQuickActionDate(todo.scheduledDate) },
+    { key: 'deadline', label: '截止', value: formatQuickActionDate(todo.deadlineDate) },
+    { key: 'maybe', label: 'Maybe', value: maybeQuickActionValue },
+    { key: 'completed', label: '完成', value: formatQuickActionDateTime(todo.completedAt) }
+  ].filter((item): item is { key: string; label: string; value: string } => Boolean(item.value));
   const visibleQuickActionDateRows = isRecurringTodo
-    ? quickActionDateRows.filter((item) => item.value !== scheduledQuickActionValue && item.value !== deadlineQuickActionValue)
+    ? quickActionDateRows.filter((item) => item.key !== 'scheduled' && item.key !== 'deadline')
     : quickActionDateRows;
 
   const handleBackdropPointerDown: React.PointerEventHandler<HTMLDivElement> = (event) => {
@@ -160,6 +197,16 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
       return;
     }
 
+    if (isMaybePickerOpen) {
+      setIsMaybePickerOpen(false);
+      return;
+    }
+
+    if (isSkipToPickerOpen) {
+      setIsSkipToPickerOpen(false);
+      return;
+    }
+
     onClose();
   };
 
@@ -178,6 +225,15 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
 
   const categoryPickerTitle = categoryPickerMode === 'upgrade' ? '升级到哪个分类？' : '移动到哪个分类？';
   const categoryPickerLabel = categoryPickerMode === 'upgrade' ? 'Upgrade Project' : 'Move Category';
+  const handleQuickMaybeDate = (dayOffset: number) => {
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + dayOffset);
+
+    onEditMaybeDates([
+      ...(todo.maybeDates || []),
+      formatDateKey(targetDate)
+    ]);
+  };
 
   return (
     <div
@@ -255,7 +311,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
                     onClick={withActionGuard(() => onMoveDate('scheduled', 'nextWeek'))}
                     className="flex items-center justify-center whitespace-nowrap border-l border-stone-100 px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
                   >
-                    <span>下周</span>
+                    <span>+7</span>
                   </button>
                 </div>
               </div>
@@ -285,7 +341,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
                     onClick={withActionGuard(() => onMoveDate('deadline', 'nextWeek'))}
                     className="flex items-center justify-center whitespace-nowrap border-l border-stone-100 px-4 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
                   >
-                    下周
+                    +7
                   </button>
                 </div>
               </div>
@@ -309,6 +365,63 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
                 <X size={16} className="text-stone-400" />
                 <span>清除截止日期</span>
               </button>
+            </div>
+
+            {isRecurringTodo && (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={withActionGuard(onSkipNextRecurrence)}
+                  className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
+                >
+                  <SkipForward size={15} className="text-stone-400" />
+                  <span>Skip 当前轮次</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={withActionGuard(() => setIsSkipToPickerOpen(true))}
+                  className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
+                >
+                  <SkipForward size={15} className="text-stone-400" />
+                  <span>Skip到</span>
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center rounded-2xl border border-stone-200 bg-white/80 pr-2">
+              <button
+                type="button"
+                onClick={withActionGuard(() => setIsMaybePickerOpen(true))}
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-l-2xl px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:bg-white"
+              >
+                <CalendarDays size={15} className="text-stone-400" />
+                <span>Maybe</span>
+              </button>
+              <div className="flex items-center pl-1">
+                  <button
+                    type="button"
+                    onClick={withActionGuard(() => handleQuickMaybeDate(0))}
+                    className="flex items-center justify-center whitespace-nowrap px-3 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
+                  >
+                    今
+                  </button>
+                  <span className="h-4 w-px bg-stone-200" aria-hidden="true" />
+                  <button
+                    type="button"
+                    onClick={withActionGuard(() => handleQuickMaybeDate(1))}
+                    className="flex items-center justify-center whitespace-nowrap px-3 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
+                  >
+                    明
+                  </button>
+                  <span className="h-4 w-px bg-stone-200" aria-hidden="true" />
+                  <button
+                    type="button"
+                    onClick={withActionGuard(() => handleQuickMaybeDate(7))}
+                    className="flex items-center justify-center whitespace-nowrap px-3 py-3 text-center text-sm text-stone-700 transition-colors hover:bg-white"
+                  >
+                    +7
+                  </button>
+              </div>
             </div>
 
             <button
@@ -375,6 +488,26 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
           </div>
         </div>
       </div>
+
+      <TodoDatePickerModal
+        isOpen={isMaybePickerOpen}
+        title="选择 Maybe Date"
+        values={todo.maybeDates}
+        mode="multi-date"
+        onSelect={() => {}}
+        onSelectMultiple={onEditMaybeDates}
+        onClear={() => onEditMaybeDates([])}
+        onClose={() => setIsMaybePickerOpen(false)}
+      />
+
+      <TodoDatePickerModal
+        isOpen={isSkipToPickerOpen}
+        title="选择 Skip 到哪里"
+        mode="date"
+        minDate="future"
+        onSelect={onSkipToMaybeDate}
+        onClose={() => setIsSkipToPickerOpen(false)}
+      />
 
       {categoryPickerMode && (
         <div

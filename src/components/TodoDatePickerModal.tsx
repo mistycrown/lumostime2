@@ -1,9 +1,11 @@
 /**
  * @file TodoDatePickerModal.tsx
- * @input open state, selected date/month value, initial month value, callbacks
- * @output Standalone date/month picker modal for todo planning fields and Memoir month jumping
+ * @input open state, selected date/month value, optional multi-date value set, initial month value, callbacks
+ * @output Standalone date/month picker modal for todo planning fields, Maybe-date multi-select, and Memoir month jumping
  * @pos Component (Modal)
- * @description A lightweight print-style modal that supports either day selection with a fast year/month jump view or a month-only picker for archive navigation.
+ * @description A lightweight print-style modal that supports single-date selection, configurable multi-date toggling, or a month-only picker with a fast year/month jump view.
+ * @updated 2026-05-14: Added configurable multi-date minimum-date rules so `Maybe Date` can stay future-only while recurrence `Skip Date` allows today plus future dates without needing a second calendar component.
+ * @updated 2026-05-14: Added a future-only `multi-date` mode with local draft selection plus confirm/clear actions so todo details can edit `Maybe Date` values without disturbing the existing single-date scheduling flow.
  * @updated 2026-04-20: Added a month-only picker mode for Memoir and removed the duplicate footer close action.
  */
 import React, { useEffect, useMemo, useState } from 'react';
@@ -25,9 +27,13 @@ interface TodoDatePickerModalProps {
   isOpen: boolean;
   title: string;
   value?: string;
+  values?: string[];
   initialMonthValue?: string;
-  mode?: 'date' | 'month';
+  mode?: 'date' | 'month' | 'multi-date';
+  minDate?: 'future' | 'today-or-future';
+  minMultiDate?: 'future' | 'today-or-future';
   onSelect: (value: string) => void;
+  onSelectMultiple?: (values: string[]) => void;
   onClear?: () => void;
   onClose: () => void;
 }
@@ -52,32 +58,54 @@ const parsePickerValue = (value?: string): Date => {
   return Number.isNaN(fallback.getTime()) ? new Date() : fallback;
 };
 
+const sortDateKeys = (values: string[]): string[] => [...values].sort((left, right) => left.localeCompare(right));
+
 export const TodoDatePickerModal: React.FC<TodoDatePickerModalProps> = ({
   isOpen,
   title,
   value,
+  values,
   initialMonthValue,
   mode = 'date',
+  minDate,
+  minMultiDate = 'future',
   onSelect,
+  onSelectMultiple,
   onClear,
   onClose
 }) => {
   const isMonthOnly = mode === 'month';
-  const [displayMonth, setDisplayMonth] = useState<Date>(() => startOfMonth(parsePickerValue(value || initialMonthValue)));
+  const isMultiDate = mode === 'multi-date';
+  const referenceValue = isMultiDate
+    ? values?.[values.length - 1] || initialMonthValue
+    : value || initialMonthValue;
+  const [displayMonth, setDisplayMonth] = useState<Date>(() => startOfMonth(parsePickerValue(referenceValue)));
   const [pickerView, setPickerView] = useState<PickerView>(isMonthOnly ? 'month' : 'calendar');
+  const [draftValues, setDraftValues] = useState<string[]>(() => sortDateKeys(values || []));
 
   useEffect(() => {
     if (isOpen) {
-      setDisplayMonth(startOfMonth(parsePickerValue(value || initialMonthValue)));
+      const nextReferenceValue = isMultiDate
+        ? values?.[values.length - 1] || initialMonthValue
+        : value || initialMonthValue;
+      setDisplayMonth(startOfMonth(parsePickerValue(nextReferenceValue)));
       setPickerView(isMonthOnly ? 'month' : 'calendar');
+      setDraftValues(sortDateKeys(values || []));
     }
-  }, [initialMonthValue, isMonthOnly, isOpen, value]);
+  }, [initialMonthValue, isMonthOnly, isMultiDate, isOpen, value, values]);
 
   const selectedDate = useMemo(
-    () => (!isMonthOnly && value ? parsePickerValue(value) : null),
-    [isMonthOnly, value]
+    () => (!isMonthOnly && !isMultiDate && value ? parsePickerValue(value) : null),
+    [isMonthOnly, isMultiDate, value]
   );
+  const selectedDateSet = useMemo(() => new Set(draftValues), [draftValues]);
   const today = useMemo(() => new Date(), []);
+  const todayDateKey = useMemo(() => format(today, 'yyyy-MM-dd'), [today]);
+  const minAllowedMultiDateKey = useMemo(() => todayDateKey, [todayDateKey]);
+  const minAllowedDateKey = useMemo(
+    () => (minDate === 'future' ? todayDateKey : minDate === 'today-or-future' ? todayDateKey : null),
+    [minDate, todayDateKey]
+  );
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(displayMonth);
@@ -122,6 +150,50 @@ export const TodoDatePickerModal: React.FC<TodoDatePickerModalProps> = ({
     setDisplayMonth((prev) => addMonths(prev, 1));
   };
 
+  const handleDaySelect = (dateKey: string) => {
+    if (isMultiDate) {
+      const isBeforeMinimum = minMultiDate === 'today-or-future'
+        ? dateKey < minAllowedMultiDateKey
+        : dateKey <= minAllowedMultiDateKey;
+      if (isBeforeMinimum) {
+        return;
+      }
+
+      setDraftValues((previous) => (
+        previous.includes(dateKey)
+          ? previous.filter((item) => item !== dateKey)
+          : sortDateKeys([...previous, dateKey])
+      ));
+      return;
+    }
+
+    if (minAllowedDateKey) {
+      const isBeforeMinimum = minDate === 'today-or-future'
+        ? dateKey < minAllowedDateKey
+        : dateKey <= minAllowedDateKey;
+      if (isBeforeMinimum) {
+        return;
+      }
+    }
+
+    onSelect(dateKey);
+    onClose();
+  };
+
+  const handleMultiDateConfirm = () => {
+    onSelectMultiple?.(draftValues);
+    onClose();
+  };
+
+  const handleClear = () => {
+    if (isMultiDate) {
+      setDraftValues([]);
+    }
+
+    onClear?.();
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -131,7 +203,7 @@ export const TodoDatePickerModal: React.FC<TodoDatePickerModalProps> = ({
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-[11px] uppercase tracking-[0.24em] text-stone-400">
-                {isMonthOnly ? 'Month Picker' : 'Date Picker'}
+                {isMonthOnly ? 'Month Picker' : isMultiDate ? 'Multi Date Picker' : 'Date Picker'}
               </div>
               <div className="mt-1 text-xl font-semibold tracking-tight text-stone-800">{title}</div>
             </div>
@@ -196,24 +268,38 @@ export const TodoDatePickerModal: React.FC<TodoDatePickerModalProps> = ({
               ))}
 
               {calendarDays.map((day) => {
+                const dateKey = format(day, 'yyyy-MM-dd');
                 const outsideMonth = day.getMonth() !== displayMonth.getMonth();
-                const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
+                const isSelected = isMultiDate
+                  ? selectedDateSet.has(dateKey)
+                  : (selectedDate ? isSameDay(day, selectedDate) : false);
                 const todayMatch = isToday(day);
+                const isDisabled = isMultiDate
+                  ? (
+                    minMultiDate === 'today-or-future'
+                      ? dateKey < minAllowedMultiDateKey
+                      : dateKey <= minAllowedMultiDateKey
+                  )
+                  : (minAllowedDateKey
+                    ? (minDate === 'today-or-future'
+                      ? dateKey < minAllowedDateKey
+                      : dateKey <= minAllowedDateKey)
+                    : false);
 
                 return (
                   <button
                     key={day.toISOString()}
                     type="button"
-                    onClick={() => {
-                      onSelect(format(day, 'yyyy-MM-dd'));
-                      onClose();
-                    }}
+                    onClick={() => handleDaySelect(dateKey)}
+                    disabled={isDisabled}
                     className={`relative mx-auto flex h-10 w-10 items-center justify-center rounded-full text-sm transition-all ${
                       isSelected
                         ? 'bg-stone-900 text-white shadow-[0_10px_22px_rgba(0,0,0,0.14)]'
-                        : outsideMonth
-                          ? 'text-stone-300 hover:bg-white'
-                          : 'text-stone-700 hover:bg-white'
+                        : isDisabled
+                          ? 'cursor-not-allowed text-stone-300 opacity-50'
+                          : outsideMonth
+                            ? 'text-stone-300 hover:bg-white'
+                            : 'text-stone-700 hover:bg-white'
                     }`}
                   >
                     <span>{format(day, 'd')}</span>
@@ -255,27 +341,54 @@ export const TodoDatePickerModal: React.FC<TodoDatePickerModalProps> = ({
 
         {!isMonthOnly && (
           <div className="flex items-center justify-between border-t border-stone-200 px-5 py-4 text-sm">
-            <button
-              type="button"
-              onClick={() => {
-                onSelect(format(today, 'yyyy-MM-dd'));
-                onClose();
-              }}
-              className="text-stone-500 transition-colors hover:text-stone-800"
-            >
-              今天
-            </button>
-            {onClear && (
-              <button
-                type="button"
-                onClick={() => {
-                  onClear();
-                  onClose();
-                }}
-                className="text-stone-400 transition-colors hover:text-stone-700"
-              >
-                清除
-              </button>
+            {isMultiDate ? (
+              <>
+                <span className="text-stone-500">
+                  {draftValues.length > 0
+                    ? `已选 ${draftValues.length} 天`
+                    : (minMultiDate === 'today-or-future' ? '仅可选择今天及未来日期' : '仅可选择未来日期')}
+                </span>
+                <div className="flex items-center gap-4">
+                  {onClear && (
+                    <button
+                      type="button"
+                      onClick={handleClear}
+                      className="text-stone-400 transition-colors hover:text-stone-700"
+                    >
+                      清空
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleMultiDateConfirm}
+                    className="text-stone-700 transition-colors hover:text-stone-900"
+                  >
+                    完成
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelect(format(today, 'yyyy-MM-dd'));
+                    onClose();
+                  }}
+                  className="text-stone-500 transition-colors hover:text-stone-800"
+                >
+                  今天
+                </button>
+                {onClear && (
+                  <button
+                    type="button"
+                    onClick={handleClear}
+                    className="text-stone-400 transition-colors hover:text-stone-700"
+                  >
+                    清空
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}

@@ -4,6 +4,8 @@
  * @output Lightweight modal for assigning or quickly creating todos for a specific week-view day
  * @pos Component (Modal)
  * @description Lets users assign unfinished todos to a selected day as either Arrange or Due, or create a linked todo, without leaving the week schedule view.
+ * @updated 2026-05-14: Treats today the same as future dates for quick `Maybe` assignment, so only past dates hide the `Maybe` tab while today and later keep the four-tab picker.
+ * @updated 2026-05-14: Hid assign-type tab icons only for future-date four-tab mode so `Maybe / Arrange / Due / New` render as pure text while past-date three-tab mode keeps icons.
  * @updated 2026-05-13: Hid the reserved `未来` category from quick schedule assignment and quick-create options so its backlog stays out of day-number arrange popups.
  * @updated 2026-05-12: Added instant title search above the assignable todo list and keep matched subtasks attached to their parent rows.
  * @updated 2026-04-25: Rendered assignable subtasks in a parent-child hierarchy so schedule pickers show child tasks nested beneath their parent rows instead of as flat standalone cards.
@@ -29,9 +31,10 @@ import { getSchedulableTodoCategories } from '../utils/todoQuickCategoryUtils';
 
 interface TodoScheduleAssignModalProps {
   isOpen: boolean;
+  dateKey: string;
   dateLabel: string;
-  assignType: 'scheduled' | 'deadline';
-  onAssignTypeChange: (type: 'scheduled' | 'deadline') => void;
+  assignType: 'maybe' | 'scheduled' | 'deadline';
+  onAssignTypeChange: (type: 'maybe' | 'scheduled' | 'deadline') => void;
   todos: TodoItem[];
   allTodos?: TodoItem[];
   todoCategories: TodoCategory[];
@@ -42,6 +45,7 @@ interface TodoScheduleAssignModalProps {
 }
 
 const ASSIGN_TYPE_OPTIONS = [
+  { value: 'maybe' as const, label: 'Maybe', Icon: CalendarDays },
   { value: 'scheduled' as const, label: 'Arrange', Icon: CalendarDays },
   { value: 'deadline' as const, label: 'Due', Icon: Flag }
 ];
@@ -53,8 +57,22 @@ const formatStatusDate = (value?: string): string | null => {
   return `${parsed.getMonth() + 1}/${parsed.getDate()}`;
 };
 
+export const isTodayOrFutureScheduleAssignDate = (
+  dateKey: string,
+  referenceDate: Date = new Date()
+): boolean => {
+  const date = parseDateKey(dateKey);
+  if (!date) {
+    return false;
+  }
+
+  const todayDate = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate());
+  return date.getTime() >= todayDate.getTime();
+};
+
 export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = ({
   isOpen,
+  dateKey,
   dateLabel,
   assignType,
   onAssignTypeChange,
@@ -68,7 +86,7 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
 }) => {
   const schedulableTodoCategories = useMemo(() => getSchedulableTodoCategories(todoCategories), [todoCategories]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'scheduled' | 'deadline' | 'new'>(assignType);
+  const [activeTab, setActiveTab] = useState<'maybe' | 'scheduled' | 'deadline' | 'new'>(assignType);
   const [expandedParentIds, setExpandedParentIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -76,6 +94,7 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
   const [newTodoCategoryId, setNewTodoCategoryId] = useState<string>(schedulableTodoCategories[0]?.id || '');
   const [newLinkedCategoryId, setNewLinkedCategoryId] = useState<string>(activityCategories[0]?.id || '');
   const [newLinkedActivityId, setNewLinkedActivityId] = useState<string>('');
+  const isTodayOrFutureDate = useMemo(() => isTodayOrFutureScheduleAssignDate(dateKey), [dateKey]);
 
   useEffect(() => {
     if (isOpen) {
@@ -89,6 +108,18 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
       setNewLinkedActivityId('');
     }
   }, [isOpen, assignType, dateLabel, schedulableTodoCategories, activityCategories]);
+
+  useEffect(() => {
+    if (!isTodayOrFutureDate && activeTab === 'maybe') {
+      setActiveTab(assignType === 'maybe' ? 'scheduled' : assignType);
+    }
+  }, [activeTab, assignType, isTodayOrFutureDate]);
+
+  const visibleAssignTypeOptions = useMemo(
+    () => (isTodayOrFutureDate ? ASSIGN_TYPE_OPTIONS : ASSIGN_TYPE_OPTIONS.filter((item) => item.value !== 'maybe')),
+    [isTodayOrFutureDate]
+  );
+  const shouldHideTabIcons = isTodayOrFutureDate;
 
   useEffect(() => {
     if (activeTab !== 'new') {
@@ -167,8 +198,11 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
             </button>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            {[...ASSIGN_TYPE_OPTIONS, { value: 'new' as const, label: 'New', Icon: CalendarDays }].map(({ value, label, Icon }) => {
+          <div
+            className="mt-4 grid gap-2"
+            style={{ gridTemplateColumns: `repeat(${visibleAssignTypeOptions.length + 1}, minmax(0, 1fr))` }}
+          >
+            {[...visibleAssignTypeOptions, { value: 'new' as const, label: 'New', Icon: CalendarDays }].map(({ value, label, Icon }) => {
               const isSelected = activeTab === value;
               return (
                 <button
@@ -185,7 +219,7 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
                     borderColor: 'var(--accent-color)'
                   } : undefined}
                 >
-                  <Icon size={14} />
+                  {!shouldHideTabIcons && <Icon size={14} />}
                   <span>{label}</span>
                 </button>
               );
@@ -323,12 +357,18 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
                   {scheduleRows.map((row) => {
                 const { todo } = row;
                 const category = todoCategories.find((item) => item.id === todo.categoryId);
+                const maybeAlreadyAdded = Boolean(todo.maybeDates?.includes(dateKey));
                 const currentStatus = activeTab === 'scheduled'
                   ? formatStatusDate(todo.scheduledDate)
-                  : formatStatusDate(todo.deadlineDate);
+                  : activeTab === 'deadline'
+                    ? formatStatusDate(todo.deadlineDate)
+                    : maybeAlreadyAdded ? formatStatusDate(dateKey) : null;
                 const statusLabel = activeTab === 'scheduled'
                   ? (currentStatus ? `Arrange: ${currentStatus}` : 'Arrange: none')
-                  : (currentStatus ? `Due: ${currentStatus}` : 'Due: none');
+                  : activeTab === 'deadline'
+                    ? (currentStatus ? `Due: ${currentStatus}` : 'Due: none')
+                    : (currentStatus ? `Maybe: ${currentStatus}` : 'Maybe: none');
+                const isRowDisabled = activeTab === 'maybe' && maybeAlreadyAdded;
 
                 return (
                   <div
@@ -342,7 +382,12 @@ export const TodoScheduleAssignModal: React.FC<TodoScheduleAssignModalProps> = (
                       <button
                         type="button"
                         onClick={() => onAssign(todo)}
-                        className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left transition-colors hover:border-stone-300 hover:bg-white"
+                        disabled={isRowDisabled}
+                        className={`flex min-w-0 flex-1 items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors ${
+                          isRowDisabled
+                            ? 'cursor-not-allowed border-stone-200 bg-stone-100/70 opacity-60'
+                            : 'border-stone-200 bg-white/80 hover:border-stone-300 hover:bg-white'
+                        }`}
                       >
                         <span className="shrink-0 text-stone-400">
                           <IconRenderer

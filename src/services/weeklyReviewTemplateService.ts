@@ -605,12 +605,12 @@ export const weeklyReviewTemplateService = {
     const methodPrompt = WEEKLY_REVIEW_TEMPLATE_PROMPTS.chatMethodPrompts[params.methodId] || '';
 
     const systemPrompt = [
-      'You are LumosTime\'s weekly review discussion assistant.',
-      'This is a template conversation dedicated to one selected week.',
-      'Your job is to help the user review that week using only the provided weekly data package.',
-      'Stay in discussion mode. Do not act like the generic log/todo assistant.',
-      'Do not propose tool calls, reminders, or memory updates.',
-      'Reply in natural Chinese unless the user clearly wants another language.',
+      '你是 LumosTime 的周复盘对话助手。',
+      '这是一段只服务于某个选定自然周的模板对话。',
+      '你的任务是只基于提供的周数据包，帮助用户复盘这一周。',
+      '保持在讨论模式里，不要表现得像通用的 log/todo 助手。',
+      '不要提出 tool calls、reminders 或 memory updates。',
+      '默认用自然中文回复，除非用户明确想用别的语言。',
       buildPersonaStyleLayer(params.personaPrompt),
       '',
       '=== Weekly Review Common Prompt ===',
@@ -622,10 +622,10 @@ export const weeklyReviewTemplateService = {
       STRICT_JSON_OUTPUT_RULES,
       '=== Output Schema ===',
       JSON.stringify(WEEKLY_REVIEW_CHAT_OUTPUT_SCHEMA, null, 2),
-      'Always set "mode" to "foreground".',
-      'Use "reply" when you can answer directly and "clarify" only when key information is genuinely missing.',
-      'Always set "memoryAction" to "no_update".',
-      'Do not include toolCalls, reminders, or memoryPatch.'
+      '始终把 "mode" 设为 "foreground"。',
+      '当你可以直接回答时使用 "reply"，只有在关键信息确实缺失时才使用 "clarify"。',
+      '始终把 "memoryAction" 设为 "no_update"。',
+      '不要包含 toolCalls、reminders 或 memoryPatch。'
     ].filter(Boolean).join('\n\n');
 
     const userPrompt = [
@@ -635,7 +635,7 @@ export const weeklyReviewTemplateService = {
       '=== User Message ===',
       params.userMessage,
       '',
-      'Return one JSON object only.'
+      '只返回一个 JSON object。'
     ].join('\n');
 
     return { systemPrompt, userPrompt };
@@ -648,16 +648,16 @@ export const weeklyReviewTemplateService = {
     const weekEndDate = params.weekDataText.match(/weekEndDate:\s*(.+)/)?.[1]?.trim() || '';
 
     const systemPrompt = [
-      'You are preparing one local tool call for LumosTime.',
-      'The tool name is exactly "write_weekly_review_narrative".',
-      'Your job is to return one complete narrativeMarkdown string for that tool.',
-      'Write in Chinese.',
-      'The narrativeMarkdown must already be fully formatted Markdown and must contain exactly these three parts:',
-      '1. A title on the first line.',
-      '2. The main body in the middle.',
-      '3. A final blockquote golden sentence at the end.',
-      'The markdown should look like: "# 标题\\n\\n正文\\n\\n> 金句".',
-      'Do not output prose outside the JSON tool-call object.',
+      '你现在要为 LumosTime 准备一个本地 tool call。',
+      'tool name 必须精确等于 "write_weekly_review_narrative"。',
+      '你的任务是为这个 tool 返回一个完整的 narrativeMarkdown 字符串。',
+      '请用中文写。',
+      '这个 narrativeMarkdown 必须已经是完整可写入的 Markdown，并且必须恰好包含以下三部分：',
+      '1. 第一行标题。',
+      '2. 中间正文。',
+      '3. 结尾一个 blockquote 金句。',
+      'Markdown 结构应类似："# 标题\\n\\n正文\\n\\n> 金句"。',
+      '不要在 JSON tool-call object 之外输出任何 prose。',
       buildPersonaStyleLayer(params.personaPrompt),
       '',
       '=== Weekly Review Writeback Common Prompt ===',
@@ -698,8 +698,8 @@ export const weeklyReviewTemplateService = {
       `weekEndDate: ${weekEndDate}`,
       `mode: ${params.mergeMode}`,
       '',
-      'Return exactly one write_weekly_review_narrative tool-call JSON object now.',
-      'Return one JSON object only.'
+      '现在请精确返回一个 write_weekly_review_narrative tool-call JSON object。',
+      '只返回一个 JSON object。'
     ].filter(Boolean).join('\n');
 
     return { systemPrompt, userPrompt };

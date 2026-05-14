@@ -217,6 +217,7 @@ export interface TodoRecurrenceRule {
   interval?: number;
   weekdays?: number[]; // weekly: 0-6
   monthDays?: number[]; // monthly: 1-31
+  skipDates?: string[]; // recurrence exceptions: hide the generated occurrence on these dates
   fallbackToMonthEnd?: boolean; // monthly only: when the target day does not exist, use that month's last day
 }
 
@@ -261,6 +262,7 @@ export interface TodoItem {
   scheduledDate?: string; // YYYY-MM-DD
   deadlineDate?: string; // YYYY-MM-DD
   recurrenceRule?: TodoRecurrenceRule;
+  maybeDates?: string[]; // YYYY-MM-DD candidate dates kept only for future possibilities
 }
 
 export type DataCollectionItemType = 'log' | 'todo';

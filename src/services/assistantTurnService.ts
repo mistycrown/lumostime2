@@ -270,7 +270,7 @@ const buildUserPrompt = (input: AssistantUnifiedTurnInput): string => [
   '=== Trigger ===',
   stringifyJson(buildPromptTrigger(input.trigger)),
   '',
-  'Return one JSON object only.'
+  '只返回一个 JSON object。'
 ].join('\n');
 
 export const assistantTurnService = {

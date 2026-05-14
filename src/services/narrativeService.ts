@@ -58,30 +58,30 @@ export const narrativeService = {
         // --- DYNAMIC SYSTEM ROLE ---
         let systemRole = '';
         if (periodType === 'daily') {
-            systemRole = 'You are a professional daily review writer. You help users reflect on their day with empathy and insight.';
+            systemRole = '你是一位专业的日复盘写作者。你帮助用户以有同理心、有洞察力的方式回顾这一天。';
         } else if (periodType === 'weekly') {
-            systemRole = 'You are a professional weekly review writer. You help users analyze their week, identifying trends, wins, and areas for improvement without getting bogged down in daily details.';
+            systemRole = '你是一位专业的周复盘写作者。你帮助用户分析这一周，识别趋势、收获与可改进之处，同时不过度陷入逐日细节。';
         } else { // monthly
-            systemRole = 'You are a professional monthly review writer. You help users reflect on their month from a high-level perspective, focusing on long-term goals, life balance, and strategic direction.';
+            systemRole = '你是一位专业的月复盘写作者。你帮助用户从更高层视角回顾这个月，关注长期目标、生活平衡与战略方向。';
         }
 
         // --- SPECIFIC WRITING INSTRUCTIONS (To override "Diary" references) ---
         let writingInstructions = '';
         if (periodType === 'weekly') {
             writingInstructions = `
-**IMPORTANT WRITING INSTRUCTIONS FOR WEEKLY REVIEW**:
-1. **Scope**: This is a WEEKLY review. Do NOT write it as a daily diary.
-2. **Focus**: Focus on the "Big Picture", trends throughout the week, and total time distribution.
-3. **Structure**: Summarize key achievements and challenges across the whole week. Do not list events day by day unless critical.
-4. **Tone**: Analytical yet encouraging.
+**周复盘写作重要要求**：
+1. **范围**：这是一次周复盘，不要把它写成日记式流水账。
+2. **焦点**：关注整周的大图景、贯穿一周的趋势，以及总体时间分布。
+3. **结构**：概括整周的关键收获与挑战；除非必要，不要按天逐条列事件。
+4. **语气**：保持分析性，同时给人支持感。
 `;
         } else if (periodType === 'monthly') {
             writingInstructions = `
-**IMPORTANT WRITING INSTRUCTIONS FOR MONTHLY REVIEW**:
-1. **Scope**: This is a MONTHLY review. Do NOT write it as a daily diary.
-2. **Focus**: Focus on long-term growth, extensive time investment in key areas, and overall life balance.
-3. **Structure**: highlighting the most significant shifts or consistency compared to general expectations.
-4. **Tone**: Reflective, deep, and strategic.
+**月复盘写作重要要求**：
+1. **范围**：这是一次月复盘，不要把它写成日记式流水账。
+2. **焦点**：关注长期成长、关键领域里的持续投入，以及整体生活平衡。
+3. **结构**：突出最显著的变化，或那些超出一般预期的持续一致性。
+4. **语气**：保持反思感、深度和战略视角。
 `;
         }
 

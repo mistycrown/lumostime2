@@ -5,6 +5,8 @@
  * @pos Service (Dream)
  * @description Stores the explicit-only Dream attention system separately from assistant memory, including user-maintained concern topics, AI-maintained observation entries, and the manual `dream` workflow that can add, rewrite, or delete entries while normal chat and background turns remain read-only consumers.
  *
+ * @updated 2026-05-14: Added a full Dream reset helper that restores the built-in default topics and notes while clearing all accumulated Dream observation entries in one action.
+ * @updated 2026-05-14: Tightened Dream workflow instructions so refreshed entries should summarize recurring habits and distill future-facing assistant rules, not merely restate observed phenomena.
  * @updated 2026-05-13: Flattened built-in and custom Dream topics into one unified prompt task list so every enabled topic reaches the Dream model at the same priority level.
  * @updated 2026-05-13: Preserved existing Dream topic notes and titles when toggling unrelated fields so enable/disable no longer clears long user-facing prompt copy.
  * @updated 2026-05-13: Added a one-way built-in Dream-topic migration so legacy preset groups automatically reconcile into the newer inner-traits, life-rhythm, wellbeing, and execution-pressure defaults without disturbing custom topics.
@@ -664,6 +666,10 @@ export const dreamService = {
     return next;
   },
 
+  resetState(): DreamState {
+    return dreamService.saveState(createDefaultDreamState());
+  },
+
   createTopic(input: DreamTopicDraftInput): DreamState {
     const title = normalizeString(input.title, DREAM_TOPIC_TITLE_LIMIT);
     const note = normalizeString(input.note, DREAM_TOPIC_NOTE_LIMIT);
@@ -908,6 +914,7 @@ export const dreamService = {
       '- Try to produce or revise at least one useful observation for every enabled topic that has any meaningful signal, and do not skip user-defined topics just because they are custom.',
       '- Recent conversation context is a first-class source for Dream整理, not just a side note.',
       '- Do not rely only on logs; if recent chat reveals meaningful ongoing issues or themes, include them in Dream when they match a topic.',
+      '- Do not stop at summarizing surface phenomena; when possible, summarize the user habit or recurring tendency and the practical rule that should guide future assistant behavior.',
       '- If logs and recent chat together support multiple semantically distinct observations, split them into multiple Dream entries.',
       '- Do not compress separate issues into one oversized entry just because they fall under nearby topics.',
       '',
@@ -922,6 +929,8 @@ export const dreamService = {
       '- Create multiple entries when there are multiple distinct observations; do not force everything into one entry.',
       '- 1 to 3 entries per topic is acceptable when the observations are genuinely distinct.',
       '- If one returned entry starts reading like a list of separate issues, split it into multiple entries instead.',
+      '- When the evidence supports it, each entry should capture both what tends to happen and what usually helps, what to avoid, or how the assistant should respond next time.',
+      '- Prefer entries that can inform future action and continuity, not entries that merely restate isolated facts.',
       '- When recent chat adds meaningful evidence that logs alone would miss, fold that evidence into Dream entries rather than ignoring it.',
       '- If the evidence is thin, you may still create a provisional but honest observation.',
       '- If a topic has no meaningful new observation, you may leave it unchanged.',

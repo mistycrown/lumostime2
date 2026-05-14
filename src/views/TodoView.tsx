@@ -4,6 +4,7 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes reserved `小事` / `未来` buckets plus a week planning view with schedule and history badges.
+ * @updated 2026-05-14: Swapped the week-view `Maybe` leading icon to `Diff` and kept virtual schedule groups aligned with batch-management ordering by preserving the saved root todo order after the existing pin/completion sorting rules.
  * @updated 2026-05-13: Restyled the `小事` quick-add submit affordance into a small embedded accent-colored check inside the full-width input, so the inline capture flow no longer shows a heavy black `添加` block.
  * @updated 2026-05-13: Passed standard todo categories into the shared quick-actions sheet so non-subtask todos can move categories from the lightweight action flow.
  * @updated 2026-05-13: Reworded the empty-state copy for the reserved `小事` and `未来` buckets so each system list explains its scheduling constraints when empty.
@@ -99,7 +100,7 @@
  */
 import React, { useState, useMemo, useRef } from 'react';
 import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log, TodoDuplicateOptions } from '../types';
-import { PlayCircle, Check, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, ChevronDown, LayoutList, Rows, Sparkles, SlidersHorizontal, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo, CircleAlert, PanelRightOpen, Pin } from 'lucide-react';
+import { PlayCircle, Check, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, ChevronDown, Diff, LayoutList, Rows, Sparkles, SlidersHorizontal, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo, CircleAlert, PanelRightOpen, Pin } from 'lucide-react';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { useToast } from '../contexts/ToastContext';
 import { IconRenderer } from '../components/IconRenderer';
@@ -742,11 +743,13 @@ const PIN_SCHEDULE_MATCH_LABEL = 'Pin';
 const TODO_SCHEDULE_MATCH_LABELS: Record<TodoScheduleMatch['kind'], string> = {
   deadline: 'Due',
   scheduled: 'Arrange',
-  recurring: 'Repeat'
+  recurring: 'Repeat',
+  maybe: 'Maybe'
 };
 
 const COMPACT_SCHEDULE_LABELS: Record<string, string> = {
   Arrange: 'Arr',
+  Maybe: 'May',
   Repeat: 'Rep',
   Pin: 'Pin',
   Due: 'Due'
@@ -755,7 +758,8 @@ const COMPACT_SCHEDULE_LABELS: Record<string, string> = {
 const TODO_SCHEDULE_MATCH_PRIORITY: Record<TodoScheduleMatch['kind'], number> = {
   deadline: 0,
   scheduled: 1,
-  recurring: 2
+  recurring: 2,
+  maybe: 3
 };
 
 interface TodoListEntry {
@@ -873,7 +877,7 @@ const decorateTodoListEntryWithHierarchy = (entry: TodoListEntry, todos: TodoIte
 const sortTodoListEntries = (
   left: TodoListEntry,
   right: TodoListEntry,
-  options?: { pinFirst?: boolean }
+  options?: { pinFirst?: boolean; orderLookup?: Map<string, number> }
 ): number => {
   if (options?.pinFirst && Boolean(left.todo.pin) !== Boolean(right.todo.pin)) {
     return Number(Boolean(right.todo.pin)) - Number(Boolean(left.todo.pin));
@@ -883,15 +887,12 @@ const sortTodoListEntries = (
     return Number(left.todo.isCompleted) - Number(right.todo.isCompleted);
   }
 
-  const leftFirstMatch = left.scheduleMatches[0];
-  const rightFirstMatch = right.scheduleMatches[0];
-
-  if (leftFirstMatch && rightFirstMatch) {
-    const dateDiff = leftFirstMatch.dateKey.localeCompare(rightFirstMatch.dateKey);
-    if (dateDiff !== 0) return dateDiff;
-
-    const priorityDiff = TODO_SCHEDULE_MATCH_PRIORITY[leftFirstMatch.kind] - TODO_SCHEDULE_MATCH_PRIORITY[rightFirstMatch.kind];
-    if (priorityDiff !== 0) return priorityDiff;
+  if (options?.orderLookup) {
+    const leftOrder = options.orderLookup.get(left.todo.id) ?? Number.MAX_SAFE_INTEGER;
+    const rightOrder = options.orderLookup.get(right.todo.id) ?? Number.MAX_SAFE_INTEGER;
+    if (leftOrder !== rightOrder) {
+      return leftOrder - rightOrder;
+    }
   }
 
   return left.todo.title.localeCompare(right.todo.title, 'zh-CN');
@@ -944,7 +945,7 @@ const formatScheduleSectionLabel = (dateKey: string, todayDateKey: string, tomor
   return `${weekdayLabel} · ${date.getMonth() + 1}.${date.getDate()}`;
 };
 
-type WeekBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'completed' | 'inProgress';
+type WeekBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'completed' | 'inProgress';
 type WeekQuickActionBadgeKey = 'deadline' | 'scheduled' | 'completed' | 'inProgress';
 
 interface WeekBadgeDescriptor {
@@ -975,7 +976,7 @@ const WeekTodoLineItem: React.FC<{
   onBadgeClick: (entry: WeekTodoEntry, badgeKey: WeekQuickActionBadgeKey) => void;
 }> = ({ entry, isDragging, onDragStart, onDragEnd, onTouchDragStart, onBadgeClick }) => {
   const { todo, badges, parentTitle } = entry;
-  const isHistoricalOnly = !badges.scheduled && !badges.deadline && !badges.recurring && (badges.completed || badges.inProgress);
+  const isHistoricalOnly = !badges.scheduled && !badges.deadline && !badges.recurring && !badges.maybe && (badges.completed || badges.inProgress);
   const iconClassName = isHistoricalOnly ? 'text-stone-300' : 'text-stone-400';
   const titleClassName = isHistoricalOnly ? 'text-stone-400' : 'text-stone-700';
   const parentTitleClassName = isHistoricalOnly ? 'text-stone-300' : 'text-stone-400';
@@ -999,16 +1000,19 @@ const WeekTodoLineItem: React.FC<{
     ? <CheckCircle2 size={12} className={iconClassName} />
     : badges.inProgress
       ? <TrendingUp size={12} className={iconClassName} />
-      : badges.deadline
-        ? <Flag size={12} className={iconClassName} />
+        : badges.deadline
+          ? <Flag size={12} className={iconClassName} />
         : badges.recurring
           ? <Repeat2 size={12} className={iconClassName} />
+          : badges.maybe
+            ? <Diff size={12} className={iconClassName} />
           : <ChevronRight size={12} className={iconClassName} />;
 
   const orderedBadges = [
     badges.deadline ? { key: 'deadline', label: 'Due', color: '#8f6f6b', overdue: isDeadlineOverdue } : null,
     badges.scheduled ? { key: 'scheduled', label: 'Arrange', color: '#7c8b97', overdue: isScheduledOverdue } : null,
     badges.recurring ? { key: 'recurring', label: 'Repeat', color: '#8b8f79' } : null,
+    badges.maybe ? { key: 'maybe', label: 'Maybe', color: '#a58863' } : null,
     badges.completed ? { key: 'completed', label: 'Done', color: '#7f8c84' } : null,
     badges.inProgress ? { key: 'inProgress', label: 'Trace', color: '#8b8096' } : null
   ].filter(Boolean) as WeekBadgeDescriptor[];
@@ -1046,7 +1050,7 @@ const WeekTodoLineItem: React.FC<{
               key={badge.key}
               data-week-badge-trigger="true"
               data-week-swipe-ignore="true"
-              onClick={() => onBadgeClick(entry, badge.key)}
+              onClick={() => onBadgeClick(entry, badge.key as WeekQuickActionBadgeKey)}
               className="inline-flex cursor-pointer items-center justify-end gap-1 whitespace-nowrap rounded-full px-1 py-0.5 text-right transition-colors hover:bg-stone-100/70"
               style={{ color: badge.color }}
             >
@@ -1099,7 +1103,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   const [touchDragPreview, setTouchDragPreview] = useState<{ x: number; y: number; title: string } | null>(null);
   const [isTouchWeekDragging, setIsTouchWeekDragging] = useState(false);
   const [assignModalDate, setAssignModalDate] = useState<string | null>(null);
-  const [assignModalType, setAssignModalType] = useState<'scheduled' | 'deadline'>('scheduled');
+  const [assignModalType, setAssignModalType] = useState<'maybe' | 'scheduled' | 'deadline'>('scheduled');
   const [isWeekJumpPickerOpen, setIsWeekJumpPickerOpen] = useState(false);
   const [scheduleViewMode, setScheduleViewMode] = useState<TodoScheduleViewMode>(() => {
     const saved = localStorage.getItem(TODO_SCHEDULE_VIEW_MODE_STORAGE_KEY);
@@ -1138,6 +1142,9 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     handleQuickActionUndoComplete,
     handleQuickActionClearDate,
     handleQuickActionTogglePin,
+    handleQuickActionMaybeDates,
+    handleQuickActionSkipNextRecurrence,
+    handleQuickActionSkipToMaybeDate,
     handleQuickActionMoveCategory,
     handleQuickActionUpgradeToProject,
     handleQuickActionDelete
@@ -1306,6 +1313,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
   const scheduleEntriesByFilter = useMemo<Record<TodoScheduleRange, TodoListEntry[]>>(() => {
     const referenceDate = parseDateKey(todayDateKey) || new Date();
+    const orderLookup = new Map(todos.map((todo, index) => [todo.id, index]));
 
     const buildEntries = (range: TodoScheduleRange): TodoListEntry[] => (
       filterVisibleTodos(todos, showCompletedTodos)
@@ -1320,7 +1328,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           );
         })
         .filter((entry) => entry.scheduleMatches.length > 0)
-        .sort((left, right) => sortTodoListEntries(left, right, { pinFirst: range === 'today' }))
+        .sort((left, right) => sortTodoListEntries(left, right, { pinFirst: range === 'today', orderLookup }))
     );
 
     return {
@@ -1332,6 +1340,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
   const pinnedTodayEntries = useMemo<TodoListEntry[]>(() => {
     const referenceDate = parseDateKey(todayDateKey) || new Date();
+    const orderLookup = new Map(todos.map((todo, index) => [todo.id, index]));
 
     return filterVisibleTodos(todos, showCompletedTodos)
       .filter((todo) => todo.pin)
@@ -1347,7 +1356,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           todos
         );
       })
-      .sort((left, right) => sortTodoListEntries(left, right, { pinFirst: true }));
+      .sort((left, right) => sortTodoListEntries(left, right, { pinFirst: true, orderLookup }));
   }, [todos, showCompletedTodos, todayDateKey]);
 
   const nonPinnedTodayEntries = useMemo<TodoListEntry[]>(
@@ -1360,6 +1369,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       ...nonPinnedTodayEntries.map((entry) => entry.todo.id),
       ...pinnedTodayEntries.map((entry) => entry.todo.id)
     ]);
+    const orderLookup = new Map(todos.map((todo, index) => [todo.id, index]));
 
     return filterVisibleTodos(todos, false)
       .filter((todo) => !visibleTodayEntryIds.has(todo.id))
@@ -1374,7 +1384,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         );
       })
       .filter((entry) => entry.scheduleMatches.length > 0)
-      .sort((left, right) => sortTodoListEntries(left, right, { pinFirst: true }));
+      .sort((left, right) => sortTodoListEntries(left, right, { pinFirst: true, orderLookup }));
   }, [todos, nonPinnedTodayEntries, pinnedTodayEntries, todayDateKey]);
 
   const todayFilterCount = useMemo<number>(() => (
@@ -1707,6 +1717,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           scheduled: false,
           deadline: true,
           recurring: false,
+          maybe: false,
           completed: false,
           inProgress: false
         }
@@ -1720,6 +1731,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           scheduled: true,
           deadline: false,
           recurring: false,
+          maybe: false,
           completed: false,
           inProgress: false
         }
@@ -2096,7 +2108,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
     return todos.filter((todo) => {
       if (todo.isCompleted) return false;
-      if (todo.recurrenceRule) return false;
+      if (todo.recurrenceRule && assignModalType !== 'maybe') return false;
       if (isFutureTodoCategoryId(todo.categoryId)) return false;
       return true;
     });
@@ -2111,6 +2123,9 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
     const nextTodo: TodoItem = {
       ...todo,
+      maybeDates: assignModalType === 'maybe'
+        ? Array.from(new Set([...(todo.maybeDates || []), assignModalDate])).sort((left, right) => left.localeCompare(right))
+        : todo.maybeDates,
       scheduledDate: assignModalType === 'scheduled' ? assignModalDate : todo.scheduledDate,
       deadlineDate: assignModalType === 'deadline' ? assignModalDate : todo.deadlineDate
     };
@@ -2120,7 +2135,9 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     }
 
     onSaveTodo(nextTodo);
-    addToast('success', `《${todo.title}》已添加到 ${readableDate}`);
+    addToast('success', assignModalType === 'maybe'
+      ? `《${todo.title}》已添加 Maybe 日期 ${readableDate}`
+      : `《${todo.title}》已添加到 ${readableDate}`);
   };
 
   const handleCreateTodoForDate = (draft: Partial<TodoItem>) => {
@@ -2141,8 +2158,8 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       defaultScopeIds: draft.defaultScopeIds,
       note: draft.note,
       completedUnits: 0,
-      scheduledDate: assignModalType === 'scheduled' ? assignModalDate : undefined,
-      deadlineDate: assignModalType === 'deadline' ? assignModalDate : undefined
+      scheduledDate: assignModalDate,
+      deadlineDate: undefined
     };
 
     onSaveTodo(newTodo);
@@ -2188,6 +2205,9 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       onComplete={handleQuickActionComplete}
       onUndoComplete={handleQuickActionUndoComplete}
       onTogglePin={handleQuickActionTogglePin}
+      onEditMaybeDates={handleQuickActionMaybeDates}
+      onSkipNextRecurrence={handleQuickActionSkipNextRecurrence}
+      onSkipToMaybeDate={handleQuickActionSkipToMaybeDate}
       onMoveCategory={handleQuickActionMoveCategory}
       onUpgradeToProject={handleQuickActionUpgradeToProject}
       onDelete={handleQuickActionDelete}
@@ -2467,6 +2487,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
         <TodoScheduleAssignModal
           isOpen={assignModalDate !== null}
+          dateKey={assignModalDate || ''}
           dateLabel={assignModalDateLabel}
           assignType={assignModalType}
           onAssignTypeChange={setAssignModalType}

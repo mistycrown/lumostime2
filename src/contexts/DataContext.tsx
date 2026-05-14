@@ -1,11 +1,13 @@
 /**
  * @file DataContext.tsx
  * @description Manages core application data state (logs, todos, todoCategories, and data collections) with async repository hydration and persistence.
+ * @updated 2026-05-14: Normalizes hydrated todo `maybeDates` on load so stale past `Maybe Date` entries are cleaned automatically when the app opens on a later day.
  */
 import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES } from '../constants';
 import { dataRepository } from '../repositories/dataRepository';
 import { DataCollection, DataCollectionEntry, Log, TodoCategory, TodoItem } from '../types';
+import { normalizeTodoMaybeDates } from '../utils/todoScheduleUtils';
 import {
   getLocalDataTimestamp,
   isLocalDataTimestampUpdateLocked,
@@ -88,8 +90,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         hydratedSuccessfully = true;
+        const normalizedTodos = snapshot.todos.map((todo) => normalizeTodoMaybeDates(todo));
         setLogs(snapshot.logs);
-        setTodos(snapshot.todos);
+        setTodos(normalizedTodos);
         setTodoCategories(snapshot.todoCategories);
         setCollections(snapshot.collections);
         setCollectionEntries(snapshot.collectionEntries);

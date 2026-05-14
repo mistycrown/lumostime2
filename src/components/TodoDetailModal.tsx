@@ -4,6 +4,8 @@
  * @output Modal Interaction (Edit Todo, View History)
  * @pos Component (Modal)
  * @description Displays detailed information for a specific Todo item, including its progress, planning fields, associated history logs, and focus stats.
+ * @updated 2026-05-14: Removed the extra nested recurrence card chrome so recurring-rule fields render directly inside the outer planning card without a second dashed frame.
+ * @updated 2026-05-14: Added multi-select `Maybe Date` editing plus recurrence `Skip Date` editing under time planning, reusing the shared date picker in future-only and today-or-future multi-date modes and persisting both candidate and skipped dates alongside arrange/due/recurrence fields.
  * @updated 2026-05-13: Monthly recurrence editing now accepts space-separated multiple days, and the optional `31 号无则月末` toggle only appears when the parsed day list includes 31.
  * @updated 2026-05-13: Added a lightweight quick-reminder detail mode plus one-way quick-to-project upgrades so non-project todos no longer expose project-only fields through shared edit entry points.
  * @updated 2026-05-12: Made subtask detail pages resolve inherited category, linked activity, and scope data from the live parent todo, and infer missing activity-category links from the activity id so stale child metadata no longer renders as unlinked.
@@ -30,13 +32,13 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { TodoItem, TodoCategory, Log, Category, Scope, TodoProgressTrackingMode, TodoRecurrenceFrequency, TodoRecurrenceRule } from '../types';
 import { ScopeAssociation } from './ScopeAssociation';
 import { TagAssociation } from './TagAssociation';
-import { Trash2, Check, CheckCircle2, TrendingUp, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Pin, RotateCcw, CalendarDays, Flag, Repeat2, Plus } from 'lucide-react';
+import { Trash2, Check, CheckCircle2, TrendingUp, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Pin, RotateCcw, CalendarDays, Flag, Repeat2, Plus, X } from 'lucide-react';
 import { DetailTimelineCard } from './DetailTimelineCard';
 import { TimelineImage } from './TimelineImage';
 import { imageService } from '../services/imageService';
 import { IconRenderer } from './IconRenderer';
 import { useToast } from '../contexts/ToastContext';
-import { formatMonthlyDayInput, getTodayDateKey, normalizeMonthlyDayInput, parseDateKey, parseMonthlyDayInput } from '../utils/todoScheduleUtils';
+import { formatMonthlyDayInput, getTodayDateKey, normalizeMaybeDates, normalizeMonthlyDayInput, parseDateKey, parseMonthlyDayInput } from '../utils/todoScheduleUtils';
 import { TodoDatePickerModal } from './TodoDatePickerModal';
 import { DataCollectionSelector } from './DataCollectionSelector';
 import {
@@ -71,7 +73,7 @@ interface TodoDetailModalProps {
 
 type Tab = '细节' | '子任务' | '时间线';
 type RecurrenceFrequencyMode = TodoRecurrenceFrequency | 'none';
-type DatePickerField = 'scheduledDate' | 'deadlineDate' | 'recurrenceStartDate' | 'recurrenceEndDate' | null;
+type DatePickerField = 'scheduledDate' | 'deadlineDate' | 'maybeDates' | 'skipDates' | 'recurrenceStartDate' | 'recurrenceEndDate' | null;
 
 const WEEKDAY_OPTIONS: Array<{ label: string; value: number }> = [
   { label: '一', value: 1 },
@@ -97,6 +99,22 @@ const normalizeOptionalText = (value?: string): string => value || '';
 const normalizeOptionalScopeIds = (value?: string[]): string[] => (
   value && value.length > 0 ? [...value].sort() : []
 );
+
+const normalizeMaybeDateListForComparison = (value?: string[]): string => JSON.stringify(normalizeMaybeDates(value) || []);
+
+const normalizeSkipDates = (value?: string[]): string[] => {
+  if (!Array.isArray(value) || value.length === 0) {
+    return [];
+  }
+
+  const todayDateKey = getTodayDateKey();
+  return Array.from(new Set(
+    value
+      .map((dateKey) => dateKey.trim())
+      .filter((dateKey) => Boolean(parseDateKey(dateKey)))
+      .filter((dateKey) => dateKey >= todayDateKey)
+  )).sort((left, right) => left.localeCompare(right));
+};
 
 const normalizeRecurrenceRuleForComparison = (value?: TodoRecurrenceRule): string => JSON.stringify(value ?? null);
 
@@ -166,7 +184,9 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const initialPin = initialTodo?.pin || initialDraft?.pin || false;
   const initialScheduledDate = initialTodo?.scheduledDate || initialDraft?.scheduledDate || '';
   const initialDeadlineDate = initialTodo?.deadlineDate || initialDraft?.deadlineDate || '';
+  const initialMaybeDates = normalizeMaybeDates(initialTodo?.maybeDates || initialDraft?.maybeDates) || [];
   const initialRecurrenceRule = initialTodo?.recurrenceRule || initialDraft?.recurrenceRule;
+  const initialSkipDates = normalizeSkipDates(initialRecurrenceRule?.skipDates);
   const initialParentTodoId = initialTodo?.parentTodoId || initialDraft?.parentTodoId;
   const initialChildOrder = initialTodo?.childOrder ?? initialDraft?.childOrder;
   const initialTodoKind = getTodoKind(initialTodo || initialDraft);
@@ -218,6 +238,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   // Schedule State
   const [scheduledDate, setScheduledDate] = useState(initialScheduledDate);
   const [deadlineDate, setDeadlineDate] = useState(initialDeadlineDate);
+  const [maybeDates, setMaybeDates] = useState<string[]>(initialMaybeDates);
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurrenceFrequencyMode>(
     initialParentTodoId ? 'none' : (initialRecurrenceRule?.frequency || 'none')
   );
@@ -233,6 +254,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
       parseDateKey(initialRecurrenceRule?.startDate)?.getDate() || new Date().getDate()
     )
   );
+  const [skipDates, setSkipDates] = useState<string[]>(initialSkipDates);
   const [recurrenceFallbackToMonthEnd, setRecurrenceFallbackToMonthEnd] = useState(
     initialRecurrenceRule?.fallbackToMonthEnd === true
   );
@@ -427,11 +449,17 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
       return {
         ...baseRule,
         monthDays: parsedRecurrenceMonthDays,
+        ...(skipDates.length > 0 ? { skipDates } : {}),
         ...(parsedRecurrenceMonthDays.includes(31) && recurrenceFallbackToMonthEnd ? { fallbackToMonthEnd: true } : {})
       };
     }
 
-    return baseRule;
+    return skipDates.length > 0
+      ? {
+          ...baseRule,
+          skipDates
+        }
+      : baseRule;
   }, [
     isQuickReminder,
     parsedRecurrenceMonthDays,
@@ -439,6 +467,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     recurrenceFrequency,
     recurrenceFallbackToMonthEnd,
     parsedRecurrenceInterval,
+    skipDates,
     recurrenceStartDate,
     recurrenceWeekdays
   ]);
@@ -449,6 +478,10 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     }
 
     setRecurrenceFrequency(nextFrequency);
+
+    if (nextFrequency === 'none') {
+      setSkipDates([]);
+    }
 
     if (nextFrequency !== 'none') {
       if (scheduledDate) {
@@ -488,6 +521,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     setRecurrenceIntervalInput('1');
     setRecurrenceWeekdays([]);
     setRecurrenceMonthDaysInput(String(parseDateKey(recurrenceStartDate)?.getDate() || new Date().getDate()));
+    setSkipDates([]);
   };
 
   const datePickerTitle = activeDatePicker === 'scheduledDate'
@@ -554,6 +588,39 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     }
   };
 
+  const resolvedDatePickerTitle = activeDatePicker === 'maybeDates'
+    ? '选择 Maybe Date'
+    : datePickerTitle;
+
+  const resolvedDatePickerValue = activeDatePicker === 'maybeDates'
+    ? ''
+    : datePickerValue;
+
+  const resolvedDatePickerValues = activeDatePicker === 'maybeDates'
+    ? maybeDates
+    : undefined;
+
+  const handleResolvedDatePickerSelect = (value: string) => {
+    if (activeDatePicker === 'maybeDates') {
+      return;
+    }
+
+    handleDatePickerSelect(value);
+  };
+
+  const handleMaybeDatesSelect = (values: string[]) => {
+    setMaybeDates(normalizeMaybeDates(values) || []);
+  };
+
+  const handleResolvedDatePickerClear = () => {
+    if (activeDatePicker === 'maybeDates') {
+      setMaybeDates([]);
+      return;
+    }
+
+    handleDatePickerClear();
+  };
+
   const buildTodoPayload = (overrides?: Partial<TodoItem>): TodoItem => ({
     id: todoId,
     kind: todoKind,
@@ -580,6 +647,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     coverImage: isQuickReminder ? undefined : coverImage,
     scheduledDate: scheduledDate || undefined,
     deadlineDate: deadlineDate || undefined,
+    maybeDates: maybeDates.length > 0 ? maybeDates : undefined,
     recurrenceRule: isSubtask || isQuickReminder ? undefined : recurrenceRule,
     ...overrides
   });
@@ -611,6 +679,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
         (isQuickReminder ? undefined : childOrder) !== persistedTodo.childOrder ||
         scheduledDate !== normalizeOptionalText(persistedTodo.scheduledDate) ||
         deadlineDate !== normalizeOptionalText(persistedTodo.deadlineDate) ||
+        normalizeMaybeDateListForComparison(maybeDates) !== normalizeMaybeDateListForComparison(persistedTodo.maybeDates) ||
         normalizeRecurrenceRuleForComparison(isSubtask || isQuickReminder ? undefined : recurrenceRule) !== normalizeRecurrenceRuleForComparison(persistedTodo.recurrenceRule);
       
       if (!hasChanges) return;
@@ -618,6 +687,20 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
 
     onSave(buildTodoPayload());
   }, [selectedCategoryId, title, note, isCompleted, linkedCategoryId, linkedActivityId, defaultScopeIds, resolvedProgressTrackingMode, isManualProgress, totalAmount, unitAmount, completedUnits, heatmapMin, heatmapMax, pin, coverImage, parentTodoId, childOrder, scheduledDate, deadlineDate, isSubtask, recurrenceRule, initialTodo, onSave, todos]); // 监听所有状态变化
+
+  React.useEffect(() => {
+    if (!title.trim()) return;
+    if (!persistedTodo) {
+      onSave(buildTodoPayload());
+      return;
+    }
+
+    if (normalizeMaybeDateListForComparison(maybeDates) === normalizeMaybeDateListForComparison(persistedTodo.maybeDates)) {
+      return;
+    }
+
+    onSave(buildTodoPayload());
+  }, [maybeDates, persistedTodo, title, onSave]);
 
   const selectedCategory = realTodoCategories.find(c => c.id === resolvedCategoryId) || currentCategory;
 
@@ -1225,12 +1308,13 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
             <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest">时间安排</h3>
-                {(scheduledDate || deadlineDate || recurrenceRule) && (
+                {(scheduledDate || deadlineDate || maybeDates.length > 0 || recurrenceRule) && (
                   <button
                     type="button"
                     onClick={() => {
                       setScheduledDate('');
                       setDeadlineDate('');
+                      setMaybeDates([]);
                       clearRecurrence();
                     }}
                     className="text-[10px] text-stone-400 hover:text-red-400 transition-colors"
@@ -1297,6 +1381,46 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                   )}
                 </div>
 
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-stone-400 font-medium flex items-center gap-1.5">
+                      <CalendarDays size={12} />
+                      Maybe Date
+                    </label>
+                    {maybeDates.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setMaybeDates([])}
+                        className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveDatePicker('maybeDates')}
+                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
+                  >
+                    {maybeDates.length > 0 ? `${maybeDates.length} dates selected` : 'Select future dates'}
+                  </button>
+                  {maybeDates.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {maybeDates.map((dateKey) => (
+                        <button
+                          key={dateKey}
+                          type="button"
+                          onClick={() => setMaybeDates((previous) => previous.filter((value) => value !== dateKey))}
+                          className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-600 transition-colors hover:border-stone-300 hover:text-stone-800"
+                        >
+                          <span>{formatDateFieldValue(dateKey)}</span>
+                          <X size={12} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {!isSubtask && !isQuickReminder && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -1347,7 +1471,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                     <p className="text-[11px] text-stone-400">循环规则与分配日期、截止日期互斥。开启循环后会自动清空这两个日期。循环任务是作为计时项存在的，在结束最后一次循环之前，请勿点击完成。</p>
 
                     {recurrenceFrequency !== 'none' && (
-                      <div className="space-y-3 rounded-2xl border border-dashed border-stone-200 bg-stone-50/70 p-4 animate-in slide-in-from-top-2 fade-in">
+                      <div className="space-y-4 pt-1 animate-in slide-in-from-top-2 fade-in">
                         <div className="grid gap-3 md:grid-cols-3">
                           <div className="space-y-1.5">
                             <label className="text-[11px] text-stone-400 font-medium">开始日期</label>
@@ -1439,6 +1563,46 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                             )}
                           </div>
                         )}
+
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs text-stone-400 font-medium flex items-center gap-1.5">
+                              <CalendarDays size={12} />
+                              Skip Date
+                            </label>
+                            {skipDates.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setSkipDates([])}
+                                className="text-[10px] text-stone-400 hover:text-stone-600 transition-colors"
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setActiveDatePicker('skipDates')}
+                            className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
+                          >
+                            {skipDates.length > 0 ? `${skipDates.length} dates selected` : 'Select dates to skip'}
+                          </button>
+                          {skipDates.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {skipDates.map((dateKey) => (
+                                <button
+                                  key={dateKey}
+                                  type="button"
+                                  onClick={() => setSkipDates((previous) => previous.filter((value) => value !== dateKey))}
+                                  className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-600 transition-colors hover:border-stone-300 hover:text-stone-800"
+                                >
+                                  <span>{formatDateFieldValue(dateKey)}</span>
+                                  <X size={12} />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1678,10 +1842,28 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
 
       <TodoDatePickerModal
         isOpen={activeDatePicker !== null}
-        title={datePickerTitle}
-        value={datePickerValue || undefined}
-        onSelect={handleDatePickerSelect}
-        onClear={handleDatePickerClear}
+        title={activeDatePicker === 'skipDates' ? '閫夋嫨 Skip Date' : resolvedDatePickerTitle}
+        value={activeDatePicker === 'skipDates' ? undefined : (resolvedDatePickerValue || undefined)}
+        values={activeDatePicker === 'skipDates' ? skipDates : resolvedDatePickerValues}
+        mode={activeDatePicker === 'maybeDates' || activeDatePicker === 'skipDates' ? 'multi-date' : 'date'}
+        minMultiDate={activeDatePicker === 'skipDates' ? 'today-or-future' : 'future'}
+        onSelect={handleResolvedDatePickerSelect}
+        onSelectMultiple={(values) => {
+          if (activeDatePicker === 'skipDates') {
+            setSkipDates(normalizeSkipDates(values));
+            return;
+          }
+
+          handleMaybeDatesSelect(values);
+        }}
+        onClear={() => {
+          if (activeDatePicker === 'skipDates') {
+            setSkipDates([]);
+            return;
+          }
+
+          handleResolvedDatePickerClear();
+        }}
         onClose={() => setActiveDatePicker(null)}
       />
     </div >

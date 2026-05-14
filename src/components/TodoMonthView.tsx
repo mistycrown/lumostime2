@@ -3,7 +3,8 @@
  * @input Todo items, logs, a reference date, and an optional todo-open callback
  * @output Reference-style rolling month schedule UI backed by real daily todo data
  * @pos Component (Todo scheduling)
- * @description Renders the editorial monthly schedule view adapted from the minimalist demo, using shared todo schedule utilities so each day shows the same real Arrange / Due / Repeat / Done / Trace data as the week planner.
+ * @description Renders the editorial monthly schedule view adapted from the minimalist demo, using shared todo schedule utilities so each day shows the same real Arrange / Due / Repeat / Maybe / Done / Trace data as the week planner.
+ * @updated 2026-05-14: Added `Maybe` schedule badges plus the `Diff` leading icon, so tentative future dates now render consistently in both the month grid and expanded day detail list.
  * @updated 2026-05-11: Prevented month-edge preloading from firing during programmatic entry jumps, so the smooth `本月` auto-scroll no longer prepends earlier months mid-animation and yanks the viewport back up to March.
  * @updated 2026-05-11: Added an explicit parent-driven month-entry jump signal and replays the shared `本月` jump after mount, so opening the month planner no longer intermittently gets stuck at the rolling range's top month before the auto-scroll lands.
  * @updated 2026-05-11: Reused the top-right `本月` jump path for month-view entry, so opening the month planner now lands on the same current-month position as tapping the header shortcut instead of inheriting the parent reference week's offset.
@@ -46,7 +47,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CheckCircle2, ChevronLeft, ChevronRight, CircleAlert, Flag, Repeat2, SlidersHorizontal, TrendingUp } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, CircleAlert, Diff, Flag, Repeat2, SlidersHorizontal, TrendingUp } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import {
   addMonths,
@@ -205,6 +206,10 @@ const getMonthEntryLeadingIcon = (entry: TodoDateEntry): React.ReactNode => {
     return <Repeat2 size={12} className={iconClassName} />;
   }
 
+  if (badges.maybe) {
+    return <Diff size={12} className={iconClassName} />;
+  }
+
   return <ChevronRight size={12} className={iconClassName} />;
 };
 
@@ -217,6 +222,7 @@ const MONTH_VIEW_ENTRY_TAGS: Array<{
   { key: 'deadline', label: 'Due', color: '#8f6f6b', clickable: true },
   { key: 'scheduled', label: 'Arrange', color: '#7c8b97', clickable: true },
   { key: 'recurring', label: 'Repeat', color: '#8b8f79', clickable: false },
+  { key: 'maybe', label: 'Maybe', color: '#a58863', clickable: false },
   { key: 'completed', label: 'Done', color: '#7f8c84', clickable: true },
   { key: 'inProgress', label: 'Trace', color: '#8b8096', clickable: true }
 ];
@@ -532,6 +538,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
           scheduled: false,
           deadline: true,
           recurring: false,
+          maybe: false,
           completed: false,
           inProgress: false
         },
@@ -546,6 +553,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
           scheduled: true,
           deadline: false,
           recurring: false,
+          maybe: false,
           completed: false,
           inProgress: false
         },
@@ -1491,7 +1499,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                                       )}
                                     </button>
                                   )}
-                                  <div className={`flex shrink-0 self-center translate-y-px flex-wrap items-center justify-end gap-1 whitespace-nowrap text-[9px] uppercase leading-none ${activeTagCount > 1 ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
+                                  <div className={`flex shrink-0 self-center translate-y-px flex-wrap items-center justify-end gap-1 whitespace-nowrap text-[9px] leading-none ${activeTagCount > 1 ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
                                     {activeTags.map((tag) => (
                                       tag.clickable ? (
                                         <button
@@ -1539,7 +1547,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                                     <span className={`${parentSegmentClassName} ${parentTitleClassName}`}>{` @${parentTitle}`}</span>
                                   )}
                                 </span>
-                                <div className={`flex shrink-0 self-center translate-y-px flex-wrap items-center justify-end gap-1 whitespace-nowrap text-[9px] uppercase leading-none ${activeTagCount > 1 ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
+                                <div className={`flex shrink-0 self-center translate-y-px flex-wrap items-center justify-end gap-1 whitespace-nowrap text-[9px] leading-none ${activeTagCount > 1 ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
                                   {activeTags.map((tag) => (
                                     <span
                                       key={tag.key}

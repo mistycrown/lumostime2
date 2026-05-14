@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-14: Added a full Dream reset action with inline confirmation so the Dream manager can restore built-in topic titles and notes while clearing all Dream observations in one guarded step.
  * @updated 2026-05-13: Rendered chat bubbles through Markdown with GFM and hard line-break support, so AI replies can keep one complete `assistantReply` body while still showing headings, emphasis, lists, blockquotes, code, and newline-based paragraph breaks correctly inside the conversation UI.
  * @updated 2026-05-13: Made the Dream viewer body its own vertical scroll container so long topic notes and entry lists can be scrolled on mobile instead of getting clipped inside the fixed full-screen overlay.
  * @updated 2026-05-13: Replaced weekly-review's popup-based week/method setup with a staged in-chat flow, so the template session now asks for range and method through fake-AI turns plus composer shortcut buttons before entering the real review conversation.
@@ -2450,6 +2451,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [dreamTopicDrafts, setDreamTopicDrafts] = useState<DreamTopicDrafts>(DEFAULT_DREAM_TOPIC_DRAFTS);
   const [isDreamTopicComposerOpen, setIsDreamTopicComposerOpen] = useState(false);
   const [editingDreamTopicId, setEditingDreamTopicId] = useState<string | null>(null);
+  const [isDreamResetConfirmOpen, setIsDreamResetConfirmOpen] = useState(false);
   const [dreamTopicDeleteTargetId, setDreamTopicDeleteTargetId] = useState<string | null>(null);
   const [editingDreamEntryId, setEditingDreamEntryId] = useState<string | null>(null);
   const [dreamEntryDrafts, setDreamEntryDrafts] = useState<DreamEntryDrafts>(DEFAULT_DREAM_ENTRY_DRAFTS);
@@ -5210,12 +5212,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     refreshDreamSnapshot();
     resetDreamTopicUi();
     resetDreamEntryUi();
+    setIsDreamResetConfirmOpen(false);
     setIsDreamViewerOpen(true);
   };
 
   const handleCloseDreamViewer = () => {
     resetDreamTopicUi();
     resetDreamEntryUi();
+    setIsDreamResetConfirmOpen(false);
     setIsDreamViewerOpen(false);
   };
 
@@ -5225,6 +5229,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       note: topic?.note || ''
     });
     setEditingDreamTopicId(topic?.id || null);
+    setIsDreamResetConfirmOpen(false);
     setDreamTopicDeleteTargetId(null);
     setIsDreamTopicComposerOpen(true);
   };
@@ -5266,7 +5271,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const title = dreamTopicDrafts.title.trim();
     const note = dreamTopicDrafts.note.trim();
     if (!title) {
-      addToast('warning', '先写一个 Dream 领域标题再保存吧。');
+      addToast('warning', '先写一个 Dream aspect 标题再保存吧。');
       return;
     }
 
@@ -5276,7 +5281,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         && topic.title.trim().toLowerCase() === title.toLowerCase()
       ))
     ) {
-      addToast('info', '这个 Dream 领域已经存在了。');
+      addToast('info', '这个 Dream aspect 已经存在了。');
       return;
     }
 
@@ -5285,13 +5290,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         title,
         note
       });
-      addToast('success', '已更新 Dream 领域');
+      addToast('success', '已更新 Dream aspect');
     } else {
       dreamService.createTopic({
         title,
         note
       });
-      addToast('success', '已新增 Dream 领域');
+      addToast('success', '已新增 Dream aspect');
     }
 
     refreshDreamSnapshot();
@@ -5299,10 +5304,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   };
 
   const handleToggleDreamTopicDelete = (topicId: string) => {
+    setIsDreamResetConfirmOpen(false);
     setDreamTopicDeleteTargetId((current) => (current === topicId ? null : topicId));
   };
 
   const handleToggleDreamEntryDelete = (entryId: string) => {
+    setIsDreamResetConfirmOpen(false);
     setDreamEntryDeleteTargetId((current) => (current === entryId ? null : entryId));
     setEditingDreamEntryId((current) => (current === entryId ? null : current));
     setDreamEntryDrafts(DEFAULT_DREAM_ENTRY_DRAFTS);
@@ -5312,7 +5319,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     dreamService.deleteTopic(topicId);
     refreshDreamSnapshot();
     setDreamTopicDeleteTargetId((current) => (current === topicId ? null : current));
-    addToast('success', '已删除 Dream 领域');
+    addToast('success', '已删除 Dream aspect');
   };
 
   const handleConfirmDreamEntryDelete = (entryId: string) => {
@@ -5329,6 +5336,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       enabled: !topic.enabled
     });
     refreshDreamSnapshot();
+  };
+
+  const handleConfirmDreamReset = () => {
+    dreamService.resetState();
+    refreshDreamSnapshot();
+    resetDreamTopicUi();
+    resetDreamEntryUi();
+    setIsDreamResetConfirmOpen(false);
+    setIsDreamTopicNoteExpanded(false);
+    addToast('success', '已重置 Dream');
   };
 
   const handleStartDreamMonthSelection = (sessionId: string) => {
@@ -5751,6 +5768,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
 
     if (isDreamViewerOpen) {
+      if (isDreamResetConfirmOpen) {
+        setIsDreamResetConfirmOpen(false);
+        return true;
+      }
+
       if (dreamEntryDeleteTargetId) {
         setDreamEntryDeleteTargetId(null);
         return true;
@@ -5833,6 +5855,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     handleCloseAssistantMemoryViewer,
     dreamEntryDeleteTargetId,
     editingDreamEntryId,
+    isDreamResetConfirmOpen,
     isAssistantBackgroundHistoryViewerOpen,
     isDreamViewerOpen,
     isAssistantMemoryViewerOpen,
@@ -10414,7 +10437,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                       color: AI_CHAT_THEME.textSecondary
                     }}
                   >
-                    新增领域
+                    新增 aspect
                   </button>
                   <button
                     onClick={() => {
@@ -10431,6 +10454,23 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     }}
                   >
                     运行 dream
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsDreamResetConfirmOpen((current) => !current);
+                      setDreamTopicDeleteTargetId(null);
+                      setDreamEntryDeleteTargetId(null);
+                      setEditingDreamEntryId(null);
+                      setDreamEntryDrafts(DEFAULT_DREAM_ENTRY_DRAFTS);
+                    }}
+                    className="rounded-[0.65rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white/80"
+                    style={{
+                      borderColor: 'rgba(157,84,77,0.22)',
+                      backgroundColor: 'rgba(196,111,79,0.07)',
+                      color: '#9d544d'
+                    }}
+                  >
+                    重置
                   </button>
                   <button
                     onClick={handleCloseDreamViewer}
@@ -10451,6 +10491,42 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 style={{ WebkitOverflowScrolling: 'touch' }}
               >
                 <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-6">
+                  {isDreamResetConfirmOpen && (
+                    <div
+                      className="flex flex-wrap items-center justify-between gap-3 border-y py-4 text-xs"
+                      style={{
+                        borderColor: 'rgba(157,84,77,0.22)',
+                        color: '#9d544d'
+                      }}
+                    >
+                      <span>确认重置 Dream 吗？这会恢复默认 aspect 和提示词，并清空全部 Dream 观察。</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setIsDreamResetConfirmOpen(false)}
+                          className="rounded-[0.65rem] border px-3 py-2 font-medium transition-colors hover:bg-white/70"
+                          style={{
+                            borderColor: 'rgba(32,28,25,0.14)',
+                            backgroundColor: 'rgba(255,255,255,0.26)',
+                            color: '#71685f'
+                          }}
+                        >
+                          取消
+                        </button>
+                        <button
+                          onClick={handleConfirmDreamReset}
+                          className="rounded-[0.65rem] border px-3 py-2 font-medium transition-colors hover:bg-white/70"
+                          style={{
+                            borderColor: 'rgba(157,84,77,0.24)',
+                            backgroundColor: 'rgba(196,111,79,0.09)',
+                            color: '#9d544d'
+                          }}
+                        >
+                          确认重置
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {isDreamTopicComposerOpen && (
                     <div
                       className="border-y px-0 py-5"
@@ -10459,7 +10535,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                       <div className="grid gap-4 lg:grid-cols-[minmax(0,11rem)_minmax(0,1fr)] lg:gap-6">
                         <div>
                           <p className="font-serif text-[1.02rem] leading-7 text-[#231f1b]">
-                            {editingDreamTopicId ? '编辑 Dream 领域' : '新增 Dream 领域'}
+                            {editingDreamTopicId ? '编辑 Dream aspect' : '新增 Dream aspect'}
                           </p>
                           <p className="mt-1 text-xs leading-5 text-stone-500">
                             保持标题简洁，用备注补充长期关注重点。
@@ -10467,7 +10543,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         </div>
                         <div className="grid gap-3">
                           <label className="space-y-1.5">
-                            <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-stone-500">领域标题</span>
+                            <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-stone-500">aspect 标题</span>
                             <input
                               value={dreamTopicDrafts.title}
                               onChange={(event) => updateDreamTopicDraft('title', event.target.value)}
@@ -10529,12 +10605,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                       className="border-y py-10 text-[13px] leading-7 text-stone-500"
                       style={{ borderColor: 'rgba(32,28,25,0.12)' }}
                     >
-                      还没有 Dream 领域。先新增几个你希望我长期关注的主题，再运行 `dream`。
+                      还没有 Dream aspect。先新增几个你希望我长期关注的主题，再运行 `dream`。
                     </div>
                   ) : !isDreamTopicComposerOpen ? (
                     <div className="min-h-0 flex flex-1 flex-col">
                       <div className="pb-3" style={{ borderColor: 'rgba(32,28,25,0.12)' }}>
-                        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-stone-500">领域目录</p>
+                        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-stone-500">Aspect 目录</p>
                       </div>
                       <div
                         className="overflow-x-auto border-b pb-px"
@@ -10578,11 +10654,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                 <div className="mt-3 max-w-3xl space-y-2">
                                   <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-stone-400">长期提示</p>
                                   <p
-                                    className="text-[0.92rem] leading-[1.95] text-stone-500"
+                                    className={`text-[0.92rem] leading-[1.95] text-stone-500 ${
+                                      isDreamTopicNoteExpanded ? 'whitespace-pre-wrap' : 'line-clamp-2'
+                                    }`}
                                     title={activeDreamTopic.note || '暂无备注'}
                                   >
                                     {activeDreamTopic.note
-                                      ? (isDreamTopicNoteExpanded ? activeDreamTopic.note : truncateText(activeDreamTopic.note, 120))
+                                      ? activeDreamTopic.note
                                       : '暂无备注'}
                                   </p>
                                   {activeDreamTopic.note && activeDreamTopic.note.length > 120 && (
@@ -10609,8 +10687,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                       : 'rgba(255,255,255,0.26)',
                                     color: activeDreamTopic.enabled ? AI_CHAT_THEME.textPrimary : AI_CHAT_THEME.textMuted
                                   }}
-                                  title={activeDreamTopic.enabled ? '停用领域' : '启用领域'}
-                                  aria-label={activeDreamTopic.enabled ? '停用领域' : '启用领域'}
+                                  title={activeDreamTopic.enabled ? '停用 aspect' : '启用 aspect'}
+                                  aria-label={activeDreamTopic.enabled ? '停用 aspect' : '启用 aspect'}
                                 >
                                   {activeDreamTopic.enabled ? <Check size={14} /> : <XCircle size={14} />}
                                 </button>
@@ -10622,8 +10700,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                     backgroundColor: 'rgba(255,255,255,0.26)',
                                     color: AI_CHAT_THEME.textSecondary
                                   }}
-                                  title="编辑领域"
-                                  aria-label="编辑领域"
+                                  title="编辑 aspect"
+                                  aria-label="编辑 aspect"
                                 >
                                   <Pencil size={14} />
                                 </button>
@@ -10635,8 +10713,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                     backgroundColor: 'rgba(196,111,79,0.07)',
                                     color: '#9d544d'
                                   }}
-                                  title="删除领域"
-                                  aria-label="删除领域"
+                                  title="删除 aspect"
+                                  aria-label="删除 aspect"
                                 >
                                   <Trash2 size={14} />
                                 </button>
@@ -10652,7 +10730,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                                 color: '#9d544d'
                               }}
                             >
-                              <span>确认删除这个 Dream 领域以及下面的所有观察条目？</span>
+                              <span>确认删除这个 Dream aspect 以及下面的所有观察条目？</span>
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => setDreamTopicDeleteTargetId(null)}
@@ -10688,7 +10766,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                           >
                             {activeDreamEntries.length === 0 ? (
                               <div className="py-10 text-[13px] leading-7 text-stone-500">
-                                这个领域下面还没有 Dream 观察。运行一次 `dream` 之后，我会把整理出来的内容放在这里。
+                                这个 aspect 下面还没有 Dream 观察。运行一次 `dream` 之后，我会把整理出来的内容放在这里。
                               </div>
                             ) : (
                               activeDreamEntries.map((entry) => (
