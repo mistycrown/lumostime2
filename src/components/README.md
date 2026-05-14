@@ -3,6 +3,14 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-05-14: `TodoDetailModal.tsx` now removes the extra nested recurrence-rule frame inside `时间安排`, so recurring fields render directly within the outer planning card instead of inside a second dashed box.
+- Update 2026-05-14: `TodoQuickActionsModal.tsx` now keeps the main `Maybe` picker button but splits out adjacent `今天 / 明天 / +7` shortcut chips for faster tentative-date assignment, while the arrange/due shortcut label also shortens from `下周` to `+7`.
+- Update 2026-05-14: `TodoBentoWeekView.tsx` now lets the 2x4 day-grid switch to the previous/next week with the same conservative horizontal swipe thresholds as the standard week planner, while explicitly ignoring the mini calendar, date buttons, badge buttons, and drag handles to avoid accidental flips.
+- Update 2026-05-14: `TodoQuickActionsModal.tsx` now shows `Maybe` in the title summary too, rendering every future candidate date in order instead of collapsing multiple `maybeDates` into a `+n` count.
+- Update 2026-05-14: `TodoBentoWeekView.tsx`, `TodoMonthView.tsx`, and `TodoScheduleTypeColorSettings.tsx` now recognize the new `Maybe` schedule badge and color key, so tentative future dates render with their own marker styling alongside Arrange / Due / Repeat / Done / Trace in both week and month planners.
+- Update 2026-05-14: `TodoDetailModal.tsx` now exposes a multi-select `Maybe Date` field under `时间安排`, and `TodoDatePickerModal.tsx` now supports a future-only `multi-date` mode so users can add or remove several tentative dates in one pass.
+- Update 2026-05-14: `TodoScheduleAssignModal.tsx` now shows its quick `Maybe` tab for today as well as future dates, while still hiding that tab for past days; it also disables rows that already contain the selected date in `maybeDates`, allows recurring todos back into that `Maybe` picker only, and keeps `New` focused on creating an arranged task for the chosen day instead of inheriting the active quick-assign mode.
+- Update 2026-05-14: `TodoQuickActionsModal.tsx` now adds a `Maybe` action that opens the shared future-only multi-date picker with the current task's existing `maybeDates`, so task-level quick actions can edit tentative dates for all task types, including recurring ones.
 - Update 2026-05-13: `TodoQuickActionsModal.tsx` now routes quick-todo `升级为项目` through the same centered category picker as `移动分类`, so quick reminders must choose their destination standard category instead of silently falling into a default project bucket.
 - Update 2026-05-13: `TodoQuickActionsModal.tsx` now matches the centered `移动分类` picker width and horizontal gutter to the parent quick-actions sheet, so the nested dialog reads as one aligned surface instead of a narrower floating card.
 - Update 2026-05-13: `TodoQuickActionsModal.tsx` now adds a centered `移动分类` picker for non-subtask todos, reusing standard todo categories only and saving the new `categoryId` immediately from the shared quick-actions flow.
@@ -51,6 +59,7 @@ Components that form the structural or global UI elements.
 - `Toast.tsx`: Notification system.
 
 ## Modals
+- Update 2026-05-14: `AIBackfillChatModal.tsx` now adds a guarded `重置` action inside the Dream manager, using the same inline danger-confirm pattern as existing delete flows to restore the built-in Dream topics/notes and clear every Dream observation entry at once.
 - Update 2026-05-13: `AIBackfillChatModal.tsx` now treats one complete `assistantReply` string as the only AI-visible message payload across ordinary chat, weekly-review template turns, and Dream results, splitting that single reply into multiple bubbles from blank lines or line breaks instead of rendering a duplicate full-text reply beside separate model-authored parts.
 - Update 2026-05-13: `AIBackfillChatModal.tsx` now starts `模板对话：周复盘` as a staged in-chat setup, immediately creating one weekly-review session that first asks for `本周 / 上周 / YYYYMMDD` and then asks for one of four analysis methods through local fake-AI turns plus composer shortcut chips, replacing the old popup-based range/method selectors before the real weekly-review AI conversation begins.
 - Update 2026-05-13: `AIBackfillChatModal.tsx` now reveals an extra monthly fallback toggle only when assistant scheduled tasks use day `31`, and the saved summary text reflects the explicit `无则月末` behavior.

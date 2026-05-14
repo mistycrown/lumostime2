@@ -1,14 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { assistantPromptService } from './assistantPromptService';
 
 describe('assistantPromptService', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
-    Object.defineProperty(globalThis, 'fetch', {
-      value: vi.fn().mockRejectedValue(new Error('offline')),
-      configurable: true
-    });
+    vi.resetModules();
   });
 
   afterEach(() => {
@@ -18,75 +14,84 @@ describe('assistantPromptService', () => {
     });
   });
 
-  it('fallback foreground mode prompt includes explicit intent recognition guidance', async () => {
+  it('loads prompt content from the public assistant markdown asset', async () => {
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => '前台用户消息模式（FOREGROUND USER MESSAGE MODE）'
+      }),
+      configurable: true
+    });
+
+    const { assistantPromptService } = await import('./assistantPromptService');
     const prompt = await assistantPromptService.getForegroundModePrompt();
 
-    expect(prompt).toContain('Core operating sequence:');
-    expect(prompt).toContain('Intent taxonomy:');
-    expect(prompt).toContain('daily_planning');
-    expect(prompt).toContain('Use the intent taxonomy only for internal routing.');
-    expect(prompt).toContain('Behavior by intent:');
+    expect(prompt).toBe('前台用户消息模式（FOREGROUND USER MESSAGE MODE）');
+    expect(globalThis.fetch).toHaveBeenCalledWith('/assistant/foreground-mode.md', { cache: 'no-cache' });
   });
 
-  it('fallback assistant base prompt frames the assistant as a continuous companion with stronger human-feeling guidance', async () => {
-    const prompt = await assistantPromptService.getAssistantBasePrompt();
+  it('caches loaded prompt assets after the first successful fetch', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => '你是 LumosTime 里的长期陪伴型助手。'
+    });
+    Object.defineProperty(globalThis, 'fetch', {
+      value: fetchMock,
+      configurable: true
+    });
 
-    expect(prompt).toContain('continuous companion inside LumosTime');
-    expect(prompt).toContain('distinct, steady presence');
-    expect(prompt).toContain('Deep embodiment:');
-    expect(prompt).toContain('become a real person in the conversation');
-    expect(prompt).toContain('Human-feeling language rules:');
-    expect(prompt).toContain('Do not mechanically mirror the user\'s wording');
-    expect(prompt).toContain('Selective attention and response shape:');
-    expect(prompt).toContain('Emotional continuity and inertia:');
-    expect(prompt).toContain('Relationship drift and accumulation:');
-    expect(prompt).toContain('Anti-template guardrails:');
-    expect(prompt).toContain('Fragmented chat rhythm:');
-    expect(prompt).toContain('Turn-level self-check:');
+    const { assistantPromptService } = await import('./assistantPromptService');
+    const first = await assistantPromptService.getAssistantBasePrompt();
+    const second = await assistantPromptService.getAssistantBasePrompt();
+
+    expect(first).toBe('你是 LumosTime 里的长期陪伴型助手。');
+    expect(second).toBe(first);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('fallback foreground tools prompt includes intent-to-action routing guidance', async () => {
-    const prompt = await assistantPromptService.getForegroundToolsPrompt();
+  it('throws when prompt asset fetch fails instead of falling back', async () => {
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockRejectedValue(new Error('offline')),
+      configurable: true
+    });
 
-    expect(prompt).toContain('Intent-to-action routing:');
-    expect(prompt).toContain('Mixed-intent rules:');
-    expect(prompt).toContain('Hard safety rules:');
-    expect(prompt).toContain('Never invent ids.');
+    const { assistantPromptService } = await import('./assistantPromptService');
+
+    await expect(assistantPromptService.getMemoryRulesPrompt()).rejects.toThrow(
+      '[assistantPromptService] Failed to load prompt asset /assistant/memory-rules.md: offline'
+    );
   });
 
-  it('fallback foreground tools prompt prefers a small lead time for punctual attendance reminders', async () => {
-    const prompt = await assistantPromptService.getForegroundToolsPrompt();
+  it('throws when prompt asset returns a non-ok response', async () => {
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found'
+      }),
+      configurable: true
+    });
 
-    expect(prompt).toContain('punctual attendance event');
-    expect(prompt).toContain('use 5 minutes early as the default');
+    const { assistantPromptService } = await import('./assistantPromptService');
+
+    await expect(assistantPromptService.getBackgroundModePrompt()).rejects.toThrow(
+      '[assistantPromptService] Failed to load prompt asset /assistant/background-mode.md: HTTP 404 Not Found'
+    );
   });
 
-  it('fallback foreground tools prompt keeps reminder text free of relative time wording', async () => {
-    const prompt = await assistantPromptService.getForegroundToolsPrompt();
+  it('throws when prompt asset is empty', async () => {
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => '   '
+      }),
+      configurable: true
+    });
 
-    expect(prompt).toContain('must not include relative time adverbs such as today, tomorrow, or the day after tomorrow');
-    expect(prompt).toContain('not "tomorrow remind the user to stretch"');
-  });
+    const { assistantPromptService } = await import('./assistantPromptService');
 
-  it('fallback foreground tools prompt encourages timed follow-up reminders for ongoing progress tracking', async () => {
-    const prompt = await assistantPromptService.getForegroundToolsPrompt();
-
-    expect(prompt).toContain('requires checking the user\'s later implementation and progress');
-    expect(prompt).toContain('background agent can wake up and check status');
-  });
-
-  it('fallback memory rules keep fired-reminder cleanup in runtime instead of the model', async () => {
-    const prompt = await assistantPromptService.getMemoryRulesPrompt();
-
-    expect(prompt).toContain('the runtime will reconcile fired reminders after successful consumption');
-    expect(prompt).not.toContain('Remove a reminder from activeReminders once it has already come due and this turn is reacting to it');
-  });
-
-  it('fallback memory rules keep active reminder text descriptive instead of relative-time based', async () => {
-    const prompt = await assistantPromptService.getMemoryRulesPrompt();
-
-    expect(prompt).toContain('keep reminder text purely descriptive');
-    expect(prompt).toContain('not "tomorrow remind the user to submit the weekly report"');
-    expect(prompt).toContain('requires continued attention to the user\'s execution or progress');
+    await expect(assistantPromptService.getForegroundToolsPrompt()).rejects.toThrow(
+      '[assistantPromptService] Failed to load prompt asset /assistant/foreground-tools.md: asset is empty'
+    );
   });
 });

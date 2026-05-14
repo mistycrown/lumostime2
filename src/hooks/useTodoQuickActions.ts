@@ -4,6 +4,9 @@
  * @output Shared quick-actions state and handlers for todo list rows and week-view badges
  * @pos Hook
  * @description Centralizes todo quick-actions sheet state so multiple entry points can open the same modal without duplicating move/complete/detail logic inside the view.
+ * @updated 2026-05-14: Dismisses the quick-actions sheet after the recurring skip-current action succeeds so both recurrence skip shortcuts share the same success-close feedback.
+ * @updated 2026-05-14: Added recurring `Skip 当前轮次 / Skip到` quick actions so recurrence shortcuts can skip the next occurrence and optionally pair that skip with one future `Maybe Date` target from the shared quick-actions flow.
+ * @updated 2026-05-14: Added a shared `Maybe` quick action that writes normalized multi-date `maybeDates`, including for recurring todos, through the same save pipeline as other lightweight task actions.
  * @updated 2026-05-13: Changed the quick `升级为项目` flow to require picking a target standard category instead of silently falling back to the default project bucket.
  * @updated 2026-05-13: Added a shared move-category quick action so non-subtask todos can jump between standard todo categories without opening the detail editor.
  * @updated 2026-05-13: Added a shared quick-to-project upgrade action so lightweight reminders can graduate into full project todos from shared entry points.
@@ -14,7 +17,7 @@
  */
 import { useRef, useState } from 'react';
 import { TodoItem } from '../types';
-import { formatDateKey, parseDateKey } from '../utils/todoScheduleUtils';
+import { formatDateKey, getNextRecurrenceOccurrenceDateKey, normalizeMaybeDates, normalizeSkipDates, parseDateKey } from '../utils/todoScheduleUtils';
 import { isQuickTodo } from '../utils/todoKindUtils';
 
 export const QUICK_ACTION_INTERACTION_GUARD_MS = 280;
@@ -172,6 +175,58 @@ export const useTodoQuickActions = ({ onSaveTodo, onEditTodo, onDeleteTodo }: Us
     closeQuickActions(true);
   };
 
+  const handleQuickActionMaybeDates = (values: string[]) => {
+    if (!quickActionTodo) return;
+
+    onSaveTodo({
+      ...quickActionTodo,
+      maybeDates: normalizeMaybeDates(values)
+    });
+    closeQuickActions(true);
+  };
+
+  const handleQuickActionSkipNextRecurrence = () => {
+    if (!quickActionTodo?.recurrenceRule) return;
+
+    const nextOccurrenceDateKey = getNextRecurrenceOccurrenceDateKey(quickActionTodo.recurrenceRule);
+    if (!nextOccurrenceDateKey) return;
+
+    const nextTodo: TodoItem = {
+      ...quickActionTodo,
+      recurrenceRule: {
+        ...quickActionTodo.recurrenceRule,
+        skipDates: normalizeSkipDates([
+          ...(quickActionTodo.recurrenceRule.skipDates || []),
+          nextOccurrenceDateKey
+        ])
+      }
+    };
+
+    onSaveTodo(nextTodo);
+    closeQuickActions(true);
+  };
+
+  const handleQuickActionSkipToMaybeDate = (dateKey: string) => {
+    if (!quickActionTodo?.recurrenceRule) return;
+
+    const nextOccurrenceDateKey = getNextRecurrenceOccurrenceDateKey(quickActionTodo.recurrenceRule);
+    onSaveTodo({
+      ...quickActionTodo,
+      maybeDates: normalizeMaybeDates([
+        ...(quickActionTodo.maybeDates || []),
+        dateKey
+      ]),
+      recurrenceRule: {
+        ...quickActionTodo.recurrenceRule,
+        skipDates: normalizeSkipDates([
+          ...(quickActionTodo.recurrenceRule.skipDates || []),
+          ...(nextOccurrenceDateKey ? [nextOccurrenceDateKey] : [])
+        ])
+      }
+    });
+    closeQuickActions(true);
+  };
+
   const handleQuickActionDelete = () => {
     if (!quickActionTodo) return;
     const todoId = quickActionTodo.id;
@@ -190,6 +245,9 @@ export const useTodoQuickActions = ({ onSaveTodo, onEditTodo, onDeleteTodo }: Us
     handleQuickActionUndoComplete,
     handleQuickActionClearDate,
     handleQuickActionTogglePin,
+    handleQuickActionMaybeDates,
+    handleQuickActionSkipNextRecurrence,
+    handleQuickActionSkipToMaybeDate,
     handleQuickActionMoveCategory,
     handleQuickActionUpgradeToProject,
     handleQuickActionDelete

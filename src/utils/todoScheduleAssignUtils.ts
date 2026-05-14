@@ -3,7 +3,8 @@
  * @input Assignable todo subsets, full todo sources, picker category ids, and schedule-assignment modes
  * @output Shared pure filtering and ordering helpers for the schedule assignment picker
  * @pos Utility (Todo schedule assignment)
- * @description Keeps the week-plan arrange/due picker aligned with todo hierarchy visibility rules by hiding unfinished subtasks whose parent todo is already completed and suppressing the reserved `未来` bucket from quick scheduling.
+ * @description Keeps the week-plan picker aligned with todo hierarchy visibility rules by hiding unfinished subtasks whose parent todo is already completed and suppressing the reserved `未来` bucket from quick scheduling.
+ * @updated 2026-05-14: Allowed recurring todos back into the quick picker only for the `Maybe` tab, while Arrange / Due still exclude them.
  * @updated 2026-05-13: Excluded the reserved `未来` category from arrange/due picker pools so future-only project backlogs stay out of quick scheduling popups.
  * @updated 2026-05-13: Excluded recurring todos from arrange/due picker pools so quick scheduling only offers one-shot tasks that can legally carry arrange or due dates.
  * @updated 2026-05-12: Added title search filtering that keeps matched subtasks attached to their visible parent rows inside the schedule assignment picker.
@@ -14,7 +15,11 @@
  */
 
 import { TodoItem } from '../types';
-import { getDirectChildTodosForDisplay, getParentTodo, isIncompleteSubtaskHiddenByCompletedParent } from './todoHierarchyUtils';
+import {
+  getDirectChildTodosForDisplay,
+  getParentTodo,
+  isIncompleteSubtaskHiddenByCompletedParent
+} from './todoHierarchyUtils';
 import { isFutureTodoCategoryId } from './todoQuickCategoryUtils';
 
 export interface TodoScheduleAssignRow {
@@ -25,15 +30,26 @@ export interface TodoScheduleAssignRow {
   isExpanded: boolean;
 }
 
-const getStatusDateValue = (todo: TodoItem, type: 'scheduled' | 'deadline'): string | undefined => (
-  type === 'scheduled' ? todo.scheduledDate : todo.deadlineDate
-);
+const getStatusDateValue = (
+  todo: TodoItem,
+  type: 'scheduled' | 'deadline' | 'maybe'
+): string | undefined => {
+  if (type === 'scheduled') {
+    return todo.scheduledDate;
+  }
+
+  if (type === 'deadline') {
+    return todo.deadlineDate;
+  }
+
+  return todo.maybeDates?.slice().sort((left, right) => left.localeCompare(right))[0];
+};
 
 const compareScheduleAssignTodos = (
   left: TodoItem,
   right: TodoItem,
-  activeType: 'scheduled' | 'deadline' | 'new',
-  assignType: 'scheduled' | 'deadline'
+  activeType: 'maybe' | 'scheduled' | 'deadline' | 'new',
+  assignType: 'maybe' | 'scheduled' | 'deadline'
 ): number => {
   const leftDate = getStatusDateValue(left, activeType === 'new' ? assignType : activeType);
   const rightDate = getStatusDateValue(right, activeType === 'new' ? assignType : activeType);
@@ -86,14 +102,24 @@ export const getVisibleScheduleAssignTodos = (
   todos: TodoItem[],
   sourceTodos: TodoItem[],
   selectedCategoryId: string,
-  activeType: 'scheduled' | 'deadline' | 'new',
-  assignType: 'scheduled' | 'deadline',
+  activeType: 'maybe' | 'scheduled' | 'deadline' | 'new',
+  assignType: 'maybe' | 'scheduled' | 'deadline',
   searchQuery = ''
 ): TodoItem[] => {
   const nextTodos = selectedCategoryId === 'all'
     ? [...todos]
     : todos.filter((todo) => todo.categoryId === selectedCategoryId);
-  const schedulableTodos = nextTodos.filter((todo) => !isFutureTodoCategoryId(todo.categoryId) && !todo.recurrenceRule);
+  const schedulableTodos = nextTodos.filter((todo) => {
+    if (isFutureTodoCategoryId(todo.categoryId)) {
+      return false;
+    }
+
+    if (todo.recurrenceRule && activeType !== 'maybe') {
+      return false;
+    }
+
+    return true;
+  });
 
   const visibleTodos = schedulableTodos.filter((todo) => !isIncompleteSubtaskHiddenByCompletedParent(sourceTodos, todo));
   const matchedTodoIds = buildMatchedTodoSet(visibleTodos, sourceTodos, searchQuery);
@@ -132,8 +158,8 @@ export const buildTodoScheduleAssignRows = (
   todos: TodoItem[],
   sourceTodos: TodoItem[],
   expandedParentIds: string[],
-  activeType: 'scheduled' | 'deadline' | 'new',
-  assignType: 'scheduled' | 'deadline'
+  activeType: 'maybe' | 'scheduled' | 'deadline' | 'new',
+  assignType: 'maybe' | 'scheduled' | 'deadline'
 ): TodoScheduleAssignRow[] => {
   const expandedParentIdSet = new Set(expandedParentIds);
   const rootTodos = todos

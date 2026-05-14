@@ -3,6 +3,8 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- Update 2026-05-14: `todoScheduleUtils.ts` now derives a sixth `Maybe` schedule type from today-or-future `maybeDates`, respects recurrence `skipDates`, and also exposes hydration cleanup so stale past `Maybe Date` values are dropped automatically when todos load.
+- Update 2026-05-14: `todoScheduleAssignUtils.ts` now tolerates a `Maybe` quick-assign mode so the schedule picker can keep using the shared hierarchy/filter pipeline even when future tentative dates become a first-class tab beside Arrange / Due / New.
 - `todoScheduleUtils.ts`: [Active] - Shared todo planning helpers for Arrange / Due / Repeat / Done / Trace surfaces, including compact recurrence summaries like `每天`, `每周一三五`, and `每月 1,15,31` for lightweight UI metadata.
 - `todoScheduleAssignUtils.ts`: [Active] - Filters, sorts, and builds hierarchy rows for arrange/due picker todos, including the rules that unfinished subtasks disappear when their parent todo is already completed, recurring todos and the reserved `鏈潵` category stay out of quick scheduling, and title search keeps matched subtasks attached to their parent rows.
 - `todoQuickCategoryUtils.ts`: [Active] - Synthesizes the reserved `未来` and `小事` buckets, separates project-available categories from quick-schedule-available ones, and keeps quick reminders normalized onto the `小事` category id.
@@ -36,5 +38,6 @@ Contains pure utility functions for data processing and business logic calculati
 - `todoAssociationUtils.ts`: [Active] - Builds collapsed parent/subtask row models for todo pickers, auto-expands the selected child's parent when hierarchy mode is enabled, hides finished todos by default while preserving the current linked completed todo, hides unfinished subtasks whose parent todo is already completed, and tags standalone subtasks with hidden-parent context when the parent row is outside the current picker pool.
 - `todoCompletionModeUtils.ts`: [Active] - Gates one-shot completion mode for unfinished linked todos and sequences save-first, complete-second follow-up actions for focus-log submission flows.
 - `lumosTimeUrlParser.ts`: [Active] - Normalizes LumosTime NFC/deep-link URIs across custom-scheme parsing differences, old action aliases, and legacy parameter names.
+- `nfcActivityRestartGuard.ts`: [Active] - Builds per-activity NFC keys, suppresses same-tag timer restarts immediately after an NFC stop, and now keeps the just-stopped tag blocked until a different timer actually starts.
 
 > Once the folder I belong to changes, please update me.

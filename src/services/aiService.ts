@@ -1508,30 +1508,29 @@ export const aiService = {
         const scopeContext = context.scopes ? context.scopes.map(s => ({ id: s.id, name: s.name })) : [];
 
         const systemPrompt = `
-Role: You are a professional time management assistant.
-Task: Extract time records from the user's natural language description.
+角色：你是一位专业的时间管理助手。
+任务：从用户的自然语言描述里提取时间记录。
 
-Context:
-- Current Time: ${context.now} (for understanding "now" or "until now")
-- Target Date: ${context.targetDate} (the date user wants to log activities for)
-- Existing Tag List: ${JSON.stringify(tagList)}
-- Available Scopes: ${JSON.stringify(scopeContext)}
+上下文：
+- 当前时间：${context.now}（用于理解“现在”或“到现在为止”）
+- 目标日期：${context.targetDate}（用户希望把活动记录到哪一天）
+- 现有标签列表：${JSON.stringify(tagList)}
+- 可用 Scopes：${JSON.stringify(scopeContext)}
 
-Requirements:
-1. **You ONLY need to return the TIME (hour and minute), NOT the date.**
-2. Return time in 24-hour format: "HH:mm" (e.g., "09:00", "15:30", "23:45")
-3. **CRITICAL: All records must be within the same day (00:00 to 23:59).**
-4. **NO cross-day records allowed.** If a time range would cross midnight, end it at "23:59".
-5. If user says "3 PM", return "15:00". If user says "9 AM", return "09:00".
-6. **If user says "until now" or "to now"**, use the CURRENT TIME (${context.now}) from the context above.
-7. If only duration is given (e.g., "read for 2 hours"), you can estimate a reasonable time range.
-8. Match activities to provided tags where possible.
-9. **Infer Scopes**: Based on the activity description and available scopes, suggest relevant 'scopeIds'. If no scope matches well, leave it empty.
-10. Return format must be a pure JSON Array.
-11. **CRITICAL: Preserve ALL details from user input in the 'description' field.**
-12. **DO NOT summarize, simplify, or omit any information provided by the user.**
-13. **Copy the user's original wording as much as possible for descriptions.**
-
+要求：
+1. **你只需要返回时间（小时和分钟），不要返回日期。**
+2. 时间一律使用 24 小时制："HH:mm"（例如 "09:00"、"15:30"、"23:45"）
+3. **关键：所有记录都必须落在同一天内（00:00 到 23:59）。**
+4. **禁止跨天记录。** 如果某个时间段会跨过午夜，就把结束时间截断为 "23:59"。
+5. 如果用户说 "3 PM"，返回 "15:00"；如果用户说 "9 AM"，返回 "09:00"。
+6. **如果用户说“直到现在”或“到现在为止”**，就使用上方上下文里的当前时间 ${context.now}。
+7. 如果只给了时长（例如“读了 2 小时书”），你可以估算一个合理的时间区间。
+8. 尽可能把活动匹配到已提供的标签。
+9. **推断 Scopes**：根据活动描述和可用 scopes，给出相关的 "scopeIds" 建议；如果没有合适匹配，就留空。
+10. 返回格式必须是纯 JSON Array。
+11. **关键：在 "description" 字段中保留用户输入里的全部细节。**
+12. **不要总结、简化或省略用户提供的任何信息。**
+13. **在描述字段里尽量保留用户原本的措辞。**
 
 JSON Output Schema:
 [
@@ -1546,12 +1545,12 @@ JSON Output Schema:
 ]
 
 Example 1:
-User: "濠电偞鍨堕幐鎼侇敄閸涱厾鏆︾€广儱妫涢埢鏂款熆鐠洪缚瀚板ù鐙€鍨堕弻娑㈠箳濡ゅ﹥娈ョ紓浣靛妽閻擄繝骞冨▎鎺嬩汗闁圭儤鎼╁鎰版煟?濠电偛鐡ㄧ划宥咁潖婵犳艾纾婚柨婵嗩槸绾偓婵犵數濮撮崐褰掑磹閺嶎灛鏂课旀繝鍌氱缂備焦鏌ㄩ悺銊х矙婢舵劦鏁傞柛鏇ㄥ幗閻︽捇姊?濠电偞鍨堕幐鎼佸疮娴兼潙纾婚柨婵嗩槸缁€鍡涙煛婢跺﹦浠㈢憸鏉垮閺岋綁骞囬浣界闁汇埄鍨伴幖顐﹀Υ閹烘宸濆┑鐘插€绘禍?
+User: "下午三点到五点写周报，五点半到六点半去散步，晚上七点到八点读论文"
 Output:
 [
-  {"startTime": "15:00", "endTime": "17:00", "description": "闂傚倸鍊搁崯顐﹀箠閹炬椿鏁?, "categoryName": "闂佽瀛╅崘鑽ょ磽濮樺崬濮?, "activityName": "濠电偞鍨跺Λ鎴炰繆閸ヮ剚鍎撻柛鏇ㄥ灠濡﹢鏌涢妷銏℃珔闁烩斁鍋?, "scopeIds": ["scope_id_for_growth"]},
-  {"startTime": "17:30", "endTime": "18:30", "description": "闂備礁鎲￠懝楣冨疮閹绢喖围?, "categoryName": "闂備焦鐪归崹濠氬窗閹邦剦娓?, "activityName": "濠德板€栭〃蹇涘闯閿濆＆?, "scopeIds": ["scope_id_for_life"]},
-  {"startTime": "19:00", "endTime": "20:00", "description": "闂備胶绮竟鏇㈠疾濠婂牊鍋夐柛顐ｆ礀缁?, "categoryName": "闂備胶绮悧鐐淬仈閹间緡鏁勭€广儱顦粈鍐偓骞垮劚濞诧箓寮茬粙妫?, "activityName": "闂備胶绮竟鏇㈠疾濠靛牊鏆滈柛婵嗗閳ь剚甯″畷銊︾節閸屾粈绨?, "scopeIds": []}
+  {"startTime": "15:00", "endTime": "17:00", "description": "下午三点到五点写周报", "categoryName": "工作", "activityName": "写作", "scopeIds": ["scope_id_for_growth"]},
+  {"startTime": "17:30", "endTime": "18:30", "description": "五点半到六点半去散步", "categoryName": "生活", "activityName": "运动", "scopeIds": ["scope_id_for_life"]},
+  {"startTime": "19:00", "endTime": "20:00", "description": "晚上七点到八点读论文", "categoryName": "学习", "activityName": "阅读", "scopeIds": []}
 ]
 `;
 
@@ -1765,7 +1764,7 @@ Output:
         const config = aiService.getConfig();
         const fetchFn = Capacitor.isNativePlatform() ? nativeFetch : fetch;
 
-        const effectiveSystemPrompt = systemPrompt || 'You are a helpful assistant that generates personal daily review narratives based on provided data.';
+        const effectiveSystemPrompt = systemPrompt || '你是一位有帮助的写作助手，会基于提供的数据生成人的、细腻的个人复盘叙事。';
 
         try {
             if (config.provider === 'openai') {

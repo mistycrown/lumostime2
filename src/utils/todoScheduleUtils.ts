@@ -3,7 +3,10 @@
  * @input Todo items with optional schedule fields, reference dates
  * @output Week buckets, daily schedule entries, and badge metadata for todo planning views
  * @pos Utility (Todo planning)
- * @description Shared helpers for deriving scheduled, deadline, recurring, completed, and in-progress todo visibility without creating standalone occurrence records.
+ * @description Shared helpers for deriving scheduled, deadline, recurring, maybe, completed, and in-progress todo visibility without creating standalone occurrence records.
+ * @updated 2026-05-14: Relaxed `maybeDates` normalization to keep today-plus-future candidates, and added a shared todo-level cleanup helper so hydration can drop only stale past `Maybe Date` values automatically each day.
+ * @updated 2026-05-14: Added shared recurrence quick-action helpers for normalizing `skipDates` and resolving the next visible recurrence occurrence, so recurring todo quick actions can skip the upcoming run without duplicating recurrence math in UI components.
+ * @updated 2026-05-14: Added `maybeDates` candidate-date support plus recurrence `skipDates`, so week/month schedule views can show future tentative plans and single-date recurring skips without materializing standalone occurrence rows.
  * @updated 2026-05-13: Added a shared compact recurrence-summary formatter so quick-actions and other lightweight todo surfaces can describe repeating rules with one consistent short label.
  * @updated 2026-05-13: Added shared monthly day-list parsing plus optional month-end fallback matching so monthly recurrence rules can target multiple days while limiting short-month fallback to day 31 when explicitly enabled.
  * @updated 2026-05-11: Added week-scoped month-layout helpers that reserve stable per-row lanes for continuous `Trace` entries, so month cells can render cross-day in-progress bars without breaking the expanded-day order model.
@@ -23,6 +26,7 @@ export interface TodoDateBadges {
   scheduled: boolean;
   deadline: boolean;
   recurring: boolean;
+  maybe: boolean;
   completed: boolean;
   inProgress: boolean;
 }
@@ -38,9 +42,9 @@ export interface WeekDayBucket {
   items: WeekTodoEntry[];
 }
 
-export type TodoScheduleMatchKind = 'deadline' | 'scheduled' | 'recurring';
+export type TodoScheduleMatchKind = 'deadline' | 'scheduled' | 'recurring' | 'maybe';
 export type TodoScheduleRange = 'today' | 'tomorrow' | 'thisWeek';
-export type TodoScheduleEntryKind = 'deadline' | 'scheduled' | 'recurring' | 'completed' | 'inProgress';
+export type TodoScheduleEntryKind = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'completed' | 'inProgress';
 
 export interface TodoScheduleMatch {
   dateKey: string;
@@ -77,7 +81,8 @@ const TODO_RECURRENCE_WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五'
 const TODO_SCHEDULE_MATCH_PRIORITY: Record<TodoScheduleMatchKind, number> = {
   deadline: 0,
   scheduled: 1,
-  recurring: 2
+  recurring: 2,
+  maybe: 3
 };
 
 const normalizeDate = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -204,6 +209,66 @@ export const getWeekDates = (referenceDate: Date): Date[] => {
 
 export const getTodayDateKey = (): string => formatDateKey(new Date());
 
+export const normalizeMaybeDates = (
+  maybeDates?: string[],
+  referenceDate: Date = new Date()
+): string[] | undefined => {
+  if (!Array.isArray(maybeDates) || maybeDates.length === 0) {
+    return undefined;
+  }
+
+  const todayDateKey = formatDateKey(referenceDate);
+  const normalized = Array.from(new Set(
+    maybeDates
+      .map((dateKey) => dateKey.trim())
+      .filter((dateKey) => Boolean(parseDateKey(dateKey)))
+      .filter((dateKey) => dateKey >= todayDateKey)
+  )).sort((left, right) => left.localeCompare(right));
+
+  return normalized.length > 0 ? normalized : undefined;
+};
+
+export const normalizeTodoMaybeDates = (
+  todo: TodoItem,
+  referenceDate: Date = new Date()
+): TodoItem => {
+  const normalizedMaybeDates = normalizeMaybeDates(todo.maybeDates, referenceDate);
+
+  if (normalizedMaybeDates === todo.maybeDates) {
+    return todo;
+  }
+
+  return {
+    ...todo,
+    maybeDates: normalizedMaybeDates
+  };
+};
+
+export const normalizeSkipDates = (
+  skipDates?: string[],
+  referenceDate: Date = new Date()
+): string[] | undefined => {
+  if (!Array.isArray(skipDates) || skipDates.length === 0) {
+    return undefined;
+  }
+
+  const todayDateKey = formatDateKey(referenceDate);
+  const normalized = Array.from(new Set(
+    skipDates
+      .map((dateKey) => dateKey.trim())
+      .filter((dateKey) => Boolean(parseDateKey(dateKey)))
+      .filter((dateKey) => dateKey >= todayDateKey)
+  )).sort((left, right) => left.localeCompare(right));
+
+  return normalized.length > 0 ? normalized : undefined;
+};
+
+const hasMaybeDate = (
+  todo: TodoItem,
+  targetDateKey: string,
+  referenceDate: Date = new Date()
+): boolean => Boolean(normalizeMaybeDates(todo.maybeDates, referenceDate)?.includes(targetDateKey));
+
 export const isTodoInAssociationTodayCategory = (
   todo: TodoItem,
   referenceDate: Date = new Date()
@@ -298,6 +363,7 @@ export const matchesRecurrenceRule = (rule: TodoRecurrenceRule | undefined, targ
   if (!targetDate || !startDate) return false;
   if (targetDate.getTime() < startDate.getTime()) return false;
   if (endDate && targetDate.getTime() > endDate.getTime()) return false;
+  if (rule.skipDates?.includes(targetDateKey)) return false;
 
   switch (rule.frequency) {
     case 'daily':
@@ -309,6 +375,40 @@ export const matchesRecurrenceRule = (rule: TodoRecurrenceRule | undefined, targ
     default:
       return false;
   }
+};
+
+export const getNextRecurrenceOccurrenceDateKey = (
+  rule: TodoRecurrenceRule | undefined,
+  referenceDate: Date = new Date()
+): string | null => {
+  if (!rule) {
+    return null;
+  }
+
+  const startDate = parseDateKey(rule.startDate);
+  if (!startDate) {
+    return null;
+  }
+
+  const normalizedReference = normalizeDate(referenceDate);
+  const cursor = startDate.getTime() > normalizedReference.getTime()
+    ? new Date(startDate)
+    : new Date(normalizedReference);
+  const endDate = parseDateKey(rule.endDate);
+  const maxIterations = endDate
+    ? Math.max(0, Math.floor((endDate.getTime() - cursor.getTime()) / ONE_DAY_MS) + 1)
+    : 3660;
+
+  for (let index = 0; index < maxIterations; index += 1) {
+    const dateKey = formatDateKey(cursor);
+    if (matchesRecurrenceRule(rule, dateKey)) {
+      return dateKey;
+    }
+
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return null;
 };
 
 const buildInProgressLookup = (logs: Log[]): Map<string, Set<string>> => {
@@ -347,6 +447,7 @@ export const getTodoDateBadges = (
   scheduled: todo.scheduledDate === targetDateKey,
   deadline: todo.deadlineDate === targetDateKey,
   recurring: matchesRecurrenceRule(todo.recurrenceRule, targetDateKey),
+  maybe: hasMaybeDate(todo, targetDateKey),
   completed: todo.completedAt ? formatDateKey(new Date(todo.completedAt)) === targetDateKey : false,
   inProgress: inProgressLookup?.get(todo.id)?.has(targetDateKey) || false
 });
@@ -374,6 +475,10 @@ export const getTodoScheduleMatches = (
       matches.push({ dateKey, kind: 'recurring' });
     }
 
+    if (badges.maybe) {
+      matches.push({ dateKey, kind: 'maybe' });
+    }
+
     return matches;
   }).sort((left, right) => {
     if (left.dateKey !== right.dateKey) {
@@ -388,8 +493,9 @@ const getTodoEntryPriority = (badges: TodoDateBadges): number => {
   if (badges.deadline) return 0;
   if (badges.scheduled) return 1;
   if (badges.recurring) return 2;
-  if (badges.completed) return 3;
-  if (badges.inProgress) return 4;
+  if (badges.maybe) return 3;
+  if (badges.completed) return 4;
+  if (badges.inProgress) return 5;
   return 6;
 };
 
@@ -397,6 +503,7 @@ export const getPrimaryTodoScheduleEntryKind = (badges: TodoDateBadges): TodoSch
   if (badges.deadline) return 'deadline';
   if (badges.scheduled) return 'scheduled';
   if (badges.recurring) return 'recurring';
+  if (badges.maybe) return 'maybe';
   if (badges.completed) return 'completed';
   return 'inProgress';
 };
@@ -566,7 +673,7 @@ const buildTodoDateEntriesWithLookup = (
   .map((todo) => {
     const badges = getTodoDateBadges(todo, targetDateKey, inProgressLookup);
 
-    if (!badges.scheduled && !badges.deadline && !badges.recurring && !badges.completed && !badges.inProgress) {
+    if (!badges.scheduled && !badges.deadline && !badges.recurring && !badges.maybe && !badges.completed && !badges.inProgress) {
       return null;
     }
 

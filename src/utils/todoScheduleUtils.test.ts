@@ -3,7 +3,8 @@
  * @input Todo schedule helpers with fixed reference dates
  * @output Regression coverage for virtual-category date matching, shared day entries, and week-view badge normalization
  * @pos Test (todo planning utilities)
- * @description Verifies today/tomorrow/this-week filtering and shared per-day entry building against Arrange, Due, and recurrence rules without creating occurrence records.
+ * @description Verifies today/tomorrow/this-week filtering and shared per-day entry building against Arrange, Due, recurrence, and Maybe rules without creating occurrence records.
+ * @updated 2026-05-14: Added regression coverage for recurrence `skipDates`, quick-action next-occurrence resolution, today-or-future `maybeDates`, hydration cleanup helpers, and Maybe ordering in shared day-entry builders.
  * @updated 2026-05-13: Added compact recurrence-summary coverage so lightweight todo surfaces can reuse one short repeating-rule label format.
  * @updated 2026-05-13: Added monthly multi-day parsing plus 31-only fallback coverage so monthly recurrence rules can target multiple dates without changing legacy short-month semantics for other days.
  * @updated 2026-05-11: Added regression coverage for week-scoped month trace layouts so overlapping `Trace` segments keep stable lanes, preserve non-trace order, split on non-trace days, and keep hidden counts aligned with sparse lane rows.
@@ -14,7 +15,7 @@
  * @updated 2026-04-20: Added tests for virtual todo category schedule matches and deadline-over-scheduled normalization.
  */
 
-import { describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Log, TodoItem } from '../types';
 import {
   buildWeekTodoBuckets,
@@ -23,12 +24,16 @@ import {
   buildTodoMonthWeekLayout,
   formatMonthlyDayInput,
   formatTodoRecurrenceSummary,
+  getNextRecurrenceOccurrenceDateKey,
   formatWeekTodoLineTitle,
   getTodoAssociationTodayTodos,
   getTodoScheduleMatches,
   getTodoScheduleRangeDateKeys,
   isTodoInAssociationTodayCategory,
   matchesRecurrenceRule,
+  normalizeMaybeDates,
+  normalizeTodoMaybeDates,
+  normalizeSkipDates,
   normalizeMonthlyDayInput,
   parseMonthlyDayInput
 } from './todoScheduleUtils';
@@ -51,6 +56,15 @@ const buildLog = (overrides: Partial<Log>): Log => ({
   endTime: new Date('2026-04-20T10:00:00+08:00').getTime(),
   duration: 3600,
   ...overrides
+});
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(REFERENCE_DATE);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('todoScheduleUtils virtual category helpers', () => {
@@ -98,6 +112,74 @@ describe('todoScheduleUtils virtual category helpers', () => {
       { dateKey: '2026-04-22', kind: 'recurring' },
       { dateKey: '2026-04-24', kind: 'recurring' }
     ]);
+  });
+
+  test('skips explicitly excluded recurring dates before matching the current week', () => {
+    const todo = buildTodo({
+      recurrenceRule: {
+        frequency: 'weekly',
+        startDate: '2026-04-20',
+        weekdays: [1, 3, 5],
+        skipDates: ['2026-04-22']
+      }
+    });
+
+    expect(getTodoScheduleMatches(todo, 'thisWeek', REFERENCE_DATE)).toEqual([
+      { dateKey: '2026-04-20', kind: 'recurring' },
+      { dateKey: '2026-04-24', kind: 'recurring' }
+    ]);
+  });
+
+  test('normalizes maybe dates to today-or-future unique valid keys', () => {
+    expect(normalizeMaybeDates([
+      '2026-04-20',
+      '2026-04-24',
+      '2026-04-24',
+      '2026-04-19',
+      'invalid',
+      '2026-04-21'
+    ], REFERENCE_DATE)).toEqual([
+      '2026-04-20',
+      '2026-04-21',
+      '2026-04-24'
+    ]);
+  });
+
+  test('normalizes hydrated todo maybe dates by removing only stale past entries', () => {
+    expect(normalizeTodoMaybeDates(buildTodo({
+      maybeDates: ['2026-04-19', '2026-04-20', '2026-04-22']
+    }), REFERENCE_DATE).maybeDates).toEqual([
+      '2026-04-20',
+      '2026-04-22'
+    ]);
+  });
+
+  test('normalizes skip dates to today-or-future unique valid keys', () => {
+    expect(normalizeSkipDates([
+      '2026-04-20',
+      '2026-04-20',
+      '2026-04-19',
+      'invalid',
+      '2026-04-24'
+    ], REFERENCE_DATE)).toEqual([
+      '2026-04-20',
+      '2026-04-24'
+    ]);
+  });
+
+  test('resolves the next visible recurrence occurrence after skipped dates', () => {
+    expect(getNextRecurrenceOccurrenceDateKey({
+      frequency: 'weekly',
+      startDate: '2026-04-20',
+      weekdays: [1, 3, 5],
+      skipDates: ['2026-04-20']
+    }, REFERENCE_DATE)).toBe('2026-04-22');
+
+    expect(getNextRecurrenceOccurrenceDateKey({
+      frequency: 'daily',
+      startDate: '2026-04-18',
+      endDate: '2026-04-19'
+    }, REFERENCE_DATE)).toBe(null);
   });
 
   test('keeps legacy monthly 31st rules skipping short months unless fallback is enabled', () => {
@@ -244,6 +326,56 @@ describe('todoScheduleUtils virtual category helpers', () => {
       'deadline:deadline',
       'scheduled:scheduled',
       'recurring:recurring',
+      'completed:completed',
+      'in-progress:inProgress'
+    ]);
+  });
+
+  test('adds future maybe dates to schedule matches after recurring entries', () => {
+    const todo = buildTodo({
+      recurrenceRule: {
+        frequency: 'weekly',
+        startDate: '2026-04-20',
+        weekdays: [1]
+      },
+      maybeDates: ['2026-04-23', '2026-04-25']
+    });
+
+    expect(getTodoScheduleMatches(todo, 'thisWeek', REFERENCE_DATE)).toEqual([
+      { dateKey: '2026-04-20', kind: 'recurring' },
+      { dateKey: '2026-04-23', kind: 'maybe' },
+      { dateKey: '2026-04-25', kind: 'maybe' }
+    ]);
+  });
+
+  test('places maybe entries after recurring rows but before completed and trace rows', () => {
+    const todos: TodoItem[] = [
+      buildTodo({ id: 'completed', title: 'Echo', completedAt: new Date('2026-04-21T20:00:00+08:00').getTime() }),
+      buildTodo({ id: 'in-progress', title: 'Foxtrot' }),
+      buildTodo({ id: 'maybe', title: 'Delta', maybeDates: ['2026-04-21'] }),
+      buildTodo({
+        id: 'recurring',
+        title: 'Charlie',
+        recurrenceRule: {
+          frequency: 'daily',
+          startDate: '2026-04-18'
+        }
+      })
+    ];
+    const logs: Log[] = [
+      buildLog({
+        id: 'log-in-progress-future',
+        linkedTodoId: 'in-progress',
+        startTime: new Date('2026-04-21T14:00:00+08:00').getTime(),
+        endTime: new Date('2026-04-21T15:00:00+08:00').getTime()
+      })
+    ];
+
+    const entries = buildTodoDateEntries(todos, logs, '2026-04-21');
+
+    expect(entries.map((entry) => `${entry.todo.id}:${entry.primaryKind}`)).toEqual([
+      'recurring:recurring',
+      'maybe:maybe',
       'completed:completed',
       'in-progress:inProgress'
     ]);

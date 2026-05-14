@@ -4,6 +4,7 @@
  * @output Single-week 2x4 bento schedule UI backed by real todo data
  * @pos Component (Todo scheduling)
  * @description Renders one selected week at a time in the bento layout so the mini calendar, header range, and visible day cells always describe the same week.
+ * @updated 2026-05-14: Added conservative left/right swipe week switching on the bento planner's 2x4 day grid, reusing the header's previous/next week actions while ignoring the mini calendar, date buttons, badge buttons, and drag handles to reduce accidental triggers.
  * @updated 2026-05-11: Raised the display popup above the schedule floating button and restored a full-screen blur scrim so the button now sits underneath the softened overlay instead of peeking above it.
  * @updated 2026-05-11: Kept the display popup vertically centered while tightening its symmetric top/bottom clearance so the sheet no longer overlaps the bottom-right floating action button.
  * @updated 2026-05-11: Capped the display popup's scrollable height with extra bottom clearance so longer settings content no longer reaches the bottom-right floating action button.
@@ -80,6 +81,9 @@ const TODO_BENTO_MARKER_COLOR_MODE_STORAGE_KEY = 'todoBentoMarkerColorMode';
 const DEFAULT_BENTO_VISIBLE_ENTRY_COUNT = 4;
 const BENTO_ENTRY_ROW_HEIGHT = 24;
 const BENTO_ENTRY_GAP = 6;
+const BENTO_WEEK_SWIPE_LOCK_DISTANCE = 18;
+const BENTO_WEEK_SWIPE_TRIGGER_DISTANCE = 112;
+const BENTO_WEEK_SWIPE_DOMINANCE_RATIO = 1.6;
 const TODO_DISPLAY_POPUP_MAX_HEIGHT = 'min(calc(100vh - 14rem - env(safe-area-inset-bottom)), 42rem)';
 const TODO_BENTO_DISPLAY_MODE_OPTIONS = [
   { key: 'single', label: '单页' },
@@ -89,7 +93,7 @@ const TODO_BENTO_MARKER_COLOR_OPTIONS = [
   { key: 'schedule', label: '按排期类型' },
   { key: 'category', label: '按任务分类' }
 ] as const;
-type BentoBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'completed' | 'inProgress';
+type BentoBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'completed' | 'inProgress';
 type BentoQuickActionBadgeKey = 'deadline' | 'scheduled' | 'completed' | 'inProgress';
 type TodoBentoDisplayMode = typeof TODO_BENTO_DISPLAY_MODE_OPTIONS[number]['key'];
 type TodoBentoMarkerColorMode = typeof TODO_BENTO_MARKER_COLOR_OPTIONS[number]['key'];
@@ -105,6 +109,7 @@ const getWeekEntryColorKey = (entry: WeekTodoEntry): TodoScheduleTypeColorKey =>
   if (entry.badges.deadline) return 'deadline';
   if (entry.badges.scheduled) return 'scheduled';
   if (entry.badges.recurring) return 'recurring';
+  if (entry.badges.maybe) return 'maybe';
   if (entry.badges.completed) return 'completed';
   return 'inProgress';
 };
@@ -124,6 +129,7 @@ const createDraggableEntry = (entry: WeekTodoEntry): BentoDraggableEntry | null 
         scheduled: false,
         deadline: true,
         recurring: false,
+        maybe: false,
         completed: false,
         inProgress: false
       },
@@ -138,6 +144,7 @@ const createDraggableEntry = (entry: WeekTodoEntry): BentoDraggableEntry | null 
         scheduled: true,
         deadline: false,
         recurring: false,
+        maybe: false,
         completed: false,
         inProgress: false
       },
@@ -185,6 +192,10 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
   const touchDragTargetDateRef = useRef<string | null>(null);
   const touchDragPointRef = useRef<{ x: number; y: number; title: string } | null>(null);
   const touchDragFrameRef = useRef<number | null>(null);
+  const weekSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const weekSwipeAxisRef = useRef<'x' | 'y' | null>(null);
+  const weekSwipeEligibleRef = useRef(false);
+  const weekSwipeSurfaceRef = useRef<HTMLDivElement | null>(null);
   const dayEntryListRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [draggingTodoId, setDraggingTodoId] = useState<string | null>(null);
   const [draggingEntry, setDraggingEntry] = useState<BentoDraggableEntry | null>(null);
@@ -474,6 +485,132 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
     onWeekStartChange(startOfWeek(weekStart, { weekStartsOn: 1 }));
   };
 
+  const resetWeekSwipeGesture = () => {
+    weekSwipeStartRef.current = null;
+    weekSwipeAxisRef.current = null;
+    weekSwipeEligibleRef.current = false;
+  };
+
+  const shouldIgnoreWeekSwipeTarget = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+
+    return Boolean(
+      target.closest('[data-bento-week-swipe-ignore="true"], button, a, input, textarea, select, [role="button"]')
+    );
+  };
+
+  const handleBentoWeekTouchStart = (event: TouchEvent) => {
+    if (touchDragActivatedRef.current || event.touches.length !== 1) {
+      resetWeekSwipeGesture();
+      return;
+    }
+
+    if (shouldIgnoreWeekSwipeTarget(event.target)) {
+      resetWeekSwipeGesture();
+      return;
+    }
+
+    const touch = event.touches[0];
+    if (!touch) {
+      resetWeekSwipeGesture();
+      return;
+    }
+
+    weekSwipeStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY
+    };
+    weekSwipeAxisRef.current = null;
+    weekSwipeEligibleRef.current = true;
+  };
+
+  const handleBentoWeekTouchMove = (event: TouchEvent) => {
+    const swipeStart = weekSwipeStartRef.current;
+    if (!weekSwipeEligibleRef.current || !swipeStart) {
+      return;
+    }
+
+    if (touchDragActivatedRef.current || event.touches.length !== 1) {
+      resetWeekSwipeGesture();
+      return;
+    }
+
+    const touch = event.touches[0];
+    if (!touch) {
+      return;
+    }
+
+    const deltaX = touch.clientX - swipeStart.x;
+    const deltaY = touch.clientY - swipeStart.y;
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
+
+    if (weekSwipeAxisRef.current === null) {
+      if (absDeltaX < BENTO_WEEK_SWIPE_LOCK_DISTANCE && absDeltaY < BENTO_WEEK_SWIPE_LOCK_DISTANCE) {
+        return;
+      }
+
+      weekSwipeAxisRef.current = absDeltaX > absDeltaY * BENTO_WEEK_SWIPE_DOMINANCE_RATIO ? 'x' : 'y';
+    }
+
+    if (weekSwipeAxisRef.current === 'x') {
+      event.preventDefault();
+    }
+  };
+
+  const handleBentoWeekTouchEnd = (event: TouchEvent) => {
+    const swipeStart = weekSwipeStartRef.current;
+    if (!weekSwipeEligibleRef.current || !swipeStart || touchDragActivatedRef.current) {
+      resetWeekSwipeGesture();
+      return;
+    }
+
+    const touch = event.changedTouches[0];
+    if (!touch) {
+      resetWeekSwipeGesture();
+      return;
+    }
+
+    const deltaX = touch.clientX - swipeStart.x;
+    const deltaY = touch.clientY - swipeStart.y;
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
+    const shouldSwitchWeek = absDeltaX >= BENTO_WEEK_SWIPE_TRIGGER_DISTANCE
+      && absDeltaX > absDeltaY * BENTO_WEEK_SWIPE_DOMINANCE_RATIO;
+
+    if (shouldSwitchWeek) {
+      event.preventDefault();
+      if (deltaX > 0) {
+        onGoToPreviousWeek();
+      } else {
+        onGoToNextWeek();
+      }
+    }
+
+    resetWeekSwipeGesture();
+  };
+
+  useEffect(() => {
+    const surface = weekSwipeSurfaceRef.current;
+    if (!surface) {
+      return;
+    }
+
+    surface.addEventListener('touchstart', handleBentoWeekTouchStart);
+    surface.addEventListener('touchmove', handleBentoWeekTouchMove, { passive: false });
+    surface.addEventListener('touchend', handleBentoWeekTouchEnd);
+    surface.addEventListener('touchcancel', resetWeekSwipeGesture);
+
+    return () => {
+      surface.removeEventListener('touchstart', handleBentoWeekTouchStart);
+      surface.removeEventListener('touchmove', handleBentoWeekTouchMove);
+      surface.removeEventListener('touchend', handleBentoWeekTouchEnd);
+      surface.removeEventListener('touchcancel', resetWeekSwipeGesture);
+    };
+  }, [selectedWeekId, onGoToNextWeek, onGoToPreviousWeek]);
+
   return (
     <div className="flex min-h-0 flex-1 w-full">
       <div className="relative flex min-h-0 flex-1 overflow-hidden bg-transparent">
@@ -536,12 +673,16 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
 
           <div className={`min-h-0 flex-1 ${displayMode === 'all' ? 'overflow-y-auto no-scrollbar' : 'overflow-hidden'}`}>
             <div
+              ref={weekSwipeSurfaceRef}
               key={selectedWeekId}
               data-week-id={selectedWeekId}
               className={`grid min-w-full grid-cols-2 ${displayMode === 'all' ? 'min-h-full' : 'h-full'} grid-rows-4`}
               style={displayMode === 'all' ? { gridTemplateRows: 'repeat(4, minmax(10rem, auto))' } : undefined}
             >
-              <div className="flex min-h-0 flex-col overflow-hidden border-b border-r border-stone-200/80 bg-transparent p-2 md:p-3">
+              <div
+                data-bento-week-swipe-ignore="true"
+                className="flex min-h-0 flex-col overflow-hidden border-b border-r border-stone-200/80 bg-transparent p-2 md:p-3"
+              >
                 <div className={`shrink-0 text-center font-bold uppercase tracking-[0.24em] text-stone-400 ${isDenseMonthGrid ? 'mb-1 text-[0.52rem] md:text-[0.58rem]' : 'mb-1.5 text-[0.58rem] md:mb-2 md:text-[0.65rem]'}`}>
                   {format(middleDay, 'MMMM')}
                 </div>
@@ -639,6 +780,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                         <button
                           type="button"
                           onClick={() => onOpenDay?.(dateKey)}
+                          data-bento-week-swipe-ignore="true"
                           className="mb-2 flex items-start justify-between gap-2 text-left"
                         >
                           <span
@@ -685,6 +827,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                               entry.badges.deadline ? { key: 'deadline', label: 'Due', color: '#8f6f6b', overdue: isDeadlineOverdue } : null,
                               entry.badges.scheduled ? { key: 'scheduled', label: 'Arrange', color: '#7c8b97', overdue: isScheduledOverdue } : null,
                               entry.badges.recurring ? { key: 'recurring', label: 'Repeat', color: '#8b8f79' } : null,
+                              entry.badges.maybe ? { key: 'maybe', label: 'Maybe', color: '#a58863' } : null,
                               entry.badges.completed ? { key: 'completed', label: 'Done', color: '#7f8c84' } : null,
                               entry.badges.inProgress ? { key: 'inProgress', label: 'Trace', color: '#8b8096' } : null
                             ].filter(Boolean) as BentoBadgeDescriptor[];
@@ -702,6 +845,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                                   style={{ borderLeftColor: markerColor }}
                                 />
                                 <div
+                                  data-bento-week-swipe-ignore={draggable ? 'true' : undefined}
                                   draggable={draggable}
                                   onDragStart={(event) => draggable && handleDesktopDragStart(entry, event)}
                                   onDragEnd={resetDragState}
@@ -721,7 +865,8 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                                       <button
                                         key={badge.key}
                                         type="button"
-                                        onClick={() => handleEntryBadgeClick(entry, badge.key)}
+                                        onClick={() => handleEntryBadgeClick(entry, badge.key as BentoQuickActionBadgeKey)}
+                                        data-bento-week-swipe-ignore="true"
                                         className="inline-flex cursor-pointer items-center justify-end gap-1 rounded-full px-1 py-0.5 text-right transition-colors hover:bg-stone-100/70"
                                         style={{ color: badge.color }}
                                       >

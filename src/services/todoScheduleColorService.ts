@@ -3,8 +3,9 @@
  * @input Schedule-type color setting payloads
  * @output Shared persisted schedule-type color settings plus resolved colors
  * @pos Service
- * @description Persists the shared default/custom color mapping used when Todo schedule views color entries by Arrange / Due / Repeat / Done / Trace type.
- * @updated 2026-05-11: Added shared default/custom schedule-type colors so week and month schedule views can reuse one editable five-color palette.
+ * @description Persists the shared default/custom color mapping used when Todo schedule views color entries by Arrange / Due / Repeat / Maybe / Done / Trace type.
+ * @updated 2026-05-14: Added a dedicated `Maybe` schedule color so week and month schedule views can theme tentative future dates alongside the existing five schedule badges.
+ * @updated 2026-05-11: Added shared default/custom schedule-type colors so week and month schedule views can reuse one editable six-color palette.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -14,7 +15,7 @@ import { normalizeHexColor } from '../utils/colorUtils';
 
 export const TODO_SCHEDULE_TYPE_COLOR_SETTINGS_UPDATED_EVENT = 'lumostime:todo-schedule-type-colors-updated';
 
-export type TodoScheduleTypeColorKey = 'scheduled' | 'deadline' | 'recurring' | 'completed' | 'inProgress';
+export type TodoScheduleTypeColorKey = 'scheduled' | 'deadline' | 'recurring' | 'maybe' | 'completed' | 'inProgress';
 export type TodoScheduleTypeColorMode = 'default' | 'custom';
 
 export interface TodoScheduleTypeColorSettings {
@@ -28,6 +29,7 @@ export const TODO_SCHEDULE_TYPE_COLOR_ITEMS: Array<{ key: TodoScheduleTypeColorK
   { key: 'scheduled', label: '安排' },
   { key: 'deadline', label: '截止' },
   { key: 'recurring', label: '重复' },
+  { key: 'maybe', label: 'Maybe' },
   { key: 'completed', label: '完成' },
   { key: 'inProgress', label: '追踪' }
 ];
@@ -36,6 +38,7 @@ export const DEFAULT_TODO_SCHEDULE_TYPE_COLORS: Record<TodoScheduleTypeColorKey,
   scheduled: '#141414',
   deadline: '#C86A4C',
   recurring: '#768252',
+  maybe: '#A58863',
   completed: '#A4A09A',
   inProgress: '#60758B'
 };
@@ -119,23 +122,22 @@ export const todoScheduleColorService = {
     const sanitized = sanitizeSettings(raw);
 
     if (JSON.stringify(raw) !== JSON.stringify(sanitized)) {
-      todoScheduleColorService.saveSettings(sanitized);
+      storage.setJSON(SETTINGS_KEYS.TODO_SCHEDULE_TYPE_COLORS, sanitized);
     }
 
     return sanitized;
   },
 
-  saveSettings(settings: TodoScheduleTypeColorSettings): void {
+  saveSettings(settings: TodoScheduleTypeColorSettings): TodoScheduleTypeColorSettings {
     const sanitized = sanitizeSettings(settings);
-
-    storage.setJSON(SETTINGS_KEYS.TODO_SCHEDULE_TYPE_COLORS, {
-      ...sanitized,
-      version: 1,
-      updatedAt: Date.now()
-    } satisfies TodoScheduleTypeColorSettings);
+    storage.setJSON(SETTINGS_KEYS.TODO_SCHEDULE_TYPE_COLORS, sanitized);
 
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent(TODO_SCHEDULE_TYPE_COLOR_SETTINGS_UPDATED_EVENT));
+      window.dispatchEvent(new CustomEvent(TODO_SCHEDULE_TYPE_COLOR_SETTINGS_UPDATED_EVENT, {
+        detail: sanitized
+      }));
     }
+
+    return sanitized;
   }
 };
