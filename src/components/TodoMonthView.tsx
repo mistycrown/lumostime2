@@ -4,45 +4,8 @@
  * @output Reference-style rolling month schedule UI backed by real daily todo data
  * @pos Component (Todo scheduling)
  * @description Renders the editorial monthly schedule view adapted from the minimalist demo, using shared todo schedule utilities so each day shows the same real Arrange / Due / Repeat / Maybe / Done / Trace data as the week planner.
- * @updated 2026-05-14: Added `Maybe` schedule badges plus the `Diff` leading icon, so tentative future dates now render consistently in both the month grid and expanded day detail list.
- * @updated 2026-05-11: Prevented month-edge preloading from firing during programmatic entry jumps, so the smooth `本月` auto-scroll no longer prepends earlier months mid-animation and yanks the viewport back up to March.
- * @updated 2026-05-11: Added an explicit parent-driven month-entry jump signal and replays the shared `本月` jump after mount, so opening the month planner no longer intermittently gets stuck at the rolling range's top month before the auto-scroll lands.
- * @updated 2026-05-11: Reused the top-right `本月` jump path for month-view entry, so opening the month planner now lands on the same current-month position as tapping the header shortcut instead of inheriting the parent reference week's offset.
- * @updated 2026-05-11: Limited cross-month dimming to the date numerals instead of the whole cell, and nudged expanded-row schedule tags slightly downward to better center against the task title line.
- * @updated 2026-05-11: Added a hairline side inset for the month grid, removed gray completed-task text treatment, and unified regular-entry and Trace row baselines so mixed rows stay vertically aligned.
- * @updated 2026-05-11: Made each month-cell date numeral a dedicated quick-add trigger, matching week view while leaving the rest of the cell focused on expanding that day's detail rows.
- * @updated 2026-05-11: Froze the month-view settings title bar so the title and close button stay pinned while the settings body scrolls underneath.
- * @updated 2026-05-11: Added a draft-based `隐藏 Trace 类型` toggle in month-view settings so Trace rows only disappear after the popup closes instead of recomputing while the user is still editing.
- * @updated 2026-05-11: Stopped month-view hidden-filter typing from recomputing live; the popup now edits a draft expression and only applies the filter once the settings panel closes.
- * @updated 2026-05-11: Added a persisted hidden-filter expression field inside the month-view settings popup, reusing custom-filter syntax to hide matching todo entries by title/category, linked activity/category, scope, and note.
- * @updated 2026-05-11: Raised the month display popup above the schedule floating button and restored a full-screen blur scrim so the button now sits underneath the softened overlay instead of peeking above it.
- * @updated 2026-05-11: Kept the month display popup vertically centered while tightening its symmetric top/bottom clearance so the sheet no longer overlaps the bottom-right floating action button.
- * @updated 2026-05-11: Capped the month display popup's scrollable height with extra bottom clearance so longer settings content no longer reaches the bottom-right floating action button.
- * @updated 2026-05-11: Added a shared default/custom schedule-type color editor to the month display popup so Arrange / Due / Repeat / Done / Trace colors can be customized whenever marker coloring follows schedule type.
- * @updated 2026-05-11: Squared off the week-row `Trace` overlay bars so they now keep only the left marker line plus a pale fill, with straight ends that sit flush against the covered day cells instead of using rounded pills.
- * @updated 2026-05-11: Added week-scoped `Trace` lane layout plus per-week overlay bars, so consecutive in-progress entries can render as one continuous strip across adjacent day cells while the day-detail list keeps the same sorted order.
- * @updated 2026-05-11: Limited month-title retargeting to first entry plus explicit external date jumps, and now freeze the `YYYY.M` header during programmatic month scrolls until the animation settles so edge-loading no longer snaps back to today and arrow-based month changes stop flickering.
- * @updated 2026-05-11: Switched the rolling month grid to an edge-loaded window that starts at current month minus/plus two months and appends another two months whenever scrolling nears either edge, reducing enter-time schedule recompute work without changing the visible interaction model.
- * @updated 2026-05-11: Removed the fixed-width split between expanded-row todo titles and `@parent` hints so both text pieces now stay visually adjacent and only compress when space actually runs out.
- * @updated 2026-05-11: Kept expanded-row todo titles and `@parent` hints as one adjacent truncation group, and let in-cell month strips run flush to the grid edges so the marker line and tinted fill fully align with each day tile.
- * @updated 2026-05-11: Added a same-color translucent fill behind each in-cell month entry so the marker line now has a soft tinted label background without changing the minimal mobile density.
- * @updated 2026-05-11: Tightened in-cell task left padding and switched month-cell titles from ellipsis to hard clipping so each calendar tile can reveal more characters on narrow mobile screens.
- * @updated 2026-05-11: Truncated expanded-day row titles to a single line with ellipsis and kept the right-side status tags fixed so long task names no longer overflow the month view on mobile.
- * @updated 2026-05-11: Removed the background blur transition from the month-settings open state so the softened calendar and popup appear on the same frame.
- * @updated 2026-05-11: Aligned the month-settings popup glass treatment and control sizing with the schedule shortcut menu so blur strength, fill, and typography now match.
- * @updated 2026-05-11: Added a dedicated full-screen blur scrim behind the month-settings popup and made the card fill more opaque so the wallpaper stays soft without making the text glow.
- * @updated 2026-05-11: Moved the month-settings frosted blur onto the popup card background layer so Android/WebView no longer adds a false glow to popup text and buttons.
- * @updated 2026-05-10: Expanded month-view rows now append truncated `@父任务` context for subtasks so the monthly detail list matches the week planner's parent-hint treatment.
- * @updated 2026-05-10: Added a top-right `本月` jump action so the month view can quickly snap back to today's month without using the title link or month arrows.
- * @updated 2026-05-10: Replaced the inline month-view settings dropdown with a standalone modal panel so density, font-size, and marker-color controls have more room without crowding the header.
- * @updated 2026-05-10: Month view now opens at today's month, renders the header title as `YYYY.M`, and trims expand-time animation work so tapping a day feels lighter.
- * @updated 2026-05-10: Added a persisted month-row density control beside the view switcher so users can choose 2/3/4/5 visible week rows per screen, and enlarged in-cell task typography for better readability.
- * @updated 2026-05-10: Added draggable expanded-day rows for Arrange and Due items only, including desktop drag/drop plus touch drag with edge auto-scroll so the month view now matches the week planner's editable schedule movement rules.
- * @updated 2026-05-10: Reduced scroll-time visual overhead, enlarged task typography, let each day cell use more of its vertical space with dynamic visible-entry counts, and switched the date numerals to the same smaller Bilbo Swash Caps treatment used by the week planner.
- * @updated 2026-05-10: Added inline schedule-type tags to each expanded day row and lets clickable tags reuse the same quick-edit entry path as the week planner, while keeping recurring tags display-only.
- * @updated 2026-05-10: Removed the boxed white month surfaces so the calendar now runs edge-to-edge and inherits the Todo schedule page's custom background treatment instead of masking it.
- * @updated 2026-05-10: Replaced seeded demo items with shared real daily todo entries, added month-view-only type marker colors, and preserved the continuous rolling grid plus selected-day expansion behavior.
- *
+ * @updated 2026-05-14: Added a parent-controlled schedule lock toggle so the month planner can freeze drag-to-move interactions while keeping day opening and quick-edit actions available.
+ 
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -97,6 +60,8 @@ interface TodoMonthViewProps {
   useReducedEffects?: boolean;
   viewMenuNode: React.ReactNode;
   onOpenTodo?: (todo: TodoItem) => void;
+  isScheduleLocked?: boolean;
+  onToggleScheduleLock?: () => void;
 }
 
 interface TodoMonthWeek {
@@ -222,7 +187,7 @@ const MONTH_VIEW_ENTRY_TAGS: Array<{
   { key: 'deadline', label: 'Due', color: '#8f6f6b', clickable: true },
   { key: 'scheduled', label: 'Arrange', color: '#7c8b97', clickable: true },
   { key: 'recurring', label: 'Repeat', color: '#8b8f79', clickable: false },
-  { key: 'maybe', label: 'Maybe', color: '#a58863', clickable: false },
+  { key: 'maybe', label: 'Maybe', color: '#a58863', clickable: true },
   { key: 'completed', label: 'Done', color: '#7f8c84', clickable: true },
   { key: 'inProgress', label: 'Trace', color: '#8b8096', clickable: true }
 ];
@@ -255,7 +220,9 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   onOpenDatePicker,
   useReducedEffects = false,
   viewMenuNode,
-  onOpenTodo
+  onOpenTodo,
+  isScheduleLocked = false,
+  onToggleScheduleLock
 }) => {
   const today = useMemo(() => new Date(), []);
   const initialMonthRange = useMemo(
@@ -561,10 +528,26 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
       };
     }
 
+    if (entry.badges.maybe) {
+      return {
+        ...entry,
+        badges: {
+          scheduled: false,
+          deadline: false,
+          recurring: false,
+          maybe: true,
+          completed: false,
+          inProgress: false
+        },
+        primaryKind: 'maybe'
+      };
+    }
+
     return null;
   };
 
-  const isMonthEntryDraggable = (entry: TodoDateEntry): boolean => Boolean(entry.badges.deadline || entry.badges.scheduled);
+  const isMonthEntryDraggable = (entry: TodoDateEntry): boolean =>
+    !isScheduleLocked && Boolean(entry.badges.deadline || entry.badges.scheduled || entry.badges.maybe);
 
   const handleMonthItemDragEnd = () => {
     setDraggingTodoId(null);
@@ -589,7 +572,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   };
 
   const commitMonthDrop = (targetDateKey: string, entry: TodoDateEntry | null) => {
-    if (!entry || !onMoveScheduleEntry) {
+    if (isScheduleLocked || !entry || !onMoveScheduleEntry) {
       handleMonthItemDragEnd();
       return;
     }
@@ -599,6 +582,10 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   };
 
   const handleMonthItemDragStart = (entry: TodoDateEntry, event: React.DragEvent<HTMLDivElement>) => {
+    if (isScheduleLocked) {
+      return;
+    }
+
     const dragEntry = createDragEntryForMonthItem(entry);
     if (!dragEntry) {
       return;
@@ -612,7 +599,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   };
 
   const handleMonthDrop = (targetDateKey: string) => {
-    if (!draggingEntry) {
+    if (isScheduleLocked || !draggingEntry) {
       return;
     }
 
@@ -620,7 +607,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   };
 
   const handleMonthContainerDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    if (!draggingEntry || !scrollRef.current) {
+    if (isScheduleLocked || !draggingEntry || !scrollRef.current) {
       return;
     }
 
@@ -731,6 +718,10 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   };
 
   const handleTouchMonthItemDragStart = (entry: TodoDateEntry, event: React.TouchEvent<HTMLDivElement>) => {
+    if (isScheduleLocked) {
+      return;
+    }
+
     const dragEntry = createDragEntryForMonthItem(entry);
     if (!dragEntry) {
       return;
@@ -1000,6 +991,14 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
     };
   }, [isTouchDragging, onMoveScheduleEntry]);
 
+  useEffect(() => {
+    if (!isScheduleLocked) {
+      return;
+    }
+
+    handleMonthItemDragEnd();
+  }, [isScheduleLocked]);
+
   const activeMonthDate = useMemo(() => buildMonthLabelDate(activeMonth), [activeMonth]);
   const topRowHeight = useMemo(
     () => Math.max(96, containerHeight / monthRowsPerScreen),
@@ -1215,6 +1214,19 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
             </button>
             <button
               type="button"
+              onClick={onToggleScheduleLock}
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] tracking-[0.14em] transition-colors ${
+                isScheduleLocked
+                  ? 'bg-stone-900 text-[#faf9f6]'
+                  : 'text-slate-400 hover:bg-white/50 hover:text-slate-600'
+              }`}
+              aria-pressed={isScheduleLocked}
+              title={isScheduleLocked ? '已锁定拖拽，点击恢复移动' : '锁定拖拽，防止误移动'}
+            >
+              {isScheduleLocked ? '解锁' : '锁定'}
+            </button>
+            <button
+              type="button"
               onClick={openDensityMenu}
               className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-white/60 hover:text-slate-700"
               title="月视图设置"
@@ -1311,7 +1323,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                           }
                         }}
                         onDragOver={(event) => {
-                          if (!draggingEntry) return;
+                          if (isScheduleLocked || !draggingEntry) return;
                           event.preventDefault();
                           if (dragTargetDate !== dateKey) {
                             setDragTargetDate(dateKey);
@@ -1324,6 +1336,9 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                         }}
                         onDrop={(event) => {
                           event.preventDefault();
+                          if (isScheduleLocked) {
+                            return;
+                          }
                           handleMonthDrop(dateKey);
                         }}
                         className={[

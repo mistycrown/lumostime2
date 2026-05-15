@@ -4,20 +4,8 @@
  * @output Single-week 2x4 bento schedule UI backed by real todo data
  * @pos Component (Todo scheduling)
  * @description Renders one selected week at a time in the bento layout so the mini calendar, header range, and visible day cells always describe the same week.
- * @updated 2026-05-14: Added conservative left/right swipe week switching on the bento planner's 2x4 day grid, reusing the header's previous/next week actions while ignoring the mini calendar, date buttons, badge buttons, and drag handles to reduce accidental triggers.
- * @updated 2026-05-11: Raised the display popup above the schedule floating button and restored a full-screen blur scrim so the button now sits underneath the softened overlay instead of peeking above it.
- * @updated 2026-05-11: Kept the display popup vertically centered while tightening its symmetric top/bottom clearance so the sheet no longer overlaps the bottom-right floating action button.
- * @updated 2026-05-11: Capped the display popup's scrollable height with extra bottom clearance so longer settings content no longer reaches the bottom-right floating action button.
- * @updated 2026-05-11: Added a shared default/custom schedule-type color editor to the display popup so Arrange / Due / Repeat / Done / Trace colors can be customized whenever marker coloring follows schedule type.
- * @updated 2026-05-11: Removed the background blur transition from the display-settings open state so the softened calendar and popup appear on the same frame.
- * @updated 2026-05-11: Aligned the display-settings popup glass treatment and control sizing with the schedule shortcut menu so blur strength, fill, and typography now match.
- * @updated 2026-05-11: Added a dedicated full-screen blur scrim behind the display-settings popup and made the card fill more opaque so the wallpaper stays soft without making the text glow.
- * @updated 2026-05-11: Moved the display-settings frosted blur onto the popup card background layer so Android/WebView no longer adds a false glow to popup text and buttons.
- * @updated 2026-05-10: Added `单页 / 全部` bento display modes, per-cell visible-entry limits with `+N` overflow badges, and an all-items layout that expands row heights so every task in the selected week can be rendered.
- * @updated 2026-05-10: Replaced the unstable multi-page horizontal week strip with a single-week bento renderer so mini-calendar taps, header navigation, and rendered tasks stay locked to one parent-owned Monday `weekStart`.
- * @updated 2026-05-10: Rebuilt bento week navigation around one parent-owned Monday `weekStart` so the header, week picker, and mini-calendar stop competing with each other.
- * @updated 2026-05-10: Removed the top-left shortcut footer buttons so the mini calendar can use the full cell height without extra footer controls.
- *
+ * @updated 2026-05-14: Added a parent-controlled schedule lock toggle so bento week rows can disable drag-to-move without changing the surrounding week navigation or quick-action behavior.
+ 
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -66,12 +54,14 @@ interface TodoBentoWeekViewProps {
   onMoveScheduleEntry?: (entry: Pick<TodoDateEntry, 'todo' | 'badges'>, targetDateKey: string) => void;
   onOpenTodo?: (todo: TodoItem) => void;
   onOpenDay?: (dateKey: string) => void;
+  isScheduleLocked?: boolean;
+  onToggleScheduleLock?: () => void;
   useReducedEffects?: boolean;
   viewMenuNode: React.ReactNode;
 }
 
-type BentoDraggableEntry = Pick<WeekTodoEntry, 'todo' | 'badges' | 'parentTitle'> & {
-  primaryKind: 'deadline' | 'scheduled';
+type BentoDraggableEntry = Pick<WeekTodoEntry, 'todo' | 'badges' | 'parentTitle' | 'dateKey'> & {
+  primaryKind: 'deadline' | 'scheduled' | 'maybe';
 };
 
 const MINI_WEEKDAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -94,7 +84,7 @@ const TODO_BENTO_MARKER_COLOR_OPTIONS = [
   { key: 'category', label: '按任务分类' }
 ] as const;
 type BentoBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'completed' | 'inProgress';
-type BentoQuickActionBadgeKey = 'deadline' | 'scheduled' | 'completed' | 'inProgress';
+type BentoQuickActionBadgeKey = 'deadline' | 'scheduled' | 'maybe' | 'completed' | 'inProgress';
 type TodoBentoDisplayMode = typeof TODO_BENTO_DISPLAY_MODE_OPTIONS[number]['key'];
 type TodoBentoMarkerColorMode = typeof TODO_BENTO_MARKER_COLOR_OPTIONS[number]['key'];
 
@@ -152,6 +142,21 @@ const createDraggableEntry = (entry: WeekTodoEntry): BentoDraggableEntry | null 
     };
   }
 
+  if (entry.badges.maybe) {
+    return {
+      ...entry,
+      badges: {
+        scheduled: false,
+        deadline: false,
+        recurring: false,
+        maybe: true,
+        completed: false,
+        inProgress: false
+      },
+      primaryKind: 'maybe'
+    };
+  }
+
   return null;
 };
 
@@ -182,6 +187,8 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
   onMoveScheduleEntry,
   onOpenTodo,
   onOpenDay,
+  isScheduleLocked = false,
+  onToggleScheduleLock,
   useReducedEffects = false,
   viewMenuNode
 }) => {
@@ -308,7 +315,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
   }, [displayMode, selectedWeekId, weekBuckets]);
 
   const commitDrop = (targetDateKey: string, entry: BentoDraggableEntry | null) => {
-    if (!entry || !onMoveScheduleEntry) {
+    if (isScheduleLocked || !entry || !onMoveScheduleEntry) {
       return;
     }
 
@@ -319,7 +326,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
     entry: WeekTodoEntry,
     badgeKey: BentoQuickActionBadgeKey
   ) => {
-    if (badgeKey === 'deadline' || badgeKey === 'scheduled' || badgeKey === 'completed' || badgeKey === 'inProgress') {
+    if (badgeKey === 'deadline' || badgeKey === 'scheduled' || badgeKey === 'maybe' || badgeKey === 'completed' || badgeKey === 'inProgress') {
       onOpenTodo?.(entry.todo);
     }
   };
@@ -350,6 +357,10 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
   };
 
   const handleDesktopDragStart = (entry: WeekTodoEntry, event: React.DragEvent<HTMLDivElement>) => {
+    if (isScheduleLocked) {
+      return;
+    }
+
     const nextDraggingEntry = createDraggableEntry(entry);
     if (!nextDraggingEntry) {
       return;
@@ -397,6 +408,10 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
   };
 
   const handleTouchDragStart = (entry: WeekTodoEntry, event: React.TouchEvent<HTMLDivElement>) => {
+    if (isScheduleLocked) {
+      return;
+    }
+
     const nextDraggingEntry = createDraggableEntry(entry);
     const touch = event.touches[0];
 
@@ -476,6 +491,14 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
       window.removeEventListener('touchcancel', handleWindowTouchEnd);
     };
   }, [isTouchDragging]);
+
+  useEffect(() => {
+    if (!isScheduleLocked) {
+      return;
+    }
+
+    resetDragState();
+  }, [isScheduleLocked]);
 
   const navigateToWeekStart = (weekStart: Date) => {
     if (!onWeekStartChange) {
@@ -658,6 +681,19 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                 </button>
                 <button
                   type="button"
+                  onClick={onToggleScheduleLock}
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] tracking-[0.14em] transition-colors ${
+                    isScheduleLocked
+                      ? 'bg-stone-900 text-[#faf9f6]'
+                      : 'text-slate-400 hover:bg-white/50 hover:text-slate-600'
+                  }`}
+                  aria-pressed={isScheduleLocked}
+                  title={isScheduleLocked ? '已锁定拖拽，点击恢复移动' : '锁定拖拽，防止误移动'}
+                >
+                  {isScheduleLocked ? '解锁' : '锁定'}
+                </button>
+                <button
+                  type="button"
                   onClick={() => setIsDisplaySettingsOpen(true)}
                   className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-white/60 hover:text-slate-700"
                   title="Display settings"
@@ -757,7 +793,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                       dragTargetDate === dateKey ? 'bg-stone-100/30' : ''
                     }`}
                     onDragOver={(event) => {
-                      if (!draggingEntry) {
+                      if (isScheduleLocked || !draggingEntry) {
                         return;
                       }
 
@@ -773,6 +809,9 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                     }}
                     onDrop={(event) => {
                       event.preventDefault();
+                      if (isScheduleLocked) {
+                        return;
+                      }
                       commitDrop(dateKey, draggingEntry);
                       resetDragState();
                     }}
@@ -808,7 +847,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                             : entries
                           ).map((entry) => {
                         const markerColor = getEntryMarkerColor(entry);
-                            const draggable = entry.badges.deadline || entry.badges.scheduled;
+                            const draggable = !isScheduleLocked && Boolean(entry.badges.deadline || entry.badges.scheduled || entry.badges.maybe);
                             const fullTitle = formatWeekTodoLineTitle(entry);
                             const completedDateKey = entry.todo.completedAt ? formatDateKey(new Date(entry.todo.completedAt)) : null;
                             const isScheduledOverdue = Boolean(
@@ -861,7 +900,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                                 </div>
                                 <div className={`shrink-0 self-center flex items-center justify-end gap-1 whitespace-nowrap text-[9px] uppercase leading-none ${hasMultipleBadges ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
                                   {orderedBadges.map((badge) => (
-                                    badge.key === 'scheduled' || badge.key === 'deadline' || badge.key === 'completed' || badge.key === 'inProgress' ? (
+                                    badge.key === 'scheduled' || badge.key === 'deadline' || badge.key === 'maybe' || badge.key === 'completed' || badge.key === 'inProgress' ? (
                                       <button
                                         key={badge.key}
                                         type="button"

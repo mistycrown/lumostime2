@@ -25,6 +25,16 @@ const createLocalStorageMock = (): LocalStorageMock => {
   };
 };
 
+const createJsonTextResponse = (payload: unknown) => {
+  const text = JSON.stringify(payload);
+  return {
+    ok: true,
+    status: 200,
+    text: async () => text,
+    json: async () => JSON.parse(text)
+  };
+};
+
 describe('aiService unified turn normalization', () => {
   const originalFetch = globalThis.fetch;
 
@@ -51,28 +61,24 @@ describe('aiService unified turn normalization', () => {
 
   it('drops create_todo tool calls that omit linkedActivityId', async () => {
     Object.defineProperty(globalThis, 'fetch', {
-      value: vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          choices: [{
-            message: {
-              content: JSON.stringify({
-                outcome: 'reply',
-                assistantReply: 'ok',
-                memoryAction: 'no_update',
-                toolCalls: [{
-                  toolName: 'create_todo',
-                  args: {
-                    title: 'Read paper',
-                    categoryId: 'todo-general'
-                  }
-                }]
-              })
-            }
-          }]
-        })
-      }),
+      value: vi.fn().mockResolvedValue(createJsonTextResponse({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              outcome: 'reply',
+              assistantReply: 'ok',
+              memoryAction: 'no_update',
+              toolCalls: [{
+                toolName: 'create_todo',
+                args: {
+                  title: 'Read paper',
+                  categoryId: 'todo-general'
+                }
+              }]
+            })
+          }
+        }]
+      })),
       configurable: true
     });
 
@@ -85,19 +91,101 @@ describe('aiService unified turn normalization', () => {
     expect(result.output.toolCalls).toBeUndefined();
   });
 
+  it('keeps quick create_todo tool calls for the reserved 小事 bucket without linkedActivityId', async () => {
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockResolvedValue(createJsonTextResponse({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              outcome: 'reply',
+              assistantReply: 'ok',
+              memoryAction: 'no_update',
+              toolCalls: [{
+                toolName: 'create_todo',
+                args: {
+                  title: '取快递',
+                  categoryId: '__virtual_quick__',
+                  kind: 'quick',
+                  scheduledDate: '2026-05-15'
+                }
+              }]
+            })
+          }
+        }]
+      })),
+      configurable: true
+    });
+
+    const result = await aiService.requestAssistantUnifiedTurnWithDebug({
+      mode: 'foreground',
+      systemPrompt: 'system',
+      userPrompt: 'user'
+    });
+
+    expect(result.output.toolCalls).toEqual([{
+      toolName: 'create_todo',
+      args: {
+        title: '取快递',
+        categoryId: '__virtual_quick__',
+        kind: 'quick',
+        scheduledDate: '2026-05-15'
+      }
+    }]);
+  });
+
+  it('keeps reserved 未来 create_todo tool calls when linkedActivityId is present', async () => {
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockResolvedValue(createJsonTextResponse({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              outcome: 'reply',
+              assistantReply: 'ok',
+              memoryAction: 'no_update',
+              toolCalls: [{
+                toolName: 'create_todo',
+                args: {
+                  title: '系统梳理博士申请材料',
+                  categoryId: '__virtual_future__',
+                  kind: 'project',
+                  linkedCategoryId: 'study',
+                  linkedActivityId: 'writing'
+                }
+              }]
+            })
+          }
+        }]
+      })),
+      configurable: true
+    });
+
+    const result = await aiService.requestAssistantUnifiedTurnWithDebug({
+      mode: 'foreground',
+      systemPrompt: 'system',
+      userPrompt: 'user'
+    });
+
+    expect(result.output.toolCalls).toEqual([{
+      toolName: 'create_todo',
+      args: {
+        title: '系统梳理博士申请材料',
+        categoryId: '__virtual_future__',
+        kind: 'project',
+        linkedCategoryId: 'study',
+        linkedActivityId: 'writing'
+      }
+    }]);
+  });
+
   it('treats empty unified-turn content as a failed decision instead of a silent success', async () => {
     Object.defineProperty(globalThis, 'fetch', {
-      value: vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          choices: [{
-            message: {
-              content: ''
-            }
-          }]
-        })
-      }),
+      value: vi.fn().mockResolvedValue(createJsonTextResponse({
+        choices: [{
+          message: {
+            content: ''
+          }
+        }]
+      })),
       configurable: true
     });
 
@@ -116,10 +204,7 @@ describe('aiService unified turn normalization', () => {
       modelName: 'test-model'
     }));
 
-    const fetchSpy = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
+    const fetchSpy = vi.fn().mockResolvedValue(createJsonTextResponse({
         usage: {
           prompt_tokens_details: {
             cached_tokens: 512
@@ -134,8 +219,7 @@ describe('aiService unified turn normalization', () => {
             })
           }
         }]
-      })
-    });
+      }));
 
     Object.defineProperty(globalThis, 'fetch', {
       value: fetchSpy,
@@ -174,10 +258,7 @@ describe('aiService unified turn normalization', () => {
       modelName: 'qwen-plus'
     }));
 
-    const fetchSpy = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
+    const fetchSpy = vi.fn().mockResolvedValue(createJsonTextResponse({
         usage: {
           prompt_tokens_details: {
             cached_tokens: 256,
@@ -193,8 +274,7 @@ describe('aiService unified turn normalization', () => {
             })
           }
         }]
-      })
-    });
+      }));
 
     Object.defineProperty(globalThis, 'fetch', {
       value: fetchSpy,
@@ -240,10 +320,7 @@ describe('aiService unified turn normalization', () => {
       modelName: 'anthropic/claude-3.7-sonnet'
     }));
 
-    const fetchSpy = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
+    const fetchSpy = vi.fn().mockResolvedValue(createJsonTextResponse({
         usage: {
           prompt_tokens_details: {
             cache_write_tokens: 2048
@@ -258,8 +335,7 @@ describe('aiService unified turn normalization', () => {
             })
           }
         }]
-      })
-    });
+      }));
 
     Object.defineProperty(globalThis, 'fetch', {
       value: fetchSpy,
@@ -292,22 +368,18 @@ describe('aiService unified turn normalization', () => {
 
   it('extracts reasoning_content from OpenAI-compatible unified-turn responses', async () => {
     Object.defineProperty(globalThis, 'fetch', {
-      value: vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          choices: [{
-            message: {
-              content: JSON.stringify({
-                outcome: 'reply',
-                assistantReply: 'final answer',
-                memoryAction: 'no_update'
-              }),
-              reasoning_content: 'step one\nstep two'
-            }
-          }]
-        })
-      }),
+      value: vi.fn().mockResolvedValue(createJsonTextResponse({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              outcome: 'reply',
+              assistantReply: 'final answer',
+              memoryAction: 'no_update'
+            }),
+            reasoning_content: 'step one\nstep two'
+          }
+        }]
+      })),
       configurable: true
     });
 
@@ -334,29 +406,25 @@ describe('aiService unified turn normalization', () => {
     }));
 
     Object.defineProperty(globalThis, 'fetch', {
-      value: vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          candidates: [{
-            content: {
-              parts: [{
-                text: JSON.stringify({
-                  outcome: 'reply',
-                  assistantReply: 'gemini answer',
-                  memoryAction: 'no_update'
-                })
-              }, {
-                text: 'first thought',
-                thought: true
-              }, {
-                text: 'second thought',
-                type: 'reasoning'
-              }]
-            }
-          }]
-        })
-      }),
+      value: vi.fn().mockResolvedValue(createJsonTextResponse({
+        candidates: [{
+          content: {
+            parts: [{
+              text: JSON.stringify({
+                outcome: 'reply',
+                assistantReply: 'gemini answer',
+                memoryAction: 'no_update'
+              })
+            }, {
+              text: 'first thought',
+              thought: true
+            }, {
+              text: 'second thought',
+              type: 'reasoning'
+            }]
+          }
+        }]
+      })),
       configurable: true
     });
 

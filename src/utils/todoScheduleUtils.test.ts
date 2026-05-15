@@ -5,14 +5,8 @@
  * @pos Test (todo planning utilities)
  * @description Verifies today/tomorrow/this-week filtering and shared per-day entry building against Arrange, Due, recurrence, and Maybe rules without creating occurrence records.
  * @updated 2026-05-14: Added regression coverage for recurrence `skipDates`, quick-action next-occurrence resolution, today-or-future `maybeDates`, hydration cleanup helpers, and Maybe ordering in shared day-entry builders.
- * @updated 2026-05-13: Added compact recurrence-summary coverage so lightweight todo surfaces can reuse one short repeating-rule label format.
- * @updated 2026-05-13: Added monthly multi-day parsing plus 31-only fallback coverage so monthly recurrence rules can target multiple dates without changing legacy short-month semantics for other days.
- * @updated 2026-05-11: Added regression coverage for week-scoped month trace layouts so overlapping `Trace` segments keep stable lanes, preserve non-trace order, split on non-trace days, and keep hidden counts aligned with sparse lane rows.
- * @updated 2026-05-10: Added regression coverage for week-view subtask parent labels so shared week buckets expose inline `@parent` context only for child rows.
- * @updated 2026-05-10: Added regression coverage for shared real-data day entries so month view and week view stay aligned on daily inclusion and priority ordering.
- * @updated 2026-04-27: Added regression coverage for the shared today-category helper so `today + pin` widget and picker views keep due-today and recurring-today todos.
- * @updated 2026-04-22: Added regression coverage for the shared todo-picker today category that mixes pinned todos with todos arranged for today.
- * @updated 2026-04-20: Added tests for virtual todo category schedule matches and deadline-over-scheduled normalization.
+  * Once I am updated, be sure to update my header comment and the folder's md.
+
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';

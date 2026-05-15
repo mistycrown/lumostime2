@@ -4,19 +4,8 @@
  * @output Week buckets, daily schedule entries, and badge metadata for todo planning views
  * @pos Utility (Todo planning)
  * @description Shared helpers for deriving scheduled, deadline, recurring, maybe, completed, and in-progress todo visibility without creating standalone occurrence records.
- * @updated 2026-05-14: Relaxed `maybeDates` normalization to keep today-plus-future candidates, and added a shared todo-level cleanup helper so hydration can drop only stale past `Maybe Date` values automatically each day.
- * @updated 2026-05-14: Added shared recurrence quick-action helpers for normalizing `skipDates` and resolving the next visible recurrence occurrence, so recurring todo quick actions can skip the upcoming run without duplicating recurrence math in UI components.
- * @updated 2026-05-14: Added `maybeDates` candidate-date support plus recurrence `skipDates`, so week/month schedule views can show future tentative plans and single-date recurring skips without materializing standalone occurrence rows.
- * @updated 2026-05-13: Added a shared compact recurrence-summary formatter so quick-actions and other lightweight todo surfaces can describe repeating rules with one consistent short label.
- * @updated 2026-05-13: Added shared monthly day-list parsing plus optional month-end fallback matching so monthly recurrence rules can target multiple days while limiting short-month fallback to day 31 when explicitly enabled.
- * @updated 2026-05-11: Added week-scoped month-layout helpers that reserve stable per-row lanes for continuous `Trace` entries, so month cells can render cross-day in-progress bars without breaking the expanded-day order model.
- * @updated 2026-05-10: Week planner buckets now carry resolved parent-task titles for subtasks so the week schedule can render inline `@parent` context without re-looking up hierarchy in the view.
- * @updated 2026-05-10: Added shared day-entry builders for the new reference-style month schedule so the month grid and week planner now read the same real per-day todo data.
- * @updated 2026-04-27: Expanded the shared today-selector helpers so widget and picker `today + pin` views include todos that match today via arrange, due, or recurrence rules.
- * @updated 2026-04-22: Added shared today-selector helpers so todo pickers can reuse the same `pin or arranged today` virtual category.
- * @updated 2026-04-20 19:08: Added reusable today/tomorrow/this-week schedule match helpers for the todo list virtual category.
- * @updated 2026-04-20 18:12: Normalized week-view badge combinations so Due hides Arrange and Done hides Trace for the same day.
- *
+ * @updated 2026-05-14: Updated `TodoDateEntry` and `WeekTodoEntry` to include an optional `dateKey`, enabling drag-and-drop logic to identify which specific occurrence is being moved in multi-date `Maybe` schedules.
+
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
@@ -35,6 +24,7 @@ export interface WeekTodoEntry {
   todo: TodoItem;
   badges: TodoDateBadges;
   parentTitle?: string;
+  dateKey?: string;
 }
 
 export interface WeekDayBucket {
@@ -55,6 +45,7 @@ export interface TodoDateEntry {
   todo: TodoItem;
   badges: TodoDateBadges;
   primaryKind: TodoScheduleEntryKind;
+  dateKey?: string;
 }
 
 export interface TodoWeekTraceSegment {
@@ -680,7 +671,8 @@ const buildTodoDateEntriesWithLookup = (
     return {
       todo,
       badges,
-      primaryKind: getPrimaryTodoScheduleEntryKind(badges)
+      primaryKind: getPrimaryTodoScheduleEntryKind(badges),
+      dateKey: targetDateKey
     } satisfies TodoDateEntry;
   })
   .filter((entry): entry is TodoDateEntry => entry !== null)
@@ -811,7 +803,8 @@ export const buildWeekTodoBuckets = (todos: TodoItem[], logs: Log[], referenceDa
       return {
         todo,
         badges,
-        parentTitle
+        parentTitle,
+        dateKey
       };
     });
 

@@ -3,35 +3,10 @@
  * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
  * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
  * @pos Service (AI Integration Layer)
+ * @updated 2026-05-14: Enhanced debug error capture: responses are now read as text first to ensure non-JSON server replies (like HTML error pages) are preserved in `rawResponseText` for the debug viewer.
  * @updated 2026-05-14: Added provider-aware reasoning extraction so OpenAI-compatible and Gemini responses can surface native thinking content through the shared assistant message pipeline.
  * @updated 2026-05-14: Added named AI preset storage with current-preset switching, migration from older single-config/profile keys, and preset CRUD helpers for multi-provider quick switching in settings.
- * @description AI 闂備礁鎼悧鍡欑矓鐎涙ɑ鍙?- 濠电姰鍨煎▔娑氣偓姘煎櫍楠炲啯绻濋崘顏佹灃?AI 闂備礁婀辩划顖炲礉閹烘梹顐介柣銏㈩焾閻ゎ噣鏌涢埥鍡楀箻缂佲偓閸戠晝enAI/Gemini闂備焦瀵х粙鎴λ囬崡鐐╂灁闁硅揪绠戠粻銉╂煃瑜滈崜鐔奉嚕閸偄绶炲璺侯儏閺€顓熺箾鐎涙鐭嬮悽顖ｄ簽濡cljs劕鈹戠€ｎ亞顦遍梺鍛婁緱閸犳牠顢旈鍫熲拺闁哄娉曡倴闂佹眹鍊曞Λ娑氬垝婵犳碍鏅柛鏇ㄥ墮閳ь剛鍋ら弻鏇㈠幢閺囩喓銈扮紓浣虹帛閻╊垶鐛幒妤€唯闁挎柧鍕橀崑鐐烘煟閻樺弶澶勬繛鍙夌墵楠炲繑瀵奸弶鎴狀唽闂佸綊鍋婇崰鎾寸濞戙垺鐓欑紒妤佺☉濡參寮? * @updated 2026-04-27: Extended unified assistant-turn normalization with decision summaries, silent reasons, side effects, and structured multi-bubble reply parts.
- * @updated 2026-05-13: Extended recurrence-rule normalization with an explicit month-end fallback flag for monthly 31st-style schedules.
- * @updated 2026-05-10: Added provider-aware prompt-cache routing hints plus normalized cache debug metrics for OpenAI-compatible assistant turns, while keeping unsupported providers on the existing transport path.
- * @updated 2026-05-10: Taught native AI requests to honor AbortSignal by bridging unified-turn cancellation onto `cordova-plugin-advanced-http` request ids, so Android stop actions can actually terminate in-flight model calls.
- * @updated 2026-05-09: Treat empty or content-free unified assistant-turn outputs as failures so reminder dispatchers keep pending reminders for retry instead of deleting them on blank model responses.
- * @updated 2026-05-13: Extended todo tool normalization with explicit `kind` support so AI can create lightweight quick todos without forcing linked activity tags onto reminder-style items.
- * @updated 2026-05-06: Tightened unified foreground tool normalization so `create_todo` now requires `linkedActivityId` before the tool call is accepted.
- * @updated 2026-04-27: Normalized malformed unified-turn memoryPatch fields such as single-string recentDecisions so durable memory updates are not silently dropped downstream.
- * @updated 2026-04-27: Removed retired intent-router and multi-planner assistant endpoints so the service now centers on the shared unified-turn path plus still-used parsing and narrative helpers.
- * @updated 2026-04-26: Consolidated assistant inference around the shared unified-turn endpoint so foreground chat and Android-first background runs reuse the same provider/debug pipeline and explicit memory-action schema.
- 
- * @updated 2026-04-26: Guaranteed a lowercase json instruction on every OpenAI json_object request so structured assistant and tool-planning calls do not fail provider-side validation.
- * @updated 2026-04-25: Expanded AI intent routing and tool planning with dedicated edit-log, update-todo, and create-subtask flows that return id-plus-patch payloads for local application.
- * @updated 2026-04-25: Tightened subtask planning so scheduled or deadline dates are only emitted when the user explicitly asked for them.
- * @updated 2026-04-22: Simplified unified-chat intent classification into a message-only lightweight routing step without extra runtime context.
- * @updated 2026-04-22: Added persona-aware formal prompts plus optional cached conversation history for unified AI chat sessions.
- * @updated 2026-04-22: Added two-stage AI chat support with lightweight intent classification, debug-aware chat replies, and direct todo tool planning alongside backfill planning.
- * @updated 2026-04-22: AI backfill planning now supports per-call dates, latest-log context, todo hierarchy hints, and local cross-midnight normalization.
- * 
- * 闂備礁鎼粔鍫曗€﹂崼銏㈢处濡わ絽鍟粈澶愭煟閺冨浂鍤欓柛妯绘尦閺?
- * - 闂備胶鍘ч〃搴㈢閻愬搫绀夌憸蹇涘箯閻樻椿鏁囬柍閿亾闁哄鎳橀幃宄扳枎濞嗘垹蓱闂佽姘︽慨銈囩矙婢舵劖鍊绘俊顖涙た濡差垶姊婚崒姘偓濠毸夐幇閭︽晩闁搞儺浜楁禍?
- * - 闁诲骸鐏氬姗€骞婃惔銏″弿婵炲棙鍔楅々鐑芥偣閸ャ劌绲绘い顐犲€濋弻锟犲川鐎靛摜绐楅梺绋跨箲閿曘垽鐛幘璇茬疀妞ゆ巻鍋撶紒?
- * - AI 闂備礁鎲￠悷锕傛偡閵堝洩濮抽柕濞炬櫆閸嬨劑鏌ｉ弮鍌ょ劸闁?
- * - 濠?AI 闂備礁婀辩划顖炲礉閹烘梹顐介柣銏㈩焾閻ゎ噣鏌涢埄鍏╂垿寮冲鍫熺厵?
- * - 闂傚倷鐒﹀妯肩矓閸洘鍋柛鈩冪☉濡﹢鏌涢妷顖炴妞ゆ劗鏅槐鎺楁偑閸涱垳锛熼梺?
- * 
- * 闂備礁鐤囧▔鏇熷垔鐎靛摜绠?Once I am updated, be sure to update my header comment and the folder's md.
+ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { Scope, TodoKind, TodoRecurrenceRule } from '../types';
 import type {
@@ -581,6 +556,7 @@ const nativeFetch = async (url: string, options: any) => {
                         resolveOnce({
                             ok: response.status >= 200 && response.status < 300,
                             status: response.status,
+                            text: async () => response.data,
                             json: async () => JSON.parse(response.data)
                         });
                     },
@@ -604,6 +580,7 @@ const nativeFetch = async (url: string, options: any) => {
         return {
             ok: response.status >= 200 && response.status < 300,
             status: response.status,
+            text: async () => response.data,
             json: async () => JSON.parse(response.data)
         };
     } catch (error: any) {
@@ -1572,7 +1549,16 @@ const requestJsonObjectWithDebug = async <T>(
             });
             responseStatus = response.status || 0;
             responseOk = Boolean(response.ok);
-            responseBody = await response.json();
+            const responseText = await response.text();
+            try {
+                responseBody = JSON.parse(responseText);
+            } catch (parseError) {
+                responseBody = {
+                    rawResponseText: responseText,
+                    transportError: parseError instanceof Error ? parseError.message : String(parseError)
+                };
+                throw parseError;
+            }
 
             const debug: AIDebugExchange = {
                 provider: 'openai',
@@ -1666,7 +1652,16 @@ const requestJsonObjectWithDebug = async <T>(
             });
             responseStatus = response.status || 0;
             responseOk = Boolean(response.ok);
-            responseBody = await response.json();
+            const responseText = await response.text();
+            try {
+                responseBody = JSON.parse(responseText);
+            } catch (parseError) {
+                responseBody = {
+                    rawResponseText: responseText,
+                    transportError: parseError instanceof Error ? parseError.message : String(parseError)
+                };
+                throw parseError;
+            }
 
             const debug: AIDebugExchange = {
                 provider: 'gemini',

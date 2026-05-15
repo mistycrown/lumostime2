@@ -4,139 +4,18 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
- * @updated 2026-05-14: Kept Android reminder alarms on the native wakeup path but routed `reminder_due` execution through the Web listener only, so native Android no longer produces a duplicate UTC-timestamped background request beside the local-offset run.
- * @updated 2026-05-14: Added collapsible assistant reasoning blocks with persisted provider-native thinking summaries, so foreground and background chat messages can reveal model reasoning without polluting the main reply body.
- * @updated 2026-05-14: Added an ordinary-chat `日报` command that packages today's context, confirms overwrite when needed, writes back the current day's AI narrative, and returns a Daily Review result card inline.
- * @updated 2026-05-14: Added a full Dream reset action with inline confirmation so the Dream manager can restore built-in topic titles and notes while clearing all Dream observations in one guarded step.
- * @updated 2026-05-13: Rendered chat bubbles through Markdown with GFM and hard line-break support, so AI replies can keep one complete `assistantReply` body while still showing headings, emphasis, lists, blockquotes, code, and newline-based paragraph breaks correctly inside the conversation UI.
- * @updated 2026-05-13: Made the Dream viewer body its own vertical scroll container so long topic notes and entry lists can be scrolled on mobile instead of getting clipped inside the fixed full-screen overlay.
- * @updated 2026-05-13: Replaced weekly-review's popup-based week/method setup with a staged in-chat flow, so the template session now asks for range and method through fake-AI turns plus composer shortcut buttons before entering the real review conversation.
- * @updated 2026-05-13: Flattened every shared `查看调试` viewer section by removing the outer grouped card shell, so debug pages no longer render card-inside-card nesting above the expandable request blocks.
- * @updated 2026-05-13: Monthly assistant scheduled tasks now reveal an optional `31 号无则月末` toggle only when the user enters day 31, and both summaries and trigger rules honor that explicit fallback.
- * @updated 2026-05-13: Debug-viewer prompt groups now default to collapsed and expand per block on demand, so long assembled request payloads stay scannable without losing the detailed prompt breakdown.
- * @updated 2026-05-13: Native background request diagnostics now rebuild the exact assembled prompt/request payload into the shared debug viewer, so background history and hydrated messages expose the same prompt-level detail as foreground calls.
- * @updated 2026-05-13: Replaced Dream's old range-picker flow with a conversational month prompt that waits for a user-supplied `YYYYMM` reply (with tolerant parsing for common month formats) before running the Dream refresh.
- * @updated 2026-05-13: Updated Dream topic copy toward longer person-understanding prompts and now truncates long Dream topic notes with an ellipsis in the narrow viewer header instead of expanding them full width.
- * @updated 2026-05-13: Replaced the Dream topic directory cards with a TagDetail-style horizontal tab rail so switching among many topics no longer creates multi-row overlap with the active topic content on mobile.
- * @updated 2026-05-13: Reworked the Dream mobile topic directory into a stable two-column grid with its own bottom divider so wrapped topic chips no longer collide visually with the active topic detail when long entry lists follow below.
- * @updated 2026-05-13: Collapsed the Dream topic directory and detail/list columns while the topic editor is open so mobile edit mode shows only one focused editing surface instead of competing layers.
- * @updated 2026-05-13: Hid the duplicate Dream topic detail pane while the topic editor is open so mobile edit mode no longer shows the same topic as both an active preview and a live form at once.
- * @updated 2026-05-13: Separated the Dream mobile topic directory into wrapped chip buttons and a dedicated prompt-preview block so long topic guidance no longer visually blends into the content column on narrow screens.
- * @updated 2026-05-13: Reflowed the Dream viewer for narrow mobile screens so topic and entry action buttons stack below content during long lists and edit states instead of squeezing text into misaligned layouts.
- * @updated 2026-05-12: Added inline manual edit/delete controls for individual Dream entries so users can refine or remove AI-written observations directly from the Dream page.
- * @updated 2026-05-12: Restyled the Dream viewer into a flatter editorial layout with a split topic index, inline actions, and divider-led entry presentation instead of nested cards.
- * @updated 2026-05-12: Added the first Dream viewer, explicit `dream` command workflow, topic tabs, and Dream update cards, while keeping Dream read-only for ordinary chat and background assistant turns.
- * @updated 2026-05-12: Background assistant messages now always expose a debug entry in debug mode, synthesizing a readable summary-style debug view when a native-only background run has no full request/response exchange payload.
- * @updated 2026-05-12: Exposed user-editable four-digit random-check-in protection windows in the background assistant settings, wiring them into the existing quiet-hours config without affecting reminder_due dispatch.
- * @updated 2026-05-12: Cold app startup now hydrates native reminders first and immediately flushes any overdue reminder_due items once, so reminders that expired while the app was fully closed get replayed on launch.
- * @updated 2026-05-12: Background polling and reminder dispatch now target only the ordinary conversation whose latest user-authored message is the newest, while template sessions are fully excluded from background persona/context selection and native snapshot sync.
- * @updated 2026-05-11: Fixed weekly-review writeback result cards so long titles truncate cleanly and the `打开` action closes the AI modal while navigating straight into Weekly Review `叙事`.
- * @updated 2026-05-11: Added weekly-review template conversations with non-AI week selection, template-specific weekly review prompts/context, and exact `写入 AI 叙事` narrative writeback handling with local overwrite confirmation.
- * @updated 2026-05-10: Wired the chat stop action through the unified-turn AbortSignal path and blocked late native replies from writing back after the user cancels an in-flight AI request.
- * @updated 2026-05-10: Disabled the extra visual-viewport keyboard inset on native Android so the shared AI chat no longer double-lifts above the soft keyboard inside the Capacitor WebView.
- * @updated 2026-05-10: Blocked background assistant execution while core logs/todos are still fallback-seeded and now directly clears locally queued reminder_due items after successful system-turn completion.
- * @updated 2026-05-09: Added mobile visual-viewport keyboard tracking so the chat list and composer rise together above the soft keyboard and the latest messages stay visible while typing.
- * @updated 2026-05-09: Retrying a failed foreground assistant turn now reuses the original error bubble in place, so successful retry content replaces the failure instead of appending a duplicate assistant block.
- * @updated 2026-05-09: Added recurring `定时任务` management under AI call settings, backed by shared todo recurrence rules and continuously seeded native reminders.
- * @updated 2026-05-06: Made debug-viewer block keys unique per section render so repeated labels like `对话上下文` no longer trigger React duplicate-key warnings.
- * @updated 2026-05-06: Moved the six built-in persona system prompts into `src/constants/aiPersonaSystemPrompts.ts`, so the modal keeps persona metadata while prompt copy lives in one shared constant file.
- * @updated 2026-05-06: Replaced the six built-in persona system prompts with the user-authored versions, while standardizing in-prompt user references to `用户` only.
- * @updated 2026-05-06: Preserved AI request debug payloads on foreground error messages whenever debug mode is on, so failed requests still render the per-message `查看调试` entry instead of dropping the trace.
- * @updated 2026-05-06: Added explicit `yesterdayTimelineSummary` to assistant state context, removed duplicate provider-side conversation-history injection, and lifted the persona context-turn cap above 30.
- * @updated 2026-05-06: Restored `todayTimelineSummary` to the full same-day log list, moved the today/yesterday digest into `timelineReviewSummary`, added structured same-day log candidates for `edit_log`, and blocked foreground log-edit turns from claiming success when no `edit_log` action actually applied.
- * @updated 2026-05-06: Hid the custom system-prompt editor for built-in personas while keeping their name, addressing, and avatar fields editable, so only custom personas can modify prompt text.
- * @updated 2026-05-06: Kept user chat bubbles anchored on the right while forcing multi-line message text to stay left-aligned, so manual line breaks no longer produce right-aligned paragraphs.
- * @updated 2026-05-05: Refreshed the new-conversation empty-state examples so they cover backfill, todo creation, daily planning, reminders, long-term memory, and casual chat, while only gated capabilities show required feature toggles.
- * @updated 2026-05-05: Added a dedicated reopen-time scroll-to-latest pass so entering the AI chat lands on the newest turn by default, while exact session/message navigation still keeps its higher priority.
- * @updated 2026-05-05: Kept applied-result, memory-update, reminder-update, and retry blocks inside the main message column so narrow mobile layouts no longer let those side panels squeeze assistant bubbles into single-character vertical text.
- * @updated 2026-05-04: Enlarged the in-chat avatars and tightened their icon centering so emoji, uploaded portraits, and fallback glyphs sit cleanly inside the message avatar frame.
- * @updated 2026-05-04: Made persona switching open a brand-new empty conversation bound to the selected persona, so each chat window stays locked to one persona instead of changing identity in place.
- * @updated 2026-05-04: Switched chat rows to a WeChat-like grouped layout where avatars sit beside the bubble, speaker labels are removed, and consecutive turns from the same side reuse the same avatar slot.
- * @updated 2026-05-04: Restored a direct per-message debug entry for background assistant replies by linking chat bubbles back to persisted background call traces.
- * @updated 2026-05-03: Moved the background-notification visibility helper ahead of diagnostics hydration so production bundles no longer hit a temporal-dead-zone crash during AI modal startup.
- * @updated 2026-05-01: Unified remaining hard-edged AI panels under the same subtle corner radius so history rows, composer surfaces, and auxiliary edit boxes no longer mix square and rounded treatments.
- * @updated 2026-05-01: Reorganized AI settings into top-level tabs plus smaller in-section tabs so persona, avatar, background-agent, and context options read as layered panels instead of one long form.
- * @updated 2026-05-01: Simplified persona-list selection in AI settings so the active row no longer uses a tinted background and relies on the checkmark alone.
- * @updated 2026-05-01: Widened the AI settings side gutters after the divider-based redesign so the editorial layout keeps more breathing room on both sides.
- * @updated 2026-05-01: Flattened the AI workspace into a more editorial layout by tightening composer height, simplifying history-session delete confirmations, reducing heavy card nesting, and trimming excessive radii/shadows across the AI panels.
- * @updated 2026-05-01: Filtered persisted null-like assistant placeholders during session hydration so malformed native-backfilled entries no longer render standalone "null" chat bubbles.
- * @updated 2026-05-01: Native background replies are now rehydrated from Android diagnostics back into persisted chat sessions, so successful direct-native check-ins render in the main conversation instead of only in the debug history.
- * @updated 2026-04-30: Added a unified AI hardware-back chain so nested AI pages close one layer at a time before the root chat window dismisses.
- * @updated 2026-04-30: Strengthened multi-bubble assistant reply reveals with a longer stagger, clearer lift/scale entry, and a short highlight fade so each paragraph lands more distinctly in sequence.
- * @updated 2026-04-27: Condensed the background history drawer into a request-chain view that only shows wake time, request start, request result, and returned content for meaningful background runs.
- * @updated 2026-04-27: Simplified long-term-memory add controls down to compact plus-only icon buttons so the section headers stay lighter and less repetitive.
- * @updated 2026-04-27: Aligned the AI workspace, AI settings panel, long-term-memory viewer, background-history viewer, and debug viewer headers to the shared external-page title bar pattern by trimming their height, removing subtitle copy, and using the same compact title sizing.
- * @updated 2026-04-27: Moved `记忆更新` and `提醒结果` expand/collapse controls into the same subtle metadata row as the timestamp/context line, and only render the detail cards after the user expands them.
- * @updated 2026-04-27: Assistant multi-bubble replies now reveal one part at a time with a short stagger and a soft slide/fade so the conversation feels more like sequential live sending.
- * @updated 2026-04-27: Made per-message `记忆更新` and `提醒结果` cards default to collapsed, and restyled their summary rows to read like subtle metadata instead of prominent control bars.
- * @updated 2026-04-27: Made per-message `记忆更新` cards default to collapsed and reveal their section details only when the user explicitly expands them.
- * @updated 2026-04-27: Switched assistant message headers from the generic `AI 回答` label to the active persona name so each bubble group clearly reflects the selected AI identity.
- * @updated 2026-04-27: Moved both user and assistant avatars back outside the bubble into a vertical message header so chat copy keeps the wider reading column without reintroducing a side avatar rail.
- * @updated 2026-04-27: Unified foreground/background context assembly, fixed stale background closures, and synced Android agent throttling state from real assistant interactions.
- * @updated 2026-04-27: Added grouped multi-bubble assistant reply rendering plus richer silent-decision summaries in background history and latest-decision surfaces.
- * @updated 2026-04-27: Foreground unified turns now skip reminder-summary and long-term-memory prompt sections when the corresponding background or memory features are disabled, and memory patches no longer persist while long-term memory is off.
- * @updated 2026-04-27: Turned the long-term-memory `活跃 reminders` block into the same add/delete card UI used by editable memory notes, with manual `YYYYMMDD + HHMM` reminder entry that writes directly into the shared reminder queue.
- * @updated 2026-04-27: Replaced chat bubble `面向` date labels with per-message numeric timestamps in `4月27日 09:05` format, and aligned session history timestamps to the same display.
- * @updated 2026-04-26: Turned profile/preference long-term memory into readable note lists with manual add/delete controls, while leaving the other assistant-memory sections in debug-style read-only form.
- * @updated 2026-04-26: Replaced the built-in persona roster with six new signature voices, including empty-name-safe self/user addressing so personas can intentionally omit fixed forms of address.
- * @updated 2026-04-26: Reframed the built-in assistant personas around continuity-aware companionship so the default voice feels more present, more natural, and less like a detached helper in both foreground and background turns.
- * @updated 2026-04-25: Added AI-driven todo updates, subtask creation, and log editing with local patch application plus undo support, and expanded intent routing so edit flows receive dedicated context and tool plans.
- * @updated 2026-04-25: Rendered subtask result cards with `@分类 / 父任务`, and stripped AI-added subtask dates unless the user explicitly asked for scheduling.
- * @updated 2026-04-25: Corrected applied-todo metadata to render task category as `@`, linked activity hierarchy as `#`, and scope domains as `%`, while respecting the auto-link scope toggle when merging activity rules.
- * @updated 2026-04-25: Fixed the applied-todo detail action so newly created todo results stay clickable even if the live todo lookup lags behind the message render.
- * @updated 2026-04-25: Matched applied-result metadata to the context-page prefix syntax by removing icons and using `# / % / @` markers for tags, domains, and todos.
- * @updated 2026-04-25: Softened the AI dialog shadow system so the shell, cards, and avatar surfaces feel lighter and less floating.
- * @updated 2026-04-25: Added a true grayscale fallback for the `default` color scheme so the AI workspace no longer picks up tinted beige/green surfaces when no themed accent is active.
- * @updated 2026-04-26: Switched planned log/todo/subtask/edit application to the shared `assistantActionExecutor` service so the modal no longer owns the primary local tool execution layer.
- * @updated 2026-04-26: Switched foreground chat onto the unified single-turn path, made memory updates explicit in the main turn result, surfaced memory-update feedback to the user, and kept the older planner chain disabled for safety during cleanup.
- * @updated 2026-04-26: Added background-assistant settings inside the AI panel, including polling frequency, check-in timing, long-term-memory toggles, background call history, and native assistant-trigger wiring for Android.
- * @updated 2026-04-25: Refined the title/header alignment and simplified applied-result cards by reducing capsules, moving log time pills to the top-right, and switching action buttons to icon-only controls.
- * @updated 2026-04-25: Simplified the AI settings panel by flattening the avatar/persona layouts, trimming low-value helper copy, and tightening everything around the existing theme tokens.
- * @updated 2026-04-23: Unified the AI workspace colors around dynamic `--accent-color` theme tokens and reordered the settings panel into persona list, current persona, user avatar, and context sections.
- * @updated 2026-04-23: Shifted the editorial redesign toward a cooler grayscale palette, removed the inset rounded shell for full-bleed layout, tightened header/composer sizing, simplified applied-result cards into left-rule summaries, and added configurable user avatars with default, emoji, and upload support.
- * @updated 2026-04-23: Rebuilt the full AI workspace into a warmer editorial shell inspired by Claude, unifying the chat stage, history rail, persona studio, and debug ledger with a production-grade reading-first layout.
- * @updated 2026-04-22: Added deletion for custom personas with inline confirmation and automatic session fallback to the default built-in preset.
- * @updated 2026-04-22: Simplified the empty-chat state into example prompts and refreshed the built-in persona roster with stronger themed voices plus personalized user addressing.
- * @updated 2026-04-22: Cached recent conversation turns per session before formal AI calls, and changed persona selection to a lightweight checkmark state instead of a full black card.
- * @updated 2026-04-22: Removed the extra emoji-input preview tile and tightened emoji avatar centering inside circular chat/header slots.
- * @updated 2026-04-22: Reworked AI settings into a cleaner single-panel layout and replaced the avatar `Use Emoji` prompt with an inline editor plus quick emoji picks.
- * @updated 2026-04-22: Refined the AI settings avatar controls into compact `使用 Emoji / 上传图片` actions and removed extra helper copy below the persona name.
- * @updated 2026-04-22: The shared AI chat window can now stay mounted globally and continue in-flight execution after the modal UI is closed.
- * @updated 2026-04-22: Removed apply-success toasts, limited log-planning todo context to unfinished todos, and simplified the intent-router request to a lightweight message-only classification step.
- * @updated 2026-04-22: Rebuilt the unified AI chat modal around persistent sessions, persona presets, and quick context caching.
- * @updated 2026-04-22: Restored direct AI log/todo application with edit-detail and undo actions inside the new session-based workspace.
- * @updated 2026-04-22: Added session rename/delete controls in history and changed quick-context caching from raw message count to recent conversation rounds.
- * @updated 2026-04-22: Moved the quick-context toggle into the chat composer footer and simplified the title/input helper copy.
- * @updated 2026-04-26: Added open-time session/message navigation handling so Android assistant notifications can reopen the modal at the exact background reply.
- * @updated 2026-04-27: Unified assistant-facing time context around local-offset ISO strings, removed UTC `Z` prompt anchors, and kept reminder execution timestamps canonical only in backend storage.
- * @updated 2026-04-26: Normalized assistant reminder timestamps before enqueue/dispatch, exposed unambiguous local-vs-UTC time context to unified turns, and persisted background debug sections onto surfaced assistant messages so debug mode also works for automatic replies.
- * @updated 2026-04-26: Changed background assistant interval inputs to use editable draft strings with inline validation, so users can clear and retype values without invalid intermediate states being auto-saved.
- *
- * Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-05-15: Continued the refactor by extracting the conversation pane, Dream command flow, review command/writeback helpers, weekly/monthly template session flow helpers, shared chat types/helpers, memory/Dream/debug/background/session/settings overlays, the persona/call settings sections, and the session/template helper layer into `src/components/ai-chat/`, reducing local file size while preserving behavior.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
-import ReactMarkdown from 'react-markdown';
-import remarkBreaks from 'remark-breaks';
-import remarkGfm from 'remark-gfm';
 import {
-  ChevronDown,
-  ChevronRight,
   Check,
   History,
-  Loader2,
-  MessageSquarePlus,
   Pencil,
-  Plus,
-  RotateCcw,
   Send,
-  Sparkles,
   Square,
-  Trash2,
   Undo2,
-  Upload,
-  User,
   X,
   XCircle
 } from 'lucide-react';
@@ -157,7 +36,6 @@ import { useReview } from '../contexts/ReviewContext';
 import { useSession } from '../contexts/SessionContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
-import { BUILTIN_PERSONA_SYSTEM_PROMPTS } from '../constants/aiPersonaSystemPrompts';
 import { AppView } from '../types';
 import type { DailyReview, Log, MonthlyReview, TodoItem, TodoRecurrenceRule, WeeklyReview } from '../types';
 import type {
@@ -175,23 +53,18 @@ import type {
   DreamUpdateCard
 } from '../types/assistant';
 import { formatDateKey } from '../utils/aiBackfillUtils';
-import { parseNarrative } from '../utils/narrativeUtils';
 import { getLocalDateStr } from '../utils/dateUtils';
 import {
   formatAssistantDateTimeForDisplay,
   formatAssistantLocalDateTime,
-  getAssistantDelayMinutes,
   normalizeAssistantDateTime,
   parseAssistantDateTime
 } from '../utils/assistantTime';
-import { buildAssistantDisplayParts, normalizeAssistantDisplayParts } from '../utils/assistantMessageParts';
+import { buildAssistantDisplayParts } from '../utils/assistantMessageParts';
 import { buildNativeDiagnosticDebugExchange } from '../utils/assistantNativeDebug';
 import { normalizeAssistantQuietHoursValue } from '../utils/assistantQuietHours';
-import { normalizeAssistantReasoningSummary } from '../utils/assistantReasoning';
 import { resolveLatestOrdinaryAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
 import { getTodoProgressTrackingMode } from '../utils/todoProgressUtils';
-import { normalizeMonthlyDayInput, parseMonthlyDayInput } from '../utils/todoScheduleUtils';
-import { imageService } from '../services/imageService';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
 import { assistantAgentConfigService } from '../services/assistantAgentConfigService';
 import { assistantMemoryService } from '../services/assistantMemoryService';
@@ -232,9 +105,157 @@ import {
 } from '../services/monthlyReviewTemplateService';
 import { dailyReviewTemplateService } from '../services/dailyReviewTemplateService';
 import type { AssistantToolCall, AssistantUnifiedTurnOutput } from '../types/assistant';
-import { CustomSelect } from './CustomSelect';
-
-type ChatTone = 'normal' | 'system' | 'error' | 'pending';
+import {
+  AIChatDebugViewerOverlay,
+  AssistantBackgroundHistoryOverlay
+} from './ai-chat/AIBackfillChatOverlays';
+import { AIBackfillChatAssistantSettingsSection } from './ai-chat/AIBackfillChatAssistantSettingsSection';
+import { renderAppliedChatAction } from './ai-chat/AIBackfillChatAppliedActionRenderer';
+import { AIBackfillChatCallSettingsSection } from './ai-chat/AIBackfillChatCallSettingsSection';
+import { AIBackfillChatConversationPane } from './ai-chat/AIBackfillChatConversationPane';
+import {
+  normalizeDreamRetryYearMonth,
+  parseDreamMonthSelection,
+  runDreamCommand as runDreamCommandFlow
+} from './ai-chat/AIBackfillChatDreamFlow';
+import {
+  prepareForegroundTurn,
+  runOrdinaryForegroundTurn
+} from './ai-chat/AIBackfillChatForegroundTurn';
+import { AIBackfillChatDreamOverlay } from './ai-chat/AIBackfillChatDreamOverlay';
+import {
+  ACTIVE_SESSION_KEY,
+  CHAT_PERSONAS_KEY,
+  CHAT_SESSIONS_KEY,
+  clampContextLimit,
+  createDefaultSession,
+  DEBUG_MODE_KEY,
+  DEFAULT_AI_PERSONAS,
+  loadInitialChatState,
+  normalizePersistedSessions,
+  PERSONA_EMOJI_CHOICES,
+  USER_PROFILE_KEY
+} from './ai-chat/AIBackfillChatInitialization';
+import { AIBackfillChatMemoryOverlay } from './ai-chat/AIBackfillChatMemoryOverlay';
+import { AIBackfillChatPersonaSettingsSection } from './ai-chat/AIBackfillChatPersonaSettingsSection';
+import {
+  runDailyReviewNarrativeCommand as runDailyReviewNarrativeCommandFlow,
+  runDailyReviewNarrativeOverwriteConfirmation as runDailyReviewNarrativeOverwriteConfirmationFlow,
+  runMonthlyReviewNarrativeWritebackCommand as runMonthlyReviewNarrativeWritebackCommandFlow,
+  runWeeklyReviewNarrativeWritebackCommand as runWeeklyReviewNarrativeWritebackCommandFlow
+} from './ai-chat/AIBackfillChatReviewCommands';
+import {
+  runDailyReviewNarrativeWriteback as runDailyReviewNarrativeWritebackFlow,
+  runMonthlyReviewNarrativeWriteback as runMonthlyReviewNarrativeWritebackFlow,
+  runWeeklyReviewNarrativeWriteback as runWeeklyReviewNarrativeWritebackFlow
+} from './ai-chat/AIBackfillChatReviewWriteback';
+import { AIBackfillChatSettingsOverlay } from './ai-chat/AIBackfillChatSettingsOverlay';
+import {
+  AIBackfillChatHistoryOverlay,
+  AIBackfillChatNewSessionDialog
+} from './ai-chat/AIBackfillChatSessionOverlays';
+import {
+  createMonthlyReviewTemplateSession,
+  createWeeklyReviewTemplateSession,
+  runMonthlyReviewTemplateChatTurn,
+  runMonthlyReviewTemplateGuidedSelection,
+  runMonthlyReviewTemplateOpeningTurn as runMonthlyReviewTemplateOpeningTurnFlow,
+  runWeeklyReviewTemplateChatTurn,
+  runWeeklyReviewTemplateGuidedSelection,
+  runWeeklyReviewTemplateOpeningTurn as runWeeklyReviewTemplateOpeningTurnFlow
+} from './ai-chat/AIBackfillChatTemplateFlow';
+import {
+  appendSystemMessageToChatSession,
+  appendUserMessageToChatSession,
+  buildConversationHistoryFromSessionMessages,
+  buildRetryConversationHistory as buildRetryConversationHistoryFromSessions,
+  mutateChatSessions,
+  narrowConversationHistoryForTimeSensitiveTurn,
+  replaceSessionMessage,
+  resolveMonthlyReviewTemplateRangeMeta,
+  resolveMonthlyReviewTemplateSessionMeta,
+  resolveWeeklyReviewTemplateRangeMeta,
+  resolveWeeklyReviewTemplateSessionMeta,
+  safeJsonParse,
+  sortChatSessionsByUpdatedAt,
+  updateSessionAppliedActionStatus,
+  updateWeeklyReviewTemplateStageInSessions
+} from './ai-chat/AIBackfillChatSessionHelpers';
+import {
+  TIME_SENSITIVE_MESSAGE_PATTERN,
+  buildAssistantCurrentTimeSnapshot,
+  buildBackgroundSummaryDebugExchange,
+  buildDebugBlocks,
+  buildMemoryUpdateSections,
+  buildPersonaPrompt,
+  createSessionTitleFromUserMessage,
+  dedupeStringArray,
+  formatActionDate,
+  formatAssistantReminderSnapshot,
+  formatConversationTime,
+  formatDateLabel,
+  formatLocalDateTimeContext,
+  formatTimeRange,
+  getAssistantBackgroundRequestStatusLabel,
+  getAssistantBackgroundTriggerLabel,
+  getErrorDebugSections,
+  getRetryableAIErrorMessage,
+  isAbortError,
+  normalizeAssistantNativeDiagnostics
+} from './ai-chat/AIBackfillChatHelpers';
+import {
+  type AIChatDailyReviewWritebackResult,
+  type AIChatDebugSection,
+  type AIChatDreamUpdateCard,
+  type AIChatMemoryUpdateSection,
+  type AIChatMessage,
+  type AIChatMonthlyReviewWritebackResult,
+  type AIChatPersona,
+  type AIChatSession,
+  type AIChatUserProfile,
+  type AIChatWeeklyReviewWritebackResult,
+  type AISettingsMainTab,
+  type AssistantAgentIntervalDrafts,
+  type AssistantAgentIntervalField,
+  type AssistantAgentQuietHoursDrafts,
+  type AssistantAgentQuietHoursField,
+  type AssistantBackgroundTimelineEntry,
+  type AssistantBackgroundTurnRequestOptions,
+  type AssistantEditableMemoryDeleteTarget,
+  type AssistantReminderDeleteTarget,
+  type AssistantReminderDrafts,
+  type AssistantScheduledTaskDeleteTarget,
+  type AssistantScheduledTaskDrafts,
+  type ChatTone,
+  type DailyReviewWritebackConfirmationState,
+  type DebugViewerState,
+  type DreamEntryDrafts,
+  type DreamMonthRangeSelection,
+  type DreamMonthSelectionState,
+  type DreamTopicDrafts,
+  type InitialChatState,
+  DEFAULT_ASSISTANT_EDITABLE_MEMORY_DRAFTS,
+  DEFAULT_ASSISTANT_REMINDER_DRAFTS,
+  DEFAULT_ASSISTANT_SCHEDULED_TASK_DRAFTS,
+  DEFAULT_DREAM_ENTRY_DRAFTS,
+  DEFAULT_DREAM_TOPIC_DRAFTS,
+  DREAM_MONTH_SELECTION_INVALID_PROMPT,
+  DREAM_MONTH_SELECTION_PROMPT,
+  LOG_EDIT_REQUEST_PATTERN,
+  LOG_EDIT_SUCCESS_REPLY_PATTERN,
+  MOBILE_KEYBOARD_INSET_THRESHOLD,
+  ASSISTANT_EDITABLE_MEMORY_SECTION_META,
+  ASSISTANT_SCHEDULED_TASK_WEEKDAY_OPTIONS,
+  PersonaAvatar,
+  buildAssistantAgentIntervalDrafts,
+  buildAssistantAgentQuietHoursDrafts,
+  buildAssistantScheduledTaskRecurrenceRule,
+  buildAssistantScheduledTaskTime,
+  buildManualAssistantReminderDueAt,
+  formatAssistantScheduledTaskRecurrence,
+  validateAssistantAgentIntervalDrafts,
+  validateAssistantAgentQuietHoursDrafts
+} from './ai-chat/AIBackfillChatShared';
 
 const CHAT_MARKDOWN_COMPONENTS = {
   h1: ({ node, ...props }: any) => <h1 className="mb-3 mt-1 text-[1.05rem] font-bold leading-7" {...props} />,
@@ -283,163 +304,6 @@ const CHAT_MARKDOWN_COMPONENTS = {
   a: ({ node, ...props }: any) => <a className="underline underline-offset-2" {...props} />
 };
 
-interface AIChatDebugSection {
-  label: string;
-  exchange: AIDebugExchange;
-}
-
-interface AIChatPersona {
-  id: string;
-  name: string;
-  avatarIcon: string;
-  avatarImage?: string;
-  assistantSelfName: string;
-  userCallName: string;
-  systemPrompt: string;
-  contextMessageLimit: number;
-  isBuiltIn: boolean;
-}
-
-interface AIChatUserProfile {
-  avatarIcon: string;
-  avatarImage?: string;
-}
-
-interface AIChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  reasoning?: AssistantReasoningSummary;
-  displayParts?: string[];
-  createdAt: number;
-  tone?: ChatTone;
-  backgroundDebugHistoryId?: string;
-  debugSections?: AIChatDebugSection[];
-  appliedActions?: AppliedChatAction[];
-  memoryUpdates?: AIChatMemoryUpdateSection[];
-  dreamUpdates?: AIChatDreamUpdateCard[];
-  reminderUpdates?: string[];
-  dailyReviewWriteback?: AIChatDailyReviewWritebackResult;
-  weeklyReviewWriteback?: AIChatWeeklyReviewWritebackResult;
-  monthlyReviewWriteback?: AIChatMonthlyReviewWritebackResult;
-  retryInput?: string;
-  retrySourceUserMessageId?: string;
-  dreamRetryYearMonth?: string;
-}
-
-interface AIChatWeeklyReviewWritebackResult {
-  weeklyReviewId: string;
-  weekStartDate: string;
-  weekEndDate: string;
-  title: string;
-  preview: string;
-  createdReview: boolean;
-  mergeMode: 'create' | 'overwrite';
-}
-
-interface AIChatDailyReviewWritebackResult {
-  dailyReviewId: string;
-  date: string;
-  title: string;
-  preview: string;
-  createdReview: boolean;
-  mergeMode: 'create' | 'overwrite';
-}
-
-interface AIChatMonthlyReviewWritebackResult {
-  monthlyReviewId: string;
-  monthStartDate: string;
-  monthEndDate: string;
-  title: string;
-  preview: string;
-  createdReview: boolean;
-  mergeMode: 'create' | 'overwrite';
-}
-
-interface AIChatMemoryUpdateSection {
-  label: string;
-  items: string[];
-}
-
-interface AIChatDreamUpdateCard extends DreamUpdateCard {}
-
-interface AssistantEditableMemoryDeleteTarget {
-  key: AssistantEditableMemoryListKey;
-  value: string;
-}
-
-const MOBILE_KEYBOARD_INSET_THRESHOLD = 120;
-
-interface AssistantReminderDrafts {
-  text: string;
-  date: string;
-  hour: string;
-}
-
-interface AssistantReminderDeleteTarget {
-  id: string;
-}
-
-interface AssistantScheduledTaskDrafts {
-  text: string;
-  time: string;
-  frequency: TodoRecurrenceRule['frequency'];
-  interval: string;
-  weekdays: number[];
-  monthDaysInput: string;
-  fallbackToMonthEnd: boolean;
-}
-
-interface AssistantScheduledTaskDeleteTarget {
-  id: string;
-}
-
-interface DreamTopicDrafts {
-  title: string;
-  note: string;
-}
-
-interface DreamEntryDrafts {
-  content: string;
-}
-
-interface DreamMonthSelectionState {
-  sessionId: string;
-}
-
-interface DailyReviewWritebackConfirmationState {
-  sessionId: string;
-  date: string;
-}
-
-interface DreamMonthRangeSelection {
-  yearMonth: string;
-  year: number;
-  month: number;
-  label: string;
-  startDate: string;
-  endDate: string;
-}
-
-interface AssistantBackgroundTurnRequestOptions {
-  trigger: AssistantSystemTrigger;
-  now: Date;
-  targetSession?: AIChatSession;
-  conversationHistory?: AIConversationTurn[];
-  showSystemNotification: boolean;
-}
-
-interface AIChatSession {
-  id: string;
-  title: string;
-  createdAt: number;
-  updatedAt: number;
-  personaId: string;
-  contextCacheEnabled: boolean;
-  messages: AIChatMessage[];
-  templateMeta?: WeeklyReviewTemplateSessionMeta | MonthlyReviewTemplateSessionMeta;
-}
-
 interface AIBackfillChatModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -450,566 +314,6 @@ interface AIBackfillChatModalProps {
   onUnreadAssistantMessage?: (count?: number) => void;
   onMarkRead?: () => void;
 }
-
-type AISettingsMainTab = 'persona' | 'call';
-
-type AssistantAgentIntervalField = 'basePollMinutes' | 'minCheckinMinutes' | 'maxCheckinMinutes';
-
-type AssistantAgentIntervalDrafts = Record<AssistantAgentIntervalField, string>;
-
-type AssistantAgentIntervalErrors = Record<AssistantAgentIntervalField, string | null>;
-
-type AssistantAgentQuietHoursField = 'quietHoursStart' | 'quietHoursEnd';
-
-type AssistantAgentQuietHoursDrafts = Record<AssistantAgentQuietHoursField, string>;
-
-type AssistantAgentQuietHoursErrors = Record<AssistantAgentQuietHoursField, string | null>;
-
-const ASSISTANT_AGENT_INTERVAL_FIELD_META: Record<
-  AssistantAgentIntervalField,
-  { label: string; minimum: number; maximum: number }
-> = {
-  basePollMinutes: {
-    label: '检查频率',
-    minimum: 1,
-    maximum: 60
-  },
-  minCheckinMinutes: {
-    label: '最低间隔',
-    minimum: 1,
-    maximum: 24 * 60
-  },
-  maxCheckinMinutes: {
-    label: '最高间隔',
-    minimum: 1,
-    maximum: 24 * 60
-  }
-};
-
-const DEFAULT_ASSISTANT_EDITABLE_MEMORY_DRAFTS: Record<AssistantEditableMemoryListKey, string> = {
-  profileMemory: '',
-  preferenceMemory: ''
-};
-
-const DEFAULT_ASSISTANT_REMINDER_DRAFTS: AssistantReminderDrafts = {
-  text: '',
-  date: '',
-  hour: ''
-};
-
-const DEFAULT_DREAM_TOPIC_DRAFTS: DreamTopicDrafts = {
-  title: '',
-  note: ''
-};
-
-const DEFAULT_DREAM_ENTRY_DRAFTS: DreamEntryDrafts = {
-  content: ''
-};
-
-const DREAM_MONTH_SELECTION_PROMPT = '要对哪个年月进行 dream？请回复 6 位阿拉伯数字，例如 202601。';
-const DREAM_MONTH_SELECTION_INVALID_PROMPT = '这个年月我没读懂。请回复 6 位阿拉伯数字，例如 202601。';
-
-const ASSISTANT_SCHEDULED_TASK_WEEKDAY_OPTIONS = [
-  { value: 1, label: '一' },
-  { value: 2, label: '二' },
-  { value: 3, label: '三' },
-  { value: 4, label: '四' },
-  { value: 5, label: '五' },
-  { value: 6, label: '六' },
-  { value: 0, label: '日' }
-] as const;
-
-const DEFAULT_ASSISTANT_SCHEDULED_TASK_DRAFTS: AssistantScheduledTaskDrafts = {
-  text: '',
-  time: '0800',
-  frequency: 'daily',
-  interval: '1',
-  weekdays: [1],
-  monthDaysInput: '1',
-  fallbackToMonthEnd: false
-};
-
-const LOG_EDIT_REQUEST_PATTERN = /(改成|改为|改回|改下|改一下|修改|我没|不是)/;
-const LOG_EDIT_SUCCESS_REPLY_PATTERN = /(改过来了|改好了|改成了|已经改好|已经改成|已改好|已改成|收到，?改过来了|帮你改好了)/;
-
-const ASSISTANT_EDITABLE_MEMORY_SECTION_META: Record<
-  AssistantEditableMemoryListKey,
-  {
-    label: string;
-    emptyLabel: string;
-    helperText: string;
-    placeholder: string;
-    addSuccessMessage: string;
-    removeSuccessMessage: string;
-  }
-> = {
-  profileMemory: {
-    label: '用户画像记忆',
-    emptyLabel: '暂无用户画像记忆。',
-    helperText: '记录相对稳定的用户背景与现实处境。',
-    placeholder: '比如：用户最近在准备论文答辩，且每周三下午固定开组会。',
-    addSuccessMessage: '已加入用户画像记忆',
-    removeSuccessMessage: '已删除这条用户画像记忆'
-  },
-  preferenceMemory: {
-    label: '偏好记忆',
-    emptyLabel: '暂无偏好记忆。',
-    helperText: '记录提醒风格、推进节奏、表达方式等长期偏好。',
-    placeholder: '比如：用户更喜欢短句提醒，不喜欢一次给太多步骤。',
-    addSuccessMessage: '已加入偏好记忆',
-    removeSuccessMessage: '已删除这条偏好记忆'
-  }
-};
-
-const buildAssistantAgentIntervalDrafts = (config: AssistantAgentConfig): AssistantAgentIntervalDrafts => ({
-  basePollMinutes: String(config.basePollMinutes),
-  minCheckinMinutes: String(config.minCheckinMinutes),
-  maxCheckinMinutes: String(config.maxCheckinMinutes)
-});
-
-const buildAssistantAgentQuietHoursDrafts = (config: AssistantAgentConfig): AssistantAgentQuietHoursDrafts => ({
-  quietHoursStart: normalizeAssistantQuietHoursValue(config.quietHoursStart) || '',
-  quietHoursEnd: normalizeAssistantQuietHoursValue(config.quietHoursEnd) || ''
-});
-
-const validateAssistantAgentIntervalDrafts = (
-  drafts: AssistantAgentIntervalDrafts
-): AssistantAgentIntervalErrors => {
-  const errors: AssistantAgentIntervalErrors = {
-    basePollMinutes: null,
-    minCheckinMinutes: null,
-    maxCheckinMinutes: null
-  };
-  const parsedValues: Partial<Record<AssistantAgentIntervalField, number>> = {};
-
-  (Object.keys(ASSISTANT_AGENT_INTERVAL_FIELD_META) as AssistantAgentIntervalField[]).forEach((field) => {
-    const { label, minimum, maximum } = ASSISTANT_AGENT_INTERVAL_FIELD_META[field];
-    const rawValue = drafts[field].trim();
-
-    if (!rawValue) {
-      errors[field] = `${label}不能为空`;
-      return;
-    }
-
-    if (!/^\d+$/.test(rawValue)) {
-      errors[field] = `${label}只能输入正整数`;
-      return;
-    }
-
-    const parsedValue = Number(rawValue);
-    if (parsedValue < minimum || parsedValue > maximum) {
-      errors[field] = `${label}需在 ${minimum} 到 ${maximum} 分钟之间`;
-      return;
-    }
-
-    parsedValues[field] = parsedValue;
-  });
-
-  if (
-    errors.minCheckinMinutes === null
-    && errors.maxCheckinMinutes === null
-    && parsedValues.minCheckinMinutes !== undefined
-    && parsedValues.maxCheckinMinutes !== undefined
-    && parsedValues.minCheckinMinutes > parsedValues.maxCheckinMinutes
-  ) {
-    errors.minCheckinMinutes = '最低间隔不能大于最高间隔';
-    errors.maxCheckinMinutes = '最高间隔不能小于最低间隔';
-  }
-
-  return errors;
-};
-
-const validateAssistantAgentQuietHoursDrafts = (
-  drafts: AssistantAgentQuietHoursDrafts,
-  requireBoth = false
-): AssistantAgentQuietHoursErrors => {
-  const errors: AssistantAgentQuietHoursErrors = {
-    quietHoursStart: null,
-    quietHoursEnd: null
-  };
-
-  ([
-    ['quietHoursStart', '开始保护时间'],
-    ['quietHoursEnd', '结束保护时间']
-  ] as const).forEach(([field, label]) => {
-    const rawValue = drafts[field].trim();
-
-    if (!rawValue) {
-      if (requireBoth) {
-        errors[field] = `${label}不能为空`;
-      }
-      return;
-    }
-
-    if (!normalizeAssistantQuietHoursValue(rawValue)) {
-      errors[field] = `${label}需为四位数字时间`;
-    }
-  });
-
-  if (
-    errors.quietHoursStart === null
-    && errors.quietHoursEnd === null
-    && requireBoth
-    && drafts.quietHoursStart.trim()
-    && drafts.quietHoursEnd.trim()
-    && drafts.quietHoursStart.trim() === drafts.quietHoursEnd.trim()
-  ) {
-    errors.quietHoursStart = '开始和结束保护时间不能相同';
-    errors.quietHoursEnd = '开始和结束保护时间不能相同';
-  }
-
-  return errors;
-};
-
-const buildManualAssistantReminderDueAt = (
-  dateDraft: string,
-  hourDraft: string
-): { dueAt?: string; error?: string } => {
-  const normalizedDate = dateDraft.trim();
-  const normalizedHour = hourDraft.trim();
-
-  if (!/^\d{8}$/.test(normalizedDate)) {
-    return { error: '日期需要填写 8 位数字，例如 20260427。' };
-  }
-
-  if (!/^\d{4}$/.test(normalizedHour)) {
-    return { error: '时间需要填写 4 位数字，例如 0930。' };
-  }
-
-  const year = Number(normalizedDate.slice(0, 4));
-  const month = Number(normalizedDate.slice(4, 6));
-  const day = Number(normalizedDate.slice(6, 8));
-  const hour = Number(normalizedHour.slice(0, 2));
-  const minute = Number(normalizedHour.slice(2, 4));
-
-  if (year < 2000 || year > 2999) {
-    return { error: '日期中的年份需在 2000 到 2999 之间。' };
-  }
-
-  if (month < 1 || month > 12) {
-    return { error: '日期中的月份需在 01 到 12 之间。' };
-  }
-
-  if (day < 1 || day > 31) {
-    return { error: '日期中的日需在 01 到 31 之间。' };
-  }
-
-  if (hour < 0 || hour > 23) {
-    return { error: '时间需在 00 到 23 之间。' };
-  }
-
-  if (minute < 0 || minute > 59) {
-    return { error: '分钟需在 00 到 59 之间。' };
-  }
-
-  const candidate = new Date(year, month - 1, day, hour, minute, 0, 0);
-  if (
-    candidate.getFullYear() !== year
-    || candidate.getMonth() !== month - 1
-    || candidate.getDate() !== day
-    || candidate.getHours() !== hour
-    || candidate.getMinutes() !== minute
-  ) {
-    return { error: '这个日期时间无效，请检查后再保存。' };
-  }
-
-  const dueAt = normalizeAssistantDateTime(candidate.toISOString());
-  if (!dueAt) {
-    return { error: '提醒时间解析失败，请重试。' };
-  }
-
-  return { dueAt };
-};
-
-const buildAssistantScheduledTaskRecurrenceRule = (
-  drafts: AssistantScheduledTaskDrafts,
-  startDate: string
-): { recurrenceRule?: TodoRecurrenceRule; error?: string } => {
-  const normalizedInterval = Number(drafts.interval.trim() || '1');
-  if (!Number.isInteger(normalizedInterval) || normalizedInterval < 1 || normalizedInterval > 365) {
-    return { error: '循环间隔需要填写 1 到 365 之间的整数。' };
-  }
-
-  if (drafts.frequency === 'weekly' && drafts.weekdays.length === 0) {
-    return { error: '每周循环至少要选择一天。' };
-  }
-
-  if (drafts.frequency === 'monthly') {
-    const monthDays = parseMonthlyDayInput(drafts.monthDaysInput);
-    if (monthDays.length === 0) {
-      return { error: '每月日期需要填写 1 到 31，可用空格分隔多个数字。' };
-    }
-
-    return {
-      recurrenceRule: {
-        frequency: 'monthly',
-        startDate,
-        ...(normalizedInterval > 1 ? { interval: normalizedInterval } : {}),
-        monthDays,
-        ...(monthDays.includes(31) && drafts.fallbackToMonthEnd ? { fallbackToMonthEnd: true } : {})
-      }
-    };
-  }
-
-  if (drafts.frequency === 'weekly') {
-    return {
-      recurrenceRule: {
-        frequency: 'weekly',
-        startDate,
-        ...(normalizedInterval > 1 ? { interval: normalizedInterval } : {}),
-        weekdays: [...drafts.weekdays].sort((left, right) => left - right)
-      }
-    };
-  }
-
-  return {
-    recurrenceRule: {
-      frequency: 'daily',
-      startDate,
-      ...(normalizedInterval > 1 ? { interval: normalizedInterval } : {})
-    }
-  };
-};
-
-const buildAssistantScheduledTaskTime = (value: string): { time?: string; error?: string } => {
-  const normalized = value.trim();
-  if (!/^\d{4}$/.test(normalized)) {
-    return { error: '触发时间需要填写 4 位数字，例如 0800。' };
-  }
-
-  const hours = Number(normalized.slice(0, 2));
-  const minutes = Number(normalized.slice(2, 4));
-  if (!Number.isInteger(hours) || hours < 0 || hours > 23) {
-    return { error: '小时需要在 00 到 23 之间。' };
-  }
-  if (!Number.isInteger(minutes) || minutes < 0 || minutes > 59) {
-    return { error: '分钟需要在 00 到 59 之间。' };
-  }
-
-  return {
-    time: `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
-  };
-};
-
-const formatAssistantScheduledTaskRecurrence = (task: AssistantScheduledTask): string => {
-  const interval = Math.max(1, task.recurrenceRule.interval || 1);
-
-  if (task.recurrenceRule.frequency === 'weekly') {
-    const weekdayLabels = (task.recurrenceRule.weekdays?.length
-      ? task.recurrenceRule.weekdays
-      : [new Date(task.recurrenceRule.startDate).getDay()]
-    )
-      .map((weekday) => ASSISTANT_SCHEDULED_TASK_WEEKDAY_OPTIONS.find((option) => option.value === weekday)?.label || '')
-      .filter(Boolean)
-      .join('、');
-    return interval > 1
-      ? `每${interval}周 ${weekdayLabels || '指定日期'} ${task.time}`
-      : `每周${weekdayLabels || '指定日期'} ${task.time}`;
-  }
-
-  if (task.recurrenceRule.frequency === 'monthly') {
-    const monthDays = task.recurrenceRule.monthDays?.length
-      ? task.recurrenceRule.monthDays
-      : [Number(task.recurrenceRule.startDate.split('-')[2] || '1')];
-    const fallbackSuffix = monthDays.includes(31) && task.recurrenceRule.fallbackToMonthEnd
-      ? '，无则月末'
-      : '';
-    const monthDayLabel = monthDays.map((monthDay) => `${monthDay}号`).join('/');
-    return interval > 1
-      ? `每${interval}个月 ${monthDayLabel}${fallbackSuffix} ${task.time}`
-      : `每月${monthDayLabel}${fallbackSuffix} ${task.time}`;
-  }
-
-  return interval > 1
-    ? `每${interval}天 ${task.time}`
-    : `每天 ${task.time}`;
-};
-
-const PersonaAvatar: React.FC<{
-  persona: AIChatPersona;
-  className?: string;
-  iconClassName?: string;
-}> = ({
-  persona,
-  className = '',
-  iconClassName = ''
-}) => {
-  const [src, setSrc] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!persona.avatarImage) {
-      setSrc('');
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    imageService.getImageUrl(persona.avatarImage).then((url) => {
-      if (!cancelled) {
-        setSrc(url);
-      }
-    }).catch((error) => {
-      console.error('[AIBackfillChatModal] Failed to load persona avatar', error);
-      if (!cancelled) {
-        setSrc('');
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [persona.avatarImage]);
-
-  if (src) {
-    return <img src={src} alt={persona.name} className={`h-full w-full object-cover ${className}`.trim()} />;
-  }
-
-  return (
-    <span
-      className={`inline-flex h-full w-full items-center justify-center text-center leading-none ${iconClassName}`.trim()}
-      style={{ lineHeight: 1 }}
-    >
-      {persona.avatarIcon || '✨'}
-    </span>
-  );
-};
-
-const UserAvatar: React.FC<{
-  profile: AIChatUserProfile;
-  className?: string;
-  iconClassName?: string;
-}> = ({
-  profile,
-  className = '',
-  iconClassName = ''
-}) => {
-  const [src, setSrc] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!profile.avatarImage) {
-      setSrc('');
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    imageService.getImageUrl(profile.avatarImage).then((url) => {
-      if (!cancelled) {
-        setSrc(url);
-      }
-    }).catch((error) => {
-      console.error('[AIBackfillChatModal] Failed to load user avatar', error);
-      if (!cancelled) {
-        setSrc('');
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [profile.avatarImage]);
-
-  if (src) {
-    return <img src={src} alt="user avatar" className={`h-full w-full object-cover ${className}`.trim()} />;
-  }
-
-  if (profile.avatarIcon.trim()) {
-    return (
-      <span
-        className={`inline-flex h-full w-full items-center justify-center text-center leading-none ${iconClassName}`.trim()}
-        style={{ lineHeight: 1 }}
-      >
-        {profile.avatarIcon}
-      </span>
-    );
-  }
-
-  return (
-    <span
-      className={`inline-flex h-full w-full items-center justify-center text-center leading-none ${iconClassName}`.trim()}
-      style={{ lineHeight: 1 }}
-    >
-      <User size={15} />
-    </span>
-  );
-};
-
-const RevealingMessageBubble: React.FC<{
-  children: React.ReactNode;
-  className: string;
-  style: React.CSSProperties;
-  revealMode?: 'default' | 'assistantStaggered';
-  partIndex?: number;
-  partCount?: number;
-}> = ({
-  children,
-  className,
-  style,
-  revealMode = 'default',
-  partIndex = 0,
-  partCount = 1
-}) => {
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    const frameId = window.requestAnimationFrame(() => {
-      setIsVisible(true);
-    });
-
-    return () => window.cancelAnimationFrame(frameId);
-  }, []);
-
-  const isAssistantStaggered = revealMode === 'assistantStaggered';
-  const totalParts = Math.max(partCount, 1);
-  const depthRatio = totalParts > 1 ? partIndex / (totalParts - 1) : 0;
-  const hiddenOffsetPx = isAssistantStaggered
-    ? clampNumber(
-      ASSISTANT_MULTI_BUBBLE_REVEAL_BASE_OFFSET_PX + (depthRatio * 8),
-      ASSISTANT_MULTI_BUBBLE_REVEAL_BASE_OFFSET_PX,
-      ASSISTANT_MULTI_BUBBLE_REVEAL_MAX_OFFSET_PX
-    )
-    : 4;
-  const baseBoxShadow = typeof style.boxShadow === 'string' ? style.boxShadow : '';
-  const landingShadow = isAssistantStaggered
-    ? '0 18px 34px -28px rgba(15,23,42,0.28)'
-    : '0 10px 22px -24px rgba(15,23,42,0.16)';
-  const hiddenShadow = isAssistantStaggered
-    ? '0 26px 42px -34px rgba(15,23,42,0.18)'
-    : '0 12px 24px -24px rgba(15,23,42,0.10)';
-  const composedStyle: React.CSSProperties = {
-    ...style,
-    transform: isVisible
-      ? 'translate3d(0, 0, 0) scale(1)'
-      : `translate3d(0, ${hiddenOffsetPx}px, 0) scale(${isAssistantStaggered ? ASSISTANT_MULTI_BUBBLE_REVEAL_INITIAL_SCALE : 0.99})`,
-    opacity: isVisible ? 1 : 0,
-    filter: isVisible
-      ? 'blur(0px) brightness(1)'
-      : `blur(${isAssistantStaggered ? 1 : 0.6}px) brightness(${isAssistantStaggered ? 1.045 : 1.02})`,
-    boxShadow: baseBoxShadow ? `${baseBoxShadow}, ${isVisible ? landingShadow : hiddenShadow}` : (isVisible ? landingShadow : hiddenShadow),
-    transitionDuration: `${ASSISTANT_MULTI_BUBBLE_REVEAL_DURATION_MS}ms`
-  };
-
-  return (
-    <div
-      className={`${className} relative overflow-hidden transform-gpu transition-[opacity,transform,filter,box-shadow] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[transform,opacity,filter]`}
-      style={composedStyle}
-    >
-      {isAssistantStaggered && (
-        <div
-          className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/40 via-white/12 to-transparent transition-opacity duration-500"
-          style={{ opacity: isVisible ? 0 : 0.75 }}
-        />
-      )}
-      <div className="relative z-10">
-        {children}
-      </div>
-    </div>
-  );
-};
 
 interface ActiveRequestRef {
   controller: AbortController;
@@ -1022,39 +326,6 @@ interface ForegroundSendOptions {
   retrySourceUserMessageId?: string;
 }
 
-interface DebugViewerState {
-  title: string;
-  sections: AIChatDebugSection[];
-}
-
-interface InitialChatState {
-  personas: AIChatPersona[];
-  sessions: AIChatSession[];
-  activeSessionId: string;
-  debugMode: boolean;
-  userProfile: AIChatUserProfile;
-}
-
-interface AssistantBackgroundTimelineEntry {
-  id: string;
-  triggerId?: string;
-  triggerType?: string;
-  persistedMessageId?: string;
-  wakeAt?: string;
-  requestStartedAt?: string;
-  requestCompletedAt?: string;
-  requestStatus: 'not_started' | 'pending' | 'completed' | 'failed';
-  outcomeSummary: string;
-  message?: string;
-  errorMessage?: string;
-  debugExchange?: AIDebugExchange;
-}
-
-const CHAT_SESSIONS_KEY = 'lumostime_ai_chat_sessions_v1';
-const ACTIVE_SESSION_KEY = 'lumostime_ai_chat_active_session_v1';
-const CHAT_PERSONAS_KEY = 'lumostime_ai_chat_personas_v1';
-const DEBUG_MODE_KEY = 'lumostime_ai_chat_debug_mode_v1';
-const USER_PROFILE_KEY = 'lumostime_ai_chat_user_profile_v1';
 const ASSISTANT_CHAT_UPDATED_EVENT = assistantOrchestratorService.getAssistantDecisionEventName();
 const ASSISTANT_MULTI_BUBBLE_REVEAL_DELAY_MS = 540;
 const ASSISTANT_MULTI_BUBBLE_REVEAL_DURATION_MS = 320;
@@ -1164,1291 +435,9 @@ const getAIChatTheme = (isDefaultTheme: boolean) => {
   return ACCENT_AI_CHAT_THEME;
 };
 
-const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
-  {
-    id: 'builtin-default',
-    name: '私人助理',
-    avatarIcon: '🗂️',
-    assistantSelfName: '',
-    userCallName: '',
-    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-default'],
-    contextMessageLimit: 30,
-    isBuiltIn: true
-  },
-  {
-    id: 'builtin-gentle',
-    name: '喵喵陪伴',
-    avatarIcon: '🐱',
-    assistantSelfName: '喵喵',
-    userCallName: '主人',
-    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-gentle'],
-    contextMessageLimit: 30,
-    isBuiltIn: true
-  },
-  {
-    id: 'builtin-planner',
-    name: '内阁首辅',
-    avatarIcon: '🪶',
-    assistantSelfName: '臣',
-    userCallName: '陛下',
-    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-planner'],
-    contextMessageLimit: 30,
-    isBuiltIn: true
-  },
-  {
-    id: 'builtin-chatty',
-    name: '知心姐姐',
-    avatarIcon: '💗',
-    assistantSelfName: '',
-    userCallName: '',
-    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-chatty'],
-    contextMessageLimit: 30,
-    isBuiltIn: true
-  },
-  {
-    id: 'builtin-mentor',
-    name: '赛博导师',
-    avatarIcon: '🧠',
-    assistantSelfName: '',
-    userCallName: '',
-    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-mentor'],
-    contextMessageLimit: 30,
-    isBuiltIn: true
-  },
-  {
-    id: 'builtin-poet',
-    name: '古风小生',
-    avatarIcon: '🪭',
-    assistantSelfName: '小生',
-    userCallName: '姑娘',
-    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-poet'],
-    contextMessageLimit: 30,
-    isBuiltIn: true
-  }
-];
-
-const PERSONA_PRESET_ORDER = DEFAULT_AI_PERSONAS.map((persona) => persona.id);
-const PERSONA_EMOJI_CHOICES = ['✨', '🤖', '🌞', '🦊', '🦉', '🌿', '📚', '🎯'];
-
 const clampNumber = (value: number, min: number, max: number): number => (
   Math.min(max, Math.max(min, value))
 );
-
-const clampContextLimit = (value: unknown): number => {
-  const numeric = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(numeric)) {
-    return 30;
-  }
-  return Math.max(0, Math.round(numeric));
-};
-
-const safeJsonParse = <T,>(raw: string | null, fallback: T): T => {
-  if (!raw) {
-    return fallback;
-  }
-
-  try {
-    return JSON.parse(raw) as T;
-  } catch (error) {
-    console.error('[AIBackfillChatModal] Failed to parse JSON from localStorage', error);
-    return fallback;
-  }
-};
-
-const isValidTone = (value: unknown): value is ChatTone => (
-  value === 'normal' || value === 'system' || value === 'error' || value === 'pending'
-);
-
-const normalizeDebugSections = (value: unknown): AIChatDebugSection[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.filter((item): item is AIChatDebugSection => (
-    Boolean(item)
-    && typeof item === 'object'
-    && typeof (item as AIChatDebugSection).label === 'string'
-    && Boolean((item as AIChatDebugSection).exchange)
-  ));
-};
-
-const normalizeAppliedActions = (value: unknown): AppliedChatAction[] => (
-  Array.isArray(value) ? value as AppliedChatAction[] : []
-);
-
-const normalizeMemoryUpdates = (value: unknown): AIChatMemoryUpdateSection[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.flatMap((item) => {
-    if (!item || typeof item !== 'object') {
-      return [];
-    }
-
-    const candidate = item as Partial<AIChatMemoryUpdateSection>;
-    if (typeof candidate.label !== 'string' || !Array.isArray(candidate.items)) {
-      return [];
-    }
-
-    const items = candidate.items
-      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
-      .filter(Boolean);
-
-    if (!candidate.label.trim() || items.length === 0) {
-      return [];
-    }
-
-    return [{
-      label: candidate.label.trim(),
-      items
-    }];
-  });
-};
-
-const normalizeReminderUpdates = (value: unknown): string[] => (
-  Array.isArray(value)
-    ? value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean)
-    : []
-);
-
-const normalizeDreamUpdates = (value: unknown): AIChatDreamUpdateCard[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.flatMap((item) => {
-    if (!item || typeof item !== 'object') {
-      return [];
-    }
-
-    const candidate = item as Partial<AIChatDreamUpdateCard>;
-    const topicId = typeof candidate.topicId === 'string' ? candidate.topicId.trim() : '';
-    const topicTitle = typeof candidate.topicTitle === 'string' ? candidate.topicTitle.trim() : '';
-    const content = typeof candidate.content === 'string' ? candidate.content.trim() : '';
-    const updatedAt = typeof candidate.updatedAt === 'string' ? candidate.updatedAt.trim() : '';
-    if (!topicId || !topicTitle || !content || !updatedAt) {
-      return [];
-    }
-
-    return [{
-      topicId,
-      topicTitle,
-      action: candidate.action === 'created' || candidate.action === 'deleted' ? candidate.action : 'updated',
-      content,
-      ...(typeof candidate.observedRangeStart === 'string' && candidate.observedRangeStart.trim()
-        ? { observedRangeStart: candidate.observedRangeStart.trim() }
-        : {}),
-      ...(typeof candidate.observedRangeEnd === 'string' && candidate.observedRangeEnd.trim()
-        ? { observedRangeEnd: candidate.observedRangeEnd.trim() }
-        : {}),
-      updatedAt
-    }];
-  });
-};
-
-const normalizeRetryInput = (value: unknown): string | undefined => (
-  typeof value === 'string' && value.trim().length > 0
-    ? value.trim()
-    : undefined
-);
-
-const normalizeRetrySourceUserMessageId = (value: unknown): string | undefined => (
-  typeof value === 'string' && value.trim().length > 0
-    ? value.trim()
-    : undefined
-);
-
-const buildDreamMonthRangeSelection = (year: number, month: number): DreamMonthRangeSelection => {
-  const start = new Date(year, month - 1, 1, 12, 0, 0, 0);
-  const end = new Date(year, month, 0, 12, 0, 0, 0);
-
-  return {
-    yearMonth: `${year}${String(month).padStart(2, '0')}`,
-    year,
-    month,
-    label: `${year}年${month}月`,
-    startDate: getLocalDateStr(start),
-    endDate: getLocalDateStr(end)
-  };
-};
-
-const parseDreamMonthSelection = (value: string): DreamMonthRangeSelection | null => {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
-  }
-
-  const normalizedInput = trimmed
-    .replace(/^dream(?:\s*[·•:：-]\s*|\s+)/i, '')
-    .replace(/[。．，,！!？?；;：:]+$/g, '')
-    .trim();
-  const directMatch = normalizedInput.match(/^(\d{4})(\d{2})$/);
-  const separatorMatch = normalizedInput.match(/^(\d{4})\s*[-/]\s*(\d{1,2})$/);
-  const chineseMatch = normalizedInput.match(/^(\d{4})\s*年\s*(\d{1,2})\s*月$/);
-  const matchedGroups = directMatch || separatorMatch || chineseMatch;
-  if (!matchedGroups) {
-    return null;
-  }
-
-  const year = Number.parseInt(matchedGroups[1], 10);
-  const month = Number.parseInt(matchedGroups[2], 10);
-  if (!Number.isInteger(year) || year < 1000 || year > 9999 || !Number.isInteger(month) || month < 1 || month > 12) {
-    return null;
-  }
-
-  return buildDreamMonthRangeSelection(year, month);
-};
-
-const normalizeDreamRetryYearMonth = (value: unknown): string | undefined => {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  return parseDreamMonthSelection(value)?.yearMonth;
-};
-
-const normalizeDailyReviewWritebackResult = (value: unknown): AIChatDailyReviewWritebackResult | undefined => {
-  if (!value || typeof value !== 'object') {
-    return undefined;
-  }
-
-  const candidate = value as Partial<AIChatDailyReviewWritebackResult>;
-  if (
-    typeof candidate.dailyReviewId !== 'string'
-    || typeof candidate.date !== 'string'
-    || typeof candidate.title !== 'string'
-    || typeof candidate.preview !== 'string'
-  ) {
-    return undefined;
-  }
-
-  return {
-    dailyReviewId: candidate.dailyReviewId.trim(),
-    date: candidate.date.trim(),
-    title: candidate.title.trim(),
-    preview: candidate.preview.trim(),
-    createdReview: candidate.createdReview === true,
-    mergeMode: candidate.mergeMode === 'overwrite' ? 'overwrite' : 'create'
-  };
-};
-
-const normalizeWeeklyReviewWritebackResult = (value: unknown): AIChatWeeklyReviewWritebackResult | undefined => {
-  if (!value || typeof value !== 'object') {
-    return undefined;
-  }
-
-  const candidate = value as Partial<AIChatWeeklyReviewWritebackResult>;
-  if (
-    typeof candidate.weeklyReviewId !== 'string'
-    || typeof candidate.weekStartDate !== 'string'
-    || typeof candidate.weekEndDate !== 'string'
-    || typeof candidate.title !== 'string'
-    || typeof candidate.preview !== 'string'
-  ) {
-    return undefined;
-  }
-
-  return {
-    weeklyReviewId: candidate.weeklyReviewId.trim(),
-    weekStartDate: candidate.weekStartDate.trim(),
-    weekEndDate: candidate.weekEndDate.trim(),
-    title: candidate.title.trim(),
-    preview: candidate.preview.trim(),
-    createdReview: candidate.createdReview === true,
-    mergeMode: candidate.mergeMode === 'overwrite' ? 'overwrite' : 'create'
-  };
-};
-
-const normalizeMonthlyReviewWritebackResult = (value: unknown): AIChatMonthlyReviewWritebackResult | undefined => {
-  if (!value || typeof value !== 'object') {
-    return undefined;
-  }
-
-  const candidate = value as Partial<AIChatMonthlyReviewWritebackResult>;
-  if (
-    typeof candidate.monthlyReviewId !== 'string'
-    || typeof candidate.monthStartDate !== 'string'
-    || typeof candidate.monthEndDate !== 'string'
-    || typeof candidate.title !== 'string'
-    || typeof candidate.preview !== 'string'
-  ) {
-    return undefined;
-  }
-
-  return {
-    monthlyReviewId: candidate.monthlyReviewId.trim(),
-    monthStartDate: candidate.monthStartDate.trim(),
-    monthEndDate: candidate.monthEndDate.trim(),
-    title: candidate.title.trim(),
-    preview: candidate.preview.trim(),
-    createdReview: candidate.createdReview === true,
-    mergeMode: candidate.mergeMode === 'overwrite' ? 'overwrite' : 'create'
-  };
-};
-
-const normalizeTemplateMeta = (value: unknown): AIChatSession['templateMeta'] | undefined => {
-  if (!value || typeof value !== 'object') {
-    return undefined;
-  }
-
-  const candidate = value as Record<string, unknown>;
-  if (candidate.templateType === 'weekly_review') {
-    const normalizedWeekStartDate = typeof candidate.weekStartDate === 'string'
-      ? candidate.weekStartDate.trim()
-      : '';
-    const normalizedWeekEndDate = typeof candidate.weekEndDate === 'string'
-      ? candidate.weekEndDate.trim()
-      : '';
-    const hasResolvedWeek = Boolean(normalizedWeekStartDate && normalizedWeekEndDate);
-    const selectedRangeLabel = (
-      candidate.selectedRangeLabel === '本周'
-      || candidate.selectedRangeLabel === '上周'
-      || candidate.selectedRangeLabel === 'custom_date'
-    )
-      ? candidate.selectedRangeLabel
-      : undefined;
-    const methodId = (
-      candidate.methodId === 'pdca'
-      || candidate.methodId === 'systems'
-      || candidate.methodId === 'cbt'
-      || candidate.methodId === 'narrative'
-    )
-      ? candidate.methodId
-      : undefined;
-    const methodLabel = typeof candidate.methodLabel === 'string' && candidate.methodLabel.trim()
-      ? candidate.methodLabel.trim()
-      : (methodId
-        ? weeklyReviewTemplateService.listMethodOptions().find((item) => item.id === methodId)?.title || '系统复盘'
-        : undefined);
-    const stage = (
-      candidate.stage === 'select_range'
-      || candidate.stage === 'select_method'
-      || candidate.stage === 'ready'
-    )
-      ? candidate.stage
-      : (hasResolvedWeek && methodId ? 'ready' : 'select_range');
-
-    return {
-      templateType: 'weekly_review',
-      stage,
-      ...(normalizedWeekStartDate ? { weekStartDate: normalizedWeekStartDate } : {}),
-      ...(normalizedWeekEndDate ? { weekEndDate: normalizedWeekEndDate } : {}),
-      ...(selectedRangeLabel ? { selectedRangeLabel } : {}),
-      ...(methodId ? { methodId } : {}),
-      ...(methodLabel ? { methodLabel } : {}),
-      ...(candidate.pendingWriteIntent ? { pendingWriteIntent: true } : {})
-    };
-  }
-
-  if (candidate.templateType === 'monthly_review') {
-    const normalizedMonthStartDate = typeof candidate.monthStartDate === 'string'
-      ? candidate.monthStartDate.trim()
-      : '';
-    const normalizedMonthEndDate = typeof candidate.monthEndDate === 'string'
-      ? candidate.monthEndDate.trim()
-      : '';
-    const hasResolvedMonth = Boolean(normalizedMonthStartDate && normalizedMonthEndDate);
-    const selectedRangeLabel = (
-      candidate.selectedRangeLabel === '本月'
-      || candidate.selectedRangeLabel === '上月'
-      || candidate.selectedRangeLabel === 'custom_date'
-    )
-      ? candidate.selectedRangeLabel
-      : undefined;
-    const methodId = (
-      candidate.methodId === 'pdca'
-      || candidate.methodId === 'systems'
-      || candidate.methodId === 'cbt'
-      || candidate.methodId === 'narrative'
-    )
-      ? candidate.methodId
-      : undefined;
-    const methodLabel = typeof candidate.methodLabel === 'string' && candidate.methodLabel.trim()
-      ? candidate.methodLabel.trim()
-      : (methodId
-        ? monthlyReviewTemplateService.listMethodOptions().find((item) => item.id === methodId)?.title || '系统复盘'
-        : undefined);
-    const stage = (
-      candidate.stage === 'select_range'
-      || candidate.stage === 'select_method'
-      || candidate.stage === 'ready'
-    )
-      ? candidate.stage
-      : (hasResolvedMonth && methodId ? 'ready' : 'select_range');
-
-    return {
-      templateType: 'monthly_review',
-      stage,
-      ...(normalizedMonthStartDate ? { monthStartDate: normalizedMonthStartDate } : {}),
-      ...(normalizedMonthEndDate ? { monthEndDate: normalizedMonthEndDate } : {}),
-      ...(selectedRangeLabel ? { selectedRangeLabel } : {}),
-      ...(methodId ? { methodId } : {}),
-      ...(methodLabel ? { methodLabel } : {}),
-      ...(candidate.pendingWriteIntent ? { pendingWriteIntent: true } : {})
-    };
-  }
-
-  return undefined;
-};
-
-const normalizeMessageContent = (value: unknown): string | undefined => {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  const trimmed = value.trim();
-  return trimmed && !['null', 'undefined'].includes(trimmed.toLowerCase())
-    ? trimmed
-    : undefined;
-};
-
-const normalizeMessages = (value: unknown): AIChatMessage[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.flatMap((item) => {
-    if (!item || typeof item !== 'object') {
-      return [];
-    }
-
-    const candidate = item as Partial<AIChatMessage>;
-    if (typeof candidate.id !== 'string' || (candidate.role !== 'user' && candidate.role !== 'assistant')) {
-      return [];
-    }
-
-    if (typeof candidate.content !== 'string' || typeof candidate.createdAt !== 'number') {
-      return [];
-    }
-
-    if (candidate.tone && !isValidTone(candidate.tone)) {
-      return [];
-    }
-
-    const normalizedDisplayParts = candidate.role === 'assistant'
-      ? normalizeAssistantDisplayParts(candidate.displayParts, candidate.content)
-      : undefined;
-    const normalizedReasoning = candidate.role === 'assistant'
-      ? normalizeAssistantReasoningSummary(candidate.reasoning)
-      : undefined;
-    const normalizedContent = normalizeMessageContent(candidate.content)
-      || (
-        candidate.role === 'assistant'
-        && normalizedDisplayParts?.length
-          ? normalizedDisplayParts.join('\n')
-          : undefined
-      );
-    if (!normalizedContent) {
-      return [];
-    }
-
-    const normalizedMessage: AIChatMessage = {
-      id: candidate.id,
-      role: candidate.role,
-      content: normalizedContent,
-      ...(normalizedReasoning ? { reasoning: normalizedReasoning } : {}),
-      ...(normalizedDisplayParts ? { displayParts: normalizedDisplayParts } : {}),
-      createdAt: candidate.createdAt,
-      ...(candidate.tone ? { tone: candidate.tone } : {}),
-      ...(typeof candidate.backgroundDebugHistoryId === 'string' && candidate.backgroundDebugHistoryId.trim()
-        ? { backgroundDebugHistoryId: candidate.backgroundDebugHistoryId.trim() }
-        : {}),
-      ...(candidate.debugSections ? { debugSections: normalizeDebugSections(candidate.debugSections) } : {}),
-      ...(candidate.appliedActions ? { appliedActions: normalizeAppliedActions(candidate.appliedActions) } : {}),
-      ...(candidate.memoryUpdates ? { memoryUpdates: normalizeMemoryUpdates(candidate.memoryUpdates) } : {}),
-      ...(candidate.dreamUpdates ? { dreamUpdates: normalizeDreamUpdates(candidate.dreamUpdates) } : {}),
-      ...(candidate.reminderUpdates ? { reminderUpdates: normalizeReminderUpdates(candidate.reminderUpdates) } : {}),
-      ...(normalizeDailyReviewWritebackResult(candidate.dailyReviewWriteback)
-        ? { dailyReviewWriteback: normalizeDailyReviewWritebackResult(candidate.dailyReviewWriteback) }
-        : {}),
-      ...(normalizeWeeklyReviewWritebackResult(candidate.weeklyReviewWriteback)
-        ? { weeklyReviewWriteback: normalizeWeeklyReviewWritebackResult(candidate.weeklyReviewWriteback) }
-        : {}),
-      ...(normalizeMonthlyReviewWritebackResult(candidate.monthlyReviewWriteback)
-        ? { monthlyReviewWriteback: normalizeMonthlyReviewWritebackResult(candidate.monthlyReviewWriteback) }
-        : {}),
-      ...(normalizeRetryInput(candidate.retryInput) ? { retryInput: normalizeRetryInput(candidate.retryInput) } : {}),
-      ...(normalizeRetrySourceUserMessageId(candidate.retrySourceUserMessageId)
-        ? { retrySourceUserMessageId: normalizeRetrySourceUserMessageId(candidate.retrySourceUserMessageId) }
-        : {}),
-      ...(normalizeDreamRetryYearMonth(candidate.dreamRetryYearMonth)
-        ? { dreamRetryYearMonth: normalizeDreamRetryYearMonth(candidate.dreamRetryYearMonth) }
-        : {})
-    };
-
-    if (normalizedMessage.tone === 'pending') {
-      return [];
-    }
-
-    return [normalizedMessage];
-  });
-};
-
-const normalizePersonas = (value: unknown): AIChatPersona[] => {
-  const personaMap = new Map<string, AIChatPersona>();
-  const defaultPersonaMap = new Map<string, AIChatPersona>();
-  DEFAULT_AI_PERSONAS.forEach((persona) => {
-    personaMap.set(persona.id, persona);
-    defaultPersonaMap.set(persona.id, persona);
-  });
-
-  if (Array.isArray(value)) {
-    value.forEach((item) => {
-      if (!item || typeof item !== 'object') {
-        return;
-      }
-
-      const candidate = item as Partial<AIChatPersona>;
-      if (typeof candidate.id !== 'string' || typeof candidate.name !== 'string') {
-        return;
-      }
-
-      if (defaultPersonaMap.has(candidate.id)) {
-        personaMap.set(candidate.id, defaultPersonaMap.get(candidate.id)!);
-        return;
-      }
-
-      personaMap.set(candidate.id, {
-        id: candidate.id,
-        name: candidate.name.trim() || '未命名人设',
-        avatarIcon: typeof candidate.avatarIcon === 'string' && candidate.avatarIcon.trim()
-          ? candidate.avatarIcon.trim()
-          : '✨',
-        ...(typeof candidate.avatarImage === 'string' && candidate.avatarImage.trim()
-          ? { avatarImage: candidate.avatarImage.trim() }
-          : {}),
-        assistantSelfName: typeof candidate.assistantSelfName === 'string'
-          ? candidate.assistantSelfName.trim()
-          : '',
-        userCallName: typeof candidate.userCallName === 'string'
-          ? candidate.userCallName.trim()
-          : '',
-        systemPrompt: typeof candidate.systemPrompt === 'string' ? candidate.systemPrompt : '',
-        contextMessageLimit: clampContextLimit(candidate.contextMessageLimit),
-        isBuiltIn: Boolean(candidate.isBuiltIn)
-      });
-    });
-  }
-
-  const builtinIds = new Set(PERSONA_PRESET_ORDER);
-  const personas = Array.from(personaMap.values());
-
-  return personas.sort((left, right) => {
-    const leftBuiltin = builtinIds.has(left.id);
-    const rightBuiltin = builtinIds.has(right.id);
-    if (leftBuiltin && rightBuiltin) {
-      return PERSONA_PRESET_ORDER.indexOf(left.id) - PERSONA_PRESET_ORDER.indexOf(right.id);
-    }
-    if (leftBuiltin) return -1;
-    if (rightBuiltin) return 1;
-    return left.name.localeCompare(right.name, 'zh-CN');
-  });
-};
-
-const normalizeUserProfile = (value: unknown): AIChatUserProfile => {
-  if (!value || typeof value !== 'object') {
-    return {
-      avatarIcon: ''
-    };
-  }
-
-  const candidate = value as Partial<AIChatUserProfile>;
-  return {
-    avatarIcon: typeof candidate.avatarIcon === 'string' ? candidate.avatarIcon.trim() : '',
-    ...(typeof candidate.avatarImage === 'string' && candidate.avatarImage.trim()
-      ? { avatarImage: candidate.avatarImage.trim() }
-      : {})
-  };
-};
-
-const createDefaultSession = (
-  personaId: string,
-  options?: {
-    title?: string;
-    messages?: AIChatMessage[];
-    templateMeta?: WeeklyReviewTemplateSessionMeta;
-  }
-): AIChatSession => {
-  const now = Date.now();
-  return {
-    id: crypto.randomUUID(),
-    title: options?.title || '新对话',
-    createdAt: now,
-    updatedAt: now,
-    personaId,
-    contextCacheEnabled: true,
-    messages: options?.messages || [],
-    ...(options?.templateMeta ? { templateMeta: options.templateMeta } : {})
-  };
-};
-
-const normalizeSessions = (value: unknown, personas: AIChatPersona[]): AIChatSession[] => {
-  const validPersonaIds = new Set(personas.map((persona) => persona.id));
-  const fallbackPersonaId = personas[0]?.id || DEFAULT_AI_PERSONAS[0].id;
-
-  if (!Array.isArray(value)) {
-    return [createDefaultSession(fallbackPersonaId)];
-  }
-
-  const sessions = value.flatMap((item) => {
-    if (!item || typeof item !== 'object') {
-      return [];
-    }
-
-    const candidate = item as Partial<AIChatSession>;
-    if (typeof candidate.id !== 'string') {
-      return [];
-    }
-
-    const createdAt = typeof candidate.createdAt === 'number' ? candidate.createdAt : Date.now();
-    const updatedAt = typeof candidate.updatedAt === 'number' ? candidate.updatedAt : createdAt;
-    const normalized: AIChatSession = {
-      id: candidate.id,
-      title: typeof candidate.title === 'string' && candidate.title.trim() ? candidate.title.trim() : '新对话',
-      createdAt,
-      updatedAt,
-      personaId: typeof candidate.personaId === 'string' && validPersonaIds.has(candidate.personaId)
-        ? candidate.personaId
-        : fallbackPersonaId,
-      contextCacheEnabled: candidate.contextCacheEnabled !== false,
-      messages: normalizeMessages(candidate.messages),
-      ...(normalizeTemplateMeta(candidate.templateMeta)
-        ? { templateMeta: normalizeTemplateMeta(candidate.templateMeta) }
-        : {})
-    };
-
-    return [normalized];
-  });
-
-  return sessions.length > 0 ? sessions : [createDefaultSession(fallbackPersonaId)];
-};
-
-const loadInitialChatState = (): InitialChatState => {
-  const personas = normalizePersonas(safeJsonParse<unknown>(localStorage.getItem(CHAT_PERSONAS_KEY), []));
-  const sessions = normalizeSessions(safeJsonParse<unknown>(localStorage.getItem(CHAT_SESSIONS_KEY), []), personas);
-  const userProfile = normalizeUserProfile(safeJsonParse<unknown>(localStorage.getItem(USER_PROFILE_KEY), null));
-  const storedActiveSessionId = localStorage.getItem(ACTIVE_SESSION_KEY);
-  const activeSessionId = sessions.some((session) => session.id === storedActiveSessionId)
-    ? storedActiveSessionId as string
-    : [...sessions].sort((left, right) => right.updatedAt - left.updatedAt)[0].id;
-
-  return {
-    personas,
-    sessions,
-    activeSessionId,
-    debugMode: localStorage.getItem(DEBUG_MODE_KEY) === 'true',
-    userProfile
-  };
-};
-
-const formatDateLabel = (date: Date): string => (
-  new Intl.DateTimeFormat('zh-CN', {
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short'
-  }).format(date)
-);
-
-const formatTimeRange = (startTime: number, endTime: number): string => {
-  const formatter = new Intl.DateTimeFormat('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  });
-  return `${formatter.format(startTime)} - ${formatter.format(endTime)}`;
-};
-
-const formatDateTimeRange = (startTime: number, endTime: number): string => (
-  `${new Intl.DateTimeFormat('zh-CN', {
-    month: 'numeric',
-    day: 'numeric',
-    weekday: 'short'
-  }).format(startTime)} · ${formatTimeRange(startTime, endTime)}`
-);
-
-const formatActionDate = (timestamp: number): string => (
-  new Intl.DateTimeFormat('zh-CN', {
-    month: 'numeric',
-    day: 'numeric'
-  }).format(timestamp)
-);
-
-const formatConversationTime = (timestamp: number): string => {
-  const date = new Date(timestamp);
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const hour = String(date.getHours()).padStart(2, '0');
-  const minute = String(date.getMinutes()).padStart(2, '0');
-
-  return `${month}月${day}日 ${hour}:${minute}`;
-};
-
-const createSessionTitleFromUserMessage = (text: string): string => {
-  const condensed = text.trim().replace(/\s+/g, ' ');
-  if (!condensed) {
-    return '新对话';
-  }
-  return condensed.length > 18 ? `${condensed.slice(0, 18)}…` : condensed;
-};
-
-const truncateText = (value: string, maxLength: number): string => (
-  value.length > maxLength
-    ? `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`
-    : value
-);
-
-const TIME_SENSITIVE_MESSAGE_PATTERN = /今天|明天|后天|昨天|今晚|今早|明早|下午|晚上|下周|本周|这周|周[一二三四五六日天]|星期[一二三四五六日天]|月底|月初|\d{4}-\d{1,2}-\d{1,2}|\d{1,2}月\d{1,2}日|\d{1,2}:\d{2}/;
-
-const formatLocalDateTimeContext = (date: Date): string => formatAssistantLocalDateTime(date);
-
-const formatAssistantDateKey = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const buildAssistantCurrentTimeSnapshot = (date: Date) => ({
-  currentDateTime: formatLocalDateTimeContext(date),
-  stateContextDate: formatAssistantDateKey(date)
-});
-
-const stringifyDebugSection = (value: unknown): string => {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch (error) {
-    console.error('[AIBackfillChatModal] Failed to stringify debug payload', error);
-    return String(value);
-  }
-};
-
-interface DebugTextBlock {
-  label: string;
-  content: string;
-}
-
-const splitLabeledSections = (content: string): DebugTextBlock[] => {
-  const normalized = content.trim();
-  if (!normalized.includes('=== ')) {
-    return [];
-  }
-
-  const markerRegex = /^===\s+(.+?)\s+===$/gm;
-  const matches = Array.from(normalized.matchAll(markerRegex));
-  if (matches.length === 0) {
-    return [];
-  }
-
-  return matches.map((match, index) => {
-    const label = match[1]?.trim() || '';
-    const start = (match.index || 0) + match[0].length;
-    const end = index + 1 < matches.length ? (matches[index + 1].index || normalized.length) : normalized.length;
-    const sectionContent = normalized.slice(start, end).trim();
-    return {
-      label,
-      content: sectionContent
-    };
-  }).filter((section) => section.label && section.content);
-};
-
-const mapPromptSectionLabel = (label: string): string => {
-  switch (label) {
-    case 'Assistant Base Prompt':
-      return '基础 System Prompt';
-    case 'Foreground Mode Prompt':
-      return '前台调用 Prompt';
-    case 'Background Mode Prompt':
-      return '后台调用 Prompt';
-    case 'User Persona Prompt':
-      return '人格 Prompt';
-    case 'Foreground Tool Prompt':
-    case 'Background Tool Prompt':
-    case 'Tool and Mode Rules':
-      return '工具与模式规则 Prompt';
-    case 'Memory Update Rules':
-      return '记忆更新规则 Prompt';
-    case 'Unified Turn Output Schema':
-      return '统一输出 Schema';
-    case 'Memory Snapshot':
-      return '长期记忆快照';
-    case 'State Context':
-      return '应用状态上下文';
-    case 'Recent Logs Digest':
-      return '近期日志摘要上下文';
-    case 'Dictionary Context':
-      return '应用候选字典上下文';
-    case 'Trigger':
-      return '触发信息';
-    case 'Conversation Context':
-      return '对话上下文';
-    default:
-      return label;
-  }
-};
-
-const toPrettyJson = (value: unknown): string => {
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch (error) {
-    console.error('[AIBackfillChatModal] Failed to stringify debug payload', error);
-    return String(value);
-  }
-};
-
-const normalizeDebugText = (value: unknown): string => {
-  if (typeof value === 'string') {
-    return value.trim();
-  }
-  return toPrettyJson(value).trim();
-};
-
-const buildMemoryUpdateSections = (
-  before: AssistantMemory,
-  after: AssistantMemory
-): AIChatMemoryUpdateSection[] => {
-  const sections: AIChatMemoryUpdateSection[] = [];
-
-  const addedProfile = after.profileMemory.filter((item) => !before.profileMemory.includes(item));
-  if (addedProfile.length > 0) {
-    sections.push({ label: '用户画像记忆', items: addedProfile });
-  }
-
-  const addedPreferences = after.preferenceMemory.filter((item) => !before.preferenceMemory.includes(item));
-  if (addedPreferences.length > 0) {
-    sections.push({ label: '偏好记忆', items: addedPreferences });
-  }
-
-  if (after.lastKnownState && after.lastKnownState !== before.lastKnownState) {
-    sections.push({ label: '当前状态', items: [after.lastKnownState] });
-  }
-
-  if (after.workingMemorySummary && after.workingMemorySummary !== before.workingMemorySummary) {
-    sections.push({ label: '工作记忆摘要', items: [after.workingMemorySummary] });
-  }
-
-  const addedDecisions = after.recentDecisions.filter((item) => !before.recentDecisions.includes(item));
-  if (addedDecisions.length > 0) {
-    sections.push({ label: '决策摘要', items: addedDecisions });
-  }
-
-  return sections;
-};
-
-const buildDebugBlocks = (exchange: AIDebugExchange): DebugTextBlock[] => {
-  const blocks: DebugTextBlock[] = [];
-  const requestBody = exchange.request.body as Record<string, unknown> | null | undefined;
-  const responseBody = exchange.response.body as Record<string, unknown> | null | undefined;
-
-  blocks.push({
-    label: '请求元信息',
-    content: [
-      `provider: ${exchange.provider}`,
-      `requestedAt: ${exchange.requestedAt}`,
-      `completedAt: ${exchange.completedAt}`,
-      `url: ${exchange.request.url}`,
-      `method: ${exchange.request.method}`
-    ].join('\n')
-  });
-
-  if (exchange.cache) {
-    const cacheLines = [
-      `providerFamily: ${exchange.cache.providerFamily}`,
-      `strategy: ${exchange.cache.strategy}`,
-      ...(exchange.cache.key ? [`key: ${exchange.cache.key}`] : []),
-      ...(exchange.cache.metrics?.cachedTokens !== undefined ? [`cachedTokens: ${exchange.cache.metrics.cachedTokens}`] : []),
-      ...(exchange.cache.metrics?.promptCacheHitTokens !== undefined ? [`promptCacheHitTokens: ${exchange.cache.metrics.promptCacheHitTokens}`] : []),
-      ...(exchange.cache.metrics?.promptCacheMissTokens !== undefined ? [`promptCacheMissTokens: ${exchange.cache.metrics.promptCacheMissTokens}`] : []),
-      ...(exchange.cache.metrics?.cacheCreationInputTokens !== undefined ? [`cacheCreationInputTokens: ${exchange.cache.metrics.cacheCreationInputTokens}`] : []),
-      ...(exchange.cache.metrics?.cacheReadInputTokens !== undefined ? [`cacheReadInputTokens: ${exchange.cache.metrics.cacheReadInputTokens}`] : []),
-      ...(exchange.cache.metrics?.cacheWriteTokens !== undefined ? [`cacheWriteTokens: ${exchange.cache.metrics.cacheWriteTokens}`] : [])
-    ];
-
-    blocks.push({
-      label: '缓存信息',
-      content: cacheLines.join('\n')
-    });
-  }
-
-  const modelValue = typeof requestBody?.model === 'string'
-    ? requestBody.model
-    : typeof requestBody?.['model'] === 'string'
-      ? String(requestBody.model)
-      : '';
-  if (modelValue) {
-    blocks.push({
-      label: '模型',
-      content: modelValue
-    });
-  }
-
-  const openAIMessages = Array.isArray(requestBody?.messages)
-    ? requestBody.messages as Array<{ role?: string; content?: unknown }>
-    : [];
-  if (openAIMessages.length > 0) {
-    const systemMessage = openAIMessages.find((message) => message.role === 'system');
-    const historyMessages = openAIMessages.slice(systemMessage ? 1 : 0, -1);
-    const latestUserMessage = openAIMessages[openAIMessages.length - 1];
-
-    if (systemMessage?.content) {
-      const systemPromptContent = normalizeDebugText(systemMessage.content);
-      const promptSections = splitLabeledSections(systemPromptContent);
-      if (promptSections.length > 0) {
-        blocks.push(...promptSections.map((section) => ({
-          label: mapPromptSectionLabel(section.label),
-          content: section.content
-        })));
-      } else {
-        blocks.push({
-          label: '系统提示词',
-          content: systemPromptContent
-        });
-      }
-    }
-
-    if (historyMessages.length > 0) {
-      blocks.push({
-        label: '对话上下文',
-        content: historyMessages.map((message) => (
-          `${message.role === 'assistant' ? 'assistant' : 'user'}:\n${normalizeDebugText(message.content || '')}`
-        )).join('\n\n')
-      });
-    }
-
-    if (latestUserMessage?.content) {
-      const userPromptContent = normalizeDebugText(latestUserMessage.content);
-      const userPromptSections = splitLabeledSections(userPromptContent);
-      if (userPromptSections.length > 0) {
-        blocks.push(...userPromptSections.map((section) => ({
-          label: mapPromptSectionLabel(section.label),
-          content: section.content
-        })));
-      } else {
-        blocks.push({
-          label: '最终用户输入',
-          content: userPromptContent
-        });
-      }
-    }
-  }
-
-  const geminiSystemInstruction = requestBody?.system_instruction as { parts?: Array<{ text?: string }> } | undefined;
-  if (!openAIMessages.length && geminiSystemInstruction?.parts?.length) {
-    const systemPromptContent = geminiSystemInstruction.parts.map((part) => part.text || '').filter(Boolean).join('\n\n').trim();
-    const promptSections = splitLabeledSections(systemPromptContent);
-    if (promptSections.length > 0) {
-      blocks.push(...promptSections.map((section) => ({
-        label: mapPromptSectionLabel(section.label),
-        content: section.content
-      })));
-    } else {
-      blocks.push({
-        label: '系统提示词',
-        content: systemPromptContent
-      });
-    }
-  }
-
-  const geminiContents = Array.isArray(requestBody?.contents)
-    ? requestBody.contents as Array<{ role?: string; parts?: Array<{ text?: string }> }>
-    : [];
-  if (!openAIMessages.length && geminiContents.length > 0) {
-    const conversationItems = geminiContents.slice(0, -1);
-    const finalUser = geminiContents[geminiContents.length - 1];
-
-    if (conversationItems.length > 0) {
-      blocks.push({
-        label: '对话上下文',
-        content: conversationItems.map((item) => (
-          `${item.role || 'user'}:\n${(item.parts || []).map((part) => part.text || '').filter(Boolean).join('\n')}`
-        )).join('\n\n')
-      });
-    }
-
-    if (finalUser?.parts?.length) {
-      const userPromptContent = finalUser.parts.map((part) => part.text || '').filter(Boolean).join('\n').trim();
-      const userPromptSections = splitLabeledSections(userPromptContent);
-      if (userPromptSections.length > 0) {
-        blocks.push(...userPromptSections.map((section) => ({
-          label: mapPromptSectionLabel(section.label),
-          content: section.content
-        })));
-      } else {
-        blocks.push({
-          label: '最终用户输入',
-          content: userPromptContent
-        });
-      }
-    }
-  }
-
-  const openAIResponseContent = typeof (responseBody as any)?.choices?.[0]?.message?.content === 'string'
-    ? (responseBody as any).choices[0].message.content.trim()
-    : '';
-  const geminiResponseContent = typeof (responseBody as any)?.candidates?.[0]?.content?.parts?.[0]?.text === 'string'
-    ? (responseBody as any).candidates[0].content.parts[0].text.trim()
-    : '';
-  const responseContent = openAIResponseContent || geminiResponseContent;
-  if (responseContent) {
-    blocks.push({
-      label: '模型原始输出',
-      content: responseContent
-    });
-  }
-
-  return blocks.filter((block) => block.content.trim().length > 0);
-};
-
-const buildBackgroundSummaryDebugExchange = (
-  entry: AssistantBackgroundCallHistoryEntry
-): AIDebugExchange => {
-  const summaryLines = [
-    `triggerType: ${entry.triggerType || '-'}`,
-    ...(entry.triggerId ? [`triggerId: ${entry.triggerId}`] : []),
-    `status: ${entry.status}`,
-    `action: ${entry.action}`,
-    `memoryAction: ${entry.memoryAction}`,
-    `reminderCount: ${entry.reminderCount}`,
-    ...(entry.silentReason ? [`silentReason: ${entry.silentReason}`] : []),
-    ...(entry.sideEffects?.length ? [`sideEffects: ${entry.sideEffects.join('；')}`] : []),
-    ...(entry.decisionSummary ? [`decisionSummary: ${entry.decisionSummary}`] : []),
-    ...(entry.errorMessage ? [`errorMessage: ${entry.errorMessage}`] : [])
-  ];
-
-  const responseSummary = [
-    entry.message?.trim() || '',
-    entry.decisionSummary?.trim() || '',
-    entry.errorMessage?.trim() || ''
-  ].filter(Boolean).join('\n\n');
-
-  return {
-    provider: 'openai',
-    requestedAt: entry.requestedAt,
-    completedAt: entry.completedAt || entry.requestedAt,
-    request: {
-      url: 'native://assistant-background-summary',
-      method: 'POST',
-      headers: {},
-      body: {
-        model: 'native-background-summary',
-        messages: [
-          {
-            role: 'system',
-            content: [
-              '=== 后台摘要 ===',
-              summaryLines.join('\n')
-            ].join('\n')
-          },
-          {
-            role: 'user',
-            content: [
-              '=== 后台触发 ===',
-              `triggerText: ${entry.triggerText || '-'}`,
-              ...(entry.targetSessionId ? [`targetSessionId: ${entry.targetSessionId}`] : [])
-            ].join('\n')
-          }
-        ]
-      }
-    },
-    response: {
-      status: entry.status === 'failed' ? 500 : 200,
-      ok: entry.status !== 'failed',
-      body: {
-        choices: [{
-          message: {
-            content: responseSummary || '后台原生请求没有返回更详细的调试正文。'
-          }
-        }]
-      }
-    }
-  };
-};
-
-const normalizeAssistantNativeDiagnostics = (value: unknown): AssistantNativeDiagnosticEntry[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.flatMap((item) => {
-    if (!item || typeof item !== 'object') {
-      return [];
-    }
-
-    const candidate = item as Partial<AssistantNativeDiagnosticEntry>;
-    const id = typeof candidate.id === 'string' ? candidate.id.trim() : '';
-    const type = typeof candidate.type === 'string' ? candidate.type.trim() : '';
-    const level = candidate.level === 'success'
-      || candidate.level === 'warning'
-      || candidate.level === 'error'
-      ? candidate.level
-      : 'info';
-    const createdAt = typeof candidate.createdAt === 'string' ? candidate.createdAt.trim() : '';
-    const message = typeof candidate.message === 'string' ? candidate.message.trim() : '';
-    const context = candidate.context && typeof candidate.context === 'object'
-      ? Object.fromEntries(
-        Object.entries(candidate.context as Record<string, unknown>)
-          .map(([key, entryValue]) => [key.trim(), typeof entryValue === 'string' ? entryValue.trim() : String(entryValue ?? '')])
-          .filter(([key, entryValue]) => key && entryValue)
-      )
-      : undefined;
-
-    if (!id || !type || !createdAt || !message) {
-      return [];
-    }
-
-    return [{
-      id,
-      type: type as AssistantNativeDiagnosticEntry['type'],
-      level,
-      createdAt,
-      message,
-      ...(typeof candidate.triggerId === 'string' && candidate.triggerId.trim() ? { triggerId: candidate.triggerId.trim() } : {}),
-      ...(typeof candidate.triggerType === 'string' && candidate.triggerType.trim() ? { triggerType: candidate.triggerType.trim() as AssistantNativeDiagnosticEntry['triggerType'] } : {}),
-      ...(typeof candidate.reason === 'string' && candidate.reason.trim() ? { reason: candidate.reason.trim() } : {}),
-      ...(context && Object.keys(context).length > 0 ? { context } : {})
-    }];
-  });
-};
-
-const getAssistantBackgroundTriggerLabel = (triggerType?: string): string => {
-  switch (triggerType) {
-    case 'checkin':
-      return '后台 check-in';
-    case 'manual_background_nudge':
-      return '手动后台触发';
-    case 'reminder_due':
-      return 'Reminder 到点';
-    case 'long_idle':
-      return '长时间空闲';
-    case 'focus_started':
-      return '专注开始';
-    case 'focus_ended':
-      return '专注结束';
-    case 'todo_changed':
-      return '任务变更';
-    default:
-      return triggerType || '后台触发';
-  }
-};
-
-const getAssistantBackgroundRequestStatusLabel = (status: AssistantBackgroundTimelineEntry['requestStatus']): string => {
-  switch (status) {
-    case 'not_started':
-      return '未开始请求';
-    case 'pending':
-      return '请求中';
-    case 'completed':
-      return '请求成功';
-    case 'failed':
-      return '请求失败';
-    default:
-      return status;
-  }
-};
-
-const formatAssistantReminderSnapshot = (reminders: AssistantReminder[]): string => {
-  if (!reminders.length) {
-    return '暂无';
-  }
-
-  return reminders.map((reminder, index) => {
-    const delayMinutes = getAssistantDelayMinutes(reminder.dueAt, reminder.lastDispatchedAt);
-
-    return [
-      `${index + 1}. ${reminder.text}`,
-      `   type: ${reminder.type}`,
-      `   status: ${reminder.status}`,
-      `   scheduledDueAt: ${formatAssistantDateTimeForDisplay(reminder.dueAt)}`,
-      `   lastDispatchAttemptAt: ${formatAssistantDateTimeForDisplay(reminder.lastDispatchAttemptAt) || '-'}`,
-      `   actualDispatchAt: ${formatAssistantDateTimeForDisplay(reminder.lastDispatchedAt) || '-'}`,
-      `   delayMinutes: ${delayMinutes ?? '-'}`,
-      `   dispatchAttemptCount: ${reminder.dispatchAttemptCount || 0}`
-    ].join('\n');
-  }).join('\n\n');
-};
-
-const buildPersonaPrompt = (persona: AIChatPersona): string => {
-  const lines: string[] = [];
-
-  if (persona.name.trim()) {
-    lines.push(`你当前的人设名字是“${persona.name.trim()}”。`);
-  }
-  if (persona.assistantSelfName.trim()) {
-    lines.push(`如果需要自称，优先使用“${persona.assistantSelfName.trim()}”。`);
-  }
-  if (persona.userCallName.trim()) {
-    lines.push(`称呼用户时优先使用“${persona.userCallName.trim()}”。`);
-  }
-  if (persona.systemPrompt.trim()) {
-    lines.push(persona.systemPrompt.trim());
-  }
-
-  return lines.join('\n');
-};
-
-const dedupeStringArray = (values: Array<string | undefined | null>): string[] => (
-  Array.from(new Set(values.filter((value): value is string => Boolean(value && value.trim())).map((value) => value.trim())))
-);
-
-const isAbortError = (error: unknown): boolean => (
-  error instanceof DOMException
-    ? error.name === 'AbortError'
-    : error instanceof Error
-      ? error.name === 'AbortError' || /aborted|abort/i.test(error.message)
-      : false
-);
-
-const getRetryableAIErrorMessage = (error: unknown): string => {
-  const debugTransportError = (
-    typeof error === 'object'
-    && error !== null
-    && 'debug' in error
-    && typeof (error as { debug?: AIDebugExchange }).debug?.response?.body === 'object'
-    && (error as { debug?: AIDebugExchange }).debug?.response?.body
-    && 'transportError' in ((error as { debug?: AIDebugExchange }).debug?.response?.body as Record<string, unknown>)
-  )
-    ? String(((error as { debug?: AIDebugExchange }).debug?.response?.body as Record<string, unknown>).transportError || '')
-    : '';
-
-  const rawMessage = error instanceof Error ? error.message : String(error || '');
-  const message = (debugTransportError || rawMessage || '').trim();
-
-  if (!message) {
-    return 'AI 请求失败了。你可以点“重试”再试一次。';
-  }
-
-  if (/failed to fetch|networkerror|load failed|err_connection_closed|err_connection_reset|err_connection_close/i.test(message)) {
-    return '网络连接失败，可能是连接被关闭、网络波动，或 AI 服务暂时不可用。你可以点“重试”再试一次。';
-  }
-
-  if (/timeout|timed out|network request failed/i.test(message)) {
-    return '请求超时了，可能是网络较慢或 AI 服务响应过久。你可以点“重试”再试一次。';
-  }
-
-  return `AI 请求失败：${message}`;
-};
-
-const getErrorDebugSections = (
-  error: unknown,
-  label: string,
-  enabled: boolean
-): AIChatDebugSection[] | undefined => {
-  if (!enabled || typeof error !== 'object' || error === null || !('debug' in error)) {
-    return undefined;
-  }
-
-  const exchange = (error as { debug?: AIDebugExchange }).debug;
-  return exchange
-    ? [{
-      label,
-      exchange
-    }]
-    : undefined;
-};
 
 export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   isOpen,
@@ -2460,7 +449,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   onUnreadAssistantMessage,
   onMarkRead
 }) => {
-  const [initialState] = useState<InitialChatState>(() => loadInitialChatState());
+  const [initialState] = useState<InitialChatState>(() => loadInitialChatState(getLocalDateStr));
   const [personas, setPersonas] = useState<AIChatPersona[]>(initialState.personas);
   const [sessions, setSessions] = useState<AIChatSession[]>(initialState.sessions);
   const [activeSessionId, setActiveSessionId] = useState<string>(initialState.activeSessionId);
@@ -2546,6 +535,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messageElementRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const handleMessageElementRef = useCallback((messageId: string, node: HTMLDivElement | null) => {
+    if (node) {
+      messageElementRefs.current.set(messageId, node);
+      return;
+    }
+
+    messageElementRefs.current.delete(messageId);
+  }, []);
   const handledNavigationKeyRef = useRef('');
   const handledAssistantTriggerIdsRef = useRef<Set<string>>(new Set());
   const hasCompletedStartupReminderCatchupRef = useRef(false);
@@ -3362,118 +1359,46 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
   ), []);
 
-  const sortedSessions = useMemo(
-    () => [...sessions].sort((left, right) => right.updatedAt - left.updatedAt),
-    [sessions]
-  );
+  const sortedSessions = useMemo(() => sortChatSessionsByUpdatedAt(sessions), [sessions]);
+  const resolveSessionPersona = useCallback((session: AIChatSession) => (
+    personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0]
+  ), [personaMap, personas]);
 
   const buildConversationHistoryFromMessages = (
     session: AIChatSession,
     messages: AIChatMessage[]
   ): AIConversationTurn[] => {
     const sessionPersona = personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0];
-    if (!session.contextCacheEnabled || sessionPersona.contextMessageLimit <= 0) {
-      return [];
-    }
-
-    const turns = messages
-      .filter((message) => message.tone !== 'system' && message.tone !== 'pending')
-      .map((message) => ({
-        role: message.role,
-        content: message.content.trim(),
-        createdAt: formatAssistantLocalDateTime(new Date(message.createdAt))
-      }))
-      .filter((turn): turn is AIConversationTurn => Boolean(turn.content));
-
-    if (turns.length <= 1) {
-      return [];
-    }
-
-    const rounds: AIConversationTurn[][] = [];
-    let currentRound: AIConversationTurn[] = [];
-
-    turns.forEach((turn) => {
-      if (turn.role === 'user') {
-        if (currentRound.length > 1) {
-          rounds.push(currentRound);
-        }
-        currentRound = [turn];
-        return;
-      }
-
-      if (currentRound.length === 0) {
-        return;
-      }
-
-      currentRound = [...currentRound, turn];
-      rounds.push(currentRound);
-      currentRound = [];
+    return buildConversationHistoryFromSessionMessages(messages, {
+      contextCacheEnabled: session.contextCacheEnabled,
+      contextMessageLimit: sessionPersona.contextMessageLimit,
+      formatCreatedAt: formatAssistantLocalDateTime
     });
-
-    if (rounds.length === 0) {
-      return [];
-    }
-
-    return rounds.slice(-sessionPersona.contextMessageLimit).flat();
   };
 
   const buildConversationHistory = (session: AIChatSession): AIConversationTurn[] => (
     buildConversationHistoryFromMessages(session, session.messages)
   );
 
-  const narrowConversationHistoryForTimeSensitiveTurn = useCallback((
+  const narrowHistoryForTimeSensitiveTurn = useCallback((
     history: AIConversationTurn[],
     sourceText: string
-  ): AIConversationTurn[] => {
-    if (!TIME_SENSITIVE_MESSAGE_PATTERN.test(sourceText)) {
-      return history;
-    }
-
-    const recentUserTurns = history
-      .filter((turn) => turn.role === 'user')
-      .slice(-4);
-    if (recentUserTurns.length === 0) {
-      return history.slice(-6);
-    }
-
-    const earliestKeptCreatedAt = recentUserTurns[0]?.createdAt
-      ? Date.parse(recentUserTurns[0].createdAt)
-      : Number.NaN;
-    if (!Number.isFinite(earliestKeptCreatedAt)) {
-      return history.slice(-6);
-    }
-
-    return history.filter((turn) => {
-      const turnCreatedAt = typeof turn.createdAt === 'string' ? Date.parse(turn.createdAt) : Number.NaN;
-      return Number.isFinite(turnCreatedAt) && turnCreatedAt >= earliestKeptCreatedAt;
-    });
-  }, []);
+  ): AIConversationTurn[] => narrowConversationHistoryForTimeSensitiveTurn(
+    history,
+    sourceText,
+    TIME_SENSITIVE_MESSAGE_PATTERN
+  ), []);
 
   const buildRetryConversationHistory = (
     sessionId: string,
     retrySourceUserMessageId?: string
-  ): AIConversationTurn[] => {
-    if (!retrySourceUserMessageId) {
-      return conversationHistoryCache.get(sessionId) || [];
-    }
-
-    const session = sessions.find((candidate) => candidate.id === sessionId);
-    if (!session) {
-      return conversationHistoryCache.get(sessionId) || [];
-    }
-
-    const retryUserMessageIndex = session.messages.findIndex((message) => (
-      message.id === retrySourceUserMessageId && message.role === 'user'
-    ));
-    if (retryUserMessageIndex < 0) {
-      return conversationHistoryCache.get(sessionId) || [];
-    }
-
-    return buildConversationHistoryFromMessages(
-      session,
-      session.messages.slice(0, retryUserMessageIndex)
-    );
-  };
+  ): AIConversationTurn[] => buildRetryConversationHistoryFromSessions({
+    buildConversationHistoryFromMessages,
+    conversationHistoryCache,
+    retrySourceUserMessageId,
+    sessionId,
+    sessions
+  });
 
   const conversationHistoryCache = useMemo(
     () => new Map(
@@ -3483,9 +1408,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   );
 
   const reloadPersistedChatSessions = () => {
-    setSessions(normalizeSessions(
+    setSessions(normalizePersistedSessions(
       safeJsonParse<unknown>(localStorage.getItem(CHAT_SESSIONS_KEY), []),
-      personas
+      personas,
+      getLocalDateStr
     ));
   };
 
@@ -4428,23 +2354,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   ]);
 
   const mutateSession = (sessionId: string, updater: (session: AIChatSession) => AIChatSession) => {
-    setSessions((prev) => prev.map((session) => (
-      session.id === sessionId
-        ? {
-          ...updater(session),
-          updatedAt: Date.now()
-        }
-        : session
-    )));
+    setSessions((prev) => mutateChatSessions(prev, sessionId, updater));
   };
 
   const replaceMessage = (sessionId: string, messageId: string, nextMessage: AIChatMessage) => {
-    mutateSession(sessionId, (session) => ({
-      ...session,
-      messages: session.messages.map((message) => (
-        message.id === messageId ? nextMessage : message
-      ))
-    }));
+    setSessions((prev) => replaceSessionMessage(prev, sessionId, messageId, nextMessage));
   };
 
   const updateAppliedActionStatus = (
@@ -4453,23 +2367,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     actionId: string,
     nextStatus: AppliedActionStatus
   ) => {
-    mutateSession(sessionId, (session) => ({
-      ...session,
-      messages: session.messages.map((message) => {
-        if (message.id !== messageId || !message.appliedActions) {
-          return message;
-        }
-
-        return {
-          ...message,
-          appliedActions: message.appliedActions.map((action) => (
-            action.actionId === actionId
-              ? { ...action, status: nextStatus }
-              : action
-          ))
-        };
-      })
-    }));
+    setSessions((prev) => updateSessionAppliedActionStatus(prev, sessionId, messageId, actionId, nextStatus));
   };
 
   const appendSystemMessage = (
@@ -4480,45 +2378,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       tone?: ChatTone;
     }
   ) => {
-    const trimmed = content.trim();
-    if (!trimmed) {
-      return;
-    }
-
-    mutateSession(sessionId, (session) => ({
-      ...session,
-      messages: [
-        ...session.messages,
-        {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: trimmed,
-          createdAt: Date.now(),
-          tone: options?.tone || 'system',
-          ...(options?.debugSections?.length ? { debugSections: options.debugSections } : {})
-        }
-      ]
-    }));
+    setSessions((prev) => appendSystemMessageToChatSession(prev, sessionId, content, options));
   };
 
   const appendUserMessage = (sessionId: string, content: string) => {
-    const trimmed = content.trim();
-    if (!trimmed) {
-      return;
-    }
-
-    mutateSession(sessionId, (session) => ({
-      ...session,
-      messages: [
-        ...session.messages,
-        {
-          id: crypto.randomUUID(),
-          role: 'user',
-          content: trimmed,
-          createdAt: Date.now()
-        }
-      ]
-    }));
+    setSessions((prev) => appendUserMessageToChatSession(prev, sessionId, content));
   };
 
   const updateWeeklyReviewTemplateStage = (
@@ -4526,331 +2390,58 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     stage: WeeklyReviewTemplateSessionMeta['stage'],
     pendingWriteIntent = false
   ) => {
-    mutateSession(sessionId, (session) => ({
-      ...session,
-      ...(session.templateMeta
-        ? {
-          templateMeta: {
-            ...session.templateMeta,
-            stage,
-            pendingWriteIntent
-          }
-        }
-        : {})
-    }));
+    setSessions((prev) => updateWeeklyReviewTemplateStageInSessions(prev, sessionId, stage, pendingWriteIntent));
   };
 
-  const resolveWeeklyReviewTemplateSessionMeta = (
-    session: AIChatSession
-  ): Required<Pick<WeeklyReviewTemplateSessionMeta, 'weekStartDate' | 'weekEndDate' | 'selectedRangeLabel' | 'methodId' | 'methodLabel'>> | null => {
-    const meta = session.templateMeta;
-    if (
-      meta?.templateType !== 'weekly_review'
-      || typeof meta.weekStartDate !== 'string'
-      || !meta.weekStartDate.trim()
-      || typeof meta.weekEndDate !== 'string'
-      || !meta.weekEndDate.trim()
-      || (meta.selectedRangeLabel !== '本周' && meta.selectedRangeLabel !== '上周' && meta.selectedRangeLabel !== 'custom_date')
-      || (meta.methodId !== 'pdca' && meta.methodId !== 'systems' && meta.methodId !== 'cbt' && meta.methodId !== 'narrative')
-    ) {
-      return null;
-    }
-
-    return {
-      weekStartDate: meta.weekStartDate.trim(),
-      weekEndDate: meta.weekEndDate.trim(),
-      selectedRangeLabel: meta.selectedRangeLabel,
-      methodId: meta.methodId,
-      methodLabel: typeof meta.methodLabel === 'string' && meta.methodLabel.trim()
-        ? meta.methodLabel.trim()
-        : weeklyReviewTemplateService.listMethodOptions().find((item) => item.id === meta.methodId)?.title || '系统复盘'
-    };
-  };
-
-  const resolveMonthlyReviewTemplateSessionMeta = (
-    session: AIChatSession
-  ): Required<Pick<MonthlyReviewTemplateSessionMeta, 'monthStartDate' | 'monthEndDate' | 'selectedRangeLabel' | 'methodId' | 'methodLabel'>> | null => {
-    const meta = session.templateMeta;
-    if (
-      meta?.templateType !== 'monthly_review'
-      || typeof meta.monthStartDate !== 'string'
-      || !meta.monthStartDate.trim()
-      || typeof meta.monthEndDate !== 'string'
-      || !meta.monthEndDate.trim()
-      || (meta.selectedRangeLabel !== '本月' && meta.selectedRangeLabel !== '上月' && meta.selectedRangeLabel !== 'custom_date')
-      || (meta.methodId !== 'pdca' && meta.methodId !== 'systems' && meta.methodId !== 'cbt' && meta.methodId !== 'narrative')
-    ) {
-      return null;
-    }
-
-    return {
-      monthStartDate: meta.monthStartDate.trim(),
-      monthEndDate: meta.monthEndDate.trim(),
-      selectedRangeLabel: meta.selectedRangeLabel,
-      methodId: meta.methodId,
-      methodLabel: typeof meta.methodLabel === 'string' && meta.methodLabel.trim()
-        ? meta.methodLabel.trim()
-        : monthlyReviewTemplateService.listMethodOptions().find((item) => item.id === meta.methodId)?.title || '系统复盘'
-    };
-  };
-
-  const resolveWeeklyReviewTemplateRangeMeta = (
-    session: AIChatSession
-  ): Required<Pick<WeeklyReviewTemplateSessionMeta, 'weekStartDate' | 'weekEndDate' | 'selectedRangeLabel'>> | null => {
-    const meta = session.templateMeta;
-    if (
-      meta?.templateType !== 'weekly_review'
-      || typeof meta.weekStartDate !== 'string'
-      || !meta.weekStartDate.trim()
-      || typeof meta.weekEndDate !== 'string'
-      || !meta.weekEndDate.trim()
-      || (meta.selectedRangeLabel !== '本周' && meta.selectedRangeLabel !== '上周' && meta.selectedRangeLabel !== 'custom_date')
-    ) {
-      return null;
-    }
-
-    return {
-      weekStartDate: meta.weekStartDate.trim(),
-      weekEndDate: meta.weekEndDate.trim(),
-      selectedRangeLabel: meta.selectedRangeLabel
-    };
-  };
-
-  const resolveMonthlyReviewTemplateRangeMeta = (
-    session: AIChatSession
-  ): Required<Pick<MonthlyReviewTemplateSessionMeta, 'monthStartDate' | 'monthEndDate' | 'selectedRangeLabel'>> | null => {
-    const meta = session.templateMeta;
-    if (
-      meta?.templateType !== 'monthly_review'
-      || typeof meta.monthStartDate !== 'string'
-      || !meta.monthStartDate.trim()
-      || typeof meta.monthEndDate !== 'string'
-      || !meta.monthEndDate.trim()
-      || (meta.selectedRangeLabel !== '本月' && meta.selectedRangeLabel !== '上月' && meta.selectedRangeLabel !== 'custom_date')
-    ) {
-      return null;
-    }
-
-    return {
-      monthStartDate: meta.monthStartDate.trim(),
-      monthEndDate: meta.monthEndDate.trim(),
-      selectedRangeLabel: meta.selectedRangeLabel
-    };
-  };
+  const prepareForTemplateInteraction = useCallback(() => {
+    setInputText('');
+    setIsHistoryPanelOpen(false);
+    setIsPersonaPanelOpen(false);
+  }, []);
 
   const handleWeeklyReviewTemplateGuidedSelection = async (
     session: AIChatSession,
     userInput: string
-  ): Promise<boolean> => {
-    const sessionId = session.id;
-    const trimmedInput = userInput.trim();
-    if (!trimmedInput || session.templateMeta?.templateType !== 'weekly_review') {
-      return false;
-    }
-
-    const now = Date.now();
-    mutateSession(sessionId, (currentSession) => ({
-      ...currentSession,
-      messages: [
-        ...currentSession.messages,
-        {
-          id: crypto.randomUUID(),
-          role: 'user',
-          content: trimmedInput,
-          createdAt: now
-        }
-      ]
-    }));
-    setInputText('');
-    setIsHistoryPanelOpen(false);
-    setIsPersonaPanelOpen(false);
-
-    if (session.templateMeta.stage === 'select_range') {
-      const selection = weeklyReviewTemplateService.parseWeekSelectionInput(trimmedInput, new Date());
-      if (!selection) {
-        appendSystemMessage(sessionId, weeklyReviewTemplateService.getRangeSelectionInvalidPrompt());
-        return true;
-      }
-
-      mutateSession(sessionId, (currentSession) => ({
-        ...currentSession,
-        title: weeklyReviewTemplateService.getSessionTitle(selection),
-        ...(currentSession.templateMeta
-          ? {
-            templateMeta: {
-              ...currentSession.templateMeta,
-              stage: 'select_method',
-              weekStartDate: selection.weekStartDate,
-              weekEndDate: selection.weekEndDate,
-              selectedRangeLabel: selection.selectedRangeLabel,
-              methodId: undefined,
-              methodLabel: undefined,
-              pendingWriteIntent: false
-            }
-          }
-          : {})
-      }));
-      appendSystemMessage(sessionId, weeklyReviewTemplateService.getMethodSelectionPrompt(selection));
-      return true;
-    }
-
-    if (session.templateMeta.stage === 'select_method') {
-      const methodId = weeklyReviewTemplateService.parseMethodSelectionInput(trimmedInput);
-      if (!methodId) {
-        appendSystemMessage(sessionId, weeklyReviewTemplateService.getMethodSelectionInvalidPrompt());
-        return true;
-      }
-
-      const selectionMeta = resolveWeeklyReviewTemplateRangeMeta(session);
-      if (!selectionMeta) {
-        appendSystemMessage(sessionId, weeklyReviewTemplateService.getRangeSelectionPrompt());
-        mutateSession(sessionId, (currentSession) => ({
-          ...currentSession,
-          title: '周复盘模板对话',
-          ...(currentSession.templateMeta
-            ? {
-              templateMeta: weeklyReviewTemplateService.createSetupSessionMeta()
-            }
-            : {})
-        }));
-        return true;
-      }
-
-      const methodLabel = weeklyReviewTemplateService.listMethodOptions().find((item) => item.id === methodId)?.title || '系统复盘';
-      const readySession: AIChatSession = {
-        ...session,
-        title: weeklyReviewTemplateService.getSessionTitle(selectionMeta),
-        templateMeta: {
-          ...(session.templateMeta || weeklyReviewTemplateService.createSetupSessionMeta()),
-          templateType: 'weekly_review',
-          stage: 'ready',
-          weekStartDate: selectionMeta.weekStartDate,
-          weekEndDate: selectionMeta.weekEndDate,
-          selectedRangeLabel: selectionMeta.selectedRangeLabel,
-          methodId,
-          methodLabel,
-          pendingWriteIntent: false
-        }
-      };
-
-      mutateSession(sessionId, (currentSession) => ({
-        ...currentSession,
-        title: readySession.title,
-        templateMeta: readySession.templateMeta
-      }));
-      await handleWeeklyReviewTemplateOpeningTurn(readySession);
-      return true;
-    }
-
-    return false;
-  };
+  ): Promise<boolean> => runWeeklyReviewTemplateGuidedSelection({
+    activeRequestRef,
+    appendSystemMessage,
+    buildConversationHistory,
+    buildPersonaPrompt,
+    getErrorDebugSections,
+    getRetryableAIErrorMessage,
+    isAbortError,
+    mutateSession,
+    onReadySession: handleWeeklyReviewTemplateOpeningTurn,
+    prepareForTemplateInteraction,
+    replacePendingWithResult,
+    resolveAssistantDisplayParts,
+    resolveAssistantReplyContent,
+    session,
+    setIsLoading,
+    userInput
+  });
 
   const handleMonthlyReviewTemplateGuidedSelection = async (
     session: AIChatSession,
     userInput: string
-  ): Promise<boolean> => {
-    const sessionId = session.id;
-    const trimmedInput = userInput.trim();
-    if (!trimmedInput || session.templateMeta?.templateType !== 'monthly_review') {
-      return false;
-    }
-
-    const now = Date.now();
-    mutateSession(sessionId, (currentSession) => ({
-      ...currentSession,
-      messages: [
-        ...currentSession.messages,
-        {
-          id: crypto.randomUUID(),
-          role: 'user',
-          content: trimmedInput,
-          createdAt: now
-        }
-      ]
-    }));
-    setInputText('');
-    setIsHistoryPanelOpen(false);
-    setIsPersonaPanelOpen(false);
-
-    if (session.templateMeta.stage === 'select_range') {
-      const selection = monthlyReviewTemplateService.parseMonthSelectionInput(trimmedInput, new Date());
-      if (!selection) {
-        appendSystemMessage(sessionId, monthlyReviewTemplateService.getRangeSelectionInvalidPrompt());
-        return true;
-      }
-
-      mutateSession(sessionId, (currentSession) => ({
-        ...currentSession,
-        title: monthlyReviewTemplateService.getSessionTitle(selection),
-        ...(currentSession.templateMeta
-          ? {
-            templateMeta: {
-              ...currentSession.templateMeta,
-              stage: 'select_method',
-              monthStartDate: selection.monthStartDate,
-              monthEndDate: selection.monthEndDate,
-              selectedRangeLabel: selection.selectedRangeLabel,
-              methodId: undefined,
-              methodLabel: undefined,
-              pendingWriteIntent: false
-            }
-          }
-          : {})
-      }));
-      appendSystemMessage(sessionId, monthlyReviewTemplateService.getMethodSelectionPrompt(selection));
-      return true;
-    }
-
-    if (session.templateMeta.stage === 'select_method') {
-      const methodId = monthlyReviewTemplateService.parseMethodSelectionInput(trimmedInput);
-      if (!methodId) {
-        appendSystemMessage(sessionId, monthlyReviewTemplateService.getMethodSelectionInvalidPrompt());
-        return true;
-      }
-
-      const selectionMeta = resolveMonthlyReviewTemplateRangeMeta(session);
-      if (!selectionMeta) {
-        appendSystemMessage(sessionId, monthlyReviewTemplateService.getRangeSelectionPrompt());
-        mutateSession(sessionId, (currentSession) => ({
-          ...currentSession,
-          title: '月复盘模板对话',
-          ...(currentSession.templateMeta
-            ? {
-              templateMeta: monthlyReviewTemplateService.createSetupSessionMeta()
-            }
-            : {})
-        }));
-        return true;
-      }
-
-      const methodLabel = monthlyReviewTemplateService.listMethodOptions().find((item) => item.id === methodId)?.title || '系统复盘';
-      const readySession: AIChatSession = {
-        ...session,
-        title: monthlyReviewTemplateService.getSessionTitle(selectionMeta),
-        templateMeta: {
-          ...(session.templateMeta || monthlyReviewTemplateService.createSetupSessionMeta()),
-          templateType: 'monthly_review',
-          stage: 'ready',
-          monthStartDate: selectionMeta.monthStartDate,
-          monthEndDate: selectionMeta.monthEndDate,
-          selectedRangeLabel: selectionMeta.selectedRangeLabel,
-          methodId,
-          methodLabel,
-          pendingWriteIntent: false
-        }
-      };
-
-      mutateSession(sessionId, (currentSession) => ({
-        ...currentSession,
-        title: readySession.title,
-        templateMeta: readySession.templateMeta
-      }));
-      await handleMonthlyReviewTemplateOpeningTurn(readySession);
-      return true;
-    }
-
-    return false;
-  };
+  ): Promise<boolean> => runMonthlyReviewTemplateGuidedSelection({
+    activeRequestRef,
+    appendSystemMessage,
+    buildConversationHistory,
+    buildPersonaPrompt,
+    getErrorDebugSections,
+    getRetryableAIErrorMessage,
+    isAbortError,
+    mutateSession,
+    onReadySession: handleMonthlyReviewTemplateOpeningTurn,
+    prepareForTemplateInteraction,
+    replacePendingWithResult,
+    resolveAssistantDisplayParts,
+    resolveAssistantReplyContent,
+    session,
+    setIsLoading,
+    userInput
+  });
 
   const appendDebugSectionToMessage = (
     sessionId: string,
@@ -4917,17 +2508,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return;
     }
 
-    const templateSession = createDefaultSession(activeSession.personaId, {
-      title: '周复盘模板对话',
-      templateMeta: weeklyReviewTemplateService.createSetupSessionMeta(),
-      messages: [{
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: weeklyReviewTemplateService.getRangeSelectionPrompt(),
-        createdAt: Date.now(),
-        tone: 'system'
-      }]
-    });
+    const templateSession = createWeeklyReviewTemplateSession(activeSession.personaId);
 
     setSessions((prev) => [templateSession, ...prev]);
     setActiveSessionId(templateSession.id);
@@ -4941,17 +2522,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return;
     }
 
-    const templateSession = createDefaultSession(activeSession.personaId, {
-      title: '月复盘模板对话',
-      messages: [{
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: monthlyReviewTemplateService.getRangeSelectionPrompt(),
-        createdAt: Date.now(),
-        tone: 'system'
-      }],
-      templateMeta: monthlyReviewTemplateService.createSetupSessionMeta()
-    });
+    const templateSession = createMonthlyReviewTemplateSession(activeSession.personaId);
 
     setSessions((prev) => [templateSession, ...prev]);
     setActiveSessionId(templateSession.id);
@@ -4990,6 +2561,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const handleCancelRenameSession = () => {
     setEditingSessionId(null);
     setEditingSessionTitle('');
+  };
+
+  const handleSelectSessionFromHistory = (sessionId: string) => {
+    setActiveSessionId(sessionId);
+    setIsHistoryPanelOpen(false);
+  };
+
+  const handleToggleDeleteSession = (sessionId: string) => {
+    setEditingSessionId(null);
+    setEditingSessionTitle('');
+    setDeleteConfirmSessionId((current) => (current === sessionId ? null : sessionId));
   };
 
   const handleCommitRenameSession = (sessionId: string) => {
@@ -5454,6 +3036,41 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     addToast('success', '已重置 Dream');
   };
 
+  const handleToggleDreamResetConfirm = () => {
+    setIsDreamResetConfirmOpen((current) => !current);
+    setDreamTopicDeleteTargetId(null);
+    setDreamEntryDeleteTargetId(null);
+    setEditingDreamEntryId(null);
+    setDreamEntryDrafts(DEFAULT_DREAM_ENTRY_DRAFTS);
+  };
+
+  const handleCancelDreamReset = () => {
+    setIsDreamResetConfirmOpen(false);
+  };
+
+  const handleCancelDreamTopicDelete = () => {
+    setDreamTopicDeleteTargetId(null);
+  };
+
+  const handleCancelDreamEntryDelete = () => {
+    setDreamEntryDeleteTargetId(null);
+  };
+
+  const handleSelectDreamTopic = (topicId: string) => {
+    setSelectedDreamTopicId(topicId);
+  };
+
+  const handleToggleDreamTopicNoteExpanded = () => {
+    setIsDreamTopicNoteExpanded((current) => !current);
+  };
+
+  const handleRunDreamFromViewer = () => {
+    if (!isLoading && activeSession) {
+      handleCloseDreamViewer();
+      handleStartDreamMonthSelection(activeSession.id);
+    }
+  };
+
   const handleStartDreamMonthSelection = (sessionId: string) => {
     const now = Date.now();
     mutateSession(sessionId, (currentSession) => ({
@@ -5507,7 +3124,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }));
     setInputText('');
 
-    const selectedMonth = parseDreamMonthSelection(trimmedInput);
+    const selectedMonth = parseDreamMonthSelection(trimmedInput, getLocalDateStr);
     if (!selectedMonth) {
       mutateSession(sessionId, (currentSession) => ({
         ...currentSession,
@@ -6012,7 +3629,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const historyBeforeCurrent = canRetryInPlace
       ? buildRetryConversationHistory(sessionId, options?.retrySourceUserMessageId)
       : (conversationHistoryCache.get(sessionId) || []);
-    const promptHistory = narrowConversationHistoryForTimeSensitiveTurn(historyBeforeCurrent, trimmedText);
+    const promptHistory = narrowHistoryForTimeSensitiveTurn(historyBeforeCurrent, trimmedText);
 
     if (canRetryInPlace) {
       mutateSession(sessionId, (session) => ({
@@ -6668,136 +4285,30 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       mergeMode: 'create' | 'overwrite';
       createdReview: boolean;
     }
-  ) => {
-    const sessionId = session.id;
-    const pendingMessageId = crypto.randomUUID();
-    const now = Date.now();
-    const sessionPersona = personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0];
-    const conversationSummary = assistantContextBuilder.summarizeConversationTurns(
-      conversationHistoryCache.get(session.id) || [],
+  ) => runWeeklyReviewNarrativeWritebackFlow({
+    activeRequestRef,
+    addToast,
+    buildConversationHistory,
+    buildPersonaPrompt,
+    getConversationSummary: (sessionId) => assistantContextBuilder.summarizeConversationTurns(
+      conversationHistoryCache.get(sessionId) || [],
       24
-    );
-
-    mutateSession(sessionId, (currentSession) => ({
-      ...currentSession,
-      messages: [
-        ...currentSession.messages,
-        {
-          id: pendingMessageId,
-          role: 'assistant',
-          content: '我来整理成这周的 AI 叙事。',
-          createdAt: now,
-          tone: 'pending'
-        }
-      ]
-    }));
-
-    setInputText('');
-    setIsLoading(true);
-    setIsHistoryPanelOpen(false);
-    setIsPersonaPanelOpen(false);
-
-    const controller = new AbortController();
-    activeRequestRef.current = {
-      controller,
-      sessionId,
-      pendingMessageId
-    };
-
-    if (params.createdReview) {
-      setWeeklyReviews((previousReviews) => {
-        if (previousReviews.some((review) => review.id === params.weeklyReview.id)) {
-          return previousReviews;
-        }
-
-        return [...previousReviews, params.weeklyReview];
-      });
-    }
-
-    try {
-      const templateMeta = resolveWeeklyReviewTemplateSessionMeta(session);
-      if (!templateMeta) {
-        throw new Error('周复盘上下文还没有准备好。');
-      }
-
-      const { systemPrompt, userPrompt } = await weeklyReviewTemplateService.buildNarrativeWritebackPrompts({
-        personaPrompt: buildPersonaPrompt(sessionPersona),
-        weekDataText: params.weekDataText,
-        conversationSummary,
-        mergeMode: params.mergeMode,
-        methodId: templateMeta.methodId
-      });
-
-      const rawToolCallResponse = await aiService.generateNarrative(userPrompt, systemPrompt);
-
-      if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
-        return;
-      }
-
-      const toolCall = weeklyReviewTemplateService.parseNarrativeToolCallResponse(
-        rawToolCallResponse,
-        params.weeklyReview.weekStartDate,
-        params.weeklyReview.weekEndDate,
-        params.mergeMode
-      );
-      const narrative = weeklyReviewTemplateService.buildNarrativeFromToolCall(toolCall);
-
-      setWeeklyReviews((previousReviews) => (
-        weeklyReviewTemplateService.updateWeeklyReviewNarrative(
-          previousReviews,
-          params.weeklyReview.id,
-          narrative
-        )
-      ));
-
-      const parsedNarrative = parseNarrative(narrative, `周复盘 ${params.weeklyReview.weekStartDate}`);
-      const writebackResultCard: AIChatWeeklyReviewWritebackResult = {
-        weeklyReviewId: params.weeklyReview.id,
-        weekStartDate: params.weeklyReview.weekStartDate,
-        weekEndDate: params.weeklyReview.weekEndDate,
-        title: parsedNarrative.title,
-        preview: parsedNarrative.content,
-        createdReview: params.createdReview,
-        mergeMode: params.mergeMode
-      };
-
-      const successMessage = params.createdReview
-        ? '已新建本周 Weekly Review，并写入 AI 叙事。'
-        : '已覆盖写入这周的 AI 叙事。';
-
-      replacePendingWithResult(sessionId, pendingMessageId, successMessage, {
-        tone: 'system',
-        weeklyReviewWriteback: writebackResultCard
-      });
-      updateWeeklyReviewTemplateStage(sessionId, 'ready');
-      addToast('success', 'AI 叙事已写入周回顾');
-    } catch (error) {
-      const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
-
-      if (isAbortError(error)) {
-        if (isCurrentPendingRequest) {
-          replacePendingWithResult(sessionId, pendingMessageId, '已停止这次写入。', {
-            tone: 'system'
-          });
-        }
-        return;
-      }
-
-      if (!isCurrentPendingRequest || controller.signal.aborted) {
-        return;
-      }
-
-      replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), {
-        tone: 'error'
-      });
-      updateWeeklyReviewTemplateStage(sessionId, 'ready');
-    } finally {
-      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
-        activeRequestRef.current = null;
-        setIsLoading(false);
-      }
-    }
-  };
+    ),
+    getRetryableAIErrorMessage,
+    isAbortError,
+    mutateSession,
+    params,
+    replacePendingWithResult,
+    resolveSessionPersona,
+    resolveTemplateMeta: resolveWeeklyReviewTemplateSessionMeta,
+    session,
+    setInputText,
+    setIsHistoryPanelOpen,
+    setIsLoading,
+    setIsPersonaPanelOpen,
+    setWeeklyReviews,
+    updateWeeklyReviewTemplateStage
+  });
 
   const runDailyReviewNarrativeWriteback = async (
     session: AIChatSession,
@@ -6807,146 +4318,30 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       mergeMode: 'create' | 'overwrite';
       createdReview: boolean;
     }
-  ) => {
-    const sessionId = session.id;
-    const pendingMessageId = crypto.randomUUID();
-    const now = Date.now();
-    const sessionPersona = personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0];
-    const conversationSummary = assistantContextBuilder.summarizeConversationTurns(
-      conversationHistoryCache.get(session.id) || [],
+  ) => runDailyReviewNarrativeWritebackFlow({
+    activeRequestRef,
+    addToast,
+    buildConversationHistory,
+    buildPersonaPrompt,
+    debugMode,
+    getConversationSummary: (sessionId) => assistantContextBuilder.summarizeConversationTurns(
+      conversationHistoryCache.get(sessionId) || [],
       24
-    );
-
-    mutateSession(sessionId, (currentSession) => ({
-      ...currentSession,
-      messages: [
-        ...currentSession.messages,
-        {
-          id: pendingMessageId,
-          role: 'assistant',
-          content: '我来整理今天的日报。',
-          createdAt: now,
-          tone: 'pending'
-        }
-      ]
-    }));
-
-    setInputText('');
-    setIsLoading(true);
-    setIsHistoryPanelOpen(false);
-    setIsPersonaPanelOpen(false);
-    setDailyReviewWritebackConfirmation(null);
-
-    const controller = new AbortController();
-    activeRequestRef.current = {
-      controller,
-      sessionId,
-      pendingMessageId
-    };
-
-    if (params.createdReview) {
-      setDailyReviews((previousReviews) => {
-        if (previousReviews.some((review) => review.id === params.dailyReview.id)) {
-          return previousReviews;
-        }
-
-        return [...previousReviews, params.dailyReview];
-      });
-    }
-
-    try {
-      const { systemPrompt, userPrompt } = await dailyReviewTemplateService.buildNarrativeWritebackPrompts({
-        personaPrompt: buildPersonaPrompt(sessionPersona),
-        dayDataText: params.dayDataText,
-        conversationSummary,
-        existingNarrative: params.dailyReview.narrative,
-        mergeMode: params.mergeMode
-      });
-
-      const dailyWritebackResult = await aiService.requestStructuredJsonWithDebug({
-        systemPrompt,
-        userPrompt,
-        conversationHistory: buildConversationHistory(session),
-        cacheHint: {
-          keySeed: `daily_review_writeback:${params.dailyReview.date}:${params.mergeMode}`,
-          scope: 'daily_review_writeback'
-        },
-        normalizeResult: (rawValue) => dailyReviewTemplateService.parseNarrativeToolCallResponse(
-          rawValue,
-          params.dailyReview.date,
-          params.mergeMode
-        )
-      }, {
-        signal: controller.signal
-      });
-
-      if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
-        return;
-      }
-
-      const narrative = dailyReviewTemplateService.buildNarrativeFromToolCall(dailyWritebackResult.result.toolCall);
-
-      setDailyReviews((previousReviews) => (
-        dailyReviewTemplateService.updateDailyReviewNarrative(
-          previousReviews,
-          params.dailyReview.id,
-          narrative
-        )
-      ));
-
-      const parsedNarrative = parseNarrative(narrative, `日报 ${params.dailyReview.date}`);
-      const writebackResultCard: AIChatDailyReviewWritebackResult = {
-        dailyReviewId: params.dailyReview.id,
-        date: params.dailyReview.date,
-        title: parsedNarrative.title,
-        preview: parsedNarrative.content,
-        createdReview: params.createdReview,
-        mergeMode: params.mergeMode
-      };
-
-      const successMessage = params.createdReview
-        ? dailyWritebackResult.result.assistantReply
-        : dailyWritebackResult.result.assistantReply;
-
-      replacePendingWithResult(sessionId, pendingMessageId, successMessage, {
-        tone: 'system',
-        dailyReviewWriteback: writebackResultCard,
-        ...(debugMode
-          ? {
-            debugSections: [{
-              label: '日报写入 AI 叙事',
-              exchange: dailyWritebackResult.debug
-            }]
-          }
-          : {})
-      });
-      addToast('success', 'AI 叙事已写入日报');
-    } catch (error) {
-      const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
-
-      if (isAbortError(error)) {
-        if (isCurrentPendingRequest) {
-          replacePendingWithResult(sessionId, pendingMessageId, '已停止这次写入。', {
-            tone: 'system'
-          });
-        }
-        return;
-      }
-
-      if (!isCurrentPendingRequest || controller.signal.aborted) {
-        return;
-      }
-
-      replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), {
-        tone: 'error'
-      });
-    } finally {
-      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
-        activeRequestRef.current = null;
-        setIsLoading(false);
-      }
-    }
-  };
+    ),
+    getRetryableAIErrorMessage,
+    isAbortError,
+    mutateSession,
+    params,
+    replacePendingWithResult,
+    resolveSessionPersona,
+    session,
+    setDailyReviewWritebackConfirmation,
+    setDailyReviews,
+    setInputText,
+    setIsHistoryPanelOpen,
+    setIsLoading,
+    setIsPersonaPanelOpen
+  });
 
   const runMonthlyReviewNarrativeWriteback = async (
     session: AIChatSession,
@@ -6956,286 +4351,98 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       mergeMode: 'create' | 'overwrite';
       createdReview: boolean;
     }
-  ) => {
-    const sessionId = session.id;
-    const pendingMessageId = crypto.randomUUID();
-    const now = Date.now();
-    const sessionPersona = personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0];
-    const conversationSummary = assistantContextBuilder.summarizeConversationTurns(
-      conversationHistoryCache.get(session.id) || [],
+  ) => runMonthlyReviewNarrativeWritebackFlow({
+    activeRequestRef,
+    addToast,
+    buildConversationHistory,
+    buildPersonaPrompt,
+    getConversationSummary: (sessionId) => assistantContextBuilder.summarizeConversationTurns(
+      conversationHistoryCache.get(sessionId) || [],
       24
-    );
+    ),
+    getRetryableAIErrorMessage,
+    isAbortError,
+    mutateSession,
+    params,
+    replacePendingWithResult,
+    resolveSessionPersona,
+    resolveTemplateMeta: resolveMonthlyReviewTemplateSessionMeta,
+    session,
+    setInputText,
+    setIsHistoryPanelOpen,
+    setIsLoading,
+    setIsPersonaPanelOpen,
+    setMonthlyReviews,
+    updateWeeklyReviewTemplateStage
+  });
 
-    mutateSession(sessionId, (currentSession) => ({
-      ...currentSession,
-      messages: [
-        ...currentSession.messages,
-        {
-          id: pendingMessageId,
-          role: 'assistant',
-          content: '我来整理成本月的 AI 叙事。',
-          createdAt: now,
-          tone: 'pending'
-        }
-      ]
-    }));
-
-    setInputText('');
-    setIsLoading(true);
-    setIsHistoryPanelOpen(false);
-    setIsPersonaPanelOpen(false);
-
-    const controller = new AbortController();
-    activeRequestRef.current = {
-      controller,
-      sessionId,
-      pendingMessageId
-    };
-
-    if (params.createdReview) {
-      setMonthlyReviews((previousReviews) => {
-        if (previousReviews.some((review) => review.id === params.monthlyReview.id)) {
-          return previousReviews;
-        }
-
-        return [...previousReviews, params.monthlyReview];
-      });
-    }
-
-    try {
-      const templateMeta = resolveMonthlyReviewTemplateSessionMeta(session);
-      if (!templateMeta) {
-        throw new Error('月复盘上下文还没有准备好。');
-      }
-
-      const { systemPrompt, userPrompt } = await monthlyReviewTemplateService.buildNarrativeWritebackPrompts({
-        personaPrompt: buildPersonaPrompt(sessionPersona),
-        monthDataText: params.monthDataText,
-        conversationSummary,
-        mergeMode: params.mergeMode
-      });
-
-      const rawToolCallResponse = await aiService.generateNarrative(userPrompt, systemPrompt);
-
-      if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
-        return;
-      }
-
-      const toolCall = monthlyReviewTemplateService.parseNarrativeToolCallResponse(
-        rawToolCallResponse,
-        params.monthlyReview.monthStartDate,
-        params.monthlyReview.monthEndDate,
-        params.mergeMode
-      );
-      const narrative = monthlyReviewTemplateService.buildNarrativeFromToolCall(toolCall);
-
-      setMonthlyReviews((previousReviews) => (
-        monthlyReviewTemplateService.updateMonthlyReviewNarrative(
-          previousReviews,
-          params.monthlyReview.id,
-          narrative
-        )
-      ));
-
-      const parsedNarrative = parseNarrative(narrative, `月复盘 ${params.monthlyReview.monthStartDate}`);
-      const writebackResultCard: AIChatMonthlyReviewWritebackResult = {
-        monthlyReviewId: params.monthlyReview.id,
-        monthStartDate: params.monthlyReview.monthStartDate,
-        monthEndDate: params.monthlyReview.monthEndDate,
-        title: parsedNarrative.title,
-        preview: parsedNarrative.content,
-        createdReview: params.createdReview,
-        mergeMode: params.mergeMode
-      };
-
-      const successMessage = params.createdReview
-        ? '已新建本月 Monthly Review，并写入 AI 叙事。'
-        : '已覆盖写入这个月的 AI 叙事。';
-
-      replacePendingWithResult(sessionId, pendingMessageId, successMessage, {
-        tone: 'system',
-        monthlyReviewWriteback: writebackResultCard
-      });
-      updateWeeklyReviewTemplateStage(sessionId, 'ready');
-      addToast('success', 'AI 叙事已写入月回顾');
-    } catch (error) {
-      const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
-
-      if (isAbortError(error)) {
-        if (isCurrentPendingRequest) {
-          replacePendingWithResult(sessionId, pendingMessageId, '已停止这次写入。', {
-            tone: 'system'
-          });
-        }
-        return;
-      }
-
-      if (!isCurrentPendingRequest || controller.signal.aborted) {
-        return;
-      }
-
-      replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), {
-        tone: 'error'
-      });
-      updateWeeklyReviewTemplateStage(sessionId, 'ready');
-    } finally {
-      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
-        activeRequestRef.current = null;
-        setIsLoading(false);
-      }
-    }
-  };
-
-  const handleWeeklyReviewNarrativeWritebackCommand = async (session: AIChatSession) => {
-    const templateMeta = resolveWeeklyReviewTemplateSessionMeta(session);
-    if (!templateMeta) {
-      return;
-    }
-
-    const weekDataText = buildWeeklyReviewTemplateWeekDataText(session);
-    if (!weekDataText) {
-      addToast('error', '这段对话还没有可用的周复盘数据。');
-      return;
-    }
-
-    const ensuredReview = weeklyReviewTemplateService.ensureWeeklyReview(
-      weeklyReviews,
+  const handleWeeklyReviewNarrativeWritebackCommand = async (session: AIChatSession) => (
+    runWeeklyReviewNarrativeWritebackCommandFlow({
+      addToast,
+      buildWeekDataText: buildWeeklyReviewTemplateWeekDataText,
+      resolveTemplateMeta: resolveWeeklyReviewTemplateSessionMeta,
       reviewTemplates,
-      templateMeta.weekStartDate,
-      templateMeta.weekEndDate
-    );
+      runWriteback: runWeeklyReviewNarrativeWriteback,
+      session,
+      weeklyReviews
+    })
+  );
 
-    await runWeeklyReviewNarrativeWriteback(session, {
-      weeklyReview: ensuredReview.weeklyReview,
-      weekDataText,
-      mergeMode: ensuredReview.weeklyReview.narrative?.trim() ? 'overwrite' : 'create',
-      createdReview: ensuredReview.created
-    });
-  };
-
-  const handleDailyReviewNarrativeCommand = async (session: AIChatSession) => {
-    const today = new Date();
-    today.setHours(12, 0, 0, 0);
-    const date = getLocalDateStr(today);
-    const ensuredReview = dailyReviewTemplateService.ensureDailyReview(
-      dailyReviews,
-      checkTemplates,
-      reviewTemplates,
-      date
-    );
-    const dayDataText = dailyReviewTemplateService.buildDayDataText({
-      date,
-      logs,
+  const handleDailyReviewNarrativeCommand = async (session: AIChatSession) => (
+    runDailyReviewNarrativeCommandFlow({
+      appendSystemMessage,
       categories,
-      todos,
-      todoCategories,
+      checkTemplates,
+      dailyReviews,
+      getLocalDateStr,
+      logs,
+      prepareForInteraction: prepareForTemplateInteraction,
+      reviewTemplates,
+      runWriteback: runDailyReviewNarrativeWriteback,
       scopes,
-      dailyReviews: ensuredReview.created ? [...dailyReviews, ensuredReview.dailyReview] : dailyReviews,
-      dailyReview: ensuredReview.dailyReview
-    });
-
-    if (ensuredReview.dailyReview.narrative?.trim()) {
-      setDailyReviewWritebackConfirmation({
-        sessionId: session.id,
-        date
-      });
-      appendSystemMessage(
-        session.id,
-        `今天（${date}）的日报已经有 AI 叙事了。回复“是”覆盖，回复“否”取消。`
-      );
-      return;
-    }
-
-    await runDailyReviewNarrativeWriteback(session, {
-      dailyReview: ensuredReview.dailyReview,
-      dayDataText,
-      mergeMode: 'create',
-      createdReview: ensuredReview.created
-    });
-  };
+      session,
+      setConfirmation: setDailyReviewWritebackConfirmation,
+      todoCategories,
+      todos
+    })
+  );
 
   const handleDailyReviewNarrativeOverwriteConfirmation = async (
     session: AIChatSession,
     userInput: string
-  ): Promise<boolean> => {
-    if (!dailyReviewWritebackConfirmation || dailyReviewWritebackConfirmation.sessionId !== session.id) {
-      return false;
-    }
-
-    const trimmed = userInput.trim();
-    if (!trimmed) {
-      return true;
-    }
-
-    appendUserMessage(session.id, trimmed);
-    setInputText('');
-    setIsHistoryPanelOpen(false);
-    setIsPersonaPanelOpen(false);
-
-    if (trimmed === '否') {
-      setDailyReviewWritebackConfirmation(null);
-      appendSystemMessage(session.id, '这次日报写入已取消。');
-      return true;
-    }
-
-    if (trimmed !== '是') {
-      appendSystemMessage(session.id, '今天的日报已有 AI 叙事。请回复“是”覆盖，或回复“否”取消。');
-      return true;
-    }
-
-    const date = dailyReviewWritebackConfirmation.date;
-    const ensuredReview = dailyReviewTemplateService.ensureDailyReview(
-      dailyReviews,
-      checkTemplates,
-      reviewTemplates,
-      date
-    );
-    const dayDataText = dailyReviewTemplateService.buildDayDataText({
-      date,
-      logs,
+  ): Promise<boolean> => (
+    runDailyReviewNarrativeOverwriteConfirmationFlow({
+      appendSystemMessage,
+      appendUserMessage,
       categories,
-      todos,
-      todoCategories,
-      scopes,
-      dailyReviews: ensuredReview.created ? [...dailyReviews, ensuredReview.dailyReview] : dailyReviews,
-      dailyReview: ensuredReview.dailyReview
-    });
-
-    await runDailyReviewNarrativeWriteback(session, {
-      dailyReview: ensuredReview.dailyReview,
-      dayDataText,
-      mergeMode: 'overwrite',
-      createdReview: ensuredReview.created
-    });
-    return true;
-  };
-
-  const handleMonthlyReviewNarrativeWritebackCommand = async (session: AIChatSession) => {
-    const templateMeta = resolveMonthlyReviewTemplateSessionMeta(session);
-    if (!templateMeta) {
-      return;
-    }
-
-    const monthDataText = buildMonthlyReviewTemplateMonthDataText(session);
-    if (!monthDataText) {
-      addToast('error', '这段对话还没有可用的月复盘数据。');
-      return;
-    }
-
-    const ensuredReview = monthlyReviewTemplateService.ensureMonthlyReview(
-      monthlyReviews,
+      checkTemplates,
+      confirmation: dailyReviewWritebackConfirmation,
+      dailyReviews,
+      getLocalDateStr,
+      logs,
+      prepareForInteraction: prepareForTemplateInteraction,
       reviewTemplates,
-      templateMeta.monthStartDate,
-      templateMeta.monthEndDate
-    );
+      runWriteback: runDailyReviewNarrativeWriteback,
+      scopes,
+      session,
+      setConfirmation: setDailyReviewWritebackConfirmation,
+      todoCategories,
+      todos,
+      userInput
+    })
+  );
 
-    await runMonthlyReviewNarrativeWriteback(session, {
-      monthlyReview: ensuredReview.monthlyReview,
-      monthDataText,
-      mergeMode: ensuredReview.monthlyReview.narrative?.trim() ? 'overwrite' : 'create',
-      createdReview: ensuredReview.created
-    });
-  };
+  const handleMonthlyReviewNarrativeWritebackCommand = async (session: AIChatSession) => (
+    runMonthlyReviewNarrativeWritebackCommandFlow({
+      addToast,
+      buildMonthDataText: buildMonthlyReviewTemplateMonthDataText,
+      monthlyReviews,
+      resolveTemplateMeta: resolveMonthlyReviewTemplateSessionMeta,
+      reviewTemplates,
+      runWriteback: runMonthlyReviewNarrativeWriteback,
+      session
+    })
+  );
 
   const handleDreamCommand = async (
     session: AIChatSession,
@@ -7247,389 +4454,110 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       userMessageAlreadyExists?: boolean;
     }
   ) => {
-    const sessionId = session.id;
-    const retryMessageId = options?.replaceMessageId;
-    const canRetryInPlace = Boolean(
-      retryMessageId && session.messages.some((message) => message.id === retryMessageId)
-    );
-    const pendingMessageId = canRetryInPlace && retryMessageId
-      ? retryMessageId
-      : crypto.randomUUID();
-    const now = Date.now();
-    const historyBeforeCurrent = canRetryInPlace
-      ? buildRetryConversationHistory(sessionId, options?.retrySourceUserMessageId)
-      : (conversationHistoryCache.get(sessionId) || []);
-    const nextUserMessageId = options?.retrySourceUserMessageId || userMessageId || crypto.randomUUID();
+    const historyBeforeCurrent = options?.replaceMessageId
+      ? buildRetryConversationHistory(session.id, options?.retrySourceUserMessageId)
+      : (conversationHistoryCache.get(session.id) || []);
 
-    if (canRetryInPlace) {
-      mutateSession(sessionId, (currentSession) => ({
-        ...currentSession,
-        messages: currentSession.messages.map((message) => (
-          message.id === pendingMessageId
-            ? {
-              id: pendingMessageId,
-              role: 'assistant',
-              content: `我先按${selectedMonth.label}整理一下 Dream。`,
-              createdAt: now,
-              tone: 'pending'
-            }
-            : message
-        ))
-      }));
-    } else {
-      mutateSession(sessionId, (currentSession) => ({
-        ...currentSession,
-        messages: [
-          ...currentSession.messages,
-          ...(
-            options?.userMessageAlreadyExists
-              ? []
-              : [{
-                id: nextUserMessageId,
-                role: 'user' as const,
-                content: `dream · ${selectedMonth.label}`,
-                createdAt: now
-              }]
-          ),
-          {
-            id: pendingMessageId,
-            role: 'assistant',
-            content: `我先按${selectedMonth.label}整理一下 Dream。`,
-            createdAt: now + 1,
-            tone: 'pending'
-          }
-        ]
-      }));
-    }
-
-    setInputText('');
-    setIsLoading(true);
-    setIsHistoryPanelOpen(false);
-    setIsPersonaPanelOpen(false);
-
-    const controller = new AbortController();
-    activeRequestRef.current = {
-      controller,
-      sessionId,
-      pendingMessageId
-    };
-
-    try {
-      const currentTurnDate = new Date(now);
-      const reminderSummary = buildForegroundAssistantReminderSummary();
-      const stateContext = {
-        ...assistantContextBuilder.buildStateContext({
-          ...buildAssistantCurrentTimeSnapshot(currentTurnDate),
-          defaultDate: selectedMonth.endDate,
-          logs: logs.filter((log) => {
-            const logDate = formatDateKey(new Date(log.startTime));
-            return logDate >= selectedMonth.startDate && logDate <= selectedMonth.endDate;
+    await runDreamCommandFlow({
+      activeRequestRef,
+      buildConversationSummary: (history) => assistantContextBuilder.summarizeConversationTurns(history, 24),
+      buildDictionaryDigestText: (monthSelection) => assistantContextBuilder.buildDictionaryDigest(
+        buildDreamRangeDictionaryContext(monthSelection.startDate, monthSelection.endDate)
+      ),
+      buildStateContextText: (monthSelection, currentTurnDate) => {
+        const reminderSummary = buildForegroundAssistantReminderSummary();
+        return JSON.stringify({
+          ...assistantContextBuilder.buildStateContext({
+            ...buildAssistantCurrentTimeSnapshot(currentTurnDate),
+            defaultDate: monthSelection.endDate,
+            logs: logs.filter((log) => {
+              const logDate = formatDateKey(new Date(log.startTime));
+              return logDate >= monthSelection.startDate && logDate <= monthSelection.endDate;
+            }),
+            categories,
+            todos,
+            activeSessions,
+            timelineReviewSummary: buildAssistantTimelineSummary(),
+            ...(reminderSummary ? { reminderSummary } : {})
           }),
-          categories,
-          todos,
-          activeSessions,
-          timelineReviewSummary: buildAssistantTimelineSummary(),
-          ...(reminderSummary ? { reminderSummary } : {})
-        }),
-        dreamRangeLabel: selectedMonth.label,
-        dreamRangeStart: selectedMonth.startDate,
-        dreamRangeEnd: selectedMonth.endDate
-      };
-      const dictionaryContext = buildDreamRangeDictionaryContext(selectedMonth.startDate, selectedMonth.endDate);
-      const dictionaryDigestText = assistantContextBuilder.buildDictionaryDigest(dictionaryContext);
-      const conversationSummary = assistantContextBuilder.summarizeConversationTurns(historyBeforeCurrent, 24);
-      const dreamResult = await dreamService.runDreamWorkflow({
-        rangeLabel: selectedMonth.label,
-        rangeStartDate: selectedMonth.startDate,
-        rangeEndDate: selectedMonth.endDate,
-        currentDateTime: formatAssistantLocalDateTime(currentTurnDate),
-        currentDate: selectedMonth.endDate,
-        conversationSummary,
-        stateContextText: JSON.stringify(stateContext, null, 2),
-        dictionaryDigestText
-      });
-
-      if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
-        return;
-      }
-
-      if (
-        (dreamResult.patch.createdEntries && dreamResult.patch.createdEntries.length > 0)
-        || (dreamResult.patch.updatedEntries && dreamResult.patch.updatedEntries.length > 0)
-        || (dreamResult.patch.deletedEntryIds && dreamResult.patch.deletedEntryIds.length > 0)
-      ) {
-        dreamService.applyPatch(dreamResult.patch);
-        refreshDreamSnapshot();
-        const firstUpdatedTopicId = dreamResult.cards[0]?.topicId;
-        if (firstUpdatedTopicId) {
-          setSelectedDreamTopicId(firstUpdatedTopicId);
-        }
-      }
-
-      replacePendingWithResult(sessionId, pendingMessageId, dreamResult.assistantReply, {
-        ...(debugMode && dreamResult.debug
-          ? {
-            debugSections: [{
-              label: 'Dream 整理',
-              exchange: dreamResult.debug
-            }]
-          }
-          : {}),
-        dreamUpdates: dreamResult.cards
-      });
-    } catch (error) {
-      const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
-
-      if (isAbortError(error)) {
-        if (isCurrentPendingRequest) {
-          replacePendingWithResult(sessionId, pendingMessageId, '已停止这次 Dream 整理。', {
-            tone: 'system'
-          });
-        }
-        return;
-      }
-
-      if (!isCurrentPendingRequest || controller.signal.aborted) {
-        return;
-      }
-
-      replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), {
-        tone: 'error',
-        retryInput: 'dream',
-        retrySourceUserMessageId: nextUserMessageId,
-        dreamRetryYearMonth: selectedMonth.yearMonth,
-        debugSections: getErrorDebugSections(error, 'Dream 整理', debugMode)
-      });
-    } finally {
-      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
-        activeRequestRef.current = null;
-        setIsLoading(false);
-      }
-    }
+          dreamRangeLabel: monthSelection.label,
+          dreamRangeStart: monthSelection.startDate,
+          dreamRangeEnd: monthSelection.endDate
+        }, null, 2);
+      },
+      debugMode,
+      formatCurrentDateTime: formatAssistantLocalDateTime,
+      getErrorDebugSections,
+      getRetryableAIErrorMessage,
+      historyBeforeCurrent,
+      isAbortError,
+      mutateSession,
+      options,
+      refreshDreamSnapshot,
+      replacePendingWithResult,
+      selectedMonth,
+      session,
+      setInputText,
+      setIsHistoryPanelOpen,
+      setIsLoading,
+      setIsPersonaPanelOpen,
+      setSelectedDreamTopicId,
+      userMessageId
+    });
   };
 
   const handleWeeklyReviewTemplateOpeningTurn = async (session: AIChatSession) => {
-    const sessionId = session.id;
-    const templateMeta = resolveWeeklyReviewTemplateSessionMeta(session);
-    if (!templateMeta) {
-      throw new Error('周复盘上下文还没有准备好。');
-    }
-
     const weekDataText = buildWeeklyReviewTemplateWeekDataText(session);
     if (!weekDataText) {
       throw new Error('周复盘上下文还没有准备好。');
     }
 
-    const pendingMessageId = crypto.randomUUID();
-    const now = Date.now();
-    mutateSession(sessionId, (currentSession) => ({
-      ...currentSession,
-      messages: [
-        ...currentSession.messages,
-        {
-          id: pendingMessageId,
-          role: 'assistant',
-          content: '我先整理一下这周的脉络。',
-          createdAt: now,
-          tone: 'pending'
-        }
-      ]
-    }));
-
-    setIsLoading(true);
-    setIsHistoryPanelOpen(false);
-    setIsPersonaPanelOpen(false);
-
-    const controller = new AbortController();
-    activeRequestRef.current = {
-      controller,
-      sessionId,
-      pendingMessageId
-    };
-
-    try {
-      const templatePrompt = await weeklyReviewTemplateService.buildChatPrompts({
-        personaPrompt: buildPersonaPrompt(activePersona),
-        weekDataText,
-        userMessage: '请先根据这一周的数据，主动开始这次周复盘，对这一周做一个有结构的开场，并带着我继续往下聊。',
-        methodId: templateMeta.methodId
-      });
-      const templateTurnResult = await aiService.requestAssistantUnifiedTurnWithDebug({
-        mode: 'foreground',
-        systemPrompt: templatePrompt.systemPrompt,
-        userPrompt: templatePrompt.userPrompt,
-        conversationHistory: buildConversationHistory(session),
-        cacheHint: {
-          keySeed: `weekly_review_chat:${templateMeta.weekStartDate}:${templateMeta.weekEndDate}:${templateMeta.methodId}`,
-          scope: 'weekly_review_template'
-        }
-      }, {
-        signal: controller.signal
-      });
-
-      if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
-        return;
-      }
-
-      const output = templateTurnResult.output;
-      const templateContent = resolveAssistantReplyContent(
-        output,
-        output.outcome === 'clarify'
-          ? '我已经把这一周的大体情况理出来了，我们继续往下拆。'
-          : undefined
-      );
-      const displayParts = resolveAssistantDisplayParts(templateContent);
-
-      replacePendingWithResult(sessionId, pendingMessageId, templateContent, {
-        ...(output.reasoning ? { reasoning: output.reasoning } : {}),
-        ...(displayParts?.length ? { displayParts } : {}),
-        ...(debugMode
-          ? {
-            debugSections: [{
-              label: '周复盘模板对话',
-              exchange: templateTurnResult.debug
-            }]
-          }
-          : {})
-      });
-    } catch (error) {
-      const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
-
-      if (isAbortError(error)) {
-        if (isCurrentPendingRequest) {
-          replacePendingWithResult(sessionId, pendingMessageId, '已停止这次周复盘开场。', {
-            tone: 'system'
-          });
-        }
-        return;
-      }
-
-      if (!isCurrentPendingRequest || controller.signal.aborted) {
-        return;
-      }
-
-      replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), {
-        tone: 'error',
-        debugSections: getErrorDebugSections(error, '周复盘模板对话', debugMode)
-      });
-    } finally {
-      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
-        activeRequestRef.current = null;
-        setIsLoading(false);
-      }
-    }
+    await runWeeklyReviewTemplateOpeningTurnFlow({
+      activePersona,
+      activeRequestRef,
+      appendSystemMessage,
+      buildConversationHistory,
+      buildPersonaPrompt,
+      debugMode,
+      getErrorDebugSections,
+      getRetryableAIErrorMessage,
+      isAbortError,
+      mutateSession,
+      prepareForTemplateInteraction,
+      replacePendingWithResult,
+      resolveAssistantDisplayParts,
+      resolveAssistantReplyContent,
+      session,
+      setIsLoading,
+      weekDataText
+    });
   };
 
   const handleMonthlyReviewTemplateOpeningTurn = async (session: AIChatSession) => {
-    const sessionId = session.id;
-    const templateMeta = resolveMonthlyReviewTemplateSessionMeta(session);
-    if (!templateMeta) {
-      throw new Error('月复盘上下文还没有准备好。');
-    }
-
     const monthDataText = buildMonthlyReviewTemplateMonthDataText(session);
     if (!monthDataText) {
       throw new Error('月复盘上下文还没有准备好。');
     }
 
-    const pendingMessageId = crypto.randomUUID();
-    const now = Date.now();
-    mutateSession(sessionId, (currentSession) => ({
-      ...currentSession,
-      messages: [
-        ...currentSession.messages,
-        {
-          id: pendingMessageId,
-          role: 'assistant',
-          content: '我先整理一下这个月的脉络。',
-          createdAt: now,
-          tone: 'pending'
-        }
-      ]
-    }));
-
-    setIsLoading(true);
-    setIsHistoryPanelOpen(false);
-    setIsPersonaPanelOpen(false);
-
-    const controller = new AbortController();
-    activeRequestRef.current = {
-      controller,
-      sessionId,
-      pendingMessageId
-    };
-
-    try {
-      const templatePrompt = await monthlyReviewTemplateService.buildChatPrompts({
-        personaPrompt: buildPersonaPrompt(activePersona),
-        monthDataText,
-        userMessage: '请先根据这一个月的数据，主动开始这次月复盘，对这一个月做一个有结构的开场，并带着我继续往下聊。',
-        methodId: templateMeta.methodId
-      });
-      const templateTurnResult = await aiService.requestAssistantUnifiedTurnWithDebug({
-        mode: 'foreground',
-        systemPrompt: templatePrompt.systemPrompt,
-        userPrompt: templatePrompt.userPrompt,
-        conversationHistory: buildConversationHistory(session),
-        cacheHint: {
-          keySeed: `monthly_review_chat:${templateMeta.monthStartDate}:${templateMeta.monthEndDate}:${templateMeta.methodId}`,
-          scope: 'monthly_review_template'
-        }
-      }, {
-        signal: controller.signal
-      });
-
-      if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
-        return;
-      }
-
-      const output = templateTurnResult.output;
-      const templateContent = resolveAssistantReplyContent(
-        output,
-        output.outcome === 'clarify'
-          ? '我已经把这个月的大体情况理出来了，我们继续往下拆。'
-          : undefined
-      );
-      const displayParts = resolveAssistantDisplayParts(templateContent);
-
-      replacePendingWithResult(sessionId, pendingMessageId, templateContent, {
-        ...(output.reasoning ? { reasoning: output.reasoning } : {}),
-        ...(displayParts?.length ? { displayParts } : {}),
-        ...(debugMode
-          ? {
-            debugSections: [{
-              label: '月复盘模板对话',
-              exchange: templateTurnResult.debug
-            }]
-          }
-          : {})
-      });
-    } catch (error) {
-      const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
-
-      if (isAbortError(error)) {
-        if (isCurrentPendingRequest) {
-          replacePendingWithResult(sessionId, pendingMessageId, '已停止这次月复盘开场。', {
-            tone: 'system'
-          });
-        }
-        return;
-      }
-
-      if (!isCurrentPendingRequest || controller.signal.aborted) {
-        return;
-      }
-
-      replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), {
-        tone: 'error',
-        debugSections: getErrorDebugSections(error, '月复盘模板对话', debugMode)
-      });
-    } finally {
-      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
-        activeRequestRef.current = null;
-        setIsLoading(false);
-      }
-    }
+    await runMonthlyReviewTemplateOpeningTurnFlow({
+      activePersona,
+      activeRequestRef,
+      appendSystemMessage,
+      buildConversationHistory,
+      buildPersonaPrompt,
+      debugMode,
+      getErrorDebugSections,
+      getRetryableAIErrorMessage,
+      isAbortError,
+      monthDataText,
+      mutateSession,
+      prepareForTemplateInteraction,
+      replacePendingWithResult,
+      resolveAssistantDisplayParts,
+      resolveAssistantReplyContent,
+      session,
+      setIsLoading
+    });
   };
 
   const handleSend = async (overrideText?: string, options?: ForegroundSendOptions) => {
@@ -7693,75 +4621,31 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return;
     }
 
-    const sessionId = activeSession.id;
-    const retryMessageId = options?.replaceMessageId;
-    const canRetryInPlace = Boolean(
-      retryMessageId && activeSession.messages.some((message) => message.id === retryMessageId)
-    );
-    const userMessageId = options?.retrySourceUserMessageId || crypto.randomUUID();
-    const pendingMessageId = canRetryInPlace && retryMessageId
-      ? retryMessageId
-      : crypto.randomUUID();
-    const now = Date.now();
-    const historyBeforeCurrent = canRetryInPlace
-      ? buildRetryConversationHistory(sessionId, options?.retrySourceUserMessageId)
-      : (conversationHistoryCache.get(sessionId) || []);
-    const promptHistory = narrowConversationHistoryForTimeSensitiveTurn(historyBeforeCurrent, trimmedText);
-    const shouldRenameTitle = !isWeeklyReviewTemplateSession
-      && !isMonthlyReviewTemplateSession
-      && !canRetryInPlace
-      && !activeSession.messages.some((message) => message.role === 'user');
-
-    if (canRetryInPlace) {
-      mutateSession(sessionId, (session) => ({
-        ...session,
-        messages: session.messages.map((message) => (
-          message.id === pendingMessageId
-            ? {
-              id: pendingMessageId,
-              role: 'assistant',
-              content: '我先想一下。',
-              createdAt: now,
-              tone: 'pending'
-            }
-            : message
-        ))
-      }));
-    } else {
-      mutateSession(sessionId, (session) => ({
-        ...session,
-        title: shouldRenameTitle ? createSessionTitleFromUserMessage(trimmedText) : session.title,
-        messages: [
-          ...session.messages,
-          {
-            id: userMessageId,
-            role: 'user',
-            content: trimmedText,
-            createdAt: now
-          },
-          {
-            id: pendingMessageId,
-            role: 'assistant',
-            content: '我先想一下。',
-            createdAt: now + 1,
-            tone: 'pending'
-          }
-        ]
-      }));
-    }
-
-    if (!canRetryInPlace) {
-      void AssistantAgent.notifyUserTurn({
-        text: trimmedText,
-        at: new Date(now).toISOString()
-      }).catch((error) => {
+    const {
+      canRetryInPlace,
+      historyBeforeCurrent,
+      now,
+      pendingMessageId,
+      sessionId,
+      userMessageId
+    } = prepareForegroundTurn({
+      activeSession,
+      buildRetryConversationHistory,
+      conversationHistoryCache,
+      createSessionTitleFromUserMessage,
+      isMonthlyReviewTemplateSession,
+      isWeeklyReviewTemplateSession,
+      mutateSession,
+      notifyUserTurn: (text, at) => AssistantAgent.notifyUserTurn({ text, at }),
+      onNotifyUserTurnError: (error) => {
         console.error('[AIBackfillChatModal] Failed to notify assistant agent about user turn', error);
-      });
-    }
-
-    if (!canRetryInPlace) {
-      setInputText('');
-    }
+      },
+      ...(options?.replaceMessageId ? { replaceMessageId: options.replaceMessageId } : {}),
+      ...(options?.retrySourceUserMessageId ? { retrySourceUserMessageId: options.retrySourceUserMessageId } : {}),
+      setInputText,
+      trimmedText
+    });
+    const promptHistory = narrowHistoryForTimeSensitiveTurn(historyBeforeCurrent, trimmedText);
     setIsLoading(true);
     setIsHistoryPanelOpen(false);
     setIsPersonaPanelOpen(false);
@@ -7780,49 +4664,23 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           throw new Error('周复盘上下文还没有准备好。');
         }
 
-        const templateMeta = resolveWeeklyReviewTemplateSessionMeta(activeSession);
-        if (!templateMeta) {
-          throw new Error('周复盘上下文还没有准备好。');
-        }
-
-        const templatePrompt = await weeklyReviewTemplateService.buildChatPrompts({
-          personaPrompt: buildPersonaPrompt(activePersona),
-          weekDataText,
+        await runWeeklyReviewTemplateChatTurn({
+          activePersona,
+          activeRequestRef,
+          buildPersonaPrompt,
+          controller,
+          debugMode,
+          getErrorDebugSections,
+          getRetryableAIErrorMessage,
+          historyBeforeCurrent,
+          isAbortError,
+          pendingMessageId,
+          replacePendingWithResult,
+          resolveAssistantDisplayParts,
+          resolveAssistantReplyContent,
+          session: activeSession,
           userMessage: trimmedText,
-          methodId: templateMeta.methodId
-        });
-        const templateTurnResult = await aiService.requestAssistantUnifiedTurnWithDebug({
-          mode: 'foreground',
-          systemPrompt: templatePrompt.systemPrompt,
-          userPrompt: templatePrompt.userPrompt,
-          conversationHistory: historyBeforeCurrent,
-          cacheHint: {
-            keySeed: `weekly_review_chat:${templateMeta.weekStartDate}:${templateMeta.weekEndDate}:${templateMeta.methodId}`,
-            scope: 'weekly_review_template'
-          }
-        }, {
-          signal: controller.signal
-        });
-
-        if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
-          return;
-        }
-
-        const output = templateTurnResult.output;
-        const templateContent = resolveAssistantReplyContent(output);
-        const displayParts = resolveAssistantDisplayParts(templateContent);
-
-        replacePendingWithResult(sessionId, pendingMessageId, templateContent, {
-          ...(output.reasoning ? { reasoning: output.reasoning } : {}),
-          ...(displayParts?.length ? { displayParts } : {}),
-          ...(debugMode
-            ? {
-              debugSections: [{
-                label: '周复盘模板对话',
-                exchange: templateTurnResult.debug
-              }]
-            }
-            : {})
+          weekDataText
         });
         return;
       }
@@ -7833,139 +4691,86 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           throw new Error('月复盘上下文还没有准备好。');
         }
 
-        const templateMeta = resolveMonthlyReviewTemplateSessionMeta(activeSession);
-        if (!templateMeta) {
-          throw new Error('月复盘上下文还没有准备好。');
-        }
-
-        const templatePrompt = await monthlyReviewTemplateService.buildChatPrompts({
-          personaPrompt: buildPersonaPrompt(activePersona),
+        await runMonthlyReviewTemplateChatTurn({
+          activePersona,
+          activeRequestRef,
+          buildPersonaPrompt,
+          controller,
+          debugMode,
+          getErrorDebugSections,
+          getRetryableAIErrorMessage,
+          historyBeforeCurrent,
+          isAbortError,
           monthDataText,
-          userMessage: trimmedText,
-          methodId: templateMeta.methodId
+          pendingMessageId,
+          replacePendingWithResult,
+          resolveAssistantDisplayParts,
+          resolveAssistantReplyContent,
+          session: activeSession,
+          userMessage: trimmedText
         });
-        const templateTurnResult = await aiService.requestAssistantUnifiedTurnWithDebug({
+        return;
+      }
+
+      await runOrdinaryForegroundTurn({
+        activePersona,
+        activeRequestRef,
+        applyAssistantMemoryPatch,
+        applyUnifiedReminders,
+        applyUnifiedToolCalls,
+        assistantMemoryEnabled: assistantAgentConfig.longTermMemoryEnabled,
+        buildDictionaryContext: buildAssistantDictionaryContext,
+        buildDreamContext,
+        buildForegroundAssistantMemory,
+        buildForegroundAssistantReminderSummary,
+        buildPromptLayers: async () => {
+          const [basePrompt, foregroundModePrompt] = await Promise.all([
+            assistantPromptService.getAssistantBasePrompt(),
+            assistantPromptService.getForegroundModePrompt()
+          ]);
+          return { basePrompt, foregroundModePrompt };
+        },
+        buildStateContext: buildAssistantStateContext,
+        controller,
+        createTriggerCreatedAt: (date) => formatAssistantLocalDateTime(date),
+        debugMode,
+        getErrorDebugSections,
+        getRetryableAIErrorMessage,
+        handleRunUnifiedTurn: async (args, runnerOptions) => assistantTurnService.runUnifiedTurn({
           mode: 'foreground',
-          systemPrompt: templatePrompt.systemPrompt,
-          userPrompt: templatePrompt.userPrompt,
-          conversationHistory: historyBeforeCurrent,
-          cacheHint: {
-            keySeed: `monthly_review_chat:${templateMeta.monthStartDate}:${templateMeta.monthEndDate}:${templateMeta.methodId}`,
-            scope: 'monthly_review_template'
-          }
-        }, {
-          signal: controller.signal
-        });
-
-        if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
-          return;
-        }
-
-        const output = templateTurnResult.output;
-        const templateContent = resolveAssistantReplyContent(output);
-        const displayParts = resolveAssistantDisplayParts(templateContent);
-
-        replacePendingWithResult(sessionId, pendingMessageId, templateContent, {
-          ...(output.reasoning ? { reasoning: output.reasoning } : {}),
-          ...(displayParts?.length ? { displayParts } : {}),
-          ...(debugMode
-            ? {
-              debugSections: [{
-                label: '月复盘模板对话',
-                exchange: templateTurnResult.debug
-              }]
-            }
-            : {})
-        });
-        return;
-      }
-
-      const currentTurnDate = new Date();
-      const debugSections: AIChatDebugSection[] = [];
-
-      const [basePrompt, foregroundModePrompt] = await Promise.all([
-        assistantPromptService.getAssistantBasePrompt(),
-        assistantPromptService.getForegroundModePrompt()
-      ]);
-
-      const narrowedConversationContext = assistantContextBuilder.buildConversationContext(promptHistory);
-      const stateContext = buildAssistantStateContext(
-        currentTurnDate,
-        buildForegroundAssistantReminderSummary()
-      );
-      const dictionaryContext = buildAssistantDictionaryContext();
-      const dreamContext = buildDreamContext(trimmedText);
-
-      const unifiedTurnResult = await assistantTurnService.runUnifiedTurn({
-        mode: 'foreground',
-        trigger: {
-          type: 'user_message',
-          source: 'user',
-          text: trimmedText,
-          createdAt: formatAssistantLocalDateTime(new Date(now))
-        },
-        promptLayers: {
-          basePrompt,
-          modePrompt: foregroundModePrompt,
-          userPersonaPrompt: buildPersonaPrompt(activePersona)
-        },
-        memoryEnabled: assistantAgentConfig.longTermMemoryEnabled,
-        memory: buildForegroundAssistantMemory(),
-        conversation: narrowedConversationContext,
-        stateContext,
-        dictionaryContext,
-        ...(dreamContext ? { dreamContext } : {})
-      }, {
-        signal: controller.signal
+          trigger: {
+            type: 'user_message',
+            source: 'user',
+            text: args.userMessage,
+            createdAt: formatAssistantLocalDateTime(new Date(args.now))
+          },
+          promptLayers: {
+            basePrompt: args.systemPrompt,
+            modePrompt: args.modePrompt,
+            userPersonaPrompt: buildPersonaPrompt(activePersona)
+          },
+          memoryEnabled: args.memoryEnabled,
+          memory: args.memory,
+          conversation: args.conversation,
+          stateContext: args.stateContext,
+          ...(args.dictionaryContext ? { dictionaryContext: args.dictionaryContext } : {}),
+          ...(args.dreamContext ? { dreamContext: args.dreamContext } : {})
+        }, runnerOptions),
+        historyBeforeCurrent,
+        isAbortError,
+        narrowConversationContext: assistantContextBuilder.buildConversationContext,
+        notifyAssistantTaskStateChanged,
+        now,
+        pendingMessageId,
+        replacePendingWithResult,
+        resolveAssistantDisplayParts,
+        resolveAssistantReplyContent,
+        resolveForegroundAssistantReply,
+        sessionId,
+        setIsLoading,
+        trimmedText,
+        userMessageId
       });
-
-      if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
-        return;
-      }
-
-      if (debugMode) {
-        debugSections.push({
-          label: '统一单轮调用',
-          exchange: unifiedTurnResult.debug
-        });
-      }
-
-      const output = unifiedTurnResult.output;
-      const toolCalls = output.toolCalls || [];
-      const unifiedAppliedActions = toolCalls.length > 0
-        ? applyUnifiedToolCalls(toolCalls, trimmedText)
-        : [];
-      const unifiedSuccessCount = unifiedAppliedActions.filter((action) => action.status === 'applied').length;
-      const successCount = unifiedSuccessCount;
-
-      const reminderUpdates = applyUnifiedReminders(output);
-
-      const memoryUpdates = assistantAgentConfig.longTermMemoryEnabled && output.memoryAction === 'update_memory'
-        ? applyAssistantMemoryPatch(output.memoryPatch)
-        : [];
-
-      const rawUnifiedContent = resolveAssistantReplyContent(
-        output,
-        unifiedSuccessCount > 0
-          ? `我先帮你处理好了 ${successCount} 项。`
-          : ((output.reminders || []).length > 0
-            ? '我记下来了，到时候会提醒你。'
-            : undefined)
-      );
-      const unifiedContent = resolveForegroundAssistantReply(rawUnifiedContent, trimmedText, unifiedAppliedActions);
-      const displayParts = resolveAssistantDisplayParts(unifiedContent);
-
-      replacePendingWithResult(sessionId, pendingMessageId, unifiedContent, {
-        ...(output.reasoning ? { reasoning: output.reasoning } : {}),
-        ...(displayParts?.length ? { displayParts } : {}),
-        debugSections,
-        ...(unifiedAppliedActions.length > 0 ? { appliedActions: unifiedAppliedActions } : {}),
-        ...(memoryUpdates.length > 0 ? { memoryUpdates } : {}),
-        ...(reminderUpdates.length > 0 ? { reminderUpdates } : {})
-      });
-      if (unifiedAppliedActions.length > 0 || reminderUpdates.length > 0) {
-        notifyAssistantTaskStateChanged();
-      }
       return;
     } catch (error) {
       const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
@@ -8041,7 +4846,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
 
     if (message.retryInput === 'dream' && message.dreamRetryYearMonth && activeSession) {
-      const selectedMonth = parseDreamMonthSelection(message.dreamRetryYearMonth);
+      const selectedMonth = parseDreamMonthSelection(message.dreamRetryYearMonth, getLocalDateStr);
       if (!selectedMonth) {
         addToast('info', '这次 Dream 重试缺少可用的年月。');
         return;
@@ -8076,672 +4881,28 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     return null;
   }
 
-  const renderLogAction = (messageId: string, action: AppliedCreateLogAction) => {
-    const liveLog = action.snapshot.logId
-      ? logs.find((log) => log.id === action.snapshot.logId)
-      : undefined;
-    const liveCategory = liveLog
-      ? categories.find((category) => category.id === liveLog.categoryId)
-      : categories.find((category) => category.id === action.snapshot.categoryId);
-    const liveActivity = liveLog
-      ? liveCategory?.activities.find((activity) => activity.id === liveLog.activityId)
-      : liveCategory?.activities.find((activity) => activity.id === action.snapshot.activityId);
-    const liveLinkedTodo = liveLog?.linkedTodoId
-      ? todos.find((todo) => todo.id === liveLog.linkedTodoId)
-      : undefined;
-    const categoryActivityLabel = dedupeStringArray([
-      liveCategory?.name || action.snapshot.categoryName,
-      liveActivity?.name || action.snapshot.activityName
-    ]).join(' / ');
-    const primaryText = action.snapshot.description.trim() || liveActivity?.name || action.snapshot.activityName;
-
-    return (
-      <div
-        key={action.actionId}
-        className={`border-l-2 pl-3 pr-1 py-1 ${action.status === 'undone' ? 'opacity-70' : ''}`}
-        style={{
-          borderColor: action.status === 'failed'
-            ? AI_CHAT_THEME.dangerBorder
-            : action.status === 'undone'
-              ? AI_CHAT_THEME.undoneBorder
-              : AI_CHAT_THEME.activeBorder
-        }}
-      >
-        <div className="min-w-0">
-          <div className="flex items-start justify-between gap-3">
-            <span className="pt-0.5 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
-              {formatActionDate(action.snapshot.startTime)}
-            </span>
-            <span
-              className="inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px]"
-              style={{
-                color: AI_CHAT_THEME.textSecondary,
-                borderColor: AI_CHAT_THEME.chipBorder,
-                backgroundColor: AI_CHAT_THEME.chipBg
-              }}
-            >
-              {formatTimeRange(action.snapshot.startTime, action.snapshot.endTime)}
-            </span>
-          </div>
-          <div className="min-w-0">
-            <p className="mt-1 font-serif text-[1rem] leading-6" style={{ color: AI_CHAT_THEME.textPrimary }}>
-              {primaryText}
-            </p>
-          </div>
-
-          <span
-            className="hidden shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
-            style={
-              action.status === 'failed'
-                ? {
-                    borderColor: AI_CHAT_THEME.dangerBorder,
-                    backgroundColor: AI_CHAT_THEME.dangerBg,
-                    color: AI_CHAT_THEME.dangerText
-                  }
-                : action.status === 'undone'
-                  ? {
-                      borderColor: AI_CHAT_THEME.undoneBorder,
-                      backgroundColor: AI_CHAT_THEME.undoneBg,
-                      color: AI_CHAT_THEME.undoneText
-                    }
-                  : {
-                      borderColor: AI_CHAT_THEME.successBorder,
-                      backgroundColor: AI_CHAT_THEME.successBg,
-                      color: AI_CHAT_THEME.successText
-                    }
-            }
-          >
-            {action.status === 'failed' ? '失败' : action.status === 'undone' ? '已撤销' : '已应用'}
-          </span>
-        </div>
-
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
-          <span className="inline-flex items-center gap-1">
-            <span className="font-bold">#</span>
-            <span>{categoryActivityLabel}</span>
-          </span>
-
-          {action.snapshot.scopeNames.map((scopeName) => (
-            <span key={`${action.actionId}-${scopeName}`} className="inline-flex items-center gap-1">
-              <span className="font-bold">%</span>
-              <span>{scopeName}</span>
-            </span>
-          ))}
-
-          {(liveLinkedTodo?.title || action.snapshot.linkedTodoTitle) && (
-            <span className="inline-flex items-center gap-1">
-              <span className="font-bold">@</span>
-              <span>{liveLinkedTodo?.title || action.snapshot.linkedTodoTitle}</span>
-            </span>
-          )}
-        </div>
-
-        {action.kind === 'create_subtask' && action.snapshot.parentTodoTitle && (
-          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
-            <span className="inline-flex items-center gap-1">
-              <span className="font-bold">↳</span>
-              <span>{action.snapshot.parentTodoTitle}</span>
-            </span>
-          </div>
-        )}
-
-        {action.errorMessage && (
-          <p className="mt-2 text-xs" style={{ color: AI_CHAT_THEME.dangerText }}>{action.errorMessage}</p>
-        )}
-
-        <div className="mt-2.5 flex justify-end gap-2">
-          <button
-            onClick={() => handleOpenLogEditor(action.snapshot.logId)}
-            disabled={!liveLog || action.status !== 'applied'}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-            style={{
-              borderColor: AI_CHAT_THEME.chipBorder,
-              backgroundColor: AI_CHAT_THEME.inputBg,
-              color: AI_CHAT_THEME.textSecondary
-            }}
-            title="编辑"
-          >
-            <Pencil size={13} />
-          </button>
-          <button
-            onClick={() => handleUndoLogAction(messageId, action)}
-            disabled={action.status !== 'applied'}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-            style={{
-              borderColor: AI_CHAT_THEME.chipBorder,
-              backgroundColor: AI_CHAT_THEME.inputBg,
-              color: AI_CHAT_THEME.textSecondary
-            }}
-            title="撤销"
-          >
-            <Undo2 size={13} />
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  const renderTodoAction = (messageId: string, action: AppliedCreateTodoAction | AppliedCreateSubtaskAction) => {
-    const liveTodo = action.snapshot.todoId
-      ? todos.find((todo) => todo.id === action.snapshot.todoId)
-      : undefined;
-    const liveParentTodo = action.kind === 'create_subtask' && liveTodo?.parentTodoId
-      ? todos.find((todo) => todo.id === liveTodo.parentTodoId)
-      : undefined;
-    const resolvedTodoCategoryName = todoCategories.find((category) => category.id === (liveTodo?.categoryId || action.snapshot.categoryId))?.name
-      || action.snapshot.categoryName;
-    const resolvedTodoAtLabel = action.kind === 'create_subtask'
-      ? [resolvedTodoCategoryName, liveParentTodo?.title || action.snapshot.parentTodoTitle].filter(Boolean).join(' / ')
-      : resolvedTodoCategoryName;
-    const resolvedLinkedCategory = (
-      categories.find((category) => category.id === (liveTodo?.linkedCategoryId || action.snapshot.linkedCategoryId))
-      || getActivityCategory(liveTodo?.linkedActivityId || action.snapshot.linkedActivityId)
-    );
-    const resolvedLinkedActivity = getActivityById(liveTodo?.linkedActivityId || action.snapshot.linkedActivityId);
-    const linkedTagLabel = dedupeStringArray([
-      resolvedLinkedCategory?.name || action.snapshot.linkedCategoryName,
-      resolvedLinkedActivity?.name || action.snapshot.linkedActivityName
-    ]).join(' / ');
-    const resolvedScopeIds = dedupeStringArray([
-      ...(liveTodo?.defaultScopeIds || action.snapshot.defaultScopeIds)
-    ]);
-    const resolvedScopeNames = resolvedScopeIds.length > 0
-      ? (() => {
-        const names = getScopeNames(resolvedScopeIds);
-        return names.length > 0 ? names : action.snapshot.defaultScopeNames;
-      })()
-      : action.snapshot.defaultScopeNames;
-
-    return (
-      <div
-        key={action.actionId}
-        className={`border-l-2 pl-3 pr-1 py-1 ${action.status === 'undone' ? 'opacity-70' : ''}`}
-        style={{
-          borderColor: action.status === 'failed'
-            ? AI_CHAT_THEME.dangerBorder
-            : action.status === 'undone'
-              ? AI_CHAT_THEME.undoneBorder
-              : AI_CHAT_THEME.activeBorder
-        }}
-      >
-        <div className="min-w-0">
-          <div className="min-w-0">
-            <p className="font-serif text-[1rem] leading-6" style={{ color: AI_CHAT_THEME.textPrimary }}>
-              {liveTodo?.title || action.snapshot.title}
-            </p>
-            {action.snapshot.note && (
-              <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textSecondary }}>
-                {action.snapshot.note}
-              </p>
-            )}
-          </div>
-
-          <span
-            className="hidden shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
-            style={
-              action.status === 'failed'
-                ? {
-                    borderColor: AI_CHAT_THEME.dangerBorder,
-                    backgroundColor: AI_CHAT_THEME.dangerBg,
-                    color: AI_CHAT_THEME.dangerText
-                  }
-                : action.status === 'undone'
-                  ? {
-                      borderColor: AI_CHAT_THEME.undoneBorder,
-                      backgroundColor: AI_CHAT_THEME.undoneBg,
-                      color: AI_CHAT_THEME.undoneText
-                    }
-                  : {
-                      borderColor: AI_CHAT_THEME.successBorder,
-                      backgroundColor: AI_CHAT_THEME.successBg,
-                      color: AI_CHAT_THEME.successText
-                    }
-            }
-          >
-            {action.status === 'failed' ? '失败' : action.status === 'undone' ? '已撤销' : '已创建'}
-          </span>
-        </div>
-
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
-          {resolvedTodoAtLabel && (
-            <span className="inline-flex items-center gap-1">
-              <span className="font-bold">@</span>
-              <span>{resolvedTodoAtLabel}</span>
-            </span>
-          )}
-
-          {linkedTagLabel && (
-            <span className="inline-flex items-center gap-1">
-              <span className="font-bold">#</span>
-              <span>{linkedTagLabel}</span>
-            </span>
-          )}
-
-          {resolvedScopeNames.map((scopeName) => (
-            <span key={`${action.actionId}-${scopeName}`} className="inline-flex items-center gap-1">
-              <span className="font-bold">%</span>
-              <span>{scopeName}</span>
-            </span>
-          ))}
-
-          {action.snapshot.scheduledDate && (
-            <span className="inline-flex items-center">
-              安排 {action.snapshot.scheduledDate}
-            </span>
-          )}
-
-          {action.snapshot.deadlineDate && (
-            <span className="inline-flex items-center">
-              截止 {action.snapshot.deadlineDate}
-            </span>
-          )}
-
-          {action.snapshot.recurrenceRule && (
-            <span className="inline-flex items-center">
-              循环 {action.snapshot.recurrenceRule.frequency}
-            </span>
-          )}
-        </div>
-
-        {action.errorMessage && (
-          <p className="mt-2 text-xs" style={{ color: AI_CHAT_THEME.dangerText }}>{action.errorMessage}</p>
-        )}
-
-        <div className="mt-2.5 flex justify-end gap-2">
-          <button
-            onClick={() => handleOpenTodoDetail(action.snapshot.todoId)}
-            disabled={!action.snapshot.todoId || action.status !== 'applied'}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-            style={{
-              borderColor: AI_CHAT_THEME.chipBorder,
-              backgroundColor: AI_CHAT_THEME.inputBg,
-              color: AI_CHAT_THEME.textSecondary
-            }}
-            title="详情"
-          >
-            <Pencil size={13} />
-          </button>
-          <button
-            onClick={() => (
-              action.kind === 'create_subtask'
-                ? handleUndoCreateSubtaskAction(messageId, action)
-                : handleUndoTodoAction(messageId, action)
-            )}
-            disabled={action.status !== 'applied'}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-            style={{
-              borderColor: AI_CHAT_THEME.chipBorder,
-              backgroundColor: AI_CHAT_THEME.inputBg,
-              color: AI_CHAT_THEME.textSecondary
-            }}
-            title="撤销"
-          >
-            <Undo2 size={13} />
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  const renderUpdateTodoAction = (messageId: string, action: AppliedUpdateTodoAction) => {
-    const liveTodo = action.snapshot.todoId
-      ? todos.find((todo) => todo.id === action.snapshot.todoId)
-      : undefined;
-    const displayTodo = liveTodo || action.snapshot.nextTodo || action.snapshot.previousTodo;
-    const linkedCategory = displayTodo?.linkedCategoryId
-      ? categories.find((category) => category.id === displayTodo.linkedCategoryId)
-      : undefined;
-    const linkedActivity = displayTodo?.linkedActivityId
-      ? linkedCategory?.activities.find((activity) => activity.id === displayTodo.linkedActivityId) || getActivityById(displayTodo.linkedActivityId)
-      : undefined;
-    const linkedTagLabel = dedupeStringArray([
-      linkedCategory?.name,
-      linkedActivity?.name
-    ]).join(' / ');
-    const scopeNames = getScopeNames(displayTodo?.defaultScopeIds || []);
-    const todoCategoryName = displayTodo?.categoryId
-      ? todoCategories.find((category) => category.id === displayTodo.categoryId)?.name
-      : '';
-
-    return (
-      <div
-        key={action.actionId}
-        className={`border-l-2 pl-3 pr-1 py-1 ${action.status === 'undone' ? 'opacity-70' : ''}`}
-        style={{
-          borderColor: action.status === 'failed'
-            ? AI_CHAT_THEME.dangerBorder
-            : action.status === 'undone'
-              ? AI_CHAT_THEME.undoneBorder
-              : AI_CHAT_THEME.activeBorder
-        }}
-      >
-        <div className="min-w-0">
-          <p className="font-serif text-[1rem] leading-6" style={{ color: AI_CHAT_THEME.textPrimary }}>
-            {displayTodo?.title || action.snapshot.previousTodo?.title || '未找到待办'}
-          </p>
-          {displayTodo?.note && (
-            <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textSecondary }}>
-              {displayTodo.note}
-            </p>
-          )}
-        </div>
-
-        {displayTodo && (
-          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
-            {todoCategoryName && (
-              <span className="inline-flex items-center gap-1">
-                <span className="font-bold">@</span>
-                <span>{todoCategoryName}</span>
-              </span>
-            )}
-            {linkedTagLabel && (
-              <span className="inline-flex items-center gap-1">
-                <span className="font-bold">#</span>
-                <span>{linkedTagLabel}</span>
-              </span>
-            )}
-            {scopeNames.map((scopeName) => (
-              <span key={`${action.actionId}-scope-${scopeName}`} className="inline-flex items-center gap-1">
-                <span className="font-bold">%</span>
-                <span>{scopeName}</span>
-              </span>
-            ))}
-            {displayTodo.pin && <span className="inline-flex items-center">Pin</span>}
-            {displayTodo.scheduledDate && <span className="inline-flex items-center">安排 {displayTodo.scheduledDate}</span>}
-            {displayTodo.deadlineDate && <span className="inline-flex items-center">截止 {displayTodo.deadlineDate}</span>}
-            {displayTodo.isCompleted && <span className="inline-flex items-center">已完成</span>}
-          </div>
-        )}
-
-        {action.errorMessage && (
-          <p className="mt-2 text-xs" style={{ color: AI_CHAT_THEME.dangerText }}>{action.errorMessage}</p>
-        )}
-
-        <div className="mt-2.5 flex justify-end gap-2">
-          <button
-            onClick={() => handleOpenTodoDetail(action.snapshot.todoId)}
-            disabled={!action.snapshot.todoId || action.status !== 'applied'}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-            style={{
-              borderColor: AI_CHAT_THEME.chipBorder,
-              backgroundColor: AI_CHAT_THEME.inputBg,
-              color: AI_CHAT_THEME.textSecondary
-            }}
-            title="详情"
-          >
-            <Pencil size={13} />
-          </button>
-          <button
-            onClick={() => handleUndoUpdateTodoAction(messageId, action)}
-            disabled={action.status !== 'applied'}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-            style={{
-              borderColor: AI_CHAT_THEME.chipBorder,
-              backgroundColor: AI_CHAT_THEME.inputBg,
-              color: AI_CHAT_THEME.textSecondary
-            }}
-            title="撤销"
-          >
-            <Undo2 size={13} />
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  const renderEditLogAction = (messageId: string, action: AppliedEditLogAction) => {
-    const liveLog = action.snapshot.logId
-      ? logs.find((log) => log.id === action.snapshot.logId)
-      : undefined;
-    const displayLog = liveLog || action.snapshot.nextLog || action.snapshot.previousLog;
-    const category = displayLog
-      ? categories.find((item) => item.id === displayLog.categoryId)
-      : undefined;
-    const activity = displayLog
-      ? category?.activities.find((item) => item.id === displayLog.activityId)
-        || categories.flatMap((item) => item.activities).find((item) => item.id === displayLog.activityId)
-      : undefined;
-    const linkedTodo = displayLog?.linkedTodoId
-      ? todos.find((todo) => todo.id === displayLog.linkedTodoId)
-      : undefined;
-    const scopeNames = getScopeNames(displayLog?.scopeIds || []);
-
-    return (
-      <div
-        key={action.actionId}
-        className={`border-l-2 pl-3 pr-1 py-1 ${action.status === 'undone' ? 'opacity-70' : ''}`}
-        style={{
-          borderColor: action.status === 'failed'
-            ? AI_CHAT_THEME.dangerBorder
-            : action.status === 'undone'
-              ? AI_CHAT_THEME.undoneBorder
-              : AI_CHAT_THEME.activeBorder
-        }}
-      >
-        <div className="min-w-0">
-          <div className="flex items-start justify-between gap-3">
-            <span className="pt-0.5 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
-              {displayLog ? formatActionDate(displayLog.startTime) : ''}
-            </span>
-            <span
-              className="inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px]"
-              style={{
-                color: AI_CHAT_THEME.textSecondary,
-                borderColor: AI_CHAT_THEME.chipBorder,
-                backgroundColor: AI_CHAT_THEME.chipBg
-              }}
-            >
-              {displayLog ? formatTimeRange(displayLog.startTime, displayLog.endTime) : ''}
-            </span>
-          </div>
-          <p className="mt-1 font-serif text-[1rem] leading-6" style={{ color: AI_CHAT_THEME.textPrimary }}>
-            {displayLog?.note?.trim() || activity?.name || '已修改记录'}
-          </p>
-        </div>
-
-        {displayLog && (
-          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
-            <span className="inline-flex items-center gap-1">
-              <span className="font-bold">#</span>
-              <span>{dedupeStringArray([category?.name, activity?.name]).join(' / ')}</span>
-            </span>
-            {scopeNames.map((scopeName) => (
-              <span key={`${action.actionId}-log-scope-${scopeName}`} className="inline-flex items-center gap-1">
-                <span className="font-bold">%</span>
-                <span>{scopeName}</span>
-              </span>
-            ))}
-            {linkedTodo?.title && (
-              <span className="inline-flex items-center gap-1">
-                <span className="font-bold">@</span>
-                <span>{linkedTodo.title}</span>
-              </span>
-            )}
-          </div>
-        )}
-
-        {action.errorMessage && (
-          <p className="mt-2 text-xs" style={{ color: AI_CHAT_THEME.dangerText }}>{action.errorMessage}</p>
-        )}
-
-        <div className="mt-2.5 flex justify-end gap-2">
-          <button
-            onClick={() => handleOpenLogEditor(action.snapshot.logId)}
-            disabled={!action.snapshot.logId || action.status !== 'applied'}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-            style={{
-              borderColor: AI_CHAT_THEME.chipBorder,
-              backgroundColor: AI_CHAT_THEME.inputBg,
-              color: AI_CHAT_THEME.textSecondary
-            }}
-            title="编辑"
-          >
-            <Pencil size={13} />
-          </button>
-          <button
-            onClick={() => handleUndoEditLogAction(messageId, action)}
-            disabled={action.status !== 'applied'}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-            style={{
-              borderColor: AI_CHAT_THEME.chipBorder,
-              backgroundColor: AI_CHAT_THEME.inputBg,
-              color: AI_CHAT_THEME.textSecondary
-            }}
-            title="撤销"
-          >
-            <Undo2 size={13} />
-          </button>
-        </div>
-      </div>
-    );
-  };
-
   const renderAppliedAction = (messageId: string, action: AppliedChatAction) => (
-    action.kind === 'create_log'
-      ? renderLogAction(messageId, action)
-      : action.kind === 'edit_log'
-        ? renderEditLogAction(messageId, action)
-        : action.kind === 'update_todo'
-          ? renderUpdateTodoAction(messageId, action)
-          : renderTodoAction(messageId, action)
-  );
-
-  const renderDailyReviewWritebackResult = (result: AIChatDailyReviewWritebackResult) => (
-    <div
-      className="border-l-2 pl-3 pr-1 py-1"
-      style={{ borderColor: AI_CHAT_THEME.activeBorder }}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <button
-            type="button"
-            onClick={() => handleOpenDailyReviewNarrative(result.date)}
-            className="block w-full truncate text-left font-serif text-[1rem] leading-6 transition-colors hover:opacity-80"
-            style={{ color: AI_CHAT_THEME.textPrimary }}
-            title="打开对应日报的 AI 叙事"
-          >
-            {result.title || 'AI 叙事'}
-          </button>
-          <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textSecondary }}>
-            {result.preview || '点击查看完整叙事'}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
-        <span>{result.date}</span>
-        <span>{result.createdReview ? '已新建日报' : '已写入日报'}</span>
-        <span>{result.mergeMode === 'overwrite' ? '覆盖写入' : '首次写入'}</span>
-      </div>
-
-      <div className="mt-2.5 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => handleOpenDailyReviewNarrative(result.date)}
-          className="inline-flex h-8 items-center justify-center rounded-full border px-3 text-xs transition-colors"
-          style={{
-            borderColor: AI_CHAT_THEME.chipBorder,
-            backgroundColor: AI_CHAT_THEME.inputBg,
-            color: AI_CHAT_THEME.textSecondary
-          }}
-          title="打开日报叙事"
-        >
-          打开
-        </button>
-      </div>
-    </div>
-  );
-
-  const renderWeeklyReviewWritebackResult = (result: AIChatWeeklyReviewWritebackResult) => (
-    <div
-      className="border-l-2 pl-3 pr-1 py-1"
-      style={{ borderColor: AI_CHAT_THEME.activeBorder }}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <button
-            type="button"
-            onClick={() => handleOpenWeeklyReviewNarrative(result.weekStartDate, result.weekEndDate)}
-            className="block w-full truncate text-left font-serif text-[1rem] leading-6 transition-colors hover:opacity-80"
-            style={{ color: AI_CHAT_THEME.textPrimary }}
-            title="打开对应周回顾的 AI 叙事"
-          >
-            {result.title || 'AI 叙事'}
-          </button>
-          <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textSecondary }}>
-            {result.preview || '点击查看完整叙事'}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
-        <span>{`${result.weekStartDate} ~ ${result.weekEndDate}`}</span>
-        <span>{result.createdReview ? '已新建周回顾' : '已写入周回顾'}</span>
-        <span>{result.mergeMode === 'overwrite' ? '覆盖写入' : '首次写入'}</span>
-      </div>
-
-      <div className="mt-2.5 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => handleOpenWeeklyReviewNarrative(result.weekStartDate, result.weekEndDate)}
-          className="inline-flex h-8 items-center justify-center rounded-full border px-3 text-xs transition-colors"
-          style={{
-            borderColor: AI_CHAT_THEME.chipBorder,
-            backgroundColor: AI_CHAT_THEME.inputBg,
-            color: AI_CHAT_THEME.textSecondary
-          }}
-          title="打开周回顾叙事"
-        >
-          打开
-        </button>
-      </div>
-    </div>
-  );
-
-  const renderMonthlyReviewWritebackResult = (result: AIChatMonthlyReviewWritebackResult) => (
-    <div
-      className="border-l-2 pl-3 pr-1 py-1"
-      style={{ borderColor: AI_CHAT_THEME.activeBorder }}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <button
-            type="button"
-            onClick={() => handleOpenMonthlyReviewNarrative(result.monthStartDate, result.monthEndDate)}
-            className="block w-full truncate text-left font-serif text-[1rem] leading-6 transition-colors hover:opacity-80"
-            style={{ color: AI_CHAT_THEME.textPrimary }}
-            title="打开对应月回顾的 AI 叙事"
-          >
-            {result.title || 'AI 叙事'}
-          </button>
-          <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textSecondary }}>
-            {result.preview || '点击查看完整叙事'}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: AI_CHAT_THEME.textMuted }}>
-        <span>{`${result.monthStartDate} ~ ${result.monthEndDate}`}</span>
-        <span>{result.createdReview ? '已新建月回顾' : '已写入月回顾'}</span>
-        <span>{result.mergeMode === 'overwrite' ? '覆盖写入' : '首次写入'}</span>
-      </div>
-
-      <div className="mt-2.5 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => handleOpenMonthlyReviewNarrative(result.monthStartDate, result.monthEndDate)}
-          className="inline-flex h-8 items-center justify-center rounded-full border px-3 text-xs transition-colors"
-          style={{
-            borderColor: AI_CHAT_THEME.chipBorder,
-            backgroundColor: AI_CHAT_THEME.inputBg,
-            color: AI_CHAT_THEME.textSecondary
-          }}
-          title="打开月回顾叙事"
-        >
-          打开
-        </button>
-      </div>
-    </div>
+    renderAppliedChatAction({
+      action,
+      categories,
+      formatActionDate,
+      formatTimeRange,
+      getActivityById,
+      getActivityCategory,
+      getScopeNames,
+      logs,
+      messageId,
+      onOpenLogEditor: handleOpenLogEditor,
+      onOpenTodoDetail: handleOpenTodoDetail,
+      onUndoCreateSubtaskAction: handleUndoCreateSubtaskAction,
+      onUndoEditLogAction: handleUndoEditLogAction,
+      onUndoLogAction: handleUndoLogAction,
+      onUndoTodoAction: handleUndoTodoAction,
+      onUndoUpdateTodoAction: handleUndoUpdateTodoAction,
+      theme: AI_CHAT_THEME,
+      todoCategories,
+      todos
+    })
   );
 
   const emptyPromptExampleGroups: Array<{
@@ -8777,365 +4938,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       prompt: '我今天感觉有点乱，也有点累，陪我理一理现在最该做什么。'
     }
   ];
-
-  const renderMessageBubble = (message: AIChatMessage, index: number, messages: AIChatMessage[]) => {
-    const isUser = message.role === 'user';
-    const tone = message.tone || 'normal';
-    const displayParts = message.displayParts && message.displayParts.length > 0
-      ? message.displayParts
-      : [message.content];
-    const isAnimatedAssistantMessage = !isUser && tone === 'normal' && displayParts.length > 1;
-    const visibleDisplayPartCount = isAnimatedAssistantMessage
-      ? Math.max(1, Math.min(revealedAssistantPartCounts[message.id] || 1, displayParts.length))
-      : displayParts.length;
-    const visibleDisplayParts = displayParts.slice(0, visibleDisplayPartCount);
-    const allDisplayPartsRevealed = visibleDisplayPartCount >= displayParts.length;
-    const reasoningParts = message.reasoning?.parts || [];
-    const hasReasoning = !isUser && reasoningParts.length > 0;
-    const isReasoningExpanded = expandedReasoningMessageIds.has(message.id);
-    const isMemoryUpdatesExpanded = expandedMemoryUpdateMessageIds.has(message.id);
-    const isDreamUpdatesExpanded = expandedDreamUpdateMessageIds.has(message.id);
-    const isReminderUpdatesExpanded = expandedReminderUpdateMessageIds.has(message.id);
-    const previousMessage = index > 0 ? messages[index - 1] : null;
-    const showAvatar = !previousMessage || previousMessage.role !== message.role;
-
-    let bubbleStyle = {
-      borderColor: AI_CHAT_THEME.panelBorder,
-      backgroundColor: AI_CHAT_THEME.panelBg,
-      color: AI_CHAT_THEME.textPrimary,
-      boxShadow: `0 0 0 1px ${accentMix(8, 'rgba(0,0,0,0.02)')}`
-    };
-    if (isUser) {
-      bubbleStyle = {
-        borderColor: AI_CHAT_THEME.activeBorder,
-        backgroundColor: AI_CHAT_THEME.activeBg,
-        color: AI_CHAT_THEME.textPrimary,
-        boxShadow: `0 0 0 1px ${accentMix(10, 'rgba(0,0,0,0.03)')}`
-      };
-    } else if (tone === 'system') {
-      bubbleStyle = {
-        borderColor: AI_CHAT_THEME.panelBorder,
-        backgroundColor: AI_CHAT_THEME.inputBg,
-        color: AI_CHAT_THEME.textSecondary,
-        boxShadow: `0 0 0 1px ${accentMix(7, 'rgba(0,0,0,0.02)')}`
-      };
-    } else if (tone === 'error') {
-      bubbleStyle = {
-        borderColor: AI_CHAT_THEME.dangerBorder,
-        backgroundColor: AI_CHAT_THEME.dangerBg,
-        color: AI_CHAT_THEME.dangerText,
-        boxShadow: '0 0 0 1px rgba(157,84,77,0.08)'
-      };
-    } else if (tone === 'pending') {
-      bubbleStyle = {
-        borderColor: AI_CHAT_THEME.pendingBorder,
-        backgroundColor: AI_CHAT_THEME.pendingBg,
-        color: AI_CHAT_THEME.textMuted,
-        boxShadow: `0 0 0 1px ${accentMix(6, 'rgba(0,0,0,0.02)')}`
-      };
-    }
-
-    const avatarStyle = isUser
-      ? {
-          borderColor: AI_CHAT_THEME.activeBorder,
-          backgroundColor: AI_CHAT_THEME.activeBg,
-          color: AI_CHAT_THEME.textSecondary
-        }
-      : tone === 'error'
-        ? {
-            borderColor: AI_CHAT_THEME.dangerBorder,
-            backgroundColor: AI_CHAT_THEME.dangerBg,
-            color: AI_CHAT_THEME.dangerText
-          }
-        : tone === 'system'
-          ? {
-              borderColor: AI_CHAT_THEME.panelBorder,
-              backgroundColor: AI_CHAT_THEME.inputBg,
-              color: AI_CHAT_THEME.textMuted
-            }
-          : {
-              borderColor: AI_CHAT_THEME.panelBorder,
-              backgroundColor: AI_CHAT_THEME.avatarBg,
-              color: AI_CHAT_THEME.textSecondary
-            };
-    const messageDebugViewer = resolveMessageDebugViewer(message);
-
-    return (
-      <div
-        key={message.id}
-        ref={(node) => {
-          if (node) {
-            messageElementRefs.current.set(message.id, node);
-            return;
-          }
-
-          messageElementRefs.current.delete(message.id);
-        }}
-        className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
-      >
-        <div className={`flex w-full max-w-[96%] items-start gap-2.5 sm:max-w-[92%] ${isUser ? 'ml-auto flex-row-reverse' : ''}`}>
-          <div className="w-8 shrink-0 pt-0.5">
-            {showAvatar ? (
-              <div
-                className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-[0.75rem] border"
-                style={avatarStyle}
-              >
-                {isUser ? (
-                  <UserAvatar profile={userProfile} iconClassName="text-sm" />
-                ) : (
-                  <div className="h-full w-full overflow-hidden rounded-[0.75rem]">
-                    <PersonaAvatar persona={activePersona} className="rounded-[0.75rem]" iconClassName="text-sm" />
-                  </div>
-                )}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="min-w-0 flex-1 space-y-1.5">
-            {hasReasoning && (
-              <div className="px-1 pb-0.5 text-left">
-                <button
-                  type="button"
-                  onClick={() => toggleReasoningExpansion(message.id)}
-                  className="inline-flex items-center gap-1.5 text-[11px] transition-colors hover:opacity-100"
-                  style={{ color: AI_CHAT_THEME.textFaint }}
-                >
-                  {isReasoningExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                  <span>推理过程</span>
-                  <span>{isReasoningExpanded ? '收起' : '展开'}</span>
-                </button>
-                {isReasoningExpanded && (
-                  <div className="mt-1.5 space-y-2 pl-5">
-                    {reasoningParts.map((part, reasoningIndex) => (
-                      <div
-                        key={`${message.id}-reasoning-${reasoningIndex}`}
-                        className="text-[12px] leading-6"
-                        style={{ color: AI_CHAT_THEME.textMuted }}
-                      >
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm, remarkBreaks]}
-                          components={CHAT_MARKDOWN_COMPONENTS}
-                        >
-                          {part.text}
-                        </ReactMarkdown>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            {visibleDisplayParts.map((part, index) => (
-              <RevealingMessageBubble
-                key={`${message.id}-part-${index}`}
-                className={`rounded-[0.95rem] border px-4 py-3 ${isUser ? 'ml-auto' : ''}`}
-                style={bubbleStyle}
-                revealMode={isAnimatedAssistantMessage ? 'assistantStaggered' : 'default'}
-                partIndex={index}
-                partCount={displayParts.length}
-              >
-                <div className="flex items-start gap-2 text-left">
-                  {tone === 'pending' && index === 0 && (
-                    <Loader2 size={15} className="mt-1 shrink-0 animate-spin" style={{ color: AI_CHAT_THEME.textFaint }} />
-                  )}
-                  <div className="min-w-0 flex-1 break-words text-left text-[14px] leading-6 sm:text-[15px]">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm, remarkBreaks]}
-                      components={CHAT_MARKDOWN_COMPONENTS}
-                    >
-                      {part}
-                    </ReactMarkdown>
-                  </div>
-                </div>
-              </RevealingMessageBubble>
-            ))}
-            {allDisplayPartsRevealed && (
-              <div className={`px-1 text-[10px] ${isUser ? 'text-right' : 'text-left'}`} style={{ color: AI_CHAT_THEME.textMuted }}>
-                <div className={`flex flex-wrap items-center gap-x-2.5 gap-y-1 ${isUser ? 'justify-end' : 'justify-start'}`}>
-                  <span>{formatConversationTime(message.createdAt)}</span>
-                  <span className="hidden text-[#b4a79a] sm:inline">·</span>
-                  <span>{activeSession?.contextCacheEnabled ? `上下文开启 · ${activePersona.contextMessageLimit}轮` : '单轮'}</span>
-                  {message.memoryUpdates && message.memoryUpdates.length > 0 && (
-                    <>
-                      <span className="hidden text-[#b4a79a] sm:inline">·</span>
-                      <button
-                        type="button"
-                        onClick={() => toggleMemoryUpdateExpansion(message.id)}
-                        className="transition-colors hover:opacity-100"
-                        style={{ color: AI_CHAT_THEME.textMuted }}
-                      >
-                        记忆更新 {message.memoryUpdates.length}项 · {isMemoryUpdatesExpanded ? '收起' : '展开'}
-                      </button>
-                    </>
-                  )}
-                  {message.dreamUpdates && message.dreamUpdates.length > 0 && (
-                    <>
-                      <span className="hidden text-[#b4a79a] sm:inline">·</span>
-                      <button
-                        type="button"
-                        onClick={() => toggleDreamUpdateExpansion(message.id)}
-                        className="transition-colors hover:opacity-100"
-                        style={{ color: AI_CHAT_THEME.textMuted }}
-                      >
-                        Dream 更新 {message.dreamUpdates.length}项 · {isDreamUpdatesExpanded ? '收起' : '展开'}
-                      </button>
-                    </>
-                  )}
-                  {message.reminderUpdates && message.reminderUpdates.length > 0 && (
-                    <>
-                      <span className="hidden text-[#b4a79a] sm:inline">·</span>
-                      <button
-                        type="button"
-                        onClick={() => toggleReminderUpdateExpansion(message.id)}
-                        className="transition-colors hover:opacity-100"
-                        style={{ color: AI_CHAT_THEME.textMuted }}
-                      >
-                        提醒结果 {message.reminderUpdates.length}项 · {isReminderUpdatesExpanded ? '收起' : '展开'}
-                      </button>
-                    </>
-                  )}
-                  {messageDebugViewer && (
-                    <>
-                      <span className="hidden text-[#b4a79a] sm:inline">·</span>
-                      <button
-                        type="button"
-                        onClick={() => setDebugViewer(messageDebugViewer)}
-                        className="transition-colors hover:opacity-100"
-                        style={{ color: AI_CHAT_THEME.textMuted }}
-                      >
-                        查看调试
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {allDisplayPartsRevealed && ((message.appliedActions && message.appliedActions.length > 0) || message.dailyReviewWriteback || message.weeklyReviewWriteback || message.monthlyReviewWriteback) && (
-              <div
-                className="space-y-2 border-l pl-3 pr-1 py-1"
-                style={{
-                  borderColor: AI_CHAT_THEME.activeBorder
-                }}
-              >
-                <p className="font-serif text-[10px] tracking-[0.08em]" style={{ color: AI_CHAT_THEME.textFaint }}>
-                  应用结果
-                </p>
-                <div className="space-y-2">
-                  {message.appliedActions?.map((action) => renderAppliedAction(message.id, action))}
-                  {message.dailyReviewWriteback && renderDailyReviewWritebackResult(message.dailyReviewWriteback)}
-                  {message.weeklyReviewWriteback && renderWeeklyReviewWritebackResult(message.weeklyReviewWriteback)}
-                  {message.monthlyReviewWriteback && renderMonthlyReviewWritebackResult(message.monthlyReviewWriteback)}
-                </div>
-              </div>
-            )}
-
-            {allDisplayPartsRevealed && message.memoryUpdates && message.memoryUpdates.length > 0 && isMemoryUpdatesExpanded && (
-              <div
-                className="space-y-2 border-l pl-3 pr-1 py-1"
-                style={{
-                  borderColor: AI_CHAT_THEME.activeBorder
-                }}
-              >
-                <div className="space-y-2">
-                  {message.memoryUpdates.map((section) => (
-                    <div
-                      key={`${message.id}-memory-${section.label}`}
-                      className="border-l-2 pl-3 pr-1 py-1"
-                      style={{ borderColor: AI_CHAT_THEME.activeBorder }}
-                    >
-                      <p className="text-[11px] font-semibold" style={{ color: AI_CHAT_THEME.textSecondary }}>
-                        {section.label}
-                      </p>
-                      <div className="mt-1.5 space-y-1 text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textPrimary }}>
-                        {section.items.map((item) => (
-                          <p key={`${message.id}-memory-item-${section.label}-${item}`}>{item}</p>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {allDisplayPartsRevealed && message.dreamUpdates && message.dreamUpdates.length > 0 && isDreamUpdatesExpanded && (
-              <div
-                className="space-y-2 border-l pl-3 pr-1 py-1"
-                style={{
-                  borderColor: AI_CHAT_THEME.activeBorder
-                }}
-              >
-                <div className="space-y-2">
-                  {message.dreamUpdates.map((card, cardIndex) => (
-                    <div
-                      key={`${message.id}-dream-${card.topicId}-${cardIndex}`}
-                      className="border-l-2 pl-3 pr-1 py-1"
-                      style={{ borderColor: AI_CHAT_THEME.activeBorder }}
-                    >
-                      <p className="text-[11px] font-semibold" style={{ color: AI_CHAT_THEME.textSecondary }}>
-                        {card.topicTitle} · {card.action === 'created' ? '新增' : card.action === 'deleted' ? '删除' : '改写'}
-                      </p>
-                      <div className="mt-1.5 space-y-1 text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textPrimary }}>
-                        <p>{card.content}</p>
-                        {(card.observedRangeStart && card.observedRangeEnd) && (
-                          <p className="text-[12px]" style={{ color: AI_CHAT_THEME.textSecondary }}>
-                            观察窗口：{card.observedRangeStart} 至 {card.observedRangeEnd}
-                          </p>
-                        )}
-                        <p className="text-[12px]" style={{ color: AI_CHAT_THEME.textSecondary }}>
-                          更新时间：{formatAssistantDateTimeForDisplay(card.updatedAt)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {allDisplayPartsRevealed && message.reminderUpdates && message.reminderUpdates.length > 0 && isReminderUpdatesExpanded && (
-              <div
-                className="space-y-2 border-l pl-3 pr-1 py-1"
-                style={{
-                  borderColor: AI_CHAT_THEME.activeBorder
-                }}
-              >
-                <div className="space-y-2">
-                  {message.reminderUpdates.map((item) => (
-                    <div
-                      key={`${message.id}-reminder-${item}`}
-                      className="border-l-2 pl-3 pr-1 py-1"
-                      style={{ borderColor: AI_CHAT_THEME.activeBorder }}
-                    >
-                      <p className="text-[13px] leading-6" style={{ color: AI_CHAT_THEME.textPrimary }}>
-                        {item}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {!isUser && tone === 'error' && message.retryInput && (
-              <div className="pl-1">
-                <button
-                  onClick={() => handleRetryMessage(message)}
-                  disabled={isLoading}
-                  className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                  style={{
-                    borderColor: AI_CHAT_THEME.chipBorder,
-                    backgroundColor: AI_CHAT_THEME.panelBg,
-                    color: AI_CHAT_THEME.textSecondary
-                  }}
-                >
-                  <RotateCcw size={12} />
-                  重试
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div
@@ -9226,56 +5028,36 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
-          {!activeSession || activeSession.messages.length === 0 ? (
-            <div
-              className="mx-auto mt-10 max-w-2xl rounded-[0.9rem] border border-dashed px-6 py-7 text-sm leading-7"
-              style={{
-                borderColor: AI_CHAT_THEME.panelBorderStrong,
-                background: `linear-gradient(180deg, ${AI_CHAT_THEME.panelBg} 0%, ${AI_CHAT_THEME.panelBgSoft} 100%)`,
-                color: AI_CHAT_THEME.textSecondary,
-                boxShadow: AI_CHAT_THEME.cardShadow
-              }}
-            >
-              <p className="font-medium text-stone-700">试试这样说</p>
-              <div className="mt-4 space-y-4">
-                {emptyPromptExampleGroups.map((group) => (
-                  <div key={group.title}>
-                    <p className="font-medium text-stone-700">{group.title}</p>
-                    <p>{group.prompt}</p>
-                    {group.requirement ? (
-                      <p className="text-xs text-stone-400">功能要求：{group.requirement}</p>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          {false ? (
-            <div className="mx-auto mt-10 max-w-2xl rounded-[2rem] border border-dashed border-stone-200 bg-white/85 px-6 py-7 text-sm leading-7 text-stone-500 shadow-sm">
-              <p className="font-medium text-stone-700">
-                这里已经是统一对话流了。你可以直接聊天，也可以让 AI 帮你补记时间或创建待办。
-              </p>
-              <p>
-                比如：“下午两点到三点半写周报，挂到工作/写作。” 或者 “帮我建一个明天交论文初稿的待办。”
-              </p>
-              <p>
-                点击右上角可以切到历史对话并新建会话，点击左上头像可以换人设、名字、称呼和提示词。
-              </p>
-              <p>
-                {activeSession?.contextCacheEnabled
-                  ? `当前已开启快速上下文，会把最近 ${activePersona.contextMessageLimit} 次对话一起发给 AI 理解。`
-                  : '当前是单轮模式，AI 只会看你这次输入。'}
-              </p>
-              <p>输入 `/debug` 可以打开或关闭调试模式。</p>
-            </div>
-          ) : (
-            <div className="mx-auto max-w-[920px] space-y-4">
-              {activeSession.messages.map(renderMessageBubble)}
-              <div ref={messagesEndRef} />
-            </div>
-          )}
-        </div>
+        <AIBackfillChatConversationPane
+          accentMix={accentMix}
+          activePersona={activePersona}
+          activeSession={activeSession}
+          emptyPromptExampleGroups={emptyPromptExampleGroups}
+          expandedDreamUpdateMessageIds={expandedDreamUpdateMessageIds}
+          expandedMemoryUpdateMessageIds={expandedMemoryUpdateMessageIds}
+          expandedReasoningMessageIds={expandedReasoningMessageIds}
+          expandedReminderUpdateMessageIds={expandedReminderUpdateMessageIds}
+          formatAssistantDateTimeForDisplay={formatAssistantDateTimeForDisplay}
+          formatConversationTime={formatConversationTime}
+          getMessageDebugViewer={resolveMessageDebugViewer}
+          isLoading={isLoading}
+          markdownComponents={CHAT_MARKDOWN_COMPONENTS}
+          messagesEndRef={messagesEndRef}
+          onMessageRef={handleMessageElementRef}
+          onOpenDailyReviewNarrative={handleOpenDailyReviewNarrative}
+          onOpenDebugViewer={setDebugViewer}
+          onOpenMonthlyReviewNarrative={handleOpenMonthlyReviewNarrative}
+          onOpenWeeklyReviewNarrative={handleOpenWeeklyReviewNarrative}
+          onRetryMessage={handleRetryMessage}
+          renderAppliedAction={renderAppliedAction}
+          revealedAssistantPartCounts={revealedAssistantPartCounts}
+          setDreamUpdateExpansion={toggleDreamUpdateExpansion}
+          setMemoryUpdateExpansion={toggleMemoryUpdateExpansion}
+          setReasoningExpansion={toggleReasoningExpansion}
+          setReminderUpdateExpansion={toggleReminderUpdateExpansion}
+          theme={AI_CHAT_THEME}
+          userProfile={userProfile}
+        />
 
         <div
           className="border-t px-4 pb-3 pt-3 backdrop-blur-xl sm:px-5"
@@ -9433,2549 +5215,230 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           </div>
         </div>
 
-        {isHistoryPanelOpen && (
-          <div className="absolute inset-0 z-10 backdrop-blur-[10px]" style={{ backgroundColor: AI_CHAT_THEME.overlayDark }}>
-            <div
-              className="absolute inset-3 flex flex-col overflow-hidden rounded-[0.95rem] border sm:inset-4"
-              style={{
-                borderColor: AI_CHAT_THEME.panelBorder,
-                backgroundColor: AI_CHAT_THEME.panelBg,
-                boxShadow: AI_CHAT_THEME.cardShadowStrong
-              }}
-            >
-              <div
-                className="flex items-start justify-between border-b px-5 py-4 backdrop-blur"
-                style={{
-                  borderColor: AI_CHAT_THEME.panelBorder,
-                  backgroundColor: AI_CHAT_THEME.panelBg
-                }}
-              >
-                <div>
-                  <h3 className="text-base font-bold text-stone-800">历史对话</h3>
-                </div>
-                <button
-                  onClick={() => setIsHistoryPanelOpen(false)}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.8rem] border transition-colors"
-                  style={{
-                    borderColor: AI_CHAT_THEME.chipBorder,
-                    backgroundColor: AI_CHAT_THEME.panelBg,
-                    color: AI_CHAT_THEME.textMuted
-                  }}
-                >
-                  <X size={18} />
-                </button>
-              </div>
+        <AIBackfillChatHistoryOverlay
+          activeSessionId={activeSessionId}
+          deleteConfirmSessionId={deleteConfirmSessionId}
+          editingSessionId={editingSessionId}
+          editingSessionTitle={editingSessionTitle}
+          formatConversationTime={formatConversationTime}
+          getSessionPersona={resolveSessionPersona}
+          isOpen={isHistoryPanelOpen}
+          onCancelDeleteSession={() => setDeleteConfirmSessionId(null)}
+          onCancelRenameSession={handleCancelRenameSession}
+          onClose={() => setIsHistoryPanelOpen(false)}
+          onCommitRenameSession={handleCommitRenameSession}
+          onDeleteSession={handleDeleteSession}
+          onEditSessionTitleChange={setEditingSessionTitle}
+          onOpenNewSessionDialog={handleOpenNewSessionDialog}
+          onSelectSession={handleSelectSessionFromHistory}
+          onStartRenameSession={handleStartRenameSession}
+          onToggleDeleteSession={handleToggleDeleteSession}
+          sortedSessions={sortedSessions}
+          theme={AI_CHAT_THEME}
+        />
 
-              <div className="border-b px-5 py-4" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
-                <button
-                  onClick={handleOpenNewSessionDialog}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-[0.8rem] border px-4 py-2.5 text-sm font-semibold transition-colors"
-                  style={{
-                    borderColor: AI_CHAT_THEME.primaryButtonBorder,
-                    backgroundColor: AI_CHAT_THEME.primaryButtonBg,
-                    color: AI_CHAT_THEME.primaryButtonText,
-                    boxShadow: `0 0 0 1px ${AI_CHAT_THEME.primaryButtonBorder}`
-                  }}
-                >
-                  <MessageSquarePlus size={16} />
-                  新建对话
-                </button>
-              </div>
+        <AIBackfillChatNewSessionDialog
+          isOpen={isNewSessionDialogOpen}
+          onClose={handleCloseNewSessionDialog}
+          onCreateGenericSession={handleCreateGenericSession}
+          onOpenMonthlyReviewTemplateSelection={handleOpenMonthlyReviewTemplateSelection}
+          onOpenWeeklyReviewTemplateSelection={handleOpenWeeklyReviewTemplateSelection}
+          theme={AI_CHAT_THEME}
+        />
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-                <div className="space-y-2">
-                  {sortedSessions.map((session) => {
-                    const sessionPersona = personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0];
-                    const lastMessage = [...session.messages].reverse().find((message) => message.tone !== 'pending');
-                    const isEditing = editingSessionId === session.id;
-                    const isDeleteConfirming = deleteConfirmSessionId === session.id;
-                    return (
-                      <div
-                        key={session.id}
-                        className="w-full rounded-[0.85rem] border px-4 py-3 text-left transition-all"
-                        style={
-                          session.id === activeSessionId
-                            ? {
-                                borderColor: AI_CHAT_THEME.activeBorder,
-                                backgroundColor: AI_CHAT_THEME.activeBg,
-                                boxShadow: AI_CHAT_THEME.cardShadow
-                              }
-                            : {
-                                borderColor: AI_CHAT_THEME.panelBorder,
-                                backgroundColor: AI_CHAT_THEME.panelBg
-                              }
-                        }
-                      >
-                        <div className="flex items-start gap-3">
-                          <div
-                            onClick={() => {
-                              if (isEditing) {
-                                return;
-                              }
-                              setActiveSessionId(session.id);
-                              setIsHistoryPanelOpen(false);
-                            }}
-                            className={`flex min-w-0 flex-1 items-start gap-3 text-left ${isEditing ? '' : 'cursor-pointer'}`}
-                          >
-                            <div
-                              className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[0.7rem] border text-base"
-                              style={{
-                                borderColor: AI_CHAT_THEME.panelBorder,
-                                backgroundColor: AI_CHAT_THEME.avatarBg,
-                                boxShadow: AI_CHAT_THEME.avatarShadow
-                              }}
-                            >
-                              <PersonaAvatar persona={sessionPersona} iconClassName="text-base" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center justify-between gap-2">
-                                {isEditing ? (
-                                  <input
-                                    value={editingSessionTitle}
-                                    onChange={(event) => setEditingSessionTitle(event.target.value)}
-                                    onClick={(event) => event.stopPropagation()}
-                                    onKeyDown={(event) => {
-                                      event.stopPropagation();
-                                      if (event.key === 'Enter') {
-                                        event.preventDefault();
-                                        handleCommitRenameSession(session.id);
-                                      }
-                                      if (event.key === 'Escape') {
-                                        event.preventDefault();
-                                        handleCancelRenameSession();
-                                      }
-                                    }}
-                                    className="w-full rounded-[0.7rem] border px-3 py-1.5 text-sm font-semibold outline-none"
-                                    style={{
-                                      borderColor: AI_CHAT_THEME.chipBorder,
-                                      backgroundColor: AI_CHAT_THEME.inputBg,
-                                      color: AI_CHAT_THEME.textPrimary
-                                    }}
-                                    autoFocus
-                                  />
-                                ) : (
-                                  <p className="truncate font-serif text-[1.05rem] text-[#26211d]">{session.title}</p>
-                                )}
-                                <span className="shrink-0 text-[11px] text-[#978d82]">
-                                  {formatConversationTime(session.updatedAt)}
-                                </span>
-                              </div>
-                              <p className="mt-1 truncate text-xs text-[#69615a]">
-                                {lastMessage?.content || '还没有消息'}
-                              </p>
-                              <div className="mt-2 flex items-center gap-2 text-[11px] text-[#91877d]">
-                                <span>{sessionPersona.name}</span>
-                                <span>·</span>
-                                <span>{session.contextCacheEnabled ? `上下文 ${sessionPersona.contextMessageLimit}轮` : '单轮'}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex shrink-0 items-center gap-1">
-                            {isEditing ? (
-                              <>
-                                <button
-                                  onClick={() => handleCommitRenameSession(session.id)}
-                                  className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#ced8ca] bg-[#edf3ea] text-[#556a52] transition-colors hover:bg-[#e5eee1]"
-                                  title="保存名称"
-                                >
-                                  <Check size={14} />
-                                </button>
-                                <button
-                                  onClick={handleCancelRenameSession}
-                                  className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#e3d8ca] bg-[#fff8f0] text-[#736a61] transition-colors hover:bg-[#f2e9de]"
-                                  title="取消重命名"
-                                >
-                                  <X size={14} />
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => handleStartRenameSession(session)}
-                                  className="rounded-[0.7rem] p-2 text-[#897f75] transition-colors hover:bg-[#f1e8dd] hover:text-[#2f2a26]"
-                                  title="重命名对话"
-                                >
-                                  <Pencil size={14} />
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setEditingSessionId(null);
-                                    setEditingSessionTitle('');
-                                    setDeleteConfirmSessionId((current) => current === session.id ? null : session.id);
-                                  }}
-                                  className="rounded-[0.7rem] p-2 text-[#897f75] transition-colors hover:bg-[#f8e9e6] hover:text-[#b35b50]"
-                                  title="删除对话"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-
-                        {isDeleteConfirming && !isEditing && (
-                          <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#e4c1bc] pt-3 text-xs text-[#9d544d]">
-                            <span>删除后不能恢复，确认删除？</span>
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                onClick={() => setDeleteConfirmSessionId(null)}
-                                className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#ddd6ce] bg-transparent text-[#71685f] transition-colors hover:bg-[#fffaf3]"
-                                title="取消删除"
-                              >
-                                <X size={14} />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteSession(session.id)}
-                                className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#ba6256] bg-[#c46f4f] text-[#fff8f2] transition-colors hover:bg-[#b95f43]"
-                                title="确认删除"
-                              >
-                                <Check size={14} />
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isNewSessionDialogOpen && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/20 p-5 backdrop-blur-sm">
-            <div
-              className="w-full max-w-sm overflow-hidden rounded-[1.4rem] border"
-              style={{
-                borderColor: AI_CHAT_THEME.panelBorder,
-                backgroundColor: AI_CHAT_THEME.panelBg,
-                boxShadow: AI_CHAT_THEME.cardShadowStrong
-              }}
-            >
-              <div className="flex items-start justify-between border-b px-5 py-4" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
-                <div>
-                  <h3 className="text-base font-bold text-stone-800">新建对话</h3>
-                </div>
-                <button
-                  onClick={handleCloseNewSessionDialog}
-                  className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] border transition-colors"
-                  style={{
-                    borderColor: AI_CHAT_THEME.chipBorder,
-                    backgroundColor: AI_CHAT_THEME.panelBg,
-                    color: AI_CHAT_THEME.textMuted
-                  }}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="space-y-3 px-5 py-5">
-                <button
-                  onClick={handleCreateGenericSession}
-                  className="w-full rounded-[0.95rem] border px-4 py-3 text-left transition-colors"
-                  style={{
-                    borderColor: AI_CHAT_THEME.panelBorder,
-                    backgroundColor: AI_CHAT_THEME.panelBgStrong,
-                    color: AI_CHAT_THEME.textPrimary
-                  }}
-                >
-                  <div className="text-sm font-semibold">普通对话</div>
-                </button>
-                <button
-                  onClick={handleOpenWeeklyReviewTemplateSelection}
-                  className="w-full rounded-[0.95rem] border px-4 py-3 text-left transition-colors"
-                  style={{
-                    borderColor: AI_CHAT_THEME.panelBorder,
-                    backgroundColor: AI_CHAT_THEME.panelBgStrong,
-                    color: AI_CHAT_THEME.textPrimary
-                  }}
-                >
-                  <div className="text-sm font-semibold">模板对话：周复盘</div>
-                </button>
-                <button
-                  onClick={handleOpenMonthlyReviewTemplateSelection}
-                  className="w-full rounded-[0.95rem] border px-4 py-3 text-left transition-colors"
-                  style={{
-                    borderColor: AI_CHAT_THEME.panelBorder,
-                    backgroundColor: AI_CHAT_THEME.panelBgStrong,
-                    color: AI_CHAT_THEME.textPrimary
-                  }}
-                >
-                  <div className="text-sm font-semibold">模板对话：月复盘</div>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isPersonaPanelOpen && (
-          <div className="absolute inset-0 z-10 backdrop-blur-[10px]" style={{ backgroundColor: AI_CHAT_THEME.overlayLight }}>
-            <div
-              className="flex h-full flex-col"
-              style={{
-                paddingTop: 'env(safe-area-inset-top)',
-                paddingBottom: 'env(safe-area-inset-bottom)'
-              }}
-            >
-              <div
-                className="flex h-14 items-center justify-between border-b px-4 backdrop-blur-md"
-                style={{
-                  borderColor: AI_CHAT_THEME.panelBorder,
-                  backgroundColor: AI_CHAT_THEME.panelBg
-                }}
-              >
-                <h3 className="font-serif text-lg font-bold leading-none text-stone-800">AI 设置</h3>
-                <button
-                  onClick={() => setIsPersonaPanelOpen(false)}
-                  className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] border transition-colors"
-                  style={{
-                    borderColor: AI_CHAT_THEME.chipBorder,
-                    backgroundColor: AI_CHAT_THEME.panelBg,
-                    color: AI_CHAT_THEME.textMuted
-                  }}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div className="min-h-0 flex-1 overflow-y-auto px-7 py-5 sm:px-12">
-                <div className="mx-auto max-w-4xl">
-                  <div className="mb-5 flex gap-6 overflow-x-auto border-b border-stone-200 no-scrollbar">
-                    {([
-                      { id: 'persona', label: '人设设置' },
-                      { id: 'call', label: '调用设置' }
-                    ] as Array<{ id: AISettingsMainTab; label: string }>).map((tab) => (
-                      <button
-                        key={tab.id}
-                        onClick={() => setActiveSettingsMainTab(tab.id)}
-                        className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors ${
-                          activeSettingsMainTab === tab.id
-                            ? 'border-b-2 border-stone-900 font-bold text-stone-900'
-                            : 'text-stone-400 hover:text-stone-600'
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {activeSettingsMainTab === 'persona' ? (
-                    <div className="space-y-8">
-                      <section className="space-y-4">
-                        <div className="flex min-h-[3.25rem] items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-bold text-stone-800">选择人设</p>
-                          </div>
-                          <button
-                            onClick={handleCreatePersona}
-                            className="inline-flex items-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium text-[#4b5563] transition-colors hover:bg-white"
-                            style={{
-                              borderColor: 'color-mix(in srgb, var(--accent-color) 14%, #d8dde6)',
-                              backgroundColor: 'color-mix(in srgb, var(--accent-color) 4%, white)'
-                            }}
-                          >
-                            <Plus size={14} />
-                            添加人设
-                          </button>
-                        </div>
-
-                        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                          <div className="block">
-                            <span className="mb-1 block text-xs font-medium text-stone-500">选择人设后会新建对话</span>
-                            <CustomSelect
-                              value={activeSession?.personaId || ''}
-                              onChange={handleApplyPersonaPreset}
-                              options={personas.map((persona) => ({
-                                value: persona.id,
-                                label: `${persona.name || '未命名人设'}${persona.isBuiltIn ? ' · 内置' : ' · 自定义'}`
-                              }))}
-                              className="w-full"
-                            />
-                          </div>
-
-                          <span
-                            className="inline-flex h-[2.625rem] items-center rounded-[0.75rem] border px-3 text-xs font-medium"
-                            style={{
-                              borderColor: AI_CHAT_THEME.chipBorder,
-                              backgroundColor: AI_CHAT_THEME.chipBg,
-                              color: AI_CHAT_THEME.textMuted
-                            }}
-                          >
-                            {activePersona.isBuiltIn ? '当前窗口：内置模板' : '当前窗口：自定义人设'}
-                          </span>
-                        </div>
-                      </section>
-
-                      <section
-                        className="border-t pt-5"
-                        style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)' }}
-                      >
-                        <div className="mb-4 flex min-h-[3.25rem] items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-bold text-stone-800">人设内容</p>
-                          </div>
-                        </div>
-
-                        <input
-                          ref={avatarInputRef}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleAvatarUpload}
-                        />
-
-                        <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start">
-                          <div className="space-y-4">
-                            <div className="flex items-center gap-4">
-                              <div
-                                className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[0.95rem] border text-2xl"
-                                style={{
-                                  borderColor: AI_CHAT_THEME.panelBorder,
-                                  backgroundColor: AI_CHAT_THEME.avatarBg,
-                                  boxShadow: AI_CHAT_THEME.avatarShadow
-                                }}
-                              >
-                                <PersonaAvatar persona={activePersona} iconClassName="text-2xl" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-bold" style={{ color: AI_CHAT_THEME.textPrimary }}>
-                                  {activePersona.name || '未命名人设'}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                onClick={handleUseEmojiAvatar}
-                                className="inline-flex items-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
-                                style={{
-                                  borderColor: AI_CHAT_THEME.chipBorder,
-                                  backgroundColor: AI_CHAT_THEME.avatarBg,
-                                  color: AI_CHAT_THEME.textSecondary
-                                }}
-                              >
-                                <Sparkles size={14} />
-                                Emoji
-                              </button>
-                              <button
-                                onClick={() => avatarInputRef.current?.click()}
-                                disabled={isUploadingAvatar}
-                                className="inline-flex items-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-                                style={{
-                                  borderColor: AI_CHAT_THEME.chipBorder,
-                                  backgroundColor: AI_CHAT_THEME.avatarBg,
-                                  color: AI_CHAT_THEME.textSecondary
-                                }}
-                              >
-                                {isUploadingAvatar ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                                {isUploadingAvatar ? '上传中' : '上传图片'}
-                              </button>
-                              {!activePersona.isBuiltIn && (
-                                <button
-                                  onClick={() => setDeleteConfirmPersonaId((current) => current === activePersona.id ? null : activePersona.id)}
-                                  className="inline-flex items-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors"
-                                  style={{
-                                    borderColor: AI_CHAT_THEME.dangerBorder,
-                                    backgroundColor: AI_CHAT_THEME.dangerBg,
-                                    color: AI_CHAT_THEME.dangerText
-                                  }}
-                                >
-                                  <Trash2 size={14} />
-                                  删除人设
-                                </button>
-                              )}
-                            </div>
-
-                            {isEmojiEditorOpen && (
-                              <div
-                                className="rounded-[0.85rem] border p-3"
-                                style={{
-                                  borderColor: AI_CHAT_THEME.panelBorder,
-                                  backgroundColor: AI_CHAT_THEME.panelBg
-                                }}
-                              >
-                                <div className="flex flex-wrap gap-2">
-                                  {PERSONA_EMOJI_CHOICES.map((emoji) => (
-                                    <button
-                                      key={emoji}
-                                      onClick={() => setEmojiDraft(emoji)}
-                                      className={`flex h-10 w-10 items-center justify-center rounded-[0.7rem] border text-lg transition-colors ${
-                                        emojiDraft.trim() === emoji ? 'shadow-[0_0_0_1px_rgba(0,0,0,0.03)]' : 'hover:bg-white'
-                                      }`}
-                                      style={emojiDraft.trim() === emoji
-                                        ? {
-                                          borderColor: AI_CHAT_THEME.activeBorder,
-                                          backgroundColor: AI_CHAT_THEME.activeBg,
-                                          color: AI_CHAT_THEME.textPrimary
-                                        }
-                                        : {
-                                          borderColor: AI_CHAT_THEME.panelBorder,
-                                          backgroundColor: AI_CHAT_THEME.panelBgStrong,
-                                          color: AI_CHAT_THEME.textSecondary
-                                        }}
-                                    >
-                                      {emoji}
-                                    </button>
-                                  ))}
-                                </div>
-
-                                <div
-                                  className="mt-3 rounded-[0.75rem] border px-3 py-3"
-                                  style={{
-                                    borderColor: AI_CHAT_THEME.chipBorder,
-                                    backgroundColor: AI_CHAT_THEME.inputBg
-                                  }}
-                                >
-                                  <input
-                                    value={emojiDraft}
-                                    onChange={(event) => setEmojiDraft(event.target.value)}
-                                    className="w-full bg-transparent text-sm outline-none"
-                                    style={{ color: AI_CHAT_THEME.textPrimary }}
-                                    placeholder="输入一个 Emoji，例如 ✨"
-                                  />
-                                </div>
-
-                                <div className="mt-3 flex justify-end gap-2">
-                                  <button
-                                    onClick={handleCancelEmojiAvatarEdit}
-                                    className="rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white"
-                                    style={{
-                                      borderColor: AI_CHAT_THEME.chipBorder,
-                                      backgroundColor: AI_CHAT_THEME.inputBg,
-                                      color: AI_CHAT_THEME.textSecondary
-                                    }}
-                                  >
-                                    取消
-                                  </button>
-                                  <button
-                                    onClick={() => void handleApplyEmojiAvatar()}
-                                    className="rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium text-white transition-colors"
-                                    style={{
-                                      borderColor: AI_CHAT_THEME.primaryButtonBorder,
-                                      backgroundColor: AI_CHAT_THEME.primaryButtonBg
-                                    }}
-                                  >
-                                    保存 Emoji
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-
-                            {deleteConfirmPersonaId === activePersona.id && !activePersona.isBuiltIn && (
-                              <div
-                                className="rounded-[0.85rem] border p-3 text-xs"
-                                style={{
-                                  borderColor: AI_CHAT_THEME.dangerBorder,
-                                  backgroundColor: AI_CHAT_THEME.dangerBg,
-                                  color: AI_CHAT_THEME.dangerText
-                                }}
-                              >
-                                <p>确认删除这个人设？</p>
-                                <div className="mt-3 flex justify-end gap-2">
-                                  <button
-                                    onClick={() => setDeleteConfirmPersonaId(null)}
-                                    className="rounded-[0.75rem] border px-3 py-1.5 font-medium transition-colors hover:bg-white"
-                                    style={{
-                                      borderColor: AI_CHAT_THEME.chipBorder,
-                                      backgroundColor: AI_CHAT_THEME.avatarBg,
-                                      color: AI_CHAT_THEME.textSecondary
-                                    }}
-                                  >
-                                    取消
-                                  </button>
-                                  <button
-                                    onClick={() => void handleDeleteCurrentPersona()}
-                                    className="rounded-[0.75rem] border px-3 py-1.5 font-medium text-white transition-colors"
-                                    style={{
-                                      borderColor: AI_CHAT_THEME.dangerBorder,
-                                      backgroundColor: AI_CHAT_THEME.dangerText
-                                    }}
-                                  >
-                                    删除
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="space-y-4">
-                            <div className="grid gap-4 sm:grid-cols-2">
-                              <label className="block">
-                                <span className="mb-1 block text-xs font-medium text-stone-500">名字</span>
-                                <input
-                                  value={activePersona.name}
-                                  onChange={(event) => updateCurrentPersona({ name: event.target.value })}
-                                  className="w-full rounded-[1rem] border px-3 py-2 text-sm outline-none"
-                                  style={{
-                                    borderColor: AI_CHAT_THEME.chipBorder,
-                                    backgroundColor: AI_CHAT_THEME.inputBg,
-                                    color: AI_CHAT_THEME.textPrimary
-                                  }}
-                                  placeholder="可留空"
-                                />
-                              </label>
-
-                              <label className="block">
-                                <span className="mb-1 block text-xs font-medium text-stone-500">AI 自称</span>
-                                <input
-                                  value={activePersona.assistantSelfName}
-                                  onChange={(event) => updateCurrentPersona({ assistantSelfName: event.target.value })}
-                                  className="w-full rounded-[1rem] border px-3 py-2 text-sm outline-none"
-                                  style={{
-                                    borderColor: AI_CHAT_THEME.chipBorder,
-                                    backgroundColor: AI_CHAT_THEME.inputBg,
-                                    color: AI_CHAT_THEME.textPrimary
-                                  }}
-                                  placeholder="可留空"
-                                />
-                              </label>
-                            </div>
-
-                            <label className="block">
-                              <span className="mb-1 block text-xs font-medium text-stone-500">对用户称呼</span>
-                              <input
-                                value={activePersona.userCallName}
-                                onChange={(event) => updateCurrentPersona({ userCallName: event.target.value })}
-                                className="w-full rounded-[1rem] border px-3 py-2 text-sm outline-none"
-                                style={{
-                                  borderColor: AI_CHAT_THEME.chipBorder,
-                                  backgroundColor: AI_CHAT_THEME.inputBg,
-                                  color: AI_CHAT_THEME.textPrimary
-                                }}
-                                placeholder="可留空"
-                              />
-                            </label>
-
-                            {!activePersona.isBuiltIn && (
-                              <label className="block">
-                                <span className="mb-1 block text-xs font-medium text-stone-500">自定义提示词</span>
-                                <textarea
-                                  value={activePersona.systemPrompt}
-                                  onChange={(event) => updateCurrentPersona({ systemPrompt: event.target.value })}
-                                  className="min-h-[220px] w-full rounded-[0.85rem] border px-4 py-3 text-sm leading-7 outline-none"
-                                  style={{
-                                    borderColor: AI_CHAT_THEME.chipBorder,
-                                    backgroundColor: AI_CHAT_THEME.inputBg,
-                                    color: AI_CHAT_THEME.textPrimary
-                                  }}
-                                  placeholder="补充这个人设的语气、风格、偏好、边界条件。"
-                                />
-                              </label>
-                            )}
-                          </div>
-                        </div>
-                      </section>
-
-                      <section
-                        className="border-t pt-5"
-                        style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)' }}
-                      >
-                        <div className="mb-4 flex min-h-[3.25rem] items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-bold text-stone-800">用户头像</p>
-                          </div>
-                          <span
-                            className="rounded-[0.75rem] border px-3 py-1 text-xs font-medium"
-                            style={{
-                              borderColor: AI_CHAT_THEME.chipBorder,
-                              backgroundColor: AI_CHAT_THEME.chipBg,
-                              color: AI_CHAT_THEME.textMuted
-                            }}
-                          >
-                            全局设置
-                          </span>
-                        </div>
-
-                        <input
-                          ref={userAvatarInputRef}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleUserAvatarUpload}
-                        />
-
-                        <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start">
-                          <div className="flex items-center gap-4">
-                            <div
-                              className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[0.95rem] border text-2xl"
-                              style={{
-                                borderColor: AI_CHAT_THEME.panelBorder,
-                                backgroundColor: AI_CHAT_THEME.avatarBg,
-                                boxShadow: AI_CHAT_THEME.avatarShadow
-                              }}
-                            >
-                              <UserAvatar profile={userProfile} iconClassName="text-xl" />
-                            </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>当前用户头像</p>
-                          </div>
-                          </div>
-
-                          <div className="space-y-4">
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                onClick={handleUseUserEmojiAvatar}
-                                className="inline-flex items-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
-                                style={{
-                                  borderColor: AI_CHAT_THEME.chipBorder,
-                                  backgroundColor: AI_CHAT_THEME.avatarBg,
-                                  color: AI_CHAT_THEME.textSecondary
-                                }}
-                              >
-                                <Sparkles size={14} />
-                                Emoji
-                              </button>
-                              <button
-                                onClick={() => userAvatarInputRef.current?.click()}
-                                disabled={isUploadingUserAvatar}
-                                className="inline-flex items-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-                                style={{
-                                  borderColor: AI_CHAT_THEME.chipBorder,
-                                  backgroundColor: AI_CHAT_THEME.avatarBg,
-                                  color: AI_CHAT_THEME.textSecondary
-                                }}
-                              >
-                                {isUploadingUserAvatar ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                                {isUploadingUserAvatar ? '上传中' : '上传图片'}
-                              </button>
-                              <button
-                                onClick={() => void handleResetUserAvatar()}
-                                className="inline-flex items-center gap-1.5 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
-                                style={{
-                                  borderColor: AI_CHAT_THEME.chipBorder,
-                                  backgroundColor: AI_CHAT_THEME.avatarBg,
-                                  color: AI_CHAT_THEME.textSecondary
-                                }}
-                              >
-                                <RotateCcw size={14} />
-                                默认
-                              </button>
-                            </div>
-
-                            {isUserEmojiEditorOpen && (
-                              <div
-                                className="rounded-[0.85rem] border p-3"
-                                style={{
-                                  borderColor: AI_CHAT_THEME.panelBorder,
-                                  backgroundColor: AI_CHAT_THEME.panelBg
-                                }}
-                              >
-                                <div className="flex flex-wrap gap-2">
-                                  {PERSONA_EMOJI_CHOICES.map((emoji) => (
-                                    <button
-                                      key={`user-${emoji}`}
-                                      onClick={() => setUserEmojiDraft(emoji)}
-                                      className="flex h-10 w-10 items-center justify-center rounded-[0.7rem] border text-lg transition-colors hover:bg-white"
-                                      style={{
-                                        borderColor: userEmojiDraft.trim() === emoji ? AI_CHAT_THEME.activeBorder : AI_CHAT_THEME.panelBorder,
-                                        backgroundColor: userEmojiDraft.trim() === emoji ? AI_CHAT_THEME.activeBg : AI_CHAT_THEME.panelBgStrong,
-                                        color: userEmojiDraft.trim() === emoji ? AI_CHAT_THEME.textPrimary : AI_CHAT_THEME.textSecondary,
-                                        boxShadow: userEmojiDraft.trim() === emoji ? `0 0 0 1px ${accentMix(8, 'rgba(0,0,0,0.02)')}` : undefined
-                                      }}
-                                    >
-                                      {emoji}
-                                    </button>
-                                  ))}
-                                </div>
-                                <div
-                                  className="mt-3 rounded-[0.75rem] border px-3 py-3"
-                                  style={{
-                                    borderColor: AI_CHAT_THEME.chipBorder,
-                                    backgroundColor: AI_CHAT_THEME.inputBg
-                                  }}
-                                >
-                                  <input
-                                    value={userEmojiDraft}
-                                    onChange={(event) => setUserEmojiDraft(event.target.value)}
-                                    className="w-full bg-transparent text-sm outline-none"
-                                    style={{ color: AI_CHAT_THEME.textPrimary }}
-                                    placeholder="输入一个 Emoji，例如 🙂"
-                                  />
-                                </div>
-                                <div className="mt-3 flex justify-end gap-2">
-                                  <button
-                                    onClick={handleCancelUserEmojiAvatarEdit}
-                                    className="rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white"
-                                    style={{
-                                      borderColor: AI_CHAT_THEME.chipBorder,
-                                      backgroundColor: AI_CHAT_THEME.chipBg,
-                                      color: AI_CHAT_THEME.textSecondary
-                                    }}
-                                  >
-                                    取消
-                                  </button>
-                                  <button
-                                    onClick={() => void handleApplyUserEmojiAvatar()}
-                                    className="rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium text-white transition-colors"
-                                    style={{
-                                      borderColor: AI_CHAT_THEME.primaryButtonBorder,
-                                      backgroundColor: AI_CHAT_THEME.primaryButtonBg
-                                    }}
-                                  >
-                                    保存 Emoji
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </section>
-                    </div>
-                  ) : (
-                    <div className="space-y-8">
-                      <section className="space-y-4">
-                        <div className="flex min-h-[3.25rem] items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-bold text-stone-800">上下文设置</p>
-                          </div>
-                          <span
-                            className="rounded-[0.75rem] border px-3 py-1 text-xs font-medium"
-                            style={{
-                              borderColor: AI_CHAT_THEME.chipBorder,
-                              backgroundColor: AI_CHAT_THEME.chipBg,
-                              color: AI_CHAT_THEME.textMuted
-                            }}
-                          >
-                            当前会话
-                          </span>
-                        </div>
-
-                        <label className="block max-w-[240px]">
-                          <span className="mb-1 block text-xs font-medium text-stone-500">手动输入最近上下文轮数</span>
-                          <input
-                            type="number"
-                            min={0}
-                            value={activePersona.contextMessageLimit}
-                            onChange={(event) => updateCurrentPersona({ contextMessageLimit: Number(event.target.value) })}
-                            className="w-full rounded-[1rem] border px-3 py-2 text-sm outline-none"
-                            style={{
-                              borderColor: AI_CHAT_THEME.chipBorder,
-                              backgroundColor: AI_CHAT_THEME.inputBg,
-                              color: AI_CHAT_THEME.textPrimary
-                            }}
-                          />
-                        </label>
-                      </section>
-
-                      <section
-                        className="border-t pt-5"
-                        style={{ borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)' }}
-                      >
-                        <div className="mb-4 flex min-h-[3.25rem] items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-bold text-stone-800">后台助理</p>
-                          </div>
-                          <span
-                            className="rounded-[0.75rem] border px-3 py-1 text-xs font-medium"
-                            style={{
-                              borderColor: AI_CHAT_THEME.chipBorder,
-                              backgroundColor: AI_CHAT_THEME.chipBg,
-                              color: AI_CHAT_THEME.textMuted
-                            }}
-                          >
-                            Android
-                          </span>
-                        </div>
-
-                        <div className="space-y-4">
-                          <div className="flex items-start justify-between gap-4 border-b pb-4" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
-                            <div>
-                              <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>开启后台轮询</p>
-                            </div>
-                            <button
-                              onClick={() => handleUpdateAssistantAgentConfig({ enabled: !assistantAgentConfig.enabled })}
-                              className="inline-flex min-w-[72px] items-center justify-center rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors"
-                              style={assistantAgentConfig.enabled
-                                ? {
-                                  borderColor: AI_CHAT_THEME.activeBorder,
-                                  backgroundColor: AI_CHAT_THEME.activeBg,
-                                  color: AI_CHAT_THEME.textPrimary
-                                }
-                                : {
-                                  borderColor: AI_CHAT_THEME.chipBorder,
-                                  backgroundColor: AI_CHAT_THEME.inputBg,
-                                  color: AI_CHAT_THEME.textMuted
-                                }}
-                            >
-                              {assistantAgentConfig.enabled ? '已开启' : '未开启'}
-                            </button>
-                          </div>
-
-                          <div>
-                            <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>check-in 间隔</p>
-                            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                              <label className="block">
-                                <span className="mb-1 block text-xs font-medium text-stone-500">检查频率（分钟）</span>
-                                <div className="relative">
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={assistantAgentIntervalDrafts.basePollMinutes}
-                                    onChange={(event) => handleAssistantAgentIntervalDraftChange('basePollMinutes', event.target.value)}
-                                    onBlur={() => commitAssistantAgentIntervalDraft('basePollMinutes')}
-                                    onKeyDown={(event) => {
-                                      if (event.key === 'Enter') {
-                                        event.preventDefault();
-                                        commitAssistantAgentIntervalDraft('basePollMinutes');
-                                      }
-                                    }}
-                                    aria-invalid={!!assistantAgentIntervalErrors.basePollMinutes}
-                                    className="w-full rounded-[1rem] border px-3 py-2 pr-9 text-sm outline-none"
-                                    style={{
-                                      borderColor: assistantAgentIntervalErrors.basePollMinutes ? '#ef4444' : AI_CHAT_THEME.chipBorder,
-                                      backgroundColor: AI_CHAT_THEME.inputBg,
-                                      color: AI_CHAT_THEME.textPrimary
-                                    }}
-                                  />
-                                  {assistantAgentIntervalErrors.basePollMinutes ? (
-                                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-red-500">
-                                      <XCircle size={15} aria-hidden="true" />
-                                    </span>
-                                  ) : null}
-                                </div>
-                                {assistantAgentIntervalErrors.basePollMinutes ? (
-                                  <span className="mt-1 block text-xs font-medium text-red-500" role="alert">
-                                    {assistantAgentIntervalErrors.basePollMinutes}
-                                  </span>
-                                ) : null}
-                              </label>
-
-                              <label className="block">
-                                <span className="mb-1 block text-xs font-medium text-stone-500">最低间隔（分钟）</span>
-                                <div className="relative">
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={assistantAgentIntervalDrafts.minCheckinMinutes}
-                                    onChange={(event) => handleAssistantAgentIntervalDraftChange('minCheckinMinutes', event.target.value)}
-                                    onBlur={() => commitAssistantAgentIntervalDraft('minCheckinMinutes')}
-                                    onKeyDown={(event) => {
-                                      if (event.key === 'Enter') {
-                                        event.preventDefault();
-                                        commitAssistantAgentIntervalDraft('minCheckinMinutes');
-                                      }
-                                    }}
-                                    aria-invalid={!!assistantAgentIntervalErrors.minCheckinMinutes}
-                                    className="w-full rounded-[1rem] border px-3 py-2 pr-9 text-sm outline-none"
-                                    style={{
-                                      borderColor: assistantAgentIntervalErrors.minCheckinMinutes ? '#ef4444' : AI_CHAT_THEME.chipBorder,
-                                      backgroundColor: AI_CHAT_THEME.inputBg,
-                                      color: AI_CHAT_THEME.textPrimary
-                                    }}
-                                  />
-                                  {assistantAgentIntervalErrors.minCheckinMinutes ? (
-                                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-red-500">
-                                      <XCircle size={15} aria-hidden="true" />
-                                    </span>
-                                  ) : null}
-                                </div>
-                                {assistantAgentIntervalErrors.minCheckinMinutes ? (
-                                  <span className="mt-1 block text-xs font-medium text-red-500" role="alert">
-                                    {assistantAgentIntervalErrors.minCheckinMinutes}
-                                  </span>
-                                ) : null}
-                              </label>
-
-                              <label className="block">
-                                <span className="mb-1 block text-xs font-medium text-stone-500">最高间隔（分钟）</span>
-                                <div className="relative">
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={assistantAgentIntervalDrafts.maxCheckinMinutes}
-                                    onChange={(event) => handleAssistantAgentIntervalDraftChange('maxCheckinMinutes', event.target.value)}
-                                    onBlur={() => commitAssistantAgentIntervalDraft('maxCheckinMinutes')}
-                                    onKeyDown={(event) => {
-                                      if (event.key === 'Enter') {
-                                        event.preventDefault();
-                                        commitAssistantAgentIntervalDraft('maxCheckinMinutes');
-                                      }
-                                    }}
-                                    aria-invalid={!!assistantAgentIntervalErrors.maxCheckinMinutes}
-                                    className="w-full rounded-[1rem] border px-3 py-2 pr-9 text-sm outline-none"
-                                    style={{
-                                      borderColor: assistantAgentIntervalErrors.maxCheckinMinutes ? '#ef4444' : AI_CHAT_THEME.chipBorder,
-                                      backgroundColor: AI_CHAT_THEME.inputBg,
-                                      color: AI_CHAT_THEME.textPrimary
-                                    }}
-                                  />
-                                  {assistantAgentIntervalErrors.maxCheckinMinutes ? (
-                                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-red-500">
-                                      <XCircle size={15} aria-hidden="true" />
-                                    </span>
-                                  ) : null}
-                                </div>
-                                {assistantAgentIntervalErrors.maxCheckinMinutes ? (
-                                  <span className="mt-1 block text-xs font-medium text-red-500" role="alert">
-                                    {assistantAgentIntervalErrors.maxCheckinMinutes}
-                                  </span>
-                                ) : null}
-                              </label>
-                            </div>
-                          </div>
-
-                          <div className="border-t pt-4" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
-                            <div className="flex items-start justify-between gap-4">
-                              <div>
-                                <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>夜间保护时间（只拦随机 check-in）</p>
-                              </div>
-                              <button
-                                onClick={handleToggleAssistantQuietHours}
-                                className="inline-flex min-w-[72px] items-center justify-center rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors"
-                                style={assistantAgentConfig.quietHoursEnabled
-                                  ? {
-                                    borderColor: AI_CHAT_THEME.activeBorder,
-                                    backgroundColor: AI_CHAT_THEME.activeBg,
-                                    color: AI_CHAT_THEME.textPrimary
-                                  }
-                                  : {
-                                    borderColor: AI_CHAT_THEME.chipBorder,
-                                    backgroundColor: AI_CHAT_THEME.inputBg,
-                                    color: AI_CHAT_THEME.textMuted
-                                  }}
-                              >
-                                {assistantAgentConfig.quietHoursEnabled ? '已开启' : '未开启'}
-                              </button>
-                            </div>
-
-                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                              <label className="block">
-                                <span className="mb-1 block text-xs font-medium text-stone-500">开始保护时间</span>
-                                <div className="relative">
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    placeholder="2300"
-                                    value={assistantAgentQuietHoursDrafts.quietHoursStart}
-                                    onChange={(event) => handleAssistantAgentQuietHoursDraftChange('quietHoursStart', event.target.value)}
-                                    onBlur={commitAssistantAgentQuietHoursDraft}
-                                    onKeyDown={(event) => {
-                                      if (event.key === 'Enter') {
-                                        event.preventDefault();
-                                        commitAssistantAgentQuietHoursDraft();
-                                      }
-                                    }}
-                                    aria-invalid={!!assistantAgentQuietHoursErrors.quietHoursStart}
-                                    className="w-full rounded-[1rem] border px-3 py-2 pr-9 text-sm outline-none"
-                                    style={{
-                                      borderColor: assistantAgentQuietHoursErrors.quietHoursStart ? '#ef4444' : AI_CHAT_THEME.chipBorder,
-                                      backgroundColor: AI_CHAT_THEME.inputBg,
-                                      color: AI_CHAT_THEME.textPrimary
-                                    }}
-                                  />
-                                  {assistantAgentQuietHoursErrors.quietHoursStart ? (
-                                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-red-500">
-                                      <XCircle size={15} aria-hidden="true" />
-                                    </span>
-                                  ) : null}
-                                </div>
-                                {assistantAgentQuietHoursErrors.quietHoursStart ? (
-                                  <span className="mt-1 block text-xs font-medium text-red-500" role="alert">
-                                    {assistantAgentQuietHoursErrors.quietHoursStart}
-                                  </span>
-                                ) : null}
-                              </label>
-
-                              <label className="block">
-                                <span className="mb-1 block text-xs font-medium text-stone-500">结束保护时间</span>
-                                <div className="relative">
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    placeholder="0800"
-                                    value={assistantAgentQuietHoursDrafts.quietHoursEnd}
-                                    onChange={(event) => handleAssistantAgentQuietHoursDraftChange('quietHoursEnd', event.target.value)}
-                                    onBlur={commitAssistantAgentQuietHoursDraft}
-                                    onKeyDown={(event) => {
-                                      if (event.key === 'Enter') {
-                                        event.preventDefault();
-                                        commitAssistantAgentQuietHoursDraft();
-                                      }
-                                    }}
-                                    aria-invalid={!!assistantAgentQuietHoursErrors.quietHoursEnd}
-                                    className="w-full rounded-[1rem] border px-3 py-2 pr-9 text-sm outline-none"
-                                    style={{
-                                      borderColor: assistantAgentQuietHoursErrors.quietHoursEnd ? '#ef4444' : AI_CHAT_THEME.chipBorder,
-                                      backgroundColor: AI_CHAT_THEME.inputBg,
-                                      color: AI_CHAT_THEME.textPrimary
-                                    }}
-                                  />
-                                  {assistantAgentQuietHoursErrors.quietHoursEnd ? (
-                                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-red-500">
-                                      <XCircle size={15} aria-hidden="true" />
-                                    </span>
-                                  ) : null}
-                                </div>
-                                {assistantAgentQuietHoursErrors.quietHoursEnd ? (
-                                  <span className="mt-1 block text-xs font-medium text-red-500" role="alert">
-                                    {assistantAgentQuietHoursErrors.quietHoursEnd}
-                                  </span>
-                                ) : null}
-                              </label>
-                            </div>
-                          </div>
-
-                          <div className="flex items-start justify-between gap-4 border-t pt-4" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
-                            <div>
-                              <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>开启长期记忆</p>
-                            </div>
-                            <button
-                              onClick={() => handleUpdateAssistantAgentConfig({ longTermMemoryEnabled: !assistantAgentConfig.longTermMemoryEnabled })}
-                              className="inline-flex min-w-[72px] items-center justify-center rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors"
-                              style={assistantAgentConfig.longTermMemoryEnabled
-                                ? {
-                                  borderColor: AI_CHAT_THEME.activeBorder,
-                                  backgroundColor: AI_CHAT_THEME.activeBg,
-                                  color: AI_CHAT_THEME.textPrimary
-                                }
-                                : {
-                                  borderColor: AI_CHAT_THEME.chipBorder,
-                                  backgroundColor: AI_CHAT_THEME.inputBg,
-                                  color: AI_CHAT_THEME.textMuted
-                                }}
-                            >
-                              {assistantAgentConfig.longTermMemoryEnabled ? '已开启' : '未开启'}
-                            </button>
-                          </div>
-
-                          <div className="border-t pt-4" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <p className="text-sm font-semibold" style={{ color: AI_CHAT_THEME.textPrimary }}>定时任务</p>
-                              </div>
-                              <button
-                                onClick={handleOpenAssistantScheduledTaskComposer}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-[0.75rem] border text-xs font-medium transition-colors hover:bg-white"
-                                style={{
-                                  borderColor: AI_CHAT_THEME.chipBorder,
-                                  backgroundColor: AI_CHAT_THEME.panelBg,
-                                  color: AI_CHAT_THEME.textSecondary
-                                }}
-                                title="新增定时任务"
-                              >
-                                <Plus size={14} />
-                              </button>
-                            </div>
-
-                            {isAssistantScheduledTaskComposerOpen && (
-                              <div className="mt-4 border-t pt-4" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
-                                <textarea
-                                  value={assistantScheduledTaskDrafts.text}
-                                  onChange={(event) => updateAssistantScheduledTaskDraft('text', event.target.value)}
-                                  placeholder="比如：每周一提醒我交周报。"
-                                  rows={3}
-                                  className="w-full resize-none rounded-[0.75rem] border px-3 py-3 text-sm leading-6 outline-none"
-                                  style={{
-                                    borderColor: AI_CHAT_THEME.chipBorder,
-                                    backgroundColor: AI_CHAT_THEME.inputBg,
-                                    color: AI_CHAT_THEME.textPrimary
-                                  }}
-                                />
-
-                                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                                  <label className="space-y-1.5">
-                                    <span className="text-xs font-medium text-stone-500">触发时间（HHMM）</span>
-                                    <input
-                                      type="text"
-                                      value={assistantScheduledTaskDrafts.time}
-                                      onChange={(event) => updateAssistantScheduledTaskDraft('time', event.target.value.replace(/[^\d]/g, '').slice(0, 4))}
-                                      placeholder="0800"
-                                      inputMode="numeric"
-                                      className="w-full rounded-[0.75rem] border px-3 py-2 text-sm outline-none"
-                                      style={{
-                                        borderColor: AI_CHAT_THEME.chipBorder,
-                                        backgroundColor: AI_CHAT_THEME.inputBg,
-                                        color: AI_CHAT_THEME.textPrimary
-                                      }}
-                                    />
-                                  </label>
-                                  <label className="space-y-1.5">
-                                    <span className="text-xs font-medium text-stone-500">循环间隔</span>
-                                    <input
-                                      type="text"
-                                      inputMode="numeric"
-                                      value={assistantScheduledTaskDrafts.interval}
-                                      onChange={(event) => updateAssistantScheduledTaskDraft('interval', event.target.value.replace(/[^\d]/g, '').slice(0, 3))}
-                                      className="w-full rounded-[0.75rem] border px-3 py-2 text-sm outline-none"
-                                      style={{
-                                        borderColor: AI_CHAT_THEME.chipBorder,
-                                        backgroundColor: AI_CHAT_THEME.inputBg,
-                                        color: AI_CHAT_THEME.textPrimary
-                                      }}
-                                    />
-                                  </label>
-                                </div>
-
-                                <div className="mt-3">
-                                  <span className="mb-2 block text-xs font-medium text-stone-500">循环模式</span>
-                                  <div className="grid grid-cols-3 gap-2">
-                                    {[
-                                      { value: 'daily' as const, label: '每天' },
-                                      { value: 'weekly' as const, label: '每周' },
-                                      { value: 'monthly' as const, label: '每月' }
-                                    ].map((option) => {
-                                      const isSelected = assistantScheduledTaskDrafts.frequency === option.value;
-                                      return (
-                                        <button
-                                          key={option.value}
-                                          type="button"
-                                          onClick={() => updateAssistantScheduledTaskDraft('frequency', option.value)}
-                                          className="rounded-[0.75rem] border px-2 py-2 text-xs font-medium transition-colors"
-                                          style={isSelected
-                                            ? {
-                                              borderColor: AI_CHAT_THEME.activeBorder,
-                                              backgroundColor: AI_CHAT_THEME.activeBg,
-                                              color: AI_CHAT_THEME.textPrimary
-                                            }
-                                            : {
-                                              borderColor: AI_CHAT_THEME.chipBorder,
-                                              backgroundColor: AI_CHAT_THEME.inputBg,
-                                              color: AI_CHAT_THEME.textMuted
-                                            }}
-                                        >
-                                          {option.label}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-
-                                {assistantScheduledTaskDrafts.frequency === 'weekly' && (
-                                  <div className="mt-3">
-                                    <span className="mb-2 block text-xs font-medium text-stone-500">每周日期</span>
-                                    <div className="grid grid-cols-7 gap-2">
-                                      {ASSISTANT_SCHEDULED_TASK_WEEKDAY_OPTIONS.map((weekday) => {
-                                        const isSelected = assistantScheduledTaskDrafts.weekdays.includes(weekday.value);
-                                        return (
-                                          <button
-                                            key={weekday.value}
-                                            type="button"
-                                            onClick={() => toggleAssistantScheduledTaskWeekday(weekday.value)}
-                                            className="rounded-[0.75rem] border px-0 py-2 text-xs font-bold transition-colors"
-                                            style={isSelected
-                                              ? {
-                                                borderColor: AI_CHAT_THEME.activeBorder,
-                                                backgroundColor: AI_CHAT_THEME.activeBg,
-                                                color: AI_CHAT_THEME.textPrimary
-                                              }
-                                              : {
-                                                borderColor: AI_CHAT_THEME.chipBorder,
-                                                backgroundColor: AI_CHAT_THEME.inputBg,
-                                                color: AI_CHAT_THEME.textMuted
-                                              }}
-                                          >
-                                            {weekday.label}
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {assistantScheduledTaskDrafts.frequency === 'monthly' && (
-                                  <div className="mt-3 space-y-1.5">
-                                    <label className="block space-y-1.5">
-                                      <span className="text-xs font-medium text-stone-500">每月日期</span>
-                                      <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={assistantScheduledTaskDrafts.monthDaysInput}
-                                        onChange={(event) => updateAssistantScheduledTaskDraft('monthDaysInput', normalizeMonthlyDayInput(event.target.value))}
-                                        placeholder="例如 1 15 31"
-                                        className="w-full rounded-[0.75rem] border px-3 py-2 text-sm outline-none"
-                                        style={{
-                                          borderColor: AI_CHAT_THEME.chipBorder,
-                                          backgroundColor: AI_CHAT_THEME.inputBg,
-                                          color: AI_CHAT_THEME.textPrimary
-                                        }}
-                                      />
-                                    </label>
-                                    {parseMonthlyDayInput(assistantScheduledTaskDrafts.monthDaysInput).includes(31) && (
-                                      <label
-                                        className="flex cursor-pointer items-center gap-2 rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors"
-                                        style={{
-                                          borderColor: AI_CHAT_THEME.chipBorder,
-                                          backgroundColor: AI_CHAT_THEME.inputBg,
-                                          color: AI_CHAT_THEME.textMuted
-                                        }}
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          checked={assistantScheduledTaskDrafts.fallbackToMonthEnd}
-                                          onChange={(event) => updateAssistantScheduledTaskDraft('fallbackToMonthEnd', event.target.checked)}
-                                          className="sr-only"
-                                        />
-                                        <span
-                                          className="flex h-4 w-4 items-center justify-center rounded-[0.35rem] border transition-colors"
-                                          style={assistantScheduledTaskDrafts.fallbackToMonthEnd
-                                            ? {
-                                              borderColor: AI_CHAT_THEME.activeBorder,
-                                              backgroundColor: AI_CHAT_THEME.activeBorder,
-                                              color: AI_CHAT_THEME.activeBg
-                                            }
-                                            : {
-                                              borderColor: AI_CHAT_THEME.chipBorder,
-                                              backgroundColor: '#ffffff',
-                                              color: 'transparent'
-                                            }}
-                                        >
-                                          <Check size={10} strokeWidth={3} />
-                                        </span>
-                                        <span>若当月没有 31 号，则自动定位到最后一天</span>
-                                      </label>
-                                    )}
-                                  </div>
-                                )}
-
-                                <div className="mt-3 flex items-center justify-end gap-2">
-                                  <button
-                                    onClick={handleCancelAssistantScheduledTaskComposer}
-                                    className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
-                                    style={{
-                                      borderColor: AI_CHAT_THEME.chipBorder,
-                                      backgroundColor: AI_CHAT_THEME.inputBg,
-                                      color: AI_CHAT_THEME.textMuted
-                                    }}
-                                  >
-                                    取消
-                                  </button>
-                                  <button
-                                    onClick={handleSaveAssistantScheduledTask}
-                                    className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:brightness-[0.98]"
-                                    style={{
-                                      borderColor: AI_CHAT_THEME.activeBorder,
-                                      backgroundColor: AI_CHAT_THEME.activeBg,
-                                      color: AI_CHAT_THEME.textPrimary
-                                    }}
-                                  >
-                                    保存
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-
-                            <div className="mt-4 space-y-3">
-                              {assistantScheduledTaskSnapshot.length === 0 ? (
-                                <div
-                                  className="rounded-[0.85rem] border border-dashed px-4 py-4 text-sm leading-6 text-stone-500"
-                                  style={{
-                                    borderColor: AI_CHAT_THEME.panelBorder,
-                                    backgroundColor: AI_CHAT_THEME.panelBg
-                                  }}
-                                >
-                                  暂无定时任务。
-                                </div>
-                              ) : (
-                                assistantScheduledTaskSnapshot.map((task) => {
-                                  const isDeleteConfirming = assistantScheduledTaskDeleteTarget?.id === task.id;
-                                  const linkedReminder = task.pendingReminderId
-                                    ? assistantReminderSnapshot.find((reminder) => reminder.id === task.pendingReminderId)
-                                    : undefined;
-                                  const upcomingDueAt = linkedReminder?.dueAt || task.nextTriggerAt;
-
-                                  return (
-                                    <div
-                                      key={task.id}
-                                      className="rounded-[0.85rem] border px-4 py-3"
-                                      style={{
-                                        borderColor: AI_CHAT_THEME.panelBorder,
-                                        backgroundColor: 'rgba(255,255,255,0.84)'
-                                      }}
-                                    >
-                                      <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0 flex-1">
-                                          <p className="whitespace-pre-wrap break-words text-sm leading-6 text-stone-700">
-                                            {task.text}
-                                          </p>
-                                          <p className="mt-1 text-xs leading-5 text-stone-500">
-                                            {formatAssistantScheduledTaskRecurrence(task)}
-                                          </p>
-                                          <p className="mt-1 text-xs leading-5 text-stone-500">
-                                            下次触发：{formatAssistantDateTimeForDisplay(upcomingDueAt)}
-                                          </p>
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                          <button
-                                            onClick={() => handleToggleAssistantScheduledTaskEnabled(task)}
-                                            className="inline-flex min-w-[60px] items-center justify-center rounded-[0.7rem] border px-2.5 py-1.5 text-[11px] font-medium transition-colors"
-                                            style={task.enabled
-                                              ? {
-                                                borderColor: AI_CHAT_THEME.activeBorder,
-                                                backgroundColor: AI_CHAT_THEME.activeBg,
-                                                color: AI_CHAT_THEME.textPrimary
-                                              }
-                                              : {
-                                                borderColor: AI_CHAT_THEME.chipBorder,
-                                                backgroundColor: AI_CHAT_THEME.inputBg,
-                                                color: AI_CHAT_THEME.textMuted
-                                              }}
-                                          >
-                                            {task.enabled ? '已开启' : '未开启'}
-                                          </button>
-                                          <button
-                                            onClick={() => handleToggleAssistantScheduledTaskDelete(task.id)}
-                                            className="rounded-[0.7rem] p-2 text-[#897f75] transition-colors hover:bg-[#f8e9e6] hover:text-[#b35b50]"
-                                            title="删除这条定时任务"
-                                          >
-                                            <Trash2 size={14} />
-                                          </button>
-                                        </div>
-                                      </div>
-
-                                      {isDeleteConfirming && (
-                                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#e4c1bc] pt-3 text-xs text-[#9d544d]">
-                                          <span>确认删除这条定时任务？</span>
-                                          <div className="flex items-center gap-1.5">
-                                            <button
-                                              onClick={() => setAssistantScheduledTaskDeleteTarget(null)}
-                                              className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#ddd6ce] bg-transparent text-[#71685f] transition-colors hover:bg-[#fffaf3]"
-                                              title="取消删除"
-                                            >
-                                              <X size={14} />
-                                            </button>
-                                            <button
-                                              onClick={() => handleConfirmAssistantScheduledTaskDelete(task.id)}
-                                              className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#ba6256] bg-[#c46f4f] text-[#fff8f2] transition-colors hover:bg-[#b95f43]"
-                                              title="确认删除"
-                                            >
-                                              <Check size={14} />
-                                            </button>
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap gap-2 pt-1">
-                            <button
-                              onClick={handleOpenDreamViewer}
-                              className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
-                              style={{
-                                borderColor: AI_CHAT_THEME.chipBorder,
-                                backgroundColor: AI_CHAT_THEME.panelBg,
-                                color: AI_CHAT_THEME.textSecondary
-                              }}
-                            >
-                              打开 Dream
-                            </button>
-                            <button
-                              onClick={handleOpenAssistantMemoryViewer}
-                              className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
-                              style={{
-                                borderColor: AI_CHAT_THEME.chipBorder,
-                                backgroundColor: AI_CHAT_THEME.panelBg,
-                                color: AI_CHAT_THEME.textSecondary
-                              }}
-                            >
-                              查看长期记忆
-                            </button>
-                            <button
-                              onClick={handleOpenAssistantBackgroundHistoryViewer}
-                              className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors"
-                              style={{
-                                borderColor: AI_CHAT_THEME.chipBorder,
-                                backgroundColor: AI_CHAT_THEME.panelBg,
-                                color: AI_CHAT_THEME.textSecondary
-                              }}
-                            >
-                              查看后台调用记录
-                            </button>
-                          </div>
-                        </div>
-                      </section>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <AIBackfillChatSettingsOverlay
+          activeTab={activeSettingsMainTab}
+          isOpen={isPersonaPanelOpen}
+          onClose={() => setIsPersonaPanelOpen(false)}
+          onTabChange={setActiveSettingsMainTab}
+          personaContent={(
+            <AIBackfillChatPersonaSettingsSection
+              accentMix={accentMix}
+              activePersona={activePersona}
+              activeSessionPersonaId={activeSession?.personaId || ''}
+              avatarInputRef={avatarInputRef}
+              deleteConfirmPersonaId={deleteConfirmPersonaId}
+              emojiChoices={PERSONA_EMOJI_CHOICES}
+              emojiDraft={emojiDraft}
+              isEmojiEditorOpen={isEmojiEditorOpen}
+              isUploadingAvatar={isUploadingAvatar}
+              isUploadingUserAvatar={isUploadingUserAvatar}
+              isUserEmojiEditorOpen={isUserEmojiEditorOpen}
+              onApplyEmojiAvatar={handleApplyEmojiAvatar}
+              onApplyPersonaPreset={handleApplyPersonaPreset}
+              onApplyUserEmojiAvatar={handleApplyUserEmojiAvatar}
+              onAvatarUpload={handleAvatarUpload}
+              onCancelDeletePersona={() => setDeleteConfirmPersonaId(null)}
+              onCancelEmojiAvatarEdit={handleCancelEmojiAvatarEdit}
+              onCancelUserEmojiAvatarEdit={handleCancelUserEmojiAvatarEdit}
+              onCreatePersona={handleCreatePersona}
+              onDeleteCurrentPersona={handleDeleteCurrentPersona}
+              onEmojiDraftChange={setEmojiDraft}
+              onResetUserAvatar={handleResetUserAvatar}
+              onSelectEmoji={setEmojiDraft}
+              onSelectUserEmoji={setUserEmojiDraft}
+              onToggleDeletePersona={() => setDeleteConfirmPersonaId((current) => current === activePersona.id ? null : activePersona.id)}
+              onUpdateCurrentPersona={updateCurrentPersona}
+              onUseEmojiAvatar={handleUseEmojiAvatar}
+              onUseUserEmojiAvatar={handleUseUserEmojiAvatar}
+              onUserAvatarUpload={handleUserAvatarUpload}
+              onUserEmojiDraftChange={setUserEmojiDraft}
+              personas={personas}
+              theme={AI_CHAT_THEME}
+              userAvatarInputRef={userAvatarInputRef}
+              userEmojiDraft={userEmojiDraft}
+              userProfile={userProfile}
+            />
+          )}
+          callContent={(
+            <AIBackfillChatCallSettingsSection
+              contextMessageLimit={activePersona.contextMessageLimit}
+              onContextMessageLimitChange={(value) => updateCurrentPersona({ contextMessageLimit: value })}
+              theme={AI_CHAT_THEME}
+              assistantSettingsContent={(
+              <AIBackfillChatAssistantSettingsSection
+                assistantAgentConfig={assistantAgentConfig}
+                assistantAgentIntervalDrafts={assistantAgentIntervalDrafts}
+                assistantAgentIntervalErrors={assistantAgentIntervalErrors}
+                assistantAgentQuietHoursDrafts={assistantAgentQuietHoursDrafts}
+                assistantAgentQuietHoursErrors={assistantAgentQuietHoursErrors}
+                assistantScheduledTaskDrafts={assistantScheduledTaskDrafts}
+                isAssistantScheduledTaskComposerOpen={isAssistantScheduledTaskComposerOpen}
+                assistantScheduledTaskSnapshot={assistantScheduledTaskSnapshot}
+                assistantScheduledTaskDeleteTarget={assistantScheduledTaskDeleteTarget}
+                assistantReminderSnapshot={assistantReminderSnapshot}
+                theme={AI_CHAT_THEME}
+                onUpdateAgentConfig={handleUpdateAssistantAgentConfig}
+                onIntervalDraftChange={handleAssistantAgentIntervalDraftChange}
+                onCommitIntervalDraft={commitAssistantAgentIntervalDraft}
+                onToggleQuietHours={handleToggleAssistantQuietHours}
+                onQuietHoursDraftChange={handleAssistantAgentQuietHoursDraftChange}
+                onCommitQuietHoursDraft={commitAssistantAgentQuietHoursDraft}
+                onOpenScheduledTaskComposer={handleOpenAssistantScheduledTaskComposer}
+                onUpdateScheduledTaskDraft={updateAssistantScheduledTaskDraft}
+                onToggleScheduledTaskWeekday={toggleAssistantScheduledTaskWeekday}
+                onCancelScheduledTaskComposer={handleCancelAssistantScheduledTaskComposer}
+                onSaveScheduledTask={handleSaveAssistantScheduledTask}
+                onToggleScheduledTaskEnabled={handleToggleAssistantScheduledTaskEnabled}
+                onToggleScheduledTaskDelete={handleToggleAssistantScheduledTaskDelete}
+                onCancelScheduledTaskDelete={() => setAssistantScheduledTaskDeleteTarget(null)}
+                onConfirmScheduledTaskDelete={handleConfirmAssistantScheduledTaskDelete}
+                onOpenDreamViewer={handleOpenDreamViewer}
+                onOpenAssistantMemoryViewer={handleOpenAssistantMemoryViewer}
+                onOpenAssistantBackgroundHistoryViewer={handleOpenAssistantBackgroundHistoryViewer}
+              />
+              )}
+            />
+          )}
+          theme={AI_CHAT_THEME}
+        />
 
         {isDreamViewerOpen && (
-          <div className="absolute inset-0 z-20 bg-[rgba(15,23,42,0.12)] backdrop-blur-[10px]">
-            <div
-              className="flex h-full flex-col bg-[linear-gradient(180deg,#f7f5f1_0%,#f3f1ec_100%)]"
-              style={{
-                paddingTop: 'env(safe-area-inset-top)',
-                paddingBottom: 'env(safe-area-inset-bottom)'
-              }}
-            >
-              <div className="flex h-14 items-center justify-between border-b border-[rgba(32,28,25,0.12)] bg-[rgba(247,245,241,0.92)] px-4 backdrop-blur-md">
-                <div>
-                  <h3 className="font-serif text-[1.02rem] font-bold leading-none text-[#201c19]">Dream</h3>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleOpenDreamTopicComposer()}
-                    className="rounded-[0.65rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white/70"
-                    style={{
-                      borderColor: 'rgba(32,28,25,0.14)',
-                      backgroundColor: 'rgba(255,255,255,0.38)',
-                      color: AI_CHAT_THEME.textSecondary
-                    }}
-                  >
-                    新增 aspect
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (!isLoading && activeSession) {
-                        handleCloseDreamViewer();
-                        handleStartDreamMonthSelection(activeSession.id);
-                      }
-                    }}
-                    className="rounded-[0.65rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white/80"
-                    style={{
-                      borderColor: 'color-mix(in srgb, var(--accent-color) 22%, rgba(32,28,25,0.14))',
-                      backgroundColor: 'color-mix(in srgb, var(--accent-color) 5%, rgba(255,255,255,0.55))',
-                      color: AI_CHAT_THEME.textPrimary
-                    }}
-                  >
-                    运行 dream
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsDreamResetConfirmOpen((current) => !current);
-                      setDreamTopicDeleteTargetId(null);
-                      setDreamEntryDeleteTargetId(null);
-                      setEditingDreamEntryId(null);
-                      setDreamEntryDrafts(DEFAULT_DREAM_ENTRY_DRAFTS);
-                    }}
-                    className="rounded-[0.65rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white/80"
-                    style={{
-                      borderColor: 'rgba(157,84,77,0.22)',
-                      backgroundColor: 'rgba(196,111,79,0.07)',
-                      color: '#9d544d'
-                    }}
-                  >
-                    重置
-                  </button>
-                  <button
-                    onClick={handleCloseDreamViewer}
-                    className="flex h-9 w-9 items-center justify-center rounded-[0.7rem] border transition-colors hover:bg-white/70"
-                    style={{
-                      borderColor: 'rgba(32,28,25,0.14)',
-                      backgroundColor: 'rgba(255,255,255,0.38)',
-                      color: '#5f5a54'
-                    }}
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-              </div>
-
-              <div
-                className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6 sm:py-6"
-                style={{ WebkitOverflowScrolling: 'touch' }}
-              >
-                <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-6">
-                  {isDreamResetConfirmOpen && (
-                    <div
-                      className="flex flex-wrap items-center justify-between gap-3 border-y py-4 text-xs"
-                      style={{
-                        borderColor: 'rgba(157,84,77,0.22)',
-                        color: '#9d544d'
-                      }}
-                    >
-                      <span>确认重置 Dream 吗？这会恢复默认 aspect 和提示词，并清空全部 Dream 观察。</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setIsDreamResetConfirmOpen(false)}
-                          className="rounded-[0.65rem] border px-3 py-2 font-medium transition-colors hover:bg-white/70"
-                          style={{
-                            borderColor: 'rgba(32,28,25,0.14)',
-                            backgroundColor: 'rgba(255,255,255,0.26)',
-                            color: '#71685f'
-                          }}
-                        >
-                          取消
-                        </button>
-                        <button
-                          onClick={handleConfirmDreamReset}
-                          className="rounded-[0.65rem] border px-3 py-2 font-medium transition-colors hover:bg-white/70"
-                          style={{
-                            borderColor: 'rgba(157,84,77,0.24)',
-                            backgroundColor: 'rgba(196,111,79,0.09)',
-                            color: '#9d544d'
-                          }}
-                        >
-                          确认重置
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {isDreamTopicComposerOpen && (
-                    <div
-                      className="border-y px-0 py-5"
-                      style={{ borderColor: 'rgba(32,28,25,0.12)' }}
-                    >
-                      <div className="grid gap-4 lg:grid-cols-[minmax(0,11rem)_minmax(0,1fr)] lg:gap-6">
-                        <div>
-                          <p className="font-serif text-[1.02rem] leading-7 text-[#231f1b]">
-                            {editingDreamTopicId ? '编辑 Dream aspect' : '新增 Dream aspect'}
-                          </p>
-                          <p className="mt-1 text-xs leading-5 text-stone-500">
-                            保持标题简洁，用备注补充长期关注重点。
-                          </p>
-                        </div>
-                        <div className="grid gap-3">
-                          <label className="space-y-1.5">
-                            <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-stone-500">aspect 标题</span>
-                            <input
-                              value={dreamTopicDrafts.title}
-                              onChange={(event) => updateDreamTopicDraft('title', event.target.value)}
-                              placeholder="比如：内在特征"
-                              className="w-full rounded-[0.6rem] border px-3 py-2 text-[13px] outline-none"
-                              style={{
-                                borderColor: 'rgba(32,28,25,0.14)',
-                                backgroundColor: 'rgba(255,255,255,0.56)',
-                                color: AI_CHAT_THEME.textPrimary
-                              }}
-                            />
-                          </label>
-                          <label className="space-y-1.5">
-                            <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-stone-500">备注</span>
-                            <textarea
-                              value={dreamTopicDrafts.note}
-                              onChange={(event) => updateDreamTopicDraft('note', event.target.value)}
-                              placeholder="比如：长期关注用户的价值取向、情绪习惯和内在需求。"
-                              rows={3}
-                              className="w-full resize-none rounded-[0.6rem] border px-3 py-3 text-[13px] leading-6 outline-none"
-                              style={{
-                                borderColor: 'rgba(32,28,25,0.14)',
-                                backgroundColor: 'rgba(255,255,255,0.56)',
-                                color: AI_CHAT_THEME.textPrimary
-                              }}
-                            />
-                          </label>
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={handleCancelDreamTopicComposer}
-                              className="rounded-[0.65rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white/70"
-                              style={{
-                                borderColor: 'rgba(32,28,25,0.14)',
-                                backgroundColor: 'rgba(255,255,255,0.3)',
-                                color: AI_CHAT_THEME.textMuted
-                              }}
-                            >
-                              取消
-                            </button>
-                            <button
-                              onClick={handleSaveDreamTopic}
-                              className="rounded-[0.65rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white/80"
-                              style={{
-                                borderColor: 'color-mix(in srgb, var(--accent-color) 22%, rgba(32,28,25,0.14))',
-                                backgroundColor: 'color-mix(in srgb, var(--accent-color) 5%, rgba(255,255,255,0.55))',
-                                color: AI_CHAT_THEME.textPrimary
-                              }}
-                            >
-                              保存
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {!isDreamTopicComposerOpen && dreamSnapshot.topics.length === 0 ? (
-                    <div
-                      className="border-y py-10 text-[13px] leading-7 text-stone-500"
-                      style={{ borderColor: 'rgba(32,28,25,0.12)' }}
-                    >
-                      还没有 Dream aspect。先新增几个你希望我长期关注的主题，再运行 `dream`。
-                    </div>
-                  ) : !isDreamTopicComposerOpen ? (
-                    <div className="min-h-0 flex flex-1 flex-col">
-                      <div className="pb-3" style={{ borderColor: 'rgba(32,28,25,0.12)' }}>
-                        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-stone-500">Aspect 目录</p>
-                      </div>
-                      <div
-                        className="overflow-x-auto border-b pb-px"
-                        style={{ borderColor: 'rgba(32,28,25,0.12)' }}
-                      >
-                        <div className="flex min-w-max items-end gap-5">
-                          {dreamSnapshot.topics.map((topic) => {
-                            const isActive = activeDreamTopic?.id === topic.id;
-                            return (
-                              <button
-                                key={topic.id}
-                                type="button"
-                                onClick={() => setSelectedDreamTopicId(topic.id)}
-                                className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors border-b-2 ${
-                                  isActive
-                                    ? 'font-bold'
-                                    : 'hover:text-stone-600'
-                                }`}
-                                style={{
-                                  borderBottomColor: isActive
-                                    ? '#201c19'
-                                    : 'transparent',
-                                  color: isActive
-                                    ? '#201c19'
-                                    : (topic.enabled ? '#78716c' : '#b0a79e')
-                                }}
-                              >
-                                {topic.title}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {activeDreamTopic && (
-                        <section className="min-w-0 pt-5">
-                          <div className="border-b pb-5" style={{ borderColor: 'rgba(32,28,25,0.12)' }}>
-                            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                              <div className="min-w-0 flex-1">
-                                <p className="font-serif text-[1.5rem] leading-[1.2] text-[#231f1b]">{activeDreamTopic.title}</p>
-                                <div className="mt-3 max-w-3xl space-y-2">
-                                  <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-stone-400">长期提示</p>
-                                  <p
-                                    className={`text-[0.92rem] leading-[1.95] text-stone-500 ${
-                                      isDreamTopicNoteExpanded ? 'whitespace-pre-wrap' : 'line-clamp-2'
-                                    }`}
-                                    title={activeDreamTopic.note || '暂无备注'}
-                                  >
-                                    {activeDreamTopic.note
-                                      ? activeDreamTopic.note
-                                      : '暂无备注'}
-                                  </p>
-                                  {activeDreamTopic.note && activeDreamTopic.note.length > 120 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => setIsDreamTopicNoteExpanded((current) => !current)}
-                                      className="text-[11px] font-medium uppercase tracking-[0.14em] text-stone-500 transition-colors hover:text-stone-700"
-                                    >
-                                      {isDreamTopicNoteExpanded ? '收起提示' : '展开提示'}
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex shrink-0 flex-wrap items-center gap-2 self-start text-xs sm:flex-col sm:items-center">
-                                <button
-                                  onClick={() => handleToggleDreamTopicEnabled(activeDreamTopic)}
-                                  className="flex h-9 w-9 items-center justify-center rounded-[0.65rem] border transition-colors hover:bg-white/70"
-                                  style={{
-                                    borderColor: activeDreamTopic.enabled
-                                      ? 'color-mix(in srgb, var(--accent-color) 24%, rgba(32,28,25,0.14))'
-                                      : 'rgba(32,28,25,0.14)',
-                                    backgroundColor: activeDreamTopic.enabled
-                                      ? 'color-mix(in srgb, var(--accent-color) 5%, rgba(255,255,255,0.5))'
-                                      : 'rgba(255,255,255,0.26)',
-                                    color: activeDreamTopic.enabled ? AI_CHAT_THEME.textPrimary : AI_CHAT_THEME.textMuted
-                                  }}
-                                  title={activeDreamTopic.enabled ? '停用 aspect' : '启用 aspect'}
-                                  aria-label={activeDreamTopic.enabled ? '停用 aspect' : '启用 aspect'}
-                                >
-                                  {activeDreamTopic.enabled ? <Check size={14} /> : <XCircle size={14} />}
-                                </button>
-                                <button
-                                  onClick={() => handleOpenDreamTopicComposer(activeDreamTopic)}
-                                  className="flex h-9 w-9 items-center justify-center rounded-[0.65rem] border transition-colors hover:bg-white/70"
-                                  style={{
-                                    borderColor: 'rgba(32,28,25,0.14)',
-                                    backgroundColor: 'rgba(255,255,255,0.26)',
-                                    color: AI_CHAT_THEME.textSecondary
-                                  }}
-                                  title="编辑 aspect"
-                                  aria-label="编辑 aspect"
-                                >
-                                  <Pencil size={14} />
-                                </button>
-                                <button
-                                  onClick={() => handleToggleDreamTopicDelete(activeDreamTopic.id)}
-                                  className="flex h-9 w-9 items-center justify-center rounded-[0.65rem] border transition-colors hover:bg-white/70"
-                                  style={{
-                                    borderColor: 'rgba(157,84,77,0.22)',
-                                    backgroundColor: 'rgba(196,111,79,0.07)',
-                                    color: '#9d544d'
-                                  }}
-                                  title="删除 aspect"
-                                  aria-label="删除 aspect"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-
-                          {dreamTopicDeleteTargetId === activeDreamTopic.id && (
-                            <div
-                              className="flex flex-wrap items-center justify-between gap-3 border-b py-4 text-xs"
-                              style={{
-                                borderColor: 'rgba(157,84,77,0.22)',
-                                color: '#9d544d'
-                              }}
-                            >
-                              <span>确认删除这个 Dream aspect 以及下面的所有观察条目？</span>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => setDreamTopicDeleteTargetId(null)}
-                                  className="flex h-8 min-w-8 items-center justify-center rounded-[0.65rem] border px-2 transition-colors hover:bg-white/70"
-                                  style={{
-                                    borderColor: 'rgba(32,28,25,0.14)',
-                                    backgroundColor: 'rgba(255,255,255,0.26)',
-                                    color: '#71685f'
-                                  }}
-                                  title="取消删除"
-                                >
-                                  <X size={14} />
-                                </button>
-                                <button
-                                  onClick={() => handleConfirmDreamTopicDelete(activeDreamTopic.id)}
-                                  className="flex h-8 min-w-8 items-center justify-center rounded-[0.65rem] border px-2 transition-colors hover:bg-white/70"
-                                  style={{
-                                    borderColor: 'rgba(157,84,77,0.24)',
-                                    backgroundColor: 'rgba(196,111,79,0.09)',
-                                    color: '#9d544d'
-                                  }}
-                                  title="确认删除"
-                                >
-                                  <Check size={14} />
-                                </button>
-                              </div>
-                            </div>
-                          )}
-
-                          <div
-                            className="divide-y"
-                            style={{ borderColor: 'rgba(32,28,25,0.1)' }}
-                          >
-                            {activeDreamEntries.length === 0 ? (
-                              <div className="py-10 text-[13px] leading-7 text-stone-500">
-                                这个 aspect 下面还没有 Dream 观察。运行一次 `dream` 之后，我会把整理出来的内容放在这里。
-                              </div>
-                            ) : (
-                              activeDreamEntries.map((entry) => (
-                                <article key={entry.id} className="py-5 first:pt-6">
-                                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                    <div className="min-w-0 flex-1">
-                                      {editingDreamEntryId === entry.id ? (
-                                        <div className="space-y-3">
-                                          <textarea
-                                            value={dreamEntryDrafts.content}
-                                            onChange={(event) => handleUpdateDreamEntryDraft(event.target.value)}
-                                            rows={4}
-                                            className="w-full resize-none rounded-[0.6rem] border px-3 py-3 text-[13px] leading-7 outline-none"
-                                            style={{
-                                              borderColor: 'rgba(32,28,25,0.14)',
-                                              backgroundColor: 'rgba(255,255,255,0.56)',
-                                              color: AI_CHAT_THEME.textPrimary
-                                            }}
-                                          />
-                                          <div className="flex flex-wrap items-center justify-end gap-2">
-                                            <button
-                                              onClick={handleCancelDreamEntryEditor}
-                                              className="rounded-[0.65rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white/70"
-                                              style={{
-                                                borderColor: 'rgba(32,28,25,0.14)',
-                                                backgroundColor: 'rgba(255,255,255,0.3)',
-                                                color: AI_CHAT_THEME.textMuted
-                                              }}
-                                            >
-                                              取消
-                                            </button>
-                                            <button
-                                              onClick={() => handleSaveDreamEntry(entry.id)}
-                                              className="rounded-[0.65rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white/80"
-                                              style={{
-                                                borderColor: 'color-mix(in srgb, var(--accent-color) 22%, rgba(32,28,25,0.14))',
-                                                backgroundColor: 'color-mix(in srgb, var(--accent-color) 5%, rgba(255,255,255,0.55))',
-                                                color: AI_CHAT_THEME.textPrimary
-                                              }}
-                                            >
-                                              保存
-                                            </button>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <p className="whitespace-pre-wrap break-words text-[0.94rem] leading-[1.95] text-stone-700">
-                                          {entry.content}
-                                        </p>
-                                      )}
-                                    </div>
-                                    {editingDreamEntryId !== entry.id && (
-                                      <div className="flex shrink-0 flex-wrap items-center gap-2 self-start text-xs sm:flex-col sm:items-center">
-                                        <button
-                                          onClick={() => handleOpenDreamEntryEditor(entry)}
-                                          disabled={editingDreamEntryId === entry.id}
-                                          className="flex h-9 w-9 items-center justify-center rounded-[0.65rem] border transition-colors hover:bg-white/70 disabled:cursor-default disabled:opacity-45"
-                                          style={{
-                                            borderColor: 'rgba(32,28,25,0.14)',
-                                            backgroundColor: 'rgba(255,255,255,0.26)',
-                                            color: AI_CHAT_THEME.textSecondary
-                                          }}
-                                          title="编辑条目"
-                                          aria-label="编辑条目"
-                                        >
-                                          <Pencil size={14} />
-                                        </button>
-                                        <button
-                                          onClick={() => handleToggleDreamEntryDelete(entry.id)}
-                                          className="flex h-9 w-9 items-center justify-center rounded-[0.65rem] border transition-colors hover:bg-white/70"
-                                          style={{
-                                            borderColor: 'rgba(157,84,77,0.22)',
-                                            backgroundColor: 'rgba(196,111,79,0.07)',
-                                            color: '#9d544d'
-                                          }}
-                                          title="删除条目"
-                                          aria-label="删除条目"
-                                        >
-                                          <Trash2 size={14} />
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] uppercase tracking-[0.12em] text-stone-500">
-                                    <span>观察窗口 {entry.observedRangeStart} - {entry.observedRangeEnd}</span>
-                                    <span>状态 {entry.status}</span>
-                                    <span>更新于 {formatAssistantDateTimeForDisplay(entry.updatedAt)}</span>
-                                  </div>
-                                  {entry.sourceSummary && (
-                                    <p className="mt-2 text-xs leading-6 text-stone-500">
-                                      来源：{entry.sourceSummary}
-                                    </p>
-                                  )}
-                                  {dreamEntryDeleteTargetId === entry.id && (
-                                    <div
-                                      className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-3 text-xs"
-                                      style={{
-                                        borderColor: 'rgba(157,84,77,0.22)',
-                                        color: '#9d544d'
-                                      }}
-                                    >
-                                      <span>确认删除这一条 Dream 观察？</span>
-                                      <div className="flex items-center gap-2">
-                                        <button
-                                          onClick={() => setDreamEntryDeleteTargetId(null)}
-                                          className="rounded-[0.65rem] border px-3 py-2 font-medium transition-colors hover:bg-white/70"
-                                          style={{
-                                            borderColor: 'rgba(32,28,25,0.14)',
-                                            backgroundColor: 'rgba(255,255,255,0.26)',
-                                            color: '#71685f'
-                                          }}
-                                        >
-                                          取消
-                                        </button>
-                                        <button
-                                          onClick={() => handleConfirmDreamEntryDelete(entry.id)}
-                                          className="rounded-[0.65rem] border px-3 py-2 font-medium transition-colors hover:bg-white/70"
-                                          style={{
-                                            borderColor: 'rgba(157,84,77,0.24)',
-                                            backgroundColor: 'rgba(196,111,79,0.09)',
-                                            color: '#9d544d'
-                                          }}
-                                        >
-                                          确认删除
-                                        </button>
-                                      </div>
-                                    </div>
-                                  )}
-                                </article>
-                              ))
-                            )}
-                          </div>
-                        </section>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          </div>
+          <AIBackfillChatDreamOverlay
+            activeDreamEntries={activeDreamEntries}
+            activeDreamTopic={activeDreamTopic}
+            dreamSnapshot={dreamSnapshot}
+            dreamEntryDeleteTargetId={dreamEntryDeleteTargetId}
+            dreamEntryDrafts={dreamEntryDrafts}
+            dreamTopicDeleteTargetId={dreamTopicDeleteTargetId}
+            dreamTopicDrafts={dreamTopicDrafts}
+            editingDreamEntryId={editingDreamEntryId}
+            editingDreamTopicId={editingDreamTopicId}
+            isDreamResetConfirmOpen={isDreamResetConfirmOpen}
+            isDreamTopicComposerOpen={isDreamTopicComposerOpen}
+            isDreamTopicNoteExpanded={isDreamTopicNoteExpanded}
+            theme={AI_CHAT_THEME}
+            onCancelDreamEntryDelete={handleCancelDreamEntryDelete}
+            onCancelDreamEntryEditor={handleCancelDreamEntryEditor}
+            onCancelDreamReset={handleCancelDreamReset}
+            onCancelDreamTopicComposer={handleCancelDreamTopicComposer}
+            onCancelDreamTopicDelete={handleCancelDreamTopicDelete}
+            onClose={handleCloseDreamViewer}
+            onConfirmDreamEntryDelete={handleConfirmDreamEntryDelete}
+            onConfirmDreamReset={handleConfirmDreamReset}
+            onConfirmDreamTopicDelete={handleConfirmDreamTopicDelete}
+            onOpenDreamEntryEditor={handleOpenDreamEntryEditor}
+            onOpenDreamTopicComposer={handleOpenDreamTopicComposer}
+            onRunDream={handleRunDreamFromViewer}
+            onSaveDreamEntry={handleSaveDreamEntry}
+            onSaveDreamTopic={handleSaveDreamTopic}
+            onSelectDreamTopic={handleSelectDreamTopic}
+            onToggleDreamEntryDelete={handleToggleDreamEntryDelete}
+            onToggleDreamResetConfirm={handleToggleDreamResetConfirm}
+            onToggleDreamTopicDelete={handleToggleDreamTopicDelete}
+            onToggleDreamTopicEnabled={handleToggleDreamTopicEnabled}
+            onToggleTopicNoteExpanded={handleToggleDreamTopicNoteExpanded}
+            onUpdateDreamEntryDraft={handleUpdateDreamEntryDraft}
+            onUpdateDreamTopicDraft={updateDreamTopicDraft}
+          />
         )}
 
         {isAssistantMemoryViewerOpen && (
-          <div className="absolute inset-0 z-20 bg-[rgba(15,23,42,0.14)] backdrop-blur-[10px]">
-            <div
-              className="flex h-full flex-col bg-[#f3f4f6]"
-              style={{
-                paddingTop: 'env(safe-area-inset-top)',
-                paddingBottom: 'env(safe-area-inset-bottom)'
-              }}
-            >
-              <div className="flex h-14 items-center justify-between border-b border-[#e5e7eb] bg-[rgba(255,255,255,0.9)] px-4 backdrop-blur-md">
-                <div>
-                  <h3 className="font-serif text-lg font-bold leading-none text-[#201c19]">长期记忆</h3>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleClearAssistantMemory}
-                    className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors"
-                    style={{
-                      borderColor: AI_CHAT_THEME.dangerBorder,
-                      backgroundColor: AI_CHAT_THEME.dangerBg,
-                      color: AI_CHAT_THEME.dangerText
-                    }}
-                  >
-                    清空长期记忆
-                  </button>
-                  <button
-                    onClick={handleCloseAssistantMemoryViewer}
-                    className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:border-[#cfd8e3] hover:bg-[#f9fafb] hover:text-[#111827]"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-                <div className="mx-auto max-w-4xl space-y-4">
-                  <div
-                    className="rounded-[0.95rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4"
-                    style={{
-                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
-                      backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
-                    }}
-                  >
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-stone-400">状态摘要</p>
-                        <p className="text-sm leading-6 text-stone-700">{assistantMemorySnapshot.lastKnownState || '暂无'}</p>
-                      </div>
-                      <div>
-                        <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-stone-400">工作记忆摘要</p>
-                        <p className="text-sm leading-6 text-stone-700">{assistantMemorySnapshot.workingMemorySummary || '暂无'}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {(Object.keys(ASSISTANT_EDITABLE_MEMORY_SECTION_META) as AssistantEditableMemoryListKey[]).map((key) => {
-                    const sectionMeta = ASSISTANT_EDITABLE_MEMORY_SECTION_META[key];
-                    const items = assistantMemorySnapshot[key];
-                    const isComposerOpen = assistantEditableMemoryComposerKey === key;
-
-                    return (
-                      <div
-                        key={key}
-                        className="rounded-[0.95rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4"
-                        style={{
-                          borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
-                          backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
-                        }}
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <p className="font-serif text-xl text-[#231f1b]">{sectionMeta.label}</p>
-                            <p className="mt-1 text-xs leading-5 text-stone-500">{sectionMeta.helperText}</p>
-                          </div>
-                          <button
-                            onClick={() => handleOpenAssistantEditableMemoryComposer(key)}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-[0.75rem] border text-xs font-medium transition-colors hover:bg-white"
-                            style={{
-                              borderColor: AI_CHAT_THEME.chipBorder,
-                              backgroundColor: AI_CHAT_THEME.panelBg,
-                              color: AI_CHAT_THEME.textSecondary
-                            }}
-                            title={`新增${sectionMeta.label}`}
-                          >
-                            <Plus size={14} />
-                          </button>
-                        </div>
-
-                        {isComposerOpen && (
-                          <div
-                            className="mt-4 border px-4 py-4"
-                            style={{
-                              borderColor: AI_CHAT_THEME.panelBorder,
-                              backgroundColor: AI_CHAT_THEME.panelBg
-                            }}
-                          >
-                            <textarea
-                              value={assistantEditableMemoryDrafts[key]}
-                              onChange={(event) => updateAssistantEditableMemoryDraft(key, event.target.value)}
-                              placeholder={sectionMeta.placeholder}
-                              rows={3}
-                              className="w-full resize-none rounded-[0.75rem] border px-3 py-3 text-sm leading-6 outline-none"
-                              style={{
-                                borderColor: AI_CHAT_THEME.chipBorder,
-                                backgroundColor: AI_CHAT_THEME.inputBg,
-                                color: AI_CHAT_THEME.textPrimary
-                              }}
-                            />
-                            <div className="mt-3 flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => handleCancelAssistantEditableMemoryComposer(key)}
-                                className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
-                                style={{
-                                  borderColor: AI_CHAT_THEME.chipBorder,
-                                  backgroundColor: AI_CHAT_THEME.inputBg,
-                                  color: AI_CHAT_THEME.textMuted
-                                }}
-                              >
-                                取消
-                              </button>
-                              <button
-                                onClick={() => handleSaveAssistantEditableMemoryEntry(key)}
-                                className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:brightness-[0.98]"
-                                style={{
-                                  borderColor: AI_CHAT_THEME.activeBorder,
-                                  backgroundColor: AI_CHAT_THEME.activeBg,
-                                  color: AI_CHAT_THEME.textPrimary
-                                }}
-                              >
-                                保存
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="mt-4 space-y-3">
-                          {items.length === 0 ? (
-                            <div
-                              className="rounded-[0.85rem] border border-dashed px-4 py-4 text-sm leading-6 text-stone-500"
-                              style={{
-                                borderColor: AI_CHAT_THEME.panelBorder,
-                                backgroundColor: AI_CHAT_THEME.panelBg
-                              }}
-                            >
-                              {sectionMeta.emptyLabel}
-                            </div>
-                          ) : (
-                            items.map((item) => {
-                              const isDeleteConfirming = (
-                                assistantEditableMemoryDeleteTarget?.key === key
-                                && assistantEditableMemoryDeleteTarget.value === item
-                              );
-
-                              return (
-                                <div
-                                  key={`${key}-${item}`}
-                                  className="rounded-[0.85rem] border px-4 py-3"
-                                  style={{
-                                    borderColor: AI_CHAT_THEME.panelBorder,
-                                    backgroundColor: 'rgba(255,255,255,0.84)'
-                                  }}
-                                >
-                                  <div className="flex items-start justify-between gap-3">
-                                    <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm leading-6 text-stone-700">
-                                      {item}
-                                    </p>
-                                    <button
-                                      onClick={() => handleToggleAssistantEditableMemoryDelete(key, item)}
-                                      className="rounded-[0.7rem] p-2 text-[#897f75] transition-colors hover:bg-[#f8e9e6] hover:text-[#b35b50]"
-                                      title="删除这条记忆"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </div>
-
-                                  {isDeleteConfirming && (
-                                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#e4c1bc] pt-3 text-xs text-[#9d544d]">
-                                      <span>确认删除这条记忆？</span>
-                                      <div className="flex items-center gap-1.5">
-                                        <button
-                                          onClick={() => setAssistantEditableMemoryDeleteTarget(null)}
-                                          className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#ddd6ce] bg-transparent text-[#71685f] transition-colors hover:bg-[#fffaf3]"
-                                          title="取消删除"
-                                        >
-                                          <X size={14} />
-                                        </button>
-                                        <button
-                                          onClick={() => handleConfirmAssistantEditableMemoryDelete(key, item)}
-                                          className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#ba6256] bg-[#c46f4f] text-[#fff8f2] transition-colors hover:bg-[#b95f43]"
-                                          title="确认删除"
-                                        >
-                                          <Check size={14} />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  <div
-                    className="rounded-[0.95rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4"
-                    style={{
-                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
-                      backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
-                    }}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-serif text-xl text-[#231f1b]">活跃 reminders</p>
-                        <p className="mt-1 text-xs leading-5 text-stone-500">日期填 YYYYMMDD；时间填 HHMM。</p>
-                      </div>
-                      <button
-                        onClick={handleOpenAssistantReminderComposer}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-[0.75rem] border text-xs font-medium transition-colors hover:bg-white"
-                        style={{
-                          borderColor: AI_CHAT_THEME.chipBorder,
-                          backgroundColor: AI_CHAT_THEME.panelBg,
-                          color: AI_CHAT_THEME.textSecondary
-                        }}
-                        title="新增 reminder"
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </div>
-
-                    {isAssistantReminderComposerOpen && (
-                      <div
-                        className="mt-4 border px-4 py-4"
-                        style={{
-                          borderColor: AI_CHAT_THEME.panelBorder,
-                          backgroundColor: AI_CHAT_THEME.panelBg
-                        }}
-                      >
-                        <textarea
-                          value={assistantReminderDrafts.text}
-                          onChange={(event) => updateAssistantReminderDraft('text', event.target.value)}
-                          placeholder="比如：周三上午记得回看导师邮件。"
-                          rows={3}
-                          className="w-full resize-none rounded-[0.75rem] border px-3 py-3 text-sm leading-6 outline-none"
-                          style={{
-                            borderColor: AI_CHAT_THEME.chipBorder,
-                            backgroundColor: AI_CHAT_THEME.inputBg,
-                            color: AI_CHAT_THEME.textPrimary
-                          }}
-                        />
-                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                          <label className="space-y-1.5">
-                            <span className="text-xs font-medium text-stone-500">日期（YYYYMMDD）</span>
-                            <input
-                              value={assistantReminderDrafts.date}
-                              onChange={(event) => updateAssistantReminderDraft('date', event.target.value.replace(/\D/g, '').slice(0, 8))}
-                              placeholder="20260427"
-                              inputMode="numeric"
-                              className="w-full rounded-[0.75rem] border px-3 py-2 text-sm outline-none"
-                              style={{
-                                borderColor: AI_CHAT_THEME.chipBorder,
-                                backgroundColor: AI_CHAT_THEME.inputBg,
-                                color: AI_CHAT_THEME.textPrimary
-                              }}
-                            />
-                          </label>
-                          <label className="space-y-1.5">
-                            <span className="text-xs font-medium text-stone-500">时间（HHMM）</span>
-                            <input
-                              value={assistantReminderDrafts.hour}
-                              onChange={(event) => updateAssistantReminderDraft('hour', event.target.value.replace(/\D/g, '').slice(0, 4))}
-                              placeholder="0930"
-                              inputMode="numeric"
-                              className="w-full rounded-[0.75rem] border px-3 py-2 text-sm outline-none"
-                              style={{
-                                borderColor: AI_CHAT_THEME.chipBorder,
-                                backgroundColor: AI_CHAT_THEME.inputBg,
-                                color: AI_CHAT_THEME.textPrimary
-                              }}
-                            />
-                          </label>
-                        </div>
-                        <div className="mt-3 flex items-center justify-end gap-2">
-                          <button
-                            onClick={handleCancelAssistantReminderComposer}
-                            className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
-                            style={{
-                              borderColor: AI_CHAT_THEME.chipBorder,
-                              backgroundColor: AI_CHAT_THEME.inputBg,
-                              color: AI_CHAT_THEME.textMuted
-                            }}
-                          >
-                            取消
-                          </button>
-                          <button
-                            onClick={handleSaveAssistantReminder}
-                            className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:brightness-[0.98]"
-                            style={{
-                              borderColor: AI_CHAT_THEME.activeBorder,
-                              backgroundColor: AI_CHAT_THEME.activeBg,
-                              color: AI_CHAT_THEME.textPrimary
-                            }}
-                          >
-                            保存
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="mt-4 space-y-3">
-                      {assistantReminderSnapshot.length === 0 ? (
-                        <div
-                          className="rounded-[0.85rem] border border-dashed px-4 py-4 text-sm leading-6 text-stone-500"
-                          style={{
-                            borderColor: AI_CHAT_THEME.panelBorder,
-                            backgroundColor: AI_CHAT_THEME.panelBg
-                          }}
-                        >
-                          暂无活跃 reminder。
-                        </div>
-                      ) : (
-                        assistantReminderSnapshot.map((reminder) => {
-                          const isDeleteConfirming = assistantReminderDeleteTarget?.id === reminder.id;
-
-                          return (
-                            <div
-                              key={reminder.id}
-                              className="rounded-[0.85rem] border px-4 py-3"
-                              style={{
-                                borderColor: AI_CHAT_THEME.panelBorder,
-                                backgroundColor: 'rgba(255,255,255,0.84)'
-                              }}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0 flex-1">
-                                  <p className="whitespace-pre-wrap break-words text-sm leading-6 text-stone-700">
-                                    {reminder.text}
-                                  </p>
-                                  <p className="mt-1 text-xs leading-5 text-stone-500">
-                                    {formatAssistantDateTimeForDisplay(reminder.dueAt)} · {reminder.type}
-                                  </p>
-                                </div>
-                                <button
-                                  onClick={() => handleToggleAssistantReminderDelete(reminder.id)}
-                                  className="rounded-[0.7rem] p-2 text-[#897f75] transition-colors hover:bg-[#f8e9e6] hover:text-[#b35b50]"
-                                  title="删除这条 reminder"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-
-                              {isDeleteConfirming && (
-                                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#e4c1bc] pt-3 text-xs text-[#9d544d]">
-                                  <span>确认删除这条 reminder？</span>
-                                  <div className="flex items-center gap-1.5">
-                                    <button
-                                      onClick={() => setAssistantReminderDeleteTarget(null)}
-                                      className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#ddd6ce] bg-transparent text-[#71685f] transition-colors hover:bg-[#fffaf3]"
-                                      title="取消删除"
-                                    >
-                                      <X size={14} />
-                                    </button>
-                                    <button
-                                      onClick={() => handleConfirmAssistantReminderDelete(reminder.id)}
-                                      className="flex h-8 w-8 items-center justify-center rounded-[0.7rem] border border-[#ba6256] bg-[#c46f4f] text-[#fff8f2] transition-colors hover:bg-[#b95f43]"
-                                      title="确认删除"
-                                    >
-                                      <Check size={14} />
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-
-                  <div
-                    className="rounded-[0.95rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4"
-                    style={{
-                      borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
-                      backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
-                    }}
-                  >
-                    <p className="mb-2 font-serif text-xl text-[#231f1b]">最近 agent 决策</p>
-                    <p className="mb-3 text-xs leading-5 text-stone-500">这里展示 AI 最近一次做了什么，用来帮助后续回合理解刚发生过的行为。</p>
-                    <div
-                      className="border px-4 py-4 text-sm leading-6"
-                      style={{
-                        borderColor: AI_CHAT_THEME.panelBorder,
-                        backgroundColor: AI_CHAT_THEME.panelBg,
-                        color: AI_CHAT_THEME.textPrimary
-                      }}
-                    >
-                      {assistantMemorySnapshot.recentDecisions[0] || '暂无'}
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-            </div>
-          </div>
+          <AIBackfillChatMemoryOverlay
+            assistantMemorySnapshot={assistantMemorySnapshot}
+            assistantReminderSnapshot={assistantReminderSnapshot}
+            assistantEditableMemoryComposerKey={assistantEditableMemoryComposerKey}
+            assistantEditableMemoryDrafts={assistantEditableMemoryDrafts}
+            assistantEditableMemoryDeleteTarget={assistantEditableMemoryDeleteTarget}
+            assistantReminderDrafts={assistantReminderDrafts}
+            isAssistantReminderComposerOpen={isAssistantReminderComposerOpen}
+            assistantReminderDeleteTarget={assistantReminderDeleteTarget}
+            theme={AI_CHAT_THEME}
+            onClearMemory={handleClearAssistantMemory}
+            onClose={handleCloseAssistantMemoryViewer}
+            onOpenEditableMemoryComposer={handleOpenAssistantEditableMemoryComposer}
+            onUpdateEditableMemoryDraft={updateAssistantEditableMemoryDraft}
+            onCancelEditableMemoryComposer={handleCancelAssistantEditableMemoryComposer}
+            onSaveEditableMemoryEntry={handleSaveAssistantEditableMemoryEntry}
+            onToggleEditableMemoryDelete={handleToggleAssistantEditableMemoryDelete}
+            onCancelEditableMemoryDelete={() => setAssistantEditableMemoryDeleteTarget(null)}
+            onConfirmEditableMemoryDelete={handleConfirmAssistantEditableMemoryDelete}
+            onOpenReminderComposer={handleOpenAssistantReminderComposer}
+            onUpdateReminderDraft={updateAssistantReminderDraft}
+            onCancelReminderComposer={handleCancelAssistantReminderComposer}
+            onSaveReminder={handleSaveAssistantReminder}
+            onToggleReminderDelete={handleToggleAssistantReminderDelete}
+            onCancelReminderDelete={() => setAssistantReminderDeleteTarget(null)}
+            onConfirmReminderDelete={handleConfirmAssistantReminderDelete}
+          />
         )}
 
         {isAssistantBackgroundHistoryViewerOpen && (
-          <div className="absolute inset-0 z-20 bg-[rgba(15,23,42,0.14)] backdrop-blur-[10px]">
-            <div
-              className="flex h-full flex-col bg-[#f3f4f6]"
-              style={{
-                paddingTop: 'env(safe-area-inset-top)',
-                paddingBottom: 'env(safe-area-inset-bottom)'
-              }}
-            >
-              <div className="flex h-14 items-center justify-between border-b border-[#e5e7eb] bg-[rgba(255,255,255,0.9)] px-4 backdrop-blur-md">
-                <div>
-                  <h3 className="font-serif text-lg font-bold leading-none text-[#201c19]">后台调用记录</h3>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleClearAssistantBackgroundCallHistory}
-                    className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors"
-                    style={{
-                      borderColor: AI_CHAT_THEME.dangerBorder,
-                      backgroundColor: AI_CHAT_THEME.dangerBg,
-                      color: AI_CHAT_THEME.dangerText
-                    }}
-                  >
-                    清空记录
-                  </button>
-                  <button
-                    onClick={handleCloseAssistantBackgroundHistoryViewer}
-                    className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:border-[#cfd8e3] hover:bg-[#f9fafb] hover:text-[#111827]"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-                <div className="mx-auto max-w-4xl space-y-4">
-                  {assistantBackgroundTimeline.length === 0 ? (
-                    <div
-                      className="rounded-[0.95rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-5"
-                      style={{
-                        borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
-                        backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
-                      }}
-                    >
-                      <p className="text-sm leading-6 text-stone-600">暂无后台诊断记录。</p>
-                    </div>
-                  ) : (
-                    assistantBackgroundTimeline.map((entry) => (
-                      <div
-                        key={entry.id}
-                        className="rounded-[0.95rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4"
-                        style={{
-                          borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
-                          backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
-                        }}
-                      >
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                          <p className="font-serif text-xl text-[#231f1b]">{getAssistantBackgroundTriggerLabel(entry.triggerType)}</p>
-                          <span className="rounded-full border px-2 py-0.5 text-[11px]" style={{
-                            borderColor: AI_CHAT_THEME.chipBorder,
-                            backgroundColor: AI_CHAT_THEME.panelBg,
-                            color: AI_CHAT_THEME.textSecondary
-                          }}>
-                            {getAssistantBackgroundRequestStatusLabel(entry.requestStatus)}
-                          </span>
-                          {entry.debugExchange && (
-                            <button
-                              onClick={() => setDebugViewer({
-                                title: `后台请求调试 · ${getAssistantBackgroundTriggerLabel(entry.triggerType)}`,
-                                sections: [{
-                                  label: '后台 AI 调用',
-                                  exchange: entry.debugExchange
-                                }]
-                              })}
-                              className="rounded-[0.75rem] border px-3 py-1 text-xs font-medium transition-colors"
-                              style={{
-                                borderColor: AI_CHAT_THEME.chipBorderStrong,
-                                backgroundColor: AI_CHAT_THEME.panelBg,
-                                color: AI_CHAT_THEME.textPrimary
-                              }}
-                            >
-                              查看请求
-                            </button>
-                          )}
-                        </div>
-                        <div className="mt-2 space-y-1 text-sm leading-6 text-stone-700">
-                          <p>醒来时间：{entry.wakeAt || '未拿到原生时间'}</p>
-                          <p>开始请求：{entry.requestStartedAt || '还没开始请求'}</p>
-                          <p>请求结果：{entry.requestCompletedAt || (entry.requestStatus === 'pending' ? '进行中' : getAssistantBackgroundRequestStatusLabel(entry.requestStatus))}</p>
-                          {entry.triggerId && <p>Trigger ID：{entry.triggerId}</p>}
-                          <p>结果内容：{entry.outcomeSummary}</p>
-                          {entry.message && <p>返回消息：{entry.message}</p>}
-                          {entry.errorMessage && <p style={{ color: AI_CHAT_THEME.dangerText }}>错误：{entry.errorMessage}</p>}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          <AssistantBackgroundHistoryOverlay
+            entries={assistantBackgroundTimeline}
+            theme={AI_CHAT_THEME}
+            onClear={handleClearAssistantBackgroundCallHistory}
+            onClose={handleCloseAssistantBackgroundHistoryViewer}
+            onOpenDebug={(entry) => setDebugViewer({
+              title: `后台请求调试 · ${getAssistantBackgroundTriggerLabel(entry.triggerType)}`,
+              sections: [{
+                label: '后台 AI 调用',
+                exchange: entry.debugExchange as AIDebugExchange
+              }]
+            })}
+            getTriggerLabel={getAssistantBackgroundTriggerLabel}
+            getRequestStatusLabel={getAssistantBackgroundRequestStatusLabel}
+          />
         )}
 
         {debugViewer && (
-          <div className="absolute inset-0 z-20 bg-[rgba(15,23,42,0.14)] backdrop-blur-[10px]">
-            <div
-              className="flex h-full flex-col bg-[#f3f4f6]"
-              style={{
-                paddingTop: 'env(safe-area-inset-top)',
-                paddingBottom: 'env(safe-area-inset-bottom)'
-              }}
-            >
-              <div className="flex h-14 items-center justify-between border-b border-[#e5e7eb] bg-[rgba(255,255,255,0.9)] px-4 backdrop-blur-md">
-                <div>
-                  <h3 className="font-serif text-lg font-bold leading-none text-[#201c19]">{debugViewer.title}</h3>
-                </div>
-                <button
-                  onClick={() => setDebugViewer(null)}
-                  className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:border-[#cfd8e3] hover:bg-[#f9fafb] hover:text-[#111827]"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-                <div className="mx-auto max-w-4xl space-y-5">
-                  {debugViewer.sections.map((section, sectionIndex) => (
-                    <section
-                      key={`${section.label}-${sectionIndex}`}
-                      className="space-y-3 border-b border-[#e5e7eb] pb-5 last:border-b-0 last:pb-0"
-                    >
-                      <p className="px-1 font-serif text-xl text-[#231f1b]">{section.label}</p>
-                      <div className="mb-3 space-y-3">
-                        {buildDebugBlocks(section.exchange).map((block, index) => {
-                          const blockKey = `${section.label}-${block.label}-${index}`;
-                          const isExpanded = expandedDebugBlockKeys.has(blockKey);
-
-                          return (
-                            <div
-                              key={blockKey}
-                              className="overflow-hidden rounded-[0.85rem] border border-[#d8d2ca] bg-[rgba(255,255,255,0.72)]"
-                            >
-                              <button
-                                type="button"
-                                onClick={() => setExpandedDebugBlockKeys((current) => {
-                                  const next = new Set(current);
-                                  if (next.has(blockKey)) {
-                                    next.delete(blockKey);
-                                  } else {
-                                    next.add(blockKey);
-                                  }
-                                  return next;
-                                })}
-                                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[rgba(255,255,255,0.58)]"
-                              >
-                                <span className="text-xs font-bold uppercase tracking-[0.2em] text-stone-500">{block.label}</span>
-                                <span className="flex items-center gap-2 text-[11px] font-medium text-stone-400">
-                                  {isExpanded ? '收起' : '展开'}
-                                  {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                                </span>
-                              </button>
-                              {isExpanded && (
-                                <div className="border-t border-[#e3ddd4] p-3 pt-3">
-                                  <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-[0.85rem] border border-[#433a34] bg-[#2d2926] p-4 text-xs leading-6 text-[#efe7db] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
-                                    {block.content}
-                                  </pre>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </section>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+          <AIChatDebugViewerOverlay
+            viewer={debugViewer}
+            expandedBlockKeys={expandedDebugBlockKeys}
+            onClose={() => setDebugViewer(null)}
+            onToggleBlock={(blockKey) => {
+              setExpandedDebugBlockKeys((current) => {
+                const next = new Set(current);
+                if (next.has(blockKey)) {
+                  next.delete(blockKey);
+                } else {
+                  next.add(blockKey);
+                }
+                return next;
+              });
+            }}
+            buildBlocks={buildDebugBlocks}
+          />
         )}
       </div>
     </div>

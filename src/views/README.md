@@ -15,7 +15,9 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 > Note: color pickers in detail and batch management views should keep built-in theme colors and persisted custom HEX colors consistent, including todo category colors and scope colors used by stats.
 
+- Update 2026-05-14: `TodoView.tsx` now persists a shared `锁定/解锁` planner toggle and passes it through the standard week, bento week, and month schedule views, so all arrange/deadline/tentative entries can be frozen against drag-to-move until explicitly re-enabled.
 - Update 2026-05-14: `TimelineView.tsx` now renders `◬ CollectionName` chips on any timeline log row that belongs to one or more collections, matching the existing linked-todo metadata badge styling instead of inventing a separate collection-only tag treatment.
+- Update 2026-05-14: `TodoView.tsx` and planning components now support drag-and-drop for `Maybe` entries, and the standard week view plus month view `Maybe` badges now open the same quick-edit bar as Arrange/Due while multi-date drags replace only the moved tentative date.
 - Update 2026-05-14: `TodoView.tsx`, `TodoBentoWeekView.tsx`, `TodoMonthView.tsx`, and `todoScheduleUtils.ts` now understand a sixth `Maybe` schedule type backed by today-or-future `maybeDates`, while recurring rows can suppress one generated date through `skipDates`.
 - Update 2026-05-14: `TodoBentoWeekView.tsx` now mirrors the standard week planner's conservative horizontal swipe switching inside the `八宫格` day grid, while keeping the mini calendar, date buttons, badge buttons, and drag handles out of the swipe target set to reduce accidental week changes.
 - Update 2026-05-14: `TodoView.tsx` and `TodoScheduleAssignModal.tsx` now expose a future-only `Maybe` quick-assign tab in the week/month day picker, let recurring todos reappear only inside that `Maybe` picker, and keep the `New` tab creating a task arranged on the chosen date instead of inheriting `Due` or `Maybe`.

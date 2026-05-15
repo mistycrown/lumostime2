@@ -4,13 +4,8 @@
  * @output Shared pure filtering and ordering helpers for the schedule assignment picker
  * @pos Utility (Todo schedule assignment)
  * @description Keeps the week-plan picker aligned with todo hierarchy visibility rules by hiding unfinished subtasks whose parent todo is already completed and suppressing the reserved `未来` bucket from quick scheduling.
- * @updated 2026-05-14: Allowed recurring todos back into the quick picker only for the `Maybe` tab, while Arrange / Due still exclude them.
- * @updated 2026-05-13: Excluded the reserved `未来` category from arrange/due picker pools so future-only project backlogs stay out of quick scheduling popups.
- * @updated 2026-05-13: Excluded recurring todos from arrange/due picker pools so quick scheduling only offers one-shot tasks that can legally carry arrange or due dates.
- * @updated 2026-05-12: Added title search filtering that keeps matched subtasks attached to their visible parent rows inside the schedule assignment picker.
- * @updated 2026-04-25: Added hierarchy row builders so schedule assignment pickers can render subtasks beneath their parent rows while preserving completed-parent visibility rules.
- * @updated 2026-04-25: Added shared filtering so schedule assignment pickers can resolve completed-parent visibility from the full todo source.
- *
+ * @updated 2026-05-14: Aligned quick-picker ordering so `Maybe` / `Arrange` / `Due` all keep undated root todos first, preserve saved root-todo order, and still pin subtasks beneath their parent via `childOrder`.
+
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
 
@@ -30,6 +25,11 @@ export interface TodoScheduleAssignRow {
   isExpanded: boolean;
 }
 
+interface ScheduleAssignSortContext {
+  orderLookup: Map<string, number>;
+  todoMap: Map<string, TodoItem>;
+}
+
 const getStatusDateValue = (
   todo: TodoItem,
   type: 'scheduled' | 'deadline' | 'maybe'
@@ -45,23 +45,73 @@ const getStatusDateValue = (
   return todo.maybeDates?.slice().sort((left, right) => left.localeCompare(right))[0];
 };
 
+const compareSiblingChildOrder = (left: TodoItem, right: TodoItem): number => {
+  const leftOrder = typeof left.childOrder === 'number' ? left.childOrder : Number.MAX_SAFE_INTEGER;
+  const rightOrder = typeof right.childOrder === 'number' ? right.childOrder : Number.MAX_SAFE_INTEGER;
+
+  if (leftOrder !== rightOrder) {
+    return leftOrder - rightOrder;
+  }
+
+  return left.title.localeCompare(right.title, 'zh-CN');
+};
+
+const getRootTodo = (todo: TodoItem, todoMap: Map<string, TodoItem>): TodoItem => {
+  if (!todo.parentTodoId) {
+    return todo;
+  }
+
+  const parentTodo = todoMap.get(todo.parentTodoId);
+  return parentTodo && !parentTodo.parentTodoId ? parentTodo : todo;
+};
+
 const compareScheduleAssignTodos = (
   left: TodoItem,
   right: TodoItem,
   activeType: 'maybe' | 'scheduled' | 'deadline' | 'new',
-  assignType: 'maybe' | 'scheduled' | 'deadline'
+  assignType: 'maybe' | 'scheduled' | 'deadline',
+  context: ScheduleAssignSortContext
 ): number => {
   const leftDate = getStatusDateValue(left, activeType === 'new' ? assignType : activeType);
   const rightDate = getStatusDateValue(right, activeType === 'new' ? assignType : activeType);
 
   if (!leftDate && !rightDate) {
-    return left.title.localeCompare(right.title, 'zh-CN');
+    // When both todos are undated for the active picker, fall back to saved root order
+    // so root tasks stay stable and subtasks can remain attached below their parent.
+  } else {
+    if (!leftDate) return -1;
+    if (!rightDate) return 1;
   }
-  if (!leftDate) return -1;
-  if (!rightDate) return 1;
 
-  const dateCompare = leftDate.localeCompare(rightDate);
-  if (dateCompare !== 0) return dateCompare;
+  if (leftDate && rightDate) {
+    const dateCompare = leftDate.localeCompare(rightDate);
+    if (dateCompare !== 0) return dateCompare;
+  }
+
+  const leftRootTodo = getRootTodo(left, context.todoMap);
+  const rightRootTodo = getRootTodo(right, context.todoMap);
+  const leftRootOrder = context.orderLookup.get(leftRootTodo.id) ?? Number.MAX_SAFE_INTEGER;
+  const rightRootOrder = context.orderLookup.get(rightRootTodo.id) ?? Number.MAX_SAFE_INTEGER;
+
+  if (leftRootOrder !== rightRootOrder) {
+    return leftRootOrder - rightRootOrder;
+  }
+
+  if (leftRootTodo.id === rightRootTodo.id) {
+    if (left.id === right.id) {
+      return 0;
+    }
+
+    if (left.id === leftRootTodo.id) {
+      return -1;
+    }
+
+    if (right.id === rightRootTodo.id) {
+      return 1;
+    }
+
+    return compareSiblingChildOrder(left, right);
+  }
 
   return left.title.localeCompare(right.title, 'zh-CN');
 };
@@ -106,6 +156,10 @@ export const getVisibleScheduleAssignTodos = (
   assignType: 'maybe' | 'scheduled' | 'deadline',
   searchQuery = ''
 ): TodoItem[] => {
+  const sortContext: ScheduleAssignSortContext = {
+    orderLookup: new Map(sourceTodos.map((todo, index) => [todo.id, index])),
+    todoMap: new Map(sourceTodos.map((todo) => [todo.id, todo]))
+  };
   const nextTodos = selectedCategoryId === 'all'
     ? [...todos]
     : todos.filter((todo) => todo.categoryId === selectedCategoryId);
@@ -128,7 +182,7 @@ export const getVisibleScheduleAssignTodos = (
     ? visibleTodos.filter((todo) => matchedTodoIds.has(todo.id))
     : visibleTodos;
 
-  searchedTodos.sort((left, right) => compareScheduleAssignTodos(left, right, activeType, assignType));
+  searchedTodos.sort((left, right) => compareScheduleAssignTodos(left, right, activeType, assignType, sortContext));
 
   return searchedTodos;
 };
@@ -161,10 +215,14 @@ export const buildTodoScheduleAssignRows = (
   activeType: 'maybe' | 'scheduled' | 'deadline' | 'new',
   assignType: 'maybe' | 'scheduled' | 'deadline'
 ): TodoScheduleAssignRow[] => {
+  const sortContext: ScheduleAssignSortContext = {
+    orderLookup: new Map(sourceTodos.map((todo, index) => [todo.id, index])),
+    todoMap: new Map(sourceTodos.map((todo) => [todo.id, todo]))
+  };
   const expandedParentIdSet = new Set(expandedParentIds);
   const rootTodos = todos
     .filter((todo) => !getParentTodo(sourceTodos, todo))
-    .sort((left, right) => compareScheduleAssignTodos(left, right, activeType, assignType));
+    .sort((left, right) => compareScheduleAssignTodos(left, right, activeType, assignType, sortContext));
 
   return rootTodos.flatMap((todo) => {
     const childTodos = getDirectChildTodosForDisplay(todos, todo.id, {
