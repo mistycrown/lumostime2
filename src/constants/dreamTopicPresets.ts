@@ -4,8 +4,7 @@
  * @output Shared Dream topic preset definitions
  * @description Centralizes the built-in Dream concern-topic presets so the Dream system can seed a stable first-run topic set without hardcoding labels inside services or UI components.
  * @updated 2026-05-13: Replaced gendered references in the built-in Dream topic notes with 用户 so the default topic instructions stay neutral across users.
- * @updated 2026-05-13: Reframed the built-in Dream topic presets around inner traits, living rhythm, wellbeing, and execution-pressure patterns so Dream defaults to understanding the user more like a person than a monitoring dashboard.
- * @updated 2026-05-12: Added the initial built-in Dream topic presets for schedule, health, energy, execution, and long-term pressure tracking.
+
  */
 
 export interface DreamTopicPreset {

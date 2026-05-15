@@ -4,6 +4,7 @@
  * @output Persistent Android agent loop, shared runtime notification state, and bridge-triggered assistant events
  * @pos Native Service
  * @description Minimal Android foreground service scaffold for the background AI agent. Maintains a lightweight polling loop, shares one persistent Android status notification with the floating-window service, and emits assistant system-trigger events through the Capacitor plugin bridge.
+ * @updated 2026-05-15: Remove a native reminder immediately after it has been persisted as a pending `reminder_due` trigger so background retries do not re-dispatch the same completed reminder every minute.
  * @updated 2026-05-14: Changed Android reminder alarms to dispatch one metadata-rich `reminder_due` trigger back to the Web layer, preserving the local-offset request path and preventing duplicate native-plus-web AI reminder runs.
  * @updated 2026-05-13: Moved next due-reminder wakeups onto AlarmManager-backed service wakeups so reminder_due dispatch no longer depends on in-process Handler delays while the device is idle.
  * @updated 2026-05-11: Split due-reminder scheduling off the coarse base poll so reminders can fire at their exact next eligible time instead of waiting for the next 5-minute sweep.
@@ -370,6 +371,7 @@ public class AssistantAgentService extends Service {
                 triggerId,
                 metadata
             );
+            AssistantNativeReminderStore.markDispatched(this, reminderId, attemptedAt);
 
             appendDiagnostic(
                 "reminder_due_dispatched",
