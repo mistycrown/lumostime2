@@ -121,6 +121,24 @@ describe('assistantTurnService', () => {
     expect(typeof request?.cacheHint?.keySeed).toBe('string');
   });
 
+  it('places the optional user persona prompt before the base system prompt', async () => {
+    await assistantTurnService.runUnifiedTurn(createInput({
+      promptLayers: {
+        basePrompt: 'base prompt',
+        modePrompt: 'foreground mode prompt',
+        userPersonaPrompt: 'persona prompt'
+      }
+    }));
+
+    const request = vi.mocked(aiService.requestAssistantUnifiedTurnWithDebug).mock.calls[0]?.[0];
+    const personaIndex = request?.systemPrompt?.indexOf('=== User Persona Prompt ===') ?? -1;
+    const baseIndex = request?.systemPrompt?.indexOf('=== Assistant Base Prompt ===') ?? -1;
+
+    expect(request?.systemPrompt).toContain('persona prompt');
+    expect(personaIndex).toBeGreaterThanOrEqual(0);
+    expect(baseIndex).toBeGreaterThan(personaIndex);
+  });
+
   it('serializes the optional timeline review digest without replacing the concrete same-day log list', async () => {
     await assistantTurnService.runUnifiedTurn(createInput({
       stateContext: {

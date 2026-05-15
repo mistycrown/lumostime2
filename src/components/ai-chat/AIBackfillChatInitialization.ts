@@ -42,7 +42,7 @@ export const USER_PROFILE_KEY = 'lumostime_ai_chat_user_profile_v1';
 export const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
   {
     id: 'builtin-default',
-    name: '私人助理',
+    name: '默认',
     avatarIcon: '🗂️',
     assistantSelfName: '',
     userCallName: '',
@@ -51,52 +51,32 @@ export const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     isBuiltIn: true
   },
   {
-    id: 'builtin-gentle',
-    name: '喵喵陪伴',
+    id: 'builtin-banliang',
+    name: '半两',
     avatarIcon: '🐱',
-    assistantSelfName: '喵喵',
-    userCallName: '主人',
-    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-gentle'],
+    assistantSelfName: '半两',
+    userCallName: '',
+    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-banliang'],
     contextMessageLimit: 30,
     isBuiltIn: true
   },
   {
-    id: 'builtin-planner',
-    name: '内阁首辅',
-    avatarIcon: '🪶',
-    assistantSelfName: '臣',
-    userCallName: '陛下',
-    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-planner'],
+    id: 'builtin-shenyuqiu',
+    name: '沈聿秋',
+    avatarIcon: '📚',
+    assistantSelfName: '沈聿秋',
+    userCallName: '',
+    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-shenyuqiu'],
     contextMessageLimit: 30,
     isBuiltIn: true
   },
   {
-    id: 'builtin-chatty',
-    name: '知心姐姐',
+    id: 'builtin-suwanqing',
+    name: '苏晚晴',
     avatarIcon: '💗',
-    assistantSelfName: '',
+    assistantSelfName: '晚晴姐',
     userCallName: '',
-    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-chatty'],
-    contextMessageLimit: 30,
-    isBuiltIn: true
-  },
-  {
-    id: 'builtin-mentor',
-    name: '赛博导师',
-    avatarIcon: '🧠',
-    assistantSelfName: '',
-    userCallName: '',
-    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-mentor'],
-    contextMessageLimit: 30,
-    isBuiltIn: true
-  },
-  {
-    id: 'builtin-poet',
-    name: '古风小生',
-    avatarIcon: '🪭',
-    assistantSelfName: '小生',
-    userCallName: '姑娘',
-    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-poet'],
+    systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-suwanqing'],
     contextMessageLimit: 30,
     isBuiltIn: true
   }
@@ -519,6 +499,10 @@ const normalizePersonas = (value: unknown): AIChatPersona[] => {
 
       if (defaultPersonaMap.has(candidate.id)) {
         personaMap.set(candidate.id, defaultPersonaMap.get(candidate.id)!);
+        return;
+      }
+
+      if (candidate.isBuiltIn) {
         return;
       }
 

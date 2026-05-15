@@ -5,6 +5,7 @@
  * @pos Service (Assistant Unified Turn)
  * @description Builds the single-turn prompt payload for the converged assistant architecture and forwards it through aiService so foreground and background flows can gradually migrate off the older multi-prompt planner stack.
  *
+ * @updated 2026-05-15: Reordered unified assistant prompt assembly so the optional user persona layer is serialized before the base system prompt.
  * @updated 2026-05-13: Unified visible-message output back around `assistantReply`, while instructing the model to use newline-separated paragraphs inside that single reply so the UI can split one complete answer into multiple bubbles without a second duplicate field.
  * @updated 2026-05-10: Reordered unified assistant prompt assembly so long-lived dictionary/state sections sit ahead of volatile anchors, improving provider-side prompt-cache reuse across repeated turns.
  * @updated 2026-05-12: Added an optional read-only Dream context section so foreground and background assistant turns can reference explicit Dream observations without mutating them.
@@ -235,12 +236,12 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
         }
     );
   return [
+    ...(input.promptLayers.userPersonaPrompt ? ['=== User Persona Prompt ===', input.promptLayers.userPersonaPrompt, ''] : []),
     '=== Assistant Base Prompt ===',
     input.promptLayers.basePrompt,
     '',
     `=== ${modePromptLabel} ===`,
     input.promptLayers.modePrompt,
-    ...(input.promptLayers.userPersonaPrompt ? ['', '=== User Persona Prompt ===', input.promptLayers.userPersonaPrompt] : []),
     '',
     `=== ${toolPromptLabel} ===`,
     toolSchemaPrompt,

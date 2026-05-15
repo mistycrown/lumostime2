@@ -4921,7 +4921,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     {
       title: '规划今天',
       prompt: '我今天计划推进论文初稿、整理实验数据、晚上去跑步，帮我拆成待办，也顺手安排几个提醒。',
-      requirement: '开启后台轮询'
+      requirement: '开启后台轮询和长期记忆'
     },
     {
       title: '定时提醒',
