@@ -3,10 +3,15 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-05-15: `AIBackfillChatModal.tsx` now continues moving stable support code into `src/components/ai-chat/`, extracting the conversation pane, Dream command flow, review command/writeback helpers, weekly/monthly template session flow helpers, shared chat types and validators, the Dream/memory/debug/background/session/settings overlays, the persona/call/background-assistant settings sections, the session/template state helpers, and pure formatter/debug helper functions so the main modal reads more like orchestration code.
+- Update 2026-05-14: `AIBackfillChatModal.tsx` now summarizes HTML/non-JSON AI failures directly in the error bubble and exposes `原始响应摘要 / 解析失败原因 / 原始响应文本 / 完整响应体` inside `查看调试`, so upstream gateway pages and malformed responses are diagnosable without guessing from a bare JSON parse error.
+- Update 2026-05-14: `TodoBentoWeekView.tsx` and `TodoMonthView.tsx` now expose a shared schedule-lock toggle beside `本周/本月`, so Arrange / Due / Maybe rows can temporarily disable drag-to-move without losing quick-action access.
+- Update 2026-05-14: `AIBackfillChatModal.tsx` now exposes complete raw server output (including HTML error pages) in the "查看调试" (View Debug) modal when requests fail, providing full transparency for troubleshooting AI communication issues.
 - Update 2026-05-14: `AIBackfillChatModal.tsx` now lets Android reminder alarms wake natively but routes `reminder_due` execution back through the shared Web listener only, preserving the local-offset `+08:00` request path and removing the duplicate UTC-flavored native reminder run.
 - Update 2026-05-14: `AIBackfillChatModal.tsx` now intercepts the ordinary-chat command `日报`, confirms overwrite when today's Daily Review already has an AI narrative, writes back the new daily narrative through `dailyReviewTemplateService.ts`, and renders the same inline result-card style used by weekly/monthly review writebacks.
 - Update 2026-05-14: `TodoDetailModal.tsx` now removes the extra nested recurrence-rule frame inside `时间安排`, so recurring fields render directly within the outer planning card instead of inside a second dashed box.
 - Update 2026-05-14: `TodoQuickActionsModal.tsx` now keeps the main `Maybe` picker button but splits out adjacent `今天 / 明天 / +7` shortcut chips for faster tentative-date assignment, while the arrange/due shortcut label also shortens from `下周` to `+7`.
+- Update 2026-05-14: `TodoBentoWeekView.tsx` now routes `Maybe` badge clicks into the same quick-actions sheet as Arrange/Due, completing the bento-week quick-edit path for tentative schedule entries.
 - Update 2026-05-14: `TodoBentoWeekView.tsx` now lets the 2x4 day-grid switch to the previous/next week with the same conservative horizontal swipe thresholds as the standard week planner, while explicitly ignoring the mini calendar, date buttons, badge buttons, and drag handles to avoid accidental flips.
 - Update 2026-05-14: `TodoQuickActionsModal.tsx` now shows `Maybe` in the title summary too, rendering every future candidate date in order instead of collapsing multiple `maybeDates` into a `+n` count.
 - Update 2026-05-14: `TodoBentoWeekView.tsx`, `TodoMonthView.tsx`, and `TodoScheduleTypeColorSettings.tsx` now recognize the new `Maybe` schedule badge and color key, so tentative future dates render with their own marker styling alongside Arrange / Due / Repeat / Done / Trace in both week and month planners.
@@ -190,7 +195,7 @@ Components for theme and appearance customization.
 - `UiThemeButton.tsx`: 新增 - 从 SponsorshipView 中提取的可复用主题按钮组件
 - `TimePalSettings.tsx`: 新增 - 从 SponsorshipView 中提取的时光小友设置组件
 
-> ⚠️ 本文档最后更新：2026-02-09
+> ⚠️ 本文档最后更新：2026-05-15
 ## Recently Added (2026-03)
 - `TimelineStyleSelector.tsx`: 时间线样式切换与参数调节组件。
 - `TimelineStyleRail.tsx`: TimelineView、Memoir 与详情页共用的样式轨道渲染组件，支持摘要节点圆点对齐和页面级轨道宽度限制。

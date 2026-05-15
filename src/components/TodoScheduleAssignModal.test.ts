@@ -4,6 +4,7 @@
  * @output Regression coverage for schedule picker todo filtering
  * @pos Test
  * @description Ensures the schedule assignment picker can hide unfinished subtasks when their parent todo is completed, even if the visible picker pool excludes completed parents.
+ * @updated 2026-05-14: Added regression coverage for quick-picker ordering so undated roots stay first, saved root order is preserved, and subtasks still use `childOrder`.
  * @updated 2026-05-14: Added regression coverage for the quick-picker date gate so `Maybe` stays available on today and future dates, while past dates still hide it.
  * @updated 2026-05-14: Added regression coverage so recurring todos reappear only for the quick `Maybe` picker tab, while Arrange / Due still exclude them.
  * @updated 2026-05-12: Added search coverage so matching subtasks keep their parent row visible inside the schedule assignment picker hierarchy.
@@ -121,6 +122,74 @@ describe('getVisibleScheduleAssignTodos', () => {
     ]);
   });
 
+  it('keeps undated roots first, preserves saved root order, and still sorts subtasks by childOrder', () => {
+    const allTodos: TodoItem[] = [
+      {
+        id: 'root-dated',
+        categoryId: 'cat-1',
+        title: 'Root dated',
+        isCompleted: false,
+        scheduledDate: '2026-05-20'
+      } as TodoItem,
+      {
+        id: 'root-undated-b',
+        categoryId: 'cat-1',
+        title: 'Root undated B',
+        isCompleted: false
+      } as TodoItem,
+      {
+        id: 'root-undated-a',
+        categoryId: 'cat-1',
+        title: 'Root undated A',
+        isCompleted: false
+      } as TodoItem,
+      {
+        id: 'child-late',
+        categoryId: 'cat-1',
+        parentTodoId: 'root-undated-a',
+        childOrder: 2,
+        title: 'Child late',
+        isCompleted: false
+      } as TodoItem,
+      {
+        id: 'child-early',
+        categoryId: 'cat-1',
+        parentTodoId: 'root-undated-a',
+        childOrder: 1,
+        title: 'Child early',
+        isCompleted: false
+      } as TodoItem,
+      {
+        id: 'root-dated-earlier',
+        categoryId: 'cat-1',
+        title: 'Root dated earlier',
+        isCompleted: false,
+        scheduledDate: '2026-05-18'
+      } as TodoItem
+    ];
+
+    const visibleTodos = getVisibleScheduleAssignTodos(allTodos, allTodos, 'all', 'scheduled', 'scheduled');
+    const expandedParentIds = getInitialExpandedScheduleAssignParentIds(visibleTodos, allTodos);
+    const rows = buildTodoScheduleAssignRows(visibleTodos, allTodos, expandedParentIds, 'scheduled', 'scheduled');
+
+    expect(visibleTodos.map((todo) => todo.id)).toEqual([
+      'root-undated-b',
+      'root-undated-a',
+      'child-early',
+      'child-late',
+      'root-dated-earlier',
+      'root-dated'
+    ]);
+    expect(rows.map((row) => `${row.level}:${row.todo.id}`)).toEqual([
+      '0:root-undated-b',
+      '0:root-undated-a',
+      '1:child-early',
+      '1:child-late',
+      '0:root-dated-earlier',
+      '0:root-dated'
+    ]);
+  });
+
   it('keeps a matched subtask attached to its parent when search filters the picker', () => {
     const allTodos: TodoItem[] = [
       {
@@ -158,8 +227,8 @@ describe('getVisibleScheduleAssignTodos', () => {
     const rows = buildTodoScheduleAssignRows(visibleTodos, allTodos, expandedParentIds, 'scheduled', 'scheduled');
 
     expect(visibleTodos.map((todo) => todo.id)).toEqual([
-      'child-match',
-      'parent-open'
+      'parent-open',
+      'child-match'
     ]);
     expect(rows.map((row) => `${row.level}:${row.todo.id}`)).toEqual([
       '0:parent-open',
@@ -195,8 +264,8 @@ describe('getVisibleScheduleAssignTodos', () => {
       'one-shot'
     ]);
     expect(getVisibleScheduleAssignTodos(allTodos, allTodos, 'all', 'maybe', 'maybe').map((todo) => todo.id)).toEqual([
-      'one-shot',
-      'recurring'
+      'recurring',
+      'one-shot'
     ]);
   });
 });

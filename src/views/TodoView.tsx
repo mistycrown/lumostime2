@@ -1,102 +1,11 @@
-﻿/**
+/**
  * @file TodoView.tsx
  * @input Todos, Categories, Scopes
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes reserved `小事` / `未来` buckets plus a week planning view with schedule and history badges.
- * @updated 2026-05-14: Swapped the week-view `Maybe` leading icon to `Diff` and kept virtual schedule groups aligned with batch-management ordering by preserving the saved root todo order after the existing pin/completion sorting rules.
- * @updated 2026-05-13: Restyled the `小事` quick-add submit affordance into a small embedded accent-colored check inside the full-width input, so the inline capture flow no longer shows a heavy black `添加` block.
- * @updated 2026-05-13: Passed standard todo categories into the shared quick-actions sheet so non-subtask todos can move categories from the lightweight action flow.
- * @updated 2026-05-13: Reworded the empty-state copy for the reserved `小事` and `未来` buckets so each system list explains its scheduling constraints when empty.
- * @updated 2026-05-13: Added a reserved `未来` project bucket alongside `小事`, rendered it as a dedicated sidebar system category, and hid its todos from the quick schedule popup opened from week/month day numbers.
- * @updated 2026-05-13: Lowered the Todo sidebar utility trio again so the bottom expand/collapse button sits closer to the Record view reference position above the fixed navigation.
- * @updated 2026-05-13: Nudged the Todo sidebar utility buttons lower by trimming the left rail's bottom reserve so the bottom trio sits closer to the fixed navigation.
- * @updated 2026-05-13: Added a bottom-pinned virtual `小事` group with inline quick capture, while keeping quick reminders visible in shared schedule views and blocking their timer affordances.
- * @updated 2026-05-11: Added an explicit month-view entry jump signal from the parent schedule screen so opening `月视图` now replays the same `本月` jump after the calendar mounts, instead of sometimes staying at the rolling window's top month.
- * @updated 2026-05-11: Routed month-view date numeral taps into the shared quick-add schedule modal so monthly and weekly planners now open the same fast create flow for a chosen day.
- * @updated 2026-05-11: Passed activity-category, todo-category, and scope metadata into the month planner so its display-settings hidden filter can reuse custom-filter syntax against rendered todo entries.
- * @updated 2026-05-10: Rebuilt schedule-week navigation around one parent-owned Monday `weekStart` so the standard week view and `八宫格` now share the same source of truth for labels and switching.
- * @updated 2026-05-10: Unified schedule-week navigation around a Monday-based week reference so the header range, week picker, and bento week pages stay in sync while switching dates.
- * @updated 2026-05-10: Week schedule rows now append inline `@父任务` context for visible subtasks and keep the combined title on a single truncating line.
- * @updated 2026-05-10: Added a third `八宫格` schedule mode that reuses the real todo schedule data and drag-to-move rules inside a one-screen-per-week 2x4 bento layout with mini-calendar linking.
- * @updated 2026-05-10: Passed the schedule page's reduced-effects preference into the monthly calendar path so month-view rendering can dial back heavy visuals together with the rest of the Todo background shell.
- * @updated 2026-05-10: Let the monthly schedule view go edge-to-edge inside the schedule page and inherit the same custom-background rendering as the week planner instead of locking the month grid to white boxed surfaces.
- * @updated 2026-05-10: Replaced the monthly placeholder with a reference-style rolling month schedule backed by the same real Arrange / Due / Repeat / Done / Trace data as the week planner, and added month-view-specific type marker colors for each daily item.
- * @updated 2026-05-06: Captured active touch pointers for todo-row swipes and stopped release-target filtering so left-swipe complete and undo actions no longer intermittently fail when the finger drifts off the row or lifts over a child element.
- * @updated 2026-05-06: Removed the display-settings button dot indicator so the left sidebar utility icons now share the same clean Lucide-only appearance.
- * @updated 2026-05-05: Replaced the completed-visibility eye button with a dedicated display-settings modal, added compact-mode metadata toggles, and lowered the sidebar utility controls closer to the fixed bottom navigation.
- * @updated 2026-05-05: Category lists now only group incomplete todos before completed ones and otherwise preserve the incoming todo order from batch-management saves, while compact rows keep symbol-only date suffixes fully visible.
- * @updated 2026-05-05: Restored completed-row undo on a left swipe, while still passing the quick-actions open timestamp into the shared bottom sheet so lower-row taps cannot instantly trigger a mounted quick action.
- * @updated 2026-05-05: Stopped completed rows from undoing via left swipe, so accidental lower-list taps no longer reopen finished todos by mistake.
- * @updated 2026-05-05: Reserved bottom navigation space in list mode too, so lower todo rows no longer sit underneath the fixed footer hit area.
- * @updated 2026-05-05: Restored recurring and normal incomplete rows onto the same swipe/tap gesture path while keeping completed rows out of left-swipe undo.
- * @updated 2026-05-05: Replaced todo-row tap/swipe heuristics with an axis-locked gesture classifier so lower-list taps no longer get swallowed or accidentally toggle completion during scrolling.
- * @updated 2026-05-05: Reworked the custom-background surface stack so the whole todo page gets one shared base scrim and the right content panel adds a second warm overlay, eliminating sidebar seams without separate left-rail patches.
- * @updated 2026-05-05: Softened the custom-background sidebar scrim with a warm bridge into the main panel so the todo layout no longer shows a visible wallpaper seam.
- * @updated 2026-05-04: Added a custom-background-only sidebar scrim so the todo left rail stays readable over wallpaper textures.
- * @updated 2026-04-27: Routed the shared quick-actions sheet into todo deletion and added an inline two-tap delete entry for list and week-view action bars.
- * @updated 2026-04-25: Hide unfinished subtasks from todo-list rendering whenever their parent task is completed, while preserving child state and restoring the rows when the parent is reopened.
- * @updated 2026-04-25: Keep the todo page floating list-week switchers on the active color-scheme button style even when the UI icon theme stays default.
- * @updated 2026-04-25: Let floating list-week switchers inherit button theme colors when the default UI theme falls back to Lucide icons.
- * @updated 2026-04-26: Let the AI unread badge use the shared overlap positioning so it sits slightly inside the circular button edge instead of feeling detached.
- * @updated 2026-04-22: The todo-page AI magic button now opens the app-level shared AI window so closing the modal does not interrupt an in-flight request.
- * @updated 2026-04-22: Routed the todo-page AI magic button into the shared AI chat workspace and removed the old standalone AI todo parse/confirm flow.
- * @updated 2026-04-22: Narrowed the `今` filter count to only standalone todos whose own arranged or due date is today, excluding pin-only and overdue entries.
- * @updated 2026-04-22: Made expanded subtask rows in the virtual schedule view respect the sidebar's hide-completed toggle, so completed child rows disappear together with other completed todos.
- * @updated 2026-04-22: Hid redundant linked-activity and scope badges for child rows rendered directly beneath their parent so nested subtasks no longer repeat inherited metadata.
- * @updated 2026-04-22: Fixed the `排期 -> 今` hierarchy filtering so pin-only todos stay visible in the virtual today list instead of being dropped after section counts are computed.
- * @updated 2026-04-21 13:56: Made virtual-schedule parent hierarchy capsules expandable so parent rows can reveal matching child todos inline without duplicate standalone child rows.
- * @updated 2026-04-21 13:44: Abbreviated compact virtual-schedule labels such as `Arrange` and `Repeat` to three-letter forms.
- * @updated 2026-04-21 13:36: Nudged the compact `0/1` hierarchy capsule upward again for a tighter visual center alignment.
- * @updated 2026-04-21 13:31: Removed compact-list gaps between adjacent todo rows and nudged the compact `0/1` hierarchy capsule upward a bit more.
- * @updated 2026-04-21 13:22: Nudged the compact-mode hierarchy capsule slightly upward so the `0/1` badge aligns more naturally with neighboring inline metadata.
- * @updated 2026-04-21 13:14: Normalized hierarchy and metadata badge heights so the `0/1` capsule sits on the same vertical center line as neighboring containers.
- * @updated 2026-04-21 13:02: Removed the remaining compact-mode subtask branch marker so child rows rely only on indentation and hierarchy badges.
- * @updated 2026-04-21 12:55: Hid parent-title badges for child rows already rendered under their parent, while standalone scheduled subtasks now show `@` plus the first four parent-title characters.
- * @updated 2026-04-21 12:46: Removed the loose-mode curved subtask branch marker while keeping the compact-mode hierarchy connector.
- * @updated 2026-04-21 12:39: Kept loose-mode hierarchy, pin, link, and scope badges in a shared single-row wrap container so labels only wrap when space actually runs out.
- * @updated 2026-04-21 12:27: Simplified hierarchy badges to compact counts and four-character parent-title labels without extra `子任务` wording.
- * @updated 2026-04-21 12:18: Restored parent/subtask hierarchy cues inside the virtual schedule list by showing child progress on parent rows and parent labels on scheduled subtasks.
- * @updated 2026-04-21 11:46: Pinned todos now rise to the top of category lists, with icon-only compact chips and icon-plus-text loose chips.
- * @updated 2026-04-21 11:25: Added todo pin support so the today schedule tab can pin items to the top and show a matching `Pin` label.
- * @updated 2026-04-21 10:29: Let week-view `Trace` and `Done` badges open the shared quick-actions sheet just like `Arrange` and `Due`.
- * @updated 2026-04-21 10:16: Forced multi-badge week-view status labels onto a compact single line so abbreviated badges no longer wrap.
- * @updated 2026-04-21 10:02: Tightened multi-badge week-view status spacing and split the virtual `今` schedule list into today and overdue unfinished sections.
- * @updated 2026-04-21 09:11: Shortened multi-badge week-view status labels to three-letter abbreviations for non-`Due` and non-`Done` states.
- * @updated 2026-04-21 00:56: Applied the `Bilbo Swash Caps` font to the week-view left date numerals for a more decorative calendar column.
- * @updated 2026-04-21 00:43: Excluded the inline start-focus button from the row's quick-action gesture handling so mobile taps can launch focus without opening the shared sheet.
- * @updated 2026-04-21 00:34: Stopped todo-row click bubbling when opening quick actions so desktop clicks no longer reopen and immediately dismiss the shared action sheet.
- * @updated 2026-04-21 00:18: Shortened the virtual schedule filter chips under `排期` from `今天 / 明天 / 本周` to `今 / 明 / 周`.
- * @updated 2026-04-21 00:10: Unified todo-row tap targets across the whole card and tightened touch gesture suppression so mobile taps no longer get swallowed on active items.
- * @updated 2026-04-20 22:22: Added conservative left/right week-switch swipes inside the week planning scroll area, while ignoring row drag handles and date controls to reduce accidental triggers.
- * @updated 2026-04-20 22:05: Moved the week-view `本周` action into the header's top-right corner so it reads as a separate jump-to-current-week control.
- * @updated 2026-04-20 21:58: Split the right-swipe background styling so detail and duplicate states use clearly different colors while keeping the same gesture thresholds.
- * @updated 2026-04-20 21:48: Mounted the shared todo quick-actions sheet above both list and week layouts so list-row taps render it in the active screen.
- * @updated 2026-04-20 21:44: Softened completed progress indicators by lowering the fill opacity in both compact and loose todo cards.
- * @updated 2026-04-20 21:34: Let detailed progress bars span the full card width so top-right schedule markers no longer shrink them.
- * @updated 2026-04-20 21:18: Extracted shared todo quick-actions UI/control logic and switched todo-row touch handling onto a unified pointer flow.
- * @updated 2026-04-20 20:56: Prevented touch ghost-clicks from instantly dismissing todo quick actions after tap-open on mobile.
- * @updated 2026-04-20 20:43: Fixed mobile todo-row taps to reliably open quick actions, and split right-swipe into a light detail-open gesture plus a deeper duplicate gesture.
- * @updated 2026-04-20 20:18: Switched todo-row primary taps to open the quick-actions sheet first, while keeping full detail editing available from the sheet header.
- * @updated 2026-04-20 19:50: Moved detailed-list arranged/due markers into the right action rail as stacked text-only rows and clamped loose titles to two lines.
- * @updated 2026-04-20 19:39: Moved detailed-list arranged/due markers onto the title row and reduced them to icon-only capsules.
- * @updated 2026-04-20 19:32: Added detailed-list date markers for arranged and due todos while keeping compact rows unchanged.
- * @updated 2026-04-20 18:46: Shortened quick-action move labels to single-character `今 / 明` and widened the `下周` column to prevent wrapping.
- * @updated 2026-04-20 18:43: Added a tomorrow shortcut to the week-view quick-actions sheet for both Arrange and Due date moves.
- * @updated 2026-04-20 19:08: Added a top-pinned virtual schedule category with today, tomorrow, and this-week list filters.
- * @updated 2026-04-20 18:38: Added an undo-complete quick action for completed items in the week-view badge editor.
- * @updated 2026-04-20 18:12: Added touch edge auto-scroll for week-view dragging and reduced redundant badge combinations in the rendered week rows.
- * @updated 2026-04-20 18:07: Limited week-view overdue alerts to items that are past due and still have no completion date.
- * @updated 2026-04-20 18:03: Added extra bottom padding to the week planning scroll area so the floating action button no longer covers the last rows.
- * @updated 2026-04-20 17:59: Hid empty quick-action schedule metadata rows instead of rendering None placeholders.
- * @updated 2026-04-20: Added a quick duplicate-edit modal before creating copied todos.
- * @updated 2026-04-20: Added list/week switching, seven-row week planning layout, and first-pass schedule/history badge rendering.
- * @updated 2026-04-12: Matched the expanded sidebar action button spacing with RecordView, added a persisted toggle for showing completed todos, and softened the shared sidebar control styling.
- * @updated 2026-04-20: Switched custom background rendering to the shared preloaded display hook and reduced mobile blur cost.
- * @updated 2026-04-20: Moved week-view touch dragging to non-passive native listeners so mobile drag no longer logs passive preventDefault warnings.
- * @updated 2026-04-20: Simplified week Arrange icons, added quick-clear actions, and refined schedule picker ordering.
- *
- * 闁宠法濯寸粭?Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-05-14: Added a persisted schedule lock toggle across the standard week, bento week, and month planners so schedule and deadline rows can be frozen against drag-to-move until explicitly unlocked.
+ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useMemo, useRef } from 'react';
 import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log, TodoDuplicateOptions } from '../types';
@@ -788,6 +697,7 @@ interface TodoTreeEntryGroup {
 
 const TODO_COMPACT_DISPLAY_SETTINGS_STORAGE_KEY = 'todoCompactDisplaySettings';
 const TODO_SCHEDULE_VIEW_MODE_STORAGE_KEY = 'todoScheduleViewMode';
+const TODO_SCHEDULE_LOCKED_STORAGE_KEY = 'todoScheduleLocked';
 const DEFAULT_TODO_COMPACT_DISPLAY_SETTINGS: TodoCompactDisplaySettings = {
   showLinkedTag: true,
   showLinkedScope: true,
@@ -946,7 +856,7 @@ const formatScheduleSectionLabel = (dateKey: string, todayDateKey: string, tomor
 };
 
 type WeekBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'completed' | 'inProgress';
-type WeekQuickActionBadgeKey = 'deadline' | 'scheduled' | 'completed' | 'inProgress';
+type WeekQuickActionBadgeKey = 'deadline' | 'scheduled' | 'maybe' | 'completed' | 'inProgress';
 
 interface WeekBadgeDescriptor {
   key: WeekBadgeKey;
@@ -970,11 +880,12 @@ const getWeekBadgeDisplayLabel = (badge: WeekBadgeDescriptor, badgeCount: number
 const WeekTodoLineItem: React.FC<{
   entry: WeekTodoEntry;
   isDragging: boolean;
+  isScheduleLocked: boolean;
   onDragStart: (entry: WeekTodoEntry, event: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
   onTouchDragStart: (entry: WeekTodoEntry, event: React.TouchEvent<HTMLDivElement>) => void;
   onBadgeClick: (entry: WeekTodoEntry, badgeKey: WeekQuickActionBadgeKey) => void;
-}> = ({ entry, isDragging, onDragStart, onDragEnd, onTouchDragStart, onBadgeClick }) => {
+}> = ({ entry, isDragging, isScheduleLocked, onDragStart, onDragEnd, onTouchDragStart, onBadgeClick }) => {
   const { todo, badges, parentTitle } = entry;
   const isHistoricalOnly = !badges.scheduled && !badges.deadline && !badges.recurring && !badges.maybe && (badges.completed || badges.inProgress);
   const iconClassName = isHistoricalOnly ? 'text-stone-300' : 'text-stone-400';
@@ -1017,7 +928,15 @@ const WeekTodoLineItem: React.FC<{
     badges.inProgress ? { key: 'inProgress', label: 'Trace', color: '#8b8096' } : null
   ].filter(Boolean) as WeekBadgeDescriptor[];
   const hasMultipleBadges = orderedBadges.length > 1;
-  const dragBadgeKey: 'scheduled' | 'deadline' | null = badges.deadline ? 'deadline' : badges.scheduled ? 'scheduled' : null;
+  const dragBadgeKey: 'scheduled' | 'deadline' | 'maybe' | null = isScheduleLocked
+    ? null
+    : badges.deadline
+      ? 'deadline'
+      : badges.scheduled
+        ? 'scheduled'
+        : badges.maybe
+          ? 'maybe'
+          : null;
 
   return (
     <div
@@ -1045,7 +964,7 @@ const WeekTodoLineItem: React.FC<{
       </div>
       <div className={`shrink-0 flex items-center justify-end gap-1 whitespace-nowrap text-[9px] uppercase leading-none ${hasMultipleBadges ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
         {orderedBadges.map((badge) => (
-          badge.key === 'scheduled' || badge.key === 'deadline' || badge.key === 'completed' || badge.key === 'inProgress' ? (
+          badge.key === 'scheduled' || badge.key === 'deadline' || badge.key === 'maybe' || badge.key === 'completed' || badge.key === 'inProgress' ? (
             <span
               key={badge.key}
               data-week-badge-trigger="true"
@@ -1109,6 +1028,9 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     const saved = localStorage.getItem(TODO_SCHEDULE_VIEW_MODE_STORAGE_KEY);
     return saved === 'month' || saved === 'bento' ? saved : 'week';
   });
+  const [isScheduleLocked, setIsScheduleLocked] = useState<boolean>(() => (
+    localStorage.getItem(TODO_SCHEDULE_LOCKED_STORAGE_KEY) === 'true'
+  ));
   const [monthViewEntryJumpSignal, setMonthViewEntryJumpSignal] = useState(0);
   const [isScheduleViewMenuOpen, setIsScheduleViewMenuOpen] = useState(false);
   const [duplicatingTodo, setDuplicatingTodo] = useState<TodoItem | null>(null);
@@ -1203,6 +1125,10 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   React.useEffect(() => {
     localStorage.setItem(TODO_SCHEDULE_VIEW_MODE_STORAGE_KEY, scheduleViewMode);
   }, [scheduleViewMode]);
+
+  React.useEffect(() => {
+    localStorage.setItem(TODO_SCHEDULE_LOCKED_STORAGE_KEY, isScheduleLocked ? 'true' : 'false');
+  }, [isScheduleLocked]);
 
   React.useEffect(() => {
     localStorage.setItem('todoScreenMode', screenMode);
@@ -1671,6 +1597,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       : `${startMonth}.${start.getDate()} - ${endMonth}.${end.getDate()}`;
   }, [weekDates]);
   const weekJumpDateValue = formatDateKey(scheduleWeekStart);
+  const scheduleLockLabel = isScheduleLocked ? '解锁' : '锁定';
   const weekSwipeLockDistance = 18;
   const weekSwipeTriggerDistance = 112;
   const weekSwipeDominanceRatio = 1.6;
@@ -1738,10 +1665,26 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       };
     }
 
+    if (entry.badges.maybe) {
+      return {
+        ...entry,
+        badges: {
+          scheduled: false,
+          deadline: false,
+          recurring: false,
+          maybe: true,
+          completed: false,
+          inProgress: false
+        }
+      };
+    }
+
     return null;
   };
 
   const handleWeekItemDragStart = (entry: WeekTodoEntry, event: React.DragEvent<HTMLDivElement>) => {
+    if (isScheduleLocked) return;
+
     const dragEntry = createDragEntryForWeekItem(entry);
     if (!dragEntry) return;
     event.dataTransfer.effectAllowed = 'move';
@@ -1782,11 +1725,20 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
     const shouldMoveDeadline = entry.badges.deadline;
     const shouldMoveScheduled = entry.badges.scheduled;
+    const shouldMoveMaybe = entry.badges.maybe;
+
     const nextTodo: TodoItem = {
       ...targetTodo,
       deadlineDate: shouldMoveDeadline ? entryDate : targetTodo.deadlineDate,
       scheduledDate: shouldMoveScheduled ? entryDate : targetTodo.scheduledDate
     };
+
+    if (shouldMoveMaybe && (entry as any).dateKey) {
+      const originalDate = (entry as any).dateKey;
+      const otherMaybeDates = (targetTodo.maybeDates || []).filter((d) => d !== originalDate);
+      const newMaybeDates = Array.from(new Set([...otherMaybeDates, entryDate])).sort();
+      nextTodo.maybeDates = newMaybeDates.length > 0 ? newMaybeDates : undefined;
+    }
 
     onSaveTodo(nextTodo);
     handleWeekItemDragEnd();
@@ -1802,7 +1754,9 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
     const shouldMoveDeadline = entry.badges.deadline;
     const shouldMoveScheduled = entry.badges.scheduled;
-    if (!shouldMoveDeadline && !shouldMoveScheduled) {
+    const shouldMoveMaybe = entry.badges.maybe;
+
+    if (!shouldMoveDeadline && !shouldMoveScheduled && !shouldMoveMaybe) {
       return;
     }
 
@@ -1811,6 +1765,13 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       deadlineDate: shouldMoveDeadline ? entryDate : targetTodo.deadlineDate,
       scheduledDate: shouldMoveScheduled ? entryDate : targetTodo.scheduledDate
     };
+
+    if (shouldMoveMaybe && (entry as any).dateKey) {
+      const originalDate = (entry as any).dateKey;
+      const otherMaybeDates = (targetTodo.maybeDates || []).filter((d) => d !== originalDate);
+      const newMaybeDates = Array.from(new Set([...otherMaybeDates, entryDate])).sort();
+      nextTodo.maybeDates = newMaybeDates.length > 0 ? newMaybeDates : undefined;
+    }
 
     onSaveTodo(nextTodo);
   };
@@ -1823,9 +1784,14 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   };
 
   const handleWeekDrop = (entryDate: string) => {
-    if (!draggingWeekEntry) return;
+    if (isScheduleLocked || !draggingWeekEntry) return;
     commitWeekDrop(entryDate, draggingWeekEntry);
   };
+
+  React.useEffect(() => {
+    if (!isScheduleLocked) return;
+    handleWeekItemDragEnd();
+  }, [isScheduleLocked]);
 
   const resetWeekSwipeGesture = () => {
     weekSwipeStartRef.current = null;
@@ -2019,6 +1985,8 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   };
 
   const handleTouchWeekItemDragStart = (entry: WeekTodoEntry, event: React.TouchEvent<HTMLDivElement>) => {
+    if (isScheduleLocked) return;
+
     const dragEntry = createDragEntryForWeekItem(entry);
     if (!dragEntry) return;
     const touch = event.touches[0];
@@ -2337,6 +2305,19 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                     >
                       本周
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsScheduleLocked((previous) => !previous)}
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] tracking-[0.14em] transition-colors ${
+                        isScheduleLocked
+                          ? 'bg-stone-900 text-[#faf9f6]'
+                          : 'text-slate-400 hover:bg-white/50 hover:text-slate-600'
+                      }`}
+                      aria-pressed={isScheduleLocked}
+                      title={isScheduleLocked ? '已锁定拖拽，点击恢复移动' : '锁定拖拽，防止误移动'}
+                    >
+                      {scheduleLockLabel}
+                    </button>
                     {scheduleViewMenuNode}
                   </div>
                 </div>
@@ -2361,7 +2342,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                         data-week-drop-date={bucket.date}
                         className="grid min-h-[5.5rem] grid-cols-[4.25rem_minmax(0,1fr)] border-b border-stone-300/70 md:grid-cols-[4.75rem_minmax(0,1fr)]"
                         onDragOver={(event) => {
-                          if (!draggingWeekTodoId) return;
+                          if (isScheduleLocked || !draggingWeekTodoId) return;
                           event.preventDefault();
                           if (dragTargetDate !== bucket.date) {
                             setDragTargetDate(bucket.date);
@@ -2374,6 +2355,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                         }}
                         onDrop={(event) => {
                           event.preventDefault();
+                          if (isScheduleLocked) return;
                           handleWeekDrop(bucket.date);
                         }}
                       >
@@ -2410,6 +2392,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                                     key={`${bucket.date}-${entry.todo.id}`}
                                     entry={entry}
                                     isDragging={draggingWeekTodoId === entry.todo.id}
+                                    isScheduleLocked={isScheduleLocked}
                                     onDragStart={handleWeekItemDragStart}
                                     onDragEnd={handleWeekItemDragEnd}
                                     onTouchDragStart={handleTouchWeekItemDragStart}
@@ -2445,6 +2428,8 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                 onOpenWeekPicker={() => setIsWeekJumpPickerOpen(true)}
                 onWeekStartChange={(weekStart) => setScheduleWeekStart(getStartOfWeek(weekStart))}
                 onMoveScheduleEntry={handleScheduleEntryMove}
+                isScheduleLocked={isScheduleLocked}
+                onToggleScheduleLock={() => setIsScheduleLocked((previous) => !previous)}
                 useReducedEffects={useReducedEffects}
                 viewMenuNode={scheduleViewMenuNode}
                 onOpenTodo={openQuickActions}
@@ -2463,6 +2448,8 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                 referenceDate={scheduleWeekStart}
                 entryJumpSignal={monthViewEntryJumpSignal}
                 onMoveScheduleEntry={handleScheduleEntryMove}
+                isScheduleLocked={isScheduleLocked}
+                onToggleScheduleLock={() => setIsScheduleLocked((previous) => !previous)}
                 onOpenDay={(dateKey) => {
                   setAssignModalDate(dateKey);
                   setAssignModalType('scheduled');

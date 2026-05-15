@@ -2,6 +2,8 @@
 
 Contains business logic and external integrations.
 
+Update 2026-05-15: `assistantActionExecutor.ts`, `aiService.ts`, and `public/assistant/foreground-tools.md` now make the reserved foreground todo buckets explicit end to end, so assistant-created `小事` items can use the quick-reminder path while `未来` items stay in the reserved future category instead of falling back to a normal project bucket.
+Update 2026-05-14: `aiService.ts` now ensures non-JSON AI responses (e.g. HTML error pages) are preserved as raw text in debug exchanges by reading responses as text before parsing, allowing the chat debug viewer to surface full server-side error output.
 Update 2026-05-14: `aiService.ts` now persists named AI API presets plus the current preset id, migrates the older single-config/profile storage into the new shape, and keeps a mirrored current config so the app can quick-switch between saved providers without changing existing request call sites.
 
 Update 2026-05-14: `dailyReviewTemplateService.ts` now powers the ordinary-chat `日报` command by packaging one day's local logs/todos/review state, composing a strict AI narrative writeback prompt, and parsing a `write_daily_review_narrative` JSON tool call back into Daily Review narrative persistence.
@@ -57,9 +59,9 @@ Update 2026-04-09: `obsidianExportService.ts` now supports copying referenced lo
 Update 2026-03-12: timeline styling for normal timeline records is managed by `timelineStyleService.ts`.
 
 ## Files
-- `aiService.ts`: [Active] - Handles AI integration (OpenAI/Gemini) for text parsing, unified foreground/background assistant-turn requests, persona-aware chat replies, dated AI-planned backfill tool calls, root-todo creation, todo updates, subtask creation, log editing, abort-aware chat requests, narrative generation, and named local AI preset persistence/migration for quick provider switching.
+- `aiService.ts`: [Active] - Handles AI integration (OpenAI/Gemini) for text parsing, unified foreground/background assistant-turn requests, persona-aware chat replies, dated AI-planned backfill tool calls, root-todo creation, todo updates, subtask creation, log editing, abort-aware chat requests, narrative generation, named local AI preset persistence/migration, and robust non-JSON error capture for debug transparency.
 - `assistantAgentConfigService.ts`: [Active] - Persists background assistant runtime settings such as polling enablement, long-term-memory enablement, and user-editable random check-in ranges so the AI chat settings panel and native Android service can stay aligned.
-- `assistantActionExecutor.ts`: [Active] - Executes assistant-planned create/edit tool calls for logs, todos, and subtasks against local app data, returning applied-action snapshots plus the next logs/todos state for UI reuse.
+- `assistantActionExecutor.ts`: [Active] - Executes assistant-planned create/edit tool calls for logs, todos, and subtasks against local app data, including the reserved `小事` quick-reminder bucket and the reserved `未来` future bucket, returning applied-action snapshots plus the next logs/todos state for UI reuse.
 - `assistantMemoryService.ts`: [Active] - Stores structured assistant memory for the Android-first background AI agent, including profile facts, open loops, working summaries, the latest readable decision summary, and active reminders, with explicit replacement semantics for the active reminder list plus narrow helpers for manually appending and removing profile/preference memory notes.
 - `assistantReminderQueueService.ts`: [Active] - Persists and queries the assistant's follow-up reminder queue, canonicalizes reminder timestamps, computes due reminders against parsed datetimes, and keeps assistant memory in sync.
 - `assistantScheduledTaskService.ts`: [Active] - Stores recurring assistant task templates, reuses shared todo recurrence rules to compute their next trigger time, continuously seeds exactly one linked pending reminder per enabled task for native reminder_due execution, atomically removes the previously triggered reminder before reconciling and creating the next occurrence, and now honors optional monthly `无则月末` fallback behavior for 31st-style schedules.
@@ -95,4 +97,4 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 - `navigationDecorationService.ts`: 支持自定义导航栏装饰上传和存储
 
 > ⚠️ Once the folder I belong to changes, please update me.
-> ⚠️ 本文档最后更新：2026-04-22
+> ⚠️ 本文档最后更新：2026-05-14
