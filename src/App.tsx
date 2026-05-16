@@ -225,8 +225,10 @@ const AppContent: React.FC = () => {
     isFiltersOpen, setIsFiltersOpen,
     activeFilterId, setActiveFilterId,
     isDailyReviewOpen, setIsDailyReviewOpen,
+    isDailyNewspaperOpen, setIsDailyNewspaperOpen,
     isOnThisDayOpen, setIsOnThisDayOpen,
     currentReviewDate, setCurrentReviewDate,
+    setCurrentDailyNewspaperDate,
     setCurrentOnThisDayDate,
     isWeeklyReviewOpen,
     isMonthlyReviewOpen,
@@ -599,6 +601,10 @@ const AppContent: React.FC = () => {
       handleBackFromScope={() => {
         setIsGoalBatchManaging(false);
         setSelectedScopeId(null);
+      }}
+      handleCloseDailyNewspaper={() => {
+        setIsDailyNewspaperOpen(false);
+        setCurrentDailyNewspaperDate(null);
       }}
       handleCloseDailyReview={() => {
         setIsDailyReviewOpen(false);

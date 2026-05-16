@@ -124,7 +124,9 @@ describe('assistantOrchestratorService', () => {
       maxCheckinMinutes: 60,
       quietHoursEnabled: false,
       minimumNudgeGapMinutes: 15,
-      longTermMemoryEnabled: true
+      longTermMemoryEnabled: true,
+      logSubmissionTriggerEnabled: false,
+      logSubmissionTriggerActivityIds: []
     });
     vi.mocked(assistantPromptService.getAssistantBasePrompt).mockResolvedValue('base prompt');
     vi.mocked(assistantPromptService.getBackgroundModePrompt).mockResolvedValue('background prompt');
@@ -318,6 +320,40 @@ describe('assistantOrchestratorService', () => {
     const history = assistantOrchestratorService.listBackgroundCallHistory();
     expect(history[0].triggerId).toBe('trigger-3');
     expect(history[0].debugExchange).toEqual(debugExchange);
+  });
+
+  it('persists a background user message into the targeted session and resolves persona display names', () => {
+    localStorage.setItem('lumostime_ai_chat_sessions_v1', JSON.stringify([{
+      id: 'session-user-message',
+      title: '测试会话',
+      createdAt: 1,
+      updatedAt: 1,
+      personaId: 'persona-1',
+      contextCacheEnabled: true,
+      messages: []
+    }]));
+    localStorage.setItem('lumostime_ai_chat_personas_v1', JSON.stringify([{
+      id: 'persona-1',
+      name: '赛博导师'
+    }]));
+
+    const location = assistantOrchestratorService.persistBackgroundUserMessage(
+      '刚刚完成了 写代码，耗时 45 分钟。',
+      'session-user-message'
+    );
+
+    expect(location).toEqual({
+      sessionId: 'session-user-message',
+      messageId: expect.any(String)
+    });
+    expect(assistantOrchestratorService.getBackgroundPersonaDisplayName('session-user-message')).toBe('赛博导师');
+
+    const persistedSessions = JSON.parse(localStorage.getItem('lumostime_ai_chat_sessions_v1') || '[]');
+    expect(persistedSessions[0].messages).toHaveLength(1);
+    expect(persistedSessions[0].messages[0]).toEqual(expect.objectContaining({
+      role: 'user',
+      content: '刚刚完成了 写代码，耗时 45 分钟。'
+    }));
   });
 
   it('falls back only to the latest ordinary conversation with a real user turn', async () => {

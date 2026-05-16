@@ -4,6 +4,7 @@
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
+ * @updated 2026-05-16: Added lightweight daily AI newspaper types so Daily Review can persist structured editorial timeline commentary by log ID.
  * @updated 2026-05-13: Added optional monthly recurrence fallback support so 31st-style rules can land on the last day in shorter months when explicitly enabled.
  * @updated 2026-05-13: Added optional todo `kind` support so lightweight quick reminders can share the Todo pipeline while opting out of project-only behavior.
  * @updated 2026-05-12: Added first-pass `DataCollection` and `DataCollectionEntry` types for grouping logs and todos into themed review collections.
@@ -633,6 +634,21 @@ export interface ReviewAnswer {
   answer: string; // 鏂囨湰绛旀鎴栭€夋嫨鐨勯€夐」
 }
 
+export interface DailyNewspaperAnnotation {
+  logId: string;
+  comment: string;
+}
+
+export interface DailyNewspaper {
+  version: 1;
+  date: string;
+  title: string;
+  assistantReply: string;
+  overallComment: string;
+  annotations: DailyNewspaperAnnotation[];
+  updatedAt: number;
+}
+
 // 姣忔棩鍥為【
 export interface DailyReview {
   id: string;
@@ -647,6 +663,7 @@ export interface DailyReview {
   moodEmoji?: string; // 浠婃棩蹇冩儏 emoji
   narrative?: string; // AI鐢熸垚鐨勫彊浜?
   narrativeUpdatedAt?: number;
+  aiNewspaper?: DailyNewspaper;
   isEdited?: boolean; // 鍙欎簨鏄惁琚墜鍔ㄧ紪杈戣繃
   templateSnapshot?: ReviewTemplateSnapshot[]; // 鍒涘缓鏃剁殑妯℃澘蹇収
 }

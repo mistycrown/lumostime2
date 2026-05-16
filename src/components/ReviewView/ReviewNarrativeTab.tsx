@@ -1,6 +1,7 @@
 /**
  * @file ReviewNarrativeTab.tsx
  * @description Shared Narrative Tab component for Review Views with Reading/Editing modes
+ * @updated 2026-05-16: Split the narrative page into summary, newspaper, and AI narrative sections with a single-line newspaper card.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { RefreshCw, Sparkles, Trash2, Smile } from 'lucide-react';
@@ -11,231 +12,248 @@ import { MoodPickerModal } from '../MoodPicker';
 import { IconRenderer } from '../IconRenderer';
 
 interface ReviewNarrativeTabProps {
-    summary: string;
-    narrative: string;
-    isGenerating: boolean;
-    isReadingMode: boolean;
-    moodEmoji?: string;
-    date: string; // 添加日期参数，用于模态框标题
-    onSummaryChange: (value: string) => void;
-    onNarrativeChange: (value: string) => void;
-    onMoodChange?: (emoji: string) => void;
-    onMoodClear?: () => void;
-    onGenerateNarrative: () => void;
-    onDeleteSummary: () => void;
-    onDeleteNarrative: () => void;
+  summary: string;
+  narrative: string;
+  isGenerating: boolean;
+  isReadingMode: boolean;
+  moodEmoji?: string;
+  newspaperTitle?: string;
+  date: string;
+  onSummaryChange: (value: string) => void;
+  onNarrativeChange: (value: string) => void;
+  onMoodChange?: (emoji: string) => void;
+  onMoodClear?: () => void;
+  onOpenNewspaper?: () => void;
+  onGenerateNewspaper?: () => void;
+  onDeleteNewspaper?: () => void;
+  onGenerateNarrative: () => void;
+  onDeleteSummary: () => void;
+  onDeleteNarrative: () => void;
 }
 
 export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
-    summary,
-    narrative,
-    isGenerating,
-    isReadingMode,
-    moodEmoji,
-    date,
-    onSummaryChange,
-    onNarrativeChange,
-    onMoodChange,
-    onMoodClear,
-    onGenerateNarrative,
-    onDeleteSummary,
-    onDeleteNarrative
+  summary,
+  narrative,
+  isGenerating,
+  isReadingMode,
+  moodEmoji,
+  newspaperTitle,
+  date,
+  onSummaryChange,
+  onNarrativeChange,
+  onMoodChange,
+  onMoodClear,
+  onOpenNewspaper,
+  onGenerateNewspaper,
+  onDeleteNewspaper,
+  onGenerateNarrative,
+  onDeleteSummary,
+  onDeleteNarrative
 }) => {
-    const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
-    // 自动保存的防抖处理
-    const summaryTimeoutRef = useRef<NodeJS.Timeout>();
-    const narrativeTimeoutRef = useRef<NodeJS.Timeout>();
+  const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
+  const summaryTimeoutRef = useRef<NodeJS.Timeout>();
+  const narrativeTimeoutRef = useRef<NodeJS.Timeout>();
 
-    const handleSummaryChange = (value: string) => {
-        onSummaryChange(value);
-        
-        // 清除之前的定时器
-        if (summaryTimeoutRef.current) {
-            clearTimeout(summaryTimeoutRef.current);
-        }
-        
-        // 设置新的定时器，500ms 后自动保存
-        summaryTimeoutRef.current = setTimeout(() => {
-            // 自动保存逻辑已经在 onSummaryChange 中处理
-        }, 500);
+  const handleSummaryChange = (value: string) => {
+    onSummaryChange(value);
+
+    if (summaryTimeoutRef.current) {
+      clearTimeout(summaryTimeoutRef.current);
+    }
+
+    summaryTimeoutRef.current = setTimeout(() => {
+      // Autosave is handled upstream in onSummaryChange.
+    }, 500);
+  };
+
+  const handleNarrativeChange = (value: string) => {
+    onNarrativeChange(value);
+
+    if (narrativeTimeoutRef.current) {
+      clearTimeout(narrativeTimeoutRef.current);
+    }
+
+    narrativeTimeoutRef.current = setTimeout(() => {
+      // Autosave is handled upstream in onNarrativeChange.
+    }, 500);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (summaryTimeoutRef.current) {
+        clearTimeout(summaryTimeoutRef.current);
+      }
+      if (narrativeTimeoutRef.current) {
+        clearTimeout(narrativeTimeoutRef.current);
+      }
     };
+  }, []);
 
-    const handleNarrativeChange = (value: string) => {
-        onNarrativeChange(value);
-        
-        // 清除之前的定时器
-        if (narrativeTimeoutRef.current) {
-            clearTimeout(narrativeTimeoutRef.current);
-        }
-        
-        // 设置新的定时器，500ms 后自动保存
-        narrativeTimeoutRef.current = setTimeout(() => {
-            // 自动保存逻辑已经在 onNarrativeChange 中处理
-        }, 500);
-    };
-
-    // 清理定时器
-    useEffect(() => {
-        return () => {
-            if (summaryTimeoutRef.current) {
-                clearTimeout(summaryTimeoutRef.current);
-            }
-            if (narrativeTimeoutRef.current) {
-                clearTimeout(narrativeTimeoutRef.current);
-            }
-        };
-    }, []);
-
-    return (
-        <div className="space-y-8 min-w-0 max-w-full">
-            {/* Section 1: 手动叙事（一句话总结） */}
-            <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-bold text-stone-600">一句话总结</h3>
-                    </div>
-                    {summary && isReadingMode && (
-                        <button
-                            onClick={onDeleteSummary}
-                            className="text-red-400 hover:text-red-500 text-xs flex items-center gap-1 px-2 py-1"
-                        >
-                            <Trash2 size={12} />
-                        </button>
-                    )}
-                </div>
-
-                {isReadingMode ? (
-                    // 阅读模式：emoji + 文字内容作为一个整体，无边框
-                    summary ? (
-                        <div className="text-stone-800 text-[15px] leading-relaxed flex items-start gap-2">
-                            {moodEmoji && (
-                                <span className="text-lg flex items-center justify-center leading-none mt-0.5">
-                                    <IconRenderer icon={moodEmoji} />
-                                </span>
-                            )}
-                            <span className="flex-1">{summary}</span>
-                        </div>
-                    ) : (
-                        <div className="text-center py-8 text-stone-400 text-sm border border-dashed border-stone-200 rounded-xl">
-                            暂无内容
-                        </div>
-                    )
-                ) : (
-                    // 编辑模式：显示输入框和心情选择器按钮
-                    <div className="flex min-w-0 max-w-full items-center gap-3">
-                        <input
-                            type="text"
-                            value={summary}
-                            onChange={(e) => handleSummaryChange(e.target.value)}
-                            className="min-w-0 max-w-full flex-1 bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-stone-800 outline-none text-[15px] leading-relaxed shadow-sm focus:border-stone-400 transition-colors h-[42px]"
-                            placeholder="用一句话总结..."
-                        />
-                        {onMoodChange && (
-                            <button
-                                onClick={() => setIsMoodModalOpen(true)}
-                                className={`flex items-center justify-center w-[42px] h-[42px] rounded-xl transition-all flex-shrink-0 ${
-                                    moodEmoji
-                                        ? 'bg-stone-100 hover:bg-stone-200'
-                                        : 'bg-white border border-stone-200 hover:border-stone-300'
-                                }`}
-                                title="选择今日心情"
-                            >
-                                {moodEmoji ? (
-                                    <span className="text-2xl flex items-center justify-center leading-none">
-                                        <IconRenderer icon={moodEmoji} />
-                                    </span>
-                                ) : (
-                                    <Smile size={20} className="text-stone-400" />
-                                )}
-                            </button>
-                        )}
-                    </div>
-                )}
-            </div>
-
-            {/* Divider */}
-            <div className="border-t border-stone-200"></div>
-
-            {/* 心情选择器模态框 */}
-            {onMoodChange && (
-                <MoodPickerModal
-                    isOpen={isMoodModalOpen}
-                    date={date}
-                    selectedMood={moodEmoji}
-                    summary={summary}
-                    onSelect={onMoodChange}
-                    onClear={onMoodClear}
-                    onSummaryChange={onSummaryChange}
-                    onClose={() => setIsMoodModalOpen(false)}
-                />
-            )}
-
-            {/* Section 2: AI 生成的叙事 */}
-            <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-stone-600">AI 叙事</h3>
-                    {narrative ? (
-                        // 有内容时显示删除按钮
-                        <button
-                            onClick={onDeleteNarrative}
-                            className="text-red-400 hover:text-red-500 text-xs flex items-center gap-1 px-2 py-1"
-                        >
-                            <Trash2 size={12} />
-                        </button>
-                    ) : (
-                        // 无内容时显示 AI 生成按钮
-                        <button
-                            onClick={onGenerateNarrative}
-                            disabled={isGenerating}
-                            className="text-stone-400 hover:text-stone-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed p-1"
-                            title="与 AI 共创叙事"
-                        >
-                            {isGenerating ? (
-                                <RefreshCw size={14} className="animate-spin" />
-                            ) : (
-                                <Sparkles size={14} />
-                            )}
-                        </button>
-                    )}
-                </div>
-
-                {isReadingMode ? (
-                    // 阅读模式：显示 Markdown 内容或空状态
-                    narrative ? (
-                        <div className="min-w-0 px-1 prose prose-stone max-w-none text-[15px] leading-relaxed prose-headings:font-bold prose-headings:text-stone-800 prose-headings:my-5 prose-strong:text-stone-900">
-                            <ReactMarkdown
-                                remarkPlugins={[remarkGfm, remarkBreaks]}
-                                components={{
-                                    h1: ({ node, ...props }) => <h1 className="text-xl font-bold text-stone-900 mt-8 mb-4 flex items-center gap-2" {...props} />,
-                                    h2: ({ node, ...props }) => <h2 className="text-lg font-bold text-stone-800 mt-6 mb-3 flex items-center gap-2" {...props} />,
-                                    h3: ({ node, ...props }) => <h3 className="text-base font-bold text-stone-800 mt-5 mb-2" {...props} />,
-                                    p: ({ node, ...props }) => <p className="mb-6 last:mb-0" {...props} />,
-                                    blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-stone-300 pl-4 italic text-stone-600 my-6 font-serif bg-stone-50 py-2 pr-2 rounded-r" {...props} />,
-                                    ul: ({ node, ...props }) => <ul className="list-disc pl-5 my-4 space-y-1 text-stone-700" {...props} />,
-                                    ol: ({ node, ...props }) => <ol className="list-decimal pl-5 my-4 space-y-1 text-stone-700" {...props} />,
-                                    li: ({ node, ...props }) => <li className="pl-1" {...props} />,
-                                    hr: ({ node, ...props }) => <hr className="my-10 border-stone-300" {...props} />
-                                }}
-                            >
-                                {narrative}
-                            </ReactMarkdown>
-                        </div>
-                    ) : (
-                        <div className="text-center py-8 text-stone-400 text-sm border border-dashed border-stone-200 rounded-xl">
-                            暂无内容
-                        </div>
-                    )
-                ) : (
-                    // 编辑模式：显示输入框
-                    <textarea
-                        value={narrative}
-                        onChange={(e) => handleNarrativeChange(e.target.value)}
-                        className="block w-full min-w-0 max-w-full bg-white border border-stone-200 rounded-2xl p-6 text-stone-800 outline-none resize-none text-[15px] leading-relaxed shadow-sm focus:border-stone-400 transition-colors"
-                        rows={16}
-                        placeholder="在此开始写作..."
-                    />
-                )}
-            </div>
+  return (
+    <div className="space-y-8 min-w-0 max-w-full">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-stone-600">一句话总结</h3>
+          {summary && isReadingMode && (
+            <button
+              onClick={onDeleteSummary}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-red-400 hover:text-red-500"
+            >
+              <Trash2 size={12} />
+            </button>
+          )}
         </div>
-    );
+
+        {isReadingMode ? (
+          summary ? (
+            <div className="flex items-start gap-2 text-[15px] leading-relaxed text-stone-800">
+              {moodEmoji && (
+                <span className="mt-0.5 flex items-center justify-center text-lg leading-none">
+                  <IconRenderer icon={moodEmoji} />
+                </span>
+              )}
+              <span className="flex-1">{summary}</span>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-stone-200 py-8 text-center text-sm text-stone-400">
+              暂无内容
+            </div>
+          )
+        ) : (
+          <div className="flex min-w-0 max-w-full items-center gap-3">
+            <input
+              type="text"
+              value={summary}
+              onChange={(event) => handleSummaryChange(event.target.value)}
+              className="h-[42px] min-w-0 max-w-full flex-1 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-[15px] leading-relaxed text-stone-800 shadow-sm outline-none transition-colors focus:border-stone-400"
+              placeholder="用一句话总结..."
+            />
+            {onMoodChange && (
+              <button
+                onClick={() => setIsMoodModalOpen(true)}
+                className={`flex h-[42px] w-[42px] flex-shrink-0 items-center justify-center rounded-xl transition-all ${
+                  moodEmoji
+                    ? 'bg-stone-100 hover:bg-stone-200'
+                    : 'border border-stone-200 bg-white hover:border-stone-300'
+                }`}
+                title="选择今日心情"
+              >
+                {moodEmoji ? (
+                  <span className="flex items-center justify-center text-2xl leading-none">
+                    <IconRenderer icon={moodEmoji} />
+                  </span>
+                ) : (
+                  <Smile size={20} className="text-stone-400" />
+                )}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-stone-200" />
+
+      {onMoodChange && (
+        <MoodPickerModal
+          isOpen={isMoodModalOpen}
+          date={date}
+          selectedMood={moodEmoji}
+          summary={summary}
+          onSelect={onMoodChange}
+          onClear={onMoodClear}
+          onSummaryChange={onSummaryChange}
+          onClose={() => setIsMoodModalOpen(false)}
+        />
+      )}
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-stone-600">AI 小报</h3>
+          {newspaperTitle && onDeleteNewspaper && (
+            <button
+              type="button"
+              onClick={onDeleteNewspaper}
+              className="flex shrink-0 items-center gap-1 px-2 py-1 text-xs text-red-400 hover:text-red-500"
+              title="删除小报"
+            >
+              <Trash2 size={12} />
+            </button>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={newspaperTitle ? onOpenNewspaper : onGenerateNewspaper}
+          disabled={!newspaperTitle && !onGenerateNewspaper}
+          className="block w-full rounded-2xl border border-stone-200 bg-[#faf8f4] px-4 py-3 text-left transition-colors hover:border-stone-300 hover:bg-[#f6f2eb] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <div className="line-clamp-1 font-serif text-[1.02rem] leading-7 text-stone-900">
+            {newspaperTitle || '暂无小报，点击生成'}
+          </div>
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-stone-600">AI 叙事</h3>
+          {narrative ? (
+            <button
+              onClick={onDeleteNarrative}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-red-400 hover:text-red-500"
+            >
+              <Trash2 size={12} />
+            </button>
+          ) : (
+            <button
+              onClick={onGenerateNarrative}
+              disabled={isGenerating}
+              className="p-1 text-stone-400 transition-colors hover:text-stone-600 disabled:cursor-not-allowed disabled:opacity-50"
+              title="与 AI 共创叙事"
+            >
+              {isGenerating ? (
+                <RefreshCw size={14} className="animate-spin" />
+              ) : (
+                <Sparkles size={14} />
+              )}
+            </button>
+          )}
+        </div>
+
+        {isReadingMode ? (
+          narrative ? (
+            <div className="prose prose-stone min-w-0 max-w-none px-1 text-[15px] leading-relaxed prose-headings:my-5 prose-headings:font-bold prose-headings:text-stone-800 prose-strong:text-stone-900">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkBreaks]}
+                components={{
+                  h1: ({ node, ...props }) => <h1 className="mt-8 mb-4 flex items-center gap-2 text-xl font-bold text-stone-900" {...props} />,
+                  h2: ({ node, ...props }) => <h2 className="mt-6 mb-3 flex items-center gap-2 text-lg font-bold text-stone-800" {...props} />,
+                  h3: ({ node, ...props }) => <h3 className="mt-5 mb-2 text-base font-bold text-stone-800" {...props} />,
+                  p: ({ node, ...props }) => <p className="mb-6 last:mb-0" {...props} />,
+                  blockquote: ({ node, ...props }) => <blockquote className="my-6 rounded-r border-l-4 border-stone-300 bg-stone-50 py-2 pr-2 pl-4 font-serif italic text-stone-600" {...props} />,
+                  ul: ({ node, ...props }) => <ul className="my-4 list-disc space-y-1 pl-5 text-stone-700" {...props} />,
+                  ol: ({ node, ...props }) => <ol className="my-4 list-decimal space-y-1 pl-5 text-stone-700" {...props} />,
+                  li: ({ node, ...props }) => <li className="pl-1" {...props} />,
+                  hr: ({ node, ...props }) => <hr className="my-10 border-stone-300" {...props} />
+                }}
+              >
+                {narrative}
+              </ReactMarkdown>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-stone-200 py-8 text-center text-sm text-stone-400">
+              暂无内容
+            </div>
+          )
+        ) : (
+          <textarea
+            value={narrative}
+            onChange={(event) => handleNarrativeChange(event.target.value)}
+            className="block w-full min-w-0 max-w-full resize-none rounded-2xl border border-stone-200 bg-white p-6 text-[15px] leading-relaxed text-stone-800 shadow-sm outline-none transition-colors focus:border-stone-400"
+            rows={16}
+            placeholder="在此开始写作..."
+          />
+        )}
+      </div>
+    </div>
+  );
 };

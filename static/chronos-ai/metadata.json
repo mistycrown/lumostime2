@@ -1,0 +1,8 @@
+{
+  "name": "Chronos AI",
+  "description": "Minimalist AI-powered time management app, with editorial design and AI evaluation of the user's timeline.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

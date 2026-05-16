@@ -4,6 +4,9 @@
  * @output Reusable formatter/debug/helper functions for AIBackfillChatModal
  * @pos Component Support (AI Integration)
  * @description Moves pure formatting, debug rendering, and retry/error helpers out of AIBackfillChatModal so the modal can focus on state transitions and user actions.
+ * @updated 2026-05-16: Preserved pre-section prompt text in debug rendering so unlabeled instructions remain visible above structured prompt sections.
+ * @updated 2026-05-16: Limited persona custom prompt block serialization to enabled blocks only.
+ * @updated 2026-05-16: Extended persona prompt assembly so labeled custom prompt blocks are appended into the AI request alongside the base persona prompt.
  * @updated 2026-05-15: Extracted chat formatting, debug block generation, background-history labels, and retry/debug helpers from AIBackfillChatModal.
  */
 import type { AIDebugExchange } from '../../services/aiService';
@@ -24,6 +27,7 @@ import {
   type AssistantDebugTextBlock as DebugTextBlock
 } from '../../utils/assistantDebugFormat';
 import type {
+  AIChatCustomPromptBlock,
   AIChatDebugSection,
   AIChatMemoryUpdateSection,
   AIChatPersona,
@@ -102,19 +106,25 @@ export const buildAssistantCurrentTimeSnapshot = (date: Date) => ({
   stateContextDate: formatAssistantDateKey(date)
 });
 
-const splitLabeledSections = (content: string): DebugTextBlock[] => {
+const splitLabeledSections = (content: string): { leadingContent: string; sections: DebugTextBlock[] } => {
   const normalized = content.trim();
   if (!normalized.includes('=== ')) {
-    return [];
+    return {
+      leadingContent: '',
+      sections: []
+    };
   }
 
   const markerRegex = /^===\s+(.+?)\s+===$/gm;
   const matches = Array.from(normalized.matchAll(markerRegex));
   if (matches.length === 0) {
-    return [];
+    return {
+      leadingContent: '',
+      sections: []
+    };
   }
 
-  return matches.map((match, index) => {
+  const sections = matches.map((match, index) => {
     const label = match[1]?.trim() || '';
     const start = (match.index || 0) + match[0].length;
     const end = index + 1 < matches.length ? (matches[index + 1].index || normalized.length) : normalized.length;
@@ -124,6 +134,11 @@ const splitLabeledSections = (content: string): DebugTextBlock[] => {
       content: sectionContent
     };
   }).filter((section) => section.label && section.content);
+
+  return {
+    leadingContent: normalized.slice(0, matches[0]?.index || 0).trim(),
+    sections
+  };
 };
 
 const mapPromptSectionLabel = (label: string): string => {
@@ -266,8 +281,14 @@ export const buildDebugBlocks = (exchange: AIDebugExchange): DebugTextBlock[] =>
 
     if (systemMessage?.content) {
       const systemPromptContent = normalizeDebugText(systemMessage.content);
-      const promptSections = splitLabeledSections(systemPromptContent);
+      const { leadingContent, sections: promptSections } = splitLabeledSections(systemPromptContent);
       if (promptSections.length > 0) {
+        if (leadingContent) {
+          blocks.push({
+            label: '前置系统提示',
+            content: leadingContent
+          });
+        }
         blocks.push(...promptSections.map((section) => ({
           label: mapPromptSectionLabel(section.label),
           content: section.content
@@ -291,8 +312,14 @@ export const buildDebugBlocks = (exchange: AIDebugExchange): DebugTextBlock[] =>
 
     if (latestUserMessage?.content) {
       const userPromptContent = normalizeDebugText(latestUserMessage.content);
-      const userPromptSections = splitLabeledSections(userPromptContent);
+      const { leadingContent, sections: userPromptSections } = splitLabeledSections(userPromptContent);
       if (userPromptSections.length > 0) {
+        if (leadingContent) {
+          blocks.push({
+            label: '前置用户输入',
+            content: leadingContent
+          });
+        }
         blocks.push(...userPromptSections.map((section) => ({
           label: mapPromptSectionLabel(section.label),
           content: section.content
@@ -309,8 +336,14 @@ export const buildDebugBlocks = (exchange: AIDebugExchange): DebugTextBlock[] =>
   const geminiSystemInstruction = requestBody?.system_instruction as { parts?: Array<{ text?: string }> } | undefined;
   if (!openAIMessages.length && geminiSystemInstruction?.parts?.length) {
     const systemPromptContent = geminiSystemInstruction.parts.map((part) => part.text || '').filter(Boolean).join('\n\n').trim();
-    const promptSections = splitLabeledSections(systemPromptContent);
+    const { leadingContent, sections: promptSections } = splitLabeledSections(systemPromptContent);
     if (promptSections.length > 0) {
+      if (leadingContent) {
+        blocks.push({
+          label: '前置系统提示',
+          content: leadingContent
+        });
+      }
       blocks.push(...promptSections.map((section) => ({
         label: mapPromptSectionLabel(section.label),
         content: section.content
@@ -341,8 +374,14 @@ export const buildDebugBlocks = (exchange: AIDebugExchange): DebugTextBlock[] =>
 
     if (finalUser?.parts?.length) {
       const userPromptContent = finalUser.parts.map((part) => part.text || '').filter(Boolean).join('\n').trim();
-      const userPromptSections = splitLabeledSections(userPromptContent);
+      const { leadingContent, sections: userPromptSections } = splitLabeledSections(userPromptContent);
       if (userPromptSections.length > 0) {
+        if (leadingContent) {
+          blocks.push({
+            label: '前置用户输入',
+            content: leadingContent
+          });
+        }
         blocks.push(...userPromptSections.map((section) => ({
           label: mapPromptSectionLabel(section.label),
           content: section.content
@@ -496,6 +535,8 @@ export const getAssistantBackgroundTriggerLabel = (triggerType?: string): string
       return 'Reminder 到点';
     case 'long_idle':
       return '长时间空闲';
+    case 'log_submitted':
+      return '日志提交';
     case 'focus_started':
       return '专注开始';
     case 'focus_ended':
@@ -543,8 +584,14 @@ export const formatAssistantReminderSnapshot = (reminders: AssistantReminder[]):
   }).join('\n\n');
 };
 
-export const buildPersonaPrompt = (persona: AIChatPersona): string => {
+export const buildPersonaPrompt = (
+  persona: AIChatPersona,
+  customPromptBlocks: AIChatCustomPromptBlock[] = []
+): string => {
   const lines: string[] = [];
+  const enabledCustomPromptBlocks = customPromptBlocks.filter((block) => (
+    block.enabled && (block.title.trim() || block.content.trim())
+  ));
 
   if (persona.name.trim()) {
     lines.push(`你当前的人设名字是“${persona.name.trim()}”。`);
@@ -558,8 +605,16 @@ export const buildPersonaPrompt = (persona: AIChatPersona): string => {
   if (persona.systemPrompt.trim()) {
     lines.push(persona.systemPrompt.trim());
   }
+  if (enabledCustomPromptBlocks.length > 0) {
+    lines.push('请额外遵守以下自定义提示词块：');
+    enabledCustomPromptBlocks.forEach((block, index) => {
+      const label = block.title.trim() || `提示词块 ${index + 1}`;
+      const content = block.content.trim();
+      lines.push(content ? `【${label}】\n${content}` : `【${label}】`);
+    });
+  }
 
-  return lines.join('\n');
+  return lines.join('\n\n');
 };
 
 export const dedupeStringArray = (values: Array<string | undefined | null>): string[] => (

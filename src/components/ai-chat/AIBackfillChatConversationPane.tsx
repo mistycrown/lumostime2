@@ -13,6 +13,7 @@ import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import type { AppliedChatAction } from '../../services/assistantActionExecutor';
 import type {
+  AIChatDailyNewspaperWritebackResult,
   AIChatDailyReviewWritebackResult,
   AIChatDreamUpdateCard,
   AIChatMessage,
@@ -71,6 +72,7 @@ interface AIBackfillChatConversationPaneProps {
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
   onMessageRef: (messageId: string, node: HTMLDivElement | null) => void;
   onOpenDailyReviewNarrative: (date: string) => void;
+  onOpenDailyNewspaper: (date: string) => void;
   onOpenDebugViewer: (viewer: DebugViewerState) => void;
   onOpenMonthlyReviewNarrative: (monthStartDate: string, monthEndDate: string) => void;
   onOpenWeeklyReviewNarrative: (weekStartDate: string, weekEndDate: string) => void;
@@ -128,6 +130,56 @@ const DailyReviewWritebackResultCard: React.FC<{
           color: theme.textSecondary
         }}
         title="打开日报叙事"
+      >
+        打开
+      </button>
+    </div>
+  </div>
+);
+
+const DailyNewspaperWritebackResultCard: React.FC<{
+  onOpen: () => void;
+  result: AIChatDailyNewspaperWritebackResult;
+  theme: AIChatConversationTheme;
+}> = ({ onOpen, result, theme }) => (
+  <div
+    className="border-l-2 pl-3 pr-1 py-1"
+    style={{ borderColor: theme.activeBorder }}
+  >
+    <div className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="block w-full truncate text-left font-serif text-[1rem] leading-6 transition-colors hover:opacity-80"
+          style={{ color: theme.textPrimary }}
+          title="打开对应日报的小报"
+        >
+          {result.title || 'AI 小报'}
+        </button>
+        <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: theme.textSecondary }}>
+          {result.preview || '点击查看完整小报'}
+        </p>
+      </div>
+    </div>
+
+    <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: theme.textMuted }}>
+      <span>{result.date}</span>
+      <span>{result.createdReview ? '已新建日报' : '已写入日报'}</span>
+      <span>{result.mergeMode === 'overwrite' ? '覆盖写入' : '首次写入'}</span>
+    </div>
+
+    <div className="mt-2.5 flex justify-end gap-2">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="inline-flex h-8 items-center justify-center rounded-full border px-3 text-xs transition-colors"
+        style={{
+          borderColor: theme.chipBorder,
+          backgroundColor: theme.inputBg,
+          color: theme.textSecondary
+        }}
+        title="打开日报小报"
       >
         打开
       </button>
@@ -252,6 +304,7 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
   messagesEndRef,
   onMessageRef,
   onOpenDailyReviewNarrative,
+  onOpenDailyNewspaper,
   onOpenDebugViewer,
   onOpenMonthlyReviewNarrative,
   onOpenWeeklyReviewNarrative,
@@ -490,7 +543,7 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
               </div>
             )}
 
-            {allDisplayPartsRevealed && ((message.appliedActions && message.appliedActions.length > 0) || message.dailyReviewWriteback || message.weeklyReviewWriteback || message.monthlyReviewWriteback) && (
+            {allDisplayPartsRevealed && ((message.appliedActions && message.appliedActions.length > 0) || message.dailyReviewWriteback || message.dailyNewspaperWriteback || message.weeklyReviewWriteback || message.monthlyReviewWriteback) && (
               <div
                 className="space-y-2 border-l pl-3 pr-1 py-1"
                 style={{
@@ -506,6 +559,13 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
                     <DailyReviewWritebackResultCard
                       onOpen={() => onOpenDailyReviewNarrative(message.dailyReviewWriteback!.date)}
                       result={message.dailyReviewWriteback}
+                      theme={theme}
+                    />
+                  )}
+                  {message.dailyNewspaperWriteback && (
+                    <DailyNewspaperWritebackResultCard
+                      onOpen={() => onOpenDailyNewspaper(message.dailyNewspaperWriteback!.date)}
+                      result={message.dailyNewspaperWriteback}
                       theme={theme}
                     />
                   )}

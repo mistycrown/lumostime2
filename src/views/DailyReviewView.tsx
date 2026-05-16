@@ -4,6 +4,7 @@
  * @output Updated Review Data, Generated Narrative
  * @pos View (Review System)
  * @description The interface for conducting a daily review. Supports answering template questions (Data/Guide tabs) and generating/editing an AI-assisted narrative summary.
+ * @updated 2026-05-16: Moved the daily newspaper entry under AI narrative, added one-tap AI chat generation, and added delete confirmation for newspapers.
  * @updated 2026-05-05: Clamp horizontal overflow in Daily Review so narrow Android WebViews do not get stretched by tab content.
  * @updated 2026-04-25: Let floating read-edit toggles inherit button theme colors so default UI icons remain visible on accent-theme white buttons.
  * 
@@ -32,6 +33,8 @@ import {
 import { calculateMonthlyStats } from '../utils/reviewStatsUtils';
 import { updateAutoCheckItems } from '../utils/autoCheckUtils';
 import { normalizeCheckItem } from '../utils/checkItemNormalizer';
+import { useNavigation } from '../contexts/NavigationContext';
+import { useAIChatWindow } from '../contexts/AIChatWindowContext';
 
 interface DailyReviewViewProps {
     review: DailyReview;
@@ -50,6 +53,7 @@ interface DailyReviewViewProps {
     onUpdateReview: (review: DailyReview) => void;
     onGenerateNarrative: (review: DailyReview, statsText: string, timelineText: string, promptTemplate?: string) => Promise<string>;
     addToast: (type: 'success' | 'error' | 'info', message: string) => void;
+    onOpenNewspaper?: (date: Date) => void;
 }
 
 type TabType = 'check' | 'data' | 'guide' | 'narrative';
@@ -91,8 +95,11 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     onDelete,
     onUpdateReview,
     onGenerateNarrative,
-    addToast
+    addToast,
+    onOpenNewspaper
 }) => {
+    const { setIsDailyNewspaperOpen, setCurrentDailyNewspaperDate } = useNavigation();
+    const { openAIChat } = useAIChatWindow();
     const [activeTab, setActiveTab] = useState<TabType>(initialTab || 'check');
     
     // Use shared review state hook
@@ -132,6 +139,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
     const [isReloadGuideConfirmOpen, setIsReloadGuideConfirmOpen] = useState(false);
     const [isClearGuideConfirmOpen, setIsClearGuideConfirmOpen] = useState(false);
+    const [isDeleteNewspaperConfirmOpen, setIsDeleteNewspaperConfirmOpen] = useState(false);
     
     // Count Input Modal State
     const [countInputModal, setCountInputModal] = useState<{
@@ -677,6 +685,27 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         setIsDeleteNarrativeConfirmOpen(true);
     };
 
+    const handleOpenNewspaper = () => {
+        if (!review.aiNewspaper) {
+            return;
+        }
+
+        setCurrentDailyNewspaperDate(date);
+        setIsDailyNewspaperOpen(true);
+        onOpenNewspaper?.(date);
+    };
+
+    const handleGenerateNewspaper = () => {
+        openAIChat({
+            targetDate: date,
+            initialInputText: '小报'
+        });
+    };
+
+    const handleDeleteNewspaper = () => {
+        setIsDeleteNewspaperConfirmOpen(true);
+    };
+
     const confirmDeleteNarrative = async () => {
         try {
             const updatedReview = {
@@ -693,6 +722,23 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
             addToast('error', '删除失败');
         } finally {
             setIsDeleteNarrativeConfirmOpen(false);
+        }
+    };
+
+    const confirmDeleteNewspaper = async () => {
+        try {
+            const updatedReview = {
+                ...review,
+                aiNewspaper: undefined,
+                updatedAt: Date.now()
+            };
+            await onUpdateReview(updatedReview);
+            addToast('success', 'AI 小报已删除');
+        } catch (error) {
+            console.error('Failed to delete newspaper', error);
+            addToast('error', '删除失败');
+        } finally {
+            setIsDeleteNewspaperConfirmOpen(false);
         }
     };
 
@@ -1001,11 +1047,15 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                             isGenerating={isGenerating}
                             isReadingMode={isReadingMode}
                             moodEmoji={moodEmoji}
+                            newspaperTitle={review.aiNewspaper?.title}
                             date={review.date}
                             onSummaryChange={handleSummaryChange}
                             onNarrativeChange={handleNarrativeChange}
                             onMoodChange={handleMoodChange}
                             onMoodClear={handleMoodClear}
+                            onOpenNewspaper={review.aiNewspaper ? handleOpenNewspaper : undefined}
+                            onGenerateNewspaper={!review.aiNewspaper ? handleGenerateNewspaper : undefined}
+                            onDeleteNewspaper={review.aiNewspaper ? handleDeleteNewspaper : undefined}
                             onGenerateNarrative={handleGenerateNarrative}
                             onDeleteSummary={handleDeleteSummary}
                             onDeleteNarrative={handleDeleteNarrative}
@@ -1070,6 +1120,16 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                 onConfirm={confirmDeleteNarrative}
                 title="删除 AI 叙事？"
                 description="确定要删除当前生成的 AI 叙事吗？此操作无法撤销，需要重新生成。"
+                confirmText="确认删除"
+                type="danger"
+            />
+
+            <ConfirmModal
+                isOpen={isDeleteNewspaperConfirmOpen}
+                onClose={() => setIsDeleteNewspaperConfirmOpen(false)}
+                onConfirm={confirmDeleteNewspaper}
+                title="删除 AI 小报？"
+                description="确定要删除这一天的小报吗？此操作无法撤销，需要重新生成。"
                 confirmText="确认删除"
                 type="danger"
             />

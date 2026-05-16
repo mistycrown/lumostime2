@@ -15,6 +15,7 @@ import { getLocalDateStr } from '../utils/dateUtils';
 
 // Views
 import { DailyReviewView } from '../views/DailyReviewView';
+import { DailyNewspaperView } from '../views/DailyNewspaperView';
 import { WeeklyReviewView } from '../views/WeeklyReviewView';
 import { MonthlyReviewView } from '../views/MonthlyReviewView';
 import { OnThisDayView } from '../views/OnThisDayView';
@@ -92,7 +93,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     const {
         currentView, setCurrentView,
         isSettingsOpen,
-        isDailyReviewOpen, isOnThisDayOpen, setIsOnThisDayOpen, currentReviewDate, currentDailyReviewInitialTab, currentOnThisDayDate, setCurrentOnThisDayDate,
+        isDailyReviewOpen, isDailyNewspaperOpen, isOnThisDayOpen, setIsOnThisDayOpen, currentReviewDate, currentDailyNewspaperDate, currentDailyReviewInitialTab, currentOnThisDayDate, setCurrentOnThisDayDate,
         isWeeklyReviewOpen, currentWeeklyReviewStart, currentWeeklyReviewEnd, currentWeeklyReviewInitialTab,
         currentMonthlyReviewInitialTab,
         isMonthlyReviewOpen, currentMonthlyReviewStart, currentMonthlyReviewEnd,
@@ -148,6 +149,23 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
 
     if (isSettingsOpen) return null;
 
+    if (isDailyNewspaperOpen && currentDailyNewspaperDate) {
+        const dateStr = getLocalDateStr(currentDailyNewspaperDate);
+        const review = dailyReviews.find(r => r.date === dateStr);
+        if (!review) return null;
+
+        return (
+            <DailyNewspaperView
+                review={review}
+                date={currentDailyNewspaperDate}
+                logs={logs}
+                categories={categories}
+                todos={todos}
+                scopes={scopes}
+            />
+        );
+    }
+
     // Daily Review has priority
     if (isDailyReviewOpen && currentReviewDate) {
         const dateStr = getLocalDateStr(currentReviewDate);
@@ -174,6 +192,9 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 addToast={addToast}
                 checkTemplates={checkTemplates}
                 initialTab={currentDailyReviewInitialTab || undefined}
+                onOpenNewspaper={(targetDate) => {
+                    setCurrentDate(targetDate);
+                }}
             />
         );
     }

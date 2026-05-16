@@ -4,6 +4,10 @@
  * @output AI chat storage keys, default personas, and normalization helpers for rehydrating modal state
  * @pos Component Support (AI Integration)
  * @description Moves the large persistence/bootstrap normalization layer out of AIBackfillChatModal so startup state restoration stays pure and isolated from the runtime orchestration logic.
+ * @updated 2026-05-16: Normalized legacy garbled background-debug labels during chat-state hydration so older persisted assistant messages render readable Chinese titles.
+ * @updated 2026-05-16: Moved custom prompt blocks into a global store, with legacy persona-bound block migration during initial chat-state hydration.
+ * @updated 2026-05-16: Normalized per-block enabled flags for persona custom prompt blocks and defaulted legacy blocks to enabled.
+ * @updated 2026-05-16: Normalized persona-scoped custom prompt blocks so extra labeled prompt snippets persist across AI chat sessions.
  * @updated 2026-05-15: Extracted built-in personas, storage keys, and persisted chat-state normalization from AIBackfillChatModal.
  */
 import { BUILTIN_PERSONA_SYSTEM_PROMPTS } from '../../constants/aiPersonaSystemPrompts';
@@ -19,6 +23,8 @@ import {
   normalizeChatSessions
 } from './AIBackfillChatSessionHelpers';
 import type {
+  AIChatCustomPromptBlock,
+  AIChatDailyNewspaperWritebackResult,
   AIChatDailyReviewWritebackResult,
   AIChatDebugSection,
   AIChatDreamUpdateCard,
@@ -36,6 +42,7 @@ import type {
 export const CHAT_SESSIONS_KEY = 'lumostime_ai_chat_sessions_v1';
 export const ACTIVE_SESSION_KEY = 'lumostime_ai_chat_active_session_v1';
 export const CHAT_PERSONAS_KEY = 'lumostime_ai_chat_personas_v1';
+export const CHAT_CUSTOM_PROMPT_BLOCKS_KEY = 'lumostime_ai_chat_custom_prompt_blocks_v1';
 export const DEBUG_MODE_KEY = 'lumostime_ai_chat_debug_mode_v1';
 export const USER_PROFILE_KEY = 'lumostime_ai_chat_user_profile_v1';
 
@@ -52,7 +59,7 @@ export const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
   },
   {
     id: 'builtin-banliang',
-    name: '半两',
+    name: '半两（小猫）',
     avatarIcon: '🐱',
     assistantSelfName: '半两',
     userCallName: '',
@@ -62,9 +69,9 @@ export const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
   },
   {
     id: 'builtin-shenyuqiu',
-    name: '沈聿秋',
+    name: '沈聿秋（教授）',
     avatarIcon: '📚',
-    assistantSelfName: '沈聿秋',
+    assistantSelfName: '',
     userCallName: '',
     systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-shenyuqiu'],
     contextMessageLimit: 30,
@@ -72,9 +79,9 @@ export const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
   },
   {
     id: 'builtin-suwanqing',
-    name: '苏晚晴',
+    name: '苏晚晴（姐姐）',
     avatarIcon: '💗',
-    assistantSelfName: '晚晴姐',
+    assistantSelfName: '',
     userCallName: '',
     systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-suwanqing'],
     contextMessageLimit: 30,
@@ -101,17 +108,44 @@ const isValidTone = (value: unknown): value is ChatTone => (
   value === 'normal' || value === 'system' || value === 'error' || value === 'pending'
 );
 
+const normalizeDebugSectionLabel = (value: unknown): string => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  if (trimmed.includes('Log Submitted')) {
+    return '后台日志提交调试';
+  }
+
+  return trimmed;
+};
+
 const normalizeDebugSections = (value: unknown): AIChatDebugSection[] => {
   if (!Array.isArray(value)) {
     return [];
   }
 
-  return value.filter((item): item is AIChatDebugSection => (
-    Boolean(item)
-    && typeof item === 'object'
-    && typeof (item as AIChatDebugSection).label === 'string'
-    && Boolean((item as AIChatDebugSection).exchange)
-  ));
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+
+    const candidate = item as AIChatDebugSection;
+    const label = normalizeDebugSectionLabel(candidate.label);
+    if (!label || !candidate.exchange) {
+      return [];
+    }
+
+    return [{
+      ...candidate,
+      label
+    }];
+  });
 };
 
 const normalizeAppliedActions = (value: unknown): AppliedChatAction[] => (
@@ -153,6 +187,62 @@ const normalizeReminderUpdates = (value: unknown): string[] => (
     ? value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean)
     : []
 );
+
+const normalizeCustomPromptBlocks = (value: unknown): AIChatCustomPromptBlock[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+
+    const candidate = item as Partial<AIChatCustomPromptBlock>;
+    const id = typeof candidate.id === 'string' ? candidate.id.trim() : '';
+    const title = typeof candidate.title === 'string' ? candidate.title.trim() : '';
+    const content = typeof candidate.content === 'string' ? candidate.content.trim() : '';
+    const enabled = typeof candidate.enabled === 'boolean' ? candidate.enabled : true;
+
+    if (!id || (!title && !content)) {
+      return [];
+    }
+
+    return [{
+      id,
+      title,
+      content,
+      enabled
+    }];
+  });
+};
+
+const normalizeLegacyPersonaBoundCustomPromptBlocks = (value: unknown): AIChatCustomPromptBlock[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const blocks: AIChatCustomPromptBlock[] = [];
+
+  value.forEach((item) => {
+    if (!item || typeof item !== 'object') {
+      return;
+    }
+
+    const candidate = item as { customPromptBlocks?: unknown };
+    normalizeCustomPromptBlocks(candidate.customPromptBlocks).forEach((block) => {
+      const fingerprint = `${block.title}\u0000${block.content}\u0000${block.enabled ? '1' : '0'}`;
+      if (seen.has(fingerprint)) {
+        return;
+      }
+      seen.add(fingerprint);
+      blocks.push(block);
+    });
+  });
+
+  return blocks;
+};
 
 const normalizeDreamUpdates = (value: unknown): AIChatDreamUpdateCard[] => {
   if (!Array.isArray(value)) {
@@ -207,6 +297,31 @@ const normalizeDailyReviewWritebackResult = (value: unknown): AIChatDailyReviewW
   }
 
   const candidate = value as Partial<AIChatDailyReviewWritebackResult>;
+  if (
+    typeof candidate.dailyReviewId !== 'string'
+    || typeof candidate.date !== 'string'
+    || typeof candidate.title !== 'string'
+    || typeof candidate.preview !== 'string'
+  ) {
+    return undefined;
+  }
+
+  return {
+    dailyReviewId: candidate.dailyReviewId.trim(),
+    date: candidate.date.trim(),
+    title: candidate.title.trim(),
+    preview: candidate.preview.trim(),
+    createdReview: candidate.createdReview === true,
+    mergeMode: candidate.mergeMode === 'overwrite' ? 'overwrite' : 'create'
+  };
+};
+
+const normalizeDailyNewspaperWritebackResult = (value: unknown): AIChatDailyNewspaperWritebackResult | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const candidate = value as Partial<AIChatDailyNewspaperWritebackResult>;
   if (
     typeof candidate.dailyReviewId !== 'string'
     || typeof candidate.date !== 'string'
@@ -455,6 +570,9 @@ const normalizeMessages = (value: unknown, getLocalDateStr: (date: Date) => stri
       ...(normalizeDailyReviewWritebackResult(candidate.dailyReviewWriteback)
         ? { dailyReviewWriteback: normalizeDailyReviewWritebackResult(candidate.dailyReviewWriteback) }
         : {}),
+      ...(normalizeDailyNewspaperWritebackResult(candidate.dailyNewspaperWriteback)
+        ? { dailyNewspaperWriteback: normalizeDailyNewspaperWritebackResult(candidate.dailyNewspaperWriteback) }
+        : {}),
       ...(normalizeWeeklyReviewWritebackResult(candidate.weeklyReviewWriteback)
         ? { weeklyReviewWriteback: normalizeWeeklyReviewWritebackResult(candidate.weeklyReviewWriteback) }
         : {}),
@@ -588,11 +706,18 @@ export const loadInitialChatState = (getLocalDateStr: (date: Date) => string): I
       activeSessionKey: ACTIVE_SESSION_KEY,
       chatPersonasKey: CHAT_PERSONAS_KEY,
       chatSessionsKey: CHAT_SESSIONS_KEY,
+      customPromptBlocksKey: CHAT_CUSTOM_PROMPT_BLOCKS_KEY,
       debugModeKey: DEBUG_MODE_KEY,
       userProfileKey: USER_PROFILE_KEY
     },
     normalizePersonas,
     normalizeSessions: (value, personas) => normalizePersistedSessions(value, personas, getLocalDateStr),
-    normalizeUserProfile
+    normalizeUserProfile,
+    normalizeCustomPromptBlocks: (value, rawPersonasValue) => {
+      const normalized = normalizeCustomPromptBlocks(value);
+      return normalized.length > 0
+        ? normalized
+        : normalizeLegacyPersonaBoundCustomPromptBlocks(rawPersonasValue);
+    }
   })
 );

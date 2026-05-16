@@ -4,6 +4,8 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-16: Added event-driven background assistant reactions for selected newly submitted logs, including linked todo and scope context.
+ * @updated 2026-05-16: Added persona-level custom prompt blocks in AI settings so each persona can append multiple labeled extra prompt snippets to outgoing AI requests.
  * @updated 2026-05-15: Continued the refactor by extracting the conversation pane, Dream command flow, review command/writeback helpers, weekly/monthly template session flow helpers, shared chat types/helpers, memory/Dream/debug/background/session/settings overlays, the persona/call settings sections, and the session/template helper layer into `src/components/ai-chat/`, reducing local file size while preserving behavior.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -64,6 +66,14 @@ import { buildAssistantDisplayParts } from '../utils/assistantMessageParts';
 import { buildNativeDiagnosticDebugExchange } from '../utils/assistantNativeDebug';
 import { normalizeAssistantQuietHoursValue } from '../utils/assistantQuietHours';
 import { resolveLatestOrdinaryAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
+import {
+  ASSISTANT_LOG_SUBMITTED_EVENT,
+  buildAssistantLogSubmissionTrigger,
+  buildAssistantLogSubmissionUserMessage,
+  matchesAssistantLogSubmissionTrigger,
+  type AssistantLogSubmittedEventDetail,
+  upsertLogForAssistantContext
+} from '../utils/assistantLogSubmissionTrigger';
 import { getTodoProgressTrackingMode } from '../utils/todoProgressUtils';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
 import { assistantAgentConfigService } from '../services/assistantAgentConfigService';
@@ -125,6 +135,7 @@ import {
 import { AIBackfillChatDreamOverlay } from './ai-chat/AIBackfillChatDreamOverlay';
 import {
   ACTIVE_SESSION_KEY,
+  CHAT_CUSTOM_PROMPT_BLOCKS_KEY,
   CHAT_PERSONAS_KEY,
   CHAT_SESSIONS_KEY,
   clampContextLimit,
@@ -139,12 +150,15 @@ import {
 import { AIBackfillChatMemoryOverlay } from './ai-chat/AIBackfillChatMemoryOverlay';
 import { AIBackfillChatPersonaSettingsSection } from './ai-chat/AIBackfillChatPersonaSettingsSection';
 import {
+  runDailyNewspaperCommand as runDailyNewspaperCommandFlow,
+  runDailyNewspaperOverwriteConfirmation as runDailyNewspaperOverwriteConfirmationFlow,
   runDailyReviewNarrativeCommand as runDailyReviewNarrativeCommandFlow,
   runDailyReviewNarrativeOverwriteConfirmation as runDailyReviewNarrativeOverwriteConfirmationFlow,
   runMonthlyReviewNarrativeWritebackCommand as runMonthlyReviewNarrativeWritebackCommandFlow,
   runWeeklyReviewNarrativeWritebackCommand as runWeeklyReviewNarrativeWritebackCommandFlow
 } from './ai-chat/AIBackfillChatReviewCommands';
 import {
+  runDailyNewspaperWriteback as runDailyNewspaperWritebackFlow,
   runDailyReviewNarrativeWriteback as runDailyReviewNarrativeWritebackFlow,
   runMonthlyReviewNarrativeWriteback as runMonthlyReviewNarrativeWritebackFlow,
   runWeeklyReviewNarrativeWriteback as runWeeklyReviewNarrativeWritebackFlow
@@ -207,9 +221,11 @@ import {
   type AIChatDailyReviewWritebackResult,
   type AIChatDebugSection,
   type AIChatDreamUpdateCard,
+  type AIChatDailyNewspaperWritebackResult,
   type AIChatMemoryUpdateSection,
   type AIChatMessage,
   type AIChatMonthlyReviewWritebackResult,
+  type AIChatCustomPromptBlock,
   type AIChatPersona,
   type AIChatSession,
   type AIChatUserProfile,
@@ -227,6 +243,7 @@ import {
   type AssistantScheduledTaskDeleteTarget,
   type AssistantScheduledTaskDrafts,
   type ChatTone,
+  type DailyNewspaperWritebackConfirmationState,
   type DailyReviewWritebackConfirmationState,
   type DebugViewerState,
   type DreamEntryDrafts,
@@ -310,6 +327,7 @@ interface AIBackfillChatModalProps {
   targetDate?: Date;
   targetSessionId?: string;
   targetMessageId?: string;
+  initialInputText?: string;
   registerBackHandler?: (handler: (() => boolean) | null) => void;
   onUnreadAssistantMessage?: (count?: number) => void;
   onMarkRead?: () => void;
@@ -445,12 +463,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   targetDate,
   targetSessionId,
   targetMessageId,
+  initialInputText,
   registerBackHandler,
   onUnreadAssistantMessage,
   onMarkRead
 }) => {
   const [initialState] = useState<InitialChatState>(() => loadInitialChatState(getLocalDateStr));
   const [personas, setPersonas] = useState<AIChatPersona[]>(initialState.personas);
+  const [customPromptBlocks, setCustomPromptBlocks] = useState<AIChatCustomPromptBlock[]>(initialState.customPromptBlocks);
   const [sessions, setSessions] = useState<AIChatSession[]>(initialState.sessions);
   const [activeSessionId, setActiveSessionId] = useState<string>(initialState.activeSessionId);
   const [debugMode, setDebugMode] = useState<boolean>(initialState.debugMode);
@@ -490,6 +510,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [isDreamViewerOpen, setIsDreamViewerOpen] = useState(false);
   const [dreamMonthSelectionState, setDreamMonthSelectionState] = useState<DreamMonthSelectionState | null>(null);
   const [dailyReviewWritebackConfirmation, setDailyReviewWritebackConfirmation] = useState<DailyReviewWritebackConfirmationState | null>(null);
+  const [dailyNewspaperWritebackConfirmation, setDailyNewspaperWritebackConfirmation] = useState<DailyNewspaperWritebackConfirmationState | null>(null);
   const [selectedDreamTopicId, setSelectedDreamTopicId] = useState('');
   const [isDreamTopicNoteExpanded, setIsDreamTopicNoteExpanded] = useState(false);
   const [dreamTopicDrafts, setDreamTopicDrafts] = useState<DreamTopicDrafts>(DEFAULT_DREAM_TOPIC_DRAFTS);
@@ -574,6 +595,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setCurrentReviewDate,
     setCurrentDailyReviewInitialTab,
     setIsDailyReviewOpen,
+    setCurrentDailyNewspaperDate,
+    setIsDailyNewspaperOpen,
     setCurrentWeeklyReviewStart,
     setCurrentWeeklyReviewEnd,
     setCurrentWeeklyReviewInitialTab,
@@ -1253,6 +1276,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   }, [personas]);
 
   useEffect(() => {
+    localStorage.setItem(CHAT_CUSTOM_PROMPT_BLOCKS_KEY, JSON.stringify(customPromptBlocks));
+  }, [customPromptBlocks]);
+
+  useEffect(() => {
     localStorage.setItem(CHAT_SESSIONS_KEY, JSON.stringify(sessions));
   }, [sessions]);
 
@@ -1292,6 +1319,21 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       onMarkRead?.();
     }
   }, [isOpen, onMarkRead]);
+
+  useEffect(() => {
+    if (!isOpen || !initialInputText) {
+      return;
+    }
+
+    if (activeSession?.templateMeta) {
+      const nextSession = createDefaultSession(activeSession.personaId);
+      setSessions((prev) => [...prev, nextSession]);
+      setActiveSessionId(nextSession.id);
+      return;
+    }
+
+    setInputText(initialInputText);
+  }, [activeSession, initialInputText, isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -1379,6 +1421,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const buildConversationHistory = (session: AIChatSession): AIConversationTurn[] => (
     buildConversationHistoryFromMessages(session, session.messages)
   );
+
+  const getBackgroundPersonaDisplayName = useCallback((targetSession?: AIChatSession): string => {
+    if (!targetSession) {
+      return 'AI';
+    }
+
+    return personaMap.get(targetSession.personaId)?.name
+      || assistantOrchestratorService.getBackgroundPersonaDisplayName(targetSession.id)
+      || 'AI';
+  }, [personaMap]);
 
   const narrowHistoryForTimeSensitiveTurn = useCallback((
     history: AIConversationTurn[],
@@ -1471,7 +1523,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         reloadPersistedChatSessions();
         if (!isOpenRef.current) {
           onUnreadAssistantMessage?.(hydrationResult.surfacedMessages.length);
-          addToast('info', `AI 助理：${hydrationResult.surfacedMessages[hydrationResult.surfacedMessages.length - 1]}`);
+          const personaName = assistantOrchestratorService.getBackgroundPersonaDisplayName(backgroundTargetSessionId);
+          addToast('info', `${personaName}：${hydrationResult.surfacedMessages[hydrationResult.surfacedMessages.length - 1]}`);
         }
       }
       if (hydrationResult.didUpdateMemory) {
@@ -1564,12 +1617,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     })
   ), [categories, logs, scopes, todoCategories, todos]);
 
-  const buildAssistantDictionaryContext = useCallback(() => assistantContextBuilder.buildDictionaryContext({
+  const buildAssistantDictionaryContext = useCallback((logsInput: Log[] = logs) => assistantContextBuilder.buildDictionaryContext({
     categories,
     scopes,
     todoCategories,
     todos: todos.filter((todo) => !todo.isCompleted).slice(0, 60),
-    logs: logs
+    logs: logsInput
       .filter((log) => formatDateKey(new Date(log.startTime)) === defaultDateKey)
       .sort((left, right) => left.startTime - right.startTime)
       .slice(0, 60)
@@ -1581,15 +1634,19 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
   }, [dreamMonthSelectionState, sessions]);
 
+  const buildSharedPersonaPrompt = useCallback((persona: AIChatPersona): string => (
+    buildPersonaPrompt(persona, customPromptBlocks)
+  ), [customPromptBlocks]);
+
   const buildBackgroundPersonaPrompt = useCallback((session?: AIChatSession): string | undefined => {
     if (!session) {
       return undefined;
     }
 
     const resolvedPersona = personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0];
-    const prompt = buildPersonaPrompt(resolvedPersona);
+    const prompt = buildSharedPersonaPrompt(resolvedPersona);
     return prompt.trim() ? prompt : undefined;
-  }, [personaMap, personas]);
+  }, [buildSharedPersonaPrompt, personaMap, personas]);
 
   const buildAssistantTimelineSummary = useCallback(() => assistantContextBuilder.buildTimelineSummaryDigest({
     stateContextDate: defaultDateKey,
@@ -1598,12 +1655,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   const buildAssistantStateContext = useCallback((
     date: Date,
-    reminderSummary?: string
+    reminderSummary?: string,
+    logsInput: Log[] = logs
   ) => ({
     ...assistantContextBuilder.buildStateContext({
       currentDateTime: formatLocalDateTimeContext(date),
       stateContextDate: defaultDateKey,
-      logs,
+      logs: logsInput,
       categories,
       todos,
       activeSessions,
@@ -1669,11 +1727,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     now,
     targetSession,
     conversationHistory,
-    showSystemNotification
+    showSystemNotification,
+    logsOverride
   }: AssistantBackgroundTurnRequestOptions) => {
     const reminderSummary = buildAssistantReminderSummary();
     const userPersonaPrompt = buildBackgroundPersonaPrompt(targetSession);
-    const stateContext = buildAssistantStateContext(now, reminderSummary);
+    const effectiveLogs = logsOverride ?? logs;
+    const stateContext = buildAssistantStateContext(now, reminderSummary, effectiveLogs);
 
     return {
       trigger,
@@ -1690,7 +1750,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       ...(stateContext.overdueTodoSummary ? { overdueTodoSummary: stateContext.overdueTodoSummary } : {}),
       ...(reminderSummary ? { reminderSummary } : {}),
       ...(userPersonaPrompt ? { userPersonaPrompt } : {}),
-      dictionaryContext: buildAssistantDictionaryContext(),
+      dictionaryContext: buildAssistantDictionaryContext(effectiveLogs),
       conversationHistory,
       includeDebugInPersistedMessage: debugMode
     };
@@ -1699,7 +1759,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     buildAssistantReminderSummary,
     buildAssistantStateContext,
     buildBackgroundPersonaPrompt,
-    debugMode
+    debugMode,
+    logs
   ]);
 
   const completeReminderDueTrigger = useCallback((trigger: AssistantSystemTrigger) => {
@@ -1768,7 +1829,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       reloadPersistedChatSessions();
       if (result.surfacedMessage && !isOpenRef.current) {
         onUnreadAssistantMessage?.(1);
-        addToast('info', `AI 助理：${result.surfacedMessage}`);
+        addToast('info', `${getBackgroundPersonaDisplayName(targetSession)}：${result.surfacedMessage}`);
       }
     } catch (error) {
       console.error('[AIBackfillChatModal] Assistant system turn failed', error);
@@ -1784,6 +1845,92 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     onUnreadAssistantMessage,
     refreshAssistantNativeDiagnostics,
     shouldShowBackgroundSystemNotification
+  ]);
+
+  const handleAssistantLogSubmittedEvent = useCallback(async (
+    event: CustomEvent<AssistantLogSubmittedEventDetail>
+  ): Promise<void> => {
+    const submittedLog = event.detail?.log;
+    if (!submittedLog) {
+      return;
+    }
+
+    if (!assistantAgentConfig.enabled || !isAssistantBackgroundContextReady) {
+      return;
+    }
+
+    if (!matchesAssistantLogSubmissionTrigger(assistantAgentConfig, submittedLog)) {
+      return;
+    }
+
+    const targetSession = getBackgroundTargetSession();
+    if (!targetSession) {
+      console.info('[AIBackfillChatModal] Skipping submitted-log assistant trigger because no ordinary conversation has recent user activity', submittedLog.id);
+      return;
+    }
+
+    const now = new Date();
+    const nextLogs = upsertLogForAssistantContext(logs, submittedLog);
+    const submittedLogUserMessage = buildAssistantLogSubmissionUserMessage(
+      submittedLog,
+      categories,
+      scopes,
+      todos
+    );
+    assistantOrchestratorService.persistBackgroundUserMessage(submittedLogUserMessage, targetSession.id);
+    reloadPersistedChatSessions();
+    const trigger = buildAssistantLogSubmissionTrigger({
+      log: submittedLog,
+      categories,
+      scopes,
+      todos,
+      now
+    });
+    const conversationHistory = buildConversationHistoryFromMessages(
+      targetSession,
+      [
+        ...targetSession.messages,
+        {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: submittedLogUserMessage,
+          createdAt: Date.now()
+        }
+      ]
+    );
+
+    try {
+      const result = await assistantOrchestratorService.runSystemTurn(buildBackgroundTurnRequest({
+        trigger,
+        now,
+        targetSession,
+        conversationHistory,
+        showSystemNotification: shouldShowBackgroundSystemNotification(),
+        logsOverride: nextLogs
+      }));
+
+      refreshAssistantMemorySnapshot();
+      reloadPersistedChatSessions();
+      if (result.surfacedMessage && !isOpenRef.current) {
+        onUnreadAssistantMessage?.(1);
+        addToast('info', `${getBackgroundPersonaDisplayName(targetSession)}：${result.surfacedMessage}`);
+      }
+    } catch (error) {
+      console.error('[AIBackfillChatModal] Submitted-log assistant trigger failed', error);
+    }
+  }, [
+    addToast,
+    assistantAgentConfig,
+    buildBackgroundTurnRequest,
+    categories,
+    conversationHistoryCache,
+    getBackgroundTargetSession,
+    isAssistantBackgroundContextReady,
+    logs,
+    onUnreadAssistantMessage,
+    scopes,
+    shouldShowBackgroundSystemNotification,
+    todos
   ]);
 
   const drainPendingAssistantSystemTriggers = useCallback(async () => {
@@ -2099,7 +2246,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       reloadPersistedChatSessions();
       if (result.surfacedMessage && !isOpenRef.current) {
         onUnreadAssistantMessage?.(1);
-        addToast('info', `AI 助理：${result.surfacedMessage}`);
+        addToast('info', `${getBackgroundPersonaDisplayName(targetSession)}：${result.surfacedMessage}`);
       }
     }).catch((error) => {
       console.error('[AIBackfillChatModal] Due reminder dispatch failed', error);
@@ -2181,6 +2328,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     window.addEventListener(ASSISTANT_CHAT_UPDATED_EVENT, handleAssistantChatUpdated);
     return () => window.removeEventListener(ASSISTANT_CHAT_UPDATED_EVENT, handleAssistantChatUpdated);
   }, [hydrateAssistantReminderSnapshotFromNative, personas, refreshAssistantNativeDiagnostics]);
+
+  useEffect(() => {
+    const handleSubmittedLog = (rawEvent: Event) => {
+      void handleAssistantLogSubmittedEvent(rawEvent as CustomEvent<AssistantLogSubmittedEventDetail>);
+    };
+
+    window.addEventListener(ASSISTANT_LOG_SUBMITTED_EVENT, handleSubmittedLog as EventListener);
+    return () => {
+      window.removeEventListener(ASSISTANT_LOG_SUBMITTED_EVENT, handleSubmittedLog as EventListener);
+    };
+  }, [handleAssistantLogSubmittedEvent]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2406,7 +2564,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     activeRequestRef,
     appendSystemMessage,
     buildConversationHistory,
-    buildPersonaPrompt,
+    buildPersonaPrompt: buildSharedPersonaPrompt,
     getErrorDebugSections,
     getRetryableAIErrorMessage,
     isAbortError,
@@ -2428,7 +2586,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     activeRequestRef,
     appendSystemMessage,
     buildConversationHistory,
-    buildPersonaPrompt,
+    buildPersonaPrompt: buildSharedPersonaPrompt,
     getErrorDebugSections,
     getRetryableAIErrorMessage,
     isAbortError,
@@ -2546,7 +2704,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   };
 
   const handleFillDailyNarrativeCommand = () => {
-    setInputText('日报');
+    setInputText('叙事');
+    window.requestAnimationFrame(() => {
+      composerTextareaRef.current?.focus();
+    });
+  };
+
+  const handleFillDailyNewspaperCommand = () => {
+    setInputText('小报');
     window.requestAnimationFrame(() => {
       composerTextareaRef.current?.focus();
     });
@@ -2711,6 +2876,40 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         }
         : persona
     )));
+  };
+
+  const handleAddCustomPromptBlock = (): string => {
+    const blockId = crypto.randomUUID();
+    setCustomPromptBlocks((prev) => (
+      [
+        ...prev,
+        {
+          id: blockId,
+          title: '',
+          content: '',
+          enabled: true
+        }
+      ]
+    ));
+    return blockId;
+  };
+
+  const handleUpdateCustomPromptBlock = (
+    blockId: string,
+    patch: { title?: string; content?: string; enabled?: boolean }
+  ) => {
+    setCustomPromptBlocks((prev) => prev.map((block) => (
+        block.id === blockId
+          ? {
+            ...block,
+            ...patch
+          }
+          : block
+      )));
+  };
+
+  const handleDeleteCustomPromptBlock = (blockId: string) => {
+    setCustomPromptBlocks((prev) => prev.filter((block) => block.id !== blockId));
   };
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -4144,6 +4343,19 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     onClose();
   };
 
+  const handleOpenDailyNewspaper = (date: string) => {
+    const reviewDate = new Date(`${date}T12:00:00`);
+    if (Number.isNaN(reviewDate.getTime())) {
+      addToast('info', '这个小报日期无效。');
+      return;
+    }
+
+    setCurrentView(AppView.REVIEW);
+    setCurrentDailyNewspaperDate(reviewDate);
+    setIsDailyNewspaperOpen(true);
+    onClose();
+  };
+
   const handleOpenMonthlyReviewNarrative = (monthStartDate: string, monthEndDate: string) => {
     const monthStart = new Date(`${monthStartDate}T12:00:00`);
     const monthEnd = new Date(`${monthEndDate}T12:00:00`);
@@ -4173,6 +4385,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       memoryUpdates?: AIChatMemoryUpdateSection[];
       dreamUpdates?: AIChatDreamUpdateCard[];
       reminderUpdates?: string[];
+      dailyNewspaperWriteback?: AIChatDailyNewspaperWritebackResult;
       dailyReviewWriteback?: AIChatDailyReviewWritebackResult;
       weeklyReviewWriteback?: AIChatWeeklyReviewWritebackResult;
       monthlyReviewWriteback?: AIChatMonthlyReviewWritebackResult;
@@ -4194,6 +4407,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       ...(options?.memoryUpdates && options.memoryUpdates.length > 0 ? { memoryUpdates: options.memoryUpdates } : {}),
       ...(options?.dreamUpdates && options.dreamUpdates.length > 0 ? { dreamUpdates: options.dreamUpdates } : {}),
       ...(options?.reminderUpdates && options.reminderUpdates.length > 0 ? { reminderUpdates: options.reminderUpdates } : {}),
+      ...(options?.dailyNewspaperWriteback ? { dailyNewspaperWriteback: options.dailyNewspaperWriteback } : {}),
       ...(options?.dailyReviewWriteback ? { dailyReviewWriteback: options.dailyReviewWriteback } : {}),
       ...(options?.weeklyReviewWriteback ? { weeklyReviewWriteback: options.weeklyReviewWriteback } : {}),
       ...(options?.monthlyReviewWriteback ? { monthlyReviewWriteback: options.monthlyReviewWriteback } : {}),
@@ -4289,7 +4503,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     activeRequestRef,
     addToast,
     buildConversationHistory,
-    buildPersonaPrompt,
+    buildPersonaPrompt: buildSharedPersonaPrompt,
     getConversationSummary: (sessionId) => assistantContextBuilder.summarizeConversationTurns(
       conversationHistoryCache.get(sessionId) || [],
       24
@@ -4322,7 +4536,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     activeRequestRef,
     addToast,
     buildConversationHistory,
-    buildPersonaPrompt,
+    buildPersonaPrompt: buildSharedPersonaPrompt,
     debugMode,
     getConversationSummary: (sessionId) => assistantContextBuilder.summarizeConversationTurns(
       conversationHistoryCache.get(sessionId) || [],
@@ -4343,6 +4557,45 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setIsPersonaPanelOpen
   });
 
+  const runDailyNewspaperWriteback = async (
+    session: AIChatSession,
+    params: {
+      dailyReview: DailyReview;
+      dayDataText: string;
+      mergeMode: 'create' | 'overwrite';
+      createdReview: boolean;
+    }
+  ) => runDailyNewspaperWritebackFlow({
+    activeRequestRef,
+    assistantMemoryEnabled: assistantAgentConfig.longTermMemoryEnabled,
+    addToast,
+    applyUnifiedToolCalls,
+    buildConversationHistory,
+    buildDreamContext,
+    buildForegroundAssistantMemory,
+    buildForegroundAssistantReminderSummary,
+    buildPersonaPrompt: buildSharedPersonaPrompt,
+    buildStateContext: buildAssistantStateContext,
+    debugMode,
+    getConversationSummary: (sessionId) => assistantContextBuilder.summarizeConversationTurns(
+      conversationHistoryCache.get(sessionId) || [],
+      24
+    ),
+    getRetryableAIErrorMessage,
+    isAbortError,
+    mutateSession,
+    params,
+    replacePendingWithResult,
+    resolveSessionPersona,
+    session,
+    setDailyNewspaperWritebackConfirmation: () => setDailyNewspaperWritebackConfirmation(null),
+    setDailyReviews,
+    setInputText,
+    setIsHistoryPanelOpen,
+    setIsLoading,
+    setIsPersonaPanelOpen
+  });
+
   const runMonthlyReviewNarrativeWriteback = async (
     session: AIChatSession,
     params: {
@@ -4355,7 +4608,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     activeRequestRef,
     addToast,
     buildConversationHistory,
-    buildPersonaPrompt,
+    buildPersonaPrompt: buildSharedPersonaPrompt,
     getConversationSummary: (sessionId) => assistantContextBuilder.summarizeConversationTurns(
       conversationHistoryCache.get(sessionId) || [],
       24
@@ -4407,6 +4660,25 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     })
   );
 
+  const handleDailyNewspaperCommand = async (session: AIChatSession) => (
+    runDailyNewspaperCommandFlow({
+      appendSystemMessage,
+      categories,
+      checkTemplates,
+      dailyReviews,
+      getLocalDateStr,
+      logs,
+      prepareForInteraction: prepareForTemplateInteraction,
+      reviewTemplates,
+      runWriteback: runDailyNewspaperWriteback,
+      scopes,
+      session,
+      setConfirmation: setDailyNewspaperWritebackConfirmation,
+      todoCategories,
+      todos
+    })
+  );
+
   const handleDailyReviewNarrativeOverwriteConfirmation = async (
     session: AIChatSession,
     userInput: string
@@ -4426,6 +4698,31 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       scopes,
       session,
       setConfirmation: setDailyReviewWritebackConfirmation,
+      todoCategories,
+      todos,
+      userInput
+    })
+  );
+
+  const handleDailyNewspaperOverwriteConfirmation = async (
+    session: AIChatSession,
+    userInput: string
+  ): Promise<boolean> => (
+    runDailyNewspaperOverwriteConfirmationFlow({
+      appendSystemMessage,
+      appendUserMessage,
+      categories,
+      checkTemplates,
+      confirmation: dailyNewspaperWritebackConfirmation,
+      dailyReviews,
+      getLocalDateStr,
+      logs,
+      prepareForInteraction: prepareForTemplateInteraction,
+      reviewTemplates,
+      runWriteback: runDailyNewspaperWriteback,
+      scopes,
+      session,
+      setConfirmation: setDailyNewspaperWritebackConfirmation,
       todoCategories,
       todos,
       userInput
@@ -4517,7 +4814,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       activeRequestRef,
       appendSystemMessage,
       buildConversationHistory,
-      buildPersonaPrompt,
+      buildPersonaPrompt: buildSharedPersonaPrompt,
       debugMode,
       getErrorDebugSections,
       getRetryableAIErrorMessage,
@@ -4544,7 +4841,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       activeRequestRef,
       appendSystemMessage,
       buildConversationHistory,
-      buildPersonaPrompt,
+      buildPersonaPrompt: buildSharedPersonaPrompt,
       debugMode,
       getErrorDebugSections,
       getRetryableAIErrorMessage,
@@ -4568,10 +4865,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
     const isWeeklyReviewTemplateSession = activeSession.templateMeta?.templateType === 'weekly_review';
     const isMonthlyReviewTemplateSession = activeSession.templateMeta?.templateType === 'monthly_review';
-
-    if (!options?.replaceMessageId && await handleDailyReviewNarrativeOverwriteConfirmation(activeSession, trimmedText)) {
-      return;
-    }
 
     if (handleDebugCommand(trimmedText, options)) {
       return;
@@ -4615,9 +4908,29 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return;
     }
 
-    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession && trimmedText === '日报' && !options?.replaceMessageId) {
+    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession) {
+      const consumedDailyReviewConfirmation = await handleDailyReviewNarrativeOverwriteConfirmation(activeSession, trimmedText);
+      if (consumedDailyReviewConfirmation) {
+        return;
+      }
+    }
+
+    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession) {
+      const consumedDailyNewspaperConfirmation = await handleDailyNewspaperOverwriteConfirmation(activeSession, trimmedText);
+      if (consumedDailyNewspaperConfirmation) {
+        return;
+      }
+    }
+
+    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession && (trimmedText === '日报' || trimmedText === '叙事') && !options?.replaceMessageId) {
       appendUserMessage(activeSession.id, trimmedText);
       await handleDailyReviewNarrativeCommand(activeSession);
+      return;
+    }
+
+    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession && trimmedText === '小报' && !options?.replaceMessageId) {
+      appendUserMessage(activeSession.id, trimmedText);
+      await handleDailyNewspaperCommand(activeSession);
       return;
     }
 
@@ -4667,7 +4980,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         await runWeeklyReviewTemplateChatTurn({
           activePersona,
           activeRequestRef,
-          buildPersonaPrompt,
+          buildPersonaPrompt: buildSharedPersonaPrompt,
           controller,
           debugMode,
           getErrorDebugSections,
@@ -4694,7 +5007,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         await runMonthlyReviewTemplateChatTurn({
           activePersona,
           activeRequestRef,
-          buildPersonaPrompt,
+          buildPersonaPrompt: buildSharedPersonaPrompt,
           controller,
           debugMode,
           getErrorDebugSections,
@@ -4747,7 +5060,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           promptLayers: {
             basePrompt: args.systemPrompt,
             modePrompt: args.modePrompt,
-            userPersonaPrompt: buildPersonaPrompt(activePersona)
+            userPersonaPrompt: buildSharedPersonaPrompt(activePersona)
           },
           memoryEnabled: args.memoryEnabled,
           memory: args.memory,
@@ -5044,6 +5357,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           markdownComponents={CHAT_MARKDOWN_COMPONENTS}
           messagesEndRef={messagesEndRef}
           onMessageRef={handleMessageElementRef}
+          onOpenDailyNewspaper={handleOpenDailyNewspaper}
           onOpenDailyReviewNarrative={handleOpenDailyReviewNarrative}
           onOpenDebugViewer={setDebugViewer}
           onOpenMonthlyReviewNarrative={handleOpenMonthlyReviewNarrative}
@@ -5170,19 +5484,34 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 </button>
               )}
               {!activeSession?.templateMeta && (
-                <button
-                  onClick={handleFillDailyNarrativeCommand}
-                  disabled={isLoading}
-                  className="inline-flex h-8 shrink-0 items-center rounded-[0.75rem] border px-2.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                  style={{
-                    borderColor: AI_CHAT_THEME.panelBorder,
-                    backgroundColor: AI_CHAT_THEME.panelBgStrong,
-                    color: AI_CHAT_THEME.textSecondary
-                  }}
-                  title="快速填充日报"
-                >
-                  日报
-                </button>
+                <>
+                  <button
+                    onClick={handleFillDailyNarrativeCommand}
+                    disabled={isLoading}
+                    className="inline-flex h-8 shrink-0 items-center rounded-[0.75rem] border px-2.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    style={{
+                      borderColor: AI_CHAT_THEME.panelBorder,
+                      backgroundColor: AI_CHAT_THEME.panelBgStrong,
+                      color: AI_CHAT_THEME.textSecondary
+                    }}
+                    title="快速填充叙事"
+                  >
+                    叙事
+                  </button>
+                  <button
+                    onClick={handleFillDailyNewspaperCommand}
+                    disabled={isLoading}
+                    className="inline-flex h-8 shrink-0 items-center rounded-[0.75rem] border px-2.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    style={{
+                      borderColor: AI_CHAT_THEME.panelBorder,
+                      backgroundColor: AI_CHAT_THEME.panelBgStrong,
+                      color: AI_CHAT_THEME.textSecondary
+                    }}
+                    title="快速填充小报"
+                  >
+                    小报
+                  </button>
+                </>
               )}
               <button
                 onClick={() => {
@@ -5257,6 +5586,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               activePersona={activePersona}
               activeSessionPersonaId={activeSession?.personaId || ''}
               avatarInputRef={avatarInputRef}
+              customPromptBlocks={customPromptBlocks}
               deleteConfirmPersonaId={deleteConfirmPersonaId}
               emojiChoices={PERSONA_EMOJI_CHOICES}
               emojiDraft={emojiDraft}
@@ -5278,7 +5608,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               onSelectEmoji={setEmojiDraft}
               onSelectUserEmoji={setUserEmojiDraft}
               onToggleDeletePersona={() => setDeleteConfirmPersonaId((current) => current === activePersona.id ? null : activePersona.id)}
+              onAddCustomPromptBlock={handleAddCustomPromptBlock}
+              onDeleteCustomPromptBlock={handleDeleteCustomPromptBlock}
               onUpdateCurrentPersona={updateCurrentPersona}
+              onUpdateCustomPromptBlock={handleUpdateCustomPromptBlock}
               onUseEmojiAvatar={handleUseEmojiAvatar}
               onUseUserEmojiAvatar={handleUseUserEmojiAvatar}
               onUserAvatarUpload={handleUserAvatarUpload}
@@ -5298,6 +5631,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               assistantSettingsContent={(
               <AIBackfillChatAssistantSettingsSection
                 assistantAgentConfig={assistantAgentConfig}
+                categories={categories}
                 assistantAgentIntervalDrafts={assistantAgentIntervalDrafts}
                 assistantAgentIntervalErrors={assistantAgentIntervalErrors}
                 assistantAgentQuietHoursDrafts={assistantAgentQuietHoursDrafts}

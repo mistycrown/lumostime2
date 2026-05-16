@@ -11,6 +11,7 @@ import type { AppliedActionStatus } from '../../services/assistantActionExecutor
 import { monthlyReviewTemplateService, type MonthlyReviewTemplateSessionMeta } from '../../services/monthlyReviewTemplateService';
 import { weeklyReviewTemplateService, type WeeklyReviewTemplateSessionMeta } from '../../services/weeklyReviewTemplateService';
 import type {
+  AIChatCustomPromptBlock,
   AIChatDebugSection,
   AIChatMessage,
   AIChatPersona,
@@ -24,6 +25,7 @@ interface ChatStorageKeys {
   activeSessionKey: string;
   chatPersonasKey: string;
   chatSessionsKey: string;
+  customPromptBlocksKey: string;
   debugModeKey: string;
   userProfileKey: string;
 }
@@ -33,6 +35,7 @@ interface LoadInitialChatStateOptions {
   normalizePersonas: (value: unknown) => AIChatPersona[];
   normalizeSessions: (value: unknown, personas: AIChatPersona[]) => AIChatSession[];
   normalizeUserProfile: (value: unknown) => AIChatUserProfile;
+  normalizeCustomPromptBlocks: (value: unknown, rawPersonasValue: unknown) => AIChatCustomPromptBlock[];
   storage?: Pick<Storage, 'getItem'>;
 }
 
@@ -128,10 +131,16 @@ export const loadInitialChatStateFromStorage = ({
   normalizePersonas,
   normalizeSessions,
   normalizeUserProfile,
+  normalizeCustomPromptBlocks,
   storage = localStorage
 }: LoadInitialChatStateOptions): InitialChatState => {
-  const personas = normalizePersonas(safeJsonParse<unknown>(storage.getItem(keys.chatPersonasKey), []));
+  const rawPersonas = safeJsonParse<unknown>(storage.getItem(keys.chatPersonasKey), []);
+  const personas = normalizePersonas(rawPersonas);
   const sessions = normalizeSessions(safeJsonParse<unknown>(storage.getItem(keys.chatSessionsKey), []), personas);
+  const customPromptBlocks = normalizeCustomPromptBlocks(
+    safeJsonParse<unknown>(storage.getItem(keys.customPromptBlocksKey), []),
+    rawPersonas
+  );
   const userProfile = normalizeUserProfile(safeJsonParse<unknown>(storage.getItem(keys.userProfileKey), null));
   const activeSessionId = resolveInitialActiveSessionId(
     sessions,
@@ -143,7 +152,8 @@ export const loadInitialChatStateFromStorage = ({
     sessions,
     activeSessionId,
     debugMode: storage.getItem(keys.debugModeKey) === 'true',
-    userProfile
+    userProfile,
+    customPromptBlocks
   };
 };
 

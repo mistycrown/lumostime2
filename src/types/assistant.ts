@@ -5,6 +5,7 @@
  * @pos Type Definitions (Assistant Agent)
  * @description Defines the structured contracts used by the Android-first assistant agent layer so background triggers, memory updates, reminder queues, and AI system-turn decisions can stay typed and stable across services and plugins.
  *
+ * @updated 2026-05-16: Added log-submission trigger typing plus persisted assistant config fields for selected post-log AI reactions.
  * @updated 2026-05-09: Added assistant scheduled-task template types so recurring AI task rules can materialize native reminders without overloading one-shot reminder records.
  * @updated 2026-05-12: Added Dream topic, entry, patch, and update-card types for the new explicit-only long-horizon attention system, plus optional read-only Dream context injection for unified assistant turns.
  * @updated 2026-05-14: Added shared assistant reasoning-summary types so provider-native thinking content can be normalized once and rendered consistently across foreground and background chat messages.
@@ -31,6 +32,7 @@ export type AssistantSystemTriggerType =
   | 'checkin'
   | 'reminder_due'
   | 'long_idle'
+  | 'log_submitted'
   | 'focus_started'
   | 'focus_ended'
   | 'todo_changed'
@@ -166,6 +168,8 @@ export interface AssistantAgentConfig {
   quietHoursEnd?: string;
   minimumNudgeGapMinutes: number;
   longTermMemoryEnabled: boolean;
+  logSubmissionTriggerEnabled: boolean;
+  logSubmissionTriggerActivityIds: string[];
 }
 
 export interface AssistantNotificationPayload {

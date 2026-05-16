@@ -4,6 +4,7 @@
  * @output Todo Selection UI
  * @pos Component (Input)
  * @description A specialized selector for linking a log entry to a specific Todo item, grouped by category and optionally rendered as a collapsible parent/subtask tree.
+ * @updated 2026-05-16: Hid the reserved `小事` bucket from shared association pickers while still preserving a currently linked legacy quick todo during edits.
  * @updated 2026-05-11: Added an optional header action slot so one-shot completion-mode toggles can sit beside the shared associated-todo picker title without changing picker logic.
  * @updated 2026-05-06: Shared todo pickers now hide completed todos by default while preserving the currently linked completed todo so edit flows remain stable.
  * @updated 2026-05-06: Standalone subtasks in the virtual today picker now show an `@parent` hint when their parent row is not visible, matching the schedule view's hierarchy cue.
@@ -21,6 +22,7 @@ import { CheckCircle2, ChevronDown, ChevronRight, Circle, TrendingUp } from 'luc
 import { TodoCategory, TodoItem } from '../types';
 import {
   buildTodoAssociationRows,
+  filterTodoAssociationCategories,
   filterTodoAssociationPickerTodos,
   getInitialExpandedTodoParentIds
 } from '../utils/todoAssociationUtils';
@@ -84,7 +86,10 @@ export const TodoAssociation: React.FC<TodoAssociationProps> = ({
   const [expandedParentIds, setExpandedParentIds] = useState<string[]>(() => (
     getInitialExpandedTodoParentIds(todos, linkedTodoId)
   ));
-  const categoryOptions = useMemo(() => [VIRTUAL_TODAY_CATEGORY, ...todoCategories], [todoCategories]);
+  const categoryOptions = useMemo(
+    () => [VIRTUAL_TODAY_CATEGORY, ...filterTodoAssociationCategories(todoCategories, todos, linkedTodoId)],
+    [linkedTodoId, todoCategories, todos]
+  );
   const todayCategoryAllTodos = useMemo(
     () => getTodoAssociationTodayTodos(todos, new Date(), { includeCompleted: true }),
     [todos]

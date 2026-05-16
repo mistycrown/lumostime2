@@ -4,6 +4,7 @@
  * @output Pure row models for hierarchical todo-association pickers
  * @pos Utility (Todo association)
  * @description Builds collapsed or expanded parent/subtask row models so UI pickers can render one-level todo hierarchy consistently without mixing stateful component code into tests.
+ * @updated 2026-05-16: Filtered reserved `小事` quick todos out of association pickers while still preserving the currently linked legacy quick todo for edit continuity.
  * @updated 2026-05-06: Added picker-level completed-todo filtering that hides finished todos by default while preserving the currently linked completed todo for edit continuity.
  * @updated 2026-05-06: Added standalone parent-title metadata so virtual today pickers can label subtasks whose parent row is not visible in the current picker pool.
  * @updated 2026-04-25: Hid unfinished subtasks in association pickers whenever their parent todo is completed, so hidden children never resurface as standalone rows.
@@ -13,8 +14,10 @@
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
 
-import { TodoItem } from '../types';
+import { TodoCategory, TodoItem } from '../types';
+import { isQuickTodo } from './todoKindUtils';
 import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodosForDisplay, getParentTodo, isIncompleteSubtaskHiddenByCompletedParent } from './todoHierarchyUtils';
+import { isQuickTodoCategoryId } from './todoQuickCategoryUtils';
 
 export interface TodoAssociationRow {
   todo: TodoItem;
@@ -40,11 +43,38 @@ export const getInitialExpandedTodoParentIds = (todos: TodoItem[], linkedTodoId?
   return parentTodo ? [parentTodo.id] : [];
 };
 
+const isLegacyLinkedQuickTodo = (todo: TodoItem, linkedTodoId?: string): boolean => (
+  todo.id === linkedTodoId && (isQuickTodo(todo) || isQuickTodoCategoryId(todo.categoryId))
+);
+
+const isTodoEligibleForAssociationPicker = (todo: TodoItem, linkedTodoId?: string): boolean => (
+  isLegacyLinkedQuickTodo(todo, linkedTodoId)
+  || (!isQuickTodo(todo) && !isQuickTodoCategoryId(todo.categoryId))
+);
+
+export const filterTodoAssociationCategories = (
+  categories: TodoCategory[],
+  todos: TodoItem[],
+  linkedTodoId?: string
+): TodoCategory[] => {
+  const linkedTodo = linkedTodoId ? todos.find((todo) => todo.id === linkedTodoId) : undefined;
+  const legacyQuickCategoryId = linkedTodo && isLegacyLinkedQuickTodo(linkedTodo, linkedTodoId)
+    ? linkedTodo?.categoryId
+    : undefined;
+
+  return categories.filter((category) => (
+    !isQuickTodoCategoryId(category.id) || category.id === legacyQuickCategoryId
+  ));
+};
+
 export const filterTodoAssociationPickerTodos = (
   todos: TodoItem[],
   linkedTodoId?: string
 ): TodoItem[] => (
-  todos.filter((todo) => !todo.isCompleted || todo.id === linkedTodoId)
+  todos.filter((todo) => (
+    isTodoEligibleForAssociationPicker(todo, linkedTodoId)
+    && (!todo.isCompleted || todo.id === linkedTodoId)
+  ))
 );
 
 export const buildTodoAssociationRows = (

@@ -5,6 +5,7 @@
  * @pos Service (Assistant Agent Config)
  * @description Stores the background assistant agent's runtime configuration, including polling, random check-in, and long-term-memory toggles, so the shared AI window and native plugin can stay in sync.
  *
+ * @updated 2026-05-16: Added normalization and persistence support for post-log assistant trigger toggles plus selected activity ids.
  * @updated 2026-05-12: Normalized assistant quiet-hours values to compact `HHMM` strings so the UI can accept user-entered four-digit random-check-in protection windows while still migrating older `HH:MM` data.
  * @updated 2026-04-26: Added persistent assistant agent config storage for AI chat settings, native polling sync, and long-term-memory control.
  */
@@ -22,7 +23,21 @@ const DEFAULT_ASSISTANT_AGENT_CONFIG: AssistantAgentConfig = {
   maxCheckinMinutes: 120,
   quietHoursEnabled: false,
   minimumNudgeGapMinutes: 45,
-  longTermMemoryEnabled: true
+  longTermMemoryEnabled: true,
+  logSubmissionTriggerEnabled: false,
+  logSubmissionTriggerActivityIds: []
+};
+
+const normalizeStringArray = (value: unknown): string[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(new Set(
+    value
+      .map((item) => (typeof item === 'string' ? item.trim() : ''))
+      .filter(Boolean)
+  ));
 };
 
 const clampMinutes = (value: unknown, fallback: number, minimum: number, maximum: number): number => {
@@ -65,7 +80,9 @@ const normalizeConfig = (value: unknown): AssistantAgentConfig => {
       1,
       24 * 60
     ),
-    longTermMemoryEnabled: candidate.longTermMemoryEnabled !== false
+    longTermMemoryEnabled: candidate.longTermMemoryEnabled !== false,
+    logSubmissionTriggerEnabled: candidate.logSubmissionTriggerEnabled === true,
+    logSubmissionTriggerActivityIds: normalizeStringArray(candidate.logSubmissionTriggerActivityIds)
   };
 };
 
