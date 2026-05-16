@@ -4,6 +4,7 @@
  * @output Regression coverage for hierarchical todo picker row building
  * @pos Test
  * @description Ensures the todo association picker keeps parent/subtask rows collapsed by default, auto-expands the selected child's parent, and hides completed todos unless the current linked todo needs to stay visible.
+ * @updated 2026-05-16: Added regression coverage so reserved `小事` quick todos stay out of association pickers unless a legacy linked quick todo must remain visible during editing.
  * @updated 2026-05-06: Added regression coverage for picker-level completed-todo filtering so finished todos stay hidden by default while the current linked finished todo remains visible.
  * @updated 2026-05-06: Added regression coverage for standalone virtual-category subtasks that should expose their hidden parent title as picker context.
  * @updated 2026-04-25: Added regression coverage so unfinished subtasks stay hidden in the picker whenever their parent todo is completed.
@@ -14,10 +15,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildTodoAssociationRows,
+  filterTodoAssociationCategories,
   filterTodoAssociationPickerTodos,
   getInitialExpandedTodoParentIds
 } from '../utils/todoAssociationUtils';
-import type { TodoItem } from '../types';
+import type { TodoCategory, TodoItem } from '../types';
+import { QUICK_TODO_CATEGORY_ID } from '../utils/todoQuickCategoryUtils';
 
 const baseTodos: TodoItem[] = [
   {
@@ -242,6 +245,87 @@ describe('TodoAssociation hierarchy helpers', () => {
     expect(filterTodoAssociationPickerTodos(todos, 'done-todo')).toEqual([
       expect.objectContaining({ id: 'open-todo' }),
       expect.objectContaining({ id: 'done-todo' })
+    ]);
+  });
+
+  it('filters quick todos out of picker pools by default', () => {
+    const todos: TodoItem[] = [
+      {
+        id: 'project-todo',
+        categoryId: 'cat-1',
+        title: 'Project todo',
+        isCompleted: false
+      } as TodoItem,
+      {
+        id: 'quick-todo',
+        categoryId: QUICK_TODO_CATEGORY_ID,
+        kind: 'quick',
+        title: 'Quick todo',
+        isCompleted: false
+      } as TodoItem
+    ];
+
+    expect(filterTodoAssociationPickerTodos(todos)).toEqual([
+      expect.objectContaining({ id: 'project-todo' })
+    ]);
+  });
+
+  it('keeps the currently linked quick todo visible for legacy edit flows', () => {
+    const todos: TodoItem[] = [
+      {
+        id: 'project-todo',
+        categoryId: 'cat-1',
+        title: 'Project todo',
+        isCompleted: false
+      } as TodoItem,
+      {
+        id: 'quick-todo',
+        categoryId: QUICK_TODO_CATEGORY_ID,
+        kind: 'quick',
+        title: 'Quick todo',
+        isCompleted: false
+      } as TodoItem
+    ];
+
+    expect(filterTodoAssociationPickerTodos(todos, 'quick-todo')).toEqual([
+      expect.objectContaining({ id: 'project-todo' }),
+      expect.objectContaining({ id: 'quick-todo' })
+    ]);
+  });
+
+  it('hides the quick category unless the current linked todo belongs to it', () => {
+    const categories: TodoCategory[] = [
+      {
+        id: 'cat-1',
+        name: 'Project',
+        icon: 'P'
+      },
+      {
+        id: QUICK_TODO_CATEGORY_ID,
+        name: '小事',
+        icon: 'Q'
+      }
+    ];
+    const todos: TodoItem[] = [
+      {
+        id: 'project-todo',
+        categoryId: 'cat-1',
+        title: 'Project todo',
+        isCompleted: false
+      } as TodoItem,
+      {
+        id: 'quick-todo',
+        categoryId: QUICK_TODO_CATEGORY_ID,
+        kind: 'quick',
+        title: 'Quick todo',
+        isCompleted: false
+      } as TodoItem
+    ];
+
+    expect(filterTodoAssociationCategories(categories, todos).map((category) => category.id)).toEqual(['cat-1']);
+    expect(filterTodoAssociationCategories(categories, todos, 'quick-todo').map((category) => category.id)).toEqual([
+      'cat-1',
+      QUICK_TODO_CATEGORY_ID
     ]);
   });
 

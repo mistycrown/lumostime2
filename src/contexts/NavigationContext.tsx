@@ -87,6 +87,8 @@ interface NavigationContextType {
     // Review 模态框
     isDailyReviewOpen: boolean;
     setIsDailyReviewOpen: (open: boolean) => void;
+    isDailyNewspaperOpen: boolean;
+    setIsDailyNewspaperOpen: (open: boolean) => void;
     isOnThisDayOpen: boolean;
     setIsOnThisDayOpen: (open: boolean) => void;
     isWeeklyReviewOpen: boolean;
@@ -119,6 +121,8 @@ interface NavigationContextType {
     // Review 编辑状态
     currentReviewDate: Date | null;
     setCurrentReviewDate: (date: Date | null) => void;
+    currentDailyNewspaperDate: Date | null;
+    setCurrentDailyNewspaperDate: (date: Date | null) => void;
     currentDailyReviewInitialTab: 'check' | 'data' | 'guide' | 'narrative' | null;
     setCurrentDailyReviewInitialTab: (tab: 'check' | 'data' | 'guide' | 'narrative' | null) => void;
     currentOnThisDayDate: Date | null;
@@ -254,6 +258,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
 
     // Review 模态框
     const [isDailyReviewOpen, setIsDailyReviewOpen] = useState(false);
+    const [isDailyNewspaperOpen, setIsDailyNewspaperOpen] = useState(false);
     const [isOnThisDayOpen, setIsOnThisDayOpen] = useState(false);
     const [isWeeklyReviewOpen, setIsWeeklyReviewOpen] = useState(false);
     const [isMonthlyReviewOpen, setIsMonthlyReviewOpen] = useState(false);
@@ -284,6 +289,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
 
     // Review 编辑状态
     const [currentReviewDate, setCurrentReviewDate] = useState<Date | null>(null);
+    const [currentDailyNewspaperDate, setCurrentDailyNewspaperDate] = useState<Date | null>(null);
     const [currentDailyReviewInitialTab, setCurrentDailyReviewInitialTab] = useState<'check' | 'data' | 'guide' | 'narrative' | null>(null);
     const [currentOnThisDayDate, setCurrentOnThisDayDate] = useState<Date | null>(null);
     const [currentWeeklyReviewStart, setCurrentWeeklyReviewStart] = useState<Date | null>(null);
@@ -393,6 +399,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setIsScopeManaging,
             isDailyReviewOpen,
             setIsDailyReviewOpen,
+            isDailyNewspaperOpen,
+            setIsDailyNewspaperOpen,
             isOnThisDayOpen,
             setIsOnThisDayOpen,
             isWeeklyReviewOpen,
@@ -417,6 +425,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setEditingGoal,
             currentReviewDate,
             setCurrentReviewDate,
+            currentDailyNewspaperDate,
+            setCurrentDailyNewspaperDate,
             currentDailyReviewInitialTab,
             setCurrentDailyReviewInitialTab,
             currentOnThisDayDate,

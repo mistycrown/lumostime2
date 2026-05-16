@@ -10,10 +10,12 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 *   **Main Tabs**: High-level navigation roots (e.g., `TimelineView`, `StatsView`, `TodoView`, `TagsView`).
 *   **Detail Views**: Dedicated pages for specific entities (e.g., `CategoryDetailView`, `TagDetailView`, `ScopeDetailView`).
-*   **Modals/Overlays**: Specialized interaction flows (e.g., `SettingsView`, `RecordView`, `DailyReviewView`).
+*   **Modals/Overlays**: Specialized interaction flows (e.g., `SettingsView`, `RecordView`, `DailyReviewView`, `DailyNewspaperView`).
 *   **Management Views**: Bulk editing interfaces (e.g., `BatchManageView`, `TodoBatchManageView`, `GoalBatchManageView`, `ScopeManageView`).
 
 > Note: color pickers in detail and batch management views should keep built-in theme colors and persisted custom HEX colors consistent, including todo category colors and scope colors used by stats.
+
+- Update 2026-05-16: `DailyReviewView.tsx` now places the `小报` entry directly under the `AI 叙事` section, opens the shared AI chat with a prefilled `小报` request when that day has no newspaper yet, and requires confirmation before deleting an existing newspaper.
 
 - Update 2026-05-14: `TodoView.tsx` now persists a shared `锁定/解锁` planner toggle and passes it through the standard week, bento week, and month schedule views, so all arrange/deadline/tentative entries can be frozen against drag-to-move until explicitly re-enabled.
 - Update 2026-05-14: `TimelineView.tsx` now renders `◬ CollectionName` chips on any timeline log row that belongs to one or more collections, matching the existing linked-todo metadata badge styling instead of inventing a separate collection-only tag treatment.

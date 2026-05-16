@@ -7,13 +7,15 @@
  * @updated 2026-05-15: Extracted daily, weekly, and monthly narrative writeback runners from AIBackfillChatModal.
  */
 import { aiService, type AIConversationTurn } from '../../services/aiService';
+import { dailyNewspaperService } from '../../services/dailyNewspaperService';
 import { dailyReviewTemplateService } from '../../services/dailyReviewTemplateService';
 import { monthlyReviewTemplateService } from '../../services/monthlyReviewTemplateService';
 import { weeklyReviewTemplateService } from '../../services/weeklyReviewTemplateService';
 import { parseNarrative } from '../../utils/narrativeUtils';
 import type { DailyReview, MonthlyReview, WeeklyReview } from '../../types';
-import type { AssistantReasoningSummary } from '../../types/assistant';
+import type { AssistantMemory, AssistantReasoningSummary, AssistantTurnStateContext } from '../../types/assistant';
 import type {
+  AIChatDailyNewspaperWritebackResult,
   AIChatDailyReviewWritebackResult,
   AIChatDebugSection,
   AIChatDreamUpdateCard,
@@ -38,6 +40,7 @@ interface ActiveRequestState {
 
 interface ReplacePendingResultOptions {
   appliedActions?: AppliedChatAction[];
+  dailyNewspaperWriteback?: AIChatDailyNewspaperWritebackResult;
   dailyReviewWriteback?: AIChatDailyReviewWritebackResult;
   debugSections?: AIChatDebugSection[];
   displayParts?: string[];
@@ -102,6 +105,25 @@ interface DailyWritebackOptions extends ReviewWritebackRunnerBase {
   };
   session: AIChatSession;
   setDailyReviewWritebackConfirmation: (value: null) => void;
+  setDailyReviews: (updater: (reviews: DailyReview[]) => DailyReview[]) => void;
+}
+
+interface DailyNewspaperWritebackOptions extends ReviewWritebackRunnerBase {
+  assistantMemoryEnabled: boolean;
+  applyUnifiedToolCalls: (toolCalls: any[], sourceText: string) => AppliedChatAction[];
+  buildDreamContext: (query?: string) => string | undefined;
+  buildForegroundAssistantMemory: () => AssistantMemory;
+  buildForegroundAssistantReminderSummary: () => string | undefined;
+  buildStateContext: (date: Date, reminderSummary?: string) => AssistantTurnStateContext;
+  debugMode: boolean;
+  params: {
+    createdReview: boolean;
+    dailyReview: DailyReview;
+    dayDataText: string;
+    mergeMode: 'create' | 'overwrite';
+  };
+  session: AIChatSession;
+  setDailyNewspaperWritebackConfirmation: (value: null) => void;
   setDailyReviews: (updater: (reviews: DailyReview[]) => DailyReview[]) => void;
 }
 
@@ -375,6 +397,155 @@ export const runDailyReviewNarrativeWriteback = async ({
         : {})
     });
     addToast('success', 'AI 叙事已写入日报');
+  } catch (error) {
+    const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
+
+    if (isAbortError(error)) {
+      if (isCurrentPendingRequest) {
+        replacePendingWithResult(sessionId, pendingMessageId, '已停止这次写入。', { tone: 'system' });
+      }
+      return;
+    }
+
+    if (!isCurrentPendingRequest || controller.signal.aborted) {
+      return;
+    }
+
+    replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), { tone: 'error' });
+  } finally {
+    if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
+      activeRequestRef.current = null;
+      setIsLoading(false);
+    }
+  }
+};
+
+export const runDailyNewspaperWriteback = async ({
+  activeRequestRef,
+  assistantMemoryEnabled,
+  addToast,
+  applyUnifiedToolCalls,
+  buildConversationHistory,
+  buildDreamContext,
+  buildForegroundAssistantMemory,
+  buildForegroundAssistantReminderSummary,
+  buildPersonaPrompt,
+  buildStateContext,
+  debugMode,
+  getConversationSummary,
+  getRetryableAIErrorMessage,
+  isAbortError,
+  mutateSession,
+  params,
+  replacePendingWithResult,
+  resolveSessionPersona,
+  session,
+  setDailyNewspaperWritebackConfirmation,
+  setDailyReviews,
+  setInputText,
+  setIsHistoryPanelOpen,
+  setIsLoading,
+  setIsPersonaPanelOpen
+}: DailyNewspaperWritebackOptions): Promise<void> => {
+  const sessionId = session.id;
+  const pendingMessageId = crypto.randomUUID();
+  const now = Date.now();
+  const sessionPersona = resolveSessionPersona(session);
+  const conversationSummary = getConversationSummary(session.id);
+  const reminderSummary = buildForegroundAssistantReminderSummary();
+  const stateContext = buildStateContext(new Date(now), reminderSummary);
+  const dreamContext = buildDreamContext();
+  const memorySnapshot = assistantMemoryEnabled ? buildForegroundAssistantMemory() : undefined;
+
+  appendPendingAssistantMessage(mutateSession, sessionId, pendingMessageId, '我来整理今天的小报。', now);
+
+  setInputText('');
+  setIsLoading(true);
+  setIsHistoryPanelOpen(false);
+  setIsPersonaPanelOpen(false);
+  setDailyNewspaperWritebackConfirmation(null);
+
+  const controller = new AbortController();
+  activeRequestRef.current = { controller, sessionId, pendingMessageId };
+
+  if (params.createdReview) {
+    setDailyReviews((previousReviews) => {
+      if (previousReviews.some((review) => review.id === params.dailyReview.id)) {
+        return previousReviews;
+      }
+
+      return [...previousReviews, params.dailyReview];
+    });
+  }
+
+  try {
+    const { systemPrompt, userPrompt } = await dailyNewspaperService.buildWritebackPrompts({
+      personaPrompt: buildPersonaPrompt(sessionPersona),
+      dayDataText: params.dayDataText,
+      conversationSummary,
+      existingNewspaper: params.dailyReview.aiNewspaper,
+      mergeMode: params.mergeMode,
+      stateContext,
+      ...(memorySnapshot ? { memorySnapshot } : {}),
+      ...(dreamContext ? { dreamContext } : {})
+    });
+
+    const newspaperWritebackResult = await aiService.requestStructuredJsonWithDebug({
+      systemPrompt,
+      userPrompt,
+      conversationHistory: buildConversationHistory(session),
+      cacheHint: {
+        keySeed: `daily_newspaper_writeback:${params.dailyReview.date}:${params.mergeMode}`,
+        scope: 'daily_newspaper_writeback'
+      },
+      normalizeResult: (rawValue) => dailyNewspaperService.parseWritebackResponse(
+        rawValue,
+        params.dailyReview.date,
+        params.mergeMode
+      )
+    }, {
+      signal: controller.signal
+    });
+
+    if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
+      return;
+    }
+
+    const appliedActions = Array.isArray(newspaperWritebackResult.result.toolCalls) && newspaperWritebackResult.result.toolCalls.length > 0
+      ? applyUnifiedToolCalls(newspaperWritebackResult.result.toolCalls, '小报')
+      : [];
+    const newspaper = dailyNewspaperService.buildNewspaperFromToolCall(
+      newspaperWritebackResult.result.newspaperToolCall,
+      newspaperWritebackResult.result.assistantReply
+    );
+
+    setDailyReviews((previousReviews) => (
+      dailyNewspaperService.updateDailyReviewNewspaper(previousReviews, params.dailyReview.id, newspaper)
+    ));
+
+    const writebackResultCard: AIChatDailyNewspaperWritebackResult = {
+      dailyReviewId: params.dailyReview.id,
+      date: params.dailyReview.date,
+      title: newspaper.title,
+      preview: newspaper.overallComment,
+      createdReview: params.createdReview,
+      mergeMode: params.mergeMode
+    };
+
+    replacePendingWithResult(sessionId, pendingMessageId, newspaperWritebackResult.result.assistantReply, {
+      tone: 'system',
+      ...(appliedActions.length > 0 ? { appliedActions } : {}),
+      dailyNewspaperWriteback: writebackResultCard,
+      ...(debugMode
+        ? {
+          debugSections: [{
+            label: '日报小报写入',
+            exchange: newspaperWritebackResult.debug
+          }]
+        }
+        : {})
+    });
+    addToast('success', 'AI 小报已写入日报');
   } catch (error) {
     const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
 

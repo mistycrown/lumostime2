@@ -1,5 +1,6 @@
 # Custom Hooks
 
+> `useLogManager.ts` now dispatches a shared submitted-log event only for brand-new log saves, letting the globally mounted AI assistant react to selected completed tags without firing again on log edits.
 > `useTodoManager.ts` now normalizes future-only `maybeDates` plus deduplicated recurrence `skipDates` whenever todos are saved, duplicated, or batch-created, so tentative candidate dates do not accumulate stale past entries in persisted data.
 > `useTodoQuickActions.ts` now also exposes a shared `Maybe` quick action that writes normalized multi-date `maybeDates`, so list-row quick actions can edit tentative future dates for ordinary and recurring tasks alike.
 > `useAppInitialization.ts` now imports the Android EdgeToEdge plugin from its ESM entry instead of calling `require()`, so Capacitor production bundles can initialize edge-to-edge support inside the WebView without a browser-side `require is not defined` crash.

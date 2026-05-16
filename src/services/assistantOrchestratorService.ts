@@ -5,6 +5,7 @@
  * @pos Service (Assistant Orchestrator)
  * @description Orchestrates Android-first assistant system turns by loading structured memory, assembling a prompt, calling the existing AI service, and applying the resulting silent/message/reminder/memory actions back into local state.
  *
+ * @updated 2026-05-16: Fixed submitted-log debug labels and normalized fallback assistant-notification titles to readable `AI 助理` text.
  * @updated 2026-05-14: Persisted provider-native reasoning summaries alongside surfaced background assistant messages so foreground and background chat entries share the same collapsible thinking payload shape.
  * @updated 2026-05-13: Native reminder_due hydrations now respect the diagnostic `nativeNotificationShown` flag so Web-side catch-up does not replay a second system notification for the same reminder.
  * @updated 2026-05-13: Native completed-request hydrations now rebuild and persist a foreground-style debug exchange from Android diagnostics, so background prompt assembly can be inspected from the same debug UI as Web-run turns.
@@ -142,6 +143,11 @@ interface PersistedAssistantMessageLocation {
   messageId: string;
 }
 
+interface PersistedSessionResolution {
+  sessions: PersistedAIChatSession[];
+  resolvedTargetSessionId: string;
+}
+
 interface PersistedAIChatMemoryUpdateSection {
   label: string;
   items: string[];
@@ -211,6 +217,43 @@ const loadPersistedPersonaNameMap = (): Map<string, string> => {
       return [[id, name] as const];
     })
   );
+};
+
+const resolvePersistedTargetSession = (
+  targetSessionId?: string
+): PersistedSessionResolution | null => {
+  const persistedSessions = loadPersistedSessions();
+  const sessions = persistedSessions.length > 0
+    ? persistedSessions
+    : [createFallbackPersistedSession()];
+  const resolvedTargetSessionId = (
+    targetSessionId
+    && sessions.some((session) => session.id === targetSessionId)
+  )
+    ? targetSessionId
+    : resolveLatestOrdinaryAssistantBackgroundSession(sessions)?.id;
+  if (!resolvedTargetSessionId) {
+    return null;
+  }
+
+  return {
+    sessions,
+    resolvedTargetSessionId
+  };
+};
+
+const getPersistedSessionPersonaName = (targetSessionId?: string): string => {
+  const resolved = resolvePersistedTargetSession(targetSessionId);
+  if (!resolved) {
+    return 'AI';
+  }
+
+  const targetSession = resolved.sessions.find((session) => session.id === resolved.resolvedTargetSessionId);
+  if (!targetSession?.personaId) {
+    return 'AI';
+  }
+
+  return loadPersistedPersonaNameMap().get(targetSession.personaId) || 'AI';
 };
 
 const normalizeBackgroundCallHistoryEntry = (value: unknown): AssistantBackgroundCallHistoryEntry | null => {
@@ -300,6 +343,8 @@ const getBackgroundDebugLabel = (triggerType: AssistantSystemTrigger['type']): s
       return '后台 Check-in 调试';
     case 'long_idle':
       return '后台 Long Idle 调试';
+    case 'log_submitted':
+      return '后台日志提交调试';
     case 'focus_started':
       return '后台 Focus Started 调试';
     case 'focus_ended':
@@ -386,6 +431,8 @@ const buildNativeTriggerText = (triggerType?: AssistantSystemTrigger['type']): s
       return 'Native manual background assistant trigger';
     case 'long_idle':
       return 'Native long-idle assistant trigger';
+    case 'log_submitted':
+      return 'Native submitted-log assistant trigger';
     case 'focus_started':
       return 'Native focus-started assistant trigger';
     case 'focus_ended':
@@ -533,20 +580,15 @@ const persistAssistantMessage = (
     return null;
   }
 
-  const persistedSessions = loadPersistedSessions();
-  const sessions = persistedSessions.length > 0
-    ? persistedSessions
-    : [createFallbackPersistedSession()];
-  const resolvedTargetSessionId = (
-    targetSessionId
-    && sessions.some((session) => session.id === targetSessionId)
-  )
-    ? targetSessionId
-    : resolveLatestOrdinaryAssistantBackgroundSession(sessions)?.id;
-  if (!resolvedTargetSessionId) {
+  const resolved = resolvePersistedTargetSession(targetSessionId);
+  if (!resolved) {
     return null;
   }
 
+  const {
+    sessions,
+    resolvedTargetSessionId
+  } = resolved;
   const now = Date.now();
   const nextMessage: PersistedAIChatMessage = {
     id: crypto.randomUUID(),
@@ -585,6 +627,55 @@ const persistAssistantMessage = (
   };
 };
 
+const persistUserMessage = (
+  message: string,
+  targetSessionId?: string
+): PersistedAssistantMessageLocation | null => {
+  const trimmed = normalizeAssistantText(message);
+  if (!trimmed) {
+    return null;
+  }
+
+  const resolved = resolvePersistedTargetSession(targetSessionId);
+  if (!resolved) {
+    return null;
+  }
+
+  const {
+    sessions,
+    resolvedTargetSessionId
+  } = resolved;
+  const now = Date.now();
+  const nextMessage: PersistedAIChatMessage = {
+    id: crypto.randomUUID(),
+    role: 'user',
+    content: trimmed,
+    createdAt: now
+  };
+  const nextSessions = sessions.map((session) => (
+    session.id === resolvedTargetSessionId
+      ? {
+        ...session,
+        updatedAt: now,
+        messages: [
+          ...session.messages,
+          nextMessage
+        ]
+      }
+      : session
+  ));
+
+  localStorage.setItem(CHAT_SESSIONS_KEY, JSON.stringify(nextSessions));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(ASSISTANT_DECISION_EVENT));
+  }
+
+  return {
+    sessionId: resolvedTargetSessionId,
+    messageId: nextMessage.id
+  };
+};
+
 export const assistantOrchestratorService = {
   getAssistantDecisionEventName(): string {
     return ASSISTANT_DECISION_EVENT;
@@ -592,6 +683,14 @@ export const assistantOrchestratorService = {
 
   getBackgroundCallHistoryStorageKey(): string {
     return ASSISTANT_BACKGROUND_CALL_HISTORY_KEY;
+  },
+
+  getBackgroundPersonaDisplayName(targetSessionId?: string): string {
+    return getPersistedSessionPersonaName(targetSessionId);
+  },
+
+  persistBackgroundUserMessage(message: string, targetSessionId?: string): PersistedAssistantMessageLocation | null {
+    return persistUserMessage(message, targetSessionId);
   },
 
   listBackgroundCallHistory(): AssistantBackgroundCallHistoryEntry[] {
@@ -746,7 +845,7 @@ export const assistantOrchestratorService = {
             targetSession?.personaId
               ? personaNameMap.get(targetSession.personaId)
               : undefined
-          ) || 'AI 鍔╃悊';
+          ) || 'AI 助理';
 
           void AssistantAgent.showAssistantNotification({
             title: notificationTitle,

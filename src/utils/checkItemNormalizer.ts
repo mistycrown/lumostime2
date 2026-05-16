@@ -2,7 +2,7 @@
  * @file checkItemNormalizer.ts
  * @description 日课数据归一化工具 - 兼容旧版布尔数据与新版次数数据
  */
-import { CheckItem, CheckTemplate, CheckTemplateItem, DailyReview } from '../types';
+import { CheckItem, CheckTemplate, CheckTemplateItem, DailyNewspaper, DailyReview } from '../types';
 
 type ManualMode = 'binary' | 'count';
 
@@ -113,6 +113,46 @@ export const normalizeCheckTemplate = (template: Partial<CheckTemplate>): CheckT
 };
 
 export const normalizeDailyReview = (review: Partial<DailyReview>): DailyReview => {
+  const normalizeDailyNewspaper = (value: Partial<DailyNewspaper> | undefined): DailyNewspaper | undefined => {
+    if (!value || typeof value !== 'object') {
+      return undefined;
+    }
+
+    const date = typeof value.date === 'string' ? value.date.trim() : '';
+    const title = typeof value.title === 'string' ? value.title.trim() : '';
+    const assistantReply = typeof value.assistantReply === 'string' ? value.assistantReply.trim() : '';
+    const overallComment = typeof value.overallComment === 'string' ? value.overallComment.trim() : '';
+    const annotations = Array.isArray(value.annotations)
+      ? value.annotations.flatMap((annotation) => {
+        if (!annotation || typeof annotation !== 'object') {
+          return [];
+        }
+
+        const logId = typeof annotation.logId === 'string' ? annotation.logId.trim() : '';
+        const comment = typeof annotation.comment === 'string' ? annotation.comment.trim() : '';
+        if (!logId || !comment) {
+          return [];
+        }
+
+        return [{ logId, comment }];
+      })
+      : [];
+
+    if (!date || !title || !assistantReply || !overallComment) {
+      return undefined;
+    }
+
+    return {
+      version: 1,
+      date,
+      title,
+      assistantReply,
+      overallComment,
+      annotations,
+      updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : Date.now()
+    };
+  };
+
   return {
     ...review,
     id: review.id || crypto.randomUUID(),
@@ -120,7 +160,8 @@ export const normalizeDailyReview = (review: Partial<DailyReview>): DailyReview 
     createdAt: typeof review.createdAt === 'number' ? review.createdAt : Date.now(),
     updatedAt: typeof review.updatedAt === 'number' ? review.updatedAt : Date.now(),
     answers: Array.isArray(review.answers) ? review.answers : [],
-    checkItems: Array.isArray(review.checkItems) ? review.checkItems.map(normalizeCheckItem) : []
+    checkItems: Array.isArray(review.checkItems) ? review.checkItems.map(normalizeCheckItem) : [],
+    ...(normalizeDailyNewspaper(review.aiNewspaper) ? { aiNewspaper: normalizeDailyNewspaper(review.aiNewspaper) } : {})
   };
 };
 

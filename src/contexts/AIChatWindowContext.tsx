@@ -11,6 +11,7 @@ interface OpenAIChatOptions {
   targetDate?: Date;
   targetSessionId?: string;
   targetMessageId?: string;
+  initialInputText?: string;
 }
 
 interface AIChatWindowContextValue {
@@ -19,6 +20,7 @@ interface AIChatWindowContextValue {
   targetDate?: Date;
   targetSessionId?: string;
   targetMessageId?: string;
+  initialInputText?: string;
   openAIChat: (options?: OpenAIChatOptions) => void;
   closeAIChat: () => void;
   handleAIChatBack: () => boolean;
@@ -42,12 +44,14 @@ export const AIChatWindowProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [targetDate, setTargetDate] = useState<Date | undefined>(undefined);
   const [targetSessionId, setTargetSessionId] = useState<string | undefined>(undefined);
   const [targetMessageId, setTargetMessageId] = useState<string | undefined>(undefined);
+  const [initialInputText, setInitialInputText] = useState<string | undefined>(undefined);
   const aiChatBackHandlerRef = useRef<(() => boolean) | null>(null);
 
   const openAIChat = useCallback((options?: OpenAIChatOptions) => {
     setTargetDate(options?.targetDate ? new Date(options.targetDate) : undefined);
     setTargetSessionId(options?.targetSessionId?.trim() || undefined);
     setTargetMessageId(options?.targetMessageId?.trim() || undefined);
+    setInitialInputText(options?.initialInputText?.trim() || undefined);
     setUnreadCount(0);
     setIsAIChatOpen(true);
   }, []);
@@ -57,6 +61,7 @@ export const AIChatWindowProvider: React.FC<{ children: ReactNode }> = ({ childr
     setTargetDate(undefined);
     setTargetSessionId(undefined);
     setTargetMessageId(undefined);
+    setInitialInputText(undefined);
   }, []);
 
   const registerAIChatBackHandler = useCallback((handler: (() => boolean) | null) => {
@@ -94,6 +99,7 @@ export const AIChatWindowProvider: React.FC<{ children: ReactNode }> = ({ childr
     targetDate,
     targetSessionId,
     targetMessageId,
+    initialInputText,
     openAIChat,
     closeAIChat,
     handleAIChatBack,
@@ -104,6 +110,7 @@ export const AIChatWindowProvider: React.FC<{ children: ReactNode }> = ({ childr
     handleAIChatBack,
     incrementUnreadCount,
     isAIChatOpen,
+    initialInputText,
     markAIChatRead,
     openAIChat,
     targetDate,
@@ -121,6 +128,7 @@ export const AIChatWindowProvider: React.FC<{ children: ReactNode }> = ({ childr
         targetDate={targetDate}
         targetSessionId={targetSessionId}
         targetMessageId={targetMessageId}
+        initialInputText={initialInputText}
         registerBackHandler={registerAIChatBackHandler}
         onUnreadAssistantMessage={incrementUnreadCount}
         onMarkRead={markAIChatRead}

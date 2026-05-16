@@ -35,7 +35,7 @@ export const useHardwareBackButton = () => {
         focusDetailSessionId, setFocusDetailSessionId,
         isAddModalOpen, setIsAddModalOpen,
         isTodoModalOpen, closeTodoDetail,
-        isDailyReviewOpen, setIsDailyReviewOpen, setCurrentReviewDate,
+        isDailyReviewOpen, isDailyNewspaperOpen, setIsDailyReviewOpen, setCurrentReviewDate, setIsDailyNewspaperOpen, setCurrentDailyNewspaperDate,
         isOnThisDayOpen, setIsOnThisDayOpen, setCurrentOnThisDayDate,
         isWeeklyReviewOpen, setIsWeeklyReviewOpen, setCurrentWeeklyReviewStart, setCurrentWeeklyReviewEnd,
         isMonthlyReviewOpen, setIsMonthlyReviewOpen, setCurrentMonthlyReviewStart, setCurrentMonthlyReviewEnd,
@@ -163,6 +163,11 @@ export const useHardwareBackButton = () => {
             }
 
             // 1.5. Daily/Weekly/Monthly Review
+            if (isDailyNewspaperOpen) {
+                setIsDailyNewspaperOpen(false);
+                setCurrentDailyNewspaperDate(null);
+                return;
+            }
             if (isDailyReviewOpen) {
                 setIsDailyReviewOpen(false);
                 setCurrentReviewDate(null);
@@ -234,7 +239,7 @@ export const useHardwareBackButton = () => {
     }, [
         closeTodoDetail, handleAIChatBack, isAIChatOpen,
         isSettingsOpen, isAutoLinkOpen, isSearchOpen, isFiltersOpen, isExportViewOpen, isGalleryViewOpen, isShareViewOpen, focusDetailSessionId, isAddModalOpen, isTodoModalOpen,
-        isDailyReviewOpen, isOnThisDayOpen, isWeeklyReviewOpen, isMonthlyReviewOpen, isAchievementOpen,
+        isDailyNewspaperOpen, isDailyReviewOpen, isOnThisDayOpen, isWeeklyReviewOpen, isMonthlyReviewOpen, isAchievementOpen,
         isStatsFullScreen, isTodoManaging, isTagsManaging, isScopeManaging,
         currentView, selectedTagId, selectedCategoryId, selectedScopeId, settingsSubmenu, settingsSubmenuBackCloses, isSearchOpenedFromSettings, activeFilterId
     ]);

@@ -4,13 +4,17 @@
  * @output Reusable AI chat model definitions, validation helpers, and small presentational components
  * @pos Component Support (AI Integration)
  * @description Centralizes the stable data model and low-risk helper/UI pieces used by AIBackfillChatModal so the main modal focuses on orchestration instead of carrying every type and validator inline.
+ * @updated 2026-05-16: Added daily newspaper result card types so AI chat can open lightweight structured newspaper pages stored on Daily Review.
+ * @updated 2026-05-16: Added per-block enable flags for persona-scoped custom prompt blocks so each extra prompt snippet can be toggled independently.
+ * @updated 2026-05-16: Added optional temporary log overrides for event-driven background assistant turns that need to see a just-saved record before React state settles.
+ * @updated 2026-05-16: Added persona-scoped custom prompt blocks so AI settings can store multiple labeled extra prompt snippets per persona.
  * @updated 2026-05-14: Extracted shared chat types, reminder/scheduled-task validators, and avatar/revealing bubble helpers out of AIBackfillChatModal for a safer first-pass refactor.
  */
 import React, { useEffect, useState } from 'react';
 import { User } from 'lucide-react';
 import type { AIDebugExchange, AIConversationTurn } from '../../services/aiService';
 import { imageService } from '../../services/imageService';
-import type { TodoRecurrenceRule } from '../../types';
+import type { Log, TodoRecurrenceRule } from '../../types';
 import type {
   AssistantAgentConfig,
   AssistantEditableMemoryListKey,
@@ -38,6 +42,13 @@ export type ChatTone = 'normal' | 'system' | 'error' | 'pending';
 export interface AIChatDebugSection {
   label: string;
   exchange: AIDebugExchange;
+}
+
+export interface AIChatCustomPromptBlock {
+  id: string;
+  title: string;
+  content: string;
+  enabled: boolean;
 }
 
 export interface AIChatPersona {
@@ -83,6 +94,15 @@ export interface AIChatDailyReviewWritebackResult {
   mergeMode: 'create' | 'overwrite';
 }
 
+export interface AIChatDailyNewspaperWritebackResult {
+  dailyReviewId: string;
+  date: string;
+  title: string;
+  preview: string;
+  createdReview: boolean;
+  mergeMode: 'create' | 'overwrite';
+}
+
 export interface AIChatMonthlyReviewWritebackResult {
   monthlyReviewId: string;
   monthStartDate: string;
@@ -108,6 +128,7 @@ export interface AIChatMessage {
   dreamUpdates?: AIChatDreamUpdateCard[];
   reminderUpdates?: string[];
   dailyReviewWriteback?: AIChatDailyReviewWritebackResult;
+  dailyNewspaperWriteback?: AIChatDailyNewspaperWritebackResult;
   weeklyReviewWriteback?: AIChatWeeklyReviewWritebackResult;
   monthlyReviewWriteback?: AIChatMonthlyReviewWritebackResult;
   retryInput?: string;
@@ -162,6 +183,11 @@ export interface DailyReviewWritebackConfirmationState {
   date: string;
 }
 
+export interface DailyNewspaperWritebackConfirmationState {
+  sessionId: string;
+  date: string;
+}
+
 export interface DreamMonthRangeSelection {
   yearMonth: string;
   year: number;
@@ -188,6 +214,7 @@ export interface AssistantBackgroundTurnRequestOptions {
   targetSession?: AIChatSession;
   conversationHistory?: AIConversationTurn[];
   showSystemNotification: boolean;
+  logsOverride?: Log[];
 }
 
 export type AISettingsMainTab = 'persona' | 'call';
@@ -215,6 +242,7 @@ export interface InitialChatState {
   activeSessionId: string;
   debugMode: boolean;
   userProfile: AIChatUserProfile;
+  customPromptBlocks: AIChatCustomPromptBlock[];
 }
 
 export interface AssistantBackgroundTimelineEntry {

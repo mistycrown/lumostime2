@@ -4,11 +4,14 @@
  * @output Reusable background-assistant settings section for the AI chat settings panel
  * @pos Component Support (AI Integration)
  * @description Extracts the large background-assistant settings render tree from AIBackfillChatModal while leaving all state mutation logic in the parent modal.
+ * @updated 2026-05-16: Added the log-submission trigger settings block with a multi-tag selector for post-log assistant reactions.
  * @updated 2026-05-15: Extracted the assistant settings section from AIBackfillChatModal.
  */
 import React from 'react';
 import { XCircle } from 'lucide-react';
+import type { Category } from '../../types';
 import type { AssistantAgentConfig, AssistantReminder, AssistantScheduledTask } from '../../types/assistant';
+import { TagMultipleAssociation } from '../TagMultipleAssociation';
 import { AIBackfillChatScheduledTaskSection } from './AIBackfillChatScheduledTaskSection';
 import type {
   AssistantAgentIntervalDrafts,
@@ -36,6 +39,7 @@ interface AIChatAssistantSettingsTheme {
 
 interface AIBackfillChatAssistantSettingsSectionProps {
   assistantAgentConfig: AssistantAgentConfig;
+  categories: Category[];
   assistantAgentIntervalDrafts: AssistantAgentIntervalDrafts;
   assistantAgentIntervalErrors: AssistantAgentIntervalErrors;
   assistantAgentQuietHoursDrafts: AssistantAgentQuietHoursDrafts;
@@ -71,6 +75,7 @@ interface AIBackfillChatAssistantSettingsSectionProps {
 
 export const AIBackfillChatAssistantSettingsSection: React.FC<AIBackfillChatAssistantSettingsSectionProps> = ({
   assistantAgentConfig,
+  categories,
   assistantAgentIntervalDrafts,
   assistantAgentIntervalErrors,
   assistantAgentQuietHoursDrafts,
@@ -379,6 +384,58 @@ export const AIBackfillChatAssistantSettingsSection: React.FC<AIBackfillChatAssi
         >
           {assistantAgentConfig.longTermMemoryEnabled ? '已开启' : '未开启'}
         </button>
+      </div>
+
+      <div className="border-t pt-4" style={{ borderColor: theme.panelBorder }}>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold" style={{ color: theme.textPrimary }}>日志提交触发</p>
+            <p className="mt-1 text-xs leading-5" style={{ color: theme.textMuted }}>
+              新建日志或结束专注后生成记录时，若命中选中标签，就自动发一次后台 System 提示。
+            </p>
+          </div>
+          <button
+            onClick={() => onUpdateAgentConfig({
+              logSubmissionTriggerEnabled: !assistantAgentConfig.logSubmissionTriggerEnabled
+            })}
+            className="inline-flex min-w-[72px] items-center justify-center rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors"
+            style={assistantAgentConfig.logSubmissionTriggerEnabled
+              ? {
+                borderColor: theme.activeBorder,
+                backgroundColor: theme.activeBg,
+                color: theme.textPrimary
+              }
+              : {
+                borderColor: theme.chipBorder,
+                backgroundColor: theme.inputBg,
+                color: theme.textMuted
+              }}
+          >
+            {assistantAgentConfig.logSubmissionTriggerEnabled ? '已开启' : '未开启'}
+          </button>
+        </div>
+
+        {assistantAgentConfig.logSubmissionTriggerEnabled && (
+          <div
+            className="mt-4 rounded-[1rem] border px-4 py-4"
+            style={{
+              borderColor: theme.panelBorder,
+              backgroundColor: theme.panelBg
+            }}
+          >
+            <p className="mb-3 text-xs leading-5" style={{ color: theme.textMuted }}>
+              命中任一标签就触发。
+            </p>
+            <TagMultipleAssociation
+              categories={categories}
+              selectedActivityIds={assistantAgentConfig.logSubmissionTriggerActivityIds}
+              onChange={(activityIds) => onUpdateAgentConfig({
+                logSubmissionTriggerActivityIds: activityIds
+              })}
+              description=""
+            />
+          </div>
+        )}
       </div>
 
       <AIBackfillChatScheduledTaskSection
