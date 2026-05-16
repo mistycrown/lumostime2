@@ -13,6 +13,8 @@ The views are designed as "dumb" or "presentational" components where possible, 
 *   **Modals/Overlays**: Specialized interaction flows (e.g., `SettingsView`, `RecordView`, `DailyReviewView`, `DailyNewspaperView`).
 *   **Management Views**: Bulk editing interfaces (e.g., `BatchManageView`, `TodoBatchManageView`, `GoalBatchManageView`, `ScopeManageView`).
 
+- Update 2026-05-16: `DailyNewspaperView.tsx` now renders every real log from the target day in time order instead of only annotated items, keeps orphaned annotation rows when source logs were deleted, and tightens the newspaper header/body spacing for a denser editorial layout.
+
 > Note: color pickers in detail and batch management views should keep built-in theme colors and persisted custom HEX colors consistent, including todo category colors and scope colors used by stats.
 
 - Update 2026-05-16: `DailyReviewView.tsx` now places the `小报` entry directly under the `AI 叙事` section, opens the shared AI chat with a prefilled `小报` request when that day has no newspaper yet, and requires confirmation before deleting an existing newspaper.

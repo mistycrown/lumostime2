@@ -4,6 +4,7 @@
  * @output Shared command handlers for weekly/monthly writeback entrypoints and daily overwrite confirmation
  * @pos Component Support (AI Integration)
  * @description Extracts the review command coordination layer out of AIBackfillChatModal so the modal keeps the main send-path dispatch while review preparation and overwrite confirmation live in focused helpers.
+ * @updated 2026-05-16: Added explicit date parsing for the `小报` command so daily-review jumps and manual chat commands can target past dates.
  * @updated 2026-05-15: Extracted weekly/monthly review writeback commands plus daily narrative command/confirmation handling from AIBackfillChatModal.
  */
 import { dailyReviewTemplateService } from '../../services/dailyReviewTemplateService';
@@ -115,6 +116,8 @@ interface DailyOverwriteConfirmationOptions extends DailyNarrativeCommandBase {
 }
 
 interface DailyNewspaperCommandOptions extends DailyNewspaperCommandBase {
+  commandText?: string;
+  fallbackDate?: string;
   session: AIChatSession;
 }
 
@@ -124,6 +127,80 @@ interface DailyNewspaperOverwriteConfirmationOptions extends DailyNewspaperComma
   session: AIChatSession;
   userInput: string;
 }
+
+const normalizeCommandDate = (rawValue: string): string | null => {
+  const trimmed = rawValue.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const compactMatch = trimmed.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (compactMatch) {
+    const [, year, month, day] = compactMatch;
+    return `${year}-${month}-${day}`;
+  }
+
+  const dashedMatch = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (!dashedMatch) {
+    return null;
+  }
+
+  const [, year, month, day] = dashedMatch;
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+};
+
+const isValidCommandDate = (value: string): boolean => {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return false;
+  }
+
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const candidate = new Date(year, month - 1, day, 12, 0, 0, 0);
+
+  return candidate.getFullYear() === year
+    && candidate.getMonth() === month - 1
+    && candidate.getDate() === day;
+};
+
+const resolveDailyNewspaperCommandDate = ({
+  commandText,
+  fallbackDate,
+  getLocalDateStr
+}: {
+  commandText?: string;
+  fallbackDate?: string;
+  getLocalDateStr: (date: Date) => string;
+}): { date: string | null; error?: string } => {
+  const trimmed = commandText?.trim() || '';
+  const match = trimmed.match(/^小报(?:\s+(.+))?$/);
+
+  if (match) {
+    const requestedDate = match[1]?.trim();
+    if (requestedDate) {
+      const normalizedDate = normalizeCommandDate(requestedDate);
+      if (!normalizedDate || !isValidCommandDate(normalizedDate)) {
+        return {
+          date: null,
+          error: '小报日期无效。请使用 YYYY-MM-DD，例如：小报 2026-05-16。'
+        };
+      }
+
+      return { date: normalizedDate };
+    }
+  }
+
+  if (fallbackDate && isValidCommandDate(fallbackDate)) {
+    return { date: fallbackDate };
+  }
+
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  return { date: getLocalDateStr(today) };
+};
 
 const buildEnsuredDailyReviewPayload = ({
   categories,
@@ -401,7 +478,9 @@ export const runDailyNewspaperCommand = async ({
   appendSystemMessage,
   categories,
   checkTemplates,
+  commandText,
   dailyReviews,
+  fallbackDate,
   getLocalDateStr,
   logs,
   prepareForInteraction,
@@ -413,9 +492,17 @@ export const runDailyNewspaperCommand = async ({
   todoCategories,
   todos
 }: DailyNewspaperCommandOptions): Promise<void> => {
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
-  const date = getLocalDateStr(today);
+  const resolvedDate = resolveDailyNewspaperCommandDate({
+    commandText,
+    fallbackDate,
+    getLocalDateStr
+  });
+  if (!resolvedDate.date) {
+    appendSystemMessage(session.id, resolvedDate.error || '小报日期无效。');
+    return;
+  }
+
+  const date = resolvedDate.date;
   const { dayDataText, ensuredReview } = buildEnsuredDailyNewspaperPayload({
     categories,
     checkTemplates,

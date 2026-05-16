@@ -4,11 +4,12 @@
  * @output Full-screen editorial newspaper page for one day
  * @pos View (Review System)
  * @description Renders a dedicated daily AI newspaper page based on lightweight Daily Review storage plus real timeline data resolved by log ID.
+ * @updated 2026-05-16: Switched per-log metadata to shared timeline-style pills, kept only notes as body text, tightened typography, and rendered all real logs for the target day while preserving orphaned annotations whose source logs were later deleted.
  * @updated 2026-05-16: Added the first dedicated daily newspaper full-screen view inspired by the chronos-ai reference demo.
  */
 import React, { useMemo } from 'react';
 import type { Category, DailyReview, Log, Scope, TodoItem } from '../types';
-import { getLocalTimeStr } from '../utils/dateUtils';
+import { getLocalDateStr, getLocalTimeStr } from '../utils/dateUtils';
 import { formatDuration } from '../utils/reviewStatsUtils';
 import { getParentTodo } from '../utils/todoHierarchyUtils';
 
@@ -19,6 +20,11 @@ interface DailyNewspaperViewProps {
   categories: Category[];
   todos: TodoItem[];
   scopes: Scope[];
+}
+
+interface TimelineRow {
+  logId: string;
+  log: Log | null;
 }
 
 const formatDateLabel = (date: Date): string => (
@@ -40,30 +46,44 @@ export const DailyNewspaperView: React.FC<DailyNewspaperViewProps> = ({
 }) => {
   const newspaper = review.aiNewspaper;
 
-  const timelineRows = useMemo(() => {
+  const activityMap = useMemo(() => (
+    new Map(
+      categories.flatMap((category) => category.activities.map((activity) => [activity.id, activity] as const))
+    )
+  ), [categories]);
+
+  const timelineRows = useMemo<TimelineRow[]>(() => {
     if (!newspaper) {
       return [];
     }
 
-    const annotationMap = new Map(
-      newspaper.annotations.map((annotation) => [annotation.logId, annotation.comment])
-    );
-
+    const targetDate = getLocalDateStr(date);
     const logMap = new Map(logs.map((log) => [log.id, log]));
-    const orderedLogIds = newspaper.annotations.map((annotation) => annotation.logId);
-    const knownLogIds = new Set(orderedLogIds);
-    const datedLogs = logs
-      .filter((log) => annotationMap.has(log.id))
+    const dayLogs = logs
+      .filter((log) => (
+        getLocalDateStr(new Date(log.startTime)) === targetDate
+        || getLocalDateStr(new Date(log.endTime)) === targetDate
+      ))
       .sort((left, right) => left.startTime - right.startTime);
-    const remainingRows = orderedLogIds
-      .filter((logId) => !datedLogs.some((log) => log.id === logId))
-      .map((logId) => ({ logId, log: logMap.get(logId) || null }));
+    const renderedLogIds = new Set(dayLogs.map((log) => log.id));
+    const orphanedAnnotationRows = newspaper.annotations
+      .filter((annotation) => !renderedLogIds.has(annotation.logId))
+      .map((annotation) => ({
+        logId: annotation.logId,
+        log: logMap.get(annotation.logId) || null
+      }));
 
     return [
-      ...datedLogs.map((log) => ({ logId: log.id, log })),
-      ...remainingRows.filter((row) => knownLogIds.has(row.logId))
+      ...dayLogs.map((log) => ({ logId: log.id, log })),
+      ...orphanedAnnotationRows
     ];
-  }, [logs, newspaper]);
+  }, [date, logs, newspaper]);
+
+  const annotationMap = useMemo(() => (
+    new Map(
+      (newspaper?.annotations || []).map((annotation) => [annotation.logId, annotation.comment])
+    )
+  ), [newspaper]);
 
   if (!newspaper) {
     return (
@@ -77,36 +97,33 @@ export const DailyNewspaperView: React.FC<DailyNewspaperViewProps> = ({
 
   return (
     <div className="h-full overflow-y-auto bg-[#f8f7f5]">
-      <div className="mx-auto min-h-full w-full max-w-3xl bg-white px-6 pb-16 pt-12 shadow-[0_10px_40px_rgba(15,23,42,0.04)] sm:px-10">
-        <header className="border-b border-[#efede8] pb-6">
+      <div className="mx-auto min-h-full w-full max-w-3xl bg-white px-6 pb-16 pt-7 shadow-[0_10px_40px_rgba(15,23,42,0.04)] sm:px-10 sm:pt-8">
+        <header className="border-b border-[#efede8] pb-5">
           <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[#91867a]">
             {formatDateLabel(date)}
           </div>
-          <h1 className="mt-3 font-serif text-4xl font-medium tracking-tight text-black sm:text-5xl">
+          <h1 className="mt-2 font-serif text-[2rem] font-medium tracking-tight text-black sm:text-[2.55rem]">
             {newspaper.title}
           </h1>
-          <p className="mt-3 max-w-2xl font-serif text-lg leading-relaxed text-[#4a433d]">
+          <p className="mt-2 max-w-2xl font-serif text-[15px] leading-7 text-[#4a433d] sm:text-base">
             {newspaper.overallComment}
           </p>
         </header>
 
-        <main className="pt-8">
+        <main className="pt-7">
           <div className="relative pl-7">
-            <div className="absolute left-0 top-4 bottom-4 w-px bg-[#e4e0d9]" />
-            <div className="space-y-10">
+            <div className="absolute bottom-4 left-0 top-4 w-px bg-[#e4e0d9]" />
+            <div className="space-y-7">
               {timelineRows.length === 0 ? (
                 <div className="py-10 text-sm leading-7 text-stone-500">
-                  这一天的小报已经存在，但当前没有可渲染的时间轴批注。
+                  这一天的小报已经存在，但当前没有可渲染的时间轴内容。
                 </div>
               ) : (
                 timelineRows.map((row) => {
                   const log = row.log;
-                  const comment = newspaper.annotations.find((annotation) => annotation.logId === row.logId)?.comment || '';
+                  const comment = annotationMap.get(row.logId) || '';
                   const category = log ? categories.find((item) => item.id === log.categoryId) : undefined;
-                  const activity = log
-                    ? category?.activities.find((item) => item.id === log.activityId)
-                      || categories.flatMap((item) => item.activities).find((item) => item.id === log.activityId)
-                    : undefined;
+                  const activity = log ? activityMap.get(log.activityId) : undefined;
                   const linkedTodo = log?.linkedTodoId
                     ? todos.find((item) => item.id === log.linkedTodoId)
                     : undefined;
@@ -115,7 +132,7 @@ export const DailyNewspaperView: React.FC<DailyNewspaperViewProps> = ({
                     ? (parentTodo ? `${linkedTodo.title} @${parentTodo.title}` : linkedTodo.title)
                     : null;
                   const scopeNames = Array.isArray(log?.scopeIds)
-                    ? log!.scopeIds
+                    ? log.scopeIds
                       .map((scopeId) => scopes.find((item) => item.id === scopeId)?.name || '')
                       .filter(Boolean)
                     : [];
@@ -136,30 +153,46 @@ export const DailyNewspaperView: React.FC<DailyNewspaperViewProps> = ({
                                 </span>
                               )}
                             </div>
-                            <h2 className="font-serif text-[1.4rem] leading-tight text-black">
+                            <h2 className="font-serif text-[1.2rem] leading-tight text-black sm:text-[1.26rem]">
                               {activity?.name || log.title || '未命名记录'}
                             </h2>
-                            <div className="mt-2 space-y-1.5 text-[14px] leading-6 text-[#625b54]">
-                              <p>时长：{formatDuration(log.duration)}</p>
-                              {todoLabel && <p>待办：{todoLabel}</p>}
-                              {scopeNames.length > 0 && <p>领域：{scopeNames.join(' / ')}</p>}
-                              {log.note && <p>备注：{log.note}</p>}
+                            <div className="mt-1.5 flex items-center gap-2 overflow-hidden whitespace-nowrap">
+                              <span className="shrink-0 rounded border border-stone-200 bg-stone-50/30 px-2 py-0.5 text-[10px] font-medium text-stone-500">
+                                {formatDuration(log.duration)}
+                              </span>
+                              {todoLabel && (
+                                <span className="flex min-w-0 items-center gap-1 rounded border border-stone-200 bg-stone-50/30 px-2 py-0.5 text-[10px] font-medium text-stone-500">
+                                  <span className="shrink-0 font-bold text-stone-400">@</span>
+                                  <span className="truncate">{todoLabel}</span>
+                                </span>
+                              )}
+                              {scopeNames.length > 0 && (
+                                <span className="flex min-w-0 items-center gap-1 rounded border border-stone-200 bg-stone-50/30 px-2 py-0.5 text-[10px] font-medium text-stone-500">
+                                  <span className="shrink-0 font-bold text-stone-400">%</span>
+                                  <span className="truncate">{scopeNames.join(' / ')}</span>
+                                </span>
+                              )}
                             </div>
+                            {log.note && (
+                              <p className="mt-2 text-[13px] leading-5 text-[#625b54]">
+                                {log.note}
+                              </p>
+                            )}
                           </>
                         ) : (
                           <>
                             <div className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#9d9489]">
                               原记录已不存在
                             </div>
-                            <h2 className="font-serif text-[1.25rem] leading-tight text-black">
-                              这条批注对应的时间记录已被删除
+                            <h2 className="font-serif text-[1.12rem] leading-tight text-black sm:text-[1.18rem]">
+                              这条批注对应的时间记录已经被删除
                             </h2>
                           </>
                         )}
 
                         {comment && (
-                          <div className="mt-4 border-l-2 border-[#d8d2c7] pl-4">
-                            <p className="font-serif text-[15px] italic leading-7 text-[#7b746c]">
+                          <div className="mt-3 border-l-2 border-[#d8d2c7] pl-4">
+                            <p className="font-serif text-[14px] italic leading-6 text-[#7b746c]">
                               {comment}
                             </p>
                           </div>

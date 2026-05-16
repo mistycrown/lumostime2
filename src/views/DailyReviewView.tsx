@@ -698,7 +698,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     const handleGenerateNewspaper = () => {
         openAIChat({
             targetDate: date,
-            initialInputText: '小报'
+            initialInputText: `小报 ${review.date}`
         });
     };
 

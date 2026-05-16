@@ -4660,12 +4660,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     })
   );
 
-  const handleDailyNewspaperCommand = async (session: AIChatSession) => (
+  const handleDailyNewspaperCommand = async (session: AIChatSession, commandText: string) => (
     runDailyNewspaperCommandFlow({
       appendSystemMessage,
       categories,
       checkTemplates,
+      commandText,
       dailyReviews,
+      fallbackDate: targetDate ? getLocalDateStr(defaultTargetDate) : undefined,
       getLocalDateStr,
       logs,
       prepareForInteraction: prepareForTemplateInteraction,
@@ -4928,9 +4930,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return;
     }
 
-    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession && trimmedText === '小报' && !options?.replaceMessageId) {
+    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession && /^小报(?:\s+.+)?$/.test(trimmedText) && !options?.replaceMessageId) {
       appendUserMessage(activeSession.id, trimmedText);
-      await handleDailyNewspaperCommand(activeSession);
+      await handleDailyNewspaperCommand(activeSession, trimmedText);
       return;
     }
 
