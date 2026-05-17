@@ -9,6 +9,7 @@
  * @updated 2026-05-17: 扩展了桌面小组件的支持，新增 desktop-quick（小事清单小组件）快照构建与窗口检测，实现了 buildDesktopQuickWidgetSnapshot 以确保无排期的小事能够完整呈现在小组件待办列表中。
  * @updated 2026-05-17: Added a dedicated `desktop-editor` route and shared payload type for the transparent widget quick-editor window.
  * @updated 2026-05-17: Added desktop widget route detection plus today/pin/overdue snapshot builders for the Electron desktop today widget and month-widget window, with getDesktopWidgetType helper support.
+ * @updated 2026-05-17: Kept completed todos visible in desktop today/quick widget snapshots so the widget views can render them after unfinished rows instead of dropping them.
  */
 import { USER_DATA_KEYS, storage } from '../constants/storageKeys';
 import { Category, TodoItem, ActiveSession } from '../types';
@@ -135,6 +136,13 @@ const buildDesktopWidgetTodoItem = (
   };
 };
 
+const sortWidgetTodosByCompletionAndTitle = (
+  list: TodoItem[]
+): TodoItem[] => [...list].sort((left, right) => (
+  Number(left.isCompleted) - Number(right.isCompleted)
+  || left.title.localeCompare(right.title, 'zh-CN')
+));
+
 const getOverdueSortKey = (todo: TodoItem, todayDateKey: string): string => {
   const overdueCandidates = [todo.deadlineDate, todo.scheduledDate]
     .filter((value): value is string => Boolean(value && value < todayDateKey))
@@ -146,18 +154,25 @@ const buildOverdueTodos = (
   todos: TodoItem[],
   categories: Category[],
   referenceDate: Date,
-  visibleTodayIds: Set<string>
+  visibleTodayIds: Set<string>,
+  options?: {
+    includeCompleted?: boolean;
+  }
 ): DesktopWidgetTodoItem[] => {
   const todayDateKey = formatDateKey(referenceDate);
 
   return todos
-    .filter((todo) => !todo.isCompleted)
+    .filter((todo) => (options?.includeCompleted ? true : !todo.isCompleted))
     .filter((todo) => !visibleTodayIds.has(todo.id))
     .filter((todo) => (
       Boolean(todo.deadlineDate && todo.deadlineDate < todayDateKey)
       || Boolean(todo.scheduledDate && todo.scheduledDate < todayDateKey)
     ))
     .sort((left, right) => {
+      const completionDiff = Number(left.isCompleted) - Number(right.isCompleted);
+      if (completionDiff !== 0) {
+        return completionDiff;
+      }
       const leftKey = getOverdueSortKey(left, todayDateKey);
       const rightKey = getOverdueSortKey(right, todayDateKey);
       return leftKey.localeCompare(rightKey) || left.title.localeCompare(right.title, 'zh-CN');
@@ -232,30 +247,31 @@ export const buildDesktopTodayWidgetSnapshot = ({
 }): DesktopTodayWidgetSnapshot => {
   const referenceDate = new Date(date);
   const dateKey = formatDateKey(referenceDate);
-  const visibleTodayTodos = getTodoAssociationTodayTodos(todos, referenceDate);
-  const visibleTodayIds = new Set(visibleTodayTodos.map((todo) => todo.id));
-  const visibleTodayCompletedTodos = getTodoAssociationTodayTodos(todos, referenceDate, {
+  const visibleTodayTodos = getTodoAssociationTodayTodos(todos, referenceDate, {
     includeCompleted: true
-  }).filter((todo) => todo.isCompleted);
+  });
+  const visibleTodayIds = new Set(visibleTodayTodos.map((todo) => todo.id));
 
-  const pinned = visibleTodayTodos
+  const pinned = sortWidgetTodosByCompletionAndTitle(visibleTodayTodos
     .filter((todo) => Boolean(todo.pin))
-    .map((todo) => buildDesktopWidgetTodoItem(todo, todos, categories, 'PIN'));
+  ).map((todo) => buildDesktopWidgetTodoItem(todo, todos, categories, 'PIN'));
   
-  const maybeItems = visibleTodayTodos
+  const maybeItems = sortWidgetTodosByCompletionAndTitle(visibleTodayTodos
     .filter((todo) => !todo.pin && hasMaybeDate(todo, dateKey, referenceDate))
-    .map((todo) => buildDesktopWidgetTodoItem(todo, todos, categories, 'MAYBE'));
+  ).map((todo) => buildDesktopWidgetTodoItem(todo, todos, categories, 'MAYBE'));
     
-  const todayItems = visibleTodayTodos
+  const todayItems = sortWidgetTodosByCompletionAndTitle(visibleTodayTodos
     .filter((todo) => !todo.pin && !hasMaybeDate(todo, dateKey, referenceDate))
-    .map((todo) => buildDesktopWidgetTodoItem(todo, todos, categories, 'TODAY'));
+  ).map((todo) => buildDesktopWidgetTodoItem(todo, todos, categories, 'TODAY'));
     
-  const overdue = buildOverdueTodos(todos, categories, referenceDate, visibleTodayIds);
-  const completedItems = visibleTodayCompletedTodos
-    .map((todo) => buildDesktopWidgetTodoItem(todo, todos, categories, 'TODAY'));
+  const overdue = buildOverdueTodos(todos, categories, referenceDate, visibleTodayIds, {
+    includeCompleted: true
+  });
+  const allVisibleItems = [...pinned, ...todayItems, ...maybeItems, ...overdue];
+  const completedItems = allVisibleItems.filter((item) => item.isCompleted);
 
-  const remaining = pinned.length + maybeItems.length + todayItems.length + overdue.length;
-  const completed = visibleTodayCompletedTodos.length;
+  const completed = completedItems.length;
+  const remaining = allVisibleItems.length - completed;
 
   return {
     date: dateKey,
@@ -309,9 +325,8 @@ export const buildDesktopQuickWidgetSnapshot = ({
   // 1. 过滤已完成和未完成的小事
   const uncompletedQuickTodos = todos.filter((todo) => !todo.isCompleted);
   // 已完成的我们仍然只保留今天完成的小事，以便展示已完成列表
-  const completedTodayQuickTodos = todos.filter(
-    (todo) => todo.isCompleted && todo.completedAt && formatDateKey(new Date(todo.completedAt)) === dateKey
-  );
+  // Completed quick todos stay in the snapshot so the flat widget list can render them at the end.
+  const completedQuickTodos = todos.filter((todo) => todo.isCompleted);
 
   // 2. 归类置顶小事
   const pinnedTodos = uncompletedQuickTodos.filter((todo) => Boolean(todo.pin));
@@ -355,12 +370,12 @@ export const buildDesktopQuickWidgetSnapshot = ({
   const overdue = sortTodos(overdueTodos).map((todo) =>
     buildDesktopWidgetTodoItem(todo, todos, categories, 'LATE')
   );
-  const completedItems = sortTodos(completedTodayQuickTodos).map((todo) =>
+  const completedItems = sortTodos(completedQuickTodos).map((todo) =>
     buildDesktopWidgetTodoItem(todo, todos, categories, 'TODAY')
   );
 
   const remaining = pinned.length + maybeItems.length + todayItems.length + overdue.length;
-  const completed = completedTodayQuickTodos.length;
+  const completed = completedQuickTodos.length;
 
   return {
     date: dateKey,

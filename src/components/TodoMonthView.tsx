@@ -8,7 +8,7 @@
  * @updated 2026-05-17: Added a dashed outline border around "maybe" schedule items in the month view grid matching their type color.
  * @updated 2026-05-17: Added a strike-through (line-through) style to "completed" schedule items in both month view grid cells and expanded details.
  * @updated 2026-05-17: Wired up click handlers on monthly trace segments to trigger the quick actions sheet.
- 
+ * @updated 2026-05-17: 支持在格子中为 due 类型的条目加上 flag 图标（并实现超出截断且 flag 完整显示），并将 trace / 连续 trace 条目字色置为灰色。
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -1290,7 +1290,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                   {visibleTraceSegments.map((segment) => (
                     <div
                       key={`${week.id}-${segment.todoId}-${segment.startDayIndex}-${segment.endDayIndex}`}
-                      className={`absolute flex items-center overflow-hidden font-medium leading-[1.2] text-stone-800 ${monthCellTaskClassName} ${
+                      className={`absolute flex items-center overflow-hidden font-medium leading-[1.2] text-stone-400 dark:text-stone-500/90 ${monthCellTaskClassName} ${
                         onOpenTodo ? 'cursor-pointer pointer-events-auto' : ''
                       }`}
                       style={getTraceSegmentStyle(segment)}
@@ -1421,16 +1421,35 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                               );
                             }
 
+                            const isCompleted = entry.primaryKind === 'completed';
+                            const isTrace = entry.primaryKind === 'inProgress';
+                            const isDue = entry.primaryKind === 'deadline';
+
+                            const textClassName = isCompleted
+                              ? 'line-through text-stone-400/90 dark:text-stone-500/90'
+                              : (isTrace
+                                ? 'text-stone-400 dark:text-stone-500/90'
+                                : 'text-stone-800 dark:text-stone-200');
+
+                            const shapeClassName = entry.primaryKind === 'maybe'
+                              ? 'rounded-[2px] px-[3px]'
+                              : 'border-l-[1.5px] pl-[3px]';
+
+                            const markerColor = getTodoMarkerColor(entry);
+
                             return (
                               <div
                                 key={`${dateKey}-${entry.todo.id}-${entry.primaryKind}`}
-                                className={`overflow-hidden text-clip whitespace-nowrap font-medium leading-[1.2] ${entry.primaryKind === 'completed' ? 'line-through text-stone-400/90 dark:text-stone-500/90' : 'text-stone-800'} ${monthCellTaskClassName} ${entry.primaryKind === 'maybe' ? 'rounded-[2px] px-[3px]' : 'border-l-[1.5px] pl-[3px]'}`}
+                                className={`flex items-center justify-between gap-0.5 overflow-hidden font-medium leading-[1.2] ${textClassName} ${monthCellTaskClassName} ${shapeClassName}`}
                                 style={{
                                   ...getTodoMarkerStyle(entry),
                                   ...monthCellRowStyle
                                 }}
                               >
-                                {entry.todo.title}
+                                <span className="truncate flex-1">{entry.todo.title}</span>
+                                {isDue && (
+                                  <Flag size={10} style={{ color: markerColor, fill: markerColor, paddingRight: '2px' }} className="shrink-0 ml-0.5" />
+                                )}
                               </div>
                             );
                           })}
@@ -1476,7 +1495,10 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                           const activeTags = MONTH_VIEW_ENTRY_TAGS.filter(({ key }) => entry.badges[key]);
                           const activeTagCount = activeTags.length;
                           const completedDateKey = entry.todo.completedAt ? formatDateKey(new Date(entry.todo.completedAt)) : null;
-                          const titleClassName = 'text-stone-800';
+                          const isTrace = entry.primaryKind === 'inProgress';
+                          const titleClassName = isTrace
+                            ? 'text-stone-400 dark:text-stone-500/90'
+                            : 'text-stone-800 dark:text-stone-200';
                           const parentTodo = getParentTodo(todos, entry.todo);
                           const parentTitle = parentTodo?.title || null;
                           const parentTitleClassName = 'text-stone-400';

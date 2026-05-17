@@ -4,6 +4,8 @@
  * @updated 2026-05-17: 移除了所有分组标题（包括“今天/置顶/逾期”），使得列表完全扁平化展示，视觉更加纯粹精简，完美匹配“小事待办”的产品调性。
  * @updated 2026-05-17: 移除了顶部控制栏的日期显示，使标题栏更加纯粹极简。
  * @updated 2026-05-17: 移除任务圆点及任务颜色设置，增加屏幕内快速添加小事功能（提供加号快捷按钮、精致输入窗与回车/ESC按键处理）。
+ * @updated 2026-05-17: Keep completed quick todos visible in the flat list and place them after unfinished rows.
+ * @updated 2026-05-17: Softened the completed checkbox treatment so finished rows read quieter than unfinished rows.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, ExternalLink, X, SlidersHorizontal, Plus } from 'lucide-react';
@@ -62,8 +64,8 @@ const TodoRow: React.FC<{
           className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition disabled:cursor-wait disabled:opacity-60 ${
             item.isCompleted
               ? isDark
-                ? 'bg-stone-200 border-stone-200 text-stone-900'
-                : 'bg-stone-800 border-stone-800 text-white'
+                ? 'bg-stone-700/60 border-stone-600 text-stone-300'
+                : 'bg-stone-200/80 border-stone-300 text-stone-500'
               : isDark
               ? 'bg-transparent border-stone-700 text-transparent hover:border-stone-500'
               : 'bg-transparent border-stone-300 text-transparent hover:border-stone-500'
@@ -192,7 +194,15 @@ export const DesktopQuickWidgetView: React.FC = () => {
       ...(snapshot.overdue || [])
     ].filter(item => !item.isCompleted && !pinnedIds.has(item.todoId));
 
-    return [...pinnedItems, ...otherItems];
+    const visibleTodoIds = new Set([
+      ...pinnedItems.map((item) => item.todoId),
+      ...otherItems.map((item) => item.todoId)
+    ]);
+    const completedItems = (snapshot.completed || []).filter(
+      (item) => !visibleTodoIds.has(item.todoId)
+    );
+
+    return [...pinnedItems, ...otherItems, ...completedItems];
   }, [snapshot]);
 
   const handleOpenTodoQuickEditor = async (

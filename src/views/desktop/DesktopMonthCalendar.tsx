@@ -10,9 +10,10 @@
  * @updated 2026-05-17: Switched month-cell overflow from a fixed per-page row cap to ResizeObserver-backed height estimation so taller widgets use their spare space before collapsing to `+N`.
  * @updated 2026-05-17: Wired up click handlers on monthly trace segments to trigger the quick actions popover outside widget bounds.
  * @updated 2026-05-17: Switched desktop month-entry marker colors to the shared `primaryKind`, so completed rows now keep completed styling even when due/arrange/maybe badges also match on the same day.
- * @updated 2026-05-17: 支持在月历小组件显示设置中切换任务着色模式（按排期/按分类），并完美读取分类着色数据。
+ * @updated 2026-05-17: 支持在月视图中如果是 due 则在任务名称后显示 flag 图标，如果是 trace 则将文字设为灰色。
  */
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Flag } from 'lucide-react';
 import { addDays, format, isSameDay } from 'date-fns';
 import { Log, TodoCategory, TodoItem } from '../../types';
 import {
@@ -356,7 +357,7 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
                   <div
                     key={`${weekIndex}-${segment.todoId}-${segment.startDayIndex}-${segment.endDayIndex}`}
                     className={`absolute flex items-center overflow-hidden font-medium leading-[1.2] ${
-                      isDark ? 'text-stone-200' : 'text-stone-800'
+                      isDark ? 'text-stone-500' : 'text-stone-400'
                     } text-[0.74rem] ${onOpenTodo ? 'cursor-pointer pointer-events-auto' : ''}`}
                     style={getTraceSegmentStyle(segment)}
                     title={segment.entry.todo.title}
@@ -464,12 +465,21 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
                           }
 
                           const draggable = isEntryDraggable(entry, isScheduleLocked);
-                          const textClassName = entry.primaryKind === 'completed'
+                          const isCompleted = entry.primaryKind === 'completed';
+                          const isTrace = entry.primaryKind === 'inProgress';
+                          const isDue = entry.primaryKind === 'deadline';
+
+                          const textClassName = isCompleted
                             ? (isDark ? 'line-through text-stone-500/90' : 'line-through text-stone-400/90')
-                            : (isDark ? 'text-stone-200' : 'text-stone-800');
+                            : (isTrace
+                              ? (isDark ? 'text-stone-500' : 'text-stone-400')
+                              : (isDark ? 'text-stone-200' : 'text-stone-800'));
+
                           const shapeClassName = entry.primaryKind === 'maybe'
                             ? 'rounded-[2px] px-[3px]'
                             : 'border-l-[1.5px] pl-[3px]';
+
+                          const markerColor = getTodoMarkerColor(entry);
 
                           return (
                             <div
@@ -484,7 +494,7 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
                                 setDraggingEntry(entry);
                               }}
                               onDragEnd={stopDragging}
-                              className={`overflow-hidden text-clip whitespace-nowrap font-medium leading-[1.2] ${textClassName} ${shapeClassName} ${
+                              className={`flex items-center justify-between gap-0.5 overflow-hidden font-medium leading-[1.2] ${textClassName} ${shapeClassName} ${
                                 draggable ? 'cursor-grab active:cursor-grabbing' : ''
                               } text-[0.74rem]`}
                               style={{
@@ -502,13 +512,19 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
                                       onOpenTodo(entry.todo, anchor);
                                     });
                                   }}
-                                  className="block w-full truncate text-left"
+                                  className="flex w-full items-center justify-between gap-0.5 text-left"
                                 >
-                                  {entry.todo.title}
+                                  <span className="truncate flex-1">{entry.todo.title}</span>
+                                  {isDue && (
+                                    <Flag size={10} style={{ color: markerColor, fill: markerColor, paddingRight: '2px' }} className="shrink-0 ml-0.5" />
+                                  )}
                                 </button>
                               ) : (
-                                <div className="truncate">
-                                  {entry.todo.title}
+                                <div className="flex w-full items-center justify-between gap-0.5">
+                                  <span className="truncate flex-1">{entry.todo.title}</span>
+                                  {isDue && (
+                                    <Flag size={10} style={{ color: markerColor, fill: markerColor, paddingRight: '2px' }} className="shrink-0 ml-0.5" />
+                                  )}
                                 </div>
                               )}
                             </div>
