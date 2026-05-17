@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-05-17: `desktopWidgetService.ts` now builds a compact Electron desktop-widget snapshot from shared today-task logic, splitting pinned, today, and overdue todos while reusing persisted category/activity metadata from local storage.
+
 Contains business logic and external integrations.
 
 Update 2026-05-17: `aiService.ts` now forwards provider-native reasoning summaries through the generic structured-JSON request path too, so ordinary-chat writeback flows like `日报` and `小报` can render the same collapsible `推理过程` block as regular assistant replies.
@@ -86,6 +88,7 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 - `weeklyReviewTemplateService.ts`: [Active] - Parses weekly-review template range commands, strictly resolves one of the four supported analysis methods, exposes staged setup prompts for the chat-native `select_range / select_method / ready` flow, locates or creates Weekly Review records for a chosen week, builds compact weekly data-package text from logs/todos/daily reviews, and prepares dedicated weekly-review chat plus AI-narrative writeback prompts from shared TS constants outside the generic assistant prompt stack.
 - `todoScheduleColorService.ts`: [Active] - Persists the shared `默认 / 自定义` schedule-type marker palette for Todo schedule views, normalizes per-type HEX overrides, and resolves the five Arrange / Due / Repeat / Done / Trace colors consumed by week and month displays.
 - `widgetService.ts`: [Active] - Centralizes widget payload and template helpers, including the TODAY + PIN list payload that stays aligned with shared today-category matching for pinned, due-today, arranged-today, and recurring-today todos while also mirroring source todo/category snapshots and recurrence fallback metadata for native refresh rebuilding.
+- `desktopWidgetService.ts`: [Active] - Builds the lightweight Electron desktop-widget route detection and today-task snapshot used by the frameless desktop today widget, reusing shared todo schedule logic while staying separate from the Android native widget bridge.
 - `achievementBottleStyleService.ts`: [Active] - Defines achievement bottle skin options, including lighter glass palettes and the extended neutral bottle set.
 - `timelineStyleService.ts`: [Active] - Manages timeline style themes, defaults, Memoir-specific offset values, and config normalization for shared timeline nodes.
 - `themePresetService.ts`: [Active] - 主题预设应用服务，拆分复杂的主题切换逻辑为独立方法

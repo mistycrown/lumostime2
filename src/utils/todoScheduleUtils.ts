@@ -254,7 +254,7 @@ export const normalizeSkipDates = (
   return normalized.length > 0 ? normalized : undefined;
 };
 
-const hasMaybeDate = (
+export const hasMaybeDate = (
   todo: TodoItem,
   targetDateKey: string,
   referenceDate: Date = new Date()
@@ -268,7 +268,8 @@ export const isTodoInAssociationTodayCategory = (
   return Boolean(todo.pin)
     || todo.scheduledDate === todayDateKey
     || todo.deadlineDate === todayDateKey
-    || matchesRecurrenceRule(todo.recurrenceRule, todayDateKey);
+    || matchesRecurrenceRule(todo.recurrenceRule, todayDateKey)
+    || hasMaybeDate(todo, todayDateKey, referenceDate);
 };
 
 export const getTodoAssociationTodayTodos = (

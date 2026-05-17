@@ -31,7 +31,8 @@ export type SettingsSubmenu =
     | 'scene'
     | 'emoji'
     | 'principle'
-    | 'widget';
+    | 'widget'
+    | 'desktop_widget';
 
 interface NavigationContextType {
     // 主视图

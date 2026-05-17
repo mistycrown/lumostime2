@@ -2,6 +2,8 @@
 
 The `views/` directory contains all the React components that represent the distinct screens or pages of the LumosTime application. This layer is responsible for the presentation logic and user interaction.
 
+- Update 2026-05-17: `DesktopTodayWidgetView.tsx` now provides a dedicated Electron-only today-task widget surface with compact `Pin / Today / Overdue` sections, while `SettingsView.tsx` adds a desktop launcher entry (Electron-only, in the Android features section) that directly opens the today-task widget window without navigating to a submenu.
+
 ## Architecture
 
 The views are designed as "dumb" or "presentational" components where possible, receiving their data and callbacks via props from the main container (`App.tsx`). This centralization of state management in `App.tsx` (or custom hooks) keeps the views focused on rendering.

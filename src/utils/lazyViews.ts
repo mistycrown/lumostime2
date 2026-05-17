@@ -49,6 +49,7 @@ const loadCloudSyncSettingsView = () => import('../views/settings/CloudSyncSetti
 const loadS3SyncSettingsView = () => import('../views/settings/S3SyncSettingsView').then((module) => ({ default: module.S3SyncSettingsView }));
 const loadDataManagementView = () => import('../views/settings/DataManagementView').then((module) => ({ default: module.DataManagementView }));
 const loadWidgetSettingsView = () => import('../views/settings/WidgetSettingsView').then((module) => ({ default: module.WidgetSettingsView }));
+const loadDesktopWidgetSettingsView = () => import('../views/settings/DesktopWidgetSettingsView').then((module) => ({ default: module.DesktopWidgetSettingsView }));
 
 export const SearchViewLazy = lazyWithPreload(loadSearchView);
 export const FocusDetailViewLazy = lazyWithPreload(loadFocusDetailView);
@@ -77,6 +78,7 @@ export const CloudSyncSettingsViewLazy = lazyWithPreload(loadCloudSyncSettingsVi
 export const S3SyncSettingsViewLazy = lazyWithPreload(loadS3SyncSettingsView);
 export const DataManagementViewLazy = lazyWithPreload(loadDataManagementView);
 export const WidgetSettingsViewLazy = lazyWithPreload(loadWidgetSettingsView);
+export const DesktopWidgetSettingsViewLazy = lazyWithPreload(loadDesktopWidgetSettingsView);
 
 type Preloader = () => Promise<unknown>;
 
@@ -109,7 +111,8 @@ const secondaryPreloaders: Preloader[] = [
   FiltersSettingsViewLazy.preload,
   CollectionSettingsViewLazy.preload,
   S3SyncSettingsViewLazy.preload,
-  WidgetSettingsViewLazy.preload
+  WidgetSettingsViewLazy.preload,
+  DesktopWidgetSettingsViewLazy.preload
 ];
 
 let hasStartedAppViewPreload = false;

@@ -6,19 +6,8 @@
  * @description The central configuration hub. Manages Cloud Sync (WebDAV), AI integration (Providers/Presets), Data (Import/Export), and Application Preferences (Appearance, Habits, etc.), including settings subpage hierarchy state and in-session main-list scroll restoration while keeping manual sync payloads aligned with repository-backed data.
  *
  * 修改历史:
- * - 2026-03-23: 接入云端图片一致性检查与按本地状态修复入口，补齐数据管理页中的图片清理入口。
- * - 2026-03-19: 恢复场景设置为直接加载，排查并修复子页面白屏无法打开的问题。
- * - 2026-04-13: Localized widget settings entry and loading label to Chinese.
- * - 2026-04-13: Passed todo and scope sources into widget settings so slot preview modals can reuse the existing selectors.
- * - 2026-04-19: Added a separate compatible S3 sync path alongside the existing Tencent Cloud COS flow.
- * - 2026-04-25: Passed timeline quick-action preferences through to the preferences settings page.
- * - 2026-05-05: Moved the widget settings entry below the floating-window toggle in the Android features section.
- * - 2026-05-10: Upgraded the post-start timer jump preference to a three-mode dropdown and passed the new mode setter into PreferencesSettingsView.
- * - 2026-05-12: Added a `Collection` subpage under the content section and moved the Collection entrance there with a minimalist archive-style browser.
- * - 2026-05-12: Swapped the Collection entry icon in settings from archive to star to match the timeline quick action.
- * - 2026-05-13: Kept `Settings > Collections` mounted underneath shared log/todo detail overlays so closing those details returns directly to the current collection page.
- * - 2026-05-13: Fixed the garbled loading label shown while opening the Collection settings subpage.
- * 
+ * - 2026-05-17: Added a desktop launcher entry in the Android features section (Electron-only) to open the dedicated today-task widget window.
+
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useRef, useEffect } from 'react';
@@ -117,6 +106,7 @@ import {
     CollectionSettingsViewLazy as CollectionSettingsView,
     CloudSyncSettingsViewLazy as CloudSyncSettingsView,
     DataManagementViewLazy as DataManagementView,
+    DesktopWidgetSettingsViewLazy as DesktopWidgetSettingsView,
     EmojiSettingsViewLazy as EmojiSettingsView,
     FiltersSettingsViewLazy as FiltersSettingsView,
     MemoirSettingsViewLazy as MemoirSettingsView,
@@ -508,10 +498,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const handleSyncUpload = async () => {
         if (!webdavConfig) return;
         setIsSyncing(true);
-        
+
         try {
             const localData = getFullLocalData();
-            
+
             // 验证数据
             const uploadCheck = canSafelyUpload(localData);
             if (!uploadCheck.canUpload) {
@@ -532,7 +522,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 const now = Date.now();
                 setLocalDataTimestampValue(now);
                 console.log(`[Settings] WebDAV 上传完成，本地时间戳已更新: ${now}`);
-                
+
                 onToast('success', result.message);
             } else {
                 onToast('error', result.message);
@@ -550,10 +540,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         if (!window.confirm("这将使用云端版本覆盖当前本地数据。首先会将当前本地数据的备份上传到云端的 'backups/' 目录。确定吗？")) return;
 
         setIsSyncing(true);
-        
+
         try {
             const localData = getFullLocalData();
-            
+
             // 使用统一的下载函数（包含备份）
             const result = await downloadWithBackup(
                 webdavService,
@@ -567,7 +557,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 const now = Date.now();
                 setLocalDataTimestampValue(now);
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
-                
+
                 // 同步完成后关闭设置页面，自动刷新到脉络页面
                 setTimeout(() => {
                     onClose();
@@ -587,10 +577,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const handleS3SyncUpload = async () => {
         if (!s3Config) return;
         setIsSyncing(true);
-        
+
         try {
             const localData = getFullLocalData();
-            
+
             // 验证数据
             const uploadCheck = canSafelyUpload(localData);
             if (!uploadCheck.canUpload) {
@@ -611,7 +601,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 const now = Date.now();
                 setLocalDataTimestampValue(now);
                 console.log(`[Settings] S3 上传完成，本地时间戳已更新: ${now}`);
-                
+
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
             } else {
                 onToast('error', result.message);
@@ -627,7 +617,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const handleCompatibleS3SyncUpload = async () => {
         if (!compatibleS3Config) return;
         setIsSyncing(true);
-        
+
         try {
             const localData = getFullLocalData();
             const uploadCheck = canSafelyUpload(localData);
@@ -662,11 +652,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         // 从 localStorage 读取场景组设置（兼容旧版 sceneTimeSlots）
         const sceneGroupState = loadSceneGroupStateFromStorage();
         const sceneTimeSlots = getActiveSceneGroup(sceneGroupState)?.timeSlots || [];
-        
+
         // 从 localStorage 读取原则库
         const principlesStr = localStorage.getItem('lumostime_principles');
         const principles = principlesStr ? JSON.parse(principlesStr) : [];
-        
+
         const localData = {
             logs: ctxLogs,
             todos: ctxTodos,
@@ -704,10 +694,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         if (!window.confirm("这将使用 COS 版本覆盖当前本地数据。首先会将当前本地数据的备份上传到云端的 'backups/' 目录。确定吗？")) return;
 
         setIsSyncing(true);
-        
+
         try {
             const localData = getFullLocalData();
-            
+
             // 使用统一的下载函数（包含备份）
             const result = await downloadWithBackup(
                 s3Service,
@@ -721,7 +711,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 const now = Date.now();
                 setLocalDataTimestampValue(now);
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
-                
+
                 // 同步完成后关闭设置页面
                 setTimeout(() => {
                     onClose();
@@ -742,7 +732,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         if (!window.confirm("这将使用兼容 S3 版本覆盖当前本地数据。首先会将当前本地数据的备份上传到云端的 'backups/' 目录。确定吗？")) return;
 
         setIsSyncing(true);
-        
+
         try {
             const localData = getFullLocalData();
             const result = await downloadWithBackup(
@@ -757,7 +747,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 const now = Date.now();
                 setLocalDataTimestampValue(now);
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
-                
+
                 setTimeout(() => {
                     onClose();
                 }, 1000);
@@ -1316,8 +1306,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
     if (activeSubmenu === 'sponsorship_preview') {
         return renderLazySettingsSubview(
-            <SponsorshipView 
-                onBack={handleBackToMain} 
+            <SponsorshipView
+                onBack={handleBackToMain}
                 onToast={onToast}
                 categories={categoriesData}
             />,
@@ -1341,6 +1331,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 scopes={scopes || []}
             />,
             '正在加载小组件计时器...'
+        );
+    }
+
+    if (activeSubmenu === 'desktop_widget') {
+        return renderLazySettingsSubview(
+            <DesktopWidgetSettingsView
+                onBack={handleBackToMain}
+            />,
+            '正在加载桌面小组件...'
         );
     }
 
@@ -1459,9 +1458,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <MenuItem
                             icon={<LayoutGrid size={18} className="text-sky-500" />}
                             label="小组件"
-                            isLast
+                            isLast={!isElectronEnvironment()}
                             onClick={() => openSettingsSubmenu('widget')}
                         />
+                        {isElectronEnvironment() && (
+                            <MenuItem
+                                icon={<LayoutGrid size={18} className="text-amber-500" />}
+                                label="桌面今日小组件"
+                                isLast
+                                onClick={() => openSettingsSubmenu('desktop_widget')}
+                            />
+                        )}
                     </div>
                 </div>
                 {/* Section: Daily Review */}
