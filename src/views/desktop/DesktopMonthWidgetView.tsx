@@ -4,6 +4,7 @@
  * @output Unified desktop month widget view with one shared title bar, week-paged calendar, and collapsible planning sidebar
  * @pos View (Desktop widget)
  * @description Hosts the Electron desktop month widget, including one unified header, compact display settings, a 2/3/4-week paged calendar body, and the right-side Arrange / Maybe / Due planning sidebar.
+ * @updated 2026-05-17: Added a dedicated month-entry background opacity slider in display settings so the widget can strengthen or soften item fills without changing the window glass opacity.
  * @updated 2026-05-17: The planning sidebar now keeps unfinished todos visible across arrange/maybe/due even when they already have dates, and shows those dated rows with compact trailing labels.
  * @updated 2026-05-17: 改良计划栏分类标签，调整顺序为 maybe / arrange / due 并默认选中 arrange 标签。
  * @updated 2026-05-17: Grouped the planning sidebar by todo category, removed the misleading linked-category line, and restored one-level subtask visibility with standalone `@parent` labels when a parent row is filtered out.
@@ -29,6 +30,7 @@ const APP_READY_EVENT = 'lumostime:app-ready';
 const DISPLAY_SETTINGS_STORAGE_KEY = 'desktop-month-widget:display-settings';
 const ROWS_PER_SCREEN_STORAGE_KEY = 'desktop-month-widget:rows-per-screen';
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'desktop-month-widget:sidebar-collapsed';
+const DEFAULT_ENTRY_BACKGROUND_OPACITY = 0.08;
 const ROWS_PER_SCREEN_OPTIONS = [2, 3, 4] as const;
 
 type WidgetRowsPerScreen = typeof ROWS_PER_SCREEN_OPTIONS[number];
@@ -62,6 +64,7 @@ export const DesktopMonthWidgetView: React.FC = () => {
   const [externalDraggingType, setExternalDraggingType] = useState<'scheduled' | 'deadline' | 'maybe' | null>(null);
   const [theme, setThemeState] = useState<'light' | 'dark'>('dark');
   const [opacity, setOpacityState] = useState<number>(0.92);
+  const [entryBackgroundOpacity, setEntryBackgroundOpacity] = useState<number>(DEFAULT_ENTRY_BACKGROUND_OPACITY);
   const [showDisplaySettings, setShowDisplaySettings] = useState(false);
   const [activeTab, setActiveTab] = useState<DesktopMonthSidebarTab>('scheduled');
   const [isScheduleLocked] = useState(false);
@@ -87,10 +90,18 @@ export const DesktopMonthWidgetView: React.FC = () => {
     localStorage.setItem('todoMonthViewMarkerColorMode', mode);
   };
 
-  const persistDisplaySettings = useCallback((nextTheme: 'light' | 'dark', nextOpacity: number) => {
+  const persistDisplaySettings = useCallback((
+    nextTheme: 'light' | 'dark',
+    nextOpacity: number,
+    nextEntryBackgroundOpacity: number
+  ) => {
     localStorage.setItem(
       DISPLAY_SETTINGS_STORAGE_KEY,
-      JSON.stringify({ theme: nextTheme, opacity: nextOpacity })
+      JSON.stringify({
+        theme: nextTheme,
+        opacity: nextOpacity,
+        entryBackgroundOpacity: nextEntryBackgroundOpacity
+      })
     );
   }, []);
 
@@ -129,6 +140,12 @@ export const DesktopMonthWidgetView: React.FC = () => {
           const nextOpacity = Number(parsed.opacity);
           setOpacityState(nextOpacity);
           window.desktopWidget?.setOpacity?.(nextOpacity);
+        }
+        if (parsed.entryBackgroundOpacity !== undefined) {
+          const nextEntryBackgroundOpacity = Number(parsed.entryBackgroundOpacity);
+          if (!Number.isNaN(nextEntryBackgroundOpacity)) {
+            setEntryBackgroundOpacity(Math.min(0.4, Math.max(0, nextEntryBackgroundOpacity)));
+          }
         }
       }
 
@@ -172,13 +189,18 @@ export const DesktopMonthWidgetView: React.FC = () => {
   const handleThemeChange = (nextTheme: 'light' | 'dark') => {
     setThemeState(nextTheme);
     window.desktopWidget?.setTheme?.(nextTheme);
-    persistDisplaySettings(nextTheme, opacity);
+    persistDisplaySettings(nextTheme, opacity, entryBackgroundOpacity);
   };
 
   const handleOpacityChange = (nextOpacity: number) => {
     setOpacityState(nextOpacity);
     window.desktopWidget?.setOpacity?.(nextOpacity);
-    persistDisplaySettings(theme, nextOpacity);
+    persistDisplaySettings(theme, nextOpacity, entryBackgroundOpacity);
+  };
+
+  const handleEntryBackgroundOpacityChange = (nextOpacity: number) => {
+    setEntryBackgroundOpacity(nextOpacity);
+    persistDisplaySettings(theme, opacity, nextOpacity);
   };
 
   const sidebarSections = useMemo(
@@ -428,6 +450,7 @@ export const DesktopMonthWidgetView: React.FC = () => {
               onOpenTodo={handleOpenTodoQuickEditor}
               isDark={isDark}
               markerColorMode={markerColorMode}
+              entryBackgroundOpacity={entryBackgroundOpacity}
               todoCategories={todoCategories}
               onWheelPageChange={(direction) => {
                 setPageStartDate((previous) => (
@@ -638,6 +661,22 @@ export const DesktopMonthWidgetView: React.FC = () => {
                 step="0.05"
                 value={opacity}
                 onChange={(event) => handleOpacityChange(parseFloat(event.target.value))}
+                className="h-1 w-full cursor-pointer appearance-none rounded-lg bg-stone-200 accent-stone-700 dark:bg-stone-800 dark:accent-stone-400"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1.5 flex items-center justify-between text-[10px] font-semibold tracking-wider">
+                <span className={isDark ? 'text-stone-500' : 'text-stone-400'}>条目背景</span>
+                <span className="font-mono">{Math.round(entryBackgroundOpacity * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0.00"
+                max="0.40"
+                step="0.02"
+                value={entryBackgroundOpacity}
+                onChange={(event) => handleEntryBackgroundOpacityChange(parseFloat(event.target.value))}
                 className="h-1 w-full cursor-pointer appearance-none rounded-lg bg-stone-200 accent-stone-700 dark:bg-stone-800 dark:accent-stone-400"
               />
             </div>

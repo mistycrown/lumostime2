@@ -4,6 +4,8 @@
 
 ## Updates
 
+- 2026-05-17: `DesktopMonthWidgetView.tsx` and `DesktopMonthCalendar.tsx` now expose a dedicated month-entry background opacity slider in widget display settings, so users can strengthen or soften calendar item fills without changing the whole window opacity.
+
 - 2026-05-17: `DesktopMonthCalendar.tsx` now colors desktop month rows from the shared month-entry `primaryKind`, so a todo that is both completed and due/arranged/maybe on the same day still renders with completed-first styling while the existing continuous trace strip layout remains intact.
 - 2026-05-17: `DesktopMonthCalendar.tsx` 支持在格子中为由于 (due) 类型的条目加上 flag 图标（并实现超出截断且 flag 完整显示），并将 trace / 连续 trace 条目字色置为灰色。
 

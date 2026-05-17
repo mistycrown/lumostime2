@@ -4,6 +4,8 @@
  * @output Window Management
  * @pos Electron Main
  * @description Entry point for the Electron application. Handles main-window and desktop-widget creation, lifecycle events, and inter-process communication (IPC).
+ * @updated 2026-05-17: Softened expected DEV navigation aborts so renderer-triggered reloads no longer surface as unhandled Electron promise rejections.
+ * @updated 2026-05-17: Added a Windows tray integration so closing the main window hides the app to the system tray while explicit tray quit still exits the background process.
  * @updated 2026-05-17: Isolated Electron development builds into a dedicated `userData` directory so DEV localStorage, IndexedDB, and widget-state files no longer share packaged desktop data.
  * @updated 2026-05-17: 扩展了 Electron 主进程，新增对桌面计时器小组件（timer widget）独立窗口的生命周期管理（常驻置顶、固定大小、不可缩放、拖动坐标持久化）以及配套 IPC 接口。
  * @updated 2026-05-17: 扩展了 Electron 主进程小组件管理器，新增对桌面小事清单小组件（quick widget）独立窗口的生命周期、拖拽缩放边界持久化和 IPC 调起/关闭支持。并支持了 add_quick_todo 动作的透明转发。
@@ -13,7 +15,7 @@
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import { app, BrowserWindow, ipcMain, screen, shell } from 'electron';
+import { app, BrowserWindow, Menu, Tray, ipcMain, screen, shell } from 'electron';
 import fs from 'fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -115,7 +117,9 @@ let monthWidgetWindow: BrowserWindow | null = null;
 let quickWidgetWindow: BrowserWindow | null = null;
 let timerWidgetWindow: BrowserWindow | null = null;
 let todoQuickEditorWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
 let isMainRendererReady = false;
+let isQuitting = false;
 let pendingDesktopWidgetActions: DesktopWidgetMainAction[] = [];
 let desktopTodoQuickEditorPayload: DesktopTodoQuickEditorPayload | null = null;
 let isTodoQuickEditorReady = false;
@@ -149,6 +153,49 @@ const buildRendererUrl = (windowType?: string): string => {
   return fileUrl.toString();
 };
 
+const isNavigationAbortError = (error: unknown): boolean => {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const { message } = error;
+  const code = 'code' in error
+    ? (error as { code?: string | number }).code
+    : undefined;
+
+  return code === 'ERR_ABORTED'
+    || code === -3
+    || message.includes('ERR_ABORTED')
+    || message.includes('(-3)');
+};
+
+const logAsyncTaskError = (label: string, error: unknown) => {
+  console.error(`[Electron] ${label} failed`, error);
+};
+
+const runInBackground = (label: string, task: Promise<unknown>) => {
+  task.catch((error) => {
+    logAsyncTaskError(label, error);
+  });
+};
+
+const loadWindowUrl = async (
+  targetWindow: BrowserWindow,
+  url: string,
+  label: string
+) => {
+  try {
+    await targetWindow.loadURL(url);
+  } catch (error) {
+    if (isNavigationAbortError(error)) {
+      console.info(`[Electron] Ignored expected navigation abort for ${label}`, { url });
+      return;
+    }
+
+    throw error;
+  }
+};
+
 const focusWindow = (targetWindow: BrowserWindow | null) => {
   if (!targetWindow) {
     return;
@@ -159,6 +206,54 @@ const focusWindow = (targetWindow: BrowserWindow | null) => {
   }
   targetWindow.show();
   targetWindow.focus();
+};
+
+const hideMainWindow = () => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.hide();
+};
+
+const createTrayMenu = () =>
+  Menu.buildFromTemplate([
+    {
+      label: '显示主界面',
+      click: () => {
+        runInBackground('focus main window from tray menu', focusMainWindow());
+      }
+    },
+    {
+      label: '退出 LumosTime',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      }
+    }
+  ]);
+
+const createTray = () => {
+  if (tray) {
+    return tray;
+  }
+
+  try {
+    tray = new Tray(getIconPath());
+    tray.setToolTip('LumosTime');
+    tray.setContextMenu(createTrayMenu());
+    tray.on('click', () => {
+      runInBackground('focus main window from tray click', focusMainWindow());
+    });
+    tray.on('double-click', () => {
+      runInBackground('focus main window from tray double-click', focusMainWindow());
+    });
+  } catch (error) {
+    console.error('[Electron] Failed to create tray icon', error);
+    tray = null;
+  }
+
+  return tray;
 };
 
 const clampWidgetBounds = (bounds?: PersistedWidgetWindowState['bounds']) => {
@@ -472,11 +567,20 @@ async function createMainWindow() {
   } else {
     console.log('Loading File:', indexHtml);
   }
-  await mainWindow.loadURL(buildRendererUrl());
+  await loadWindowUrl(mainWindow, buildRendererUrl(), 'main window');
 
   if (IS_DEV) {
     mainWindow.webContents.openDevTools();
   }
+
+  mainWindow.on('close', (event) => {
+    if (process.platform !== 'win32' || isQuitting) {
+      return;
+    }
+
+    event.preventDefault();
+    hideMainWindow();
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -533,16 +637,16 @@ async function createWidgetWindow() {
   widgetWindow.setMenuBarVisibility(false);
   configureExternalLinks(widgetWindow);
   attachWidgetShowFallback(widgetWindow, 'today');
-  await widgetWindow.loadURL(buildRendererUrl(DESKTOP_WIDGET_QUERY_VALUE));
+  await loadWindowUrl(widgetWindow, buildRendererUrl(DESKTOP_WIDGET_QUERY_VALUE), 'today widget');
 
   widgetWindow.on('move', () => {
-    void saveWidgetWindowState(widgetWindow);
+    runInBackground('save today widget state after move', saveWidgetWindowState(widgetWindow));
   });
   widgetWindow.on('resize', () => {
-    void saveWidgetWindowState(widgetWindow);
+    runInBackground('save today widget state after resize', saveWidgetWindowState(widgetWindow));
   });
   widgetWindow.on('close', () => {
-    void saveWidgetWindowState(widgetWindow);
+    runInBackground('save today widget state before close', saveWidgetWindowState(widgetWindow));
   });
   widgetWindow.on('closed', () => {
     widgetWindow = null;
@@ -585,16 +689,16 @@ async function createMonthWidgetWindow() {
   monthWidgetWindow.setMenuBarVisibility(false);
   configureExternalLinks(monthWidgetWindow);
   attachWidgetShowFallback(monthWidgetWindow, 'month');
-  await monthWidgetWindow.loadURL(buildRendererUrl(DESKTOP_MONTH_WIDGET_QUERY_VALUE));
+  await loadWindowUrl(monthWidgetWindow, buildRendererUrl(DESKTOP_MONTH_WIDGET_QUERY_VALUE), 'month widget');
 
   monthWidgetWindow.on('move', () => {
-    void saveMonthWidgetWindowState(monthWidgetWindow);
+    runInBackground('save month widget state after move', saveMonthWidgetWindowState(monthWidgetWindow));
   });
   monthWidgetWindow.on('resize', () => {
-    void saveMonthWidgetWindowState(monthWidgetWindow);
+    runInBackground('save month widget state after resize', saveMonthWidgetWindowState(monthWidgetWindow));
   });
   monthWidgetWindow.on('close', () => {
-    void saveMonthWidgetWindowState(monthWidgetWindow);
+    runInBackground('save month widget state before close', saveMonthWidgetWindowState(monthWidgetWindow));
   });
   monthWidgetWindow.on('closed', () => {
     monthWidgetWindow = null;
@@ -637,16 +741,16 @@ async function createQuickWidgetWindow() {
   quickWidgetWindow.setMenuBarVisibility(false);
   configureExternalLinks(quickWidgetWindow);
   attachWidgetShowFallback(quickWidgetWindow, 'quick');
-  await quickWidgetWindow.loadURL(buildRendererUrl(DESKTOP_QUICK_WIDGET_QUERY_VALUE));
+  await loadWindowUrl(quickWidgetWindow, buildRendererUrl(DESKTOP_QUICK_WIDGET_QUERY_VALUE), 'quick widget');
 
   quickWidgetWindow.on('move', () => {
-    void saveQuickWidgetWindowState(quickWidgetWindow);
+    runInBackground('save quick widget state after move', saveQuickWidgetWindowState(quickWidgetWindow));
   });
   quickWidgetWindow.on('resize', () => {
-    void saveQuickWidgetWindowState(quickWidgetWindow);
+    runInBackground('save quick widget state after resize', saveQuickWidgetWindowState(quickWidgetWindow));
   });
   quickWidgetWindow.on('close', () => {
-    void saveQuickWidgetWindowState(quickWidgetWindow);
+    runInBackground('save quick widget state before close', saveQuickWidgetWindowState(quickWidgetWindow));
   });
   quickWidgetWindow.on('closed', () => {
     quickWidgetWindow = null;
@@ -690,13 +794,13 @@ async function createTimerWidgetWindow() {
   timerWidgetWindow.setMenuBarVisibility(false);
   configureExternalLinks(timerWidgetWindow);
   attachWidgetShowFallback(timerWidgetWindow, 'timer');
-  await timerWidgetWindow.loadURL(buildRendererUrl(DESKTOP_TIMER_WIDGET_QUERY_VALUE));
+  await loadWindowUrl(timerWidgetWindow, buildRendererUrl(DESKTOP_TIMER_WIDGET_QUERY_VALUE), 'timer widget');
 
   timerWidgetWindow.on('move', () => {
-    void saveTimerWidgetWindowState(timerWidgetWindow);
+    runInBackground('save timer widget state after move', saveTimerWidgetWindowState(timerWidgetWindow));
   });
   timerWidgetWindow.on('close', () => {
-    void saveTimerWidgetWindowState(timerWidgetWindow);
+    runInBackground('save timer widget state before close', saveTimerWidgetWindowState(timerWidgetWindow));
   });
   timerWidgetWindow.on('closed', () => {
     timerWidgetWindow = null;
@@ -845,7 +949,11 @@ async function createTodoQuickEditorWindow() {
     publishTodoQuickEditorState();
     showTodoQuickEditorWindow();
   });
-  await todoQuickEditorWindow.loadURL(buildRendererUrl(DESKTOP_EDITOR_WIDGET_QUERY_VALUE));
+  await loadWindowUrl(
+    todoQuickEditorWindow,
+    buildRendererUrl(DESKTOP_EDITOR_WIDGET_QUERY_VALUE),
+    'todo quick editor window'
+  );
 
   todoQuickEditorWindow.on('focus', () => {
     clearTodoQuickEditorHideTimeout();
@@ -869,13 +977,21 @@ async function createTodoQuickEditorWindow() {
 }
 
 app.whenReady().then(() => {
-  void createMainWindow();
+  createTray();
+  runInBackground('create main window on app ready', createMainWindow());
+});
+
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
+app.on('will-quit', () => {
+  tray?.destroy();
+  tray = null;
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // Keep the desktop app resident when tray mode is active.
 });
 
 app.on('second-instance', () => {
@@ -885,7 +1001,7 @@ app.on('second-instance', () => {
   }
 
   if (widgetWindow || monthWidgetWindow || quickWidgetWindow || timerWidgetWindow || todoQuickEditorWindow) {
-    void focusMainWindow();
+    runInBackground('focus main window from second instance', focusMainWindow());
   }
 });
 
@@ -895,7 +1011,7 @@ app.on('activate', () => {
     return;
   }
 
-  void createMainWindow();
+  runInBackground('create main window on activate', createMainWindow());
 });
 
 // New window example arg: new windows url
@@ -909,14 +1025,14 @@ ipcMain.handle('open-win', async (_, arg) => {
   });
 
   if (IS_DEV) {
-    await childWindow.loadURL(`${VITE_DEV_SERVER_URL}#${arg}`);
+    await loadWindowUrl(childWindow, `${VITE_DEV_SERVER_URL}#${arg}`, 'child window');
   } else {
-    await childWindow.loadURL(`${buildRendererUrl()}#${arg}`);
+    await loadWindowUrl(childWindow, `${buildRendererUrl()}#${arg}`, 'child window');
   }
 });
 
 ipcMain.on('desktop-widget:open', () => {
-  void createWidgetWindow();
+  runInBackground('open today widget window', createWidgetWindow());
 });
 
 ipcMain.on('desktop-widget:close', () => {
@@ -925,7 +1041,7 @@ ipcMain.on('desktop-widget:close', () => {
 });
 
 ipcMain.on('desktop-widget:open-month', () => {
-  void createMonthWidgetWindow();
+  runInBackground('open month widget window', createMonthWidgetWindow());
 });
 
 ipcMain.on('desktop-widget:close-month', () => {
@@ -934,7 +1050,7 @@ ipcMain.on('desktop-widget:close-month', () => {
 });
 
 ipcMain.on('desktop-widget:open-quick', () => {
-  void createQuickWidgetWindow();
+  runInBackground('open quick widget window', createQuickWidgetWindow());
 });
 
 ipcMain.on('desktop-widget:close-quick', () => {
@@ -943,7 +1059,7 @@ ipcMain.on('desktop-widget:close-quick', () => {
 });
 
 ipcMain.on('desktop-widget:open-timer', () => {
-  void createTimerWidgetWindow();
+  runInBackground('open timer widget window', createTimerWidgetWindow());
 });
 
 ipcMain.on('desktop-widget:close-timer', () => {
@@ -952,7 +1068,7 @@ ipcMain.on('desktop-widget:close-timer', () => {
 
 ipcMain.on('desktop-widget:open-todo-quick-editor', (_, payload: DesktopTodoQuickEditorPayload) => {
   desktopTodoQuickEditorPayload = payload;
-  void createTodoQuickEditorWindow();
+  runInBackground('open todo quick editor window', createTodoQuickEditorWindow());
 });
 
 ipcMain.on('desktop-widget:close-todo-quick-editor', () => {
@@ -960,14 +1076,14 @@ ipcMain.on('desktop-widget:close-todo-quick-editor', () => {
 });
 
 ipcMain.on('desktop-widget:open-main', () => {
-  void focusMainWindow();
+  runInBackground('focus main window from widget', focusMainWindow());
 });
 
 ipcMain.on('desktop-widget:request-main-action', (_, action: DesktopWidgetMainAction) => {
   if (action.type === 'open_todo') {
-    void focusMainWindow().then(() => {
+    runInBackground('focus main window before open_todo action', focusMainWindow().then(() => {
       queueDesktopWidgetAction(action);
-    });
+    }));
   } else {
     queueDesktopWidgetAction(action);
   }
