@@ -3,6 +3,7 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- Update 2026-05-18: `dataValidation.ts` now accepts the nested `achievementData` backup block so achievement bottle exports and cloud restores can pass import validation without flattening those fields into the root payload.
 - Update 2026-05-17: `aiBackupChange.ts` now centralizes the AI-only backup change signal, bumping the shared local-data timestamp and dispatching a dedicated event so local AI storage writes can participate in cloud sync.
 - Update 2026-05-17: `todoScheduleUtils.ts` now treats shared month-view entries as `Done > Due > Arrange > Repeat > Maybe > Trace` for non-trace ordering, so one todo with multiple day badges renders and sorts by its highest-priority state while the continuous trace-lane layout stays unchanged.
 - Update 2026-05-17: `desktopTodoQuickEditorAnchorUtils.ts` now converts widget click and keyboard events into screen-space anchor coordinates so the external desktop quick-editor window can open near the source row.

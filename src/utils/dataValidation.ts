@@ -1,11 +1,11 @@
 /**
  * @file dataValidation.ts
- * @description 数据验证工具函数
+ * @description Data validation helpers for backup, import, and cloud sync payloads.
+ * @updated 2026-05-18: Added validation support for the nested `achievementData` backup block so achievement bottle progress can travel with user-data exports and sync restores.
+ * @updated 2026-05-18: Added validation support for the nested `customColorGroup` backup block so custom palette swatches can travel with user-data exports and sync restores.
  * @updated 2026-05-17: Added unified-backup validation support for the nested `aiData` object so AI chat, prompt, and assistant-state payloads can travel with the main app JSON without tripping import guards.
- * 
- * 提供统一的数据验证逻辑，确保数据完整性和一致性
- * 
- * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ *
+ * Once I am updated, be sure to update my header comment and the folder's md.
  */
 import {
   CATEGORIES,
@@ -16,43 +16,30 @@ import {
   SCOPES
 } from '../constants';
 
-/**
- * 验证结果
- */
 export interface ValidationResult {
   isValid: boolean;
   errors: string[];
   warnings: string[];
 }
 
-/**
- * 验证本地数据的完整性
- * 
- * @param data - 要验证的数据对象
- * @returns 验证结果
- */
 export function validateLocalData(data: any): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // 1. 检查数据对象是否存在
   if (!data || typeof data !== 'object') {
-    errors.push('数据对象不存在或格式错误');
+    errors.push('Data object is missing or invalid');
     return { isValid: false, errors, warnings };
   }
 
-  // 2. 检查必需字段
   const requiredFields = ['logs', 'todos', 'categories'];
-  
   for (const field of requiredFields) {
     if (data[field] === undefined) {
-      errors.push(`缺少必需字段: ${field}`);
+      errors.push(`Missing required field: ${field}`);
     } else if (data[field] === null) {
-      warnings.push(`字段 ${field} 为 null，将被视为空数组`);
+      warnings.push(`Field ${field} is null and will be treated as an empty array`);
     }
   }
 
-  // 3. 检查数组类型
   const arrayFields = [
     'logs',
     'todos',
@@ -74,54 +61,55 @@ export function validateLocalData(data: any): ValidationResult {
   ];
 
   for (const field of arrayFields) {
-    if (data[field] !== undefined && data[field] !== null) {
-      if (!Array.isArray(data[field])) {
-        errors.push(`字段 ${field} 应该是数组类型`);
-      }
+    if (data[field] !== undefined && data[field] !== null && !Array.isArray(data[field])) {
+      errors.push(`Field ${field} must be an array`);
     }
   }
 
   if (data.sceneGroupState !== undefined && data.sceneGroupState !== null && typeof data.sceneGroupState !== 'object') {
-    errors.push('字段 sceneGroupState 应该是对象类型');
+    errors.push('Field sceneGroupState must be an object');
+  }
+
+  if (data.customColorGroup !== undefined && data.customColorGroup !== null && typeof data.customColorGroup !== 'object') {
+    errors.push('Field customColorGroup must be an object');
+  }
+
+  if (data.achievementData !== undefined && data.achievementData !== null && typeof data.achievementData !== 'object') {
+    errors.push('Field achievementData must be an object');
   }
 
   if (data.aiData !== undefined && data.aiData !== null && typeof data.aiData !== 'object') {
-    errors.push('字段 aiData 应该是对象类型');
+    errors.push('Field aiData must be an object');
   }
 
-  // 4. 检查版本信息
   if (!data.version) {
-    warnings.push('缺少版本信息');
+    warnings.push('Missing version information');
   }
 
-  // 5. 检查时间戳
   if (!data.timestamp) {
-    warnings.push('缺少时间戳');
+    warnings.push('Missing timestamp');
   } else if (typeof data.timestamp !== 'number') {
-    warnings.push('时间戳格式错误');
+    warnings.push('Timestamp must be a number');
   }
 
-  // 6. 检查数据量（警告级别）
-  if (data.logs && Array.isArray(data.logs)) {
+  if (Array.isArray(data.logs)) {
     if (data.logs.length === 0) {
-      warnings.push('日志数据为空');
+      warnings.push('Log data is empty');
     } else if (data.logs.length > 100000) {
-      warnings.push(`日志数量过多 (${data.logs.length})，可能影响性能`);
+      warnings.push(`Log count is very large (${data.logs.length}) and may impact performance`);
     }
   }
 
-  if (data.todos && Array.isArray(data.todos)) {
-    if (data.todos.length > 10000) {
-      warnings.push(`待办数量过多 (${data.todos.length})，可能影响性能`);
-    }
+  if (Array.isArray(data.todos) && data.todos.length > 10000) {
+    warnings.push(`Todo count is very large (${data.todos.length}) and may impact performance`);
   }
 
   if (Array.isArray(data.categories) && data.categories.length === 0) {
-    errors.push('分类数据为空，无法恢复');
+    errors.push('Category data is empty and cannot be restored safely');
   }
 
   if (Array.isArray(data.todoCategories) && data.todoCategories.length === 0) {
-    errors.push('待办分类数据为空，无法恢复');
+    errors.push('Todo category data is empty and cannot be restored safely');
   }
 
   return {
@@ -131,25 +119,16 @@ export function validateLocalData(data: any): ValidationResult {
   };
 }
 
-/**
- * 验证并修复数据
- * 
- * @param data - 要验证和修复的数据对象
- * @returns 修复后的数据和验证结果
- */
 export function validateAndFixData(data: any): { data: any; result: ValidationResult } {
   const result = validateLocalData(data);
 
-  // 如果数据无效，尝试修复
   if (!result.isValid || result.warnings.length > 0) {
     const fixedData = { ...data };
 
-    // 修复缺失的必需字段
     if (!fixedData.logs) fixedData.logs = [];
     if (!fixedData.todos) fixedData.todos = [];
     if (!fixedData.categories) fixedData.categories = CATEGORIES;
-    
-    // 修复可选字段
+
     if (!fixedData.todoCategories) fixedData.todoCategories = MOCK_TODO_CATEGORIES;
     if (!fixedData.scopes) fixedData.scopes = SCOPES;
     if (!fixedData.goals) fixedData.goals = INITIAL_GOALS;
@@ -165,7 +144,6 @@ export function validateAndFixData(data: any): { data: any; result: ValidationRe
     if (!fixedData.filters) fixedData.filters = [];
     if (!fixedData.principles) fixedData.principles = [];
 
-    // 添加版本和时间戳
     if (!fixedData.version) fixedData.version = '1.0.0';
     if (!fixedData.timestamp) fixedData.timestamp = Date.now();
 
@@ -175,13 +153,6 @@ export function validateAndFixData(data: any): { data: any; result: ValidationRe
   return { data, result };
 }
 
-/**
- * 比较两个数据版本
- * 
- * @param localData - 本地数据
- * @param cloudData - 云端数据
- * @returns 比较结果
- */
 export function compareDataVersions(localData: any, cloudData: any): {
   isLocalNewer: boolean;
   isCloudNewer: boolean;
@@ -201,12 +172,6 @@ export function compareDataVersions(localData: any, cloudData: any): {
   };
 }
 
-/**
- * 获取数据统计信息
- * 
- * @param data - 数据对象
- * @returns 统计信息
- */
 export function getDataStats(data: any): {
   logsCount: number;
   todosCount: number;
@@ -228,15 +193,14 @@ export function getDataStats(data: any): {
     totalSize: '0 KB'
   };
 
-  // 计算大致大小
   try {
     const jsonStr = JSON.stringify(data);
     const sizeInBytes = new Blob([jsonStr]).size;
     const sizeInKB = (sizeInBytes / 1024).toFixed(2);
     const sizeInMB = (sizeInBytes / (1024 * 1024)).toFixed(2);
-    
-    stats.totalSize = sizeInBytes > 1024 * 1024 
-      ? `${sizeInMB} MB` 
+
+    stats.totalSize = sizeInBytes > 1024 * 1024
+      ? `${sizeInMB} MB`
       : `${sizeInKB} KB`;
   } catch (error) {
     console.error('[dataValidation] Failed to calculate data size:', error);
@@ -245,12 +209,6 @@ export function getDataStats(data: any): {
   return stats;
 }
 
-/**
- * 验证数据是否可以安全上传
- * 
- * @param data - 要上传的数据
- * @returns 是否可以安全上传
- */
 export function canSafelyUpload(data: any): { canUpload: boolean; reason?: string } {
   const validation = validateLocalData(data);
 
@@ -261,11 +219,10 @@ export function canSafelyUpload(data: any): { canUpload: boolean; reason?: strin
     };
   }
 
-  // 检查是否有实际数据
   if (!data.logs || data.logs.length === 0) {
     return {
       canUpload: false,
-      reason: '日志数据为空，无法上传'
+      reason: 'Log data is empty and cannot be uploaded'
     };
   }
 

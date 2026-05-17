@@ -1,12 +1,13 @@
 ﻿/**
  * @file AchievementContext.tsx
  * @description Manages achievement bottle data, live snapshots, archived bottles, and reward redemption records with repository hydration and selective recent-day recomputation.
+ * @updated 2026-05-18: Added unified achievement backup export/restore helpers so bottle data can travel through app export/import and cloud sync.
  * @updated 2026-04-25: Added global check streak config plus active-period recomputation for streak-weighted check-category rules.
  * @updated 2026-04-17: Added filter-duration achievement rules that reuse the shared custom filter expression logic.
  * @updated 2026-04-07: Separates live and carryover redemption funding so sealing only archives live-period spending.
  */
 import React, { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { dataRepository } from '../repositories/dataRepository';
+import { AchievementSnapshot, dataRepository } from '../repositories/dataRepository';
 import {
   AchievementArchivedBottle,
   AchievementBottleActionRecord,
@@ -38,6 +39,7 @@ import {
 } from '../utils/achievementUtils';
 import { getDefaultCheckStreakConfig, normalizeCheckStreakConfig } from '../utils/checkStreakUtils';
 import { getLocalDateStr } from '../utils/dateUtils';
+import { achievementBackupService, type AchievementBackupPayload } from '../services/achievementBackupService';
 import {
   isLocalDataTimestampUpdateLocked,
   updateLocalDataTimestamp
@@ -82,6 +84,8 @@ interface AchievementContextType {
   availableStars: number;
   totalEarnedStars: number;
   totalRedeemedStars: number;
+  buildBackupPayload: () => AchievementBackupPayload;
+  applyBackupPayload: (value: unknown) => boolean;
   ensureRecentSnapshots: () => Promise<void>;
   recomputeSnapshotForDate: (date: string) => { ok: boolean; message?: string };
   updateCheckStreakConfig: (config: CheckStreakConfig) => void;
@@ -161,6 +165,18 @@ const normalizeArchivedBottle = (bottle: AchievementArchivedBottle): Achievement
 const normalizeBottleActionRecord = (record: AchievementBottleActionRecord): AchievementBottleActionRecord => ({
   ...record,
   amount: Math.max(0, normalizeAchievementStarValue(record.amount || 0))
+});
+
+const normalizeAchievementSnapshotState = (snapshot: AchievementSnapshot): AchievementSnapshot => ({
+  meta: normalizeAchievementMeta(snapshot.meta),
+  rules: snapshot.rules.map(normalizeAchievementRule),
+  rewards: snapshot.rewards.map(normalizeReward),
+  collections: snapshot.collections.map(normalizeCollection),
+  dailySnapshots: sortAchievementSnapshots(snapshot.dailySnapshots.map(normalizeAchievementSnapshot)),
+  redemptionRecords: snapshot.redemptionRecords.map(normalizeRedemptionRecord),
+  collectionRecords: snapshot.collectionRecords.map(normalizeCollectionRecord),
+  archivedBottles: snapshot.archivedBottles.map(normalizeArchivedBottle),
+  bottleActionRecords: snapshot.bottleActionRecords.map(normalizeBottleActionRecord)
 });
 
 export const useAchievement = () => {
@@ -688,6 +704,47 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     return { ok: true };
   };
 
+  const buildBackupPayload = (): AchievementBackupPayload => (
+    achievementBackupService.buildBackupPayload({
+      meta: {
+        achievementStartDate: meta.achievementStartDate,
+        activeBottleCarryoverStars: meta.activeBottleCarryoverStars,
+        checkStreakConfig: normalizeCheckStreakConfig(meta.checkStreakConfig)
+      },
+      rules,
+      rewards,
+      collections,
+      dailySnapshots,
+      redemptionRecords,
+      collectionRecords,
+      archivedBottles,
+      bottleActionRecords
+    })
+  );
+
+  const applyBackupPayload = (value: unknown): boolean => {
+    const snapshot = achievementBackupService.readBackupPayload(value);
+    if (!snapshot) {
+      return false;
+    }
+
+    const normalizedSnapshot = normalizeAchievementSnapshotState(snapshot);
+    isHydratingRef.current = true;
+    setMeta(normalizedSnapshot.meta);
+    setRules(normalizedSnapshot.rules);
+    setRewards(normalizedSnapshot.rewards);
+    setCollections(normalizedSnapshot.collections);
+    setDailySnapshots(normalizedSnapshot.dailySnapshots);
+    setRedemptionRecords(normalizedSnapshot.redemptionRecords);
+    setCollectionRecords(normalizedSnapshot.collectionRecords);
+    setArchivedBottles(normalizedSnapshot.archivedBottles);
+    setBottleActionRecords(normalizedSnapshot.bottleActionRecords);
+    window.setTimeout(() => {
+      isHydratingRef.current = false;
+    }, 0);
+    return true;
+  };
+
   const spendRecords = [...redemptionRecords, ...collectionRecords];
   const availableStars = calculateAchievementAvailableStars(
     dailySnapshots,
@@ -819,6 +876,8 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         availableStars,
         totalEarnedStars,
         totalRedeemedStars,
+        buildBackupPayload,
+        applyBackupPayload,
         ensureRecentSnapshots,
         recomputeSnapshotForDate,
         updateCheckStreakConfig,

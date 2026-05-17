@@ -73,6 +73,7 @@ import { imageService } from '../services/imageService';
 import { syncService } from '../services/syncService';
 import { NfcService } from '../services/NfcService';
 import { aiService, AIConfig } from '../services/aiService';
+import { customColorGroupService } from '../services/customColorGroupService';
 import { UpdateService, VersionInfo } from '../services/updateService';
 import { CustomSelect } from '../components/CustomSelect';
 import { getTodoProgressTrackingMode, syncSubtaskProgressToParentTodos } from '../utils/todoProgressUtils';
@@ -657,6 +658,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         const principlesStr = localStorage.getItem('lumostime_principles');
         const principles = principlesStr ? JSON.parse(principlesStr) : [];
 
+        const customColorGroup = customColorGroupService.getGroup();
+
         const localData = {
             logs: ctxLogs,
             todos: ctxTodos,
@@ -674,6 +677,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             customNarrativeTemplates: ctxCustomNarrativeTemplates,
             userPersonalInfo: ctxUserPersonalInfo,
             filters: ctxFilters,
+            customColorGroup,
             sceneGroupState, // 新版：场景组状态
             sceneTimeSlots, // 添加场景设置
             principles, // 添加原则库
