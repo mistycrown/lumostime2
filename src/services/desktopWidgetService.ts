@@ -4,7 +4,7 @@
  * @output Desktop widget route helpers and compact today-task snapshot builders for the Electron widget window
  * @pos Service
  * @description Builds the lightweight desktop widget snapshot from the shared todo model so the Electron widget window can reuse the app's existing today-task logic without mounting the full app shell.
- * @updated 2026-05-17: Added desktop widget route detection plus today/pin/overdue snapshot builders for the Electron desktop todo widget.
+ * @updated 2026-05-17: Added desktop widget route detection plus today/pin/overdue snapshot builders for the Electron desktop today widget and month-widget window, with getDesktopWidgetType helper support.
  */
 import { USER_DATA_KEYS, storage } from '../constants/storageKeys';
 import { Category, TodoItem } from '../types';
@@ -18,6 +18,7 @@ import {
 
 export const DESKTOP_WIDGET_WINDOW_QUERY_KEY = 'window';
 export const DESKTOP_WIDGET_WINDOW_QUERY_VALUE = 'desktop-widget';
+export const DESKTOP_MONTH_WIDGET_WINDOW_QUERY_VALUE = 'desktop-month';
 
 export type DesktopWidgetBadgeLabel = 'PIN' | 'TODAY' | 'LATE' | 'MAYBE';
 
@@ -147,9 +148,22 @@ export const isDesktopWidgetWindow = (): boolean => {
   if (typeof window === 'undefined') {
     return false;
   }
+  const val = new URLSearchParams(window.location.search).get(DESKTOP_WIDGET_WINDOW_QUERY_KEY);
+  return val === DESKTOP_WIDGET_WINDOW_QUERY_VALUE || val === DESKTOP_MONTH_WIDGET_WINDOW_QUERY_VALUE;
+};
 
-  return new URLSearchParams(window.location.search).get(DESKTOP_WIDGET_WINDOW_QUERY_KEY)
-    === DESKTOP_WIDGET_WINDOW_QUERY_VALUE;
+export const getDesktopWidgetType = (): 'today' | 'month' | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  const val = new URLSearchParams(window.location.search).get(DESKTOP_WIDGET_WINDOW_QUERY_KEY);
+  if (val === DESKTOP_WIDGET_WINDOW_QUERY_VALUE) {
+    return 'today';
+  }
+  if (val === DESKTOP_MONTH_WIDGET_WINDOW_QUERY_VALUE) {
+    return 'month';
+  }
+  return null;
 };
 
 export const buildDesktopTodayWidgetSnapshot = ({

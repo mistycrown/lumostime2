@@ -1,12 +1,7 @@
 /**
  * @file DesktopTodayWidgetView.tsx
- * @description 桌面今日小组件的UI视图，采用极其紧凑的单行设计。包含“置顶”、“今天”（合并arrange、due与maybe）、“逾期未完成”三个分组。
- * @updated 2026-05-17: 优化了小组件的分组模式，重新设计为三栏极简紧凑布局。添加了开始计时专注功能以及鼠标悬浮播放按钮。
- */
-/**
- * @file DesktopTodayWidgetView.tsx
  * @description 桌面今日小组件的UI视图，采用极其紧凑的单行设计。支持轻量完成/计时（完全后台静默执行，不唤起主窗口），并自带显示设置面板（提供深浅配色切换与窗体透明度滑块调节）。
- * @updated 2026-05-17: 实现了完成/开始计时的后台静默机制（剥离 focusMainWindow 和 openMainApp），新增了 SlidersHorizontal 显示设置按钮及其悬浮面板，支持动态黑白配色方案和原生/CSS透明度控制。
+ * @updated 2026-05-17: 实现了显示设置中“任务颜色”选项，支持按“排期类型”与“任务分类”动态渲染小圆点前缀，并与周/月视图的自定义排期配色联动。
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, ExternalLink, X, Play, SlidersHorizontal } from 'lucide-react';
@@ -15,6 +10,10 @@ import {
   DesktopWidgetTodoItem,
   loadDesktopTodayWidgetSnapshotAsync
 } from '../../services/desktopWidgetService';
+import {
+  getResolvedTodoScheduleTypeColors,
+  todoScheduleColorService
+} from '../../services/todoScheduleColorService';
 
 const APP_READY_EVENT = 'lumostime:app-ready';
 const PENDING_TOGGLE_RESET_MS = 1800;
@@ -36,8 +35,37 @@ const TodoRow: React.FC<{
   onOpen: (todoId: string) => void;
   onStartFocus: (todoId: string) => void;
   theme: 'light' | 'dark';
-}> = ({ item, isPending, onToggle, onOpen, onStartFocus, theme }) => {
+  markerColorMode: 'schedule' | 'category';
+  resolvedScheduleTypeColors: Record<string, string>;
+}> = ({
+  item,
+  isPending,
+  onToggle,
+  onOpen,
+  onStartFocus,
+  theme,
+  markerColorMode,
+  resolvedScheduleTypeColors
+}) => {
   const isDark = theme === 'dark';
+
+  const getTodoScheduleTypeColorKey = (todo: DesktopWidgetTodoItem): string => {
+    if (todo.isCompleted) return 'completed';
+    if (todo.badgeLabel === 'MAYBE') return 'maybe';
+    if (todo.deadlineDate) return 'deadline';
+    return 'scheduled';
+  };
+
+  const getMarkerColor = (): string | undefined => {
+    const scheduleColor = resolvedScheduleTypeColors[getTodoScheduleTypeColorKey(item)];
+    if (markerColorMode === 'schedule') {
+      return scheduleColor;
+    }
+    return item.color || scheduleColor;
+  };
+
+  const dotColor = getMarkerColor();
+
   return (
     <div
       role="button"
@@ -75,10 +103,10 @@ const TodoRow: React.FC<{
           <Check size={10} strokeWidth={3} />
         </button>
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          {item.color && (
+          {dotColor && (
             <span
               className="h-1.5 w-1.5 shrink-0 rounded-full"
-              style={{ backgroundColor: item.color }}
+              style={{ backgroundColor: dotColor }}
             />
           )}
           <span className={`truncate text-[13px] font-medium leading-none transition-colors ${
@@ -123,6 +151,29 @@ export const DesktopTodayWidgetView: React.FC = () => {
   const [theme, setThemeState] = useState<'light' | 'dark'>('light');
   const [opacity, setOpacityState] = useState<number>(0.95);
   const [showDisplaySettings, setShowDisplaySettings] = useState(false);
+  const [markerColorMode, setMarkerColorMode] = useState<'schedule' | 'category'>('schedule');
+
+  const [scheduleTypeColorSettings, setScheduleTypeColorSettings] = useState(() =>
+    todoScheduleColorService.getSettings()
+  );
+
+  const resolvedScheduleTypeColors = useMemo(
+    () => getResolvedTodoScheduleTypeColors(scheduleTypeColorSettings),
+    [scheduleTypeColorSettings]
+  );
+
+  useEffect(() => {
+    const handleUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        setScheduleTypeColorSettings(customEvent.detail);
+      }
+    };
+    window.addEventListener('lumostime:todo-schedule-type-colors-updated', handleUpdated);
+    return () => {
+      window.removeEventListener('lumostime:todo-schedule-type-colors-updated', handleUpdated);
+    };
+  }, []);
 
   const refreshSnapshot = React.useCallback(async () => {
     try {
@@ -133,7 +184,7 @@ export const DesktopTodayWidgetView: React.FC = () => {
     }
   }, []);
 
-  // 挂载时加载保存的主题和透明度设置
+  // 挂载时加载保存的主题、透明度和着色方式设置
   useEffect(() => {
     try {
       const saved = localStorage.getItem('desktop-widget:display-settings');
@@ -148,6 +199,9 @@ export const DesktopTodayWidgetView: React.FC = () => {
           setOpacityState(val);
           window.desktopWidget?.setOpacity?.(val);
         }
+        if (parsed.markerColorMode) {
+          setMarkerColorMode(parsed.markerColorMode);
+        }
       }
     } catch (e) {
       console.error('Failed to load widget display settings', e);
@@ -159,7 +213,7 @@ export const DesktopTodayWidgetView: React.FC = () => {
     window.desktopWidget?.setTheme?.(newTheme);
     localStorage.setItem(
       'desktop-widget:display-settings',
-      JSON.stringify({ theme: newTheme, opacity })
+      JSON.stringify({ theme: newTheme, opacity, markerColorMode })
     );
   };
 
@@ -168,7 +222,15 @@ export const DesktopTodayWidgetView: React.FC = () => {
     window.desktopWidget?.setOpacity?.(newOpacity);
     localStorage.setItem(
       'desktop-widget:display-settings',
-      JSON.stringify({ theme, opacity: newOpacity })
+      JSON.stringify({ theme, opacity: newOpacity, markerColorMode })
+    );
+  };
+
+  const handleMarkerColorModeChange = (mode: 'schedule' | 'category') => {
+    setMarkerColorMode(mode);
+    localStorage.setItem(
+      'desktop-widget:display-settings',
+      JSON.stringify({ theme, opacity, markerColorMode: mode })
     );
   };
 
@@ -381,7 +443,7 @@ export const DesktopTodayWidgetView: React.FC = () => {
       {/* 显示设置悬浮调节选项面板 */}
       {showDisplaySettings && (
         <div
-          className={`absolute right-4 top-9 z-50 w-44 rounded-md border p-3 shadow-lg ${
+          className={`absolute right-4 top-9 z-50 w-48 rounded-md border p-3 shadow-lg ${
             isDark
               ? 'border-stone-800 bg-[#1c1c1e] text-stone-100'
               : 'border-stone-200 bg-white text-stone-800'
@@ -416,6 +478,46 @@ export const DesktopTodayWidgetView: React.FC = () => {
                   }`}
                 >
                   深色 (黑)
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div className={`text-[10px] font-semibold tracking-wider mb-1.5 ${
+                isDark ? 'text-stone-500' : 'text-stone-400'
+              }`}>任务颜色</div>
+              <div className={`flex rounded p-0.5 text-[11px] ${
+                isDark ? 'bg-stone-800/80' : 'bg-stone-100'
+              }`}>
+                <button
+                  type="button"
+                  onClick={() => handleMarkerColorModeChange('schedule')}
+                  className={`flex-1 py-1 text-center rounded transition font-medium ${
+                    markerColorMode === 'schedule'
+                      ? isDark
+                        ? 'bg-stone-700 text-white shadow-sm'
+                        : 'bg-white text-stone-800 shadow-sm'
+                      : isDark
+                      ? 'text-stone-400 hover:text-stone-300'
+                      : 'text-stone-500 hover:text-stone-700'
+                  }`}
+                >
+                  排期类型
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMarkerColorModeChange('category')}
+                  className={`flex-1 py-1 text-center rounded transition font-medium ${
+                    markerColorMode === 'category'
+                      ? isDark
+                        ? 'bg-stone-700 text-white shadow-sm'
+                        : 'bg-white text-stone-800 shadow-sm'
+                      : isDark
+                      ? 'text-stone-400 hover:text-stone-300'
+                      : 'text-stone-500 hover:text-stone-700'
+                  }`}
+                >
+                  任务分类
                 </button>
               </div>
             </div>
@@ -466,6 +568,8 @@ export const DesktopTodayWidgetView: React.FC = () => {
                       onOpen={handleOpenTodo}
                       onStartFocus={handleStartFocus}
                       theme={theme}
+                      markerColorMode={markerColorMode}
+                      resolvedScheduleTypeColors={resolvedScheduleTypeColors}
                     />
                   ))}
                 </div>

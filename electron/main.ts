@@ -4,10 +4,10 @@
  * @output Window Management
  * @pos Electron Main
  * @description Entry point for the Electron application. Handles main-window and desktop-widget creation, lifecycle events, and inter-process communication (IPC).
- * @updated 2026-05-17: Added a dedicated desktop today-widget window with persisted bounds, main-renderer action forwarding, and widget open/close IPC handlers for Electron builds.
+ * @updated 2026-05-17: Added a dedicated desktop today-widget and monthly-widget windows with persisted bounds, main-renderer action forwarding, and widget open/close IPC handlers for Electron builds.
  * @updated 2026-04-09: Added Obsidian image attachment export IPC handler for desktop builds.
  *
- * 鈿狅笍 Once I am updated, be sure to update my header comment and the folder's md.
+ * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { app, BrowserWindow, ipcMain, screen, shell } from 'electron';
 import fs from 'fs/promises';
@@ -55,10 +55,14 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 
 const DESKTOP_WIDGET_QUERY_KEY = 'window';
 const DESKTOP_WIDGET_QUERY_VALUE = 'desktop-widget';
+const DESKTOP_MONTH_WIDGET_QUERY_VALUE = 'desktop-month';
 const DESKTOP_WIDGET_MAIN_ACTION_CHANNEL = 'desktop-widget:main-action';
 const DEFAULT_WIDGET_WIDTH = 360;
 const DEFAULT_WIDGET_HEIGHT = 520;
+const DEFAULT_MONTH_WIDGET_WIDTH = 880;
+const DEFAULT_MONTH_WIDGET_HEIGHT = 640;
 const WIDGET_STATE_FILENAME = 'desktop-widget-state.json';
+const MONTH_WIDGET_STATE_FILENAME = 'desktop-month-widget-state.json';
 
 // Disable GPU Acceleration for Windows 7
 if (os.release().startsWith('6.1')) app.disableHardwareAcceleration();
@@ -73,6 +77,7 @@ if (!app.requestSingleInstanceLock()) {
 
 let mainWindow: BrowserWindow | null = null;
 let widgetWindow: BrowserWindow | null = null;
+let monthWidgetWindow: BrowserWindow | null = null;
 let isMainRendererReady = false;
 let pendingDesktopWidgetActions: DesktopWidgetMainAction[] = [];
 
@@ -83,8 +88,9 @@ const indexHtml = path.join(RENDERER_DIST, 'index.html');
 const getIconPath = () => path.join(process.env.VITE_PUBLIC || '', 'icon.ico');
 
 const getWidgetStatePath = () => path.join(app.getPath('userData'), WIDGET_STATE_FILENAME);
+const getMonthWidgetStatePath = () => path.join(app.getPath('userData'), MONTH_WIDGET_STATE_FILENAME);
 
-const buildRendererUrl = (windowType?: typeof DESKTOP_WIDGET_QUERY_VALUE): string => {
+const buildRendererUrl = (windowType?: string): string => {
   if (VITE_DEV_SERVER_URL) {
     const devUrl = new URL(VITE_DEV_SERVER_URL);
     if (windowType) {
@@ -148,6 +154,71 @@ const clampWidgetBounds = (bounds?: PersistedWidgetWindowState['bounds']) => {
   };
 };
 
+const clampMonthWidgetBounds = (bounds?: PersistedWidgetWindowState['bounds']) => {
+  const fallbackWidth = DEFAULT_MONTH_WIDGET_WIDTH;
+  const fallbackHeight = DEFAULT_MONTH_WIDGET_HEIGHT;
+
+  if (!bounds) {
+    const primaryWorkArea = screen.getPrimaryDisplay().workArea;
+    return {
+      width: fallbackWidth,
+      height: fallbackHeight,
+      x: primaryWorkArea.x + Math.max(32, Math.floor((primaryWorkArea.width - fallbackWidth) / 2)),
+      y: primaryWorkArea.y + Math.max(32, Math.floor((primaryWorkArea.height - fallbackHeight) / 2))
+    };
+  }
+
+  const desiredWidth = Math.max(400, Math.floor(bounds.width || fallbackWidth));
+  const desiredHeight = Math.max(300, Math.floor(bounds.height || fallbackHeight));
+  const display = screen.getDisplayMatching({
+    x: bounds.x,
+    y: bounds.y,
+    width: desiredWidth,
+    height: desiredHeight
+  });
+  const workArea = display.workArea;
+  const width = Math.min(desiredWidth, workArea.width);
+  const height = Math.min(desiredHeight, workArea.height);
+  const maxX = workArea.x + Math.max(0, workArea.width - width);
+  const maxY = workArea.y + Math.max(0, workArea.height - height);
+
+  return {
+    width,
+    height,
+    x: Math.min(Math.max(bounds.x, workArea.x), maxX),
+    y: Math.min(Math.max(bounds.y, workArea.y), maxY)
+  };
+};
+
+const readMonthWidgetWindowState = async (): Promise<PersistedWidgetWindowState> => {
+  try {
+    const raw = await fs.readFile(getMonthWidgetStatePath(), 'utf-8');
+    return JSON.parse(raw) as PersistedWidgetWindowState;
+  } catch (error: any) {
+    if (error?.code !== 'ENOENT') {
+      console.error('[Electron] Failed to read desktop month widget state', error);
+    }
+    return {};
+  }
+};
+
+const saveMonthWidgetWindowState = async (targetWindow: BrowserWindow | null) => {
+  if (!targetWindow || targetWindow.isDestroyed()) {
+    return;
+  }
+
+  try {
+    const bounds = clampMonthWidgetBounds(targetWindow.getBounds());
+    await fs.writeFile(
+      getMonthWidgetStatePath(),
+      JSON.stringify({ bounds }, null, 2),
+      'utf-8'
+    );
+  } catch (error) {
+    console.error('[Electron] Failed to save desktop month widget state', error);
+  }
+};
+
 const readWidgetWindowState = async (): Promise<PersistedWidgetWindowState> => {
   try {
     const raw = await fs.readFile(getWidgetStatePath(), 'utf-8');
@@ -200,6 +271,38 @@ const configureExternalLinks = (targetWindow: BrowserWindow) => {
       shell.openExternal(url);
     }
     return { action: 'deny' };
+  });
+};
+
+const attachWidgetShowFallback = (targetWindow: BrowserWindow, label: 'today' | 'month') => {
+  let didShow = false;
+
+  const showWindow = (reason: string) => {
+    if (didShow || targetWindow.isDestroyed()) {
+      return;
+    }
+
+    didShow = true;
+    targetWindow.show();
+    console.info(`[Electron] Showed ${label} widget via ${reason}`);
+  };
+
+  targetWindow.once('ready-to-show', () => {
+    showWindow('ready-to-show');
+  });
+
+  targetWindow.webContents.once('did-finish-load', () => {
+    setTimeout(() => {
+      showWindow('did-finish-load-fallback');
+    }, 120);
+  });
+
+  targetWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    console.error(`[Electron] ${label} widget failed to load`, { errorCode, errorDescription });
+  });
+
+  targetWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error(`[Electron] ${label} widget renderer exited`, details);
   });
 };
 
@@ -277,7 +380,7 @@ async function createWidgetWindow() {
     frame: false,
     transparent: true,
     resizable: true,
-    thickFrame: true,
+    thickFrame: false,
     minimizable: true,
     maximizable: true,
     fullscreenable: false,
@@ -291,11 +394,8 @@ async function createWidgetWindow() {
 
   widgetWindow.setMenuBarVisibility(false);
   configureExternalLinks(widgetWindow);
+  attachWidgetShowFallback(widgetWindow, 'today');
   await widgetWindow.loadURL(buildRendererUrl(DESKTOP_WIDGET_QUERY_VALUE));
-
-  widgetWindow.once('ready-to-show', () => {
-    widgetWindow?.show();
-  });
 
   widgetWindow.on('move', () => {
     void saveWidgetWindowState(widgetWindow);
@@ -311,6 +411,58 @@ async function createWidgetWindow() {
   });
 
   return widgetWindow;
+}
+
+async function createMonthWidgetWindow() {
+  if (monthWidgetWindow && !monthWidgetWindow.isDestroyed()) {
+    focusWindow(monthWidgetWindow);
+    return monthWidgetWindow;
+  }
+
+  const widgetState = await readMonthWidgetWindowState();
+  const widgetBounds = clampMonthWidgetBounds(widgetState.bounds);
+
+  monthWidgetWindow = new BrowserWindow({
+    title: 'LumosTime Month Widget',
+    icon: getIconPath(),
+    width: widgetBounds.width,
+    height: widgetBounds.height,
+    x: widgetBounds.x,
+    y: widgetBounds.y,
+    frame: false,
+    transparent: true,
+    resizable: true,
+    thickFrame: false,
+    minimizable: true,
+    maximizable: true,
+    fullscreenable: false,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      preload,
+      webSecurity: false
+    }
+  });
+
+  monthWidgetWindow.setMenuBarVisibility(false);
+  configureExternalLinks(monthWidgetWindow);
+  attachWidgetShowFallback(monthWidgetWindow, 'month');
+  await monthWidgetWindow.loadURL(buildRendererUrl(DESKTOP_MONTH_WIDGET_QUERY_VALUE));
+
+  monthWidgetWindow.on('move', () => {
+    void saveMonthWidgetWindowState(monthWidgetWindow);
+  });
+  monthWidgetWindow.on('resize', () => {
+    void saveMonthWidgetWindowState(monthWidgetWindow);
+  });
+  monthWidgetWindow.on('close', () => {
+    void saveMonthWidgetWindowState(monthWidgetWindow);
+  });
+  monthWidgetWindow.on('closed', () => {
+    monthWidgetWindow = null;
+  });
+
+  return monthWidgetWindow;
 }
 
 app.whenReady().then(() => {
@@ -329,7 +481,7 @@ app.on('second-instance', () => {
     return;
   }
 
-  if (widgetWindow) {
+  if (widgetWindow || monthWidgetWindow) {
     void focusMainWindow();
   }
 });
@@ -368,6 +520,14 @@ ipcMain.on('desktop-widget:close', () => {
   widgetWindow?.close();
 });
 
+ipcMain.on('desktop-widget:open-month', () => {
+  void createMonthWidgetWindow();
+});
+
+ipcMain.on('desktop-widget:close-month', () => {
+  monthWidgetWindow?.close();
+});
+
 ipcMain.on('desktop-widget:open-main', () => {
   void focusMainWindow();
 });
@@ -386,23 +546,26 @@ ipcMain.on('desktop-widget:set-opacity', (_, _opacity: number) => {
   // 空操作，避免原生整窗透明度导致文字/按钮变虚。完全在前端 CSS 层控制背景的 rgba 透明度。
 });
 
-ipcMain.on('desktop-widget:set-theme', (_, _theme: 'light' | 'dark') => {
-  if (widgetWindow && !widgetWindow.isDestroyed()) {
+ipcMain.on('desktop-widget:set-theme', (event, _theme: 'light' | 'dark') => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && !win.isDestroyed()) {
     // 强制使用完全透明底色，避免遮挡渲染层 CSS 的背景半透明透底效果
-    widgetWindow.setBackgroundColor('#00000000');
+    win.setBackgroundColor('#00000000');
   }
 });
 
-ipcMain.handle('desktop-widget:get-bounds', () => {
-  if (widgetWindow && !widgetWindow.isDestroyed()) {
-    return widgetWindow.getBounds();
+ipcMain.handle('desktop-widget:get-bounds', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && !win.isDestroyed()) {
+    return win.getBounds();
   }
   return null;
 });
 
-ipcMain.on('desktop-widget:set-bounds', (_, bounds: { x: number; y: number; width: number; height: number }) => {
-  if (widgetWindow && !widgetWindow.isDestroyed()) {
-    widgetWindow.setBounds(bounds);
+ipcMain.on('desktop-widget:set-bounds', (event, bounds: { x: number; y: number; width: number; height: number }) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && !win.isDestroyed()) {
+    win.setBounds(bounds);
   }
 });
 

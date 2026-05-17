@@ -4,7 +4,7 @@
  * @output Mounted React Application
  * @pos Entry Point (Bootstrapping)
  * @description The entry point that mounts the React App component, keeps the native loading screen until data hydration is ready, and handles polyfills.
- * @updated 2026-05-17: Added a dedicated desktop-widget boot path so Electron can render a lightweight today-tasks window without mounting the full app shell.
+ * @updated 2026-05-17: Added a dedicated desktop-widget boot path so Electron can render a lightweight today-tasks window or month planning calendar window without mounting the full app shell.
  */
 import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -12,8 +12,9 @@ import { Buffer } from 'buffer';
 import App from './App';
 import './index.css';
 import './styles/themes.css';
-import { isDesktopWidgetWindow } from './services/desktopWidgetService';
+import { isDesktopWidgetWindow, getDesktopWidgetType } from './services/desktopWidgetService';
 import { DesktopTodayWidgetView } from './views/desktop/DesktopTodayWidgetView';
+import { DesktopMonthWidgetView } from './views/desktop/DesktopMonthWidgetView';
 
 const APP_READY_EVENT = 'lumostime:app-ready';
 
@@ -42,6 +43,8 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    {isDesktopWidgetWindow() ? <DesktopTodayWidgetView /> : <App />}
+    {isDesktopWidgetWindow() ? (
+      getDesktopWidgetType() === 'month' ? <DesktopMonthWidgetView /> : <DesktopTodayWidgetView />
+    ) : <App />}
   </React.StrictMode>
 );

@@ -4,7 +4,7 @@
  * @output IPC Bridge
  * @pos Electron Preload
  * @description Exposes safe IPC methods to the renderer process via `contextBridge`, enabling communication between the web app and the main process.
- * @updated 2026-05-17: Added a dedicated desktop-widget bridge so Electron windows can open, close, and forward lightweight todo actions without reaching for raw IPC in every component.
+ * @updated 2026-05-17: Added a dedicated desktop today-widget and monthly-widget bridge so Electron windows can open, close, and forward lightweight todo actions without reaching for raw IPC in every component.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -45,6 +45,12 @@ contextBridge.exposeInMainWorld('desktopWidget', {
     },
     close() {
         ipcRenderer.send('desktop-widget:close')
+    },
+    openMonth() {
+        ipcRenderer.send('desktop-widget:open-month')
+    },
+    closeMonth() {
+        ipcRenderer.send('desktop-widget:close-month')
     },
     openMainApp() {
         ipcRenderer.send('desktop-widget:open-main')

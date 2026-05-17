@@ -4,10 +4,16 @@
 
 ## Updates
 
+- 2026-05-17: `DesktopWidgetSettingsView.tsx` added a toggle switch and IPC launcher for the "Desktop Month Widget" (桌面月历小组件).
 - 2026-05-14: `AISettingsView.tsx` now supports named AI API presets with a built-in `默认预设`, custom preset create/rename/delete actions, provider-template switching, and per-preset `API Key / baseUrl / modelName` storage while switching the active preset immediately.
 - 2026-05-10: `PreferencesSettingsView.tsx` changed the post-start timer jump behavior from a boolean toggle into a three-option selector.
 
 ## Current Subviews
+
+### `DesktopWidgetSettingsView.tsx`
+- Toggle switches for "Desktop Today Widget" and "Desktop Month Widget"
+- Triggers open/close Electron IPC events for each desktop widget
+- Validates desktop availability so it gracefully disables toggles on web/mobile clients
 
 ### `CloudSyncSettingsView.tsx`
 - WebDAV connection settings
@@ -38,3 +44,4 @@
 - Each subview receives `onBack` so it can return to the main settings page.
 - Shared state is still passed through props from `SettingsView.tsx`.
 - Keep visual language consistent with the rest of settings: full-screen layout, soft stone palette, and minimal controls.
+
