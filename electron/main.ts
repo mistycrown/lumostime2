@@ -4,6 +4,7 @@
  * @output Window Management
  * @pos Electron Main
  * @description Entry point for the Electron application. Handles main-window and desktop-widget creation, lifecycle events, and inter-process communication (IPC).
+ * @updated 2026-05-17: Isolated Electron development builds into a dedicated `userData` directory so DEV localStorage, IndexedDB, and widget-state files no longer share packaged desktop data.
  * @updated 2026-05-17: 扩展了 Electron 主进程，新增对桌面计时器小组件（timer widget）独立窗口的生命周期管理（常驻置顶、固定大小、不可缩放、拖动坐标持久化）以及配套 IPC 接口。
  * @updated 2026-05-17: 扩展了 Electron 主进程小组件管理器，新增对桌面小事清单小组件（quick widget）独立窗口的生命周期、拖拽缩放边界持久化和 IPC 调起/关闭支持。并支持了 add_quick_todo 动作的透明转发。
  * @updated 2026-05-17: Added a dedicated transparent desktop quick-editor window so widget todo clicks can open one always-on-top editor beyond the source widget bounds.
@@ -60,6 +61,7 @@ process.env.APP_ROOT = path.join(__dirname, '..');
 export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron');
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist');
 export const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
+const IS_DEV = Boolean(VITE_DEV_SERVER_URL);
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, 'public')
@@ -88,9 +90,16 @@ const WIDGET_STATE_FILENAME = 'desktop-widget-state.json';
 const MONTH_WIDGET_STATE_FILENAME = 'desktop-month-widget-state.json';
 const QUICK_WIDGET_STATE_FILENAME = 'desktop-quick-widget-state.json';
 const TIMER_WIDGET_STATE_FILENAME = 'desktop-timer-widget-state.json';
+const DEV_USER_DATA_DIRECTORY_NAME = 'LumosTime Dev';
 
 // Disable GPU Acceleration for Windows 7
 if (os.release().startsWith('6.1')) app.disableHardwareAcceleration();
+
+if (IS_DEV) {
+  const devUserDataPath = path.join(app.getPath('appData'), DEV_USER_DATA_DIRECTORY_NAME);
+  app.setPath('userData', devUserDataPath);
+  console.info(`[Electron] Using isolated development userData directory: ${devUserDataPath}`);
+}
 
 // Set application name for Windows 10+ notifications
 if (process.platform === 'win32') app.setAppUserModelId(app.getName());
@@ -125,7 +134,7 @@ const getQuickWidgetStatePath = () => path.join(app.getPath('userData'), QUICK_W
 const getTimerWidgetStatePath = () => path.join(app.getPath('userData'), TIMER_WIDGET_STATE_FILENAME);
 
 const buildRendererUrl = (windowType?: string): string => {
-  if (VITE_DEV_SERVER_URL) {
+  if (IS_DEV) {
     const devUrl = new URL(VITE_DEV_SERVER_URL);
     if (windowType) {
       devUrl.searchParams.set(DESKTOP_WIDGET_QUERY_KEY, windowType);
@@ -458,14 +467,14 @@ async function createMainWindow() {
     isMainRendererReady = false;
   });
 
-  if (VITE_DEV_SERVER_URL) {
+  if (IS_DEV) {
     console.log('Loading URL:', VITE_DEV_SERVER_URL);
   } else {
     console.log('Loading File:', indexHtml);
   }
   await mainWindow.loadURL(buildRendererUrl());
 
-  if (VITE_DEV_SERVER_URL) {
+  if (IS_DEV) {
     mainWindow.webContents.openDevTools();
   }
 
@@ -899,7 +908,7 @@ ipcMain.handle('open-win', async (_, arg) => {
     }
   });
 
-  if (VITE_DEV_SERVER_URL) {
+  if (IS_DEV) {
     await childWindow.loadURL(`${VITE_DEV_SERVER_URL}#${arg}`);
   } else {
     await childWindow.loadURL(`${buildRendererUrl()}#${arg}`);

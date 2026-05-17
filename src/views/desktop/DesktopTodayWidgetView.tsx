@@ -2,6 +2,9 @@
  * @file DesktopTodayWidgetView.tsx
  * @description 桌面今日小组件的UI视图，采用极其紧凑的单行设计。支持轻量完成/计时（完全后台静默执行，不唤起主窗口），并自带显示设置面板（提供深浅配色切换与窗体透明度滑块调节）。
  * @updated 2026-05-17: 实现了显示设置中“任务颜色”选项，支持按“排期类型”与“任务分类”动态渲染小圆点前缀，并与周/月视图的自定义排期配色联动。
+ * @updated 2026-05-17: Keep completed todos visible inside each today-widget section while still ordering them after unfinished rows.
+ * @updated 2026-05-17: Softened the completed checkbox treatment and hid finished rows from the overdue section while keeping them visible in pinned/today.
+ * @updated 2026-05-17: Increased the unfinished checkbox outline contrast in the today widget so open tasks stay legible on the translucent background.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, ExternalLink, X, Play, SlidersHorizontal } from 'lucide-react';
@@ -28,6 +31,21 @@ const formatWidgetHeaderDate = (dateKey: string): string => {
     weekday: 'short'
   });
 };
+
+const TODAY_GROUP_BADGE_ORDER: Record<DesktopWidgetTodoItem['badgeLabel'], number> = {
+  PIN: 0,
+  TODAY: 1,
+  MAYBE: 2,
+  LATE: 3
+};
+
+const sortTodaySectionItems = (
+  items: DesktopWidgetTodoItem[]
+): DesktopWidgetTodoItem[] => [...items].sort((left, right) => (
+  Number(left.isCompleted) - Number(right.isCompleted)
+  || TODAY_GROUP_BADGE_ORDER[left.badgeLabel] - TODAY_GROUP_BADGE_ORDER[right.badgeLabel]
+  || left.title.localeCompare(right.title, 'zh-CN')
+));
 
 const TodoRow: React.FC<{
   item: DesktopWidgetTodoItem;
@@ -97,11 +115,11 @@ const TodoRow: React.FC<{
           className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition disabled:cursor-wait disabled:opacity-60 ${
             item.isCompleted
               ? isDark
-                ? 'bg-stone-200 border-stone-200 text-stone-900'
-                : 'bg-stone-800 border-stone-800 text-white'
+                ? 'bg-stone-700/60 border-stone-600 text-stone-300'
+                : 'bg-stone-200/80 border-stone-300 text-stone-500'
               : isDark
-              ? 'bg-transparent border-stone-700 text-transparent hover:border-stone-500'
-              : 'bg-transparent border-stone-300 text-transparent hover:border-stone-500'
+              ? 'bg-transparent border-stone-500 text-transparent hover:border-stone-300'
+              : 'bg-transparent border-stone-400 text-transparent hover:border-stone-500'
           }`}
         >
           <Check size={10} strokeWidth={3} />
@@ -266,17 +284,18 @@ export const DesktopTodayWidgetView: React.FC = () => {
     }
     
     // 合并 arrange、due 和 maybe 的非完成任务作为今天分组
-    const todayAndMaybe = [
+    const todayAndMaybe = sortTodaySectionItems([
       ...(snapshot.today || []),
       ...(snapshot.maybe || [])
-    ].filter(item => !item.isCompleted);
+    ]);
 
     if (todayAndMaybe.length > 0) {
       nextSections.push({ id: 'today', label: '今天', items: todayAndMaybe });
     }
     
-    if (snapshot.overdue.length > 0) {
-      nextSections.push({ id: 'overdue', label: '逾期未完成', items: snapshot.overdue });
+    const overdueItems = snapshot.overdue.filter((item) => !item.isCompleted);
+    if (overdueItems.length > 0) {
+      nextSections.push({ id: 'overdue', label: '逾期未完成', items: overdueItems });
     }
     return nextSections;
   }, [snapshot]);

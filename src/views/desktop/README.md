@@ -5,6 +5,7 @@
 ## Updates
 
 - 2026-05-17: `DesktopMonthCalendar.tsx` now colors desktop month rows from the shared month-entry `primaryKind`, so a todo that is both completed and due/arranged/maybe on the same day still renders with completed-first styling while the existing continuous trace strip layout remains intact.
+- 2026-05-17: `DesktopMonthCalendar.tsx` 支持在格子中为由于 (due) 类型的条目加上 flag 图标（并实现超出截断且 flag 完整显示），并将 trace / 连续 trace 条目字色置为灰色。
 
 - 2026-05-17: 修复并优化了桌面任务快捷编辑气泡框（`DesktopTodoQuickEditorPopover.tsx`）在 `inline` 模式下的最大高度限制和 flex 伸缩布局，解决子任务条目过多时由于外层未限高导致无法在独立 Electron 窗口内滚动显示的问题。
 - 2026-05-17: 支持了桌面月历小组件中任务着色模式的屏内切换，用户可以在显示设置面板中选择“按排期”或“按分类”进行着色渲染，并能直接无缝同步和读取应用内已有的排期或分类颜色配置。
