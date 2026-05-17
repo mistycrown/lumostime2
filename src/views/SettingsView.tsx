@@ -7,9 +7,6 @@
  *
  * 修改历史:
  * - 2026-05-17: 新增“Windows 特性”设置分组，将“PC端小组件”与“导出到 Obsidian”归口至此分组并限定移动端不可见。
- * - 2026-05-17: 优化 PC 端小组件菜单的显示条件，结合 !Capacitor.isNativePlatform() 逻辑彻底确保其在 Android 端隐藏。
- * - 2026-05-17: 将“桌面今日小组件”菜单入口及加载占位符更名为“PC端小组件”。
- * - 2026-05-17: Added a desktop launcher entry in the Android features section (Electron-only) to open the dedicated today-task widget window.
 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */

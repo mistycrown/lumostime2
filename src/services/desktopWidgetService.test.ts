@@ -4,14 +4,16 @@
  * @output Regression coverage for the Electron desktop widget today/pin/overdue grouping logic
  * @pos Test (desktop widget service)
  * @description Verifies the desktop today-widget snapshot keeps pinned and today-visible todos together while still surfacing overdue items outside the shared today bucket.
+ * @updated 2026-05-17: 扩展了单元测试，补全了计时器小组件（timer widget）的快照构建 buildDesktopTimerWidgetSnapshot 和 loadEnabledDesktopWidgetTypes 在启用 timer 时的测试覆盖。
  * @updated 2026-05-17: Added startup preference coverage for Electron desktop widget auto-restore state parsing.
  * @updated 2026-05-17: Added first-pass regression coverage for Electron desktop widget snapshot grouping.
  */
 import { describe, expect, it } from 'vitest';
-import type { Category, TodoItem } from '../types';
+import type { Category, TodoItem, ActiveSession } from '../types';
 import {
   buildDesktopTodayWidgetSnapshot,
-  loadEnabledDesktopWidgetTypes
+  loadEnabledDesktopWidgetTypes,
+  buildDesktopTimerWidgetSnapshot
 } from './desktopWidgetService';
 
 const REFERENCE_DATE = new Date('2026-05-17T09:00:00');
@@ -123,13 +125,14 @@ describe('loadEnabledDesktopWidgetTypes', () => {
         const map: Record<string, string | null> = {
           lumostime_desktop_widget_today_enabled: 'true',
           lumostime_desktop_widget_month_enabled: 'false',
-          lumostime_desktop_widget_quick_enabled: 'true'
+          lumostime_desktop_widget_quick_enabled: 'true',
+          lumostime_desktop_widget_timer_enabled: 'true'
         };
         return map[key] ?? null;
       }
     };
 
-    expect(loadEnabledDesktopWidgetTypes(storageLike)).toEqual(['today', 'quick']);
+    expect(loadEnabledDesktopWidgetTypes(storageLike)).toEqual(['today', 'quick', 'timer']);
   });
 
   it('returns an empty list when no desktop widget startup toggle is enabled', () => {
@@ -140,5 +143,54 @@ describe('loadEnabledDesktopWidgetTypes', () => {
     };
 
     expect(loadEnabledDesktopWidgetTypes(storageLike)).toEqual([]);
+  });
+});
+
+describe('buildDesktopTimerWidgetSnapshot', () => {
+  it('returns a null session when no active sessions are present', () => {
+    const snapshot = buildDesktopTimerWidgetSnapshot([]);
+    expect(snapshot.session).toBeNull();
+  });
+
+  it('returns the latest active session when only one is present', () => {
+    const activeSessions: ActiveSession[] = [
+      {
+        id: 'session-1',
+        activityId: 'coding',
+        activityName: 'Coding',
+        startTime: 1000000000000
+      }
+    ];
+
+    const snapshot = buildDesktopTimerWidgetSnapshot(activeSessions);
+    expect(snapshot.session).toEqual({
+      sessionId: 'session-1',
+      activityName: 'Coding',
+      startTime: 1000000000000
+    });
+  });
+
+  it('returns the last active session in the list when multiple are present', () => {
+    const activeSessions: ActiveSession[] = [
+      {
+        id: 'session-1',
+        activityId: 'coding',
+        activityName: 'Coding',
+        startTime: 1000000000000
+      },
+      {
+        id: 'session-2',
+        activityId: 'writing',
+        activityName: 'Writing Art',
+        startTime: 2000000000000
+      }
+    ];
+
+    const snapshot = buildDesktopTimerWidgetSnapshot(activeSessions);
+    expect(snapshot.session).toEqual({
+      sessionId: 'session-2',
+      activityName: 'Writing Art',
+      startTime: 2000000000000
+    });
   });
 });

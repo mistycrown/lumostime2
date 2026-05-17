@@ -4,13 +4,15 @@
  * @output Desktop widget route helpers and compact today-task snapshot builders for the Electron widget window
  * @pos Service
  * @description Builds the lightweight desktop widget snapshot from the shared todo model so the Electron widget window can reuse the app's existing today-task logic without mounting the full app shell.
+ * @updated 2026-05-17: 扩展了桌面小组件状态快照，新增计时器小组件（timer widget）的快照构建 buildDesktopTimerWidgetSnapshot 与 loadDesktopTimerWidgetSnapshotFromStorage。
  * @updated 2026-05-17: 新增桌面小组件启动偏好键名与读取辅助逻辑，供 Electron 主应用启动时自动恢复已启用的 PC 端小组件。
  * @updated 2026-05-17: 扩展了桌面小组件的支持，新增 desktop-quick（小事清单小组件）快照构建与窗口检测，实现了 buildDesktopQuickWidgetSnapshot 以确保无排期的小事能够完整呈现在小组件待办列表中。
  * @updated 2026-05-17: Added desktop widget route detection plus today/pin/overdue snapshot builders for the Electron desktop today widget and month-widget window, with getDesktopWidgetType helper support.
  */
 import { USER_DATA_KEYS, storage } from '../constants/storageKeys';
-import { Category, TodoItem } from '../types';
+import { Category, TodoItem, ActiveSession } from '../types';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
+import { loadPersistedActiveSessions } from '../utils/sessionPersistence';
 import { getParentTodo } from '../utils/todoHierarchyUtils';
 import {
   formatDateKey,
@@ -22,11 +24,13 @@ export const DESKTOP_WIDGET_WINDOW_QUERY_KEY = 'window';
 export const DESKTOP_WIDGET_WINDOW_QUERY_VALUE = 'desktop-widget';
 export const DESKTOP_MONTH_WIDGET_WINDOW_QUERY_VALUE = 'desktop-month';
 export const DESKTOP_QUICK_WIDGET_WINDOW_QUERY_VALUE = 'desktop-quick';
+export const DESKTOP_TIMER_WIDGET_WINDOW_QUERY_VALUE = 'desktop-timer';
 export const DESKTOP_WIDGET_TODAY_STORAGE_KEY = 'lumostime_desktop_widget_today_enabled';
 export const DESKTOP_WIDGET_MONTH_STORAGE_KEY = 'lumostime_desktop_widget_month_enabled';
 export const DESKTOP_WIDGET_QUICK_STORAGE_KEY = 'lumostime_desktop_widget_quick_enabled';
+export const DESKTOP_WIDGET_TIMER_STORAGE_KEY = 'lumostime_desktop_widget_timer_enabled';
 
-export type DesktopWidgetStartupType = 'today' | 'month' | 'quick';
+export type DesktopWidgetStartupType = 'today' | 'month' | 'quick' | 'timer';
 
 export type DesktopWidgetBadgeLabel = 'PIN' | 'TODAY' | 'LATE' | 'MAYBE';
 
@@ -157,10 +161,10 @@ export const isDesktopWidgetWindow = (): boolean => {
     return false;
   }
   const val = new URLSearchParams(window.location.search).get(DESKTOP_WIDGET_WINDOW_QUERY_KEY);
-  return val === DESKTOP_WIDGET_WINDOW_QUERY_VALUE || val === DESKTOP_MONTH_WIDGET_WINDOW_QUERY_VALUE || val === DESKTOP_QUICK_WIDGET_WINDOW_QUERY_VALUE;
+  return val === DESKTOP_WIDGET_WINDOW_QUERY_VALUE || val === DESKTOP_MONTH_WIDGET_WINDOW_QUERY_VALUE || val === DESKTOP_QUICK_WIDGET_WINDOW_QUERY_VALUE || val === DESKTOP_TIMER_WIDGET_WINDOW_QUERY_VALUE;
 };
 
-export const getDesktopWidgetType = (): 'today' | 'month' | 'quick' | null => {
+export const getDesktopWidgetType = (): 'today' | 'month' | 'quick' | 'timer' | null => {
   if (typeof window === 'undefined') {
     return null;
   }
@@ -173,6 +177,9 @@ export const getDesktopWidgetType = (): 'today' | 'month' | 'quick' | null => {
   }
   if (val === DESKTOP_QUICK_WIDGET_WINDOW_QUERY_VALUE) {
     return 'quick';
+  }
+  if (val === DESKTOP_TIMER_WIDGET_WINDOW_QUERY_VALUE) {
+    return 'timer';
   }
   return null;
 };
@@ -190,6 +197,9 @@ export const loadEnabledDesktopWidgetTypes = (
   }
   if (storageLike.getItem(DESKTOP_WIDGET_QUICK_STORAGE_KEY) === 'true') {
     enabledWidgetTypes.push('quick');
+  }
+  if (storageLike.getItem(DESKTOP_WIDGET_TIMER_STORAGE_KEY) === 'true') {
+    enabledWidgetTypes.push('timer');
   }
 
   return enabledWidgetTypes;
@@ -397,4 +407,39 @@ export const loadDesktopQuickWidgetSnapshotAsync = async (
     categories,
     date
   });
+};
+
+export interface DesktopTimerWidgetSnapshot {
+  session: {
+    sessionId: string;
+    activityName: string;
+    startTime: number;
+  } | null;
+  syncedAt: number;
+}
+
+export const buildDesktopTimerWidgetSnapshot = (
+  activeSessions: ActiveSession[]
+): DesktopTimerWidgetSnapshot => {
+  if (!activeSessions || activeSessions.length === 0) {
+    return { session: null, syncedAt: Date.now() };
+  }
+  // 默认升序，最后一个是最新开始的
+  const latest = activeSessions[activeSessions.length - 1];
+  return {
+    session: {
+      sessionId: latest.id,
+      activityName: latest.activityName,
+      startTime: latest.startTime
+    },
+    syncedAt: Date.now()
+  };
+};
+
+export const loadDesktopTimerWidgetSnapshotFromStorage = (): DesktopTimerWidgetSnapshot => {
+  if (typeof window === 'undefined') {
+    return { session: null, syncedAt: Date.now() };
+  }
+  const sessions = loadPersistedActiveSessions();
+  return buildDesktopTimerWidgetSnapshot(sessions);
 };

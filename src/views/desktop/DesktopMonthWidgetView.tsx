@@ -4,13 +4,15 @@
  * @output Unified desktop month widget view with one shared title bar, week-paged calendar, and collapsible planning sidebar
  * @pos View (Desktop widget)
  * @description Hosts the Electron desktop month widget, including one unified header, compact display settings, a 2/3/4-week paged calendar body, and the right-side Arrange / Maybe / Due planning sidebar.
+ * @updated 2026-05-17: The planning sidebar now keeps unfinished todos visible across arrange/maybe/due even when they already have dates, and shows those dated rows with compact trailing labels.
  * @updated 2026-05-17: 改良计划栏分类标签，调整顺序为 maybe / arrange / due 并默认选中 arrange 标签。
  * @updated 2026-05-17: Grouped the planning sidebar by todo category, removed the misleading linked-category line, and restored one-level subtask visibility with standalone `@parent` labels when a parent row is filtered out.
  * @updated 2026-05-17: Replaced fixed month paging with 2/3/4-week whole-page navigation so widget row settings control weeks per page without auto-resizing the widget window.
  * @updated 2026-05-17: Added a persisted top-right toggle that fully collapses the planning sidebar so the calendar can expand across the whole widget width.
+ * @updated 2026-05-17: 禁用计划栏小目的跳转详情点击事件，将 hover 箭头改为展开/收缩子任务按钮，支持副任务折叠/展开子任务。
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, GripVertical, ArrowRight, SlidersHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, GripVertical, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { addDays, addWeeks, format, isSameDay, isSameMonth, isSameYear, startOfWeek, subWeeks } from 'date-fns';
 import { dataRepository } from '../../repositories/dataRepository';
 import { Log, TodoCategory, TodoItem } from '../../types';
@@ -64,6 +66,7 @@ export const DesktopMonthWidgetView: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => (
     localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true'
   ));
+  const [collapsedTodoIds, setCollapsedTodoIds] = useState<Record<string, boolean>>({});
   const today = useMemo(() => new Date(), []);
   const [pageStartDate, setPageStartDate] = useState<Date>(() => getWeekPageStart(new Date()));
   const [rowsPerScreen, setRowsPerScreen] = useState<WidgetRowsPerScreen>(() => {
@@ -220,6 +223,14 @@ export const DesktopMonthWidgetView: React.FC = () => {
       localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(nextValue));
       return nextValue;
     });
+  };
+
+  const toggleCollapse = (todoId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setCollapsedTodoIds((prev) => ({
+      ...prev,
+      [todoId]: !prev[todoId]
+    }));
   };
 
   const handleOpenTodo = (todo: TodoItem) => {
@@ -454,46 +465,84 @@ export const DesktopMonthWidgetView: React.FC = () => {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {sidebarSections.map((section) => (
-                      <div key={section.categoryId} className="space-y-1.5">
-                        <div className={`px-1 text-[10px] font-semibold tracking-[0.16em] ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>
-                          {section.title}
-                        </div>
-                        <div className="space-y-1.5">
-                          {section.rows.map((row) => {
-                            const isDraggingThis = externalDraggingTodoId === row.todo.id;
-                            const isChildRow = row.level === 1;
+                    {sidebarSections.map((section) => {
+                      const visibleRows = section.rows.filter((row) => {
+                        if (row.level === 1 && row.todo.parentTodoId) {
+                          return !collapsedTodoIds[row.todo.parentTodoId];
+                        }
+                        return true;
+                      });
 
-                            return (
-                              <div
-                                key={row.todo.id}
-                                draggable
-                                onDragStart={(event) => handleDragStart(event, row.todo.id)}
-                                onDragEnd={handleDragEnd}
-                                onClick={() => handleOpenTodo(row.todo)}
-                                className={`group flex cursor-grab items-center gap-2 rounded border p-2 text-left transition select-none active:cursor-grabbing ${
-                                  isDraggingThis
-                                    ? 'border-dashed border-stone-500 opacity-40'
-                                    : isDark
-                                      ? 'border-stone-900 bg-stone-900/30 hover:border-stone-800 hover:bg-stone-900/60'
-                                      : 'border-stone-200 bg-white/60 hover:border-stone-300 hover:bg-white'
-                                } ${isChildRow ? 'ml-4' : ''}`}
-                              >
-                                <GripVertical size={11} className={`shrink-0 ${isDark ? 'text-stone-700' : 'text-stone-400'}`} />
-                                <div className={`min-w-0 flex-1 ${isChildRow ? 'pl-2' : ''}`}>
-                                  <div className="flex items-center gap-1">
-                                    <span className={`truncate text-xs font-semibold leading-none ${isDark ? 'text-stone-200' : 'text-stone-700'}`}>
-                                      {row.displayTitle}
-                                    </span>
+                      return (
+                        <div key={section.categoryId} className="space-y-1.5">
+                          <div className={`px-1 text-[10px] font-semibold tracking-[0.16em] ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>
+                            {section.title}
+                          </div>
+                          <div className="space-y-1.5">
+                            {visibleRows.map((row) => {
+                              const isDraggingThis = externalDraggingTodoId === row.todo.id;
+                              const isChildRow = row.level === 1;
+                              const hasChildren = section.rows.some(
+                                (r) => r.level === 1 && r.todo.parentTodoId === row.todo.id
+                              );
+                              const isCollapsed = !!collapsedTodoIds[row.todo.id];
+
+                              return (
+                                <div
+                                  key={row.todo.id}
+                                  draggable
+                                  onDragStart={(event) => handleDragStart(event, row.todo.id)}
+                                  onDragEnd={handleDragEnd}
+                                  className={`group flex cursor-grab items-center gap-2 rounded border p-2 text-left transition select-none active:cursor-grabbing ${
+                                    isDraggingThis
+                                      ? 'border-dashed border-stone-500 opacity-40'
+                                      : isDark
+                                        ? 'border-stone-900 bg-stone-900/30 hover:border-stone-800 hover:bg-stone-900/60'
+                                        : 'border-stone-200 bg-white/60 hover:border-stone-300 hover:bg-white'
+                                  } ${isChildRow ? 'ml-4' : ''}`}
+                                >
+                                  <GripVertical size={11} className={`shrink-0 ${isDark ? 'text-stone-700' : 'text-stone-400'}`} />
+                                  <div className={`min-w-0 flex-1 ${isChildRow ? 'pl-2' : ''}`}>
+                                    <div className="flex items-center gap-1">
+                                      <span className={`truncate text-xs font-semibold leading-none ${isDark ? 'text-stone-200' : 'text-stone-700'}`}>
+                                        {row.displayTitle}
+                                      </span>
+                                    </div>
                                   </div>
+                                  {row.trailingDateText && (
+                                    <span
+                                      className={`shrink-0 text-[10px] font-medium tabular-nums ${
+                                        isDark ? 'text-stone-500' : 'text-stone-400'
+                                      }`}
+                                    >
+                                      {row.trailingDateText}
+                                    </span>
+                                  )}
+                                  {row.level === 0 && hasChildren && (
+                                    <button
+                                      type="button"
+                                      onClick={(event) => toggleCollapse(row.todo.id, event)}
+                                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded transition-all ${
+                                        isDark
+                                          ? 'text-stone-400 hover:bg-stone-800 hover:text-stone-100'
+                                          : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900'
+                                      } ${isCollapsed ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                      aria-label={isCollapsed ? '展开子任务' : '收起子任务'}
+                                    >
+                                      {isCollapsed ? (
+                                        <ChevronRight size={12} strokeWidth={2.5} />
+                                      ) : (
+                                        <ChevronDown size={12} strokeWidth={2.5} />
+                                      )}
+                                    </button>
+                                  )}
                                 </div>
-                                <ArrowRight size={10} className={`shrink-0 opacity-0 transition group-hover:opacity-100 ${isDark ? 'text-stone-500' : 'text-stone-400'}`} />
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

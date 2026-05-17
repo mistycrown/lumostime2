@@ -1,19 +1,21 @@
 /**
  * @file DesktopWidgetSettingsView.tsx
  * @input window.desktopWidget IPC bridge（Electron 环境），localStorage 状态
- * @output PC端小组件设置页面，含今日小组件与月历小组件开关
+ * @output PC端小组件设置页面，含今日小组件、月历小组件、小事小组件与计时器小组件开关
  * @pos View (Settings Subpage)
  * @description 桌面小组件的PC端控制台，在此管理和触发小组件的呼起、配置保存与环境提示。
+ * @updated 2026-05-17: 扩展了小组件控制中心，新增“桌面计时器小组件”开关选项与触发器支持，实现独立的 IPC 呼起与收起桌面计时器小组件（timer widget）。
  * @updated 2026-05-17: 改为复用共享的桌面小组件启动偏好键名，确保设置页与应用启动恢复逻辑读写同一份状态。
  * @updated 2026-05-17: 新增“小事清单小组件”开关选项与触发器支持，实现独立的 IPC 打开与关闭桌面小事清单小组件（quick widget）。
  * @updated 2026-05-17: 添加桌面月历小组件开关与触发器支持。
  */
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, LayoutGrid, Monitor, Calendar, ListTodo } from 'lucide-react';
+import { ChevronLeft, LayoutGrid, Monitor, Calendar, ListTodo, Timer } from 'lucide-react';
 import {
   DESKTOP_WIDGET_MONTH_STORAGE_KEY,
   DESKTOP_WIDGET_QUICK_STORAGE_KEY,
-  DESKTOP_WIDGET_TODAY_STORAGE_KEY
+  DESKTOP_WIDGET_TODAY_STORAGE_KEY,
+  DESKTOP_WIDGET_TIMER_STORAGE_KEY
 } from '../../services/desktopWidgetService';
 
 interface DesktopWidgetItem {
@@ -47,12 +49,17 @@ export const DesktopWidgetSettingsView: React.FC<DesktopWidgetSettingsViewProps>
     return localStorage.getItem(DESKTOP_WIDGET_QUICK_STORAGE_KEY) === 'true';
   });
 
+  const [timerEnabled, setTimerEnabled] = useState(() => {
+    return localStorage.getItem(DESKTOP_WIDGET_TIMER_STORAGE_KEY) === 'true';
+  });
+
   useEffect(() => {
     // 非 Electron 环境下强制重置为 false
     if (!isElectron) {
       setTodayEnabled(false);
       setMonthEnabled(false);
       setQuickEnabled(false);
+      setTimerEnabled(false);
     }
   }, [isElectron]);
 
@@ -101,6 +108,22 @@ export const DesktopWidgetSettingsView: React.FC<DesktopWidgetSettingsViewProps>
       window.desktopWidget?.openQuick?.();
     } else {
       window.desktopWidget?.closeQuick?.();
+    }
+  };
+
+  const handleToggleTimerWidget = () => {
+    if (!isElectron) {
+      return;
+    }
+
+    const nextEnabled = !timerEnabled;
+    setTimerEnabled(nextEnabled);
+    localStorage.setItem(DESKTOP_WIDGET_TIMER_STORAGE_KEY, String(nextEnabled));
+
+    if (nextEnabled) {
+      window.desktopWidget?.openTimer?.();
+    } else {
+      window.desktopWidget?.closeTimer?.();
     }
   };
 
@@ -197,7 +220,7 @@ export const DesktopWidgetSettingsView: React.FC<DesktopWidgetSettingsViewProps>
               type="button"
               disabled={!isElectron}
               onClick={handleToggleQuickWidget}
-              className="w-full flex items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-stone-50 disabled:cursor-default disabled:hover:bg-white"
+              className="w-full flex items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-stone-50 disabled:cursor-default disabled:hover:bg-white border-b border-stone-100"
             >
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-50">
                 <ListTodo size={18} className="text-orange-500" />
@@ -216,6 +239,35 @@ export const DesktopWidgetSettingsView: React.FC<DesktopWidgetSettingsViewProps>
                 <span
                   className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
                     quickEnabled && isElectron ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
+              </div>
+            </button>
+
+            {/* 桌面计时器小组件 */}
+            <button
+              type="button"
+              disabled={!isElectron}
+              onClick={handleToggleTimerWidget}
+              className="w-full flex items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-stone-50 disabled:cursor-default disabled:hover:bg-white"
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50">
+                <Timer size={18} className="text-amber-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-stone-800">桌面计时器小组件</div>
+              </div>
+              {/* 开关 */}
+              <div
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ${
+                  timerEnabled && isElectron
+                    ? 'bg-amber-400'
+                    : 'bg-stone-200'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                    timerEnabled && isElectron ? 'translate-x-5' : 'translate-x-0.5'
                   }`}
                 />
               </div>

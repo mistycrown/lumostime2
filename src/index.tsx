@@ -4,6 +4,7 @@
  * @output Mounted React Application
  * @pos Entry Point (Bootstrapping)
  * @description The entry point that mounts the React App component, keeps the native loading screen until data hydration is ready, and handles polyfills.
+ * @updated 2026-05-17: 扩展了桌面小组件的分流路由逻辑，新增对 DesktopTimerWidgetView（计时器小组件）的渲染路由分发。
  * @updated 2026-05-17: 扩展了桌面小组件的分流路由逻辑，新增对 DesktopQuickWidgetView（小事清单小组件）的渲染路由分发。
  * @updated 2026-05-17: Added a dedicated desktop-widget boot path so Electron can render a lightweight today-tasks window or month planning calendar window without mounting the full app shell.
  */
@@ -17,6 +18,7 @@ import { isDesktopWidgetWindow, getDesktopWidgetType } from './services/desktopW
 import { DesktopTodayWidgetView } from './views/desktop/DesktopTodayWidgetView';
 import { DesktopMonthWidgetView } from './views/desktop/DesktopMonthWidgetView';
 import { DesktopQuickWidgetView } from './views/desktop/DesktopQuickWidgetView';
+import { DesktopTimerWidgetView } from './views/desktop/DesktopTimerWidgetView';
 
 const APP_READY_EVENT = 'lumostime:app-ready';
 
@@ -50,6 +52,8 @@ root.render(
         <DesktopMonthWidgetView />
       ) : getDesktopWidgetType() === 'quick' ? (
         <DesktopQuickWidgetView />
+      ) : getDesktopWidgetType() === 'timer' ? (
+        <DesktopTimerWidgetView />
       ) : (
         <DesktopTodayWidgetView />
       )

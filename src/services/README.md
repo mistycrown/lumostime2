@@ -1,5 +1,6 @@
 # Services Architecture
 
+Update 2026-05-17: `desktopWidgetService.ts` now supports the compact desktop-timer widget snapshot creation (`buildDesktopTimerWidgetSnapshot`) and storage loading (`loadDesktopTimerWidgetSnapshotFromStorage`), and parses the timer widget startup toggle to auto-restore it at launch alongside today/month/quick windows.
 Update 2026-05-17: `desktopWidgetService.ts` now also centralizes the Electron desktop-widget startup preference keys plus an enabled-widget reader, so the main app can auto-restore whichever PC widgets the user left enabled at launch. It continues to build the compact desktop-widget snapshots and route helpers for today/month/quick widget windows.
 
 Contains business logic and external integrations.
@@ -88,7 +89,7 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 - `weeklyReviewTemplateService.ts`: [Active] - Parses weekly-review template range commands, strictly resolves one of the four supported analysis methods, exposes staged setup prompts for the chat-native `select_range / select_method / ready` flow, locates or creates Weekly Review records for a chosen week, builds compact weekly data-package text from logs/todos/daily reviews, and prepares dedicated weekly-review chat plus AI-narrative writeback prompts from shared TS constants outside the generic assistant prompt stack.
 - `todoScheduleColorService.ts`: [Active] - Persists the shared `默认 / 自定义` schedule-type marker palette for Todo schedule views, normalizes per-type HEX overrides, and resolves the five Arrange / Due / Repeat / Done / Trace colors consumed by week and month displays.
 - `widgetService.ts`: [Active] - Centralizes widget payload and template helpers, including the TODAY + PIN list payload that stays aligned with shared today-category matching for pinned, due-today, arranged-today, and recurring-today todos while also mirroring source todo/category snapshots and recurrence fallback metadata for native refresh rebuilding.
-- `desktopWidgetService.ts`: [Active] - Builds the lightweight Electron desktop-widget route detection and today-task snapshot used by the frameless desktop today widget and the month-widget window, exposes shared startup-toggle storage keys plus enabled-widget parsing for launch-time auto-restore, and stays separate from the Android native widget bridge.
+- `desktopWidgetService.ts`: [Active] - Builds the lightweight Electron desktop-widget route detection, today-task snapshot, and active focus timer snapshot used by the today, month, quick, and timer widget windows, exposes shared startup-toggle storage keys plus enabled-widget parsing for launch-time auto-restore, and stays separate from the Android native widget bridge.
 - `achievementBottleStyleService.ts`: [Active] - Defines achievement bottle skin options, including lighter glass palettes and the extended neutral bottle set.
 - `timelineStyleService.ts`: [Active] - Manages timeline style themes, defaults, Memoir-specific offset values, and config normalization for shared timeline nodes.
 - `themePresetService.ts`: [Active] - 主题预设应用服务，拆分复杂的主题切换逻辑为独立方法
