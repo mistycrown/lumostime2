@@ -3,6 +3,9 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-05-17: `TodoMonthView.tsx` now renders an elegant dashed outline border around 'maybe' schedule items matching their color scheme, and applies a strike-through (line-through) text decoration with slight opacity fading for 'completed' tasks in both month grid cells and detail lists to match their accomplished state.
+- Update 2026-05-17: `TodoMonthView.tsx` now supports an optional `isDark` prop to dynamically adapt all date numbers, task titles, border dividers, expanded panels, and setting modals for seamless light/dark mode presentation inside transparent widgets.
+- Update 2026-05-17: `TodoMonthView.tsx` now also supports an embedded desktop mode with an optional hidden toolbar, external month-navigation signal, active-month reporting callback, and rows-per-screen override so the desktop month widget can reuse the same continuous scroll engine as the in-app month view.
 - Update 2026-05-17: `ai-chat/AIBackfillChatReviewWriteback.ts` now carries provider-native reasoning summaries through the ordinary-chat `日报` and `小报` writeback flows, so the final generated result message shows the same collapsible `推理过程` block as standard chat replies.
 - Update 2026-05-16: `ReviewNarrativeTab.tsx` now renders the daily `小报` row directly under the `AI 叙事` section, keeps existing newspapers tappable into the newspaper page, exposes an empty-state `点击生成` entry, and supports a guarded delete action supplied by the parent review view.
 - Update 2026-05-16: `AIBackfillChatModal.tsx` and `ai-chat/AIBackfillChatAssistantSettingsSection.tsx` now add a `日志提交触发` block under assistant call settings, let users select multiple trigger tags, listen for new-log submission events from shared log save flows, and run background assistant turns with fixed submitted-log summaries that include linked todo and scope context.

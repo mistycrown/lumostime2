@@ -2,7 +2,9 @@
 
 The `views/` directory contains all the React components that represent the distinct screens or pages of the LumosTime application. This layer is responsible for the presentation logic and user interaction.
 
+- Update 2026-05-17: Added `DesktopMonthWidgetView.tsx` plus `desktop/DesktopMonthCalendar.tsx`, providing a premium dual-panel desktop month widget. The left side now reuses the app's rolling month planner so months scroll continuously instead of paging one fixed grid at a time, while the right side displays an interactive planning sidebar with tabs for `Arrange / Maybe / Due` to support HTML5 drag-and-drop scheduling with IndexedDB write-backs and BroadcastChannel cross-window synchronization.
 - Update 2026-05-17: `DesktopTodayWidgetView.tsx` now provides a dedicated Electron-only today-task widget surface with compact `Pin / Today / Overdue` sections, while `SettingsView.tsx` adds a desktop launcher entry (Electron-only, in the Android features section) that directly opens the today-task widget window without navigating to a submenu.
+- Update 2026-05-17 (桌面今日小组件): 在 `DesktopTodayWidgetView.tsx` 中新增“任务颜色”显示设置选项。支持用户在“排期类型”（基于任务状态如安排、截止、Maybe、完成等，并与周/月视图自定义配色实时同步）与“任务分类”（基于所属分组固有色）着色方案之间一键切换，并支持设置的本地持久化。
 
 ## Architecture
 

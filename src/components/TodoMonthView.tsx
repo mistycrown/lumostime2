@@ -5,6 +5,8 @@
  * @pos Component (Todo scheduling)
  * @description Renders the editorial monthly schedule view adapted from the minimalist demo, using shared todo schedule utilities so each day shows the same real Arrange / Due / Repeat / Maybe / Done / Trace data as the week planner.
  * @updated 2026-05-14: Added a parent-controlled schedule lock toggle so the month planner can freeze drag-to-move interactions while keeping day opening and quick-edit actions available.
+ * @updated 2026-05-17: Added a dashed outline border around "maybe" schedule items in the month view grid matching their type color.
+ * @updated 2026-05-17: Added a strike-through (line-through) style to "completed" schedule items in both month view grid cells and expanded details.
  
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -802,6 +804,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
         scrollToWeekContainingDate(pendingReferenceDate);
         pendingReferenceDateKeyRef.current = null;
         lastAppliedReferenceDateKeyRef.current = pendingReferenceDateKey;
+        lastAppliedExternalNavigationSignalRef.current = externalNavigationSignal;
         scheduleActiveMonthFreezeSettle();
       }
     }
@@ -1116,6 +1119,12 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
 
   const getTodoMarkerStyle = (entry: TodoDateEntry): React.CSSProperties => {
     const markerColor = getTodoMarkerColor(entry);
+    if (entry.primaryKind === 'maybe') {
+      return {
+        border: `1px dashed ${markerColor}`,
+        backgroundColor: hexToRgba(markerColor, 0.08)
+      };
+    }
     return {
       borderLeftColor: markerColor,
       backgroundColor: hexToRgba(markerColor, 0.08)
@@ -1408,7 +1417,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                             return (
                               <div
                                 key={`${dateKey}-${entry.todo.id}-${entry.primaryKind}`}
-                                className={`overflow-hidden text-clip whitespace-nowrap border-l-[1.5px] pl-[3px] font-medium leading-[1.2] text-stone-800 ${monthCellTaskClassName}`}
+                                className={`overflow-hidden text-clip whitespace-nowrap font-medium leading-[1.2] ${entry.primaryKind === 'completed' ? 'line-through text-stone-400/90 dark:text-stone-500/90' : 'text-stone-800'} ${monthCellTaskClassName} ${entry.primaryKind === 'maybe' ? 'rounded-[2px] px-[3px]' : 'border-l-[1.5px] pl-[3px]'}`}
                                 style={{
                                   ...getTodoMarkerStyle(entry),
                                   ...monthCellRowStyle
@@ -1506,7 +1515,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                                     <button
                                       type="button"
                                       onClick={() => onOpenTodo(entry.todo)}
-                                      className={`min-w-0 flex flex-1 items-baseline gap-0 overflow-hidden font-medium uppercase tracking-[0.12em] text-left ${monthDetailTaskClassName} ${titleClassName}`}
+                                      className={`min-w-0 flex flex-1 items-baseline gap-0 overflow-hidden font-medium uppercase tracking-[0.12em] text-left ${monthDetailTaskClassName} ${titleClassName} ${entry.primaryKind === 'completed' ? 'line-through opacity-70' : ''}`}
                                     >
                                       <span className={titleSegmentClassName}>{entry.todo.title}</span>
                                       {parentTitle && (
@@ -1556,7 +1565,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                                 {getMonthEntryLeadingIcon(entry)}
                               </span>
                               <div className="flex min-w-0 flex-1 items-start gap-2">
-                                <span className={`min-w-0 flex flex-1 items-baseline gap-0 overflow-hidden font-medium uppercase tracking-[0.12em] ${monthDetailTaskClassName} ${titleClassName}`}>
+                                <span className={`min-w-0 flex flex-1 items-baseline gap-0 overflow-hidden font-medium uppercase tracking-[0.12em] ${monthDetailTaskClassName} ${titleClassName} ${entry.primaryKind === 'completed' ? 'line-through opacity-70' : ''}`}>
                                   <span className={titleSegmentClassName}>{entry.todo.title}</span>
                                   {parentTitle && (
                                     <span className={`${parentSegmentClassName} ${parentTitleClassName}`}>{` @${parentTitle}`}</span>
