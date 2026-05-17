@@ -6,6 +6,9 @@
  * @description The central configuration hub. Manages Cloud Sync (WebDAV), AI integration (Providers/Presets), Data (Import/Export), and Application Preferences (Appearance, Habits, etc.), including settings subpage hierarchy state and in-session main-list scroll restoration while keeping manual sync payloads aligned with repository-backed data.
  *
  * 修改历史:
+ * - 2026-05-17: 新增“Windows 特性”设置分组，将“PC端小组件”与“导出到 Obsidian”归口至此分组并限定移动端不可见。
+ * - 2026-05-17: 优化 PC 端小组件菜单的显示条件，结合 !Capacitor.isNativePlatform() 逻辑彻底确保其在 Android 端隐藏。
+ * - 2026-05-17: 将“桌面今日小组件”菜单入口及加载占位符更名为“PC端小组件”。
  * - 2026-05-17: Added a desktop launcher entry in the Android features section (Electron-only) to open the dedicated today-task widget window.
 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -1339,7 +1342,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             <DesktopWidgetSettingsView
                 onBack={handleBackToMain}
             />,
-            '正在加载桌面小组件...'
+            '正在加载PC端小组件...'
         );
     }
 
@@ -1458,19 +1461,31 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <MenuItem
                             icon={<LayoutGrid size={18} className="text-sky-500" />}
                             label="小组件"
-                            isLast={!isElectronEnvironment()}
+                            isLast
                             onClick={() => openSettingsSubmenu('widget')}
                         />
-                        {isElectronEnvironment() && (
-                            <MenuItem
-                                icon={<LayoutGrid size={18} className="text-amber-500" />}
-                                label="桌面今日小组件"
-                                isLast
-                                onClick={() => openSettingsSubmenu('desktop_widget')}
-                            />
-                        )}
                     </div>
                 </div>
+
+                {/* Section: Windows Features */}
+                {isElectronEnvironment() && !Capacitor.isNativePlatform() && (
+                    <div className="space-y-3">
+                        <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">Windows 特性</h3>
+                        <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
+                            <MenuItem
+                                icon={<LayoutGrid size={18} className="text-amber-500" />}
+                                label="PC端小组件"
+                                onClick={() => openSettingsSubmenu('desktop_widget')}
+                            />
+                            <MenuItem
+                                icon={<FileText size={18} className="text-indigo-500" />}
+                                label="导出到 Obsidian"
+                                isLast
+                                onClick={() => openSettingsSubmenu('obsidian_export')}
+                            />
+                        </div>
+                    </div>
+                )}
                 {/* Section: Daily Review */}
                 <div className="space-y-3">
                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">每日回顾</h3>
@@ -1515,17 +1530,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                         <MenuItem
                             icon={<FileSpreadsheet size={18} className="text-blue-500" />}
                             label="数据导出导入"
-                            isLast={!isElectronEnvironment()}
+                            isLast
                             onClick={() => openSettingsSubmenu('data')}
                         />
-                        {isElectronEnvironment() && (
-                            <MenuItem
-                                icon={<FileText size={18} className="text-indigo-500" />}
-                                label="导出到 Obsidian"
-                                isLast
-                                onClick={() => openSettingsSubmenu('obsidian_export')}
-                            />
-                        )}
                     </div>
                 </div>
 

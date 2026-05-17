@@ -1,17 +1,20 @@
 /**
  * @file DesktopWidgetSettingsView.tsx
  * @input window.desktopWidget IPC bridge（Electron 环境），localStorage 状态
- * @output 桌面小组件设置页面，含今日小组件与月历小组件开关
+ * @output PC端小组件设置页面，含今日小组件与月历小组件开关
  * @pos View (Settings Subpage)
- * @description 桌面小组件设置子页面。支持"今日"和"月历"桌面小组件。
- *              开关打开时自动调用 Electron IPC 打开对应小组件窗口，关闭时隐藏。
+ * @description 桌面小组件的PC端控制台，在此管理和触发小组件的呼起、配置保存与环境提示。
+ * @updated 2026-05-17: 改为复用共享的桌面小组件启动偏好键名，确保设置页与应用启动恢复逻辑读写同一份状态。
+ * @updated 2026-05-17: 新增“小事清单小组件”开关选项与触发器支持，实现独立的 IPC 打开与关闭桌面小事清单小组件（quick widget）。
  * @updated 2026-05-17: 添加桌面月历小组件开关与触发器支持。
  */
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, LayoutGrid, Monitor, Calendar } from 'lucide-react';
-
-const DESKTOP_WIDGET_TODAY_KEY = 'lumostime_desktop_widget_today_enabled';
-const DESKTOP_WIDGET_MONTH_KEY = 'lumostime_desktop_widget_month_enabled';
+import { ChevronLeft, LayoutGrid, Monitor, Calendar, ListTodo } from 'lucide-react';
+import {
+  DESKTOP_WIDGET_MONTH_STORAGE_KEY,
+  DESKTOP_WIDGET_QUICK_STORAGE_KEY,
+  DESKTOP_WIDGET_TODAY_STORAGE_KEY
+} from '../../services/desktopWidgetService';
 
 interface DesktopWidgetItem {
   id: string;
@@ -33,11 +36,15 @@ export const DesktopWidgetSettingsView: React.FC<DesktopWidgetSettingsViewProps>
   const isElectron = typeof window !== 'undefined' && !!(window as any).desktopWidget;
 
   const [todayEnabled, setTodayEnabled] = useState(() => {
-    return localStorage.getItem(DESKTOP_WIDGET_TODAY_KEY) === 'true';
+    return localStorage.getItem(DESKTOP_WIDGET_TODAY_STORAGE_KEY) === 'true';
   });
 
   const [monthEnabled, setMonthEnabled] = useState(() => {
-    return localStorage.getItem(DESKTOP_WIDGET_MONTH_KEY) === 'true';
+    return localStorage.getItem(DESKTOP_WIDGET_MONTH_STORAGE_KEY) === 'true';
+  });
+
+  const [quickEnabled, setQuickEnabled] = useState(() => {
+    return localStorage.getItem(DESKTOP_WIDGET_QUICK_STORAGE_KEY) === 'true';
   });
 
   useEffect(() => {
@@ -45,6 +52,7 @@ export const DesktopWidgetSettingsView: React.FC<DesktopWidgetSettingsViewProps>
     if (!isElectron) {
       setTodayEnabled(false);
       setMonthEnabled(false);
+      setQuickEnabled(false);
     }
   }, [isElectron]);
 
@@ -55,7 +63,7 @@ export const DesktopWidgetSettingsView: React.FC<DesktopWidgetSettingsViewProps>
 
     const nextEnabled = !todayEnabled;
     setTodayEnabled(nextEnabled);
-    localStorage.setItem(DESKTOP_WIDGET_TODAY_KEY, String(nextEnabled));
+    localStorage.setItem(DESKTOP_WIDGET_TODAY_STORAGE_KEY, String(nextEnabled));
 
     if (nextEnabled) {
       window.desktopWidget?.open();
@@ -71,12 +79,28 @@ export const DesktopWidgetSettingsView: React.FC<DesktopWidgetSettingsViewProps>
 
     const nextEnabled = !monthEnabled;
     setMonthEnabled(nextEnabled);
-    localStorage.setItem(DESKTOP_WIDGET_MONTH_KEY, String(nextEnabled));
+    localStorage.setItem(DESKTOP_WIDGET_MONTH_STORAGE_KEY, String(nextEnabled));
 
     if (nextEnabled) {
-      window.desktopWidget?.openMonth();
+      window.desktopWidget?.openMonth?.();
     } else {
-      window.desktopWidget?.closeMonth();
+      window.desktopWidget?.closeMonth?.();
+    }
+  };
+
+  const handleToggleQuickWidget = () => {
+    if (!isElectron) {
+      return;
+    }
+
+    const nextEnabled = !quickEnabled;
+    setQuickEnabled(nextEnabled);
+    localStorage.setItem(DESKTOP_WIDGET_QUICK_STORAGE_KEY, String(nextEnabled));
+
+    if (nextEnabled) {
+      window.desktopWidget?.openQuick?.();
+    } else {
+      window.desktopWidget?.closeQuick?.();
     }
   };
 
@@ -90,7 +114,7 @@ export const DesktopWidgetSettingsView: React.FC<DesktopWidgetSettingsViewProps>
         >
           <ChevronLeft size={22} />
         </button>
-        <span className="text-stone-800 font-bold text-lg">桌面小组件</span>
+        <span className="text-stone-800 font-bold text-lg">PC端小组件</span>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-20">
@@ -122,9 +146,6 @@ export const DesktopWidgetSettingsView: React.FC<DesktopWidgetSettingsViewProps>
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold text-stone-800">今日小组件</div>
-                <div className="text-xs text-stone-400 mt-0.5 leading-relaxed">
-                  在桌面显示今日待办，支持一键完成
-                </div>
               </div>
               {/* 开关 */}
               <div
@@ -147,16 +168,13 @@ export const DesktopWidgetSettingsView: React.FC<DesktopWidgetSettingsViewProps>
               type="button"
               disabled={!isElectron}
               onClick={handleToggleMonthWidget}
-              className="w-full flex items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-stone-50 disabled:cursor-default disabled:hover:bg-white"
+              className="w-full flex items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-stone-50 disabled:cursor-default disabled:hover:bg-white border-b border-stone-100"
             >
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-50">
                 <Calendar size={18} className="text-purple-500" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold text-stone-800">桌面月历小组件</div>
-                <div className="text-xs text-stone-400 mt-0.5 leading-relaxed">
-                  在桌面显示月历与待安排任务，支持拖拽排期
-                </div>
               </div>
               {/* 开关 */}
               <div
@@ -169,6 +187,35 @@ export const DesktopWidgetSettingsView: React.FC<DesktopWidgetSettingsViewProps>
                 <span
                   className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
                     monthEnabled && isElectron ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
+              </div>
+            </button>
+
+            {/* 小事清单小组件 */}
+            <button
+              type="button"
+              disabled={!isElectron}
+              onClick={handleToggleQuickWidget}
+              className="w-full flex items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-stone-50 disabled:cursor-default disabled:hover:bg-white"
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-50">
+                <ListTodo size={18} className="text-orange-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-stone-800">小事清单小组件</div>
+              </div>
+              {/* 开关 */}
+              <div
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ${
+                  quickEnabled && isElectron
+                    ? 'bg-orange-400'
+                    : 'bg-stone-200'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                    quickEnabled && isElectron ? 'translate-x-5' : 'translate-x-0.5'
                   }`}
                 />
               </div>

@@ -2,6 +2,9 @@
 
 The `views/` directory contains all the React components that represent the distinct screens or pages of the LumosTime application. This layer is responsible for the presentation logic and user interaction.
 
+- Update 2026-05-17: 重构设置菜单布局，新增了“Windows 特性”分组，将“PC端小组件”与原在数据同步分类下的“导出到 Obsidian”归拢在此专有分组下，并确保其在安卓端不可见。
+- Update 2026-05-17: 优化了显示条件，结合 !Capacitor.isNativePlatform() 逻辑彻底确保“PC端小组件”设置项在 Android 端隐藏。
+- Update 2026-05-17: 进行了重命名与界面极简化修改，将设置项名称由“桌面今日小组件”更名为“PC端小组件”，并移除各小组件选项下的详细说明文字，仅保留标题。
 - Update 2026-05-17: Added `DesktopMonthWidgetView.tsx` plus `desktop/DesktopMonthCalendar.tsx`, providing a premium dual-panel desktop month widget. The left side now reuses the app's rolling month planner so months scroll continuously instead of paging one fixed grid at a time, while the right side displays an interactive planning sidebar with tabs for `Arrange / Maybe / Due` to support HTML5 drag-and-drop scheduling with IndexedDB write-backs and BroadcastChannel cross-window synchronization.
 - Update 2026-05-17: `DesktopTodayWidgetView.tsx` now provides a dedicated Electron-only today-task widget surface with compact `Pin / Today / Overdue` sections, while `SettingsView.tsx` adds a desktop launcher entry (Electron-only, in the Android features section) that directly opens the today-task widget window without navigating to a submenu.
 - Update 2026-05-17 (桌面今日小组件): 在 `DesktopTodayWidgetView.tsx` 中新增“任务颜色”显示设置选项。支持用户在“排期类型”（基于任务状态如安排、截止、Maybe、完成等，并与周/月视图自定义配色实时同步）与“任务分类”（基于所属分组固有色）着色方案之间一键切换，并支持设置的本地持久化。

@@ -4,6 +4,7 @@
  * @output IPC Bridge
  * @pos Electron Preload
  * @description Exposes safe IPC methods to the renderer process via `contextBridge`, enabling communication between the web app and the main process.
+ * @updated 2026-05-17: 扩展了桌面小组件的 IPC 桥接，暴露了 openQuick() 和 closeQuick() 方法以支持小事清单小组件的打开与关闭。并在 DesktopWidgetMainAction 中新增了 add_quick_todo 动作支持。
  * @updated 2026-05-17: Added a dedicated desktop today-widget and monthly-widget bridge so Electron windows can open, close, and forward lightweight todo actions without reaching for raw IPC in every component.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -14,6 +15,7 @@ type DesktopWidgetMainAction =
     | { type: 'open_todo'; todoId: string }
     | { type: 'toggle_todo'; todoId: string }
     | { type: 'start_focus'; todoId: string }
+    | { type: 'add_quick_todo'; title: string }
 
 const DESKTOP_WIDGET_MAIN_ACTION_CHANNEL = 'desktop-widget:main-action'
 
@@ -51,6 +53,12 @@ contextBridge.exposeInMainWorld('desktopWidget', {
     },
     closeMonth() {
         ipcRenderer.send('desktop-widget:close-month')
+    },
+    openQuick() {
+        ipcRenderer.send('desktop-widget:open-quick')
+    },
+    closeQuick() {
+        ipcRenderer.send('desktop-widget:close-quick')
     },
     openMainApp() {
         ipcRenderer.send('desktop-widget:open-main')

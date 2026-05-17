@@ -1,18 +1,22 @@
 /**
  * @file DesktopMonthCalendar.tsx
- * @input Todo items, logs, current display month, and desktop widget drag callbacks
- * @output Fixed 6x7 monthly calendar grid for the Electron desktop month widget
+ * @input Todo items, logs, current week-page start date, and desktop widget drag callbacks
+ * @output Week-paged calendar grid for the Electron desktop month widget
  * @pos View helper (Desktop widget)
- * @description Renders a traditional full-month calendar body that keeps every date visible, follows the app month-view spacing more closely, and supports drag-to-schedule inside the desktop widget.
- * @updated 2026-05-17: Rebuilt the desktop month calendar as a headerless fixed grid so the outer widget can own one unified title bar, wheel month switching, and shared display settings.
+ * @description Renders a desktop scheduling calendar that pages by 2/3/4 whole weeks, keeps the app's month-view spacing feel, and supports drag-to-schedule inside the desktop widget.
+ * @updated 2026-05-17: Replaced the fixed 6x7 month grid with a dynamic 2/3/4-week page layout so the widget can navigate by week-page units instead of whole months.
+ * @updated 2026-05-17: Reused the shared week-trace layout so cross-day trace events render as continuous bars and aligned desktop complete/maybe styling with the app month view.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { addDays, format, isSameMonth, startOfMonth, startOfWeek } from 'date-fns';
+import { addDays, format, isSameDay } from 'date-fns';
 import { Log, TodoItem } from '../../types';
 import {
   buildTodoDateEntryMap,
+  buildTodoMonthWeekLayout,
   formatDateKey,
-  TodoDateEntry
+  TodoDateEntry,
+  TodoMonthWeekLayout,
+  TodoWeekTraceSegment
 } from '../../utils/todoScheduleUtils';
 import { hexToRgba } from '../../utils/colorUtils';
 import {
@@ -24,30 +28,30 @@ import {
 } from '../../services/todoScheduleColorService';
 
 const WEEKDAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-const FIXED_MONTH_GRID_DAY_COUNT = 42;
 const MONTH_CELL_VERTICAL_PADDING_PX = 6;
 const MONTH_DAY_NUMBER_ROW_HEIGHT_PX = 16;
 const MONTH_ENTRY_TOP_MARGIN_PX = 6;
+const MONTH_ENTRY_TOP_OFFSET_PX = MONTH_CELL_VERTICAL_PADDING_PX + MONTH_DAY_NUMBER_ROW_HEIGHT_PX + MONTH_ENTRY_TOP_MARGIN_PX;
 const MONTH_ENTRY_ROW_GAP_PX = 2;
-const ROWS_PER_SCREEN_TO_VISIBLE_ENTRY_COUNT: Record<2 | 3 | 4 | 5, number> = {
+const MONTH_CELL_LINE_HEIGHT_PX = 16;
+const WEEKS_PER_PAGE_TO_VISIBLE_ENTRY_COUNT: Record<2 | 3 | 4, number> = {
   2: 5,
   3: 4,
-  4: 3,
-  5: 2
+  4: 3
 };
 
 interface DesktopMonthCalendarProps {
   todos: TodoItem[];
   logs: Log[];
-  displayMonth: Date;
-  visibleRowsPerScreen: 2 | 3 | 4 | 5;
+  pageStartDate: Date;
+  weeksPerPage: 2 | 3 | 4;
   onMoveScheduleEntry?: (entry: TodoDateEntry, targetDateKey: string) => void;
   onOpenTodo?: (todo: TodoItem) => void;
   isScheduleLocked?: boolean;
   externalDraggingTodoId?: string | null;
   externalDraggingType?: 'scheduled' | 'deadline' | 'maybe' | null;
   isDark?: boolean;
-  onWheelMonthChange?: (direction: 'prev' | 'next') => void;
+  onWheelPageChange?: (direction: 'prev' | 'next') => void;
 }
 
 const getEntryColorKey = (entry: TodoDateEntry): TodoScheduleTypeColorKey => {
@@ -76,17 +80,18 @@ const isEntryDraggable = (entry: TodoDateEntry, isScheduleLocked: boolean): bool
 export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
   todos,
   logs,
-  displayMonth,
-  visibleRowsPerScreen,
+  pageStartDate,
+  weeksPerPage,
   onMoveScheduleEntry,
   onOpenTodo,
   isScheduleLocked = false,
   externalDraggingTodoId = null,
   externalDraggingType = null,
   isDark = false,
-  onWheelMonthChange
+  onWheelPageChange
 }) => {
-  const todayDateKey = useMemo(() => formatDateKey(new Date()), []);
+  const today = useMemo(() => new Date(), []);
+  const todayDateKey = useMemo(() => formatDateKey(today), [today]);
   const wheelLockRef = useRef(false);
   const [draggingEntry, setDraggingEntry] = useState<TodoDateEntry | null>(null);
   const [dragTargetDate, setDragTargetDate] = useState<string | null>(null);
@@ -152,10 +157,10 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
     } satisfies TodoDateEntry;
   }, [draggingEntry, externalDraggingTodoId, externalDraggingType, todos]);
 
-  const calendarDays = useMemo(() => {
-    const start = startOfWeek(startOfMonth(displayMonth), { weekStartsOn: 1 });
-    return Array.from({ length: FIXED_MONTH_GRID_DAY_COUNT }, (_, index) => addDays(start, index));
-  }, [displayMonth]);
+  const calendarDays = useMemo(
+    () => Array.from({ length: weeksPerPage * 7 }, (_, index) => addDays(pageStartDate, index)),
+    [pageStartDate, weeksPerPage]
+  );
 
   const dateKeys = useMemo(
     () => calendarDays.map((day) => formatDateKey(day)),
@@ -166,8 +171,23 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
     () => buildTodoDateEntryMap(todos, logs, dateKeys),
     [dateKeys, logs, todos]
   );
+  const calendarWeeks = useMemo(
+    () => Array.from({ length: weeksPerPage }, (_, index) => (
+      calendarDays.slice(index * 7, (index + 1) * 7)
+    )),
+    [calendarDays, weeksPerPage]
+  );
 
-  const visibleEntryCount = ROWS_PER_SCREEN_TO_VISIBLE_ENTRY_COUNT[visibleRowsPerScreen];
+  const visibleEntryCount = WEEKS_PER_PAGE_TO_VISIBLE_ENTRY_COUNT[weeksPerPage];
+  const weekLayouts = useMemo<TodoMonthWeekLayout[]>(
+    () => calendarWeeks.map((days) => buildTodoMonthWeekLayout(
+      days.map((day) => formatDateKey(day)),
+      entriesByDate,
+      visibleEntryCount,
+      { includeTraceSegments: true }
+    )),
+    [calendarWeeks, entriesByDate, visibleEntryCount]
+  );
 
   const stopDragging = () => {
     setDraggingEntry(null);
@@ -185,7 +205,7 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
   };
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
-    if (!onWheelMonthChange || Math.abs(event.deltaY) < 12) {
+    if (!onWheelPageChange || Math.abs(event.deltaY) < 12) {
       return;
     }
 
@@ -200,7 +220,48 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
       wheelLockRef.current = false;
     }, 180);
 
-    onWheelMonthChange(event.deltaY > 0 ? 'next' : 'prev');
+    onWheelPageChange(event.deltaY > 0 ? 'next' : 'prev');
+  };
+
+  const getTodoMarkerStyle = (entry: TodoDateEntry): React.CSSProperties => {
+    const markerColor = resolvedScheduleTypeColors[getEntryColorKey(entry)];
+
+    if (entry.primaryKind === 'maybe') {
+      return {
+        border: `1px dashed ${markerColor}`,
+        backgroundColor: hexToRgba(markerColor, 0.08)
+      };
+    }
+
+    return {
+      borderLeftColor: markerColor,
+      backgroundColor: hexToRgba(markerColor, 0.08)
+    };
+  };
+
+  const monthCellRowStyle = useMemo<React.CSSProperties>(
+    () => ({
+      display: 'flex',
+      alignItems: 'center',
+      height: `${MONTH_CELL_LINE_HEIGHT_PX}px`,
+      minHeight: `${MONTH_CELL_LINE_HEIGHT_PX}px`
+    }),
+    []
+  );
+
+  const getTraceSegmentStyle = (segment: TodoWeekTraceSegment): React.CSSProperties => {
+    const markerColor = resolvedScheduleTypeColors[getEntryColorKey(segment.entry)];
+    const spanDayCount = segment.endDayIndex - segment.startDayIndex + 1;
+
+    return {
+      left: `${(segment.startDayIndex / 7) * 100}%`,
+      width: `${(spanDayCount / 7) * 100}%`,
+      top: `${MONTH_ENTRY_TOP_OFFSET_PX + (segment.laneIndex * (MONTH_CELL_LINE_HEIGHT_PX + MONTH_ENTRY_ROW_GAP_PX))}px`,
+      height: `${MONTH_CELL_LINE_HEIGHT_PX}px`,
+      paddingLeft: '3px',
+      backgroundColor: hexToRgba(markerColor, 0.08),
+      boxShadow: `inset 1.5px 0 0 ${markerColor}`
+    };
   };
 
   return (
@@ -213,143 +274,193 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
         ))}
       </div>
 
-      <div
-        className="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 overflow-hidden px-px"
-        onWheel={handleWheel}
-      >
-        {calendarDays.map((day) => {
-          const dateKey = formatDateKey(day);
-          const entries = entriesByDate[dateKey] || [];
-          const visibleEntries = entries.slice(0, visibleEntryCount);
-          const hiddenCount = Math.max(0, entries.length - visibleEntries.length);
-          const isCurrentMonth = isSameMonth(day, displayMonth);
-          const isToday = dateKey === todayDateKey;
-          const isFirst = day.getDate() === 1;
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-px" onWheel={handleWheel}>
+        {calendarWeeks.map((weekDays, weekIndex) => {
+          const weekLayout = weekLayouts[weekIndex];
+          const visibleTraceSegments = (weekLayout?.traceSegments || []).filter(
+            (segment) => segment.laneIndex < visibleEntryCount
+          );
 
           return (
-            <div
-              key={dateKey}
-              data-month-drop-date={dateKey}
-              onDragOver={(event) => {
-                if (isScheduleLocked || !activeDraggingEntry) {
-                  return;
-                }
-                event.preventDefault();
-                if (dragTargetDate !== dateKey) {
-                  setDragTargetDate(dateKey);
-                }
-              }}
-              onDragLeave={() => {
-                if (dragTargetDate === dateKey) {
-                  setDragTargetDate(null);
-                }
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                handleDrop(dateKey);
-              }}
-              className={[
-                `relative z-0 flex min-h-0 flex-col border-b border-r ${isDark ? 'border-stone-800/50' : 'border-stone-200/35'} text-left transition-colors duration-200`,
-                !isCurrentMonth ? (isDark ? 'bg-stone-950/25' : 'bg-[rgba(245,244,240,0.14)]') : 'bg-transparent',
-                isToday ? `z-10 ring-1 ring-inset ${isDark ? 'ring-stone-500/80' : 'ring-stone-400'}` : '',
-                dragTargetDate === dateKey ? (isDark ? 'bg-stone-800/35 ring-2 ring-inset ring-stone-500/60' : 'bg-[rgba(250,249,246,0.32)] ring-2 ring-inset ring-stone-800/75') : ''
-              ].join(' ')}
-              style={{
-                paddingTop: `${MONTH_CELL_VERTICAL_PADDING_PX}px`,
-                paddingBottom: `${MONTH_CELL_VERTICAL_PADDING_PX}px`
-              }}
-            >
-              <div
-                className="flex justify-start px-2"
-                style={{ minHeight: `${MONTH_DAY_NUMBER_ROW_HEIGHT_PX}px` }}
-              >
-                <span
-                  className={`rounded-sm text-[1.02rem] leading-none ${
-                    isCurrentMonth
-                      ? (isDark ? 'text-stone-100' : 'text-stone-800')
-                      : (isDark ? 'text-stone-500' : 'text-stone-400')
-                  }`}
-                  style={{
-                    fontFamily: '\'Bilbo Swash Caps\', \'Georgia\', \'Times New Roman\', cursive, serif',
-                    lineHeight: `${MONTH_DAY_NUMBER_ROW_HEIGHT_PX}px`
-                  }}
-                >
-                  {format(day, 'dd')}
-                </span>
+            <div key={weekDays[0]?.toISOString() || `week-${weekIndex}`} className="relative min-h-0 flex-1">
+              <div className="pointer-events-none absolute inset-0 z-[1] overflow-hidden">
+                {visibleTraceSegments.map((segment) => (
+                  <div
+                    key={`${weekIndex}-${segment.todoId}-${segment.startDayIndex}-${segment.endDayIndex}`}
+                    className={`absolute flex items-center overflow-hidden font-medium leading-[1.2] ${
+                      isDark ? 'text-stone-200' : 'text-stone-800'
+                    } text-[0.74rem]`}
+                    style={getTraceSegmentStyle(segment)}
+                    title={segment.entry.todo.title}
+                  >
+                    <span className="truncate whitespace-nowrap">{segment.entry.todo.title}</span>
+                  </div>
+                ))}
               </div>
 
-              <div
-                className="flex min-h-0 flex-1 flex-col overflow-hidden"
-                style={{
-                  marginTop: `${MONTH_ENTRY_TOP_MARGIN_PX}px`,
-                  rowGap: `${MONTH_ENTRY_ROW_GAP_PX}px`
-                }}
-              >
-                {visibleEntries.map((entry) => {
-                  const colorKey = getEntryColorKey(entry);
-                  const markerColor = resolvedScheduleTypeColors[colorKey];
-                  const draggable = isEntryDraggable(entry, isScheduleLocked);
+              <div className="grid h-full grid-cols-7">
+                {weekDays.map((day) => {
+                  const dateKey = formatDateKey(day);
+                  const rowEntries = weekLayout?.rowEntriesByDate[dateKey] || [];
+                  const visibleRowEntries = rowEntries.slice(0, visibleEntryCount);
+                  const hiddenCount = weekLayout?.hiddenCountByDate[dateKey] ?? 0;
+                  const isToday = dateKey === todayDateKey;
+                  const isPageStart = isSameDay(day, pageStartDate);
+                  const isFirstOfMonth = day.getDate() === 1;
 
                   return (
                     <div
-                      key={`${dateKey}-${entry.todo.id}-${entry.primaryKind}`}
-                      draggable={draggable}
-                      onDragStart={(event) => {
-                        if (!draggable) {
+                      key={dateKey}
+                      data-month-drop-date={dateKey}
+                      onDragOver={(event) => {
+                        if (isScheduleLocked || !activeDraggingEntry) {
                           return;
                         }
-                        event.dataTransfer.effectAllowed = 'move';
-                        event.dataTransfer.setData('text/plain', entry.todo.id);
-                        setDraggingEntry(entry);
+                        event.preventDefault();
+                        if (dragTargetDate !== dateKey) {
+                          setDragTargetDate(dateKey);
+                        }
                       }}
-                      onDragEnd={stopDragging}
-                      className={`overflow-hidden text-clip whitespace-nowrap border-l-[1.5px] pl-[3px] font-medium leading-[1.2] ${
-                        isDark ? (entry.badges.completed ? 'text-stone-500' : 'text-stone-200') : (entry.badges.completed ? 'text-stone-500' : 'text-stone-800')
-                      } ${draggable ? 'cursor-grab active:cursor-grabbing' : ''} text-[0.74rem]`}
+                      onDragLeave={() => {
+                        if (dragTargetDate === dateKey) {
+                          setDragTargetDate(null);
+                        }
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        handleDrop(dateKey);
+                      }}
+                      className={[
+                        `relative z-0 flex min-h-0 flex-col border-b border-r ${isDark ? 'border-stone-800/50' : 'border-stone-200/35'} bg-transparent text-left transition-colors duration-200`,
+                        isToday ? `z-10 ring-1 ring-inset ${isDark ? 'ring-stone-500/80' : 'ring-stone-400'}` : '',
+                        dragTargetDate === dateKey ? (isDark ? 'bg-stone-800/35 ring-2 ring-inset ring-stone-500/60' : 'bg-[rgba(250,249,246,0.32)] ring-2 ring-inset ring-stone-800/75') : ''
+                      ].join(' ')}
                       style={{
-                        borderLeftColor: markerColor,
-                        backgroundColor: hexToRgba(markerColor, 0.08)
+                        paddingTop: `${MONTH_CELL_VERTICAL_PADDING_PX}px`,
+                        paddingBottom: `${MONTH_CELL_VERTICAL_PADDING_PX}px`
                       }}
-                      title={entry.todo.title}
                     >
-                      {onOpenTodo ? (
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onOpenTodo(entry.todo);
+                      <div
+                        className="flex justify-start px-2"
+                        style={{ minHeight: `${MONTH_DAY_NUMBER_ROW_HEIGHT_PX}px` }}
+                      >
+                        <span
+                          className={`rounded-sm text-[1.02rem] leading-none ${isDark ? 'text-stone-100' : 'text-stone-800'}`}
+                          style={{
+                            fontFamily: '\'Bilbo Swash Caps\', \'Georgia\', \'Times New Roman\', cursive, serif',
+                            lineHeight: `${MONTH_DAY_NUMBER_ROW_HEIGHT_PX}px`
                           }}
-                          className={`block w-full truncate text-left ${entry.badges.completed ? 'line-through' : ''}`}
                         >
-                          {entry.todo.title}
-                        </button>
-                      ) : (
-                        <div className={`truncate ${entry.badges.completed ? 'line-through' : ''}`}>
-                          {entry.todo.title}
+                          {format(day, 'dd')}
+                        </span>
+                      </div>
+
+                      <div
+                        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+                        style={{
+                          marginTop: `${MONTH_ENTRY_TOP_MARGIN_PX}px`,
+                          rowGap: `${MONTH_ENTRY_ROW_GAP_PX}px`
+                        }}
+                      >
+                        {visibleRowEntries.map((entry, rowIndex) => {
+                          if (!entry) {
+                            return (
+                              <div
+                                key={`${dateKey}-empty-${rowIndex}`}
+                                aria-hidden="true"
+                                style={monthCellRowStyle}
+                              />
+                            );
+                          }
+
+                          if (entry.primaryKind === 'inProgress') {
+                            return (
+                              <div
+                                key={`${dateKey}-${entry.todo.id}-${entry.primaryKind}`}
+                                aria-hidden="true"
+                                className="invisible overflow-hidden text-clip whitespace-nowrap border-l-[1.5px] pl-[3px] font-medium leading-[1.2] text-[0.74rem]"
+                                style={{
+                                  ...getTodoMarkerStyle(entry),
+                                  ...monthCellRowStyle
+                                }}
+                              >
+                                {entry.todo.title}
+                              </div>
+                            );
+                          }
+
+                          const draggable = isEntryDraggable(entry, isScheduleLocked);
+                          const textClassName = entry.primaryKind === 'completed'
+                            ? (isDark ? 'line-through text-stone-500/90' : 'line-through text-stone-400/90')
+                            : (isDark ? 'text-stone-200' : 'text-stone-800');
+                          const shapeClassName = entry.primaryKind === 'maybe'
+                            ? 'rounded-[2px] px-[3px]'
+                            : 'border-l-[1.5px] pl-[3px]';
+
+                          return (
+                            <div
+                              key={`${dateKey}-${entry.todo.id}-${entry.primaryKind}`}
+                              draggable={draggable}
+                              onDragStart={(event) => {
+                                if (!draggable) {
+                                  return;
+                                }
+                                event.dataTransfer.effectAllowed = 'move';
+                                event.dataTransfer.setData('text/plain', entry.todo.id);
+                                setDraggingEntry(entry);
+                              }}
+                              onDragEnd={stopDragging}
+                              className={`overflow-hidden text-clip whitespace-nowrap font-medium leading-[1.2] ${textClassName} ${shapeClassName} ${
+                                draggable ? 'cursor-grab active:cursor-grabbing' : ''
+                              } text-[0.74rem]`}
+                              style={{
+                                ...getTodoMarkerStyle(entry),
+                                ...monthCellRowStyle
+                              }}
+                              title={entry.todo.title}
+                            >
+                              {onOpenTodo ? (
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    onOpenTodo(entry.todo);
+                                  }}
+                                  className="block w-full truncate text-left"
+                                >
+                                  {entry.todo.title}
+                                </button>
+                              ) : (
+                                <div className="truncate">
+                                  {entry.todo.title}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        {hiddenCount > 0 && (
+                          <div className={`pl-[5px] pt-0.5 text-[0.53rem] font-bold uppercase tracking-[0.14em] ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>
+                            +{hiddenCount}
+                          </div>
+                        )}
+                      </div>
+
+                      {isToday && (
+                        <div className={`absolute bottom-1 right-1.5 text-[0.45rem] font-bold uppercase tracking-widest ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>
+                          TODAY
+                        </div>
+                      )}
+
+                      {(isFirstOfMonth || isPageStart) && !isToday && (
+                        <div className={`absolute bottom-1 right-1.5 text-[0.45rem] font-bold uppercase tracking-widest ${isDark ? 'text-stone-600' : 'text-stone-300'}`}>
+                          {format(day, 'MMM')}
                         </div>
                       )}
                     </div>
                   );
                 })}
-
-                {hiddenCount > 0 && (
-                  <div className={`pl-[5px] pt-0.5 text-[0.53rem] font-bold uppercase tracking-[0.14em] ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>
-                    +{hiddenCount}
-                  </div>
-                )}
               </div>
-
-              {isToday && (
-                <div className={`absolute bottom-1 right-1.5 text-[0.45rem] font-bold uppercase tracking-widest ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>
-                  TODAY
-                </div>
-              )}
-
-              {isFirst && !isToday && (
-                <div className={`absolute bottom-1 right-1.5 text-[0.45rem] font-bold uppercase tracking-widest ${isDark ? 'text-stone-600' : 'text-stone-300'}`}>
-                  {format(day, 'MMM')}
-                </div>
-              )}
             </div>
           );
         })}

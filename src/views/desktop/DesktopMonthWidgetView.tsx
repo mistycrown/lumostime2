@@ -1,30 +1,52 @@
 /**
  * @file DesktopMonthWidgetView.tsx
  * @input Desktop widget IPC bridge plus persisted todo snapshot data
- * @output Unified desktop month widget view with one shared title bar, fixed month grid, and planning sidebar
+ * @output Unified desktop month widget view with one shared title bar, week-paged calendar, and collapsible planning sidebar
  * @pos View (Desktop widget)
- * @description Hosts the Electron desktop month widget, including one unified header, compact display settings, a fixed 6x7 month calendar body, and the right-side Arrange / Maybe / Due planning sidebar.
- * @updated 2026-05-17: Rebuilt the desktop month widget shell so the outer window owns the only title bar, merges widget display settings into one panel, supports wheel-based month switching, and adds quick month-height presets for the widget calendar.
+ * @description Hosts the Electron desktop month widget, including one unified header, compact display settings, a 2/3/4-week paged calendar body, and the right-side Arrange / Maybe / Due planning sidebar.
+ * @updated 2026-05-17: Grouped the planning sidebar by todo category, removed the misleading linked-category line, and restored one-level subtask visibility with standalone `@parent` labels when a parent row is filtered out.
+ * @updated 2026-05-17: Replaced fixed month paging with 2/3/4-week whole-page navigation so widget row settings control weeks per page without auto-resizing the widget window.
+ * @updated 2026-05-17: Added a persisted top-right toggle that fully collapses the planning sidebar so the calendar can expand across the whole widget width.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, GripVertical, ArrowRight, SlidersHorizontal } from 'lucide-react';
-import { addMonths, startOfMonth, subMonths } from 'date-fns';
+import { addDays, addWeeks, format, isSameDay, isSameMonth, isSameYear, startOfWeek, subWeeks } from 'date-fns';
 import { dataRepository } from '../../repositories/dataRepository';
 import { Log, TodoCategory, TodoItem } from '../../types';
+import {
+  buildDesktopMonthSidebarSections,
+  type DesktopMonthSidebarTab
+} from '../../utils/desktopMonthWidgetSidebarUtils';
 import { TodoDateEntry } from '../../utils/todoScheduleUtils';
 import { DesktopMonthCalendar } from './DesktopMonthCalendar';
 
 const APP_READY_EVENT = 'lumostime:app-ready';
 const DISPLAY_SETTINGS_STORAGE_KEY = 'desktop-month-widget:display-settings';
 const ROWS_PER_SCREEN_STORAGE_KEY = 'desktop-month-widget:rows-per-screen';
-const ROWS_PER_SCREEN_OPTIONS = [2, 3, 4, 5] as const;
+const SIDEBAR_COLLAPSED_STORAGE_KEY = 'desktop-month-widget:sidebar-collapsed';
+const ROWS_PER_SCREEN_OPTIONS = [2, 3, 4] as const;
+
 type WidgetRowsPerScreen = typeof ROWS_PER_SCREEN_OPTIONS[number];
 
-const ROWS_PER_SCREEN_WINDOW_HEIGHT: Record<WidgetRowsPerScreen, number> = {
-  2: 460,
-  3: 560,
-  4: 660,
-  5: 760
+const getWeekPageStart = (date: Date): Date => startOfWeek(date, { weekStartsOn: 1 });
+
+const getWeekPageEnd = (pageStartDate: Date, weeksPerPage: WidgetRowsPerScreen): Date => (
+  addDays(pageStartDate, (weeksPerPage * 7) - 1)
+);
+
+const buildWeekPageLabel = (pageStartDate: Date, weeksPerPage: WidgetRowsPerScreen): string => {
+  const pageEndDate = getWeekPageEnd(pageStartDate, weeksPerPage);
+  if (isSameYear(pageStartDate, pageEndDate) && isSameMonth(pageStartDate, pageEndDate)) {
+    return format(pageStartDate, 'yyyy.M');
+  }
+
+  return `${format(pageStartDate, 'yyyy.M')} - ${format(pageEndDate, 'yyyy.M')}`;
+};
+
+const WEEKS_PER_PAGE_LABEL: Record<WidgetRowsPerScreen, string> = {
+  2: '两周',
+  3: '三周',
+  4: '四周'
 };
 
 export const DesktopMonthWidgetView: React.FC = () => {
@@ -36,9 +58,13 @@ export const DesktopMonthWidgetView: React.FC = () => {
   const [theme, setThemeState] = useState<'light' | 'dark'>('dark');
   const [opacity, setOpacityState] = useState<number>(0.92);
   const [showDisplaySettings, setShowDisplaySettings] = useState(false);
-  const [activeTab, setActiveTab] = useState<'scheduled' | 'maybe' | 'deadline'>('scheduled');
+  const [activeTab, setActiveTab] = useState<DesktopMonthSidebarTab>('scheduled');
   const [isScheduleLocked] = useState(false);
-  const [displayMonth, setDisplayMonth] = useState<Date>(() => startOfMonth(new Date()));
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => (
+    localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true'
+  ));
+  const today = useMemo(() => new Date(), []);
+  const [pageStartDate, setPageStartDate] = useState<Date>(() => getWeekPageStart(new Date()));
   const [rowsPerScreen, setRowsPerScreen] = useState<WidgetRowsPerScreen>(() => {
     const saved = Number(localStorage.getItem(ROWS_PER_SCREEN_STORAGE_KEY));
     return ROWS_PER_SCREEN_OPTIONS.includes(saved as WidgetRowsPerScreen)
@@ -53,22 +79,9 @@ export const DesktopMonthWidgetView: React.FC = () => {
     );
   }, []);
 
-  const applyRowsPerScreenPreset = useCallback(async (nextRows: WidgetRowsPerScreen) => {
+  const applyRowsPerScreenPreset = useCallback((nextRows: WidgetRowsPerScreen) => {
     setRowsPerScreen(nextRows);
     localStorage.setItem(ROWS_PER_SCREEN_STORAGE_KEY, String(nextRows));
-
-    const bounds = await window.desktopWidget?.getBounds?.();
-    if (!bounds) {
-      return;
-    }
-
-    const nextHeight = ROWS_PER_SCREEN_WINDOW_HEIGHT[nextRows];
-    window.desktopWidget?.setBounds?.({
-      x: bounds.x,
-      y: bounds.y,
-      width: bounds.width,
-      height: nextHeight
-    });
   }, []);
 
   const refreshData = useCallback(async () => {
@@ -143,16 +156,10 @@ export const DesktopMonthWidgetView: React.FC = () => {
     persistDisplaySettings(theme, nextOpacity);
   };
 
-  const sidebarTodos = useMemo(() => {
-    const incomplete = todos.filter((todo) => !todo.isCompleted);
-    if (activeTab === 'scheduled') {
-      return incomplete.filter((todo) => !todo.scheduledDate && !todo.recurrence);
-    }
-    if (activeTab === 'deadline') {
-      return incomplete.filter((todo) => !todo.deadlineDate && !todo.recurrence);
-    }
-    return incomplete.filter((todo) => !todo.recurrence);
-  }, [todos, activeTab]);
+  const sidebarSections = useMemo(
+    () => buildDesktopMonthSidebarSections(todos, todoCategories, activeTab),
+    [activeTab, todoCategories, todos]
+  );
 
   const handleMoveScheduleEntry = async (entry: TodoDateEntry, targetDateKey: string) => {
     const todoId = entry.todo.id;
@@ -203,6 +210,15 @@ export const DesktopMonthWidgetView: React.FC = () => {
   const handleDragEnd = () => {
     setExternalDraggingTodoId(null);
     setExternalDraggingType(null);
+  };
+
+  const handleToggleSidebar = () => {
+    handleDragEnd();
+    setIsSidebarCollapsed((previous) => {
+      const nextValue = !previous;
+      localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(nextValue));
+      return nextValue;
+    });
   };
 
   const handleOpenTodo = (todo: TodoItem) => {
@@ -274,11 +290,12 @@ export const DesktopMonthWidgetView: React.FC = () => {
   };
 
   const isDark = theme === 'dark';
-  const monthLabel = `${displayMonth.getFullYear()}.${displayMonth.getMonth() + 1}`;
-  const isCurrentMonthActive = (
-    displayMonth.getFullYear() === new Date().getFullYear()
-    && displayMonth.getMonth() === new Date().getMonth()
+  const pageLabel = useMemo(
+    () => buildWeekPageLabel(pageStartDate, rowsPerScreen),
+    [pageStartDate, rowsPerScreen]
   );
+  const currentWeekPageStart = useMemo(() => getWeekPageStart(today), [today]);
+  const isCurrentWeekPageActive = isSameDay(pageStartDate, currentWeekPageStart);
 
   return (
     <div
@@ -300,20 +317,20 @@ export const DesktopMonthWidgetView: React.FC = () => {
           >
             <button
               type="button"
-              onClick={() => setDisplayMonth((previous) => startOfMonth(subMonths(previous, 1)))}
+              onClick={() => setPageStartDate((previous) => subWeeks(previous, rowsPerScreen))}
               className={`rounded-full p-1.5 transition-colors ${isDark ? 'text-stone-400 hover:bg-white/5 hover:text-stone-100' : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900'}`}
-              aria-label="上一月"
+              aria-label="上一页"
             >
               <ChevronLeft size={14} strokeWidth={2.5} />
             </button>
             <div className="px-1 text-[1.05rem] font-serif font-black italic leading-none">
-              {monthLabel}
+              {pageLabel}
             </div>
             <button
               type="button"
-              onClick={() => setDisplayMonth((previous) => startOfMonth(addMonths(previous, 1)))}
+              onClick={() => setPageStartDate((previous) => addWeeks(previous, rowsPerScreen))}
               className={`rounded-full p-1.5 transition-colors ${isDark ? 'text-stone-400 hover:bg-white/5 hover:text-stone-100' : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900'}`}
-              aria-label="下一月"
+              aria-label="下一页"
             >
               <ChevronRight size={14} strokeWidth={2.5} />
             </button>
@@ -325,14 +342,27 @@ export const DesktopMonthWidgetView: React.FC = () => {
           >
             <button
               type="button"
-              onClick={() => setDisplayMonth(startOfMonth(new Date()))}
+              onClick={() => setPageStartDate(currentWeekPageStart)}
               className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] tracking-[0.14em] transition-colors ${
-                isCurrentMonthActive
+                isCurrentWeekPageActive
                   ? (isDark ? 'bg-stone-800 text-stone-200' : 'bg-stone-100 text-slate-600')
                   : (isDark ? 'text-stone-400 hover:bg-white/5 hover:text-stone-200' : 'text-slate-400 hover:bg-white/50 hover:text-slate-600')
               }`}
             >
-              本月
+              本页
+            </button>
+            <button
+              type="button"
+              aria-label={isSidebarCollapsed ? '展开侧栏' : '收起侧栏'}
+              title={isSidebarCollapsed ? '展开侧栏' : '收起侧栏'}
+              onClick={handleToggleSidebar}
+              className={`flex h-7 w-7 items-center justify-center rounded transition ${
+                isDark
+                  ? 'text-stone-400 hover:bg-stone-900 hover:text-white'
+                  : 'text-stone-500 hover:bg-stone-100 hover:text-stone-950'
+              }`}
+            >
+              {isSidebarCollapsed ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
             </button>
             <button
               type="button"
@@ -354,112 +384,120 @@ export const DesktopMonthWidgetView: React.FC = () => {
             <DesktopMonthCalendar
               todos={todos}
               logs={logs}
-              displayMonth={displayMonth}
-              visibleRowsPerScreen={rowsPerScreen}
+              pageStartDate={pageStartDate}
+              weeksPerPage={rowsPerScreen}
               onMoveScheduleEntry={handleMoveScheduleEntry}
               isScheduleLocked={isScheduleLocked}
               externalDraggingTodoId={externalDraggingTodoId}
               externalDraggingType={externalDraggingType}
               onOpenTodo={handleOpenTodo}
               isDark={isDark}
-              onWheelMonthChange={(direction) => {
-                setDisplayMonth((previous) => startOfMonth(
-                  direction === 'next' ? addMonths(previous, 1) : subMonths(previous, 1)
+              onWheelPageChange={(direction) => {
+                setPageStartDate((previous) => (
+                  direction === 'next' ? addWeeks(previous, rowsPerScreen) : subWeeks(previous, rowsPerScreen)
                 ));
               }}
             />
           </div>
 
-          <div
-            className={`flex w-72 shrink-0 flex-col border-l transition-colors duration-300 ${
-              isDark ? 'border-stone-900 bg-stone-950/45' : 'border-stone-200/50 bg-stone-50/20'
-            }`}
-          >
-            <div className="p-3.5 pb-2.5">
-              <div className={`flex rounded-md p-0.5 text-xs ${isDark ? 'bg-stone-900/60' : 'bg-stone-200/40'}`}>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('scheduled')}
-                  className={`flex-1 rounded py-1 text-center font-medium transition ${
-                    activeTab === 'scheduled'
-                      ? (isDark ? 'bg-stone-800 text-white shadow-sm' : 'bg-white text-stone-800 shadow-sm')
-                      : (isDark ? 'text-stone-400 hover:text-stone-200' : 'text-stone-500 hover:text-stone-800')
-                  }`}
-                >
-                  安排
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('maybe')}
-                  className={`flex-1 rounded py-1 text-center font-medium transition ${
-                    activeTab === 'maybe'
-                      ? (isDark ? 'bg-stone-800 text-white shadow-sm' : 'bg-white text-stone-800 shadow-sm')
-                      : (isDark ? 'text-stone-400 hover:text-stone-200' : 'text-stone-500 hover:text-stone-800')
-                  }`}
-                >
-                  暂定
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('deadline')}
-                  className={`flex-1 rounded py-1 text-center font-medium transition ${
-                    activeTab === 'deadline'
-                      ? (isDark ? 'bg-stone-800 text-white shadow-sm' : 'bg-white text-stone-800 shadow-sm')
-                      : (isDark ? 'text-stone-400 hover:text-stone-200' : 'text-stone-500 hover:text-stone-800')
-                  }`}
-                >
-                  截止
-                </button>
+          {!isSidebarCollapsed && (
+            <div
+              className={`flex w-72 shrink-0 flex-col border-l transition-colors duration-300 ${
+                isDark ? 'border-stone-900 bg-stone-950/45' : 'border-stone-200/50 bg-stone-50/20'
+              }`}
+            >
+              <div className="p-3.5 pb-2.5">
+                <div className={`flex rounded-md p-0.5 text-xs ${isDark ? 'bg-stone-900/60' : 'bg-stone-200/40'}`}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('scheduled')}
+                    className={`flex-1 rounded py-1 text-center font-medium transition ${
+                      activeTab === 'scheduled'
+                        ? (isDark ? 'bg-stone-800 text-white shadow-sm' : 'bg-white text-stone-800 shadow-sm')
+                        : (isDark ? 'text-stone-400 hover:text-stone-200' : 'text-stone-500 hover:text-stone-800')
+                    }`}
+                  >
+                    安排
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('maybe')}
+                    className={`flex-1 rounded py-1 text-center font-medium transition ${
+                      activeTab === 'maybe'
+                        ? (isDark ? 'bg-stone-800 text-white shadow-sm' : 'bg-white text-stone-800 shadow-sm')
+                        : (isDark ? 'text-stone-400 hover:text-stone-200' : 'text-stone-500 hover:text-stone-800')
+                    }`}
+                  >
+                    暂定
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('deadline')}
+                    className={`flex-1 rounded py-1 text-center font-medium transition ${
+                      activeTab === 'deadline'
+                        ? (isDark ? 'bg-stone-800 text-white shadow-sm' : 'bg-white text-stone-800 shadow-sm')
+                        : (isDark ? 'text-stone-400 hover:text-stone-200' : 'text-stone-500 hover:text-stone-800')
+                    }`}
+                  >
+                    截止
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-3.5 pb-4 styled-scrollbar">
+                {sidebarSections.length === 0 ? (
+                  <div className="flex h-40 flex-col items-center justify-center text-center">
+                    <span className={`text-[11px] ${isDark ? 'text-stone-600' : 'text-stone-400'}`}>
+                      无待排期事项
+                    </span>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {sidebarSections.map((section) => (
+                      <div key={section.categoryId} className="space-y-1.5">
+                        <div className={`px-1 text-[10px] font-semibold tracking-[0.16em] ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>
+                          {section.title}
+                        </div>
+                        <div className="space-y-1.5">
+                          {section.rows.map((row) => {
+                            const isDraggingThis = externalDraggingTodoId === row.todo.id;
+                            const isChildRow = row.level === 1;
+
+                            return (
+                              <div
+                                key={row.todo.id}
+                                draggable
+                                onDragStart={(event) => handleDragStart(event, row.todo.id)}
+                                onDragEnd={handleDragEnd}
+                                onClick={() => handleOpenTodo(row.todo)}
+                                className={`group flex cursor-grab items-center gap-2 rounded border p-2 text-left transition select-none active:cursor-grabbing ${
+                                  isDraggingThis
+                                    ? 'border-dashed border-stone-500 opacity-40'
+                                    : isDark
+                                      ? 'border-stone-900 bg-stone-900/30 hover:border-stone-800 hover:bg-stone-900/60'
+                                      : 'border-stone-200 bg-white/60 hover:border-stone-300 hover:bg-white'
+                                } ${isChildRow ? 'ml-4' : ''}`}
+                              >
+                                <GripVertical size={11} className={`shrink-0 ${isDark ? 'text-stone-700' : 'text-stone-400'}`} />
+                                <div className={`min-w-0 flex-1 ${isChildRow ? 'pl-2' : ''}`}>
+                                  <div className="flex items-center gap-1">
+                                    <span className={`truncate text-xs font-semibold leading-none ${isDark ? 'text-stone-200' : 'text-stone-700'}`}>
+                                      {row.displayTitle}
+                                    </span>
+                                  </div>
+                                </div>
+                                <ArrowRight size={10} className={`shrink-0 opacity-0 transition group-hover:opacity-100 ${isDark ? 'text-stone-500' : 'text-stone-400'}`} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
-
-            <div className="flex-1 overflow-y-auto px-3.5 pb-4 styled-scrollbar">
-              {sidebarTodos.length === 0 ? (
-                <div className="flex h-40 flex-col items-center justify-center text-center">
-                  <span className={`text-[11px] ${isDark ? 'text-stone-600' : 'text-stone-400'}`}>
-                    无待排期事项
-                  </span>
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {sidebarTodos.map((todo) => {
-                    const isDraggingThis = externalDraggingTodoId === todo.id;
-                    return (
-                      <div
-                        key={todo.id}
-                        draggable
-                        onDragStart={(event) => handleDragStart(event, todo.id)}
-                        onDragEnd={handleDragEnd}
-                        onClick={() => handleOpenTodo(todo)}
-                        className={`group flex cursor-grab items-center gap-2 rounded border p-2 text-left transition select-none active:cursor-grabbing ${
-                          isDraggingThis
-                            ? 'border-dashed border-stone-500 opacity-40'
-                            : isDark
-                              ? 'border-stone-900 bg-stone-900/30 hover:border-stone-800 hover:bg-stone-900/60'
-                              : 'border-stone-200 bg-white/60 hover:border-stone-300 hover:bg-white'
-                        }`}
-                      >
-                        <GripVertical size={11} className={`shrink-0 ${isDark ? 'text-stone-700' : 'text-stone-400'}`} />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1">
-                            <span className={`truncate text-xs font-semibold leading-none ${isDark ? 'text-stone-200' : 'text-stone-700'}`}>
-                              {todo.title}
-                            </span>
-                          </div>
-                          {todo.linkedCategoryId && (
-                            <div className={`mt-1 truncate text-[9px] ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>
-                              类别: {todoCategories.find((category) => category.id === todo.linkedCategoryId)?.title || '无'}
-                            </div>
-                          )}
-                        </div>
-                        <ArrowRight size={10} className={`shrink-0 opacity-0 transition group-hover:opacity-100 ${isDark ? 'text-stone-500' : 'text-stone-400'}`} />
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -516,9 +554,9 @@ export const DesktopMonthWidgetView: React.FC = () => {
 
             <div>
               <div className={`mb-1.5 text-[10px] font-semibold tracking-wider ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>
-                一屏显示几格
+                一页显示几周
               </div>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-3 gap-1.5">
                 {ROWS_PER_SCREEN_OPTIONS.map((option) => {
                   const isSelected = rowsPerScreen === option;
 
@@ -535,7 +573,7 @@ export const DesktopMonthWidgetView: React.FC = () => {
                           : (isDark ? 'text-stone-400 hover:bg-stone-900/60 hover:text-stone-200' : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700')
                       }`}
                     >
-                      {option}格
+                      {WEEKS_PER_PAGE_LABEL[option]}
                     </button>
                   );
                 })}
