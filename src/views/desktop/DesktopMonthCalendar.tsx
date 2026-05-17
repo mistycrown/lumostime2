@@ -4,6 +4,7 @@
  * @output Week-paged calendar grid for the Electron desktop month widget
  * @pos View helper (Desktop widget)
  * @description Renders a desktop scheduling calendar that pages by 2/3/4 whole weeks, keeps the app's month-view spacing feel, and supports drag-to-schedule inside the desktop widget.
+ * @updated 2026-05-17: Added a caller-controlled entry background opacity so the desktop month widget display settings can tune task strip fill strength independently from window opacity.
  * @updated 2026-05-17: Replaced the fixed 6x7 month grid with a dynamic 2/3/4-week page layout so the widget can navigate by week-page units instead of whole months.
  * @updated 2026-05-17: Reused the shared week-trace layout so cross-day trace events render as continuous bars and aligned desktop complete/maybe styling with the app month view.
  * @updated 2026-05-17: Converted todo clicks to screen-space anchors so the external widget quick editor can open outside the widget window bounds.
@@ -64,6 +65,7 @@ interface DesktopMonthCalendarProps {
   onWheelPageChange?: (direction: 'prev' | 'next') => void;
   markerColorMode?: 'schedule' | 'category';
   todoCategories?: TodoCategory[];
+  entryBackgroundOpacity?: number;
 }
 
 export const getDesktopMonthVisibleEntryCount = (
@@ -106,6 +108,7 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
   isDark = false,
   markerColorMode = 'schedule',
   todoCategories = [],
+  entryBackgroundOpacity = 0.08,
   onWheelPageChange
 }) => {
   const today = useMemo(() => new Date(), []);
@@ -294,13 +297,13 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
     if (entry.primaryKind === 'maybe') {
       return {
         border: `1px dashed ${markerColor}`,
-        backgroundColor: hexToRgba(markerColor, 0.08)
+        backgroundColor: hexToRgba(markerColor, entryBackgroundOpacity)
       };
     }
 
     return {
       borderLeftColor: markerColor,
-      backgroundColor: hexToRgba(markerColor, 0.08)
+      backgroundColor: hexToRgba(markerColor, entryBackgroundOpacity)
     };
   };
 
@@ -324,7 +327,7 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
       top: `${MONTH_ENTRY_TOP_OFFSET_PX + (segment.laneIndex * (MONTH_CELL_LINE_HEIGHT_PX + MONTH_ENTRY_ROW_GAP_PX))}px`,
       height: `${MONTH_CELL_LINE_HEIGHT_PX}px`,
       paddingLeft: '3px',
-      backgroundColor: hexToRgba(markerColor, 0.08),
+      backgroundColor: hexToRgba(markerColor, entryBackgroundOpacity),
       boxShadow: `inset 1.5px 0 0 ${markerColor}`
     };
   };
