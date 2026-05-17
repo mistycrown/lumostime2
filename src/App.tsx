@@ -539,6 +539,11 @@ const AppContent: React.FC = () => {
     setIsSearchOpenedFromSettings(false);
     setIsGalleryViewOpen(false);
 
+    if (action.type === 'stop_active_session_and_save') {
+      handleStopActivityWrapper(action.sessionId);
+      return;
+    }
+
     if (action.type === 'add_quick_todo') {
       const newTodo = {
         id: crypto.randomUUID(),
@@ -599,7 +604,14 @@ const AppContent: React.FC = () => {
         window.desktopWidget?.openMonth();
         return;
       }
-      window.desktopWidget?.openQuick?.();
+      if (widgetType === 'quick') {
+        window.desktopWidget?.openQuick?.();
+        return;
+      }
+      if (widgetType === 'timer') {
+        window.desktopWidget?.openTimer?.();
+        return;
+      }
     });
   }, []);
 

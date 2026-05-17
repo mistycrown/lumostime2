@@ -3,7 +3,8 @@
  * @input Full todo list, todo-category metadata, and the active desktop month-widget planning tab
  * @output Grouped sidebar section/row models for the desktop month widget planning panel
  * @pos Utility (desktop month widget)
- * @description Builds grouped sidebar sections for the desktop month widget so arrange/maybe/due tasks render by task group, preserve one-level subtask hierarchy, and keep standalone subtasks visible with plain-text `@parent` context when their parent row is filtered out.
+ * @description Builds grouped sidebar sections for the desktop month widget so arrange/maybe/due tasks render by task group, preserve one-level subtask hierarchy, keep standalone subtasks visible with plain-text `@parent` context when their parent row is filtered out, and let all three planning tabs surface dated todos after undated ones for quick rescheduling.
+ * @updated 2026-05-17: Unified the month-widget arrange/maybe/due sidebar rules so all unfinished todos stay visible, undated rows sort first inside each category, and dated rows expose compact trailing date text.
  * @updated 2026-05-17: Added grouped month-widget sidebar models that remove the misleading linked-category line and keep visible subtasks attached to their parent rows whenever possible.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
@@ -15,6 +16,7 @@ import {
   getParentTodo,
   isIncompleteSubtaskHiddenByCompletedParent
 } from './todoHierarchyUtils';
+import { parseDateKey } from './todoScheduleUtils';
 
 export type DesktopMonthSidebarTab = 'scheduled' | 'maybe' | 'deadline';
 
@@ -22,6 +24,7 @@ export interface DesktopMonthSidebarRow {
   todo: TodoItem;
   displayTitle: string;
   level: 0 | 1;
+  trailingDateText?: string;
 }
 
 export interface DesktopMonthSidebarSection {
@@ -45,17 +48,62 @@ const compareBySourceOrder = (
   - (orderLookup.get(right.id) ?? Number.MAX_SAFE_INTEGER)
 );
 
-const isTodoVisibleForTab = (todo: TodoItem, tab: DesktopMonthSidebarTab): boolean => {
-  if (todo.isCompleted || todo.recurrenceRule) {
-    return false;
-  }
-
+const getPrimaryDateValue = (
+  todo: TodoItem,
+  tab: DesktopMonthSidebarTab
+): string | undefined => {
   if (tab === 'scheduled') {
-    return !todo.scheduledDate;
+    return todo.scheduledDate;
   }
 
   if (tab === 'deadline') {
-    return !todo.deadlineDate;
+    return todo.deadlineDate;
+  }
+
+  return todo.maybeDates?.slice().sort((left, right) => left.localeCompare(right))[0];
+};
+
+const getDateBucketOrder = (
+  todo: TodoItem,
+  tab: DesktopMonthSidebarTab
+): number => (
+  getPrimaryDateValue(todo, tab) ? 1 : 0
+);
+
+const compareSectionTodos = (
+  left: TodoItem,
+  right: TodoItem,
+  orderLookup: Map<string, number>,
+  tab: DesktopMonthSidebarTab
+): number => {
+  if (tab === 'scheduled' || tab === 'deadline' || tab === 'maybe') {
+    const leftBucketOrder = getDateBucketOrder(left, tab);
+    const rightBucketOrder = getDateBucketOrder(right, tab);
+
+    if (leftBucketOrder !== rightBucketOrder) {
+      return leftBucketOrder - rightBucketOrder;
+    }
+  }
+
+  return compareBySourceOrder(left, right, orderLookup);
+};
+
+const formatCompactDate = (value?: string): string | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = parseDateKey(value);
+  if (!parsed) {
+    return value;
+  }
+
+  return `${parsed.getMonth() + 1}/${parsed.getDate()}`;
+};
+
+const isTodoVisibleForTab = (todo: TodoItem, tab: DesktopMonthSidebarTab): boolean => {
+  if (todo.isCompleted || todo.recurrenceRule) {
+    return false;
   }
 
   return true;
@@ -63,7 +111,8 @@ const isTodoVisibleForTab = (todo: TodoItem, tab: DesktopMonthSidebarTab): boole
 
 const buildSectionRows = (
   sectionTodos: TodoItem[],
-  sourceTodos: TodoItem[]
+  sourceTodos: TodoItem[],
+  activeTab: DesktopMonthSidebarTab
 ): DesktopMonthSidebarRow[] => {
   const visibleTodoIds = new Set(sectionTodos.map((todo) => todo.id));
   const orderLookup = buildTodoOrderLookup(sourceTodos);
@@ -72,7 +121,7 @@ const buildSectionRows = (
       const parentTodo = getParentTodo(sourceTodos, todo);
       return !parentTodo || !visibleTodoIds.has(parentTodo.id);
     })
-    .sort((left, right) => compareBySourceOrder(left, right, orderLookup));
+    .sort((left, right) => compareSectionTodos(left, right, orderLookup, activeTab));
 
   return topLevelRows.flatMap((todo) => {
     const hiddenParentTodo = getParentTodo(sourceTodos, todo);
@@ -80,7 +129,8 @@ const buildSectionRows = (
       return [{
         todo,
         displayTitle: `${todo.title} @${hiddenParentTodo.title}`,
-        level: 0 as const
+        level: 0 as const,
+        trailingDateText: formatCompactDate(getPrimaryDateValue(todo, activeTab))
       }];
     }
 
@@ -88,17 +138,21 @@ const buildSectionRows = (
       incompleteFirst: true,
       includeCompleted: false,
       hideIncompleteWhenParentCompleted: true
-    }).map((childTodo) => ({
-      todo: childTodo,
-      displayTitle: childTodo.title,
-      level: 1 as const
-    }));
+    })
+      .sort((left, right) => compareSectionTodos(left, right, orderLookup, activeTab))
+      .map((childTodo) => ({
+        todo: childTodo,
+        displayTitle: childTodo.title,
+        level: 1 as const,
+        trailingDateText: formatCompactDate(getPrimaryDateValue(childTodo, activeTab))
+      }));
 
     return [
       {
         todo,
         displayTitle: todo.title,
-        level: 0 as const
+        level: 0 as const,
+        trailingDateText: formatCompactDate(getPrimaryDateValue(todo, activeTab))
       },
       ...childRows
     ];
@@ -140,7 +194,7 @@ export const buildDesktopMonthSidebarSections = (
     .map(([categoryId, sectionTodos]) => ({
       categoryId,
       title: categoryLookup.get(categoryId)?.name || UNCATEGORIZED_SECTION_TITLE,
-      rows: buildSectionRows(sectionTodos, todos)
+      rows: buildSectionRows(sectionTodos, todos, activeTab)
     }))
     .filter((section) => section.rows.length > 0);
 };

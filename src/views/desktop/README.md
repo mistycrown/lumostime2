@@ -4,6 +4,9 @@
 
 ## Updates
 
+- 2026-05-17: 优化了月历小组件计划栏，禁用列表项的点击跳转详情事件，移除了 hover 时向右的跳转详情箭头，变更为可点击的展开/收缩子任务按钮，支持父任务对其下子任务的收起与展开操作，无子任务的项则直接删除按钮，并在折叠状态下常驻显示展开图标。
+- 2026-05-17: 新增了 `DesktopTimerWidgetView.tsx`（桌面计时器小组件）视图。长宽固定为 240px x 120px。静止（Resting）状态下大字呼吸计时，悬停（Hover）状态下展现活动标题与全功能操作按钮，支持主题与透明度调节，打通了结束专注与快速打开主页面的跨窗口动作转发。
+- 2026-05-17: `DesktopMonthWidgetView.tsx` now keeps already dated unfinished todos visible across the right-side `arrange` / `maybe` / `due` tabs, sorts undated rows before dated rows inside each todo category, and shows compact trailing dates like `5/20` so items can be rescheduled in place.
 - 2026-05-17: 优化了月历小组件（DesktopMonthWidgetView.tsx）右侧计划栏的分类标签，将其顺序变更为 maybe / arrange / due 并默认选中 arrange 标签，标签样式改为英文小写形式。
 - 2026-05-17: 新增并迭代重构了 `DesktopQuickWidgetView.tsx`（小事清单小组件）。移除了任务前面的颜色圆点、顶部控制栏的日期显示以及所有多余的分组标题（如置顶、今天、逾期等），使小事列表完全扁平化展示，视觉极致纯粹精简；同时新增了屏幕内快速添加小事的精致输入栏，完全打通了小事的新增、勾选、多端无感知同步。
 - 2026-05-17: Added `DesktopTodayWidgetView.tsx` for the compact desktop today widget.
@@ -16,6 +19,13 @@
 - 2026-05-17: `DesktopMonthWidgetView.tsx` now groups the right planning sidebar by todo category, removes the extra linked-category line, and keeps one-level subtasks visible under their parent rows or as standalone `子任务 @父任务` rows when the parent is filtered out.
 
 ## Included Views
+
+### `DesktopTimerWidgetView.tsx`
+
+- 桌面计时器小组件，长宽固定为 240px x 120px，不可拉伸，支持边缘 clamps 贴边和 bounds 持久化。
+- 极简极致的毛玻璃设计语言。静止（Resting）时仅大字呼吸显示已用专注时间。
+- 鼠标悬浮（Hover）时展现当前活动标题，滑入“结束提交”与“打开主页面”动作按钮，支持右上角一键收起。
+- 带有屏内控制面板，用户可自由调节显示透明度以及深浅配色偏好，支持跨窗口 `window.storage` 本地秒级响应与数据自同步。
 
 ### `DesktopQuickWidgetView.tsx`
 
@@ -34,7 +44,8 @@
 - Owns the desktop month-widget shell, unified header, display settings, and sidebar.
 - Persists theme, opacity, and weeks-per-page settings while keeping widget size unchanged when the weeks-per-page setting changes.
 - Handles widget data refresh, cross-window sync, and drag-and-drop write-back.
-- Renders grouped `Arrange / Maybe / Due` sidebar sections so tasks stay separated by todo group and subtasks remain visible.
+- Renders grouped `Arrange / Maybe / Due` sidebar sections so tasks stay separated by todo group, subtasks remain visible, and every planning tab can show both undated and already dated unfinished todos for rescheduling.
+- 计划栏支持父任务对其下子任务的折叠/展开操作，默认展开，并在折叠状态下有常驻的 `ChevronRight` 图标，禁用了条目详情跳转点击事件。
 
 ### `DesktopMonthCalendar.tsx`
 

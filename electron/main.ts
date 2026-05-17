@@ -4,6 +4,7 @@
  * @output Window Management
  * @pos Electron Main
  * @description Entry point for the Electron application. Handles main-window and desktop-widget creation, lifecycle events, and inter-process communication (IPC).
+ * @updated 2026-05-17: 扩展了 Electron 主进程，新增对桌面计时器小组件（timer widget）独立窗口的生命周期管理（常驻置顶、固定大小、不可缩放、拖动坐标持久化）以及配套 IPC 接口。
  * @updated 2026-05-17: 扩展了 Electron 主进程小组件管理器，新增对桌面小事清单小组件（quick widget）独立窗口的生命周期、拖拽缩放边界持久化和 IPC 调起/关闭支持。并支持了 add_quick_todo 动作的透明转发。
  * @updated 2026-05-17: Added a dedicated desktop today-widget and monthly-widget windows with persisted bounds, main-renderer action forwarding, and widget open/close IPC handlers for Electron builds.
  * @updated 2026-04-09: Added Obsidian image attachment export IPC handler for desktop builds.
@@ -21,7 +22,8 @@ type DesktopWidgetMainAction =
   | { type: 'open_todo'; todoId: string }
   | { type: 'toggle_todo'; todoId: string }
   | { type: 'start_focus'; todoId: string }
-  | { type: 'add_quick_todo'; title: string };
+  | { type: 'add_quick_todo'; title: string }
+  | { type: 'stop_active_session_and_save'; sessionId: string };
 
 type PersistedWidgetWindowState = {
   bounds?: {
@@ -59,14 +61,18 @@ const DESKTOP_WIDGET_QUERY_KEY = 'window';
 const DESKTOP_WIDGET_QUERY_VALUE = 'desktop-widget';
 const DESKTOP_MONTH_WIDGET_QUERY_VALUE = 'desktop-month';
 const DESKTOP_QUICK_WIDGET_QUERY_VALUE = 'desktop-quick';
+const DESKTOP_TIMER_WIDGET_QUERY_VALUE = 'desktop-timer';
 const DESKTOP_WIDGET_MAIN_ACTION_CHANNEL = 'desktop-widget:main-action';
 const DEFAULT_WIDGET_WIDTH = 360;
 const DEFAULT_WIDGET_HEIGHT = 520;
 const DEFAULT_MONTH_WIDGET_WIDTH = 880;
 const DEFAULT_MONTH_WIDGET_HEIGHT = 640;
+const DEFAULT_TIMER_WIDGET_WIDTH = 80;
+const DEFAULT_TIMER_WIDGET_HEIGHT = 32;
 const WIDGET_STATE_FILENAME = 'desktop-widget-state.json';
 const MONTH_WIDGET_STATE_FILENAME = 'desktop-month-widget-state.json';
 const QUICK_WIDGET_STATE_FILENAME = 'desktop-quick-widget-state.json';
+const TIMER_WIDGET_STATE_FILENAME = 'desktop-timer-widget-state.json';
 
 // Disable GPU Acceleration for Windows 7
 if (os.release().startsWith('6.1')) app.disableHardwareAcceleration();
@@ -83,6 +89,7 @@ let mainWindow: BrowserWindow | null = null;
 let widgetWindow: BrowserWindow | null = null;
 let monthWidgetWindow: BrowserWindow | null = null;
 let quickWidgetWindow: BrowserWindow | null = null;
+let timerWidgetWindow: BrowserWindow | null = null;
 let isMainRendererReady = false;
 let pendingDesktopWidgetActions: DesktopWidgetMainAction[] = [];
 
@@ -95,6 +102,7 @@ const getIconPath = () => path.join(process.env.VITE_PUBLIC || '', 'icon.ico');
 const getWidgetStatePath = () => path.join(app.getPath('userData'), WIDGET_STATE_FILENAME);
 const getMonthWidgetStatePath = () => path.join(app.getPath('userData'), MONTH_WIDGET_STATE_FILENAME);
 const getQuickWidgetStatePath = () => path.join(app.getPath('userData'), QUICK_WIDGET_STATE_FILENAME);
+const getTimerWidgetStatePath = () => path.join(app.getPath('userData'), TIMER_WIDGET_STATE_FILENAME);
 
 const buildRendererUrl = (windowType?: string): string => {
   if (VITE_DEV_SERVER_URL) {
@@ -280,6 +288,69 @@ const saveQuickWidgetWindowState = async (targetWindow: BrowserWindow | null) =>
     );
   } catch (error) {
     console.error('[Electron] Failed to save desktop quick widget state', error);
+  }
+};
+
+const clampTimerWidgetBounds = (bounds?: PersistedWidgetWindowState['bounds']) => {
+  const fallbackWidth = DEFAULT_TIMER_WIDGET_WIDTH;
+  const fallbackHeight = DEFAULT_TIMER_WIDGET_HEIGHT;
+
+  if (!bounds) {
+    const primaryWorkArea = screen.getPrimaryDisplay().workArea;
+    return {
+      width: fallbackWidth,
+      height: fallbackHeight,
+      x: primaryWorkArea.x + primaryWorkArea.width - fallbackWidth - 32,
+      y: primaryWorkArea.y + 32
+    };
+  }
+
+  const display = screen.getDisplayMatching({
+    x: bounds.x,
+    y: bounds.y,
+    width: fallbackWidth,
+    height: fallbackHeight
+  });
+  const workArea = display.workArea;
+  const width = fallbackWidth;
+  const height = fallbackHeight;
+  const maxX = workArea.x + Math.max(0, workArea.width - width);
+  const maxY = workArea.y + Math.max(0, workArea.height - height);
+
+  return {
+    width,
+    height,
+    x: Math.min(Math.max(bounds.x, workArea.x), maxX),
+    y: Math.min(Math.max(bounds.y, workArea.y), maxY)
+  };
+};
+
+const readTimerWidgetWindowState = async (): Promise<PersistedWidgetWindowState> => {
+  try {
+    const raw = await fs.readFile(getTimerWidgetStatePath(), 'utf-8');
+    return JSON.parse(raw) as PersistedWidgetWindowState;
+  } catch (error: any) {
+    if (error?.code !== 'ENOENT') {
+      console.error('[Electron] Failed to read desktop timer widget state', error);
+    }
+    return {};
+  }
+};
+
+const saveTimerWidgetWindowState = async (targetWindow: BrowserWindow | null) => {
+  if (!targetWindow || targetWindow.isDestroyed()) {
+    return;
+  }
+
+  try {
+    const bounds = clampTimerWidgetBounds(targetWindow.getBounds());
+    await fs.writeFile(
+      getTimerWidgetStatePath(),
+      JSON.stringify({ bounds }, null, 2),
+      'utf-8'
+    );
+  } catch (error) {
+    console.error('[Electron] Failed to save desktop timer widget state', error);
   }
 };
 
@@ -552,6 +623,56 @@ async function createQuickWidgetWindow() {
   return quickWidgetWindow;
 }
 
+async function createTimerWidgetWindow() {
+  if (timerWidgetWindow && !timerWidgetWindow.isDestroyed()) {
+    focusWindow(timerWidgetWindow);
+    return timerWidgetWindow;
+  }
+
+  const widgetState = await readTimerWidgetWindowState();
+  const widgetBounds = clampTimerWidgetBounds(widgetState.bounds);
+
+  timerWidgetWindow = new BrowserWindow({
+    title: 'LumosTime Timer Widget',
+    icon: getIconPath(),
+    width: widgetBounds.width,
+    height: widgetBounds.height,
+    x: widgetBounds.x,
+    y: widgetBounds.y,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    alwaysOnTop: true,
+    thickFrame: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      preload,
+      webSecurity: false
+    }
+  });
+
+  timerWidgetWindow.setMenuBarVisibility(false);
+  configureExternalLinks(timerWidgetWindow);
+  attachWidgetShowFallback(timerWidgetWindow, 'timer' as any);
+  await timerWidgetWindow.loadURL(buildRendererUrl(DESKTOP_TIMER_WIDGET_QUERY_VALUE));
+
+  timerWidgetWindow.on('move', () => {
+    void saveTimerWidgetWindowState(timerWidgetWindow);
+  });
+  timerWidgetWindow.on('close', () => {
+    void saveTimerWidgetWindowState(timerWidgetWindow);
+  });
+  timerWidgetWindow.on('closed', () => {
+    timerWidgetWindow = null;
+  });
+
+  return timerWidgetWindow;
+}
+
 app.whenReady().then(() => {
   void createMainWindow();
 });
@@ -568,7 +689,7 @@ app.on('second-instance', () => {
     return;
   }
 
-  if (widgetWindow || monthWidgetWindow || quickWidgetWindow) {
+  if (widgetWindow || monthWidgetWindow || quickWidgetWindow || timerWidgetWindow) {
     void focusMainWindow();
   }
 });
@@ -621,6 +742,14 @@ ipcMain.on('desktop-widget:open-quick', () => {
 
 ipcMain.on('desktop-widget:close-quick', () => {
   quickWidgetWindow?.close();
+});
+
+ipcMain.on('desktop-widget:open-timer', () => {
+  void createTimerWidgetWindow();
+});
+
+ipcMain.on('desktop-widget:close-timer', () => {
+  timerWidgetWindow?.close();
 });
 
 ipcMain.on('desktop-widget:open-main', () => {
