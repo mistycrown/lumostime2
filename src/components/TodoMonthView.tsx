@@ -4,6 +4,7 @@
  * @output Reference-style rolling month schedule UI backed by real daily todo data
  * @pos Component (Todo scheduling)
  * @description Renders the editorial monthly schedule view adapted from the minimalist demo, using shared todo schedule utilities so each day shows the same real Arrange / Due / Repeat / Maybe / Done / Trace data as the week planner.
+ * @updated 2026-05-17: Added a month-view entry background color picker so users can override the default ultra-light item tint with one unified custom background color.
  * @updated 2026-05-14: Added a parent-controlled schedule lock toggle so the month planner can freeze drag-to-move interactions while keeping day opening and quick-edit actions available.
  * @updated 2026-05-17: Added a dashed outline border around "maybe" schedule items in the month view grid matching their type color.
  * @updated 2026-05-17: Added a strike-through (line-through) style to "completed" schedule items in both month view grid cells and expanded details.
@@ -29,6 +30,7 @@ import {
   subMonths
 } from 'date-fns';
 import { Category, Log, Scope, TodoCategory, TodoItem } from '../types';
+import { COLOR_OPTIONS } from '../constants';
 import {
   buildTodoDateEntryMap,
   buildTodoMonthWeekLayout,
@@ -40,14 +42,16 @@ import {
 } from '../utils/todoScheduleUtils';
 import { getParentTodo } from '../utils/todoHierarchyUtils';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
-import { hexToRgba } from '../utils/colorUtils';
+import { hexToRgba, isStoredColorSelected, normalizeHexColor } from '../utils/colorUtils';
 import { matchesTodoFilterExpression } from '../utils/filterUtils';
+import { useCustomColors } from '../hooks/useCustomColors';
 import { TodoScheduleTypeColorSettings as TodoScheduleTypeColorSettingsPanel } from './TodoScheduleTypeColorSettings';
 import {
   getResolvedTodoScheduleTypeColors,
   todoScheduleColorService,
   type TodoScheduleTypeColorSettings
 } from '../services/todoScheduleColorService';
+import { normalizeCustomColorHex } from '../services/customColorGroupService';
 
 interface TodoMonthViewProps {
   todos: TodoItem[];
@@ -82,6 +86,7 @@ const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTH_VIEW_ROWS_PER_SCREEN_STORAGE_KEY = 'todoMonthViewRowsPerScreen';
 const MONTH_VIEW_FONT_SIZE_STORAGE_KEY = 'todoMonthViewFontSize';
 const MONTH_VIEW_MARKER_COLOR_MODE_STORAGE_KEY = 'todoMonthViewMarkerColorMode';
+const MONTH_VIEW_ENTRY_BACKGROUND_COLOR_STORAGE_KEY = 'todoMonthViewEntryBackgroundColor';
 const MONTH_VIEW_HIDDEN_FILTER_EXPRESSION_STORAGE_KEY = 'todoMonthViewHiddenFilterExpression';
 const MONTH_VIEW_HIDE_TRACE_TYPES_STORAGE_KEY = 'todoMonthViewHideTraceTypes';
 const MONTH_VIEW_INITIAL_MONTHS_BEFORE = 2;
@@ -275,6 +280,10 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
       ? (saved as MonthViewMarkerColorMode)
       : 'schedule';
   });
+  const [monthEntryBackgroundColor, setMonthEntryBackgroundColor] = useState<string | null>(() => {
+    const saved = localStorage.getItem(MONTH_VIEW_ENTRY_BACKGROUND_COLOR_STORAGE_KEY);
+    return saved ? normalizeCustomColorHex(saved) || normalizeHexColor(saved) : null;
+  });
   const [hiddenFilterExpression, setHiddenFilterExpression] = useState<string>(() => (
     localStorage.getItem(MONTH_VIEW_HIDDEN_FILTER_EXPRESSION_STORAGE_KEY) || ''
   ));
@@ -296,6 +305,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   const [dragTargetDate, setDragTargetDate] = useState<string | null>(null);
   const [touchDragPreview, setTouchDragPreview] = useState<{ x: number; y: number; title: string } | null>(null);
   const [isTouchDragging, setIsTouchDragging] = useState(false);
+  const customColors = useCustomColors();
 
   const weeks = useMemo<TodoMonthWeek[]>(
     () => buildWeeksForMonthRange(loadedRange),
@@ -876,6 +886,15 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   }, [monthMarkerColorMode]);
 
   useEffect(() => {
+    if (monthEntryBackgroundColor) {
+      localStorage.setItem(MONTH_VIEW_ENTRY_BACKGROUND_COLOR_STORAGE_KEY, monthEntryBackgroundColor);
+      return;
+    }
+
+    localStorage.removeItem(MONTH_VIEW_ENTRY_BACKGROUND_COLOR_STORAGE_KEY);
+  }, [monthEntryBackgroundColor]);
+
+  useEffect(() => {
     localStorage.setItem(MONTH_VIEW_HIDDEN_FILTER_EXPRESSION_STORAGE_KEY, hiddenFilterExpression);
   }, [hiddenFilterExpression]);
 
@@ -1117,18 +1136,26 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
 
     return resolvedScheduleTypeColors[entry.primaryKind];
   };
+  const monthEntryBackgroundFillColor = useMemo(
+    () => (monthEntryBackgroundColor ? hexToRgba(monthEntryBackgroundColor, 0.18) : null),
+    [monthEntryBackgroundColor]
+  );
+  const monthDetailEntryBackgroundFillColor = useMemo(
+    () => (monthEntryBackgroundColor ? hexToRgba(monthEntryBackgroundColor, 0.12) : null),
+    [monthEntryBackgroundColor]
+  );
 
   const getTodoMarkerStyle = (entry: TodoDateEntry): React.CSSProperties => {
     const markerColor = getTodoMarkerColor(entry);
     if (entry.primaryKind === 'maybe') {
       return {
         border: `1px dashed ${markerColor}`,
-        backgroundColor: hexToRgba(markerColor, 0.08)
+        backgroundColor: monthEntryBackgroundFillColor || hexToRgba(markerColor, 0.08)
       };
     }
     return {
       borderLeftColor: markerColor,
-      backgroundColor: hexToRgba(markerColor, 0.08)
+      backgroundColor: monthEntryBackgroundFillColor || hexToRgba(markerColor, 0.08)
     };
   };
   const monthCellRowStyle = useMemo<React.CSSProperties>(
@@ -1149,7 +1176,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
       top: `${MONTH_VIEW_ENTRY_TOP_OFFSET_PX + (segment.laneIndex * (monthCellLineHeightPx + MONTH_VIEW_ENTRY_ROW_GAP_PX))}px`,
       height: `${monthCellLineHeightPx}px`,
       paddingLeft: '3px',
-      backgroundColor: hexToRgba(markerColor, 0.08),
+      backgroundColor: monthEntryBackgroundFillColor || hexToRgba(markerColor, 0.08),
       boxShadow: `inset 1.5px 0 0 ${markerColor}`
     };
   };
@@ -1524,6 +1551,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                               <div
                                 key={`${selectedDate}-${entry.todo.id}-${entry.primaryKind}-detail`}
                                 className={rowClassName}
+                                style={monthDetailEntryBackgroundFillColor ? { backgroundColor: monthDetailEntryBackgroundFillColor } : undefined}
                                 draggable={isMonthEntryDraggable(entry)}
                                 onDragStart={(event) => isMonthEntryDraggable(entry) && handleMonthItemDragStart(entry, event)}
                                 onDragEnd={handleMonthItemDragEnd}
@@ -1589,6 +1617,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                             <div
                               key={`${selectedDate}-${entry.todo.id}-${entry.primaryKind}-detail`}
                               className={rowClassName}
+                              style={monthDetailEntryBackgroundFillColor ? { backgroundColor: monthDetailEntryBackgroundFillColor } : undefined}
                             >
                               <span className="flex h-4 w-4 shrink-0 items-center justify-center self-center">
                                 {getMonthEntryLeadingIcon(entry)}
@@ -1775,6 +1804,56 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                   }}
                 />
               )}
+            </div>
+
+            <div className="mt-4 overflow-hidden rounded-2xl border border-stone-200 bg-white/88">
+              <div className="border-b border-stone-100 px-4 py-3 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
+                条目背景颜色
+              </div>
+              <div className="p-3">
+                <button
+                  type="button"
+                  onClick={() => setMonthEntryBackgroundColor(null)}
+                  className={`mb-3 w-full rounded-xl px-3 py-2.5 text-left text-[14px] tracking-[0.04em] transition-colors ${
+                    monthEntryBackgroundColor === null
+                      ? 'bg-stone-100 text-slate-700'
+                      : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
+                  }`}
+                >
+                  默认跟随类型浅色
+                </button>
+
+                <div className="grid grid-cols-6 gap-2">
+                  {COLOR_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setMonthEntryBackgroundColor(option.hex)}
+                      title={option.label}
+                      className={`h-8 w-8 rounded-full transition-all hover:scale-110 ${
+                        isStoredColorSelected(monthEntryBackgroundColor || undefined, option.hex)
+                          ? `ring-2 ${option.ring} ring-offset-2`
+                          : ''
+                      } ${option.picker}`}
+                    />
+                  ))}
+
+                  {customColors.map((customColor) => (
+                    <button
+                      key={customColor.id}
+                      type="button"
+                      onClick={() => setMonthEntryBackgroundColor(customColor.color)}
+                      title={customColor.color}
+                      className={`h-8 w-8 rounded-full border border-stone-300 transition-all hover:scale-110 ${
+                        isStoredColorSelected(monthEntryBackgroundColor || undefined, customColor.color)
+                          ? 'ring-2 ring-stone-400 ring-offset-2'
+                          : ''
+                      }`}
+                      style={{ backgroundColor: customColor.color }}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className="mt-4">
