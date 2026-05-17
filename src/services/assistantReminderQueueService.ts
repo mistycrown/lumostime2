@@ -5,6 +5,7 @@
  * @pos Service (Assistant Reminders)
  * @description Provides a small durable reminder queue for the Android-first AI agent so it can leave follow-up instructions for future background turns without depending on the chat session history.
  *
+ * @updated 2026-05-17: Deduplicate pending reminders by natural content key during queue saves and agent enqueue calls so repeated background turns cannot silently stack identical self-followup reminders that all fire at the same due time.
  * @updated 2026-05-10: Preserved scheduled-task linkage ids during queue normalization so recurring assistant tasks can reliably reconcile and dedupe pending reminders.
  * @updated 2026-05-09: Delayed failed due-reminder retries for at least one minute in the web queue so failed dispatches stay pending instead of being re-fired immediately.
  * @updated 2026-04-26: Canonicalized reminder timestamps before storage so due checks, delay math, and debug output all run against one normalized timeline.
@@ -81,13 +82,54 @@ const sortReminders = (reminders: AssistantReminder[]): AssistantReminder[] => (
   [...reminders].sort((left, right) => {
     const leftMs = parseAssistantDateTime(left.dueAt);
     const rightMs = parseAssistantDateTime(right.dueAt);
-    if (Number.isFinite(leftMs) && Number.isFinite(rightMs)) {
+    if (Number.isFinite(leftMs) && Number.isFinite(rightMs) && leftMs !== rightMs) {
       return leftMs - rightMs;
     }
 
-    return left.dueAt.localeCompare(right.dueAt);
+    if (left.createdAt !== right.createdAt) {
+      return left.createdAt.localeCompare(right.createdAt);
+    }
+
+    return left.id.localeCompare(right.id);
   })
 );
+
+const buildReminderNaturalKey = (
+  reminder: Pick<AssistantReminder, 'type' | 'dueAt' | 'text' | 'source' | 'todoId' | 'scheduledTaskId'>
+): string => (
+  [
+    reminder.type.trim(),
+    reminder.dueAt.trim(),
+    reminder.text.trim(),
+    reminder.source.trim(),
+    reminder.todoId?.trim() || '',
+    reminder.scheduledTaskId?.trim() || ''
+  ].join('::')
+);
+
+const areEquivalentPendingReminders = (left: AssistantReminder, right: AssistantReminder): boolean => (
+  left.status === 'pending'
+  && right.status === 'pending'
+  && buildReminderNaturalKey(left) === buildReminderNaturalKey(right)
+);
+
+const dedupePendingReminders = (reminders: AssistantReminder[]): AssistantReminder[] => {
+  const seenPendingKeys = new Set<string>();
+
+  return reminders.filter((reminder) => {
+    if (reminder.status !== 'pending') {
+      return true;
+    }
+
+    const naturalKey = buildReminderNaturalKey(reminder);
+    if (seenPendingKeys.has(naturalKey)) {
+      return false;
+    }
+
+    seenPendingKeys.add(naturalKey);
+    return true;
+  });
+};
 
 const syncRemindersToMemory = (reminders: AssistantReminder[]) => {
   assistantMemoryService.replaceActiveReminders(reminders.filter((reminder) => reminder.status === 'pending'));
@@ -114,9 +156,9 @@ export const assistantReminderQueueService = {
   },
 
   saveReminders(reminders: AssistantReminder[]): AssistantReminder[] {
-    const normalized = sortReminders(
+    const normalized = dedupePendingReminders(sortReminders(
       reminders.map(normalizeReminder).filter((item): item is AssistantReminder => Boolean(item))
-    );
+    ));
     localStorage.setItem(ASSISTANT_REMINDER_QUEUE_KEY, JSON.stringify(normalized));
     syncRemindersToMemory(normalized);
     syncRemindersToNative(normalized);
@@ -149,6 +191,11 @@ export const assistantReminderQueueService = {
     }
 
     const current = assistantReminderQueueService.listReminders().filter((item) => item.id !== normalized.id);
+    const existingEquivalentReminder = current.find((item) => areEquivalentPendingReminders(item, normalized)) || null;
+    if (existingEquivalentReminder) {
+      return existingEquivalentReminder;
+    }
+
     assistantReminderQueueService.saveReminders([...current, normalized]);
     return normalized;
   },

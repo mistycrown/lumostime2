@@ -4,6 +4,7 @@
  * @output Shared async runners for daily, weekly, and monthly AI narrative writeback flows
  * @pos Component Support (AI Integration)
  * @description Moves the long review-writeback async flows out of AIBackfillChatModal while preserving the same pending-message, review-persistence, and retry/error behavior.
+ * @updated 2026-05-17: Daily review and newspaper writeback flows now preserve provider reasoning summaries so the generated result message can render the same collapsible thinking block as ordinary chat.
  * @updated 2026-05-15: Extracted daily, weekly, and monthly narrative writeback runners from AIBackfillChatModal.
  */
 import { aiService, type AIConversationTurn } from '../../services/aiService';
@@ -355,11 +356,14 @@ export const runDailyReviewNarrativeWriteback = async ({
         keySeed: `daily_review_writeback:${params.dailyReview.date}:${params.mergeMode}`,
         scope: 'daily_review_writeback'
       },
-      normalizeResult: (rawValue) => dailyReviewTemplateService.parseNarrativeToolCallResponse(
-        rawValue,
-        params.dailyReview.date,
-        params.mergeMode
-      )
+      normalizeResult: (rawValue, meta) => ({
+        ...dailyReviewTemplateService.parseNarrativeToolCallResponse(
+          rawValue,
+          params.dailyReview.date,
+          params.mergeMode
+        ),
+        ...(meta?.reasoning ? { reasoning: meta.reasoning } : {})
+      })
     }, {
       signal: controller.signal
     });
@@ -386,6 +390,7 @@ export const runDailyReviewNarrativeWriteback = async ({
 
     replacePendingWithResult(sessionId, pendingMessageId, dailyWritebackResult.result.assistantReply, {
       tone: 'system',
+      ...(dailyWritebackResult.result.reasoning ? { reasoning: dailyWritebackResult.result.reasoning } : {}),
       dailyReviewWriteback: writebackResultCard,
       ...(debugMode
         ? {
@@ -498,11 +503,14 @@ export const runDailyNewspaperWriteback = async ({
         keySeed: `daily_newspaper_writeback:${params.dailyReview.date}:${params.mergeMode}`,
         scope: 'daily_newspaper_writeback'
       },
-      normalizeResult: (rawValue) => dailyNewspaperService.parseWritebackResponse(
-        rawValue,
-        params.dailyReview.date,
-        params.mergeMode
-      )
+      normalizeResult: (rawValue, meta) => ({
+        ...dailyNewspaperService.parseWritebackResponse(
+          rawValue,
+          params.dailyReview.date,
+          params.mergeMode
+        ),
+        ...(meta?.reasoning ? { reasoning: meta.reasoning } : {})
+      })
     }, {
       signal: controller.signal
     });
@@ -534,6 +542,7 @@ export const runDailyNewspaperWriteback = async ({
 
     replacePendingWithResult(sessionId, pendingMessageId, newspaperWritebackResult.result.assistantReply, {
       tone: 'system',
+      ...(newspaperWritebackResult.result.reasoning ? { reasoning: newspaperWritebackResult.result.reasoning } : {}),
       ...(appliedActions.length > 0 ? { appliedActions } : {}),
       dailyNewspaperWriteback: writebackResultCard,
       ...(debugMode

@@ -442,6 +442,41 @@ describe('aiService unified turn normalization', () => {
       providerLabel: 'gemini'
     });
   });
+
+  it('passes reasoning metadata through structured JSON normalization helpers', async () => {
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockResolvedValue(createJsonTextResponse({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              assistantReply: 'structured answer'
+            }),
+            reasoning_content: 'structured step one\nstructured step two'
+          }
+        }]
+      })),
+      configurable: true
+    });
+
+    const result = await aiService.requestStructuredJsonWithDebug({
+      systemPrompt: 'system',
+      userPrompt: 'user',
+      normalizeResult: (rawValue, meta) => ({
+        ...rawValue,
+        ...(meta?.reasoning ? { reasoning: meta.reasoning } : {})
+      })
+    });
+
+    expect(result.result).toMatchObject({
+      assistantReply: 'structured answer',
+      reasoning: {
+        parts: [{
+          text: 'structured step one\nstructured step two'
+        }],
+        providerLabel: 'unknown'
+      }
+    });
+  });
 });
 
 describe('aiService preset storage', () => {

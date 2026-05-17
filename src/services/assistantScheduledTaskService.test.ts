@@ -357,7 +357,7 @@ describe('assistantScheduledTaskService', () => {
       '2026-05-11T00:05:00.000Z'
     );
 
-    expect(result.removedReminderIds).toEqual(['reminder-1', 'reminder-duplicate']);
+    expect(result.removedReminderIds).toEqual(['reminder-1']);
     expect(result.createdReminders).toHaveLength(1);
     expect(result.createdReminders[0].dueAt).toBe('2026-05-18T00:00:00.000Z');
     expect(result.tasks[0].pendingReminderId).toBe(result.createdReminders[0].id);
