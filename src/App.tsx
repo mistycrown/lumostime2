@@ -7,6 +7,8 @@
  * @updated 2026-05-17: 在 Electron 主应用启动时自动恢复已启用的 PC 端小组件，并与设置页共享桌面小组件启动偏好读取逻辑。
  * @updated 2026-05-17: 增加 Electron 桌面小组件动作处理逻辑，支持 toggle_todo, open_todo 和 'start_focus' 快捷开始任务专注。
  * @updated 2026-05-13: Normalized reserved todo categories before passing them into UI editors and pickers so the system `未来` bucket behaves like a first-class category even when older saved data has not persisted it yet.
+ * @updated 2026-05-18: Included the full achievement bottle backup block in JSON export payloads so synced exports now carry achievement progress too.
+ * @updated 2026-05-18: Included the persisted custom color group in JSON export payloads so user-defined palette swatches travel with backup data.
  * @updated 2026-05-17: Added unified AI backup payload export so chat sessions, prompts, assistant memory, Dream state, and sanitized AI presets now travel inside the main JSON backup together with the rest of the app data.
  * @updated 2026-05-10: Upgraded the post-start timer auto-jump flow to support none, focus-detail, and immersive entry modes while preserving scene-card immersive overrides.
  * @updated 2026-05-10: Made the widget supplement-log shortcut snap the timeline date back to today before opening the backfill modal.
@@ -62,6 +64,7 @@ import { useAppLifecycle } from './hooks/useAppLifecycle';
 import { useWidgetBridgeSync } from './hooks/useWidgetBridgeSync';
 import { useFloatingWindowSync } from './hooks/useFloatingWindowSync';
 import { assistantBackupService } from './services/assistantBackupService';
+import { customColorGroupService } from './services/customColorGroupService';
 import { loadEnabledDesktopWidgetTypes } from './services/desktopWidgetService';
 import { ShortcutWidgetAction } from './services/widgetShortcutService';
 import { splitLogByDays } from './utils/logUtils';
@@ -260,6 +263,7 @@ const AppContent: React.FC = () => {
     setIsGalleryViewOpen
   } = useNavigation();
   const { categories, scopes, goals, majorGoals, setCategories, setScopes, setGoals, setMajorGoals } = useCategoryScope();
+  const { buildBackupPayload: buildAchievementBackupPayload } = useAchievement();
   const { startActivity, stopActivity, cancelSession, activeSessions, setActiveSessions } = useSession();
   const { logs, todos, todoCategories, setLogs, setTodos, setTodoCategories } = useData();
   const normalizedTodoCategories = useMemo(() => ensureQuickTodoCategory(todoCategories), [todoCategories]);
@@ -284,11 +288,14 @@ const AppContent: React.FC = () => {
     // 从 localStorage 读取原则库
     const principlesStr = localStorage.getItem('lumostime_principles');
     const principles = principlesStr ? JSON.parse(principlesStr) : [];
+    const customColorGroup = customColorGroupService.getGroup();
     
     const data = {
       logs, todos, categories, todoCategories, scopes, goals, majorGoals,
       autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
       monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, customStickerSets, customStickers, filters,
+      customColorGroup,
+      achievementData: buildAchievementBackupPayload(),
       aiData: assistantBackupService.buildBackupPayload(),
       sceneGroupState, // 新版：场景组状态
       sceneTimeSlots, // 添加场景设置

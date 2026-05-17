@@ -4,7 +4,9 @@
  * @output Sync Operations (performSync, handleQuickSync, handleImageSync, handleSyncDataUpdate), Sync State (isSyncing, refreshKey)
  * @pos Hook (System Integration)
  * @description 同步管理 Hook - 处理数据和图片的云端同步，支持启动同步、恢复同步、手动同步、自动同步等多种模式，并在恢复筛选器时保持顺序稳定，同时保证空值恢复与 majorGoals 载荷一致。
+ * @updated 2026-05-18: Extended the unified backup/sync payload to include the achievement bottle backup block, and now restore that state alongside the main app data during imports and cloud downloads.
  * @updated 2026-05-17: Extended the unified backup/sync payload to include the shared AI backup block, and now restore that AI state alongside the main app data during imports and cloud downloads.
+ * @updated 2026-05-18: Included the persisted custom color group in backup/sync payloads and now auto-sync palette-only edits as part of user data.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -12,6 +14,7 @@ import { useState, useRef, useEffect } from 'react';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useData } from '../contexts/DataContext';
+import { useAchievement } from '../contexts/AchievementContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useReview } from '../contexts/ReviewContext';
@@ -21,6 +24,10 @@ import { webdavService } from '../services/webdavService';
 import { s3Service } from '../services/s3Service';
 import { compatibleS3Service } from '../services/compatibleS3Service';
 import { assistantBackupService } from '../services/assistantBackupService';
+import {
+    CUSTOM_COLOR_GROUP_UPDATED_EVENT,
+    customColorGroupService
+} from '../services/customColorGroupService';
 import { imageService } from '../services/imageService';
 import { syncService } from '../services/syncService';
 import { uploadDataToCloud, downloadWithBackup, CloudService } from '../utils/syncUtils';
@@ -65,6 +72,10 @@ export const useSyncManager = () => {
         monthlyReviews, setMonthlyReviews,
         onThisDayEntries, setOnThisDayEntries
     } = useReview();
+    const {
+        buildBackupPayload: buildAchievementBackupPayload,
+        applyBackupPayload: applyAchievementBackupPayload
+    } = useAchievement();
     const { currentView, setIsSettingsOpen } = useNavigation();
     const { addToast } = useToast();
 
@@ -127,6 +138,14 @@ export const useSyncManager = () => {
                 window.dispatchEvent(new Event('principleLibraryChanged'));
             }
 
+            if (hasField('customColorGroup')) {
+                customColorGroupService.saveGroup(data.customColorGroup);
+            }
+
+            if (hasField('achievementData')) {
+                applyAchievementBackupPayload(data.achievementData);
+            }
+
             if (hasField('aiData')) {
                 await assistantBackupService.applyBackupPayload(data.aiData);
             }
@@ -156,10 +175,14 @@ export const useSyncManager = () => {
         const principlesStr = localStorage.getItem('lumostime_principles');
         const principles = principlesStr ? JSON.parse(principlesStr) : [];
         
+        const customColorGroup = customColorGroupService.getGroup();
+
         const localData = {
             logs, todos, categories, todoCategories, scopes, goals, majorGoals,
             autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
             monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, customStickerSets, customStickers, filters,
+            customColorGroup,
+            achievementData: buildAchievementBackupPayload(),
             aiData: assistantBackupService.buildBackupPayload(),
             sceneTimeSlots,
             sceneGroupState,
@@ -784,6 +807,37 @@ export const useSyncManager = () => {
 
         return () => {
             window.removeEventListener(AI_BACKUP_CHANGED_EVENT, handleAIBackupChanged as EventListener);
+            if (timer) clearTimeout(timer);
+        };
+    }, [manualSyncMode]);
+
+    // 2d. Custom color group Auto Sync
+    useEffect(() => {
+        let timer: NodeJS.Timeout | null = null;
+
+        const handleCustomColorGroupChanged = () => {
+            if (manualSyncMode || isRestoring.current) {
+                return;
+            }
+
+            if (timer) {
+                clearTimeout(timer);
+            }
+
+            pendingAutoSyncRef.current = true;
+
+            timer = setTimeout(async () => {
+                if (!isSyncingRef.current && !isRestoring.current) {
+                    await performSync('auto');
+                    pendingAutoSyncRef.current = false;
+                }
+            }, SYNC_CONFIG.AUTO_SYNC_DEBOUNCE_MS);
+        };
+
+        window.addEventListener(CUSTOM_COLOR_GROUP_UPDATED_EVENT, handleCustomColorGroupChanged as EventListener);
+
+        return () => {
+            window.removeEventListener(CUSTOM_COLOR_GROUP_UPDATED_EVENT, handleCustomColorGroupChanged as EventListener);
             if (timer) clearTimeout(timer);
         };
     }, [manualSyncMode]);
