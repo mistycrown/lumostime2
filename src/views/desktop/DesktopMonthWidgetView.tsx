@@ -10,6 +10,7 @@
  * @updated 2026-05-17: Replaced fixed month paging with 2/3/4-week whole-page navigation so widget row settings control weeks per page without auto-resizing the widget window.
  * @updated 2026-05-17: Added a persisted top-right toggle that fully collapses the planning sidebar so the calendar can expand across the whole widget width.
  * @updated 2026-05-17: 禁用计划栏小目的跳转详情点击事件，将 hover 箭头改为展开/收缩子任务按钮，支持副任务折叠/展开子任务。
+ * @updated 2026-05-17: 在显示设置弹出面板中增加了“任务着色模式”选择，支持在按排期和按分类模式间切换，且和应用内的月视图颜色设置同步。
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, GripVertical, SlidersHorizontal, ChevronDown } from 'lucide-react';
@@ -22,6 +23,7 @@ import {
 } from '../../utils/desktopMonthWidgetSidebarUtils';
 import { TodoDateEntry } from '../../utils/todoScheduleUtils';
 import { DesktopMonthCalendar } from './DesktopMonthCalendar';
+import { resolveDesktopTodoQuickEditorScreenAnchor } from '../../utils/desktopTodoQuickEditorAnchorUtils';
 
 const APP_READY_EVENT = 'lumostime:app-ready';
 const DISPLAY_SETTINGS_STORAGE_KEY = 'desktop-month-widget:display-settings';
@@ -75,6 +77,15 @@ export const DesktopMonthWidgetView: React.FC = () => {
       ? saved as WidgetRowsPerScreen
       : 4;
   });
+  const [markerColorMode, setMarkerColorMode] = useState<'schedule' | 'category'>(() => {
+    const saved = localStorage.getItem('todoMonthViewMarkerColorMode');
+    return saved === 'category' ? 'category' : 'schedule';
+  });
+
+  const handleMarkerColorModeChange = (mode: 'schedule' | 'category') => {
+    setMarkerColorMode(mode);
+    localStorage.setItem('todoMonthViewMarkerColorMode', mode);
+  };
 
   const persistDisplaySettings = useCallback((nextTheme: 'light' | 'dark', nextOpacity: number) => {
     localStorage.setItem(
@@ -95,6 +106,11 @@ export const DesktopMonthWidgetView: React.FC = () => {
       setTodos(dataSnapshot.todos || []);
       setTodoCategories(dataSnapshot.todoCategories || []);
       setLogs(dataSnapshot.logs || []);
+
+      const savedMarkerMode = localStorage.getItem('todoMonthViewMarkerColorMode');
+      if (savedMarkerMode === 'category' || savedMarkerMode === 'schedule') {
+        setMarkerColorMode(savedMarkerMode);
+      }
     } catch (error) {
       console.error('Failed to load desktop month widget data:', error);
     }
@@ -114,6 +130,11 @@ export const DesktopMonthWidgetView: React.FC = () => {
           setOpacityState(nextOpacity);
           window.desktopWidget?.setOpacity?.(nextOpacity);
         }
+      }
+
+      const savedMarkerMode = localStorage.getItem('todoMonthViewMarkerColorMode');
+      if (savedMarkerMode === 'category' || savedMarkerMode === 'schedule') {
+        setMarkerColorMode(savedMarkerMode);
       }
     } catch (error) {
       console.error('Failed to load desktop month widget display settings:', error);
@@ -233,10 +254,12 @@ export const DesktopMonthWidgetView: React.FC = () => {
     }));
   };
 
-  const handleOpenTodo = (todo: TodoItem) => {
-    window.desktopWidget?.requestMainAction({
-      type: 'open_todo',
-      todoId: todo.id
+  const handleOpenTodoQuickEditor = (todo: TodoItem, anchor: { x: number; y: number }) => {
+    window.desktopWidget?.openTodoQuickEditor?.({
+      todoId: todo.id,
+      theme,
+      x: anchor.x,
+      y: anchor.y
     });
   };
 
@@ -402,8 +425,10 @@ export const DesktopMonthWidgetView: React.FC = () => {
               isScheduleLocked={isScheduleLocked}
               externalDraggingTodoId={externalDraggingTodoId}
               externalDraggingType={externalDraggingType}
-              onOpenTodo={handleOpenTodo}
+              onOpenTodo={handleOpenTodoQuickEditor}
               isDark={isDark}
+              markerColorMode={markerColorMode}
+              todoCategories={todoCategories}
               onWheelPageChange={(direction) => {
                 setPageStartDate((previous) => (
                   direction === 'next' ? addWeeks(previous, rowsPerScreen) : subWeeks(previous, rowsPerScreen)
@@ -490,7 +515,22 @@ export const DesktopMonthWidgetView: React.FC = () => {
                               return (
                                 <div
                                   key={row.todo.id}
+                                  role="button"
+                                  tabIndex={0}
                                   draggable
+                                  onClick={(event) => {
+                                    void resolveDesktopTodoQuickEditorScreenAnchor(event).then((anchor) => {
+                                      handleOpenTodoQuickEditor(row.todo, anchor);
+                                    });
+                                  }}
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                      event.preventDefault();
+                                      void resolveDesktopTodoQuickEditorScreenAnchor(event).then((anchor) => {
+                                        handleOpenTodoQuickEditor(row.todo, anchor);
+                                      });
+                                    }
+                                  }}
                                   onDragStart={(event) => handleDragStart(event, row.todo.id)}
                                   onDragEnd={handleDragEnd}
                                   className={`group flex cursor-grab items-center gap-2 rounded border p-2 text-left transition select-none active:cursor-grabbing ${
@@ -600,6 +640,36 @@ export const DesktopMonthWidgetView: React.FC = () => {
                 onChange={(event) => handleOpacityChange(parseFloat(event.target.value))}
                 className="h-1 w-full cursor-pointer appearance-none rounded-lg bg-stone-200 accent-stone-700 dark:bg-stone-800 dark:accent-stone-400"
               />
+            </div>
+
+            <div>
+              <div className={`mb-1.5 text-[10px] font-semibold tracking-wider ${isDark ? 'text-stone-500' : 'text-stone-400'}`}>
+                任务着色模式
+              </div>
+              <div className={`flex rounded p-0.5 text-xs ${isDark ? 'bg-stone-950' : 'bg-stone-100'}`}>
+                <button
+                  type="button"
+                  onClick={() => handleMarkerColorModeChange('schedule')}
+                  className={`flex-1 rounded py-1 text-center font-medium transition ${
+                    markerColorMode === 'schedule'
+                      ? (isDark ? 'bg-stone-800 text-white shadow-sm' : 'bg-white text-stone-800 shadow-sm')
+                      : (isDark ? 'text-stone-400 hover:text-stone-300' : 'text-stone-500 hover:text-stone-800')
+                  }`}
+                >
+                  按排期
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMarkerColorModeChange('category')}
+                  className={`flex-1 rounded py-1 text-center font-medium transition ${
+                    markerColorMode === 'category'
+                      ? (isDark ? 'bg-stone-800 text-white shadow-sm' : 'bg-white text-stone-800 shadow-sm')
+                      : (isDark ? 'text-stone-400 hover:text-stone-300' : 'text-stone-500 hover:text-stone-800')
+                  }`}
+                >
+                  按分类
+                </button>
+              </div>
             </div>
 
             <div>

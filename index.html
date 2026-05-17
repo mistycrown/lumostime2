@@ -10,6 +10,11 @@
   <script>
     (function() {
       try {
+        var windowType = new URLSearchParams(window.location.search).get('window');
+        if (windowType === 'desktop-editor') {
+          document.documentElement.style.background = 'transparent';
+          document.documentElement.style.setProperty('--editor-window-mode', '1');
+        }
         const savedFont = localStorage.getItem('lumostime_font_family');
         const fontMap = {
           'default': '"Noto Serif SC", "Source Han Serif SC", "Source Han Serif CN", "Songti SC", "STSong", "SimSun", "Microsoft YaHei", serif',
@@ -149,6 +154,15 @@
       justify-content: center;
       z-index: 9999;
       transition: opacity 0.3s ease;
+    }
+
+    html[style*="--editor-window-mode: 1"] #loading-screen {
+      display: none;
+    }
+
+    html[style*="--editor-window-mode: 1"] body,
+    html[style*="--editor-window-mode: 1"] #root {
+      background: transparent !important;
     }
 
     #loading-screen.fade-out {

@@ -6,6 +6,7 @@
  * @description Entry point for the Electron application. Handles main-window and desktop-widget creation, lifecycle events, and inter-process communication (IPC).
  * @updated 2026-05-17: 扩展了 Electron 主进程，新增对桌面计时器小组件（timer widget）独立窗口的生命周期管理（常驻置顶、固定大小、不可缩放、拖动坐标持久化）以及配套 IPC 接口。
  * @updated 2026-05-17: 扩展了 Electron 主进程小组件管理器，新增对桌面小事清单小组件（quick widget）独立窗口的生命周期、拖拽缩放边界持久化和 IPC 调起/关闭支持。并支持了 add_quick_todo 动作的透明转发。
+ * @updated 2026-05-17: Added a dedicated transparent desktop quick-editor window so widget todo clicks can open one always-on-top editor beyond the source widget bounds.
  * @updated 2026-05-17: Added a dedicated desktop today-widget and monthly-widget windows with persisted bounds, main-renderer action forwarding, and widget open/close IPC handlers for Electron builds.
  * @updated 2026-04-09: Added Obsidian image attachment export IPC handler for desktop builds.
  *
@@ -24,6 +25,13 @@ type DesktopWidgetMainAction =
   | { type: 'start_focus'; todoId: string }
   | { type: 'add_quick_todo'; title: string }
   | { type: 'stop_active_session_and_save'; sessionId: string };
+
+type DesktopTodoQuickEditorPayload = {
+  todoId: string;
+  theme: 'light' | 'dark';
+  x: number;
+  y: number;
+};
 
 type PersistedWidgetWindowState = {
   bounds?: {
@@ -62,13 +70,20 @@ const DESKTOP_WIDGET_QUERY_VALUE = 'desktop-widget';
 const DESKTOP_MONTH_WIDGET_QUERY_VALUE = 'desktop-month';
 const DESKTOP_QUICK_WIDGET_QUERY_VALUE = 'desktop-quick';
 const DESKTOP_TIMER_WIDGET_QUERY_VALUE = 'desktop-timer';
+const DESKTOP_EDITOR_WIDGET_QUERY_VALUE = 'desktop-editor';
 const DESKTOP_WIDGET_MAIN_ACTION_CHANNEL = 'desktop-widget:main-action';
+const DESKTOP_TODO_QUICK_EDITOR_STATE_CHANNEL = 'desktop-widget:todo-quick-editor-state';
 const DEFAULT_WIDGET_WIDTH = 360;
 const DEFAULT_WIDGET_HEIGHT = 520;
 const DEFAULT_MONTH_WIDGET_WIDTH = 880;
 const DEFAULT_MONTH_WIDGET_HEIGHT = 640;
 const DEFAULT_TIMER_WIDGET_WIDTH = 80;
 const DEFAULT_TIMER_WIDGET_HEIGHT = 32;
+const TODO_QUICK_EDITOR_WIDTH = 296;
+const TODO_QUICK_EDITOR_HEIGHT = 300;
+const TODO_QUICK_EDITOR_OFFSET_PX = 12;
+const TODO_QUICK_EDITOR_BLUR_GUARD_MS = 250;
+const TODO_QUICK_EDITOR_HIDE_DELAY_MS = 120;
 const WIDGET_STATE_FILENAME = 'desktop-widget-state.json';
 const MONTH_WIDGET_STATE_FILENAME = 'desktop-month-widget-state.json';
 const QUICK_WIDGET_STATE_FILENAME = 'desktop-quick-widget-state.json';
@@ -90,8 +105,13 @@ let widgetWindow: BrowserWindow | null = null;
 let monthWidgetWindow: BrowserWindow | null = null;
 let quickWidgetWindow: BrowserWindow | null = null;
 let timerWidgetWindow: BrowserWindow | null = null;
+let todoQuickEditorWindow: BrowserWindow | null = null;
 let isMainRendererReady = false;
 let pendingDesktopWidgetActions: DesktopWidgetMainAction[] = [];
+let desktopTodoQuickEditorPayload: DesktopTodoQuickEditorPayload | null = null;
+let isTodoQuickEditorReady = false;
+let todoQuickEditorIgnoreBlurUntil = 0;
+let todoQuickEditorHideTimeout: ReturnType<typeof setTimeout> | null = null;
 
 // Preload script is in the same directory as main.js after build
 const preload = path.join(__dirname, 'preload.mjs');
@@ -380,7 +400,10 @@ const configureExternalLinks = (targetWindow: BrowserWindow) => {
   });
 };
 
-const attachWidgetShowFallback = (targetWindow: BrowserWindow, label: 'today' | 'month') => {
+const attachWidgetShowFallback = (
+  targetWindow: BrowserWindow,
+  label: 'today' | 'month' | 'quick' | 'timer' | 'editor'
+) => {
   let didShow = false;
 
   const showWindow = (reason: string) => {
@@ -604,7 +627,7 @@ async function createQuickWidgetWindow() {
 
   quickWidgetWindow.setMenuBarVisibility(false);
   configureExternalLinks(quickWidgetWindow);
-  attachWidgetShowFallback(quickWidgetWindow, 'today');
+  attachWidgetShowFallback(quickWidgetWindow, 'quick');
   await quickWidgetWindow.loadURL(buildRendererUrl(DESKTOP_QUICK_WIDGET_QUERY_VALUE));
 
   quickWidgetWindow.on('move', () => {
@@ -657,7 +680,7 @@ async function createTimerWidgetWindow() {
 
   timerWidgetWindow.setMenuBarVisibility(false);
   configureExternalLinks(timerWidgetWindow);
-  attachWidgetShowFallback(timerWidgetWindow, 'timer' as any);
+  attachWidgetShowFallback(timerWidgetWindow, 'timer');
   await timerWidgetWindow.loadURL(buildRendererUrl(DESKTOP_TIMER_WIDGET_QUERY_VALUE));
 
   timerWidgetWindow.on('move', () => {
@@ -671,6 +694,169 @@ async function createTimerWidgetWindow() {
   });
 
   return timerWidgetWindow;
+}
+
+const getTodoQuickEditorBounds = (payload: DesktopTodoQuickEditorPayload) => {
+  const display = screen.getDisplayNearestPoint({
+    x: Math.round(payload.x),
+    y: Math.round(payload.y)
+  });
+  const workArea = display.workArea;
+  const width = TODO_QUICK_EDITOR_WIDTH;
+  const height = TODO_QUICK_EDITOR_HEIGHT;
+  const maxX = workArea.x + Math.max(0, workArea.width - width);
+  const maxY = workArea.y + Math.max(0, workArea.height - height);
+
+  return {
+    width,
+    height,
+    x: Math.min(
+      Math.max(Math.round(payload.x + TODO_QUICK_EDITOR_OFFSET_PX), workArea.x),
+      maxX
+    ),
+    y: Math.min(
+      Math.max(Math.round(payload.y + TODO_QUICK_EDITOR_OFFSET_PX), workArea.y),
+      maxY
+    )
+  };
+};
+
+const publishTodoQuickEditorState = () => {
+  if (
+    !todoQuickEditorWindow
+    || todoQuickEditorWindow.isDestroyed()
+    || !desktopTodoQuickEditorPayload
+  ) {
+    return;
+  }
+
+  todoQuickEditorWindow.webContents.send(
+    DESKTOP_TODO_QUICK_EDITOR_STATE_CHANNEL,
+    desktopTodoQuickEditorPayload
+  );
+};
+
+const clearTodoQuickEditorHideTimeout = () => {
+  if (todoQuickEditorHideTimeout) {
+    clearTimeout(todoQuickEditorHideTimeout);
+    todoQuickEditorHideTimeout = null;
+  }
+};
+
+const armTodoQuickEditorBlurGuard = () => {
+  todoQuickEditorIgnoreBlurUntil = Date.now() + TODO_QUICK_EDITOR_BLUR_GUARD_MS;
+};
+
+const hideTodoQuickEditorWindow = () => {
+  clearTodoQuickEditorHideTimeout();
+  if (
+    todoQuickEditorWindow
+    && !todoQuickEditorWindow.isDestroyed()
+    && todoQuickEditorWindow.isVisible()
+  ) {
+    todoQuickEditorWindow.hide();
+  }
+};
+
+const scheduleHideTodoQuickEditorWindow = () => {
+  clearTodoQuickEditorHideTimeout();
+  todoQuickEditorHideTimeout = setTimeout(() => {
+    if (
+      todoQuickEditorWindow
+      && !todoQuickEditorWindow.isDestroyed()
+      && !todoQuickEditorWindow.isFocused()
+    ) {
+      todoQuickEditorWindow.hide();
+    }
+  }, TODO_QUICK_EDITOR_HIDE_DELAY_MS);
+};
+
+const showTodoQuickEditorWindow = () => {
+  if (!todoQuickEditorWindow || todoQuickEditorWindow.isDestroyed()) {
+    return;
+  }
+
+  clearTodoQuickEditorHideTimeout();
+  armTodoQuickEditorBlurGuard();
+  todoQuickEditorWindow.show();
+  todoQuickEditorWindow.focus();
+};
+
+const closeTodoQuickEditorWindow = () => {
+  hideTodoQuickEditorWindow();
+};
+
+async function createTodoQuickEditorWindow() {
+  if (!desktopTodoQuickEditorPayload) {
+    return null;
+  }
+
+  const editorBounds = getTodoQuickEditorBounds(desktopTodoQuickEditorPayload);
+
+  if (todoQuickEditorWindow && !todoQuickEditorWindow.isDestroyed()) {
+    todoQuickEditorWindow.setBounds(editorBounds);
+    if (isTodoQuickEditorReady) {
+      publishTodoQuickEditorState();
+      showTodoQuickEditorWindow();
+    }
+    return todoQuickEditorWindow;
+  }
+
+  isTodoQuickEditorReady = false;
+  todoQuickEditorWindow = new BrowserWindow({
+    title: 'LumosTime Quick Editor',
+    icon: getIconPath(),
+    width: editorBounds.width,
+    height: editorBounds.height,
+    x: editorBounds.x,
+    y: editorBounds.y,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    alwaysOnTop: true,
+    hasShadow: false,
+    thickFrame: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    show: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload,
+      webSecurity: false
+    }
+  });
+
+  todoQuickEditorWindow.setMenuBarVisibility(false);
+  configureExternalLinks(todoQuickEditorWindow);
+  todoQuickEditorWindow.webContents.once('did-finish-load', () => {
+    isTodoQuickEditorReady = true;
+    publishTodoQuickEditorState();
+    showTodoQuickEditorWindow();
+  });
+  await todoQuickEditorWindow.loadURL(buildRendererUrl(DESKTOP_EDITOR_WIDGET_QUERY_VALUE));
+
+  todoQuickEditorWindow.on('focus', () => {
+    clearTodoQuickEditorHideTimeout();
+  });
+  todoQuickEditorWindow.on('blur', () => {
+    if (!todoQuickEditorWindow || todoQuickEditorWindow.webContents.isDevToolsOpened()) {
+      return;
+    }
+    if (Date.now() < todoQuickEditorIgnoreBlurUntil) {
+      return;
+    }
+    scheduleHideTodoQuickEditorWindow();
+  });
+  todoQuickEditorWindow.on('closed', () => {
+    clearTodoQuickEditorHideTimeout();
+    todoQuickEditorWindow = null;
+    isTodoQuickEditorReady = false;
+  });
+
+  return todoQuickEditorWindow;
 }
 
 app.whenReady().then(() => {
@@ -689,7 +875,7 @@ app.on('second-instance', () => {
     return;
   }
 
-  if (widgetWindow || monthWidgetWindow || quickWidgetWindow || timerWidgetWindow) {
+  if (widgetWindow || monthWidgetWindow || quickWidgetWindow || timerWidgetWindow || todoQuickEditorWindow) {
     void focusMainWindow();
   }
 });
@@ -726,6 +912,7 @@ ipcMain.on('desktop-widget:open', () => {
 
 ipcMain.on('desktop-widget:close', () => {
   widgetWindow?.close();
+  closeTodoQuickEditorWindow();
 });
 
 ipcMain.on('desktop-widget:open-month', () => {
@@ -734,6 +921,7 @@ ipcMain.on('desktop-widget:open-month', () => {
 
 ipcMain.on('desktop-widget:close-month', () => {
   monthWidgetWindow?.close();
+  closeTodoQuickEditorWindow();
 });
 
 ipcMain.on('desktop-widget:open-quick', () => {
@@ -742,6 +930,7 @@ ipcMain.on('desktop-widget:open-quick', () => {
 
 ipcMain.on('desktop-widget:close-quick', () => {
   quickWidgetWindow?.close();
+  closeTodoQuickEditorWindow();
 });
 
 ipcMain.on('desktop-widget:open-timer', () => {
@@ -750,6 +939,15 @@ ipcMain.on('desktop-widget:open-timer', () => {
 
 ipcMain.on('desktop-widget:close-timer', () => {
   timerWidgetWindow?.close();
+});
+
+ipcMain.on('desktop-widget:open-todo-quick-editor', (_, payload: DesktopTodoQuickEditorPayload) => {
+  desktopTodoQuickEditorPayload = payload;
+  void createTodoQuickEditorWindow();
+});
+
+ipcMain.on('desktop-widget:close-todo-quick-editor', () => {
+  closeTodoQuickEditorWindow();
 });
 
 ipcMain.on('desktop-widget:open-main', () => {
@@ -784,6 +982,10 @@ ipcMain.handle('desktop-widget:get-bounds', (event) => {
     return win.getBounds();
   }
   return null;
+});
+
+ipcMain.handle('desktop-widget:get-todo-quick-editor-state', () => {
+  return desktopTodoQuickEditorPayload;
 });
 
 ipcMain.on('desktop-widget:set-bounds', (event, bounds: { x: number; y: number; width: number; height: number }) => {

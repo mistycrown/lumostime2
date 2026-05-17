@@ -7,6 +7,13 @@ type DesktopWidgetBridgeAction =
   | { type: 'add_quick_todo'; title: string }
   | { type: 'stop_active_session_and_save'; sessionId: string };
 
+type DesktopTodoQuickEditorBridgePayload = {
+  todoId: string;
+  theme: 'light' | 'dark';
+  x: number;
+  y: number;
+};
+
 interface Window {
   ipcRenderer?: {
     on: (...args: any[]) => any;
@@ -23,6 +30,8 @@ interface Window {
     closeQuick?: () => void;
     openTimer?: () => void;
     closeTimer?: () => void;
+    openTodoQuickEditor?: (payload: DesktopTodoQuickEditorBridgePayload) => void;
+    closeTodoQuickEditor?: () => void;
     openMainApp: () => void;
     requestMainAction: (action: DesktopWidgetBridgeAction) => void;
     notifyMainReady: () => void;
@@ -33,5 +42,9 @@ interface Window {
     setTheme?: (theme: 'light' | 'dark') => void;
     getBounds?: () => Promise<{ x: number; y: number; width: number; height: number } | null>;
     setBounds?: (bounds: { x: number; y: number; width: number; height: number }) => void;
+    getTodoQuickEditorState?: () => Promise<DesktopTodoQuickEditorBridgePayload | null>;
+    onTodoQuickEditorState?: (
+      listener: (payload: DesktopTodoQuickEditorBridgePayload) => void
+    ) => (() => void);
   };
 }

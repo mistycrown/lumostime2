@@ -4,6 +4,7 @@
  * @output Week buckets, daily schedule entries, and badge metadata for todo planning views
  * @pos Utility (Todo planning)
  * @description Shared helpers for deriving scheduled, deadline, recurring, maybe, completed, and in-progress todo visibility without creating standalone occurrence records.
+ * @updated 2026-05-17: Reordered shared month-entry priority so completed rows win over due/arrange/repeat/maybe/trace when one todo matches multiple day badges, while keeping the continuous trace lane layout unchanged.
  * @updated 2026-05-14: Updated `TodoDateEntry` and `WeekTodoEntry` to include an optional `dateKey`, enabling drag-and-drop logic to identify which specific occurrence is being moved in multi-date `Maybe` schedules.
 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -74,6 +75,14 @@ const TODO_SCHEDULE_MATCH_PRIORITY: Record<TodoScheduleMatchKind, number> = {
   scheduled: 1,
   recurring: 2,
   maybe: 3
+};
+const TODO_SCHEDULE_ENTRY_PRIORITY: Record<TodoScheduleEntryKind, number> = {
+  completed: 0,
+  deadline: 1,
+  scheduled: 2,
+  recurring: 3,
+  maybe: 4,
+  inProgress: 5
 };
 
 const normalizeDate = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -481,24 +490,17 @@ export const getTodoScheduleMatches = (
   });
 };
 
-const getTodoEntryPriority = (badges: TodoDateBadges): number => {
-  if (badges.deadline) return 0;
-  if (badges.scheduled) return 1;
-  if (badges.recurring) return 2;
-  if (badges.maybe) return 3;
-  if (badges.completed) return 4;
-  if (badges.inProgress) return 5;
-  return 6;
-};
-
 export const getPrimaryTodoScheduleEntryKind = (badges: TodoDateBadges): TodoScheduleEntryKind => {
+  if (badges.completed) return 'completed';
   if (badges.deadline) return 'deadline';
   if (badges.scheduled) return 'scheduled';
   if (badges.recurring) return 'recurring';
   if (badges.maybe) return 'maybe';
-  if (badges.completed) return 'completed';
   return 'inProgress';
 };
+
+const getTodoEntryPriority = (badges: TodoDateBadges): number =>
+  TODO_SCHEDULE_ENTRY_PRIORITY[getPrimaryTodoScheduleEntryKind(badges)];
 
 const isTraceEntry = (entry: TodoDateEntry | null | undefined): entry is TodoDateEntry =>
   Boolean(entry) && entry.primaryKind === 'inProgress';

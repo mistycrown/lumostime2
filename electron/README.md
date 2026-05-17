@@ -9,7 +9,7 @@ The `electron/` directory contains the main process and preload scripts for runn
 
 ## Key Features
 
-*   **Window Management**: Configures the main application window plus the dedicated desktop today-widget, month-widget, and quick-widget (小事清单) windows, including widget focus/open-close IPC and persisted widget bounds. Optimized widget resizing on Windows by disabling standard transparency (`transparent: false`) and utilizing solid background to restore native OS resizing boundaries.
+*   **Window Management**: Configures the main application window plus the dedicated desktop today-widget, month-widget, quick-widget, timer-widget, and transparent quick-editor windows, including widget focus/open-close IPC, persisted widget bounds, and a separate always-on-top editor surface that can exceed widget bounds without clipping.
 *   **Security**: Disables Web Security (`webSecurity: false`) to allow WebDAV access across origins (critical for the Sync feature).
-*   **IPC**: Sets up handlers for inter-process communication, including desktop-widget action forwarding back into the main renderer (toggling tasks, opening details, and launching timer focus using the `start_focus` action), along with new month-widget and quick-widget routes (`desktop-widget:open-month`, `desktop-widget:close-month`, `desktop-widget:open-quick`, `desktop-widget:close-quick`).
+*   **IPC**: Sets up handlers for inter-process communication, including desktop-widget action forwarding back into the main renderer (toggling tasks, opening details, and launching timer focus using the `start_focus` action), widget open/close routes, and the dedicated quick-editor open/close plus payload-sync bridge used by the transparent external todo editor window.
 *   **Obsidian Export Helpers**: Writes Markdown files and copies referenced log images into the user-selected Obsidian attachments folder on desktop builds.

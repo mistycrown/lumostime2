@@ -7,6 +7,7 @@
  * @updated 2026-05-14: Added a parent-controlled schedule lock toggle so the month planner can freeze drag-to-move interactions while keeping day opening and quick-edit actions available.
  * @updated 2026-05-17: Added a dashed outline border around "maybe" schedule items in the month view grid matching their type color.
  * @updated 2026-05-17: Added a strike-through (line-through) style to "completed" schedule items in both month view grid cells and expanded details.
+ * @updated 2026-05-17: Wired up click handlers on monthly trace segments to trigger the quick actions sheet.
  
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -1289,8 +1290,14 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                   {visibleTraceSegments.map((segment) => (
                     <div
                       key={`${week.id}-${segment.todoId}-${segment.startDayIndex}-${segment.endDayIndex}`}
-                      className={`absolute flex items-center overflow-hidden font-medium leading-[1.2] text-stone-800 ${monthCellTaskClassName}`}
+                      className={`absolute flex items-center overflow-hidden font-medium leading-[1.2] text-stone-800 ${monthCellTaskClassName} ${
+                        onOpenTodo ? 'cursor-pointer pointer-events-auto' : ''
+                      }`}
                       style={getTraceSegmentStyle(segment)}
+                      onClick={onOpenTodo ? (event) => {
+                        event.stopPropagation();
+                        onOpenTodo(segment.entry.todo);
+                      } : undefined}
                     >
                       <span className="truncate whitespace-nowrap">{segment.entry.todo.title}</span>
                     </div>

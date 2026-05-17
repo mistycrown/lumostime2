@@ -1,5 +1,6 @@
 # Services Architecture
 
+Update 2026-05-17: `desktopWidgetService.ts` now also exposes the `desktop-editor` route and shared quick-editor payload type used by the transparent external widget todo editor window.
 Update 2026-05-17: `desktopWidgetService.ts` now supports the compact desktop-timer widget snapshot creation (`buildDesktopTimerWidgetSnapshot`) and storage loading (`loadDesktopTimerWidgetSnapshotFromStorage`), and parses the timer widget startup toggle to auto-restore it at launch alongside today/month/quick windows.
 Update 2026-05-17: `desktopWidgetService.ts` now also centralizes the Electron desktop-widget startup preference keys plus an enabled-widget reader, so the main app can auto-restore whichever PC widgets the user left enabled at launch. It continues to build the compact desktop-widget snapshots and route helpers for today/month/quick widget windows.
 
