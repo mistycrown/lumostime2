@@ -1,6 +1,7 @@
 /**
  * @file DesktopQuickWidgetView.tsx
- * @description 桌面“小事”清单小组件的UI视图，采用极其紧凑的单行设计。移除了任务颜色圆点展示与顶部日期以保持清爽编辑风格，支持快捷添加小事并在屏幕内渲染优美输入框。
+ * @description 桌面“小事”清单小组件的UI视图，采用极其紧凑的单行设计。移除了任务颜色圆点展示、顶部日期与任务分组标题以保持极致清爽的随手记编辑风格，支持快捷添加小事并在屏幕内渲染优美输入框。
+ * @updated 2026-05-17: 移除了所有分组标题（包括“今天/置顶/逾期”），使得列表完全扁平化展示，视觉更加纯粹精简，完美匹配“小事待办”的产品调性。
  * @updated 2026-05-17: 移除了顶部控制栏的日期显示，使标题栏更加纯粹极简。
  * @updated 2026-05-17: 移除任务圆点及任务颜色设置，增加屏幕内快速添加小事功能（提供加号快捷按钮、精致输入窗与回车/ESC按键处理）。
  */
@@ -176,28 +177,19 @@ export const DesktopQuickWidgetView: React.FC = () => {
     };
   }, [refreshSnapshot]);
 
-  const sections = useMemo(() => {
+  const todoList = useMemo<DesktopWidgetTodoItem[]>(() => {
     if (!snapshot) return [];
-    
-    const nextSections: Array<{ id: string; label: string; items: DesktopWidgetTodoItem[] }> = [];
-    if (snapshot.pinned.length > 0) {
-      nextSections.push({ id: 'pinned', label: '置顶', items: snapshot.pinned });
-    }
-    
-    // 合并 arrange、due 和 maybe 的非完成任务作为今天分组
-    const todayAndMaybe = [
-      ...(snapshot.today || []),
-      ...(snapshot.maybe || [])
-    ].filter(item => !item.isCompleted);
 
-    if (todayAndMaybe.length > 0) {
-      nextSections.push({ id: 'today', label: '今天', items: todayAndMaybe });
-    }
-    
-    if (snapshot.overdue.length > 0) {
-      nextSections.push({ id: 'overdue', label: '逾期未完成', items: snapshot.overdue });
-    }
-    return nextSections;
+    const pinnedItems = snapshot.pinned || [];
+    const pinnedIds = new Set(pinnedItems.map(item => item.todoId));
+
+    const otherItems = [
+      ...(snapshot.today || []),
+      ...(snapshot.maybe || []),
+      ...(snapshot.overdue || [])
+    ].filter(item => !item.isCompleted && !pinnedIds.has(item.todoId));
+
+    return [...pinnedItems, ...otherItems];
   }, [snapshot]);
 
   const handleOpenTodo = (todoId: string) => {
@@ -293,7 +285,7 @@ export const DesktopQuickWidgetView: React.FC = () => {
     window.addEventListener('mouseup', handleMouseUp);
   };
 
-  const isEmpty = sections.length === 0;
+  const isEmpty = todoList.length === 0;
   const isDark = theme === 'dark';
 
   return (
@@ -508,27 +500,16 @@ export const DesktopQuickWidgetView: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
-            {sections.map((section) => (
-              <section key={section.id} className="space-y-0.5">
-                <div className={`px-2 text-[10px] font-semibold tracking-wider mb-1 ${
-                  isDark ? 'text-stone-500' : 'text-stone-400'
-                }`}>
-                  {section.label}
-                </div>
-                <div className="space-y-0.5">
-                  {section.items.map((item) => (
-                    <TodoRow
-                      key={item.todoId}
-                      item={item}
-                      isPending={pendingTodoIds.includes(item.todoId)}
-                      onToggle={handleToggleTodo}
-                      onOpen={handleOpenTodo}
-                      theme={theme}
-                    />
-                  ))}
-                </div>
-              </section>
+          <div className="space-y-0.5">
+            {todoList.map((item) => (
+              <TodoRow
+                key={item.todoId}
+                item={item}
+                isPending={pendingTodoIds.includes(item.todoId)}
+                onToggle={handleToggleTodo}
+                onOpen={handleOpenTodo}
+                theme={theme}
+              />
             ))}
           </div>
         )}

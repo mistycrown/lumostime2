@@ -4,6 +4,7 @@
  * @output Unified desktop month widget view with one shared title bar, week-paged calendar, and collapsible planning sidebar
  * @pos View (Desktop widget)
  * @description Hosts the Electron desktop month widget, including one unified header, compact display settings, a 2/3/4-week paged calendar body, and the right-side Arrange / Maybe / Due planning sidebar.
+ * @updated 2026-05-17: 改良计划栏分类标签，调整顺序为 maybe / arrange / due 并默认选中 arrange 标签。
  * @updated 2026-05-17: Grouped the planning sidebar by todo category, removed the misleading linked-category line, and restored one-level subtask visibility with standalone `@parent` labels when a parent row is filtered out.
  * @updated 2026-05-17: Replaced fixed month paging with 2/3/4-week whole-page navigation so widget row settings control weeks per page without auto-resizing the widget window.
  * @updated 2026-05-17: Added a persisted top-right toggle that fully collapses the planning sidebar so the calendar can expand across the whole widget width.
@@ -410,17 +411,6 @@ export const DesktopMonthWidgetView: React.FC = () => {
                 <div className={`flex rounded-md p-0.5 text-xs ${isDark ? 'bg-stone-900/60' : 'bg-stone-200/40'}`}>
                   <button
                     type="button"
-                    onClick={() => setActiveTab('scheduled')}
-                    className={`flex-1 rounded py-1 text-center font-medium transition ${
-                      activeTab === 'scheduled'
-                        ? (isDark ? 'bg-stone-800 text-white shadow-sm' : 'bg-white text-stone-800 shadow-sm')
-                        : (isDark ? 'text-stone-400 hover:text-stone-200' : 'text-stone-500 hover:text-stone-800')
-                    }`}
-                  >
-                    安排
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setActiveTab('maybe')}
                     className={`flex-1 rounded py-1 text-center font-medium transition ${
                       activeTab === 'maybe'
@@ -428,7 +418,18 @@ export const DesktopMonthWidgetView: React.FC = () => {
                         : (isDark ? 'text-stone-400 hover:text-stone-200' : 'text-stone-500 hover:text-stone-800')
                     }`}
                   >
-                    暂定
+                    maybe
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('scheduled')}
+                    className={`flex-1 rounded py-1 text-center font-medium transition ${
+                      activeTab === 'scheduled'
+                        ? (isDark ? 'bg-stone-800 text-white shadow-sm' : 'bg-white text-stone-800 shadow-sm')
+                        : (isDark ? 'text-stone-400 hover:text-stone-200' : 'text-stone-500 hover:text-stone-800')
+                    }`}
+                  >
+                    arrange
                   </button>
                   <button
                     type="button"
@@ -439,7 +440,7 @@ export const DesktopMonthWidgetView: React.FC = () => {
                         : (isDark ? 'text-stone-400 hover:text-stone-200' : 'text-stone-500 hover:text-stone-800')
                     }`}
                   >
-                    截止
+                    due
                   </button>
                 </div>
               </div>
