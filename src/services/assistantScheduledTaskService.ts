@@ -5,6 +5,7 @@
  * @pos Service (Assistant Scheduled Tasks)
  * @description Stores recurring assistant task templates, computes their next concrete trigger datetimes from shared todo recurrence rules, and continuously keeps one next native reminder per enabled task so Android can fire reminder_due at the correct time without waiting for check-in logic.
  *
+ * @updated 2026-05-17: Scheduled-task persistence now marks the unified AI backup state as changed so recurring assistant rule edits participate in export/cloud sync timestamps.
  * @updated 2026-05-13: Added optional monthly month-end fallback normalization so scheduled 31st tasks can explicitly fire on shorter months' final day instead of skipping them.
  * @updated 2026-05-12: Added atomic scheduled-task reminder consumption so a successfully triggered reminder is removed before the next occurrence is materialized, while duplicate pending reminders for the same task are purged during the same handoff.
  * @updated 2026-05-10: Reconciled duplicate scheduled-task reminders back down to one active occurrence and stopped advancing tasks before the current reminder was actually consumed.
@@ -13,6 +14,7 @@
 
 import type { TodoRecurrenceRule } from '../types';
 import type { AssistantReminder, AssistantScheduledTask } from '../types/assistant';
+import { notifyAIBackupDataChanged } from '../utils/aiBackupChange';
 import { formatDateKey, matchesRecurrenceRule, parseDateKey } from '../utils/todoScheduleUtils';
 import { normalizeAssistantDateTime, parseAssistantDateTime } from '../utils/assistantTime';
 import { assistantReminderQueueService } from './assistantReminderQueueService';
@@ -245,6 +247,7 @@ export const assistantScheduledTaskService = {
   saveTasks(tasks: AssistantScheduledTask[]): AssistantScheduledTask[] {
     const normalized = sortTasks(tasks.map(normalizeTask).filter((item): item is AssistantScheduledTask => Boolean(item)));
     localStorage.setItem(ASSISTANT_SCHEDULED_TASKS_KEY, JSON.stringify(normalized));
+    notifyAIBackupDataChanged();
     return normalized;
   },
 
@@ -353,6 +356,7 @@ export const assistantScheduledTaskService = {
 
   clearAll(): void {
     localStorage.removeItem(ASSISTANT_SCHEDULED_TASKS_KEY);
+    notifyAIBackupDataChanged();
   },
 
   consumeTriggeredReminder(

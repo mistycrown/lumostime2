@@ -5,6 +5,7 @@
  * @pos Service (Dream)
  * @description Stores the explicit-only Dream attention system separately from assistant memory, including user-maintained concern topics, AI-maintained observation entries, and the manual `dream` workflow that can add, rewrite, or delete entries while normal chat and background turns remain read-only consumers.
  *
+ * @updated 2026-05-17: Dream-state writes now mark the unified AI backup state as changed so topic/entry edits update the main backup and cloud-sync timestamp.
  * @updated 2026-05-14: Added a full Dream reset helper that restores the built-in default topics and notes while clearing all accumulated Dream observation entries in one action.
  * @updated 2026-05-14: Tightened Dream workflow instructions so refreshed entries should summarize recurring habits and distill future-facing assistant rules, not merely restate observed phenomena.
  * @updated 2026-05-13: Flattened built-in and custom Dream topics into one unified prompt task list so every enabled topic reaches the Dream model at the same priority level.
@@ -18,6 +19,7 @@
 import { aiService, type AIDebugExchange } from './aiService';
 import { DREAM_MODE_SYSTEM_PROMPT } from '../constants/dreamModePrompt';
 import { DREAM_TOPIC_PRESETS } from '../constants/dreamTopicPresets';
+import { notifyAIBackupDataChanged } from '../utils/aiBackupChange';
 import type {
   DreamEntry,
   DreamEntryStatus,
@@ -663,6 +665,7 @@ export const dreamService = {
       updatedAt: new Date().toISOString()
     };
     localStorage.setItem(DREAM_STORAGE_KEY, JSON.stringify(next));
+    notifyAIBackupDataChanged();
     return next;
   },
 

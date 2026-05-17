@@ -1,6 +1,7 @@
 /**
  * @file dataValidation.ts
  * @description 数据验证工具函数
+ * @updated 2026-05-17: Added unified-backup validation support for the nested `aiData` object so AI chat, prompt, and assistant-state payloads can travel with the main app JSON without tripping import guards.
  * 
  * 提供统一的数据验证逻辑，确保数据完整性和一致性
  * 
@@ -82,6 +83,10 @@ export function validateLocalData(data: any): ValidationResult {
 
   if (data.sceneGroupState !== undefined && data.sceneGroupState !== null && typeof data.sceneGroupState !== 'object') {
     errors.push('字段 sceneGroupState 应该是对象类型');
+  }
+
+  if (data.aiData !== undefined && data.aiData !== null && typeof data.aiData !== 'object') {
+    errors.push('字段 aiData 应该是对象类型');
   }
 
   // 4. 检查版本信息

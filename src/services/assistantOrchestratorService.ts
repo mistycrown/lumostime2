@@ -4,6 +4,7 @@
  * @output Background assistant turn decisions plus applied reminder or memory side effects
  * @pos Service (Assistant Orchestrator)
  * @description Orchestrates Android-first assistant system turns by loading structured memory, assembling a prompt, calling the existing AI service, and applying the resulting silent/message/reminder/memory actions back into local state.
+ * @updated 2026-05-17: Persisted background chat/history writes now mark the unified AI backup state as changed so background-only AI activity can trigger cloud-sync/export timestamp updates.
  *
  * @updated 2026-05-16: Fixed submitted-log debug labels and normalized fallback assistant-notification titles to readable `AI 助理` text.
  * @updated 2026-05-14: Persisted provider-native reasoning summaries alongside surfaced background assistant messages so foreground and background chat entries share the same collapsible thinking payload shape.
@@ -56,6 +57,7 @@ import { formatAssistantDateTimeForDisplay, normalizeAssistantDateTime } from '.
 import { resolveLatestOrdinaryAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
 import { buildAssistantDisplayParts } from '../utils/assistantMessageParts';
 import { buildNativeDiagnosticDebugExchange } from '../utils/assistantNativeDebug';
+import { notifyAIBackupDataChanged } from '../utils/aiBackupChange';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
 
 interface AssistantSystemTurnRequest {
@@ -317,6 +319,7 @@ const saveBackgroundCallHistory = (entries: AssistantBackgroundCallHistoryEntry[
     ASSISTANT_BACKGROUND_CALL_HISTORY_KEY,
     JSON.stringify(entries.slice(0, MAX_BACKGROUND_CALL_HISTORY))
   );
+  notifyAIBackupDataChanged();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(ASSISTANT_DECISION_EVENT));
   }
@@ -617,6 +620,7 @@ const persistAssistantMessage = (
   ));
 
   localStorage.setItem(CHAT_SESSIONS_KEY, JSON.stringify(nextSessions));
+  notifyAIBackupDataChanged();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(ASSISTANT_DECISION_EVENT));
   }
@@ -666,6 +670,7 @@ const persistUserMessage = (
   ));
 
   localStorage.setItem(CHAT_SESSIONS_KEY, JSON.stringify(nextSessions));
+  notifyAIBackupDataChanged();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(ASSISTANT_DECISION_EVENT));
   }
@@ -699,6 +704,7 @@ export const assistantOrchestratorService = {
 
   clearBackgroundCallHistory(): void {
     localStorage.removeItem(ASSISTANT_BACKGROUND_CALL_HISTORY_KEY);
+    notifyAIBackupDataChanged();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent(ASSISTANT_DECISION_EVENT));
     }

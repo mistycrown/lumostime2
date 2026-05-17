@@ -3,6 +3,7 @@
  * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
  * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
  * @pos Service (AI Integration Layer)
+ * @updated 2026-05-17: AI preset/config writes now mark the unified AI backup state as changed so provider/preset edits participate in the main backup and cloud-sync timestamp.
  * @updated 2026-05-17: Structured-JSON requests now expose provider-native reasoning metadata to custom normalizers, allowing report/newspaper writeback flows to persist the same collapsible thinking block used by ordinary chat.
  * @updated 2026-05-14: Enhanced debug error capture: responses are now read as text first to ensure non-JSON server replies (like HTML error pages) are preserved in `rawResponseText` for the debug viewer.
  * @updated 2026-05-14: Added provider-aware reasoning extraction so OpenAI-compatible and Gemini responses can surface native thinking content through the shared assistant message pipeline.
@@ -234,6 +235,7 @@ const DEFAULT_AI_PRESET_NAME = '默认预设';
 import { HTTP } from '@awesome-cordova-plugins/http';
 import { Capacitor } from '@capacitor/core';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
+import { notifyAIBackupDataChanged } from '../utils/aiBackupChange';
 
 const DEFAULT_AI_CONFIG: AIConfig = {
     provider: 'openai',
@@ -437,6 +439,7 @@ const persistPresetState = (
     localStorage.setItem(AI_CURRENT_PRESET_KEY, state.currentPresetId);
     const currentPreset = state.presets.find(preset => preset.id === state.currentPresetId) || state.presets[0];
     localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(currentPreset.config));
+    notifyAIBackupDataChanged();
 
     if (syncNativeConfig && Capacitor.isNativePlatform()) {
         void AssistantAgent.syncNativeAIConfig(currentPreset.config).catch((error) => {
@@ -1864,6 +1867,7 @@ export const aiService = {
         localStorage.removeItem(AI_CONFIG_KEY);
         localStorage.removeItem(AI_PRESETS_KEY);
         localStorage.removeItem(AI_CURRENT_PRESET_KEY);
+        notifyAIBackupDataChanged();
         if (Capacitor.isNativePlatform()) {
             void AssistantAgent.clearNativeAIConfig().catch((error) => {
                 console.error('[aiService] Failed to clear native AI config', error);
@@ -1876,6 +1880,7 @@ export const aiService = {
         const profiles = stored ? JSON.parse(stored) : {};
         profiles[key] = normalizeAIConfig(config);
         localStorage.setItem(AI_PROFILES_KEY, JSON.stringify(profiles));
+        notifyAIBackupDataChanged();
     },
 
     getProfile: (key: string): AIConfig | null => {

@@ -4,6 +4,7 @@
  * @output Sync Operations (performSync, handleQuickSync, handleImageSync, handleSyncDataUpdate), Sync State (isSyncing, refreshKey)
  * @pos Hook (System Integration)
  * @description 同步管理 Hook - 处理数据和图片的云端同步，支持启动同步、恢复同步、手动同步、自动同步等多种模式，并在恢复筛选器时保持顺序稳定，同时保证空值恢复与 majorGoals 载荷一致。
+ * @updated 2026-05-17: Extended the unified backup/sync payload to include the shared AI backup block, and now restore that AI state alongside the main app data during imports and cloud downloads.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -19,12 +20,14 @@ import { useToast } from '../contexts/ToastContext';
 import { webdavService } from '../services/webdavService';
 import { s3Service } from '../services/s3Service';
 import { compatibleS3Service } from '../services/compatibleS3Service';
+import { assistantBackupService } from '../services/assistantBackupService';
 import { imageService } from '../services/imageService';
 import { syncService } from '../services/syncService';
 import { uploadDataToCloud, downloadWithBackup, CloudService } from '../utils/syncUtils';
 import { AppView } from '../types';
 import { SYNC_CONFIG } from '../config/syncConfig';
 import { normalizeCheckTemplates, normalizeDailyReviews } from '../utils/checkItemNormalizer';
+import { AI_BACKUP_CHANGED_EVENT } from '../utils/aiBackupChange';
 import { normalizeFiltersOrder } from '../utils/filterUtils';
 import {
     getLocalDataTimestamp,
@@ -124,6 +127,10 @@ export const useSyncManager = () => {
                 window.dispatchEvent(new Event('principleLibraryChanged'));
             }
 
+            if (hasField('aiData')) {
+                await assistantBackupService.applyBackupPayload(data.aiData);
+            }
+
             await new Promise(resolve => setTimeout(resolve, 10));
             console.log('[Sync] handleSyncDataUpdate applied restore payload');
 
@@ -153,8 +160,9 @@ export const useSyncManager = () => {
             logs, todos, categories, todoCategories, scopes, goals, majorGoals,
             autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
             monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, customStickerSets, customStickers, filters,
-            sceneGroupState, // 新版：场景组状态
-            sceneTimeSlots, // 添加场景设置
+            aiData: assistantBackupService.buildBackupPayload(),
+            sceneTimeSlots,
+            sceneGroupState,
             principles, // 添加原则库
             version: '1.0.0',
             timestamp: getLocalDataTimestamp() // Use the latest persisted tracking timestamp
@@ -745,6 +753,37 @@ export const useSyncManager = () => {
         
         return () => {
             window.removeEventListener('imageListChanged', handleImageListChanged as EventListener);
+            if (timer) clearTimeout(timer);
+        };
+    }, [manualSyncMode]);
+
+    // 2c. AI-only localStorage Auto Sync
+    useEffect(() => {
+        let timer: NodeJS.Timeout | null = null;
+
+        const handleAIBackupChanged = () => {
+            if (manualSyncMode || isRestoring.current) {
+                return;
+            }
+
+            if (timer) {
+                clearTimeout(timer);
+            }
+
+            pendingAutoSyncRef.current = true;
+
+            timer = setTimeout(async () => {
+                if (!isSyncingRef.current && !isRestoring.current) {
+                    await performSync('auto');
+                    pendingAutoSyncRef.current = false;
+                }
+            }, SYNC_CONFIG.AUTO_SYNC_DEBOUNCE_MS);
+        };
+
+        window.addEventListener(AI_BACKUP_CHANGED_EVENT, handleAIBackupChanged as EventListener);
+
+        return () => {
+            window.removeEventListener(AI_BACKUP_CHANGED_EVENT, handleAIBackupChanged as EventListener);
             if (timer) clearTimeout(timer);
         };
     }, [manualSyncMode]);
