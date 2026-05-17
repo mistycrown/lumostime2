@@ -4,6 +4,7 @@
  * @output Window Management
  * @pos Electron Main
  * @description Entry point for the Electron application. Handles main-window and desktop-widget creation, lifecycle events, and inter-process communication (IPC).
+ * @updated 2026-05-17: 扩展了 Electron 主进程小组件管理器，新增对桌面小事清单小组件（quick widget）独立窗口的生命周期、拖拽缩放边界持久化和 IPC 调起/关闭支持。并支持了 add_quick_todo 动作的透明转发。
  * @updated 2026-05-17: Added a dedicated desktop today-widget and monthly-widget windows with persisted bounds, main-renderer action forwarding, and widget open/close IPC handlers for Electron builds.
  * @updated 2026-04-09: Added Obsidian image attachment export IPC handler for desktop builds.
  *
@@ -19,7 +20,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 type DesktopWidgetMainAction =
   | { type: 'open_todo'; todoId: string }
   | { type: 'toggle_todo'; todoId: string }
-  | { type: 'start_focus'; todoId: string };
+  | { type: 'start_focus'; todoId: string }
+  | { type: 'add_quick_todo'; title: string };
 
 type PersistedWidgetWindowState = {
   bounds?: {
@@ -56,6 +58,7 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 const DESKTOP_WIDGET_QUERY_KEY = 'window';
 const DESKTOP_WIDGET_QUERY_VALUE = 'desktop-widget';
 const DESKTOP_MONTH_WIDGET_QUERY_VALUE = 'desktop-month';
+const DESKTOP_QUICK_WIDGET_QUERY_VALUE = 'desktop-quick';
 const DESKTOP_WIDGET_MAIN_ACTION_CHANNEL = 'desktop-widget:main-action';
 const DEFAULT_WIDGET_WIDTH = 360;
 const DEFAULT_WIDGET_HEIGHT = 520;
@@ -63,6 +66,7 @@ const DEFAULT_MONTH_WIDGET_WIDTH = 880;
 const DEFAULT_MONTH_WIDGET_HEIGHT = 640;
 const WIDGET_STATE_FILENAME = 'desktop-widget-state.json';
 const MONTH_WIDGET_STATE_FILENAME = 'desktop-month-widget-state.json';
+const QUICK_WIDGET_STATE_FILENAME = 'desktop-quick-widget-state.json';
 
 // Disable GPU Acceleration for Windows 7
 if (os.release().startsWith('6.1')) app.disableHardwareAcceleration();
@@ -78,6 +82,7 @@ if (!app.requestSingleInstanceLock()) {
 let mainWindow: BrowserWindow | null = null;
 let widgetWindow: BrowserWindow | null = null;
 let monthWidgetWindow: BrowserWindow | null = null;
+let quickWidgetWindow: BrowserWindow | null = null;
 let isMainRendererReady = false;
 let pendingDesktopWidgetActions: DesktopWidgetMainAction[] = [];
 
@@ -89,6 +94,7 @@ const getIconPath = () => path.join(process.env.VITE_PUBLIC || '', 'icon.ico');
 
 const getWidgetStatePath = () => path.join(app.getPath('userData'), WIDGET_STATE_FILENAME);
 const getMonthWidgetStatePath = () => path.join(app.getPath('userData'), MONTH_WIDGET_STATE_FILENAME);
+const getQuickWidgetStatePath = () => path.join(app.getPath('userData'), QUICK_WIDGET_STATE_FILENAME);
 
 const buildRendererUrl = (windowType?: string): string => {
   if (VITE_DEV_SERVER_URL) {
@@ -245,6 +251,35 @@ const saveWidgetWindowState = async (targetWindow: BrowserWindow | null) => {
     );
   } catch (error) {
     console.error('[Electron] Failed to save desktop widget state', error);
+  }
+};
+
+const readQuickWidgetWindowState = async (): Promise<PersistedWidgetWindowState> => {
+  try {
+    const raw = await fs.readFile(getQuickWidgetStatePath(), 'utf-8');
+    return JSON.parse(raw) as PersistedWidgetWindowState;
+  } catch (error: any) {
+    if (error?.code !== 'ENOENT') {
+      console.error('[Electron] Failed to read desktop quick widget state', error);
+    }
+    return {};
+  }
+};
+
+const saveQuickWidgetWindowState = async (targetWindow: BrowserWindow | null) => {
+  if (!targetWindow || targetWindow.isDestroyed()) {
+    return;
+  }
+
+  try {
+    const bounds = clampWidgetBounds(targetWindow.getBounds());
+    await fs.writeFile(
+      getQuickWidgetStatePath(),
+      JSON.stringify({ bounds }, null, 2),
+      'utf-8'
+    );
+  } catch (error) {
+    console.error('[Electron] Failed to save desktop quick widget state', error);
   }
 };
 
@@ -465,6 +500,58 @@ async function createMonthWidgetWindow() {
   return monthWidgetWindow;
 }
 
+async function createQuickWidgetWindow() {
+  if (quickWidgetWindow && !quickWidgetWindow.isDestroyed()) {
+    focusWindow(quickWidgetWindow);
+    return quickWidgetWindow;
+  }
+
+  const widgetState = await readQuickWidgetWindowState();
+  const widgetBounds = clampWidgetBounds(widgetState.bounds);
+
+  quickWidgetWindow = new BrowserWindow({
+    title: 'LumosTime Quick Widget',
+    icon: getIconPath(),
+    width: widgetBounds.width,
+    height: widgetBounds.height,
+    x: widgetBounds.x,
+    y: widgetBounds.y,
+    frame: false,
+    transparent: true,
+    resizable: true,
+    thickFrame: false,
+    minimizable: true,
+    maximizable: true,
+    fullscreenable: false,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      preload,
+      webSecurity: false
+    }
+  });
+
+  quickWidgetWindow.setMenuBarVisibility(false);
+  configureExternalLinks(quickWidgetWindow);
+  attachWidgetShowFallback(quickWidgetWindow, 'today');
+  await quickWidgetWindow.loadURL(buildRendererUrl(DESKTOP_QUICK_WIDGET_QUERY_VALUE));
+
+  quickWidgetWindow.on('move', () => {
+    void saveQuickWidgetWindowState(quickWidgetWindow);
+  });
+  quickWidgetWindow.on('resize', () => {
+    void saveQuickWidgetWindowState(quickWidgetWindow);
+  });
+  quickWidgetWindow.on('close', () => {
+    void saveQuickWidgetWindowState(quickWidgetWindow);
+  });
+  quickWidgetWindow.on('closed', () => {
+    quickWidgetWindow = null;
+  });
+
+  return quickWidgetWindow;
+}
+
 app.whenReady().then(() => {
   void createMainWindow();
 });
@@ -481,7 +568,7 @@ app.on('second-instance', () => {
     return;
   }
 
-  if (widgetWindow || monthWidgetWindow) {
+  if (widgetWindow || monthWidgetWindow || quickWidgetWindow) {
     void focusMainWindow();
   }
 });
@@ -526,6 +613,14 @@ ipcMain.on('desktop-widget:open-month', () => {
 
 ipcMain.on('desktop-widget:close-month', () => {
   monthWidgetWindow?.close();
+});
+
+ipcMain.on('desktop-widget:open-quick', () => {
+  void createQuickWidgetWindow();
+});
+
+ipcMain.on('desktop-widget:close-quick', () => {
+  quickWidgetWindow?.close();
 });
 
 ipcMain.on('desktop-widget:open-main', () => {

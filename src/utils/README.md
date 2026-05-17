@@ -3,6 +3,7 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- Update 2026-05-17: `desktopMonthWidgetSidebarUtils.ts` now builds grouped desktop month-widget sidebar sections so Arrange/Maybe/Due rows render by todo category, keep one-level subtasks attached to visible parents, and fall back to plain-text `@parent` labels when a parent row is filtered out.
 - Update 2026-05-16: `assistantLogSubmissionTrigger.ts` now centralizes the new-log assistant trigger event, selected-tag matching, temporary log upsert, and fixed submitted-log system-text assembly so manual log saves and focus-generated logs can share one post-save AI path without coupling log CRUD to assistant orchestration.
 - Update 2026-05-16: `todoAssociationUtils.ts` now filters the reserved `小事` quick bucket out of association pickers while still preserving the currently linked legacy quick todo so old records can be edited safely.
 - Update 2026-05-14: `assistantDebugFormat.ts` now summarizes malformed AI responses (especially HTML gateway pages) and builds explicit raw-response debug blocks, so chat failures can surface both a short diagnosis and the full upstream payload.

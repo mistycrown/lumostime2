@@ -4,6 +4,7 @@
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
+ * @updated 2026-05-17: 在 Electron 主应用启动时自动恢复已启用的 PC 端小组件，并与设置页共享桌面小组件启动偏好读取逻辑。
  * @updated 2026-05-17: 增加 Electron 桌面小组件动作处理逻辑，支持 toggle_todo, open_todo 和 'start_focus' 快捷开始任务专注。
  * @updated 2026-05-13: Normalized reserved todo categories before passing them into UI editors and pickers so the system `未来` bucket behaves like a first-class category even when older saved data has not persisted it yet.
  * @updated 2026-05-10: Upgraded the post-start timer auto-jump flow to support none, focus-detail, and immersive entry modes while preserving scene-card immersive overrides.
@@ -59,6 +60,7 @@ import { useHardwareBackButton } from './hooks/useHardwareBackButton';
 import { useAppLifecycle } from './hooks/useAppLifecycle';
 import { useWidgetBridgeSync } from './hooks/useWidgetBridgeSync';
 import { useFloatingWindowSync } from './hooks/useFloatingWindowSync';
+import { loadEnabledDesktopWidgetTypes } from './services/desktopWidgetService';
 import { ShortcutWidgetAction } from './services/widgetShortcutService';
 import { splitLogByDays } from './utils/logUtils';
 import { buildSceneGroupStateFromLegacySlots, getActiveSceneGroup, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from './utils/sceneGroupStorage';
@@ -137,6 +139,7 @@ const AppContent: React.FC = () => {
   const { addToast } = useToast();
   const { openAIChat } = useAIChatWindow();
   const lastStorageErrorToastRef = useRef<{ signature: string; timestamp: number } | null>(null);
+  const hasRestoredDesktopWidgetsRef = useRef(false);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) {
@@ -528,13 +531,27 @@ const AppContent: React.FC = () => {
     setIsSettingsOpen
   ]);
 
-  const handleDesktopWidgetAction = React.useCallback((action: { type: 'open_todo' | 'toggle_todo' | 'start_focus'; todoId: string }) => {
+  const handleDesktopWidgetAction = React.useCallback((action: DesktopWidgetBridgeAction) => {
     closeFiltersOverlay();
     setIsSettingsOpen(false);
     setIsAutoLinkOpen(false);
     setIsSearchOpen(false);
     setIsSearchOpenedFromSettings(false);
     setIsGalleryViewOpen(false);
+
+    if (action.type === 'add_quick_todo') {
+      const newTodo = {
+        id: crypto.randomUUID(),
+        categoryId: '__virtual_quick__',
+        kind: 'quick' as const,
+        title: action.title,
+        isCompleted: false,
+        pin: false,
+        completedUnits: 0
+      };
+      todoManager.handleSaveTodo(newTodo);
+      return;
+    }
 
     if (action.type === 'toggle_todo') {
       if (todos.some((todo) => todo.id === action.todoId)) {
@@ -565,6 +582,26 @@ const AppContent: React.FC = () => {
     todos,
     handleStartTodoFocusWrapper
   ]);
+
+  useEffect(() => {
+    if (!window.desktopWidget || hasRestoredDesktopWidgetsRef.current) {
+      return;
+    }
+
+    hasRestoredDesktopWidgetsRef.current = true;
+
+    loadEnabledDesktopWidgetTypes(localStorage).forEach((widgetType) => {
+      if (widgetType === 'today') {
+        window.desktopWidget?.open();
+        return;
+      }
+      if (widgetType === 'month') {
+        window.desktopWidget?.openMonth();
+        return;
+      }
+      window.desktopWidget?.openQuick?.();
+    });
+  }, []);
 
   useEffect(() => {
     if (!window.desktopWidget) {

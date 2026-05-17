@@ -4,11 +4,15 @@
  * @output Regression coverage for the Electron desktop widget today/pin/overdue grouping logic
  * @pos Test (desktop widget service)
  * @description Verifies the desktop today-widget snapshot keeps pinned and today-visible todos together while still surfacing overdue items outside the shared today bucket.
+ * @updated 2026-05-17: Added startup preference coverage for Electron desktop widget auto-restore state parsing.
  * @updated 2026-05-17: Added first-pass regression coverage for Electron desktop widget snapshot grouping.
  */
 import { describe, expect, it } from 'vitest';
 import type { Category, TodoItem } from '../types';
-import { buildDesktopTodayWidgetSnapshot } from './desktopWidgetService';
+import {
+  buildDesktopTodayWidgetSnapshot,
+  loadEnabledDesktopWidgetTypes
+} from './desktopWidgetService';
 
 const REFERENCE_DATE = new Date('2026-05-17T09:00:00');
 
@@ -109,5 +113,32 @@ describe('buildDesktopTodayWidgetSnapshot', () => {
       'scheduled-overdue'
     ]);
     expect(snapshot.summary.completed).toBe(1);
+  });
+});
+
+describe('loadEnabledDesktopWidgetTypes', () => {
+  it('returns only widget types whose startup toggles are enabled', () => {
+    const storageLike = {
+      getItem(key: string) {
+        const map: Record<string, string | null> = {
+          lumostime_desktop_widget_today_enabled: 'true',
+          lumostime_desktop_widget_month_enabled: 'false',
+          lumostime_desktop_widget_quick_enabled: 'true'
+        };
+        return map[key] ?? null;
+      }
+    };
+
+    expect(loadEnabledDesktopWidgetTypes(storageLike)).toEqual(['today', 'quick']);
+  });
+
+  it('returns an empty list when no desktop widget startup toggle is enabled', () => {
+    const storageLike = {
+      getItem() {
+        return null;
+      }
+    };
+
+    expect(loadEnabledDesktopWidgetTypes(storageLike)).toEqual([]);
   });
 });

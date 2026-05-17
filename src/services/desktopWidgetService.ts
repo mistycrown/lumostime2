@@ -4,6 +4,8 @@
  * @output Desktop widget route helpers and compact today-task snapshot builders for the Electron widget window
  * @pos Service
  * @description Builds the lightweight desktop widget snapshot from the shared todo model so the Electron widget window can reuse the app's existing today-task logic without mounting the full app shell.
+ * @updated 2026-05-17: 新增桌面小组件启动偏好键名与读取辅助逻辑，供 Electron 主应用启动时自动恢复已启用的 PC 端小组件。
+ * @updated 2026-05-17: 扩展了桌面小组件的支持，新增 desktop-quick（小事清单小组件）快照构建与窗口检测，实现了 buildDesktopQuickWidgetSnapshot 以确保无排期的小事能够完整呈现在小组件待办列表中。
  * @updated 2026-05-17: Added desktop widget route detection plus today/pin/overdue snapshot builders for the Electron desktop today widget and month-widget window, with getDesktopWidgetType helper support.
  */
 import { USER_DATA_KEYS, storage } from '../constants/storageKeys';
@@ -19,6 +21,12 @@ import {
 export const DESKTOP_WIDGET_WINDOW_QUERY_KEY = 'window';
 export const DESKTOP_WIDGET_WINDOW_QUERY_VALUE = 'desktop-widget';
 export const DESKTOP_MONTH_WIDGET_WINDOW_QUERY_VALUE = 'desktop-month';
+export const DESKTOP_QUICK_WIDGET_WINDOW_QUERY_VALUE = 'desktop-quick';
+export const DESKTOP_WIDGET_TODAY_STORAGE_KEY = 'lumostime_desktop_widget_today_enabled';
+export const DESKTOP_WIDGET_MONTH_STORAGE_KEY = 'lumostime_desktop_widget_month_enabled';
+export const DESKTOP_WIDGET_QUICK_STORAGE_KEY = 'lumostime_desktop_widget_quick_enabled';
+
+export type DesktopWidgetStartupType = 'today' | 'month' | 'quick';
 
 export type DesktopWidgetBadgeLabel = 'PIN' | 'TODAY' | 'LATE' | 'MAYBE';
 
@@ -149,10 +157,10 @@ export const isDesktopWidgetWindow = (): boolean => {
     return false;
   }
   const val = new URLSearchParams(window.location.search).get(DESKTOP_WIDGET_WINDOW_QUERY_KEY);
-  return val === DESKTOP_WIDGET_WINDOW_QUERY_VALUE || val === DESKTOP_MONTH_WIDGET_WINDOW_QUERY_VALUE;
+  return val === DESKTOP_WIDGET_WINDOW_QUERY_VALUE || val === DESKTOP_MONTH_WIDGET_WINDOW_QUERY_VALUE || val === DESKTOP_QUICK_WIDGET_WINDOW_QUERY_VALUE;
 };
 
-export const getDesktopWidgetType = (): 'today' | 'month' | null => {
+export const getDesktopWidgetType = (): 'today' | 'month' | 'quick' | null => {
   if (typeof window === 'undefined') {
     return null;
   }
@@ -163,7 +171,28 @@ export const getDesktopWidgetType = (): 'today' | 'month' | null => {
   if (val === DESKTOP_MONTH_WIDGET_WINDOW_QUERY_VALUE) {
     return 'month';
   }
+  if (val === DESKTOP_QUICK_WIDGET_WINDOW_QUERY_VALUE) {
+    return 'quick';
+  }
   return null;
+};
+
+export const loadEnabledDesktopWidgetTypes = (
+  storageLike: Pick<Storage, 'getItem'>
+): DesktopWidgetStartupType[] => {
+  const enabledWidgetTypes: DesktopWidgetStartupType[] = [];
+
+  if (storageLike.getItem(DESKTOP_WIDGET_TODAY_STORAGE_KEY) === 'true') {
+    enabledWidgetTypes.push('today');
+  }
+  if (storageLike.getItem(DESKTOP_WIDGET_MONTH_STORAGE_KEY) === 'true') {
+    enabledWidgetTypes.push('month');
+  }
+  if (storageLike.getItem(DESKTOP_WIDGET_QUICK_STORAGE_KEY) === 'true') {
+    enabledWidgetTypes.push('quick');
+  }
+
+  return enabledWidgetTypes;
 };
 
 export const buildDesktopTodayWidgetSnapshot = ({
@@ -239,6 +268,90 @@ export const loadDesktopTodayWidgetSnapshotFromStorage = (
   });
 };
 
+export const buildDesktopQuickWidgetSnapshot = ({
+  todos,
+  categories,
+  date = new Date()
+}: {
+  todos: TodoItem[];
+  categories: Category[];
+  date?: Date;
+}): DesktopTodayWidgetSnapshot => {
+  const referenceDate = new Date(date);
+  const dateKey = formatDateKey(referenceDate);
+
+  // 1. 过滤已完成和未完成的小事
+  const uncompletedQuickTodos = todos.filter((todo) => !todo.isCompleted);
+  // 已完成的我们仍然只保留今天完成的小事，以便展示已完成列表
+  const completedTodayQuickTodos = todos.filter(
+    (todo) => todo.isCompleted && todo.completedAt && formatDateKey(new Date(todo.completedAt)) === dateKey
+  );
+
+  // 2. 归类置顶小事
+  const pinnedTodos = uncompletedQuickTodos.filter((todo) => Boolean(todo.pin));
+  const pinnedIds = new Set(pinnedTodos.map((t) => t.id));
+
+  // 3. 归类逾期小事 (有排期且排期小于今天)
+  const overdueTodos = uncompletedQuickTodos.filter((todo) => {
+    if (pinnedIds.has(todo.id)) return false;
+    return (
+      (todo.deadlineDate && todo.deadlineDate < dateKey) ||
+      (todo.scheduledDate && todo.scheduledDate < dateKey)
+    );
+  });
+  const overdueIds = new Set(overdueTodos.map((t) => t.id));
+
+  // 4. 归类备选小事
+  const maybeTodos = uncompletedQuickTodos.filter((todo) => {
+    if (pinnedIds.has(todo.id) || overdueIds.has(todo.id)) return false;
+    return hasMaybeDate(todo, dateKey, referenceDate);
+  });
+  const maybeIds = new Set(maybeTodos.map((t) => t.id));
+
+  // 5. 剩余的所有未完成小事，即：排期在今天、或者没有任何排期的小事，都归入今天小事
+  const todayTodos = uncompletedQuickTodos.filter((todo) => {
+    return !pinnedIds.has(todo.id) && !overdueIds.has(todo.id) && !maybeIds.has(todo.id);
+  });
+
+  // 映射到小组件所需要的 DesktopWidgetTodoItem 数组中，按标题排序以保持稳定
+  const sortTodos = (list: TodoItem[]) =>
+    [...list].sort((left, right) => left.title.localeCompare(right.title, 'zh-CN'));
+
+  const pinned = sortTodos(pinnedTodos).map((todo) =>
+    buildDesktopWidgetTodoItem(todo, todos, categories, 'PIN')
+  );
+  const todayItems = sortTodos(todayTodos).map((todo) =>
+    buildDesktopWidgetTodoItem(todo, todos, categories, 'TODAY')
+  );
+  const maybeItems = sortTodos(maybeTodos).map((todo) =>
+    buildDesktopWidgetTodoItem(todo, todos, categories, 'MAYBE')
+  );
+  const overdue = sortTodos(overdueTodos).map((todo) =>
+    buildDesktopWidgetTodoItem(todo, todos, categories, 'LATE')
+  );
+  const completedItems = sortTodos(completedTodayQuickTodos).map((todo) =>
+    buildDesktopWidgetTodoItem(todo, todos, categories, 'TODAY')
+  );
+
+  const remaining = pinned.length + maybeItems.length + todayItems.length + overdue.length;
+  const completed = completedTodayQuickTodos.length;
+
+  return {
+    date: dateKey,
+    summary: {
+      total: remaining + completed,
+      completed,
+      remaining
+    },
+    pinned,
+    today: todayItems,
+    maybe: maybeItems,
+    overdue,
+    completed: completedItems,
+    syncedAt: Date.now()
+  };
+};
+
 export const loadDesktopTodayWidgetSnapshotAsync = async (
   date: Date = new Date()
 ): Promise<DesktopTodayWidgetSnapshot> => {
@@ -256,6 +369,31 @@ export const loadDesktopTodayWidgetSnapshotAsync = async (
 
   return buildDesktopTodayWidgetSnapshot({
     todos,
+    categories,
+    date
+  });
+};
+
+export const loadDesktopQuickWidgetSnapshotAsync = async (
+  date: Date = new Date()
+): Promise<DesktopTodayWidgetSnapshot> => {
+  if (typeof window === 'undefined') {
+    return {
+      ...EMPTY_SNAPSHOT,
+      date: formatDateKey(date),
+      syncedAt: Date.now()
+    };
+  }
+
+  const { dataRepository } = await import('../repositories/dataRepository');
+  const { todos } = await dataRepository.loadDataContextSnapshot();
+  const { categories } = await dataRepository.loadCategoryScopeSnapshot();
+
+  // 仅筛选小事清单（kind 为 quick）的 todo 项
+  const quickTodos = (todos || []).filter((todo) => todo.kind === 'quick');
+
+  return buildDesktopQuickWidgetSnapshot({
+    todos: quickTodos,
     categories,
     date
   });

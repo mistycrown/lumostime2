@@ -3,7 +3,8 @@
 type DesktopWidgetBridgeAction =
   | { type: 'open_todo'; todoId: string }
   | { type: 'toggle_todo'; todoId: string }
-  | { type: 'start_focus'; todoId: string };
+  | { type: 'start_focus'; todoId: string }
+  | { type: 'add_quick_todo'; title: string };
 
 interface Window {
   ipcRenderer?: {
@@ -15,6 +16,10 @@ interface Window {
   desktopWidget?: {
     open: () => void;
     close: () => void;
+    openMonth: () => void;
+    closeMonth: () => void;
+    openQuick?: () => void;
+    closeQuick?: () => void;
     openMainApp: () => void;
     requestMainAction: (action: DesktopWidgetBridgeAction) => void;
     notifyMainReady: () => void;
