@@ -3,6 +3,7 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-05-17: `ai-chat/AIBackfillChatReviewWriteback.ts` now carries provider-native reasoning summaries through the ordinary-chat `日报` and `小报` writeback flows, so the final generated result message shows the same collapsible `推理过程` block as standard chat replies.
 - Update 2026-05-16: `ReviewNarrativeTab.tsx` now renders the daily `小报` row directly under the `AI 叙事` section, keeps existing newspapers tappable into the newspaper page, exposes an empty-state `点击生成` entry, and supports a guarded delete action supplied by the parent review view.
 - Update 2026-05-16: `AIBackfillChatModal.tsx` and `ai-chat/AIBackfillChatAssistantSettingsSection.tsx` now add a `日志提交触发` block under assistant call settings, let users select multiple trigger tags, listen for new-log submission events from shared log save flows, and run background assistant turns with fixed submitted-log summaries that include linked todo and scope context.
 - Update 2026-05-16: `TodoAssociation.tsx` now hides the reserved `小事` bucket from shared `Associated Todo` pickers so non-timable quick reminders cannot be linked to logs or focus sessions, while still preserving an already-linked legacy quick todo during edit flows.

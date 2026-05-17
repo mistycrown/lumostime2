@@ -4,6 +4,7 @@
  * @output SharedPreferences-backed native reminder queue for background reminder_due execution
  * @pos Native Helper
  * @description Mirrors the assistant reminder queue onto Android so the foreground service can dispatch due reminders without relying on the Web runtime.
+ * @updated 2026-05-17: Deduplicate pending reminders by natural content key while reading and saving the native queue so identical agent-created reminders cannot stack and dispatch together at the same due timestamp.
  * @updated 2026-05-11: Added next-eligible reminder lookup so the native assistant service can schedule exact due-reminder wakeups instead of waiting for the next coarse poll cycle.
  * @updated 2026-04-30: Added native reminder queue persistence, due lookup, dispatch-attempt tracking, and completion helpers.
  */
@@ -16,6 +17,9 @@ import android.util.Log;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.util.HashSet;
+import java.util.Set;
 
 public final class AssistantNativeReminderStore {
     private static final String TAG = "AssistantNativeReminder";
@@ -31,7 +35,10 @@ public final class AssistantNativeReminderStore {
             return;
         }
 
-        prefs(context).edit().putString(KEY_REMINDERS_JSON, reminders == null ? "[]" : reminders.toString()).apply();
+        prefs(context).edit().putString(
+            KEY_REMINDERS_JSON,
+            dedupePendingReminders(reminders == null ? new JSONArray() : reminders).toString()
+        ).apply();
     }
 
     public static JSONArray list(Context context) {
@@ -139,7 +146,7 @@ public final class AssistantNativeReminderStore {
         }
 
         try {
-            return new JSONArray(raw);
+            return dedupePendingReminders(new JSONArray(raw));
         } catch (JSONException error) {
             Log.e(TAG, "Failed to parse native reminder queue", error);
             return new JSONArray();
@@ -173,5 +180,52 @@ public final class AssistantNativeReminderStore {
         }
 
         return eligibleAtMs;
+    }
+
+    private static JSONArray dedupePendingReminders(JSONArray reminders) {
+        JSONArray deduped = new JSONArray();
+        if (reminders == null) {
+            return deduped;
+        }
+
+        Set<String> seenPendingKeys = new HashSet<>();
+        for (int index = 0; index < reminders.length(); index += 1) {
+            JSONObject reminder = reminders.optJSONObject(index);
+            if (reminder == null) {
+                continue;
+            }
+
+            if (!"pending".equals(safeTrim(reminder.optString("status", "")))) {
+                deduped.put(reminder);
+                continue;
+            }
+
+            String naturalKey = buildReminderNaturalKey(reminder);
+            if (seenPendingKeys.contains(naturalKey)) {
+                continue;
+            }
+
+            seenPendingKeys.add(naturalKey);
+            deduped.put(reminder);
+        }
+
+        return deduped;
+    }
+
+    private static String buildReminderNaturalKey(JSONObject reminder) {
+        if (reminder == null) {
+            return "";
+        }
+
+        return safeTrim(reminder.optString("type", ""))
+            + "::" + safeTrim(reminder.optString("dueAt", ""))
+            + "::" + safeTrim(reminder.optString("text", ""))
+            + "::" + safeTrim(reminder.optString("source", ""))
+            + "::" + safeTrim(reminder.optString("todoId", ""))
+            + "::" + safeTrim(reminder.optString("scheduledTaskId", ""));
+    }
+
+    private static String safeTrim(String value) {
+        return value == null ? "" : value.trim();
     }
 }

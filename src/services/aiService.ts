@@ -3,6 +3,7 @@
  * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
  * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
  * @pos Service (AI Integration Layer)
+ * @updated 2026-05-17: Structured-JSON requests now expose provider-native reasoning metadata to custom normalizers, allowing report/newspaper writeback flows to persist the same collapsible thinking block used by ordinary chat.
  * @updated 2026-05-14: Enhanced debug error capture: responses are now read as text first to ensure non-JSON server replies (like HTML error pages) are preserved in `rawResponseText` for the debug viewer.
  * @updated 2026-05-14: Added provider-aware reasoning extraction so OpenAI-compatible and Gemini responses can surface native thinking content through the shared assistant message pipeline.
  * @updated 2026-05-14: Added named AI preset storage with current-preset switching, migration from older single-config/profile keys, and preset CRUD helpers for multi-provider quick switching in settings.
@@ -1517,7 +1518,7 @@ const requestJsonObjectWithDebug = async <T>(
         userPrompt: string;
         conversationHistory?: AIConversationTurn[];
         cacheHint?: AIPromptCacheHint;
-        normalizeResult: (rawValue: any) => T;
+        normalizeResult: (rawValue: any, meta?: AIResponseNormalizationMeta) => T;
         options?: AIRequestOptions;
     }
 ): Promise<{ result: T; debug: AIDebugExchange }> => {
@@ -2276,4 +2277,3 @@ Output:
     },
 
 };
-

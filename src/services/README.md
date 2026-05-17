@@ -2,6 +2,8 @@
 
 Contains business logic and external integrations.
 
+Update 2026-05-17: `aiService.ts` now forwards provider-native reasoning summaries through the generic structured-JSON request path too, so ordinary-chat writeback flows like `日报` and `小报` can render the same collapsible `推理过程` block as regular assistant replies.
+
 Update 2026-05-16: `assistantAgentConfigService.ts` now persists the new submitted-log assistant trigger toggle plus selected activity ids, while `assistantOrchestratorService.ts` and the surrounding UI helpers can label `log_submitted` background turns consistently in history/debug views.
 
 Update 2026-05-15: `assistantActionExecutor.ts`, `aiService.ts`, and `public/assistant/foreground-tools.md` now make the reserved foreground todo buckets explicit end to end, so assistant-created `小事` items can use the quick-reminder path while `未来` items stay in the reserved future category instead of falling back to a normal project bucket.
