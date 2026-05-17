@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-17: AI chat session/persona/profile persistence now marks the unified AI backup state as changed so foreground-only AI edits can auto-sync with the main backup JSON.
  * @updated 2026-05-16: Added event-driven background assistant reactions for selected newly submitted logs, including linked todo and scope context.
  * @updated 2026-05-16: Added persona-level custom prompt blocks in AI settings so each persona can append multiple labeled extra prompt snippets to outgoing AI requests.
  * @updated 2026-05-15: Continued the refactor by extracting the conversation pane, Dream command flow, review command/writeback helpers, weekly/monthly template session flow helpers, shared chat types/helpers, memory/Dream/debug/background/session/settings overlays, the persona/call settings sections, and the session/template helper layer into `src/components/ai-chat/`, reducing local file size while preserving behavior.
@@ -66,6 +67,7 @@ import { buildAssistantDisplayParts } from '../utils/assistantMessageParts';
 import { buildNativeDiagnosticDebugExchange } from '../utils/assistantNativeDebug';
 import { normalizeAssistantQuietHoursValue } from '../utils/assistantQuietHours';
 import { resolveLatestOrdinaryAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
+import { notifyAIBackupDataChanged } from '../utils/aiBackupChange';
 import {
   ASSISTANT_LOG_SUBMITTED_EVENT,
   buildAssistantLogSubmissionTrigger,
@@ -1272,29 +1274,52 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   }, [getKeyboardBottomInset, isOpen, scrollToLatestMessage, shouldUseVisualViewportKeyboardInset]);
 
   useEffect(() => {
-    localStorage.setItem(CHAT_PERSONAS_KEY, JSON.stringify(personas));
+    const serialized = JSON.stringify(personas);
+    if (localStorage.getItem(CHAT_PERSONAS_KEY) !== serialized) {
+      localStorage.setItem(CHAT_PERSONAS_KEY, serialized);
+      notifyAIBackupDataChanged();
+    }
   }, [personas]);
 
   useEffect(() => {
-    localStorage.setItem(CHAT_CUSTOM_PROMPT_BLOCKS_KEY, JSON.stringify(customPromptBlocks));
+    const serialized = JSON.stringify(customPromptBlocks);
+    if (localStorage.getItem(CHAT_CUSTOM_PROMPT_BLOCKS_KEY) !== serialized) {
+      localStorage.setItem(CHAT_CUSTOM_PROMPT_BLOCKS_KEY, serialized);
+      notifyAIBackupDataChanged();
+    }
   }, [customPromptBlocks]);
 
   useEffect(() => {
-    localStorage.setItem(CHAT_SESSIONS_KEY, JSON.stringify(sessions));
+    const serialized = JSON.stringify(sessions);
+    if (localStorage.getItem(CHAT_SESSIONS_KEY) !== serialized) {
+      localStorage.setItem(CHAT_SESSIONS_KEY, serialized);
+      notifyAIBackupDataChanged();
+    }
   }, [sessions]);
 
   useEffect(() => {
     if (activeSessionId) {
-      localStorage.setItem(ACTIVE_SESSION_KEY, activeSessionId);
+      if (localStorage.getItem(ACTIVE_SESSION_KEY) !== activeSessionId) {
+        localStorage.setItem(ACTIVE_SESSION_KEY, activeSessionId);
+        notifyAIBackupDataChanged();
+      }
     }
   }, [activeSessionId]);
 
   useEffect(() => {
-    localStorage.setItem(DEBUG_MODE_KEY, String(debugMode));
+    const serialized = String(debugMode);
+    if (localStorage.getItem(DEBUG_MODE_KEY) !== serialized) {
+      localStorage.setItem(DEBUG_MODE_KEY, serialized);
+      notifyAIBackupDataChanged();
+    }
   }, [debugMode]);
 
   useEffect(() => {
-    localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(userProfile));
+    const serialized = JSON.stringify(userProfile);
+    if (localStorage.getItem(USER_PROFILE_KEY) !== serialized) {
+      localStorage.setItem(USER_PROFILE_KEY, serialized);
+      notifyAIBackupDataChanged();
+    }
   }, [userProfile]);
 
   useEffect(() => {

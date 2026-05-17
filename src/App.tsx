@@ -7,6 +7,7 @@
  * @updated 2026-05-17: 在 Electron 主应用启动时自动恢复已启用的 PC 端小组件，并与设置页共享桌面小组件启动偏好读取逻辑。
  * @updated 2026-05-17: 增加 Electron 桌面小组件动作处理逻辑，支持 toggle_todo, open_todo 和 'start_focus' 快捷开始任务专注。
  * @updated 2026-05-13: Normalized reserved todo categories before passing them into UI editors and pickers so the system `未来` bucket behaves like a first-class category even when older saved data has not persisted it yet.
+ * @updated 2026-05-17: Added unified AI backup payload export so chat sessions, prompts, assistant memory, Dream state, and sanitized AI presets now travel inside the main JSON backup together with the rest of the app data.
  * @updated 2026-05-10: Upgraded the post-start timer auto-jump flow to support none, focus-detail, and immersive entry modes while preserving scene-card immersive overrides.
  * @updated 2026-05-10: Made the widget supplement-log shortcut snap the timeline date back to today before opening the backfill modal.
  * @updated 2026-04-27: Passed todo delete callbacks into the shared quick-actions sheet path so list and week todo action bars can trigger task removal.
@@ -60,6 +61,7 @@ import { useHardwareBackButton } from './hooks/useHardwareBackButton';
 import { useAppLifecycle } from './hooks/useAppLifecycle';
 import { useWidgetBridgeSync } from './hooks/useWidgetBridgeSync';
 import { useFloatingWindowSync } from './hooks/useFloatingWindowSync';
+import { assistantBackupService } from './services/assistantBackupService';
 import { loadEnabledDesktopWidgetTypes } from './services/desktopWidgetService';
 import { ShortcutWidgetAction } from './services/widgetShortcutService';
 import { splitLogByDays } from './utils/logUtils';
@@ -287,6 +289,7 @@ const AppContent: React.FC = () => {
       logs, todos, categories, todoCategories, scopes, goals, majorGoals,
       autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
       monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, customStickerSets, customStickers, filters,
+      aiData: assistantBackupService.buildBackupPayload(),
       sceneGroupState, // 新版：场景组状态
       sceneTimeSlots, // 添加场景设置
       principles, // 添加原则库

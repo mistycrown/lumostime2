@@ -5,12 +5,14 @@
  * @pos Service (Assistant Agent Config)
  * @description Stores the background assistant agent's runtime configuration, including polling, random check-in, and long-term-memory toggles, so the shared AI window and native plugin can stay in sync.
  *
+ * @updated 2026-05-17: Assistant-agent config writes now mark the unified AI backup state as changed so background-setting edits update sync timestamps too.
  * @updated 2026-05-16: Added normalization and persistence support for post-log assistant trigger toggles plus selected activity ids.
  * @updated 2026-05-12: Normalized assistant quiet-hours values to compact `HHMM` strings so the UI can accept user-entered four-digit random-check-in protection windows while still migrating older `HH:MM` data.
  * @updated 2026-04-26: Added persistent assistant agent config storage for AI chat settings, native polling sync, and long-term-memory control.
  */
 
 import type { AssistantAgentConfig } from '../types/assistant';
+import { notifyAIBackupDataChanged } from '../utils/aiBackupChange';
 import { normalizeAssistantQuietHoursValue } from '../utils/assistantQuietHours';
 
 const ASSISTANT_AGENT_CONFIG_KEY = 'lumostime_assistant_agent_config_v1';
@@ -121,10 +123,12 @@ export const assistantAgentConfigService = {
       ...config
     });
     localStorage.setItem(ASSISTANT_AGENT_CONFIG_KEY, JSON.stringify(next));
+    notifyAIBackupDataChanged();
     return next;
   },
 
   clearConfig(): void {
     localStorage.removeItem(ASSISTANT_AGENT_CONFIG_KEY);
+    notifyAIBackupDataChanged();
   }
 };

@@ -6,6 +6,9 @@ Update 2026-05-17: `desktopWidgetService.ts` now also centralizes the Electron d
 
 Contains business logic and external integrations.
 
+Update 2026-05-17: `assistantBackupService.ts` now centralizes the AI-specific backup block for export/import/cloud sync, bundling chat sessions, persona settings, assistant memory/reminders/tasks/history, Dream state, and sanitized AI presets while preserving any compatible local API keys during restore.
+Update 2026-05-17: `assistantAgentConfigService.ts`, `assistantMemoryService.ts`, `assistantReminderQueueService.ts`, `assistantScheduledTaskService.ts`, `assistantOrchestratorService.ts`, `dreamService.ts`, and `aiService.ts` now all mark AI-only persistence changes as sync-relevant so background/foreground AI edits can update the unified backup timestamp even when no main timeline/todo data changed.
+
 Update 2026-05-17: `aiService.ts` now forwards provider-native reasoning summaries through the generic structured-JSON request path too, so ordinary-chat writeback flows like `日报` and `小报` can render the same collapsible `推理过程` block as regular assistant replies.
 
 Update 2026-05-16: `assistantAgentConfigService.ts` now persists the new submitted-log assistant trigger toggle plus selected activity ids, while `assistantOrchestratorService.ts` and the surrounding UI helpers can label `log_submitted` background turns consistently in history/debug views.
@@ -68,7 +71,8 @@ Update 2026-04-09: `obsidianExportService.ts` now supports copying referenced lo
 Update 2026-03-12: timeline styling for normal timeline records is managed by `timelineStyleService.ts`.
 
 ## Files
-- `aiService.ts`: [Active] - Handles AI integration (OpenAI/Gemini) for text parsing, unified foreground/background assistant-turn requests, persona-aware chat replies, dated AI-planned backfill tool calls, root-todo creation, todo updates, subtask creation, log editing, abort-aware chat requests, narrative generation, named local AI preset persistence/migration, and robust non-JSON error capture for debug transparency.
+- `aiService.ts`: [Active] - Handles AI integration (OpenAI/Gemini) for text parsing, unified foreground/background assistant-turn requests, persona-aware chat replies, dated AI-planned backfill tool calls, root-todo creation, todo updates, subtask creation, log editing, abort-aware chat requests, narrative generation, named local AI preset persistence/migration, robust non-JSON error capture for debug transparency, and sync-relevant AI preset/config change signaling.
+- `assistantBackupService.ts`: [Active] - Builds and restores the unified AI backup block used by JSON export/import and cloud sync, including sanitized AI preset metadata plus chat, assistant-agent, Dream, and background-history state.
 - `assistantAgentConfigService.ts`: [Active] - Persists background assistant runtime settings such as polling enablement, long-term-memory enablement, user-editable random check-in ranges, and the new post-log trigger toggle plus selected activity ids so the AI chat settings panel and native Android service can stay aligned.
 - `assistantActionExecutor.ts`: [Active] - Executes assistant-planned create/edit tool calls for logs, todos, and subtasks against local app data, including the reserved `小事` quick-reminder bucket and the reserved `未来` future bucket, returning applied-action snapshots plus the next logs/todos state for UI reuse.
 - `assistantMemoryService.ts`: [Active] - Stores structured assistant memory for the Android-first background AI agent, including profile facts, open loops, working summaries, the latest readable decision summary, and active reminders, with explicit replacement semantics for the active reminder list plus narrow helpers for manually appending and removing profile/preference memory notes.

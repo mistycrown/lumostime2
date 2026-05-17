@@ -5,6 +5,7 @@
  * @pos Service (Assistant Reminders)
  * @description Provides a small durable reminder queue for the Android-first AI agent so it can leave follow-up instructions for future background turns without depending on the chat session history.
  *
+ * @updated 2026-05-17: Reminder queue writes now mark the unified AI backup state as changed so reminder-only edits can trigger export/cloud sync timestamps.
  * @updated 2026-05-17: Deduplicate pending reminders by natural content key during queue saves and agent enqueue calls so repeated background turns cannot silently stack identical self-followup reminders that all fire at the same due time.
  * @updated 2026-05-10: Preserved scheduled-task linkage ids during queue normalization so recurring assistant tasks can reliably reconcile and dedupe pending reminders.
  * @updated 2026-05-09: Delayed failed due-reminder retries for at least one minute in the web queue so failed dispatches stay pending instead of being re-fired immediately.
@@ -16,6 +17,7 @@ import type { AssistantReminder } from '../types/assistant';
 import { Capacitor } from '@capacitor/core';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
 import { assistantMemoryService } from './assistantMemoryService';
+import { notifyAIBackupDataChanged } from '../utils/aiBackupChange';
 import {
   isAssistantDateTimeDue,
   normalizeAssistantDateTime,
@@ -162,6 +164,7 @@ export const assistantReminderQueueService = {
     localStorage.setItem(ASSISTANT_REMINDER_QUEUE_KEY, JSON.stringify(normalized));
     syncRemindersToMemory(normalized);
     syncRemindersToNative(normalized);
+    notifyAIBackupDataChanged();
     return normalized;
   },
 
@@ -299,6 +302,7 @@ export const assistantReminderQueueService = {
     localStorage.removeItem(ASSISTANT_REMINDER_QUEUE_KEY);
     syncRemindersToMemory([]);
     syncRemindersToNative([]);
+    notifyAIBackupDataChanged();
   },
 
   async hydrateFromNative(): Promise<AssistantReminder[]> {

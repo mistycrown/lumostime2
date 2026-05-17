@@ -3,6 +3,7 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- Update 2026-05-17: `aiBackupChange.ts` now centralizes the AI-only backup change signal, bumping the shared local-data timestamp and dispatching a dedicated event so local AI storage writes can participate in cloud sync.
 - Update 2026-05-17: `todoScheduleUtils.ts` now treats shared month-view entries as `Done > Due > Arrange > Repeat > Maybe > Trace` for non-trace ordering, so one todo with multiple day badges renders and sorts by its highest-priority state while the continuous trace-lane layout stays unchanged.
 - Update 2026-05-17: `desktopTodoQuickEditorAnchorUtils.ts` now converts widget click and keyboard events into screen-space anchor coordinates so the external desktop quick-editor window can open near the source row.
 - Update 2026-05-17: `desktopTodoQuickEditorUtils.ts` now builds the shared desktop-widget quick-editor model, including compact arrange/due/maybe summary text plus child-list or note-only fallback content for the external quick editor.
@@ -14,6 +15,7 @@ Contains pure utility functions for data processing and business logic calculati
 - Update 2026-05-14: `todoScheduleUtils.ts` now derives a sixth `Maybe` schedule type from today-or-future `maybeDates`, respects recurrence `skipDates`, and also exposes hydration cleanup so stale past `Maybe Date` values are dropped automatically when todos load.
 - Update 2026-05-14: `todoScheduleAssignUtils.ts` now keeps `Maybe` / `Arrange` / `Due` on one shared picker order: undated root todos first, dated roots after that in date order, saved root-todo order preserved within each bucket, and subtasks still attached under parents via `childOrder`.
 - `assistantDebugFormat.ts`: [Active] - Extracts readable summaries and debug-view blocks from malformed AI responses, including raw HTML error pages, parse failures, and full response-body fallbacks.
+- `aiBackupChange.ts`: [Active] - Marks AI-only local persistence updates as sync-relevant by updating the shared local timestamp and dispatching a dedicated AI backup change event.
 - `assistantLogSubmissionTrigger.ts`: [Active] - Emits the shared submitted-log event, matches newly created logs against the assistant's selected activity ids, builds the fixed `System: 用户刚才完成了一条时间记录` trigger text, and provides a temporary log-upsert helper so background turns can see a just-saved record immediately.
 - `todoScheduleUtils.ts`: [Active] - Shared todo planning helpers for Arrange / Due / Repeat / Done / Trace surfaces, including compact recurrence summaries like `每天`, `每周一三五`, and `每月 1,15,31` for lightweight UI metadata.
 - `todoScheduleAssignUtils.ts`: [Active] - Filters, sorts, and builds hierarchy rows for arrange/due picker todos, including the rules that unfinished subtasks disappear when their parent todo is already completed, recurring todos and the reserved `鏈潵` category stay out of quick scheduling, and title search keeps matched subtasks attached to their parent rows.

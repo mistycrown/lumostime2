@@ -5,6 +5,7 @@
  * @pos Service (Assistant Memory)
  * @description Stores and updates the Android-first assistant agent's structured memory so background turns can rely on compact durable state instead of replaying unbounded chat history.
  *
+ * @updated 2026-05-17: AI memory writes now mark the unified AI backup state as changed so exports and cloud sync can see memory-only updates immediately.
  * @updated 2026-05-10: Preserved scheduled-task reminder linkage in memory snapshots so active reminder state stays lossless across queue syncs.
  * @updated 2026-04-27: Accepted malformed single-string memory patch fields such as recentDecisions so foreground/background turns do not silently lose durable memory writes when model output drifts from the exact schema.
  * @updated 2026-04-27: Collapsed recent decision memory down to the latest single summary so the assistant keeps only the newest behavior snapshot.
@@ -20,6 +21,7 @@ import type {
   AssistantMemoryPatch,
   AssistantReminder
 } from '../types/assistant';
+import { notifyAIBackupDataChanged } from '../utils/aiBackupChange';
 
 const ASSISTANT_MEMORY_KEY = 'lumostime_assistant_memory_v1';
 
@@ -197,6 +199,7 @@ export const assistantMemoryService = {
       updatedAt: new Date().toISOString()
     };
     localStorage.setItem(ASSISTANT_MEMORY_KEY, JSON.stringify(next));
+    notifyAIBackupDataChanged();
     return next;
   },
 
@@ -289,5 +292,6 @@ export const assistantMemoryService = {
 
   clearMemory(): void {
     localStorage.removeItem(ASSISTANT_MEMORY_KEY);
+    notifyAIBackupDataChanged();
   }
 };
