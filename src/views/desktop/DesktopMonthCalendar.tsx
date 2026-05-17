@@ -6,8 +6,9 @@
  * @description Renders a desktop scheduling calendar that pages by 2/3/4 whole weeks, keeps the app's month-view spacing feel, and supports drag-to-schedule inside the desktop widget.
  * @updated 2026-05-17: Replaced the fixed 6x7 month grid with a dynamic 2/3/4-week page layout so the widget can navigate by week-page units instead of whole months.
  * @updated 2026-05-17: Reused the shared week-trace layout so cross-day trace events render as continuous bars and aligned desktop complete/maybe styling with the app month view.
+ * @updated 2026-05-17: Switched month-cell overflow from a fixed per-page row cap to ResizeObserver-backed height estimation so taller widgets use their spare space before collapsing to `+N`.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, isSameDay } from 'date-fns';
 import { Log, TodoItem } from '../../types';
 import {
@@ -34,11 +35,13 @@ const MONTH_ENTRY_TOP_MARGIN_PX = 6;
 const MONTH_ENTRY_TOP_OFFSET_PX = MONTH_CELL_VERTICAL_PADDING_PX + MONTH_DAY_NUMBER_ROW_HEIGHT_PX + MONTH_ENTRY_TOP_MARGIN_PX;
 const MONTH_ENTRY_ROW_GAP_PX = 2;
 const MONTH_CELL_LINE_HEIGHT_PX = 16;
-const WEEKS_PER_PAGE_TO_VISIBLE_ENTRY_COUNT: Record<2 | 3 | 4, number> = {
+const MONTH_CELL_FOOTER_RESERVE_PX = 18;
+const DEFAULT_VISIBLE_ENTRY_COUNT_BY_PAGE: Record<2 | 3 | 4, number> = {
   2: 5,
   3: 4,
   4: 3
 };
+const MAX_VISIBLE_ENTRY_COUNT = 12;
 
 interface DesktopMonthCalendarProps {
   todos: TodoItem[];
@@ -53,6 +56,27 @@ interface DesktopMonthCalendarProps {
   isDark?: boolean;
   onWheelPageChange?: (direction: 'prev' | 'next') => void;
 }
+
+export const getDesktopMonthVisibleEntryCount = (
+  calendarBodyHeight: number,
+  weeksPerPage: 2 | 3 | 4
+): number => {
+  if (calendarBodyHeight <= 0) {
+    return DEFAULT_VISIBLE_ENTRY_COUNT_BY_PAGE[weeksPerPage];
+  }
+
+  const weekRowHeight = calendarBodyHeight / weeksPerPage;
+  const nonEntryHeight = (MONTH_CELL_VERTICAL_PADDING_PX * 2)
+    + MONTH_DAY_NUMBER_ROW_HEIGHT_PX
+    + MONTH_ENTRY_TOP_MARGIN_PX
+    + MONTH_CELL_FOOTER_RESERVE_PX;
+  const availableEntryHeight = Math.max(0, weekRowHeight - nonEntryHeight);
+  const computedRows = Math.floor(
+    (availableEntryHeight + MONTH_ENTRY_ROW_GAP_PX) / (MONTH_CELL_LINE_HEIGHT_PX + MONTH_ENTRY_ROW_GAP_PX)
+  );
+
+  return Math.max(1, Math.min(MAX_VISIBLE_ENTRY_COUNT, computedRows));
+};
 
 const getEntryColorKey = (entry: TodoDateEntry): TodoScheduleTypeColorKey => {
   if (entry.badges.deadline) {
@@ -92,12 +116,44 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
 }) => {
   const today = useMemo(() => new Date(), []);
   const todayDateKey = useMemo(() => formatDateKey(today), [today]);
+  const calendarBodyRef = useRef<HTMLDivElement | null>(null);
   const wheelLockRef = useRef(false);
   const [draggingEntry, setDraggingEntry] = useState<TodoDateEntry | null>(null);
   const [dragTargetDate, setDragTargetDate] = useState<string | null>(null);
+  const [calendarBodyHeight, setCalendarBodyHeight] = useState(0);
   const [scheduleTypeColorSettings, setScheduleTypeColorSettings] = useState<TodoScheduleTypeColorSettings>(() => (
     todoScheduleColorService.getSettings()
   ));
+
+  useLayoutEffect(() => {
+    const target = calendarBodyRef.current;
+    if (!target) {
+      return;
+    }
+
+    const updateHeight = () => {
+      const nextHeight = target.clientHeight;
+      setCalendarBodyHeight((current) => (current === nextHeight ? current : nextHeight));
+    };
+
+    updateHeight();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateHeight);
+      return () => {
+        window.removeEventListener('resize', updateHeight);
+      };
+    }
+
+    const observer = new ResizeObserver(() => {
+      updateHeight();
+    });
+    observer.observe(target);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [weeksPerPage]);
 
   useEffect(() => {
     const handleSettingsUpdated = (event: Event) => {
@@ -178,7 +234,10 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
     [calendarDays, weeksPerPage]
   );
 
-  const visibleEntryCount = WEEKS_PER_PAGE_TO_VISIBLE_ENTRY_COUNT[weeksPerPage];
+  const visibleEntryCount = useMemo(
+    () => getDesktopMonthVisibleEntryCount(calendarBodyHeight, weeksPerPage),
+    [calendarBodyHeight, weeksPerPage]
+  );
   const weekLayouts = useMemo<TodoMonthWeekLayout[]>(
     () => calendarWeeks.map((days) => buildTodoMonthWeekLayout(
       days.map((day) => formatDateKey(day)),
@@ -274,7 +333,11 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
         ))}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-px" onWheel={handleWheel}>
+      <div
+        ref={calendarBodyRef}
+        className="flex min-h-0 flex-1 flex-col overflow-hidden px-px"
+        onWheel={handleWheel}
+      >
         {calendarWeeks.map((weekDays, weekIndex) => {
           const weekLayout = weekLayouts[weekIndex];
           const visibleTraceSegments = (weekLayout?.traceSegments || []).filter(

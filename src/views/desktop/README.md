@@ -4,12 +4,14 @@
 
 ## Updates
 
-- 2026-05-17: 新增并迭代重构了 `DesktopQuickWidgetView.tsx`（小事清单小组件）。移除了任务颜色圆点和相关配色设置，新增了屏幕内快速添加小事的精致输入栏，完全打通了小事的新增、勾选、同步数据链路。
+- 2026-05-17: 优化了月历小组件（DesktopMonthWidgetView.tsx）右侧计划栏的分类标签，将其顺序变更为 maybe / arrange / due 并默认选中 arrange 标签，标签样式改为英文小写形式。
+- 2026-05-17: 新增并迭代重构了 `DesktopQuickWidgetView.tsx`（小事清单小组件）。移除了任务前面的颜色圆点、顶部控制栏的日期显示以及所有多余的分组标题（如置顶、今天、逾期等），使小事列表完全扁平化展示，视觉极致纯粹精简；同时新增了屏幕内快速添加小事的精致输入栏，完全打通了小事的新增、勾选、多端无感知同步。
 - 2026-05-17: Added `DesktopTodayWidgetView.tsx` for the compact desktop today widget.
 - 2026-05-17: Added `DesktopMonthWidgetView.tsx` for the desktop planning calendar widget.
 - 2026-05-17: The desktop month widget now pages by `2 / 3 / 4` whole weeks instead of forcing one fixed month per screen. Header arrows and wheel gestures move by one page, `本月` jumps to the page containing today, and changing weeks-per-page no longer auto-resizes the widget window.
 - 2026-05-17: `DesktopMonthCalendar.tsx` now renders a dynamic `7 x 2/3/4` week-page grid while preserving drag-to-schedule behavior and the right-side planning sidebar.
 - 2026-05-17: The desktop month widget now supports a persisted top-right sidebar collapse toggle, and `DesktopMonthCalendar.tsx` now reuses the shared week-trace lane layout so cross-day `Trace` bars stay connected while `Maybe` and `Done` match the app month-view styling.
+- 2026-05-17: `DesktopMonthCalendar.tsx` now estimates visible todo rows from the widget's real body height, so taller month-widget cells keep using spare vertical space before showing `+N`.
 
 - 2026-05-17: `DesktopMonthWidgetView.tsx` now groups the right planning sidebar by todo category, removes the extra linked-category line, and keeps one-level subtasks visible under their parent rows or as standalone `子任务 @父任务` rows when the parent is filtered out.
 
@@ -18,8 +20,8 @@
 ### `DesktopQuickWidgetView.tsx`
 
 - 渲染轻量级的桌面小事待办清单。
-- 移除了专注计时（Play）按钮，并移除了任务前面的颜色圆点，界面极致素雅清爽。
-- 新增屏内“快速添加小事”输入框（通过顶部控制栏 `+` 按钮触发），支持回车直接添加、ESC 取消输入并自动收起，拥有极其出色的按键和焦点响应。
+- 移除了专注计时（Play）按钮，去除了任务前面的颜色圆点以及控制栏的日期，**并彻底剔除了“置顶/今天/逾期”等日期与分组标题**，使待办事项呈完全扁平、一目了然的素雅纸条平铺状态，视觉无任何杂质。
+- 新增屏内“快速添加小事”输入框（通过顶部控制栏 `+` 按钮触发），支持回车直接添加、ESC 取消输入并自动收起，拥有极其出色的按键 and 焦点响应。
 - 拥有独立于今日小组件、月历小组件的透明度、深浅色模式等显示设置的持久化本地存储。
 
 ### `DesktopTodayWidgetView.tsx`
