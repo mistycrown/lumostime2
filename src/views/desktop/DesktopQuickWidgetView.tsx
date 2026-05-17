@@ -12,16 +12,19 @@ import {
   DesktopWidgetTodoItem,
   loadDesktopQuickWidgetSnapshotAsync
 } from '../../services/desktopWidgetService';
+import { resolveDesktopTodoQuickEditorScreenAnchor } from '../../utils/desktopTodoQuickEditorAnchorUtils';
 
 const APP_READY_EVENT = 'lumostime:app-ready';
 const PENDING_TOGGLE_RESET_MS = 1800;
-
 
 const TodoRow: React.FC<{
   item: DesktopWidgetTodoItem;
   isPending: boolean;
   onToggle: (todoId: string) => void;
-  onOpen: (todoId: string) => void;
+  onOpen: (
+    todoId: string,
+    event: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
+  ) => void;
   theme: 'light' | 'dark';
 }> = ({
   item,
@@ -36,11 +39,11 @@ const TodoRow: React.FC<{
     <div
       role="button"
       tabIndex={0}
-      onClick={() => onOpen(item.todoId)}
+      onClick={(event) => onOpen(item.todoId, event)}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          onOpen(item.todoId);
+          onOpen(item.todoId, event);
         }
       }}
       className={`group flex w-full items-center justify-between gap-2.5 rounded px-2 py-1 text-left transition ${
@@ -192,10 +195,16 @@ export const DesktopQuickWidgetView: React.FC = () => {
     return [...pinnedItems, ...otherItems];
   }, [snapshot]);
 
-  const handleOpenTodo = (todoId: string) => {
-    window.desktopWidget?.requestMainAction({
-      type: 'open_todo',
-      todoId
+  const handleOpenTodoQuickEditor = async (
+    todoId: string,
+    event: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
+  ) => {
+    const anchor = await resolveDesktopTodoQuickEditorScreenAnchor(event);
+    window.desktopWidget?.openTodoQuickEditor?.({
+      todoId,
+      theme,
+      x: anchor.x,
+      y: anchor.y
     });
   };
 
@@ -295,7 +304,7 @@ export const DesktopQuickWidgetView: React.FC = () => {
           ? `rgba(28, 28, 30, ${opacity})`
           : `rgba(250, 250, 250, ${opacity})`
       } as React.CSSProperties}
-      className={`h-screen w-screen flex flex-col font-sans overflow-hidden border transition-colors duration-200 ${
+      className={`relative h-screen w-screen flex flex-col font-sans overflow-hidden border transition-colors duration-200 ${
         isDark
           ? 'text-stone-100 border-stone-800'
           : 'text-stone-800 border-stone-200/50'
@@ -507,7 +516,7 @@ export const DesktopQuickWidgetView: React.FC = () => {
                 item={item}
                 isPending={pendingTodoIds.includes(item.todoId)}
                 onToggle={handleToggleTodo}
-                onOpen={handleOpenTodo}
+                onOpen={handleOpenTodoQuickEditor}
                 theme={theme}
               />
             ))}

@@ -4,6 +4,12 @@
 
 ## Updates
 
+- 2026-05-17: `DesktopMonthCalendar.tsx` now colors desktop month rows from the shared month-entry `primaryKind`, so a todo that is both completed and due/arranged/maybe on the same day still renders with completed-first styling while the existing continuous trace strip layout remains intact.
+
+- 2026-05-17: 修复并优化了桌面任务快捷编辑气泡框（`DesktopTodoQuickEditorPopover.tsx`）在 `inline` 模式下的最大高度限制和 flex 伸缩布局，解决子任务条目过多时由于外层未限高导致无法在独立 Electron 窗口内滚动显示的问题。
+- 2026-05-17: 支持了桌面月历小组件中任务着色模式的屏内切换，用户可以在显示设置面板中选择“按排期”或“按分类”进行着色渲染，并能直接无缝同步和读取应用内已有的排期或分类颜色配置。
+- 2026-05-17: `DesktopTodoQuickEditorWindowView.tsx` now hosts the shared widget quick editor inside its own transparent always-on-top Electron window, with an added quick toggle-complete action button next to the external-link button in the popover header, so todo clicks from today/quick/month widgets can open a larger editor beyond the source widget bounds instead of getting clipped by the widget `BrowserWindow`.
+- 2026-05-17: `DesktopTodayWidgetView.tsx`, `DesktopQuickWidgetView.tsx`, `DesktopMonthWidgetView.tsx`, and `DesktopMonthCalendar.tsx` now route todo clicks into that external quick-editor window, using screen-space anchors instead of local popover coordinates.
 - 2026-05-17: 优化了月历小组件计划栏，禁用列表项的点击跳转详情事件，移除了 hover 时向右的跳转详情箭头，变更为可点击的展开/收缩子任务按钮，支持父任务对其下子任务的收起与展开操作，无子任务的项则直接删除按钮，并在折叠状态下常驻显示展开图标。
 - 2026-05-17: 新增了 `DesktopTimerWidgetView.tsx`（桌面计时器小组件）视图。长宽固定为 240px x 120px。静止（Resting）状态下大字呼吸计时，悬停（Hover）状态下展现活动标题与全功能操作按钮，支持主题与透明度调节，打通了结束专注与快速打开主页面的跨窗口动作转发。
 - 2026-05-17: `DesktopMonthWidgetView.tsx` now keeps already dated unfinished todos visible across the right-side `arrange` / `maybe` / `due` tabs, sorts undated rows before dated rows inside each todo category, and shows compact trailing dates like `5/20` so items can be rescheduled in place.
@@ -12,7 +18,7 @@
 - 2026-05-17: Added `DesktopTodayWidgetView.tsx` for the compact desktop today widget.
 - 2026-05-17: Added `DesktopMonthWidgetView.tsx` for the desktop planning calendar widget.
 - 2026-05-17: The desktop month widget now pages by `2 / 3 / 4` whole weeks instead of forcing one fixed month per screen. Header arrows and wheel gestures move by one page, `本月` jumps to the page containing today, and changing weeks-per-page no longer auto-resizes the widget window.
-- 2026-05-17: `DesktopMonthCalendar.tsx` now renders a dynamic `7 x 2/3/4` week-page grid while preserving drag-to-schedule behavior and the right-side planning sidebar.
+- 2026-05-17: `DesktopMonthCalendar.tsx` now renders a dynamic `7 x 2/3/4` week-page grid while preserving drag-to-schedule behavior and the right-side planning sidebar, and now wires up click handlers on monthly trace segments to trigger the quick actions popover outside widget bounds.
 - 2026-05-17: The desktop month widget now supports a persisted top-right sidebar collapse toggle, and `DesktopMonthCalendar.tsx` now reuses the shared week-trace lane layout so cross-day `Trace` bars stay connected while `Maybe` and `Done` match the app month-view styling.
 - 2026-05-17: `DesktopMonthCalendar.tsx` now estimates visible todo rows from the widget's real body height, so taller month-widget cells keep using spare vertical space before showing `+N`.
 

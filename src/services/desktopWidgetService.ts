@@ -7,6 +7,7 @@
  * @updated 2026-05-17: 扩展了桌面小组件状态快照，新增计时器小组件（timer widget）的快照构建 buildDesktopTimerWidgetSnapshot 与 loadDesktopTimerWidgetSnapshotFromStorage。
  * @updated 2026-05-17: 新增桌面小组件启动偏好键名与读取辅助逻辑，供 Electron 主应用启动时自动恢复已启用的 PC 端小组件。
  * @updated 2026-05-17: 扩展了桌面小组件的支持，新增 desktop-quick（小事清单小组件）快照构建与窗口检测，实现了 buildDesktopQuickWidgetSnapshot 以确保无排期的小事能够完整呈现在小组件待办列表中。
+ * @updated 2026-05-17: Added a dedicated `desktop-editor` route and shared payload type for the transparent widget quick-editor window.
  * @updated 2026-05-17: Added desktop widget route detection plus today/pin/overdue snapshot builders for the Electron desktop today widget and month-widget window, with getDesktopWidgetType helper support.
  */
 import { USER_DATA_KEYS, storage } from '../constants/storageKeys';
@@ -25,6 +26,7 @@ export const DESKTOP_WIDGET_WINDOW_QUERY_VALUE = 'desktop-widget';
 export const DESKTOP_MONTH_WIDGET_WINDOW_QUERY_VALUE = 'desktop-month';
 export const DESKTOP_QUICK_WIDGET_WINDOW_QUERY_VALUE = 'desktop-quick';
 export const DESKTOP_TIMER_WIDGET_WINDOW_QUERY_VALUE = 'desktop-timer';
+export const DESKTOP_EDITOR_WIDGET_WINDOW_QUERY_VALUE = 'desktop-editor';
 export const DESKTOP_WIDGET_TODAY_STORAGE_KEY = 'lumostime_desktop_widget_today_enabled';
 export const DESKTOP_WIDGET_MONTH_STORAGE_KEY = 'lumostime_desktop_widget_month_enabled';
 export const DESKTOP_WIDGET_QUICK_STORAGE_KEY = 'lumostime_desktop_widget_quick_enabled';
@@ -33,6 +35,13 @@ export const DESKTOP_WIDGET_TIMER_STORAGE_KEY = 'lumostime_desktop_widget_timer_
 export type DesktopWidgetStartupType = 'today' | 'month' | 'quick' | 'timer';
 
 export type DesktopWidgetBadgeLabel = 'PIN' | 'TODAY' | 'LATE' | 'MAYBE';
+
+export interface DesktopTodoQuickEditorWindowPayload {
+  todoId: string;
+  theme: 'light' | 'dark';
+  x: number;
+  y: number;
+}
 
 export interface DesktopWidgetTodoItem {
   todoId: string;
@@ -161,10 +170,14 @@ export const isDesktopWidgetWindow = (): boolean => {
     return false;
   }
   const val = new URLSearchParams(window.location.search).get(DESKTOP_WIDGET_WINDOW_QUERY_KEY);
-  return val === DESKTOP_WIDGET_WINDOW_QUERY_VALUE || val === DESKTOP_MONTH_WIDGET_WINDOW_QUERY_VALUE || val === DESKTOP_QUICK_WIDGET_WINDOW_QUERY_VALUE || val === DESKTOP_TIMER_WIDGET_WINDOW_QUERY_VALUE;
+  return val === DESKTOP_WIDGET_WINDOW_QUERY_VALUE
+    || val === DESKTOP_MONTH_WIDGET_WINDOW_QUERY_VALUE
+    || val === DESKTOP_QUICK_WIDGET_WINDOW_QUERY_VALUE
+    || val === DESKTOP_TIMER_WIDGET_WINDOW_QUERY_VALUE
+    || val === DESKTOP_EDITOR_WIDGET_WINDOW_QUERY_VALUE;
 };
 
-export const getDesktopWidgetType = (): 'today' | 'month' | 'quick' | 'timer' | null => {
+export const getDesktopWidgetType = (): 'today' | 'month' | 'quick' | 'timer' | 'editor' | null => {
   if (typeof window === 'undefined') {
     return null;
   }
@@ -180,6 +193,9 @@ export const getDesktopWidgetType = (): 'today' | 'month' | 'quick' | 'timer' | 
   }
   if (val === DESKTOP_TIMER_WIDGET_WINDOW_QUERY_VALUE) {
     return 'timer';
+  }
+  if (val === DESKTOP_EDITOR_WIDGET_WINDOW_QUERY_VALUE) {
+    return 'editor';
   }
   return null;
 };

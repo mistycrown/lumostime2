@@ -217,11 +217,11 @@ export const DesktopTimerWidgetView: React.FC = () => {
         </span>
       </div>
 
-      {/* 控制按钮区域：Hover 时直接在最中央淡入浮现 */}
+      {/* 控制按钮区域：Hover 时直接在最中央淡入浮现，极简紧凑定位以绝不遮挡底层背景的 drag 拖拽区域 */}
       <div
         onDoubleClick={handleToggleTheme}
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        className={`absolute inset-0 z-30 flex items-center justify-center gap-2.5 transition-all duration-300 transform cursor-pointer ${
+        className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 flex items-center justify-center gap-2.5 transition-all duration-300 transform cursor-pointer w-auto h-auto ${
           isHovered ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'
         }`}
         title="双击切换深浅色主题"

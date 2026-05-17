@@ -3,6 +3,9 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- Update 2026-05-17: `todoScheduleUtils.ts` now treats shared month-view entries as `Done > Due > Arrange > Repeat > Maybe > Trace` for non-trace ordering, so one todo with multiple day badges renders and sorts by its highest-priority state while the continuous trace-lane layout stays unchanged.
+- Update 2026-05-17: `desktopTodoQuickEditorAnchorUtils.ts` now converts widget click and keyboard events into screen-space anchor coordinates so the external desktop quick-editor window can open near the source row.
+- Update 2026-05-17: `desktopTodoQuickEditorUtils.ts` now builds the shared desktop-widget quick-editor model, including compact arrange/due/maybe summary text plus child-list or note-only fallback content for the external quick editor.
 - Update 2026-05-17: `desktopMonthWidgetSidebarUtils.ts` now keeps unfinished todos visible across the desktop month widget's `Arrange` / `Maybe` / `Due` tabs, sorts undated rows before dated rows inside each category, and exposes compact trailing date text for rescheduling.
 - Update 2026-05-17: `desktopMonthWidgetSidebarUtils.ts` now builds grouped desktop month-widget sidebar sections so Arrange/Maybe/Due rows render by todo category, keep one-level subtasks attached to visible parents, and fall back to plain-text `@parent` labels when a parent row is filtered out.
 - Update 2026-05-16: `assistantLogSubmissionTrigger.ts` now centralizes the new-log assistant trigger event, selected-tag matching, temporary log upsert, and fixed submitted-log system-text assembly so manual log saves and focus-generated logs can share one post-save AI path without coupling log CRUD to assistant orchestration.

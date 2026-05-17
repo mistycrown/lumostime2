@@ -6,11 +6,15 @@
  * @description Renders a desktop scheduling calendar that pages by 2/3/4 whole weeks, keeps the app's month-view spacing feel, and supports drag-to-schedule inside the desktop widget.
  * @updated 2026-05-17: Replaced the fixed 6x7 month grid with a dynamic 2/3/4-week page layout so the widget can navigate by week-page units instead of whole months.
  * @updated 2026-05-17: Reused the shared week-trace layout so cross-day trace events render as continuous bars and aligned desktop complete/maybe styling with the app month view.
+ * @updated 2026-05-17: Converted todo clicks to screen-space anchors so the external widget quick editor can open outside the widget window bounds.
  * @updated 2026-05-17: Switched month-cell overflow from a fixed per-page row cap to ResizeObserver-backed height estimation so taller widgets use their spare space before collapsing to `+N`.
+ * @updated 2026-05-17: Wired up click handlers on monthly trace segments to trigger the quick actions popover outside widget bounds.
+ * @updated 2026-05-17: Switched desktop month-entry marker colors to the shared `primaryKind`, so completed rows now keep completed styling even when due/arrange/maybe badges also match on the same day.
+ * @updated 2026-05-17: 支持在月历小组件显示设置中切换任务着色模式（按排期/按分类），并完美读取分类着色数据。
  */
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, isSameDay } from 'date-fns';
-import { Log, TodoItem } from '../../types';
+import { Log, TodoCategory, TodoItem } from '../../types';
 import {
   buildTodoDateEntryMap,
   buildTodoMonthWeekLayout,
@@ -20,6 +24,7 @@ import {
   TodoWeekTraceSegment
 } from '../../utils/todoScheduleUtils';
 import { hexToRgba } from '../../utils/colorUtils';
+import { getColorHexForCharts } from '../../utils/colorAdapterUtils';
 import {
   getResolvedTodoScheduleTypeColors,
   TODO_SCHEDULE_TYPE_COLOR_SETTINGS_UPDATED_EVENT,
@@ -27,6 +32,7 @@ import {
   type TodoScheduleTypeColorKey,
   type TodoScheduleTypeColorSettings
 } from '../../services/todoScheduleColorService';
+import { resolveDesktopTodoQuickEditorScreenAnchor } from '../../utils/desktopTodoQuickEditorAnchorUtils';
 
 const WEEKDAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 const MONTH_CELL_VERTICAL_PADDING_PX = 6;
@@ -49,12 +55,14 @@ interface DesktopMonthCalendarProps {
   pageStartDate: Date;
   weeksPerPage: 2 | 3 | 4;
   onMoveScheduleEntry?: (entry: TodoDateEntry, targetDateKey: string) => void;
-  onOpenTodo?: (todo: TodoItem) => void;
+  onOpenTodo?: (todo: TodoItem, anchor: { x: number; y: number }) => void;
   isScheduleLocked?: boolean;
   externalDraggingTodoId?: string | null;
   externalDraggingType?: 'scheduled' | 'deadline' | 'maybe' | null;
   isDark?: boolean;
   onWheelPageChange?: (direction: 'prev' | 'next') => void;
+  markerColorMode?: 'schedule' | 'category';
+  todoCategories?: TodoCategory[];
 }
 
 export const getDesktopMonthVisibleEntryCount = (
@@ -78,24 +86,7 @@ export const getDesktopMonthVisibleEntryCount = (
   return Math.max(1, Math.min(MAX_VISIBLE_ENTRY_COUNT, computedRows));
 };
 
-const getEntryColorKey = (entry: TodoDateEntry): TodoScheduleTypeColorKey => {
-  if (entry.badges.deadline) {
-    return 'deadline';
-  }
-  if (entry.badges.scheduled) {
-    return 'scheduled';
-  }
-  if (entry.badges.maybe) {
-    return 'maybe';
-  }
-  if (entry.badges.recurring) {
-    return 'recurring';
-  }
-  if (entry.badges.completed) {
-    return 'completed';
-  }
-  return 'inProgress';
-};
+const getEntryColorKey = (entry: TodoDateEntry): TodoScheduleTypeColorKey => entry.primaryKind;
 
 const isEntryDraggable = (entry: TodoDateEntry, isScheduleLocked: boolean): boolean => (
   !isScheduleLocked && (entry.badges.scheduled || entry.badges.deadline || entry.badges.maybe)
@@ -112,6 +103,8 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
   externalDraggingTodoId = null,
   externalDraggingType = null,
   isDark = false,
+  markerColorMode = 'schedule',
+  todoCategories = [],
   onWheelPageChange
 }) => {
   const today = useMemo(() => new Date(), []);
@@ -124,6 +117,11 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
   const [scheduleTypeColorSettings, setScheduleTypeColorSettings] = useState<TodoScheduleTypeColorSettings>(() => (
     todoScheduleColorService.getSettings()
   ));
+
+  const todoCategoryColorMap = useMemo(
+    () => new Map(todoCategories.map((category) => [category.id, getColorHexForCharts(category.color || '')])),
+    [todoCategories]
+  );
 
   useLayoutEffect(() => {
     const target = calendarBodyRef.current;
@@ -282,8 +280,15 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
     onWheelPageChange(event.deltaY > 0 ? 'next' : 'prev');
   };
 
+  const getTodoMarkerColor = (entry: TodoDateEntry): string => {
+    if (markerColorMode === 'category') {
+      return todoCategoryColorMap.get(entry.todo.categoryId) || resolvedScheduleTypeColors[getEntryColorKey(entry)];
+    }
+    return resolvedScheduleTypeColors[getEntryColorKey(entry)];
+  };
+
   const getTodoMarkerStyle = (entry: TodoDateEntry): React.CSSProperties => {
-    const markerColor = resolvedScheduleTypeColors[getEntryColorKey(entry)];
+    const markerColor = getTodoMarkerColor(entry);
 
     if (entry.primaryKind === 'maybe') {
       return {
@@ -309,7 +314,7 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
   );
 
   const getTraceSegmentStyle = (segment: TodoWeekTraceSegment): React.CSSProperties => {
-    const markerColor = resolvedScheduleTypeColors[getEntryColorKey(segment.entry)];
+    const markerColor = getTodoMarkerColor(segment.entry);
     const spanDayCount = segment.endDayIndex - segment.startDayIndex + 1;
 
     return {
@@ -352,9 +357,15 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
                     key={`${weekIndex}-${segment.todoId}-${segment.startDayIndex}-${segment.endDayIndex}`}
                     className={`absolute flex items-center overflow-hidden font-medium leading-[1.2] ${
                       isDark ? 'text-stone-200' : 'text-stone-800'
-                    } text-[0.74rem]`}
+                    } text-[0.74rem] ${onOpenTodo ? 'cursor-pointer pointer-events-auto' : ''}`}
                     style={getTraceSegmentStyle(segment)}
                     title={segment.entry.todo.title}
+                    onClick={onOpenTodo ? (event) => {
+                      event.stopPropagation();
+                      void resolveDesktopTodoQuickEditorScreenAnchor(event).then((anchor) => {
+                        onOpenTodo(segment.entry.todo, anchor);
+                      });
+                    } : undefined}
                   >
                     <span className="truncate whitespace-nowrap">{segment.entry.todo.title}</span>
                   </div>
@@ -487,7 +498,9 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
                                   type="button"
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    onOpenTodo(entry.todo);
+                                    void resolveDesktopTodoQuickEditorScreenAnchor(event).then((anchor) => {
+                                      onOpenTodo(entry.todo, anchor);
+                                    });
                                   }}
                                   className="block w-full truncate text-left"
                                 >

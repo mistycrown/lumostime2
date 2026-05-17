@@ -4,6 +4,7 @@
  * @output Regression coverage for virtual-category date matching, shared day entries, and week-view badge normalization
  * @pos Test (todo planning utilities)
  * @description Verifies today/tomorrow/this-week filtering and shared per-day entry building against Arrange, Due, recurrence, and Maybe rules without creating occurrence records.
+ * @updated 2026-05-17: Added regression coverage for completed-first month-entry priority when one todo matches multiple day badges, while preserving repeat-before-maybe ordering and leaving trace-lane layout unchanged.
  * @updated 2026-05-14: Added regression coverage for recurrence `skipDates`, quick-action next-occurrence resolution, today-or-future `maybeDates`, hydration cleanup helpers, and Maybe ordering in shared day-entry builders.
   * Once I am updated, be sure to update my header comment and the folder's md.
 
@@ -324,7 +325,7 @@ describe('todoScheduleUtils virtual category helpers', () => {
     ]);
   });
 
-  test('builds shared per-day entries with the same priority order used by the week planner', () => {
+  test('builds shared per-day entries with completed rows first, followed by due, arrange, repeat, and trace', () => {
     const todos: TodoItem[] = [
       buildTodo({ id: 'completed', title: 'Echo', completedAt: new Date('2026-04-20T20:00:00+08:00').getTime() }),
       buildTodo({ id: 'scheduled', title: 'Bravo', scheduledDate: '2026-04-20' }),
@@ -351,11 +352,44 @@ describe('todoScheduleUtils virtual category helpers', () => {
     const entries = buildTodoDateEntries(todos, logs, '2026-04-20');
 
     expect(entries.map((entry) => `${entry.todo.id}:${entry.primaryKind}`)).toEqual([
+      'completed:completed',
       'deadline:deadline',
       'scheduled:scheduled',
       'recurring:recurring',
-      'completed:completed',
       'in-progress:inProgress'
+    ]);
+  });
+
+  test('uses the highest-priority shared primary kind when one todo matches completed, due, arrange, repeat, maybe, and trace on the same day', () => {
+    const todos: TodoItem[] = [
+      buildTodo({
+        id: 'stacked',
+        title: 'Stacked priority',
+        scheduledDate: '2026-04-20',
+        deadlineDate: '2026-04-20',
+        maybeDates: ['2026-04-20'],
+        recurrenceRule: {
+          frequency: 'daily',
+          startDate: '2026-04-18'
+        },
+        completedAt: new Date('2026-04-20T20:00:00+08:00').getTime()
+      }),
+      buildTodo({ id: 'due-only', title: 'Due only', deadlineDate: '2026-04-20' })
+    ];
+    const logs: Log[] = [
+      buildLog({
+        id: 'stacked-log',
+        linkedTodoId: 'stacked',
+        startTime: new Date('2026-04-20T14:00:00+08:00').getTime(),
+        endTime: new Date('2026-04-20T15:00:00+08:00').getTime()
+      })
+    ];
+
+    const entries = buildTodoDateEntries(todos, logs, '2026-04-20');
+
+    expect(entries.map((entry) => `${entry.todo.id}:${entry.primaryKind}`)).toEqual([
+      'stacked:completed',
+      'due-only:deadline'
     ]);
   });
 
@@ -376,7 +410,7 @@ describe('todoScheduleUtils virtual category helpers', () => {
     ]);
   });
 
-  test('places maybe entries after recurring rows but before completed and trace rows', () => {
+  test('keeps repeat rows ahead of maybe rows while completed rows still win the non-trace ordering', () => {
     const todos: TodoItem[] = [
       buildTodo({ id: 'completed', title: 'Echo', completedAt: new Date('2026-04-21T20:00:00+08:00').getTime() }),
       buildTodo({ id: 'in-progress', title: 'Foxtrot' }),
@@ -402,9 +436,9 @@ describe('todoScheduleUtils virtual category helpers', () => {
     const entries = buildTodoDateEntries(todos, logs, '2026-04-21');
 
     expect(entries.map((entry) => `${entry.todo.id}:${entry.primaryKind}`)).toEqual([
+      'completed:completed',
       'recurring:recurring',
       'maybe:maybe',
-      'completed:completed',
       'in-progress:inProgress'
     ]);
   });
@@ -477,7 +511,7 @@ describe('todoScheduleUtils virtual category helpers', () => {
     ]);
   });
 
-  test('moves non-trace rows below reserved trace lanes while preserving their internal order', () => {
+  test('moves non-trace rows below reserved trace lanes while preserving the new completed-first internal order', () => {
     const weekDateKeys = getTodoScheduleRangeDateKeys('thisWeek', REFERENCE_DATE);
     const todos: TodoItem[] = [
       buildTodo({ id: 'trace-row', title: 'Trace row' }),
@@ -494,9 +528,9 @@ describe('todoScheduleUtils virtual category helpers', () => {
 
     expect(layout.sortedEntriesByDate['2026-04-21']?.map((entry) => entry.todo.id)).toEqual([
       'trace-row',
+      'done-row',
       'due-row',
-      'scheduled-row',
-      'done-row'
+      'scheduled-row'
     ]);
   });
 
