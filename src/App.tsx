@@ -4,6 +4,7 @@
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
+ * @updated 2026-05-17: 增加 Electron 桌面小组件动作处理逻辑，支持 toggle_todo, open_todo 和 'start_focus' 快捷开始任务专注。
  * @updated 2026-05-13: Normalized reserved todo categories before passing them into UI editors and pickers so the system `未来` bucket behaves like a first-class category even when older saved data has not persisted it yet.
  * @updated 2026-05-10: Upgraded the post-start timer auto-jump flow to support none, focus-detail, and immersive entry modes while preserving scene-card immersive overrides.
  * @updated 2026-05-10: Made the widget supplement-log shortcut snap the timeline date back to today before opening the backfill modal.
@@ -526,6 +527,57 @@ const AppContent: React.FC = () => {
     setIsSearchOpenedFromSettings,
     setIsSettingsOpen
   ]);
+
+  const handleDesktopWidgetAction = React.useCallback((action: { type: 'open_todo' | 'toggle_todo' | 'start_focus'; todoId: string }) => {
+    closeFiltersOverlay();
+    setIsSettingsOpen(false);
+    setIsAutoLinkOpen(false);
+    setIsSearchOpen(false);
+    setIsSearchOpenedFromSettings(false);
+    setIsGalleryViewOpen(false);
+
+    if (action.type === 'toggle_todo') {
+      if (todos.some((todo) => todo.id === action.todoId)) {
+        todoManager.handleToggleTodo(action.todoId);
+      }
+      return;
+    }
+
+    const liveTodo = todos.find((todo) => todo.id === action.todoId);
+    if (!liveTodo) return;
+
+    if (action.type === 'start_focus') {
+      handleStartTodoFocusWrapper(liveTodo, true);
+      return;
+    }
+
+    setCurrentView(AppView.TODO);
+    todoManager.openEditTodoModal(liveTodo);
+  }, [
+    closeFiltersOverlay,
+    setCurrentView,
+    setIsAutoLinkOpen,
+    setIsGalleryViewOpen,
+    setIsSearchOpen,
+    setIsSearchOpenedFromSettings,
+    setIsSettingsOpen,
+    todoManager,
+    todos,
+    handleStartTodoFocusWrapper
+  ]);
+
+  useEffect(() => {
+    if (!window.desktopWidget) {
+      return;
+    }
+
+    const unsubscribe = window.desktopWidget.onMainAction(handleDesktopWidgetAction);
+    window.desktopWidget.notifyMainReady();
+
+    return () => {
+      unsubscribe();
+    };
+  }, [handleDesktopWidgetAction]);
 
   useDeepLink(
     logManager.handleQuickPunch,

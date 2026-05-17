@@ -9,7 +9,7 @@ The `electron/` directory contains the main process and preload scripts for runn
 
 ## Key Features
 
-*   **Window Management**: Configures the main application window (dimensions, icon, frame).
+*   **Window Management**: Configures the main application window plus the dedicated desktop today-widget window, including widget focus/open-close IPC and persisted widget bounds. Optimized widget resizing on Windows by disabling standard transparency (`transparent: false`) and utilizing solid background to restore native OS resizing boundaries.
 *   **Security**: Disables Web Security (`webSecurity: false`) to allow WebDAV access across origins (critical for the Sync feature).
-*   **IPC**: Sets up handlers for inter-process communication if needed.
+*   **IPC**: Sets up handlers for inter-process communication, including desktop-widget action forwarding back into the main renderer (toggling tasks, opening details, and launching timer focus using the `start_focus` action).
 *   **Obsidian Export Helpers**: Writes Markdown files and copies referenced log images into the user-selected Obsidian attachments folder on desktop builds.

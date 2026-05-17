@@ -3,248 +3,510 @@
  * @input App Lifecycle
  * @output Window Management
  * @pos Electron Main
- * @description Entry point for the Electron application. Handles window creation, lifecycle events, and inter-process communication (IPC).
- * @updated 2026-04-09: Added Obsidian image attachment export IPC handler for desktop builds.
- * 
- * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @description Entry point for the Electron application. Handles main-window and desktop-widget creation, lifecycle events, and inter-process communication (IPC).
+ * @updated 2026-05-17: Added a dedicated desktop today-widget window with persisted bounds, main-renderer action forwarding, and widget open/close IPC handlers for Electron builds.
+ * @updated 2026-04-09: Added Obsidian image attachment export IPC handler for desktop builds.
+ *
+ * 鈿狅笍 Once I am updated, be sure to update my header comment and the folder's md.
  */
-import { app, BrowserWindow, shell, ipcMain } from 'electron'
-import { createRequire } from 'node:module'
-import { fileURLToPath } from 'node:url'
-import path from 'node:path'
-import os from 'node:os'
+import { app, BrowserWindow, ipcMain, screen, shell } from 'electron';
+import fs from 'fs/promises';
+import { createRequire } from 'node:module';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const require = createRequire(import.meta.url)
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
+type DesktopWidgetMainAction =
+  | { type: 'open_todo'; todoId: string }
+  | { type: 'toggle_todo'; todoId: string }
+  | { type: 'start_focus'; todoId: string };
+
+type PersistedWidgetWindowState = {
+  bounds?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+};
+
+const require = createRequire(import.meta.url);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // The built directory structure
 //
-// ├─┬ dist-electron
-// │ ├─┬ main
-// │ │ └── index.js    > Electron-Main
-// │ └─┬ preload
-// │   └── index.mjs   > Preload-Scripts
-// ├─┬ dist
-// │ └── index.html    > Electron-Renderer
+// 鈹溾攢鈹?dist-electron
+// 鈹?鈹溾攢鈹?main
+// 鈹?鈹?鈹斺攢鈹€ index.js    > Electron-Main
+// 鈹?鈹斺攢鈹?preload
+// 鈹?  鈹斺攢鈹€ index.mjs   > Preload-Scripts
+// 鈹溾攢鈹?dist
+// 鈹?鈹斺攢鈹€ index.html    > Electron-Renderer
 //
-process.env.APP_ROOT = path.join(__dirname, '..')
+process.env.APP_ROOT = path.join(__dirname, '..');
 
-export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron')
-export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
-export const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL
+export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron');
+export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist');
+export const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
-    ? path.join(process.env.APP_ROOT, 'public')
-    : RENDERER_DIST
+  ? path.join(process.env.APP_ROOT, 'public')
+  : RENDERER_DIST;
+
+const DESKTOP_WIDGET_QUERY_KEY = 'window';
+const DESKTOP_WIDGET_QUERY_VALUE = 'desktop-widget';
+const DESKTOP_WIDGET_MAIN_ACTION_CHANNEL = 'desktop-widget:main-action';
+const DEFAULT_WIDGET_WIDTH = 360;
+const DEFAULT_WIDGET_HEIGHT = 520;
+const WIDGET_STATE_FILENAME = 'desktop-widget-state.json';
 
 // Disable GPU Acceleration for Windows 7
-if (os.release().startsWith('6.1')) app.disableHardwareAcceleration()
+if (os.release().startsWith('6.1')) app.disableHardwareAcceleration();
 
 // Set application name for Windows 10+ notifications
-if (process.platform === 'win32') app.setAppUserModelId(app.getName())
+if (process.platform === 'win32') app.setAppUserModelId(app.getName());
 
 if (!app.requestSingleInstanceLock()) {
-    app.quit()
-    process.exit(0)
+  app.quit();
+  process.exit(0);
 }
 
-let win: BrowserWindow | null = null
+let mainWindow: BrowserWindow | null = null;
+let widgetWindow: BrowserWindow | null = null;
+let isMainRendererReady = false;
+let pendingDesktopWidgetActions: DesktopWidgetMainAction[] = [];
+
 // Preload script is in the same directory as main.js after build
-const preload = path.join(__dirname, 'preload.mjs')
-const indexHtml = path.join(RENDERER_DIST, 'index.html')
+const preload = path.join(__dirname, 'preload.mjs');
+const indexHtml = path.join(RENDERER_DIST, 'index.html');
 
-async function createWindow() {
-    const iconPath = path.join(process.env.VITE_PUBLIC, 'icon.ico');
-    console.log('Icon Path:', iconPath);
+const getIconPath = () => path.join(process.env.VITE_PUBLIC || '', 'icon.ico');
 
-    win = new BrowserWindow({
-        title: 'LumosTime',
-        icon: iconPath,
-        width: 600,
-        height: 900,
-        resizable: true, // 允许用户调整大小
-        webPreferences: {
-            preload,
-            // Warning: Enable nodeIntegration and disable contextIsolation is not secure in production
-            //nodeIntegration: true,
+const getWidgetStatePath = () => path.join(app.getPath('userData'), WIDGET_STATE_FILENAME);
 
-            // Consider using contextBridge.exposeInMainWorld
-            // Read more on https://www.electronjs.org/docs/latest/tutorial/context-isolation
-            // contextIsolation: false,
-
-            // CRITICAL FOR WEBDAV: Disable Web Security to bypass CORS
-            webSecurity: false,
-        },
-    })
-
-    // 隐藏菜单栏 (可选)
-    win.setMenuBarVisibility(false)
-
-    if (VITE_DEV_SERVER_URL) {
-        console.log('Loading URL:', VITE_DEV_SERVER_URL)
-        win.loadURL(VITE_DEV_SERVER_URL)
-        win.webContents.openDevTools()
-    } else {
-        console.log('Loading File:', indexHtml)
-        win.loadFile(indexHtml)
+const buildRendererUrl = (windowType?: typeof DESKTOP_WIDGET_QUERY_VALUE): string => {
+  if (VITE_DEV_SERVER_URL) {
+    const devUrl = new URL(VITE_DEV_SERVER_URL);
+    if (windowType) {
+      devUrl.searchParams.set(DESKTOP_WIDGET_QUERY_KEY, windowType);
     }
+    return devUrl.toString();
+  }
 
-    // Make all links open with the browser, not with the application
-    win.webContents.setWindowOpenHandler(({ url }) => {
-        if (url.startsWith('https:')) shell.openExternal(url)
-        return { action: 'deny' }
-    })
+  const fileUrl = pathToFileURL(indexHtml);
+  if (windowType) {
+    fileUrl.searchParams.set(DESKTOP_WIDGET_QUERY_KEY, windowType);
+  }
+  return fileUrl.toString();
+};
+
+const focusWindow = (targetWindow: BrowserWindow | null) => {
+  if (!targetWindow) {
+    return;
+  }
+
+  if (targetWindow.isMinimized()) {
+    targetWindow.restore();
+  }
+  targetWindow.show();
+  targetWindow.focus();
+};
+
+const clampWidgetBounds = (bounds?: PersistedWidgetWindowState['bounds']) => {
+  const fallbackWidth = DEFAULT_WIDGET_WIDTH;
+  const fallbackHeight = DEFAULT_WIDGET_HEIGHT;
+
+  if (!bounds) {
+    const primaryWorkArea = screen.getPrimaryDisplay().workArea;
+    return {
+      width: fallbackWidth,
+      height: fallbackHeight,
+      x: primaryWorkArea.x + primaryWorkArea.width - fallbackWidth - 32,
+      y: primaryWorkArea.y + 32
+    };
+  }
+
+  const desiredWidth = Math.max(180, Math.floor(bounds.width || fallbackWidth));
+  const desiredHeight = Math.max(200, Math.floor(bounds.height || fallbackHeight));
+  const display = screen.getDisplayMatching({
+    x: bounds.x,
+    y: bounds.y,
+    width: desiredWidth,
+    height: desiredHeight
+  });
+  const workArea = display.workArea;
+  const width = Math.min(desiredWidth, workArea.width);
+  const height = Math.min(desiredHeight, workArea.height);
+  const maxX = workArea.x + Math.max(0, workArea.width - width);
+  const maxY = workArea.y + Math.max(0, workArea.height - height);
+
+  return {
+    width,
+    height,
+    x: Math.min(Math.max(bounds.x, workArea.x), maxX),
+    y: Math.min(Math.max(bounds.y, workArea.y), maxY)
+  };
+};
+
+const readWidgetWindowState = async (): Promise<PersistedWidgetWindowState> => {
+  try {
+    const raw = await fs.readFile(getWidgetStatePath(), 'utf-8');
+    return JSON.parse(raw) as PersistedWidgetWindowState;
+  } catch (error: any) {
+    if (error?.code !== 'ENOENT') {
+      console.error('[Electron] Failed to read desktop widget state', error);
+    }
+    return {};
+  }
+};
+
+const saveWidgetWindowState = async (targetWindow: BrowserWindow | null) => {
+  if (!targetWindow || targetWindow.isDestroyed()) {
+    return;
+  }
+
+  try {
+    const bounds = clampWidgetBounds(targetWindow.getBounds());
+    await fs.writeFile(
+      getWidgetStatePath(),
+      JSON.stringify({ bounds }, null, 2),
+      'utf-8'
+    );
+  } catch (error) {
+    console.error('[Electron] Failed to save desktop widget state', error);
+  }
+};
+
+const flushPendingDesktopWidgetActions = () => {
+  if (!mainWindow || mainWindow.isDestroyed() || !isMainRendererReady) {
+    return;
+  }
+
+  const queuedActions = [...pendingDesktopWidgetActions];
+  pendingDesktopWidgetActions = [];
+  queuedActions.forEach((action) => {
+    mainWindow?.webContents.send(DESKTOP_WIDGET_MAIN_ACTION_CHANNEL, action);
+  });
+};
+
+const queueDesktopWidgetAction = (action: DesktopWidgetMainAction) => {
+  pendingDesktopWidgetActions.push(action);
+  flushPendingDesktopWidgetActions();
+};
+
+const configureExternalLinks = (targetWindow: BrowserWindow) => {
+  targetWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https:')) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+};
+
+async function createMainWindow() {
+  const iconPath = getIconPath();
+  console.log('Icon Path:', iconPath);
+
+  mainWindow = new BrowserWindow({
+    title: 'LumosTime',
+    icon: iconPath,
+    width: 600,
+    height: 900,
+    resizable: true,
+    webPreferences: {
+      preload,
+      webSecurity: false
+    }
+  });
+  isMainRendererReady = false;
+
+  mainWindow.setMenuBarVisibility(false);
+  configureExternalLinks(mainWindow);
+  mainWindow.webContents.on('did-start-loading', () => {
+    isMainRendererReady = false;
+  });
+
+  if (VITE_DEV_SERVER_URL) {
+    console.log('Loading URL:', VITE_DEV_SERVER_URL);
+  } else {
+    console.log('Loading File:', indexHtml);
+  }
+  await mainWindow.loadURL(buildRendererUrl());
+
+  if (VITE_DEV_SERVER_URL) {
+    mainWindow.webContents.openDevTools();
+  }
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+    isMainRendererReady = false;
+  });
+
+  return mainWindow;
 }
 
-app.whenReady().then(createWindow)
+const ensureMainWindow = async () => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return createMainWindow();
+  }
+  return mainWindow;
+};
+
+const focusMainWindow = async () => {
+  const targetWindow = await ensureMainWindow();
+  focusWindow(targetWindow);
+  return targetWindow;
+};
+
+async function createWidgetWindow() {
+  if (widgetWindow && !widgetWindow.isDestroyed()) {
+    focusWindow(widgetWindow);
+    return widgetWindow;
+  }
+
+  const widgetState = await readWidgetWindowState();
+  const widgetBounds = clampWidgetBounds(widgetState.bounds);
+
+  widgetWindow = new BrowserWindow({
+    title: 'LumosTime Widget',
+    icon: getIconPath(),
+    width: widgetBounds.width,
+    height: widgetBounds.height,
+    x: widgetBounds.x,
+    y: widgetBounds.y,
+    frame: false,
+    transparent: true,
+    resizable: true,
+    thickFrame: true,
+    minimizable: true,
+    maximizable: true,
+    fullscreenable: false,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      preload,
+      webSecurity: false
+    }
+  });
+
+  widgetWindow.setMenuBarVisibility(false);
+  configureExternalLinks(widgetWindow);
+  await widgetWindow.loadURL(buildRendererUrl(DESKTOP_WIDGET_QUERY_VALUE));
+
+  widgetWindow.once('ready-to-show', () => {
+    widgetWindow?.show();
+  });
+
+  widgetWindow.on('move', () => {
+    void saveWidgetWindowState(widgetWindow);
+  });
+  widgetWindow.on('resize', () => {
+    void saveWidgetWindowState(widgetWindow);
+  });
+  widgetWindow.on('close', () => {
+    void saveWidgetWindowState(widgetWindow);
+  });
+  widgetWindow.on('closed', () => {
+    widgetWindow = null;
+  });
+
+  return widgetWindow;
+}
+
+app.whenReady().then(() => {
+  void createMainWindow();
+});
 
 app.on('window-all-closed', () => {
-    win = null
-    if (process.platform !== 'darwin') app.quit()
-})
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
 
 app.on('second-instance', () => {
-    if (win) {
-        // Focus on the main window if the user tried to open another
-        if (win.isMinimized()) win.restore()
-        win.focus()
-    }
-})
+  if (mainWindow) {
+    focusWindow(mainWindow);
+    return;
+  }
+
+  if (widgetWindow) {
+    void focusMainWindow();
+  }
+});
 
 app.on('activate', () => {
-    const allWindows = BrowserWindow.getAllWindows()
-    if (allWindows.length) {
-        allWindows[0].focus()
-    } else {
-        createWindow()
-    }
-})
+  if (mainWindow) {
+    focusWindow(mainWindow);
+    return;
+  }
+
+  void createMainWindow();
+});
 
 // New window example arg: new windows url
-ipcMain.handle('open-win', (_, arg) => {
-    const childWindow = new BrowserWindow({
-        webPreferences: {
-            preload,
-            nodeIntegration: true,
-            contextIsolation: false,
-        },
-    })
-
-    if (VITE_DEV_SERVER_URL) {
-        childWindow.loadURL(`${VITE_DEV_SERVER_URL}#${arg}`)
-    } else {
-        childWindow.loadFile(indexHtml, { hash: arg })
+ipcMain.handle('open-win', async (_, arg) => {
+  const childWindow = new BrowserWindow({
+    webPreferences: {
+      preload,
+      nodeIntegration: true,
+      contextIsolation: false
     }
-})
+  });
 
-// Obsidian Export: 写入 Markdown 文件
-import fs from 'fs/promises'
+  if (VITE_DEV_SERVER_URL) {
+    await childWindow.loadURL(`${VITE_DEV_SERVER_URL}#${arg}`);
+  } else {
+    await childWindow.loadURL(`${buildRendererUrl()}#${arg}`);
+  }
+});
+
+ipcMain.on('desktop-widget:open', () => {
+  void createWidgetWindow();
+});
+
+ipcMain.on('desktop-widget:close', () => {
+  widgetWindow?.close();
+});
+
+ipcMain.on('desktop-widget:open-main', () => {
+  void focusMainWindow();
+});
+
+ipcMain.on('desktop-widget:request-main-action', (_, action: DesktopWidgetMainAction) => {
+  if (action.type === 'open_todo') {
+    void focusMainWindow().then(() => {
+      queueDesktopWidgetAction(action);
+    });
+  } else {
+    queueDesktopWidgetAction(action);
+  }
+});
+
+ipcMain.on('desktop-widget:set-opacity', (_, _opacity: number) => {
+  // 空操作，避免原生整窗透明度导致文字/按钮变虚。完全在前端 CSS 层控制背景的 rgba 透明度。
+});
+
+ipcMain.on('desktop-widget:set-theme', (_, _theme: 'light' | 'dark') => {
+  if (widgetWindow && !widgetWindow.isDestroyed()) {
+    // 强制使用完全透明底色，避免遮挡渲染层 CSS 的背景半透明透底效果
+    widgetWindow.setBackgroundColor('#00000000');
+  }
+});
+
+ipcMain.handle('desktop-widget:get-bounds', () => {
+  if (widgetWindow && !widgetWindow.isDestroyed()) {
+    return widgetWindow.getBounds();
+  }
+  return null;
+});
+
+ipcMain.on('desktop-widget:set-bounds', (_, bounds: { x: number; y: number; width: number; height: number }) => {
+  if (widgetWindow && !widgetWindow.isDestroyed()) {
+    widgetWindow.setBounds(bounds);
+  }
+});
+
+ipcMain.on('desktop-widget:main-ready', () => {
+  isMainRendererReady = true;
+  flushPendingDesktopWidgetActions();
+});
 
 ipcMain.handle('write-obsidian-file', async (_, { filePath, content }) => {
+  try {
+    const dir = path.dirname(filePath);
+    await fs.mkdir(dir, { recursive: true });
+
+    let finalContent = content;
+
     try {
-        // 确保目录存在
-        const dir = path.dirname(filePath)
-        await fs.mkdir(dir, { recursive: true })
-
-        let finalContent = content
-
-        // 检测文件是否已存在
-        try {
-            const existingContent = await fs.readFile(filePath, 'utf-8')
-            // 如果文件存在,追加新内容(在末尾添加分隔符和新内容)
-            finalContent = existingContent + '\n\n---\n\n' + content
-            console.log(`📝 文件已存在,追加内容: ${filePath}`)
-        } catch (error: any) {
-            // 文件不存在,使用新内容
-            if (error.code === 'ENOENT') {
-                console.log(`📄 创建新文件: ${filePath}`)
-            } else {
-                throw error
-            }
-        }
-
-        // 写入文件 (UTF-8 编码)
-        await fs.writeFile(filePath, finalContent, 'utf-8')
-
-        console.log(`✅ Obsidian 文件写入成功: ${filePath}`)
-        return { success: true }
+      const existingContent = await fs.readFile(filePath, 'utf-8');
+      finalContent = existingContent + '\n\n---\n\n' + content;
+      console.log(`[Electron] Appending Obsidian file content: ${filePath}`);
     } catch (error: any) {
-        console.error('❌ 写入 Obsidian 文件失败:', error)
-        throw new Error(`文件写入失败: ${error.message}`)
+      if (error.code === 'ENOENT') {
+        console.log(`[Electron] Creating Obsidian file: ${filePath}`);
+      } else {
+        throw error;
+      }
     }
-})
+
+    await fs.writeFile(filePath, finalContent, 'utf-8');
+
+    console.log(`[Electron] Obsidian file write succeeded: ${filePath}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error('[Electron] Failed to write Obsidian file:', error);
+    throw new Error(`File write failed: ${error.message}`);
+  }
+});
 
 ipcMain.handle('write-obsidian-images', async (_, { rootPath, imageFolderName, files }) => {
-    try {
-        if (!rootPath || !imageFolderName || !Array.isArray(files)) {
-            throw new Error('Invalid parameters for image export');
-        }
-
-        const safeRoot = path.resolve(rootPath);
-        const targetDir = path.resolve(safeRoot, imageFolderName);
-        const relativeDir = path.relative(safeRoot, targetDir);
-        if (relativeDir.startsWith('..') || path.isAbsolute(relativeDir)) {
-            throw new Error('Image folder must stay within the configured root path');
-        }
-
-        await fs.mkdir(targetDir, { recursive: true });
-
-        let saved = 0;
-        for (const file of files) {
-            if (!file?.filename || !file?.base64Data) continue;
-            const buffer = Buffer.from(file.base64Data, 'base64');
-            const destPath = path.join(targetDir, file.filename);
-            await fs.writeFile(destPath, buffer);
-            saved += 1;
-        }
-
-        return { success: true, saved };
-    } catch (error: any) {
-        console.error('Failed to write Obsidian images:', error);
-        throw new Error(`Image file write failed: ${error.message}`);
+  try {
+    if (!rootPath || !imageFolderName || !Array.isArray(files)) {
+      throw new Error('Invalid parameters for image export');
     }
-})
 
-// 图标更新: 更新应用图标
+    const safeRoot = path.resolve(rootPath);
+    const targetDir = path.resolve(safeRoot, imageFolderName);
+    const relativeDir = path.relative(safeRoot, targetDir);
+    if (relativeDir.startsWith('..') || path.isAbsolute(relativeDir)) {
+      throw new Error('Image folder must stay within the configured root path');
+    }
+
+    await fs.mkdir(targetDir, { recursive: true });
+
+    let saved = 0;
+    for (const file of files) {
+      if (!file?.filename || !file?.base64Data) continue;
+      const buffer = Buffer.from(file.base64Data, 'base64');
+      const destPath = path.join(targetDir, file.filename);
+      await fs.writeFile(destPath, buffer);
+      saved += 1;
+    }
+
+    return { success: true, saved };
+  } catch (error: any) {
+    console.error('Failed to write Obsidian images:', error);
+    throw new Error(`Image file write failed: ${error.message}`);
+  }
+});
+
+// App icon update support for the Electron desktop build.
 ipcMain.on('update-app-icon', (_, iconPath) => {
-    try {
-        if (win) {
-            console.log('[Electron] 收到图标更新请求:', iconPath);
-            
-            // 移除开头的 / 以避免路径拼接问题
-            const cleanPath = iconPath.startsWith('/') ? iconPath.slice(1) : iconPath;
-            console.log('[Electron] 清理后的路径:', cleanPath);
-            
-            // 拼接完整路径
-            const fullIconPath = path.join(process.env.VITE_PUBLIC || '', cleanPath);
-            console.log('[Electron] 完整路径:', fullIconPath);
-            console.log('[Electron] 文件是否存在:', require('fs').existsSync(fullIconPath));
-            
-            if (!require('fs').existsSync(fullIconPath)) {
-                console.log('[Electron] ❌ 文件不存在，使用默认图标');
-                const defaultIcon = path.join(process.env.VITE_PUBLIC || '', 'icon.ico');
-                win.setIcon(defaultIcon);
-                return;
-            }
-            
-            console.log('[Electron] 最终使用的图标路径:', fullIconPath);
-            
-            // 更新窗口图标
-            win.setIcon(fullIconPath);
-            console.log('[Electron] ✓ 窗口图标已更新');
-            
-            // 更新任务栏图标 (Windows)
-            if (process.platform === 'win32') {
-                win.setOverlayIcon(fullIconPath, 'LumosTime');
-                console.log('[Electron] ✓ 任务栏覆盖图标已更新');
-            }
-            
-            console.log('[Electron] ✅ 应用图标更新成功');
-        } else {
-            console.log('[Electron] ❌ 窗口对象不存在');
-        }
-    } catch (error: any) {
-        console.error('[Electron] ❌ 更新应用图标失败:', error);
-        console.error('[Electron] 错误堆栈:', error.stack);
+  try {
+    if (mainWindow) {
+      console.log('[Electron] Received app icon update request:', iconPath);
+
+      const cleanPath = iconPath.startsWith('/') ? iconPath.slice(1) : iconPath;
+      console.log('[Electron] Sanitized icon path:', cleanPath);
+
+      const fullIconPath = path.join(process.env.VITE_PUBLIC || '', cleanPath);
+      console.log('[Electron] Resolved icon path:', fullIconPath);
+      console.log('[Electron] Icon exists:', require('fs').existsSync(fullIconPath));
+
+      if (!require('fs').existsSync(fullIconPath)) {
+        console.log('[Electron] Icon file missing, falling back to default icon');
+        const defaultIcon = getIconPath();
+        mainWindow.setIcon(defaultIcon);
+        return;
+      }
+
+      console.log('[Electron] Applying icon path:', fullIconPath);
+
+      mainWindow.setIcon(fullIconPath);
+      console.log('[Electron] Window icon updated');
+
+      if (process.platform === 'win32') {
+        mainWindow.setOverlayIcon(fullIconPath, 'LumosTime');
+        console.log('[Electron] Taskbar overlay icon updated');
+      }
+
+      console.log('[Electron] App icon update succeeded');
+    } else {
+      console.log('[Electron] Main window is unavailable for icon updates');
     }
+  } catch (error: any) {
+    console.error('[Electron] Failed to update app icon:', error);
+    console.error('[Electron] Error stack:', error.stack);
+  }
 });
