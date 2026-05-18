@@ -4,6 +4,7 @@
  * @output Regression coverage for the Electron desktop widget today/pin/overdue grouping logic
  * @pos Test (desktop widget service)
  * @description Verifies the desktop today-widget snapshot keeps pinned and today-visible todos together while still surfacing overdue items outside the shared today bucket.
+ * @updated 2026-05-18: Added regression coverage for subtask parent metadata in today-widget snapshot items so compact Electron views can rebuild one-level hierarchy locally.
  * @updated 2026-05-17: 扩展了单元测试，补全了计时器小组件（timer widget）的快照构建 buildDesktopTimerWidgetSnapshot 和 loadEnabledDesktopWidgetTypes 在启用 timer 时的测试覆盖。
  * @updated 2026-05-17: Added startup preference coverage for Electron desktop widget auto-restore state parsing.
  * @updated 2026-05-17: Added first-pass regression coverage for Electron desktop widget snapshot grouping.
@@ -109,12 +110,40 @@ describe('buildDesktopTodayWidgetSnapshot', () => {
     });
 
     expect(snapshot.pinned.map((item) => item.todoId)).toEqual(['pin-today']);
-    expect(snapshot.today).toHaveLength(0);
+    expect(snapshot.today.map((item) => item.todoId)).toEqual(['done-today']);
     expect(snapshot.overdue.map((item) => item.todoId)).toEqual([
       'deadline-overdue',
       'scheduled-overdue'
     ]);
     expect(snapshot.summary.completed).toBe(1);
+  });
+
+  it('preserves parent metadata for visible subtasks', () => {
+    const todos: TodoItem[] = [
+      buildTodo({
+        id: 'parent',
+        title: 'Parent task',
+        scheduledDate: '2026-05-17'
+      }),
+      buildTodo({
+        id: 'child',
+        title: 'Child task',
+        parentTodoId: 'parent',
+        scheduledDate: '2026-05-17'
+      })
+    ];
+
+    const snapshot = buildDesktopTodayWidgetSnapshot({
+      todos,
+      categories,
+      date: REFERENCE_DATE
+    });
+
+    const childItem = snapshot.today.find((item) => item.todoId === 'child');
+    expect(childItem).toMatchObject({
+      parentTodoId: 'parent',
+      parentTitle: 'Parent task'
+    });
   });
 });
 

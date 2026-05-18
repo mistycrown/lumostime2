@@ -423,4 +423,55 @@ describe('DataRepository', () => {
       }
     ]);
   });
+
+  it('repairs stale desktop default bottle file URLs even when legacy ids no longer match the current preset ids', async () => {
+    const repository = new InMemoryStorageRepository();
+
+    repository.data.set(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTIONS, [
+      {
+        id: 'legacy-bottle-choice-08',
+        name: preset08?.name,
+        cost: 200,
+        imagePath: 'file:///C:/Program Files/LumosTime/resources/app.asar/dist/bottle/08.png',
+        description: preset08?.description,
+        enabled: true,
+        createdAt: 1,
+        updatedAt: 1
+      }
+    ]);
+    repository.data.set(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTION_RECORDS, [
+      {
+        id: 'record-legacy-08',
+        collectionId: 'legacy-bottle-choice-08',
+        collectionName: preset08?.name,
+        cost: 200,
+        imagePath: 'file:///C:/Program Files/LumosTime/resources/app.asar/dist/bottle/08.png',
+        redeemedAt: 10
+      }
+    ]);
+    repository.data.set(REPOSITORY_KEYS.ACHIEVEMENT_ARCHIVED_BOTTLES, [
+      {
+        id: 'archive-legacy-08',
+        collectionId: 'legacy-bottle-choice-08',
+        collectionName: preset08?.name,
+        imagePath: 'file:///C:/Program Files/LumosTime/resources/app.asar/dist/bottle/08.png',
+        periodStartDate: '2026-04-01',
+        periodEndDate: '2026-04-05',
+        earnedStars: 10,
+        spentStars: 2,
+        sealedAmount: 8,
+        status: 'sealed',
+        sealedAt: 30,
+        dailySnapshots: [],
+        redemptionRecords: []
+      }
+    ]);
+
+    const dataRepository = new DataRepository(repository, createLegacyStorageAdapter(new Map()).adapter);
+    const snapshot = await dataRepository.loadAchievementSnapshot();
+
+    expect(snapshot.collections[0]?.imagePath).toBe('/bottle/08.png');
+    expect(snapshot.collectionRecords[0]?.imagePath).toBe('/bottle/08.png');
+    expect(snapshot.archivedBottles[0]?.imagePath).toBe('/bottle/08.png');
+  });
 });

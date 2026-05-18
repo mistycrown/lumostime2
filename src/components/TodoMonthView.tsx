@@ -11,6 +11,7 @@
  * @updated 2026-05-18: 支持在月视图中如果是 recurring（循环）类型的任务，在靠右渲染 Repeat2 图标，模仿截止 (due) 条目的 Flag 样式，保持 UI 一致。
  * @updated 2026-05-17: 支持在格子中为 due 类型的条目加上 flag 图标（并实现超出截断且 flag 完整显示），并将 trace / 连续 trace 条目字色置为灰色。
  * @updated 2026-05-18: 支持点击循环排期的 Repeat 标签，唤起快捷编辑栏。
+ * @updated 2026-05-18: Removed automatic ellipsis from month-grid entry titles so in-cell rows and trace strips clip directly instead of reserving space for `...`.
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -1301,7 +1302,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                         onOpenTodo(segment.entry.todo);
                       } : undefined}
                     >
-                      <span className="truncate whitespace-nowrap">{segment.entry.todo.title}</span>
+                      <span className="overflow-hidden whitespace-nowrap text-clip">{segment.entry.todo.title}</span>
                     </div>
                   ))}
                 </div>
@@ -1449,7 +1450,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                                   ...monthCellRowStyle
                                 }}
                               >
-                                <span className="truncate flex-1">{entry.todo.title}</span>
+                                <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-clip">{entry.todo.title}</span>
                                 {isDue && (
                                   <Flag size={10} style={{ color: markerColor, fill: markerColor, paddingRight: '2px' }} className="shrink-0 ml-0.5" />
                                 )}

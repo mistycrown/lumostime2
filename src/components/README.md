@@ -3,6 +3,11 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-05-18: `TodoDatePickerModal.tsx` now strictly validates incoming `yyyy-MM-dd` / `yyyy-MM` values and only mounts its calendar body while open, so malformed short-month schedule strings no longer white-screen the shared picker tree.
+- Update 2026-05-18: `achievement/AchievementCollectionsTab.tsx` now retries broken default bottle images against the current bundled bottle asset path before falling back to the placeholder, fixing Electron desktop bottle pickers when old file URLs go stale.
+- Update 2026-05-18: `AIBackfillChatModal.tsx` now passes the source text into foreground `create_todo` execution so nested child tasks can be created inside the same parent action, and undoing that AI-created parent now removes the whole bundled parent-plus-subtasks set together.
+- Update 2026-05-18: `TodoMonthView.tsx` now clips month-grid titles directly without rendering `...`, both for in-cell rows and continuous trace strips, so each entry keeps a little more usable text width on mobile.
+- Update 2026-05-18: `TodoDisplaySettingsModal.tsx` 在最外层 `div` 上添加了 `bg-[rgba(15,23,42,0.12)] backdrop-blur-sm` 的全屏蒙层和背景虚化，解决显示设置弹出时背景没有虚化的问题，并保持与快捷操作弹窗一致的视觉体验。
 - Update 2026-05-18: `TodoMonthView.tsx` 与 `TodoBentoWeekView.tsx` 支持点击循环排期（Repeat）标签以唤起快捷编辑栏（快捷操作弹窗），保持与其他类型标签一致的交互体验。
 - Update 2026-05-18: `TodoMonthView.tsx` 支持在月视图格子中为如果是 recurring（循环）类型的任务靠右渲染 `Repeat2` 循环图标，模仿截止 (due) 条目的 Flag 样式，保持 UI 一致。
 - Update 2026-05-18: `TodoMonthView.tsx` now keeps all unfinished month-view entry titles in black across in-cell rows, expanded details, and continuous trace strips, so recurring and arrange/due items no longer render as faded gray while completed rows still stay struck through and softened.
@@ -81,6 +86,7 @@ Components that form the structural or global UI elements.
 - `Toast.tsx`: Notification system.
 
 ## Modals
+- Update 2026-05-18: `TodoDetailModal.tsx` now defaults the timeline metadata callback's optional `collectionNames` payload to an empty list, so detail-log chips keep rendering safely even when a caller omits that helper argument.
 - Update 2026-05-18: `TodoDetailModal.tsx` now buffers task title inputs in a local draft state and only commits them to the live database on blur or enter, eliminating live-updating stutter on the header title during typing.
 - Update 2026-05-14: `AIBackfillChatModal.tsx` now adds a guarded `重置` action inside the Dream manager, using the same inline danger-confirm pattern as existing delete flows to restore the built-in Dream topics/notes and clear every Dream observation entry at once.
 - Update 2026-05-13: `AIBackfillChatModal.tsx` now treats one complete `assistantReply` string as the only AI-visible message payload across ordinary chat, weekly-review template turns, and Dream results, splitting that single reply into multiple bubbles from blank lines or line breaks instead of rendering a duplicate full-text reply beside separate model-authored parts.

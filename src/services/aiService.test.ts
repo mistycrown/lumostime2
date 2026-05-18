@@ -177,6 +177,65 @@ describe('aiService unified turn normalization', () => {
     }]);
   });
 
+  it('keeps nested create_todo subtasks inside the same normalized tool call', async () => {
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockResolvedValue(createJsonTextResponse({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              outcome: 'reply',
+              assistantReply: 'ok',
+              memoryAction: 'no_update',
+              toolCalls: [{
+                toolName: 'create_todo',
+                args: {
+                  title: 'Finish paper revision',
+                  categoryId: 'project-general',
+                  kind: 'project',
+                  linkedCategoryId: 'study',
+                  linkedActivityId: 'writing',
+                  subtasks: [
+                    {
+                      title: 'Draft outline',
+                      note: 'Focus on intro',
+                      scheduledDate: '2026-05-19'
+                    },
+                    {
+                      title: '   '
+                    }
+                  ]
+                }
+              }]
+            })
+          }
+        }]
+      })),
+      configurable: true
+    });
+
+    const result = await aiService.requestAssistantUnifiedTurnWithDebug({
+      mode: 'foreground',
+      systemPrompt: 'system',
+      userPrompt: 'user'
+    });
+
+    expect(result.output.toolCalls).toEqual([{
+      toolName: 'create_todo',
+      args: {
+        title: 'Finish paper revision',
+        categoryId: 'project-general',
+        kind: 'project',
+        linkedCategoryId: 'study',
+        linkedActivityId: 'writing',
+        subtasks: [{
+          title: 'Draft outline',
+          note: 'Focus on intro',
+          scheduledDate: '2026-05-19'
+        }]
+      }
+    }]);
+  });
+
   it('treats empty unified-turn content as a failed decision instead of a silent success', async () => {
     Object.defineProperty(globalThis, 'fetch', {
       value: vi.fn().mockResolvedValue(createJsonTextResponse({

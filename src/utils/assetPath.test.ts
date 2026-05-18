@@ -7,6 +7,11 @@ describe('resolveAssetPath', () => {
       .toBe('file:///E:/lumostime/resources/app.asar/dist/uiicon/cat/01.webp');
   });
 
+  it('normalizes raw Windows absolute paths into file URLs', () => {
+    expect(resolveAssetPath('C:\\Users\\xiangpu\\AppData\\Local\\Programs\\LumosTime\\resources\\app.asar\\dist\\bottle\\01.png'))
+      .toBe('file:///C:/Users/xiangpu/AppData/Local/Programs/LumosTime/resources/app.asar/dist/bottle/01.png');
+  });
+
   it('preserves absolute URLs and data URLs', () => {
     expect(resolveAssetPath('https://example.com/icon.png', 'file:///E:/lumostime/resources/app.asar/dist/index.html'))
       .toBe('https://example.com/icon.png');

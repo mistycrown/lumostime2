@@ -4,6 +4,7 @@
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
+ * @updated 2026-05-18: Added bootstrap readiness timing logs so slow Electron startup can be traced to the async hydration gate.
  * @updated 2026-05-17: 在 Electron 主应用启动时自动恢复已启用的 PC 端小组件，并与设置页共享桌面小组件启动偏好读取逻辑。
  * @updated 2026-05-17: 增加 Electron 桌面小组件动作处理逻辑，支持 toggle_todo, open_todo 和 'start_focus' 快捷开始任务专注。
  * @updated 2026-05-13: Normalized reserved todo categories before passing them into UI editors and pickers so the system `未来` bucket behaves like a first-class category even when older saved data has not persisted it yet.
@@ -89,6 +90,11 @@ import {
 } from './utils/lazyViews';
 
 const APP_READY_EVENT = 'lumostime:app-ready';
+const getBootstrapTimingNow = (): number => (
+  typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now()
+);
 
 // Polyfill Buffer for webdav library
 if (typeof window !== 'undefined') {
@@ -1216,12 +1222,33 @@ const AppBootstrapGate: React.FC<{ children: React.ReactNode }> = ({ children })
   const { isReady: isCategoryScopeReady } = useCategoryScope();
   const { isReady: isAchievementReady } = useAchievement();
   const isAppReady = isDataReady && isReviewReady && isCategoryScopeReady && isAchievementReady;
+  const bootstrapStartedAtRef = useRef(getBootstrapTimingNow());
+  const lastLoggedStateRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const readinessState = JSON.stringify({
+      isDataReady,
+      isReviewReady,
+      isCategoryScopeReady,
+      isAchievementReady
+    });
+
+    if (lastLoggedStateRef.current === readinessState) {
+      return;
+    }
+
+    lastLoggedStateRef.current = readinessState;
+    console.info('[AppBootstrapGate] readiness changed', JSON.parse(readinessState));
+  }, [isAchievementReady, isCategoryScopeReady, isDataReady, isReviewReady]);
 
   useEffect(() => {
     if (!isAppReady) {
       return;
     }
 
+    console.info(
+      `[AppBootstrapGate] app ready after ${(getBootstrapTimingNow() - bootstrapStartedAtRef.current).toFixed(1)}ms`
+    );
     window.dispatchEvent(new Event(APP_READY_EVENT));
   }, [isAppReady]);
 

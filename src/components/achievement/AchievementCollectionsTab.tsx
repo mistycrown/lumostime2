@@ -5,6 +5,7 @@
  * @pos Component (Achievement Collection Tab)
  * @description Renders the history shelf, a compact seal entry button, a two-step seal modal, and archived bottle detail with shatter support.
  *
+ * @updated 2026-05-18: Added a render-time fallback that repairs stale default bottle file URLs back to the current bundled asset path before showing a placeholder.
  * @updated 2026-04-06: Simplified the collections page into a history shelf and moved sealing into a two-step modal flow.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -14,7 +15,11 @@ import {
   AchievementCollection,
   AchievementSealPreview
 } from '../../types';
-import { resolveAchievementCollectionImagePath } from '../../constants/achievementCollections';
+import {
+  getDefaultAchievementCollectionPresetFromReference,
+  repairAchievementCollectionImagePath,
+  resolveAchievementCollectionImagePath
+} from '../../constants/achievementCollections';
 import { useToast } from '../../contexts/ToastContext';
 import { getLocalDateTimeStr } from '../../utils/dateUtils';
 import { formatAchievementSignedStars, formatAchievementStars } from '../../utils/achievementUtils';
@@ -53,15 +58,27 @@ interface AchievementCollectionsTabProps {
 type SealStep = 1 | 2;
 
 const BottlePreview: React.FC<{
+  collectionId?: string;
   imagePath?: string;
   alt: string;
   size?: 'sm' | 'lg';
   shattered?: boolean;
   transparent?: boolean;
-}> = ({ imagePath, alt, size = 'sm', shattered = false, transparent = false }) => {
+}> = ({ collectionId, imagePath, alt, size = 'sm', shattered = false, transparent = false }) => {
   const resolvedImagePath = imagePath
     ? resolveAchievementCollectionImagePath(imagePath)
     : imagePath;
+  const fallbackImagePath = useMemo(() => repairAchievementCollectionImagePath({
+    collectionId,
+    imagePath,
+    name: alt
+  }), [alt, collectionId, imagePath]);
+  const [currentImagePath, setCurrentImagePath] = useState<string | undefined>(resolvedImagePath || undefined);
+
+  useEffect(() => {
+    setCurrentImagePath(resolvedImagePath || undefined);
+  }, [resolvedImagePath]);
+
   const wrapperClassName = size === 'lg'
     ? transparent
       ? 'relative flex h-24 items-end justify-center px-2 pb-0 pt-4'
@@ -76,11 +93,26 @@ const BottlePreview: React.FC<{
 
   return (
     <div className={wrapperClassName}>
-      {resolvedImagePath ? (
+      {currentImagePath ? (
         <img
-          src={resolvedImagePath}
+          src={currentImagePath}
           alt={alt}
           className={`${imageClassName} ${shattered ? 'opacity-70 grayscale-[0.35]' : ''}`}
+          onError={() => {
+            const repairedPreset = getDefaultAchievementCollectionPresetFromReference({
+              collectionId,
+              imagePath: currentImagePath,
+              name: alt
+            });
+            const nextImagePath = repairedPreset?.imagePath || fallbackImagePath;
+
+            if (nextImagePath && nextImagePath !== currentImagePath) {
+              setCurrentImagePath(nextImagePath);
+              return;
+            }
+
+            setCurrentImagePath(undefined);
+          }}
         />
       ) : (
         <div className={placeholderClassName}>
@@ -260,6 +292,7 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
                         aria-label={bottle.collectionName}
                       >
                         <BottlePreview
+                          collectionId={bottle.collectionId}
                           imagePath={bottle.imagePath}
                           alt={bottle.collectionName}
                           size="lg"
@@ -406,7 +439,12 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
                       </div>
                     )}
                     <div className="relative z-10">
-                      <BottlePreview imagePath={collection.imagePath} alt={collection.name} size="lg" />
+                      <BottlePreview
+                        collectionId={collection.id}
+                        imagePath={collection.imagePath}
+                        alt={collection.name}
+                        size="lg"
+                      />
                     </div>
                   </button>
                 );
@@ -447,6 +485,7 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
             <div className="grid gap-4 md:grid-cols-[9rem_minmax(0,1fr)]">
               <div className="flex justify-center">
                 <BottlePreview
+                  collectionId={selectedArchivedBottle.collectionId}
                   imagePath={selectedArchivedBottle.imagePath}
                   alt={selectedArchivedBottle.collectionName}
                   size="lg"

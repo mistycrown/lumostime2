@@ -111,6 +111,7 @@ The views are designed as "dumb" or "presentational" components where possible, 
 - `TodoView.tsx`: Category-specific todo lists now also pin pinned todos to the top and render the pin chip as icon-only in compact mode versus icon plus `Pin` in loose mode.
 - `TodoView.tsx`: The `排期 -> 今` page now includes pin-only todos in a top `Pin` section, while deduplicating todos that are both pinned and already arranged/due today.
 - `TodoView.tsx`: Added a boolean `pin` flag to todo scheduling so `排期 -> 今` now lifts pinned items to the top and shows a matching `Pin` label in the same lightweight badge style as `Arrange` / `Due`.
+- `TodoView.tsx`: The mobile `排期 -> 今` top `Pin` section now respects recurring `skipDates`, so a pinned repeat task skipped for today no longer appears there unless another explicit today match still applies.
 - `TodoView.tsx`: Let the week-view `Trace` and `Done` badges open the shared quick-actions sheet, matching the existing `Arrange` and `Due` badge behavior.
 - `TodoView.tsx`: Kept week-view multi-badge abbreviations on a single compact line so `Arr / Tra / Rep` no longer wrap into stacked rows.
 - `TodoView.tsx`: Tightened the week-view multi-badge right rail so abbreviated labels no longer leave wide trailing blanks, and split the virtual `今` schedule list into `今天` plus `过期未完成` sections.

@@ -4,6 +4,8 @@
  * @output Window Management
  * @pos Electron Main
  * @description Entry point for the Electron application. Handles main-window and desktop-widget creation, lifecycle events, and inter-process communication (IPC).
+ * @updated 2026-05-18: Added renderer boot timing logs around main-window navigation so slow DEV startups can be separated from renderer hydration work.
+ * @updated 2026-05-18: Added DEV renderer load retries so Electron waits out local Vite startup lag instead of failing the first window navigation.
  * @updated 2026-05-18: Added a tray-level Windows autostart toggle backed by Electron login-item settings, with login launches opening silently into the tray.
  * @updated 2026-05-17: Softened expected DEV navigation aborts so renderer-triggered reloads no longer surface as unhandled Electron promise rejections.
  * @updated 2026-05-17: Added a Windows tray integration so closing the main window hides the app to the system tray while explicit tray quit still exits the background process.
@@ -95,6 +97,14 @@ const QUICK_WIDGET_STATE_FILENAME = 'desktop-quick-widget-state.json';
 const TIMER_WIDGET_STATE_FILENAME = 'desktop-timer-widget-state.json';
 const DEV_USER_DATA_DIRECTORY_NAME = 'LumosTime Dev';
 const LOGIN_ITEM_STARTUP_ARG = '--startup';
+const DEV_SERVER_LOAD_RETRY_DELAY_MS = 350;
+const DEV_SERVER_LOAD_RETRY_COUNT = 24;
+
+const getElectronTimingNow = (): number => (
+  typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now()
+);
 
 // Disable GPU Acceleration for Windows 7
 if (os.release().startsWith('6.1')) app.disableHardwareAcceleration();
@@ -172,6 +182,37 @@ const isNavigationAbortError = (error: unknown): boolean => {
     || message.includes('(-3)');
 };
 
+const isRetryableDevServerLoadError = (error: unknown): boolean => {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const { message } = error;
+  const code = 'code' in error
+    ? (error as { code?: string | number }).code
+    : undefined;
+  const errno = 'errno' in error
+    ? (error as { errno?: string | number }).errno
+    : undefined;
+
+  return code === 'ERR_FAILED'
+    || code === 'ERR_CONNECTION_REFUSED'
+    || code === 'ERR_CONNECTION_RESET'
+    || errno === -2
+    || errno === -102
+    || errno === -101
+    || message.includes('ERR_FAILED')
+    || message.includes('ERR_CONNECTION_REFUSED')
+    || message.includes('ERR_CONNECTION_RESET')
+    || message.includes('(-2)')
+    || message.includes('(-102)')
+    || message.includes('(-101)');
+};
+
+const delay = (ms: number) => new Promise((resolve) => {
+  setTimeout(resolve, ms);
+});
+
 const logAsyncTaskError = (label: string, error: unknown) => {
   console.error(`[Electron] ${label} failed`, error);
 };
@@ -187,15 +228,31 @@ const loadWindowUrl = async (
   url: string,
   label: string
 ) => {
-  try {
-    await targetWindow.loadURL(url);
-  } catch (error) {
-    if (isNavigationAbortError(error)) {
-      console.info(`[Electron] Ignored expected navigation abort for ${label}`, { url });
+  for (let attempt = 1; attempt <= DEV_SERVER_LOAD_RETRY_COUNT; attempt += 1) {
+    try {
+      await targetWindow.loadURL(url);
       return;
-    }
+    } catch (error) {
+      if (isNavigationAbortError(error)) {
+        console.info(`[Electron] Ignored expected navigation abort for ${label}`, { url });
+        return;
+      }
 
-    throw error;
+      const shouldRetry = IS_DEV
+        && isRetryableDevServerLoadError(error)
+        && attempt < DEV_SERVER_LOAD_RETRY_COUNT
+        && !targetWindow.isDestroyed();
+
+      if (!shouldRetry) {
+        throw error;
+      }
+
+      console.info(
+        `[Electron] Retrying ${label} after transient DEV server load failure (${attempt}/${DEV_SERVER_LOAD_RETRY_COUNT})`,
+        { url }
+      );
+      await delay(DEV_SERVER_LOAD_RETRY_DELAY_MS);
+    }
   }
 };
 
@@ -630,6 +687,7 @@ const attachWidgetShowFallback = (
 async function createMainWindow() {
   const iconPath = getIconPath();
   console.log('Icon Path:', iconPath);
+  const mainWindowLoadStartedAt = getElectronTimingNow();
 
   mainWindow = new BrowserWindow({
     title: 'LumosTime',
@@ -648,6 +706,19 @@ async function createMainWindow() {
   configureExternalLinks(mainWindow);
   mainWindow.webContents.on('did-start-loading', () => {
     isMainRendererReady = false;
+    console.info(
+      `[Electron] Main window did-start-loading at ${(getElectronTimingNow() - mainWindowLoadStartedAt).toFixed(1)}ms`
+    );
+  });
+  mainWindow.webContents.once('dom-ready', () => {
+    console.info(
+      `[Electron] Main window dom-ready at ${(getElectronTimingNow() - mainWindowLoadStartedAt).toFixed(1)}ms`
+    );
+  });
+  mainWindow.webContents.once('did-finish-load', () => {
+    console.info(
+      `[Electron] Main window did-finish-load at ${(getElectronTimingNow() - mainWindowLoadStartedAt).toFixed(1)}ms`
+    );
   });
 
   if (IS_DEV) {

@@ -4,6 +4,7 @@
  * @output Sync Operations (performSync, handleQuickSync, handleImageSync, handleSyncDataUpdate), Sync State (isSyncing, refreshKey)
  * @pos Hook (System Integration)
  * @description 同步管理 Hook - 处理数据和图片的云端同步，支持启动同步、恢复同步、手动同步、自动同步等多种模式，并在恢复筛选器时保持顺序稳定，同时保证空值恢复与 majorGoals 载荷一致。
+ * @updated 2026-05-18: Reduced timestamp comparison tolerance handling by routing sync direction through a shared helper, so fresh desktop edits are no longer swallowed as "equal" for several seconds after the previous sync.
  * @updated 2026-05-18: Extended the unified backup/sync payload to include the achievement bottle backup block, and now restore that state alongside the main app data during imports and cloud downloads.
  * @updated 2026-05-17: Extended the unified backup/sync payload to include the shared AI backup block, and now restore that AI state alongside the main app data during imports and cloud downloads.
  * @updated 2026-05-18: Included the persisted custom color group in backup/sync payloads and now auto-sync palette-only edits as part of user data.
@@ -36,6 +37,7 @@ import { SYNC_CONFIG } from '../config/syncConfig';
 import { normalizeCheckTemplates, normalizeDailyReviews } from '../utils/checkItemNormalizer';
 import { AI_BACKUP_CHANGED_EVENT } from '../utils/aiBackupChange';
 import { normalizeFiltersOrder } from '../utils/filterUtils';
+import { classifySyncTimestampDirection } from '../utils/syncTimestampDirection';
 import {
     getLocalDataTimestamp,
     setLocalDataTimestampUpdateLocked,
@@ -364,7 +366,13 @@ export const useSyncManager = () => {
             console.log(`[Sync][Step 3]   - 时间来源: ${usedFileModTime ? '文件修改时间' : '文件内部时间戳'}`);
 
             // 4. 执行操作（使用容错阈值判断）
-            if (cloudTimestamp > localTimestamp + SYNC_TOLERANCE_MS) {
+            const syncDirection = classifySyncTimestampDirection(
+                localTimestamp,
+                cloudTimestamp,
+                SYNC_TOLERANCE_MS
+            );
+
+            if (syncDirection === 'restore') {
                 // Case 1: Cloud is Newer (超过容错阈值) -> Restore (下载)
                 console.log('[Sync][Step 4] 判定: 云端明显较新 -> 执行下载恢复');
                 console.log(`[Sync][Step 4]   - 云端比本地新 ${((cloudTimestamp - localTimestamp) / 1000).toFixed(1)} 秒`);
@@ -412,7 +420,7 @@ export const useSyncManager = () => {
                     }
                 }
             }
-            else if (localTimestamp > cloudTimestamp + SYNC_TOLERANCE_MS) {
+            else if (syncDirection === 'upload') {
                 // Case 2: Local is Newer (超过容错阈值) -> Upload (上传)
                 console.log('[Sync][Step 4] 判定: 本地明显较新 -> 执行上传');
                 console.log(`[Sync][Step 4]   - 本地比云端新 ${((localTimestamp - cloudTimestamp) / 1000).toFixed(1)} 秒`);

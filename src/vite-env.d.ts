@@ -1,5 +1,10 @@
 /// <reference types="vite/client" />
 
+declare module '*?raw' {
+  const content: string;
+  export default content;
+}
+
 type DesktopWidgetBridgeAction =
   | { type: 'open_todo'; todoId: string }
   | { type: 'toggle_todo'; todoId: string }

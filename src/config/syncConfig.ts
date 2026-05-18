@@ -1,5 +1,6 @@
 /**
  * @file syncConfig.ts
+ * @updated 2026-05-18: Reduced timestamp tolerance to 1 second so fresh desktop edits are no longer misclassified as equal right after a sync.
  * @description 同步系统配置常量
  * 
  * 集中管理所有同步相关的配置参数，便于调整和测试
@@ -15,7 +16,7 @@ export const SYNC_CONFIG = {
      * 默认：8000ms (8秒)
      * 原因：处理网络延迟和上传延迟
      */
-    TOLERANCE_MS: 8000,
+    TOLERANCE_MS: 1000,
 
     /**
      * 并发上传/下载数量

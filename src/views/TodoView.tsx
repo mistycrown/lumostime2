@@ -4,6 +4,7 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes reserved `小事` / `未来` buckets plus a week planning view with schedule and history badges.
+ * @updated 2026-05-18: Hid pinned recurring todos from the mobile `今天 + Pin` section when today's occurrence is explicitly skipped, while still preserving pin-only rows and other explicit today matches.
  * @updated 2026-05-14: Added a persisted schedule lock toggle across the standard week, bento week, and month planners so schedule and deadline rows can be frozen against drag-to-move until explicitly unlocked.
  * @updated 2026-05-18: 支持点击周视图一列（标准周视图）下循环排期的 Repeat 标签以唤起快捷编辑栏。
  * Once I am updated, be sure to update my header comment and the folder's md.
@@ -27,6 +28,7 @@ import {
   formatDateKey,
   getStartOfWeek,
   getTodayDateKey,
+  isTodoInAssociationTodayCategory,
   getTodoScheduleMatches,
   getWeekDates,
   parseDateKey
@@ -1271,6 +1273,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
     return filterVisibleTodos(todos, showCompletedTodos)
       .filter((todo) => todo.pin)
+      .filter((todo) => isTodoInAssociationTodayCategory(todo, referenceDate))
       .map((todo) => {
         const todayMatches = getTodoScheduleMatches(todo, 'today', referenceDate);
         const overdueMatches = buildOverdueScheduleMatches(todo, todayDateKey);
@@ -3073,5 +3076,4 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     </div>
   );
 };
-
 

@@ -23,9 +23,19 @@ import { DesktopTimerWidgetView } from './views/desktop/DesktopTimerWidgetView';
 import { DesktopTodoQuickEditorWindowView } from './views/desktop/DesktopTodoQuickEditorWindowView';
 
 const APP_READY_EVENT = 'lumostime:app-ready';
+const getRendererBootTimingNow = (): number => (
+  typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now()
+);
+const rendererBootStartedAt = getRendererBootTimingNow();
 
 // @ts-ignore
 window.Buffer = window.Buffer || Buffer;
+
+console.info(
+  `[RendererBoot] index.tsx evaluated at ${rendererBootStartedAt.toFixed(1)}ms since renderer time origin`
+);
 
 const removeLoadingScreen = () => {
   const loadingScreen = document.getElementById('loading-screen');
@@ -47,6 +57,9 @@ if (!rootElement) {
 }
 
 const root = ReactDOM.createRoot(rootElement);
+console.info(
+  `[RendererBoot] React root created at ${(getRendererBootTimingNow() - rendererBootStartedAt).toFixed(1)}ms after index evaluation`
+);
 root.render(
   <React.StrictMode>
     {isDesktopWidgetWindow() ? (

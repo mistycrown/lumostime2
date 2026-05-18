@@ -5,6 +5,8 @@
  * @pos Repository (Application Data)
  * @description Loads and persists large core datasets through a single async repository and migrates legacy localStorage payloads into IndexedDB on first run.
  *
+ * @updated 2026-05-18: Parallelized snapshot hydration reads and added startup timing logs so Electron boot can diagnose slow IndexedDB-backed loads faster.
+ * @updated 2026-05-18: Repaired default achievement bottle image paths by id, preset name, and stale bottle asset URLs so desktop updates keep bottle artwork visible.
  * @updated 2026-05-12: Added repository-backed `DataCollection` and `DataCollectionEntry` persistence to the core data snapshot.
  * @updated 2026-05-10: Flagged fallback-seeded core snapshots so background assistant flows can refuse demo logs/todos when real user data is unavailable.
  * @updated 2026-04-07: Keeps default achievement bottle metadata synced with the latest preset names, descriptions, and archive labels.
@@ -12,7 +14,8 @@
 import {
   DEFAULT_ACHIEVEMENT_COLLECTION_COST,
   DEFAULT_ACHIEVEMENT_COLLECTIONS,
-  getDefaultAchievementCollectionPreset
+  getDefaultAchievementCollectionPresetFromReference,
+  repairAchievementCollectionImagePath
 } from '../constants/achievementCollections';
 import { CATEGORIES, INITIAL_DAILY_REVIEWS, INITIAL_GOALS, INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES, SCOPES } from '../constants';
 import { REVIEW_KEYS, StorageKey, USER_DATA_KEYS, storage } from '../constants/storageKeys';
@@ -44,6 +47,12 @@ import { normalizeDailyReviews } from '../utils/checkItemNormalizer';
 import { storageRepository, StorageRepository } from './storageRepository';
 
 const CORE_DATA_MIGRATION_META_KEY = 'core-data-migration-v2';
+
+const getTimingNow = (): number => (
+  typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now()
+);
 
 export const REPOSITORY_KEYS = {
   LOGS: 'logs',
@@ -131,13 +140,18 @@ export interface AchievementSnapshot {
 }
 
 const migrateDefaultAchievementCollection = (collection: AchievementCollection): AchievementCollection => {
-  if (!collection.id.startsWith('default-bottle-')) {
-    return collection;
-  }
-
-  const preset = getDefaultAchievementCollectionPreset(collection.id);
+  const preset = getDefaultAchievementCollectionPresetFromReference({
+    collectionId: collection.id,
+    imagePath: collection.imagePath,
+    name: collection.name
+  });
   if (!preset) {
-    return collection;
+    return {
+      ...collection,
+      imagePath: repairAchievementCollectionImagePath({
+        imagePath: collection.imagePath
+      })
+    };
   }
 
   return {
@@ -152,9 +166,18 @@ const migrateDefaultAchievementCollection = (collection: AchievementCollection):
 const migrateDefaultAchievementCollectionRecord = (
   record: AchievementCollectionRecord
 ): AchievementCollectionRecord => {
-  const preset = getDefaultAchievementCollectionPreset(record.collectionId);
+  const preset = getDefaultAchievementCollectionPresetFromReference({
+    collectionId: record.collectionId,
+    imagePath: record.imagePath,
+    name: record.collectionName
+  });
   if (!preset) {
-    return record;
+    return {
+      ...record,
+      imagePath: repairAchievementCollectionImagePath({
+        imagePath: record.imagePath
+      })
+    };
   }
 
   return {
@@ -167,9 +190,18 @@ const migrateDefaultAchievementCollectionRecord = (
 const migrateDefaultAchievementArchivedBottle = (
   bottle: AchievementArchivedBottle
 ): AchievementArchivedBottle => {
-  const preset = getDefaultAchievementCollectionPreset(bottle.collectionId);
+  const preset = getDefaultAchievementCollectionPresetFromReference({
+    collectionId: bottle.collectionId,
+    imagePath: bottle.imagePath,
+    name: bottle.collectionName
+  });
   if (!preset) {
-    return bottle;
+    return {
+      ...bottle,
+      imagePath: repairAchievementCollectionImagePath({
+        imagePath: bottle.imagePath
+      })
+    };
   }
 
   return {
@@ -222,18 +254,31 @@ export class DataRepository {
   }
 
   async loadDataContextSnapshot(): Promise<DataContextSnapshot> {
+    const startedAt = getTimingNow();
     await this.initialize();
 
-    const storedLogs = await this.repository.getData<Log[]>(REPOSITORY_KEYS.LOGS);
+    const [
+      storedLogs,
+      storedTodos,
+      storedTodoCategories,
+      storedCollections,
+      storedCollectionEntries
+    ] = await Promise.all([
+      this.repository.getData<Log[]>(REPOSITORY_KEYS.LOGS),
+      this.repository.getData<TodoItem[]>(REPOSITORY_KEYS.TODOS),
+      this.repository.getData<TodoCategory[]>(REPOSITORY_KEYS.TODO_CATEGORIES),
+      this.repository.getData<DataCollection[]>(REPOSITORY_KEYS.DATA_COLLECTIONS),
+      this.repository.getData<DataCollectionEntry[]>(REPOSITORY_KEYS.DATA_COLLECTION_ENTRIES)
+    ]);
     const logs = storedLogs ?? INITIAL_LOGS;
-    const storedTodos = await this.repository.getData<TodoItem[]>(REPOSITORY_KEYS.TODOS);
     const todos = storedTodos ?? this.buildDefaultTodos(logs);
-    const todoCategories =
-      (await this.repository.getData<TodoCategory[]>(REPOSITORY_KEYS.TODO_CATEGORIES)) ?? MOCK_TODO_CATEGORIES;
-    const collections =
-      (await this.repository.getData<DataCollection[]>(REPOSITORY_KEYS.DATA_COLLECTIONS)) ?? [];
-    const collectionEntries =
-      (await this.repository.getData<DataCollectionEntry[]>(REPOSITORY_KEYS.DATA_COLLECTION_ENTRIES)) ?? [];
+    const todoCategories = storedTodoCategories ?? MOCK_TODO_CATEGORIES;
+    const collections = storedCollections ?? [];
+    const collectionEntries = storedCollectionEntries ?? [];
+
+    console.info(
+      `[DataRepository] loadDataContextSnapshot resolved in ${(getTimingNow() - startedAt).toFixed(1)}ms`
+    );
 
     return {
       logs,
@@ -246,89 +291,120 @@ export class DataRepository {
   }
 
   async loadReviewEntriesSnapshot(): Promise<ReviewEntriesSnapshot> {
+    const startedAt = getTimingNow();
     await this.initialize();
 
-    const storedDailyReviews = await this.repository.getData<DailyReview[]>(REPOSITORY_KEYS.DAILY_REVIEWS);
+    const [
+      storedDailyReviews,
+      weeklyReviews,
+      monthlyReviews,
+      onThisDayEntries
+    ] = await Promise.all([
+      this.repository.getData<DailyReview[]>(REPOSITORY_KEYS.DAILY_REVIEWS),
+      this.repository.getData<WeeklyReview[]>(REPOSITORY_KEYS.WEEKLY_REVIEWS),
+      this.repository.getData<MonthlyReview[]>(REPOSITORY_KEYS.MONTHLY_REVIEWS),
+      this.repository.getData<OnThisDayEntry[]>(REPOSITORY_KEYS.ON_THIS_DAY_ENTRIES)
+    ]);
     const dailyReviews = storedDailyReviews
       ? normalizeDailyReviews(storedDailyReviews)
       : normalizeDailyReviews(INITIAL_DAILY_REVIEWS);
 
-    const weeklyReviews =
-      (await this.repository.getData<WeeklyReview[]>(REPOSITORY_KEYS.WEEKLY_REVIEWS)) ?? [];
-    const monthlyReviews =
-      (await this.repository.getData<MonthlyReview[]>(REPOSITORY_KEYS.MONTHLY_REVIEWS)) ?? [];
-    const onThisDayEntries =
-      (await this.repository.getData<OnThisDayEntry[]>(REPOSITORY_KEYS.ON_THIS_DAY_ENTRIES)) ?? [];
+    console.info(
+      `[DataRepository] loadReviewEntriesSnapshot resolved in ${(getTimingNow() - startedAt).toFixed(1)}ms`
+    );
 
     return {
       dailyReviews,
-      weeklyReviews,
-      monthlyReviews,
-      onThisDayEntries
+      weeklyReviews: weeklyReviews ?? [],
+      monthlyReviews: monthlyReviews ?? [],
+      onThisDayEntries: onThisDayEntries ?? []
     };
   }
 
   async loadCategoryScopeSnapshot(): Promise<CategoryScopeSnapshot> {
+    const startedAt = getTimingNow();
     await this.initialize();
 
-    const categories =
-      (await this.repository.getData<Category[]>(REPOSITORY_KEYS.CATEGORIES)) ?? CATEGORIES;
-    const scopes =
-      (await this.repository.getData<Scope[]>(REPOSITORY_KEYS.SCOPES)) ?? SCOPES;
-    const goals =
-      (await this.repository.getData<Goal[]>(REPOSITORY_KEYS.GOALS)) ?? INITIAL_GOALS;
-    const majorGoals =
-      (await this.repository.getData<MajorGoal[]>(REPOSITORY_KEYS.MAJOR_GOALS)) ?? [];
-
-    return {
+    const [
       categories,
       scopes,
       goals,
       majorGoals
+    ] = await Promise.all([
+      this.repository.getData<Category[]>(REPOSITORY_KEYS.CATEGORIES),
+      this.repository.getData<Scope[]>(REPOSITORY_KEYS.SCOPES),
+      this.repository.getData<Goal[]>(REPOSITORY_KEYS.GOALS),
+      this.repository.getData<MajorGoal[]>(REPOSITORY_KEYS.MAJOR_GOALS)
+    ]);
+
+    console.info(
+      `[DataRepository] loadCategoryScopeSnapshot resolved in ${(getTimingNow() - startedAt).toFixed(1)}ms`
+    );
+
+    return {
+      categories: categories ?? CATEGORIES,
+      scopes: scopes ?? SCOPES,
+      goals: goals ?? INITIAL_GOALS,
+      majorGoals: majorGoals ?? []
     };
   }
 
   async loadAchievementSnapshot(): Promise<AchievementSnapshot> {
+    const startedAt = getTimingNow();
     await this.initialize();
 
-    const meta =
-      (await this.repository.getData<AchievementMeta>(REPOSITORY_KEYS.ACHIEVEMENT_META)) ?? {
-        achievementStartDate: null,
-        activeBottleCarryoverStars: 0
-      };
-    const rules =
-      (await this.repository.getData<AchievementRule[]>(REPOSITORY_KEYS.ACHIEVEMENT_RULES)) ?? [];
-    const rewards =
-      (await this.repository.getData<AchievementReward[]>(REPOSITORY_KEYS.ACHIEVEMENT_REWARDS)) ?? [];
-    const collections =
-      (await this.repository.getData<AchievementCollection[]>(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTIONS)) ?? DEFAULT_ACHIEVEMENT_COLLECTIONS;
-    const migratedCollections = collections.map(migrateDefaultAchievementCollection);
-    const dailySnapshots =
-      (await this.repository.getData<AchievementDailySnapshot[]>(REPOSITORY_KEYS.ACHIEVEMENT_DAILY_SNAPSHOTS)) ?? [];
-    const redemptionRecords =
-      (await this.repository.getData<AchievementRedemptionRecord[]>(REPOSITORY_KEYS.ACHIEVEMENT_REDEMPTION_RECORDS)) ?? [];
-    const collectionRecords =
-      ((await this.repository.getData<AchievementCollectionRecord[]>(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTION_RECORDS)) ?? [])
-        .map(migrateDefaultAchievementCollectionRecord);
-    const archivedBottles =
-      ((await this.repository.getData<AchievementArchivedBottle[]>(REPOSITORY_KEYS.ACHIEVEMENT_ARCHIVED_BOTTLES)) ?? [])
-        .map(migrateDefaultAchievementArchivedBottle);
-    const bottleActionRecords =
-      (await this.repository.getData<AchievementBottleActionRecord[]>(REPOSITORY_KEYS.ACHIEVEMENT_BOTTLE_ACTION_RECORDS)) ?? [];
+    const [
+      storedMeta,
+      rules,
+      rewards,
+      collections,
+      dailySnapshots,
+      redemptionRecords,
+      collectionRecords,
+      archivedBottles,
+      bottleActionRecords
+    ] = await Promise.all([
+      this.repository.getData<AchievementMeta>(REPOSITORY_KEYS.ACHIEVEMENT_META),
+      this.repository.getData<AchievementRule[]>(REPOSITORY_KEYS.ACHIEVEMENT_RULES),
+      this.repository.getData<AchievementReward[]>(REPOSITORY_KEYS.ACHIEVEMENT_REWARDS),
+      this.repository.getData<AchievementCollection[]>(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTIONS),
+      this.repository.getData<AchievementDailySnapshot[]>(REPOSITORY_KEYS.ACHIEVEMENT_DAILY_SNAPSHOTS),
+      this.repository.getData<AchievementRedemptionRecord[]>(REPOSITORY_KEYS.ACHIEVEMENT_REDEMPTION_RECORDS),
+      this.repository.getData<AchievementCollectionRecord[]>(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTION_RECORDS),
+      this.repository.getData<AchievementArchivedBottle[]>(REPOSITORY_KEYS.ACHIEVEMENT_ARCHIVED_BOTTLES),
+      this.repository.getData<AchievementBottleActionRecord[]>(REPOSITORY_KEYS.ACHIEVEMENT_BOTTLE_ACTION_RECORDS)
+    ]);
+    const meta = storedMeta ?? {
+      achievementStartDate: null,
+      activeBottleCarryoverStars: 0
+    };
+    const safeRules = rules ?? [];
+    const safeRewards = rewards ?? [];
+    const safeCollections = collections ?? DEFAULT_ACHIEVEMENT_COLLECTIONS;
+    const migratedCollections = safeCollections.map(migrateDefaultAchievementCollection);
+    const safeDailySnapshots = dailySnapshots ?? [];
+    const safeRedemptionRecords = redemptionRecords ?? [];
+    const safeCollectionRecords = (collectionRecords ?? []).map(migrateDefaultAchievementCollectionRecord);
+    const safeArchivedBottles = (archivedBottles ?? []).map(migrateDefaultAchievementArchivedBottle);
+    const safeBottleActionRecords = bottleActionRecords ?? [];
+
+    console.info(
+      `[DataRepository] loadAchievementSnapshot resolved in ${(getTimingNow() - startedAt).toFixed(1)}ms`
+    );
 
     return {
       meta: {
         achievementStartDate: meta.achievementStartDate ?? null,
         activeBottleCarryoverStars: meta.activeBottleCarryoverStars ?? 0
       },
-      rules,
-      rewards,
+      rules: safeRules,
+      rewards: safeRewards,
       collections: migratedCollections,
-      dailySnapshots,
-      redemptionRecords,
-      collectionRecords,
-      archivedBottles,
-      bottleActionRecords
+      dailySnapshots: safeDailySnapshots,
+      redemptionRecords: safeRedemptionRecords,
+      collectionRecords: safeCollectionRecords,
+      archivedBottles: safeArchivedBottles,
+      bottleActionRecords: safeBottleActionRecords
     };
   }
 

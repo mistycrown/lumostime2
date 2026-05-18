@@ -4,6 +4,7 @@
  * @output Modal-based todo display setting updates
  * @pos Component (Modal)
  * @description Lets users adjust completed visibility and compact-row metadata visibility from the Todo sidebar.
+ * @updated 2026-05-18: Added bg-[rgba(15,23,42,0.12)] and backdrop-blur-sm to the outermost backdrop div to restore background blur and align it with the quick-actions sheet backdrop.
  * @updated 2026-05-11: Aligned the card glass treatment and control sizing with the schedule shortcut menu so display-settings popups now use the same blur, fill, and larger typography.
  * @updated 2026-05-11: Removed the misplaced full-screen blur scrim so the modal no longer tries to simulate background blur from the wrong layer.
  * @updated 2026-05-11: Added a dedicated full-screen blur scrim behind the popup and made the card fill more opaque so the background stays soft without making the text glow.
@@ -143,7 +144,7 @@ export const TodoDisplaySettingsModal: React.FC<TodoDisplaySettingsModalProps> =
 
   return (
     <div
-      className="fixed inset-0 z-[135] flex items-end justify-center px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-12 md:items-center md:pb-4"
+      className="fixed inset-0 z-[135] flex items-end justify-center bg-[rgba(15,23,42,0.12)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-12 backdrop-blur-sm md:items-center md:pb-4"
       onPointerDown={handleBackdropPointerDown}
       onClick={handleBackdropClick}
     >
