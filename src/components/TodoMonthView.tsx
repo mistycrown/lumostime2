@@ -8,7 +8,9 @@
  * @updated 2026-05-17: Added a dashed outline border around "maybe" schedule items in the month view grid matching their type color.
  * @updated 2026-05-17: Added a strike-through (line-through) style to "completed" schedule items in both month view grid cells and expanded details.
  * @updated 2026-05-17: Wired up click handlers on monthly trace segments to trigger the quick actions sheet.
+ * @updated 2026-05-18: 支持在月视图中如果是 recurring（循环）类型的任务，在靠右渲染 Repeat2 图标，模仿截止 (due) 条目的 Flag 样式，保持 UI 一致。
  * @updated 2026-05-17: 支持在格子中为 due 类型的条目加上 flag 图标（并实现超出截断且 flag 完整显示），并将 trace / 连续 trace 条目字色置为灰色。
+ * @updated 2026-05-18: 支持点击循环排期的 Repeat 标签，唤起快捷编辑栏。
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -189,7 +191,7 @@ const MONTH_VIEW_ENTRY_TAGS: Array<{
 }> = [
   { key: 'deadline', label: 'Due', color: '#8f6f6b', clickable: true },
   { key: 'scheduled', label: 'Arrange', color: '#7c8b97', clickable: true },
-  { key: 'recurring', label: 'Repeat', color: '#8b8f79', clickable: false },
+  { key: 'recurring', label: 'Repeat', color: '#8b8f79', clickable: true },
   { key: 'maybe', label: 'Maybe', color: '#a58863', clickable: true },
   { key: 'completed', label: 'Done', color: '#7f8c84', clickable: true },
   { key: 'inProgress', label: 'Trace', color: '#8b8096', clickable: true }
@@ -1424,6 +1426,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                             const isCompleted = entry.primaryKind === 'completed';
                             const isTrace = entry.primaryKind === 'inProgress';
                             const isDue = entry.primaryKind === 'deadline';
+                            const isRecurring = entry.primaryKind === 'recurring';
 
                             const textClassName = isCompleted
                               ? 'line-through text-stone-400/90 dark:text-stone-500/90'
@@ -1449,6 +1452,9 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                                 <span className="truncate flex-1">{entry.todo.title}</span>
                                 {isDue && (
                                   <Flag size={10} style={{ color: markerColor, fill: markerColor, paddingRight: '2px' }} className="shrink-0 ml-0.5" />
+                                )}
+                                {isRecurring && (
+                                  <Repeat2 size={10} style={{ color: markerColor, paddingRight: '2px' }} className="shrink-0 ml-0.5" />
                                 )}
                               </div>
                             );

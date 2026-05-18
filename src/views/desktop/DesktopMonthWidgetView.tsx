@@ -4,6 +4,7 @@
  * @output Unified desktop month widget view with one shared title bar, week-paged calendar, and collapsible planning sidebar
  * @pos View (Desktop widget)
  * @description Hosts the Electron desktop month widget, including one unified header, compact display settings, a 2/3/4-week paged calendar body, and the right-side Arrange / Maybe / Due planning sidebar.
+ * @updated 2026-05-18: Changed vertical wheel/trackpad navigation to shift the visible calendar by one week at a time while keeping header arrows as whole-page jumps.
  * @updated 2026-05-17: Added a dedicated month-entry background opacity slider in display settings so the widget can strengthen or soften item fills without changing the window glass opacity.
  * @updated 2026-05-17: The planning sidebar now keeps unfinished todos visible across arrange/maybe/due even when they already have dates, and shows those dated rows with compact trailing labels.
  * @updated 2026-05-17: 改良计划栏分类标签，调整顺序为 maybe / arrange / due 并默认选中 arrange 标签。
@@ -34,6 +35,7 @@ const DEFAULT_ENTRY_BACKGROUND_OPACITY = 0.08;
 const ROWS_PER_SCREEN_OPTIONS = [2, 3, 4] as const;
 
 type WidgetRowsPerScreen = typeof ROWS_PER_SCREEN_OPTIONS[number];
+type DesktopMonthWidgetNavigationMode = 'page' | 'wheel';
 
 const getWeekPageStart = (date: Date): Date => startOfWeek(date, { weekStartsOn: 1 });
 
@@ -48,6 +50,18 @@ const buildWeekPageLabel = (pageStartDate: Date, weeksPerPage: WidgetRowsPerScre
   }
 
   return `${format(pageStartDate, 'yyyy.M')} - ${format(pageEndDate, 'yyyy.M')}`;
+};
+
+export const shiftDesktopMonthPageStart = (
+  pageStartDate: Date,
+  direction: 'prev' | 'next',
+  navigationMode: DesktopMonthWidgetNavigationMode,
+  rowsPerScreen: WidgetRowsPerScreen
+): Date => {
+  const weekShiftCount = navigationMode === 'wheel' ? 1 : rowsPerScreen;
+  return direction === 'next'
+    ? addWeeks(pageStartDate, weekShiftCount)
+    : subWeeks(pageStartDate, weekShiftCount);
 };
 
 const WEEKS_PER_PAGE_LABEL: Record<WidgetRowsPerScreen, string> = {
@@ -374,7 +388,9 @@ export const DesktopMonthWidgetView: React.FC = () => {
           >
             <button
               type="button"
-              onClick={() => setPageStartDate((previous) => subWeeks(previous, rowsPerScreen))}
+              onClick={() => setPageStartDate((previous) => (
+                shiftDesktopMonthPageStart(previous, 'prev', 'page', rowsPerScreen)
+              ))}
               className={`rounded-full p-1.5 transition-colors ${isDark ? 'text-stone-400 hover:bg-white/5 hover:text-stone-100' : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900'}`}
               aria-label="上一页"
             >
@@ -385,7 +401,9 @@ export const DesktopMonthWidgetView: React.FC = () => {
             </div>
             <button
               type="button"
-              onClick={() => setPageStartDate((previous) => addWeeks(previous, rowsPerScreen))}
+              onClick={() => setPageStartDate((previous) => (
+                shiftDesktopMonthPageStart(previous, 'next', 'page', rowsPerScreen)
+              ))}
               className={`rounded-full p-1.5 transition-colors ${isDark ? 'text-stone-400 hover:bg-white/5 hover:text-stone-100' : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900'}`}
               aria-label="下一页"
             >
@@ -454,7 +472,7 @@ export const DesktopMonthWidgetView: React.FC = () => {
               todoCategories={todoCategories}
               onWheelPageChange={(direction) => {
                 setPageStartDate((previous) => (
-                  direction === 'next' ? addWeeks(previous, rowsPerScreen) : subWeeks(previous, rowsPerScreen)
+                  shiftDesktopMonthPageStart(previous, direction, 'wheel', rowsPerScreen)
                 ));
               }}
             />

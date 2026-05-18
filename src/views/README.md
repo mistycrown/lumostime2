@@ -27,6 +27,7 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 - Update 2026-05-16: `DailyReviewView.tsx` now places the `小报` entry directly under the `AI 叙事` section, opens the shared AI chat with a prefilled `小报` request when that day has no newspaper yet, and requires confirmation before deleting an existing newspaper.
 
+- Update 2026-05-18: `TodoView.tsx` 支持点击周视图一列（标准周视图）下循环排期的 Repeat 标签以唤起快捷编辑栏。
 - Update 2026-05-14: `TodoView.tsx` now persists a shared `锁定/解锁` planner toggle and passes it through the standard week, bento week, and month schedule views, so all arrange/deadline/tentative entries can be frozen against drag-to-move until explicitly re-enabled.
 - Update 2026-05-14: `TimelineView.tsx` now renders `◬ CollectionName` chips on any timeline log row that belongs to one or more collections, matching the existing linked-todo metadata badge styling instead of inventing a separate collection-only tag treatment.
 - Update 2026-05-14: `TodoView.tsx` and planning components now support drag-and-drop for `Maybe` entries, and the standard week view plus month view `Maybe` badges now open the same quick-edit bar as Arrange/Due while multi-date drags replace only the moved tentative date.
