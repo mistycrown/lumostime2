@@ -11,6 +11,7 @@ The `electron/` directory contains the main process and preload scripts for runn
 
 *   **Window Management**: Configures the main application window plus the dedicated desktop today-widget, month-widget, quick-widget, timer-widget, and transparent quick-editor windows, including widget focus/open-close IPC, persisted widget bounds, and a separate always-on-top editor surface that can exceed widget bounds without clipping.
 *   **Tray Background Mode**: On Windows, minimizing still behaves normally, while closing the main window hides LumosTime to the system tray so it can keep running in the background until the tray `退出 LumosTime` action is used.
+*   **Tray Autostart Toggle**: The Windows tray context menu now includes a `开机自启动` checkbox backed by Electron login-item settings. When Windows launches LumosTime from that login item, the app starts silently in the tray until the user restores the main window.
 *   **DEV Data Isolation**: Redirects Electron `userData` into a dedicated `LumosTime Dev` directory whenever the Vite dev server is attached, so desktop development storage stays separate from the packaged app's localStorage, IndexedDB, and persisted widget JSON files.
 *   **DEV Navigation Resilience**: Treats Electron `ERR_ABORTED` load interruptions as expected during renderer-triggered reloads in development, so startup data-repair refreshes do not surface as unhandled promise rejections.
 *   **Security**: Disables Web Security (`webSecurity: false`) to allow WebDAV access across origins (critical for the Sync feature).

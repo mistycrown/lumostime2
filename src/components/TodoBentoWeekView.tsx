@@ -5,6 +5,7 @@
  * @pos Component (Todo scheduling)
  * @description Renders one selected week at a time in the bento layout so the mini calendar, header range, and visible day cells always describe the same week.
  * @updated 2026-05-14: Added a parent-controlled schedule lock toggle so bento week rows can disable drag-to-move without changing the surrounding week navigation or quick-action behavior.
+ * @updated 2026-05-18: 支持点击循环排期的 Repeat 标签，唤起快捷编辑栏。
  
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -84,7 +85,7 @@ const TODO_BENTO_MARKER_COLOR_OPTIONS = [
   { key: 'category', label: '按任务分类' }
 ] as const;
 type BentoBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'completed' | 'inProgress';
-type BentoQuickActionBadgeKey = 'deadline' | 'scheduled' | 'maybe' | 'completed' | 'inProgress';
+type BentoQuickActionBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'completed' | 'inProgress';
 type TodoBentoDisplayMode = typeof TODO_BENTO_DISPLAY_MODE_OPTIONS[number]['key'];
 type TodoBentoMarkerColorMode = typeof TODO_BENTO_MARKER_COLOR_OPTIONS[number]['key'];
 
@@ -326,7 +327,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
     entry: WeekTodoEntry,
     badgeKey: BentoQuickActionBadgeKey
   ) => {
-    if (badgeKey === 'deadline' || badgeKey === 'scheduled' || badgeKey === 'maybe' || badgeKey === 'completed' || badgeKey === 'inProgress') {
+    if (badgeKey === 'deadline' || badgeKey === 'scheduled' || badgeKey === 'recurring' || badgeKey === 'maybe' || badgeKey === 'completed' || badgeKey === 'inProgress') {
       onOpenTodo?.(entry.todo);
     }
   };
@@ -900,7 +901,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                                 </div>
                                 <div className={`shrink-0 self-center flex items-center justify-end gap-1 whitespace-nowrap text-[9px] uppercase leading-none ${hasMultipleBadges ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
                                   {orderedBadges.map((badge) => (
-                                    badge.key === 'scheduled' || badge.key === 'deadline' || badge.key === 'maybe' || badge.key === 'completed' || badge.key === 'inProgress' ? (
+                                    badge.key === 'scheduled' || badge.key === 'deadline' || badge.key === 'recurring' || badge.key === 'maybe' || badge.key === 'completed' || badge.key === 'inProgress' ? (
                                       <button
                                         key={badge.key}
                                         type="button"

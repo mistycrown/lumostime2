@@ -6,7 +6,7 @@ LumosTime 是一款专注于个人成长与生活记录的全能时间管理应�
 
 支持 **Web** 、 **Windows** 与 **Android** 原生应用。
 
-🌐 **在线预览**: [lumostime2.vercel.app](https://lumostime2.vercel.app)
+🌐 **在线预览**（这是老版本，网页端没更新了）: [lumostime2.vercel.app](https://lumostime2.vercel.app)
 
 📖 **用户指南** - 详细的功能使用说明：
 - [时间记录方法论](./docs/user-guide/00-time-tracking-methods.md) - 为什么要记录时间？柳比歇夫时间统计法与间歇日志

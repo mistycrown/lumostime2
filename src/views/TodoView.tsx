@@ -5,7 +5,8 @@
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes reserved `小事` / `未来` buckets plus a week planning view with schedule and history badges.
  * @updated 2026-05-14: Added a persisted schedule lock toggle across the standard week, bento week, and month planners so schedule and deadline rows can be frozen against drag-to-move until explicitly unlocked.
- Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-05-18: 支持点击周视图一列（标准周视图）下循环排期的 Repeat 标签以唤起快捷编辑栏。
+ * Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useMemo, useRef } from 'react';
 import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log, TodoDuplicateOptions } from '../types';
@@ -856,7 +857,7 @@ const formatScheduleSectionLabel = (dateKey: string, todayDateKey: string, tomor
 };
 
 type WeekBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'completed' | 'inProgress';
-type WeekQuickActionBadgeKey = 'deadline' | 'scheduled' | 'maybe' | 'completed' | 'inProgress';
+type WeekQuickActionBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'completed' | 'inProgress';
 
 interface WeekBadgeDescriptor {
   key: WeekBadgeKey;
@@ -964,7 +965,7 @@ const WeekTodoLineItem: React.FC<{
       </div>
       <div className={`shrink-0 flex items-center justify-end gap-1 whitespace-nowrap text-[9px] uppercase leading-none ${hasMultipleBadges ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
         {orderedBadges.map((badge) => (
-          badge.key === 'scheduled' || badge.key === 'deadline' || badge.key === 'maybe' || badge.key === 'completed' || badge.key === 'inProgress' ? (
+          badge.key === 'scheduled' || badge.key === 'deadline' || badge.key === 'recurring' || badge.key === 'maybe' || badge.key === 'completed' || badge.key === 'inProgress' ? (
             <span
               key={badge.key}
               data-week-badge-trigger="true"

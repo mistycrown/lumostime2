@@ -3,6 +3,10 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-05-18: `TodoMonthView.tsx` 与 `TodoBentoWeekView.tsx` 支持点击循环排期（Repeat）标签以唤起快捷编辑栏（快捷操作弹窗），保持与其他类型标签一致的交互体验。
+- Update 2026-05-18: `TodoMonthView.tsx` 支持在月视图格子中为如果是 recurring（循环）类型的任务靠右渲染 `Repeat2` 循环图标，模仿截止 (due) 条目的 Flag 样式，保持 UI 一致。
+- Update 2026-05-18: `TodoMonthView.tsx` now keeps all unfinished month-view entry titles in black across in-cell rows, expanded details, and continuous trace strips, so recurring and arrange/due items no longer render as faded gray while completed rows still stay struck through and softened.
+- Update 2026-05-18: `TodoMonthView.tsx` now removes the extra right padding from clickable expanded-row status tags, so right-edge labels like `ARRANGE` align flush with `REPEAT` and the rest of the month-detail rail on mobile.
 - Update 2026-05-17: `AIBackfillChatModal.tsx` now marks persisted session/persona/custom-prompt/debug/user-profile edits as sync-relevant only when their serialized localStorage payload actually changes, so foreground AI-only changes can auto-sync into the main backup JSON without causing false sync churn on modal mount.
 - Update 2026-05-17: `DesktopTodoQuickEditorPopover.tsx` now serves as the shared todo quick-editor surface inside the dedicated transparent desktop editor window, with inline title save, editable empty-note fallback, clickable parent navigation, viewport-clamped scrolling so larger content no longer clips itself, tightened space offsets/line-heights between titles and schedule metadata, and a quick toggle-complete action button right of the external-link button.
 - Update 2026-05-17: `TodoMonthView.tsx` now renders an elegant dashed outline border around 'maybe' schedule items matching their color scheme, applies a strike-through (line-through) text decoration with slight opacity fading for 'completed' tasks in both month grid cells and detail lists, and wires up click handlers on monthly trace segments to trigger the quick actions sheet.
@@ -77,6 +81,7 @@ Components that form the structural or global UI elements.
 - `Toast.tsx`: Notification system.
 
 ## Modals
+- Update 2026-05-18: `TodoDetailModal.tsx` now buffers task title inputs in a local draft state and only commits them to the live database on blur or enter, eliminating live-updating stutter on the header title during typing.
 - Update 2026-05-14: `AIBackfillChatModal.tsx` now adds a guarded `重置` action inside the Dream manager, using the same inline danger-confirm pattern as existing delete flows to restore the built-in Dream topics/notes and clear every Dream observation entry at once.
 - Update 2026-05-13: `AIBackfillChatModal.tsx` now treats one complete `assistantReply` string as the only AI-visible message payload across ordinary chat, weekly-review template turns, and Dream results, splitting that single reply into multiple bubbles from blank lines or line breaks instead of rendering a duplicate full-text reply beside separate model-authored parts.
 - Update 2026-05-13: `AIBackfillChatModal.tsx` now starts `模板对话：周复盘` as a staged in-chat setup, immediately creating one weekly-review session that first asks for `本周 / 上周 / YYYYMMDD` and then asks for one of four analysis methods through local fake-AI turns plus composer shortcut chips, replacing the old popup-based range/method selectors before the real weekly-review AI conversation begins.

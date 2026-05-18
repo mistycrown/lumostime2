@@ -4,6 +4,7 @@
  * @output Week-paged calendar grid for the Electron desktop month widget
  * @pos View helper (Desktop widget)
  * @description Renders a desktop scheduling calendar that pages by 2/3/4 whole weeks, keeps the app's month-view spacing feel, and supports drag-to-schedule inside the desktop widget.
+ * @updated 2026-05-18: 支持在月视图小组件中如果是 recurring（循环）类型的任务，在靠右渲染 Repeat2 图标，模仿截止 (due) 条目的 Flag 样式，保持 UI 一致。
  * @updated 2026-05-17: Added a caller-controlled entry background opacity so the desktop month widget display settings can tune task strip fill strength independently from window opacity.
  * @updated 2026-05-17: Replaced the fixed 6x7 month grid with a dynamic 2/3/4-week page layout so the widget can navigate by week-page units instead of whole months.
  * @updated 2026-05-17: Reused the shared week-trace layout so cross-day trace events render as continuous bars and aligned desktop complete/maybe styling with the app month view.
@@ -14,7 +15,7 @@
  * @updated 2026-05-17: 支持在月视图中如果是 due 则在任务名称后显示 flag 图标，如果是 trace 则将文字设为灰色。
  */
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Flag } from 'lucide-react';
+import { Flag, Repeat2 } from 'lucide-react';
 import { addDays, format, isSameDay } from 'date-fns';
 import { Log, TodoCategory, TodoItem } from '../../types';
 import {
@@ -471,6 +472,7 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
                           const isCompleted = entry.primaryKind === 'completed';
                           const isTrace = entry.primaryKind === 'inProgress';
                           const isDue = entry.primaryKind === 'deadline';
+                          const isRecurring = entry.primaryKind === 'recurring';
 
                           const textClassName = isCompleted
                             ? (isDark ? 'line-through text-stone-500/90' : 'line-through text-stone-400/90')
@@ -521,12 +523,18 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
                                   {isDue && (
                                     <Flag size={10} style={{ color: markerColor, fill: markerColor, paddingRight: '2px' }} className="shrink-0 ml-0.5" />
                                   )}
+                                  {isRecurring && (
+                                    <Repeat2 size={10} style={{ color: markerColor, paddingRight: '2px' }} className="shrink-0 ml-0.5" />
+                                  )}
                                 </button>
                               ) : (
                                 <div className="flex w-full items-center justify-between gap-0.5">
                                   <span className="truncate flex-1">{entry.todo.title}</span>
                                   {isDue && (
                                     <Flag size={10} style={{ color: markerColor, fill: markerColor, paddingRight: '2px' }} className="shrink-0 ml-0.5" />
+                                  )}
+                                  {isRecurring && (
+                                    <Repeat2 size={10} style={{ color: markerColor, paddingRight: '2px' }} className="shrink-0 ml-0.5" />
                                   )}
                                 </div>
                               )}

@@ -4,6 +4,7 @@
  * @output Modal Interaction (Edit Todo, View History)
  * @pos Component (Modal)
  * @description Displays detailed information for a specific Todo item, including its progress, planning fields, associated history logs, and focus stats.
+ * @updated 2026-05-18: Changed task title editing to update only on blur (or Enter) to prevent live-updating and redundant auto-saves during typing.
  * @updated 2026-05-14: Restricted recurrence `Skip Date` selection to dates that actually belong to the active recurrence rule and fixed damaged UTF-8 picker labels.
  * @updated 2026-05-14: Removed the extra nested recurrence card chrome so recurring-rule fields render directly inside the outer planning card without a second dashed frame.
  * @updated 2026-05-14: Added multi-select `Maybe Date` editing plus recurrence `Skip Date` editing under time planning, reusing the shared date picker in future-only and today-or-future multi-date modes and persisting both candidate and skipped dates alongside arrange/due/recurrence fields.
@@ -203,6 +204,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const [selectedCategoryId, setSelectedCategoryId] = useState(initialCategoryId);
   const [todoKind, setTodoKind] = useState(initialTodoKind);
   const [title, setTitle] = useState(initialTitle);
+  const [inputTitle, setInputTitle] = useState(initialTitle);
 
   const [note, setNote] = useState(initialNote);
   const [isCompleted, setIsCompleted] = useState(initialIsCompleted);
@@ -1073,8 +1075,14 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                 <input
                   ref={taskNameInputRef}
                   type="text"
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
+                  value={inputTitle}
+                  onChange={e => setInputTitle(e.target.value)}
+                  onBlur={() => setTitle(inputTitle)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      taskNameInputRef.current?.blur();
+                    }
+                  }}
                   className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
                 />
               </div>

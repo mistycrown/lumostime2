@@ -4,6 +4,7 @@
  * @output Window Management
  * @pos Electron Main
  * @description Entry point for the Electron application. Handles main-window and desktop-widget creation, lifecycle events, and inter-process communication (IPC).
+ * @updated 2026-05-18: Added a tray-level Windows autostart toggle backed by Electron login-item settings, with login launches opening silently into the tray.
  * @updated 2026-05-17: Softened expected DEV navigation aborts so renderer-triggered reloads no longer surface as unhandled Electron promise rejections.
  * @updated 2026-05-17: Added a Windows tray integration so closing the main window hides the app to the system tray while explicit tray quit still exits the background process.
  * @updated 2026-05-17: Isolated Electron development builds into a dedicated `userData` directory so DEV localStorage, IndexedDB, and widget-state files no longer share packaged desktop data.
@@ -15,7 +16,7 @@
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import { app, BrowserWindow, Menu, Tray, ipcMain, screen, shell } from 'electron';
+import { app, BrowserWindow, Menu, Tray, ipcMain, screen, shell, type MenuItemConstructorOptions } from 'electron';
 import fs from 'fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -93,6 +94,7 @@ const MONTH_WIDGET_STATE_FILENAME = 'desktop-month-widget-state.json';
 const QUICK_WIDGET_STATE_FILENAME = 'desktop-quick-widget-state.json';
 const TIMER_WIDGET_STATE_FILENAME = 'desktop-timer-widget-state.json';
 const DEV_USER_DATA_DIRECTORY_NAME = 'LumosTime Dev';
+const LOGIN_ITEM_STARTUP_ARG = '--startup';
 
 // Disable GPU Acceleration for Windows 7
 if (os.release().startsWith('6.1')) app.disableHardwareAcceleration();
@@ -136,6 +138,7 @@ const getWidgetStatePath = () => path.join(app.getPath('userData'), WIDGET_STATE
 const getMonthWidgetStatePath = () => path.join(app.getPath('userData'), MONTH_WIDGET_STATE_FILENAME);
 const getQuickWidgetStatePath = () => path.join(app.getPath('userData'), QUICK_WIDGET_STATE_FILENAME);
 const getTimerWidgetStatePath = () => path.join(app.getPath('userData'), TIMER_WIDGET_STATE_FILENAME);
+const didLaunchFromLoginItem = process.argv.includes(LOGIN_ITEM_STARTUP_ARG);
 
 const buildRendererUrl = (windowType?: string): string => {
   if (IS_DEV) {
@@ -233,6 +236,88 @@ const createTrayMenu = () =>
     }
   ]);
 
+const getLoginItemArgs = () => {
+  if (process.defaultApp) {
+    const entryPoint = process.argv[1];
+    if (entryPoint) {
+      return [path.resolve(entryPoint), LOGIN_ITEM_STARTUP_ARG];
+    }
+  }
+
+  return [LOGIN_ITEM_STARTUP_ARG];
+};
+
+const getLoginItemQuery = () => ({
+  path: process.execPath,
+  args: getLoginItemArgs()
+});
+
+const isOpenAtLoginEnabled = () => {
+  if (process.platform !== 'win32') {
+    return false;
+  }
+
+  try {
+    return app.getLoginItemSettings(getLoginItemQuery()).openAtLogin;
+  } catch (error) {
+    console.error('[Electron] Failed to read login item settings', error);
+    return false;
+  }
+};
+
+const buildTrayMenu = () => {
+  const menuItems: MenuItemConstructorOptions[] = [
+    {
+      label: '显示主界面',
+      click: () => {
+        runInBackground('focus main window from tray menu', focusMainWindow());
+      }
+    }
+  ];
+
+  if (process.platform === 'win32') {
+    menuItems.push({
+      label: '开机自启动',
+      type: 'checkbox',
+      checked: isOpenAtLoginEnabled(),
+      click: (menuItem) => {
+        if (process.platform !== 'win32') {
+          return;
+        }
+
+        try {
+          app.setLoginItemSettings({
+            openAtLogin: menuItem.checked,
+            path: process.execPath,
+            args: getLoginItemArgs()
+          });
+        } catch (error) {
+          console.error('[Electron] Failed to update login item settings', error);
+        }
+
+        refreshTrayMenu();
+      }
+    });
+  }
+
+  menuItems.push(
+    { type: 'separator' },
+    {
+      label: '退出 LumosTime',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      }
+    }
+  );
+
+  return Menu.buildFromTemplate(menuItems);
+};
+
+const refreshTrayMenu = () => {
+  tray?.setContextMenu(buildTrayMenu());
+};
+
 const createTray = () => {
   if (tray) {
     return tray;
@@ -241,12 +326,15 @@ const createTray = () => {
   try {
     tray = new Tray(getIconPath());
     tray.setToolTip('LumosTime');
-    tray.setContextMenu(createTrayMenu());
+    refreshTrayMenu();
     tray.on('click', () => {
       runInBackground('focus main window from tray click', focusMainWindow());
     });
     tray.on('double-click', () => {
       runInBackground('focus main window from tray double-click', focusMainWindow());
+    });
+    tray.on('right-click', () => {
+      refreshTrayMenu();
     });
   } catch (error) {
     console.error('[Electron] Failed to create tray icon', error);
@@ -977,7 +1065,12 @@ async function createTodoQuickEditorWindow() {
 }
 
 app.whenReady().then(() => {
-  createTray();
+  const trayInstance = createTray();
+  if (didLaunchFromLoginItem && process.platform === 'win32' && trayInstance) {
+    console.info('[Electron] Started from login item; keeping app in tray until restored.');
+    return;
+  }
+
   runInBackground('create main window on app ready', createMainWindow());
 });
 
@@ -1000,9 +1093,7 @@ app.on('second-instance', () => {
     return;
   }
 
-  if (widgetWindow || monthWidgetWindow || quickWidgetWindow || timerWidgetWindow || todoQuickEditorWindow) {
-    runInBackground('focus main window from second instance', focusMainWindow());
-  }
+  runInBackground('focus main window from second instance', focusMainWindow());
 });
 
 app.on('activate', () => {
