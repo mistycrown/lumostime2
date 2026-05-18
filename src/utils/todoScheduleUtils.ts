@@ -4,6 +4,7 @@
  * @output Week buckets, daily schedule entries, and badge metadata for todo planning views
  * @pos Utility (Todo planning)
  * @description Shared helpers for deriving scheduled, deadline, recurring, maybe, completed, and in-progress todo visibility without creating standalone occurrence records.
+ * @updated 2026-05-18: Prevented today-category pin views from surfacing recurring todos whose current-day occurrence is explicitly suppressed by `skipDates`, while still allowing true pin-only todos and other explicit today matches through.
  * @updated 2026-05-17: Reordered shared month-entry priority so completed rows win over due/arrange/repeat/maybe/trace when one todo matches multiple day badges, while keeping the continuous trace lane layout unchanged.
  * @updated 2026-05-14: Updated `TodoDateEntry` and `WeekTodoEntry` to include an optional `dateKey`, enabling drag-and-drop logic to identify which specific occurrence is being moved in multi-date `Maybe` schedules.
 
@@ -269,16 +270,39 @@ export const hasMaybeDate = (
   referenceDate: Date = new Date()
 ): boolean => Boolean(normalizeMaybeDates(todo.maybeDates, referenceDate)?.includes(targetDateKey));
 
+const isSuppressedRecurringOccurrenceForDate = (
+  todo: TodoItem,
+  targetDateKey: string
+): boolean => {
+  const recurrenceRule = todo.recurrenceRule;
+
+  if (!recurrenceRule?.skipDates?.includes(targetDateKey)) {
+    return false;
+  }
+
+  return matchesRecurrenceRule({
+    ...recurrenceRule,
+    skipDates: []
+  }, targetDateKey);
+};
+
 export const isTodoInAssociationTodayCategory = (
   todo: TodoItem,
   referenceDate: Date = new Date()
 ): boolean => {
   const todayDateKey = formatDateKey(referenceDate);
-  return Boolean(todo.pin)
-    || todo.scheduledDate === todayDateKey
+  const hasExplicitTodayMatch = todo.scheduledDate === todayDateKey
     || todo.deadlineDate === todayDateKey
-    || matchesRecurrenceRule(todo.recurrenceRule, todayDateKey)
     || hasMaybeDate(todo, todayDateKey, referenceDate);
+  const hasRecurringMatch = matchesRecurrenceRule(todo.recurrenceRule, todayDateKey);
+
+  if (!hasExplicitTodayMatch && !hasRecurringMatch && isSuppressedRecurringOccurrenceForDate(todo, todayDateKey)) {
+    return false;
+  }
+
+  return Boolean(todo.pin)
+    || hasExplicitTodayMatch
+    || hasRecurringMatch;
 };
 
 export const getTodoAssociationTodayTodos = (

@@ -5,12 +5,15 @@
  * @pos Constant (Achievement Collections)
  * @description Provides the default collectible bottle catalog for the achievement ledger collection tab.
  *
+ * @updated 2026-05-18: Added default-bottle preset lookup by id, preset name, and stale bottle asset URLs so Electron can repair outdated desktop image paths.
  * @updated 2026-04-07: Resolve bottle image paths through the shared asset-path helper so Electron desktop builds can load bundled bottle images.
  */
 import { AchievementCollection } from '../types';
 import { resolveAssetPath } from '../utils/assetPath';
 
 export const DEFAULT_ACHIEVEMENT_COLLECTION_COST = 200;
+const DEFAULT_ACHIEVEMENT_COLLECTION_ID_PATTERN = /^default-bottle-(\d{2})$/i;
+const DEFAULT_ACHIEVEMENT_COLLECTION_IMAGE_PATH_PATTERN = /(?:^|[\\/])bottle[\\/](\d{2})\.png(?:$|[?#])/i;
 
 export const resolveAchievementCollectionImagePath = (imagePath: string, baseUri?: string): string => {
   return resolveAssetPath(imagePath, baseUri);
@@ -20,6 +23,10 @@ interface DefaultAchievementCollectionDefinition {
   assetId: string;
   name: string;
   description: string;
+}
+
+export interface DefaultAchievementCollectionPreset extends DefaultAchievementCollectionDefinition {
+  imagePath: string;
 }
 
 const DEFAULT_ACHIEVEMENT_COLLECTION_DEFINITIONS: DefaultAchievementCollectionDefinition[] = [
@@ -114,16 +121,100 @@ const DEFAULT_ACHIEVEMENT_COLLECTION_PRESET_BY_ID = DEFAULT_ACHIEVEMENT_COLLECTI
   return accumulator;
 }, {});
 
-export const getDefaultAchievementCollectionPreset = (collectionId: string) => {
+const DEFAULT_ACHIEVEMENT_COLLECTION_PRESET_BY_NAME = DEFAULT_ACHIEVEMENT_COLLECTION_DEFINITIONS.reduce<Record<string, DefaultAchievementCollectionDefinition>>((accumulator, definition) => {
+  accumulator[definition.name] = definition;
+  return accumulator;
+}, {});
+
+const buildDefaultAchievementCollectionPreset = (
+  definition: DefaultAchievementCollectionDefinition,
+  baseUri?: string
+): DefaultAchievementCollectionPreset => ({
+  ...definition,
+  imagePath: resolveAchievementCollectionImagePath(`/bottle/${definition.assetId}.png`, baseUri)
+});
+
+const getDefaultAchievementCollectionAssetIdFromCollectionId = (
+  collectionId?: string | null
+): string | null => {
+  if (!collectionId) {
+    return null;
+  }
+
+  const match = collectionId.match(DEFAULT_ACHIEVEMENT_COLLECTION_ID_PATTERN);
+  return match?.[1] || null;
+};
+
+export const getDefaultAchievementCollectionAssetIdFromImagePath = (
+  imagePath?: string | null
+): string | null => {
+  if (!imagePath) {
+    return null;
+  }
+
+  const match = imagePath.trim().match(DEFAULT_ACHIEVEMENT_COLLECTION_IMAGE_PATH_PATTERN);
+  return match?.[1] || null;
+};
+
+export const getDefaultAchievementCollectionPresetByAssetId = (
+  assetId: string,
+  baseUri?: string
+): DefaultAchievementCollectionPreset | null => {
+  const definition = DEFAULT_ACHIEVEMENT_COLLECTION_DEFINITIONS.find((item) => item.assetId === assetId);
+  return definition ? buildDefaultAchievementCollectionPreset(definition, baseUri) : null;
+};
+
+export const getDefaultAchievementCollectionPreset = (
+  collectionId: string,
+  baseUri?: string
+): DefaultAchievementCollectionPreset | null => {
   const preset = DEFAULT_ACHIEVEMENT_COLLECTION_PRESET_BY_ID[collectionId];
   if (!preset) {
     return null;
   }
 
-  return {
-    ...preset,
-    imagePath: resolveAchievementCollectionImagePath(`/bottle/${preset.assetId}.png`)
-  };
+  return buildDefaultAchievementCollectionPreset(preset, baseUri);
+};
+
+export const getDefaultAchievementCollectionPresetFromReference = (
+  reference: {
+    collectionId?: string | null;
+    imagePath?: string | null;
+    name?: string | null;
+  },
+  baseUri?: string
+): DefaultAchievementCollectionPreset | null => {
+  const assetIdFromCollectionId = getDefaultAchievementCollectionAssetIdFromCollectionId(reference.collectionId);
+  if (assetIdFromCollectionId) {
+    return getDefaultAchievementCollectionPresetByAssetId(assetIdFromCollectionId, baseUri);
+  }
+
+  const assetIdFromImagePath = getDefaultAchievementCollectionAssetIdFromImagePath(reference.imagePath);
+  if (assetIdFromImagePath) {
+    return getDefaultAchievementCollectionPresetByAssetId(assetIdFromImagePath, baseUri);
+  }
+
+  const definition = reference.name
+    ? DEFAULT_ACHIEVEMENT_COLLECTION_PRESET_BY_NAME[reference.name]
+    : undefined;
+  return definition ? buildDefaultAchievementCollectionPreset(definition, baseUri) : null;
+};
+
+export const repairAchievementCollectionImagePath = (
+  reference: {
+    collectionId?: string | null;
+    imagePath?: string | null;
+    name?: string | null;
+  },
+  baseUri?: string
+): string | undefined => {
+  const preset = getDefaultAchievementCollectionPresetFromReference(reference, baseUri);
+  if (preset) {
+    return preset.imagePath;
+  }
+
+  const imagePath = reference.imagePath?.trim();
+  return imagePath ? resolveAchievementCollectionImagePath(imagePath, baseUri) : undefined;
 };
 
 const DEFAULT_COLLECTION_TIMESTAMP = Date.UTC(2026, 2, 28, 12, 0, 0, 0);

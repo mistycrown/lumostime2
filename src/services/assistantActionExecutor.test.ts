@@ -96,4 +96,50 @@ describe('assistantActionExecutor applyTodoToolCalls', () => {
     expect(action.snapshot.linkedCategoryId).toBe('study');
     expect(action.snapshot.linkedActivityId).toBe('writing');
   });
+
+  it('creates nested subtasks together with a parent todo and strips child dates unless explicitly requested', () => {
+    const toolCalls: AITodoToolCall[] = [
+      {
+        toolName: 'create_todo',
+        args: {
+          title: 'Paper revision sprint',
+          categoryId: 'project-general',
+          kind: 'project',
+          linkedCategoryId: 'study',
+          linkedActivityId: 'writing',
+          subtasks: [
+            {
+              title: 'Draft outline',
+              scheduledDate: '2026-05-16'
+            },
+            {
+              title: 'Review citations',
+              note: 'Check Zotero tags',
+              deadlineDate: '2026-05-20'
+            }
+          ]
+        }
+      }
+    ];
+
+    const result = assistantActionExecutor.applyTodoToolCalls(buildBaseContext(), toolCalls, '帮我拆成两个子任务');
+    const parentTodo = result.nextTodos.find((todo) => !todo.parentTodoId);
+    const childTodos = result.nextTodos.filter((todo) => todo.parentTodoId);
+    const outlineTodo = childTodos.find((todo) => todo.title === 'Draft outline');
+    const citationTodo = childTodos.find((todo) => todo.title === 'Review citations');
+    const action = result.actions[0];
+
+    expect(action.kind).toBe('create_todo');
+    expect(action.status).toBe('applied');
+    if (action.kind !== 'create_todo' || action.status !== 'applied' || !parentTodo) {
+      throw new Error('Expected nested todo creation to succeed.');
+    }
+
+    expect(childTodos).toHaveLength(2);
+    expect(childTodos.every((todo) => todo.parentTodoId === parentTodo.id)).toBe(true);
+    expect(outlineTodo?.scheduledDate).toBeUndefined();
+    expect(citationTodo?.deadlineDate).toBeUndefined();
+    expect(citationTodo?.note).toBe('Check Zotero tags');
+    expect(action.snapshot.createdSubtaskIds).toHaveLength(2);
+  });
 });

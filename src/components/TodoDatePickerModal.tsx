@@ -4,6 +4,7 @@
  * @output Standalone date/month picker modal for todo planning fields, Maybe-date multi-select, and Memoir month jumping
  * @pos Component (Modal)
  * @description A lightweight print-style modal that supports single-date selection, configurable multi-date toggling, or a month-only picker with a fast year/month jump view.
+ * @updated 2026-05-18: Strictly validates incoming date strings and only mounts the calendar body while open so malformed short-month values can no longer crash the hidden picker tree.
  * @updated 2026-05-14: Added optional per-date selectability rules so recurrence `Skip Date` can disable days that do not belong to the active recurrence pattern, while also restoring damaged Chinese picker copy.
  * @updated 2026-05-14: Added configurable multi-date minimum-date rules so `Maybe Date` can stay future-only while recurrence `Skip Date` allows today plus future dates without needing a second calendar component.
  * @updated 2026-05-14: Added a future-only `multi-date` mode with local draft selection plus confirm/clear actions so todo details can edit `Maybe Date` values without disturbing the existing single-date scheduling flow.
@@ -18,7 +19,6 @@ import {
   format,
   isSameDay,
   isToday,
-  parse,
   startOfMonth,
   startOfWeek
 } from 'date-fns';
@@ -45,25 +45,54 @@ type PickerView = 'calendar' | 'month';
 const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'];
 const MONTH_PICKER_LABELS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
+const buildStrictLocalDate = (year: number, month: number, day: number): Date | null => {
+  const parsed = new Date(year, month - 1, day);
+  if (
+    parsed.getFullYear() !== year
+    || parsed.getMonth() !== month - 1
+    || parsed.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return parsed;
+};
+
 const parsePickerValue = (value?: string): Date => {
   if (!value) return new Date();
 
-  const patterns = ['yyyy-MM-dd', 'yyyy-MM'];
-  for (const pattern of patterns) {
-    const parsed = parse(value, pattern, new Date());
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed;
-    }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return new Date();
   }
 
-  const fallback = new Date(value);
+  const fullDateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (fullDateMatch) {
+    const parsed = buildStrictLocalDate(
+      Number(fullDateMatch[1]),
+      Number(fullDateMatch[2]),
+      Number(fullDateMatch[3])
+    );
+    return parsed || new Date();
+  }
+
+  const monthOnlyMatch = /^(\d{4})-(\d{2})$/.exec(trimmed);
+  if (monthOnlyMatch) {
+    const parsed = buildStrictLocalDate(
+      Number(monthOnlyMatch[1]),
+      Number(monthOnlyMatch[2]),
+      1
+    );
+    return parsed || new Date();
+  }
+
+  const fallback = new Date(trimmed);
   return Number.isNaN(fallback.getTime()) ? new Date() : fallback;
 };
 
 const sortDateKeys = (values: string[]): string[] => [...values].sort((left, right) => left.localeCompare(right));
 
-export const TodoDatePickerModal: React.FC<TodoDatePickerModalProps> = ({
-  isOpen,
+const TodoDatePickerModalContent: React.FC<TodoDatePickerModalProps> = ({
   title,
   value,
   values,
@@ -87,15 +116,13 @@ export const TodoDatePickerModal: React.FC<TodoDatePickerModalProps> = ({
   const [draftValues, setDraftValues] = useState<string[]>(() => sortDateKeys(values || []));
 
   useEffect(() => {
-    if (isOpen) {
-      const nextReferenceValue = isMultiDate
-        ? values?.[values.length - 1] || initialMonthValue
-        : value || initialMonthValue;
-      setDisplayMonth(startOfMonth(parsePickerValue(nextReferenceValue)));
-      setPickerView(isMonthOnly ? 'month' : 'calendar');
-      setDraftValues(sortDateKeys(values || []));
-    }
-  }, [initialMonthValue, isMonthOnly, isMultiDate, isOpen, value, values]);
+    const nextReferenceValue = isMultiDate
+      ? values?.[values.length - 1] || initialMonthValue
+      : value || initialMonthValue;
+    setDisplayMonth(startOfMonth(parsePickerValue(nextReferenceValue)));
+    setPickerView(isMonthOnly ? 'month' : 'calendar');
+    setDraftValues(sortDateKeys(values || []));
+  }, [initialMonthValue, isMonthOnly, isMultiDate, value, values]);
 
   const selectedDate = useMemo(
     () => (!isMonthOnly && !isMultiDate && value ? parsePickerValue(value) : null),
@@ -200,8 +227,6 @@ export const TodoDatePickerModal: React.FC<TodoDatePickerModalProps> = ({
     onClear?.();
     onClose();
   };
-
-  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(245,241,236,0.72)] px-5 py-8 backdrop-blur-sm">
@@ -404,4 +429,12 @@ export const TodoDatePickerModal: React.FC<TodoDatePickerModalProps> = ({
       </div>
     </div>
   );
+};
+
+export const TodoDatePickerModal: React.FC<TodoDatePickerModalProps> = (props) => {
+  if (!props.isOpen) {
+    return null;
+  }
+
+  return <TodoDatePickerModalContent {...props} />;
 };

@@ -4,6 +4,7 @@
  * @output Modal Interaction (Edit Todo, View History)
  * @pos Component (Modal)
  * @description Displays detailed information for a specific Todo item, including its progress, planning fields, associated history logs, and focus stats.
+ * @updated 2026-05-18: Defaulted timeline metadata render options so detail-page log chips still render safely when callers omit the auxiliary collection-name payload.
  * @updated 2026-05-18: Changed task title editing to update only on blur (or Enter) to prevent live-updating and redundant auto-saves during typing.
  * @updated 2026-05-14: Restricted recurrence `Skip Date` selection to dates that actually belong to the active recurrence rule and fixed damaged UTF-8 picker labels.
  * @updated 2026-05-14: Removed the extra nested recurrence card chrome so recurring-rule fields render directly inside the outer planning card without a second dashed frame.
@@ -1794,7 +1795,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
               unitAmount: progressSnapshot.unitAmount,
               completedUnits: progressSnapshot.completedUnits
             } : undefined}
-            renderLogMetadata={(log, { collectionNames }) => {
+            renderLogMetadata={(log, { collectionNames } = { collectionNames: [] }) => {
               const category = categories?.find(c => c.id === log.categoryId);
               const activity = category?.activities.find(a => a.id === log.activityId);
               const linkedTodo = timelineTodos.find((todo) => todo.id === log.linkedTodoId);

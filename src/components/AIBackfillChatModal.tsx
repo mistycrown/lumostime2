@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-18: Foreground `create_todo` tool applications can now carry nested child tasks, and undoing that parent action removes the whole AI-created parent-plus-subtasks bundle together.
  * @updated 2026-05-17: AI chat session/persona/profile persistence now marks the unified AI backup state as changed so foreground-only AI edits can auto-sync with the main backup JSON.
  * @updated 2026-05-16: Added event-driven background assistant reactions for selected newly submitted logs, including linked todo and scope context.
  * @updated 2026-05-16: Added persona-level custom prompt blocks in AI settings so each persona can append multiple labeled extra prompt snippets to outgoing AI requests.
@@ -4164,8 +4165,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
     return result.actions;
   };
-  const applyPlannedTodoToolCalls = (toolCalls: AITodoToolCall[]): AppliedChatAction[] => {
-    const result = assistantActionExecutor.applyTodoToolCalls(buildAssistantActionContext(), toolCalls);
+  const applyPlannedTodoToolCalls = (toolCalls: AITodoToolCall[], sourceText: string): AppliedChatAction[] => {
+    const result = assistantActionExecutor.applyTodoToolCalls(buildAssistantActionContext(), toolCalls, sourceText);
     if (result.actions.some((action) => action.kind === 'create_todo' && action.status === 'applied')) {
       setTodos(result.nextTodos);
     }
@@ -4220,7 +4221,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return;
     }
 
-    setTodos((prev) => prev.filter((todo) => todo.id !== action.snapshot.todoId));
+    const deleteTodoIds = new Set([
+      action.snapshot.todoId,
+      ...(action.snapshot.createdSubtaskIds || [])
+    ]);
+    setTodos((prev) => prev.filter((todo) => !deleteTodoIds.has(todo.id)));
     updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
     addToast('success', '已撤销这条 AI 待办');
   };
@@ -4266,7 +4271,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
     return [
       ...applyPlannedLogToolCalls(logCalls),
-      ...applyPlannedTodoToolCalls(todoCalls),
+      ...applyPlannedTodoToolCalls(todoCalls, sourceText),
       ...applyPlannedTodoUpdateToolCalls(todoUpdateCalls),
       ...applyPlannedCreateSubtaskToolCalls(subtaskCalls, sourceText),
       ...applyPlannedEditLogToolCalls(editLogCalls)

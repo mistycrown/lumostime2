@@ -4,6 +4,7 @@
  * @output Regression coverage for virtual-category date matching, shared day entries, and week-view badge normalization
  * @pos Test (todo planning utilities)
  * @description Verifies today/tomorrow/this-week filtering and shared per-day entry building against Arrange, Due, recurrence, and Maybe rules without creating occurrence records.
+ * @updated 2026-05-18: Added regression coverage so a recurring todo pinned into today views disappears when today's occurrence is explicitly skipped, unless another explicit today date still keeps it visible.
  * @updated 2026-05-17: Added regression coverage for completed-first month-entry priority when one todo matches multiple day badges, while preserving repeat-before-maybe ordering and leaving trace-lane layout unchanged.
  * @updated 2026-05-14: Added regression coverage for recurrence `skipDates`, quick-action next-occurrence resolution, today-or-future `maybeDates`, hydration cleanup helpers, and Maybe ordering in shared day-entry builders.
   * Once I am updated, be sure to update my header comment and the folder's md.
@@ -299,6 +300,27 @@ describe('todoScheduleUtils virtual category helpers', () => {
     expect(isTodoInAssociationTodayCategory(buildTodo({ scheduledDate: '2026-04-21' }), REFERENCE_DATE)).toBe(false);
   });
 
+  test('hides pinned recurring todos from today-category helpers when today is skipped', () => {
+    expect(isTodoInAssociationTodayCategory(buildTodo({
+      pin: true,
+      recurrenceRule: {
+        frequency: 'daily',
+        startDate: '2026-04-18',
+        skipDates: ['2026-04-20']
+      }
+    }), REFERENCE_DATE)).toBe(false);
+
+    expect(isTodoInAssociationTodayCategory(buildTodo({
+      pin: true,
+      scheduledDate: '2026-04-20',
+      recurrenceRule: {
+        frequency: 'daily',
+        startDate: '2026-04-18',
+        skipDates: ['2026-04-20']
+      }
+    }), REFERENCE_DATE)).toBe(true);
+  });
+
   test('builds today-category picker todos with pinned items first and excludes unrelated or completed todos', () => {
     const todos: TodoItem[] = [
       buildTodo({
@@ -312,6 +334,16 @@ describe('todoScheduleUtils virtual category helpers', () => {
       buildTodo({ id: 'scheduled', title: 'Beta', scheduledDate: '2026-04-20' }),
       buildTodo({ id: 'due', title: 'Delta', deadlineDate: '2026-04-20' }),
       buildTodo({ id: 'pinned', title: 'Omega', pin: true }),
+      buildTodo({
+        id: 'skipped-pinned-recurring',
+        title: 'Skipped recurring',
+        pin: true,
+        recurrenceRule: {
+          frequency: 'daily',
+          startDate: '2026-04-18',
+          skipDates: ['2026-04-20']
+        }
+      }),
       buildTodo({ id: 'other-day', title: 'Alpha', scheduledDate: '2026-04-21' }),
       buildTodo({ id: 'overdue', title: 'Gamma', scheduledDate: '2026-04-19' }),
       buildTodo({ id: 'completed-pinned', title: 'Done', pin: true, isCompleted: true })

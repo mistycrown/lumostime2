@@ -1,73 +1,82 @@
 /**
  * @file assistantPromptService.ts
- * @input Assistant prompt asset URLs under `public/assistant/`
+ * @input Bundled assistant prompt markdown sources under `src/prompts/assistant/`
  * @output Loaded assistant prompt strings for unified foreground/background turns
  * @pos Service (Assistant Prompt Builder)
- * @description Loads the shipped assistant prompt markdown assets directly from `public/assistant/` and fails fast when any required asset is unavailable, so prompt source stays single-authored in markdown.
+ * @description Loads bundled assistant prompt markdown directly from source imports so Web and packaged Electron builds share one prompt source without runtime file fetches.
  *
- * @updated 2026-05-14: Removed all in-code fallback prompt copies; prompt loading now requires the public markdown assets and throws immediately if any asset is missing, empty, or cannot be fetched.
+ * @updated 2026-05-18: Switched assistant prompt loading from runtime `fetch('/assistant/*.md')` calls to Vite `?raw` imports so packaged Electron builds no longer break on missing `file:///assistant/*.md` paths.
  */
 
-const ASSISTANT_BASE_PROMPT_URL = '/assistant/assistant-base.md';
-const FOREGROUND_MODE_PROMPT_URL = '/assistant/foreground-mode.md';
-const BACKGROUND_MODE_PROMPT_URL = '/assistant/background-mode.md';
-const FOREGROUND_TOOLS_PROMPT_URL = '/assistant/foreground-tools.md';
-const MEMORY_RULES_PROMPT_URL = '/assistant/memory-rules.md';
+import assistantBasePromptSource from '../prompts/assistant/assistant-base.md?raw';
+import backgroundModePromptSource from '../prompts/assistant/background-mode.md?raw';
+import foregroundModePromptSource from '../prompts/assistant/foreground-mode.md?raw';
+import foregroundToolsPromptSource from '../prompts/assistant/foreground-tools.md?raw';
+import memoryRulesPromptSource from '../prompts/assistant/memory-rules.md?raw';
 
-const promptCache = new Map<string, string>();
+type PromptAssetKey =
+  | 'assistantBase'
+  | 'foregroundMode'
+  | 'backgroundMode'
+  | 'foregroundTools'
+  | 'memoryRules';
 
-const buildPromptLoadError = (url: string, reason: string): Error => (
-  new Error(`[assistantPromptService] Failed to load prompt asset ${url}: ${reason}`)
+const PROMPT_SOURCES: Record<PromptAssetKey, { assetPath: string; source: string }> = {
+  assistantBase: {
+    assetPath: 'src/prompts/assistant/assistant-base.md',
+    source: assistantBasePromptSource
+  },
+  foregroundMode: {
+    assetPath: 'src/prompts/assistant/foreground-mode.md',
+    source: foregroundModePromptSource
+  },
+  backgroundMode: {
+    assetPath: 'src/prompts/assistant/background-mode.md',
+    source: backgroundModePromptSource
+  },
+  foregroundTools: {
+    assetPath: 'src/prompts/assistant/foreground-tools.md',
+    source: foregroundToolsPromptSource
+  },
+  memoryRules: {
+    assetPath: 'src/prompts/assistant/memory-rules.md',
+    source: memoryRulesPromptSource
+  }
+};
+
+const buildPromptLoadError = (assetPath: string, reason: string): Error => (
+  new Error(`[assistantPromptService] Failed to load bundled prompt ${assetPath}: ${reason}`)
 );
 
-const loadPromptAsset = async (url: string): Promise<string> => {
-  if (promptCache.has(url)) {
-    return promptCache.get(url)!;
-  }
+const loadPromptAsset = async (key: PromptAssetKey): Promise<string> => {
+  const { assetPath, source } = PROMPT_SOURCES[key];
+  const text = source.trim();
 
-  if (typeof fetch !== 'function') {
-    throw buildPromptLoadError(url, 'fetch is unavailable in the current runtime');
-  }
-
-  let response: Response;
-  try {
-    response = await fetch(url, { cache: 'no-cache' });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw buildPromptLoadError(url, message);
-  }
-
-  if (!response.ok) {
-    throw buildPromptLoadError(url, `HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`);
-  }
-
-  const text = (await response.text()).trim();
   if (!text) {
-    throw buildPromptLoadError(url, 'asset is empty');
+    throw buildPromptLoadError(assetPath, 'asset is empty');
   }
 
-  promptCache.set(url, text);
   return text;
 };
 
 export const assistantPromptService = {
   async getAssistantBasePrompt(): Promise<string> {
-    return loadPromptAsset(ASSISTANT_BASE_PROMPT_URL);
+    return loadPromptAsset('assistantBase');
   },
 
   async getForegroundModePrompt(): Promise<string> {
-    return loadPromptAsset(FOREGROUND_MODE_PROMPT_URL);
+    return loadPromptAsset('foregroundMode');
   },
 
   async getBackgroundModePrompt(): Promise<string> {
-    return loadPromptAsset(BACKGROUND_MODE_PROMPT_URL);
+    return loadPromptAsset('backgroundMode');
   },
 
   async getForegroundToolsPrompt(): Promise<string> {
-    return loadPromptAsset(FOREGROUND_TOOLS_PROMPT_URL);
+    return loadPromptAsset('foregroundTools');
   },
 
   async getMemoryRulesPrompt(): Promise<string> {
-    return loadPromptAsset(MEMORY_RULES_PROMPT_URL);
+    return loadPromptAsset('memoryRules');
   }
 };

@@ -3,6 +3,7 @@
  * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
  * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
  * @pos Service (AI Integration Layer)
+ * @updated 2026-05-18: `create_todo` unified-turn tool calls can now carry nested `subtasks`, letting one assistant action create a parent todo together with its direct children in one pass.
  * @updated 2026-05-17: AI preset/config writes now mark the unified AI backup state as changed so provider/preset edits participate in the main backup and cloud-sync timestamp.
  * @updated 2026-05-17: Structured-JSON requests now expose provider-native reasoning metadata to custom normalizers, allowing report/newspaper writeback flows to persist the same collapsible thinking block used by ordinary chat.
  * @updated 2026-05-14: Enhanced debug error capture: responses are now read as text first to ensure non-JSON server replies (like HTML error pages) are preserved in `rawResponseText` for the debug viewer.
@@ -106,6 +107,13 @@ export interface AIBackfillToolCall {
     args: AIBackfillCreateLogArgs;
 }
 
+export interface AITodoNestedSubtaskArgs {
+    title: string;
+    note?: string;
+    scheduledDate?: string;
+    deadlineDate?: string;
+}
+
 export interface AITodoCreateArgs {
     title: string;
     categoryId: string;
@@ -117,6 +125,7 @@ export interface AITodoCreateArgs {
     scheduledDate?: string;
     deadlineDate?: string;
     recurrenceRule?: TodoRecurrenceRule;
+    subtasks?: AITodoNestedSubtaskArgs[];
 }
 
 export interface AITodoToolCall {
@@ -1268,6 +1277,26 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
         if (toolName === 'create_todo') {
             const normalizedRecurrenceRule = normalizeTodoRecurrenceRule(args.recurrenceRule);
             const normalizedKind = normalizeTodoKind(args.kind) || 'project';
+            const normalizedSubtasks = Array.isArray(args.subtasks)
+                ? args.subtasks.flatMap((subtask: unknown) => {
+                    if (!subtask || typeof subtask !== 'object' || Array.isArray(subtask)) {
+                        return [];
+                    }
+
+                    const candidate = subtask as Record<string, unknown>;
+                    const title = typeof candidate.title === 'string' ? candidate.title.trim() : '';
+                    if (!title) {
+                        return [];
+                    }
+
+                    return [{
+                        title,
+                        ...(typeof candidate.note === 'string' && candidate.note.trim() ? { note: candidate.note.trim() } : {}),
+                        ...(normalizeOptionalDateString(candidate.scheduledDate) ? { scheduledDate: normalizeOptionalDateString(candidate.scheduledDate)! } : {}),
+                        ...(normalizeOptionalDateString(candidate.deadlineDate) ? { deadlineDate: normalizeOptionalDateString(candidate.deadlineDate)! } : {})
+                    }];
+                })
+                : [];
             const normalized = {
                 toolName: 'create_todo' as const,
                 args: {
@@ -1280,7 +1309,8 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
                     ...(typeof args.note === 'string' && args.note.trim() ? { note: args.note.trim() } : {}),
                     ...(!normalizedRecurrenceRule && normalizeOptionalDateString(args.scheduledDate) ? { scheduledDate: normalizeOptionalDateString(args.scheduledDate)! } : {}),
                     ...(!normalizedRecurrenceRule && normalizeOptionalDateString(args.deadlineDate) ? { deadlineDate: normalizeOptionalDateString(args.deadlineDate)! } : {}),
-                    ...(normalizedRecurrenceRule ? { recurrenceRule: normalizedRecurrenceRule } : {})
+                    ...(normalizedRecurrenceRule ? { recurrenceRule: normalizedRecurrenceRule } : {}),
+                    ...(normalizedSubtasks.length > 0 ? { subtasks: normalizedSubtasks } : {})
                 }
             };
             const isValid = normalized.args.title

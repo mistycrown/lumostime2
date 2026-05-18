@@ -2,6 +2,7 @@
  * @file DesktopTodayWidgetView.tsx
  * @description 桌面今日小组件的UI视图，采用极其紧凑的单行设计。支持轻量完成/计时（完全后台静默执行，不唤起主窗口），并自带显示设置面板（提供深浅配色切换与窗体透明度滑块调节）。
  * @updated 2026-05-17: 实现了显示设置中“任务颜色”选项，支持按“排期类型”与“任务分类”动态渲染小圆点前缀，并与周/月视图的自定义排期配色联动。
+ * @updated 2026-05-18: Added one-level subtask rendering for the desktop today widget, nesting children beneath visible parents and falling back to `@parent` labels when a parent sits in another section.
  * @updated 2026-05-17: Keep completed todos visible inside each today-widget section while still ordering them after unfinished rows.
  * @updated 2026-05-17: Softened the completed checkbox treatment and hid finished rows from the overdue section while keeping them visible in pinned/today.
  * @updated 2026-05-17: Increased the unfinished checkbox outline contrast in the today widget so open tasks stay legible on the translucent background.
@@ -47,8 +48,52 @@ const sortTodaySectionItems = (
   || left.title.localeCompare(right.title, 'zh-CN')
 ));
 
+export interface DesktopTodayWidgetSectionRow {
+  item: DesktopWidgetTodoItem;
+  depth: 0 | 1;
+  displayTitle: string;
+}
+
+export const buildDesktopTodayWidgetSectionRows = (
+  items: DesktopWidgetTodoItem[]
+): DesktopTodayWidgetSectionRow[] => {
+  const visibleTodoIds = new Set(items.map((item) => item.todoId));
+  const childMap = new Map<string, DesktopWidgetTodoItem[]>();
+  const rootItems: DesktopWidgetTodoItem[] = [];
+
+  items.forEach((item) => {
+    if (item.parentTodoId && visibleTodoIds.has(item.parentTodoId)) {
+      const currentChildren = childMap.get(item.parentTodoId) || [];
+      currentChildren.push(item);
+      childMap.set(item.parentTodoId, currentChildren);
+      return;
+    }
+
+    rootItems.push(item);
+  });
+
+  return rootItems.flatMap((item) => {
+    const rootRow: DesktopTodayWidgetSectionRow = {
+      item,
+      depth: 0,
+      displayTitle: item.parentTodoId && item.parentTitle
+        ? `${item.title} @${item.parentTitle}`
+        : item.title
+    };
+    const childRows = (childMap.get(item.todoId) || []).map<DesktopTodayWidgetSectionRow>((child) => ({
+      item: child,
+      depth: 1,
+      displayTitle: child.title
+    }));
+
+    return [rootRow, ...childRows];
+  });
+};
+
 const TodoRow: React.FC<{
   item: DesktopWidgetTodoItem;
+  depth: 0 | 1;
+  displayTitle: string;
   isPending: boolean;
   onToggle: (todoId: string) => void;
   onOpen: (
@@ -61,6 +106,8 @@ const TodoRow: React.FC<{
   resolvedScheduleTypeColors: Record<string, string>;
 }> = ({
   item,
+  depth,
+  displayTitle,
   isPending,
   onToggle,
   onOpen,
@@ -103,7 +150,7 @@ const TodoRow: React.FC<{
         isDark ? 'hover:bg-stone-800/50' : 'hover:bg-stone-100/50'
       }`}
     >
-      <div className="flex items-center gap-2 min-w-0 flex-1">
+      <div className={`flex min-w-0 flex-1 items-center gap-2 ${depth === 1 ? 'pl-4' : ''}`}>
         <button
           type="button"
           aria-label={item.isCompleted ? '取消完成任务' : '完成任务'}
@@ -136,7 +183,7 @@ const TodoRow: React.FC<{
               ? isDark ? 'text-stone-500 line-through font-normal' : 'text-stone-400 line-through font-normal'
               : isDark ? 'text-stone-200' : 'text-stone-700'
           }`}>
-            {item.title}
+            {displayTitle}
           </span>
           {item.activityLabel && (
             <span className={`shrink-0 text-[10px] font-normal scale-90 origin-left ${
@@ -300,6 +347,14 @@ export const DesktopTodayWidgetView: React.FC = () => {
     return nextSections;
   }, [snapshot]);
 
+  const sectionRows = useMemo(() => (
+    sections.map((section) => ({
+      id: section.id,
+      label: section.label,
+      rows: buildDesktopTodayWidgetSectionRows(sortTodaySectionItems(section.items))
+    }))
+  ), [sections]);
+
   const handleOpenTodoQuickEditor = async (
     todoId: string,
     event: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
@@ -393,7 +448,7 @@ export const DesktopTodayWidgetView: React.FC = () => {
     window.addEventListener('mouseup', handleMouseUp);
   };
 
-  const isEmpty = sections.length === 0;
+  const isEmpty = sectionRows.length === 0;
   const isDark = theme === 'dark';
 
   return (
@@ -580,7 +635,7 @@ export const DesktopTodayWidgetView: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {sections.map((section) => (
+            {sectionRows.map((section) => (
               <section key={section.id} className="space-y-0.5">
                 <div className={`px-2 text-[10px] font-semibold tracking-wider mb-1 ${
                   isDark ? 'text-stone-500' : 'text-stone-400'
@@ -588,11 +643,13 @@ export const DesktopTodayWidgetView: React.FC = () => {
                   {section.label}
                 </div>
                 <div className="space-y-0.5">
-                  {section.items.map((item) => (
+                  {section.rows.map((row) => (
                     <TodoRow
-                      key={item.todoId}
-                      item={item}
-                      isPending={pendingTodoIds.includes(item.todoId)}
+                      key={row.item.todoId}
+                      item={row.item}
+                      depth={row.depth}
+                      displayTitle={row.displayTitle}
+                      isPending={pendingTodoIds.includes(row.item.todoId)}
                       onToggle={handleToggleTodo}
                       onOpen={handleOpenTodoQuickEditor}
                       onStartFocus={handleStartFocus}

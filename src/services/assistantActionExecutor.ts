@@ -5,6 +5,7 @@
  * @pos Service (Assistant Action Executor)
  * @description Executes AI-planned log/todo/subtask/edit tool calls against local app data using pure helpers so the UI can reuse one shared execution layer instead of keeping tool application logic inside a modal component.
  *
+ * @updated 2026-05-18: `create_todo` actions can now create nested direct subtasks in the same pass, and the applied snapshot records those child ids so the UI can undo the whole bundle cleanly.
  * @updated 2026-05-13: Added explicit todo kind handling so assistant-created quick reminders can skip activity linkage while still resolving into the reserved 小事 category.
  * @updated 2026-04-26: Extracted local assistant tool-call execution, save/delete helpers, action snapshots, and subtask-date stripping into a shared service for the unified AI assistant architecture.
  */
@@ -22,6 +23,7 @@ import type {
   AIBackfillToolCall,
   AICreateSubtaskToolCall,
   AIEditLogToolCall,
+  AITodoNestedSubtaskArgs,
   AITodoToolCall,
   AITodoUpdateToolCall
 } from './aiService';
@@ -77,6 +79,7 @@ export interface AppliedCreateTodoSnapshot {
   scheduledDate?: string;
   deadlineDate?: string;
   recurrenceRule?: TodoRecurrenceRule;
+  createdSubtaskIds?: string[];
 }
 
 export interface AppliedCreateTodoAction {
@@ -253,6 +256,20 @@ const stripSubtaskDatesIfNotRequested = (
   }));
 };
 
+const stripNestedSubtaskDatesIfNotRequested = (
+  subtasks: AITodoNestedSubtaskArgs[],
+  sourceText: string
+): AITodoNestedSubtaskArgs[] => {
+  if (hasExplicitSubtaskDateRequest(sourceText)) {
+    return subtasks;
+  }
+
+  return subtasks.map((subtask) => ({
+    title: subtask.title,
+    ...(subtask.note ? { note: subtask.note } : {})
+  }));
+};
+
 const formatTimeKey = (timestamp: number): string => {
   const date = new Date(timestamp);
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
@@ -270,6 +287,31 @@ export const applyTodoSave = (currentTodos: TodoItem[], todo: TodoItem): TodoIte
   }
 
   return syncSubtaskProgressToParentTodos(nextTodos);
+};
+
+const createSubtaskTodo = (
+  currentTodos: TodoItem[],
+  parentTodo: TodoItem,
+  args: AITodoNestedSubtaskArgs
+): { nextTodos: TodoItem[]; newTodo: TodoItem } => {
+  const newTodo: TodoItem = {
+    id: crypto.randomUUID(),
+    categoryId: parentTodo.categoryId,
+    parentTodoId: parentTodo.id,
+    childOrder: getNextChildOrder(currentTodos, parentTodo.id),
+    title: args.title.trim(),
+    isCompleted: false,
+    pin: false,
+    completedUnits: 0,
+    ...(args.note ? { note: args.note } : {}),
+    ...(args.scheduledDate ? { scheduledDate: args.scheduledDate } : {}),
+    ...(args.deadlineDate ? { deadlineDate: args.deadlineDate } : {})
+  };
+
+  return {
+    nextTodos: applyTodoSave(currentTodos, newTodo),
+    newTodo
+  };
 };
 
 export const applyLogSave = (
@@ -468,7 +510,8 @@ export const assistantActionExecutor = {
 
   applyTodoToolCalls(
     context: AssistantActionExecutionContext,
-    toolCalls: AITodoToolCall[]
+    toolCalls: AITodoToolCall[],
+    sourceText: string = ''
   ): AssistantActionExecutionResult {
     const actions: AppliedChatAction[] = [];
     let nextTodos = [...context.todos];
@@ -538,6 +581,19 @@ export const assistantActionExecutor = {
       };
 
       nextTodos = applyTodoSave(nextTodos, newTodo);
+      const createdSubtaskIds: string[] = [];
+      const nestedSubtasks = stripNestedSubtaskDatesIfNotRequested(
+        (args.subtasks || []).filter((subtask) => Boolean(subtask.title.trim())),
+        sourceText
+      );
+
+      nestedSubtasks.forEach((subtaskArgs) => {
+        const liveParentTodo = nextTodos.find((todo) => todo.id === newTodo.id) || newTodo;
+        const subtaskResult = createSubtaskTodo(nextTodos, liveParentTodo, subtaskArgs);
+        nextTodos = subtaskResult.nextTodos;
+        createdSubtaskIds.push(subtaskResult.newTodo.id);
+      });
+
       actions.push({
         actionId: buildActionId(),
         kind: 'create_todo',
@@ -557,7 +613,8 @@ export const assistantActionExecutor = {
           ...(args.note ? { note: args.note } : {}),
           ...(args.scheduledDate ? { scheduledDate: args.scheduledDate } : {}),
           ...(args.deadlineDate ? { deadlineDate: args.deadlineDate } : {}),
-          ...(todoKind !== 'quick' && args.recurrenceRule ? { recurrenceRule: args.recurrenceRule } : {})
+          ...(todoKind !== 'quick' && args.recurrenceRule ? { recurrenceRule: args.recurrenceRule } : {}),
+          ...(createdSubtaskIds.length > 0 ? { createdSubtaskIds } : {})
         }
       });
     });
@@ -759,22 +816,9 @@ export const assistantActionExecutor = {
       }
 
       const resolvedCategory = context.todoCategories.find((category) => category.id === parentTodo.categoryId);
-      const newTodo: TodoItem = {
-        id: crypto.randomUUID(),
-        categoryId: parentTodo.categoryId,
-        parentTodoId: parentTodo.id,
-        childOrder: getNextChildOrder(nextTodos, parentTodo.id),
-        title: args.title.trim(),
-        isCompleted: false,
-        pin: false,
-        completedUnits: 0,
-        ...(args.note ? { note: args.note } : {}),
-        ...(args.scheduledDate ? { scheduledDate: args.scheduledDate } : {}),
-        ...(args.deadlineDate ? { deadlineDate: args.deadlineDate } : {})
-      };
-
-      nextTodos = applyTodoSave(nextTodos, newTodo);
-      const liveSubtask = nextTodos.find((todo) => todo.id === newTodo.id) || newTodo;
+      const subtaskResult = createSubtaskTodo(nextTodos, parentTodo, args);
+      nextTodos = subtaskResult.nextTodos;
+      const liveSubtask = nextTodos.find((todo) => todo.id === subtaskResult.newTodo.id) || subtaskResult.newTodo;
       actions.push({
         actionId: buildActionId(),
         kind: 'create_subtask',

@@ -8,6 +8,7 @@
  * @updated 2026-05-17: 新增桌面小组件启动偏好键名与读取辅助逻辑，供 Electron 主应用启动时自动恢复已启用的 PC 端小组件。
  * @updated 2026-05-17: 扩展了桌面小组件的支持，新增 desktop-quick（小事清单小组件）快照构建与窗口检测，实现了 buildDesktopQuickWidgetSnapshot 以确保无排期的小事能够完整呈现在小组件待办列表中。
  * @updated 2026-05-17: Added a dedicated `desktop-editor` route and shared payload type for the transparent widget quick-editor window.
+ * @updated 2026-05-18: Added parent todo ids to desktop today-widget snapshot items so compact Electron list views can render one-level subtask hierarchy without reloading the full todo graph.
  * @updated 2026-05-17: Added desktop widget route detection plus today/pin/overdue snapshot builders for the Electron desktop today widget and month-widget window, with getDesktopWidgetType helper support.
  * @updated 2026-05-17: Kept completed todos visible in desktop today/quick widget snapshots so the widget views can render them after unfinished rows instead of dropping them.
  */
@@ -52,6 +53,7 @@ export interface DesktopWidgetTodoItem {
   icon: string | null;
   color: string | null;
   activityLabel: string | null;
+  parentTodoId: string | null;
   parentTitle: string | null;
   scheduledDate: string | null;
   deadlineDate: string | null;
@@ -130,6 +132,7 @@ const buildDesktopWidgetTodoItem = (
     icon: linkedPresentation.icon,
     color: linkedPresentation.color,
     activityLabel: linkedPresentation.activityLabel,
+    parentTodoId: todo.parentTodoId || null,
     parentTitle: linkedPresentation.parentTitle,
     scheduledDate: todo.scheduledDate || null,
     deadlineDate: todo.deadlineDate || null

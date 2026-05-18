@@ -4,6 +4,7 @@
 
 ## Updates
 
+- 2026-05-18: `DesktopTodayWidgetView.tsx` now renders one-level subtasks inline beneath visible parent rows, while subtasks whose parent is outside the current section fall back to standalone `子任务 @父任务` labels so the compact today widget no longer drops hierarchy context.
 - 2026-05-18: `DesktopMonthWidgetView.tsx` now shifts the visible calendar by one week for vertical wheel/trackpad navigation while keeping header arrows as whole-page jumps, so `1/2/3 -> 2/3/4` works in 3-week mode.
 
 - 2026-05-18: `DesktopMonthCalendar.tsx` 支持在月视图小组件中为如果是 recurring（循环）类型的任务靠右渲染 `Repeat2` 图标，模仿截止 (due) 条目的 Flag 样式，保持 UI 一致。
@@ -50,6 +51,7 @@
 ### `DesktopTodayWidgetView.tsx`
 
 - Renders the lightweight desktop summary for pinned, today, and overdue tasks.
+- Keeps one-level subtasks visible by nesting children beneath visible parents and using `@parent` labels when a subtask appears without its parent in the same section.
 - Supports opening the main app, opening a todo, toggling completion, and focus shortcuts through the shared widget bridge.
 
 ### `DesktopMonthWidgetView.tsx`
