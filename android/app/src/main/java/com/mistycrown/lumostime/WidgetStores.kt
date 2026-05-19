@@ -1529,7 +1529,8 @@ object WidgetStores {
             endDate = parseNullableString(optString("endDate")),
             interval = if (has("interval")) optInt("interval").takeIf { it > 0 } else null,
             weekdays = optJSONArray("weekdays").toIntList(),
-            monthDays = optJSONArray("monthDays").toIntList()
+            monthDays = optJSONArray("monthDays").toIntList(),
+            fallbackToMonthEnd = optBoolean("fallbackToMonthEnd", false)
         )
     }
 
@@ -1604,6 +1605,7 @@ object WidgetStores {
             put("interval", interval ?: JSONObject.NULL)
             put("weekdays", weekdays.toIntJsonArray())
             put("monthDays", monthDays.toIntJsonArray())
+            put("fallbackToMonthEnd", fallbackToMonthEnd)
         }
     }
 

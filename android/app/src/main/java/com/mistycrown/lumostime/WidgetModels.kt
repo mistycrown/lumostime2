@@ -360,7 +360,8 @@ data class WidgetTodoPinSourceRecurrenceRule(
     val endDate: String? = null,
     val interval: Int? = null,
     val weekdays: List<Int> = emptyList(),
-    val monthDays: List<Int> = emptyList()
+    val monthDays: List<Int> = emptyList(),
+    val fallbackToMonthEnd: Boolean = false
 )
 
 data class WidgetTodoPinSourceTodo(

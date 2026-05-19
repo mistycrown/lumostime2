@@ -4,6 +4,8 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-19: Desktop widget mode now follows the latest ordinary chat session and listens for cross-window session storage updates so the floating quick-chat stays in sync with the newest conversation.
+ * @updated 2026-05-18: Added a compact desktop-widget rendering mode plus edge-hidden handle state so the shared AI chat can power the new Electron quick-chat window without mounting the full settings/history shell.
  * @updated 2026-05-18: Foreground `create_todo` tool applications can now carry nested child tasks, and undoing that parent action removes the whole AI-created parent-plus-subtasks bundle together.
  * @updated 2026-05-17: AI chat session/persona/profile persistence now marks the unified AI backup state as changed so foreground-only AI edits can auto-sync with the main backup JSON.
  * @updated 2026-05-16: Added event-driven background assistant reactions for selected newly submitted logs, including linked todo and scope context.
@@ -15,6 +17,9 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import {
   Check,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
   History,
   Pencil,
   Send,
@@ -327,6 +332,12 @@ const CHAT_MARKDOWN_COMPONENTS = {
 interface AIBackfillChatModalProps {
   isOpen: boolean;
   onClose: () => void;
+  displayMode?: 'modal' | 'desktop-widget';
+  edgeHidden?: boolean;
+  hiddenEdge?: 'left' | 'right' | null;
+  onHideToEdge?: () => void;
+  onRestoreFromEdge?: () => void;
+  onOpenMainApp?: () => void;
   targetDate?: Date;
   targetSessionId?: string;
   targetMessageId?: string;
@@ -463,6 +474,12 @@ const clampNumber = (value: number, min: number, max: number): number => (
 export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   isOpen,
   onClose,
+  displayMode = 'modal',
+  edgeHidden = false,
+  hiddenEdge = null,
+  onHideToEdge,
+  onRestoreFromEdge,
+  onOpenMainApp,
   targetDate,
   targetSessionId,
   targetMessageId,
@@ -547,6 +564,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [revealedAssistantPartCounts, setRevealedAssistantPartCounts] = useState<Record<string, number>>({});
   const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
   const activeRequestRef = useRef<ActiveRequestRef | null>(null);
+  const isDesktopWidgetMode = displayMode === 'desktop-widget';
   const isOpenRef = useRef(isOpen);
   const wasOpenRef = useRef(isOpen);
   const processingDueReminderIdsRef = useRef<Set<string>>(new Set());
@@ -648,10 +666,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     () => monthlyReviewTemplateService.listMethodOptions(),
     []
   );
-  const activeSession = useMemo(
-    () => sessions.find((session) => session.id === activeSessionId) || sessions[0] || null,
-    [activeSessionId, sessions]
+  const sortedSessions = useMemo(() => sortChatSessionsByUpdatedAt(sessions), [sessions]);
+  const desktopWidgetPreferredSession = useMemo(
+    () => resolveLatestOrdinaryAssistantBackgroundSession(sessions) || sortedSessions[0] || null,
+    [sessions, sortedSessions]
   );
+  const activeSession = useMemo(() => {
+    if (isDesktopWidgetMode) {
+      return desktopWidgetPreferredSession;
+    }
+
+    return sessions.find((session) => session.id === activeSessionId) || sortedSessions[0] || null;
+  }, [activeSessionId, desktopWidgetPreferredSession, isDesktopWidgetMode, sessions, sortedSessions]);
   const activeWeeklyReviewShortcutOptions = useMemo(() => {
     if (activeSession?.templateMeta?.templateType !== 'weekly_review') {
       return [];
@@ -1336,9 +1362,28 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
 
     if (!sessions.some((session) => session.id === activeSessionId)) {
-      setActiveSessionId(sessions[0].id);
+      setActiveSessionId((desktopWidgetPreferredSession || sortedSessions[0]).id);
     }
-  }, [activeSessionId, personas, sessions]);
+  }, [activeSessionId, desktopWidgetPreferredSession, personas, sessions, sortedSessions]);
+
+  useEffect(() => {
+    if (!isDesktopWidgetMode || typeof window === 'undefined') {
+      return;
+    }
+
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.storageArea !== localStorage || event.key !== CHAT_SESSIONS_KEY) {
+        return;
+      }
+
+      reloadPersistedChatSessions();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [isDesktopWidgetMode, personas]);
 
   useEffect(() => {
     if (isOpen) {
@@ -1427,7 +1472,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
   ), []);
 
-  const sortedSessions = useMemo(() => sortChatSessionsByUpdatedAt(sessions), [sessions]);
   const resolveSessionPersona = useCallback((session: AIChatSession) => (
     personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0]
   ), [personaMap, personas]);
@@ -4315,6 +4359,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return;
     }
 
+    if (isDesktopWidgetMode) {
+      onOpenMainApp?.();
+      return;
+    }
+
     const liveLog = logs.find((log) => log.id === logId);
     if (!liveLog) {
       addToast('info', '这条记录已经不存在了。');
@@ -4331,6 +4380,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return;
     }
 
+    if (isDesktopWidgetMode) {
+      onOpenMainApp?.();
+      window.desktopWidget?.requestMainAction({
+        type: 'open_todo',
+        todoId
+      });
+      return;
+    }
+
     const liveTodo = todos.find((todo) => todo.id === todoId);
     if (!liveTodo) {
       addToast('info', '这条待办已经不存在了。');
@@ -4344,6 +4402,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   };
 
   const handleOpenWeeklyReviewNarrative = (weekStartDate: string, weekEndDate: string) => {
+    if (isDesktopWidgetMode) {
+      onOpenMainApp?.();
+      return;
+    }
+
     const weekStart = new Date(`${weekStartDate}T12:00:00`);
     const weekEnd = new Date(`${weekEndDate}T12:00:00`);
     if (Number.isNaN(weekStart.getTime()) || Number.isNaN(weekEnd.getTime())) {
@@ -4360,6 +4423,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   };
 
   const handleOpenDailyReviewNarrative = (date: string) => {
+    if (isDesktopWidgetMode) {
+      onOpenMainApp?.();
+      return;
+    }
+
     const reviewDate = new Date(`${date}T12:00:00`);
     if (Number.isNaN(reviewDate.getTime())) {
       addToast('info', '这个日报日期无效。');
@@ -4374,6 +4442,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   };
 
   const handleOpenDailyNewspaper = (date: string) => {
+    if (isDesktopWidgetMode) {
+      onOpenMainApp?.();
+      return;
+    }
+
     const reviewDate = new Date(`${date}T12:00:00`);
     if (Number.isNaN(reviewDate.getTime())) {
       addToast('info', '这个小报日期无效。');
@@ -4387,6 +4460,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   };
 
   const handleOpenMonthlyReviewNarrative = (monthStartDate: string, monthEndDate: string) => {
+    if (isDesktopWidgetMode) {
+      onOpenMainApp?.();
+      return;
+    }
+
     const monthStart = new Date(`${monthStartDate}T12:00:00`);
     const monthEnd = new Date(`${monthEndDate}T12:00:00`);
     if (Number.isNaN(monthStart.getTime()) || Number.isNaN(monthEnd.getTime())) {
@@ -5226,6 +5304,33 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     return null;
   }
 
+  if (isDesktopWidgetMode && edgeHidden) {
+    const restoreIcon = hiddenEdge === 'left' ? <ChevronRight size={16} /> : <ChevronLeft size={16} />;
+
+    return (
+      <div
+        className="fixed inset-0 flex h-full w-full items-center justify-center bg-transparent"
+        style={{
+          color: AI_CHAT_THEME.textSecondary
+        }}
+      >
+        <button
+          type="button"
+          onClick={onRestoreFromEdge}
+          className="flex h-14 w-4 items-center justify-center rounded-full border shadow-sm transition-colors"
+          style={{
+            borderColor: AI_CHAT_THEME.chipBorder,
+            backgroundColor: AI_CHAT_THEME.panelBg,
+            color: AI_CHAT_THEME.textPrimary
+          }}
+          title="展开 AI 对话窗"
+        >
+          {restoreIcon}
+        </button>
+      </div>
+    );
+  }
+
   const renderAppliedAction = (messageId: string, action: AppliedChatAction) => (
     renderAppliedChatAction({
       action,
@@ -5250,7 +5355,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     })
   );
 
-  const emptyPromptExampleGroups: Array<{
+  const fullPromptExampleGroups: Array<{
     title: string;
     prompt: string;
     requirement?: string;
@@ -5283,6 +5388,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       prompt: '我今天感觉有点乱，也有点累，陪我理一理现在最该做什么。'
     }
   ];
+  const compactPromptExampleGroups = fullPromptExampleGroups.slice(0, 3);
+  const emptyPromptExampleGroups = isDesktopWidgetMode
+    ? compactPromptExampleGroups
+    : fullPromptExampleGroups;
+  const conversationMaxWidthClassName = isDesktopWidgetMode ? 'max-w-none' : 'max-w-[920px]';
+  const emptyStateMaxWidthClassName = isDesktopWidgetMode ? 'max-w-none' : 'max-w-2xl';
+  const composerContainerClassName = isDesktopWidgetMode ? 'max-w-none' : 'max-w-[920px]';
 
   return (
     <div
@@ -5305,29 +5417,42 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           className="flex h-[3.25rem] items-center justify-between gap-3 border-b px-4 backdrop-blur-md"
           style={{
             borderColor: AI_CHAT_THEME.panelBorder,
-            backgroundColor: AI_CHAT_THEME.panelBg
+            backgroundColor: AI_CHAT_THEME.panelBg,
+            ...(isDesktopWidgetMode ? { WebkitAppRegion: 'drag' as const } : {})
           }}
         >
           <div className="flex min-w-0 items-center gap-3 sm:gap-3.5">
-            <button
-              onClick={() => !isLoading && setIsPersonaPanelOpen(true)}
-              disabled={isLoading}
-              className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[0.8rem] border text-base transition-all disabled:cursor-not-allowed disabled:opacity-60"
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[0.8rem] border text-base transition-all"
               style={{
                 borderColor: AI_CHAT_THEME.panelBorder,
                 backgroundColor: AI_CHAT_THEME.avatarBg,
-                boxShadow: AI_CHAT_THEME.avatarShadow
+                boxShadow: AI_CHAT_THEME.avatarShadow,
+                ...(isDesktopWidgetMode ? { WebkitAppRegion: 'no-drag' as const } : {})
               }}
-              title="打开 AI 设置"
+              title={isDesktopWidgetMode ? '桌面 AI 快聊窗' : '打开 AI 设置'}
+              onClick={() => {
+                if (!isDesktopWidgetMode && !isLoading) {
+                  setIsPersonaPanelOpen(true);
+                }
+              }}
             >
               <PersonaAvatar persona={activePersona} iconClassName="text-base" />
-            </button>
+            </div>
 
             <div className="min-w-0 self-center">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="truncate font-serif text-[1.05rem] font-bold leading-none" style={{ color: AI_CHAT_THEME.textPrimary }}>
                   {activePersona.name || 'AI 助手'}
                 </h2>
+                {isDesktopWidgetMode && (
+                  <span
+                    className="text-[10px] tracking-[0.08em]"
+                    style={{ color: AI_CHAT_THEME.textMuted }}
+                  >
+                    快聊窗
+                  </span>
+                )}
                 {debugMode && (
                   <span
                     className="text-[10px] tracking-[0.08em]"
@@ -5342,34 +5467,81 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              onClick={() => !isLoading && setIsHistoryPanelOpen(true)}
-              disabled={isLoading}
-              className="inline-flex h-8 items-center gap-1.5 rounded-[0.75rem] border px-2.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-              style={{
-                borderColor: AI_CHAT_THEME.chipBorder,
-                backgroundColor: AI_CHAT_THEME.panelBg,
-                color: AI_CHAT_THEME.textSecondary
-              }}
-              title="历史对话"
-            >
-              <History size={18} />
-              <span className="hidden sm:inline">历史</span>
-            </button>
+          <div
+            className="flex shrink-0 items-center gap-2"
+            style={isDesktopWidgetMode ? { WebkitAppRegion: 'no-drag' } : undefined}
+          >
+            {isDesktopWidgetMode ? (
+              <>
+                <button
+                  onClick={onOpenMainApp}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-[0.75rem] border px-2.5 text-[12px] transition-colors"
+                  style={{
+                    borderColor: AI_CHAT_THEME.chipBorder,
+                    backgroundColor: AI_CHAT_THEME.panelBg,
+                    color: AI_CHAT_THEME.textSecondary
+                  }}
+                  title="打开主应用"
+                >
+                  <ExternalLink size={16} />
+                  <span className="hidden sm:inline">主窗</span>
+                </button>
+                <button
+                  onClick={onHideToEdge}
+                  className="flex h-8 w-8 items-center justify-center rounded-[0.75rem] border transition-colors"
+                  style={{
+                    borderColor: AI_CHAT_THEME.chipBorder,
+                    backgroundColor: AI_CHAT_THEME.panelBg,
+                    color: AI_CHAT_THEME.textMuted
+                  }}
+                  title="贴边隐藏"
+                >
+                  <ChevronRight size={18} />
+                </button>
+                <button
+                  onClick={onClose}
+                  className="flex h-8 w-8 items-center justify-center rounded-[0.75rem] border transition-colors"
+                  style={{
+                    borderColor: AI_CHAT_THEME.chipBorder,
+                    backgroundColor: AI_CHAT_THEME.panelBg,
+                    color: AI_CHAT_THEME.textMuted
+                  }}
+                  title="关闭"
+                >
+                  <X size={18} />
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => !isLoading && setIsHistoryPanelOpen(true)}
+                  disabled={isLoading}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-[0.75rem] border px-2.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{
+                    borderColor: AI_CHAT_THEME.chipBorder,
+                    backgroundColor: AI_CHAT_THEME.panelBg,
+                    color: AI_CHAT_THEME.textSecondary
+                  }}
+                  title="历史对话"
+                >
+                  <History size={18} />
+                  <span className="hidden sm:inline">历史</span>
+                </button>
 
-            <button
-              onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-[0.75rem] border transition-colors"
-              style={{
-                borderColor: AI_CHAT_THEME.chipBorder,
-                backgroundColor: AI_CHAT_THEME.panelBg,
-                color: AI_CHAT_THEME.textMuted
-              }}
-              title="关闭"
-            >
-              <X size={20} />
-            </button>
+                <button
+                  onClick={onClose}
+                  className="flex h-8 w-8 items-center justify-center rounded-[0.75rem] border transition-colors"
+                  style={{
+                    borderColor: AI_CHAT_THEME.chipBorder,
+                    backgroundColor: AI_CHAT_THEME.panelBg,
+                    color: AI_CHAT_THEME.textMuted
+                  }}
+                  title="关闭"
+                >
+                  <X size={20} />
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -5377,7 +5549,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           accentMix={accentMix}
           activePersona={activePersona}
           activeSession={activeSession}
+          conversationMaxWidthClassName={conversationMaxWidthClassName}
           emptyPromptExampleGroups={emptyPromptExampleGroups}
+          emptyStateMaxWidthClassName={emptyStateMaxWidthClassName}
           expandedDreamUpdateMessageIds={expandedDreamUpdateMessageIds}
           expandedMemoryUpdateMessageIds={expandedMemoryUpdateMessageIds}
           expandedReasoningMessageIds={expandedReasoningMessageIds}
@@ -5413,14 +5587,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           }}
         >
           <div
-            className="mx-auto max-w-[920px] rounded-[0.85rem] border px-3 pb-2 pt-2.5"
+            className={`mx-auto ${composerContainerClassName} rounded-[0.85rem] border px-3 pb-2 pt-2.5`}
             style={{
               borderColor: AI_CHAT_THEME.panelBorder,
               backgroundColor: AI_CHAT_THEME.panelBg,
               boxShadow: AI_CHAT_THEME.cardShadow
             }}
           >
-            {(activeWeeklyReviewShortcutOptions.length > 0 || activeMonthlyReviewShortcutOptions.length > 0) && (
+            {!isDesktopWidgetMode && (activeWeeklyReviewShortcutOptions.length > 0 || activeMonthlyReviewShortcutOptions.length > 0) && (
               <div className="mb-2 flex flex-wrap gap-2">
                 {[...activeWeeklyReviewShortcutOptions, ...activeMonthlyReviewShortcutOptions].map((option) => (
                   <button
@@ -5485,7 +5659,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               >
                 {activeSession?.contextCacheEnabled ? `上下文 开 · ${activePersona.contextMessageLimit}轮` : '上下文 关'}
               </button>
-              {activeSession?.templateMeta?.templateType === 'weekly_review' && (
+              {!isDesktopWidgetMode && activeSession?.templateMeta?.templateType === 'weekly_review' && (
                 <button
                   onClick={handleFillWriteWeeklyNarrativeCommand}
                   disabled={isLoading}
@@ -5500,7 +5674,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   写入 AI 叙事
                 </button>
               )}
-              {activeSession?.templateMeta?.templateType === 'monthly_review' && (
+              {!isDesktopWidgetMode && activeSession?.templateMeta?.templateType === 'monthly_review' && (
                 <button
                   onClick={handleFillWriteMonthlyNarrativeCommand}
                   disabled={isLoading}
@@ -5515,7 +5689,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   写入 AI 叙事
                 </button>
               )}
-              {!activeSession?.templateMeta && (
+              {!isDesktopWidgetMode && !activeSession?.templateMeta && (
                 <>
                   <button
                     onClick={handleFillDailyNarrativeCommand}
@@ -5576,130 +5750,132 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           </div>
         </div>
 
-        <AIBackfillChatHistoryOverlay
-          activeSessionId={activeSessionId}
-          deleteConfirmSessionId={deleteConfirmSessionId}
-          editingSessionId={editingSessionId}
-          editingSessionTitle={editingSessionTitle}
-          formatConversationTime={formatConversationTime}
-          getSessionPersona={resolveSessionPersona}
-          isOpen={isHistoryPanelOpen}
-          onCancelDeleteSession={() => setDeleteConfirmSessionId(null)}
-          onCancelRenameSession={handleCancelRenameSession}
-          onClose={() => setIsHistoryPanelOpen(false)}
-          onCommitRenameSession={handleCommitRenameSession}
-          onDeleteSession={handleDeleteSession}
-          onEditSessionTitleChange={setEditingSessionTitle}
-          onOpenNewSessionDialog={handleOpenNewSessionDialog}
-          onSelectSession={handleSelectSessionFromHistory}
-          onStartRenameSession={handleStartRenameSession}
-          onToggleDeleteSession={handleToggleDeleteSession}
-          sortedSessions={sortedSessions}
-          theme={AI_CHAT_THEME}
-        />
-
-        <AIBackfillChatNewSessionDialog
-          isOpen={isNewSessionDialogOpen}
-          onClose={handleCloseNewSessionDialog}
-          onCreateGenericSession={handleCreateGenericSession}
-          onOpenMonthlyReviewTemplateSelection={handleOpenMonthlyReviewTemplateSelection}
-          onOpenWeeklyReviewTemplateSelection={handleOpenWeeklyReviewTemplateSelection}
-          theme={AI_CHAT_THEME}
-        />
-
-        <AIBackfillChatSettingsOverlay
-          activeTab={activeSettingsMainTab}
-          isOpen={isPersonaPanelOpen}
-          onClose={() => setIsPersonaPanelOpen(false)}
-          onTabChange={setActiveSettingsMainTab}
-          personaContent={(
-            <AIBackfillChatPersonaSettingsSection
-              accentMix={accentMix}
-              activePersona={activePersona}
-              activeSessionPersonaId={activeSession?.personaId || ''}
-              avatarInputRef={avatarInputRef}
-              customPromptBlocks={customPromptBlocks}
-              deleteConfirmPersonaId={deleteConfirmPersonaId}
-              emojiChoices={PERSONA_EMOJI_CHOICES}
-              emojiDraft={emojiDraft}
-              isEmojiEditorOpen={isEmojiEditorOpen}
-              isUploadingAvatar={isUploadingAvatar}
-              isUploadingUserAvatar={isUploadingUserAvatar}
-              isUserEmojiEditorOpen={isUserEmojiEditorOpen}
-              onApplyEmojiAvatar={handleApplyEmojiAvatar}
-              onApplyPersonaPreset={handleApplyPersonaPreset}
-              onApplyUserEmojiAvatar={handleApplyUserEmojiAvatar}
-              onAvatarUpload={handleAvatarUpload}
-              onCancelDeletePersona={() => setDeleteConfirmPersonaId(null)}
-              onCancelEmojiAvatarEdit={handleCancelEmojiAvatarEdit}
-              onCancelUserEmojiAvatarEdit={handleCancelUserEmojiAvatarEdit}
-              onCreatePersona={handleCreatePersona}
-              onDeleteCurrentPersona={handleDeleteCurrentPersona}
-              onEmojiDraftChange={setEmojiDraft}
-              onResetUserAvatar={handleResetUserAvatar}
-              onSelectEmoji={setEmojiDraft}
-              onSelectUserEmoji={setUserEmojiDraft}
-              onToggleDeletePersona={() => setDeleteConfirmPersonaId((current) => current === activePersona.id ? null : activePersona.id)}
-              onAddCustomPromptBlock={handleAddCustomPromptBlock}
-              onDeleteCustomPromptBlock={handleDeleteCustomPromptBlock}
-              onUpdateCurrentPersona={updateCurrentPersona}
-              onUpdateCustomPromptBlock={handleUpdateCustomPromptBlock}
-              onUseEmojiAvatar={handleUseEmojiAvatar}
-              onUseUserEmojiAvatar={handleUseUserEmojiAvatar}
-              onUserAvatarUpload={handleUserAvatarUpload}
-              onUserEmojiDraftChange={setUserEmojiDraft}
-              personas={personas}
+        {!isDesktopWidgetMode && (
+          <>
+            <AIBackfillChatHistoryOverlay
+              activeSessionId={activeSessionId}
+              deleteConfirmSessionId={deleteConfirmSessionId}
+              editingSessionId={editingSessionId}
+              editingSessionTitle={editingSessionTitle}
+              formatConversationTime={formatConversationTime}
+              getSessionPersona={resolveSessionPersona}
+              isOpen={isHistoryPanelOpen}
+              onCancelDeleteSession={() => setDeleteConfirmSessionId(null)}
+              onCancelRenameSession={handleCancelRenameSession}
+              onClose={() => setIsHistoryPanelOpen(false)}
+              onCommitRenameSession={handleCommitRenameSession}
+              onDeleteSession={handleDeleteSession}
+              onEditSessionTitleChange={setEditingSessionTitle}
+              onOpenNewSessionDialog={handleOpenNewSessionDialog}
+              onSelectSession={handleSelectSessionFromHistory}
+              onStartRenameSession={handleStartRenameSession}
+              onToggleDeleteSession={handleToggleDeleteSession}
+              sortedSessions={sortedSessions}
               theme={AI_CHAT_THEME}
-              userAvatarInputRef={userAvatarInputRef}
-              userEmojiDraft={userEmojiDraft}
-              userProfile={userProfile}
             />
-          )}
-          callContent={(
-            <AIBackfillChatCallSettingsSection
-              contextMessageLimit={activePersona.contextMessageLimit}
-              onContextMessageLimitChange={(value) => updateCurrentPersona({ contextMessageLimit: value })}
+
+            <AIBackfillChatNewSessionDialog
+              isOpen={isNewSessionDialogOpen}
+              onClose={handleCloseNewSessionDialog}
+              onCreateGenericSession={handleCreateGenericSession}
+              onOpenMonthlyReviewTemplateSelection={handleOpenMonthlyReviewTemplateSelection}
+              onOpenWeeklyReviewTemplateSelection={handleOpenWeeklyReviewTemplateSelection}
               theme={AI_CHAT_THEME}
-              assistantSettingsContent={(
-              <AIBackfillChatAssistantSettingsSection
-                assistantAgentConfig={assistantAgentConfig}
-                categories={categories}
-                assistantAgentIntervalDrafts={assistantAgentIntervalDrafts}
-                assistantAgentIntervalErrors={assistantAgentIntervalErrors}
-                assistantAgentQuietHoursDrafts={assistantAgentQuietHoursDrafts}
-                assistantAgentQuietHoursErrors={assistantAgentQuietHoursErrors}
-                assistantScheduledTaskDrafts={assistantScheduledTaskDrafts}
-                isAssistantScheduledTaskComposerOpen={isAssistantScheduledTaskComposerOpen}
-                assistantScheduledTaskSnapshot={assistantScheduledTaskSnapshot}
-                assistantScheduledTaskDeleteTarget={assistantScheduledTaskDeleteTarget}
-                assistantReminderSnapshot={assistantReminderSnapshot}
-                theme={AI_CHAT_THEME}
-                onUpdateAgentConfig={handleUpdateAssistantAgentConfig}
-                onIntervalDraftChange={handleAssistantAgentIntervalDraftChange}
-                onCommitIntervalDraft={commitAssistantAgentIntervalDraft}
-                onToggleQuietHours={handleToggleAssistantQuietHours}
-                onQuietHoursDraftChange={handleAssistantAgentQuietHoursDraftChange}
-                onCommitQuietHoursDraft={commitAssistantAgentQuietHoursDraft}
-                onOpenScheduledTaskComposer={handleOpenAssistantScheduledTaskComposer}
-                onUpdateScheduledTaskDraft={updateAssistantScheduledTaskDraft}
-                onToggleScheduledTaskWeekday={toggleAssistantScheduledTaskWeekday}
-                onCancelScheduledTaskComposer={handleCancelAssistantScheduledTaskComposer}
-                onSaveScheduledTask={handleSaveAssistantScheduledTask}
-                onToggleScheduledTaskEnabled={handleToggleAssistantScheduledTaskEnabled}
-                onToggleScheduledTaskDelete={handleToggleAssistantScheduledTaskDelete}
-                onCancelScheduledTaskDelete={() => setAssistantScheduledTaskDeleteTarget(null)}
-                onConfirmScheduledTaskDelete={handleConfirmAssistantScheduledTaskDelete}
-                onOpenDreamViewer={handleOpenDreamViewer}
-                onOpenAssistantMemoryViewer={handleOpenAssistantMemoryViewer}
-                onOpenAssistantBackgroundHistoryViewer={handleOpenAssistantBackgroundHistoryViewer}
-              />
+            />
+
+            <AIBackfillChatSettingsOverlay
+              activeTab={activeSettingsMainTab}
+              isOpen={isPersonaPanelOpen}
+              onClose={() => setIsPersonaPanelOpen(false)}
+              onTabChange={setActiveSettingsMainTab}
+              personaContent={(
+                <AIBackfillChatPersonaSettingsSection
+                  accentMix={accentMix}
+                  activePersona={activePersona}
+                  activeSessionPersonaId={activeSession?.personaId || ''}
+                  avatarInputRef={avatarInputRef}
+                  customPromptBlocks={customPromptBlocks}
+                  deleteConfirmPersonaId={deleteConfirmPersonaId}
+                  emojiChoices={PERSONA_EMOJI_CHOICES}
+                  emojiDraft={emojiDraft}
+                  isEmojiEditorOpen={isEmojiEditorOpen}
+                  isUploadingAvatar={isUploadingAvatar}
+                  isUploadingUserAvatar={isUploadingUserAvatar}
+                  isUserEmojiEditorOpen={isUserEmojiEditorOpen}
+                  onApplyEmojiAvatar={handleApplyEmojiAvatar}
+                  onApplyPersonaPreset={handleApplyPersonaPreset}
+                  onApplyUserEmojiAvatar={handleApplyUserEmojiAvatar}
+                  onAvatarUpload={handleAvatarUpload}
+                  onCancelDeletePersona={() => setDeleteConfirmPersonaId(null)}
+                  onCancelEmojiAvatarEdit={handleCancelEmojiAvatarEdit}
+                  onCancelUserEmojiAvatarEdit={handleCancelUserEmojiAvatarEdit}
+                  onCreatePersona={handleCreatePersona}
+                  onDeleteCurrentPersona={handleDeleteCurrentPersona}
+                  onEmojiDraftChange={setEmojiDraft}
+                  onResetUserAvatar={handleResetUserAvatar}
+                  onSelectEmoji={setEmojiDraft}
+                  onSelectUserEmoji={setUserEmojiDraft}
+                  onToggleDeletePersona={() => setDeleteConfirmPersonaId((current) => current === activePersona.id ? null : activePersona.id)}
+                  onAddCustomPromptBlock={handleAddCustomPromptBlock}
+                  onDeleteCustomPromptBlock={handleDeleteCustomPromptBlock}
+                  onUpdateCurrentPersona={updateCurrentPersona}
+                  onUpdateCustomPromptBlock={handleUpdateCustomPromptBlock}
+                  onUseEmojiAvatar={handleUseEmojiAvatar}
+                  onUseUserEmojiAvatar={handleUseUserEmojiAvatar}
+                  onUserAvatarUpload={handleUserAvatarUpload}
+                  onUserEmojiDraftChange={setUserEmojiDraft}
+                  personas={personas}
+                  theme={AI_CHAT_THEME}
+                  userAvatarInputRef={userAvatarInputRef}
+                  userEmojiDraft={userEmojiDraft}
+                  userProfile={userProfile}
+                />
               )}
+              callContent={(
+                <AIBackfillChatCallSettingsSection
+                  contextMessageLimit={activePersona.contextMessageLimit}
+                  onContextMessageLimitChange={(value) => updateCurrentPersona({ contextMessageLimit: value })}
+                  theme={AI_CHAT_THEME}
+                  assistantSettingsContent={(
+                  <AIBackfillChatAssistantSettingsSection
+                    assistantAgentConfig={assistantAgentConfig}
+                    categories={categories}
+                    assistantAgentIntervalDrafts={assistantAgentIntervalDrafts}
+                    assistantAgentIntervalErrors={assistantAgentIntervalErrors}
+                    assistantAgentQuietHoursDrafts={assistantAgentQuietHoursDrafts}
+                    assistantAgentQuietHoursErrors={assistantAgentQuietHoursErrors}
+                    assistantScheduledTaskDrafts={assistantScheduledTaskDrafts}
+                    isAssistantScheduledTaskComposerOpen={isAssistantScheduledTaskComposerOpen}
+                    assistantScheduledTaskSnapshot={assistantScheduledTaskSnapshot}
+                    assistantScheduledTaskDeleteTarget={assistantScheduledTaskDeleteTarget}
+                    assistantReminderSnapshot={assistantReminderSnapshot}
+                    theme={AI_CHAT_THEME}
+                    onUpdateAgentConfig={handleUpdateAssistantAgentConfig}
+                    onIntervalDraftChange={handleAssistantAgentIntervalDraftChange}
+                    onCommitIntervalDraft={commitAssistantAgentIntervalDraft}
+                    onToggleQuietHours={handleToggleAssistantQuietHours}
+                    onQuietHoursDraftChange={handleAssistantAgentQuietHoursDraftChange}
+                    onCommitQuietHoursDraft={commitAssistantAgentQuietHoursDraft}
+                    onOpenScheduledTaskComposer={handleOpenAssistantScheduledTaskComposer}
+                    onUpdateScheduledTaskDraft={updateAssistantScheduledTaskDraft}
+                    onToggleScheduledTaskWeekday={toggleAssistantScheduledTaskWeekday}
+                    onCancelScheduledTaskComposer={handleCancelAssistantScheduledTaskComposer}
+                    onSaveScheduledTask={handleSaveAssistantScheduledTask}
+                    onToggleScheduledTaskEnabled={handleToggleAssistantScheduledTaskEnabled}
+                    onToggleScheduledTaskDelete={handleToggleAssistantScheduledTaskDelete}
+                    onCancelScheduledTaskDelete={() => setAssistantScheduledTaskDeleteTarget(null)}
+                    onConfirmScheduledTaskDelete={handleConfirmAssistantScheduledTaskDelete}
+                    onOpenDreamViewer={handleOpenDreamViewer}
+                    onOpenAssistantMemoryViewer={handleOpenAssistantMemoryViewer}
+                    onOpenAssistantBackgroundHistoryViewer={handleOpenAssistantBackgroundHistoryViewer}
+                  />
+                  )}
+                />
+              )}
+              theme={AI_CHAT_THEME}
             />
-          )}
-          theme={AI_CHAT_THEME}
-        />
 
-        {isDreamViewerOpen && (
+            {isDreamViewerOpen && (
           <AIBackfillChatDreamOverlay
             activeDreamEntries={activeDreamEntries}
             activeDreamTopic={activeDreamTopic}
@@ -5737,9 +5913,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             onUpdateDreamEntryDraft={handleUpdateDreamEntryDraft}
             onUpdateDreamTopicDraft={updateDreamTopicDraft}
           />
-        )}
+            )}
 
-        {isAssistantMemoryViewerOpen && (
+            {isAssistantMemoryViewerOpen && (
           <AIBackfillChatMemoryOverlay
             assistantMemorySnapshot={assistantMemorySnapshot}
             assistantReminderSnapshot={assistantReminderSnapshot}
@@ -5767,9 +5943,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             onCancelReminderDelete={() => setAssistantReminderDeleteTarget(null)}
             onConfirmReminderDelete={handleConfirmAssistantReminderDelete}
           />
-        )}
+            )}
 
-        {isAssistantBackgroundHistoryViewerOpen && (
+            {isAssistantBackgroundHistoryViewerOpen && (
           <AssistantBackgroundHistoryOverlay
             entries={assistantBackgroundTimeline}
             theme={AI_CHAT_THEME}
@@ -5785,9 +5961,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             getTriggerLabel={getAssistantBackgroundTriggerLabel}
             getRequestStatusLabel={getAssistantBackgroundRequestStatusLabel}
           />
-        )}
+            )}
 
-        {debugViewer && (
+            {debugViewer && (
           <AIChatDebugViewerOverlay
             viewer={debugViewer}
             expandedBlockKeys={expandedDebugBlockKeys}
@@ -5805,6 +5981,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             }}
             buildBlocks={buildDebugBlocks}
           />
+            )}
+          </>
         )}
       </div>
     </div>

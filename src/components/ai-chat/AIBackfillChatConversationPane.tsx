@@ -4,6 +4,7 @@
  * @output Empty-state prompt list plus the rendered AI/user conversation pane
  * @pos Component Support (AI Integration)
  * @description Extracts the heavy conversation rendering UI out of AIBackfillChatModal so the modal can focus on orchestration while the message list, writeback cards, and per-message metadata remain behaviorally unchanged.
+ * @updated 2026-05-18: Added configurable width classes so compact desktop AI shells can reuse the conversation renderer without forcing the full-screen modal measure.
  * @updated 2026-05-15: Rebuilt the conversation pane with the extracted empty state, message bubble rendering, and writeback cards.
  */
 import React from 'react';
@@ -85,6 +86,8 @@ interface AIBackfillChatConversationPaneProps {
   setReminderUpdateExpansion: (messageId: string) => void;
   theme: AIChatConversationTheme;
   userProfile: AIChatUserProfile;
+  conversationMaxWidthClassName?: string;
+  emptyStateMaxWidthClassName?: string;
 }
 
 const DailyReviewWritebackResultCard: React.FC<{
@@ -316,7 +319,9 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
   setReasoningExpansion,
   setReminderUpdateExpansion,
   theme,
-  userProfile
+  userProfile,
+  conversationMaxWidthClassName = 'max-w-[920px]',
+  emptyStateMaxWidthClassName = 'max-w-2xl'
 }) => {
   const renderMessageBubble = (message: AIChatMessage, index: number, messages: AIChatMessage[]) => {
     const isUser = message.role === 'user';
@@ -705,7 +710,7 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
     <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
       {!activeSession || activeSession.messages.length === 0 ? (
         <div
-          className="mx-auto mt-10 max-w-2xl rounded-[0.9rem] border border-dashed px-6 py-7 text-sm leading-7"
+          className={`mx-auto mt-10 ${emptyStateMaxWidthClassName} rounded-[0.9rem] border border-dashed px-6 py-7 text-sm leading-7`}
           style={{
             borderColor: theme.panelBorderStrong,
             background: `linear-gradient(180deg, ${theme.panelBg} 0%, ${theme.panelBgSoft} 100%)`,
@@ -727,7 +732,7 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
           </div>
         </div>
       ) : (
-        <div className="mx-auto max-w-[920px] space-y-4">
+        <div className={`mx-auto ${conversationMaxWidthClassName} space-y-4`}>
           {activeSession.messages.map(renderMessageBubble)}
           <div ref={messagesEndRef} />
         </div>

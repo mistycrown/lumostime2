@@ -1,5 +1,7 @@
 # Custom Hooks
 
+> `useWidgetBridgeSync.ts` now catches both synchronous and async native widget bridge failures during payload sync, so newly extended todo recurrence fields such as month-end fallback cannot white-screen the app if the Android bridge rejects them.
+> `useTodoManager.ts` now canonicalizes recurrence rules during save/duplicate/batch-add, so month-end fallback toggles and older invalid monthly payloads settle into one stable persisted shape before downstream views react to the todo update.
 > `useSyncManager.ts` now classifies local-vs-cloud timestamps through a shared helper and uses a 1-second tolerance, so desktop edits made shortly after the previous sync are no longer misclassified as already equal.
 > `useSyncManager.ts` now includes the unified nested `achievementData` backup block in cloud/upload payloads and restores that achievement state during imports/downloads, while still preserving the local achievement bottle data whenever an older backup file simply does not include that block.
 > `useSyncManager.ts` now includes the unified nested `aiData` backup block in cloud/upload payloads, restores that AI state during imports/downloads, and listens for AI-only persistence change events so chat/memory/Dream updates can auto-sync even without timeline or todo edits.

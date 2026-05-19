@@ -4,6 +4,7 @@
  * @output Window Management
  * @pos Electron Main
  * @description Entry point for the Electron application. Handles main-window and desktop-widget creation, lifecycle events, and inter-process communication (IPC).
+ * @updated 2026-05-18: Added a dedicated desktop AI widget window with persisted compact bounds, edge-hide handle mode, and preload bridge events for the always-on-top quick-chat shell.
  * @updated 2026-05-18: Added renderer boot timing logs around main-window navigation so slow DEV startups can be separated from renderer hydration work.
  * @updated 2026-05-18: Added DEV renderer load retries so Electron waits out local Vite startup lag instead of failing the first window navigation.
  * @updated 2026-05-18: Added a tray-level Windows autostart toggle backed by Electron login-item settings, with login launches opening silently into the tray.
@@ -39,6 +40,8 @@ type DesktopTodoQuickEditorPayload = {
   y: number;
 };
 
+type DesktopAIWidgetHiddenEdge = 'left' | 'right';
+
 type PersistedWidgetWindowState = {
   bounds?: {
     x: number;
@@ -46,6 +49,11 @@ type PersistedWidgetWindowState = {
     width: number;
     height: number;
   };
+};
+
+type PersistedAIWidgetWindowState = PersistedWidgetWindowState & {
+  hiddenToEdge?: boolean;
+  hiddenEdge?: DesktopAIWidgetHiddenEdge;
 };
 
 const require = createRequire(import.meta.url);
@@ -78,14 +86,21 @@ const DESKTOP_MONTH_WIDGET_QUERY_VALUE = 'desktop-month';
 const DESKTOP_QUICK_WIDGET_QUERY_VALUE = 'desktop-quick';
 const DESKTOP_TIMER_WIDGET_QUERY_VALUE = 'desktop-timer';
 const DESKTOP_EDITOR_WIDGET_QUERY_VALUE = 'desktop-editor';
+const DESKTOP_AI_WIDGET_QUERY_VALUE = 'desktop-ai';
 const DESKTOP_WIDGET_MAIN_ACTION_CHANNEL = 'desktop-widget:main-action';
 const DESKTOP_TODO_QUICK_EDITOR_STATE_CHANNEL = 'desktop-widget:todo-quick-editor-state';
+const DESKTOP_AI_WIDGET_STATE_CHANNEL = 'desktop-widget:ai-window-state';
 const DEFAULT_WIDGET_WIDTH = 360;
 const DEFAULT_WIDGET_HEIGHT = 520;
 const DEFAULT_MONTH_WIDGET_WIDTH = 880;
 const DEFAULT_MONTH_WIDGET_HEIGHT = 640;
 const DEFAULT_TIMER_WIDGET_WIDTH = 80;
 const DEFAULT_TIMER_WIDGET_HEIGHT = 32;
+const DEFAULT_AI_WIDGET_WIDTH = 400;
+const DEFAULT_AI_WIDGET_HEIGHT = 620;
+const AI_WIDGET_HIDDEN_HANDLE_WIDTH = 22;
+const AI_WIDGET_AUTO_DOCK_THRESHOLD_PX = 28;
+const AI_WIDGET_AUTO_DOCK_RESTORE_GUARD_MS = 420;
 const TODO_QUICK_EDITOR_WIDTH = 296;
 const TODO_QUICK_EDITOR_HEIGHT = 300;
 const TODO_QUICK_EDITOR_OFFSET_PX = 12;
@@ -95,6 +110,7 @@ const WIDGET_STATE_FILENAME = 'desktop-widget-state.json';
 const MONTH_WIDGET_STATE_FILENAME = 'desktop-month-widget-state.json';
 const QUICK_WIDGET_STATE_FILENAME = 'desktop-quick-widget-state.json';
 const TIMER_WIDGET_STATE_FILENAME = 'desktop-timer-widget-state.json';
+const AI_WIDGET_STATE_FILENAME = 'desktop-ai-widget-state.json';
 const DEV_USER_DATA_DIRECTORY_NAME = 'LumosTime Dev';
 const LOGIN_ITEM_STARTUP_ARG = '--startup';
 const DEV_SERVER_LOAD_RETRY_DELAY_MS = 350;
@@ -128,6 +144,7 @@ let widgetWindow: BrowserWindow | null = null;
 let monthWidgetWindow: BrowserWindow | null = null;
 let quickWidgetWindow: BrowserWindow | null = null;
 let timerWidgetWindow: BrowserWindow | null = null;
+let aiWidgetWindow: BrowserWindow | null = null;
 let todoQuickEditorWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isMainRendererReady = false;
@@ -137,6 +154,12 @@ let desktopTodoQuickEditorPayload: DesktopTodoQuickEditorPayload | null = null;
 let isTodoQuickEditorReady = false;
 let todoQuickEditorIgnoreBlurUntil = 0;
 let todoQuickEditorHideTimeout: ReturnType<typeof setTimeout> | null = null;
+let isAIWidgetReady = false;
+let isAIWidgetHiddenToEdge = false;
+let aiWidgetHiddenEdge: DesktopAIWidgetHiddenEdge | null = null;
+let aiWidgetExpandedBounds: PersistedWidgetWindowState['bounds'] | null = null;
+let ignoreAIWidgetAutoDockUntil = 0;
+let isAIWidgetPointerInside = false;
 
 // Preload script is in the same directory as main.js after build
 const preload = path.join(__dirname, 'preload.mjs');
@@ -148,6 +171,7 @@ const getWidgetStatePath = () => path.join(app.getPath('userData'), WIDGET_STATE
 const getMonthWidgetStatePath = () => path.join(app.getPath('userData'), MONTH_WIDGET_STATE_FILENAME);
 const getQuickWidgetStatePath = () => path.join(app.getPath('userData'), QUICK_WIDGET_STATE_FILENAME);
 const getTimerWidgetStatePath = () => path.join(app.getPath('userData'), TIMER_WIDGET_STATE_FILENAME);
+const getAIWidgetStatePath = () => path.join(app.getPath('userData'), AI_WIDGET_STATE_FILENAME);
 const didLaunchFromLoginItem = process.argv.includes(LOGIN_ITEM_STARTUP_ARG);
 
 const buildRendererUrl = (windowType?: string): string => {
@@ -623,6 +647,198 @@ const saveTimerWidgetWindowState = async (targetWindow: BrowserWindow | null) =>
   }
 };
 
+const clampAIWidgetBounds = (bounds?: PersistedWidgetWindowState['bounds']) => {
+  const fallbackWidth = DEFAULT_AI_WIDGET_WIDTH;
+  const fallbackHeight = DEFAULT_AI_WIDGET_HEIGHT;
+
+  if (!bounds) {
+    const primaryWorkArea = screen.getPrimaryDisplay().workArea;
+    return {
+      width: fallbackWidth,
+      height: fallbackHeight,
+      x: primaryWorkArea.x + primaryWorkArea.width - fallbackWidth - 32,
+      y: primaryWorkArea.y + 48
+    };
+  }
+
+  const desiredWidth = Math.max(320, Math.floor(bounds.width || fallbackWidth));
+  const desiredHeight = Math.max(420, Math.floor(bounds.height || fallbackHeight));
+  const display = screen.getDisplayMatching({
+    x: bounds.x,
+    y: bounds.y,
+    width: desiredWidth,
+    height: desiredHeight
+  });
+  const workArea = display.workArea;
+  const width = Math.min(desiredWidth, workArea.width);
+  const height = Math.min(desiredHeight, workArea.height);
+  const maxX = workArea.x + Math.max(0, workArea.width - width);
+  const maxY = workArea.y + Math.max(0, workArea.height - height);
+
+  return {
+    width,
+    height,
+    x: Math.min(Math.max(bounds.x, workArea.x), maxX),
+    y: Math.min(Math.max(bounds.y, workArea.y), maxY)
+  };
+};
+
+const resolveAIWidgetHiddenEdge = (
+  bounds: PersistedWidgetWindowState['bounds']
+): DesktopAIWidgetHiddenEdge => {
+  const display = screen.getDisplayMatching(bounds);
+  const workArea = display.workArea;
+  const leftGap = Math.abs(bounds.x - workArea.x);
+  const rightGap = Math.abs((workArea.x + workArea.width) - (bounds.x + bounds.width));
+  return leftGap <= rightGap ? 'left' : 'right';
+};
+
+const buildHiddenAIWidgetBounds = (
+  expandedBounds: PersistedWidgetWindowState['bounds'],
+  hiddenEdge: DesktopAIWidgetHiddenEdge
+) => {
+  const clampedExpandedBounds = clampAIWidgetBounds(expandedBounds);
+  const display = screen.getDisplayMatching(clampedExpandedBounds);
+  const workArea = display.workArea;
+  const maxY = workArea.y + Math.max(0, workArea.height - clampedExpandedBounds.height);
+  const y = Math.min(Math.max(clampedExpandedBounds.y, workArea.y), maxY);
+
+  return {
+    width: AI_WIDGET_HIDDEN_HANDLE_WIDTH,
+    height: clampedExpandedBounds.height,
+    x: hiddenEdge === 'left'
+      ? workArea.x
+      : workArea.x + workArea.width - AI_WIDGET_HIDDEN_HANDLE_WIDTH,
+    y
+  };
+};
+
+const shouldAutoDockAIWidget = (
+  bounds: PersistedWidgetWindowState['bounds']
+): boolean => {
+  const clampedBounds = clampAIWidgetBounds(bounds);
+  const display = screen.getDisplayMatching(clampedBounds);
+  const workArea = display.workArea;
+  const leftGap = Math.abs(clampedBounds.x - workArea.x);
+  const rightGap = Math.abs((workArea.x + workArea.width) - (clampedBounds.x + clampedBounds.width));
+
+  return leftGap <= AI_WIDGET_AUTO_DOCK_THRESHOLD_PX
+    || rightGap <= AI_WIDGET_AUTO_DOCK_THRESHOLD_PX;
+};
+
+const isCursorInsideWindowBounds = (targetWindow: BrowserWindow | null): boolean => {
+  if (!targetWindow || targetWindow.isDestroyed()) {
+    return false;
+  }
+
+  const cursorPoint = screen.getCursorScreenPoint();
+  const bounds = targetWindow.getBounds();
+
+  return cursorPoint.x >= bounds.x
+    && cursorPoint.x <= bounds.x + bounds.width
+    && cursorPoint.y >= bounds.y
+    && cursorPoint.y <= bounds.y + bounds.height;
+};
+
+const readAIWidgetWindowState = async (): Promise<PersistedAIWidgetWindowState> => {
+  try {
+    const raw = await fs.readFile(getAIWidgetStatePath(), 'utf-8');
+    return JSON.parse(raw) as PersistedAIWidgetWindowState;
+  } catch (error: any) {
+    if (error?.code !== 'ENOENT') {
+      console.error('[Electron] Failed to read desktop AI widget state', error);
+    }
+    return {};
+  }
+};
+
+const saveAIWidgetWindowState = async () => {
+  try {
+    const bounds = clampAIWidgetBounds(aiWidgetExpandedBounds || aiWidgetWindow?.getBounds());
+    await fs.writeFile(
+      getAIWidgetStatePath(),
+      JSON.stringify({
+        bounds,
+        hiddenToEdge: isAIWidgetHiddenToEdge,
+        hiddenEdge: aiWidgetHiddenEdge
+      }, null, 2),
+      'utf-8'
+    );
+  } catch (error) {
+    console.error('[Electron] Failed to save desktop AI widget state', error);
+  }
+};
+
+const publishAIWidgetWindowState = () => {
+  if (
+    !aiWidgetWindow
+    || aiWidgetWindow.isDestroyed()
+    || !isAIWidgetReady
+  ) {
+    return;
+  }
+
+  aiWidgetWindow.webContents.send(DESKTOP_AI_WIDGET_STATE_CHANNEL, {
+    isHiddenToEdge: isAIWidgetHiddenToEdge,
+    hiddenEdge: aiWidgetHiddenEdge
+  });
+};
+
+const restoreAIWidgetWindowFromEdge = async () => {
+  if (!aiWidgetWindow || aiWidgetWindow.isDestroyed()) {
+    return;
+  }
+
+  const nextBounds = clampAIWidgetBounds(aiWidgetExpandedBounds || aiWidgetWindow.getBounds());
+  aiWidgetExpandedBounds = nextBounds;
+  ignoreAIWidgetAutoDockUntil = Date.now() + AI_WIDGET_AUTO_DOCK_RESTORE_GUARD_MS;
+  isAIWidgetHiddenToEdge = false;
+  aiWidgetWindow.setBounds(nextBounds);
+  publishAIWidgetWindowState();
+  await saveAIWidgetWindowState();
+};
+
+const hideAIWidgetWindowToEdge = async () => {
+  if (!aiWidgetWindow || aiWidgetWindow.isDestroyed()) {
+    return;
+  }
+
+  const expandedBounds = clampAIWidgetBounds(
+    isAIWidgetHiddenToEdge
+      ? aiWidgetExpandedBounds || aiWidgetWindow.getBounds()
+      : aiWidgetWindow.getBounds()
+  );
+  aiWidgetExpandedBounds = expandedBounds;
+  const nextHiddenEdge = resolveAIWidgetHiddenEdge(expandedBounds);
+  aiWidgetHiddenEdge = nextHiddenEdge;
+  isAIWidgetHiddenToEdge = true;
+  aiWidgetWindow.setBounds(buildHiddenAIWidgetBounds(expandedBounds, nextHiddenEdge));
+  publishAIWidgetWindowState();
+  await saveAIWidgetWindowState();
+};
+
+const maybeAutoDockAIWidgetAfterPointerLeave = async () => {
+  if (
+    !aiWidgetWindow
+    || aiWidgetWindow.isDestroyed()
+    || isAIWidgetHiddenToEdge
+    || isAIWidgetPointerInside
+    || isCursorInsideWindowBounds(aiWidgetWindow)
+    || Date.now() < ignoreAIWidgetAutoDockUntil
+  ) {
+    return;
+  }
+
+  const nextBounds = clampAIWidgetBounds(aiWidgetExpandedBounds || aiWidgetWindow.getBounds());
+  aiWidgetExpandedBounds = nextBounds;
+  if (!shouldAutoDockAIWidget(nextBounds)) {
+    await saveAIWidgetWindowState();
+    return;
+  }
+
+  await hideAIWidgetWindowToEdge();
+};
+
 const flushPendingDesktopWidgetActions = () => {
   if (!mainWindow || mainWindow.isDestroyed() || !isMainRendererReady) {
     return;
@@ -651,7 +867,7 @@ const configureExternalLinks = (targetWindow: BrowserWindow) => {
 
 const attachWidgetShowFallback = (
   targetWindow: BrowserWindow,
-  label: 'today' | 'month' | 'quick' | 'timer' | 'editor'
+  label: 'today' | 'month' | 'quick' | 'timer' | 'editor' | 'ai'
 ) => {
   let didShow = false;
 
@@ -968,6 +1184,98 @@ async function createTimerWidgetWindow() {
   return timerWidgetWindow;
 }
 
+async function createAIWidgetWindow() {
+  if (aiWidgetWindow && !aiWidgetWindow.isDestroyed()) {
+    if (isAIWidgetHiddenToEdge) {
+      await restoreAIWidgetWindowFromEdge();
+    }
+    focusWindow(aiWidgetWindow);
+    return aiWidgetWindow;
+  }
+
+  const widgetState = await readAIWidgetWindowState();
+  const expandedBounds = clampAIWidgetBounds(widgetState.bounds);
+  const resolvedHiddenEdge = widgetState.hiddenEdge || resolveAIWidgetHiddenEdge(expandedBounds);
+  aiWidgetExpandedBounds = expandedBounds;
+  aiWidgetHiddenEdge = resolvedHiddenEdge;
+  isAIWidgetHiddenToEdge = Boolean(widgetState.hiddenToEdge);
+  const widgetBounds = isAIWidgetHiddenToEdge
+    ? buildHiddenAIWidgetBounds(expandedBounds, resolvedHiddenEdge)
+    : expandedBounds;
+
+  isAIWidgetReady = false;
+  aiWidgetWindow = new BrowserWindow({
+    title: 'LumosTime AI Widget',
+    icon: getIconPath(),
+    width: widgetBounds.width,
+    height: widgetBounds.height,
+    x: widgetBounds.x,
+    y: widgetBounds.y,
+    frame: false,
+    transparent: true,
+    resizable: true,
+    alwaysOnTop: true,
+    thickFrame: false,
+    minimizable: true,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    show: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload,
+      webSecurity: false
+    }
+  });
+
+  aiWidgetWindow.setMenuBarVisibility(false);
+  configureExternalLinks(aiWidgetWindow);
+  attachWidgetShowFallback(aiWidgetWindow, 'ai');
+  aiWidgetWindow.webContents.once('did-finish-load', () => {
+    isAIWidgetReady = true;
+    publishAIWidgetWindowState();
+  });
+  await loadWindowUrl(aiWidgetWindow, buildRendererUrl(DESKTOP_AI_WIDGET_QUERY_VALUE), 'ai widget');
+
+  aiWidgetWindow.on('move', () => {
+    if (isAIWidgetHiddenToEdge) {
+      return;
+    }
+    const nextBounds = clampAIWidgetBounds(aiWidgetWindow?.getBounds());
+    aiWidgetExpandedBounds = nextBounds;
+    if (
+      Date.now() < ignoreAIWidgetAutoDockUntil
+      || isAIWidgetPointerInside
+      || isCursorInsideWindowBounds(aiWidgetWindow)
+    ) {
+      runInBackground('save ai widget state after guarded move', saveAIWidgetWindowState());
+      return;
+    }
+    if (shouldAutoDockAIWidget(nextBounds)) {
+      runInBackground('auto-dock ai widget after edge move', hideAIWidgetWindowToEdge());
+      return;
+    }
+    runInBackground('save ai widget state after move', saveAIWidgetWindowState());
+  });
+  aiWidgetWindow.on('resize', () => {
+    if (isAIWidgetHiddenToEdge) {
+      return;
+    }
+    aiWidgetExpandedBounds = clampAIWidgetBounds(aiWidgetWindow?.getBounds());
+    runInBackground('save ai widget state after resize', saveAIWidgetWindowState());
+  });
+  aiWidgetWindow.on('close', () => {
+    runInBackground('save ai widget state before close', saveAIWidgetWindowState());
+  });
+  aiWidgetWindow.on('closed', () => {
+    aiWidgetWindow = null;
+    isAIWidgetReady = false;
+    isAIWidgetPointerInside = false;
+  });
+
+  return aiWidgetWindow;
+}
+
 const getTodoQuickEditorBounds = (payload: DesktopTodoQuickEditorPayload) => {
   const display = screen.getDisplayNearestPoint({
     x: Math.round(payload.x),
@@ -1228,6 +1536,29 @@ ipcMain.on('desktop-widget:close-timer', () => {
   timerWidgetWindow?.close();
 });
 
+ipcMain.on('desktop-widget:open-ai', () => {
+  runInBackground('open ai widget window', createAIWidgetWindow());
+});
+
+ipcMain.on('desktop-widget:close-ai', () => {
+  aiWidgetWindow?.close();
+});
+
+ipcMain.on('desktop-widget:hide-ai-to-edge', () => {
+  runInBackground('hide ai widget window to edge', hideAIWidgetWindowToEdge());
+});
+
+ipcMain.on('desktop-widget:restore-ai-from-edge', () => {
+  runInBackground('restore ai widget window from edge', restoreAIWidgetWindowFromEdge());
+});
+
+ipcMain.on('desktop-widget:set-ai-pointer-inside', (_, inside: boolean) => {
+  isAIWidgetPointerInside = inside;
+  if (!inside) {
+    runInBackground('maybe auto-dock ai widget after pointer leave', maybeAutoDockAIWidgetAfterPointerLeave());
+  }
+});
+
 ipcMain.on('desktop-widget:open-todo-quick-editor', (_, payload: DesktopTodoQuickEditorPayload) => {
   desktopTodoQuickEditorPayload = payload;
   runInBackground('open todo quick editor window', createTodoQuickEditorWindow());
@@ -1273,6 +1604,13 @@ ipcMain.handle('desktop-widget:get-bounds', (event) => {
 
 ipcMain.handle('desktop-widget:get-todo-quick-editor-state', () => {
   return desktopTodoQuickEditorPayload;
+});
+
+ipcMain.handle('desktop-widget:get-ai-window-state', () => {
+  return {
+    isHiddenToEdge: isAIWidgetHiddenToEdge,
+    hiddenEdge: aiWidgetHiddenEdge
+  };
 });
 
 ipcMain.on('desktop-widget:set-bounds', (event, bounds: { x: number; y: number; width: number; height: number }) => {

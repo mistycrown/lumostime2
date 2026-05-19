@@ -4,14 +4,16 @@
  * @output PC端小组件设置页面，含今日小组件、月历小组件、小事小组件与计时器小组件开关
  * @pos View (Settings Subpage)
  * @description 桌面小组件的PC端控制台，在此管理和触发小组件的呼起、配置保存与环境提示。
+ * @updated 2026-05-18: Added a desktop AI widget startup toggle wired to the Electron quick-chat window so users can keep an always-on-top AI companion beside the existing desktop widgets.
  * @updated 2026-05-17: 扩展了小组件控制中心，新增“桌面计时器小组件”开关选项与触发器支持，实现独立的 IPC 呼起与收起桌面计时器小组件（timer widget）。
  * @updated 2026-05-17: 改为复用共享的桌面小组件启动偏好键名，确保设置页与应用启动恢复逻辑读写同一份状态。
  * @updated 2026-05-17: 新增“小事清单小组件”开关选项与触发器支持，实现独立的 IPC 打开与关闭桌面小事清单小组件（quick widget）。
  * @updated 2026-05-17: 添加桌面月历小组件开关与触发器支持。
  */
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, LayoutGrid, Monitor, Calendar, ListTodo, Timer } from 'lucide-react';
+import { ChevronLeft, LayoutGrid, Monitor, Calendar, ListTodo, Timer, MessageSquare } from 'lucide-react';
 import {
+  DESKTOP_WIDGET_AI_STORAGE_KEY,
   DESKTOP_WIDGET_MONTH_STORAGE_KEY,
   DESKTOP_WIDGET_QUICK_STORAGE_KEY,
   DESKTOP_WIDGET_TODAY_STORAGE_KEY,
@@ -52,6 +54,9 @@ export const DesktopWidgetSettingsView: React.FC<DesktopWidgetSettingsViewProps>
   const [timerEnabled, setTimerEnabled] = useState(() => {
     return localStorage.getItem(DESKTOP_WIDGET_TIMER_STORAGE_KEY) === 'true';
   });
+  const [aiEnabled, setAIEnabled] = useState(() => {
+    return localStorage.getItem(DESKTOP_WIDGET_AI_STORAGE_KEY) === 'true';
+  });
 
   useEffect(() => {
     // 非 Electron 环境下强制重置为 false
@@ -60,6 +65,7 @@ export const DesktopWidgetSettingsView: React.FC<DesktopWidgetSettingsViewProps>
       setMonthEnabled(false);
       setQuickEnabled(false);
       setTimerEnabled(false);
+      setAIEnabled(false);
     }
   }, [isElectron]);
 
@@ -124,6 +130,22 @@ export const DesktopWidgetSettingsView: React.FC<DesktopWidgetSettingsViewProps>
       window.desktopWidget?.openTimer?.();
     } else {
       window.desktopWidget?.closeTimer?.();
+    }
+  };
+
+  const handleToggleAIWidget = () => {
+    if (!isElectron) {
+      return;
+    }
+
+    const nextEnabled = !aiEnabled;
+    setAIEnabled(nextEnabled);
+    localStorage.setItem(DESKTOP_WIDGET_AI_STORAGE_KEY, String(nextEnabled));
+
+    if (nextEnabled) {
+      window.desktopWidget?.openAI?.();
+    } else {
+      window.desktopWidget?.closeAI?.();
     }
   };
 
@@ -249,7 +271,7 @@ export const DesktopWidgetSettingsView: React.FC<DesktopWidgetSettingsViewProps>
               type="button"
               disabled={!isElectron}
               onClick={handleToggleTimerWidget}
-              className="w-full flex items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-stone-50 disabled:cursor-default disabled:hover:bg-white"
+              className="w-full flex items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-stone-50 disabled:cursor-default disabled:hover:bg-white border-b border-stone-100"
             >
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50">
                 <Timer size={18} className="text-amber-500" />
@@ -268,6 +290,33 @@ export const DesktopWidgetSettingsView: React.FC<DesktopWidgetSettingsViewProps>
                 <span
                   className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
                     timerEnabled && isElectron ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
+              </div>
+            </button>
+
+            <button
+              type="button"
+              disabled={!isElectron}
+              onClick={handleToggleAIWidget}
+              className="w-full flex items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-stone-50 disabled:cursor-default disabled:hover:bg-white"
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50">
+                <MessageSquare size={18} className="text-blue-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-stone-800">桌面 AI 快聊窗</div>
+              </div>
+              <div
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ${
+                  aiEnabled && isElectron
+                    ? 'bg-blue-400'
+                    : 'bg-stone-200'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                    aiEnabled && isElectron ? 'translate-x-5' : 'translate-x-0.5'
                   }`}
                 />
               </div>

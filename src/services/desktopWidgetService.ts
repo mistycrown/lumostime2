@@ -8,6 +8,7 @@
  * @updated 2026-05-17: 新增桌面小组件启动偏好键名与读取辅助逻辑，供 Electron 主应用启动时自动恢复已启用的 PC 端小组件。
  * @updated 2026-05-17: 扩展了桌面小组件的支持，新增 desktop-quick（小事清单小组件）快照构建与窗口检测，实现了 buildDesktopQuickWidgetSnapshot 以确保无排期的小事能够完整呈现在小组件待办列表中。
  * @updated 2026-05-17: Added a dedicated `desktop-editor` route and shared payload type for the transparent widget quick-editor window.
+ * @updated 2026-05-18: Added a dedicated `desktop-ai` route plus startup-toggle parsing so the Electron desktop AI widget can restore alongside other desktop windows without joining the lightweight widget boot path.
  * @updated 2026-05-18: Added parent todo ids to desktop today-widget snapshot items so compact Electron list views can render one-level subtask hierarchy without reloading the full todo graph.
  * @updated 2026-05-17: Added desktop widget route detection plus today/pin/overdue snapshot builders for the Electron desktop today widget and month-widget window, with getDesktopWidgetType helper support.
  * @updated 2026-05-17: Kept completed todos visible in desktop today/quick widget snapshots so the widget views can render them after unfinished rows instead of dropping them.
@@ -29,12 +30,14 @@ export const DESKTOP_MONTH_WIDGET_WINDOW_QUERY_VALUE = 'desktop-month';
 export const DESKTOP_QUICK_WIDGET_WINDOW_QUERY_VALUE = 'desktop-quick';
 export const DESKTOP_TIMER_WIDGET_WINDOW_QUERY_VALUE = 'desktop-timer';
 export const DESKTOP_EDITOR_WIDGET_WINDOW_QUERY_VALUE = 'desktop-editor';
+export const DESKTOP_AI_WIDGET_WINDOW_QUERY_VALUE = 'desktop-ai';
 export const DESKTOP_WIDGET_TODAY_STORAGE_KEY = 'lumostime_desktop_widget_today_enabled';
 export const DESKTOP_WIDGET_MONTH_STORAGE_KEY = 'lumostime_desktop_widget_month_enabled';
 export const DESKTOP_WIDGET_QUICK_STORAGE_KEY = 'lumostime_desktop_widget_quick_enabled';
 export const DESKTOP_WIDGET_TIMER_STORAGE_KEY = 'lumostime_desktop_widget_timer_enabled';
+export const DESKTOP_WIDGET_AI_STORAGE_KEY = 'lumostime_desktop_widget_ai_enabled';
 
-export type DesktopWidgetStartupType = 'today' | 'month' | 'quick' | 'timer';
+export type DesktopWidgetStartupType = 'today' | 'month' | 'quick' | 'timer' | 'ai';
 
 export type DesktopWidgetBadgeLabel = 'PIN' | 'TODAY' | 'LATE' | 'MAYBE';
 
@@ -195,7 +198,7 @@ export const isDesktopWidgetWindow = (): boolean => {
     || val === DESKTOP_EDITOR_WIDGET_WINDOW_QUERY_VALUE;
 };
 
-export const getDesktopWidgetType = (): 'today' | 'month' | 'quick' | 'timer' | 'editor' | null => {
+export const getDesktopWidgetType = (): 'today' | 'month' | 'quick' | 'timer' | 'editor' | 'ai' | null => {
   if (typeof window === 'undefined') {
     return null;
   }
@@ -214,6 +217,9 @@ export const getDesktopWidgetType = (): 'today' | 'month' | 'quick' | 'timer' | 
   }
   if (val === DESKTOP_EDITOR_WIDGET_WINDOW_QUERY_VALUE) {
     return 'editor';
+  }
+  if (val === DESKTOP_AI_WIDGET_WINDOW_QUERY_VALUE) {
+    return 'ai';
   }
   return null;
 };
@@ -234,6 +240,9 @@ export const loadEnabledDesktopWidgetTypes = (
   }
   if (storageLike.getItem(DESKTOP_WIDGET_TIMER_STORAGE_KEY) === 'true') {
     enabledWidgetTypes.push('timer');
+  }
+  if (storageLike.getItem(DESKTOP_WIDGET_AI_STORAGE_KEY) === 'true') {
+    enabledWidgetTypes.push('ai');
   }
 
   return enabledWidgetTypes;

@@ -4,6 +4,7 @@
  * @output Regression coverage for virtual-category date matching, shared day entries, and week-view badge normalization
  * @pos Test (todo planning utilities)
  * @description Verifies today/tomorrow/this-week filtering and shared per-day entry building against Arrange, Due, recurrence, and Maybe rules without creating occurrence records.
+ * @updated 2026-05-18: Added recurrence normalization coverage so invalid monthly payloads, stale skip dates, and stray month-end fallback flags are canonicalized before runtime consumers read hydrated todo data.
  * @updated 2026-05-18: Added regression coverage so a recurring todo pinned into today views disappears when today's occurrence is explicitly skipped, unless another explicit today date still keeps it visible.
  * @updated 2026-05-17: Added regression coverage for completed-first month-entry priority when one todo matches multiple day badges, while preserving repeat-before-maybe ordering and leaving trace-lane layout unchanged.
  * @updated 2026-05-14: Added regression coverage for recurrence `skipDates`, quick-action next-occurrence resolution, today-or-future `maybeDates`, hydration cleanup helpers, and Maybe ordering in shared day-entry builders.
@@ -29,6 +30,7 @@ import {
   matchesRecurrenceRule,
   normalizeMaybeDates,
   normalizeTodoMaybeDates,
+  normalizeTodoRecurrenceRule,
   normalizeSkipDates,
   normalizeMonthlyDayInput,
   parseMonthlyDayInput
@@ -174,6 +176,44 @@ describe('todoScheduleUtils virtual category helpers', () => {
       '2026-04-20',
       '2026-04-24'
     ]);
+  });
+
+  test('normalizes persisted recurrence rules into one canonical monthly payload', () => {
+    expect(normalizeTodoRecurrenceRule({
+      frequency: 'monthly',
+      startDate: '2026-01-31',
+      endDate: '2026-01-15',
+      interval: 1,
+      monthDays: [31, 0, 30, 31],
+      skipDates: ['2026-04-19', '2026-04-20', '2026-04-20', 'invalid'],
+      fallbackToMonthEnd: true
+    }, REFERENCE_DATE)).toEqual({
+      frequency: 'monthly',
+      startDate: '2026-01-31',
+      monthDays: [30, 31],
+      skipDates: ['2026-04-20'],
+      fallbackToMonthEnd: true
+    });
+  });
+
+  test('drops invalid recurrence rules and removes stray month-end fallback flags', () => {
+    expect(normalizeTodoRecurrenceRule({
+      frequency: 'monthly',
+      startDate: 'invalid',
+      monthDays: [31],
+      fallbackToMonthEnd: true
+    } as any, REFERENCE_DATE)).toBeUndefined();
+
+    expect(normalizeTodoRecurrenceRule({
+      frequency: 'monthly',
+      startDate: '2026-01-30',
+      monthDays: [30],
+      fallbackToMonthEnd: true
+    }, REFERENCE_DATE)).toEqual({
+      frequency: 'monthly',
+      startDate: '2026-01-30',
+      monthDays: [30]
+    });
   });
 
   test('resolves the next visible recurrence occurrence after skipped dates', () => {

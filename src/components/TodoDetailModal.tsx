@@ -4,6 +4,7 @@
  * @output Modal Interaction (Edit Todo, View History)
  * @pos Component (Modal)
  * @description Displays detailed information for a specific Todo item, including its progress, planning fields, associated history logs, and focus stats.
+ * @updated 2026-05-19: Replaced the hidden monthly fallback checkbox with a pure button toggle that blocks default mouse-down focus switching, fixing the desktop white-screen triggered by tapping `31 号无则月末`.
  * @updated 2026-05-18: Defaulted timeline metadata render options so detail-page log chips still render safely when callers omit the auxiliary collection-name payload.
  * @updated 2026-05-18: Changed task title editing to update only on blur (or Enter) to prevent live-updating and redundant auto-saves during typing.
  * @updated 2026-05-14: Restricted recurrence `Skip Date` selection to dates that actually belong to the active recurrence rule and fixed damaged UTF-8 picker labels.
@@ -28,7 +29,7 @@
  * @updated 2026-04-21: Added one-level subtask display, parent navigation, and inherited-field restrictions for child todos.
  * @updated 2026-04-21: Added a detail-level pin toggle so todos can be promoted to the top of today's schedule tab.
  * @updated 2026-04-20: Added schedule date, deadline date, and lightweight recurrence-rule editing for the first todo week-view release.
- * 
+ *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -120,6 +121,41 @@ const normalizeSkipDates = (value?: string[]): string[] => {
 };
 
 const normalizeRecurrenceRuleForComparison = (value?: TodoRecurrenceRule): string => JSON.stringify(value ?? null);
+
+const MonthEndFallbackToggle: React.FC<{
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}> = React.memo(({
+  checked,
+  onCheckedChange
+}) => {
+  return (
+    <button
+      type="button"
+      aria-pressed={checked}
+      onMouseDown={(event) => {
+        event.preventDefault();
+      }}
+      onClick={() => {
+        onCheckedChange(!checked);
+      }}
+      className="flex w-full cursor-pointer items-center gap-2 rounded-xl border border-stone-200 bg-stone-50/70 px-3 py-2 text-left text-xs font-medium text-stone-600 transition-colors hover:border-stone-300"
+    >
+      <span
+        className={`flex h-4 w-4 items-center justify-center rounded-[0.35rem] border transition-colors ${
+          checked
+            ? 'border-stone-900 bg-stone-900 text-white'
+            : 'border-stone-300 bg-white text-transparent'
+        }`}
+      >
+        <Check size={10} strokeWidth={3} />
+      </span>
+      <span>若当月没有 31 号，则自动定位到最后一天</span>
+    </button>
+  );
+});
+
+MonthEndFallbackToggle.displayName = 'MonthEndFallbackToggle';
 
 export const resolvePersistedTodoForDetail = (
   todoId: string,
@@ -1552,24 +1588,10 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                               className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2.5 text-stone-700 text-sm outline-none focus:border-stone-400 transition-colors"
                             />
                             {parsedRecurrenceMonthDays.includes(31) && (
-                              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-stone-200 bg-stone-50/70 px-3 py-2 text-xs font-medium text-stone-600 transition-colors hover:border-stone-300">
-                                <input
-                                  type="checkbox"
-                                  checked={recurrenceFallbackToMonthEnd}
-                                  onChange={(event) => setRecurrenceFallbackToMonthEnd(event.target.checked)}
-                                  className="sr-only"
-                                />
-                                <span
-                                  className={`flex h-4 w-4 items-center justify-center rounded-[0.35rem] border transition-colors ${
-                                    recurrenceFallbackToMonthEnd
-                                      ? 'border-stone-900 bg-stone-900 text-white'
-                                      : 'border-stone-300 bg-white text-transparent'
-                                  }`}
-                                >
-                                  <Check size={10} strokeWidth={3} />
-                                </span>
-                                <span>若当月没有 31 号，则自动定位到最后一天</span>
-                              </label>
+                              <MonthEndFallbackToggle
+                                checked={recurrenceFallbackToMonthEnd}
+                                onCheckedChange={setRecurrenceFallbackToMonthEnd}
+                              />
                             )}
                           </div>
                         )}

@@ -4,6 +4,7 @@
  * @output Week buckets, daily schedule entries, and badge metadata for todo planning views
  * @pos Utility (Todo planning)
  * @description Shared helpers for deriving scheduled, deadline, recurring, maybe, completed, and in-progress todo visibility without creating standalone occurrence records.
+ * @updated 2026-05-18: Canonicalizes persisted recurrence rules on save/load so invalid monthly-day payloads and stale skip-date shapes cannot fan out into render-time crashes after detail-page auto-save.
  * @updated 2026-05-18: Prevented today-category pin views from surfacing recurring todos whose current-day occurrence is explicitly suppressed by `skipDates`, while still allowing true pin-only todos and other explicit today matches through.
  * @updated 2026-05-17: Reordered shared month-entry priority so completed rows win over due/arrange/repeat/maybe/trace when one todo matches multiple day badges, while keeping the continuous trace lane layout unchanged.
  * @updated 2026-05-14: Updated `TodoDateEntry` and `WeekTodoEntry` to include an optional `dateKey`, enabling drag-and-drop logic to identify which specific occurrence is being moved in multi-date `Maybe` schedules.
@@ -262,6 +263,110 @@ export const normalizeSkipDates = (
   )).sort((left, right) => left.localeCompare(right));
 
   return normalized.length > 0 ? normalized : undefined;
+};
+
+const normalizeRecurrenceWeekdays = (
+  weekdays?: number[],
+  fallbackWeekday?: number
+): number[] | undefined => {
+  const normalizedWeekdays = Array.isArray(weekdays)
+    ? Array.from(new Set(
+      weekdays
+        .map((item) => Number(item))
+        .filter((item) => Number.isInteger(item) && item >= 0 && item <= 6)
+    )).sort((left, right) => left - right)
+    : [];
+
+  if (normalizedWeekdays.length > 0) {
+    return normalizedWeekdays;
+  }
+
+  if (Number.isInteger(fallbackWeekday) && fallbackWeekday! >= 0 && fallbackWeekday! <= 6) {
+    return [fallbackWeekday!];
+  }
+
+  return undefined;
+};
+
+const normalizeRecurrenceMonthDays = (
+  monthDays?: number[],
+  fallbackMonthDay?: number
+): number[] | undefined => {
+  const normalizedMonthDays = Array.isArray(monthDays)
+    ? Array.from(new Set(
+      monthDays
+        .map((item) => Number(item))
+        .filter((item) => Number.isInteger(item) && item >= 1 && item <= 31)
+    )).sort((left, right) => left - right)
+    : [];
+
+  if (normalizedMonthDays.length > 0) {
+    return normalizedMonthDays;
+  }
+
+  if (Number.isInteger(fallbackMonthDay) && fallbackMonthDay! >= 1 && fallbackMonthDay! <= 31) {
+    return [fallbackMonthDay!];
+  }
+
+  return undefined;
+};
+
+export const normalizeTodoRecurrenceRule = (
+  rule?: TodoRecurrenceRule,
+  referenceDate: Date = new Date()
+): TodoRecurrenceRule | undefined => {
+  if (!rule) {
+    return undefined;
+  }
+
+  const startDate = parseDateKey(rule.startDate);
+  if (!startDate) {
+    return undefined;
+  }
+
+  const normalizedStartDate = formatDateKey(startDate);
+  const endDate = parseDateKey(rule.endDate);
+  const normalizedEndDate = endDate && endDate.getTime() >= startDate.getTime()
+    ? formatDateKey(endDate)
+    : undefined;
+  const normalizedInterval = Number.isFinite(rule.interval)
+    ? Math.max(1, Math.round(Number(rule.interval)))
+    : 1;
+  const normalizedSkipDates = normalizeSkipDates(rule.skipDates, referenceDate);
+  const baseRule: TodoRecurrenceRule = {
+    frequency: rule.frequency,
+    startDate: normalizedStartDate,
+    ...(normalizedEndDate ? { endDate: normalizedEndDate } : {}),
+    ...(normalizedInterval > 1 ? { interval: normalizedInterval } : {}),
+    ...(normalizedSkipDates ? { skipDates: normalizedSkipDates } : {})
+  };
+
+  if (rule.frequency === 'weekly') {
+    const normalizedWeekdays = normalizeRecurrenceWeekdays(rule.weekdays, startDate.getDay());
+    return normalizedWeekdays
+      ? {
+          ...baseRule,
+          weekdays: normalizedWeekdays
+        }
+      : baseRule;
+  }
+
+  if (rule.frequency === 'monthly') {
+    const normalizedMonthDays = normalizeRecurrenceMonthDays(rule.monthDays, startDate.getDate());
+    if (!normalizedMonthDays) {
+      return undefined;
+    }
+
+    return {
+      ...baseRule,
+      monthDays: normalizedMonthDays,
+      ...(normalizedMonthDays.includes(31) && rule.fallbackToMonthEnd === true
+        ? { fallbackToMonthEnd: true }
+        : {})
+    };
+  }
+
+  return baseRule;
 };
 
 export const hasMaybeDate = (

@@ -4,6 +4,7 @@
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
+ * @updated 2026-05-18: Added a desktop AI widget shell route that reuses the full app provider tree but swaps the normal layout for a compact always-on-top quick-chat window.
  * @updated 2026-05-18: Added bootstrap readiness timing logs so slow Electron startup can be traced to the async hydration gate.
  * @updated 2026-05-17: 在 Electron 主应用启动时自动恢复已启用的 PC 端小组件，并与设置页共享桌面小组件启动偏好读取逻辑。
  * @updated 2026-05-17: 增加 Electron 桌面小组件动作处理逻辑，支持 toggle_todo, open_todo 和 'start_focus' 快捷开始任务专注。
@@ -66,7 +67,7 @@ import { useWidgetBridgeSync } from './hooks/useWidgetBridgeSync';
 import { useFloatingWindowSync } from './hooks/useFloatingWindowSync';
 import { assistantBackupService } from './services/assistantBackupService';
 import { customColorGroupService } from './services/customColorGroupService';
-import { loadEnabledDesktopWidgetTypes } from './services/desktopWidgetService';
+import { getDesktopWidgetType, loadEnabledDesktopWidgetTypes } from './services/desktopWidgetService';
 import { ShortcutWidgetAction } from './services/widgetShortcutService';
 import { splitLogByDays } from './utils/logUtils';
 import { buildSceneGroupStateFromLegacySlots, getActiveSceneGroup, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from './utils/sceneGroupStorage';
@@ -88,6 +89,7 @@ import {
   ShareViewLazy as ShareView,
   startLazyViewPreload
 } from './utils/lazyViews';
+import { DesktopAIWidgetView } from './views/desktop/DesktopAIWidgetView';
 
 const APP_READY_EVENT = 'lumostime:app-ready';
 const getBootstrapTimingNow = (): number => (
@@ -151,6 +153,8 @@ const AppContent: React.FC = () => {
   const { openAIChat } = useAIChatWindow();
   const lastStorageErrorToastRef = useRef<{ signature: string; timestamp: number } | null>(null);
   const hasRestoredDesktopWidgetsRef = useRef(false);
+  const desktopWindowType = getDesktopWidgetType();
+  const isDesktopAIWidgetWindow = desktopWindowType === 'ai';
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) {
@@ -605,7 +609,7 @@ const AppContent: React.FC = () => {
   ]);
 
   useEffect(() => {
-    if (!window.desktopWidget || hasRestoredDesktopWidgetsRef.current) {
+    if (!window.desktopWidget || hasRestoredDesktopWidgetsRef.current || desktopWindowType !== null) {
       return;
     }
 
@@ -628,11 +632,14 @@ const AppContent: React.FC = () => {
         window.desktopWidget?.openTimer?.();
         return;
       }
+      if (widgetType === 'ai') {
+        window.desktopWidget?.openAI?.();
+      }
     });
-  }, []);
+  }, [desktopWindowType]);
 
   useEffect(() => {
-    if (!window.desktopWidget) {
+    if (!window.desktopWidget || desktopWindowType !== null) {
       return;
     }
 
@@ -642,7 +649,7 @@ const AppContent: React.FC = () => {
     return () => {
       unsubscribe();
     };
-  }, [handleDesktopWidgetAction]);
+  }, [desktopWindowType, handleDesktopWidgetAction]);
 
   useDeepLink(
     logManager.handleQuickPunch,
@@ -660,6 +667,10 @@ const AppContent: React.FC = () => {
     const cleanup = startLazyViewPreload();
     return cleanup;
   }, []);
+
+  if (isDesktopAIWidgetWindow) {
+    return <DesktopAIWidgetView />;
+  }
 
   // Calculate lastLogEndTime for AddLogModal
   const lastLogEndTime = React.useMemo(() => {

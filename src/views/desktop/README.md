@@ -4,6 +4,8 @@
 
 ## Updates
 
+- 2026-05-18: Added `DesktopAIWidgetView.tsx`, which keeps the shared AI chat mounted inside the normal app provider tree while the Electron `desktop-ai` window switches between compact quick-chat mode and a narrow edge-hide restore handle.
+
 - 2026-05-18: `DesktopTodayWidgetView.tsx` now renders one-level subtasks inline beneath visible parent rows, while subtasks whose parent is outside the current section fall back to standalone `子任务 @父任务` labels so the compact today widget no longer drops hierarchy context.
 - 2026-05-18: `DesktopMonthWidgetView.tsx` now shifts the visible calendar by one week for vertical wheel/trackpad navigation while keeping header arrows as whole-page jumps, so `1/2/3 -> 2/3/4` works in 3-week mode.
 
@@ -68,6 +70,12 @@
 - Renders the week-paged calendar body for the desktop widget.
 - Shows `2 / 3 / 4` whole weeks per page with a fixed seven-column weekday layout.
 - Handles date-cell rendering, task strips, drag targets, and wheel-based page navigation.
+
+### `DesktopAIWidgetView.tsx`
+
+- Renders the compact Electron AI quick-chat shell through the normal app provider tree instead of the lightweight widget boot switch.
+- Subscribes to preload-driven edge-hide state so the shared chat logic stays mounted even while the window collapses into a narrow restore handle.
+- Reuses `AIBackfillChatModal` in desktop mode to keep shared sessions, replies, retries, and assistant-applied action cards aligned with the main app conversation.
 
 ## Sync Mechanisms
 

@@ -3,6 +3,7 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-05-19: `TodoDetailModal.tsx` now renders the monthly `31 -> 月末` fallback control as a pure button and blocks the default mouse-down focus jump, fixing the desktop detail-page white screen triggered by tapping that toggle.
 - Update 2026-05-18: `TodoDatePickerModal.tsx` now strictly validates incoming `yyyy-MM-dd` / `yyyy-MM` values and only mounts its calendar body while open, so malformed short-month schedule strings no longer white-screen the shared picker tree.
 - Update 2026-05-18: `achievement/AchievementCollectionsTab.tsx` now retries broken default bottle images against the current bundled bottle asset path before falling back to the placeholder, fixing Electron desktop bottle pickers when old file URLs go stale.
 - Update 2026-05-18: `AIBackfillChatModal.tsx` now passes the source text into foreground `create_todo` execution so nested child tasks can be created inside the same parent action, and undoing that AI-created parent now removes the whole bundled parent-plus-subtasks set together.
