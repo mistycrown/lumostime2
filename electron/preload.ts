@@ -94,6 +94,9 @@ contextBridge.exposeInMainWorld('desktopWidget', {
     setAIPointerInside(inside: boolean) {
         ipcRenderer.send('desktop-widget:set-ai-pointer-inside', inside)
     },
+    setAIResizing(resizing: boolean) {
+        ipcRenderer.send('desktop-widget:set-ai-resizing', resizing)
+    },
     openTodoQuickEditor(payload: DesktopTodoQuickEditorPayload) {
         ipcRenderer.send('desktop-widget:open-todo-quick-editor', payload)
     },

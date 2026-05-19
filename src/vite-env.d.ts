@@ -45,6 +45,7 @@ interface Window {
     hideAIToEdge?: () => void;
     restoreAIFromEdge?: () => void;
     setAIPointerInside?: (inside: boolean) => void;
+    setAIResizing?: (resizing: boolean) => void;
     openTodoQuickEditor?: (payload: DesktopTodoQuickEditorBridgePayload) => void;
     closeTodoQuickEditor?: () => void;
     openMainApp: () => void;

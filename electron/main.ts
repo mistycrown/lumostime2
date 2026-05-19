@@ -160,6 +160,7 @@ let aiWidgetHiddenEdge: DesktopAIWidgetHiddenEdge | null = null;
 let aiWidgetExpandedBounds: PersistedWidgetWindowState['bounds'] | null = null;
 let ignoreAIWidgetAutoDockUntil = 0;
 let isAIWidgetPointerInside = false;
+let isAIWidgetResizing = false;
 
 // Preload script is in the same directory as main.js after build
 const preload = path.join(__dirname, 'preload.mjs');
@@ -823,6 +824,7 @@ const maybeAutoDockAIWidgetAfterPointerLeave = async () => {
     || aiWidgetWindow.isDestroyed()
     || isAIWidgetHiddenToEdge
     || isAIWidgetPointerInside
+    || isAIWidgetResizing
     || isCursorInsideWindowBounds(aiWidgetWindow)
     || Date.now() < ignoreAIWidgetAutoDockUntil
   ) {
@@ -1246,6 +1248,7 @@ async function createAIWidgetWindow() {
     if (
       Date.now() < ignoreAIWidgetAutoDockUntil
       || isAIWidgetPointerInside
+      || isAIWidgetResizing
       || isCursorInsideWindowBounds(aiWidgetWindow)
     ) {
       runInBackground('save ai widget state after guarded move', saveAIWidgetWindowState());
@@ -1271,6 +1274,7 @@ async function createAIWidgetWindow() {
     aiWidgetWindow = null;
     isAIWidgetReady = false;
     isAIWidgetPointerInside = false;
+    isAIWidgetResizing = false;
   });
 
   return aiWidgetWindow;
@@ -1554,8 +1558,15 @@ ipcMain.on('desktop-widget:restore-ai-from-edge', () => {
 
 ipcMain.on('desktop-widget:set-ai-pointer-inside', (_, inside: boolean) => {
   isAIWidgetPointerInside = inside;
-  if (!inside) {
+  if (!inside && !isAIWidgetResizing) {
     runInBackground('maybe auto-dock ai widget after pointer leave', maybeAutoDockAIWidgetAfterPointerLeave());
+  }
+});
+
+ipcMain.on('desktop-widget:set-ai-resizing', (_, resizing: boolean) => {
+  isAIWidgetResizing = resizing;
+  if (!resizing) {
+    ignoreAIWidgetAutoDockUntil = Date.now() + AI_WIDGET_AUTO_DOCK_RESTORE_GUARD_MS;
   }
 });
 

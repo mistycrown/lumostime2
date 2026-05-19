@@ -5,6 +5,7 @@
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
  * @updated 2026-05-19: Desktop widget mode now follows the latest ordinary chat session and listens for cross-window session storage updates so the floating quick-chat stays in sync with the newest conversation.
+ * @updated 2026-05-19: Added a lightly rounded outer shell for the desktop AI widget so the floating quick-chat no longer reads as a hard square panel.
  * @updated 2026-05-18: Added a compact desktop-widget rendering mode plus edge-hidden handle state so the shared AI chat can power the new Electron quick-chat window without mounting the full settings/history shell.
  * @updated 2026-05-18: Foreground `create_todo` tool applications can now carry nested child tasks, and undoing that parent action removes the whole AI-created parent-plus-subtasks bundle together.
  * @updated 2026-05-17: AI chat session/persona/profile persistence now marks the unified AI backup state as changed so foreground-only AI edits can auto-sync with the main backup JSON.
@@ -5398,16 +5399,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[60] overflow-hidden"
+      className={`fixed inset-0 z-[60] overflow-hidden ${isDesktopWidgetMode ? 'p-[4px]' : ''}`}
       style={{
-        backgroundColor: AI_CHAT_THEME.shellBg,
+        backgroundColor: isDesktopWidgetMode ? 'transparent' : AI_CHAT_THEME.shellBg,
         color: AI_CHAT_THEME.textPrimary
       }}
     >
       <div
-        className="relative flex h-full w-full flex-col overflow-hidden"
+        className={`relative flex h-full w-full flex-col overflow-hidden ${isDesktopWidgetMode ? 'rounded-[12px] border' : ''}`}
         style={{
           backgroundColor: AI_CHAT_THEME.shellLayerBg,
+          borderColor: isDesktopWidgetMode ? AI_CHAT_THEME.panelBorder : undefined,
           paddingTop: 'env(safe-area-inset-top)',
           paddingBottom: `calc(env(safe-area-inset-bottom) + ${keyboardBottomInset}px)`,
           transition: 'padding-bottom 180ms ease-out'
