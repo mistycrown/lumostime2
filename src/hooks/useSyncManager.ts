@@ -246,6 +246,22 @@ export const useSyncManager = () => {
         return { service: hasS3 ? s3Service : webdavService, error: null };
     };
 
+    const resolveCanonicalSyncedTimestamp = async (
+        activeService: CloudService,
+        fallbackTimestamp: number
+    ): Promise<number> => {
+        try {
+            const remoteFileDate = await activeService.statFile?.();
+            if (remoteFileDate) {
+                return remoteFileDate.getTime();
+            }
+        } catch (error) {
+            console.warn('[Sync] Failed to read canonical remote timestamp after sync, falling back to payload timestamp.', error);
+        }
+
+        return fallbackTimestamp;
+    };
+
     /**
      * Core Sync Logic - Unified for all sync triggers
      * @param mode 'startup' = App launch | 'resume' = App resume/tab visible | 'manual' = User click | 'auto' = Auto-sync
@@ -316,6 +332,7 @@ export const useSyncManager = () => {
             let dataSyncStatus: 'restored' | 'uploaded' | 'equal' | 'error' = 'equal';
             let dataSyncMsg = '';
             let hasImageWarnings = false;
+            let syncedTimestamp: number | null = null;
 
             // 容错阈值：处理上传延迟导致的时间差
             const SYNC_TOLERANCE_MS = SYNC_CONFIG.TOLERANCE_MS;
@@ -405,8 +422,8 @@ export const useSyncManager = () => {
                         
                         // 数据更新完成后，立即更新时间戳（在 localStorage 中）
                         // 这样可以确保 localStorage 中的数据和时间戳保持一致
-                        const now = Date.now();
-                        setLocalDataTimestampValue(now);
+                        syncedTimestamp = cloudTimestamp || result.data?.timestamp || localTimestamp;
+                        const now = syncedTimestamp;
                         console.log(`[Sync] 数据恢复完成，立即更新 localStorage 时间戳: ${now}`);
                         
                         if (mode === 'startup') updateLastSyncTime();
@@ -442,6 +459,10 @@ export const useSyncManager = () => {
 
                 if (result.success) {
                     hasImageWarnings = !!result.imageStats?.errors.length;
+                    syncedTimestamp = await resolveCanonicalSyncedTimestamp(
+                        activeService,
+                        result.data?.timestamp || localTimestamp
+                    );
                     // 注意：不在这里更新时间戳
                     // 时间戳会在所有同步工作完成后统一更新
                     
@@ -488,7 +509,7 @@ export const useSyncManager = () => {
             // 6. 统一更新时间戳（在所有同步工作完成后）
             if (dataSyncStatus === 'uploaded') {
                 // 上传成功后，使用当前时间作为本地时间戳
-                const now = Date.now();
+                const now = typeof syncedTimestamp === 'number' ? syncedTimestamp : Date.now();
                 setLocalDataTimestampValue(now);
                 console.log(`[Sync] 上传完成，本地时间戳已更新: ${now} (${new Date(now).toLocaleString()})`);
             } else if (dataSyncStatus === 'restored') {
@@ -590,7 +611,10 @@ export const useSyncManager = () => {
             if (result.success) {
                 // 上传成功后，使用当前时间更新本地时间戳
                 // 先更新 localStorage（持久化），后更新 React state（UI）
-                const now = Date.now();
+                const now = await resolveCanonicalSyncedTimestamp(
+                    activeService,
+                    result.data?.timestamp || getLocalDataTimestamp()
+                );
                 setLocalDataTimestampValue(now);
                 console.log(`[Sync] 手动上传完成，本地时间戳已更新: ${now}`);
                 
@@ -665,7 +689,10 @@ export const useSyncManager = () => {
                 await handleSyncDataUpdate(result.data);
                 
                 // 数据更新完成后，立即更新时间戳（在 localStorage 中）
-                const now = Date.now();
+                const now = await resolveCanonicalSyncedTimestamp(
+                    activeService,
+                    result.data?.timestamp || getLocalDataTimestamp()
+                );
                 setLocalDataTimestampValue(now);
                 console.log(`[Sync] 手动下载完成，立即更新 localStorage 时间戳: ${now}`);
                 

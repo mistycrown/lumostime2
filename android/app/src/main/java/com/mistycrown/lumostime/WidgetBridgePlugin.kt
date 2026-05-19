@@ -206,20 +206,24 @@ class WidgetBridgePlugin : Plugin() {
 
     @PluginMethod
     fun syncTodoPinWidgetData(call: PluginCall) {
-        val payloadJson = call.getObject("payload")
-        val payload = payloadJson?.let {
-            WidgetTodoPinPayload(
-                date = it.optString("date"),
-                items = it.optJSONArray("items").toTodoPinItemList(),
-                syncedAt = it.optLong("syncedAt", System.currentTimeMillis()),
-                sourceTodos = it.optJSONArray("sourceTodos").toTodoPinSourceTodoList(),
-                sourceCategories = it.optJSONArray("sourceCategories").toTodoPinSourceCategoryList()
-            )
-        }
+        try {
+            val payloadJson = call.getObject("payload")
+            val payload = payloadJson?.let {
+                WidgetTodoPinPayload(
+                    date = it.optString("date"),
+                    items = it.optJSONArray("items").toTodoPinItemList(),
+                    syncedAt = it.optLong("syncedAt", System.currentTimeMillis()),
+                    sourceTodos = it.optJSONArray("sourceTodos").toTodoPinSourceTodoList(),
+                    sourceCategories = it.optJSONArray("sourceCategories").toTodoPinSourceCategoryList()
+                )
+            }
 
-        WidgetStores.saveTodoPinPayload(context, payload)
-        WidgetRefreshCoordinator.refreshTodoPinWidgets(context)
-        call.resolve()
+            WidgetStores.saveTodoPinPayload(context, payload)
+            WidgetRefreshCoordinator.refreshTodoPinWidgets(context)
+            call.resolve()
+        } catch (error: Throwable) {
+            call.reject("Failed to sync todo pin widget data", error)
+        }
     }
 
     @PluginMethod
@@ -693,7 +697,8 @@ class WidgetBridgePlugin : Plugin() {
             endDate = parseNullableString(optString("endDate")),
             interval = if (has("interval")) optInt("interval").takeIf { value -> value > 0 } else null,
             weekdays = optJSONArray("weekdays").toIntList(),
-            monthDays = optJSONArray("monthDays").toIntList()
+            monthDays = optJSONArray("monthDays").toIntList(),
+            fallbackToMonthEnd = optBoolean("fallbackToMonthEnd", false)
         )
     }
 

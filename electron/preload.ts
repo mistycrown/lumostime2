@@ -6,6 +6,7 @@
  * @description Exposes safe IPC methods to the renderer process via `contextBridge`, enabling communication between the web app and the main process.
  * @updated 2026-05-17: 扩展了桌面小组件的 IPC 桥接，暴露了 openTimer() 和 closeTimer() 以支持桌面计时器小组件（timer widget）的启用与停用。
  * @updated 2026-05-17: 扩展了桌面小组件的 IPC 桥接，暴露了 openQuick() 和 closeQuick() 方法以支持小事清单小组件的打开与关闭。并在 DesktopWidgetMainAction 中新增了 add_quick_todo 动作支持。
+ * @updated 2026-05-18: Added desktop AI widget bridge methods plus edge-hide state subscriptions so the Electron quick-chat window can dock into a compact handle without touching raw IPC in React.
  * @updated 2026-05-17: Added quick-editor IPC bridge methods so widget clicks can open and close a transparent external todo editor window.
  * @updated 2026-05-17: Added a dedicated desktop today-widget and monthly-widget bridge so Electron windows can open, close, and forward lightweight todo actions without reaching for raw IPC in every component.
  * 
@@ -29,6 +30,7 @@ type DesktopTodoQuickEditorPayload = {
 
 const DESKTOP_WIDGET_MAIN_ACTION_CHANNEL = 'desktop-widget:main-action'
 const DESKTOP_TODO_QUICK_EDITOR_STATE_CHANNEL = 'desktop-widget:todo-quick-editor-state'
+const DESKTOP_AI_WIDGET_STATE_CHANNEL = 'desktop-widget:ai-window-state'
 
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('ipcRenderer', {
@@ -77,6 +79,21 @@ contextBridge.exposeInMainWorld('desktopWidget', {
     closeTimer() {
         ipcRenderer.send('desktop-widget:close-timer')
     },
+    openAI() {
+        ipcRenderer.send('desktop-widget:open-ai')
+    },
+    closeAI() {
+        ipcRenderer.send('desktop-widget:close-ai')
+    },
+    hideAIToEdge() {
+        ipcRenderer.send('desktop-widget:hide-ai-to-edge')
+    },
+    restoreAIFromEdge() {
+        ipcRenderer.send('desktop-widget:restore-ai-from-edge')
+    },
+    setAIPointerInside(inside: boolean) {
+        ipcRenderer.send('desktop-widget:set-ai-pointer-inside', inside)
+    },
     openTodoQuickEditor(payload: DesktopTodoQuickEditorPayload) {
         ipcRenderer.send('desktop-widget:open-todo-quick-editor', payload)
     },
@@ -118,6 +135,9 @@ contextBridge.exposeInMainWorld('desktopWidget', {
     getTodoQuickEditorState() {
         return ipcRenderer.invoke('desktop-widget:get-todo-quick-editor-state')
     },
+    getAIWindowState() {
+        return ipcRenderer.invoke('desktop-widget:get-ai-window-state')
+    },
     onTodoQuickEditorState(listener: (payload: DesktopTodoQuickEditorPayload) => void) {
         const wrappedListener = (_event: Electron.IpcRendererEvent, payload: DesktopTodoQuickEditorPayload) => {
             listener(payload)
@@ -127,6 +147,20 @@ contextBridge.exposeInMainWorld('desktopWidget', {
 
         return () => {
             ipcRenderer.off(DESKTOP_TODO_QUICK_EDITOR_STATE_CHANNEL, wrappedListener)
+        }
+    },
+    onAIWindowState(listener: (payload: { isHiddenToEdge: boolean; hiddenEdge: 'left' | 'right' | null }) => void) {
+        const wrappedListener = (
+            _event: Electron.IpcRendererEvent,
+            payload: { isHiddenToEdge: boolean; hiddenEdge: 'left' | 'right' | null }
+        ) => {
+            listener(payload)
+        }
+
+        ipcRenderer.on(DESKTOP_AI_WIDGET_STATE_CHANNEL, wrappedListener)
+
+        return () => {
+            ipcRenderer.off(DESKTOP_AI_WIDGET_STATE_CHANNEL, wrappedListener)
         }
     }
 })

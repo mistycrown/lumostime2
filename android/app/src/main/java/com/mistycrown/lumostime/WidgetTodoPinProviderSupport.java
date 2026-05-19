@@ -386,9 +386,21 @@ public final class WidgetTodoPinProviderSupport {
         if ("monthly".equals(frequency)) {
             int interval = Math.max(1, rule.getInterval() == null ? 1 : rule.getInterval());
             List<Integer> monthDays = rule.getMonthDays();
-            Set<Integer> daySet = new HashSet<>(monthDays == null || monthDays.isEmpty()
+            List<Integer> normalizedMonthDays = monthDays == null || monthDays.isEmpty()
                     ? Collections.singletonList(startDate.get(Calendar.DAY_OF_MONTH))
-                    : monthDays);
+                    : monthDays;
+            Set<Integer> daySet = new HashSet<>();
+            int lastDayOfTargetMonth = targetDate.getActualMaximum(Calendar.DAY_OF_MONTH);
+            for (Integer monthDay : normalizedMonthDays) {
+                if (monthDay == null) {
+                    continue;
+                }
+                if (rule.getFallbackToMonthEnd() && monthDay == 31) {
+                    daySet.add(Math.min(monthDay, lastDayOfTargetMonth));
+                } else {
+                    daySet.add(monthDay);
+                }
+            }
             int monthDiff = getMonthDiff(startDate, targetDate);
             return monthDiff % interval == 0
                     && daySet.contains(targetDate.get(Calendar.DAY_OF_MONTH));

@@ -4,6 +4,7 @@ Contains pure utility functions for data processing and business logic calculati
 
 ## Files
 - Update 2026-05-18: `assetPath.ts` now normalizes raw Windows absolute asset paths into `file:///` URLs so desktop renderer image sources remain loadable even when persisted data contains filesystem-style paths.
+- Update 2026-05-18: `todoScheduleUtils.ts` now canonicalizes persisted recurrence rules, trimming invalid monthly payloads, deduping/aging out skip dates, and only keeping the `31 -> 月末` fallback flag when the rule still truly targets day 31.
 - Update 2026-05-18: `dataValidation.ts` now accepts the nested `achievementData` backup block so achievement bottle exports and cloud restores can pass import validation without flattening those fields into the root payload.
 - Update 2026-05-17: `aiBackupChange.ts` now centralizes the AI-only backup change signal, bumping the shared local-data timestamp and dispatching a dedicated event so local AI storage writes can participate in cloud sync.
 - Update 2026-05-17: `todoScheduleUtils.ts` now treats shared month-view entries as `Done > Due > Arrange > Repeat > Maybe > Trace` for non-trace ordering, so one todo with multiple day badges renders and sorts by its highest-priority state while the continuous trace-lane layout stays unchanged.

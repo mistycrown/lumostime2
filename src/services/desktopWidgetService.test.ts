@@ -4,6 +4,7 @@
  * @output Regression coverage for the Electron desktop widget today/pin/overdue grouping logic
  * @pos Test (desktop widget service)
  * @description Verifies the desktop today-widget snapshot keeps pinned and today-visible todos together while still surfacing overdue items outside the shared today bucket.
+ * @updated 2026-05-18: Added startup-toggle coverage for the desktop AI widget route so launch-time restore parsing now includes the Electron AI chat window.
  * @updated 2026-05-18: Added regression coverage for subtask parent metadata in today-widget snapshot items so compact Electron views can rebuild one-level hierarchy locally.
  * @updated 2026-05-17: 扩展了单元测试，补全了计时器小组件（timer widget）的快照构建 buildDesktopTimerWidgetSnapshot 和 loadEnabledDesktopWidgetTypes 在启用 timer 时的测试覆盖。
  * @updated 2026-05-17: Added startup preference coverage for Electron desktop widget auto-restore state parsing.
@@ -155,13 +156,14 @@ describe('loadEnabledDesktopWidgetTypes', () => {
           lumostime_desktop_widget_today_enabled: 'true',
           lumostime_desktop_widget_month_enabled: 'false',
           lumostime_desktop_widget_quick_enabled: 'true',
-          lumostime_desktop_widget_timer_enabled: 'true'
+          lumostime_desktop_widget_timer_enabled: 'true',
+          lumostime_desktop_widget_ai_enabled: 'true'
         };
         return map[key] ?? null;
       }
     };
 
-    expect(loadEnabledDesktopWidgetTypes(storageLike)).toEqual(['today', 'quick', 'timer']);
+    expect(loadEnabledDesktopWidgetTypes(storageLike)).toEqual(['today', 'quick', 'timer', 'ai']);
   });
 
   it('returns an empty list when no desktop widget startup toggle is enabled', () => {

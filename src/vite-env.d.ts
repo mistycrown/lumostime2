@@ -19,6 +19,11 @@ type DesktopTodoQuickEditorBridgePayload = {
   y: number;
 };
 
+type DesktopAIWidgetBridgeState = {
+  isHiddenToEdge: boolean;
+  hiddenEdge: 'left' | 'right' | null;
+};
+
 interface Window {
   ipcRenderer?: {
     on: (...args: any[]) => any;
@@ -35,6 +40,11 @@ interface Window {
     closeQuick?: () => void;
     openTimer?: () => void;
     closeTimer?: () => void;
+    openAI?: () => void;
+    closeAI?: () => void;
+    hideAIToEdge?: () => void;
+    restoreAIFromEdge?: () => void;
+    setAIPointerInside?: (inside: boolean) => void;
     openTodoQuickEditor?: (payload: DesktopTodoQuickEditorBridgePayload) => void;
     closeTodoQuickEditor?: () => void;
     openMainApp: () => void;
@@ -48,8 +58,12 @@ interface Window {
     getBounds?: () => Promise<{ x: number; y: number; width: number; height: number } | null>;
     setBounds?: (bounds: { x: number; y: number; width: number; height: number }) => void;
     getTodoQuickEditorState?: () => Promise<DesktopTodoQuickEditorBridgePayload | null>;
+    getAIWindowState?: () => Promise<DesktopAIWidgetBridgeState | null>;
     onTodoQuickEditorState?: (
       listener: (payload: DesktopTodoQuickEditorBridgePayload) => void
+    ) => (() => void);
+    onAIWindowState?: (
+      listener: (payload: DesktopAIWidgetBridgeState) => void
     ) => (() => void);
   };
 }

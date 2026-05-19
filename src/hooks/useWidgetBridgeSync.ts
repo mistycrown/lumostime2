@@ -4,6 +4,7 @@
  * @output Runtime reconciliation between the Android widget layer and the React app
  * @pos Hook
  * @description Imports completed timer widget actions into logs, mirrors timer runtime state, syncs daily widget progress to native, and replays queued daily taps back into review state.
+ * @updated 2026-05-18: Catches both synchronous and async native bridge failures during widget payload sync so newly extended todo recurrence payloads cannot white-screen the app.
  * @updated 2026-05-14: Stops native app-sourced runtime echoes from restoring a just-stopped in-app session back into React state during NFC flows.
  * @updated 2026-04-25: Syncs today's DAILY_RUNTIME heatmap payload so the dedicated 4x4 widget reflects logs and live sessions.
  * @updated 2026-04-25: Strips unsupported widget UI icon assets on app startup so expired supporter access falls back to emoji rendering.
@@ -43,6 +44,19 @@ import {
 } from '../services/widgetService';
 import { buildSceneWidgetPayloadFromStorage } from '../services/widgetSceneService';
 import { applyDailyCheckActionForDate } from '../utils/dailyCheckUtils';
+
+const fireAndForgetWidgetBridgeCall = (
+  label: string,
+  invoke: () => Promise<unknown>
+) => {
+  try {
+    void Promise.resolve(invoke()).catch((error) => {
+      console.error(`[useWidgetBridgeSync] ${label}`, error);
+    });
+  } catch (error) {
+    console.error(`[useWidgetBridgeSync] ${label}`, error);
+  }
+};
 
 export const useWidgetBridgeSync = () => {
   const { categories, scopes } = useCategoryScope();
@@ -353,9 +367,10 @@ export const useWidgetBridgeSync = () => {
         ? buildWidgetRuntimeStateFromSession(latestSession, categories)
         : null;
 
-      WidgetBridge.syncRuntimeState({ runtimeState }).catch((error) => {
-        console.error('[useWidgetBridgeSync] Failed to sync runtime state to native widget', error);
-      });
+      fireAndForgetWidgetBridgeCall(
+        'Failed to sync runtime state to native widget',
+        () => WidgetBridge.syncRuntimeState({ runtimeState })
+      );
     };
 
     void syncRuntimeState();
@@ -371,9 +386,10 @@ export const useWidgetBridgeSync = () => {
       checkTemplates
     });
 
-    WidgetBridge.syncDailyWidgetData({ payload }).catch((error) => {
-      console.error('[useWidgetBridgeSync] Failed to sync daily widget data to native widget', error);
-    });
+    fireAndForgetWidgetBridgeCall(
+      'Failed to sync daily widget data to native widget',
+      () => WidgetBridge.syncDailyWidgetData({ payload })
+    );
   }, [checkTemplates, dailyReviews, hasHydratedNativeState]);
 
   useEffect(() => {
@@ -387,9 +403,10 @@ export const useWidgetBridgeSync = () => {
       categories
     });
 
-    WidgetBridge.syncDailyRuntimeWidgetData({ payload }).catch((error) => {
-      console.error('[useWidgetBridgeSync] Failed to sync DAILY_RUNTIME payload to native widget', error);
-    });
+    fireAndForgetWidgetBridgeCall(
+      'Failed to sync DAILY_RUNTIME payload to native widget',
+      () => WidgetBridge.syncDailyRuntimeWidgetData({ payload })
+    );
   }, [activeSessions, categories, hasHydratedNativeState, logs]);
 
   useEffect(() => {
@@ -402,9 +419,10 @@ export const useWidgetBridgeSync = () => {
       categories
     });
 
-    WidgetBridge.syncTodoPinWidgetData({ payload }).catch((error) => {
-      console.error('[useWidgetBridgeSync] Failed to sync TODAY + PIN widget payload to native widget', error);
-    });
+    fireAndForgetWidgetBridgeCall(
+      'Failed to sync TODAY + PIN widget payload to native widget',
+      () => WidgetBridge.syncTodoPinWidgetData({ payload })
+    );
   }, [categories, hasHydratedNativeState, todos]);
 
   useEffect(() => {
@@ -422,9 +440,10 @@ export const useWidgetBridgeSync = () => {
       checkTemplates
     });
 
-    WidgetBridge.syncTrackingCalendarWidgetData({ payload }).catch((error) => {
-      console.error('[useWidgetBridgeSync] Failed to sync tracking calendar payload to native widget', error);
-    });
+    fireAndForgetWidgetBridgeCall(
+      'Failed to sync tracking calendar payload to native widget',
+      () => WidgetBridge.syncTrackingCalendarWidgetData({ payload })
+    );
   }, [
     activeSessions,
     categories,
@@ -447,9 +466,10 @@ export const useWidgetBridgeSync = () => {
       checkTemplates
     });
 
-    WidgetBridge.syncSceneWidgetData({ payload }).catch((error) => {
-      console.error('[useWidgetBridgeSync] Failed to sync scene widget payload to native widget', error);
-    });
+    fireAndForgetWidgetBridgeCall(
+      'Failed to sync scene widget payload to native widget',
+      () => WidgetBridge.syncSceneWidgetData({ payload })
+    );
   }, [
     categories,
     checkTemplates,

@@ -3076,4 +3076,3 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     </div>
   );
 };
-
