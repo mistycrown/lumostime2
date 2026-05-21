@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-19: Added short desktop-widget hide/restore shell transitions so edge collapsing no longer hard-cuts between the full quick-chat panel and the hidden handle.
  * @updated 2026-05-19: Desktop widget mode now follows the latest ordinary chat session and listens for cross-window session storage updates so the floating quick-chat stays in sync with the newest conversation.
  * @updated 2026-05-19: Added a lightly rounded outer shell for the desktop AI widget so the floating quick-chat no longer reads as a hard square panel.
  * @updated 2026-05-18: Added a compact desktop-widget rendering mode plus edge-hidden handle state so the shared AI chat can power the new Electron quick-chat window without mounting the full settings/history shell.
@@ -334,6 +335,7 @@ interface AIBackfillChatModalProps {
   isOpen: boolean;
   onClose: () => void;
   displayMode?: 'modal' | 'desktop-widget';
+  desktopWidgetTransitionPhase?: 'idle' | 'hiding' | 'showing';
   edgeHidden?: boolean;
   hiddenEdge?: 'left' | 'right' | null;
   onHideToEdge?: () => void;
@@ -476,6 +478,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   isOpen,
   onClose,
   displayMode = 'modal',
+  desktopWidgetTransitionPhase = 'idle',
   edgeHidden = false,
   hiddenEdge = null,
   onHideToEdge,
@@ -5300,6 +5303,32 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       void handleSend();
     }
   };
+  const desktopWidgetTransitionOffset = hiddenEdge === 'left' ? '-12px' : '12px';
+  const desktopWidgetAnimationStyles = isDesktopWidgetMode ? (
+    <style>{`
+      @keyframes aiWidgetShellReveal {
+        0% {
+          opacity: 0;
+          transform: translate3d(var(--ai-widget-enter-x, 0), 0, 0) scale(0.985);
+        }
+        100% {
+          opacity: 1;
+          transform: translate3d(0, 0, 0) scale(1);
+        }
+      }
+
+      @keyframes aiWidgetHandleReveal {
+        0% {
+          opacity: 0;
+          transform: translate3d(var(--ai-widget-enter-x, 0), 0, 0) scale(0.96);
+        }
+        100% {
+          opacity: 1;
+          transform: translate3d(0, 0, 0) scale(1);
+        }
+      }
+    `}</style>
+  ) : null;
 
   if (!isOpen) {
     return null;
@@ -5315,6 +5344,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           color: AI_CHAT_THEME.textSecondary
         }}
       >
+        {desktopWidgetAnimationStyles}
         <button
           type="button"
           onClick={onRestoreFromEdge}
@@ -5322,7 +5352,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           style={{
             borderColor: AI_CHAT_THEME.chipBorder,
             backgroundColor: AI_CHAT_THEME.panelBg,
-            color: AI_CHAT_THEME.textPrimary
+            color: AI_CHAT_THEME.textPrimary,
+            animation: 'aiWidgetHandleReveal 150ms cubic-bezier(0.22, 1, 0.36, 1)',
+            ['--ai-widget-enter-x' as string]: hiddenEdge === 'left' ? '-7px' : '7px'
           }}
           title="展开 AI 对话窗"
         >
@@ -5405,6 +5437,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         color: AI_CHAT_THEME.textPrimary
       }}
     >
+      {desktopWidgetAnimationStyles}
       <div
         className={`relative flex h-full w-full flex-col overflow-hidden ${isDesktopWidgetMode ? 'rounded-[12px] border' : ''}`}
         style={{
@@ -5412,7 +5445,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           borderColor: isDesktopWidgetMode ? AI_CHAT_THEME.panelBorder : undefined,
           paddingTop: 'env(safe-area-inset-top)',
           paddingBottom: `calc(env(safe-area-inset-bottom) + ${keyboardBottomInset}px)`,
-          transition: 'padding-bottom 180ms ease-out'
+          transition: isDesktopWidgetMode
+            ? 'padding-bottom 180ms ease-out, opacity 150ms ease-out, transform 160ms cubic-bezier(0.22, 1, 0.36, 1)'
+            : 'padding-bottom 180ms ease-out',
+          opacity: isDesktopWidgetMode && desktopWidgetTransitionPhase === 'hiding' ? 0 : 1,
+          transform: isDesktopWidgetMode && desktopWidgetTransitionPhase === 'hiding'
+            ? `translate3d(${desktopWidgetTransitionOffset}, 0, 0) scale(0.985)`
+            : 'translate3d(0, 0, 0) scale(1)',
+          animation: isDesktopWidgetMode && desktopWidgetTransitionPhase === 'showing'
+            ? 'aiWidgetShellReveal 180ms cubic-bezier(0.22, 1, 0.36, 1)'
+            : undefined,
+          ['--ai-widget-enter-x' as string]: desktopWidgetTransitionOffset
         }}
       >
         <div
