@@ -4,8 +4,8 @@
  * @output Modal Interaction (Save/Delete Log)
  * @pos Component (Modal)
  * @description A complex modal for creating or editing time logs. Handles duration calculation, activity selection, todo association, focus scoring, segmented time entry, and inline note template recommendations.
- * @lastModified 2026-05-12
- * @change Added a one-shot completion-mode toggle beside the associated todo picker so saving a log can also complete the linked unfinished task after the record is stored. Added click-to-focus behavior on the existing Total Time summary so tapping it jumps to the note field, while preserving the original two-line header layout. Auto-advance across hour/minute inputs and continue from start time to end time after segmented time entry. Added direct camera capture functionality using Capacitor Camera plugin and native camera-path persistence fallback for Android photo attachments. Enabled hierarchical todo selection in the backfill picker so subtasks stay nested under collapsed parent tasks.
+ * @lastModified 2026-05-21
+ * @change Added multi-image picker uploads for both desktop file selection and mobile gallery selection inside the log/backfill modal, including batch-upload result toasts and input reset handling so the same images can be reselected if needed. Added a one-shot completion-mode toggle beside the associated todo picker so saving a log can also complete the linked unfinished task after the record is stored. Added click-to-focus behavior on the existing Total Time summary so tapping it jumps to the note field, while preserving the original two-line header layout. Auto-advance across hour/minute inputs and continue from start time to end time after segmented time entry. Added direct camera capture functionality using Capacitor Camera plugin and native camera-path persistence fallback for Android photo attachments. Enabled hierarchical todo selection in the backfill picker so subtasks stay nested under collapsed parent tasks.
  * @change Added an inline log-detail `Collection` selector so saved records can join themed collections without opening a separate modal.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -348,8 +348,25 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   };
 
   const handleAddImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) {
-      await imageManager.handleAddImage(e.target.files[0]);
+    const input = e.currentTarget;
+    const files = Array.from(input.files || []);
+
+    if (files.length === 0) {
+      return;
+    }
+
+    try {
+      const { added, failed } = await imageManager.handleAddImages(files);
+
+      if (added.length === files.length) {
+        addToast('success', `已添加 ${added.length} 张图片`);
+      } else if (added.length > 0) {
+        addToast('warning', `已添加 ${added.length} 张图片，另有 ${failed.length} 张失败`);
+      } else {
+        addToast('error', '图片上传失败，请重试');
+      }
+    } finally {
+      input.value = '';
     }
   };
 
@@ -1105,6 +1122,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 ref={fileInputRef}
                 className="hidden"
                 accept="image/*"
+                multiple
                 onChange={handleAddImage}
               />
             </div>
@@ -1232,6 +1250,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       {/* Full Screen Image Preview */}
       <ImagePreviewModal
         imageUrl={imageManager.previewFilename ? (imageManager.imageUrls[imageManager.previewFilename] || '') : null}
+        downloadFilename={imageManager.previewFilename || undefined}
         onClose={() => imageManager.setPreviewFilename(null)}
         onDelete={() => {
           if (imageManager.previewFilename) {

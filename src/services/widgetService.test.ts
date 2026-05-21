@@ -4,6 +4,7 @@
  * @output Regression coverage for pinned/recurring TODAY + PIN widget payload items and native refresh bindings
  * @pos Test (widget service)
  * @description Verifies pinned and recurring-today todos can populate the TODAY + PIN widget payload, preserves mirrored source snapshots for native rebuilds, and guards the dedicated refresh-button wiring.
+ * @updated 2026-05-21: Added TODAY + PIN native-rebuild regression coverage for mirrored `maybeDates` and recurrence `skipDates` so Android widget refreshes match app-side today visibility.
  * @updated 2026-04-27: Added regression coverage so recurring todos that match today are included in the TODAY + PIN widget payload.
  * @updated 2026-04-26: Added regression coverage for pinned todo actionability and removed header click bindings from the dedicated TODAY + PIN widgets.
  * @updated 2026-05-01: Added regression coverage for dedicated tracking-calendar payload builders across tag, scope, and daily sources.
@@ -176,7 +177,13 @@ describe('buildTodoPinWidgetPayload', () => {
         pin: true,
         linkedCategoryId: 'focus-category',
         linkedActivityId: 'writing-activity',
-        defaultScopeIds: ['scope-reading']
+        defaultScopeIds: ['scope-reading'],
+        maybeDates: ['2026-04-26'],
+        recurrenceRule: {
+          frequency: 'daily',
+          startDate: '2026-04-24',
+          skipDates: ['2026-04-27']
+        }
       })
     ];
 
@@ -193,7 +200,11 @@ describe('buildTodoPinWidgetPayload', () => {
         pin: true,
         linkedCategoryId: 'focus-category',
         linkedActivityId: 'writing-activity',
-        defaultScopeIds: ['scope-reading']
+        defaultScopeIds: ['scope-reading'],
+        maybeDates: ['2026-04-26'],
+        recurrenceRule: expect.objectContaining({
+          skipDates: ['2026-04-27']
+        })
       })
     ]);
     expect(payload.sourceCategories).toEqual([
@@ -609,5 +620,11 @@ describe('WidgetBridgePlugin refresh routing', () => {
     expect(widgetBridgePluginSource).toContain('WidgetRefreshCoordinator.refreshSceneWidgets(context)');
     expect(widgetBridgePluginSource).toContain('sourceTodos = it.optJSONArray("sourceTodos").toTodoPinSourceTodoList()');
     expect(widgetBridgePluginSource).toContain('sourceCategories = it.optJSONArray("sourceCategories").toTodoPinSourceCategoryList()');
+    expect(widgetBridgePluginSource).toContain('maybeDates = item.optJSONArray("maybeDates").toStringList()');
+    expect(widgetBridgePluginSource).toContain('skipDates = optJSONArray("skipDates").toStringList()');
+    expect(widgetStoresSource).toContain('put("maybeDates", item.maybeDates.toJsonArray())');
+    expect(widgetStoresSource).toContain('put("skipDates", skipDates.toJsonArray())');
+    expect(widgetTodoPinProviderSupportSource).toContain('hasMaybeDate(todo, targetDate)');
+    expect(widgetTodoPinProviderSupportSource).toContain('isSuppressedRecurringOccurrenceForDate(todo, targetDate)');
   });
 });

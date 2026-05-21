@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-05-21: Synced native background conversation snapshots through the same timestamp-preserving serializer used by foreground assistant prompts so Android-side AI turns can distinguish old context from current context.
  * @updated 2026-05-19: Added short desktop-widget hide/restore shell transitions so edge collapsing no longer hard-cuts between the full quick-chat panel and the hidden handle.
  * @updated 2026-05-19: Desktop widget mode now follows the latest ordinary chat session and listens for cross-window session storage updates so the floating quick-chat stays in sync with the newest conversation.
  * @updated 2026-05-19: Added a lightly rounded outer shell for the desktop AI widget so the floating quick-chat no longer reads as a hard square panel.
@@ -196,6 +197,7 @@ import {
   mutateChatSessions,
   narrowConversationHistoryForTimeSensitiveTurn,
   replaceSessionMessage,
+  serializeConversationTurnsForAssistantContext,
   resolveMonthlyReviewTemplateRangeMeta,
   resolveMonthlyReviewTemplateSessionMeta,
   resolveWeeklyReviewTemplateRangeMeta,
@@ -2099,13 +2101,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         memoryEnabled: assistantAgentConfig.longTermMemoryEnabled,
         memory,
         conversation: assistantContextBuilder.buildConversationContext(
-          conversationHistory.map((turn) => ({
-            role: turn.role,
-            content: turn.content,
-            ...(typeof turn.createdAt === 'string' && turn.createdAt.trim()
-              ? { createdAt: turn.createdAt.trim() }
-              : {})
-          }))
+          serializeConversationTurnsForAssistantContext(conversationHistory)
         ),
         stateContext: {
           currentDateTime: stateContext.currentDateTime,
@@ -2131,10 +2127,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       await AssistantAgent.syncNativeBackgroundSnapshot({
         systemPrompt,
         conversation: assistantContextBuilder.buildConversationContext(
-          conversationHistory.map((turn) => ({
-            role: turn.role,
-            content: turn.content
-          }))
+          serializeConversationTurnsForAssistantContext(conversationHistory)
         )
       });
     } catch (error) {

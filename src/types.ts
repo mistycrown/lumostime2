@@ -4,6 +4,7 @@
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
+ * @updated 2026-05-21: Added optional todo `createdAt` metadata so collection timelines and older persisted task flows can share one creation-time fallback.
  * @updated 2026-05-16: Added lightweight daily AI newspaper types so Daily Review can persist structured editorial timeline commentary by log ID.
  * @updated 2026-05-13: Added optional monthly recurrence fallback support so 31st-style rules can land on the last day in shorter months when explicitly enabled.
  * @updated 2026-05-13: Added optional todo `kind` support so lightweight quick reminders can share the Todo pipeline while opting out of project-only behavior.
@@ -244,6 +245,7 @@ export interface TodoItem {
   linkedActivityId?: string; // Links to a Record Activity for stats
   linkedCategoryId?: string; // Link back to Category
   defaultScopeIds?: string[]; // NEW: Default Scopes when starting this todo - changed from defaultScopeId
+  createdAt?: number; // Unix timestamp used by legacy and collection timeline fallbacks
   note?: string;
   coverImage?: string; // NEW: Cover image filename (only one image allowed)
 

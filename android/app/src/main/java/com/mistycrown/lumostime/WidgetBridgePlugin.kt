@@ -11,6 +11,7 @@ import org.json.JSONObject
 
 /**
  * Capacitor bridge for widget templates, instance binding state, runtime synchronization, and pending action import.
+ * Updated 2026-05-21: Expanded TODAY + PIN sync parsing to accept mirrored todo `maybeDates` and recurrence `skipDates`, matching app-side today visibility during native rebuilds.
  * Updated 2026-05-02: Added dedicated scene widget payload sync support for the Android 4x3 scene widget.
  * Updated 2026-05-03: Routed widget sync calls to targeted widget-family refresh helpers instead of always refreshing every widget provider.
  * Updated 2026-05-05: Expanded TODAY + PIN sync parsing to persist mirrored source todos/categories for native-side refresh rebuilding.
@@ -683,6 +684,7 @@ class WidgetBridgePlugin : Plugin() {
                     pin = item.optBoolean("pin", false),
                     scheduledDate = parseNullableString(item.optString("scheduledDate")),
                     deadlineDate = parseNullableString(item.optString("deadlineDate")),
+                    maybeDates = item.optJSONArray("maybeDates").toStringList(),
                     recurrenceRule = item.optJSONObject("recurrenceRule")?.toTodoPinSourceRecurrenceRule()
                 )
             )
@@ -700,6 +702,7 @@ class WidgetBridgePlugin : Plugin() {
             interval = if (has("interval")) optInt("interval").takeIf { value -> value > 0 } else null,
             weekdays = optJSONArray("weekdays").toIntList(),
             monthDays = optJSONArray("monthDays").toIntList(),
+            skipDates = optJSONArray("skipDates").toStringList(),
             fallbackToMonthEnd = optBoolean("fallbackToMonthEnd", false)
         )
     }

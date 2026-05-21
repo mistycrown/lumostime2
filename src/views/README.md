@@ -10,6 +10,12 @@ The `views/` directory contains all the React components that represent the dist
 - Update 2026-05-17: `DesktopTodayWidgetView.tsx` now provides a dedicated Electron-only today-task widget surface with compact `Pin / Today / Overdue` sections, while `SettingsView.tsx` adds a desktop launcher entry (Electron-only, in the Android features section) that directly opens the today-task widget window without navigating to a submenu.
 - Update 2026-05-17 (桌面今日小组件): 在 `DesktopTodayWidgetView.tsx` 中新增“任务颜色”显示设置选项。支持用户在“排期类型”（基于任务状态如安排、截止、Maybe、完成等，并与周/月视图自定义配色实时同步）与“任务分类”（基于所属分组固有色）着色方案之间一键切换，并支持设置的本地持久化。
 
+- Update 2026-05-21: `TodoView.tsx` now keeps the left sidebar's `排期 / 未来 / 小事` rail entries at the same fixed height in both collapsed and expanded states, preventing the bottom utility stack from being pushed down into the fixed navigation area when the rail opens.
+- Update 2026-05-21: `settings/CollectionSettingsView.tsx` now sorts collection timeline task entries by the latest linked log start time, falling back to the todo's `createdAt` and only then to the time it joined the collection, so collection chronology follows real activity history instead of scheduled/completed date fields.
+- Update 2026-05-21: `settings/CollectionSettingsView.tsx` now renders collection timeline preview images with their original aspect ratio inside a capped frame, replacing the previous square-only crop so cover art and screenshots keep their native composition.
+- Update 2026-05-21: `settings/CollectionSettingsView.tsx` now stops click and keyboard bubbling on timeline preview-image buttons, so tapping a cover opens only the image lightbox and no longer also drills into the linked log/todo detail.
+- Update 2026-05-21: `settings/CollectionSettingsView.tsx` now opens collection add-todo browsing at the category level with per-category expansion, while the add-log tab keeps results empty until users explicitly search, preventing huge record lists from rendering up front.
+
 ## Architecture
 
 The views are designed as "dumb" or "presentational" components where possible, receiving their data and callbacks via props from the main container (`App.tsx`). This centralization of state management in `App.tsx` (or custom hooks) keeps the views focused on rendering.

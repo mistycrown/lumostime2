@@ -4,6 +4,7 @@
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
+ * @updated 2026-05-21: Localized the todo deletion confirmation modal into Chinese so the warning copy and action labels match the rest of the app.
  * @updated 2026-05-18: Added a desktop AI widget shell route that reuses the full app provider tree but swaps the normal layout for a compact always-on-top quick-chat window.
  * @updated 2026-05-18: Added bootstrap readiness timing logs so slow Electron startup can be traced to the async hydration gate.
  * @updated 2026-05-17: 在 Electron 主应用启动时自动恢复已启用的 PC 端小组件，并与设置页共享桌面小组件启动偏好读取逻辑。
@@ -837,14 +838,14 @@ const AppContent: React.FC = () => {
       {/* Delete Todo Confirmation */}
       <ConfirmModal
         isOpen={todoManager.isDeleteTodoConfirmOpen}
-        title="Delete Task?"
+        title="删除任务"
         description={todoManager.todoDeleteChildCount > 0
-          ? `This task has linked history and ${todoManager.todoDeleteChildCount} subtasks. Deleting it will also remove those subtasks and unlink related records while keeping the time logs. Are you sure?`
-          : 'This task is linked to historical records. Deleting it will unlink those records but keep the time logs. Are you sure?'}
+          ? `这个任务已关联历史记录，并包含 ${todoManager.todoDeleteChildCount} 个子任务。删除后会一并删除这些子任务，同时解除相关历史记录的关联，但会保留时间日志。确定要删除吗？`
+          : '这个任务已关联历史记录。删除后会解除相关历史记录的关联，但会保留时间日志。确定要删除吗？'}
         onConfirm={todoManager.handleConfirmDeleteTodo}
         onClose={() => todoManager.setIsDeleteTodoConfirmOpen(false)}
-        confirmText="Delete"
-        cancelText="Cancel"
+        confirmText="删除"
+        cancelText="取消"
         type="warning"
       />
 

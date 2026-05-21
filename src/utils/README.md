@@ -3,6 +3,7 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- Update 2026-05-21: `dataCollectionUtils.ts` now exposes the shared collection-timeline todo timestamp resolver, which prefers a todo's latest linked log time, then `createdAt`, then collection `addedAt`.
 - Update 2026-05-18: `assetPath.ts` now normalizes raw Windows absolute asset paths into `file:///` URLs so desktop renderer image sources remain loadable even when persisted data contains filesystem-style paths.
 - Update 2026-05-18: `todoScheduleUtils.ts` now canonicalizes persisted recurrence rules, trimming invalid monthly payloads, deduping/aging out skip dates, and only keeping the `31 -> 月末` fallback flag when the rule still truly targets day 31.
 - Update 2026-05-18: `dataValidation.ts` now accepts the nested `achievementData` backup block so achievement bottle exports and cloud restores can pass import validation without flattening those fields into the root payload.
@@ -23,7 +24,7 @@ Contains pure utility functions for data processing and business logic calculati
 - `todoScheduleUtils.ts`: [Active] - Shared todo planning helpers for Arrange / Due / Repeat / Done / Trace surfaces, including compact recurrence summaries like `每天`, `每周一三五`, and `每月 1,15,31` for lightweight UI metadata.
 - `todoScheduleAssignUtils.ts`: [Active] - Filters, sorts, and builds hierarchy rows for arrange/due picker todos, including the rules that unfinished subtasks disappear when their parent todo is already completed, recurring todos and the reserved `鏈潵` category stay out of quick scheduling, and title search keeps matched subtasks attached to their parent rows.
 - `todoQuickCategoryUtils.ts`: [Active] - Synthesizes the reserved `未来` and `小事` buckets, separates project-available categories from quick-schedule-available ones, and keeps quick reminders normalized onto the `小事` category id.
-- `dataCollectionUtils.ts`: [Active] - Centralizes themed-collection membership updates, item resolution, and mixed log/todo count summaries for the first Collection list/detail and picker flows.
+- `dataCollectionUtils.ts`: [Active] - Centralizes themed-collection membership updates, item resolution, mixed log/todo count summaries, and the shared collection-detail todo timeline timestamp priority rules.
 - `assistantNativeDebug.ts`: [Active] - Rebuilds foreground-style debug exchanges from native Android assistant diagnostics so background history and hydrated messages can reveal the actual assembled prompts and raw payloads.
 - `assistantQuietHours.ts`: [Active] - Normalizes assistant quiet-hours values entered as `HHMM` or legacy `HH:MM`, so background random-check-in protection windows stay valid across UI drafts, persisted config, and native sync.
 - `assistantBackgroundSessionUtils.ts`: [Active] - Resolves the one background-eligible AI chat session by excluding template conversations and ranking ordinary chats only by their latest user-authored message timestamp.

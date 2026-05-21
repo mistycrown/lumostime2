@@ -8,6 +8,7 @@ import org.json.JSONObject
 /**
  * SharedPreferences-backed storage for widget templates, instance bindings, runtime state,
  * pending imports, and the daily widget's mirrored review snapshot.
+ * Updated 2026-05-21: Expanded TODAY + PIN payload storage to persist mirrored todo `maybeDates` and recurrence `skipDates`, keeping native rebuild visibility aligned with the app's today schedule.
  * Updated 2026-05-02: Added scene widget payload storage plus per-instance selected-tab persistence.
  * Updated 2026-05-05: Added scene-widget morning refresh date tracking so the first morning unlock only refreshes once per day.
  * Updated 2026-05-05: Expanded TODAY + PIN payload storage to retain mirrored source todos/categories for native-side list rebuilding.
@@ -1513,6 +1514,7 @@ object WidgetStores {
                         pin = item.optBoolean("pin", false),
                         scheduledDate = parseNullableString(item.optString("scheduledDate")),
                         deadlineDate = parseNullableString(item.optString("deadlineDate")),
+                        maybeDates = item.optJSONArray("maybeDates").toStringList(),
                         recurrenceRule = item.optJSONObject("recurrenceRule")?.toTodoPinSourceRecurrenceRule()
                     )
                 )
@@ -1530,6 +1532,7 @@ object WidgetStores {
             interval = if (has("interval")) optInt("interval").takeIf { it > 0 } else null,
             weekdays = optJSONArray("weekdays").toIntList(),
             monthDays = optJSONArray("monthDays").toIntList(),
+            skipDates = optJSONArray("skipDates").toStringList(),
             fallbackToMonthEnd = optBoolean("fallbackToMonthEnd", false)
         )
     }
@@ -1591,6 +1594,7 @@ object WidgetStores {
                 put("pin", item.pin)
                 put("scheduledDate", item.scheduledDate ?: JSONObject.NULL)
                 put("deadlineDate", item.deadlineDate ?: JSONObject.NULL)
+                put("maybeDates", item.maybeDates.toJsonArray())
                 put("recurrenceRule", item.recurrenceRule?.toTodoPinSourceRecurrenceRuleJson() ?: JSONObject.NULL)
             })
         }
@@ -1605,6 +1609,7 @@ object WidgetStores {
             put("interval", interval ?: JSONObject.NULL)
             put("weekdays", weekdays.toIntJsonArray())
             put("monthDays", monthDays.toIntJsonArray())
+            put("skipDates", skipDates.toJsonArray())
             put("fallbackToMonthEnd", fallbackToMonthEnd)
         }
     }
