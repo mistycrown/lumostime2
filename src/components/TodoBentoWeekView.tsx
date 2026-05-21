@@ -4,6 +4,8 @@
  * @output Single-week 2x4 bento schedule UI backed by real todo data
  * @pos Component (Todo scheduling)
  * @description Renders one selected week at a time in the bento layout so the mini calendar, header range, and visible day cells always describe the same week.
+ * @updated 2026-05-21: Added mini-calendar due dots for days in the visible month that contain at least one deadline, so the bento week navigator can quietly flag due dates at a glance.
+ * @updated 2026-05-21: Highlighted today's 2x4 bento week cell with the same gray inset ring used by month view so the current day reads more clearly at a glance.
  * @updated 2026-05-14: Added a parent-controlled schedule lock toggle so bento week rows can disable drag-to-move without changing the surrounding week navigation or quick-action behavior.
  * @updated 2026-05-18: 支持点击循环排期的 Repeat 标签，唤起快捷编辑栏。
  
@@ -246,6 +248,15 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
     () => getMonthGridWeeks(middleDay),
     [middleDay]
   );
+  const dueDateKeysInMiniMonth = useMemo(() => {
+    const visibleMonthKey = format(middleDay, 'yyyy-MM');
+
+    return new Set(
+      todos
+        .map((todo) => todo.deadlineDate)
+        .filter((deadlineDate): deadlineDate is string => Boolean(deadlineDate && deadlineDate.startsWith(`${visibleMonthKey}-`)))
+    );
+  }, [middleDay, todos]);
   const isDenseMonthGrid = monthGridWeeks.length >= 6;
   const weekBuckets = useMemo(
     () => buildWeekTodoBuckets(todos, logs, referenceWeekStart),
@@ -753,11 +764,15 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                           {rowDays.map((day) => {
                             const isCurrentMonth = isSameMonth(day, middleDay);
                             const isTodayCell = isToday(day);
+                            const dateKey = formatDateKey(day);
+                            const hasDueDot = isCurrentMonth && dueDateKeysInMiniMonth.has(dateKey);
 
                             return (
                               <div
                                 key={`${selectedWeekId}-${day.toISOString()}`}
-                                className={`${isDenseMonthGrid ? 'text-[0.47rem] leading-none md:text-[0.54rem]' : 'text-[0.53rem] leading-none md:text-[0.6rem]'} ${
+                                className={`flex min-h-0 flex-col items-center justify-center ${
+                                  isDenseMonthGrid ? 'text-[0.47rem] md:text-[0.54rem]' : 'text-[0.53rem] md:text-[0.6rem]'
+                                } ${
                                   !isCurrentMonth
                                     ? 'opacity-25'
                                     : isTodayCell
@@ -765,7 +780,15 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                                       : ''
                                 }`}
                               >
-                                {format(day, 'd')}
+                                <span className="leading-none">
+                                  {format(day, 'd')}
+                                </span>
+                                <span
+                                  className={`mt-0.5 h-1 w-1 rounded-full bg-stone-500 ${
+                                    hasDueDot ? 'opacity-100' : 'opacity-0'
+                                  }`}
+                                  aria-hidden="true"
+                                />
                               </div>
                             );
                           })}
@@ -790,6 +813,8 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                     data-bento-drop-date={dateKey}
                     className={`relative flex min-h-0 flex-col ${displayMode === 'all' ? 'overflow-visible' : 'overflow-hidden'} border-b border-stone-200/80 bg-transparent p-2 transition-colors md:p-3 ${
                       isLeftColumn ? 'border-r border-stone-200/80' : ''
+                    } ${
+                      isTodayCell ? 'z-10 ring-1 ring-inset ring-stone-400' : ''
                     } ${
                       dragTargetDate === dateKey ? 'bg-stone-100/30' : ''
                     }`}

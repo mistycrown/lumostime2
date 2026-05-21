@@ -25,6 +25,7 @@ import java.util.Set;
 
 /**
  * Shared rendering and tap handling for the dedicated TODAY + PIN widgets.
+ * Updated 2026-05-21: Matched native TODAY + PIN rebuild visibility to the app's today schedule helper, including `maybeDates` and recurrence `skipDates` suppression.
  */
 public final class WidgetTodoPinProviderSupport {
     public static final String ACTION_TOGGLE_TODO_ITEM =
@@ -336,15 +337,45 @@ public final class WidgetTodoPinProviderSupport {
             WidgetTodoPinSourceTodo todo,
             String targetDate
     ) {
-        return todo.getPin()
-                || TextUtils.equals(targetDate, todo.getScheduledDate())
+        boolean hasExplicitTodayMatch = TextUtils.equals(targetDate, todo.getScheduledDate())
                 || TextUtils.equals(targetDate, todo.getDeadlineDate())
-                || matchesRecurrenceRule(todo.getRecurrenceRule(), targetDate);
+                || hasMaybeDate(todo, targetDate);
+        boolean hasRecurringMatch = matchesRecurrenceRule(todo.getRecurrenceRule(), targetDate, false);
+
+        if (!hasExplicitTodayMatch
+                && !hasRecurringMatch
+                && isSuppressedRecurringOccurrenceForDate(todo, targetDate)) {
+            return false;
+        }
+
+        return todo.getPin() || hasExplicitTodayMatch || hasRecurringMatch;
+    }
+
+    private static boolean hasMaybeDate(
+            WidgetTodoPinSourceTodo todo,
+            String targetDate
+    ) {
+        List<String> maybeDates = todo.getMaybeDates();
+        return maybeDates != null && maybeDates.contains(targetDate);
+    }
+
+    private static boolean isSuppressedRecurringOccurrenceForDate(
+            WidgetTodoPinSourceTodo todo,
+            String targetDate
+    ) {
+        WidgetTodoPinSourceRecurrenceRule recurrenceRule = todo.getRecurrenceRule();
+        List<String> skipDates = recurrenceRule == null ? null : recurrenceRule.getSkipDates();
+        if (skipDates == null || !skipDates.contains(targetDate)) {
+            return false;
+        }
+
+        return matchesRecurrenceRule(recurrenceRule, targetDate, true);
     }
 
     private static boolean matchesRecurrenceRule(
             WidgetTodoPinSourceRecurrenceRule rule,
-            String targetDateKey
+            String targetDateKey,
+            boolean ignoreSkipDates
     ) {
         if (rule == null || TextUtils.isEmpty(rule.getStartDate())) {
             return false;
@@ -361,6 +392,12 @@ public final class WidgetTodoPinProviderSupport {
         }
         if (endDate != null && targetDate.after(endDate)) {
             return false;
+        }
+        if (!ignoreSkipDates) {
+            List<String> skipDates = rule.getSkipDates();
+            if (skipDates != null && skipDates.contains(targetDateKey)) {
+                return false;
+            }
         }
 
         String frequency = rule.getFrequency();

@@ -4,6 +4,7 @@
  * @output Reusable pure helpers for chat session initialization, normalization, template metadata resolution, and immutable session updates
  * @pos Component Support (AI Integration)
  * @description Centralizes the stable session and template helper logic used by AIBackfillChatModal so the main modal can focus on React state orchestration instead of carrying pure data transforms inline.
+ * @updated 2026-05-21: Added a shared assistant-context conversation serializer so web foreground prompts and native background snapshots preserve per-turn timestamps through the same mapping path.
  * @updated 2026-05-15: Extracted session initialization, immutable session update helpers, and review-template metadata resolvers from AIBackfillChatModal.
  */
 import type { AIConversationTurn } from '../../services/aiService';
@@ -343,6 +344,18 @@ export const buildConversationHistoryFromSessionMessages = (
 
   return rounds.slice(-options.contextMessageLimit).flat();
 };
+
+export const serializeConversationTurnsForAssistantContext = (
+  conversationHistory: AIConversationTurn[]
+): AIConversationTurn[] => (
+  conversationHistory.map((turn) => ({
+    role: turn.role,
+    content: turn.content,
+    ...(typeof turn.createdAt === 'string' && turn.createdAt.trim()
+      ? { createdAt: turn.createdAt.trim() }
+      : {})
+  }))
+);
 
 export const narrowConversationHistoryForTimeSensitiveTurn = (
   history: AIConversationTurn[],

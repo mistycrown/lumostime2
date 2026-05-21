@@ -4,6 +4,7 @@
  * @output Regression coverage for collection membership updates and mixed-item resolution
  * @pos Test (data collection helpers)
  * @description Verifies that collection membership updates stay deduplicated and that collection detail resolution ignores stale item references.
+ * @updated 2026-05-21: Added regression coverage for collection timeline todo timestamp priority across linked logs, todo creation time, and membership fallback.
  * @updated 2026-05-14: Added regression coverage for batch appends into a single collection detail flow.
  * @updated 2026-05-12: Added first-pass coverage for data collection helper behavior.
  */
@@ -11,6 +12,7 @@ import { describe, expect, test, vi } from 'vitest';
 import {
   appendDataCollectionEntries,
   buildDataCollectionCountMap,
+  getCollectionTimelineTodoTimestamp,
   getDataCollectionIdsForItem,
   hasDataCollectionMembershipChanged,
   resolveDataCollectionItems,
@@ -216,5 +218,51 @@ describe('dataCollectionUtils', () => {
     });
     expect(hasDataCollectionMembershipChanged(entries, ['social'], 'log', 'log-1')).toBe(false);
     expect(hasDataCollectionMembershipChanged(entries, ['writing'], 'log', 'log-1')).toBe(true);
+  });
+
+  test('getCollectionTimelineTodoTimestamp prefers latest linked log, then todo createdAt, then entry addedAt', () => {
+    const logs: Log[] = [
+      {
+        id: 'log-1',
+        activityId: 'activity-1',
+        categoryId: 'category-1',
+        linkedTodoId: 'todo-with-logs',
+        startTime: 100,
+        endTime: 160,
+        duration: 60
+      },
+      {
+        id: 'log-2',
+        activityId: 'activity-1',
+        categoryId: 'category-1',
+        linkedTodoId: 'todo-with-logs',
+        startTime: 240,
+        endTime: 300,
+        duration: 60
+      }
+    ];
+
+    expect(getCollectionTimelineTodoTimestamp({
+      id: 'todo-with-logs',
+      categoryId: 'todo-category',
+      title: 'Linked',
+      isCompleted: false,
+      createdAt: 20
+    }, logs, 10)).toBe(240);
+
+    expect(getCollectionTimelineTodoTimestamp({
+      id: 'todo-with-created-at',
+      categoryId: 'todo-category',
+      title: 'Created fallback',
+      isCompleted: false,
+      createdAt: 500
+    }, logs, 10)).toBe(500);
+
+    expect(getCollectionTimelineTodoTimestamp({
+      id: 'todo-without-dates',
+      categoryId: 'todo-category',
+      title: 'Entry fallback',
+      isCompleted: false
+    }, logs, 777)).toBe(777);
   });
 });

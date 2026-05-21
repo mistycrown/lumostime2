@@ -3,6 +3,7 @@ package com.mistycrown.lumostime
 /**
  * Lightweight native models used by the unified Android widget system.
  * Templates are size-based, while each slot carries its own timer, daily, or shortcut type.
+ * Updated 2026-05-21: Expanded mirrored TODAY + PIN source models with todo `maybeDates` plus recurrence `skipDates` so native rebuilds can match app-side today visibility.
  * Updated 2026-05-02: Added native scene-widget payload, group, slot, item, and per-instance selection models.
  * Updated 2026-05-05: Added mirrored TODAY + PIN source todo/category models so native widgets can rebuild today's list on refresh without waiting for a new web payload.
  * Updated 2026-05-05: Added optional scene item app-launch metadata so scene widgets can mirror in-app third-party app launching.
@@ -361,6 +362,7 @@ data class WidgetTodoPinSourceRecurrenceRule(
     val interval: Int? = null,
     val weekdays: List<Int> = emptyList(),
     val monthDays: List<Int> = emptyList(),
+    val skipDates: List<String> = emptyList(),
     val fallbackToMonthEnd: Boolean = false
 )
 
@@ -375,6 +377,7 @@ data class WidgetTodoPinSourceTodo(
     val pin: Boolean = false,
     val scheduledDate: String? = null,
     val deadlineDate: String? = null,
+    val maybeDates: List<String> = emptyList(),
     val recurrenceRule: WidgetTodoPinSourceRecurrenceRule? = null
 )
 

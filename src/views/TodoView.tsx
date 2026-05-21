@@ -8,6 +8,7 @@
  * @updated 2026-05-14: Added a persisted schedule lock toggle across the standard week, bento week, and month planners so schedule and deadline rows can be frozen against drag-to-move until explicitly unlocked.
  * @updated 2026-05-18: 支持点击周视图一列（标准周视图）下循环排期的 Repeat 标签以唤起快捷编辑栏。
  * Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-05-21: Unified the expanded left-sidebar entry heights with the collapsed rail so opening the Todo sidebar no longer stretches the column and pushes the bottom toggle under the fixed navigation.
  */
 import React, { useState, useMemo, useRef } from 'react';
 import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log, TodoDuplicateOptions } from '../types';
@@ -2563,7 +2564,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                 ? 'text-stone-900 font-bold bg-white shadow-[2px_2px_10px_rgba(0,0,0,0.02)] z-10'
                 : 'text-stone-600 hover:text-stone-800'
               }
-              ${!isSidebarOpen ? 'justify-center w-12 h-12 md:w-14 md:h-14' : 'w-full min-h-[3.5rem] px-4 py-3'}
+              ${!isSidebarOpen ? 'justify-center w-12 h-12 md:w-14 md:h-14' : 'w-full h-12 md:h-14 px-4'}
             `}
             title={!isSidebarOpen ? VIRTUAL_SCHEDULE_CATEGORY_NAME : undefined}
           >
@@ -2624,7 +2625,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                 ? 'text-stone-900 font-bold bg-white shadow-[2px_2px_10px_rgba(0,0,0,0.02)] z-10'
                 : 'text-stone-600 hover:text-stone-800'
               }
-              ${!isSidebarOpen ? 'justify-center w-12 h-12 md:w-14 md:h-14' : 'w-full min-h-[3.5rem] px-4 py-3'}
+              ${!isSidebarOpen ? 'justify-center w-12 h-12 md:w-14 md:h-14' : 'w-full h-12 md:h-14 px-4'}
             `}
             title={!isSidebarOpen ? FUTURE_TODO_CATEGORY_NAME : undefined}
           >
@@ -2652,7 +2653,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                 ? 'text-stone-900 font-bold bg-white shadow-[2px_2px_10px_rgba(0,0,0,0.02)] z-10'
                 : 'text-stone-600 hover:text-stone-800'
               }
-              ${!isSidebarOpen ? 'justify-center w-12 h-12 md:w-14 md:h-14' : 'w-full min-h-[3.5rem] px-4 py-3'}
+              ${!isSidebarOpen ? 'justify-center w-12 h-12 md:w-14 md:h-14' : 'w-full h-12 md:h-14 px-4'}
             `}
             title={!isSidebarOpen ? QUICK_TODO_CATEGORY_NAME : undefined}
           >

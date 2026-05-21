@@ -134,6 +134,7 @@ const {
   previewFilename,     // 'img1.jpg' | null
   setPreviewFilename,
   handleAddImage,
+  handleAddImages,
   handleDeleteImage
 } = useImageManager(initialImages);
 
@@ -144,6 +145,11 @@ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     console.log('Added:', filename);
   }
 };
+
+// 鎵归噺娣诲姞鍥剧墖
+const files = Array.from(e.target.files || []);
+const result = await handleAddImages(files);
+console.log('Added:', result.added.length, 'Failed:', result.failed.length);
 
 // 删除图片
 await handleDeleteImage('img1.jpg');

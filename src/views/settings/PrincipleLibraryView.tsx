@@ -143,6 +143,15 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* 创建按钮 */}
+                <button
+                    onClick={handleStartCreate}
+                    className="w-full py-3 border-2 border-dashed border-stone-300 rounded-xl text-stone-500 hover:border-stone-400 hover:text-stone-600 transition-colors flex items-center justify-center gap-2"
+                >
+                    <Plus size={18} />
+                    <span className="text-sm font-medium">添加新原则</span>
+                </button>
+
                 {/* 说明 */}
                 <div className="bg-white rounded-xl p-4 shadow-sm">
                     <p className="text-xs text-stone-500">
@@ -191,15 +200,6 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
                         </div>
                     ))}
                 </div>
-
-                {/* 创建按钮 */}
-                <button
-                    onClick={handleStartCreate}
-                    className="w-full py-3 border-2 border-dashed border-stone-300 rounded-xl text-stone-500 hover:border-stone-400 hover:text-stone-600 transition-colors flex items-center justify-center gap-2"
-                >
-                    <Plus size={18} />
-                    <span className="text-sm font-medium">添加新原则</span>
-                </button>
             </div>
 
             {/* 编辑模态框 */}

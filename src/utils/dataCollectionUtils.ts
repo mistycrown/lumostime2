@@ -4,6 +4,7 @@
  * @output Shared helpers for collection membership updates and mixed-item resolution
  * @pos Utility (data collection helpers)
  * @description Keeps the new themed collection feature consistent across picker, list, and detail surfaces by centralizing membership updates and display joins.
+ * @updated 2026-05-21: Added a shared collection-timeline todo timestamp resolver that prefers the latest linked log, then todo creation time, then collection membership time.
  * @updated 2026-05-14: Added a batch append helper so collection detail pages can add multiple logs or todos into one collection without duplicating existing memberships.
  * @updated 2026-05-12: Added first-pass helpers for mixed log/todo collection membership and display resolution.
  */
@@ -172,6 +173,30 @@ export const resolveDataCollectionItems = (
     })
     .filter((item): item is ResolvedDataCollectionItem => Boolean(item))
     .sort((left, right) => right.entry.addedAt - left.entry.addedAt);
+};
+
+export const getCollectionTimelineTodoTimestamp = (
+  todo: TodoItem,
+  logs: Log[],
+  fallbackAddedAt: number
+): number => {
+  const latestLinkedLogTime = logs.reduce<number | null>((latest, log) => {
+    if (log.linkedTodoId !== todo.id || !Number.isFinite(log.startTime)) {
+      return latest;
+    }
+
+    return latest === null ? log.startTime : Math.max(latest, log.startTime);
+  }, null);
+
+  if (latestLinkedLogTime !== null) {
+    return latestLinkedLogTime;
+  }
+
+  if (typeof todo.createdAt === 'number' && Number.isFinite(todo.createdAt)) {
+    return todo.createdAt;
+  }
+
+  return fallbackAddedAt;
 };
 
 export const buildDataCollectionCountMap = (

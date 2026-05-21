@@ -4,16 +4,20 @@
  * @output A settings-level Collection list plus mixed-item detail timeline
  * @pos View (Settings sub-page)
  * @description Presents collections with compact title-led rows and a detail page that uses its own lightweight timeline cards instead of reusing the shared memoir timeline UI.
+ * @updated 2026-05-21: Collection add-modal todo browsing now opens at the category level, while log search stays empty until users explicitly search to avoid rendering huge record lists.
+ * @updated 2026-05-21: Collection timeline preview-image taps now stop at the image button so zooming a cover no longer also opens the linked detail card.
+ * @updated 2026-05-21: Collection timeline preview images now keep their source aspect ratio within a capped frame instead of forcing every cover into a square crop.
+ * @updated 2026-05-21: Collection timeline todo entries now anchor to the latest linked log time, falling back to todo creation time and then collection membership time.
  * @updated 2026-05-14: Added a dual-tab Add modal to collection detail so users can search and multi-select logs or todos for batch membership insertion without leaving the page.
  * @updated 2026-05-13: Made mixed collection timeline entries clickable so linked logs/todos can open their shared detail overlays while leaving the collection page underneath for return navigation.
  * @updated 2026-05-12: Rebuilt Collection detail items as a standalone UI, tightened the create-row controls, compressed the header summary into a single line, switched entry media to a wrapped right-aligned preview layout, and aligned todo metadata with memoir/task tag rendering.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronLeft, PencilLine, Plus, Save, Search, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, PencilLine, Plus, Save, Search, X } from 'lucide-react';
 import { DataCollection, Log, Scope, TodoItem } from '../../types';
 import { useData } from '../../contexts/DataContext';
 import { useCategoryScope } from '../../contexts/CategoryScopeContext';
-import { appendDataCollectionEntries, buildDataCollectionCountMap, resolveDataCollectionItems } from '../../utils/dataCollectionUtils';
+import { appendDataCollectionEntries, buildDataCollectionCountMap, getCollectionTimelineTodoTimestamp, resolveDataCollectionItems } from '../../utils/dataCollectionUtils';
 import { getDisplayIcon } from '../../utils/iconUtils';
 import { useSettings } from '../../contexts/SettingsContext';
 import { imageService } from '../../services/imageService';
@@ -71,6 +75,17 @@ interface CollectionAddOption {
   content: string;
   metaLabel: string;
   searchText: string;
+  sortValue: number;
+  categoryId?: string;
+  categoryLabel?: string;
+  categoryIcon?: string;
+}
+
+interface CollectionAddTodoGroup {
+  id: string;
+  label: string;
+  icon?: string;
+  options: CollectionAddOption[];
 }
 
 const formatCountBadge = (count: number): string => String(count).padStart(2, '0');
@@ -196,7 +211,7 @@ const CollectionTimelineImage: React.FC<{ src: string; alt: string; className: s
   }, [src]);
 
   if (!imgUrl) {
-    return <div className={`min-h-[160px] w-full animate-pulse bg-stone-100 ${className}`} />;
+    return <div className={`block min-h-[96px] min-w-[96px] animate-pulse bg-stone-100 ${className}`} />;
   }
 
   return (
@@ -236,13 +251,19 @@ const CollectionTimelineEntryCard: React.FC<{ entry: CollectionTimelineEntry; on
     return (
       <button
         type="button"
-        className="relative h-24 w-24 overflow-hidden rounded-xl border border-stone-200/80 bg-white shadow-[0_1px_0_rgba(28,25,23,0.03)] sm:h-28 sm:w-28"
-        onClick={() => void handlePreviewImage(previewMedia.url)}
+        className="relative overflow-hidden rounded-xl border border-stone-200/80 bg-white shadow-[0_1px_0_rgba(28,25,23,0.03)]"
+        onClick={(event) => {
+          event.stopPropagation();
+          void handlePreviewImage(previewMedia.url);
+        }}
+        onKeyDown={(event) => {
+          event.stopPropagation();
+        }}
       >
         <CollectionTimelineImage
           src={previewMedia.url}
           alt={entry.title}
-          className="h-full w-full object-cover transition-transform duration-500 hover:scale-[1.03]"
+          className="block h-auto max-h-28 w-auto max-w-24 object-contain transition-transform duration-500 hover:scale-[1.03] sm:max-h-32 sm:max-w-28"
         />
         {extraImageCount > 0 ? (
           <span className="absolute right-2 top-2 inline-flex min-w-7 items-center justify-center rounded-full bg-stone-900/78 px-2 py-1 text-[10px] font-semibold tracking-[0.08em] text-white backdrop-blur-sm">
@@ -373,10 +394,15 @@ interface CollectionAddModalProps {
   onTabChange: (tab: CollectionAddTab) => void;
   todoQuery: string;
   logQuery: string;
+  appliedLogQuery: string;
   onTodoQueryChange: (value: string) => void;
   onLogQueryChange: (value: string) => void;
+  onExecuteLogSearch: () => void;
   todoOptions: CollectionAddOption[];
+  todoGroups: CollectionAddTodoGroup[];
   logOptions: CollectionAddOption[];
+  expandedTodoCategoryIds: string[];
+  onToggleTodoCategory: (categoryId: string) => void;
   selectedTodoIds: string[];
   selectedLogIds: string[];
   onToggleTodo: (todoId: string) => void;
@@ -392,10 +418,15 @@ const CollectionAddModal: React.FC<CollectionAddModalProps> = ({
   onTabChange,
   todoQuery,
   logQuery,
+  appliedLogQuery,
   onTodoQueryChange,
   onLogQueryChange,
+  onExecuteLogSearch,
   todoOptions,
+  todoGroups,
   logOptions,
+  expandedTodoCategoryIds,
+  onToggleTodoCategory,
   selectedTodoIds,
   selectedLogIds,
   onToggleTodo,
@@ -414,13 +445,64 @@ const CollectionAddModal: React.FC<CollectionAddModalProps> = ({
   const onQueryChange = isTodoTab ? onTodoQueryChange : onLogQueryChange;
   const onToggle = isTodoTab ? onToggleTodo : onToggleLog;
   const confirmLabel = isTodoTab ? '加入待办' : '加入记录';
-  const normalizedQuery = query.trim().toLocaleLowerCase();
-  const visibleOptions = normalizedQuery
-    ? options.filter((option) => option.searchText.includes(normalizedQuery))
-    : options;
-  const emptyMessage = options.length === 0
-    ? (isTodoTab ? '当前没有可加入的待办' : '当前没有可加入的记录')
-    : '没有匹配的结果';
+  const normalizedTodoQuery = todoQuery.trim().toLocaleLowerCase();
+  const trimmedLogQuery = logQuery.trim();
+  const hasTodoSearchQuery = normalizedTodoQuery.length > 0;
+  const hasAppliedLogQuery = appliedLogQuery.trim().length > 0;
+  const visibleTodoOptions = hasTodoSearchQuery
+    ? todoOptions.filter((option) => option.searchText.includes(normalizedTodoQuery))
+    : todoOptions;
+  const visibleLogOptions = hasAppliedLogQuery ? logOptions : [];
+  const isLogSearchButtonDisabled = trimmedLogQuery.length === 0;
+  const todoSelectionSet = new Set(selectedTodoIds);
+
+  const renderOptionRow = (option: CollectionAddOption, selectionIds: string[]) => {
+    const isSelected = selectionIds.includes(option.id);
+    const shouldShowContent = activeTab === 'log' && Boolean(option.content);
+
+    return (
+      <button
+        key={option.id}
+        type="button"
+        onClick={() => onToggle(option.id)}
+        className={`grid w-full grid-cols-[1.25rem_minmax(0,1fr)_auto] gap-x-3 px-2 py-3 text-left transition-colors ${
+          isSelected
+            ? 'bg-stone-100/85'
+            : 'bg-transparent hover:bg-stone-50/70'
+        }`}
+      >
+        <span className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+          isSelected
+            ? 'border-stone-900 bg-stone-900 text-white'
+            : 'border-stone-300 text-transparent'
+        }`}>
+          <Check size={12} />
+        </span>
+        <div className="min-w-0">
+          <span className={`block text-[15px] font-medium leading-6 text-stone-900 ${shouldShowContent ? 'truncate' : ''}`}>
+            {option.title}
+          </span>
+        </div>
+        <div className={`shrink-0 text-[10px] uppercase tracking-[0.14em] text-stone-400 ${shouldShowContent ? 'pt-0.5' : 'self-center'}`}>
+          {option.metaLabel}
+        </div>
+        {shouldShowContent ? (
+          <div className="col-[2/4] mt-1 min-w-0">
+            <span
+              className="block text-[12px] leading-5 text-stone-400 overflow-hidden"
+              style={{
+                display: '-webkit-box',
+                WebkitBoxOrient: 'vertical',
+                WebkitLineClamp: 3
+              }}
+            >
+              {option.content}
+            </span>
+          </div>
+        ) : null}
+      </button>
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-stone-900/10 px-5 py-8 backdrop-blur-[2px]" onClick={onClose}>
@@ -464,75 +546,106 @@ const CollectionAddModal: React.FC<CollectionAddModalProps> = ({
             ))}
           </div>
 
-          <label className="mt-4 flex items-center gap-3 rounded-2xl border border-stone-200 bg-white/70 px-4 py-3 text-sm text-stone-500">
-            <Search size={15} className="shrink-0 text-stone-400" />
-            <input
-              value={query}
-              onChange={(event) => onQueryChange(event.target.value)}
-              placeholder={isTodoTab ? '搜索待办标题或备注' : '搜索记录标题或备注'}
-              className="min-w-0 flex-1 bg-transparent text-sm text-stone-700 outline-none placeholder:text-stone-300"
-            />
-          </label>
+          <div className="mt-4 flex items-center gap-3">
+            <label className="flex flex-1 items-center gap-3 rounded-2xl border border-stone-200 bg-white/70 px-4 py-3 text-sm text-stone-500">
+              <Search size={15} className="shrink-0 text-stone-400" />
+              <input
+                value={query}
+                onChange={(event) => onQueryChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (isTodoTab || event.key !== 'Enter') {
+                    return;
+                  }
+
+                  event.preventDefault();
+                  if (!isLogSearchButtonDisabled) {
+                    onExecuteLogSearch();
+                  }
+                }}
+                placeholder={isTodoTab ? '搜索待办标题、备注或分类' : '输入关键词后按回车或点搜索'}
+                className="min-w-0 flex-1 bg-transparent text-sm text-stone-700 outline-none placeholder:text-stone-300"
+              />
+            </label>
+            {!isTodoTab ? (
+              <button
+                type="button"
+                onClick={onExecuteLogSearch}
+                disabled={isLogSearchButtonDisabled}
+                className="inline-flex h-[46px] items-center gap-2 rounded-full border border-stone-200 bg-white px-4 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300"
+              >
+                <Search size={14} />
+                搜索
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-          {options.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-stone-200 px-5 py-10 text-center text-sm italic text-stone-400">
-              {emptyMessage}
-            </div>
-          ) : visibleOptions.length > 0 ? (
-            <div>
-              {visibleOptions.map((option) => {
-                const isSelected = selectedIds.includes(option.id);
-                const shouldShowContent = activeTab === 'log' && Boolean(option.content);
+          {isTodoTab ? (
+            todoOptions.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-stone-200 px-5 py-10 text-center text-sm italic text-stone-400">
+                当前没有可加入的待办
+              </div>
+            ) : hasTodoSearchQuery ? (
+              visibleTodoOptions.length > 0 ? (
+                <div>
+                  {visibleTodoOptions.map((option) => renderOptionRow(option, selectedTodoIds))}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-stone-200 px-5 py-10 text-center text-sm italic text-stone-400">
+                  没有匹配的待办
+                </div>
+              )
+            ) : todoGroups.length > 0 ? (
+              <div className="space-y-2">
+                {todoGroups.map((group) => {
+                  const isExpanded = expandedTodoCategoryIds.includes(group.id);
+                  const selectedCount = group.options.reduce((count, option) => (
+                    todoSelectionSet.has(option.id) ? count + 1 : count
+                  ), 0);
+                  const ChevronIcon = isExpanded ? ChevronDown : ChevronRight;
 
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => onToggle(option.id)}
-                    className={`grid w-full grid-cols-[1.25rem_minmax(0,1fr)_auto] gap-x-3 px-2 py-3 text-left transition-colors ${
-                      isSelected
-                        ? 'bg-stone-100/85'
-                        : 'bg-transparent hover:bg-stone-50/70'
-                    }`}
-                  >
-                    <span className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
-                      isSelected
-                        ? 'border-stone-900 bg-stone-900 text-white'
-                        : 'border-stone-300 text-transparent'
-                    }`}>
-                      <Check size={12} />
-                    </span>
-                    <div className="min-w-0">
-                      <span className={`block text-[15px] font-medium leading-6 text-stone-900 ${shouldShowContent ? 'truncate' : ''}`}>
-                        {option.title}
-                      </span>
+                  return (
+                    <div key={group.id} className="overflow-hidden rounded-2xl border border-stone-200 bg-white/55">
+                      <button
+                        type="button"
+                        onClick={() => onToggleTodoCategory(group.id)}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-stone-50/80"
+                      >
+                        <ChevronIcon size={15} className="shrink-0 text-stone-400" />
+                        {group.icon ? <IconRenderer icon={group.icon} className="shrink-0 text-sm text-stone-500" /> : null}
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[15px] font-medium text-stone-900">{group.label}</div>
+                        </div>
+                        <div className="shrink-0 text-[10px] uppercase tracking-[0.14em] text-stone-400">
+                          {selectedCount > 0 ? `${selectedCount}/` : ''}{group.options.length}
+                        </div>
+                      </button>
+                      {isExpanded ? (
+                        <div className="border-t border-stone-200/80 px-2 py-1">
+                          {group.options.map((option) => renderOptionRow(option, selectedTodoIds))}
+                        </div>
+                      ) : null}
                     </div>
-                    <div className={`shrink-0 text-[10px] uppercase tracking-[0.14em] text-stone-400 ${shouldShowContent ? 'pt-0.5' : 'self-center'}`}>
-                      {option.metaLabel}
-                    </div>
-                    {shouldShowContent ? (
-                      <div className="col-[2/4] mt-1 min-w-0">
-                        <span
-                          className="block text-[12px] leading-5 text-stone-400 overflow-hidden"
-                          style={{
-                            display: '-webkit-box',
-                            WebkitBoxOrient: 'vertical',
-                            WebkitLineClamp: 3
-                          }}
-                        >
-                          {option.content}
-                        </span>
-                      </div>
-                    ) : null}
-                  </button>
-                );
-              })}
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-stone-200 px-5 py-10 text-center text-sm italic text-stone-400">
+                当前没有可加入的待办分类
+              </div>
+            )
+          ) : !hasAppliedLogQuery ? (
+            <div className="rounded-2xl border border-dashed border-stone-200 px-5 py-10 text-center text-sm italic text-stone-400">
+              输入关键词后点击搜索，再渲染记录结果
+            </div>
+          ) : visibleLogOptions.length > 0 ? (
+            <div>
+              {visibleLogOptions.map((option) => renderOptionRow(option, selectedLogIds))}
             </div>
           ) : (
             <div className="rounded-2xl border border-dashed border-stone-200 px-5 py-10 text-center text-sm italic text-stone-400">
-              {emptyMessage}
+              没有匹配的记录
             </div>
           )}
         </div>
@@ -561,7 +674,7 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
   onEditLog,
   onEditTodo
 }) => {
-  const { collections, setCollections, collectionEntries, setCollectionEntries, logs, todos } = useData();
+  const { collections, setCollections, collectionEntries, setCollectionEntries, logs, todos, todoCategories } = useData();
   const { categories, scopes } = useCategoryScope();
   const { uiTheme } = useSettings();
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
@@ -573,6 +686,8 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
   const [activeAddTab, setActiveAddTab] = useState<CollectionAddTab>('todo');
   const [todoSearchQuery, setTodoSearchQuery] = useState('');
   const [logSearchQuery, setLogSearchQuery] = useState('');
+  const [appliedLogSearchQuery, setAppliedLogSearchQuery] = useState('');
+  const [expandedTodoCategoryIds, setExpandedTodoCategoryIds] = useState<string[]>([]);
   const [selectedTodoIds, setSelectedTodoIds] = useState<string[]>([]);
   const [selectedLogIds, setSelectedLogIds] = useState<string[]>([]);
 
@@ -635,6 +750,8 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
     setIsAddModalOpen(false);
     setTodoSearchQuery('');
     setLogSearchQuery('');
+    setAppliedLogSearchQuery('');
+    setExpandedTodoCategoryIds([]);
     setSelectedTodoIds([]);
     setSelectedLogIds([]);
     setActiveAddTab('todo');
@@ -708,6 +825,27 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
     return accumulator;
   }, new Map<string, number>()), [logs]);
 
+  const todoCategoryDisplayMetaById = useMemo(() => new Map(
+    todoCategories.map((category, index) => [
+      category.id,
+      {
+        order: index,
+        label: category.name,
+        icon: getDisplayIcon(category.icon, category.uiIcon, uiTheme)
+      }
+    ])
+  ), [todoCategories, uiTheme]);
+
+  const availableTodoIds = useMemo(
+    () => new Set(todos.filter((todo) => !selectedCollectionTodoIds.has(todo.id)).map((todo) => todo.id)),
+    [selectedCollectionTodoIds, todos]
+  );
+
+  const availableLogIds = useMemo(
+    () => new Set(logs.filter((log) => !selectedCollectionLogIds.has(log.id)).map((log) => log.id)),
+    [logs, selectedCollectionLogIds]
+  );
+
   const availableTodoOptions = useMemo(() => todos
     .filter((todo) => !selectedCollectionTodoIds.has(todo.id))
     .map((todo) => {
@@ -715,13 +853,18 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
       const statusLabel = todo.isCompleted ? 'Done' : 'Task';
       const durationLabel = investedSeconds > 0 ? ` · ${formatAccumulatedDurationCompact(investedSeconds)}` : '';
       const content = todo.note?.trim() || '';
+      const categoryMeta = todoCategoryDisplayMetaById.get(todo.categoryId);
+      const categoryLabel = categoryMeta?.label || '未分类';
 
       return {
         id: todo.id,
         title: todo.title,
         content,
         metaLabel: `${statusLabel}${durationLabel}`,
-        searchText: buildCollectionSearchText(todo.title, content),
+        searchText: buildCollectionSearchText(`${categoryLabel} ${todo.title}`, content),
+        categoryId: todo.categoryId,
+        categoryLabel,
+        categoryIcon: categoryMeta?.icon,
         sortValue: todo.completedAt
           ? new Date(todo.completedAt).getTime()
           : todo.scheduledDate
@@ -730,40 +873,93 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
       };
     })
     .sort((left, right) => right.sortValue - left.sortValue || left.title.localeCompare(right.title)),
-  [investedSecondsByTodoId, selectedCollectionTodoIds, todos]);
+  [investedSecondsByTodoId, selectedCollectionTodoIds, todoCategoryDisplayMetaById, todos]);
 
-  const availableLogOptions = useMemo(() => logs
-    .filter((log) => !selectedCollectionLogIds.has(log.id))
-    .map((log) => {
-      const category = (categories || []).find((candidate) => candidate.id === log.categoryId);
-      const activity = category?.activities.find((candidate) => candidate.id === log.activityId);
-      const title = log.title?.trim() || [category?.name, activity?.name].filter(Boolean).join(' / ') || '记录';
-      const content = log.note?.trim() || '';
+  const availableTodoGroups = useMemo<CollectionAddTodoGroup[]>(() => {
+    const groupedOptions = new Map<string, CollectionAddOption[]>();
 
-      return {
-        id: log.id,
-        title,
-        content,
-        metaLabel: formatEntryDateWithTime(
-          new Date(log.startTime).toISOString(),
-          new Date(log.endTime).toISOString()
-        ),
-        searchText: buildCollectionSearchText(title, content),
-        sortValue: log.startTime
-      };
-    })
-    .sort((left, right) => right.sortValue - left.sortValue),
-  [categories, logs, selectedCollectionLogIds]);
+    availableTodoOptions.forEach((option) => {
+      const categoryId = option.categoryId || 'uncategorized';
+      const bucket = groupedOptions.get(categoryId) || [];
+      bucket.push(option);
+      groupedOptions.set(categoryId, bucket);
+    });
+
+    return Array.from(groupedOptions.entries())
+      .map(([categoryId, options]) => {
+        const categoryMeta = todoCategoryDisplayMetaById.get(categoryId);
+        return {
+          id: categoryId,
+          label: categoryMeta?.label || options[0]?.categoryLabel || '未分类',
+          icon: categoryMeta?.icon || options[0]?.categoryIcon,
+          options: [...options].sort((left, right) => right.sortValue - left.sortValue || left.title.localeCompare(right.title)),
+          sortOrder: categoryMeta?.order ?? Number.MAX_SAFE_INTEGER
+        };
+      })
+      .sort((left, right) => left.sortOrder - right.sortOrder || left.label.localeCompare(right.label))
+      .map(({ sortOrder: _sortOrder, ...group }) => group);
+  }, [availableTodoOptions, todoCategoryDisplayMetaById]);
+
+  const availableLogOptions = useMemo(() => {
+    const normalizedQuery = appliedLogSearchQuery.trim().toLocaleLowerCase();
+    if (!normalizedQuery) {
+      return [];
+    }
+
+    return logs
+      .filter((log) => !selectedCollectionLogIds.has(log.id))
+      .map((log) => {
+        const category = (categories || []).find((candidate) => candidate.id === log.categoryId);
+        const activity = category?.activities.find((candidate) => candidate.id === log.activityId);
+        const title = log.title?.trim() || [category?.name, activity?.name].filter(Boolean).join(' / ') || '记录';
+        const content = log.note?.trim() || '';
+
+        return {
+          id: log.id,
+          title,
+          content,
+          metaLabel: formatEntryDateWithTime(
+            new Date(log.startTime).toISOString(),
+            new Date(log.endTime).toISOString()
+          ),
+          searchText: buildCollectionSearchText(title, content),
+          sortValue: log.startTime
+        };
+      })
+      .filter((option) => option.searchText.includes(normalizedQuery))
+      .sort((left, right) => right.sortValue - left.sortValue);
+  }, [appliedLogSearchQuery, categories, logs, selectedCollectionLogIds]);
 
   useEffect(() => {
-    const availableIds = new Set(availableTodoOptions.map((option) => option.id));
-    setSelectedTodoIds((current) => current.filter((itemId) => availableIds.has(itemId)));
-  }, [availableTodoOptions]);
+    setSelectedTodoIds((current) => current.filter((itemId) => availableTodoIds.has(itemId)));
+  }, [availableTodoIds]);
 
   useEffect(() => {
-    const availableIds = new Set(availableLogOptions.map((option) => option.id));
-    setSelectedLogIds((current) => current.filter((itemId) => availableIds.has(itemId)));
-  }, [availableLogOptions]);
+    setSelectedLogIds((current) => current.filter((itemId) => availableLogIds.has(itemId)));
+  }, [availableLogIds]);
+
+  const handleLogSearchQueryChange = (value: string) => {
+    setLogSearchQuery(value);
+    setAppliedLogSearchQuery('');
+  };
+
+  const handleExecuteLogSearch = () => {
+    const trimmedQuery = logSearchQuery.trim();
+    if (!trimmedQuery) {
+      setAppliedLogSearchQuery('');
+      return;
+    }
+
+    setAppliedLogSearchQuery(trimmedQuery);
+  };
+
+  const handleToggleTodoCategory = (categoryId: string) => {
+    setExpandedTodoCategoryIds((current) => (
+      current.includes(categoryId)
+        ? current.filter((item) => item !== categoryId)
+        : [...current, categoryId]
+    ));
+  };
 
   const timelineEntries = useMemo<CollectionTimelineEntry[]>(() => {
     return resolvedItems
@@ -811,11 +1007,7 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
           } satisfies CollectionTimelineEntry;
         }
 
-        const todoTimestamp = item.todo.completedAt
-          ? new Date(item.todo.completedAt).getTime()
-          : item.todo.scheduledDate
-            ? new Date(`${item.todo.scheduledDate}T12:00:00`).getTime()
-            : item.entry.addedAt;
+        const todoTimestamp = getCollectionTimelineTodoTimestamp(item.todo, logs, item.entry.addedAt);
         const linkedCategory = item.todo.linkedCategoryId
           ? (categories || []).find((candidate) => candidate.id === item.todo.linkedCategoryId)
           : undefined;
@@ -931,9 +1123,11 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
   const handleOpenAddModal = () => {
     setTodoSearchQuery('');
     setLogSearchQuery('');
+    setAppliedLogSearchQuery('');
+    setExpandedTodoCategoryIds([]);
     setSelectedTodoIds([]);
     setSelectedLogIds([]);
-    setActiveAddTab(availableTodoOptions.length > 0 || availableLogOptions.length === 0 ? 'todo' : 'log');
+    setActiveAddTab(availableTodoOptions.length > 0 || availableLogIds.size === 0 ? 'todo' : 'log');
     setIsAddModalOpen(true);
   };
 
@@ -1157,10 +1351,15 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
         onTabChange={setActiveAddTab}
         todoQuery={todoSearchQuery}
         logQuery={logSearchQuery}
+        appliedLogQuery={appliedLogSearchQuery}
         onTodoQueryChange={setTodoSearchQuery}
-        onLogQueryChange={setLogSearchQuery}
+        onLogQueryChange={handleLogSearchQueryChange}
+        onExecuteLogSearch={handleExecuteLogSearch}
         todoOptions={availableTodoOptions}
+        todoGroups={availableTodoGroups}
         logOptions={availableLogOptions}
+        expandedTodoCategoryIds={expandedTodoCategoryIds}
+        onToggleTodoCategory={handleToggleTodoCategory}
         selectedTodoIds={selectedTodoIds}
         selectedLogIds={selectedLogIds}
         onToggleTodo={(todoId) => setSelectedTodoIds((current) => current.includes(todoId)

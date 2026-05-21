@@ -4,6 +4,7 @@
  * @output Widget template persistence helpers and app/native conversion utilities
  * @pos Service
  * @description Centralizes the shared types and conversions used by the Android widget system while keeping timer, daily, and shortcut slots on one contract.
+ * @updated 2026-05-21: Mirrored todo `maybeDates` plus recurrence `skipDates` into TODAY + PIN native source snapshots so Android widget refreshes stay aligned with the app's current-day schedule rows.
  * @updated 2026-05-13: Mirrored monthly recurrence month-end fallback metadata into widget todo snapshots so native refreshes keep the same monthly matching semantics.
  * @updated 2026-04-25: Added DAILY_RUNTIME dual-view payload builders so native heatmap widgets can toggle between category and activity coloring.
  * @updated 2026-04-25: Added widget UI icon asset preservation and sanitization helpers so Android widgets can prefer local icon bitmaps with emoji fallback.
@@ -1300,6 +1301,7 @@ const buildTodoPinSourceTodos = (todos: TodoItem[]): WidgetBridgeTodoPinSourceTo
     pin: Boolean(todo.pin),
     scheduledDate: todo.scheduledDate ?? null,
     deadlineDate: todo.deadlineDate ?? null,
+    maybeDates: todo.maybeDates ?? null,
     recurrenceRule: todo.recurrenceRule
       ? {
           frequency: todo.recurrenceRule.frequency,
@@ -1308,6 +1310,7 @@ const buildTodoPinSourceTodos = (todos: TodoItem[]): WidgetBridgeTodoPinSourceTo
           interval: todo.recurrenceRule.interval ?? null,
           weekdays: todo.recurrenceRule.weekdays ?? null,
           monthDays: todo.recurrenceRule.monthDays ?? null,
+          skipDates: todo.recurrenceRule.skipDates ?? null,
           fallbackToMonthEnd: todo.recurrenceRule.fallbackToMonthEnd ?? null
         }
       : null

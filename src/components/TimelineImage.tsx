@@ -55,6 +55,7 @@ export const TimelineImage: React.FC<TimelineImageProps> = ({
 
             <ImagePreviewModal
                 imageUrl={previewUrl}
+                downloadFilename={filename}
                 onClose={() => setPreviewUrl(null)}
             />
         </>

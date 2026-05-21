@@ -1,6 +1,7 @@
 /**
  * @file useImageManager.ts
  * @description Custom hook for managing image attachments with proper cleanup
+ * @updated 2026-05-21: Added sequential batch image saving so one picker selection can append multiple images while preserving per-file failure handling.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -85,6 +86,30 @@ export const useImageManager = (initialImages: string[] = []) => {
     }
   }, []);
 
+  const handleAddImages = useCallback(async (files: File[]) => {
+    const added: string[] = [];
+    const failed: File[] = [];
+
+    for (const file of files) {
+      try {
+        const filename = await imageService.saveImage(file);
+        added.push(filename);
+      } catch (err) {
+        console.error('Failed to save image in batch upload', err);
+        failed.push(file);
+      }
+    }
+
+    if (added.length > 0 && isMountedRef.current) {
+      setImages(prev => [...prev, ...added]);
+    }
+
+    return {
+      added,
+      failed
+    };
+  }, []);
+
   // 删除图片
   const handleDeleteImage = useCallback(async (filename: string) => {
     try {
@@ -119,6 +144,7 @@ export const useImageManager = (initialImages: string[] = []) => {
     previewFilename,
     setPreviewFilename,
     handleAddImage,
+    handleAddImages,
     handleDeleteImage
   };
 };

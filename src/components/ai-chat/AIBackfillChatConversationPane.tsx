@@ -4,6 +4,7 @@
  * @output Empty-state prompt list plus the rendered AI/user conversation pane
  * @pos Component Support (AI Integration)
  * @description Extracts the heavy conversation rendering UI out of AIBackfillChatModal so the modal can focus on orchestration while the message list, writeback cards, and per-message metadata remain behaviorally unchanged.
+ * @updated 2026-05-21: Treat assistant messages as standalone avatar groups so each AI reply starts with an avatar while multi-bubble displayParts still share one avatar.
  * @updated 2026-05-18: Added configurable width classes so compact desktop AI shells can reuse the conversation renderer without forcing the full-screen modal measure.
  * @updated 2026-05-15: Rebuilt the conversation pane with the extracted empty state, message bubble rendering, and writeback cards.
  */
@@ -342,7 +343,7 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
     const isDreamUpdatesExpanded = expandedDreamUpdateMessageIds.has(message.id);
     const isReminderUpdatesExpanded = expandedReminderUpdateMessageIds.has(message.id);
     const previousMessage = index > 0 ? messages[index - 1] : null;
-    const showAvatar = !previousMessage || previousMessage.role !== message.role;
+    const showAvatar = !isUser || !previousMessage || previousMessage.role !== message.role;
 
     let bubbleStyle = {
       borderColor: theme.panelBorder,
