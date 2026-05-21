@@ -5,6 +5,7 @@
  * @pos Service Tests (Assistant Scheduled Tasks)
  * @description Verifies that recurring assistant task templates reuse todo recurrence rules correctly and always keep one next native reminder seeded per enabled task.
  *
+ * @updated 2026-05-21: Added regression coverage for reusing a semantically equivalent pending reminder without losing the scheduled-task link needed for the next recurring handoff.
  * @updated 2026-05-13: Added monthly multi-day and month-end fallback coverage so scheduled tasks can target multiple month dates while limiting short-month fallback to explicit day 31 rules.
  * @updated 2026-05-12: Added regression coverage for atomic reminder consumption so one scheduled task cannot keep multiple pending reminders after a successful trigger handoff.
  * @updated 2026-05-10: Added regression coverage for stale-linked reminder healing and duplicate pending-reminder collapse.
@@ -213,6 +214,45 @@ describe('assistantScheduledTaskService', () => {
     expect(result.createdReminders[0].dueAt).toBe('2026-05-11T00:00:00.000Z');
     expect(result.tasks[0].nextTriggerAt).toBe('2026-05-11T00:00:00.000Z');
     expect(result.tasks[0].pendingReminderId).toBe(result.createdReminders[0].id);
+  });
+
+  it('keeps one linked reminder when the same next occurrence already exists as an unlinked pending reminder', () => {
+    assistantReminderQueueService.saveReminders([
+      {
+        id: 'reminder-agent',
+        type: 'self_followup',
+        dueAt: '2026-05-11T00:00:00.000Z',
+        status: 'pending',
+        text: 'wake up',
+        source: 'agent',
+        createdAt: '2026-05-09T00:00:00.000Z'
+      }
+    ]);
+    assistantScheduledTaskService.saveTasks([
+      {
+        id: 'task-1',
+        text: 'wake up',
+        time: '08:00',
+        recurrenceRule: {
+          frequency: 'weekly',
+          startDate: '2026-05-01',
+          weekdays: [1]
+        },
+        enabled: true,
+        createdAt: '2026-05-09T00:00:00.000Z',
+        updatedAt: '2026-05-09T00:00:00.000Z',
+        nextTriggerAt: '2026-05-11T00:00:00.000Z'
+      }
+    ]);
+
+    const result = assistantScheduledTaskService.syncScheduledTaskReminders(new Date('2026-05-10T00:05:00.000Z'));
+    const pendingReminders = assistantReminderQueueService.listReminders();
+
+    expect(result.createdReminders).toHaveLength(1);
+    expect(pendingReminders).toHaveLength(1);
+    expect(pendingReminders[0].scheduledTaskId).toBe('task-1');
+    expect(result.tasks[0].pendingReminderId).toBe(pendingReminders[0].id);
+    expect(result.tasks[0].nextTriggerAt).toBe('2026-05-11T00:00:00.000Z');
   });
 
   it('keeps only the earliest pending reminder when duplicate scheduled-task reminders exist', () => {

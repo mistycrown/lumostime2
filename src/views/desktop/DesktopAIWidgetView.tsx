@@ -4,6 +4,7 @@
  * @output Compact always-on-top Electron AI chat widget that can collapse into an edge handle without unmounting the chat engine
  * @pos View (Desktop widget)
  * @description Reuses the full app provider tree and the shared AI chat implementation, but renders it inside a compact desktop shell with edge-hide controls for quick desktop conversations.
+ * @updated 2026-05-19: Added short hide/restore transition phases so edge collapse no longer hard-cuts between the full chat shell and the hidden handle.
  * @updated 2026-05-19: Added transparent edge and corner resize handles so the frameless AI widget can be freely resized from any side while expanded.
  * @updated 2026-05-18: Added the first desktop AI widget shell with preload-driven edge-hide state, restore handling, and compact AI chat rendering.
  */
@@ -21,10 +22,17 @@ const DEFAULT_WINDOW_STATE: DesktopAIWidgetWindowState = {
 };
 
 type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+type DesktopAITransitionPhase = 'idle' | 'hiding' | 'showing';
+
+const AI_WIDGET_HIDE_TRANSITION_MS = 140;
+const AI_WIDGET_SHOW_TRANSITION_MS = 190;
 
 export const DesktopAIWidgetView: React.FC = () => {
   const [windowState, setWindowState] = useState<DesktopAIWidgetWindowState>(DEFAULT_WINDOW_STATE);
+  const [transitionPhase, setTransitionPhase] = useState<DesktopAITransitionPhase>('idle');
   const resizeCleanupRef = useRef<(() => void) | null>(null);
+  const transitionTimerRef = useRef<number | null>(null);
+  const previousHiddenRef = useRef(DEFAULT_WINDOW_STATE.isHiddenToEdge);
 
   const setPointerInside = (inside: boolean) => {
     window.desktopWidget?.setAIPointerInside?.(inside);
@@ -33,6 +41,21 @@ export const DesktopAIWidgetView: React.FC = () => {
   const setResizing = (resizing: boolean) => {
     window.desktopWidget?.setAIResizing?.(resizing);
   };
+
+  const clearTransitionTimer = useCallback(() => {
+    if (transitionTimerRef.current !== null) {
+      window.clearTimeout(transitionTimerRef.current);
+      transitionTimerRef.current = null;
+    }
+  }, []);
+
+  const armTransitionReset = useCallback((durationMs: number) => {
+    clearTransitionTimer();
+    transitionTimerRef.current = window.setTimeout(() => {
+      setTransitionPhase('idle');
+      transitionTimerRef.current = null;
+    }, durationMs);
+  }, [clearTransitionTimer]);
 
   const startResize = useCallback(async (event: React.MouseEvent<HTMLDivElement>, direction: ResizeDirection) => {
     event.preventDefault();
@@ -137,10 +160,47 @@ export const DesktopAIWidgetView: React.FC = () => {
       unsubscribe?.();
       resizeCleanupRef.current?.();
       resizeCleanupRef.current = null;
+      clearTransitionTimer();
       setResizing(false);
       setPointerInside(false);
     };
-  }, []);
+  }, [clearTransitionTimer]);
+
+  useEffect(() => {
+    const wasHidden = previousHiddenRef.current;
+    previousHiddenRef.current = windowState.isHiddenToEdge;
+
+    if (!wasHidden && windowState.isHiddenToEdge) {
+      clearTransitionTimer();
+      setTransitionPhase('idle');
+      return;
+    }
+
+    if (wasHidden && !windowState.isHiddenToEdge) {
+      setTransitionPhase('showing');
+      armTransitionReset(AI_WIDGET_SHOW_TRANSITION_MS);
+    }
+  }, [armTransitionReset, clearTransitionTimer, windowState.isHiddenToEdge]);
+
+  const handleHideToEdge = useCallback(() => {
+    if (windowState.isHiddenToEdge || transitionPhase === 'hiding') {
+      return;
+    }
+
+    setTransitionPhase('hiding');
+    clearTransitionTimer();
+    transitionTimerRef.current = window.setTimeout(() => {
+      window.desktopWidget?.hideAIToEdge?.();
+      transitionTimerRef.current = null;
+    }, AI_WIDGET_HIDE_TRANSITION_MS);
+  }, [clearTransitionTimer, transitionPhase, windowState.isHiddenToEdge]);
+
+  const handleRestoreFromEdge = useCallback(() => {
+    clearTransitionTimer();
+    setTransitionPhase('showing');
+    armTransitionReset(AI_WIDGET_SHOW_TRANSITION_MS);
+    window.desktopWidget?.restoreAIFromEdge?.();
+  }, [armTransitionReset, clearTransitionTimer]);
 
   return (
     <div
@@ -152,10 +212,11 @@ export const DesktopAIWidgetView: React.FC = () => {
         isOpen
         onClose={() => window.desktopWidget?.closeAI?.()}
         displayMode="desktop-widget"
+        desktopWidgetTransitionPhase={transitionPhase}
         edgeHidden={windowState.isHiddenToEdge}
         hiddenEdge={windowState.hiddenEdge}
-        onHideToEdge={() => window.desktopWidget?.hideAIToEdge?.()}
-        onRestoreFromEdge={() => window.desktopWidget?.restoreAIFromEdge?.()}
+        onHideToEdge={handleHideToEdge}
+        onRestoreFromEdge={handleRestoreFromEdge}
         onOpenMainApp={() => window.desktopWidget?.openMainApp()}
       />
       {!windowState.isHiddenToEdge && (

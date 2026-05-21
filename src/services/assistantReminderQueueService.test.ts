@@ -5,6 +5,7 @@
  * @pos Service Tests (Assistant Reminders)
  * @description Verifies that failed reminder dispatches stay pending for at least one minute before retry and that successful dispatch completion still removes the reminder from the queue.
  *
+ * @updated 2026-05-21: Added semantic duplicate coverage so scheduled-task reminders win over equivalent unlinked reminders and recurring-task linkage survives queue collapse.
  * @updated 2026-05-17: Added duplicate agent-reminder coverage so identical pending follow-ups collapse to one stored reminder instead of firing multiple times at the same due timestamp.
  * @updated 2026-05-09: Added coverage for the one-minute failed-dispatch retry window and successful reminder removal.
  */
@@ -158,5 +159,34 @@ describe('assistantReminderQueueService', () => {
     const reminders = assistantReminderQueueService.listReminders();
     expect(reminders).toHaveLength(1);
     expect(reminders[0].id).toBe('reminder-5');
+  });
+
+  it('prefers the scheduled-task-linked reminder when an equivalent unlinked reminder also exists', () => {
+    assistantReminderQueueService.saveReminders([
+      {
+        id: 'reminder-agent',
+        type: 'self_followup',
+        dueAt: '2026-05-22T01:00:00.000Z',
+        status: 'pending',
+        text: 'wake up',
+        source: 'agent',
+        createdAt: '2026-05-22T00:50:00.000Z'
+      },
+      {
+        id: 'reminder-task',
+        type: 'self_followup',
+        dueAt: '2026-05-22T01:00:00.000Z',
+        status: 'pending',
+        text: 'wake up',
+        scheduledTaskId: 'task-1',
+        source: 'system',
+        createdAt: '2026-05-22T00:55:00.000Z'
+      }
+    ]);
+
+    const reminders = assistantReminderQueueService.listReminders();
+    expect(reminders).toHaveLength(1);
+    expect(reminders[0].id).toBe('reminder-task');
+    expect(reminders[0].scheduledTaskId).toBe('task-1');
   });
 });

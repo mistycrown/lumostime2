@@ -15,6 +15,7 @@ import org.json.JSONObject
  * Updated 2026-05-03: Routed widget sync calls to targeted widget-family refresh helpers instead of always refreshing every widget provider.
  * Updated 2026-05-05: Expanded TODAY + PIN sync parsing to persist mirrored source todos/categories for native-side refresh rebuilding.
  * Updated 2026-05-05: Added log-tail synchronization so native quick-punch shortcuts can compute gap fills without opening the app.
+ * Updated 2026-05-20: Wrapped non-Exception sync failures before forwarding them to Capacitor's PluginCall.reject overloads.
  */
 @CapacitorPlugin(name = "WidgetBridge")
 class WidgetBridgePlugin : Plugin() {
@@ -222,7 +223,8 @@ class WidgetBridgePlugin : Plugin() {
             WidgetRefreshCoordinator.refreshTodoPinWidgets(context)
             call.resolve()
         } catch (error: Throwable) {
-            call.reject("Failed to sync todo pin widget data", error)
+            val pluginError = error as? Exception ?: Exception(error)
+            call.reject("Failed to sync todo pin widget data", pluginError)
         }
     }
 

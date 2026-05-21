@@ -4,6 +4,7 @@
  * @output Window Management
  * @pos Electron Main
  * @description Entry point for the Electron application. Handles main-window and desktop-widget creation, lifecycle events, and inter-process communication (IPC).
+ * @updated 2026-05-19: Added blur event handler to AI widget window so it auto-docks to edge when the window loses focus.
  * @updated 2026-05-18: Added a dedicated desktop AI widget window with persisted compact bounds, edge-hide handle mode, and preload bridge events for the always-on-top quick-chat shell.
  * @updated 2026-05-18: Added renderer boot timing logs around main-window navigation so slow DEV startups can be separated from renderer hydration work.
  * @updated 2026-05-18: Added DEV renderer load retries so Electron waits out local Vite startup lag instead of failing the first window navigation.
@@ -1266,6 +1267,11 @@ async function createAIWidgetWindow() {
     }
     aiWidgetExpandedBounds = clampAIWidgetBounds(aiWidgetWindow?.getBounds());
     runInBackground('save ai widget state after resize', saveAIWidgetWindowState());
+  });
+  aiWidgetWindow.on('blur', () => {
+    if (!isAIWidgetHiddenToEdge) {
+      runInBackground('auto-dock ai widget on blur', hideAIWidgetWindowToEdge());
+    }
   });
   aiWidgetWindow.on('close', () => {
     runInBackground('save ai widget state before close', saveAIWidgetWindowState());
