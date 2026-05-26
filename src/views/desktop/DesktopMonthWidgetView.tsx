@@ -4,6 +4,7 @@
  * @output Unified desktop month widget view with one shared title bar, week-paged calendar, and collapsible planning sidebar
  * @pos View (Desktop widget)
  * @description Hosts the Electron desktop month widget, including one unified header, compact display settings, a 2/3/4-week paged calendar body, and the right-side Arrange / Maybe / Due planning sidebar.
+ * @updated 2026-05-23: Switched month-widget todo sync to the shared desktop sync helpers so its cross-window refresh path matches the quick/today/editor widgets while keeping focus and polling fallbacks.
  * @updated 2026-05-18: Changed vertical wheel/trackpad navigation to shift the visible calendar by one week at a time while keeping header arrows as whole-page jumps.
  * @updated 2026-05-17: Added a dedicated month-entry background opacity slider in display settings so the widget can strengthen or soften item fills without changing the window glass opacity.
  * @updated 2026-05-17: The planning sidebar now keeps unfinished todos visible across arrange/maybe/due even when they already have dates, and shows those dated rows with compact trailing labels.
@@ -18,6 +19,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, GripVertical, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { addDays, addWeeks, format, isSameDay, isSameMonth, isSameYear, startOfWeek, subWeeks } from 'date-fns';
 import { dataRepository } from '../../repositories/dataRepository';
+import {
+  publishDesktopTodoSyncEvent,
+  subscribeDesktopTodoSyncEvent
+} from '../../services/desktopWidgetService';
 import { Log, TodoCategory, TodoItem } from '../../types';
 import {
   buildDesktopMonthSidebarSections,
@@ -177,24 +182,18 @@ export const DesktopMonthWidgetView: React.FC = () => {
   }, [refreshData]);
 
   useEffect(() => {
-    const syncChannel = new BroadcastChannel('lumostime-data-sync');
-    const handleChannelMessage = (event: MessageEvent) => {
-      if (event.data === 'todos-updated') {
-        void refreshData();
-      }
-    };
-
+    const stopTodoSyncSubscription = subscribeDesktopTodoSyncEvent(() => {
+      void refreshData();
+    });
     const handleFocus = () => {
       void refreshData();
     };
 
-    syncChannel.addEventListener('message', handleChannelMessage);
     window.addEventListener('focus', handleFocus);
     const intervalId = window.setInterval(refreshData, 10000);
 
     return () => {
-      syncChannel.removeEventListener('message', handleChannelMessage);
-      syncChannel.close();
+      stopTodoSyncSubscription();
       window.removeEventListener('focus', handleFocus);
       window.clearInterval(intervalId);
     };
@@ -251,10 +250,7 @@ export const DesktopMonthWidgetView: React.FC = () => {
       });
 
       await dataRepository.saveTodos(updatedTodos);
-
-      const syncChannel = new BroadcastChannel('lumostime-data-sync');
-      syncChannel.postMessage('todos-updated');
-      syncChannel.close();
+      publishDesktopTodoSyncEvent();
 
       await refreshData();
     } catch (error) {

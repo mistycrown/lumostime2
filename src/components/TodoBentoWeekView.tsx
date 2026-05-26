@@ -4,7 +4,7 @@
  * @output Single-week 2x4 bento schedule UI backed by real todo data
  * @pos Component (Todo scheduling)
  * @description Renders one selected week at a time in the bento layout so the mini calendar, header range, and visible day cells always describe the same week.
- * @updated 2026-05-21: Added mini-calendar due dots for days in the visible month that contain at least one deadline, so the bento week navigator can quietly flag due dates at a glance.
+ * @updated 2026-05-23: Replaced mini-calendar due dots with inline flag icons, hiding the date numeral whenever a visible-month day carries at least one deadline so the bento navigator reads more evenly.
  * @updated 2026-05-21: Highlighted today's 2x4 bento week cell with the same gray inset ring used by month view so the current day reads more clearly at a glance.
  * @updated 2026-05-14: Added a parent-controlled schedule lock toggle so bento week rows can disable drag-to-move without changing the surrounding week navigation or quick-action behavior.
  * @updated 2026-05-18: 支持点击循环排期的 Repeat 标签，唤起快捷编辑栏。
@@ -23,7 +23,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, CircleAlert, SlidersHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CircleAlert, Flag, SlidersHorizontal } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { Log, TodoCategory, TodoItem } from '../types';
 import {
@@ -765,7 +765,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                             const isCurrentMonth = isSameMonth(day, middleDay);
                             const isTodayCell = isToday(day);
                             const dateKey = formatDateKey(day);
-                            const hasDueDot = isCurrentMonth && dueDateKeysInMiniMonth.has(dateKey);
+                            const hasDeadline = isCurrentMonth && dueDateKeysInMiniMonth.has(dateKey);
 
                             return (
                               <div
@@ -780,15 +780,18 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                                       : ''
                                 }`}
                               >
-                                <span className="leading-none">
-                                  {format(day, 'd')}
-                                </span>
-                                <span
-                                  className={`mt-0.5 h-1 w-1 rounded-full bg-stone-500 ${
-                                    hasDueDot ? 'opacity-100' : 'opacity-0'
-                                  }`}
-                                  aria-hidden="true"
-                                />
+                                {hasDeadline ? (
+                                  <Flag
+                                    size={isDenseMonthGrid ? 7 : 8}
+                                    className="shrink-0"
+                                    style={{ fill: 'currentColor' }}
+                                    aria-hidden="true"
+                                  />
+                                ) : (
+                                  <span className="leading-none">
+                                    {format(day, 'd')}
+                                  </span>
+                                )}
                               </div>
                             );
                           })}

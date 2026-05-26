@@ -4,6 +4,8 @@
 
 ## Updates
 
+- 2026-05-23: `DesktopMonthWidgetView.tsx` now also reuses the shared desktop todo sync helpers from `desktopWidgetService.ts`, so month-widget drag/writeback follows the same cross-window refresh path as the quick, today, and editor windows while still keeping focus and polling as fallbacks.
+- 2026-05-23: `DesktopQuickWidgetView.tsx`, `DesktopTodayWidgetView.tsx`, and `DesktopTodoQuickEditorWindowView.tsx` now reuse the shared desktop todo sync channel from `desktopWidgetService.ts`, so quick-task creation and inline title edits repaint sibling widget windows immediately instead of waiting for focus or the 10-second polling fallback.
 - 2026-05-18: Added `DesktopAIWidgetView.tsx`, which keeps the shared AI chat mounted inside the normal app provider tree while the Electron `desktop-ai` window switches between compact quick-chat mode and a narrow edge-hide restore handle.
 
 - 2026-05-18: `DesktopTodayWidgetView.tsx` now renders one-level subtasks inline beneath visible parent rows, while subtasks whose parent is outside the current section fall back to standalone `子任务 @父任务` labels so the compact today widget no longer drops hierarchy context.

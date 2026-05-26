@@ -6,13 +6,15 @@
  * @updated 2026-05-17: 移除任务圆点及任务颜色设置，增加屏幕内快速添加小事功能（提供加号快捷按钮、精致输入窗与回车/ESC按键处理）。
  * @updated 2026-05-17: Keep completed quick todos visible in the flat list and place them after unfinished rows.
  * @updated 2026-05-17: Softened the completed checkbox treatment so finished rows read quieter than unfinished rows.
+ * @updated 2026-05-23: Subscribed to the shared desktop todo sync channel so newly added quick todos and external title edits render immediately instead of waiting for focus or polling.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, ExternalLink, X, SlidersHorizontal, Plus } from 'lucide-react';
 import {
   DesktopTodayWidgetSnapshot,
   DesktopWidgetTodoItem,
-  loadDesktopQuickWidgetSnapshotAsync
+  loadDesktopQuickWidgetSnapshotAsync,
+  subscribeDesktopTodoSyncEvent
 } from '../../services/desktopWidgetService';
 import { resolveDesktopTodoQuickEditorScreenAnchor } from '../../utils/desktopTodoQuickEditorAnchorUtils';
 
@@ -171,12 +173,16 @@ export const DesktopQuickWidgetView: React.FC = () => {
 
   useEffect(() => {
     const handleFocus = () => refreshSnapshot();
+    const stopTodoSyncSubscription = subscribeDesktopTodoSyncEvent(() => {
+      void refreshSnapshot();
+    });
     window.addEventListener('focus', handleFocus);
     
     // IndexedDB 数据无感知更新，轻量轮询保持刷新
     const intervalId = window.setInterval(refreshSnapshot, 10000);
 
     return () => {
+      stopTodoSyncSubscription();
       window.removeEventListener('focus', handleFocus);
       window.clearInterval(intervalId);
     };

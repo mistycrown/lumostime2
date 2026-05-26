@@ -4,7 +4,7 @@ This directory contains the reusable React components for the application. They 
 
 ## Core UI
 - Update 2026-05-21: `ImagePreviewModal.tsx` and `ImagePreviewControls.tsx` now expose a shared preview-toolbar download action, so logs, timeline items, gallery entries, and collection previews can save the current full-size image to the device gallery or browser downloads from the same full-screen viewer.
-- Update 2026-05-21: `TodoBentoWeekView.tsx` now marks mini-calendar dates in the visible month with a small dot whenever at least one todo has a `Due` deadline on that day, so the two-column week navigator quietly flags upcoming pressure points.
+- Update 2026-05-23: `TodoBentoWeekView.tsx` now swaps visible-month mini-calendar date numerals for a small `Flag` icon whenever that day contains at least one `Due` deadline, replacing the brief dot treatment with a cleaner, more even emphasis pattern.
 - Update 2026-05-21: `TodoBentoWeekView.tsx` now gives today's 2x4 week cell the same gray inset ring used by `TodoMonthView.tsx`, making the current day easier to spot without changing the surrounding palette.
 - Update 2026-05-19: `TodoDetailModal.tsx` now renders the monthly `31 -> 月末` fallback control as a pure button and blocks the default mouse-down focus jump, fixing the desktop detail-page white screen triggered by tapping that toggle.
 - Update 2026-05-18: `TodoDatePickerModal.tsx` now strictly validates incoming `yyyy-MM-dd` / `yyyy-MM` values and only mounts its calendar body while open, so malformed short-month schedule strings no longer white-screen the shared picker tree.

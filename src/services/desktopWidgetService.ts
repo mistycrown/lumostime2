@@ -4,6 +4,7 @@
  * @output Desktop widget route helpers and compact today-task snapshot builders for the Electron widget window
  * @pos Service
  * @description Builds the lightweight desktop widget snapshot from the shared todo model so the Electron widget window can reuse the app's existing today-task logic without mounting the full app shell.
+ * @updated 2026-05-23: Added shared desktop todo sync-channel helpers so persisted todo writes can immediately refresh quick/today/editor widget windows without waiting for focus or polling.
  * @updated 2026-05-17: 扩展了桌面小组件状态快照，新增计时器小组件（timer widget）的快照构建 buildDesktopTimerWidgetSnapshot 与 loadDesktopTimerWidgetSnapshotFromStorage。
  * @updated 2026-05-17: 新增桌面小组件启动偏好键名与读取辅助逻辑，供 Electron 主应用启动时自动恢复已启用的 PC 端小组件。
  * @updated 2026-05-17: 扩展了桌面小组件的支持，新增 desktop-quick（小事清单小组件）快照构建与窗口检测，实现了 buildDesktopQuickWidgetSnapshot 以确保无排期的小事能够完整呈现在小组件待办列表中。
@@ -36,8 +37,42 @@ export const DESKTOP_WIDGET_MONTH_STORAGE_KEY = 'lumostime_desktop_widget_month_
 export const DESKTOP_WIDGET_QUICK_STORAGE_KEY = 'lumostime_desktop_widget_quick_enabled';
 export const DESKTOP_WIDGET_TIMER_STORAGE_KEY = 'lumostime_desktop_widget_timer_enabled';
 export const DESKTOP_WIDGET_AI_STORAGE_KEY = 'lumostime_desktop_widget_ai_enabled';
+export const DESKTOP_TODO_SYNC_CHANNEL_NAME = 'lumostime-data-sync';
+export const DESKTOP_TODOS_UPDATED_EVENT = 'todos-updated';
 
 export type DesktopWidgetStartupType = 'today' | 'month' | 'quick' | 'timer' | 'ai';
+
+export const publishDesktopTodoSyncEvent = (): void => {
+  if (typeof BroadcastChannel === 'undefined') {
+    return;
+  }
+
+  const syncChannel = new BroadcastChannel(DESKTOP_TODO_SYNC_CHANNEL_NAME);
+  syncChannel.postMessage(DESKTOP_TODOS_UPDATED_EVENT);
+  syncChannel.close();
+};
+
+export const subscribeDesktopTodoSyncEvent = (
+  listener: () => void
+): (() => void) => {
+  if (typeof BroadcastChannel === 'undefined') {
+    return () => undefined;
+  }
+
+  const syncChannel = new BroadcastChannel(DESKTOP_TODO_SYNC_CHANNEL_NAME);
+  const handleChannelMessage = (event: MessageEvent) => {
+    if (event.data === DESKTOP_TODOS_UPDATED_EVENT) {
+      listener();
+    }
+  };
+
+  syncChannel.addEventListener('message', handleChannelMessage);
+
+  return () => {
+    syncChannel.removeEventListener('message', handleChannelMessage);
+    syncChannel.close();
+  };
+};
 
 export type DesktopWidgetBadgeLabel = 'PIN' | 'TODAY' | 'LATE' | 'MAYBE';
 

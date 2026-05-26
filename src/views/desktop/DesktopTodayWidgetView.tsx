@@ -6,13 +6,15 @@
  * @updated 2026-05-17: Keep completed todos visible inside each today-widget section while still ordering them after unfinished rows.
  * @updated 2026-05-17: Softened the completed checkbox treatment and hid finished rows from the overdue section while keeping them visible in pinned/today.
  * @updated 2026-05-17: Increased the unfinished checkbox outline contrast in the today widget so open tasks stay legible on the translucent background.
+ * @updated 2026-05-23: Subscribed to the shared desktop todo sync channel so rows refresh immediately after persisted todo edits from sibling Electron windows.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, ExternalLink, X, Play, SlidersHorizontal } from 'lucide-react';
 import {
   DesktopTodayWidgetSnapshot,
   DesktopWidgetTodoItem,
-  loadDesktopTodayWidgetSnapshotAsync
+  loadDesktopTodayWidgetSnapshotAsync,
+  subscribeDesktopTodoSyncEvent
 } from '../../services/desktopWidgetService';
 import {
   getResolvedTodoScheduleTypeColors,
@@ -311,12 +313,16 @@ export const DesktopTodayWidgetView: React.FC = () => {
 
   useEffect(() => {
     const handleFocus = () => refreshSnapshot();
+    const stopTodoSyncSubscription = subscribeDesktopTodoSyncEvent(() => {
+      void refreshSnapshot();
+    });
     window.addEventListener('focus', handleFocus);
     
     // IndexedDB does not trigger storage events, so we poll slightly to stay fresh
     const intervalId = window.setInterval(refreshSnapshot, 10000);
 
     return () => {
+      stopTodoSyncSubscription();
       window.removeEventListener('focus', handleFocus);
       window.clearInterval(intervalId);
     };
