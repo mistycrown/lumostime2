@@ -4,6 +4,7 @@
  * @output Transparent always-on-top desktop quick editor that can exceed the source widget bounds
  * @pos View (Desktop widget)
  * @description Hosts the shared todo quick editor inside its own transparent Electron window so desktop widgets can open a larger inline editor near the pointer without clipping against the widget BrowserWindow.
+ * @updated 2026-05-23: Reused the shared desktop todo sync helpers so title/note/completion saves notify sibling widget windows through one central channel contract.
  * @updated 2026-05-17: Added the external quick-editor window view with inline title and note editing, parent navigation, and live todo sync.
  * @updated 2026-05-17: Integrated the onToggleComplete action callback to support fast check/uncheck status updates in the desktop quick editor.
  */
@@ -11,17 +12,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DesktopTodoQuickEditorPopover } from '../../components/DesktopTodoQuickEditorPopover';
 import { dataRepository } from '../../repositories/dataRepository';
+import {
+  publishDesktopTodoSyncEvent,
+  subscribeDesktopTodoSyncEvent
+} from '../../services/desktopWidgetService';
 import type { DesktopTodoQuickEditorWindowPayload } from '../../services/desktopWidgetService';
 import type { TodoItem } from '../../types';
 import { buildDesktopTodoQuickEditorModel } from '../../utils/desktopTodoQuickEditorUtils';
 
 const APP_READY_EVENT = 'lumostime:app-ready';
-
-const publishTodoUpdate = () => {
-  const syncChannel = new BroadcastChannel('lumostime-data-sync');
-  syncChannel.postMessage('todos-updated');
-  syncChannel.close();
-};
 
 export const DesktopTodoQuickEditorWindowView: React.FC = () => {
   const [payload, setPayload] = useState<DesktopTodoQuickEditorWindowPayload | null>(null);
@@ -65,17 +64,13 @@ export const DesktopTodoQuickEditorWindowView: React.FC = () => {
 
     void hydrate();
 
-    const syncChannel = new BroadcastChannel('lumostime-data-sync');
-    const handleChannelMessage = (event: MessageEvent) => {
-      if (event.data === 'todos-updated') {
-        void refreshTodos();
-      }
-    };
+    const stopTodoSyncSubscription = subscribeDesktopTodoSyncEvent(() => {
+      void refreshTodos();
+    });
     const handleFocus = () => {
       void refreshTodos();
     };
 
-    syncChannel.addEventListener('message', handleChannelMessage);
     window.addEventListener('focus', handleFocus);
     const stopPayloadSubscription = window.desktopWidget?.onTodoQuickEditorState?.((nextPayload) => {
       applyPayload(nextPayload);
@@ -84,8 +79,7 @@ export const DesktopTodoQuickEditorWindowView: React.FC = () => {
 
     return () => {
       isMounted = false;
-      syncChannel.removeEventListener('message', handleChannelMessage);
-      syncChannel.close();
+      stopTodoSyncSubscription();
       window.removeEventListener('focus', handleFocus);
       stopPayloadSubscription?.();
     };
@@ -123,7 +117,7 @@ export const DesktopTodoQuickEditorWindowView: React.FC = () => {
 
     try {
       await dataRepository.saveTodos(updatedTodos);
-      publishTodoUpdate();
+      publishDesktopTodoSyncEvent();
       await refreshTodos();
     } catch (error) {
       console.error(errorLabel, error);

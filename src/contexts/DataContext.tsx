@@ -1,11 +1,16 @@
 /**
  * @file DataContext.tsx
  * @description Manages core application data state (logs, todos, todoCategories, and data collections) with async repository hydration and persistence.
+ * @updated 2026-05-23: Broadcasts desktop todo sync events after persisted todo writes and rehydrates todos from external desktop-window edits so Electron widgets and the main app stay aligned.
  * @updated 2026-05-14: Normalizes hydrated todo `maybeDates` on load so stale past `Maybe Date` entries are cleaned automatically when the app opens on a later day.
  */
 import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES } from '../constants';
 import { dataRepository } from '../repositories/dataRepository';
+import {
+  publishDesktopTodoSyncEvent,
+  subscribeDesktopTodoSyncEvent
+} from '../services/desktopWidgetService';
 import { DataCollection, DataCollectionEntry, Log, TodoCategory, TodoItem } from '../types';
 import { normalizeTodoMaybeDates } from '../utils/todoScheduleUtils';
 import {
@@ -61,6 +66,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [localDataTimestamp, setLocalDataTimestamp] = useState<number>(() => getLocalDataTimestamp());
 
   const isHydratingRef = useRef(true);
+  const latestTodosRef = useRef<TodoItem[]>(INITIAL_TODOS);
+
+  useEffect(() => {
+    latestTodosRef.current = todos;
+  }, [todos]);
 
   useEffect(() => {
     const handleTimestampUpdated = (event: Event) => {
@@ -135,10 +145,46 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
-    void dataRepository.saveTodos(todos).catch((error) => {
-      console.error('[DataContext] Failed to persist todos', error);
-    });
+    void (async () => {
+      try {
+        await dataRepository.saveTodos(todos);
+        if (!isHydratingRef.current) {
+          publishDesktopTodoSyncEvent();
+        }
+      } catch (error) {
+        console.error('[DataContext] Failed to persist todos', error);
+      }
+    })();
   }, [canPersist, isReady, todos]);
+
+  useEffect(() => {
+    if (!isReady || !canPersist) {
+      return;
+    }
+
+    const stopTodoSyncSubscription = subscribeDesktopTodoSyncEvent(() => {
+      void (async () => {
+        try {
+          const snapshot = await dataRepository.loadDataContextSnapshot();
+          const normalizedTodos = snapshot.todos.map((todo) => normalizeTodoMaybeDates(todo));
+          const currentSerializedTodos = JSON.stringify(latestTodosRef.current);
+          const nextSerializedTodos = JSON.stringify(normalizedTodos);
+
+          if (currentSerializedTodos === nextSerializedTodos) {
+            return;
+          }
+
+          setTodos(normalizedTodos);
+        } catch (error) {
+          console.error('[DataContext] Failed to refresh todos from desktop sync event', error);
+        }
+      })();
+    });
+
+    return () => {
+      stopTodoSyncSubscription();
+    };
+  }, [canPersist, isReady]);
 
   useEffect(() => {
     if (!isReady || !canPersist) {
