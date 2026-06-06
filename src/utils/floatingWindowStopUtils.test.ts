@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ActiveSession } from '../types';
 import {
+  buildFloatingStopToken,
   buildFloatingStopActions,
   normalizeFloatingStopSessionId,
   parseFloatingStopDetail
@@ -73,5 +74,15 @@ describe('floatingWindowStopUtils', () => {
       { mode: 'stop', sessionId: 'session-1' },
       { mode: 'stop', sessionId: 'session-2' }
     ]);
+  });
+
+  it('builds stable stop tokens that distinguish event sources', () => {
+    const actions = [
+      { mode: 'stop', sessionId: 'session-2' as const },
+      { mode: 'stop', sessionId: 'session-1' as const }
+    ];
+
+    expect(buildFloatingStopToken(actions, 'plugin')).toBe('plugin:stop:session-1|stop:session-2');
+    expect(buildFloatingStopToken(actions, 'pending')).toBe('pending:stop:session-1|stop:session-2');
   });
 });

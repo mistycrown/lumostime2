@@ -4,6 +4,9 @@
  * @output A settings-level Collection list plus mixed-item detail timeline
  * @pos View (Settings sub-page)
  * @description Presents collections with compact title-led rows and a detail page that uses its own lightweight timeline cards instead of reusing the shared memoir timeline UI.
+ * @updated 2026-06-06: Added a delete-impact confirmation step to Collection batch-management save so collection removals warn about how many membership links will be unbound before applying.
+ * @updated 2026-06-06: Added a dedicated Collection management sub-page with manual ordering, rename/create/delete controls, and delete-time unlink cleanup for related log/todo memberships.
+ * @updated 2026-06-06: Made the Collection settings page use its own scroll container so long lists keep scrolling and newly opened create rows stay reachable past the first ten items.
  * @updated 2026-05-21: Collection add-modal todo browsing now opens at the category level, while log search stays empty until users explicitly search to avoid rendering huge record lists.
  * @updated 2026-05-21: Collection timeline preview-image taps now stop at the image button so zooming a cover no longer also opens the linked detail card.
  * @updated 2026-05-21: Collection timeline preview images now keep their source aspect ratio within a capped frame instead of forcing every cover into a square crop.
@@ -12,8 +15,8 @@
  * @updated 2026-05-13: Made mixed collection timeline entries clickable so linked logs/todos can open their shared detail overlays while leaving the collection page underneath for return navigation.
  * @updated 2026-05-12: Rebuilt Collection detail items as a standalone UI, tightened the create-row controls, compressed the header summary into a single line, switched entry media to a wrapped right-aligned preview layout, and aligned todo metadata with memoir/task tag rendering.
  */
-import React, { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronDown, ChevronLeft, ChevronRight, PencilLine, Plus, Save, Search, X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, PencilLine, Plus, Save, Search, Settings2, X } from 'lucide-react';
 import { DataCollection, Log, Scope, TodoItem } from '../../types';
 import { useData } from '../../contexts/DataContext';
 import { useCategoryScope } from '../../contexts/CategoryScopeContext';
@@ -26,6 +29,8 @@ import { usePrivacy } from '../../contexts/PrivacyContext';
 import { CollapsibleText } from '../../components/CollapsibleText';
 import { IconRenderer } from '../../components/IconRenderer';
 import { registerHardwareBackHandler } from '../../utils/hardwareBackHandlerStack';
+import { ConfirmModal } from '../../components/ConfirmModal';
+import { CollectionManageView } from '../CollectionManageView';
 
 interface CollectionSettingsViewProps {
   onBack: () => void;
@@ -86,6 +91,12 @@ interface CollectionAddTodoGroup {
   label: string;
   icon?: string;
   options: CollectionAddOption[];
+}
+
+interface PendingCollectionDeleteConfirmation {
+  nextCollections: DataCollection[];
+  deletedCount: number;
+  unlinkedEntryCount: number;
 }
 
 const formatCountBadge = (count: number): string => String(count).padStart(2, '0');
@@ -690,9 +701,12 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
   const [expandedTodoCategoryIds, setExpandedTodoCategoryIds] = useState<string[]>([]);
   const [selectedTodoIds, setSelectedTodoIds] = useState<string[]>([]);
   const [selectedLogIds, setSelectedLogIds] = useState<string[]>([]);
+  const createInputRef = useRef<HTMLInputElement | null>(null);
+  const [isManagingCollections, setIsManagingCollections] = useState(false);
+  const [pendingDeleteConfirmation, setPendingDeleteConfirmation] = useState<PendingCollectionDeleteConfirmation | null>(null);
 
   const sortedCollections = useMemo(
-    () => [...collections].sort((left, right) => right.updatedAt - left.updatedAt),
+    () => collections,
     [collections]
   );
   const countMap = useMemo(
@@ -746,6 +760,28 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
     });
   }, [selectedCollectionId]);
 
+  useEffect(() => {
+    if (!isManagingCollections) {
+      return;
+    }
+
+    return registerHardwareBackHandler(() => {
+      setIsManagingCollections(false);
+      return true;
+    });
+  }, [isManagingCollections]);
+
+  useEffect(() => {
+    if (!pendingDeleteConfirmation) {
+      return;
+    }
+
+    return registerHardwareBackHandler(() => {
+      setPendingDeleteConfirmation(null);
+      return true;
+    });
+  }, [pendingDeleteConfirmation]);
+
   const closeAddModal = () => {
     setIsAddModalOpen(false);
     setTodoSearchQuery('');
@@ -767,6 +803,19 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
       return true;
     });
   }, [isAddModalOpen]);
+
+  useEffect(() => {
+    if (!isCreating || selectedCollectionId) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      createInputRef.current?.focus();
+      createInputRef.current?.scrollIntoView({ block: 'nearest' });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [isCreating, selectedCollectionId]);
 
   const buildTagString = (
     categoryName: string | undefined,
@@ -1076,7 +1125,7 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
       updatedAt: now
     };
 
-    setCollections((prev) => [nextCollection, ...prev].sort((left, right) => right.updatedAt - left.updatedAt));
+    setCollections((prev) => [nextCollection, ...prev]);
     setDraftName('');
     setIsCreating(false);
     setSelectedCollectionId(nextCollection.id);
@@ -1155,9 +1204,54 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
         item.id === selectedCollection.id
           ? { ...item, updatedAt: now }
           : item
-      ))
-      .sort((left, right) => right.updatedAt - left.updatedAt));
+      )));
     closeAddModal();
+  };
+
+  const applyCollectionManagementSave = (nextCollections: DataCollection[]) => {
+    const previousCollectionIds = new Set(collections.map((collection) => collection.id));
+    const nextCollectionIds = new Set(nextCollections.map((collection) => collection.id));
+    const deletedCollectionIds = new Set(
+      Array.from(previousCollectionIds).filter((collectionId) => !nextCollectionIds.has(collectionId))
+    );
+    const now = Date.now();
+
+    setCollections(nextCollections.map((collection) => ({
+      ...collection,
+      name: collection.name.trim() || 'Untitled Collection',
+      updatedAt: deletedCollectionIds.size > 0 || previousCollectionIds.has(collection.id) ? now : collection.updatedAt
+    })));
+
+    if (deletedCollectionIds.size > 0) {
+      setCollectionEntries((prev) => prev.filter((entry) => !deletedCollectionIds.has(entry.collectionId)));
+
+      if (selectedCollectionId && deletedCollectionIds.has(selectedCollectionId)) {
+        setSelectedCollectionId(null);
+      }
+    }
+
+    setIsManagingCollections(false);
+  };
+
+  const handleSaveCollectionManagement = (nextCollections: DataCollection[]) => {
+    const previousCollectionIds = new Set(collections.map((collection) => collection.id));
+    const nextCollectionIds = new Set(nextCollections.map((collection) => collection.id));
+    const deletedCollectionIds = new Set(
+      Array.from(previousCollectionIds).filter((collectionId) => !nextCollectionIds.has(collectionId))
+    );
+
+    if (deletedCollectionIds.size === 0) {
+      applyCollectionManagementSave(nextCollections);
+      return;
+    }
+
+    const unlinkedEntryCount = collectionEntries.filter((entry) => deletedCollectionIds.has(entry.collectionId)).length;
+
+    setPendingDeleteConfirmation({
+      nextCollections,
+      deletedCount: deletedCollectionIds.size,
+      unlinkedEntryCount
+    });
   };
 
   const renderList = () => (
@@ -1189,6 +1283,7 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
             <div className="flex items-center gap-2">
               <span className="text-sm font-normal text-stone-300">◬</span>
               <input
+                ref={createInputRef}
                 value={draftName}
                 onChange={(event) => setDraftName(event.target.value)}
                 placeholder="新建 Collection"
@@ -1326,8 +1421,9 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#faf9f6] animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-      <div className="sticky top-0 z-10 border-b border-stone-200 bg-[#faf9f6]/96 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-[#faf9f6] animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      {!isManagingCollections ? (
+        <div className="sticky top-0 z-10 border-b border-stone-200 bg-[#faf9f6]/96 backdrop-blur-sm">
         <div className="relative mx-auto flex h-14 max-w-5xl items-center px-5">
           <button
             type="button"
@@ -1340,10 +1436,31 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
           <div className="pointer-events-none absolute left-1/2 max-w-[70%] -translate-x-1/2 truncate text-center text-[1.15rem] font-medium text-stone-900">
             {selectedCollectionId ? 'Collection Detail' : 'Collection'}
           </div>
+          {!selectedCollectionId ? (
+            <button
+              type="button"
+              onClick={() => setIsManagingCollections(true)}
+              className="group ml-auto inline-flex items-center justify-center text-[0px]"
+              title="管理 Collection"
+              aria-label="管理 Collection"
+            >
+              <Settings2 size={16} className="rotate-90 text-stone-400 transition-colors group-hover:text-stone-700" />
+              管理
+            </button>
+          ) : null}
         </div>
-      </div>
+        </div>
+      ) : null}
 
-      {selectedCollectionId ? renderDetail() : renderList()}
+      <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
+        {isManagingCollections ? (
+          <CollectionManageView
+            collections={collections}
+            onBack={() => setIsManagingCollections(false)}
+            onSave={handleSaveCollectionManagement}
+          />
+        ) : selectedCollectionId ? renderDetail() : renderList()}
+      </div>
       <CollectionAddModal
         isOpen={isAddModalOpen && Boolean(selectedCollection)}
         collectionName={selectedCollection?.name || ''}
@@ -1370,6 +1487,25 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
           : [...current, logId])}
         onClose={closeAddModal}
         onConfirm={handleConfirmAddItems}
+      />
+      <ConfirmModal
+        isOpen={Boolean(pendingDeleteConfirmation)}
+        onClose={() => setPendingDeleteConfirmation(null)}
+        onConfirm={() => {
+          if (!pendingDeleteConfirmation) {
+            return;
+          }
+
+          applyCollectionManagementSave(pendingDeleteConfirmation.nextCollections);
+          setPendingDeleteConfirmation(null);
+        }}
+        title="确认删除 Collection"
+        description={pendingDeleteConfirmation
+          ? `你删除了 ${pendingDeleteConfirmation.deletedCount} 个条目，将解除 ${pendingDeleteConfirmation.unlinkedEntryCount} 条和这些 collection 的关联关系，是否继续？`
+          : ''}
+        confirmText="继续"
+        cancelText="取消"
+        type="warning"
       />
     </div>
   );

@@ -4,6 +4,7 @@
  * @output Single-week 2x4 bento schedule UI backed by real todo data
  * @pos Component (Todo scheduling)
  * @description Renders one selected week at a time in the bento layout so the mini calendar, header range, and visible day cells always describe the same week.
+ * @updated 2026-06-06: Reused the shared schedule primary-kind priority for bento marker colors so overlapping badges now follow the same Done > Due > Arrange > Repeat > Maybe > Trace precedence as month view.
  * @updated 2026-05-23: Replaced mini-calendar due dots with inline flag icons, hiding the date numeral whenever a visible-month day carries at least one deadline so the bento navigator reads more evenly.
  * @updated 2026-05-21: Highlighted today's 2x4 bento week cell with the same gray inset ring used by month view so the current day reads more clearly at a glance.
  * @updated 2026-05-14: Added a parent-controlled schedule lock toggle so bento week rows can disable drag-to-move without changing the surrounding week navigation or quick-action behavior.
@@ -30,6 +31,7 @@ import {
   buildWeekTodoBuckets,
   formatDateKey,
   formatWeekTodoLineTitle,
+  getPrimaryTodoScheduleEntryKind,
   TodoDateEntry,
   WeekTodoEntry
 } from '../utils/todoScheduleUtils';
@@ -99,12 +101,7 @@ interface BentoBadgeDescriptor {
 }
 
 const getWeekEntryColorKey = (entry: WeekTodoEntry): TodoScheduleTypeColorKey => {
-  if (entry.badges.deadline) return 'deadline';
-  if (entry.badges.scheduled) return 'scheduled';
-  if (entry.badges.recurring) return 'recurring';
-  if (entry.badges.maybe) return 'maybe';
-  if (entry.badges.completed) return 'completed';
-  return 'inProgress';
+  return getPrimaryTodoScheduleEntryKind(entry.badges);
 };
 
 const getMonthGridWeeks = (date: Date): Date[] => eachWeekOfInterval({

@@ -4,6 +4,7 @@
  * @output Batch operations on focus records
  * @pos View (Batch Management)
  * @description Batch management interface for focus records. Allows filtering, selecting, and performing batch operations on time logs.
+ * @updated 2026-06-06: Clarified custom-filter syntax so `@` matches linked todo titles or todo category names during batch log filtering.
  * @updated 2026-05-10: Added batch note delete/append/replace actions so selected records can update remarks in one pass.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -1525,7 +1526,7 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
                                 className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stone-300 resize-none"
                             />
                             <div className="text-xs text-stone-400 space-y-1">
-                                <p>语法: #活动 %领域 @待办 备注关键词 | 用OR表示或关系。建议先修改少量数据，确认无误后再全部批量操作。</p>
+                                <p>语法: #活动 %领域 @待办/分类 备注关键词 | 用OR表示或关系。建议先修改少量数据，确认无误后再全部批量操作。</p>
                             </div>
                         </div>
 

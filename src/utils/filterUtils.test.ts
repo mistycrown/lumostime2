@@ -3,13 +3,14 @@
  * @input Todo-style custom filter expressions with linked category/scope metadata
  * @output Regression coverage for month-view todo hidden-filter matching
  * @pos Test (custom filter utilities)
- * @description Verifies that todo-target custom filter expressions reuse the same AND/OR parser while matching todo title/category, linked activity/category, default scopes, and notes.
+ * @description Verifies that todo-target and linked-log custom filter expressions reuse the same AND/OR parser while matching todo title/category, linked activity/category, default scopes, and notes.
+ * @updated 2026-06-06: Added linked-log coverage so `@` expressions also match todo category names in custom filters.
  * @updated 2026-05-11: Added todo hidden-filter coverage for the month-view display-settings expression.
  */
 
 import { describe, expect, test } from 'vitest';
-import { Category, Scope, TodoCategory, TodoItem } from '../types';
-import { matchesTodoFilterExpression } from './filterUtils';
+import { Category, Log, Scope, TodoCategory, TodoItem } from '../types';
+import { matchesFilter, matchesTodoFilterExpression, parseFilterExpression } from './filterUtils';
 
 const activityCategories: Category[] = [
   {
@@ -92,6 +93,18 @@ const buildTodo = (overrides: Partial<TodoItem>): TodoItem => ({
   ...overrides
 });
 
+const buildLog = (overrides: Partial<Log> = {}): Log => ({
+  id: 'log-1',
+  activityId: 'activity-reading',
+  categoryId: 'activity-category-study',
+  startTime: 1,
+  endTime: 2,
+  duration: 60,
+  linkedTodoId: 'todo-1',
+  note: '复盘',
+  ...overrides
+});
+
 const filterContext = {
   categories: activityCategories,
   scopes,
@@ -120,5 +133,31 @@ describe('matchesTodoFilterExpression', () => {
     expect(matchesTodoFilterExpression(buildTodo({}), '%健康 复盘', filterContext)).toBe(true);
     expect(matchesTodoFilterExpression(buildTodo({ note: '只有阅读' }), '%健康 复盘', filterContext)).toBe(false);
     expect(matchesTodoFilterExpression(buildTodo({ defaultScopeIds: ['scope-school'] }), '%健康 复盘', filterContext)).toBe(false);
+  });
+});
+
+describe('matchesFilter linked todo matching', () => {
+  test('matches @ tokens against linked todo title or linked todo category title', () => {
+    const todo = buildTodo({});
+    const logContext = {
+      categories: activityCategories,
+      scopes,
+      todos: [todo],
+      todoCategories
+    };
+
+    expect(matchesFilter(buildLog({}), parseFilterExpression('@写作'), logContext)).toBe(true);
+    expect(matchesFilter(buildLog({}), parseFilterExpression('@计划'), logContext)).toBe(true);
+    expect(matchesFilter(buildLog({}), parseFilterExpression('@计划 OR 生活'), logContext)).toBe(true);
+    expect(
+      matchesFilter(
+        buildLog({ linkedTodoId: 'todo-2' }),
+        parseFilterExpression('@计划'),
+        {
+          ...logContext,
+          todos: [todo, buildTodo({ id: 'todo-2', categoryId: 'todo-category-life' })]
+        }
+      )
+    ).toBe(false);
   });
 });

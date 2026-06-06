@@ -193,7 +193,6 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
             const orderedNames = Array.from(new Set(collectionIds))
                 .map((collectionId) => collectionById.get(collectionId))
                 .filter((collection): collection is NonNullable<typeof collection> => Boolean(collection))
-                .sort((left, right) => right.updatedAt - left.updatedAt)
                 .map((collection) => collection.name.trim())
                 .filter(Boolean);
 

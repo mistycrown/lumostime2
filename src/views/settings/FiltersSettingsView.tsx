@@ -311,7 +311,7 @@ export const FiltersSettingsView: React.FC<FiltersSettingsViewProps> = ({
                                     onChange={e => setFilterExpression(e.target.value)}
                                 />
                                 <p className="text-[10px] text-stone-400 mt-1.5">
-                                    # 标签, % 领域, @ 代办, ^ Reaction, 无符号=备注, OR 表示"或"
+                                    # 标签, % 领域, @ 待办/分类, ^ Reaction, 无符号=备注, OR 表示"或"
                                 </p>
                             </div>
                         </div>

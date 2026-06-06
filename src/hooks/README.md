@@ -1,10 +1,13 @@
 # Custom Hooks
 
+> `useTodoManager.ts` now clears `coverImage` when duplicating a todo, so quick-copy tasks start clean instead of inheriting the original cover artwork.
 > `useWidgetBridgeSync.ts` now catches both synchronous and async native widget bridge failures during payload sync, so newly extended todo recurrence fields such as month-end fallback cannot white-screen the app if the Android bridge rejects them.
+> `useFloatingWindow.ts` now consumes Android floating-window stop actions through the Capacitor plugin listener only, while still reconciling persisted pending stops on resume, so one native stop tap cannot be double-consumed through both plugin and window event bridges.
 > `useTodoManager.ts` now canonicalizes recurrence rules during save/duplicate/batch-add, so month-end fallback toggles and older invalid monthly payloads settle into one stable persisted shape before downstream views react to the todo update.
 > `useSyncManager.ts` now classifies local-vs-cloud timestamps through a shared helper and uses a 1-second tolerance, so desktop edits made shortly after the previous sync are no longer misclassified as already equal.
 > `useSyncManager.ts` now includes the unified nested `achievementData` backup block in cloud/upload payloads and restores that achievement state during imports/downloads, while still preserving the local achievement bottle data whenever an older backup file simply does not include that block.
 > `useSyncManager.ts` now includes the unified nested `aiData` backup block in cloud/upload payloads, restores that AI state during imports/downloads, and listens for AI-only persistence change events so chat/memory/Dream updates can auto-sync even without timeline or todo edits.
+> `useLogManager.ts` now rejects brand-new log insertions whose `startTime`, `endTime`, and normalized `note` exactly match an existing record, so floating-window stop races and repeated backfill inserts cannot append identical timeline items twice.
 > `useLogManager.ts` now dispatches a shared submitted-log event only for brand-new log saves, letting the globally mounted AI assistant react to selected completed tags without firing again on log edits.
 > `useTodoManager.ts` now normalizes future-only `maybeDates` plus deduplicated recurrence `skipDates` whenever todos are saved, duplicated, or batch-created, so tentative candidate dates do not accumulate stale past entries in persisted data.
 > `useTodoQuickActions.ts` now also exposes a shared `Maybe` quick action that writes normalized multi-date `maybeDates`, so list-row quick actions can edit tentative future dates for ordinary and recurring tasks alike.
@@ -13,6 +16,7 @@
 > `useDeepLink.ts` now also routes NFC scans and LumosTime app links through a shared compatibility parser so older tags and WebView-specific custom-scheme variations still execute reliably.
 > `useDeepLink.ts` now dedupes equivalent NFC and app-link timer URLs by their parsed action key, so `appUrlOpen` and `nfcTagScanned` can share one stop/start path without leaving behind duplicate same-activity sessions.
 > `useDeepLink.ts` now also suppresses cross-source replays of the same NFC `start` action, so a timer stopped by scanning its own tag cannot be immediately restarted by a delayed `appUrlOpen` or launch-url echo from that same scan.
+> `useDeepLink.ts` now stops only the scanned tag's own active sessions, so scanning A then B starts concurrent timers and only a repeat scan of A or B stops that specific activity.
 > `useDeepLink.ts` now ignores stale listener instances, so React StrictMode or delayed native listener cleanup in dev builds cannot leave an old NFC/deep-link callback around to process the same scan twice.
 > `useLogManager.ts` now lets callers override the date used for new backfill defaults, so the Android widget supplement-log shortcut can always open against today even if the timeline was last left on a past date.
 > `useTodoManager.ts` now keeps a nested todo-detail history stack, and `useHardwareBackButton.ts` now consumes Android back presses through that same stack so child-task details return to their parent detail page before closing back to the main todo surface.

@@ -4,6 +4,7 @@
 
 ## Updates
 
+- 2026-06-06: `FiltersSettingsView.tsx` now labels `@` syntax as `待办/分类`, aligning the settings help text with the shared custom-filter behavior for linked-log todo matches.
 - 2026-05-17: 重构设置菜单布局，新增了“Windows 特性”分组，将“PC端小组件”与原在数据同步分类下的“导出到 Obsidian”归拢在此专有分组下，并确保其在安卓端不可见。
 - 2026-05-17: 优化了显示条件，结合 !Capacitor.isNativePlatform() 逻辑彻底确保“PC端小组件”设置项在 Android 端隐藏。
 - 2026-05-17: 进行了重命名与界面极简化修改，将设置项名称由“桌面今日小组件”更名为“PC端小组件”，并移除各小组件选项下的详细说明文字，仅保留标题。
@@ -47,4 +48,3 @@
 - Each subview receives `onBack` so it can return to the main settings page.
 - Shared state is still passed through props from `SettingsView.tsx`.
 - Keep visual language consistent with the rest of settings: full-screen layout, soft stone palette, and minimal controls.
-

@@ -3,6 +3,7 @@
  * @input Achievement rules plus category, scope, todo, and daily-check metadata for editing targets
  * @output Rule list rows and a modal editor that can safely edit temporary empty numeric input states
  * @description Achievement rule list and modal editor, reusing the shared selectors plus inline filter expressions for duration-based custom matching.
+ * @updated 2026-06-06: Clarified custom-filter help text so `@` expressions cover todo titles and todo category names.
  * @updated 2026-04-25: Added a fixed per-rule streak toggle for check-category rules without exposing custom streak-tier editing in the UI.
  * @updated 2026-04-17: Added filter-duration rules backed by inline custom filter expressions.
  */
@@ -682,7 +683,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
                 placeholder="例如：#阅读 %学习"
               />
               <p className="mt-2 text-xs leading-6 text-stone-400">
-                支持 `#标签`、`%领域`、`@待办`、`^Reaction`、备注关键词，以及 `OR` 连接同类条件。
+                支持 `#标签`、`%领域`、`@待办/分类`、`^Reaction`、备注关键词，以及 `OR` 连接同类条件。
               </p>
             </label>
           ) : draft.targetType === 'todoCategory' ? (

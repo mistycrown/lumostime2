@@ -3,6 +3,9 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-06-06: `achievement/AchievementRulesTab.tsx` now explains `@待办/分类` in filter-duration rule help text, keeping achievement filter syntax aligned with the shared custom-filter matcher.
+- Update 2026-06-06: `TodoBentoWeekView.tsx` now reuses the shared schedule primary-kind priority for marker colors, so overlapping badges in the two-column week planner follow the same `Done > Due > Arrange > Repeat > Maybe > Trace` precedence as `TodoMonthView.tsx`.
+- Update 2026-06-06: `TodoMonthView.tsx` now shows a compact `6月6日 周六 · 3 items` style summary line above each expanded month-day detail list, giving the open rail a lighter editorial header without adding extra framing.
 - Update 2026-05-21: `ImagePreviewModal.tsx` and `ImagePreviewControls.tsx` now expose a shared preview-toolbar download action, so logs, timeline items, gallery entries, and collection previews can save the current full-size image to the device gallery or browser downloads from the same full-screen viewer.
 - Update 2026-05-23: `TodoBentoWeekView.tsx` now swaps visible-month mini-calendar date numerals for a small `Flag` icon whenever that day contains at least one `Due` deadline, replacing the brief dot treatment with a cleaner, more even emphasis pattern.
 - Update 2026-05-21: `TodoBentoWeekView.tsx` now gives today's 2x4 week cell the same gray inset ring used by `TodoMonthView.tsx`, making the current day easier to spot without changing the surrounding palette.

@@ -4,6 +4,7 @@
  * @output Deep Link Listener (appUrlOpen event handler), NFC Listener (nfcTagScanned event handler)
  * @pos Hook (System Integration)
  * @description Handles app deep links and NFC scans with stable listeners, launch-url fallback, shared LumosTime URI compatibility parsing, retained NFC error handling, NFC read-test interception, and stop-confirm routing for repeated activity tags.
+ * @updated 2026-06-06: NFC activity tags now stop only their own matching sessions, so scanning A then B starts concurrent timers and only a repeat scan of A or B stops that specific activity.
  * @updated 2026-05-14: Ignores stale deep-link/NFC listener instances so React StrictMode or delayed native listener cleanup cannot process one scan twice.
  * @updated 2026-05-14: Suppresses cross-source replays of the same NFC timer start so one physical scan cannot stop a running session and then immediately restart it through the app-link bridge.
  * @updated 2026-05-14: Normalized equivalent NFC/deep-link start URLs onto one execution key so appUrlOpen and nfcTagScanned can share a single dedupe path without leaving duplicate same-activity timers behind.
@@ -33,6 +34,7 @@ import {
   shouldSuppressCrossSourceNfcStartDuplicate,
   shouldSuppressNfcActivityRestart
 } from '../utils/nfcActivityRestartGuard';
+import { decideNfcStartAction } from '../utils/nfcStartActionDecision';
 import { ShortcutWidgetAction, normalizeShortcutWidgetAction } from '../services/widgetShortcutService';
 
 type DeepLinkStateSnapshot = {
@@ -208,26 +210,20 @@ export const useDeepLink = (
         return;
       }
 
-      const matchingSessions = currentActiveSessions.filter((session) =>
-        buildNfcActivityKey(session.categoryId, session.activityId) === activityKey
-      );
-      if (matchingSessions.length > 0) {
+      const decision = decideNfcStartAction(currentActiveSessions, catId, actId);
+      if (decision.type === 'stop_matching_sessions') {
         lastNfcStoppedActivityRef.current = {
-          activityKey,
+          activityKey: decision.activityKey,
           timestamp: now
         };
-        matchingSessions.forEach((session) => {
-          requestStopActivityRef.current(session.id);
+        decision.sessionIds.forEach((sessionId) => {
+          requestStopActivityRef.current(sessionId);
         });
         return;
       }
 
       if (shouldSuppressNfcActivityRestart(lastNfcStoppedActivityRef.current, activityKey, now)) {
         return;
-      }
-
-      if (currentActiveSessions.length > 0) {
-        currentActiveSessions.forEach((session) => stopActivityRef.current(session.id));
       }
 
       startActivityRef.current(activity, category.id);

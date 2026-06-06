@@ -4,6 +4,7 @@
  * @output Inline collection membership editing for a single log or todo
  * @pos Component (Inline selector)
  * @description Renders a compact page-inline Collection selector with hidden-by-default tag-like chips, immediate membership updates, and a one-line collection creator.
+ * @updated 2026-06-06: Collection membership chips and chooser lists now respect the saved manual collection order instead of re-sorting by update time.
  * @updated 2026-05-12: Rebuilt the selector into a compact selected-first capsule flow with a list-style chooser icon, one-line name-only creation, and tighter chip rounding.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -32,17 +33,13 @@ export const DataCollectionSelector: React.FC<DataCollectionSelectorProps> = ({
     () => getDataCollectionIdsForItem(collectionEntries, itemType, itemId),
     [collectionEntries, itemId, itemType]
   );
-  const sortedCollections = useMemo(
-    () => [...collections].sort((left, right) => right.updatedAt - left.updatedAt),
-    [collections]
-  );
   const selectedCollections = useMemo(
-    () => sortedCollections.filter((collection) => selectedCollectionIds.includes(collection.id)),
-    [selectedCollectionIds, sortedCollections]
+    () => collections.filter((collection) => selectedCollectionIds.includes(collection.id)),
+    [collections, selectedCollectionIds]
   );
   const unselectedCollections = useMemo(
-    () => sortedCollections.filter((collection) => !selectedCollectionIds.includes(collection.id)),
-    [selectedCollectionIds, sortedCollections]
+    () => collections.filter((collection) => !selectedCollectionIds.includes(collection.id)),
+    [collections, selectedCollectionIds]
   );
   const orderedCollections = useMemo(
     () => [...selectedCollections, ...unselectedCollections],
@@ -64,13 +61,11 @@ export const DataCollectionSelector: React.FC<DataCollectionSelectorProps> = ({
       addedAt: now
     }));
 
-    setCollections((prev) => [...prev]
-      .map((collection) => (
-        touchedCollectionIds.has(collection.id)
-          ? { ...collection, updatedAt: now }
-          : collection
-      ))
-      .sort((left, right) => right.updatedAt - left.updatedAt));
+    setCollections((prev) => prev.map((collection) => (
+      touchedCollectionIds.has(collection.id)
+        ? { ...collection, updatedAt: now }
+        : collection
+    )));
   };
 
   const toggleCollection = (collectionId: string) => {
@@ -95,7 +90,7 @@ export const DataCollectionSelector: React.FC<DataCollectionSelectorProps> = ({
       updatedAt: now
     };
 
-    setCollections((prev) => [nextCollection, ...prev].sort((left, right) => right.updatedAt - left.updatedAt));
+    setCollections((prev) => [nextCollection, ...prev]);
     setCollectionEntries((prev) => upsertDataCollectionEntriesForItem({
       entries: prev,
       collectionIds: [...selectedCollectionIds, nextCollection.id],
