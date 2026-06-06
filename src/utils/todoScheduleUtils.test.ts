@@ -4,6 +4,7 @@
  * @output Regression coverage for virtual-category date matching, shared day entries, and week-view badge normalization
  * @pos Test (todo planning utilities)
  * @description Verifies today/tomorrow/this-week filtering and shared per-day entry building against Arrange, Due, recurrence, and Maybe rules without creating occurrence records.
+ * @updated 2026-06-06: Added regression coverage that locks the shared primary-kind priority used by both month view ordering and bento-week marker color selection when one todo matches multiple schedule badges on the same day.
  * @updated 2026-05-18: Added recurrence normalization coverage so invalid monthly payloads, stale skip dates, and stray month-end fallback flags are canonicalized before runtime consumers read hydrated todo data.
  * @updated 2026-05-18: Added regression coverage so a recurring todo pinned into today views disappears when today's occurrence is explicitly skipped, unless another explicit today date still keeps it visible.
  * @updated 2026-05-17: Added regression coverage for completed-first month-entry priority when one todo matches multiple day badges, while preserving repeat-before-maybe ordering and leaving trace-lane layout unchanged.

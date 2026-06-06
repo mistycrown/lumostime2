@@ -4,6 +4,7 @@
  * @output 解析后的筛选条件, 匹配结果, 统计数据, 筛选器排序规整
  * @pos Utils (筛选逻辑)
  * @description 自定义筛选器的核心逻辑,包括表达式解析、记录匹配、统计计算和排序规整
+ * @updated 2026-06-06: Unified `@` matching so linked-log todo filters can match both todo titles and todo category names.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -29,7 +30,7 @@ export function normalizeFiltersOrder(filters: Filter[]): Filter[] {
  * 支持的语法:
  * - #关键词: 匹配标签名称
  * - %关键词: 匹配领域名称
- * - @关键词: 匹配代办标题
+ * - @关键词: 匹配待办标题或待办分类名称
  * - ^emoji: 匹配 Reaction Emoji (例如: ^🌸)
  * - 关键词: 匹配备注全文
  * - OR: 逻辑或 (不区分大小写, 用于连接同类型条件)
@@ -135,6 +136,11 @@ export interface FilterContext {
 
 export type TodoFilterContext = Pick<FilterContext, 'categories' | 'scopes' | 'todoCategories'>;
 
+const resolveTodoCategoryName = (
+    categoryId: string,
+    todoCategories: TodoCategory[]
+): string => todoCategories.find((category) => category.id === categoryId)?.name || '';
+
 const matchesGroupedKeywords = (
     groups: string[][],
     values: string[]
@@ -210,7 +216,7 @@ export function matchesTodoFilter(
         return false;
     }
 
-    const todoCategoryName = context.todoCategories.find((category) => category.id === todo.categoryId)?.name || '';
+    const todoCategoryName = resolveTodoCategoryName(todo.categoryId, context.todoCategories);
     const { linkedActivityName, linkedCategoryName } = resolveLinkedTodoActivityNames(todo, context.categories);
     const scopeNames = (todo.defaultScopeIds || [])
         .map((scopeId) => context.scopes.find((scope) => scope.id === scopeId)?.name || '')
@@ -308,18 +314,11 @@ export function matchesFilter(
 
         const linkedTodo = context.todos.find(t => t.id === log.linkedTodoId);
         if (!linkedTodo) return false;
+        const linkedTodoCategoryName = resolveTodoCategoryName(linkedTodo.categoryId, context.todoCategories);
 
-        const todoTitleLower = linkedTodo.title.toLowerCase();
-
-        // 所有代办条件组都必须满足 (AND)
-        const allTodoGroupsMatch = condition.todos.every(todoGroup => {
-            // 每个条件组内,只要有一个匹配即可 (OR)
-            return todoGroup.some(todoKeyword =>
-                todoTitleLower.includes(todoKeyword.toLowerCase())
-            );
-        });
-
-        if (!allTodoGroupsMatch) return false;
+        if (!matchesGroupedKeywords(condition.todos, [linkedTodo.title, linkedTodoCategoryName])) {
+            return false;
+        }
     }
 
     // 4. 检查全文备注筛选

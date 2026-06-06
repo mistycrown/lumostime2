@@ -12,6 +12,7 @@
  * @updated 2026-05-17: 支持在格子中为 due 类型的条目加上 flag 图标（并实现超出截断且 flag 完整显示），并将 trace / 连续 trace 条目字色置为灰色。
  * @updated 2026-05-18: 支持点击循环排期的 Repeat 标签，唤起快捷编辑栏。
  * @updated 2026-05-18: Removed automatic ellipsis from month-grid entry titles so in-cell rows and trace strips clip directly instead of reserving space for `...`.
+ * @updated 2026-06-06: Added a compact date summary line above each expanded month-day detail list showing the selected date, weekday, and entry count.
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -82,6 +83,7 @@ interface LoadedMonthRange {
 }
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const WEEKDAY_LABELS_CN = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'] as const;
 const MONTH_VIEW_ROWS_PER_SCREEN_STORAGE_KEY = 'todoMonthViewRowsPerScreen';
 const MONTH_VIEW_FONT_SIZE_STORAGE_KEY = 'todoMonthViewFontSize';
 const MONTH_VIEW_MARKER_COLOR_MODE_STORAGE_KEY = 'todoMonthViewMarkerColorMode';
@@ -1059,6 +1061,18 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
     () => (selectedDate ? sortedEntriesByDate[selectedDate] || [] : []),
     [selectedDate, sortedEntriesByDate]
   );
+  const selectedDateSummaryLabel = useMemo(() => {
+    if (!selectedDate) {
+      return '';
+    }
+
+    const selectedDay = parseDateKey(selectedDate);
+    const weekdayLabel = WEEKDAY_LABELS_CN[selectedDay.getDay()] || '';
+    const entryCount = selectedDateEntries.length;
+    const entryCountLabel = `${entryCount} item${entryCount === 1 ? '' : 's'}`;
+
+    return `${format(selectedDay, 'M月d日')} ${weekdayLabel} · ${entryCountLabel}`;
+  }, [selectedDate, selectedDateEntries.length]);
   const toggleSelectedDate = (dateKey: string) => {
     setSelectedDate((previous) => previous === dateKey ? null : dateKey);
   };
@@ -1496,6 +1510,9 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                     className="overflow-hidden bg-[rgba(250,249,246,0.26)] shadow-[inset_0_3px_6px_rgba(0,0,0,0.02)]"
                   >
                     <div className="flex flex-col gap-1 px-5 py-3.5">
+                      <div className="text-[0.64rem] font-medium uppercase tracking-[0.14em] text-stone-400">
+                        {selectedDateSummaryLabel}
+                      </div>
                       {selectedDateEntries.length > 0 ? (
                         selectedDateEntries.map((entry) => {
                           const rowClassName = 'flex w-full items-start gap-3 rounded px-2 py-1.5 text-left transition-colors hover:bg-black/5';

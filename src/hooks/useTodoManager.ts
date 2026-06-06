@@ -4,6 +4,8 @@
  * @output Todo CRUD Operations (handleSaveTodo, handleDeleteTodo, handleToggleTodo, handleDuplicateTodo, handleBatchAddTodos), Modal Control (openAddTodoModal, openEditTodoModal, closeTodoModal), Focus Management (handleStartTodoFocus), Progress Update (updateTodoProgress)
  * @pos Hook (Data Manager)
  * @description Todo data manager hook for CRUD, focus launch, child-task inheritance sync, cascade delete behavior, nested detail-page return state, and lightweight schedule-field normalization.
+ * @updated 2026-06-06: Moved duplicate shaping into shared utilities and now clears duplicated todo cover images by default.
+ * @updated 2026-06-06: Clears duplicated todo cover images by default so quick-copy tasks start without inheriting the original cover asset.
  * @updated 2026-05-14: Normalizes `maybeDates` and recurrence `skipDates` on save/duplicate/batch-add so tentative future dates stay deduplicated and stale past `maybe` entries do not accumulate in persisted todo data.
  * @updated 2026-05-13: Blocked focus starts and subtask creation for quick reminder todos so lightweight memo items stay reminder-only even if they reach shared manager paths.
  * @updated 2026-05-12: Prefer live todo records when opening detail pages so auto-save comparisons do not loop on stale snapshots.
@@ -36,7 +38,7 @@ import { getTodoProgressTrackingMode, syncSubtaskProgressToParentTodos } from '.
 import { pushTodoDetailHistory } from '../utils/todoDetailNavigation';
 import { isQuickTodo } from '../utils/todoKindUtils';
 import { getRealTodoCategories } from '../utils/todoQuickCategoryUtils';
-import { normalizeMaybeDates } from '../utils/todoScheduleUtils';
+import { buildDuplicatedTodo, normalizeTodoScheduleFields } from '../utils/todoDuplicateUtils';
 
 export const useTodoManager = () => {
   const { todos, setTodos, todoCategories, setTodoCategories, logs, setLogs } = useData();
@@ -61,27 +63,6 @@ export const useTodoManager = () => {
   const [todoToDeleteId, setTodoToDeleteId] = useState<string | null>(null);
   const [todoDeleteTargetIds, setTodoDeleteTargetIds] = useState<string[]>([]);
   const [todoDeleteChildCount, setTodoDeleteChildCount] = useState(0);
-
-  const normalizeScheduleFields = (todo: TodoItem): TodoItem => {
-    const skipDates = todo.recurrenceRule?.skipDates?.length
-      ? Array.from(new Set(
-          todo.recurrenceRule.skipDates
-            .map((dateKey) => dateKey.trim())
-            .filter(Boolean)
-        )).sort((left, right) => left.localeCompare(right))
-      : undefined;
-
-    return {
-      ...todo,
-      maybeDates: normalizeMaybeDates(todo.maybeDates),
-      recurrenceRule: todo.recurrenceRule
-        ? {
-            ...todo.recurrenceRule,
-            ...(skipDates ? { skipDates } : {})
-          }
-        : undefined
-    };
-  };
 
   const buildSubtaskDraft = (parentTodo: TodoItem): Partial<TodoItem> => ({
     parentTodoId: parentTodo.id,
@@ -196,7 +177,7 @@ export const useTodoManager = () => {
 
   const handleSaveTodo = (todo: TodoItem) => {
     setTodos((prev) => {
-      const normalizedTodo = normalizeTodoHierarchy(normalizeScheduleFields(todo), prev);
+      const normalizedTodo = normalizeTodoHierarchy(normalizeTodoScheduleFields(todo), prev);
       const exists = prev.find((item) => item.id === normalizedTodo.id);
       let nextTodos = exists
         ? prev.map((item) => item.id === normalizedTodo.id ? normalizedTodo : item)
@@ -210,7 +191,7 @@ export const useTodoManager = () => {
     });
 
     if (editingTodo?.id === todo.id) {
-      const normalizedTodo = normalizeTodoHierarchy(normalizeScheduleFields(todo), todos);
+      const normalizedTodo = normalizeTodoHierarchy(normalizeTodoScheduleFields(todo), todos);
       setEditingTodo(normalizedTodo);
       setTodoCategoryToAdd(normalizedTodo.categoryId);
     }
@@ -268,29 +249,11 @@ export const useTodoManager = () => {
   };
 
   const handleDuplicateTodo = (todo: TodoItem, options?: TodoDuplicateOptions) => {
-    const title = options?.title?.trim() || `${todo.title} 鍓湰`;
-    const clearDates = options?.clearDates ?? true;
-    const clearTags = options?.clearTags ?? false;
-    const clearScopes = options?.clearScopes ?? false;
     const parentTodo = getParentTodo(todos, todo);
 
-    const duplicatedTodo: TodoItem = normalizeScheduleFields({
-      ...todo,
-      id: crypto.randomUUID(),
-      title,
-      isCompleted: false,
-      pin: false,
-      completedAt: undefined,
-      completedUnits: 0,
-      parentTodoId: todo.parentTodoId,
-      childOrder: todo.parentTodoId ? getNextChildOrder(todos, todo.parentTodoId) : undefined,
-      scheduledDate: clearDates ? undefined : todo.scheduledDate,
-      deadlineDate: clearDates ? undefined : todo.deadlineDate,
-      recurrenceRule: clearDates || todo.parentTodoId ? undefined : todo.recurrenceRule,
-      maybeDates: clearDates ? undefined : todo.maybeDates,
-      linkedActivityId: clearTags ? undefined : todo.linkedActivityId,
-      linkedCategoryId: clearTags ? undefined : todo.linkedCategoryId,
-      defaultScopeIds: clearScopes ? undefined : todo.defaultScopeIds
+    const duplicatedTodo: TodoItem = buildDuplicatedTodo(todo, {
+      ...options,
+      childOrder: todo.parentTodoId ? getNextChildOrder(todos, todo.parentTodoId) : undefined
     });
 
     const normalizedTodo = parentTodo
@@ -304,7 +267,7 @@ export const useTodoManager = () => {
   const handleBatchAddTodos = (newTodosData: Partial<TodoItem>[]) => {
     const realTodoCategories = getRealTodoCategories(todoCategories);
     const newTodos: TodoItem[] = newTodosData.map((data) => {
-      const baseTodo: TodoItem = normalizeScheduleFields({
+      const baseTodo: TodoItem = normalizeTodoScheduleFields({
         id: crypto.randomUUID(),
         categoryId: data.categoryId || realTodoCategories[0]?.id || todoCategories[0].id,
         title: data.title || 'New Task',

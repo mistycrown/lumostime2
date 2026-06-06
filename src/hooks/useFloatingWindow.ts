@@ -4,6 +4,7 @@
  * @output Floating window event bridge for ending active focus sessions from Android
  * @pos Hook (System Integration)
  * @description Listens for Android floating-window stop events and resolves them against app or widget-origin sessions without duplicating widget logs.
+ * @updated 2026-06-06: Prefer the Capacitor plugin stop callback as the live Android stop entrypoint so one floating tap cannot be consumed twice via both plugin and window events.
  * @updated 2026-05-09: Reconciles persisted native floating-window stop requests on resume so background stops clear app sessions without double-writing timeline history.
  * @updated 2026-05-05: Honors native session ids and cancels widget-origin sessions locally after native-side shutdown so floating-window stops work for widget-started focus.
  */
@@ -14,9 +15,10 @@ import { useSession } from '../contexts/SessionContext';
 import { useToast } from '../contexts/ToastContext';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
 import {
+  buildFloatingStopToken,
   buildFloatingStopActions,
-  parseFloatingStopDetail,
-  type FloatingStopDetail
+  type FloatingStopDetail,
+  type FloatingStopSource
 } from '../utils/floatingWindowStopUtils';
 
 export const useFloatingWindow = (
@@ -56,7 +58,7 @@ export const useFloatingWindow = (
 
     const applyStopDetail = async (
       detail: FloatingStopDetail,
-      options?: { shouldDrainPending?: boolean }
+      options?: { shouldDrainPending?: boolean; source?: FloatingStopSource }
     ) => {
       const stopActions = buildFloatingStopActions(activeSessions, detail);
       if (stopActions.length === 0) {
@@ -70,10 +72,7 @@ export const useFloatingWindow = (
         return;
       }
 
-      const stopToken = stopActions
-        .map((action) => `${action.mode}:${action.sessionId}`)
-        .sort()
-        .join('|');
+      const stopToken = buildFloatingStopToken(stopActions, options?.source ?? 'plugin');
 
       if (!claimStopToken(stopToken)) {
         if (options?.shouldDrainPending) {
@@ -113,7 +112,10 @@ export const useFloatingWindow = (
           return;
         }
 
-        await applyStopDetail({ sessionId: pendingStop.sessionId ?? null });
+        await applyStopDetail(
+          { sessionId: pendingStop.sessionId ?? null },
+          { source: 'pending' }
+        );
       } catch (error) {
         if (!cancelled) {
           console.error('[useFloatingWindow] Failed to reconcile pending floating stop', error);
@@ -121,15 +123,10 @@ export const useFloatingWindow = (
       }
     };
 
-    const handleStopFromFloating = (event: Event) => {
-      void applyStopDetail(parseFloatingStopDetail(event), { shouldDrainPending: true });
-    };
-
     const handleStopFromPlugin = (detail: FloatingStopDetail) => {
-      void applyStopDetail(detail, { shouldDrainPending: true });
+      void applyStopDetail(detail, { shouldDrainPending: true, source: 'plugin' });
     };
 
-    window.addEventListener('stopFocusFromFloating', handleStopFromFloating);
     void FocusNotification.addListener('stopFocusFromFloating', handleStopFromPlugin)
       .then((listener) => {
         pluginStopListener = listener;
@@ -159,7 +156,6 @@ export const useFloatingWindow = (
 
     return () => {
       cancelled = true;
-      window.removeEventListener('stopFocusFromFloating', handleStopFromFloating);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       void pluginStopListener?.remove();
       void appStateListener?.remove();

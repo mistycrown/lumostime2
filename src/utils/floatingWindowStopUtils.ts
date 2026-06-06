@@ -3,6 +3,7 @@
  * @input Active sessions plus native floating-window stop payloads
  * @output Shared parsing and action-resolution helpers for floating-window stop reconciliation
  * @description Normalizes floating-window stop details from live events or pending native payloads and resolves which app sessions should stop or cancel.
+ * @updated 2026-06-06: Added source-specific stop tokens so Android plugin and window stop callbacks from the same tap can be deduped deterministically.
  * @updated 2026-05-09: Added shared floating-window stop parsing and reconciliation helpers for resume-safe stop handling.
  */
 import { ActiveSession } from '../types';
@@ -10,6 +11,8 @@ import { ActiveSession } from '../types';
 export type FloatingStopDetail = {
   sessionId?: string | null;
 };
+
+export type FloatingStopSource = 'plugin' | 'window' | 'pending';
 
 export type FloatingStopAction = {
   mode: 'stop' | 'cancel';
@@ -65,3 +68,13 @@ export const buildFloatingStopActions = (
     sessionId: session.id
   }));
 };
+
+export const buildFloatingStopToken = (
+  actions: FloatingStopAction[],
+  source: FloatingStopSource
+): string => (
+  `${source}:${actions
+    .map((action) => `${action.mode}:${action.sessionId}`)
+    .sort()
+    .join('|')}`
+);

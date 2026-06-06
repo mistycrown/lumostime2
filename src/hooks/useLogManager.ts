@@ -6,6 +6,7 @@
  * @description 日志数据管理 Hook - 处理日志的增删改查、快速打点、批量添加、图片管理等操作，并统一维护 NFC 快速打点的文案与时间补记逻辑。时间戳由 DataContext 自动管理。
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-06-06: Added hard-field duplicate protection for new log insertions so floating-window stop races cannot append identical timeline records twice.
  * @updated 2026-05-16: Dispatches a shared assistant log-submission event only for brand-new logs so post-save AI triggers can ignore edits.
  * @updated 2026-05-10: Let callers override the date used for backfill defaults so widget supplement-log launches can force today even when the timeline was left on an older day.
  */
@@ -22,6 +23,10 @@ import {
     dispatchAssistantLogSubmittedEvent,
     isNewLogInsertion
 } from '../utils/assistantLogSubmissionTrigger';
+import {
+    hasHardDuplicateLog,
+    prependLogsWithDedupe
+} from '../utils/logInsertionUtils';
 
 export const useLogManager = () => {
     const { logs, setLogs, setTodos } = useData();
@@ -35,6 +40,12 @@ export const useLogManager = () => {
     const { addToast } = useToast();
     // Note: updateDataLastModified removed - DataContext automatically tracks changes
 
+    const notifySkippedDuplicateLogs = (count: number) => {
+        if (count > 0) {
+            addToast('info', `已跳过 ${count} 条重复记录`);
+        }
+    };
+
     // Helper to close modal (local needed if we want to bundle actions)
     const closeModal = () => {
         setIsAddModalOpen(false);
@@ -45,6 +56,7 @@ export const useLogManager = () => {
     const handleSaveLog = (log: Log) => {
         const existingLog = logs.find(l => l.id === log.id);
         const shouldDispatchAssistantTrigger = isNewLogInsertion(existingLog);
+        const isDuplicateInsertion = shouldDispatchAssistantTrigger && hasHardDuplicateLog(logs, log);
 
         if (log.linkedTodoId || (existingLog && existingLog.linkedTodoId)) {
             setTodos(prevTodos => {
@@ -84,10 +96,16 @@ export const useLogManager = () => {
             if (exists) {
                 return prev.map(l => l.id === log.id ? log : l);
             }
-            return [log, ...prev];
+            const insertionResult = prependLogsWithDedupe(prev, [log]);
+            return insertionResult.skippedLogs.length > 0 ? prev : insertionResult.logs;
         });
         // Timestamp automatically updated by DataContext
         closeModal();
+
+        if (isDuplicateInsertion) {
+            notifySkippedDuplicateLogs(1);
+            return;
+        }
 
         if (shouldDispatchAssistantTrigger) {
             dispatchAssistantLogSubmittedEvent({ log });
@@ -170,8 +188,17 @@ export const useLogManager = () => {
             note: ''
         };
 
-        setLogs(prev => [newLog, ...prev]);
+        let quickPunchSkippedCount = 0;
+        setLogs(prev => {
+            const insertionResult = prependLogsWithDedupe(prev, [newLog]);
+            quickPunchSkippedCount = insertionResult.skippedLogs.length;
+            return insertionResult.logs;
+        });
         // Timestamp automatically updated by DataContext
+        if (quickPunchSkippedCount > 0) {
+            notifySkippedDuplicateLogs(quickPunchSkippedCount);
+            return;
+        }
         addToast('success', '快速打点已记录');
     };
 
@@ -201,9 +228,19 @@ export const useLogManager = () => {
             };
         });
 
-        setLogs(prev => [...newLogs, ...prev]);
+        let skippedCount = 0;
+        let insertedCount = 0;
+        setLogs(prev => {
+            const insertionResult = prependLogsWithDedupe(prev, newLogs);
+            skippedCount = insertionResult.skippedLogs.length;
+            insertedCount = insertionResult.insertedLogs.length;
+            return insertionResult.logs;
+        });
         // Timestamp automatically updated by DataContext
-        addToast('success', `Successfully backfilled ${newLogs.length} logs!`);
+        if (insertedCount > 0) {
+            addToast('success', `Successfully backfilled ${insertedCount} logs!`);
+        }
+        notifySkippedDuplicateLogs(skippedCount);
     };
 
     const openAddModal = (

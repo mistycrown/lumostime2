@@ -3,7 +3,10 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- Update 2026-06-06: `filterUtils.ts` now treats `@` expressions in log-side custom filters the same way as todo-side hidden filters, matching both linked todo titles and todo category names.
+- Update 2026-06-06: `todoScheduleUtils.ts` now exposes the shared primary schedule-kind priority directly to view components, keeping bento-week marker colors aligned with month-view ordering when one todo matches multiple same-day badges.
 - Update 2026-05-21: `dataCollectionUtils.ts` now exposes the shared collection-timeline todo timestamp resolver, which prefers a todo's latest linked log time, then `createdAt`, then collection `addedAt`.
+- Update 2026-06-06: `logInsertionUtils.ts` now centralizes hard-field duplicate detection for brand-new logs, treating identical `startTime + endTime + note` payloads as the same timeline record even when duplicate stop flows generate a fresh id.
 - Update 2026-05-18: `assetPath.ts` now normalizes raw Windows absolute asset paths into `file:///` URLs so desktop renderer image sources remain loadable even when persisted data contains filesystem-style paths.
 - Update 2026-05-18: `todoScheduleUtils.ts` now canonicalizes persisted recurrence rules, trimming invalid monthly payloads, deduping/aging out skip dates, and only keeping the `31 -> 月末` fallback flag when the rule still truly targets day 31.
 - Update 2026-05-18: `dataValidation.ts` now accepts the nested `achievementData` backup block so achievement bottle exports and cloud restores can pass import validation without flattening those fields into the root payload.
@@ -35,6 +38,7 @@ Contains pure utility functions for data processing and business logic calculati
 - `assistantMessageParts.ts`: [Active] - Normalizes structured assistant reply parts and applies conservative fallback splitting so one assistant turn can render as grouped multi-bubble chat bursts without fragmenting persistence.
 - `goalUtils.ts`: [Active] - Calculates progress for Goals (duration, count, frequency).
 - `logUtils.ts`: [Active] - Handles time log manipulation, specifically splitting cross-day logs.
+- `logInsertionUtils.ts`: [Active] - Detects hard-duplicate new logs by `startTime`, `endTime`, and normalized `note`, then prepends only the unique candidates while reporting which inserts were skipped.
 - `achievementUtils.ts`: [Active] - Computes achievement daily snapshots, date ranges, and current star balances.
 - `dailyCheckUtils.ts`: [Active] - Builds daily check items from templates, normalizes review check data, applies NFC/widget/manual punch actions, and tolerates legacy templates with missing `items` arrays.
 - `checkStreakUtils.ts`: [Active] - Resolves per-item daily check streaks, global multiplier tiers, and weighted check-category completion values for achievement rules.
@@ -55,5 +59,6 @@ Contains pure utility functions for data processing and business logic calculati
 - `todoCompletionModeUtils.ts`: [Active] - Gates one-shot completion mode for unfinished linked todos and sequences save-first, complete-second follow-up actions for focus-log submission flows.
 - `lumosTimeUrlParser.ts`: [Active] - Normalizes LumosTime NFC/deep-link URIs across custom-scheme parsing differences, old action aliases, legacy parameter names, and shared execution keys used for cross-entry dedupe.
 - `nfcActivityRestartGuard.ts`: [Active] - Builds per-activity NFC keys, suppresses same-tag timer restarts only inside the short duplicate-delivery window right after an NFC stop, and blocks delayed cross-source `start` replays from reopening a timer that the NFC scan just stopped.
+- `nfcStartActionDecision.ts`: [Active] - Decides whether an NFC activity-tag scan should stop only its own matching sessions or start a new concurrent activity when the scanned tag is different from the currently running ones.
 
 > Once the folder I belong to changes, please update me.

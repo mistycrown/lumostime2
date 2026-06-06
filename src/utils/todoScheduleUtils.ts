@@ -4,6 +4,7 @@
  * @output Week buckets, daily schedule entries, and badge metadata for todo planning views
  * @pos Utility (Todo planning)
  * @description Shared helpers for deriving scheduled, deadline, recurring, maybe, completed, and in-progress todo visibility without creating standalone occurrence records.
+ * @updated 2026-06-06: Exposes one shared primary schedule-kind priority so month ordering and bento-week marker colors stay aligned when a single todo matches multiple day badges.
  * @updated 2026-05-18: Canonicalizes persisted recurrence rules on save/load so invalid monthly-day payloads and stale skip-date shapes cannot fan out into render-time crashes after detail-page auto-save.
  * @updated 2026-05-18: Prevented today-category pin views from surfacing recurring todos whose current-day occurrence is explicitly suppressed by `skipDates`, while still allowing true pin-only todos and other explicit today matches through.
  * @updated 2026-05-17: Reordered shared month-entry priority so completed rows win over due/arrange/repeat/maybe/trace when one todo matches multiple day badges, while keeping the continuous trace lane layout unchanged.
