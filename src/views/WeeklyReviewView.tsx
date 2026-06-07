@@ -4,6 +4,7 @@
  * @output Review Updates, Narrative Generation
  * @pos View (Review Modal)
  * @description The interface for conducting Weekly Reviews. Integrates statistics visualization, guided reflection templates, and AI-assisted narrative generation.
+ * @updated 2026-06-07: Added weekly AI newspaper entry, one-tap chat generation, dedicated newspaper opening, and guarded delete flow inside the narrative tab.
  * @updated 2026-05-11: Added optional initial-tab support so external jumps can open Weekly Review directly on the `叙事` tab after AI writeback.
  * @updated 2026-04-25: Let floating read-edit toggles inherit button theme colors so default UI icons remain visible on accent-theme white buttons.
  * 
@@ -32,6 +33,8 @@ import {
     generateCheckItemStatsText,
     formatDuration as utilFormatDuration
 } from '../utils/reviewStatsUtils';
+import { useNavigation } from '../contexts/NavigationContext';
+import { useAIChatWindow } from '../contexts/AIChatWindowContext';
 
 interface WeeklyReviewViewProps {
     review: WeeklyReview;
@@ -82,6 +85,13 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
     addToast,
     initialTab
 }) => {
+    const {
+        setCurrentWeeklyNewspaperStart,
+        setCurrentWeeklyNewspaperEnd,
+        setIsWeeklyNewspaperOpen
+    } = useNavigation();
+    const { openAIChat } = useAIChatWindow();
+    const onToast = addToast;
     const [activeTab, setActiveTab] = useState<TabType>(initialTab || 'data');
     
     // Use shared review state hook
@@ -112,6 +122,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
 
     const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
     const [isClearGuideConfirmOpen, setIsClearGuideConfirmOpen] = useState(false);
+    const [isDeleteNewspaperConfirmOpen, setIsDeleteNewspaperConfirmOpen] = useState(false);
 
     useEffect(() => {
         if (initialTab) {
@@ -248,6 +259,43 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
     };
 
     // 生成叙事 - Step 2: Execute with Selected Template
+    const handleOpenNewspaper = () => {
+        if (!review.aiNewspaper) {
+            return;
+        }
+
+        setCurrentWeeklyNewspaperStart(weekStartDate);
+        setCurrentWeeklyNewspaperEnd(weekEndDate);
+        setIsWeeklyNewspaperOpen(true);
+    };
+
+    const handleGenerateNewspaper = () => {
+        openAIChat({
+            initialInputText: `周小报 ${review.weekStartDate}`
+        });
+    };
+
+    const handleDeleteNewspaper = () => {
+        setIsDeleteNewspaperConfirmOpen(true);
+    };
+
+    const confirmDeleteNewspaper = async () => {
+        try {
+            const updatedReview = {
+                ...review,
+                aiNewspaper: undefined,
+                updatedAt: Date.now()
+            };
+            await onUpdateReview(updatedReview);
+            addToast('success', 'AI 小报已删除');
+        } catch (error) {
+            console.error('Failed to delete weekly newspaper', error);
+            addToast('error', '删除失败');
+        } finally {
+            setIsDeleteNewspaperConfirmOpen(false);
+        }
+    };
+
     const handleSelectStyle = async (template: NarrativeTemplate) => {
         setIsStyleModalOpen(false);
         setIsGenerating(true);
@@ -504,11 +552,16 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
                             narrative={narrative}
                             isGenerating={isGenerating}
                             isReadingMode={isReadingMode}
+                            newspaperTitle={review.aiNewspaper?.title}
+                            newspaperEmptyText="本周暂无小报，点击生成"
                             onSummaryChange={handleSummaryChange}
                             onNarrativeChange={handleNarrativeChange}
                             onGenerateNarrative={handleGenerateNarrative}
                             onDeleteSummary={handleDeleteSummary}
                             onDeleteNarrative={handleDeleteNarrative}
+                            onOpenNewspaper={review.aiNewspaper ? handleOpenNewspaper : undefined}
+                            onGenerateNewspaper={!review.aiNewspaper ? handleGenerateNewspaper : undefined}
+                            onDeleteNewspaper={review.aiNewspaper ? handleDeleteNewspaper : undefined}
                         />
                     </div>
                 )}
@@ -550,6 +603,16 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
                 onSelect={handleSelectStyle}
                 customTemplates={customNarrativeTemplates}
                 period="weekly"
+            />
+
+            <ConfirmModal
+                isOpen={isDeleteNewspaperConfirmOpen}
+                onClose={() => setIsDeleteNewspaperConfirmOpen(false)}
+                onConfirm={confirmDeleteNewspaper}
+                title="删除 AI 小报？"
+                description="确定要删除这一周的小报吗？此操作无法撤销，需要重新生成。"
+                confirmText="确认删除"
+                type="danger"
             />
 
             {/* Delete Summary Confirmation Modal */}

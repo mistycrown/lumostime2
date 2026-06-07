@@ -3,6 +3,10 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-06-07: `AIBackfillChatModal.tsx`, `ai-chat/AIBackfillChatConversationPane.tsx`, `ai-chat/AIBackfillChatReviewCommands.ts`, and `ai-chat/AIBackfillChatReviewWriteback.ts` now support ordinary-chat `周小报` / `月小报` generation, overwrite confirmation, periodic writeback result cards, and direct opening of weekly/monthly newspaper pages from chat.
+- Update 2026-06-07: `ReviewNarrativeTab.tsx` now acts as a shared `AI 小报` entry for daily, weekly, and monthly review narratives, with configurable empty-state copy while preserving the same one-line editorial entry treatment.
+- Update 2026-06-07: `TodoMonthView.tsx` now lets collapsed month-grid `Trace` overlays ignore taps, so clicking any unexpanded calendar cell always opens that day's detail rail first instead of jumping straight into quick actions.
+- Update 2026-06-07: `TodoMonthView.tsx` now renders `Arrange` / `Due` / `Repeat` entry titles with the same muted gray tone as `Trace` in both month-grid cells and expanded day details, so these unfinished schedule rows stay visually consistent and easier to scan.
 - Update 2026-06-06: `achievement/AchievementRulesTab.tsx` now explains `@待办/分类` in filter-duration rule help text, keeping achievement filter syntax aligned with the shared custom-filter matcher.
 - Update 2026-06-06: `TodoBentoWeekView.tsx` now reuses the shared schedule primary-kind priority for marker colors, so overlapping badges in the two-column week planner follow the same `Done > Due > Arrange > Repeat > Maybe > Trace` precedence as `TodoMonthView.tsx`.
 - Update 2026-06-06: `TodoMonthView.tsx` now shows a compact `6月6日 周六 · 3 items` style summary line above each expanded month-day detail list, giving the open rail a lighter editorial header without adding extra framing.

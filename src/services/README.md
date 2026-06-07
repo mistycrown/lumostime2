@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-06-07: `weeklyNewspaperService.ts` and `monthlyNewspaperService.ts` now power ordinary-chat `周小报` / `月小报` writeback flows, packaging periodic review context into strict structured AI contracts and persisting editorial newspaper payloads onto `WeeklyReview.aiNewspaper` and `MonthlyReview.aiNewspaper`.
+
 Update 2026-05-23: `desktopWidgetService.ts` now exports shared Electron todo sync-channel helpers used after persisted todo writes, so desktop quick/today/editor windows can refresh immediately without waiting for focus or polling.
 Update 2026-05-21: `imageDownloadService.ts` now centralizes preview-image saving for shared full-screen viewers, reusing native `Pictures/LumosTime` writes on mobile and browser downloads on web/desktop so image previews do not duplicate save logic.
 Update 2026-05-21: `widgetService.ts` now mirrors `maybeDates` and recurrence `skipDates` inside TODAY + PIN native source snapshots, so Android widget refreshes and date-rollover rebuilds stay aligned with the app's current-day schedule visibility.

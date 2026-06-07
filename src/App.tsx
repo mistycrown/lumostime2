@@ -246,9 +246,15 @@ const AppContent: React.FC = () => {
     activeFilterId, setActiveFilterId,
     isDailyReviewOpen, setIsDailyReviewOpen,
     isDailyNewspaperOpen, setIsDailyNewspaperOpen,
+    setIsWeeklyNewspaperOpen,
+    setIsMonthlyNewspaperOpen,
     isOnThisDayOpen, setIsOnThisDayOpen,
     currentReviewDate, setCurrentReviewDate,
     setCurrentDailyNewspaperDate,
+    setCurrentWeeklyNewspaperStart,
+    setCurrentWeeklyNewspaperEnd,
+    setCurrentMonthlyNewspaperStart,
+    setCurrentMonthlyNewspaperEnd,
     setCurrentOnThisDayDate,
     isWeeklyReviewOpen,
     isMonthlyReviewOpen,
@@ -734,6 +740,16 @@ const AppContent: React.FC = () => {
       handleCloseDailyNewspaper={() => {
         setIsDailyNewspaperOpen(false);
         setCurrentDailyNewspaperDate(null);
+      }}
+      handleCloseWeeklyNewspaper={() => {
+        setIsWeeklyNewspaperOpen(false);
+        setCurrentWeeklyNewspaperStart(null);
+        setCurrentWeeklyNewspaperEnd(null);
+      }}
+      handleCloseMonthlyNewspaper={() => {
+        setIsMonthlyNewspaperOpen(false);
+        setCurrentMonthlyNewspaperStart(null);
+        setCurrentMonthlyNewspaperEnd(null);
       }}
       handleCloseDailyReview={() => {
         setIsDailyReviewOpen(false);

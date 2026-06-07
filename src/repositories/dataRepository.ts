@@ -5,6 +5,7 @@
  * @pos Repository (Application Data)
  * @description Loads and persists large core datasets through a single async repository and migrates legacy localStorage payloads into IndexedDB on first run.
  *
+ * @updated 2026-06-07: Normalized weekly and monthly review payloads during repository hydration so periodic AI newspaper fields survive reloads with the same guarantees as daily reviews.
  * @updated 2026-05-18: Parallelized snapshot hydration reads and added startup timing logs so Electron boot can diagnose slow IndexedDB-backed loads faster.
  * @updated 2026-05-18: Repaired default achievement bottle image paths by id, preset name, and stale bottle asset URLs so desktop updates keep bottle artwork visible.
  * @updated 2026-05-12: Added repository-backed `DataCollection` and `DataCollectionEntry` persistence to the core data snapshot.
@@ -43,7 +44,7 @@ import {
   TodoItem,
   WeeklyReview
 } from '../types';
-import { normalizeDailyReviews } from '../utils/checkItemNormalizer';
+import { normalizeDailyReviews, normalizeMonthlyReviews, normalizeWeeklyReviews } from '../utils/checkItemNormalizer';
 import { storageRepository, StorageRepository } from './storageRepository';
 
 const CORE_DATA_MIGRATION_META_KEY = 'core-data-migration-v2';
@@ -308,6 +309,8 @@ export class DataRepository {
     const dailyReviews = storedDailyReviews
       ? normalizeDailyReviews(storedDailyReviews)
       : normalizeDailyReviews(INITIAL_DAILY_REVIEWS);
+    const normalizedWeeklyReviews = normalizeWeeklyReviews(weeklyReviews ?? []);
+    const normalizedMonthlyReviews = normalizeMonthlyReviews(monthlyReviews ?? []);
 
     console.info(
       `[DataRepository] loadReviewEntriesSnapshot resolved in ${(getTimingNow() - startedAt).toFixed(1)}ms`
@@ -315,8 +318,8 @@ export class DataRepository {
 
     return {
       dailyReviews,
-      weeklyReviews: weeklyReviews ?? [],
-      monthlyReviews: monthlyReviews ?? [],
+      weeklyReviews: normalizedWeeklyReviews,
+      monthlyReviews: normalizedMonthlyReviews,
       onThisDayEntries: onThisDayEntries ?? []
     };
   }

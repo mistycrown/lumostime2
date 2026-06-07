@@ -4,6 +4,8 @@
  * @output Reference-style rolling month schedule UI backed by real daily todo data
  * @pos Component (Todo scheduling)
  * @description Renders the editorial monthly schedule view adapted from the minimalist demo, using shared todo schedule utilities so each day shows the same real Arrange / Due / Repeat / Maybe / Done / Trace data as the week planner.
+ * @updated 2026-06-07: Removed quick-open clicks from collapsed month-grid Trace overlays so tapping any unexpanded calendar cell always expands that day first.
+ * @updated 2026-06-07: Aligned month-view Arrange / Due / Repeat title text with the muted Trace tone so these schedule types stay equally legible in both grid cells and expanded day details.
  * @updated 2026-05-14: Added a parent-controlled schedule lock toggle so the month planner can freeze drag-to-move interactions while keeping day opening and quick-edit actions available.
  * @updated 2026-05-17: Added a dashed outline border around "maybe" schedule items in the month view grid matching their type color.
  * @updated 2026-05-17: Added a strike-through (line-through) style to "completed" schedule items in both month view grid cells and expanded details.
@@ -213,6 +215,19 @@ const getMonthEntryTagLabel = (
   }
 
   return tag.label.slice(0, 3);
+};
+
+const getMonthEntryToneClassName = (primaryKind: TodoDateEntry['primaryKind']): string => {
+  if (
+    primaryKind === 'deadline'
+    || primaryKind === 'scheduled'
+    || primaryKind === 'recurring'
+    || primaryKind === 'inProgress'
+  ) {
+    return 'text-stone-400 dark:text-stone-500/90';
+  }
+
+  return 'text-stone-800 dark:text-stone-200';
 };
 
 export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
@@ -1307,14 +1322,8 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                   {visibleTraceSegments.map((segment) => (
                     <div
                       key={`${week.id}-${segment.todoId}-${segment.startDayIndex}-${segment.endDayIndex}`}
-                      className={`absolute flex items-center overflow-hidden font-medium leading-[1.2] text-stone-400 dark:text-stone-500/90 ${monthCellTaskClassName} ${
-                        onOpenTodo ? 'cursor-pointer pointer-events-auto' : ''
-                      }`}
+                      className={`absolute flex items-center overflow-hidden font-medium leading-[1.2] text-stone-400 dark:text-stone-500/90 ${monthCellTaskClassName}`}
                       style={getTraceSegmentStyle(segment)}
-                      onClick={onOpenTodo ? (event) => {
-                        event.stopPropagation();
-                        onOpenTodo(segment.entry.todo);
-                      } : undefined}
                     >
                       <span className="overflow-hidden whitespace-nowrap text-clip">{segment.entry.todo.title}</span>
                     </div>
@@ -1439,15 +1448,12 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                             }
 
                             const isCompleted = entry.primaryKind === 'completed';
-                            const isTrace = entry.primaryKind === 'inProgress';
                             const isDue = entry.primaryKind === 'deadline';
                             const isRecurring = entry.primaryKind === 'recurring';
 
                             const textClassName = isCompleted
                               ? 'line-through text-stone-400/90 dark:text-stone-500/90'
-                              : (isTrace
-                                ? 'text-stone-400 dark:text-stone-500/90'
-                                : 'text-stone-800 dark:text-stone-200');
+                              : getMonthEntryToneClassName(entry.primaryKind);
 
                             const shapeClassName = entry.primaryKind === 'maybe'
                               ? 'rounded-[2px] px-[3px]'
@@ -1519,10 +1525,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                           const activeTags = MONTH_VIEW_ENTRY_TAGS.filter(({ key }) => entry.badges[key]);
                           const activeTagCount = activeTags.length;
                           const completedDateKey = entry.todo.completedAt ? formatDateKey(new Date(entry.todo.completedAt)) : null;
-                          const isTrace = entry.primaryKind === 'inProgress';
-                          const titleClassName = isTrace
-                            ? 'text-stone-400 dark:text-stone-500/90'
-                            : 'text-stone-800 dark:text-stone-200';
+                          const titleClassName = getMonthEntryToneClassName(entry.primaryKind);
                           const parentTodo = getParentTodo(todos, entry.todo);
                           const parentTitle = parentTodo?.title || null;
                           const parentTitleClassName = 'text-stone-400';

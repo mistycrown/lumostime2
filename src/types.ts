@@ -4,6 +4,7 @@
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
+ * @updated 2026-06-07: Added structured weekly/monthly AI newspaper types so periodic reviews can persist editorial summary pages alongside existing narratives.
  * @updated 2026-05-21: Added optional todo `createdAt` metadata so collection timelines and older persisted task flows can share one creation-time fallback.
  * @updated 2026-05-16: Added lightweight daily AI newspaper types so Daily Review can persist structured editorial timeline commentary by log ID.
  * @updated 2026-05-13: Added optional monthly recurrence fallback support so 31st-style rules can land on the last day in shorter months when explicitly enabled.
@@ -651,6 +652,50 @@ export interface DailyNewspaper {
   updatedAt: number;
 }
 
+export interface WeeklyNewspaperDaySection {
+  date: string;
+  dayLabel: string;
+  dailySummary: string;
+  keyPoints: string[];
+}
+
+export interface WeeklyNewspaper {
+  version: 1;
+  weekStartDate: string;
+  weekEndDate: string;
+  title: string;
+  assistantReply: string;
+  overallComment: string;
+  keyInsights: string[];
+  daySections: WeeklyNewspaperDaySection[];
+  closingComment: string;
+  nextPeriodPlan: string[];
+  updatedAt: number;
+}
+
+export interface MonthlyNewspaperWeekSection {
+  weekStartDate: string;
+  weekEndDate: string;
+  weekLabel: string;
+  weeklySummary: string;
+  highlights: string[];
+  riskPoint: string;
+}
+
+export interface MonthlyNewspaper {
+  version: 1;
+  monthStartDate: string;
+  monthEndDate: string;
+  title: string;
+  assistantReply: string;
+  overallComment: string;
+  keyInsights: string[];
+  monthlyTheme: string;
+  weekSections: MonthlyNewspaperWeekSection[];
+  nextPeriodPlan: string[];
+  updatedAt: number;
+}
+
 // 姣忔棩鍥為【
 export interface DailyReview {
   id: string;
@@ -730,6 +775,7 @@ export interface WeeklyReview {
   summaryUpdatedAt?: number;
   narrative?: string; // AI鐢熸垚鐨勫彊浜?
   narrativeUpdatedAt?: number;
+  aiNewspaper?: WeeklyNewspaper;
   isEdited?: boolean; // 鍙欎簨鏄惁琚墜鍔ㄧ紪杈戣繃
   templateSnapshot?: ReviewTemplateSnapshot[]; // 鍒涘缓鏃剁殑妯℃澘蹇収
 }
@@ -746,6 +792,7 @@ export interface MonthlyReview {
   summaryUpdatedAt?: number;
   narrative?: string; // AI鐢熸垚鐨勫彊浜?
   narrativeUpdatedAt?: number;
+  aiNewspaper?: MonthlyNewspaper;
   isEdited?: boolean; // 鍙欎簨鏄惁琚墜鍔ㄧ紪杈戣繃
   templateSnapshot?: ReviewTemplateSnapshot[]; // 鍒涘缓鏃剁殑妯℃澘蹇収
   cite?: string; // 鐢ㄦ埛鑷畾涔夌殑鏈湀寮曡█

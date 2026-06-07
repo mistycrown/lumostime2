@@ -4,6 +4,7 @@
  * @output Empty-state prompt list plus the rendered AI/user conversation pane
  * @pos Component Support (AI Integration)
  * @description Extracts the heavy conversation rendering UI out of AIBackfillChatModal so the modal can focus on orchestration while the message list, writeback cards, and per-message metadata remain behaviorally unchanged.
+ * @updated 2026-06-07: Added weekly/monthly newspaper result cards so periodic AI newspaper writeback can open dedicated full-screen newspaper pages from chat results.
  * @updated 2026-05-21: Treat assistant messages as standalone avatar groups so each AI reply starts with an avatar while multi-bubble displayParts still share one avatar.
  * @updated 2026-05-18: Added configurable width classes so compact desktop AI shells can reuse the conversation renderer without forcing the full-screen modal measure.
  * @updated 2026-05-15: Rebuilt the conversation pane with the extracted empty state, message bubble rendering, and writeback cards.
@@ -19,10 +20,12 @@ import type {
   AIChatDailyReviewWritebackResult,
   AIChatDreamUpdateCard,
   AIChatMessage,
+  AIChatMonthlyNewspaperWritebackResult,
   AIChatMonthlyReviewWritebackResult,
   AIChatPersona,
   AIChatSession,
   AIChatUserProfile,
+  AIChatWeeklyNewspaperWritebackResult,
   AIChatWeeklyReviewWritebackResult,
   DebugViewerState
 } from './AIBackfillChatShared';
@@ -76,7 +79,9 @@ interface AIBackfillChatConversationPaneProps {
   onOpenDailyReviewNarrative: (date: string) => void;
   onOpenDailyNewspaper: (date: string) => void;
   onOpenDebugViewer: (viewer: DebugViewerState) => void;
+  onOpenMonthlyNewspaper: (monthStartDate: string, monthEndDate: string) => void;
   onOpenMonthlyReviewNarrative: (monthStartDate: string, monthEndDate: string) => void;
+  onOpenWeeklyNewspaper: (weekStartDate: string, weekEndDate: string) => void;
   onOpenWeeklyReviewNarrative: (weekStartDate: string, weekEndDate: string) => void;
   onRetryMessage: (message: AIChatMessage) => void;
   renderAppliedAction: (messageId: string, action: AppliedChatAction) => React.ReactNode;
@@ -241,6 +246,56 @@ const WeeklyReviewWritebackResultCard: React.FC<{
   </div>
 );
 
+const WeeklyNewspaperWritebackResultCard: React.FC<{
+  onOpen: () => void;
+  result: AIChatWeeklyNewspaperWritebackResult;
+  theme: AIChatConversationTheme;
+}> = ({ onOpen, result, theme }) => (
+  <div
+    className="border-l-2 pl-3 pr-1 py-1"
+    style={{ borderColor: theme.activeBorder }}
+  >
+    <div className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="block w-full truncate text-left font-serif text-[1rem] leading-6 transition-colors hover:opacity-80"
+          style={{ color: theme.textPrimary }}
+          title="打开对应周小报"
+        >
+          {result.title || 'AI 小报'}
+        </button>
+        <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: theme.textSecondary }}>
+          {result.preview || '点击查看完整小报'}
+        </p>
+      </div>
+    </div>
+
+    <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: theme.textMuted }}>
+      <span>{`${result.weekStartDate} ~ ${result.weekEndDate}`}</span>
+      <span>{result.createdReview ? '已新建周回顾' : '已写入周回顾'}</span>
+      <span>{result.mergeMode === 'overwrite' ? '覆盖写入' : '首次写入'}</span>
+    </div>
+
+    <div className="mt-2.5 flex justify-end gap-2">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="inline-flex h-8 items-center justify-center rounded-full border px-3 text-xs transition-colors"
+        style={{
+          borderColor: theme.chipBorder,
+          backgroundColor: theme.inputBg,
+          color: theme.textSecondary
+        }}
+        title="打开周小报"
+      >
+        打开
+      </button>
+    </div>
+  </div>
+);
+
 const MonthlyReviewWritebackResultCard: React.FC<{
   onOpen: () => void;
   result: AIChatMonthlyReviewWritebackResult;
@@ -291,6 +346,56 @@ const MonthlyReviewWritebackResultCard: React.FC<{
   </div>
 );
 
+const MonthlyNewspaperWritebackResultCard: React.FC<{
+  onOpen: () => void;
+  result: AIChatMonthlyNewspaperWritebackResult;
+  theme: AIChatConversationTheme;
+}> = ({ onOpen, result, theme }) => (
+  <div
+    className="border-l-2 pl-3 pr-1 py-1"
+    style={{ borderColor: theme.activeBorder }}
+  >
+    <div className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="block w-full truncate text-left font-serif text-[1rem] leading-6 transition-colors hover:opacity-80"
+          style={{ color: theme.textPrimary }}
+          title="打开对应月小报"
+        >
+          {result.title || 'AI 小报'}
+        </button>
+        <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: theme.textSecondary }}>
+          {result.preview || '点击查看完整小报'}
+        </p>
+      </div>
+    </div>
+
+    <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: theme.textMuted }}>
+      <span>{`${result.monthStartDate} ~ ${result.monthEndDate}`}</span>
+      <span>{result.createdReview ? '已新建月回顾' : '已写入月回顾'}</span>
+      <span>{result.mergeMode === 'overwrite' ? '覆盖写入' : '首次写入'}</span>
+    </div>
+
+    <div className="mt-2.5 flex justify-end gap-2">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="inline-flex h-8 items-center justify-center rounded-full border px-3 text-xs transition-colors"
+        style={{
+          borderColor: theme.chipBorder,
+          backgroundColor: theme.inputBg,
+          color: theme.textSecondary
+        }}
+        title="打开月小报"
+      >
+        打开
+      </button>
+    </div>
+  </div>
+);
+
 export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversationPaneProps> = ({
   accentMix,
   activePersona,
@@ -310,7 +415,9 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
   onOpenDailyReviewNarrative,
   onOpenDailyNewspaper,
   onOpenDebugViewer,
+  onOpenMonthlyNewspaper,
   onOpenMonthlyReviewNarrative,
+  onOpenWeeklyNewspaper,
   onOpenWeeklyReviewNarrative,
   onRetryMessage,
   renderAppliedAction,
@@ -549,7 +656,7 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
               </div>
             )}
 
-            {allDisplayPartsRevealed && ((message.appliedActions && message.appliedActions.length > 0) || message.dailyReviewWriteback || message.dailyNewspaperWriteback || message.weeklyReviewWriteback || message.monthlyReviewWriteback) && (
+            {allDisplayPartsRevealed && ((message.appliedActions && message.appliedActions.length > 0) || message.dailyReviewWriteback || message.dailyNewspaperWriteback || message.weeklyNewspaperWriteback || message.weeklyReviewWriteback || message.monthlyNewspaperWriteback || message.monthlyReviewWriteback) && (
               <div
                 className="space-y-2 border-l pl-3 pr-1 py-1"
                 style={{
@@ -585,6 +692,16 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
                       theme={theme}
                     />
                   )}
+                  {message.weeklyNewspaperWriteback && (
+                    <WeeklyNewspaperWritebackResultCard
+                      onOpen={() => onOpenWeeklyNewspaper(
+                        message.weeklyNewspaperWriteback!.weekStartDate,
+                        message.weeklyNewspaperWriteback!.weekEndDate
+                      )}
+                      result={message.weeklyNewspaperWriteback}
+                      theme={theme}
+                    />
+                  )}
                   {message.monthlyReviewWriteback && (
                     <MonthlyReviewWritebackResultCard
                       onOpen={() => onOpenMonthlyReviewNarrative(
@@ -592,6 +709,16 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
                         message.monthlyReviewWriteback!.monthEndDate
                       )}
                       result={message.monthlyReviewWriteback}
+                      theme={theme}
+                    />
+                  )}
+                  {message.monthlyNewspaperWriteback && (
+                    <MonthlyNewspaperWritebackResultCard
+                      onOpen={() => onOpenMonthlyNewspaper(
+                        message.monthlyNewspaperWriteback!.monthStartDate,
+                        message.monthlyNewspaperWriteback!.monthEndDate
+                      )}
+                      result={message.monthlyNewspaperWriteback}
                       theme={theme}
                     />
                   )}

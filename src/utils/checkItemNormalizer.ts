@@ -2,7 +2,17 @@
  * @file checkItemNormalizer.ts
  * @description 日课数据归一化工具 - 兼容旧版布尔数据与新版次数数据
  */
-import { CheckItem, CheckTemplate, CheckTemplateItem, DailyNewspaper, DailyReview } from '../types';
+import {
+  CheckItem,
+  CheckTemplate,
+  CheckTemplateItem,
+  DailyNewspaper,
+  DailyReview,
+  MonthlyNewspaper,
+  MonthlyReview,
+  WeeklyNewspaper,
+  WeeklyReview
+} from '../types';
 
 type ManualMode = 'binary' | 'count';
 
@@ -112,47 +122,175 @@ export const normalizeCheckTemplate = (template: Partial<CheckTemplate>): CheckT
   };
 };
 
-export const normalizeDailyReview = (review: Partial<DailyReview>): DailyReview => {
-  const normalizeDailyNewspaper = (value: Partial<DailyNewspaper> | undefined): DailyNewspaper | undefined => {
-    if (!value || typeof value !== 'object') {
-      return undefined;
-    }
+export const normalizeDailyNewspaper = (value: Partial<DailyNewspaper> | undefined): DailyNewspaper | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
 
-    const date = typeof value.date === 'string' ? value.date.trim() : '';
-    const title = typeof value.title === 'string' ? value.title.trim() : '';
-    const assistantReply = typeof value.assistantReply === 'string' ? value.assistantReply.trim() : '';
-    const overallComment = typeof value.overallComment === 'string' ? value.overallComment.trim() : '';
-    const annotations = Array.isArray(value.annotations)
-      ? value.annotations.flatMap((annotation) => {
-        if (!annotation || typeof annotation !== 'object') {
-          return [];
-        }
+  const date = typeof value.date === 'string' ? value.date.trim() : '';
+  const title = typeof value.title === 'string' ? value.title.trim() : '';
+  const assistantReply = typeof value.assistantReply === 'string' ? value.assistantReply.trim() : '';
+  const overallComment = typeof value.overallComment === 'string' ? value.overallComment.trim() : '';
+  const annotations = Array.isArray(value.annotations)
+    ? value.annotations.flatMap((annotation) => {
+      if (!annotation || typeof annotation !== 'object') {
+        return [];
+      }
 
-        const logId = typeof annotation.logId === 'string' ? annotation.logId.trim() : '';
-        const comment = typeof annotation.comment === 'string' ? annotation.comment.trim() : '';
-        if (!logId || !comment) {
-          return [];
-        }
+      const logId = typeof annotation.logId === 'string' ? annotation.logId.trim() : '';
+      const comment = typeof annotation.comment === 'string' ? annotation.comment.trim() : '';
+      if (!logId || !comment) {
+        return [];
+      }
 
-        return [{ logId, comment }];
-      })
-      : [];
+      return [{ logId, comment }];
+    })
+    : [];
 
-    if (!date || !title || !assistantReply || !overallComment) {
-      return undefined;
-    }
+  if (!date || !title || !assistantReply || !overallComment) {
+    return undefined;
+  }
 
-    return {
-      version: 1,
-      date,
-      title,
-      assistantReply,
-      overallComment,
-      annotations,
-      updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : Date.now()
-    };
+  return {
+    version: 1,
+    date,
+    title,
+    assistantReply,
+    overallComment,
+    annotations,
+    updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : Date.now()
   };
+};
 
+export const normalizeWeeklyNewspaper = (value: Partial<WeeklyNewspaper> | undefined): WeeklyNewspaper | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const weekStartDate = typeof value.weekStartDate === 'string' ? value.weekStartDate.trim() : '';
+  const weekEndDate = typeof value.weekEndDate === 'string' ? value.weekEndDate.trim() : '';
+  const title = typeof value.title === 'string' ? value.title.trim() : '';
+  const assistantReply = typeof value.assistantReply === 'string' ? value.assistantReply.trim() : '';
+  const overallComment = typeof value.overallComment === 'string' ? value.overallComment.trim() : '';
+  const keyInsights = Array.isArray(value.keyInsights)
+    ? value.keyInsights.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean)
+    : [];
+  const daySections = Array.isArray(value.daySections)
+    ? value.daySections.flatMap((section) => {
+      if (!section || typeof section !== 'object') {
+        return [];
+      }
+
+      const date = typeof section.date === 'string' ? section.date.trim() : '';
+      const dayLabel = typeof section.dayLabel === 'string' ? section.dayLabel.trim() : '';
+      const dailySummary = typeof section.dailySummary === 'string' ? section.dailySummary.trim() : '';
+      const keyPoints = Array.isArray(section.keyPoints)
+        ? section.keyPoints.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean)
+        : [];
+
+      if (!date || !dayLabel || !dailySummary) {
+        return [];
+      }
+
+      return [{
+        date,
+        dayLabel,
+        dailySummary,
+        keyPoints
+      }];
+    })
+    : [];
+  const closingComment = typeof value.closingComment === 'string' ? value.closingComment.trim() : '';
+  const nextPeriodPlan = Array.isArray(value.nextPeriodPlan)
+    ? value.nextPeriodPlan.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean)
+    : [];
+
+  if (!weekStartDate || !weekEndDate || !title || !assistantReply || !overallComment || !closingComment) {
+    return undefined;
+  }
+
+  return {
+    version: 1,
+    weekStartDate,
+    weekEndDate,
+    title,
+    assistantReply,
+    overallComment,
+    keyInsights,
+    daySections,
+    closingComment,
+    nextPeriodPlan,
+    updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : Date.now()
+  };
+};
+
+export const normalizeMonthlyNewspaper = (value: Partial<MonthlyNewspaper> | undefined): MonthlyNewspaper | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const monthStartDate = typeof value.monthStartDate === 'string' ? value.monthStartDate.trim() : '';
+  const monthEndDate = typeof value.monthEndDate === 'string' ? value.monthEndDate.trim() : '';
+  const title = typeof value.title === 'string' ? value.title.trim() : '';
+  const assistantReply = typeof value.assistantReply === 'string' ? value.assistantReply.trim() : '';
+  const overallComment = typeof value.overallComment === 'string' ? value.overallComment.trim() : '';
+  const keyInsights = Array.isArray(value.keyInsights)
+    ? value.keyInsights.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean)
+    : [];
+  const monthlyTheme = typeof value.monthlyTheme === 'string' ? value.monthlyTheme.trim() : '';
+  const weekSections = Array.isArray(value.weekSections)
+    ? value.weekSections.flatMap((section) => {
+      if (!section || typeof section !== 'object') {
+        return [];
+      }
+
+      const weekStartDate = typeof section.weekStartDate === 'string' ? section.weekStartDate.trim() : '';
+      const weekEndDate = typeof section.weekEndDate === 'string' ? section.weekEndDate.trim() : '';
+      const weekLabel = typeof section.weekLabel === 'string' ? section.weekLabel.trim() : '';
+      const weeklySummary = typeof section.weeklySummary === 'string' ? section.weeklySummary.trim() : '';
+      const highlights = Array.isArray(section.highlights)
+        ? section.highlights.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean)
+        : [];
+      const riskPoint = typeof section.riskPoint === 'string' ? section.riskPoint.trim() : '';
+
+      if (!weekStartDate || !weekEndDate || !weekLabel || !weeklySummary || !riskPoint) {
+        return [];
+      }
+
+      return [{
+        weekStartDate,
+        weekEndDate,
+        weekLabel,
+        weeklySummary,
+        highlights,
+        riskPoint
+      }];
+    })
+    : [];
+  const nextPeriodPlan = Array.isArray(value.nextPeriodPlan)
+    ? value.nextPeriodPlan.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean)
+    : [];
+
+  if (!monthStartDate || !monthEndDate || !title || !assistantReply || !overallComment || !monthlyTheme) {
+    return undefined;
+  }
+
+  return {
+    version: 1,
+    monthStartDate,
+    monthEndDate,
+    title,
+    assistantReply,
+    overallComment,
+    keyInsights,
+    monthlyTheme,
+    weekSections,
+    nextPeriodPlan,
+    updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : Date.now()
+  };
+};
+
+export const normalizeDailyReview = (review: Partial<DailyReview>): DailyReview => {
   return {
     ...review,
     id: review.id || crypto.randomUUID(),
@@ -165,6 +303,32 @@ export const normalizeDailyReview = (review: Partial<DailyReview>): DailyReview 
   };
 };
 
+export const normalizeWeeklyReview = (review: Partial<WeeklyReview>): WeeklyReview => {
+  return {
+    ...review,
+    id: review.id || crypto.randomUUID(),
+    weekStartDate: review.weekStartDate || '',
+    weekEndDate: review.weekEndDate || '',
+    createdAt: typeof review.createdAt === 'number' ? review.createdAt : Date.now(),
+    updatedAt: typeof review.updatedAt === 'number' ? review.updatedAt : Date.now(),
+    answers: Array.isArray(review.answers) ? review.answers : [],
+    ...(normalizeWeeklyNewspaper(review.aiNewspaper) ? { aiNewspaper: normalizeWeeklyNewspaper(review.aiNewspaper) } : {})
+  };
+};
+
+export const normalizeMonthlyReview = (review: Partial<MonthlyReview>): MonthlyReview => {
+  return {
+    ...review,
+    id: review.id || crypto.randomUUID(),
+    monthStartDate: review.monthStartDate || '',
+    monthEndDate: review.monthEndDate || '',
+    createdAt: typeof review.createdAt === 'number' ? review.createdAt : Date.now(),
+    updatedAt: typeof review.updatedAt === 'number' ? review.updatedAt : Date.now(),
+    answers: Array.isArray(review.answers) ? review.answers : [],
+    ...(normalizeMonthlyNewspaper(review.aiNewspaper) ? { aiNewspaper: normalizeMonthlyNewspaper(review.aiNewspaper) } : {})
+  };
+};
+
 export const normalizeCheckTemplates = (templates: unknown): CheckTemplate[] => {
   if (!Array.isArray(templates)) return [];
   return templates.map(template => normalizeCheckTemplate(template as Partial<CheckTemplate>));
@@ -173,4 +337,14 @@ export const normalizeCheckTemplates = (templates: unknown): CheckTemplate[] => 
 export const normalizeDailyReviews = (dailyReviews: unknown): DailyReview[] => {
   if (!Array.isArray(dailyReviews)) return [];
   return dailyReviews.map(review => normalizeDailyReview(review as Partial<DailyReview>));
+};
+
+export const normalizeWeeklyReviews = (weeklyReviews: unknown): WeeklyReview[] => {
+  if (!Array.isArray(weeklyReviews)) return [];
+  return weeklyReviews.map(review => normalizeWeeklyReview(review as Partial<WeeklyReview>));
+};
+
+export const normalizeMonthlyReviews = (monthlyReviews: unknown): MonthlyReview[] => {
+  if (!Array.isArray(monthlyReviews)) return [];
+  return monthlyReviews.map(review => normalizeMonthlyReview(review as Partial<MonthlyReview>));
 };
