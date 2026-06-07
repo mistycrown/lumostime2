@@ -90,6 +90,10 @@ interface NavigationContextType {
     setIsDailyReviewOpen: (open: boolean) => void;
     isDailyNewspaperOpen: boolean;
     setIsDailyNewspaperOpen: (open: boolean) => void;
+    isWeeklyNewspaperOpen: boolean;
+    setIsWeeklyNewspaperOpen: (open: boolean) => void;
+    isMonthlyNewspaperOpen: boolean;
+    setIsMonthlyNewspaperOpen: (open: boolean) => void;
     isOnThisDayOpen: boolean;
     setIsOnThisDayOpen: (open: boolean) => void;
     isWeeklyReviewOpen: boolean;
@@ -124,6 +128,14 @@ interface NavigationContextType {
     setCurrentReviewDate: (date: Date | null) => void;
     currentDailyNewspaperDate: Date | null;
     setCurrentDailyNewspaperDate: (date: Date | null) => void;
+    currentWeeklyNewspaperStart: Date | null;
+    setCurrentWeeklyNewspaperStart: (date: Date | null) => void;
+    currentWeeklyNewspaperEnd: Date | null;
+    setCurrentWeeklyNewspaperEnd: (date: Date | null) => void;
+    currentMonthlyNewspaperStart: Date | null;
+    setCurrentMonthlyNewspaperStart: (date: Date | null) => void;
+    currentMonthlyNewspaperEnd: Date | null;
+    setCurrentMonthlyNewspaperEnd: (date: Date | null) => void;
     currentDailyReviewInitialTab: 'check' | 'data' | 'guide' | 'narrative' | null;
     setCurrentDailyReviewInitialTab: (tab: 'check' | 'data' | 'guide' | 'narrative' | null) => void;
     currentOnThisDayDate: Date | null;
@@ -260,6 +272,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     // Review 模态框
     const [isDailyReviewOpen, setIsDailyReviewOpen] = useState(false);
     const [isDailyNewspaperOpen, setIsDailyNewspaperOpen] = useState(false);
+    const [isWeeklyNewspaperOpen, setIsWeeklyNewspaperOpen] = useState(false);
+    const [isMonthlyNewspaperOpen, setIsMonthlyNewspaperOpen] = useState(false);
     const [isOnThisDayOpen, setIsOnThisDayOpen] = useState(false);
     const [isWeeklyReviewOpen, setIsWeeklyReviewOpen] = useState(false);
     const [isMonthlyReviewOpen, setIsMonthlyReviewOpen] = useState(false);
@@ -291,6 +305,10 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     // Review 编辑状态
     const [currentReviewDate, setCurrentReviewDate] = useState<Date | null>(null);
     const [currentDailyNewspaperDate, setCurrentDailyNewspaperDate] = useState<Date | null>(null);
+    const [currentWeeklyNewspaperStart, setCurrentWeeklyNewspaperStart] = useState<Date | null>(null);
+    const [currentWeeklyNewspaperEnd, setCurrentWeeklyNewspaperEnd] = useState<Date | null>(null);
+    const [currentMonthlyNewspaperStart, setCurrentMonthlyNewspaperStart] = useState<Date | null>(null);
+    const [currentMonthlyNewspaperEnd, setCurrentMonthlyNewspaperEnd] = useState<Date | null>(null);
     const [currentDailyReviewInitialTab, setCurrentDailyReviewInitialTab] = useState<'check' | 'data' | 'guide' | 'narrative' | null>(null);
     const [currentOnThisDayDate, setCurrentOnThisDayDate] = useState<Date | null>(null);
     const [currentWeeklyReviewStart, setCurrentWeeklyReviewStart] = useState<Date | null>(null);
@@ -402,6 +420,10 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setIsDailyReviewOpen,
             isDailyNewspaperOpen,
             setIsDailyNewspaperOpen,
+            isWeeklyNewspaperOpen,
+            setIsWeeklyNewspaperOpen,
+            isMonthlyNewspaperOpen,
+            setIsMonthlyNewspaperOpen,
             isOnThisDayOpen,
             setIsOnThisDayOpen,
             isWeeklyReviewOpen,
@@ -428,6 +450,14 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setCurrentReviewDate,
             currentDailyNewspaperDate,
             setCurrentDailyNewspaperDate,
+            currentWeeklyNewspaperStart,
+            setCurrentWeeklyNewspaperStart,
+            currentWeeklyNewspaperEnd,
+            setCurrentWeeklyNewspaperEnd,
+            currentMonthlyNewspaperStart,
+            setCurrentMonthlyNewspaperStart,
+            currentMonthlyNewspaperEnd,
+            setCurrentMonthlyNewspaperEnd,
             currentDailyReviewInitialTab,
             setCurrentDailyReviewInitialTab,
             currentOnThisDayDate,

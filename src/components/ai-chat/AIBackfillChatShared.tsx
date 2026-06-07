@@ -4,6 +4,7 @@
  * @output Reusable AI chat model definitions, validation helpers, and small presentational components
  * @pos Component Support (AI Integration)
  * @description Centralizes the stable data model and low-risk helper/UI pieces used by AIBackfillChatModal so the main modal focuses on orchestration instead of carrying every type and validator inline.
+ * @updated 2026-06-07: Added weekly/monthly newspaper result and confirmation types so periodic AI newspaper writeback can travel through chat state and guarded overwrite flows.
  * @updated 2026-05-16: Added daily newspaper result card types so AI chat can open lightweight structured newspaper pages stored on Daily Review.
  * @updated 2026-05-16: Added per-block enable flags for persona-scoped custom prompt blocks so each extra prompt snippet can be toggled independently.
  * @updated 2026-05-16: Added optional temporary log overrides for event-driven background assistant turns that need to see a just-saved record before React state settles.
@@ -103,7 +104,27 @@ export interface AIChatDailyNewspaperWritebackResult {
   mergeMode: 'create' | 'overwrite';
 }
 
+export interface AIChatWeeklyNewspaperWritebackResult {
+  weeklyReviewId: string;
+  weekStartDate: string;
+  weekEndDate: string;
+  title: string;
+  preview: string;
+  createdReview: boolean;
+  mergeMode: 'create' | 'overwrite';
+}
+
 export interface AIChatMonthlyReviewWritebackResult {
+  monthlyReviewId: string;
+  monthStartDate: string;
+  monthEndDate: string;
+  title: string;
+  preview: string;
+  createdReview: boolean;
+  mergeMode: 'create' | 'overwrite';
+}
+
+export interface AIChatMonthlyNewspaperWritebackResult {
   monthlyReviewId: string;
   monthStartDate: string;
   monthEndDate: string;
@@ -129,7 +150,9 @@ export interface AIChatMessage {
   reminderUpdates?: string[];
   dailyReviewWriteback?: AIChatDailyReviewWritebackResult;
   dailyNewspaperWriteback?: AIChatDailyNewspaperWritebackResult;
+  weeklyNewspaperWriteback?: AIChatWeeklyNewspaperWritebackResult;
   weeklyReviewWriteback?: AIChatWeeklyReviewWritebackResult;
+  monthlyNewspaperWriteback?: AIChatMonthlyNewspaperWritebackResult;
   monthlyReviewWriteback?: AIChatMonthlyReviewWritebackResult;
   retryInput?: string;
   retrySourceUserMessageId?: string;
@@ -186,6 +209,18 @@ export interface DailyReviewWritebackConfirmationState {
 export interface DailyNewspaperWritebackConfirmationState {
   sessionId: string;
   date: string;
+}
+
+export interface WeeklyNewspaperWritebackConfirmationState {
+  sessionId: string;
+  weekStartDate: string;
+  weekEndDate: string;
+}
+
+export interface MonthlyNewspaperWritebackConfirmationState {
+  sessionId: string;
+  monthStartDate: string;
+  monthEndDate: string;
 }
 
 export interface DreamMonthRangeSelection {

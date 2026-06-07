@@ -4,13 +4,16 @@
  * @output Shared async runners for daily, weekly, and monthly AI narrative writeback flows
  * @pos Component Support (AI Integration)
  * @description Moves the long review-writeback async flows out of AIBackfillChatModal while preserving the same pending-message, review-persistence, and retry/error behavior.
+ * @updated 2026-06-07: Added weekly/monthly newspaper writeback runners so periodic AI newspapers can persist and render dedicated result cards like the daily flow.
  * @updated 2026-05-17: Daily review and newspaper writeback flows now preserve provider reasoning summaries so the generated result message can render the same collapsible thinking block as ordinary chat.
  * @updated 2026-05-15: Extracted daily, weekly, and monthly narrative writeback runners from AIBackfillChatModal.
  */
 import { aiService, type AIConversationTurn } from '../../services/aiService';
 import { dailyNewspaperService } from '../../services/dailyNewspaperService';
 import { dailyReviewTemplateService } from '../../services/dailyReviewTemplateService';
+import { monthlyNewspaperService } from '../../services/monthlyNewspaperService';
 import { monthlyReviewTemplateService } from '../../services/monthlyReviewTemplateService';
+import { weeklyNewspaperService } from '../../services/weeklyNewspaperService';
 import { weeklyReviewTemplateService } from '../../services/weeklyReviewTemplateService';
 import { parseNarrative } from '../../utils/narrativeUtils';
 import type { DailyReview, MonthlyReview, WeeklyReview } from '../../types';
@@ -21,9 +24,11 @@ import type {
   AIChatDebugSection,
   AIChatDreamUpdateCard,
   AIChatMemoryUpdateSection,
+  AIChatMonthlyNewspaperWritebackResult,
   AIChatMonthlyReviewWritebackResult,
   AIChatPersona,
   AIChatSession,
+  AIChatWeeklyNewspaperWritebackResult,
   AIChatWeeklyReviewWritebackResult,
   ChatTone
 } from './AIBackfillChatShared';
@@ -48,12 +53,14 @@ interface ReplacePendingResultOptions {
   dreamRetryYearMonth?: string;
   dreamUpdates?: AIChatDreamUpdateCard[];
   memoryUpdates?: AIChatMemoryUpdateSection[];
+  monthlyNewspaperWriteback?: AIChatMonthlyNewspaperWritebackResult;
   monthlyReviewWriteback?: AIChatMonthlyReviewWritebackResult;
   reasoning?: AssistantReasoningSummary;
   reminderUpdates?: string[];
   retryInput?: string;
   retrySourceUserMessageId?: string;
   tone?: ChatTone;
+  weeklyNewspaperWriteback?: AIChatWeeklyNewspaperWritebackResult;
   weeklyReviewWriteback?: AIChatWeeklyReviewWritebackResult;
 }
 
@@ -143,6 +150,32 @@ interface MonthlyWritebackOptions extends ReviewWritebackRunnerBase {
     stage: WeeklyReviewTemplateSessionMeta['stage'],
     pendingWriteIntent?: boolean
   ) => void;
+}
+
+interface WeeklyNewspaperWritebackOptions extends ReviewWritebackRunnerBase {
+  debugMode: boolean;
+  params: {
+    createdReview: boolean;
+    mergeMode: 'create' | 'overwrite';
+    weekDataText: string;
+    weeklyReview: WeeklyReview;
+  };
+  session: AIChatSession;
+  setWeeklyNewspaperWritebackConfirmation: (value: null) => void;
+  setWeeklyReviews: (updater: (reviews: WeeklyReview[]) => WeeklyReview[]) => void;
+}
+
+interface MonthlyNewspaperWritebackOptions extends ReviewWritebackRunnerBase {
+  debugMode: boolean;
+  params: {
+    createdReview: boolean;
+    mergeMode: 'create' | 'overwrite';
+    monthDataText: string;
+    monthlyReview: MonthlyReview;
+  };
+  session: AIChatSession;
+  setMonthlyNewspaperWritebackConfirmation: (value: null) => void;
+  setMonthlyReviews: (updater: (reviews: MonthlyReview[]) => MonthlyReview[]) => void;
 }
 
 const appendPendingAssistantMessage = (
@@ -578,6 +611,144 @@ export const runDailyNewspaperWriteback = async ({
   }
 };
 
+export const runWeeklyNewspaperWriteback = async ({
+  activeRequestRef,
+  addToast,
+  buildConversationHistory,
+  buildPersonaPrompt,
+  debugMode,
+  getConversationSummary,
+  getRetryableAIErrorMessage,
+  isAbortError,
+  mutateSession,
+  params,
+  replacePendingWithResult,
+  resolveSessionPersona,
+  session,
+  setInputText,
+  setIsHistoryPanelOpen,
+  setIsLoading,
+  setIsPersonaPanelOpen,
+  setWeeklyNewspaperWritebackConfirmation,
+  setWeeklyReviews
+}: WeeklyNewspaperWritebackOptions): Promise<void> => {
+  const sessionId = session.id;
+  const pendingMessageId = crypto.randomUUID();
+  const now = Date.now();
+  const sessionPersona = resolveSessionPersona(session);
+  const conversationSummary = getConversationSummary(session.id);
+
+  appendPendingAssistantMessage(mutateSession, sessionId, pendingMessageId, '我来整理这周的小报。', now);
+
+  setInputText('');
+  setIsLoading(true);
+  setIsHistoryPanelOpen(false);
+  setIsPersonaPanelOpen(false);
+  setWeeklyNewspaperWritebackConfirmation(null);
+
+  const controller = new AbortController();
+  activeRequestRef.current = { controller, sessionId, pendingMessageId };
+
+  if (params.createdReview) {
+    setWeeklyReviews((previousReviews) => {
+      if (previousReviews.some((review) => review.id === params.weeklyReview.id)) {
+        return previousReviews;
+      }
+
+      return [...previousReviews, params.weeklyReview];
+    });
+  }
+
+  try {
+    const { systemPrompt, userPrompt } = await weeklyNewspaperService.buildWritebackPrompts({
+      personaPrompt: buildPersonaPrompt(sessionPersona),
+      weekDataText: params.weekDataText,
+      conversationSummary,
+      existingNewspaper: params.weeklyReview.aiNewspaper,
+      mergeMode: params.mergeMode
+    });
+
+    const newspaperWritebackResult = await aiService.requestStructuredJsonWithDebug({
+      systemPrompt,
+      userPrompt,
+      conversationHistory: buildConversationHistory(session),
+      cacheHint: {
+        keySeed: `weekly_newspaper_writeback:${params.weeklyReview.weekStartDate}:${params.mergeMode}`,
+        scope: 'weekly_newspaper_writeback'
+      },
+      normalizeResult: (rawValue, meta) => ({
+        ...weeklyNewspaperService.parseWritebackResponse(
+          rawValue,
+          params.weeklyReview.weekStartDate,
+          params.weeklyReview.weekEndDate,
+          params.mergeMode
+        ),
+        ...(meta?.reasoning ? { reasoning: meta.reasoning } : {})
+      })
+    }, {
+      signal: controller.signal
+    });
+
+    if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
+      return;
+    }
+
+    const newspaper = weeklyNewspaperService.buildNewspaperFromToolCall(
+      newspaperWritebackResult.result.newspaperToolCall,
+      newspaperWritebackResult.result.assistantReply
+    );
+
+    setWeeklyReviews((previousReviews) => (
+      weeklyNewspaperService.updateWeeklyReviewNewspaper(previousReviews, params.weeklyReview.id, newspaper)
+    ));
+
+    const writebackResultCard: AIChatWeeklyNewspaperWritebackResult = {
+      weeklyReviewId: params.weeklyReview.id,
+      weekStartDate: params.weeklyReview.weekStartDate,
+      weekEndDate: params.weeklyReview.weekEndDate,
+      title: newspaper.title,
+      preview: newspaper.overallComment,
+      createdReview: params.createdReview,
+      mergeMode: params.mergeMode
+    };
+
+    replacePendingWithResult(sessionId, pendingMessageId, newspaperWritebackResult.result.assistantReply, {
+      tone: 'system',
+      ...(newspaperWritebackResult.result.reasoning ? { reasoning: newspaperWritebackResult.result.reasoning } : {}),
+      weeklyNewspaperWriteback: writebackResultCard,
+      ...(debugMode
+        ? {
+          debugSections: [{
+            label: '周报小报写入',
+            exchange: newspaperWritebackResult.debug
+          }]
+        }
+        : {})
+    });
+    addToast('success', 'AI 小报已写入周回顾');
+  } catch (error) {
+    const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
+
+    if (isAbortError(error)) {
+      if (isCurrentPendingRequest) {
+        replacePendingWithResult(sessionId, pendingMessageId, '已停止这次写入。', { tone: 'system' });
+      }
+      return;
+    }
+
+    if (!isCurrentPendingRequest || controller.signal.aborted) {
+      return;
+    }
+
+    replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), { tone: 'error' });
+  } finally {
+    if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
+      activeRequestRef.current = null;
+      setIsLoading(false);
+    }
+  }
+};
+
 export const runMonthlyReviewNarrativeWriteback = async ({
   activeRequestRef,
   addToast,
@@ -693,6 +864,144 @@ export const runMonthlyReviewNarrativeWriteback = async ({
 
     replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), { tone: 'error' });
     updateWeeklyReviewTemplateStage(sessionId, 'ready');
+  } finally {
+    if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
+      activeRequestRef.current = null;
+      setIsLoading(false);
+    }
+  }
+};
+
+export const runMonthlyNewspaperWriteback = async ({
+  activeRequestRef,
+  addToast,
+  buildConversationHistory,
+  buildPersonaPrompt,
+  debugMode,
+  getConversationSummary,
+  getRetryableAIErrorMessage,
+  isAbortError,
+  mutateSession,
+  params,
+  replacePendingWithResult,
+  resolveSessionPersona,
+  session,
+  setInputText,
+  setIsHistoryPanelOpen,
+  setIsLoading,
+  setIsPersonaPanelOpen,
+  setMonthlyNewspaperWritebackConfirmation,
+  setMonthlyReviews
+}: MonthlyNewspaperWritebackOptions): Promise<void> => {
+  const sessionId = session.id;
+  const pendingMessageId = crypto.randomUUID();
+  const now = Date.now();
+  const sessionPersona = resolveSessionPersona(session);
+  const conversationSummary = getConversationSummary(session.id);
+
+  appendPendingAssistantMessage(mutateSession, sessionId, pendingMessageId, '我来整理这个月的小报。', now);
+
+  setInputText('');
+  setIsLoading(true);
+  setIsHistoryPanelOpen(false);
+  setIsPersonaPanelOpen(false);
+  setMonthlyNewspaperWritebackConfirmation(null);
+
+  const controller = new AbortController();
+  activeRequestRef.current = { controller, sessionId, pendingMessageId };
+
+  if (params.createdReview) {
+    setMonthlyReviews((previousReviews) => {
+      if (previousReviews.some((review) => review.id === params.monthlyReview.id)) {
+        return previousReviews;
+      }
+
+      return [...previousReviews, params.monthlyReview];
+    });
+  }
+
+  try {
+    const { systemPrompt, userPrompt } = await monthlyNewspaperService.buildWritebackPrompts({
+      personaPrompt: buildPersonaPrompt(sessionPersona),
+      monthDataText: params.monthDataText,
+      conversationSummary,
+      existingNewspaper: params.monthlyReview.aiNewspaper,
+      mergeMode: params.mergeMode
+    });
+
+    const newspaperWritebackResult = await aiService.requestStructuredJsonWithDebug({
+      systemPrompt,
+      userPrompt,
+      conversationHistory: buildConversationHistory(session),
+      cacheHint: {
+        keySeed: `monthly_newspaper_writeback:${params.monthlyReview.monthStartDate}:${params.mergeMode}`,
+        scope: 'monthly_newspaper_writeback'
+      },
+      normalizeResult: (rawValue, meta) => ({
+        ...monthlyNewspaperService.parseWritebackResponse(
+          rawValue,
+          params.monthlyReview.monthStartDate,
+          params.monthlyReview.monthEndDate,
+          params.mergeMode
+        ),
+        ...(meta?.reasoning ? { reasoning: meta.reasoning } : {})
+      })
+    }, {
+      signal: controller.signal
+    });
+
+    if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
+      return;
+    }
+
+    const newspaper = monthlyNewspaperService.buildNewspaperFromToolCall(
+      newspaperWritebackResult.result.newspaperToolCall,
+      newspaperWritebackResult.result.assistantReply
+    );
+
+    setMonthlyReviews((previousReviews) => (
+      monthlyNewspaperService.updateMonthlyReviewNewspaper(previousReviews, params.monthlyReview.id, newspaper)
+    ));
+
+    const writebackResultCard: AIChatMonthlyNewspaperWritebackResult = {
+      monthlyReviewId: params.monthlyReview.id,
+      monthStartDate: params.monthlyReview.monthStartDate,
+      monthEndDate: params.monthlyReview.monthEndDate,
+      title: newspaper.title,
+      preview: newspaper.overallComment,
+      createdReview: params.createdReview,
+      mergeMode: params.mergeMode
+    };
+
+    replacePendingWithResult(sessionId, pendingMessageId, newspaperWritebackResult.result.assistantReply, {
+      tone: 'system',
+      ...(newspaperWritebackResult.result.reasoning ? { reasoning: newspaperWritebackResult.result.reasoning } : {}),
+      monthlyNewspaperWriteback: writebackResultCard,
+      ...(debugMode
+        ? {
+          debugSections: [{
+            label: '月报小报写入',
+            exchange: newspaperWritebackResult.debug
+          }]
+        }
+        : {})
+    });
+    addToast('success', 'AI 小报已写入月回顾');
+  } catch (error) {
+    const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
+
+    if (isAbortError(error)) {
+      if (isCurrentPendingRequest) {
+        replacePendingWithResult(sessionId, pendingMessageId, '已停止这次写入。', { tone: 'system' });
+      }
+      return;
+    }
+
+    if (!isCurrentPendingRequest || controller.signal.aborted) {
+      return;
+    }
+
+    replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), { tone: 'error' });
   } finally {
     if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
       activeRequestRef.current = null;

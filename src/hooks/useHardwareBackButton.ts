@@ -35,10 +35,10 @@ export const useHardwareBackButton = () => {
         focusDetailSessionId, setFocusDetailSessionId,
         isAddModalOpen, setIsAddModalOpen,
         isTodoModalOpen, closeTodoDetail,
-        isDailyReviewOpen, isDailyNewspaperOpen, setIsDailyReviewOpen, setCurrentReviewDate, setIsDailyNewspaperOpen, setCurrentDailyNewspaperDate,
+        isDailyReviewOpen, isDailyNewspaperOpen, isWeeklyNewspaperOpen, isMonthlyNewspaperOpen, setIsDailyReviewOpen, setCurrentReviewDate, setIsDailyNewspaperOpen, setCurrentDailyNewspaperDate, setIsWeeklyNewspaperOpen, setCurrentWeeklyNewspaperStart, setCurrentWeeklyNewspaperEnd, setIsMonthlyNewspaperOpen, setCurrentMonthlyNewspaperStart, setCurrentMonthlyNewspaperEnd,
         isOnThisDayOpen, setIsOnThisDayOpen, setCurrentOnThisDayDate,
-        isWeeklyReviewOpen, setIsWeeklyReviewOpen, setCurrentWeeklyReviewStart, setCurrentWeeklyReviewEnd,
-        isMonthlyReviewOpen, setIsMonthlyReviewOpen, setCurrentMonthlyReviewStart, setCurrentMonthlyReviewEnd,
+        isWeeklyReviewOpen, setIsWeeklyReviewOpen,
+        isMonthlyReviewOpen, setIsMonthlyReviewOpen,
         isAchievementOpen, setIsAchievementOpen,
         isStatsFullScreen, setIsStatsFullScreen,
         isTodoManaging, setIsTodoManaging,
@@ -168,6 +168,18 @@ export const useHardwareBackButton = () => {
                 setCurrentDailyNewspaperDate(null);
                 return;
             }
+            if (isWeeklyNewspaperOpen) {
+                setIsWeeklyNewspaperOpen(false);
+                setCurrentWeeklyNewspaperStart(null);
+                setCurrentWeeklyNewspaperEnd(null);
+                return;
+            }
+            if (isMonthlyNewspaperOpen) {
+                setIsMonthlyNewspaperOpen(false);
+                setCurrentMonthlyNewspaperStart(null);
+                setCurrentMonthlyNewspaperEnd(null);
+                return;
+            }
             if (isDailyReviewOpen) {
                 setIsDailyReviewOpen(false);
                 setCurrentReviewDate(null);
@@ -239,7 +251,7 @@ export const useHardwareBackButton = () => {
     }, [
         closeTodoDetail, handleAIChatBack, isAIChatOpen,
         isSettingsOpen, isAutoLinkOpen, isSearchOpen, isFiltersOpen, isExportViewOpen, isGalleryViewOpen, isShareViewOpen, focusDetailSessionId, isAddModalOpen, isTodoModalOpen,
-        isDailyNewspaperOpen, isDailyReviewOpen, isOnThisDayOpen, isWeeklyReviewOpen, isMonthlyReviewOpen, isAchievementOpen,
+        isDailyNewspaperOpen, isWeeklyNewspaperOpen, isMonthlyNewspaperOpen, isDailyReviewOpen, isOnThisDayOpen, isWeeklyReviewOpen, isMonthlyReviewOpen, isAchievementOpen,
         isStatsFullScreen, isTodoManaging, isTagsManaging, isScopeManaging,
         currentView, selectedTagId, selectedCategoryId, selectedScopeId, settingsSubmenu, settingsSubmenuBackCloses, isSearchOpenedFromSettings, activeFilterId
     ]);

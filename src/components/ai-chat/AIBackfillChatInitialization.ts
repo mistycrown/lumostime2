@@ -4,6 +4,7 @@
  * @output AI chat storage keys, default personas, and normalization helpers for rehydrating modal state
  * @pos Component Support (AI Integration)
  * @description Moves the large persistence/bootstrap normalization layer out of AIBackfillChatModal so startup state restoration stays pure and isolated from the runtime orchestration logic.
+ * @updated 2026-06-07: Added weekly/monthly newspaper writeback result normalization so periodic AI newspaper cards persist across chat reloads.
  * @updated 2026-05-16: Normalized legacy garbled background-debug labels during chat-state hydration so older persisted assistant messages render readable Chinese titles.
  * @updated 2026-05-16: Moved custom prompt blocks into a global store, with legacy persona-bound block migration during initial chat-state hydration.
  * @updated 2026-05-16: Normalized per-block enabled flags for persona custom prompt blocks and defaulted legacy blocks to enabled.
@@ -30,10 +31,12 @@ import type {
   AIChatDreamUpdateCard,
   AIChatMemoryUpdateSection,
   AIChatMessage,
+  AIChatMonthlyNewspaperWritebackResult,
   AIChatMonthlyReviewWritebackResult,
   AIChatPersona,
   AIChatSession,
   AIChatUserProfile,
+  AIChatWeeklyNewspaperWritebackResult,
   AIChatWeeklyReviewWritebackResult,
   ChatTone,
   InitialChatState
@@ -368,12 +371,66 @@ const normalizeWeeklyReviewWritebackResult = (value: unknown): AIChatWeeklyRevie
   };
 };
 
+const normalizeWeeklyNewspaperWritebackResult = (value: unknown): AIChatWeeklyNewspaperWritebackResult | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const candidate = value as Partial<AIChatWeeklyNewspaperWritebackResult>;
+  if (
+    typeof candidate.weeklyReviewId !== 'string'
+    || typeof candidate.weekStartDate !== 'string'
+    || typeof candidate.weekEndDate !== 'string'
+    || typeof candidate.title !== 'string'
+    || typeof candidate.preview !== 'string'
+  ) {
+    return undefined;
+  }
+
+  return {
+    weeklyReviewId: candidate.weeklyReviewId.trim(),
+    weekStartDate: candidate.weekStartDate.trim(),
+    weekEndDate: candidate.weekEndDate.trim(),
+    title: candidate.title.trim(),
+    preview: candidate.preview.trim(),
+    createdReview: candidate.createdReview === true,
+    mergeMode: candidate.mergeMode === 'overwrite' ? 'overwrite' : 'create'
+  };
+};
+
 const normalizeMonthlyReviewWritebackResult = (value: unknown): AIChatMonthlyReviewWritebackResult | undefined => {
   if (!value || typeof value !== 'object') {
     return undefined;
   }
 
   const candidate = value as Partial<AIChatMonthlyReviewWritebackResult>;
+  if (
+    typeof candidate.monthlyReviewId !== 'string'
+    || typeof candidate.monthStartDate !== 'string'
+    || typeof candidate.monthEndDate !== 'string'
+    || typeof candidate.title !== 'string'
+    || typeof candidate.preview !== 'string'
+  ) {
+    return undefined;
+  }
+
+  return {
+    monthlyReviewId: candidate.monthlyReviewId.trim(),
+    monthStartDate: candidate.monthStartDate.trim(),
+    monthEndDate: candidate.monthEndDate.trim(),
+    title: candidate.title.trim(),
+    preview: candidate.preview.trim(),
+    createdReview: candidate.createdReview === true,
+    mergeMode: candidate.mergeMode === 'overwrite' ? 'overwrite' : 'create'
+  };
+};
+
+const normalizeMonthlyNewspaperWritebackResult = (value: unknown): AIChatMonthlyNewspaperWritebackResult | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const candidate = value as Partial<AIChatMonthlyNewspaperWritebackResult>;
   if (
     typeof candidate.monthlyReviewId !== 'string'
     || typeof candidate.monthStartDate !== 'string'
@@ -573,8 +630,14 @@ const normalizeMessages = (value: unknown, getLocalDateStr: (date: Date) => stri
       ...(normalizeDailyNewspaperWritebackResult(candidate.dailyNewspaperWriteback)
         ? { dailyNewspaperWriteback: normalizeDailyNewspaperWritebackResult(candidate.dailyNewspaperWriteback) }
         : {}),
+      ...(normalizeWeeklyNewspaperWritebackResult(candidate.weeklyNewspaperWriteback)
+        ? { weeklyNewspaperWriteback: normalizeWeeklyNewspaperWritebackResult(candidate.weeklyNewspaperWriteback) }
+        : {}),
       ...(normalizeWeeklyReviewWritebackResult(candidate.weeklyReviewWriteback)
         ? { weeklyReviewWriteback: normalizeWeeklyReviewWritebackResult(candidate.weeklyReviewWriteback) }
+        : {}),
+      ...(normalizeMonthlyNewspaperWritebackResult(candidate.monthlyNewspaperWriteback)
+        ? { monthlyNewspaperWriteback: normalizeMonthlyNewspaperWritebackResult(candidate.monthlyNewspaperWriteback) }
         : {}),
       ...(normalizeMonthlyReviewWritebackResult(candidate.monthlyReviewWriteback)
         ? { monthlyReviewWriteback: normalizeMonthlyReviewWritebackResult(candidate.monthlyReviewWriteback) }

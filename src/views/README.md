@@ -2,6 +2,8 @@
 
 The `views/` directory contains all the React components that represent the distinct screens or pages of the LumosTime application. This layer is responsible for the presentation logic and user interaction.
 
+- Update 2026-06-07: `WeeklyNewspaperView.tsx` and `MonthlyNewspaperView.tsx` now provide dedicated full-screen editorial pages for periodic AI newspapers, while `WeeklyReviewView.tsx` and `MonthlyReviewView.tsx` expose the same inline `AI 小报` entry, open, generate, and delete flow already used by the daily review.
+
 - Update 2026-06-06: `BatchFocusRecordManageView.tsx` now documents `@待办/分类` in its batch-filter syntax hint, matching the shared custom-filter behavior where linked-log todo filters can hit both todo titles and todo category names.
 - Update 2026-05-17 (桌面月历小组件): 将月历小组件（DesktopMonthWidgetView.tsx）计划栏的分类标签顺序调整为 maybe / arrange / due，并将标签文字“暂定/安排/截止”替换为英文 lowercase 形式，且在打开时默认选到 arrange 标签。
 - Update 2026-05-17: 重构设置菜单布局，新增了“Windows 特性”分组，将“PC端小组件”与原在数据同步分类下的“导出到 Obsidian”归拢在此专有分组下，并确保其在安卓端不可见。

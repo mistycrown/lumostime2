@@ -16,7 +16,9 @@ import { getLocalDateStr } from '../utils/dateUtils';
 // Views
 import { DailyReviewView } from '../views/DailyReviewView';
 import { DailyNewspaperView } from '../views/DailyNewspaperView';
+import { WeeklyNewspaperView } from '../views/WeeklyNewspaperView';
 import { WeeklyReviewView } from '../views/WeeklyReviewView';
+import { MonthlyNewspaperView } from '../views/MonthlyNewspaperView';
 import { MonthlyReviewView } from '../views/MonthlyReviewView';
 import { OnThisDayView } from '../views/OnThisDayView';
 import { AchievementView } from '../views/AchievementView';
@@ -93,10 +95,10 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     const {
         currentView, setCurrentView,
         isSettingsOpen,
-        isDailyReviewOpen, isDailyNewspaperOpen, isOnThisDayOpen, setIsOnThisDayOpen, currentReviewDate, currentDailyNewspaperDate, currentDailyReviewInitialTab, currentOnThisDayDate, setCurrentOnThisDayDate,
+        isDailyReviewOpen, isDailyNewspaperOpen, isWeeklyNewspaperOpen, isMonthlyNewspaperOpen, isOnThisDayOpen, setIsOnThisDayOpen, currentReviewDate, currentDailyNewspaperDate, currentWeeklyNewspaperStart, currentWeeklyNewspaperEnd, currentDailyReviewInitialTab, currentOnThisDayDate, setCurrentOnThisDayDate,
         isWeeklyReviewOpen, currentWeeklyReviewStart, currentWeeklyReviewEnd, currentWeeklyReviewInitialTab,
         currentMonthlyReviewInitialTab,
-        isMonthlyReviewOpen, currentMonthlyReviewStart, currentMonthlyReviewEnd,
+        isMonthlyReviewOpen, currentMonthlyReviewStart, currentMonthlyReviewEnd, currentMonthlyNewspaperStart, currentMonthlyNewspaperEnd,
         isAchievementOpen,
         isStatsFullScreen, setIsStatsFullScreen,
         isTodoManaging, setIsTodoManaging,
@@ -162,6 +164,36 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 categories={categories}
                 todos={todos}
                 scopes={scopes}
+            />
+        );
+    }
+
+    if (isWeeklyNewspaperOpen && currentWeeklyNewspaperStart && currentWeeklyNewspaperEnd) {
+        const weekStartStr = getLocalDateStr(currentWeeklyNewspaperStart);
+        const weekEndStr = getLocalDateStr(currentWeeklyNewspaperEnd);
+        const review = weeklyReviews.find(r => r.weekStartDate === weekStartStr && r.weekEndDate === weekEndStr);
+        if (!review) return null;
+
+        return (
+            <WeeklyNewspaperView
+                review={review}
+                weekStartDate={currentWeeklyNewspaperStart}
+                weekEndDate={currentWeeklyNewspaperEnd}
+            />
+        );
+    }
+
+    if (isMonthlyNewspaperOpen && currentMonthlyNewspaperStart && currentMonthlyNewspaperEnd) {
+        const monthStartStr = getLocalDateStr(currentMonthlyNewspaperStart);
+        const monthEndStr = getLocalDateStr(currentMonthlyNewspaperEnd);
+        const review = monthlyReviews.find(r => r.monthStartDate === monthStartStr && r.monthEndDate === monthEndStr);
+        if (!review) return null;
+
+        return (
+            <MonthlyNewspaperView
+                review={review}
+                monthStartDate={currentMonthlyNewspaperStart}
+                monthEndDate={currentMonthlyNewspaperEnd}
             />
         );
     }

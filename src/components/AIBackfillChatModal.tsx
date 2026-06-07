@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-06-07: Added guarded review-command dispatch so weekly/monthly newspaper command setup errors now surface as chat error messages instead of failing silently.
  * @updated 2026-05-21: Synced native background conversation snapshots through the same timestamp-preserving serializer used by foreground assistant prompts so Android-side AI turns can distinguish old context from current context.
  * @updated 2026-05-19: Added short desktop-widget hide/restore shell transitions so edge collapsing no longer hard-cuts between the full quick-chat panel and the hidden handle.
  * @updated 2026-05-19: Desktop widget mode now follows the latest ordinary chat session and listens for cross-window session storage updates so the floating quick-chat stays in sync with the newest conversation.
@@ -165,13 +166,19 @@ import {
   runDailyNewspaperOverwriteConfirmation as runDailyNewspaperOverwriteConfirmationFlow,
   runDailyReviewNarrativeCommand as runDailyReviewNarrativeCommandFlow,
   runDailyReviewNarrativeOverwriteConfirmation as runDailyReviewNarrativeOverwriteConfirmationFlow,
+  runMonthlyNewspaperCommand as runMonthlyNewspaperCommandFlow,
+  runMonthlyNewspaperOverwriteConfirmation as runMonthlyNewspaperOverwriteConfirmationFlow,
   runMonthlyReviewNarrativeWritebackCommand as runMonthlyReviewNarrativeWritebackCommandFlow,
+  runWeeklyNewspaperCommand as runWeeklyNewspaperCommandFlow,
+  runWeeklyNewspaperOverwriteConfirmation as runWeeklyNewspaperOverwriteConfirmationFlow,
   runWeeklyReviewNarrativeWritebackCommand as runWeeklyReviewNarrativeWritebackCommandFlow
 } from './ai-chat/AIBackfillChatReviewCommands';
 import {
   runDailyNewspaperWriteback as runDailyNewspaperWritebackFlow,
   runDailyReviewNarrativeWriteback as runDailyReviewNarrativeWritebackFlow,
+  runMonthlyNewspaperWriteback as runMonthlyNewspaperWritebackFlow,
   runMonthlyReviewNarrativeWriteback as runMonthlyReviewNarrativeWritebackFlow,
+  runWeeklyNewspaperWriteback as runWeeklyNewspaperWritebackFlow,
   runWeeklyReviewNarrativeWriteback as runWeeklyReviewNarrativeWritebackFlow
 } from './ai-chat/AIBackfillChatReviewWriteback';
 import { AIBackfillChatSettingsOverlay } from './ai-chat/AIBackfillChatSettingsOverlay';
@@ -236,11 +243,13 @@ import {
   type AIChatDailyNewspaperWritebackResult,
   type AIChatMemoryUpdateSection,
   type AIChatMessage,
+  type AIChatMonthlyNewspaperWritebackResult,
   type AIChatMonthlyReviewWritebackResult,
   type AIChatCustomPromptBlock,
   type AIChatPersona,
   type AIChatSession,
   type AIChatUserProfile,
+  type AIChatWeeklyNewspaperWritebackResult,
   type AIChatWeeklyReviewWritebackResult,
   type AISettingsMainTab,
   type AssistantAgentIntervalDrafts,
@@ -263,6 +272,8 @@ import {
   type DreamMonthSelectionState,
   type DreamTopicDrafts,
   type InitialChatState,
+  type MonthlyNewspaperWritebackConfirmationState,
+  type WeeklyNewspaperWritebackConfirmationState,
   DEFAULT_ASSISTANT_EDITABLE_MEMORY_DRAFTS,
   DEFAULT_ASSISTANT_REMINDER_DRAFTS,
   DEFAULT_ASSISTANT_SCHEDULED_TASK_DRAFTS,
@@ -537,6 +548,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [dreamMonthSelectionState, setDreamMonthSelectionState] = useState<DreamMonthSelectionState | null>(null);
   const [dailyReviewWritebackConfirmation, setDailyReviewWritebackConfirmation] = useState<DailyReviewWritebackConfirmationState | null>(null);
   const [dailyNewspaperWritebackConfirmation, setDailyNewspaperWritebackConfirmation] = useState<DailyNewspaperWritebackConfirmationState | null>(null);
+  const [weeklyNewspaperWritebackConfirmation, setWeeklyNewspaperWritebackConfirmation] = useState<WeeklyNewspaperWritebackConfirmationState | null>(null);
+  const [monthlyNewspaperWritebackConfirmation, setMonthlyNewspaperWritebackConfirmation] = useState<MonthlyNewspaperWritebackConfirmationState | null>(null);
   const [selectedDreamTopicId, setSelectedDreamTopicId] = useState('');
   const [isDreamTopicNoteExpanded, setIsDreamTopicNoteExpanded] = useState(false);
   const [dreamTopicDrafts, setDreamTopicDrafts] = useState<DreamTopicDrafts>(DEFAULT_DREAM_TOPIC_DRAFTS);
@@ -624,10 +637,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setIsDailyReviewOpen,
     setCurrentDailyNewspaperDate,
     setIsDailyNewspaperOpen,
+    setCurrentWeeklyNewspaperStart,
+    setCurrentWeeklyNewspaperEnd,
+    setIsWeeklyNewspaperOpen,
     setCurrentWeeklyReviewStart,
     setCurrentWeeklyReviewEnd,
     setCurrentWeeklyReviewInitialTab,
     setIsWeeklyReviewOpen,
+    setCurrentMonthlyNewspaperStart,
+    setCurrentMonthlyNewspaperEnd,
+    setIsMonthlyNewspaperOpen,
     setCurrentMonthlyReviewStart,
     setCurrentMonthlyReviewEnd,
     setCurrentMonthlyReviewInitialTab,
@@ -4456,6 +4475,26 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     onClose();
   };
 
+  const handleOpenWeeklyNewspaper = (weekStartDate: string, weekEndDate: string) => {
+    if (isDesktopWidgetMode) {
+      onOpenMainApp?.();
+      return;
+    }
+
+    const weekStart = new Date(`${weekStartDate}T12:00:00`);
+    const weekEnd = new Date(`${weekEndDate}T12:00:00`);
+    if (Number.isNaN(weekStart.getTime()) || Number.isNaN(weekEnd.getTime())) {
+      addToast('info', '这个周小报的日期范围无效。');
+      return;
+    }
+
+    setCurrentView(AppView.REVIEW);
+    setCurrentWeeklyNewspaperStart(weekStart);
+    setCurrentWeeklyNewspaperEnd(weekEnd);
+    setIsWeeklyNewspaperOpen(true);
+    onClose();
+  };
+
   const handleOpenMonthlyReviewNarrative = (monthStartDate: string, monthEndDate: string) => {
     if (isDesktopWidgetMode) {
       onOpenMainApp?.();
@@ -4477,6 +4516,26 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     onClose();
   };
 
+  const handleOpenMonthlyNewspaper = (monthStartDate: string, monthEndDate: string) => {
+    if (isDesktopWidgetMode) {
+      onOpenMainApp?.();
+      return;
+    }
+
+    const monthStart = new Date(`${monthStartDate}T12:00:00`);
+    const monthEnd = new Date(`${monthEndDate}T12:00:00`);
+    if (Number.isNaN(monthStart.getTime()) || Number.isNaN(monthEnd.getTime())) {
+      addToast('info', '这个月小报的日期范围无效。');
+      return;
+    }
+
+    setCurrentView(AppView.REVIEW);
+    setCurrentMonthlyNewspaperStart(monthStart);
+    setCurrentMonthlyNewspaperEnd(monthEnd);
+    setIsMonthlyNewspaperOpen(true);
+    onClose();
+  };
+
   const replacePendingWithResult = (
     sessionId: string,
     pendingMessageId: string,
@@ -4492,7 +4551,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       reminderUpdates?: string[];
       dailyNewspaperWriteback?: AIChatDailyNewspaperWritebackResult;
       dailyReviewWriteback?: AIChatDailyReviewWritebackResult;
+      weeklyNewspaperWriteback?: AIChatWeeklyNewspaperWritebackResult;
       weeklyReviewWriteback?: AIChatWeeklyReviewWritebackResult;
+      monthlyNewspaperWriteback?: AIChatMonthlyNewspaperWritebackResult;
       monthlyReviewWriteback?: AIChatMonthlyReviewWritebackResult;
       retryInput?: string;
       retrySourceUserMessageId?: string;
@@ -4514,7 +4575,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       ...(options?.reminderUpdates && options.reminderUpdates.length > 0 ? { reminderUpdates: options.reminderUpdates } : {}),
       ...(options?.dailyNewspaperWriteback ? { dailyNewspaperWriteback: options.dailyNewspaperWriteback } : {}),
       ...(options?.dailyReviewWriteback ? { dailyReviewWriteback: options.dailyReviewWriteback } : {}),
+      ...(options?.weeklyNewspaperWriteback ? { weeklyNewspaperWriteback: options.weeklyNewspaperWriteback } : {}),
       ...(options?.weeklyReviewWriteback ? { weeklyReviewWriteback: options.weeklyReviewWriteback } : {}),
+      ...(options?.monthlyNewspaperWriteback ? { monthlyNewspaperWriteback: options.monthlyNewspaperWriteback } : {}),
       ...(options?.monthlyReviewWriteback ? { monthlyReviewWriteback: options.monthlyReviewWriteback } : {}),
       ...(options?.retryInput ? { retryInput: options.retryInput } : {}),
       ...(options?.retrySourceUserMessageId ? { retrySourceUserMessageId: options.retrySourceUserMessageId } : {}),
@@ -4701,6 +4764,39 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setIsPersonaPanelOpen
   });
 
+  const runWeeklyNewspaperWriteback = async (
+    session: AIChatSession,
+    params: {
+      weeklyReview: WeeklyReview;
+      weekDataText: string;
+      mergeMode: 'create' | 'overwrite';
+      createdReview: boolean;
+    }
+  ) => runWeeklyNewspaperWritebackFlow({
+    activeRequestRef,
+    addToast,
+    buildConversationHistory,
+    buildPersonaPrompt: buildSharedPersonaPrompt,
+    debugMode,
+    getConversationSummary: (sessionId) => assistantContextBuilder.summarizeConversationTurns(
+      conversationHistoryCache.get(sessionId) || [],
+      24
+    ),
+    getRetryableAIErrorMessage,
+    isAbortError,
+    mutateSession,
+    params,
+    replacePendingWithResult,
+    resolveSessionPersona,
+    session,
+    setInputText,
+    setIsHistoryPanelOpen,
+    setIsLoading,
+    setIsPersonaPanelOpen,
+    setWeeklyNewspaperWritebackConfirmation: () => setWeeklyNewspaperWritebackConfirmation(null),
+    setWeeklyReviews
+  });
+
   const runMonthlyReviewNarrativeWriteback = async (
     session: AIChatSession,
     params: {
@@ -4732,6 +4828,39 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setIsPersonaPanelOpen,
     setMonthlyReviews,
     updateWeeklyReviewTemplateStage
+  });
+
+  const runMonthlyNewspaperWriteback = async (
+    session: AIChatSession,
+    params: {
+      monthlyReview: MonthlyReview;
+      monthDataText: string;
+      mergeMode: 'create' | 'overwrite';
+      createdReview: boolean;
+    }
+  ) => runMonthlyNewspaperWritebackFlow({
+    activeRequestRef,
+    addToast,
+    buildConversationHistory,
+    buildPersonaPrompt: buildSharedPersonaPrompt,
+    debugMode,
+    getConversationSummary: (sessionId) => assistantContextBuilder.summarizeConversationTurns(
+      conversationHistoryCache.get(sessionId) || [],
+      24
+    ),
+    getRetryableAIErrorMessage,
+    isAbortError,
+    mutateSession,
+    params,
+    replacePendingWithResult,
+    resolveSessionPersona,
+    session,
+    setInputText,
+    setIsHistoryPanelOpen,
+    setIsLoading,
+    setIsPersonaPanelOpen,
+    setMonthlyNewspaperWritebackConfirmation: () => setMonthlyNewspaperWritebackConfirmation(null),
+    setMonthlyReviews
   });
 
   const handleWeeklyReviewNarrativeWritebackCommand = async (session: AIChatSession) => (
@@ -4786,6 +4915,28 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     })
   );
 
+  const handleWeeklyNewspaperCommand = async (session: AIChatSession, commandText: string) => (
+    runWeeklyNewspaperCommandFlow({
+      appendSystemMessage,
+      categories,
+      commandText,
+      dailyReviews,
+      fallbackDate: targetDate ? getLocalDateStr(defaultTargetDate) : undefined,
+      getLocalDateStr,
+      logs,
+      monthlyReviews,
+      prepareForInteraction: prepareForTemplateInteraction,
+      reviewTemplates,
+      runWriteback: runWeeklyNewspaperWriteback,
+      scopes,
+      session,
+      setConfirmation: setWeeklyNewspaperWritebackConfirmation,
+      todoCategories,
+      todos,
+      weeklyReviews
+    })
+  );
+
   const handleDailyReviewNarrativeOverwriteConfirmation = async (
     session: AIChatSession,
     userInput: string
@@ -4836,6 +4987,32 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     })
   );
 
+  const handleWeeklyNewspaperOverwriteConfirmation = async (
+    session: AIChatSession,
+    userInput: string
+  ): Promise<boolean> => (
+    runWeeklyNewspaperOverwriteConfirmationFlow({
+      appendSystemMessage,
+      appendUserMessage,
+      categories,
+      confirmation: weeklyNewspaperWritebackConfirmation,
+      dailyReviews,
+      getLocalDateStr,
+      logs,
+      monthlyReviews,
+      prepareForInteraction: prepareForTemplateInteraction,
+      reviewTemplates,
+      runWriteback: runWeeklyNewspaperWriteback,
+      scopes,
+      session,
+      setConfirmation: setWeeklyNewspaperWritebackConfirmation,
+      todoCategories,
+      todos,
+      userInput,
+      weeklyReviews
+    })
+  );
+
   const handleMonthlyReviewNarrativeWritebackCommand = async (session: AIChatSession) => (
     runMonthlyReviewNarrativeWritebackCommandFlow({
       addToast,
@@ -4847,6 +5024,69 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       session
     })
   );
+
+  const handleMonthlyNewspaperCommand = async (session: AIChatSession, commandText: string) => (
+    runMonthlyNewspaperCommandFlow({
+      appendSystemMessage,
+      categories,
+      commandText,
+      dailyReviews,
+      fallbackDate: targetDate ? getLocalDateStr(defaultTargetDate) : undefined,
+      getLocalDateStr,
+      logs,
+      monthlyReviews,
+      prepareForInteraction: prepareForTemplateInteraction,
+      reviewTemplates,
+      runWriteback: runMonthlyNewspaperWriteback,
+      scopes,
+      session,
+      setConfirmation: setMonthlyNewspaperWritebackConfirmation,
+      todoCategories,
+      todos,
+      weeklyReviews
+    })
+  );
+
+  const handleMonthlyNewspaperOverwriteConfirmation = async (
+    session: AIChatSession,
+    userInput: string
+  ): Promise<boolean> => (
+    runMonthlyNewspaperOverwriteConfirmationFlow({
+      appendSystemMessage,
+      appendUserMessage,
+      categories,
+      confirmation: monthlyNewspaperWritebackConfirmation,
+      dailyReviews,
+      getLocalDateStr,
+      logs,
+      monthlyReviews,
+      prepareForInteraction: prepareForTemplateInteraction,
+      reviewTemplates,
+      runWriteback: runMonthlyNewspaperWriteback,
+      scopes,
+      session,
+      setConfirmation: setMonthlyNewspaperWritebackConfirmation,
+      todoCategories,
+      todos,
+      userInput,
+      weeklyReviews
+    })
+  );
+
+  const runReviewCommandSafely = async <T,>(
+    sessionId: string,
+    label: string,
+    command: () => Promise<T>,
+    fallbackValue: T
+  ): Promise<T> => {
+    try {
+      return await command();
+    } catch (error) {
+      console.error(`[AIBackfillChatModal] Failed to run ${label}`, error);
+      appendSystemMessage(sessionId, getRetryableAIErrorMessage(error));
+      return fallbackValue;
+    }
+  };
 
   const handleDreamCommand = async (
     session: AIChatSession,
@@ -5016,28 +5256,94 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
 
     if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession) {
-      const consumedDailyReviewConfirmation = await handleDailyReviewNarrativeOverwriteConfirmation(activeSession, trimmedText);
+      const consumedDailyReviewConfirmation = await runReviewCommandSafely(
+        activeSession.id,
+        'daily review overwrite confirmation',
+        () => handleDailyReviewNarrativeOverwriteConfirmation(activeSession, trimmedText),
+        false
+      );
       if (consumedDailyReviewConfirmation) {
         return;
       }
     }
 
     if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession) {
-      const consumedDailyNewspaperConfirmation = await handleDailyNewspaperOverwriteConfirmation(activeSession, trimmedText);
+      const consumedDailyNewspaperConfirmation = await runReviewCommandSafely(
+        activeSession.id,
+        'daily newspaper overwrite confirmation',
+        () => handleDailyNewspaperOverwriteConfirmation(activeSession, trimmedText),
+        false
+      );
       if (consumedDailyNewspaperConfirmation) {
+        return;
+      }
+    }
+
+    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession) {
+      const consumedWeeklyNewspaperConfirmation = await runReviewCommandSafely(
+        activeSession.id,
+        'weekly newspaper overwrite confirmation',
+        () => handleWeeklyNewspaperOverwriteConfirmation(activeSession, trimmedText),
+        false
+      );
+      if (consumedWeeklyNewspaperConfirmation) {
+        return;
+      }
+    }
+
+    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession) {
+      const consumedMonthlyNewspaperConfirmation = await runReviewCommandSafely(
+        activeSession.id,
+        'monthly newspaper overwrite confirmation',
+        () => handleMonthlyNewspaperOverwriteConfirmation(activeSession, trimmedText),
+        false
+      );
+      if (consumedMonthlyNewspaperConfirmation) {
         return;
       }
     }
 
     if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession && (trimmedText === '日报' || trimmedText === '叙事') && !options?.replaceMessageId) {
       appendUserMessage(activeSession.id, trimmedText);
-      await handleDailyReviewNarrativeCommand(activeSession);
+      await runReviewCommandSafely(
+        activeSession.id,
+        'daily review command',
+        () => handleDailyReviewNarrativeCommand(activeSession),
+        undefined
+      );
       return;
     }
 
     if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession && /^小报(?:\s+.+)?$/.test(trimmedText) && !options?.replaceMessageId) {
       appendUserMessage(activeSession.id, trimmedText);
-      await handleDailyNewspaperCommand(activeSession, trimmedText);
+      await runReviewCommandSafely(
+        activeSession.id,
+        'daily newspaper command',
+        () => handleDailyNewspaperCommand(activeSession, trimmedText),
+        undefined
+      );
+      return;
+    }
+
+    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession && /^周小报(?:\s+.+)?$/.test(trimmedText) && !options?.replaceMessageId) {
+      appendUserMessage(activeSession.id, trimmedText);
+      await runReviewCommandSafely(
+        activeSession.id,
+        'weekly newspaper command',
+        () => handleWeeklyNewspaperCommand(activeSession, trimmedText),
+        undefined
+      );
+      return;
+    }
+
+    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession && /^月小报(?:\s+.+)?$/.test(trimmedText) && !options?.replaceMessageId) {
+      appendUserMessage(activeSession.id, trimmedText);
+      await runReviewCommandSafely(
+        activeSession.id,
+        'monthly newspaper command',
+        () => handleMonthlyNewspaperCommand(activeSession, trimmedText),
+        undefined
+      );
       return;
     }
 
@@ -5604,7 +5910,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           onOpenDailyNewspaper={handleOpenDailyNewspaper}
           onOpenDailyReviewNarrative={handleOpenDailyReviewNarrative}
           onOpenDebugViewer={setDebugViewer}
+          onOpenMonthlyNewspaper={handleOpenMonthlyNewspaper}
           onOpenMonthlyReviewNarrative={handleOpenMonthlyReviewNarrative}
+          onOpenWeeklyNewspaper={handleOpenWeeklyNewspaper}
           onOpenWeeklyReviewNarrative={handleOpenWeeklyReviewNarrative}
           onRetryMessage={handleRetryMessage}
           renderAppliedAction={renderAppliedAction}

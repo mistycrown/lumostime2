@@ -4,6 +4,7 @@
  * @output Update Review Data, Generate Narrative
  * @pos View (Review System)
  * @description A comprehensive view for conducting monthly reviews. Includes tabs for statistical data, guided questions (Review Guide), and an AI-assisted narrative editor.
+ * @updated 2026-06-07: Added monthly AI newspaper entry, one-tap chat generation, dedicated newspaper opening, and guarded delete flow inside the narrative tab.
  * @updated 2026-05-13: Added optional `initialTab` support so external entry points like AI template writeback cards can jump directly into the monthly narrative tab.
  * @updated 2026-04-25: Let floating read-edit toggles inherit button theme colors so default UI icons remain visible on accent-theme white buttons.
  * 
@@ -32,6 +33,8 @@ import {
     calculateMonthlyStats,
     generateCompleteMonthlyStatsText
 } from '../utils/reviewStatsUtils';
+import { useNavigation } from '../contexts/NavigationContext';
+import { useAIChatWindow } from '../contexts/AIChatWindowContext';
 
 interface MonthlyReviewViewProps {
     review: MonthlyReview;
@@ -82,6 +85,12 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
     onClose,
     initialTab
 }) => {
+    const {
+        setCurrentMonthlyNewspaperStart,
+        setCurrentMonthlyNewspaperEnd,
+        setIsMonthlyNewspaperOpen
+    } = useNavigation();
+    const { openAIChat } = useAIChatWindow();
     const [activeTab, setActiveTab] = useState<TabType>(initialTab || 'data');
     const [cite, setCite] = useState(review.cite || '');
     
@@ -114,6 +123,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
     const [isReloadConfirmOpen, setIsReloadConfirmOpen] = useState(false);
     const [isClearGuideConfirmOpen, setIsClearGuideConfirmOpen] = useState(false);
     const [isAIQuoteGeneratorOpen, setIsAIQuoteGeneratorOpen] = useState(false);
+    const [isDeleteNewspaperConfirmOpen, setIsDeleteNewspaperConfirmOpen] = useState(false);
 
     useEffect(() => {
         if (initialTab) {
@@ -273,6 +283,43 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
     };
 
     // Generate Narrative - Execute
+    const handleOpenNewspaper = () => {
+        if (!review.aiNewspaper) {
+            return;
+        }
+
+        setCurrentMonthlyNewspaperStart(monthStartDate);
+        setCurrentMonthlyNewspaperEnd(monthEndDate);
+        setIsMonthlyNewspaperOpen(true);
+    };
+
+    const handleGenerateNewspaper = () => {
+        openAIChat({
+            initialInputText: `月小报 ${review.monthStartDate}`
+        });
+    };
+
+    const handleDeleteNewspaper = () => {
+        setIsDeleteNewspaperConfirmOpen(true);
+    };
+
+    const confirmDeleteNewspaper = async () => {
+        try {
+            const updatedReview = {
+                ...review,
+                aiNewspaper: undefined,
+                updatedAt: Date.now()
+            };
+            await onUpdateReview(updatedReview);
+            addToast('success', 'AI 小报已删除');
+        } catch (error) {
+            console.error('Failed to delete monthly newspaper', error);
+            addToast('error', '删除失败');
+        } finally {
+            setIsDeleteNewspaperConfirmOpen(false);
+        }
+    };
+
     const handleSelectStyle = async (template: NarrativeTemplate) => {
         setIsStyleModalOpen(false);
         setIsGenerating(true);
@@ -517,11 +564,16 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                                 narrative={narrative}
                                 isGenerating={isGenerating}
                                 isReadingMode={isReadingMode}
+                                newspaperTitle={review.aiNewspaper?.title}
+                                newspaperEmptyText="本月暂无小报，点击生成"
                                 onSummaryChange={handleSummaryChange}
                                 onNarrativeChange={handleNarrativeChange}
                                 onGenerateNarrative={handleGenerateNarrative}
                                 onDeleteSummary={handleDeleteSummary}
                                 onDeleteNarrative={handleDeleteNarrative}
+                                onOpenNewspaper={review.aiNewspaper ? handleOpenNewspaper : undefined}
+                                onGenerateNewspaper={!review.aiNewspaper ? handleGenerateNewspaper : undefined}
+                                onDeleteNewspaper={review.aiNewspaper ? handleDeleteNewspaper : undefined}
                             />
                         </div>
                     )
@@ -613,6 +665,16 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                 onSelect={handleSelectStyle}
                 customTemplates={customNarrativeTemplates}
                 period="monthly"
+            />
+
+            <ConfirmModal
+                isOpen={isDeleteNewspaperConfirmOpen}
+                onClose={() => setIsDeleteNewspaperConfirmOpen(false)}
+                onConfirm={confirmDeleteNewspaper}
+                title="删除 AI 小报？"
+                description="确定要删除这个月的小报吗？此操作无法撤销，需要重新生成。"
+                confirmText="确认删除"
+                type="danger"
             />
 
             {/* AI Quote Generator Modal */}

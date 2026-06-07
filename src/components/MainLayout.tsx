@@ -2,6 +2,7 @@
  * @file MainLayout.tsx
  * @input children, navigation state, handlers
  * @output Main Application Layout
+ * @updated 2026-06-07: Added weekly/monthly newspaper overlays to the shared header title and back-navigation handling alongside the existing daily newspaper path.
  * @updated 2026-04-25: Let floating switch-button fallback icons inherit the button theme color so default UI icons stay visible on accent-theme white buttons.
  * @updated 2026-04-25: Added a `min-h-0` guard on the main content shell so nested scene lists can keep scrolling on mobile WebViews.
  * @pos Component (Layout)
@@ -33,6 +34,8 @@ interface MainLayoutProps {
     handleBackFromScope: () => void;
     // Review logic
     handleCloseDailyNewspaper: () => void;
+    handleCloseWeeklyNewspaper: () => void;
+    handleCloseMonthlyNewspaper: () => void;
     handleCloseDailyReview: () => void;
     handleCloseOnThisDay: () => void;
     handleCloseWeeklyReview: () => void;
@@ -50,6 +53,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     handleBackFromTag,
     handleBackFromScope,
     handleCloseDailyNewspaper,
+    handleCloseWeeklyNewspaper,
+    handleCloseMonthlyNewspaper,
     handleCloseDailyReview,
     handleCloseOnThisDay,
     handleCloseWeeklyReview,
@@ -60,7 +65,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     const {
         currentView, setCurrentView,
         isSettingsOpen, setIsSettingsOpen,
-        isDailyReviewOpen, isDailyNewspaperOpen, setIsDailyReviewOpen, setCurrentReviewDate, setCurrentDailyNewspaperDate, setIsDailyNewspaperOpen, isOpenedFromSearch, setIsSearchOpen, setIsOpenedFromSearch,
+        isDailyReviewOpen, isDailyNewspaperOpen, isWeeklyNewspaperOpen, isMonthlyNewspaperOpen, setIsDailyReviewOpen, setCurrentReviewDate, setCurrentDailyNewspaperDate, setIsDailyNewspaperOpen, isOpenedFromSearch, setIsSearchOpen, setIsOpenedFromSearch,
         isOnThisDayOpen,
         isWeeklyReviewOpen,
         isMonthlyReviewOpen,
@@ -107,6 +112,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
     const getHeaderTitle = () => {
         if (isDailyNewspaperOpen) return 'Daily Newspaper';
+        if (isWeeklyNewspaperOpen) return 'Weekly Newspaper';
+        if (isMonthlyNewspaperOpen) return 'Monthly Newspaper';
         if (isDailyReviewOpen) return 'Daily Review';
         if (isOnThisDayOpen) return 'On This Day';
         if (isWeeklyReviewOpen) return 'Weekly Review';
@@ -134,7 +141,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         <div className={`h-screen w-screen flex flex-col text-stone-800 overflow-hidden select-none font-serif relative pb-[env(safe-area-inset-bottom)]`}>
 
             {/* Top Header Bar */}
-            {!isSettingsOpen && (currentView !== AppView.TIMELINE || isDailyReviewOpen || isDailyNewspaperOpen || isOnThisDayOpen || isWeeklyReviewOpen || isMonthlyReviewOpen || isAchievementOpen) && !isStatsFullScreen &&
+            {!isSettingsOpen && (currentView !== AppView.TIMELINE || isDailyReviewOpen || isDailyNewspaperOpen || isWeeklyNewspaperOpen || isMonthlyNewspaperOpen || isOnThisDayOpen || isWeeklyReviewOpen || isMonthlyReviewOpen || isAchievementOpen) && !isStatsFullScreen &&
                 !isTodoModalOpen &&
                 !(currentView === AppView.TODO && isTodoManaging) &&
                 !(currentView === AppView.TODO && isTodoScheduleMode) &&
@@ -142,7 +149,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 !(currentView === AppView.SCOPE && isScopeManaging) &&
                 !(currentView === AppView.SCOPE && isGoalBatchManaging) &&
                 // Hide header for REVIEW view (Memoir/Chronicle use their own headers) UNLESS a modal review is open
-                (currentView !== AppView.REVIEW || isDailyReviewOpen || isDailyNewspaperOpen || isOnThisDayOpen || isWeeklyReviewOpen || isMonthlyReviewOpen) && (
+                (currentView !== AppView.REVIEW || isDailyReviewOpen || isDailyNewspaperOpen || isWeeklyNewspaperOpen || isMonthlyNewspaperOpen || isOnThisDayOpen || isWeeklyReviewOpen || isMonthlyReviewOpen) && (
                     <header
                         className={`flex items-center justify-between px-5 border-b border-stone-100 shrink-0 z-30 transition-all duration-300 pt-[env(safe-area-inset-top)] ${isHeaderScrolled
                             ? 'h-[calc(3rem+env(safe-area-inset-top))] bg-[#faf9f6]/90 backdrop-blur-md shadow-sm'
@@ -150,7 +157,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                             }`}
                     >
                         <div className="w-8 flex items-center">
-                            {(currentView === AppView.TODO || currentView === AppView.RECORD) && !isDailyReviewOpen && !isDailyNewspaperOpen && !isOnThisDayOpen && !isMonthlyReviewOpen && !isWeeklyReviewOpen && (
+                            {(currentView === AppView.TODO || currentView === AppView.RECORD) && !isDailyReviewOpen && !isDailyNewspaperOpen && !isWeeklyNewspaperOpen && !isMonthlyNewspaperOpen && !isOnThisDayOpen && !isMonthlyReviewOpen && !isWeeklyReviewOpen && (
                                 <button
                                     onClick={onQuickSync}
                                     disabled={isSyncing}
@@ -165,6 +172,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                                 (currentView === AppView.SCOPE && selectedScopeId) ||
                                 currentView === AppView.STATS ||
                                 isDailyNewspaperOpen ||
+                                isWeeklyNewspaperOpen ||
+                                isMonthlyNewspaperOpen ||
                                 isDailyReviewOpen ||
                                 isOnThisDayOpen ||
                                 isWeeklyReviewOpen ||
@@ -179,6 +188,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
                                                 // Also close the specific view to be clean (optional, but good for state)
                                                 if (isDailyNewspaperOpen) handleCloseDailyNewspaper();
+                                                else if (isWeeklyNewspaperOpen) handleCloseWeeklyNewspaper();
+                                                else if (isMonthlyNewspaperOpen) handleCloseMonthlyNewspaper();
                                                 else if (isDailyReviewOpen) handleCloseDailyReview();
                                                 else if (isOnThisDayOpen) handleCloseOnThisDay();
                                                 else if (isWeeklyReviewOpen) handleCloseWeeklyReview();
@@ -192,6 +203,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
                                             if (isDailyNewspaperOpen) {
                                                 handleCloseDailyNewspaper();
+                                            } else if (isWeeklyNewspaperOpen) {
+                                                handleCloseWeeklyNewspaper();
+                                            } else if (isMonthlyNewspaperOpen) {
+                                                handleCloseMonthlyNewspaper();
                                             } else if (isDailyReviewOpen) {
                                                 handleCloseDailyReview();
                                                 // If navigated from Scene page, return to Record view in scenes mode
@@ -251,7 +266,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                         <h1 className="text-lg font-bold text-stone-700 tracking-wide">
                             {getHeaderTitle()}
                         </h1>
-                        {(isDailyNewspaperOpen || isDailyReviewOpen || isOnThisDayOpen || isWeeklyReviewOpen || isMonthlyReviewOpen || isAchievementOpen) ? (
+                        {(isDailyNewspaperOpen || isWeeklyNewspaperOpen || isMonthlyNewspaperOpen || isDailyReviewOpen || isOnThisDayOpen || isWeeklyReviewOpen || isMonthlyReviewOpen || isAchievementOpen) ? (
                             <div className="w-8" />
                         ) : currentView === AppView.RECORD ? (
                             <button
@@ -314,7 +329,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                     )}
 
                 {/* Global Floating Action Button for Review/Journal Toggle */}
-                {currentView === AppView.REVIEW && !isDailyReviewOpen && !isDailyNewspaperOpen && !isOnThisDayOpen && !isWeeklyReviewOpen && !isMonthlyReviewOpen && !isTodoModalOpen && (
+                {currentView === AppView.REVIEW && !isDailyReviewOpen && !isDailyNewspaperOpen && !isWeeklyNewspaperOpen && !isMonthlyNewspaperOpen && !isOnThisDayOpen && !isWeeklyReviewOpen && !isMonthlyReviewOpen && !isTodoModalOpen && (
                     <FloatingButton
                         onClick={() => setIsJournalMode(!isJournalMode)}
                         ariaLabel={isJournalMode ? "Switch to Chronicle" : "Switch to Memoir"}
