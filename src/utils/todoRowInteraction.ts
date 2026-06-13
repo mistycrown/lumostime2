@@ -4,6 +4,7 @@
  * @output Gesture intent classification and release actions for todo-row interactions
  * @pos Utility
  * @description Helps TodoView distinguish taps, scrolls, and deliberate horizontal swipes so list rows do not accidentally swallow taps or toggle completion during scrolling.
+ * @updated 2026-06-13: 解构并传递 quickToggleDirection，同时在已确立 swipe 意图的释放阶段移除过于严格的 isHorizontalSwipeCandidate 垂直偏转二次拦截，确保左滑完成交互流畅。
  * @updated 2026-05-09: Adds a release-time fallback for deliberate long left swipes so touch completion still triggers even when the move phase never latched swipe intent, while preserving scroll lock protection.
  * @updated 2026-05-05: Keeps completion toggles on left swipes for both complete and incomplete rows, while preserving right-swipe detail and deeper duplicate swipes.
  * @updated 2026-05-05: Removed the tap-vs-swipe dead zone and only allows directional quick-toggle swipes after a clear horizontal intent.
@@ -80,7 +81,7 @@ const isHorizontalSwipeCandidate = ({
 };
 
 export const getTodoRowGestureIntent = (snapshot: TodoRowGestureSnapshot): TodoRowGestureIntent => {
-  const { diffX, diffY, canQuickToggle } = snapshot;
+  const { diffX, diffY, canQuickToggle, quickToggleDirection } = snapshot;
   const absX = Math.abs(diffX);
   const absY = Math.abs(diffY);
 
@@ -92,7 +93,7 @@ export const getTodoRowGestureIntent = (snapshot: TodoRowGestureSnapshot): TodoR
     return 'scroll';
   }
 
-  if (isHorizontalSwipeCandidate({ diffX, diffY, canQuickToggle })) {
+  if (isHorizontalSwipeCandidate({ diffX, diffY, canQuickToggle, quickToggleDirection })) {
     return 'swipe';
   }
 
@@ -128,10 +129,6 @@ export const getTodoRowReleaseAction = ({
       return 'toggleComplete';
     }
 
-    return 'none';
-  }
-
-  if (!isHorizontalSwipeCandidate({ diffX, diffY, canQuickToggle, quickToggleDirection })) {
     return 'none';
   }
 
