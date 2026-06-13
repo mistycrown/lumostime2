@@ -3,6 +3,7 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-06-13: `TodoMonthView.tsx` now updates todo item colors so that Trace (inProgress) and Done (completed) items appear in muted gray tone, while other schedule types like Maybe, Arrange, Due, and Repeat appear in a darker tone for better visual differentiation.
 - Update 2026-06-07: `AIBackfillChatModal.tsx`, `ai-chat/AIBackfillChatConversationPane.tsx`, `ai-chat/AIBackfillChatReviewCommands.ts`, and `ai-chat/AIBackfillChatReviewWriteback.ts` now support ordinary-chat `周小报` / `月小报` generation, overwrite confirmation, periodic writeback result cards, and direct opening of weekly/monthly newspaper pages from chat.
 - Update 2026-06-07: `ReviewNarrativeTab.tsx` now acts as a shared `AI 小报` entry for daily, weekly, and monthly review narratives, with configurable empty-state copy while preserving the same one-line editorial entry treatment.
 - Update 2026-06-07: `TodoMonthView.tsx` now lets collapsed month-grid `Trace` overlays ignore taps, so clicking any unexpanded calendar cell always opens that day's detail rail first instead of jumping straight into quick actions.
