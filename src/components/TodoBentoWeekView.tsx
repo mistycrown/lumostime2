@@ -4,6 +4,8 @@
  * @output Single-week 2x4 bento schedule UI backed by real todo data
  * @pos Component (Todo scheduling)
  * @description Renders one selected week at a time in the bento layout so the mini calendar, header range, and visible day cells always describe the same week.
+ * @updated 2026-06-13: 调整显示设置弹窗中已选择选项的视觉效果，移除背景加深，改为下划线指示器。
+ * @updated 2026-06-13: 调整显示设置弹窗中已选择选项的背景和文字对比度，将 bg-stone-100 更改为更明显的 bg-stone-200，并加深文字颜色。
  * @updated 2026-06-06: Reused the shared schedule primary-kind priority for bento marker colors so overlapping badges now follow the same Done > Due > Arrange > Repeat > Maybe > Trace precedence as month view.
  * @updated 2026-05-23: Replaced mini-calendar due dots with inline flag icons, hiding the date numeral whenever a visible-month day carries at least one deadline so the bento navigator reads more evenly.
  * @updated 2026-05-21: Highlighted today's 2x4 bento week cell with the same gray inset ring used by month view so the current day reads more clearly at a glance.
@@ -1047,10 +1049,10 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                         key={option.key}
                         type="button"
                         onClick={() => setDisplayMode(option.key)}
-                        className={`rounded-xl px-3 py-2.5 text-center text-[14px] tracking-[0.04em] transition-colors ${
+                        className={`border-b px-3 pt-2.5 pb-2 text-center text-[14px] tracking-[0.04em] transition-colors ${
                           isSelected
-                            ? 'bg-stone-100 text-slate-700'
-                            : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
+                            ? 'border-slate-800 text-slate-800'
+                            : 'border-transparent text-slate-500 hover:text-slate-700'
                         }`}
                       >
                         {option.label}
@@ -1073,10 +1075,10 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                           key={option.key}
                           type="button"
                           onClick={() => setMarkerColorMode(option.key)}
-                          className={`rounded-xl px-3 py-2.5 text-center text-[14px] tracking-[0.04em] transition-colors ${
+                          className={`border-b px-3 pt-2.5 pb-2 text-center text-[14px] tracking-[0.04em] transition-colors ${
                             isSelected
-                              ? 'bg-stone-100 text-slate-700'
-                              : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
+                              ? 'border-slate-800 text-slate-800'
+                              : 'border-transparent text-slate-500 hover:text-slate-700'
                           }`}
                         >
                           {option.label}

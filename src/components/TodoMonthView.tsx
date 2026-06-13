@@ -5,6 +5,8 @@
  * @pos Component (Todo scheduling)
  * @description Renders the editorial monthly schedule view adapted from the minimalist demo, using shared todo schedule utilities so each day shows the same real Arrange / Due / Repeat / Maybe / Done / Trace data as the week planner.
  *
+ * @updated 2026-06-13: 调整显示设置弹窗中已选择选项的视觉效果，移除背景加深，改为下划线指示器。
+ * @updated 2026-06-13: 调整显示设置弹窗中已选择选项的背景和文字对比度，将更浅的 bg-stone-100 调整为 bg-stone-200，并加深字体颜色。
  * @updated 2026-06-13: 调整月视图中各条目的颜色：Trace 和已完成任务（Completed）使用灰色，而 Maybe, Arrange, Due, Repeat 任务使用较黑的颜色以示区分。
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -1716,9 +1718,9 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                           key={option}
                           type="button"
                           onClick={() => setMonthRowsPerScreen(option)}
-                          className={`rounded-xl px-3 py-2.5 text-left text-[14px] tracking-[0.04em] transition-colors ${isSelected
-                              ? 'bg-stone-100 text-slate-700'
-                              : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
+                          className={`border-b px-3 pt-2.5 pb-2 text-left text-[14px] tracking-[0.04em] transition-colors ${isSelected
+                              ? 'border-slate-800 text-slate-800'
+                              : 'border-transparent text-slate-500 hover:text-slate-700'
                             }`}
                         >
                           {option}行/屏
@@ -1741,9 +1743,9 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                           key={option.key}
                           type="button"
                           onClick={() => setMonthFontSize(option.key)}
-                          className={`rounded-xl px-3 py-2.5 text-center text-[14px] tracking-[0.04em] transition-colors ${isSelected
-                              ? 'bg-stone-100 text-slate-700'
-                              : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
+                          className={`border-b px-3 pt-2.5 pb-2 text-center text-[14px] tracking-[0.04em] transition-colors ${isSelected
+                              ? 'border-slate-800 text-slate-800'
+                              : 'border-transparent text-slate-500 hover:text-slate-700'
                             }`}
                         >
                           {option.label}
@@ -1766,9 +1768,9 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                           key={option.key}
                           type="button"
                           onClick={() => setMonthMarkerColorMode(option.key)}
-                          className={`rounded-xl px-3 py-2.5 text-center text-[14px] tracking-[0.04em] transition-colors ${isSelected
-                              ? 'bg-stone-100 text-slate-700'
-                              : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
+                          className={`border-b px-3 pt-2.5 pb-2 text-center text-[14px] tracking-[0.04em] transition-colors ${isSelected
+                              ? 'border-slate-800 text-slate-800'
+                              : 'border-transparent text-slate-500 hover:text-slate-700'
                             }`}
                         >
                           {option.label}
