@@ -98,6 +98,7 @@ Components that form the structural or global UI elements.
 - `Toast.tsx`: Notification system.
 
 ## Modals
+- Update 2026-06-13: `TodoQuickActionsModal.tsx` now supports inline todo title editing in the modal header with auto-saving on blur, styled with a minimalist print-inspired bottom border to eliminate visual shift and focus-ring clutter.
 - Update 2026-05-18: `TodoDetailModal.tsx` now defaults the timeline metadata callback's optional `collectionNames` payload to an empty list, so detail-log chips keep rendering safely even when a caller omits that helper argument.
 - Update 2026-05-18: `TodoDetailModal.tsx` now buffers task title inputs in a local draft state and only commits them to the live database on blur or enter, eliminating live-updating stutter on the header title during typing.
 - Update 2026-05-14: `AIBackfillChatModal.tsx` now adds a guarded `重置` action inside the Dream manager, using the same inline danger-confirm pattern as existing delete flows to restore the built-in Dream topics/notes and clear every Dream observation entry at once.

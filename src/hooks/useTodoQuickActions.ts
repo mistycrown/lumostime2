@@ -4,6 +4,7 @@
  * @output Shared quick-actions state and handlers for todo list rows and week-view badges
  * @pos Hook
  * @description Centralizes todo quick-actions sheet state so multiple entry points can open the same modal without duplicating move/complete/detail logic inside the view.
+ * @updated 2026-06-13: Added handleQuickActionUpdateTitle to support updating todo title directly from the quick actions modal on blur.
  * @updated 2026-05-14: Dismisses the quick-actions sheet after the recurring skip-current action succeeds so both recurrence skip shortcuts share the same success-close feedback.
  * @updated 2026-05-14: Added recurring `Skip 当前轮次 / Skip到` quick actions so recurrence shortcuts can skip the next occurrence and optionally pair that skip with one future `Maybe Date` target from the shared quick-actions flow.
  * @updated 2026-05-14: Added a shared `Maybe` quick action that writes normalized multi-date `maybeDates`, including for recurring todos, through the same save pipeline as other lightweight task actions.
@@ -234,6 +235,21 @@ export const useTodoQuickActions = ({ onSaveTodo, onEditTodo, onDeleteTodo }: Us
     onDeleteTodo(todoId);
   };
 
+  const handleQuickActionUpdateTitle = (title: string) => {
+    if (!quickActionTodo) return;
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle || trimmedTitle === quickActionTodo.title) return;
+
+    setQuickActionTodo({
+      ...quickActionTodo,
+      title: trimmedTitle
+    });
+    onSaveTodo({
+      ...quickActionTodo,
+      title: trimmedTitle
+    });
+  };
+
   return {
     quickActionTodo,
     quickActionOpenedAt: quickActionOpenedAtRef.current,
@@ -250,6 +266,7 @@ export const useTodoQuickActions = ({ onSaveTodo, onEditTodo, onDeleteTodo }: Us
     handleQuickActionSkipToMaybeDate,
     handleQuickActionMoveCategory,
     handleQuickActionUpgradeToProject,
-    handleQuickActionDelete
+    handleQuickActionDelete,
+    handleQuickActionUpdateTitle
   };
 };

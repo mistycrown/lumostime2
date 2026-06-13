@@ -4,6 +4,7 @@
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
  * @pos Component
  * @description A reusable bottom sheet that exposes lightweight todo planning and completion actions without opening the full todo detail editor first.
+ * @updated 2026-06-13: Added inline todo title editing inside the sheet header with auto-save on blur, styled with a print-inspired bottom border and no focus ring to prevent visual shifts.
  * @updated 2026-05-14: Reworked the `Maybe` quick-action row into one shared outer pill that contains the main `Maybe` picker plus inline `今 / 明 / +7` shortcuts, and renamed the arrange/due `下周` shortcuts to `+7`.
  * @updated 2026-05-14: Expanded the `Maybe` summary text under the title to show every future candidate date in order instead of collapsing multiple dates into a `+n` count.
  * @updated 2026-05-14: Moved the recurring skip icon into each skip action button so the shortcut row matches the shared quick-action button structure.
@@ -24,7 +25,7 @@
  * @updated 2026-04-21: Switched backdrop dismissal to pointer-down handling so opening clicks no longer immediately close the shared sheet on desktop.
  * @updated 2026-04-20: Extracted from TodoView so todo-list taps and week badges can share one quick-actions sheet implementation.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { ArrowRightLeft, CalendarDays, Check, CheckCircle2, Flag, PanelRightOpen, Pin, SkipForward, Trash2, X } from 'lucide-react';
 import { TodoCategory, TodoItem } from '../types';
 import { formatDateKey, formatTodoRecurrenceSummary, normalizeMaybeDates, parseDateKey } from '../utils/todoScheduleUtils';
@@ -56,6 +57,7 @@ interface TodoQuickActionsModalProps {
   onForceClose?: () => void;
   openedAt?: number;
   showUpgradeToProject?: boolean;
+  onUpdateTitle?: (title: string) => void;
 }
 
 export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
@@ -77,19 +79,26 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   onClose,
   onForceClose,
   openedAt = 0,
-  showUpgradeToProject = false
+  showUpgradeToProject = false,
+  onUpdateTitle
 }) => {
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
   const [categoryPickerMode, setCategoryPickerMode] = useState<CategoryPickerMode>(null);
   const [isMaybePickerOpen, setIsMaybePickerOpen] = useState(false);
   const [isSkipToPickerOpen, setIsSkipToPickerOpen] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
+  const isEscapeRef = useRef(false);
 
   useEffect(() => {
     setIsDeleteConfirming(false);
     setCategoryPickerMode(null);
     setIsMaybePickerOpen(false);
     setIsSkipToPickerOpen(false);
-  }, [isOpen, todo?.id]);
+    setIsEditingTitle(false);
+    setEditedTitle(todo?.title || '');
+    isEscapeRef.current = false;
+  }, [isOpen, todo?.id, todo?.title]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -127,6 +136,20 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   }, [categoryPickerMode, isDeleteConfirming, isMaybePickerOpen, isOpen, isSkipToPickerOpen, onClose, onForceClose]);
 
   if (!isOpen || !todo) return null;
+
+  const handleTitleSave = () => {
+    setIsEditingTitle(false);
+    if (isEscapeRef.current) {
+      isEscapeRef.current = false;
+      return;
+    }
+    const trimmedTitle = editedTitle.trim();
+    if (trimmedTitle && trimmedTitle !== todo.title) {
+      onUpdateTitle?.(trimmedTitle);
+    } else {
+      setEditedTitle(todo.title);
+    }
+  };
 
   const showDetailShortcut = !isQuickTodo(todo);
   const isRecurringTodo = Boolean(todo.recurrenceRule);
@@ -248,7 +271,32 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
       >
         <div className="relative border-b border-stone-200 px-5 py-4 pr-24">
           <div className="text-[11px] uppercase tracking-[0.22em] text-stone-400">Quick Actions</div>
-          <div className="mt-1 text-lg font-medium text-stone-800">{todo.title}</div>
+          {isEditingTitle ? (
+            <input
+              type="text"
+              className="mt-1 w-full border-x-0 border-t-0 border-b border-stone-300 bg-transparent px-1 pb-0.5 text-lg font-medium text-stone-800 outline-none focus:border-stone-400 focus:ring-0 focus:outline-none"
+              value={editedTitle}
+              onChange={(e) => setEditedTitle(e.target.value)}
+              onBlur={handleTitleSave}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  (e.target as HTMLInputElement).blur();
+                } else if (e.key === 'Escape') {
+                  isEscapeRef.current = true;
+                  setEditedTitle(todo.title);
+                  setIsEditingTitle(false);
+                }
+              }}
+              autoFocus
+            />
+          ) : (
+            <div
+              className="mt-1 text-lg font-medium text-stone-800 cursor-pointer hover:bg-stone-100/60 rounded px-1 -mx-1 transition-colors"
+              onClick={() => setIsEditingTitle(true)}
+            >
+              {todo.title}
+            </div>
+          )}
           {visibleQuickActionDateRows.length > 0 && (
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-stone-400">
               {visibleQuickActionDateRows.map((item) => (
