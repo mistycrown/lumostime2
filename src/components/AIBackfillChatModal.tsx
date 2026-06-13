@@ -91,6 +91,7 @@ import AssistantAgent from '../plugins/AssistantAgentPlugin';
 import { assistantAgentConfigService } from '../services/assistantAgentConfigService';
 import { assistantMemoryService } from '../services/assistantMemoryService';
 import { dreamService } from '../services/dreamService';
+import { imageService } from '../services/imageService';
 import { assistantPromptService } from '../services/assistantPromptService';
 import { assistantReminderQueueService } from '../services/assistantReminderQueueService';
 import { assistantScheduledTaskService } from '../services/assistantScheduledTaskService';
@@ -3015,8 +3016,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return;
     }
 
-    const editablePersona = ensureEditablePersona();
-    const previousAvatarImage = editablePersona.avatarImage;
+    const previousAvatarImage = activePersona.avatarImage;
 
     setIsEmojiEditorOpen(false);
     setIsUploadingAvatar(true);
@@ -3028,10 +3028,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         });
       }
 
-      updateCurrentPersona({
-        avatarImage: filename,
-        avatarIcon: editablePersona.avatarIcon || '✨'
-      });
+      setPersonas((prev) => prev.map((persona) =>
+        persona.id === activePersona.id
+          ? {
+            ...persona,
+            avatarImage: filename,
+            avatarIcon: persona.avatarIcon || '✨'
+          }
+          : persona
+      ));
     } catch (error) {
       console.error('[AIBackfillChatModal] Failed to upload persona avatar', error);
       addToast('error', '头像上传失败，请重试');
@@ -3062,10 +3067,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       }
     }
 
-    updateCurrentPersona({
-      avatarIcon: trimmedEmoji,
-      avatarImage: undefined
-    });
+    setPersonas((prev) => prev.map((persona) =>
+      persona.id === activePersona.id
+        ? {
+          ...persona,
+          avatarIcon: trimmedEmoji,
+          avatarImage: undefined
+        }
+        : persona
+    ));
     setIsEmojiEditorOpen(false);
   };
 
