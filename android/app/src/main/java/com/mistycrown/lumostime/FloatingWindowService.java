@@ -8,6 +8,7 @@
  * @updated 2026-05-09: Refreshes the shared persistent notification title once per second while floating-window focus timers are active so elapsed times stay live.
  * @updated 2026-05-04: Routed floating-window foreground startup through the shared runtime notification manager so Android 8+ no longer depends on the removed legacy notification channel.
  * @updated 2026-04-26: Switched the floating-window foreground notification onto the shared runtime-status manager so Android only shows one persistent LumosTime service notification.
+ * @updated 2026-06-13: Added updateFocusStateIfRunning to allow direct memory focus state updates, bypassing background startForegroundService limitations on Android 12+.
  */
 package com.mistycrown.lumostime;
 
@@ -259,6 +260,17 @@ public class FloatingWindowService extends Service {
         new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
             instance.updateContent(icon, focusing, startTime, null);
         });
+    }
+
+    public static boolean updateFocusStateIfRunning(String icon, boolean focusing, long startTime, String sessionId) {
+        if (instance == null) {
+            return false;
+        }
+
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+            instance.updateContent(icon, focusing, startTime, sessionId);
+        });
+        return true;
     }
 
     private void showTempTextInternal(String text) {

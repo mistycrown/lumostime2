@@ -4,17 +4,8 @@
  * @output Reference-style rolling month schedule UI backed by real daily todo data
  * @pos Component (Todo scheduling)
  * @description Renders the editorial monthly schedule view adapted from the minimalist demo, using shared todo schedule utilities so each day shows the same real Arrange / Due / Repeat / Maybe / Done / Trace data as the week planner.
- * @updated 2026-06-07: Removed quick-open clicks from collapsed month-grid Trace overlays so tapping any unexpanded calendar cell always expands that day first.
- * @updated 2026-06-07: Aligned month-view Arrange / Due / Repeat title text with the muted Trace tone so these schedule types stay equally legible in both grid cells and expanded day details.
- * @updated 2026-05-14: Added a parent-controlled schedule lock toggle so the month planner can freeze drag-to-move interactions while keeping day opening and quick-edit actions available.
- * @updated 2026-05-17: Added a dashed outline border around "maybe" schedule items in the month view grid matching their type color.
- * @updated 2026-05-17: Added a strike-through (line-through) style to "completed" schedule items in both month view grid cells and expanded details.
- * @updated 2026-05-17: Wired up click handlers on monthly trace segments to trigger the quick actions sheet.
- * @updated 2026-05-18: 支持在月视图中如果是 recurring（循环）类型的任务，在靠右渲染 Repeat2 图标，模仿截止 (due) 条目的 Flag 样式，保持 UI 一致。
- * @updated 2026-05-17: 支持在格子中为 due 类型的条目加上 flag 图标（并实现超出截断且 flag 完整显示），并将 trace / 连续 trace 条目字色置为灰色。
- * @updated 2026-05-18: 支持点击循环排期的 Repeat 标签，唤起快捷编辑栏。
- * @updated 2026-05-18: Removed automatic ellipsis from month-grid entry titles so in-cell rows and trace strips clip directly instead of reserving space for `...`.
- * @updated 2026-06-06: Added a compact date summary line above each expanded month-day detail list showing the selected date, weekday, and entry count.
+ *
+ * @updated 2026-06-13: 调整月视图中各条目的颜色：Trace 和已完成任务（Completed）使用灰色，而 Maybe, Arrange, Due, Repeat 任务使用较黑的颜色以示区分。
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -194,13 +185,13 @@ const MONTH_VIEW_ENTRY_TAGS: Array<{
   color: string;
   clickable: boolean;
 }> = [
-  { key: 'deadline', label: 'Due', color: '#8f6f6b', clickable: true },
-  { key: 'scheduled', label: 'Arrange', color: '#7c8b97', clickable: true },
-  { key: 'recurring', label: 'Repeat', color: '#8b8f79', clickable: true },
-  { key: 'maybe', label: 'Maybe', color: '#a58863', clickable: true },
-  { key: 'completed', label: 'Done', color: '#7f8c84', clickable: true },
-  { key: 'inProgress', label: 'Trace', color: '#8b8096', clickable: true }
-];
+    { key: 'deadline', label: 'Due', color: '#8f6f6b', clickable: true },
+    { key: 'scheduled', label: 'Arrange', color: '#7c8b97', clickable: true },
+    { key: 'recurring', label: 'Repeat', color: '#8b8f79', clickable: true },
+    { key: 'maybe', label: 'Maybe', color: '#a58863', clickable: true },
+    { key: 'completed', label: 'Done', color: '#7f8c84', clickable: true },
+    { key: 'inProgress', label: 'Trace', color: '#8b8096', clickable: true }
+  ];
 
 const getMonthEntryTagLabel = (
   tag: typeof MONTH_VIEW_ENTRY_TAGS[number],
@@ -219,10 +210,8 @@ const getMonthEntryTagLabel = (
 
 const getMonthEntryToneClassName = (primaryKind: TodoDateEntry['primaryKind']): string => {
   if (
-    primaryKind === 'deadline'
-    || primaryKind === 'scheduled'
-    || primaryKind === 'recurring'
-    || primaryKind === 'inProgress'
+    primaryKind === 'inProgress'
+    || primaryKind === 'completed'
   ) {
     return 'text-stone-400 dark:text-stone-500/90';
   }
@@ -916,7 +905,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   };
 
   useEffect(() => {
-        const observer = new IntersectionObserver((entries) => {
+    const observer = new IntersectionObserver((entries) => {
       let nextMonth: string | null = null;
       let maxRatio = 0;
 
@@ -1189,475 +1178,473 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className={`flex min-h-0 flex-1 flex-col ${isDensityMenuOpen ? 'pointer-events-none blur-[6px] opacity-90' : ''}`}>
-      <div
-        ref={headerRef}
-        className={`shrink-0 bg-[rgba(250,249,246,0.34)] ${useReducedEffects ? '' : ''}`}
-      >
-        <div className="flex items-center justify-between border-b border-black px-3 py-2.5">
-          <div className="flex items-center space-x-1 select-none">
-            <button
-              type="button"
-              onClick={() => scrollToMonth(subMonths(activeMonthDate, 1))}
-              className="rounded-full p-1.5 opacity-50 transition-colors hover:bg-stone-200 hover:opacity-100"
-              title="上一月"
-            >
-              <ChevronLeft size={14} strokeWidth={2.5} />
-            </button>
+        <div
+          ref={headerRef}
+          className={`shrink-0 bg-[rgba(250,249,246,0.34)] ${useReducedEffects ? '' : ''}`}
+        >
+          <div className="flex items-center justify-between border-b border-black px-3 py-2.5">
+            <div className="flex items-center space-x-1 select-none">
+              <button
+                type="button"
+                onClick={() => scrollToMonth(subMonths(activeMonthDate, 1))}
+                className="rounded-full p-1.5 opacity-50 transition-colors hover:bg-stone-200 hover:opacity-100"
+                title="上一月"
+              >
+                <ChevronLeft size={14} strokeWidth={2.5} />
+              </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                if (onOpenDatePicker) {
-                  onOpenDatePicker();
-                  return;
-                }
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenDatePicker) {
+                    onOpenDatePicker();
+                    return;
+                  }
 
-                scrollToWeekContainingDate(today);
-              }}
-              className="flex items-baseline space-x-1.5 px-1 text-left"
-              title={onOpenDatePicker ? '跳到某一天' : '跳到今天'}
-            >
-              <span className="text-[1.05rem] font-serif font-black italic leading-none transition-opacity hover:opacity-60">
-                {activeMonthLabel}
-              </span>
-            </button>
+                  scrollToWeekContainingDate(today);
+                }}
+                className="flex items-baseline space-x-1.5 px-1 text-left"
+                title={onOpenDatePicker ? '跳到某一天' : '跳到今天'}
+              >
+                <span className="text-[1.05rem] font-serif font-black italic leading-none transition-opacity hover:opacity-60">
+                  {activeMonthLabel}
+                </span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => scrollToMonth(addMonths(activeMonthDate, 1))}
-              className="rounded-full p-1.5 opacity-50 transition-colors hover:bg-stone-200 hover:opacity-100"
-              title="下一月"
-            >
-              <ChevronRight size={14} strokeWidth={2.5} />
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3 pr-1">
-            <div className="pointer-events-none flex items-center gap-2">
-              <span className="hidden text-[0.45rem] font-bold uppercase tracking-[0.2em] opacity-40 sm:inline">
-                Monthly Agenda
-              </span>
-              <div className="hidden space-x-1 sm:flex">
-                <span className="h-1.5 w-1.5 rounded-full bg-black"></span>
-                <span className="h-1.5 w-1.5 rounded-full border border-black"></span>
-                <span className="h-1.5 w-1.5 rounded-full border border-black"></span>
-              </div>
+              <button
+                type="button"
+                onClick={() => scrollToMonth(addMonths(activeMonthDate, 1))}
+                className="rounded-full p-1.5 opacity-50 transition-colors hover:bg-stone-200 hover:opacity-100"
+                title="下一月"
+              >
+                <ChevronRight size={14} strokeWidth={2.5} />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={jumpToCurrentMonth}
-              className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] tracking-[0.14em] transition-colors ${
-                isCurrentMonthActive
-                  ? 'bg-stone-100 text-slate-600'
-                  : 'text-slate-400 hover:bg-white/50 hover:text-slate-600'
-              }`}
-            >
-              本月
-            </button>
-            <button
-              type="button"
-              onClick={onToggleScheduleLock}
-              className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] tracking-[0.14em] transition-colors ${
-                isScheduleLocked
-                  ? 'bg-stone-900 text-[#faf9f6]'
-                  : 'text-slate-400 hover:bg-white/50 hover:text-slate-600'
-              }`}
-              aria-pressed={isScheduleLocked}
-              title={isScheduleLocked ? '已锁定拖拽，点击恢复移动' : '锁定拖拽，防止误移动'}
-            >
-              {isScheduleLocked ? '解锁' : '锁定'}
-            </button>
-            <button
-              type="button"
-              onClick={openDensityMenu}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-white/60 hover:text-slate-700"
-              title="月视图设置"
-              aria-label="月视图设置"
-              aria-expanded={isDensityMenuOpen}
-            >
-              <SlidersHorizontal size={14} />
-            </button>
-            {viewMenuNode}
-          </div>
-        </div>
 
-        <div className={`${MONTH_VIEW_CALENDAR_SIDE_INSET_CLASS_NAME} grid grid-cols-7 border-b border-black/90 bg-[rgba(250,249,246,0.16)] py-1.5 text-[0.6rem] font-bold uppercase tracking-widest`}>
-          {WEEKDAY_LABELS.map((label) => (
-            <div key={label} className="text-center opacity-40">
-              {label}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div
-        ref={scrollRef}
-        className={`min-h-0 flex-1 overflow-y-auto bg-transparent pb-[10vh] no-scrollbar ${MONTH_VIEW_CALENDAR_SIDE_INSET_CLASS_NAME}`}
-        style={{ scrollBehavior: 'smooth' }}
-        onScroll={handleMonthScroll}
-        onDragOver={handleMonthContainerDragOver}
-        onDragLeave={stopDesktopAutoScroll}
-        onDrop={stopDesktopAutoScroll}
-      >
-        {weeks.map((week) => {
-          const middleDayOfWeek = week.days[3];
-          const firstMonthDay = week.days.find((day) => getDate(day) === 1);
-          const firstMonthKey = firstMonthDay ? format(startOfMonth(firstMonthDay), 'yyyy-MM-01') : null;
-          const weekLayout = weekLayouts[week.id];
-          const visibleTraceSegments = (weekLayout?.traceSegments || []).filter((segment) => segment.laneIndex < visibleEntryCount);
-
-          return (
-            <div
-              key={week.id}
-              data-month-key={week.monthKey}
-              ref={(element) => {
-                observerRefs.current[week.id] = element;
-                if (firstMonthKey) {
-                  monthAnchorRefs.current[firstMonthKey] = element;
-                }
-              }}
-            >
-              <div className="relative" style={{ height: `${topRowHeight}px` }}>
-                <div className="pointer-events-none absolute inset-x-0 top-0 z-[1] overflow-hidden" style={{ height: `${topRowHeight}px` }}>
-                  {visibleTraceSegments.map((segment) => (
-                    <div
-                      key={`${week.id}-${segment.todoId}-${segment.startDayIndex}-${segment.endDayIndex}`}
-                      className={`absolute flex items-center overflow-hidden font-medium leading-[1.2] text-stone-400 dark:text-stone-500/90 ${monthCellTaskClassName}`}
-                      style={getTraceSegmentStyle(segment)}
-                    >
-                      <span className="overflow-hidden whitespace-nowrap text-clip">{segment.entry.todo.title}</span>
-                    </div>
-                  ))}
+            <div className="flex items-center gap-3 pr-1">
+              <div className="pointer-events-none flex items-center gap-2">
+                <span className="hidden text-[0.45rem] font-bold uppercase tracking-[0.2em] opacity-40 sm:inline">
+                  Monthly Agenda
+                </span>
+                <div className="hidden space-x-1 sm:flex">
+                  <span className="h-1.5 w-1.5 rounded-full bg-black"></span>
+                  <span className="h-1.5 w-1.5 rounded-full border border-black"></span>
+                  <span className="h-1.5 w-1.5 rounded-full border border-black"></span>
                 </div>
+              </div>
+              <button
+                type="button"
+                onClick={jumpToCurrentMonth}
+                className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] tracking-[0.14em] transition-colors ${isCurrentMonthActive
+                    ? 'bg-stone-100 text-slate-600'
+                    : 'text-slate-400 hover:bg-white/50 hover:text-slate-600'
+                  }`}
+              >
+                本月
+              </button>
+              <button
+                type="button"
+                onClick={onToggleScheduleLock}
+                className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] tracking-[0.14em] transition-colors ${isScheduleLocked
+                    ? 'bg-stone-900 text-[#faf9f6]'
+                    : 'text-slate-400 hover:bg-white/50 hover:text-slate-600'
+                  }`}
+                aria-pressed={isScheduleLocked}
+                title={isScheduleLocked ? '已锁定拖拽，点击恢复移动' : '锁定拖拽，防止误移动'}
+              >
+                {isScheduleLocked ? '解锁' : '锁定'}
+              </button>
+              <button
+                type="button"
+                onClick={openDensityMenu}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-white/60 hover:text-slate-700"
+                title="月视图设置"
+                aria-label="月视图设置"
+                aria-expanded={isDensityMenuOpen}
+              >
+                <SlidersHorizontal size={14} />
+              </button>
+              {viewMenuNode}
+            </div>
+          </div>
 
-                <div className="grid grid-cols-7" style={{ height: `${topRowHeight}px` }}>
-                  {week.days.map((day) => {
-                    const dateKey = formatDateKey(day);
-                    const rowEntries = weekLayout?.rowEntriesByDate[dateKey] || (entriesByDate[dateKey] || []).map((entry) => entry);
-                    const visibleRowEntries = rowEntries.slice(0, visibleEntryCount);
-                    const hiddenCount = weekLayout?.hiddenCountByDate[dateKey] ?? Math.max(
-                      0,
-                      (entriesByDate[dateKey] || []).length - visibleRowEntries.length
-                    );
-                    const isCurrentMonth = isSameMonth(day, middleDayOfWeek);
-                    const dayNumberTextClassName = isCurrentMonth ? 'text-stone-800 hover:text-stone-950' : 'text-stone-400 hover:text-stone-500';
-                    const isToday = dateKey === todayDateKey;
-                    const isSelected = selectedDate === dateKey;
-                    const isFirst = getDate(day) === 1;
+          <div className={`${MONTH_VIEW_CALENDAR_SIDE_INSET_CLASS_NAME} grid grid-cols-7 border-b border-black/90 bg-[rgba(250,249,246,0.16)] py-1.5 text-[0.6rem] font-bold uppercase tracking-widest`}>
+            {WEEKDAY_LABELS.map((label) => (
+              <div key={label} className="text-center opacity-40">
+                {label}
+              </div>
+            ))}
+          </div>
+        </div>
 
-                    return (
+        <div
+          ref={scrollRef}
+          className={`min-h-0 flex-1 overflow-y-auto bg-transparent pb-[10vh] no-scrollbar ${MONTH_VIEW_CALENDAR_SIDE_INSET_CLASS_NAME}`}
+          style={{ scrollBehavior: 'smooth' }}
+          onScroll={handleMonthScroll}
+          onDragOver={handleMonthContainerDragOver}
+          onDragLeave={stopDesktopAutoScroll}
+          onDrop={stopDesktopAutoScroll}
+        >
+          {weeks.map((week) => {
+            const middleDayOfWeek = week.days[3];
+            const firstMonthDay = week.days.find((day) => getDate(day) === 1);
+            const firstMonthKey = firstMonthDay ? format(startOfMonth(firstMonthDay), 'yyyy-MM-01') : null;
+            const weekLayout = weekLayouts[week.id];
+            const visibleTraceSegments = (weekLayout?.traceSegments || []).filter((segment) => segment.laneIndex < visibleEntryCount);
+
+            return (
+              <div
+                key={week.id}
+                data-month-key={week.monthKey}
+                ref={(element) => {
+                  observerRefs.current[week.id] = element;
+                  if (firstMonthKey) {
+                    monthAnchorRefs.current[firstMonthKey] = element;
+                  }
+                }}
+              >
+                <div className="relative" style={{ height: `${topRowHeight}px` }}>
+                  <div className="pointer-events-none absolute inset-x-0 top-0 z-[1] overflow-hidden" style={{ height: `${topRowHeight}px` }}>
+                    {visibleTraceSegments.map((segment) => (
                       <div
-                        key={day.toISOString()}
-                        data-month-drop-date={dateKey}
-                        role="button"
-                        tabIndex={0}
-                        aria-pressed={isSelected}
-                        aria-label={`Open ${format(day, 'yyyy-MM-dd')} details`}
-                        onClick={() => toggleSelectedDate(dateKey)}
-                        onKeyDown={(event) => {
-                          if (event.target !== event.currentTarget) {
-                            return;
-                          }
-
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            toggleSelectedDate(dateKey);
-                          }
-                        }}
-                        onDragOver={(event) => {
-                          if (isScheduleLocked || !draggingEntry) return;
-                          event.preventDefault();
-                          if (dragTargetDate !== dateKey) {
-                            setDragTargetDate(dateKey);
-                          }
-                        }}
-                        onDragLeave={() => {
-                          if (dragTargetDate === dateKey) {
-                            setDragTargetDate(null);
-                          }
-                        }}
-                        onDrop={(event) => {
-                          event.preventDefault();
-                          if (isScheduleLocked) {
-                            return;
-                          }
-                          handleMonthDrop(dateKey);
-                        }}
-                        className={[
-                          'relative z-0 flex cursor-pointer flex-col border-b border-r border-stone-200/35 text-left transition-colors duration-200',
-                          !isCurrentMonth ? 'bg-[rgba(245,244,240,0.14)]' : 'bg-transparent',
-                          isToday ? 'z-10 ring-1 ring-inset ring-stone-400' : '',
-                          isSelected && !isToday ? 'bg-[rgba(255,255,255,0.22)]' : '',
-                          dragTargetDate === dateKey ? 'bg-[rgba(250,249,246,0.32)] ring-2 ring-inset ring-stone-800/75' : ''
-                        ].join(' ')}
-                        style={{
-                          paddingTop: `${MONTH_VIEW_CELL_VERTICAL_PADDING_PX}px`,
-                          paddingBottom: `${MONTH_VIEW_CELL_VERTICAL_PADDING_PX}px`
-                        }}
+                        key={`${week.id}-${segment.todoId}-${segment.startDayIndex}-${segment.endDayIndex}`}
+                        className={`absolute flex items-center overflow-hidden font-medium leading-[1.2] text-stone-400 dark:text-stone-500/90 ${monthCellTaskClassName}`}
+                        style={getTraceSegmentStyle(segment)}
                       >
-                        <div
-                          className="flex justify-start px-2"
-                          style={{ minHeight: `${MONTH_VIEW_DAY_NUMBER_ROW_HEIGHT_PX}px` }}
-                        >
-                          <button
-                            type="button"
-                            onClick={(event) => handleMonthDayNumberClick(event, dateKey)}
-                            className={`rounded-sm text-[1.02rem] leading-none transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-500/70 ${dayNumberTextClassName}`}
-                            style={{
-                              fontFamily: "'Bilbo Swash Caps', 'Georgia', 'Times New Roman', cursive, serif",
-                              lineHeight: `${MONTH_VIEW_DAY_NUMBER_ROW_HEIGHT_PX}px`
-                            }}
-                            aria-label={`Quick add task for ${format(day, 'yyyy-MM-dd')}`}
-                          >
-                            {format(day, 'dd')}
-                          </button>
-                        </div>
+                        <span className="overflow-hidden whitespace-nowrap text-clip">{segment.entry.todo.title}</span>
+                      </div>
+                    ))}
+                  </div>
 
+                  <div className="grid grid-cols-7" style={{ height: `${topRowHeight}px` }}>
+                    {week.days.map((day) => {
+                      const dateKey = formatDateKey(day);
+                      const rowEntries = weekLayout?.rowEntriesByDate[dateKey] || (entriesByDate[dateKey] || []).map((entry) => entry);
+                      const visibleRowEntries = rowEntries.slice(0, visibleEntryCount);
+                      const hiddenCount = weekLayout?.hiddenCountByDate[dateKey] ?? Math.max(
+                        0,
+                        (entriesByDate[dateKey] || []).length - visibleRowEntries.length
+                      );
+                      const isCurrentMonth = isSameMonth(day, middleDayOfWeek);
+                      const dayNumberTextClassName = isCurrentMonth ? 'text-stone-800 hover:text-stone-950' : 'text-stone-400 hover:text-stone-500';
+                      const isToday = dateKey === todayDateKey;
+                      const isSelected = selectedDate === dateKey;
+                      const isFirst = getDate(day) === 1;
+
+                      return (
                         <div
-                          className="flex min-h-0 flex-1 flex-col overflow-hidden"
-                          style={{
-                            marginTop: `${MONTH_VIEW_ENTRY_TOP_MARGIN_PX}px`,
-                            rowGap: `${MONTH_VIEW_ENTRY_ROW_GAP_PX}px`
-                          }}
-                        >
-                          {visibleRowEntries.map((entry, rowIndex) => {
-                            if (!entry) {
-                              return (
-                                <div
-                                  key={`${dateKey}-empty-${rowIndex}`}
-                                  aria-hidden="true"
-                                  style={monthCellRowStyle}
-                                />
-                              );
+                          key={day.toISOString()}
+                          data-month-drop-date={dateKey}
+                          role="button"
+                          tabIndex={0}
+                          aria-pressed={isSelected}
+                          aria-label={`Open ${format(day, 'yyyy-MM-dd')} details`}
+                          onClick={() => toggleSelectedDate(dateKey)}
+                          onKeyDown={(event) => {
+                            if (event.target !== event.currentTarget) {
+                              return;
                             }
 
-                            if (entry.primaryKind === 'inProgress') {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              toggleSelectedDate(dateKey);
+                            }
+                          }}
+                          onDragOver={(event) => {
+                            if (isScheduleLocked || !draggingEntry) return;
+                            event.preventDefault();
+                            if (dragTargetDate !== dateKey) {
+                              setDragTargetDate(dateKey);
+                            }
+                          }}
+                          onDragLeave={() => {
+                            if (dragTargetDate === dateKey) {
+                              setDragTargetDate(null);
+                            }
+                          }}
+                          onDrop={(event) => {
+                            event.preventDefault();
+                            if (isScheduleLocked) {
+                              return;
+                            }
+                            handleMonthDrop(dateKey);
+                          }}
+                          className={[
+                            'relative z-0 flex cursor-pointer flex-col border-b border-r border-stone-200/35 text-left transition-colors duration-200',
+                            !isCurrentMonth ? 'bg-[rgba(245,244,240,0.14)]' : 'bg-transparent',
+                            isToday ? 'z-10 ring-1 ring-inset ring-stone-400' : '',
+                            isSelected && !isToday ? 'bg-[rgba(255,255,255,0.22)]' : '',
+                            dragTargetDate === dateKey ? 'bg-[rgba(250,249,246,0.32)] ring-2 ring-inset ring-stone-800/75' : ''
+                          ].join(' ')}
+                          style={{
+                            paddingTop: `${MONTH_VIEW_CELL_VERTICAL_PADDING_PX}px`,
+                            paddingBottom: `${MONTH_VIEW_CELL_VERTICAL_PADDING_PX}px`
+                          }}
+                        >
+                          <div
+                            className="flex justify-start px-2"
+                            style={{ minHeight: `${MONTH_VIEW_DAY_NUMBER_ROW_HEIGHT_PX}px` }}
+                          >
+                            <button
+                              type="button"
+                              onClick={(event) => handleMonthDayNumberClick(event, dateKey)}
+                              className={`rounded-sm text-[1.02rem] leading-none transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-500/70 ${dayNumberTextClassName}`}
+                              style={{
+                                fontFamily: "'Bilbo Swash Caps', 'Georgia', 'Times New Roman', cursive, serif",
+                                lineHeight: `${MONTH_VIEW_DAY_NUMBER_ROW_HEIGHT_PX}px`
+                              }}
+                              aria-label={`Quick add task for ${format(day, 'yyyy-MM-dd')}`}
+                            >
+                              {format(day, 'dd')}
+                            </button>
+                          </div>
+
+                          <div
+                            className="flex min-h-0 flex-1 flex-col overflow-hidden"
+                            style={{
+                              marginTop: `${MONTH_VIEW_ENTRY_TOP_MARGIN_PX}px`,
+                              rowGap: `${MONTH_VIEW_ENTRY_ROW_GAP_PX}px`
+                            }}
+                          >
+                            {visibleRowEntries.map((entry, rowIndex) => {
+                              if (!entry) {
+                                return (
+                                  <div
+                                    key={`${dateKey}-empty-${rowIndex}`}
+                                    aria-hidden="true"
+                                    style={monthCellRowStyle}
+                                  />
+                                );
+                              }
+
+                              if (entry.primaryKind === 'inProgress') {
+                                return (
+                                  <div
+                                    key={`${dateKey}-${entry.todo.id}-${entry.primaryKind}`}
+                                    aria-hidden="true"
+                                    className={`invisible overflow-hidden text-clip whitespace-nowrap border-l-[1.5px] pl-[3px] font-medium leading-[1.2] ${monthCellTaskClassName}`}
+                                    style={{
+                                      ...getTodoMarkerStyle(entry),
+                                      ...monthCellRowStyle
+                                    }}
+                                  >
+                                    {entry.todo.title}
+                                  </div>
+                                );
+                              }
+
+                              const isCompleted = entry.primaryKind === 'completed';
+                              const isDue = entry.primaryKind === 'deadline';
+                              const isRecurring = entry.primaryKind === 'recurring';
+
+                              const textClassName = isCompleted
+                                ? 'line-through text-stone-400/90 dark:text-stone-500/90'
+                                : getMonthEntryToneClassName(entry.primaryKind);
+
+                              const shapeClassName = entry.primaryKind === 'maybe'
+                                ? 'rounded-[2px] px-[3px]'
+                                : 'border-l-[1.5px] pl-[3px]';
+
+                              const markerColor = getTodoMarkerColor(entry);
+
                               return (
                                 <div
                                   key={`${dateKey}-${entry.todo.id}-${entry.primaryKind}`}
-                                  aria-hidden="true"
-                                  className={`invisible overflow-hidden text-clip whitespace-nowrap border-l-[1.5px] pl-[3px] font-medium leading-[1.2] ${monthCellTaskClassName}`}
+                                  className={`flex items-center justify-between gap-0.5 overflow-hidden font-medium leading-[1.2] ${textClassName} ${monthCellTaskClassName} ${shapeClassName}`}
                                   style={{
                                     ...getTodoMarkerStyle(entry),
                                     ...monthCellRowStyle
                                   }}
                                 >
-                                  {entry.todo.title}
+                                  <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-clip">{entry.todo.title}</span>
+                                  {isDue && (
+                                    <Flag size={10} style={{ color: markerColor, fill: markerColor, paddingRight: '2px' }} className="shrink-0 ml-0.5" />
+                                  )}
+                                  {isRecurring && (
+                                    <Repeat2 size={10} style={{ color: markerColor, paddingRight: '2px' }} className="shrink-0 ml-0.5" />
+                                  )}
+                                </div>
+                              );
+                            })}
+
+                            {hiddenCount > 0 && (
+                              <div className="pl-[5px] pt-0.5 text-[0.53rem] font-bold uppercase tracking-[0.14em] text-stone-300">
+                                +{hiddenCount}
+                              </div>
+                            )}
+                          </div>
+
+                          {isToday && (
+                            <div className="absolute bottom-1 right-1.5 text-[0.45rem] font-bold uppercase tracking-widest opacity-50">
+                              TODAY
+                            </div>
+                          )}
+
+                          {isFirst && !isToday && (
+                            <div className="absolute bottom-1 right-1.5 text-[0.45rem] font-bold uppercase tracking-widest opacity-30">
+                              {format(day, 'MMM')}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <AnimatePresence initial={false}>
+                  {selectedDate && week.days.some((day) => formatDateKey(day) === selectedDate) && (
+                    <motion.div
+                      key={selectedDate}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: useReducedEffects ? 0.08 : 0.12, ease: 'easeOut' }}
+                      className="overflow-hidden bg-[rgba(250,249,246,0.26)] shadow-[inset_0_3px_6px_rgba(0,0,0,0.02)]"
+                    >
+                      <div className="flex flex-col gap-1 px-5 py-3.5">
+                        <div className="text-[0.64rem] font-medium uppercase tracking-[0.14em] text-stone-400">
+                          {selectedDateSummaryLabel}
+                        </div>
+                        {selectedDateEntries.length > 0 ? (
+                          selectedDateEntries.map((entry) => {
+                            const rowClassName = 'flex w-full items-start gap-3 rounded px-2 py-1.5 text-left transition-colors hover:bg-black/5';
+                            const activeTags = MONTH_VIEW_ENTRY_TAGS.filter(({ key }) => entry.badges[key]);
+                            const activeTagCount = activeTags.length;
+                            const completedDateKey = entry.todo.completedAt ? formatDateKey(new Date(entry.todo.completedAt)) : null;
+                            const titleClassName = getMonthEntryToneClassName(entry.primaryKind);
+                            const parentTodo = getParentTodo(todos, entry.todo);
+                            const parentTitle = parentTodo?.title || null;
+                            const parentTitleClassName = 'text-stone-400';
+                            const isScheduledOverdue = Boolean(
+                              entry.badges.scheduled &&
+                              entry.todo.scheduledDate &&
+                              entry.todo.scheduledDate < todayDateKey &&
+                              !completedDateKey
+                            );
+                            const isDeadlineOverdue = Boolean(
+                              entry.badges.deadline &&
+                              entry.todo.deadlineDate &&
+                              entry.todo.deadlineDate < todayDateKey &&
+                              !completedDateKey
+                            );
+                            const titleSegmentClassName = parentTitle
+                              ? 'min-w-0 max-w-[58%] flex-[0_1_auto] truncate'
+                              : 'min-w-0 flex-1 truncate';
+                            const parentSegmentClassName = 'min-w-0 max-w-[42%] flex-[0_1_auto] truncate';
+
+                            if (onOpenTodo) {
+                              return (
+                                <div
+                                  key={`${selectedDate}-${entry.todo.id}-${entry.primaryKind}-detail`}
+                                  className={rowClassName}
+                                  draggable={isMonthEntryDraggable(entry)}
+                                  onDragStart={(event) => isMonthEntryDraggable(entry) && handleMonthItemDragStart(entry, event)}
+                                  onDragEnd={handleMonthItemDragEnd}
+                                  onTouchStart={(event) => isMonthEntryDraggable(entry) && handleTouchMonthItemDragStart(entry, event)}
+                                >
+                                  <span className="flex h-4 w-4 shrink-0 items-center justify-center self-center">
+                                    {getMonthEntryLeadingIcon(entry)}
+                                  </span>
+                                  <div className="flex min-w-0 flex-1 items-start gap-2">
+                                    {isMonthEntryDraggable(entry) ? (
+                                      <span className={`min-w-0 flex flex-1 items-baseline gap-0 overflow-hidden font-medium uppercase tracking-[0.12em] text-left ${monthDetailTaskClassName} ${draggingTodoId === entry.todo.id ? 'cursor-grabbing opacity-40' : 'cursor-grab active:cursor-grabbing'} ${titleClassName}`}>
+                                        <span className={titleSegmentClassName}>{entry.todo.title}</span>
+                                        {parentTitle && (
+                                          <span className={`${parentSegmentClassName} ${parentTitleClassName}`}>{` @${parentTitle}`}</span>
+                                        )}
+                                      </span>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => onOpenTodo(entry.todo)}
+                                        className={`min-w-0 flex flex-1 items-baseline gap-0 overflow-hidden font-medium uppercase tracking-[0.12em] text-left ${monthDetailTaskClassName} ${titleClassName} ${entry.primaryKind === 'completed' ? 'line-through opacity-70' : ''}`}
+                                      >
+                                        <span className={titleSegmentClassName}>{entry.todo.title}</span>
+                                        {parentTitle && (
+                                          <span className={`${parentSegmentClassName} ${parentTitleClassName}`}>{` @${parentTitle}`}</span>
+                                        )}
+                                      </button>
+                                    )}
+                                    <div className={`flex shrink-0 self-center translate-y-px flex-wrap items-center justify-end gap-1 whitespace-nowrap text-[9px] leading-none ${activeTagCount > 1 ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
+                                      {activeTags.map((tag) => (
+                                        tag.clickable ? (
+                                          <button
+                                            key={tag.key}
+                                            type="button"
+                                            draggable={false}
+                                            onTouchStart={(event) => event.stopPropagation()}
+                                            onClick={() => onOpenTodo(entry.todo)}
+                                            className="inline-flex items-center justify-end gap-1 whitespace-nowrap rounded-full px-1 py-0.5 text-right transition-colors hover:bg-stone-100/70"
+                                            style={{ color: tag.color }}
+                                          >
+                                            {tag.key === 'deadline' && isDeadlineOverdue && <CircleAlert size={10} className="-translate-y-px shrink-0 text-red-500" />}
+                                            {tag.key === 'scheduled' && isScheduledOverdue && <CircleAlert size={10} className="-translate-y-px shrink-0 text-red-500" />}
+                                            {getMonthEntryTagLabel(tag, activeTagCount)}
+                                          </button>
+                                        ) : (
+                                          <span
+                                            key={tag.key}
+                                            onTouchStart={(event) => event.stopPropagation()}
+                                            className="inline-flex items-center justify-end gap-1 whitespace-nowrap text-right"
+                                            style={{ color: tag.color }}
+                                          >
+                                            {getMonthEntryTagLabel(tag, activeTagCount)}
+                                          </span>
+                                        )
+                                      ))}
+                                    </div>
+                                  </div>
                                 </div>
                               );
                             }
 
-                            const isCompleted = entry.primaryKind === 'completed';
-                            const isDue = entry.primaryKind === 'deadline';
-                            const isRecurring = entry.primaryKind === 'recurring';
-
-                            const textClassName = isCompleted
-                              ? 'line-through text-stone-400/90 dark:text-stone-500/90'
-                              : getMonthEntryToneClassName(entry.primaryKind);
-
-                            const shapeClassName = entry.primaryKind === 'maybe'
-                              ? 'rounded-[2px] px-[3px]'
-                              : 'border-l-[1.5px] pl-[3px]';
-
-                            const markerColor = getTodoMarkerColor(entry);
-
-                            return (
-                              <div
-                                key={`${dateKey}-${entry.todo.id}-${entry.primaryKind}`}
-                                className={`flex items-center justify-between gap-0.5 overflow-hidden font-medium leading-[1.2] ${textClassName} ${monthCellTaskClassName} ${shapeClassName}`}
-                                style={{
-                                  ...getTodoMarkerStyle(entry),
-                                  ...monthCellRowStyle
-                                }}
-                              >
-                                <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-clip">{entry.todo.title}</span>
-                                {isDue && (
-                                  <Flag size={10} style={{ color: markerColor, fill: markerColor, paddingRight: '2px' }} className="shrink-0 ml-0.5" />
-                                )}
-                                {isRecurring && (
-                                  <Repeat2 size={10} style={{ color: markerColor, paddingRight: '2px' }} className="shrink-0 ml-0.5" />
-                                )}
-                              </div>
-                            );
-                          })}
-
-                          {hiddenCount > 0 && (
-                            <div className="pl-[5px] pt-0.5 text-[0.53rem] font-bold uppercase tracking-[0.14em] text-stone-300">
-                              +{hiddenCount}
-                            </div>
-                          )}
-                        </div>
-
-                        {isToday && (
-                          <div className="absolute bottom-1 right-1.5 text-[0.45rem] font-bold uppercase tracking-widest opacity-50">
-                            TODAY
-                          </div>
-                        )}
-
-                        {isFirst && !isToday && (
-                          <div className="absolute bottom-1 right-1.5 text-[0.45rem] font-bold uppercase tracking-widest opacity-30">
-                            {format(day, 'MMM')}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <AnimatePresence initial={false}>
-                {selectedDate && week.days.some((day) => formatDateKey(day) === selectedDate) && (
-                  <motion.div
-                    key={selectedDate}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: useReducedEffects ? 0.08 : 0.12, ease: 'easeOut' }}
-                    className="overflow-hidden bg-[rgba(250,249,246,0.26)] shadow-[inset_0_3px_6px_rgba(0,0,0,0.02)]"
-                  >
-                    <div className="flex flex-col gap-1 px-5 py-3.5">
-                      <div className="text-[0.64rem] font-medium uppercase tracking-[0.14em] text-stone-400">
-                        {selectedDateSummaryLabel}
-                      </div>
-                      {selectedDateEntries.length > 0 ? (
-                        selectedDateEntries.map((entry) => {
-                          const rowClassName = 'flex w-full items-start gap-3 rounded px-2 py-1.5 text-left transition-colors hover:bg-black/5';
-                          const activeTags = MONTH_VIEW_ENTRY_TAGS.filter(({ key }) => entry.badges[key]);
-                          const activeTagCount = activeTags.length;
-                          const completedDateKey = entry.todo.completedAt ? formatDateKey(new Date(entry.todo.completedAt)) : null;
-                          const titleClassName = getMonthEntryToneClassName(entry.primaryKind);
-                          const parentTodo = getParentTodo(todos, entry.todo);
-                          const parentTitle = parentTodo?.title || null;
-                          const parentTitleClassName = 'text-stone-400';
-                          const isScheduledOverdue = Boolean(
-                            entry.badges.scheduled &&
-                            entry.todo.scheduledDate &&
-                            entry.todo.scheduledDate < todayDateKey &&
-                            !completedDateKey
-                          );
-                          const isDeadlineOverdue = Boolean(
-                            entry.badges.deadline &&
-                            entry.todo.deadlineDate &&
-                            entry.todo.deadlineDate < todayDateKey &&
-                            !completedDateKey
-                          );
-                          const titleSegmentClassName = parentTitle
-                            ? 'min-w-0 max-w-[58%] flex-[0_1_auto] truncate'
-                            : 'min-w-0 flex-1 truncate';
-                          const parentSegmentClassName = 'min-w-0 max-w-[42%] flex-[0_1_auto] truncate';
-
-                          if (onOpenTodo) {
                             return (
                               <div
                                 key={`${selectedDate}-${entry.todo.id}-${entry.primaryKind}-detail`}
                                 className={rowClassName}
-                                draggable={isMonthEntryDraggable(entry)}
-                                onDragStart={(event) => isMonthEntryDraggable(entry) && handleMonthItemDragStart(entry, event)}
-                                onDragEnd={handleMonthItemDragEnd}
-                                onTouchStart={(event) => isMonthEntryDraggable(entry) && handleTouchMonthItemDragStart(entry, event)}
                               >
                                 <span className="flex h-4 w-4 shrink-0 items-center justify-center self-center">
                                   {getMonthEntryLeadingIcon(entry)}
                                 </span>
                                 <div className="flex min-w-0 flex-1 items-start gap-2">
-                                  {isMonthEntryDraggable(entry) ? (
-                                    <span className={`min-w-0 flex flex-1 items-baseline gap-0 overflow-hidden font-medium uppercase tracking-[0.12em] text-left ${monthDetailTaskClassName} ${draggingTodoId === entry.todo.id ? 'cursor-grabbing opacity-40' : 'cursor-grab active:cursor-grabbing'} ${titleClassName}`}>
-                                      <span className={titleSegmentClassName}>{entry.todo.title}</span>
-                                      {parentTitle && (
-                                        <span className={`${parentSegmentClassName} ${parentTitleClassName}`}>{` @${parentTitle}`}</span>
-                                      )}
-                                    </span>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => onOpenTodo(entry.todo)}
-                                      className={`min-w-0 flex flex-1 items-baseline gap-0 overflow-hidden font-medium uppercase tracking-[0.12em] text-left ${monthDetailTaskClassName} ${titleClassName} ${entry.primaryKind === 'completed' ? 'line-through opacity-70' : ''}`}
-                                    >
-                                      <span className={titleSegmentClassName}>{entry.todo.title}</span>
-                                      {parentTitle && (
-                                        <span className={`${parentSegmentClassName} ${parentTitleClassName}`}>{` @${parentTitle}`}</span>
-                                      )}
-                                    </button>
-                                  )}
+                                  <span className={`min-w-0 flex flex-1 items-baseline gap-0 overflow-hidden font-medium uppercase tracking-[0.12em] ${monthDetailTaskClassName} ${titleClassName} ${entry.primaryKind === 'completed' ? 'line-through opacity-70' : ''}`}>
+                                    <span className={titleSegmentClassName}>{entry.todo.title}</span>
+                                    {parentTitle && (
+                                      <span className={`${parentSegmentClassName} ${parentTitleClassName}`}>{` @${parentTitle}`}</span>
+                                    )}
+                                  </span>
                                   <div className={`flex shrink-0 self-center translate-y-px flex-wrap items-center justify-end gap-1 whitespace-nowrap text-[9px] leading-none ${activeTagCount > 1 ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
                                     {activeTags.map((tag) => (
-                                      tag.clickable ? (
-                                        <button
-                                          key={tag.key}
-                                          type="button"
-                                          draggable={false}
-                                          onTouchStart={(event) => event.stopPropagation()}
-                                          onClick={() => onOpenTodo(entry.todo)}
-                                          className="inline-flex items-center justify-end gap-1 whitespace-nowrap rounded-full px-1 py-0.5 text-right transition-colors hover:bg-stone-100/70"
-                                          style={{ color: tag.color }}
-                                        >
-                                          {tag.key === 'deadline' && isDeadlineOverdue && <CircleAlert size={10} className="-translate-y-px shrink-0 text-red-500" />}
-                                          {tag.key === 'scheduled' && isScheduledOverdue && <CircleAlert size={10} className="-translate-y-px shrink-0 text-red-500" />}
-                                          {getMonthEntryTagLabel(tag, activeTagCount)}
-                                        </button>
-                                      ) : (
-                                        <span
-                                          key={tag.key}
-                                          onTouchStart={(event) => event.stopPropagation()}
-                                          className="inline-flex items-center justify-end gap-1 whitespace-nowrap text-right"
-                                          style={{ color: tag.color }}
-                                        >
-                                          {getMonthEntryTagLabel(tag, activeTagCount)}
-                                        </span>
-                                      )
+                                      <span
+                                        key={tag.key}
+                                        onTouchStart={(event) => event.stopPropagation()}
+                                        className="inline-flex items-center justify-end gap-1 whitespace-nowrap text-right"
+                                        style={{ color: tag.color }}
+                                      >
+                                        {tag.key === 'deadline' && isDeadlineOverdue && <CircleAlert size={10} className="-translate-y-px shrink-0 text-red-500" />}
+                                        {tag.key === 'scheduled' && isScheduledOverdue && <CircleAlert size={10} className="-translate-y-px shrink-0 text-red-500" />}
+                                        {getMonthEntryTagLabel(tag, activeTagCount)}
+                                      </span>
                                     ))}
                                   </div>
                                 </div>
                               </div>
                             );
-                          }
-
-                          return (
-                            <div
-                              key={`${selectedDate}-${entry.todo.id}-${entry.primaryKind}-detail`}
-                              className={rowClassName}
-                            >
-                              <span className="flex h-4 w-4 shrink-0 items-center justify-center self-center">
-                                {getMonthEntryLeadingIcon(entry)}
-                              </span>
-                              <div className="flex min-w-0 flex-1 items-start gap-2">
-                                <span className={`min-w-0 flex flex-1 items-baseline gap-0 overflow-hidden font-medium uppercase tracking-[0.12em] ${monthDetailTaskClassName} ${titleClassName} ${entry.primaryKind === 'completed' ? 'line-through opacity-70' : ''}`}>
-                                  <span className={titleSegmentClassName}>{entry.todo.title}</span>
-                                  {parentTitle && (
-                                    <span className={`${parentSegmentClassName} ${parentTitleClassName}`}>{` @${parentTitle}`}</span>
-                                  )}
-                                </span>
-                                <div className={`flex shrink-0 self-center translate-y-px flex-wrap items-center justify-end gap-1 whitespace-nowrap text-[9px] leading-none ${activeTagCount > 1 ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
-                                  {activeTags.map((tag) => (
-                                    <span
-                                      key={tag.key}
-                                      onTouchStart={(event) => event.stopPropagation()}
-                                      className="inline-flex items-center justify-end gap-1 whitespace-nowrap text-right"
-                                      style={{ color: tag.color }}
-                                    >
-                                      {tag.key === 'deadline' && isDeadlineOverdue && <CircleAlert size={10} className="-translate-y-px shrink-0 text-red-500" />}
-                                      {tag.key === 'scheduled' && isScheduledOverdue && <CircleAlert size={10} className="-translate-y-px shrink-0 text-red-500" />}
-                                      {getMonthEntryTagLabel(tag, activeTagCount)}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div className="py-2 text-[0.72rem] font-bold uppercase tracking-[0.14em] text-stone-300">
-                          No Tasks Scheduled
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          );
-        })}
-      </div>
+                          })
+                        ) : (
+                          <div className="py-2 text-[0.72rem] font-bold uppercase tracking-[0.14em] text-stone-300">
+                            No Tasks Scheduled
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
+        </div>
       </div>
       {touchDragPreview && (
         <div
@@ -1700,153 +1687,150 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
               className="relative z-10 flex flex-col"
               style={{ maxHeight: TODO_DISPLAY_POPUP_MAX_HEIGHT }}
             >
-            <div className="shrink-0 border-b border-stone-200/80 px-4 pb-3 pt-4">
-              <div className="flex items-center justify-between">
-                <span className="text-[0.82rem] font-medium tracking-[0.08em] text-stone-500">
-                  月视图设置
-                </span>
-                <button
-                  type="button"
-                  onClick={closeDensityMenu}
-                  className="rounded-full px-2 py-1.5 text-[0.82rem] text-stone-400 transition-colors hover:bg-stone-100/70 hover:text-stone-600"
-                >
-                  关闭
-                </button>
-              </div>
-            </div>
-
-            <div className="min-h-0 overflow-y-auto px-4 pb-4 pt-4">
-            <div className="mb-4">
-              <div className="mb-2 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
-                格子高度
-              </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                {MONTH_VIEW_ROW_OPTIONS.map((option) => {
-                  const isSelected = monthRowsPerScreen === option;
-
-                  return (
-                    <button
-                      key={option}
-                      type="button"
-                      onClick={() => setMonthRowsPerScreen(option)}
-                      className={`rounded-xl px-3 py-2.5 text-left text-[14px] tracking-[0.04em] transition-colors ${
-                        isSelected
-                          ? 'bg-stone-100 text-slate-700'
-                          : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
-                      }`}
-                    >
-                      {option}行/屏
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <div className="mb-2 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
-                字体大小
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {MONTH_VIEW_FONT_SIZE_OPTIONS.map((option) => {
-                  const isSelected = monthFontSize === option.key;
-
-                  return (
-                    <button
-                      key={option.key}
-                      type="button"
-                      onClick={() => setMonthFontSize(option.key)}
-                      className={`rounded-xl px-3 py-2.5 text-center text-[14px] tracking-[0.04em] transition-colors ${
-                        isSelected
-                          ? 'bg-stone-100 text-slate-700'
-                          : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <div className="mb-2 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
-                着色类型
-              </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                {MONTH_VIEW_MARKER_COLOR_OPTIONS.map((option) => {
-                  const isSelected = monthMarkerColorMode === option.key;
-
-                  return (
-                    <button
-                      key={option.key}
-                      type="button"
-                      onClick={() => setMonthMarkerColorMode(option.key)}
-                      className={`rounded-xl px-3 py-2.5 text-center text-[14px] tracking-[0.04em] transition-colors ${
-                        isSelected
-                          ? 'bg-stone-100 text-slate-700'
-                          : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {monthMarkerColorMode === 'schedule' && (
-                <TodoScheduleTypeColorSettingsPanel
-                  settings={scheduleTypeColorSettings}
-                  onChange={(nextSettings) => {
-                    setScheduleTypeColorSettings(nextSettings);
-                    todoScheduleColorService.saveSettings(nextSettings);
-                  }}
-                />
-              )}
-            </div>
-
-            <div className="mt-4">
-              <div className="mb-2 flex items-center justify-between gap-3 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
-                <span>隐藏筛选式</span>
-                {hiddenFilterExpressionDraft.trim() && (
+              <div className="shrink-0 border-b border-stone-200/80 px-4 pb-3 pt-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[0.82rem] font-medium tracking-[0.08em] text-stone-500">
+                    月视图设置
+                  </span>
                   <button
                     type="button"
-                    onClick={() => setHiddenFilterExpressionDraft('')}
-                    className="rounded-full px-2 py-1 text-[0.68rem] tracking-[0.04em] text-stone-400 transition-colors hover:bg-stone-100/70 hover:text-stone-600"
+                    onClick={closeDensityMenu}
+                    className="rounded-full px-2 py-1.5 text-[0.82rem] text-stone-400 transition-colors hover:bg-stone-100/70 hover:text-stone-600"
                   >
-                    清空
+                    关闭
                   </button>
-                )}
+                </div>
               </div>
-              <textarea
-                value={hiddenFilterExpressionDraft}
-                onChange={(event) => setHiddenFilterExpressionDraft(event.target.value)}
-                rows={3}
-                spellCheck={false}
-                placeholder="@写作 #阅读 %健康 复盘 OR 总结"
-                className="w-full resize-none rounded-2xl border border-stone-200 bg-white/88 px-3 py-2.5 text-[13px] leading-5 text-stone-700 outline-none transition-colors placeholder:text-stone-300 focus:border-stone-300"
-              />
-              <p className="mt-2 text-[11px] leading-5 text-stone-400">
-                语法同自定义筛选器：空格=与，OR=或，@待办/分类，#活动/分类，%领域，无前缀=备注。
-              </p>
-            </div>
 
-            <button
-              type="button"
-              role="switch"
-              aria-checked={hideTraceTypesDraft}
-              onClick={() => setHideTraceTypesDraft((previous) => !previous)}
-              className="mt-4 flex w-full items-center justify-between gap-3 px-1 py-3 text-left transition-colors hover:text-stone-900"
-            >
-              <span className="text-sm font-medium text-stone-700">隐藏 Trace 类型</span>
-              <span
-                className={`flex h-7 w-12 shrink-0 items-center rounded-full px-1 transition-colors ${hideTraceTypesDraft ? 'bg-stone-800' : 'bg-stone-200'}`}
-              >
-                <span
-                  className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${hideTraceTypesDraft ? 'translate-x-5' : 'translate-x-0'}`}
-                />
-              </span>
-            </button>
-            </div>
+              <div className="min-h-0 overflow-y-auto px-4 pb-4 pt-4">
+                <div className="mb-4">
+                  <div className="mb-2 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
+                    格子高度
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {MONTH_VIEW_ROW_OPTIONS.map((option) => {
+                      const isSelected = monthRowsPerScreen === option;
+
+                      return (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => setMonthRowsPerScreen(option)}
+                          className={`rounded-xl px-3 py-2.5 text-left text-[14px] tracking-[0.04em] transition-colors ${isSelected
+                              ? 'bg-stone-100 text-slate-700'
+                              : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
+                            }`}
+                        >
+                          {option}行/屏
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <div className="mb-2 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
+                    字体大小
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {MONTH_VIEW_FONT_SIZE_OPTIONS.map((option) => {
+                      const isSelected = monthFontSize === option.key;
+
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => setMonthFontSize(option.key)}
+                          className={`rounded-xl px-3 py-2.5 text-center text-[14px] tracking-[0.04em] transition-colors ${isSelected
+                              ? 'bg-stone-100 text-slate-700'
+                              : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
+                            }`}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-2 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
+                    着色类型
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {MONTH_VIEW_MARKER_COLOR_OPTIONS.map((option) => {
+                      const isSelected = monthMarkerColorMode === option.key;
+
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => setMonthMarkerColorMode(option.key)}
+                          className={`rounded-xl px-3 py-2.5 text-center text-[14px] tracking-[0.04em] transition-colors ${isSelected
+                              ? 'bg-stone-100 text-slate-700'
+                              : 'text-slate-500 hover:bg-stone-100/70 hover:text-slate-700'
+                            }`}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {monthMarkerColorMode === 'schedule' && (
+                    <TodoScheduleTypeColorSettingsPanel
+                      settings={scheduleTypeColorSettings}
+                      onChange={(nextSettings) => {
+                        setScheduleTypeColorSettings(nextSettings);
+                        todoScheduleColorService.saveSettings(nextSettings);
+                      }}
+                    />
+                  )}
+                </div>
+
+                <div className="mt-4">
+                  <div className="mb-2 flex items-center justify-between gap-3 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
+                    <span>隐藏筛选式</span>
+                    {hiddenFilterExpressionDraft.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => setHiddenFilterExpressionDraft('')}
+                        className="rounded-full px-2 py-1 text-[0.68rem] tracking-[0.04em] text-stone-400 transition-colors hover:bg-stone-100/70 hover:text-stone-600"
+                      >
+                        清空
+                      </button>
+                    )}
+                  </div>
+                  <textarea
+                    value={hiddenFilterExpressionDraft}
+                    onChange={(event) => setHiddenFilterExpressionDraft(event.target.value)}
+                    rows={3}
+                    spellCheck={false}
+                    placeholder="@写作 #阅读 %健康 复盘 OR 总结"
+                    className="w-full resize-none rounded-2xl border border-stone-200 bg-white/88 px-3 py-2.5 text-[13px] leading-5 text-stone-700 outline-none transition-colors placeholder:text-stone-300 focus:border-stone-300"
+                  />
+                  <p className="mt-2 text-[11px] leading-5 text-stone-400">
+                    语法同自定义筛选器：空格=与，OR=或，@待办/分类，#活动/分类，%领域，无前缀=备注。
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={hideTraceTypesDraft}
+                  onClick={() => setHideTraceTypesDraft((previous) => !previous)}
+                  className="mt-4 flex w-full items-center justify-between gap-3 px-1 py-3 text-left transition-colors hover:text-stone-900"
+                >
+                  <span className="text-sm font-medium text-stone-700">隐藏 Trace 类型</span>
+                  <span
+                    className={`flex h-7 w-12 shrink-0 items-center rounded-full px-1 transition-colors ${hideTraceTypesDraft ? 'bg-stone-800' : 'bg-stone-200'}`}
+                  >
+                    <span
+                      className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${hideTraceTypesDraft ? 'translate-x-5' : 'translate-x-0'}`}
+                    />
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </div>,
