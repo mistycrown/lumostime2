@@ -7,7 +7,7 @@
  * @updated 2026-05-18: Hid pinned recurring todos from the mobile `今天 + Pin` section when today's occurrence is explicitly skipped, while still preserving pin-only rows and other explicit today matches.
  * @updated 2026-05-14: Added a persisted schedule lock toggle across the standard week, bento week, and month planners so schedule and deadline rows can be frozen against drag-to-move until explicitly unlocked.
  * @updated 2026-05-18: 支持点击周视图一列（标准周视图）下循环排期的 Repeat 标签以唤起快捷编辑栏。
- * Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-06-13: 解构并传递 handleQuickActionUpdateTitle 给 TodoQuickActionsModal 从而支持快捷编辑栏中的标题内联编辑和自动保存。
  * @updated 2026-05-21: Unified the expanded left-sidebar entry heights with the collapsed rail so opening the Todo sidebar no longer stretches the column and pushes the bottom toggle under the fixed navigation.
  */
 import React, { useState, useMemo, useRef } from 'react';
@@ -1073,7 +1073,8 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     handleQuickActionSkipToMaybeDate,
     handleQuickActionMoveCategory,
     handleQuickActionUpgradeToProject,
-    handleQuickActionDelete
+    handleQuickActionDelete,
+    handleQuickActionUpdateTitle
   } = useTodoQuickActions({ onSaveTodo, onEditTodo, onDeleteTodo });
 
   // 濞?localStorage 閻犲洩顕цぐ鍥偨閵婏箑鐓曞☉鎾筹攻椤愬ジ鏌呮径瀣仴闁汇劌瀚～瀣炊閻愵儫浣割嚕?
@@ -2188,6 +2189,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       onForceClose={() => closeQuickActions(true)}
       openedAt={quickActionOpenedAt}
       showUpgradeToProject={Boolean(quickActionTodo && isQuickTodo(quickActionTodo))}
+      onUpdateTitle={handleQuickActionUpdateTitle}
     />
   );
 
