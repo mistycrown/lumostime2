@@ -4,6 +4,7 @@
  * @output Window Management
  * @pos Electron Main
  * @description Entry point for the Electron application. Handles main-window and desktop-widget creation, lifecycle events, and inter-process communication (IPC).
+ * @updated 2026-06-14: Changed Windows login-item startup to open the main renderer instead of stopping in tray-only mode, so data hydration and desktop widgets initialize immediately.
  * @updated 2026-05-19: Added blur event handler to AI widget window so it auto-docks to edge when the window loses focus.
  * @updated 2026-05-18: Added a dedicated desktop AI widget window with persisted compact bounds, edge-hide handle mode, and preload bridge events for the always-on-top quick-chat shell.
  * @updated 2026-05-18: Added renderer boot timing logs around main-window navigation so slow DEV startups can be separated from renderer hydration work.
@@ -1454,10 +1455,9 @@ async function createTodoQuickEditorWindow() {
 }
 
 app.whenReady().then(() => {
-  const trayInstance = createTray();
-  if (didLaunchFromLoginItem && process.platform === 'win32' && trayInstance) {
-    console.info('[Electron] Started from login item; keeping app in tray until restored.');
-    return;
+  createTray();
+  if (didLaunchFromLoginItem && process.platform === 'win32') {
+    console.info('[Electron] Started from login item; opening main window for renderer hydration and widget restore.');
   }
 
   runInBackground('create main window on app ready', createMainWindow());

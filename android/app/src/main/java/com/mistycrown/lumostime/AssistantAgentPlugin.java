@@ -4,6 +4,7 @@
  * @output Android foreground-service control and assistant system-trigger events
  * @pos Native Plugin
  * @description Capacitor plugin bridge for the Android-first background assistant agent. Starts and stops the foreground agent service, updates lightweight polling config, relays native system-trigger events back into the web layer, and surfaces assistant notification navigation.
+ * @updated 2026-06-14: Persisted the disabled assistant state and cancelled reminder alarms before sending the stop intent so native repokes cannot race the user's polling toggle.
  * @updated 2026-05-14: Added metadata-aware native trigger dispatch so Android reminder alarms can wake the app and hand one local-offset `reminder_due` trigger to the Web layer without also running a duplicate native AI request.
  * @updated 2026-05-13: Re-pokes the running native assistant service after AI-config and background-snapshot syncs so reminder alarms are rescheduled as soon as native execution becomes ready.
  * @updated 2026-05-11: Re-pokes the running native assistant service after reminder-queue syncs so newly added reminders can reschedule their exact next due wakeup immediately.
@@ -67,6 +68,8 @@ public class AssistantAgentPlugin extends Plugin {
         intent.setAction(AssistantAgentService.ACTION_STOP);
 
         try {
+            UnifiedServiceNotificationManager.clearAssistantState(context);
+            AssistantReminderAlarmScheduler.cancel(context);
             context.startService(intent);
             call.resolve();
         } catch (Exception exception) {
