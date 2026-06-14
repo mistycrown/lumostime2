@@ -4,6 +4,7 @@
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
+ * @updated 2026-06-13: Added local daily newspaper comment-thread types so users can reply to AI annotations without entering global chat history.
  * @updated 2026-06-07: Added structured weekly/monthly AI newspaper types so periodic reviews can persist editorial summary pages alongside existing narratives.
  * @updated 2026-05-21: Added optional todo `createdAt` metadata so collection timelines and older persisted task flows can share one creation-time fallback.
  * @updated 2026-05-16: Added lightweight daily AI newspaper types so Daily Review can persist structured editorial timeline commentary by log ID.
@@ -642,6 +643,21 @@ export interface DailyNewspaperAnnotation {
   comment: string;
 }
 
+export type DailyNewspaperCommentRole = 'user' | 'assistant';
+
+export interface DailyNewspaperCommentMessage {
+  id: string;
+  role: DailyNewspaperCommentRole;
+  content: string;
+  createdAt: number;
+}
+
+export interface DailyNewspaperCommentThread {
+  logId: string;
+  messages: DailyNewspaperCommentMessage[];
+  updatedAt: number;
+}
+
 export interface DailyNewspaper {
   version: 1;
   date: string;
@@ -649,6 +665,7 @@ export interface DailyNewspaper {
   assistantReply: string;
   overallComment: string;
   annotations: DailyNewspaperAnnotation[];
+  commentThreads?: DailyNewspaperCommentThread[];
   updatedAt: number;
 }
 

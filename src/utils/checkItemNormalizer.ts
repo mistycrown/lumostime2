@@ -1,6 +1,7 @@
 /**
  * @file checkItemNormalizer.ts
  * @description 日课数据归一化工具 - 兼容旧版布尔数据与新版次数数据
+ * @updated 2026-06-13: Preserved Daily Newspaper local comment threads during Daily Review normalization.
  */
 import {
   CheckItem,
@@ -146,6 +147,47 @@ export const normalizeDailyNewspaper = (value: Partial<DailyNewspaper> | undefin
       return [{ logId, comment }];
     })
     : [];
+  const commentThreads = Array.isArray(value.commentThreads)
+    ? value.commentThreads.flatMap((thread) => {
+      if (!thread || typeof thread !== 'object') {
+        return [];
+      }
+
+      const logId = typeof thread.logId === 'string' ? thread.logId.trim() : '';
+      const messages = Array.isArray(thread.messages)
+        ? thread.messages.flatMap((message) => {
+          if (!message || typeof message !== 'object') {
+            return [];
+          }
+
+          const role = message.role === 'assistant' ? 'assistant' : message.role === 'user' ? 'user' : '';
+          const content = typeof message.content === 'string' ? message.content.trim() : '';
+          if (!role || !content) {
+            return [];
+          }
+
+          return [{
+            id: typeof message.id === 'string' && message.id.trim() ? message.id.trim() : crypto.randomUUID(),
+            role,
+            content,
+            createdAt: typeof message.createdAt === 'number' ? message.createdAt : Date.now()
+          }];
+        })
+        : [];
+
+      if (!logId || messages.length === 0) {
+        return [];
+      }
+
+      return [{
+        logId,
+        messages,
+        updatedAt: typeof thread.updatedAt === 'number'
+          ? thread.updatedAt
+          : Math.max(...messages.map((message) => message.createdAt))
+      }];
+    })
+    : [];
 
   if (!date || !title || !assistantReply || !overallComment) {
     return undefined;
@@ -158,6 +200,7 @@ export const normalizeDailyNewspaper = (value: Partial<DailyNewspaper> | undefin
     assistantReply,
     overallComment,
     annotations,
+    ...(commentThreads.length > 0 ? { commentThreads } : {}),
     updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : Date.now()
   };
 };

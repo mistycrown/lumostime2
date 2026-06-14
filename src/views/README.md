@@ -2,6 +2,8 @@
 
 The `views/` directory contains all the React components that represent the distinct screens or pages of the LumosTime application. This layer is responsible for the presentation logic and user interaction.
 
+- Update 2026-06-13: `DailyNewspaperView.tsx` now renders local per-annotation comment threads beneath AI newspaper annotations, keeping replies visually quiet in the existing print-inspired layout.
+
 - Update 2026-06-13: `TodoView.tsx` now destructures and passes `handleQuickActionUpdateTitle` to `TodoQuickActionsModal` to enable inline title editing with auto-saving directly in the quick actions sheet.
 
 - Update 2026-06-07: `WeeklyNewspaperView.tsx` and `MonthlyNewspaperView.tsx` now provide dedicated full-screen editorial pages for periodic AI newspapers, while `WeeklyReviewView.tsx` and `MonthlyReviewView.tsx` expose the same inline `AI 小报` entry, open, generate, and delete flow already used by the daily review.

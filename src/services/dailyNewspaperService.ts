@@ -4,6 +4,7 @@
  * @output Structured daily-newspaper context text, strict writeback prompts, and local Daily Review newspaper helpers
  * @pos Service (Daily Review Newspaper)
  * @description Powers the ordinary-chat `小报` command by packaging one day's local context, composing a strict AI writeback contract, and writing lightweight structured newspaper data back onto `DailyReview`.
+ * @updated 2026-06-13: Added local daily newspaper comment-thread prompt helpers so users can reply to per-log AI annotations without using global chat sessions.
  * @updated 2026-05-16: Mirrored foreground-chat prompt assembly for daily newspaper writeback by adding the shared base prompt plus stable/volatile state, long-term memory, Dream, and conversation-summary sections.
  * @updated 2026-05-16: Added the first daily newspaper service for AI chat writeback and full-screen newspaper rendering.
  */
@@ -11,6 +12,8 @@
 import type {
   Category,
   DailyNewspaper,
+  DailyNewspaperCommentMessage,
+  DailyNewspaperCommentThread,
   DailyReview,
   Log,
   Scope,
@@ -78,6 +81,19 @@ interface BuildDailyNewspaperPromptParams {
   dreamContext?: string;
 }
 
+interface BuildDailyNewspaperCommentPromptsParams {
+  date: string;
+  dayDataText: string;
+  newspaper: DailyNewspaper;
+  annotation: {
+    logId: string;
+    comment: string;
+  };
+  threadMessages: DailyNewspaperCommentMessage[];
+  userReply: string;
+  personaPrompt?: string;
+}
+
 export interface DailyNewspaperWritebackToolCall {
   toolName: 'write_daily_newspaper';
   args: {
@@ -96,6 +112,10 @@ export interface DailyNewspaperWritebackResponse {
   assistantReply: string;
   toolCalls?: unknown[];
   newspaperToolCall: DailyNewspaperWritebackToolCall;
+}
+
+export interface DailyNewspaperCommentResponse {
+  assistantReply: string;
 }
 
 const pickPromptSection = <
@@ -240,6 +260,44 @@ const buildReviewDigest = (dailyReview: DailyReview): string => [
     : 'existingNewspaper: 无'
 ].join('\n');
 
+const normalizeCommentMessage = (message: Partial<DailyNewspaperCommentMessage>): DailyNewspaperCommentMessage | null => {
+  const role = message.role === 'assistant' ? 'assistant' : message.role === 'user' ? 'user' : null;
+  const content = typeof message.content === 'string' ? message.content.trim() : '';
+  if (!role || !content) {
+    return null;
+  }
+
+  return {
+    id: typeof message.id === 'string' && message.id.trim() ? message.id.trim() : crypto.randomUUID(),
+    role,
+    content,
+    createdAt: typeof message.createdAt === 'number' && Number.isFinite(message.createdAt)
+      ? message.createdAt
+      : Date.now()
+  };
+};
+
+const normalizeCommentThread = (thread: Partial<DailyNewspaperCommentThread>): DailyNewspaperCommentThread | null => {
+  const logId = typeof thread.logId === 'string' ? thread.logId.trim() : '';
+  const messages = Array.isArray(thread.messages)
+    ? thread.messages
+      .map((message) => normalizeCommentMessage(message))
+      .filter((message): message is DailyNewspaperCommentMessage => Boolean(message))
+    : [];
+
+  if (!logId || messages.length === 0) {
+    return null;
+  }
+
+  return {
+    logId,
+    messages,
+    updatedAt: typeof thread.updatedAt === 'number' && Number.isFinite(thread.updatedAt)
+      ? thread.updatedAt
+      : Math.max(...messages.map((message) => message.createdAt))
+  };
+};
+
 const buildPersonaPromptLayer = (personaPrompt?: string): string => {
   const trimmed = personaPrompt?.trim();
   if (!trimmed) {
@@ -286,12 +344,78 @@ export const dailyNewspaperService = {
           ...review,
           aiNewspaper: {
             ...newspaper,
+            ...(review.aiNewspaper?.commentThreads?.length && !newspaper.commentThreads?.length
+              ? { commentThreads: review.aiNewspaper.commentThreads }
+              : {}),
             updatedAt
           },
           updatedAt
         }
         : review
     ));
+  },
+
+  appendDailyNewspaperCommentTurn(
+    dailyReviews: DailyReview[],
+    reviewId: string,
+    logId: string,
+    userReply: string,
+    assistantReply: string,
+    createdAt: number = Date.now()
+  ): DailyReview[] {
+    const trimmedUserReply = userReply.trim();
+    const trimmedAssistantReply = assistantReply.trim();
+    if (!trimmedUserReply || !trimmedAssistantReply) {
+      return dailyReviews;
+    }
+
+    const userMessage: DailyNewspaperCommentMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: trimmedUserReply,
+      createdAt
+    };
+    const assistantMessage: DailyNewspaperCommentMessage = {
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      content: trimmedAssistantReply,
+      createdAt: createdAt + 1
+    };
+
+    return dailyReviews.map((review) => {
+      if (review.id !== reviewId || !review.aiNewspaper) {
+        return review;
+      }
+
+      const currentThreads = Array.isArray(review.aiNewspaper.commentThreads)
+        ? review.aiNewspaper.commentThreads
+          .map((thread) => normalizeCommentThread(thread))
+          .filter((thread): thread is DailyNewspaperCommentThread => Boolean(thread))
+        : [];
+      const matchedThread = currentThreads.find((thread) => thread.logId === logId);
+      const nextThread: DailyNewspaperCommentThread = {
+        logId,
+        messages: [
+          ...(matchedThread?.messages || []),
+          userMessage,
+          assistantMessage
+        ],
+        updatedAt: createdAt + 1
+      };
+      const nextThreads = matchedThread
+        ? currentThreads.map((thread) => thread.logId === logId ? nextThread : thread)
+        : [...currentThreads, nextThread];
+
+      return {
+        ...review,
+        aiNewspaper: {
+          ...review.aiNewspaper,
+          commentThreads: nextThreads,
+          updatedAt: createdAt + 1
+        },
+        updatedAt: createdAt + 1
+      };
+    });
   },
 
   buildDayDataText(params: BuildDailyNewspaperDataParams): string {
@@ -417,6 +541,64 @@ export const dailyNewspaperService = {
     return { systemPrompt, userPrompt };
   },
 
+  async buildCommentReplyPrompts(
+    params: BuildDailyNewspaperCommentPromptsParams
+  ): Promise<{ systemPrompt: string; userPrompt: string }> {
+    const assistantBasePrompt = await assistantPromptService.getAssistantBasePrompt();
+    const trimmedUserReply = params.userReply.trim();
+    const trimmedThread = params.threadMessages
+      .map((message) => ({
+        role: message.role,
+        content: message.content,
+        createdAt: new Date(message.createdAt).toISOString()
+      }));
+
+    const systemPrompt = [
+      buildPersonaPromptLayer(params.personaPrompt),
+      '=== Assistant Base Prompt ===',
+      assistantBasePrompt,
+      '',
+      '=== Daily Newspaper Comment Reply Prompt ===',
+      '你正在回复 LumosTime 日报 AI 小报里某一条批注下的本地评论。',
+      '这不是全局聊天，也不是重新生成小报；你只需要围绕目标批注、当天上下文和用户的新回复继续对话。',
+      '保持中文回复，语气延续小报的 editorial / companion 风格：具体、克制、有观察，不要空泛鼓励。',
+      '如果用户质疑你的批注，可以解释判断依据，也可以承认不确定；不要编造输入里没有的事实。',
+      '回复长度控制在 1-4 句，像朋友圈评论下的认真回复，而不是长报告。',
+      '',
+      STRICT_JSON_OUTPUT_RULES,
+      '=== Output Schema ===',
+      stringifyJson({
+        assistantReply: 'string'
+      })
+    ].filter(Boolean).join('\n\n');
+
+    const userPrompt = [
+      '=== Daily Newspaper Identity ===',
+      `date: ${params.date}`,
+      `title: ${params.newspaper.title}`,
+      `overallComment: ${params.newspaper.overallComment}`,
+      '',
+      '=== Target Annotation ===',
+      stringifyJson({
+        logId: params.annotation.logId,
+        comment: params.annotation.comment
+      }),
+      '',
+      '=== Existing Local Comment Thread ===',
+      stringifyJson(trimmedThread),
+      '',
+      '=== User New Reply ===',
+      trimmedUserReply,
+      '',
+      '=== Daily Newspaper Data ===',
+      params.dayDataText,
+      '',
+      '请只返回一个 JSON object，字段为 assistantReply。'
+    ].join('\n');
+
+    return { systemPrompt, userPrompt };
+  },
+
   parseWritebackResponse(
     raw: unknown,
     expectedDate: string,
@@ -487,6 +669,19 @@ export const dailyNewspaperService = {
     };
   },
 
+  parseCommentReplyResponse(raw: unknown): DailyNewspaperCommentResponse {
+    const parsed = typeof raw === 'string'
+      ? JSON.parse(raw) as { assistantReply?: unknown }
+      : raw as { assistantReply?: unknown };
+    const assistantReply = typeof parsed.assistantReply === 'string' ? parsed.assistantReply.trim() : '';
+
+    if (!assistantReply) {
+      throw new Error('AI 没有返回小报评论回复。');
+    }
+
+    return { assistantReply };
+  },
+
   buildNewspaperFromToolCall(
     toolCall: DailyNewspaperWritebackToolCall,
     assistantReply: string
@@ -503,5 +698,15 @@ export const dailyNewspaperService = {
       })),
       updatedAt: Date.now()
     };
+  },
+
+  normalizeCommentThreads(value: unknown): DailyNewspaperCommentThread[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .map((thread) => normalizeCommentThread(thread as Partial<DailyNewspaperCommentThread>))
+      .filter((thread): thread is DailyNewspaperCommentThread => Boolean(thread));
   }
 };

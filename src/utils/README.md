@@ -3,6 +3,7 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- Update 2026-06-13: `dataValidation.ts` now accepts data collections and collection entries in user backup payloads while preserving old backup files that omit those fields.
 - Update 2026-06-13: `todoRowInteraction.ts` now relaxes vertical drift verification once swipe intent is confirmed, ensuring left-swipe completion triggers reliably without getting canceled by post-release diagonal drifts.
 - Update 2026-06-06: `filterUtils.ts` now treats `@` expressions in log-side custom filters the same way as todo-side hidden filters, matching both linked todo titles and todo category names.
 - Update 2026-06-06: `todoScheduleUtils.ts` now exposes the shared primary schedule-kind priority directly to view components, keeping bento-week marker colors aligned with month-view ordering when one todo matches multiple same-day badges.

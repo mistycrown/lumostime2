@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-06-13: `dailyNewspaperService.ts` now supports local per-annotation daily newspaper comment threads, including strict AI reply prompts, response parsing, append helpers, and overwrite-safe preservation of existing comment history.
+
 Update 2026-06-07: `weeklyNewspaperService.ts` and `monthlyNewspaperService.ts` now power ordinary-chat `周小报` / `月小报` writeback flows, packaging periodic review context into strict structured AI contracts and persisting editorial newspaper payloads onto `WeeklyReview.aiNewspaper` and `MonthlyReview.aiNewspaper`.
 
 Update 2026-05-23: `desktopWidgetService.ts` now exports shared Electron todo sync-channel helpers used after persisted todo writes, so desktop quick/today/editor windows can refresh immediately without waiting for focus or polling.

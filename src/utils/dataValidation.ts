@@ -1,6 +1,7 @@
 /**
  * @file dataValidation.ts
  * @description Data validation helpers for backup, import, and cloud sync payloads.
+ * @updated 2026-06-13: Added validation support for data collections and collection entries in user backup payloads while preserving old backups that omit those fields.
  * @updated 2026-05-18: Added validation support for the nested `achievementData` backup block so achievement bottle progress can travel with user-data exports and sync restores.
  * @updated 2026-05-18: Added validation support for the nested `customColorGroup` backup block so custom palette swatches can travel with user-data exports and sync restores.
  * @updated 2026-05-17: Added unified-backup validation support for the nested `aiData` object so AI chat, prompt, and assistant-state payloads can travel with the main app JSON without tripping import guards.
@@ -45,6 +46,8 @@ export function validateLocalData(data: any): ValidationResult {
     'todos',
     'categories',
     'todoCategories',
+    'collections',
+    'collectionEntries',
     'scopes',
     'goals',
     'majorGoals',

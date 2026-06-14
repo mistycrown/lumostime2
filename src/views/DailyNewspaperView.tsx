@@ -4,11 +4,13 @@
  * @output Full-screen editorial newspaper page for one day
  * @pos View (Review System)
  * @description Renders a dedicated daily AI newspaper page based on lightweight Daily Review storage plus real timeline data resolved by log ID.
+ * @updated 2026-06-13: Collapsed newspaper reply inputs behind a comment button and switched assistant labels to the active persona display name.
+ * @updated 2026-06-13: Added per-annotation local comment threads with compact editorial reply inputs for AI follow-up discussion.
  * @updated 2026-05-16: Switched per-log metadata to shared timeline-style pills, kept only notes as body text, tightened typography, and rendered all real logs for the target day while preserving orphaned annotations whose source logs were later deleted.
  * @updated 2026-05-16: Added the first dedicated daily newspaper full-screen view inspired by the chronos-ai reference demo.
  */
-import React, { useMemo } from 'react';
-import type { Category, DailyReview, Log, Scope, TodoItem } from '../types';
+import React, { useMemo, useState } from 'react';
+import type { Category, DailyNewspaperCommentThread, DailyReview, Log, Scope, TodoItem } from '../types';
 import { getLocalDateStr, getLocalTimeStr } from '../utils/dateUtils';
 import { formatDuration } from '../utils/reviewStatsUtils';
 import { getParentTodo } from '../utils/todoHierarchyUtils';
@@ -20,6 +22,8 @@ interface DailyNewspaperViewProps {
   categories: Category[];
   todos: TodoItem[];
   scopes: Scope[];
+  assistantDisplayName?: string;
+  onSubmitAnnotationReply?: (logId: string, content: string) => Promise<void>;
 }
 
 interface TimelineRow {
@@ -36,15 +40,125 @@ const formatDateLabel = (date: Date): string => (
   }).format(date)
 );
 
+const formatCommentTime = (timestamp: number): string => (
+  new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(timestamp))
+);
+
+const NewspaperCommentThread: React.FC<{
+  logId: string;
+  thread?: DailyNewspaperCommentThread;
+  draft: string;
+  isComposerOpen: boolean;
+  isSubmitting: boolean;
+  assistantDisplayName: string;
+  onDraftChange: (value: string) => void;
+  onToggleComposer: () => void;
+  onSubmit: () => void;
+}> = ({
+  thread,
+  draft,
+  isComposerOpen,
+  isSubmitting,
+  assistantDisplayName,
+  onDraftChange,
+  onToggleComposer,
+  onSubmit
+}) => {
+  const messages = thread?.messages || [];
+  const canSubmit = draft.trim().length > 0 && !isSubmitting;
+
+  return (
+    <div className="mt-3">
+      {messages.length > 0 && (
+        <div className="space-y-2 border-t border-[#eee9df] pt-3">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={message.role === 'assistant'
+                ? 'border-l border-[#d9d2c6] pl-3'
+                : 'pl-3'}
+            >
+              <div className="mb-0.5 flex items-center gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#a3988c]">
+                  {message.role === 'assistant' ? assistantDisplayName : '你'}
+                </span>
+                <span className="font-mono text-[10px] text-[#b8afa5]">
+                  {formatCommentTime(message.createdAt)}
+                </span>
+              </div>
+              <p className={
+                message.role === 'assistant'
+                  ? 'font-serif text-[13px] italic leading-5 text-[#756e66]'
+                  : 'text-[13px] leading-5 text-[#4f4943]'
+              }>
+                {message.content}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-2 flex justify-end">
+        <button
+          type="button"
+          onClick={onToggleComposer}
+          className="border-b border-[#b9afa3] px-0.5 py-1 text-[11px] font-semibold tracking-[0.14em] text-[#8a8177] transition-colors hover:border-black hover:text-black"
+        >
+          {isComposerOpen ? '收起' : '评论'}
+        </button>
+      </div>
+
+      {isComposerOpen && (
+        <form
+          className="mt-2 flex items-end gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (canSubmit) {
+              onSubmit();
+            }
+          }}
+        >
+          <textarea
+            value={draft}
+            onChange={(event) => onDraftChange(event.target.value)}
+            placeholder="回复这条批注..."
+            rows={1}
+            className="min-h-[38px] flex-1 resize-none rounded-none border-0 border-b border-[#d8d2c7] bg-transparent px-0 py-2 font-serif text-[13px] leading-5 text-[#403a35] outline-none placeholder:text-[#b8afa5] focus:border-black"
+            disabled={isSubmitting}
+            autoFocus
+          />
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            className="mb-1 shrink-0 border-b border-black px-0.5 py-1 text-[11px] font-semibold tracking-[0.14em] text-black disabled:border-[#d8d2c7] disabled:text-[#bbb2a8]"
+          >
+            {isSubmitting ? '回复中' : '发送'}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+};
+
 export const DailyNewspaperView: React.FC<DailyNewspaperViewProps> = ({
   review,
   date,
   logs,
   categories,
   todos,
-  scopes
+  scopes,
+  assistantDisplayName = '小报',
+  onSubmitAnnotationReply
 }) => {
   const newspaper = review.aiNewspaper;
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [openReplyLogIds, setOpenReplyLogIds] = useState<Record<string, boolean>>({});
+  const [submittingLogId, setSubmittingLogId] = useState<string | null>(null);
 
   const activityMap = useMemo(() => (
     new Map(
@@ -84,6 +198,34 @@ export const DailyNewspaperView: React.FC<DailyNewspaperViewProps> = ({
       (newspaper?.annotations || []).map((annotation) => [annotation.logId, annotation.comment])
     )
   ), [newspaper]);
+
+  const commentThreadMap = useMemo(() => (
+    new Map(
+      (newspaper?.commentThreads || []).map((thread) => [thread.logId, thread])
+    )
+  ), [newspaper]);
+
+  const handleSubmitReply = async (logId: string) => {
+    const draft = (replyDrafts[logId] || '').trim();
+    if (!draft || !onSubmitAnnotationReply || submittingLogId) {
+      return;
+    }
+
+    setSubmittingLogId(logId);
+    try {
+      await onSubmitAnnotationReply(logId, draft);
+      setReplyDrafts((previousDrafts) => ({
+        ...previousDrafts,
+        [logId]: ''
+      }));
+      setOpenReplyLogIds((previousOpenIds) => ({
+        ...previousOpenIds,
+        [logId]: false
+      }));
+    } finally {
+      setSubmittingLogId(null);
+    }
+  };
 
   if (!newspaper) {
     return (
@@ -195,6 +337,25 @@ export const DailyNewspaperView: React.FC<DailyNewspaperViewProps> = ({
                             <p className="font-serif text-[14px] italic leading-6 text-[#7b746c]">
                               {comment}
                             </p>
+                            {onSubmitAnnotationReply && (
+                              <NewspaperCommentThread
+                                logId={row.logId}
+                                thread={commentThreadMap.get(row.logId)}
+                                draft={replyDrafts[row.logId] || ''}
+                                isComposerOpen={Boolean(openReplyLogIds[row.logId])}
+                                isSubmitting={submittingLogId === row.logId}
+                                assistantDisplayName={assistantDisplayName}
+                                onDraftChange={(value) => setReplyDrafts((previousDrafts) => ({
+                                  ...previousDrafts,
+                                  [row.logId]: value
+                                }))}
+                                onToggleComposer={() => setOpenReplyLogIds((previousOpenIds) => ({
+                                  ...previousOpenIds,
+                                  [row.logId]: !previousOpenIds[row.logId]
+                                }))}
+                                onSubmit={() => void handleSubmitReply(row.logId)}
+                              />
+                            )}
                           </div>
                         )}
                       </div>

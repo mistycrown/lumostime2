@@ -4,6 +4,7 @@
  * @output Updated Scope, Managed Goals/MajorGoals/Keywords
  * @pos View (Detail Page)
  * @description A comprehensive detail view for a specific Scope (Domain). Features a heatmap, keyword analysis, note template management, matrix chart (Tags vs Time), and management of associated Goals, Major Goals, and Todos. The Goals tab displays both major goals (with their phase goals) and independent goals.
+ * @updated 2026-06-13: Reused the shared hierarchical associated-todo list so subtasks render under parent todos in the association tab.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -30,6 +31,7 @@ import { isStoredColorSelected } from '../utils/colorUtils';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 import { getNormalizedScopeIds } from '../utils/scopeStatsUtils';
 import { NoteTemplateManager } from '../components/NoteTemplateManager';
+import { AssociatedTodoList } from '../components/AssociatedTodoList';
 
 interface ScopeDetailViewProps {
     scope: Scope;
@@ -270,68 +272,13 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
             case '关联':
                 return (
                     <div className="space-y-6">
-                        {/* Associated Todos Card */}
-                        <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest">Associated Todos</h3>
-                                <div className="text-xs font-bold text-stone-500 tabular-nums">
-                                    {scopeTodos.filter(t => t.isCompleted).length} / {scopeTodos.length}
-                                </div>
-                            </div>
-                            <div className="space-y-0 text-sm">
-                                {scopeTodos.length === 0 ? (
-                                    <div className="text-center py-6 text-stone-400 border border-dashed border-stone-200 rounded-xl">
-                                        <p className="text-xs font-medium opacity-60">No associated todos</p>
-                                    </div>
-                                ) : (
-                                    scopeTodos.map(todo => {
-                                        // Calculate duration for this todo
-                                        const todoDuration = logs
-                                            .filter(l => l.linkedTodoId === todo.id)
-                                            .reduce((acc, curr) => acc + curr.duration, 0);
-
-                                        const h = Math.floor(todoDuration / 3600);
-                                        const m = Math.floor((todoDuration % 3600) / 60);
-                                        const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
-
-                                        return (
-                                            <div
-                                                key={todo.id}
-                                                onClick={() => onEditTodo?.(todo)}
-                                                className="group flex items-center gap-3 py-2 border-b border-stone-100 last:border-0 hover:bg-stone-50 md:-mx-2 md:px-2 transition-colors cursor-pointer"
-                                            >
-                                                <button 
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onToggleTodo?.(todo.id);
-                                                    }} 
-                                                    className="shrink-0 transition-colors"
-                                                >
-                                                    <div className={`w-4 h-4 shrink-0 rounded-[4px] border-2 flex items-center justify-center transition-colors ${todo.isCompleted ? 'bg-stone-900 border-stone-900' : 'border-stone-300 group-hover:border-stone-400'
-                                                        }`}>
-                                                        {todo.isCompleted && <span className="text-white text-[10px]">✓</span>}
-                                                    </div>
-                                                </button>
-                                                <span className={`flex-1 font-medium truncate min-w-0 ${todo.isCompleted ? 'line-through text-stone-300' : 'text-stone-700'}`}>
-                                                    {todo.title}
-                                                </span>
-
-                                                {((todo.isCompleted) || todoDuration > 0) && (
-                                                    <span className="text-xs text-stone-300 font-serif whitespace-nowrap shrink-0">
-                                                        {todo.isCompleted && todo.completedAt ? (() => {
-                                                            const d = new Date(todo.completedAt);
-                                                            return `${d.getFullYear().toString().slice(-2)}/${d.getMonth() + 1}/${d.getDate()} `;
-                                                        })() : ''}
-                                                        {todoDuration > 0 && `共 ${timeStr}`}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        );
-                                    })
-                                )}
-                            </div>
-                        </div>
-
+                        <AssociatedTodoList
+                            todos={scopeTodos}
+                            logs={logs}
+                            onEditTodo={onEditTodo}
+                            onToggleTodo={onToggleTodo}
+                            showCompletionSummary={true}
+                        />
                         {/* Cross Analysis Card */}
                         <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
                             <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">TAGS</h3>

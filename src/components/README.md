@@ -3,6 +3,7 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-06-13: `AssociatedTodoList.tsx` now provides a shared parent/subtask-aware associated-todo card for tag, category, and scope detail pages, keeping child todos visually nested beneath their parent rows.
 - Update 2026-06-13: `TodoMonthView.tsx` and `TodoBentoWeekView.tsx` now replace the selection highlight background in display-settings popups with a subtle underline indicator (`border-b-2`) and text color changes, removing the background shading for a cleaner layout.
 - Update 2026-06-13: `TodoMonthView.tsx` now updates todo item colors so that Trace (inProgress) and Done (completed) items appear in muted gray tone, while other schedule types like Maybe, Arrange, Due, and Repeat appear in a darker tone for better visual differentiation.
 - Update 2026-06-07: `AIBackfillChatModal.tsx`, `ai-chat/AIBackfillChatConversationPane.tsx`, `ai-chat/AIBackfillChatReviewCommands.ts`, and `ai-chat/AIBackfillChatReviewWriteback.ts` now support ordinary-chat `周小报` / `月小报` generation, overwrite confirmation, periodic writeback result cards, and direct opening of weekly/monthly newspaper pages from chat.

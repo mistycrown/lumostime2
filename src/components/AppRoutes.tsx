@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { AppView, Category, DailyReview, WeeklyReview, MonthlyReview, Log, TodoItem, TodoCategory, TodoDuplicateOptions } from '../types';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useData } from '../contexts/DataContext';
@@ -11,7 +11,10 @@ import { useGoalManager } from '../hooks/useGoalManager';
 import { useMajorGoalManager } from '../hooks/useMajorGoalManager';
 import { useReviewManager } from '../hooks/useReviewManager';
 import { aiService } from '../services/aiService';
+import { dailyNewspaperService } from '../services/dailyNewspaperService';
 import { getLocalDateStr } from '../utils/dateUtils';
+import { ACTIVE_SESSION_KEY, CHAT_PERSONAS_KEY, CHAT_SESSIONS_KEY, DEFAULT_AI_PERSONAS } from './ai-chat/AIBackfillChatInitialization';
+import type { AIChatPersona, AIChatSession } from './ai-chat/AIBackfillChatShared';
 
 // Views
 import { DailyReviewView } from '../views/DailyReviewView';
@@ -43,6 +46,31 @@ const RouteFallback: React.FC<{ label: string }> = ({ label }) => (
         </div>
     </div>
 );
+
+const resolveNewspaperAssistantName = (): string => {
+    const fallbackPersona = DEFAULT_AI_PERSONAS[0];
+
+    try {
+        const storedPersonas = JSON.parse(localStorage.getItem(CHAT_PERSONAS_KEY) || '[]') as Partial<AIChatPersona>[];
+        const personas = Array.isArray(storedPersonas) && storedPersonas.length > 0
+            ? storedPersonas
+            : DEFAULT_AI_PERSONAS;
+        const storedSessions = JSON.parse(localStorage.getItem(CHAT_SESSIONS_KEY) || '[]') as Partial<AIChatSession>[];
+        const activeSessionId = localStorage.getItem(ACTIVE_SESSION_KEY) || '';
+        const activeSession = Array.isArray(storedSessions)
+            ? storedSessions.find((session) => session.id === activeSessionId) || storedSessions[0]
+            : undefined;
+        const persona = personas.find((item) => item.id === activeSession?.personaId)
+            || personas[0]
+            || fallbackPersona;
+        return persona.assistantSelfName?.trim()
+            || persona.name?.trim()
+            || fallbackPersona.assistantSelfName?.trim()
+            || '小报';
+    } catch {
+        return fallbackPersona.assistantSelfName?.trim() || fallbackPersona.name || '小报';
+    }
+};
 
 // Props Interface to receive all handlers
 // Minimized Props Interface
@@ -156,6 +184,62 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         const review = dailyReviews.find(r => r.date === dateStr);
         if (!review) return null;
 
+        const handleSubmitDailyNewspaperReply = async (logId: string, content: string) => {
+            if (!review.aiNewspaper) {
+                return;
+            }
+
+            const targetAnnotation = review.aiNewspaper.annotations.find((item) => item.logId === logId);
+            if (!targetAnnotation) {
+                return;
+            }
+
+            const threadMessages = review.aiNewspaper.commentThreads?.find((thread) => thread.logId === logId)?.messages || [];
+            try {
+                const { systemPrompt, userPrompt } = await dailyNewspaperService.buildCommentReplyPrompts({
+                    date: review.date,
+                    dayDataText: dailyNewspaperService.buildDayDataText({
+                        date: review.date,
+                        logs,
+                        categories,
+                        todos,
+                        todoCategories,
+                        scopes,
+                        dailyReview: review
+                    }),
+                    newspaper: review.aiNewspaper,
+                    annotation: targetAnnotation,
+                    threadMessages,
+                    userReply: content,
+                    personaPrompt: userPersonalInfo || ''
+                });
+                const response = await aiService.requestStructuredJsonWithDebug({
+                    systemPrompt,
+                    userPrompt,
+                    cacheHint: {
+                        keySeed: `daily_newspaper_comment:${review.date}:${logId}`,
+                        scope: 'daily_newspaper_comment'
+                    },
+                    normalizeResult: (rawValue) => dailyNewspaperService.parseCommentReplyResponse(rawValue)
+                });
+                setDailyReviews((previousReviews) => (
+                  dailyNewspaperService.appendDailyNewspaperCommentTurn(
+                    previousReviews,
+                    review.id,
+                    logId,
+                    content,
+                    response.result.assistantReply,
+                    Date.now()
+                  )
+                ));
+                addToast('success', 'AI 已回复小报评论');
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'AI 评论回复失败';
+                addToast('error', message);
+                throw error;
+            }
+        };
+
         return (
             <DailyNewspaperView
                 review={review}
@@ -164,6 +248,8 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 categories={categories}
                 todos={todos}
                 scopes={scopes}
+                assistantDisplayName={resolveNewspaperAssistantName()}
+                onSubmitAnnotationReply={handleSubmitDailyNewspaperReply}
             />
         );
     }
