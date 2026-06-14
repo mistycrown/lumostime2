@@ -5,6 +5,7 @@
  * @pos Hook (System Integration)
  * @description 同步管理 Hook - 处理数据和图片的云端同步，支持启动同步、恢复同步、手动同步、自动同步等多种模式，并在恢复筛选器时保持顺序稳定，同时保证空值恢复与 majorGoals 载荷一致。
  * @updated 2026-05-18: Reduced timestamp comparison tolerance handling by routing sync direction through a shared helper, so fresh desktop edits are no longer swallowed as "equal" for several seconds after the previous sync.
+ * @updated 2026-06-13: Included data collections and collection entries in unified backup/sync payloads, restore handling, and auto-sync change detection.
  * @updated 2026-05-18: Extended the unified backup/sync payload to include the achievement bottle backup block, and now restore that state alongside the main app data during imports and cloud downloads.
  * @updated 2026-05-17: Extended the unified backup/sync payload to include the shared AI backup block, and now restore that AI state alongside the main app data during imports and cloud downloads.
  * @updated 2026-05-18: Included the persisted custom color group in backup/sync payloads and now auto-sync palette-only edits as part of user data.
@@ -52,7 +53,13 @@ import {
 
 export const useSyncManager = () => {
     // Access Contexts at the top level
-    const { logs, setLogs, todos, setTodos, todoCategories, setTodoCategories } = useData();
+    const {
+        logs, setLogs,
+        todos, setTodos,
+        todoCategories, setTodoCategories,
+        collections, setCollections,
+        collectionEntries, setCollectionEntries
+    } = useData();
     const {
         autoLinkRules, setAutoLinkRules,
         customNarrativeTemplates, setCustomNarrativeTemplates,
@@ -98,6 +105,10 @@ export const useSyncManager = () => {
                 incomingLogsCount: Array.isArray(data?.logs) ? data.logs.length : 'unchanged',
                 currentTodosCount: todos.length,
                 incomingTodosCount: Array.isArray(data?.todos) ? data.todos.length : 'unchanged',
+                currentCollectionsCount: collections.length,
+                incomingCollectionsCount: Array.isArray(data?.collections) ? data.collections.length : 'unchanged',
+                currentCollectionEntriesCount: collectionEntries.length,
+                incomingCollectionEntriesCount: Array.isArray(data?.collectionEntries) ? data.collectionEntries.length : 'unchanged',
                 currentView
             });
 
@@ -105,6 +116,8 @@ export const useSyncManager = () => {
             if (hasField('categories')) setCategories(data.categories);
             if (hasField('todos')) setTodos(data.todos);
             if (hasField('todoCategories')) setTodoCategories(data.todoCategories);
+            if (hasField('collections')) setCollections(data.collections);
+            if (hasField('collectionEntries')) setCollectionEntries(data.collectionEntries);
             if (hasField('scopes')) setScopes(data.scopes);
             if (hasField('goals')) setGoals(data.goals);
             if (hasField('majorGoals')) setMajorGoals(data.majorGoals);
@@ -180,7 +193,7 @@ export const useSyncManager = () => {
         const customColorGroup = customColorGroupService.getGroup();
 
         const localData = {
-            logs, todos, categories, todoCategories, scopes, goals, majorGoals,
+            logs, todos, categories, todoCategories, collections, collectionEntries, scopes, goals, majorGoals,
             autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
             monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, customStickerSets, customStickers, filters,
             customColorGroup,
@@ -779,7 +792,12 @@ export const useSyncManager = () => {
             clearTimeout(timer);
             // Don't clear the pending flag here, only clear it when sync completes or is skipped
         };
-    }, [logs, todos, categories, todoCategories, scopes, goals, autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews, monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, customStickerSets, customStickers, filters, manualSyncMode]); // 添加 manualSyncMode 依赖
+    }, [
+        logs, todos, categories, todoCategories, collections, collectionEntries,
+        scopes, goals, autoLinkRules, reviewTemplates, checkTemplates, dailyReviews,
+        weeklyReviews, monthlyReviews, onThisDayEntries, customNarrativeTemplates,
+        userPersonalInfo, customStickerSets, customStickers, filters, manualSyncMode
+    ]);
 
     // 2b. Image List Auto Sync (监听图片列表 JSON 的变化)
     useEffect(() => {

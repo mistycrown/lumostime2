@@ -1,5 +1,6 @@
 # Custom Hooks
 
+> `useSyncManager.ts` now includes data collections and collection entries in unified cloud sync payloads, restores them from backups that explicitly contain them, and treats collection-only edits as auto-sync-relevant user data.
 > `useTodoQuickActions.ts` now exposes a shared title update helper (`handleQuickActionUpdateTitle`) to edit todo titles directly from the quick actions modal on blur.
 > `useTodoManager.ts` now clears `coverImage` when duplicating a todo, so quick-copy tasks start clean instead of inheriting the original cover artwork.
 > `useWidgetBridgeSync.ts` now catches both synchronous and async native widget bridge failures during payload sync, so newly extended todo recurrence fields such as month-end fallback cannot white-screen the app if the Android bridge rejects them.

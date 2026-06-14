@@ -10,6 +10,7 @@
  * @updated 2026-05-17: 在 Electron 主应用启动时自动恢复已启用的 PC 端小组件，并与设置页共享桌面小组件启动偏好读取逻辑。
  * @updated 2026-05-17: 增加 Electron 桌面小组件动作处理逻辑，支持 toggle_todo, open_todo 和 'start_focus' 快捷开始任务专注。
  * @updated 2026-05-13: Normalized reserved todo categories before passing them into UI editors and pickers so the system `未来` bucket behaves like a first-class category even when older saved data has not persisted it yet.
+ * @updated 2026-06-13: Included data collections and collection entries in JSON backup export payloads so themed collections travel with user data backups.
  * @updated 2026-05-18: Included the full achievement bottle backup block in JSON export payloads so synced exports now carry achievement progress too.
  * @updated 2026-05-18: Included the persisted custom color group in JSON export payloads so user-defined palette swatches travel with backup data.
  * @updated 2026-05-17: Added unified AI backup payload export so chat sessions, prompts, assistant memory, Dream state, and sanitized AI presets now travel inside the main JSON backup together with the rest of the app data.
@@ -282,7 +283,16 @@ const AppContent: React.FC = () => {
   const { categories, scopes, goals, majorGoals, setCategories, setScopes, setGoals, setMajorGoals } = useCategoryScope();
   const { buildBackupPayload: buildAchievementBackupPayload } = useAchievement();
   const { startActivity, stopActivity, cancelSession, activeSessions, setActiveSessions } = useSession();
-  const { logs, todos, todoCategories, setLogs, setTodos, setTodoCategories } = useData();
+  const {
+    logs,
+    todos,
+    todoCategories,
+    collections,
+    collectionEntries,
+    setLogs,
+    setTodos,
+    setTodoCategories
+  } = useData();
   const normalizedTodoCategories = useMemo(() => ensureQuickTodoCategory(todoCategories), [todoCategories]);
   const {
     dailyReviews, weeklyReviews, monthlyReviews, onThisDayEntries, setDailyReviews, setWeeklyReviews, setMonthlyReviews, setOnThisDayEntries,
@@ -308,7 +318,7 @@ const AppContent: React.FC = () => {
     const customColorGroup = customColorGroupService.getGroup();
     
     const data = {
-      logs, todos, categories, todoCategories, scopes, goals, majorGoals,
+      logs, todos, categories, todoCategories, collections, collectionEntries, scopes, goals, majorGoals,
       autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
       monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, customStickerSets, customStickers, filters,
       customColorGroup,
@@ -1084,6 +1094,8 @@ const AppContent: React.FC = () => {
               todos,
               categories,
               todoCategories,
+              collections,
+              collectionEntries,
               scopes,
               goals,
               majorGoals,
