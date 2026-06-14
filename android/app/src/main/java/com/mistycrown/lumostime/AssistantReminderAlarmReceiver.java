@@ -4,6 +4,7 @@
  * @output Wakes the assistant foreground service so due reminders can dispatch on time
  * @pos Native Receiver
  * @description Receives the scheduled reminder alarm and immediately re-enters the assistant agent service, avoiding in-process Handler delays while the device is idle.
+ * @updated 2026-06-14: Ignore stale reminder alarms when the assistant agent has been disabled so closing background polling cannot be undone by a queued alarm.
  * @updated 2026-05-13: Added a dedicated reminder alarm receiver so due reminders can wake the assistant service from AlarmManager instead of waiting on a delayed Handler callback.
  */
 package com.mistycrown.lumostime;
@@ -17,6 +18,11 @@ public class AssistantReminderAlarmReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         if (context == null) {
+            return;
+        }
+
+        if (!UnifiedServiceNotificationManager.isAssistantEnabled(context)) {
+            AssistantReminderAlarmScheduler.cancel(context);
             return;
         }
 

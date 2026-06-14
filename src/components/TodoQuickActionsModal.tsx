@@ -4,6 +4,7 @@
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
  * @pos Component
  * @description A reusable bottom sheet that exposes lightweight todo planning and completion actions without opening the full todo detail editor first.
+ * @updated 2026-06-14: Added visualViewport-based mobile keyboard avoidance and scrollable sheet bounds so inline title editing stays visible above the soft keyboard.
  * @updated 2026-06-13: Added inline todo title editing inside the sheet header with auto-save on blur, styled with a print-inspired bottom border and no focus ring to prevent visual shifts.
  * @updated 2026-05-14: Reworked the `Maybe` quick-action row into one shared outer pill that contains the main `Maybe` picker plus inline `今 / 明 / +7` shortcuts, and renamed the arrange/due `下周` shortcuts to `+7`.
  * @updated 2026-05-14: Expanded the `Maybe` summary text under the title to show every future candidate date in order instead of collapsing multiple dates into a `+n` count.
@@ -36,6 +37,8 @@ import { IconRenderer } from './IconRenderer';
 import { TodoDatePickerModal } from './TodoDatePickerModal';
 
 type CategoryPickerMode = 'move' | 'upgrade' | null;
+
+const QUICK_ACTION_KEYBOARD_INSET_THRESHOLD = 80;
 
 interface TodoQuickActionsModalProps {
   isOpen: boolean;
@@ -88,7 +91,10 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   const [isSkipToPickerOpen, setIsSkipToPickerOpen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
+  const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
   const isEscapeRef = useRef(false);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const visualViewportBaselineRef = useRef<{ height: number; width: number }>({ height: 0, width: 0 });
 
   useEffect(() => {
     setIsDeleteConfirming(false);
@@ -134,6 +140,71 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
       return true;
     });
   }, [categoryPickerMode, isDeleteConfirming, isMaybePickerOpen, isOpen, isSkipToPickerOpen, onClose, onForceClose]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      visualViewportBaselineRef.current = { height: 0, width: 0 };
+      setKeyboardBottomInset(0);
+      return;
+    }
+
+    if (typeof window === 'undefined' || !window.visualViewport) {
+      setKeyboardBottomInset(0);
+      return;
+    }
+
+    const viewport = window.visualViewport;
+    let frameId: number | null = null;
+
+    const getKeyboardBottomInset = () => {
+      const currentVisibleHeight = viewport.height + viewport.offsetTop;
+      const currentViewportWidth = viewport.width;
+
+      if (currentVisibleHeight <= 0 || currentViewportWidth <= 0) {
+        return 0;
+      }
+
+      const baseline = visualViewportBaselineRef.current;
+      const widthDelta = Math.abs(currentViewportWidth - baseline.width);
+
+      if (baseline.height === 0 || widthDelta > 120 || currentVisibleHeight > baseline.height) {
+        visualViewportBaselineRef.current = { height: currentVisibleHeight, width: currentViewportWidth };
+        return 0;
+      }
+
+      const baselineInset = baseline.height - currentVisibleHeight;
+      const layoutViewportInset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+      const inset = Math.round(Math.max(baselineInset, layoutViewportInset));
+
+      return inset > QUICK_ACTION_KEYBOARD_INSET_THRESHOLD ? inset : 0;
+    };
+
+    const syncKeyboardBottomInset = () => {
+      const nextInset = getKeyboardBottomInset();
+      setKeyboardBottomInset((current) => (current === nextInset ? current : nextInset));
+
+      if (nextInset > 0 && document.activeElement === titleInputRef.current) {
+        if (frameId !== null) {
+          window.cancelAnimationFrame(frameId);
+        }
+        frameId = window.requestAnimationFrame(() => {
+          titleInputRef.current?.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+        });
+      }
+    };
+
+    syncKeyboardBottomInset();
+    viewport.addEventListener('resize', syncKeyboardBottomInset);
+    viewport.addEventListener('scroll', syncKeyboardBottomInset);
+
+    return () => {
+      viewport.removeEventListener('resize', syncKeyboardBottomInset);
+      viewport.removeEventListener('scroll', syncKeyboardBottomInset);
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, [isOpen]);
 
   if (!isOpen || !todo) return null;
 
@@ -257,15 +328,24 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
       formatDateKey(targetDate)
     ]);
   };
+  const sheetMaxHeight = `calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - ${keyboardBottomInset}px - 4rem)`;
 
   return (
     <div
       className="fixed inset-0 z-[130] flex items-end justify-center bg-[rgba(15,23,42,0.12)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-12 backdrop-blur-sm md:items-center md:pb-4"
+      style={{
+        paddingBottom: `calc(1rem + env(safe-area-inset-bottom) + ${keyboardBottomInset}px)`,
+        transition: 'padding-bottom 180ms ease-out'
+      }}
       onPointerDown={handleBackdropPointerDown}
       onClick={handleBackdropClick}
     >
       <div
-        className="w-full max-w-[26rem] overflow-hidden rounded-[2rem] border border-stone-200 bg-[#faf9f6] shadow-[0_26px_70px_rgba(15,23,42,0.14)]"
+        className="w-full max-w-[26rem] overflow-y-auto overscroll-contain rounded-[2rem] border border-stone-200 bg-[#faf9f6] shadow-[0_26px_70px_rgba(15,23,42,0.14)]"
+        style={{
+          maxHeight: sheetMaxHeight,
+          transition: 'max-height 180ms ease-out'
+        }}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >
@@ -273,6 +353,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
           <div className="text-[11px] uppercase tracking-[0.22em] text-stone-400">Quick Actions</div>
           {isEditingTitle ? (
             <input
+              ref={titleInputRef}
               type="text"
               className="mt-1 w-full border-x-0 border-t-0 border-b border-stone-300 bg-transparent px-1 pb-0.5 text-lg font-medium text-stone-800 outline-none focus:border-stone-400 focus:ring-0 focus:outline-none"
               value={editedTitle}

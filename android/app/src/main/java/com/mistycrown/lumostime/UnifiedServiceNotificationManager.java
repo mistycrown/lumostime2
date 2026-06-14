@@ -4,6 +4,7 @@
  * @output A single shared Android foreground-status notification for background LumosTime services
  * @pos Native Helper
  * @description Keeps the floating window service, assistant agent service, and focus-only foreground service on one shared persistent Android notification while rendering active timer labels directly in the notification title.
+ * @updated 2026-06-14: Exposed the persisted assistant enabled flag so alarm wakeups and service restarts can refuse to revive the agent after the user turns polling off.
  * @updated 2026-05-09: Added app-focus session syncing, widget-runtime title aggregation, and dedicated focus-only foreground-service handoff so active timers can keep the persistent notification visible without the floating window or assistant poller.
  * @updated 2026-04-27: Exposed assistant-runtime activity lookup so plugin-side user-turn and task-state signals only wake the service when the assistant loop is already active.
  */
@@ -139,6 +140,10 @@ public final class UnifiedServiceNotificationManager {
 
     public static boolean isAssistantActive(Context context) {
         return prefs(context).getBoolean(KEY_ASSISTANT_ACTIVE, false);
+    }
+
+    public static boolean isAssistantEnabled(Context context) {
+        return prefs(context).getBoolean(KEY_ASSISTANT_ENABLED, false);
     }
 
     public static boolean hasActiveFocusSessions(Context context) {

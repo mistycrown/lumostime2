@@ -4,6 +4,7 @@
  * @output Persistent Android agent loop, shared runtime notification state, and bridge-triggered assistant events
  * @pos Native Service
  * @description Minimal Android foreground service scaffold for the background AI agent. Maintains a lightweight polling loop, shares one persistent Android status notification with the floating-window service, and emits assistant system-trigger events through the Capacitor plugin bridge.
+ * @updated 2026-06-14: Persisted and reloaded the assistant enabled flag before non-start wakeups so stale reminder alarms or native repokes cannot restart polling after the user disables it.
  * @updated 2026-05-15: Remove a native reminder immediately after it has been persisted as a pending `reminder_due` trigger so background retries do not re-dispatch the same completed reminder every minute.
  * @updated 2026-05-14: Changed Android reminder alarms to dispatch one metadata-rich `reminder_due` trigger back to the Web layer, preserving the local-offset request path and preventing duplicate native-plus-web AI reminder runs.
  * @updated 2026-05-13: Moved next due-reminder wakeups onto AlarmManager-backed service wakeups so reminder_due dispatch no longer depends on in-process Handler delays while the device is idle.
@@ -46,7 +47,7 @@ public class AssistantAgentService extends Service {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Random random = new Random();
 
-    private boolean enabled = true;
+    private boolean enabled = false;
     private boolean enableRandomCheckin = true;
     private int basePollMinutes = 5;
     private int minCheckinMinutes = 45;
@@ -169,6 +170,7 @@ public class AssistantAgentService extends Service {
     public void onCreate() {
         super.onCreate();
         loadRuntimeSignals();
+        enabled = UnifiedServiceNotificationManager.isAssistantEnabled(this);
         UnifiedServiceNotificationManager.startForeground(this);
         syncUnifiedStatusNotification();
         appendDiagnostic(
@@ -187,6 +189,8 @@ public class AssistantAgentService extends Service {
         String action = intent != null ? intent.getAction() : ACTION_START;
 
         if (ACTION_STOP.equals(action)) {
+            setPersistedEnabled(false);
+            enabled = false;
             appendDiagnostic(
                 "service_stopped",
                 "info",
@@ -205,6 +209,24 @@ public class AssistantAgentService extends Service {
         }
 
         applyConfig(intent);
+        if (!enabled) {
+            appendDiagnostic(
+                "service_disabled_skip",
+                "info",
+                String.format(Locale.US, "Assistant agent ignored action while disabled: %s", action),
+                null,
+                null,
+                "assistant_disabled",
+                buildPollDiagnosticContext(System.currentTimeMillis())
+            );
+            stopAgentLoop();
+            UnifiedServiceNotificationManager.clearAssistantState(this);
+            stopForeground(false);
+            UnifiedServiceNotificationManager.reconcileNotificationState(this);
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+
         appendDiagnostic(
             "config_applied",
             "info",
@@ -401,11 +423,15 @@ public class AssistantAgentService extends Service {
 
     private void applyConfig(Intent intent) {
         if (intent == null) {
+            enabled = UnifiedServiceNotificationManager.isAssistantEnabled(this);
             return;
         }
 
         if (intent.hasExtra("enabled")) {
             enabled = intent.getBooleanExtra("enabled", true);
+            setPersistedEnabled(enabled);
+        } else {
+            enabled = UnifiedServiceNotificationManager.isAssistantEnabled(this);
         }
         if (intent.hasExtra("enableRandomCheckin")) {
             enableRandomCheckin = intent.getBooleanExtra("enableRandomCheckin", true);
@@ -580,6 +606,17 @@ public class AssistantAgentService extends Service {
     private void recordAssistantNudge(long atMs) {
         lastAssistantNudgeAtMs = Math.max(0L, atMs);
         prefs().edit().putLong(KEY_LAST_ASSISTANT_NUDGE_AT_MS, lastAssistantNudgeAtMs).apply();
+    }
+
+    private void setPersistedEnabled(boolean nextEnabled) {
+        UnifiedServiceNotificationManager.setAssistantState(
+            this,
+            nextEnabled,
+            nextEnabled,
+            enableRandomCheckin,
+            basePollMinutes,
+            nextEnabled ? nextRandomCheckinAtMs : 0L
+        );
     }
 
     private SharedPreferences prefs() {
