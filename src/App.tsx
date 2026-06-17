@@ -4,6 +4,7 @@
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
+ * @updated 2026-06-15: Added a sync conflict confirmation modal so timestamp-vs-size contradictions during cloud sync now pause before a smaller JSON can overwrite a larger one.
  * @updated 2026-05-21: Localized the todo deletion confirmation modal into Chinese so the warning copy and action labels match the rest of the app.
  * @updated 2026-05-18: Added a desktop AI widget shell route that reuses the full app provider tree but swaps the normal layout for a compact always-on-top quick-chat window.
  * @updated 2026-05-18: Added bootstrap readiness timing logs so slow Electron startup can be traced to the async hydration gate.
@@ -50,6 +51,7 @@ import { AddLogModal } from './components/AddLogModal';
 import { TodoDetailModal } from './components/TodoDetailModal';
 import { GoalEditor } from './components/GoalEditor';
 import { ConfirmModal } from './components/ConfirmModal';
+import { SyncConflictModal } from './components/SyncConflictModal';
 import { SyncDirectionModal } from './components/SyncDirectionModal';
 import { BottomNavigation } from './components/BottomNavigation';
 
@@ -1222,6 +1224,22 @@ const AppContent: React.FC = () => {
         onClose={() => syncManager.setIsSyncDirectionModalOpen(false)}
         onUpload={syncManager.handleManualUpload}
         onDownload={syncManager.handleManualDownload}
+      />
+
+      <SyncConflictModal
+        isOpen={syncManager.syncConflictModalState.isOpen}
+        title="同步方向冲突"
+        description={syncManager.syncConflictModalState.decision
+          ? syncManager.buildSyncConflictDescription(
+            syncManager.syncConflictModalState.mode,
+            syncManager.syncConflictModalState.localTimestamp,
+            syncManager.syncConflictModalState.cloudTimestamp,
+            syncManager.syncConflictModalState.decision
+          )
+          : ''}
+        onClose={syncManager.closeSyncConflictModal}
+        onUpload={syncManager.handleConflictUpload}
+        onDownload={syncManager.handleConflictDownload}
       />
 
     </MainLayout>

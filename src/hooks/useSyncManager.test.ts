@@ -1,14 +1,23 @@
 /**
  * @file useSyncManager.test.ts
- * @input Sync timestamp direction helper
- * @output Regression coverage for local/cloud timestamp classification
+ * @input Sync timestamp and JSON-size direction helpers
+ * @output Regression coverage for local/cloud timestamp classification and size-aware conflict detection
  * @pos Test
- * @description Ensures sync direction classification still uploads fresh local edits shortly after the previous sync while keeping sub-second timestamp jitter treated as equal.
+ * @description Ensures sync direction classification still uploads fresh local edits shortly after the previous sync, keeps sub-second timestamp jitter treated as equal, and blocks contradictory overwrite directions when the larger backup JSON would otherwise be replaced by a smaller one.
+ * @updated 2026-06-15: Added JSON-size direction, tie-break, and conflict coverage for cloud sync overwrite protection.
+ * @updated 2026-06-14: Added pending-auto-sync coverage so freshly created local todos still upload when the timestamp delta is inside the equal-tolerance window.
  * @updated 2026-05-18: Added regression coverage for the narrowed sync tolerance so recent desktop edits are no longer swallowed as equal.
  */
 
 import { describe, expect, test } from 'vitest';
-import { classifySyncTimestampDirection } from '../utils/syncTimestampDirection';
+import {
+  classifySyncJsonSizeDirection,
+  classifySyncTimestampDirection,
+  detectForcedSyncConflict,
+  getJsonByteSize,
+  resolveSyncDirectionDecision,
+  resolveSyncTimestampDirection
+} from '../utils/syncTimestampDirection';
 
 describe('classifySyncTimestampDirection', () => {
   test('treats sub-second timestamp jitter as equal', () => {
@@ -22,5 +31,127 @@ describe('classifySyncTimestampDirection', () => {
 
   test('detects newer cloud data once it is clearly beyond tolerance', () => {
     expect(classifySyncTimestampDirection(10_000, 11_500, 1_000)).toBe('restore');
+  });
+
+  test('prefers upload for pending auto-sync edits even inside tolerance', () => {
+    expect(resolveSyncTimestampDirection({
+      localTimestamp: 10_400,
+      cloudTimestamp: 10_000,
+      toleranceMs: 1_000,
+      mode: 'auto',
+      hadPendingAutoSync: true
+    })).toBe('upload');
+  });
+
+  test('keeps equal classification inside tolerance when no local auto-sync is pending', () => {
+    expect(resolveSyncTimestampDirection({
+      localTimestamp: 10_400,
+      cloudTimestamp: 10_000,
+      toleranceMs: 1_000,
+      mode: 'auto',
+      hadPendingAutoSync: false
+    })).toBe('equal');
+  });
+});
+
+describe('classifySyncJsonSizeDirection', () => {
+  test('prefers upload when local json is larger', () => {
+    expect(classifySyncJsonSizeDirection(300, 200)).toBe('upload');
+  });
+
+  test('prefers restore when cloud json is larger', () => {
+    expect(classifySyncJsonSizeDirection(200, 300)).toBe('restore');
+  });
+
+  test('treats equal sizes as equal', () => {
+    expect(classifySyncJsonSizeDirection(300, 300)).toBe('equal');
+  });
+});
+
+describe('resolveSyncDirectionDecision', () => {
+  test('returns conflict when timestamp says restore but local json is larger', () => {
+    expect(resolveSyncDirectionDecision({
+      localTimestamp: 10_000,
+      cloudTimestamp: 12_500,
+      toleranceMs: 1_000,
+      mode: 'auto',
+      hadPendingAutoSync: false,
+      localJsonSize: 500,
+      cloudJsonSize: 300
+    })).toMatchObject({
+      direction: 'conflict',
+      timestampDirection: 'restore',
+      sizeDirection: 'upload'
+    });
+  });
+
+  test('returns conflict when timestamp says upload but cloud json is larger', () => {
+    expect(resolveSyncDirectionDecision({
+      localTimestamp: 12_500,
+      cloudTimestamp: 10_000,
+      toleranceMs: 1_000,
+      mode: 'manual',
+      hadPendingAutoSync: false,
+      localJsonSize: 300,
+      cloudJsonSize: 500
+    })).toMatchObject({
+      direction: 'conflict',
+      timestampDirection: 'upload',
+      sizeDirection: 'restore'
+    });
+  });
+
+  test('uses larger json as the tiebreaker when timestamps are equal', () => {
+    expect(resolveSyncDirectionDecision({
+      localTimestamp: 10_400,
+      cloudTimestamp: 10_000,
+      toleranceMs: 1_000,
+      mode: 'manual',
+      hadPendingAutoSync: false,
+      localJsonSize: 450,
+      cloudJsonSize: 300
+    })).toMatchObject({
+      direction: 'upload',
+      timestampDirection: 'equal',
+      sizeDirection: 'upload'
+    });
+  });
+
+  test('keeps timestamp direction when size is equal', () => {
+    expect(resolveSyncDirectionDecision({
+      localTimestamp: 10_000,
+      cloudTimestamp: 12_500,
+      toleranceMs: 1_000,
+      mode: 'manual',
+      hadPendingAutoSync: false,
+      localJsonSize: 300,
+      cloudJsonSize: 300
+    })).toMatchObject({
+      direction: 'restore',
+      timestampDirection: 'restore',
+      sizeDirection: 'equal'
+    });
+  });
+});
+
+describe('detectForcedSyncConflict', () => {
+  test('flags forced upload when cloud json is larger', () => {
+    expect(detectForcedSyncConflict('upload', 300, 500)).toMatchObject({
+      direction: 'conflict',
+      sizeDirection: 'restore'
+    });
+  });
+
+  test('allows forced download when cloud json is larger', () => {
+    expect(detectForcedSyncConflict('restore', 300, 500)).toMatchObject({
+      direction: 'restore',
+      sizeDirection: 'restore'
+    });
+  });
+});
+
+describe('getJsonByteSize', () => {
+  test('returns utf-8 byte length instead of plain character count', () => {
+    expect(getJsonByteSize({ text: '中' })).toBeGreaterThan(JSON.stringify({ text: '中' }).length);
   });
 });

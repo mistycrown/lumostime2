@@ -7,6 +7,7 @@
  *   - independent: Create/edit standalone goals (can optionally link to a major goal)
  *   - phase: Create/edit phase goals within a major goal (inherits metric and filters)
  *   - majorGoal: Create/edit major goals (no target value, time range auto-calculated)
+ * @updated 2026-06-16: Added a current-week quick date range shortcut that fills the goal date window from Monday through Sunday.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -306,7 +307,7 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({
     const selectedMetricInfo = metricOptions.find(m => m.value === metric);
 
     // 快捷时间范围设置
-    const setQuickDateRange = (range: 'month' | 'quarter' | 'year') => {
+    const setQuickDateRange = (range: 'week' | 'month' | 'quarter' | 'year') => {
         const now = new Date();
         const year = now.getFullYear();
         const month = now.getMonth() + 1;
@@ -314,7 +315,17 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({
         let start = '';
         let end = '';
 
-        if (range === 'month') {
+        if (range === 'week') {
+            const currentDay = now.getDay();
+            const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
+            const weekStart = new Date(now);
+            weekStart.setDate(now.getDate() + mondayOffset);
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+
+            start = `${weekStart.getFullYear()}${String(weekStart.getMonth() + 1).padStart(2, '0')}${String(weekStart.getDate()).padStart(2, '0')}`;
+            end = `${weekEnd.getFullYear()}${String(weekEnd.getMonth() + 1).padStart(2, '0')}${String(weekEnd.getDate()).padStart(2, '0')}`;
+        } else if (range === 'month') {
             // 本月
             start = `${year}${String(month).padStart(2, '0')}01`;
             const lastDay = new Date(year, month, 0).getDate();
@@ -585,6 +596,12 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({
                             </label>
                             {/* 快捷按钮 */}
                             <div className="flex gap-1">
+                                <button
+                                    onClick={() => setQuickDateRange('week')}
+                                    className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-600 text-[10px] font-medium rounded transition-colors"
+                                >
+                                    本周
+                                </button>
                                 <button
                                     onClick={() => setQuickDateRange('month')}
                                     className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-600 text-[10px] font-medium rounded transition-colors"

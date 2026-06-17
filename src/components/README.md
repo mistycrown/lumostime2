@@ -3,6 +3,8 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-06-16: `GoalEditor.tsx` now includes a `本周` quick date-range shortcut in the goal time-window toolbar, filling the current Monday-through-Sunday span alongside the existing `本月 / 本季度 / 本年` chips.
+- Update 2026-06-16: `TodoMonthView.tsx` now darkens unfinished `Arrange` / `Due` / `Repeat` / `Maybe` entry titles in both month-grid cells and expanded day details, improving contrast against the translucent calendar surface while keeping completed and trace rows muted.
 - Update 2026-06-13: `AssociatedTodoList.tsx` now provides a shared parent/subtask-aware associated-todo card for tag, category, and scope detail pages, keeping child todos visually nested beneath their parent rows.
 - Update 2026-06-13: `TodoMonthView.tsx` and `TodoBentoWeekView.tsx` now replace the selection highlight background in display-settings popups with a subtle underline indicator (`border-b-2`) and text color changes, removing the background shading for a cleaner layout.
 - Update 2026-06-13: `TodoMonthView.tsx` now updates todo item colors so that Trace (inProgress) and Done (completed) items appear in muted gray tone, while other schedule types like Maybe, Arrange, Due, and Repeat appear in a darker tone for better visual differentiation.

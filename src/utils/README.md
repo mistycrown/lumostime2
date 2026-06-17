@@ -3,6 +3,7 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- Update 2026-06-15: `syncTimestampDirection.ts` now combines timestamp tolerance with full JSON-size comparison, letting cloud sync break timestamp ties by payload size and surface explicit conflicts whenever a smaller backup would overwrite a larger one.
 - Update 2026-06-13: `dataValidation.ts` now accepts data collections and collection entries in user backup payloads while preserving old backup files that omit those fields.
 - Update 2026-06-13: `todoRowInteraction.ts` now relaxes vertical drift verification once swipe intent is confirmed, ensuring left-swipe completion triggers reliably without getting canceled by post-release diagonal drifts.
 - Update 2026-06-06: `filterUtils.ts` now treats `@` expressions in log-side custom filters the same way as todo-side hidden filters, matching both linked todo titles and todo category names.
@@ -26,6 +27,7 @@ Contains pure utility functions for data processing and business logic calculati
 - `assistantDebugFormat.ts`: [Active] - Extracts readable summaries and debug-view blocks from malformed AI responses, including raw HTML error pages, parse failures, and full response-body fallbacks.
 - `aiBackupChange.ts`: [Active] - Marks AI-only local persistence updates as sync-relevant by updating the shared local timestamp and dispatching a dedicated AI backup change event.
 - `assistantLogSubmissionTrigger.ts`: [Active] - Emits the shared submitted-log event, matches newly created logs against the assistant's selected activity ids, builds the fixed `System: 用户刚才完成了一条时间记录` trigger text, and provides a temporary log-upsert helper so background turns can see a just-saved record immediately.
+- `syncTimestampDirection.ts`: [Active] - Resolves local/cloud sync direction from timestamp tolerance, pending-auto-sync state, and full JSON byte size so larger payloads can block contradictory overwrite decisions before data is lost.
 - `todoScheduleUtils.ts`: [Active] - Shared todo planning helpers for Arrange / Due / Repeat / Done / Trace surfaces, including compact recurrence summaries like `每天`, `每周一三五`, and `每月 1,15,31` for lightweight UI metadata.
 - `todoScheduleAssignUtils.ts`: [Active] - Filters, sorts, and builds hierarchy rows for arrange/due picker todos, including the rules that unfinished subtasks disappear when their parent todo is already completed, recurring todos and the reserved `鏈潵` category stay out of quick scheduling, and title search keeps matched subtasks attached to their parent rows.
 - `todoQuickCategoryUtils.ts`: [Active] - Synthesizes the reserved `未来` and `小事` buckets, separates project-available categories from quick-schedule-available ones, and keeps quick reminders normalized onto the `小事` category id.

@@ -4,6 +4,10 @@
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
  * @pos Component
  * @description A reusable bottom sheet that exposes lightweight todo planning and completion actions without opening the full todo detail editor first.
+ * @updated 2026-06-16: Switched the mobile compact-edit guard from a width-only media query to real mobile detection so desktop windows keep the full sheet while phones collapse to the title editor.
+ * @updated 2026-06-15: Added a mobile-only compact title-edit mode that hides the lower quick-action body while typing so the editor can sit close to the soft keyboard.
+ * @updated 2026-06-14: Added a `创建副本` quick action that reuses the same duplicate-modal flow as the row swipe gesture.
+ * @updated 2026-06-14: Softened the mobile keyboard offset with a bottom breathing margin and added a title-row confirm action that replaces the global header actions while editing.
  * @updated 2026-06-14: Added visualViewport-based mobile keyboard avoidance and scrollable sheet bounds so inline title editing stays visible above the soft keyboard.
  * @updated 2026-06-13: Added inline todo title editing inside the sheet header with auto-save on blur, styled with a print-inspired bottom border and no focus ring to prevent visual shifts.
  * @updated 2026-05-14: Reworked the `Maybe` quick-action row into one shared outer pill that contains the main `Maybe` picker plus inline `今 / 明 / +7` shortcuts, and renamed the arrange/due `下周` shortcuts to `+7`.
@@ -27,7 +31,8 @@
  * @updated 2026-04-20: Extracted from TodoView so todo-list taps and week badges can share one quick-actions sheet implementation.
  */
 import React, { useEffect, useState, useRef } from 'react';
-import { ArrowRightLeft, CalendarDays, Check, CheckCircle2, Flag, PanelRightOpen, Pin, SkipForward, Trash2, X } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { ArrowRightLeft, CalendarDays, Check, CheckCircle2, Copy, Flag, PanelRightOpen, Pin, SkipForward, Trash2, X } from 'lucide-react';
 import { TodoCategory, TodoItem } from '../types';
 import { formatDateKey, formatTodoRecurrenceSummary, normalizeMaybeDates, parseDateKey } from '../utils/todoScheduleUtils';
 import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
@@ -39,6 +44,8 @@ import { TodoDatePickerModal } from './TodoDatePickerModal';
 type CategoryPickerMode = 'move' | 'upgrade' | null;
 
 const QUICK_ACTION_KEYBOARD_INSET_THRESHOLD = 80;
+const QUICK_ACTION_KEYBOARD_BREATHING_ROOM = 56;
+const QUICK_ACTION_MOBILE_EDIT_KEYBOARD_BREATHING_ROOM = 12;
 
 interface TodoQuickActionsModalProps {
   isOpen: boolean;
@@ -50,6 +57,7 @@ interface TodoQuickActionsModalProps {
   onComplete: () => void;
   onUndoComplete: () => void;
   onTogglePin: () => void;
+  onDuplicate?: () => void;
   onEditMaybeDates: (values: string[]) => void;
   onSkipNextRecurrence: () => void;
   onSkipToMaybeDate: (dateKey: string) => void;
@@ -73,6 +81,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   onComplete,
   onUndoComplete,
   onTogglePin,
+  onDuplicate,
   onEditMaybeDates,
   onSkipNextRecurrence,
   onSkipToMaybeDate,
@@ -92,6 +101,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
   const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const isEscapeRef = useRef(false);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const visualViewportBaselineRef = useRef<{ height: number; width: number }>({ height: 0, width: 0 });
@@ -205,6 +215,22 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
       }
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      setIsMobileViewport(false);
+      return;
+    }
+
+    const nativePlatform = Capacitor.getPlatform();
+    const isNativeMobile = Capacitor.isNativePlatform()
+      && (nativePlatform === 'android' || nativePlatform === 'ios');
+    const userAgent = window.navigator.userAgent || '';
+    const isBrowserMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent)
+      || Boolean((window.navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData?.mobile);
+
+    setIsMobileViewport(isNativeMobile || isBrowserMobile);
+  }, []);
 
   if (!isOpen || !todo) return null;
 
@@ -328,13 +354,18 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
       formatDateKey(targetDate)
     ]);
   };
-  const sheetMaxHeight = `calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - ${keyboardBottomInset}px - 4rem)`;
+  const isMobileTitleEditMode = isEditingTitle && isMobileViewport;
+  const keyboardBreathingRoom = isMobileTitleEditMode
+    ? QUICK_ACTION_MOBILE_EDIT_KEYBOARD_BREATHING_ROOM
+    : QUICK_ACTION_KEYBOARD_BREATHING_ROOM;
+  const effectiveKeyboardBottomInset = Math.max(0, keyboardBottomInset - keyboardBreathingRoom);
+  const sheetMaxHeight = `calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - ${effectiveKeyboardBottomInset}px - 4rem)`;
 
   return (
     <div
       className="fixed inset-0 z-[130] flex items-end justify-center bg-[rgba(15,23,42,0.12)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-12 backdrop-blur-sm md:items-center md:pb-4"
       style={{
-        paddingBottom: `calc(1rem + env(safe-area-inset-bottom) + ${keyboardBottomInset}px)`,
+        paddingBottom: `calc(1rem + env(safe-area-inset-bottom) + ${effectiveKeyboardBottomInset}px)`,
         transition: 'padding-bottom 180ms ease-out'
       }}
       onPointerDown={handleBackdropPointerDown}
@@ -343,42 +374,54 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
       <div
         className="w-full max-w-[26rem] overflow-y-auto overscroll-contain rounded-[2rem] border border-stone-200 bg-[#faf9f6] shadow-[0_26px_70px_rgba(15,23,42,0.14)]"
         style={{
-          maxHeight: sheetMaxHeight,
+          maxHeight: isMobileTitleEditMode ? 'none' : sheetMaxHeight,
+          overflowY: isMobileTitleEditMode ? 'hidden' : 'auto',
           transition: 'max-height 180ms ease-out'
         }}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="relative border-b border-stone-200 px-5 py-4 pr-24">
+        <div className={`relative px-5 py-4 ${isMobileTitleEditMode ? '' : 'border-b border-stone-200 pr-24'}`}>
           <div className="text-[11px] uppercase tracking-[0.22em] text-stone-400">Quick Actions</div>
           {isEditingTitle ? (
-            <input
-              ref={titleInputRef}
-              type="text"
-              className="mt-1 w-full border-x-0 border-t-0 border-b border-stone-300 bg-transparent px-1 pb-0.5 text-lg font-medium text-stone-800 outline-none focus:border-stone-400 focus:ring-0 focus:outline-none"
-              value={editedTitle}
-              onChange={(e) => setEditedTitle(e.target.value)}
-              onBlur={handleTitleSave}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  (e.target as HTMLInputElement).blur();
-                } else if (e.key === 'Escape') {
-                  isEscapeRef.current = true;
-                  setEditedTitle(todo.title);
-                  setIsEditingTitle(false);
-                }
-              }}
-              autoFocus
-            />
+            <div className="mt-1 flex items-end gap-2">
+              <input
+                ref={titleInputRef}
+                type="text"
+                className="min-w-0 flex-1 border-x-0 border-t-0 border-b border-stone-300 bg-transparent px-1 pb-0.5 text-lg font-medium text-stone-800 outline-none focus:border-stone-400 focus:ring-0 focus:outline-none"
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                onBlur={handleTitleSave}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    (e.target as HTMLInputElement).blur();
+                  } else if (e.key === 'Escape') {
+                    isEscapeRef.current = true;
+                    setEditedTitle(todo.title);
+                    setIsEditingTitle(false);
+                  }
+                }}
+                autoFocus
+              />
+              <button
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => titleInputRef.current?.blur()}
+                className="shrink-0 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-stone-600 transition-colors hover:border-stone-300 hover:text-stone-800"
+                title="Confirm title"
+              >
+                OK
+              </button>
+            </div>
           ) : (
             <div
               className="mt-1 text-lg font-medium text-stone-800 cursor-pointer hover:bg-stone-100/60 rounded px-1 -mx-1 transition-colors"
-              onClick={() => setIsEditingTitle(true)}
+              onClick={withActionGuard(() => setIsEditingTitle(true))}
             >
               {todo.title}
             </div>
           )}
-          {visibleQuickActionDateRows.length > 0 && (
+          {!isMobileTitleEditMode && visibleQuickActionDateRows.length > 0 && (
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-stone-400">
               {visibleQuickActionDateRows.map((item) => (
                 <span key={`${item.label}-${item.value}`} className="inline-flex min-w-0 items-center gap-1.5">
@@ -388,7 +431,8 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
               ))}
             </div>
           )}
-          <div className="absolute right-5 top-4 flex items-center gap-2">
+          {!isEditingTitle && (
+            <div className="absolute right-5 top-4 flex items-center gap-2">
             {showDetailShortcut && (
               <button
               type="button"
@@ -409,10 +453,12 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
                 <Check size={16} />
               </button>
             )}
-          </div>
+            </div>
+          )}
         </div>
 
-        <div className="px-4 py-4">
+        {!isMobileTitleEditMode && (
+          <div className="px-4 py-4">
           <div className="space-y-2">
             <div className={isRecurringTodo ? 'hidden' : 'grid grid-cols-2 gap-2'}>
               <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white/80">
@@ -562,6 +608,17 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
               <span>{todo.pin ? '取消 Pin' : 'Pin'}</span>
             </button>
 
+            {onDuplicate && (
+              <button
+                type="button"
+                onClick={withActionGuard(onDuplicate)}
+                className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
+              >
+                <Copy size={15} className="text-stone-400" />
+                <span>创建副本</span>
+              </button>
+            )}
+
             {canMoveCategory && (
               <button
                 type="button"
@@ -615,7 +672,8 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
               <span>{isDeleteConfirming ? '确认删除？' : '删除任务'}</span>
             </button>
           </div>
-        </div>
+          </div>
+        )}
       </div>
 
       <TodoDatePickerModal
