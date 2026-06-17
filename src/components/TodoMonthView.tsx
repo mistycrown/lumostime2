@@ -5,6 +5,8 @@
  * @pos Component (Todo scheduling)
  * @description Renders the editorial monthly schedule view adapted from the minimalist demo, using shared todo schedule utilities so each day shows the same real Arrange / Due / Repeat / Maybe / Done / Trace data as the week planner.
  *
+ * @updated 2026-06-16: Locked the month-cell date-number header row to a fixed height so ordinary entries and cross-day Trace overlays share the same vertical baseline instead of drifting a few pixels apart.
+ * @updated 2026-06-16: Darkened month-view titles for unfinished Arrange / Due / Repeat / Maybe entries in both grid cells and expanded day details so those schedule rows no longer read as faded against the translucent calendar surface.
  * @updated 2026-06-13: 调整显示设置弹窗中已选择选项的视觉效果，移除背景加深，改为下划线指示器。
  * @updated 2026-06-13: 调整显示设置弹窗中已选择选项的背景和文字对比度，将更浅的 bg-stone-100 调整为 bg-stone-200，并加深字体颜色。
  * @updated 2026-06-13: 调整月视图中各条目的颜色：Trace 和已完成任务（Completed）使用灰色，而 Maybe, Arrange, Due, Repeat 任务使用较黑的颜色以示区分。
@@ -218,7 +220,7 @@ const getMonthEntryToneClassName = (primaryKind: TodoDateEntry['primaryKind']): 
     return 'text-stone-400 dark:text-stone-500/90';
   }
 
-  return 'text-stone-800 dark:text-stone-200';
+  return 'text-stone-950 dark:text-stone-100';
 };
 
 export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
@@ -1385,8 +1387,8 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                           }}
                         >
                           <div
-                            className="flex justify-start px-2"
-                            style={{ minHeight: `${MONTH_VIEW_DAY_NUMBER_ROW_HEIGHT_PX}px` }}
+                            className="flex h-4 justify-start px-2"
+                            style={{ height: `${MONTH_VIEW_DAY_NUMBER_ROW_HEIGHT_PX}px` }}
                           >
                             <button
                               type="button"

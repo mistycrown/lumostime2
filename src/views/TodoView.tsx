@@ -2179,6 +2179,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       onComplete={handleQuickActionComplete}
       onUndoComplete={handleQuickActionUndoComplete}
       onTogglePin={handleQuickActionTogglePin}
+      onDuplicate={() => quickActionTodo && handleOpenDuplicateModal(quickActionTodo)}
       onEditMaybeDates={handleQuickActionMaybeDates}
       onSkipNextRecurrence={handleQuickActionSkipNextRecurrence}
       onSkipToMaybeDate={handleQuickActionSkipToMaybeDate}

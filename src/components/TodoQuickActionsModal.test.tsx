@@ -4,6 +4,7 @@
  * @output Regression coverage for quick category move visibility and Maybe-date summary rendering in the shared todo quick-actions sheet
  * @pos Test
  * @description Ensures the shared quick-actions modal only exposes category move for standalone todos, still offers quick-todo project upgrades through the shared category-picker flow, and summarizes Maybe dates as compact title metadata.
+ * @updated 2026-06-14: Added coverage for the quick-actions duplicate entry so the modal can reuse the row swipe duplicate flow.
  * @updated 2026-05-14: Added coverage for the split `Maybe` shortcut row and `+7` date labels in the quick actions sheet, alongside Maybe summary rendering under the title.
  * @updated 2026-05-14: Added coverage for single and multi-date Maybe summaries under the quick-actions title, including full multi-date expansion instead of count folding.
  * @updated 2026-05-13: Added coverage for the quick `升级为项目` entry now that it reuses category selection instead of a silent default bucket fallback.
@@ -41,6 +42,7 @@ const baseProps = {
   onComplete: vi.fn(),
   onUndoComplete: vi.fn(),
   onTogglePin: vi.fn(),
+  onDuplicate: vi.fn(),
   onEditMaybeDates: vi.fn(),
   onSkipNextRecurrence: vi.fn(),
   onSkipToMaybeDate: vi.fn(),

@@ -1,5 +1,7 @@
 # Custom Hooks
 
+> `useSyncManager.ts` now treats confirmed pending local auto-sync edits as upload-worthy even when the local/cloud timestamps are still within the equal-tolerance window, so creating a new todo right after a sync no longer gets skipped.
+> `useSyncManager.ts` now also compares the full local/cloud backup JSON sizes before overwrite operations, so any timestamp decision that would let a smaller payload replace a larger one now opens an explicit conflict chooser instead of silently overwriting data.
 > `useSyncManager.ts` now includes data collections and collection entries in unified cloud sync payloads, restores them from backups that explicitly contain them, and treats collection-only edits as auto-sync-relevant user data.
 > `useTodoQuickActions.ts` now exposes a shared title update helper (`handleQuickActionUpdateTitle`) to edit todo titles directly from the quick actions modal on blur.
 > `useTodoManager.ts` now clears `coverImage` when duplicating a todo, so quick-copy tasks start clean instead of inheriting the original cover artwork.
