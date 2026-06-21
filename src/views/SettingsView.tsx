@@ -520,9 +520,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
             if (result.success) {
                 // 上传成功后，使用当前时间更新本地时间戳
-                const now = Date.now();
-                setLocalDataTimestampValue(now);
-                console.log(`[Settings] WebDAV 上传完成，本地时间戳已更新: ${now}`);
+                const syncedTimestamp = result.data?.timestamp || getLocalDataTimestamp();
+                setLocalDataTimestampValue(syncedTimestamp);
+                console.log(`[Settings] WebDAV upload timestamp updated: ${syncedTimestamp}`);
 
                 onToast('success', result.message);
             } else {
@@ -555,8 +555,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
             if (result.success && result.data) {
                 await onSyncUpdate(result.data);
-                const now = Date.now();
-                setLocalDataTimestampValue(now);
+                setLocalDataTimestampValue(result.data?.timestamp || getLocalDataTimestamp());
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
 
                 // 同步完成后关闭设置页面，自动刷新到脉络页面
@@ -599,9 +598,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
             if (result.success) {
                 // 上传成功后，使用当前时间更新本地时间戳
-                const now = Date.now();
-                setLocalDataTimestampValue(now);
-                console.log(`[Settings] S3 上传完成，本地时间戳已更新: ${now}`);
+                const syncedTimestamp = result.data?.timestamp || getLocalDataTimestamp();
+                setLocalDataTimestampValue(syncedTimestamp);
+                console.log(`[Settings] S3 upload timestamp updated: ${syncedTimestamp}`);
 
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
             } else {
@@ -635,8 +634,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             );
 
             if (result.success) {
-                const now = Date.now();
-                setLocalDataTimestampValue(now);
+                setLocalDataTimestampValue(result.data?.timestamp || getLocalDataTimestamp());
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
             } else {
                 onToast('error', result.message);
@@ -661,23 +659,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         const customColorGroup = customColorGroupService.getGroup();
 
         const localData = {
-            logs: ctxLogs,
-            todos: ctxTodos,
-            categories: ctxCategories,
-            todoCategories: ctxTodoCategories,
-            scopes: ctxScopes,
-            goals: ctxGoals,
-            majorGoals: ctxMajorGoals,
-            autoLinkRules: ctxAutoLinkRules,
-            reviewTemplates: ctxReviewTemplates,
-            checkTemplates: ctxCheckTemplates,
-            dailyReviews: ctxDailyReviews,
-            weeklyReviews: ctxWeeklyReviews,
-            monthlyReviews: ctxMonthlyReviews,
-            customNarrativeTemplates: ctxCustomNarrativeTemplates,
-            userPersonalInfo: ctxUserPersonalInfo,
-            filters: ctxFilters,
-            customColorGroup,
+            ...syncData,
+            logs: syncData?.logs ?? ctxLogs,
+            todos: syncData?.todos ?? ctxTodos,
+            categories: syncData?.categories ?? ctxCategories,
+            todoCategories: syncData?.todoCategories ?? ctxTodoCategories,
+            scopes: syncData?.scopes ?? ctxScopes,
+            goals: syncData?.goals ?? ctxGoals,
+            majorGoals: syncData?.majorGoals ?? ctxMajorGoals,
+            autoLinkRules: syncData?.autoLinkRules ?? ctxAutoLinkRules,
+            reviewTemplates: syncData?.reviewTemplates ?? ctxReviewTemplates,
+            checkTemplates: syncData?.checkTemplates ?? ctxCheckTemplates,
+            dailyReviews: syncData?.dailyReviews ?? ctxDailyReviews,
+            weeklyReviews: syncData?.weeklyReviews ?? ctxWeeklyReviews,
+            monthlyReviews: syncData?.monthlyReviews ?? ctxMonthlyReviews,
+            customNarrativeTemplates: syncData?.customNarrativeTemplates ?? ctxCustomNarrativeTemplates,
+            userPersonalInfo: syncData?.userPersonalInfo ?? ctxUserPersonalInfo,
+            filters: syncData?.filters ?? ctxFilters,
+            customColorGroup: syncData?.customColorGroup ?? customColorGroup,
             sceneGroupState, // 新版：场景组状态
             sceneTimeSlots, // 添加场景设置
             principles, // 添加原则库
@@ -712,8 +711,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
             if (result.success && result.data) {
                 await onSyncUpdate(result.data);
-                const now = Date.now();
-                setLocalDataTimestampValue(now);
+                setLocalDataTimestampValue(result.data?.timestamp || getLocalDataTimestamp());
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
 
                 // 同步完成后关闭设置页面
@@ -748,8 +746,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
             if (result.success && result.data) {
                 await onSyncUpdate(result.data);
-                const now = Date.now();
-                setLocalDataTimestampValue(now);
+                setLocalDataTimestampValue(result.data?.timestamp || getLocalDataTimestamp());
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
 
                 setTimeout(() => {

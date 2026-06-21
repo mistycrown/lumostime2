@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-06-21: `webdavService.ts`, `s3Service.ts`, and `compatibleS3Service.ts` now harden canonical JSON backup reads with cache-busting / no-cache behavior so sync verification reads the current `lumostime_backup.json` instead of stale responses.
+
 Update 2026-06-13: `dailyNewspaperService.ts` now supports local per-annotation daily newspaper comment threads, including strict AI reply prompts, response parsing, append helpers, and overwrite-safe preservation of existing comment history.
 
 Update 2026-06-07: `weeklyNewspaperService.ts` and `monthlyNewspaperService.ts` now power ordinary-chat `周小报` / `月小报` writeback flows, packaging periodic review context into strict structured AI contracts and persisting editorial newspaper payloads onto `WeeklyReview.aiNewspaper` and `MonthlyReview.aiNewspaper`.

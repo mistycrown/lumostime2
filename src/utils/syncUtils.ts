@@ -1,6 +1,7 @@
 /**
  * @file syncUtils.ts
  * @description Unified cloud sync helpers for WebDAV, COS, and compatible S3.
+ * @updated 2026-06-21: Added write-after-read verification for main backup uploads so stale cloud reads or failed overwrites cannot be reported as a successful sync.
  * @updated 2026-04-20: Cleaned user-facing messages and kept compatible S3 fully aligned with the shared upload/restore flow.
  */
 
@@ -10,6 +11,7 @@ import { compatibleS3Service } from '../services/compatibleS3Service';
 import { imageService } from '../services/imageService';
 import { syncService } from '../services/syncService';
 import { validateAndFixData, validateLocalData } from './dataValidation';
+import { buildSyncPayloadMetadata, isSameSyncPayload } from './syncPayloadMetadata';
 
 export type CloudService = typeof webdavService | typeof s3Service | typeof compatibleS3Service;
 export type CloudServiceName = 'webdav' | 's3' | 'compatible-s3';
@@ -25,6 +27,8 @@ export interface SyncResult {
     errors: string[];
   };
 }
+
+export const MAIN_BACKUP_FILENAME = 'lumostime_backup.json';
 
 function isValidSyncPayload(data: any): boolean {
   return validateLocalData(data).isValid;
@@ -130,6 +134,45 @@ export function getServiceName(service: CloudService): CloudServiceName {
   return 'webdav';
 }
 
+async function verifyMainBackupUpload(
+  service: CloudService,
+  expectedData: any,
+  displayName: string
+): Promise<{ success: boolean; message?: string; verifiedData?: any }> {
+  let verifiedData: any;
+
+  try {
+    verifiedData = await service.downloadData(MAIN_BACKUP_FILENAME);
+  } catch (error: any) {
+    console.error('[syncUtils] Failed to verify uploaded main backup:', error);
+    return {
+      success: false,
+      message: `Upload to ${displayName} finished, but reading the main backup back failed: ${error?.message || 'unknown error'}`
+    };
+  }
+
+  if (!isSameSyncPayload(expectedData, verifiedData)) {
+    const expectedMeta = buildSyncPayloadMetadata(expectedData);
+    const actualMeta = buildSyncPayloadMetadata(verifiedData);
+    console.error('[syncUtils] Uploaded main backup verification mismatch:', {
+      expectedTimestamp: expectedMeta.timestamp,
+      actualTimestamp: actualMeta.timestamp,
+      expectedJsonSize: expectedMeta.jsonSize,
+      actualJsonSize: actualMeta.jsonSize
+    });
+
+    return {
+      success: false,
+      message: `Upload to ${displayName} did not verify: the main backup read back from cloud is not the data that was just written.`
+    };
+  }
+
+  return {
+    success: true,
+    verifiedData
+  };
+}
+
 export async function uploadDataToCloud(
   service: CloudService,
   localData: any,
@@ -154,7 +197,16 @@ export async function uploadDataToCloud(
     };
 
     onProgress?.(`正在上传数据到${displayName}...`);
-    await service.uploadData(dataToSync);
+    await service.uploadData(dataToSync, MAIN_BACKUP_FILENAME);
+
+    onProgress?.('Verifying cloud main backup...');
+    const verifyResult = await verifyMainBackupUpload(service, dataToSync, displayName);
+    if (!verifyResult.success) {
+      return {
+        success: false,
+        message: verifyResult.message || 'Cloud main backup verification failed'
+      };
+    }
 
     const localImageList = buildReferencedImageList(localData);
     imageService.updateReferencedImagesList(localImageList);

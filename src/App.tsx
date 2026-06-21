@@ -1107,11 +1107,15 @@ const AppContent: React.FC = () => {
               dailyReviews,
               weeklyReviews,
               monthlyReviews,
+              onThisDayEntries,
               customNarrativeTemplates,
               userPersonalInfo,
               customStickerSets,
               customStickers,
-              filters
+              filters,
+              customColorGroup: customColorGroupService.getGroup(),
+              achievementData: buildAchievementBackupPayload(),
+              aiData: assistantBackupService.buildBackupPayload()
             }}
             onEditTodo={todoManager.openEditTodoModal}
 
