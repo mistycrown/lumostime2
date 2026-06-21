@@ -46,6 +46,7 @@ import {
     resolveSyncDirectionDecision,
     SyncDirectionDecision
 } from '../utils/syncTimestampDirection';
+import { getSyncPayloadTimestamp } from '../utils/syncPayloadMetadata';
 import {
     getLocalDataTimestamp,
     setLocalDataTimestampUpdateLocked,
@@ -608,6 +609,25 @@ export const useSyncManager = () => {
             }
 
             // 3. 比较时间戳（使用容错阈值）
+            try {
+                const canonicalCloudData = await activeService.downloadData();
+                const canonicalCloudTimestamp = getSyncPayloadTimestamp(canonicalCloudData, 0);
+                cloudData = canonicalCloudData;
+
+                if (canonicalCloudTimestamp > 0) {
+                    cloudTimestamp = canonicalCloudTimestamp;
+                    usedFileModTime = false;
+                }
+
+                console.log('[Sync][Step 2c] Canonical cloud main backup loaded:', {
+                    cloudTimestamp,
+                    cloudTimestampSource: canonicalCloudTimestamp > 0 ? 'payload' : 'metadata-fallback',
+                    cloudJsonSize: getJsonByteSize(cloudData)
+                });
+            } catch (error) {
+                console.warn('[Sync] Failed to load canonical cloud main backup; keeping metadata fallback.', error);
+            }
+
             const timeDiff = localTimestamp - cloudTimestamp;
             console.log(`[Sync][Step 3] 时间戳比较:`);
             console.log(`[Sync][Step 3]   - 本地时间: ${localTimestamp} (${new Date(localTimestamp).toLocaleString()})`);

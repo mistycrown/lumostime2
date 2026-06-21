@@ -6,11 +6,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getObjectMock = vi.fn();
 const headBucketMock = vi.fn();
+const putObjectMock = vi.fn();
 
 vi.mock('cos-js-sdk-v5', () => {
   const COSMock = vi.fn(function MockCOS(this: Record<string, unknown>) {
     this.getObject = getObjectMock;
     this.headBucket = headBucketMock;
+    this.putObject = putObjectMock;
   });
 
   return {
@@ -84,6 +86,39 @@ describe('S3Service', () => {
           _: expect.any(String)
         }),
         ResponseCacheControl: 'no-cache, no-store, must-revalidate'
+      }),
+      expect.any(Function)
+    );
+  });
+
+  it('uploads JSON data with no-cache metadata for the canonical main backup', async () => {
+    putObjectMock.mockImplementation((_params, callback) => {
+      callback(null, {});
+    });
+
+    const { S3Service } = await import('./s3Service');
+    const service = new S3Service();
+
+    service.saveConfig({
+      bucketName: 'bucket-1234567890',
+      region: 'ap-beijing',
+      secretId: 'secret-id',
+      secretKey: 'secret-key'
+    });
+
+    await service.uploadData({
+      logs: [],
+      todos: [],
+      categories: [],
+      timestamp: 3
+    });
+
+    expect(putObjectMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        Bucket: 'bucket-1234567890',
+        Region: 'ap-beijing',
+        Key: 'lumostime_backup.json',
+        CacheControl: 'no-cache, no-store, must-revalidate'
       }),
       expect.any(Function)
     );

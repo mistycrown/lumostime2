@@ -406,7 +406,9 @@ export class WebDAVService {
         if (Capacitor.isNativePlatform() && this.config) {
             console.log(`[WebDAV] Mobile Upload Data: ${filename}, size: ${content.length}`);
             try {
-                const url = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
+                const baseUrl = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
+                const url = `${baseUrl}?_=${Date.now()}`;
+                const tempPath = `temp/${filename}.${Date.now()}.json`;
                 const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
 
                 console.log('[WebDAV] Upload URL:', url);
@@ -468,7 +470,7 @@ export class WebDAVService {
                 
                 // Download directly to filesystem
                 await Filesystem.downloadFile({
-                    path: `temp/${filename}`,
+                    path: tempPath,
                     url: url,
                     directory: Directory.Data,
                     headers: {
@@ -480,7 +482,7 @@ export class WebDAVService {
                 
                 // Read the downloaded file
                 const result = await Filesystem.readFile({
-                    path: `temp/${filename}`,
+                    path: tempPath,
                     directory: Directory.Data,
                     encoding: Encoding.UTF8
                 });
@@ -488,7 +490,7 @@ export class WebDAVService {
                 // Clean up temp file
                 try {
                     await Filesystem.deleteFile({
-                        path: `temp/${filename}`,
+                        path: tempPath,
                         directory: Directory.Data
                     });
                 } catch (e) {
@@ -689,7 +691,9 @@ export class WebDAVService {
             // NATIVE: Use put method with Uint8Array for WebDAV
             if (Capacitor.isNativePlatform() && this.config) {
                 console.log(`[WebDAV] Mobile Upload Image List: ${filename}, size: ${content.length}`);
-                const url = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
+                const baseUrl = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
+                const url = `${baseUrl}?_=${Date.now()}`;
+                const tempPath = `temp/${filename}.${Date.now()}.json`;
                 const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
 
                 const encoder = new TextEncoder();
@@ -737,7 +741,7 @@ export class WebDAVService {
                 
                 // Download directly to filesystem
                 await Filesystem.downloadFile({
-                    path: `temp/${filename}`,
+                    path: tempPath,
                     url: url,
                     directory: Directory.Data,
                     headers: {
@@ -747,7 +751,7 @@ export class WebDAVService {
                 
                 // Read the downloaded file
                 const result = await Filesystem.readFile({
-                    path: `temp/${filename}`,
+                    path: tempPath,
                     directory: Directory.Data,
                     encoding: Encoding.UTF8
                 });
@@ -755,7 +759,7 @@ export class WebDAVService {
                 // Clean up temp file
                 try {
                     await Filesystem.deleteFile({
-                        path: `temp/${filename}`,
+                        path: tempPath,
                         directory: Directory.Data
                     });
                 } catch (e) {

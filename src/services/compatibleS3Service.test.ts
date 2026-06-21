@@ -209,6 +209,8 @@ describe('CompatibleS3Service', () => {
       Bucket: 'bucket-c',
       Key: 'lumostime_backup.json',
       ResponseCacheControl: 'no-cache, no-store, must-revalidate',
+      ResponseContentDisposition: expect.stringContaining('fresh='),
+      ResponseExpires: expect.any(Date),
       ResponseContentType: 'application/json'
     }));
   });

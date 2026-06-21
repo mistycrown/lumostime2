@@ -558,6 +558,8 @@ export class CompatibleS3Service {
       Bucket: this.getBucket(),
       Key: filename,
       ResponseCacheControl: 'no-cache, no-store, must-revalidate',
+      ResponseContentDisposition: `inline; filename="${filename}"; fresh=${Date.now()}`,
+      ResponseExpires: new Date(0),
       ResponseContentType: 'application/json'
     }));
 
@@ -632,6 +634,8 @@ export class CompatibleS3Service {
         Bucket: this.getBucket(),
         Key: 'lumostime_images.json',
         ResponseCacheControl: 'no-cache, no-store, must-revalidate',
+        ResponseContentDisposition: `inline; filename="lumostime_images.json"; fresh=${Date.now()}`,
+        ResponseExpires: new Date(0),
         ResponseContentType: 'application/json'
       }));
 

@@ -2,6 +2,8 @@
 
 The `views/` directory contains all the React components that represent the distinct screens or pages of the LumosTime application. This layer is responsible for the presentation logic and user interaction.
 
+- Update 2026-06-21: `SettingsView.tsx` now builds manual cloud-sync uploads from the complete app sync payload passed by `App.tsx`, so settings-page uploads no longer omit collections, AI, achievements, stickers, or other backup-only fields.
+
 - Update 2026-06-13: `DailyNewspaperView.tsx` now renders local per-annotation comment threads beneath AI newspaper annotations, keeping replies visually quiet in the existing print-inspired layout.
 
 - Update 2026-06-13: `TodoView.tsx` now destructures and passes `handleQuickActionUpdateTitle` to `TodoQuickActionsModal` to enable inline title editing with auto-saving directly in the quick actions sheet.
