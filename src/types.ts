@@ -176,6 +176,7 @@ export interface ActiveSession {
   sceneGroupId?: string;
   sceneSlotId?: string;
   sceneItemId?: string;
+  appAwarenessMeta?: AppAwarenessSessionMeta;
 }
 
 // 璇勮鎺ュ彛
@@ -202,6 +203,156 @@ export interface Log {
   images?: string[]; // (NEW) Array of image filenames/identifiers
   comments?: Comment[]; // (NEW) 璇勮鍒楄〃
   reactions?: string[]; // (NEW) 鍙嶅簲鍒楄〃 (Emoji list)
+  appAwarenessMeta?: AppAwarenessSessionMeta;
+}
+
+export type AppAwarenessStepType =
+  | 'text_question'
+  | 'single_choice'
+  | 'cooldown_wait'
+  | 'expected_duration'
+  | 'start_record';
+
+export type AppAwarenessRunStatus =
+  | 'idle'
+  | 'running_step'
+  | 'waiting_cooldown'
+  | 'paused_away'
+  | 'timer_running'
+  | 'timer_overtime_pending'
+  | 'completed'
+  | 'abandoned'
+  | 'cancelled';
+
+export interface AppAwarenessChoiceOption {
+  id: string;
+  label: string;
+  value: string;
+}
+
+export interface AppAwarenessActivityOption {
+  id: string;
+  categoryId: string;
+  activityId: string;
+  label: string;
+  icon?: string;
+}
+
+export interface AppAwarenessStepBase {
+  id: string;
+  type: AppAwarenessStepType;
+  title: string;
+  description?: string;
+  required?: boolean;
+}
+
+export interface AppAwarenessTextQuestionStep extends AppAwarenessStepBase {
+  type: 'text_question';
+  answerKey: string;
+  placeholder?: string;
+  maxLength?: number;
+}
+
+export interface AppAwarenessSingleChoiceStep extends AppAwarenessStepBase {
+  type: 'single_choice';
+  answerKey: string;
+  options: AppAwarenessChoiceOption[];
+}
+
+export interface AppAwarenessCooldownWaitStep extends AppAwarenessStepBase {
+  type: 'cooldown_wait';
+  durationSeconds: number;
+}
+
+export interface AppAwarenessExpectedDurationStep extends AppAwarenessStepBase {
+  type: 'expected_duration';
+  answerKey: string;
+  durationMinutesOptions: number[];
+  allowCustomDuration?: boolean;
+}
+
+export interface AppAwarenessStartRecordStep extends AppAwarenessStepBase {
+  type: 'start_record';
+  answerKey: string;
+  activityOptions: AppAwarenessActivityOption[];
+  durationSource?: 'from_step' | 'fixed' | 'none';
+  defaultDurationMinutes?: number;
+  allowContinueExtensions?: boolean;
+  extensionMinutesOptions?: number[];
+}
+
+export type AppAwarenessWorkflowStep =
+  | AppAwarenessTextQuestionStep
+  | AppAwarenessSingleChoiceStep
+  | AppAwarenessCooldownWaitStep
+  | AppAwarenessExpectedDurationStep
+  | AppAwarenessStartRecordStep;
+
+export interface AppAwarenessWorkflowTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  isPreset: boolean;
+  enabled: boolean;
+  allowClose?: boolean;
+  steps: AppAwarenessWorkflowStep[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AppAwarenessAppBinding {
+  packageName: string;
+  appName: string;
+  workflowTemplateId: string;
+  enabled: boolean;
+  updatedAt: number;
+}
+
+export interface AppAwarenessExpectedTimerState {
+  startedAt: number;
+  durationMinutes: number;
+  scheduledEndAt: number;
+  extensionHistory: number[];
+  reminderIssuedAt?: number;
+}
+
+export type AppAwarenessAnswerValue =
+  | string
+  | number
+  | boolean
+  | {
+      categoryId: string;
+      activityId: string;
+      label: string;
+      icon?: string;
+    };
+
+export interface AppAwarenessRun {
+  id: string;
+  templateId: string;
+  packageName: string;
+  appName: string;
+  status: AppAwarenessRunStatus;
+  currentStepIndex: number;
+  answers: Record<string, AppAwarenessAnswerValue>;
+  startedAt: number;
+  stepStartedAt?: number;
+  stepEndsAt?: number;
+  completedAt?: number;
+  linkedSessionId?: string;
+  expectedTimer?: AppAwarenessExpectedTimerState;
+}
+
+export interface AppAwarenessSessionMeta {
+  sourceAppPackage: string;
+  sourceAppName: string;
+  workflowTemplateId: string;
+  workflowTemplateName: string;
+  answers: Record<string, AppAwarenessAnswerValue>;
+  startedAt?: number;
+  nativeTimerId?: string;
+  expectedDurationMinutes?: number;
+  extensionHistory?: number[];
 }
 
 export interface TodoCategory {

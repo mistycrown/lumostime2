@@ -1,6 +1,7 @@
 ﻿/**
  * @file AchievementContext.tsx
  * @description Manages achievement bottle data, live snapshots, archived bottles, and reward redemption records with repository hydration and selective recent-day recomputation.
+ * @updated 2026-06-30: Prevents sealing bottles while the current active star balance is negative, with a shared validation message for UI and logic.
  * @updated 2026-05-18: Added unified achievement backup export/restore helpers so bottle data can travel through app export/import and cloud sync.
  * @updated 2026-04-25: Added global check streak config plus active-period recomputation for streak-weighted check-category rules.
  * @updated 2026-04-17: Added filter-duration achievement rules that reuse the shared custom filter expression logic.
@@ -28,6 +29,7 @@ import {
   computeAchievementDailySnapshot,
   enumerateAchievementDates,
   getAchievementActiveStartDate,
+  getAchievementSealBlockedReason,
   getAchievementSealPreview,
   getAchievementYesterday,
   normalizeAchievementRedemptionRecordFunding,
@@ -572,18 +574,24 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
   });
 
   const sealBottle = (collection: AchievementCollection) => {
-    if (!sealPreview) {
+    const sealBlockedReason = getAchievementSealBlockedReason({
+      sealPreview,
+      availableStars
+    });
+
+    if (sealBlockedReason) {
       return {
         ok: false,
-        message: '昨天之前还没有可封存的光点'
+        message: sealBlockedReason
       };
     }
 
-    const snapshotMap = new Set(sealPreview.snapshotIds);
+    const activeSealPreview = sealPreview;
+    const snapshotMap = new Set(activeSealPreview.snapshotIds);
     const snapshotsToArchive = dailySnapshots.filter((snapshot) => snapshotMap.has(snapshot.id));
     const { archivedRecords, remainingActiveRecords } = partitionAchievementRedemptionsForSeal({
-      startDate: sealPreview.startDate,
-      endDate: sealPreview.endDate,
+      startDate: activeSealPreview.startDate,
+      endDate: activeSealPreview.endDate,
       redemptionRecords
     });
     const redemptionsToArchive = archivedRecords.map((record) => {
@@ -619,24 +627,17 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       };
     }
 
-    if (sealPreview.sealableStars <= 0) {
-      return {
-        ok: false,
-        message: '这段时间还没有可封存的正向余额'
-      };
-    }
-
     const now = Date.now();
     const nextArchivedBottle: AchievementArchivedBottle = {
       id: crypto.randomUUID(),
       collectionId: collection.id,
       collectionName: collection.name,
       imagePath: collection.imagePath,
-      periodStartDate: sealPreview.startDate,
-      periodEndDate: sealPreview.endDate,
-      earnedStars: sealPreview.earnedStars,
-      spentStars: sealPreview.spentStars,
-      sealedAmount: sealPreview.sealableStars,
+      periodStartDate: activeSealPreview.startDate,
+      periodEndDate: activeSealPreview.endDate,
+      earnedStars: activeSealPreview.earnedStars,
+      spentStars: activeSealPreview.spentStars,
+      sealedAmount: activeSealPreview.sealableStars,
       status: 'sealed',
       sealedAt: now,
       dailySnapshots: snapshotsToArchive,

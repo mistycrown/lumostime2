@@ -14,6 +14,7 @@ import { Capacitor } from '@capacitor/core';
 import { useSession } from '../contexts/SessionContext';
 import { useToast } from '../contexts/ToastContext';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
+import { ActiveSession } from '../types';
 import {
   buildFloatingStopToken,
   buildFloatingStopActions,
@@ -22,7 +23,7 @@ import {
 } from '../utils/floatingWindowStopUtils';
 
 export const useFloatingWindow = (
-  handleStopActivity: (sessionId: string) => void
+  handleStopActivity: (sessionId: string, finalSessionData?: ActiveSession) => void
 ) => {
   const { activeSessions, cancelSession } = useSession();
   const { addToast } = useToast();
@@ -91,7 +92,8 @@ export const useFloatingWindow = (
           return;
         }
 
-        handleStopActivity(action.sessionId);
+        const matchedSession = activeSessions.find((session) => session.id === action.sessionId);
+        handleStopActivity(action.sessionId, matchedSession);
       });
 
       addToast('success', '已从悬浮球结束计时');

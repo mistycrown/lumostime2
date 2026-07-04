@@ -32,6 +32,7 @@ const loadStatsView = () => import('../views/StatsView').then((module) => ({ def
 const loadReviewTemplateManageView = () => import('../views/ReviewTemplateManageView').then((module) => ({ default: module.ReviewTemplateManageView }));
 const loadCheckTemplateManageView = () => import('../views/CheckTemplateManageView').then((module) => ({ default: module.CheckTemplateManageView }));
 const loadAutoRecordSettingsView = () => import('../views/AutoRecordSettingsView').then((module) => ({ default: module.AutoRecordSettingsView }));
+const loadAppAwarenessSettingsView = () => import('../views/AppAwarenessSettingsView').then((module) => ({ default: module.AppAwarenessSettingsView }));
 const loadObsidianExportView = () => import('../views/ObsidianExportView').then((module) => ({ default: module.ObsidianExportView }));
 const loadMemoirSettingsView = () => import('../views/MemoirSettingsView').then((module) => ({ default: module.MemoirSettingsView }));
 const loadBatchFocusRecordManageView = () => import('../views/BatchFocusRecordManageView').then((module) => ({ default: module.BatchFocusRecordManageView }));
@@ -61,6 +62,7 @@ export const StatsViewLazy = lazyWithPreload(loadStatsView);
 export const ReviewTemplateManageViewLazy = lazyWithPreload(loadReviewTemplateManageView);
 export const CheckTemplateManageViewLazy = lazyWithPreload(loadCheckTemplateManageView);
 export const AutoRecordSettingsViewLazy = lazyWithPreload(loadAutoRecordSettingsView);
+export const AppAwarenessSettingsViewLazy = lazyWithPreload(loadAppAwarenessSettingsView);
 export const ObsidianExportViewLazy = lazyWithPreload(loadObsidianExportView);
 export const MemoirSettingsViewLazy = lazyWithPreload(loadMemoirSettingsView);
 export const BatchFocusRecordManageViewLazy = lazyWithPreload(loadBatchFocusRecordManageView);
@@ -101,6 +103,7 @@ const secondaryPreloaders: Preloader[] = [
   ReviewTemplateManageViewLazy.preload,
   CheckTemplateManageViewLazy.preload,
   AutoRecordSettingsViewLazy.preload,
+  AppAwarenessSettingsViewLazy.preload,
   MemoirSettingsViewLazy.preload,
   AISettingsViewLazy.preload,
   EmojiSettingsViewLazy.preload,

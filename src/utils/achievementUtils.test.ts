@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   calculateAchievementAvailableStars,
   getAchievementActiveStartDate,
+  getAchievementSealBlockedReason,
   getAchievementSealPreview,
   computeAchievementDailySnapshot,
   formatAchievementSignedStars,
@@ -422,6 +423,30 @@ describe('achievementUtils decimal stars', () => {
       snapshotIds: ['snapshot-3', 'snapshot-4', 'snapshot-5'],
       redemptionRecordIds: ['redeem-2']
     });
+  });
+
+  it('blocks sealing when the current available stars are negative even if the period preview is positive', () => {
+    const sealPreview = getAchievementSealPreview({
+      achievementStartDate: '2026-04-01',
+      archivedBottles: [],
+      dailySnapshots: [
+        {
+          id: 'snapshot-1',
+          date: '2026-04-01',
+          netDelta: 5,
+          ruleBreakdown: [],
+          computedAt: 1
+        }
+      ],
+      redemptionRecords: [],
+      today: new Date('2026-04-02T12:00:00+08:00')
+    });
+
+    expect(sealPreview?.sealableStars).toBe(5);
+    expect(getAchievementSealBlockedReason({
+      sealPreview,
+      availableStars: -0.1
+    })).toBe('当前光点为负，暂时不能封瓶');
   });
 
   it('moves the live snapshot start date to the day after the latest archived bottle', () => {

@@ -14,6 +14,53 @@ export interface AppRulesResult {
     ignoredApps: { [packageName: string]: boolean };
 }
 
+export interface AppAwarenessBindingsResult {
+    bindings: { [packageName: string]: string };
+}
+
+export interface AppAwarenessOverlayButton {
+    id: string;
+    label: string;
+    style?: 'primary' | 'secondary' | 'danger';
+    value?: string;
+    submitTextValue?: boolean;
+}
+
+export interface AppAwarenessOverlayPayload {
+    title: string;
+    body?: string;
+    progressText?: string;
+    allowClose?: boolean;
+    countdownSeconds?: number;
+    showInput?: boolean;
+    inputValue?: string;
+    inputPlaceholder?: string;
+    inputHint?: string;
+    buttons: AppAwarenessOverlayButton[];
+}
+
+export interface PendingAppAwarenessNativeStartPayload {
+    nativeTimerId?: string;
+    packageName?: string;
+    appLabel?: string;
+    workflowTemplateId?: string;
+    answers?: Record<string, unknown>;
+    selectedActivity?: {
+        categoryId?: string;
+        activityId?: string;
+        label?: string;
+        icon?: string;
+    };
+    expectedDurationMinutes?: number;
+    startedAt?: number;
+}
+
+export interface PendingAppAwarenessNativeFinishPayload {
+    nativeTimerId?: string;
+    packageName?: string;
+    finishedAt?: number;
+}
+
 export interface AppUsagePlugin {
     checkPermissions(): Promise<{ granted: boolean }>;
     requestPermissions(): Promise<void>;
@@ -25,6 +72,14 @@ export interface AppUsagePlugin {
     removeAppRule(options: { packageName: string }): Promise<void>;
     setAppIgnored(options: { packageName: string; ignored: boolean }): Promise<void>;
     getAppRules(): Promise<AppRulesResult>;
+    syncAppAwarenessBindings(options: { bindings: { [packageName: string]: string } }): Promise<void>;
+    syncAppAwarenessTemplates(options: { templates: unknown[] }): Promise<void>;
+    getAppAwarenessBindings(): Promise<AppAwarenessBindingsResult>;
+    consumePendingAppAwarenessStart(): Promise<{ hasPending: boolean } & PendingAppAwarenessNativeStartPayload>;
+    consumePendingAppAwarenessFinish(): Promise<{ hasPending: boolean } & PendingAppAwarenessNativeFinishPayload>;
+    showAppAwarenessOverlay(options: { payload: AppAwarenessOverlayPayload }): Promise<void>;
+    hideAppAwarenessOverlay(): Promise<void>;
+    stopCurrentAppAwarenessTimer(): Promise<void>;
     startMonitor(): Promise<void>;
     stopMonitor(): Promise<void>;
     showFloatingText(options: { text: string }): Promise<void>;
