@@ -100,6 +100,7 @@ import { SceneSettingsView } from './SceneSettingsView';
 import { startFloatingWindowWithGuards, type FloatingWindowStartupResult } from '../utils/floatingWindowStartup';
 import {
     AISettingsViewLazy as AISettingsView,
+    AppAwarenessSettingsViewLazy as AppAwarenessSettingsView,
     AutoLinkViewLazy as AutoLinkView,
     AutoRecordSettingsViewLazy as AutoRecordSettingsView,
     BatchFocusRecordManageViewLazy as BatchFocusRecordManageView,
@@ -1103,6 +1104,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         );
     }
 
+    if (activeSubmenu === 'app_awareness') {
+        return renderLazySettingsSubview(
+            <AppAwarenessSettingsView
+                onBack={handleBackToMain}
+                categories={categories || []}
+            />,
+            '正在加载应用感知...'
+        );
+    }
+
     if (activeSubmenu === 'obsidian_export') {
         // 获取当天的 dailyReview
         const dateStr = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
@@ -1449,6 +1460,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             icon={<Smartphone size={18} className="text-indigo-500" />}
                             label="应用关联标签规则"
                             onClick={() => openSettingsSubmenu('auto_record')}
+                        />
+                        <MenuItem
+                            icon={<Target size={18} className="text-cyan-600" />}
+                            label="应用感知"
+                            onClick={() => openSettingsSubmenu('app_awareness')}
                         />
                         <ToggleItem
                             icon={<SquareActivity size={18} className="text-teal-500" />}

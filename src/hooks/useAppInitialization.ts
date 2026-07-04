@@ -28,7 +28,7 @@ import { startFloatingWindowWithGuards } from '../utils/floatingWindowStartup';
 
 // Edge-to-Edge 支持（仅在 Android 上可用）
 export const useAppInitialization = () => {
-    const { setAppRules } = useSettings();
+    const { setAppRules, appAwarenessBindings, appAwarenessTemplates } = useSettings();
     const { addToast } = useToast();
     const { logs, setLogs } = useData();
     const hasCleanedImagesRef = useRef(false);
@@ -93,6 +93,45 @@ export const useAppInitialization = () => {
         };
         loadAppRules();
     }, []);
+
+    useEffect(() => {
+        if (Capacitor.getPlatform() !== 'android' || typeof AppUsage.syncAppAwarenessBindings !== 'function') {
+            return;
+        }
+
+        const syncBindings = async () => {
+            try {
+                const bindings = appAwarenessBindings.reduce<Record<string, string>>((acc, binding) => {
+                    if (binding.enabled) {
+                        acc[binding.packageName] = binding.workflowTemplateId;
+                    }
+                    return acc;
+                }, {});
+
+                await AppUsage.syncAppAwarenessBindings({ bindings });
+            } catch (error) {
+                console.error('同步应用感知绑定到原生失败:', error);
+            }
+        };
+
+        void syncBindings();
+    }, [appAwarenessBindings]);
+
+    useEffect(() => {
+        if (Capacitor.getPlatform() !== 'android' || typeof AppUsage.syncAppAwarenessTemplates !== 'function') {
+            return;
+        }
+
+        const syncTemplates = async () => {
+            try {
+                await AppUsage.syncAppAwarenessTemplates({ templates: appAwarenessTemplates });
+            } catch (error) {
+                console.error('同步应用感知模板到原生失败:', error);
+            }
+        };
+
+        void syncTemplates();
+    }, [appAwarenessTemplates]);
 
     // Check for Updates on Mount (with 24h interval)
     useEffect(() => {

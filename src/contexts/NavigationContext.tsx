@@ -21,6 +21,7 @@ export type SettingsSubmenu =
     | 'check_templates'
     | 'narrative_prompt'
     | 'auto_record'
+    | 'app_awareness'
     | 'autolink'
     | 'obsidian_export'
     | 'filters'

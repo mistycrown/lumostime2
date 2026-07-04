@@ -5,6 +5,7 @@
  * @pos Utility (Achievement)
  * @description 成就系统计算工具 - 负责每日快照计算、日期枚举和账本汇总。
  *
+ * @updated 2026-06-30: Added shared seal validation so bottles cannot be sealed while the current active balance is negative.
  * @updated 2026-04-25: Added check-category streak weighting so daily check rules can sum per-item multiplier contributions.
  * @updated 2026-04-17: Added filter-expression duration rules that reuse the shared custom-filter matching logic.
  * @updated 2026-04-07: Separates live-period spending from remaining carryover so archived carryover-funded redemptions do not inflate the active balance.
@@ -348,6 +349,28 @@ export const calculateAchievementTotalEarned = (snapshots: AchievementDailySnaps
 
 export const calculateAchievementTotalRedeemed = (spendRecords: AchievementSpendRecordLike[]): number => {
   return normalizeAchievementStarValue(spendRecords.reduce((sum, item) => sum + item.cost, 0));
+};
+
+export const getAchievementSealBlockedReason = ({
+  sealPreview,
+  availableStars
+}: {
+  sealPreview: AchievementSealPreview | null;
+  availableStars: number;
+}): string | null => {
+  if (!sealPreview) {
+    return '昨天之前还没有新的内容可以封瓶';
+  }
+
+  if (normalizeAchievementStarValue(availableStars) < 0) {
+    return '当前光点为负，暂时不能封瓶';
+  }
+
+  if (sealPreview.sealableStars <= 0) {
+    return '这段时间还没有可封存的正向余额';
+  }
+
+  return null;
 };
 
 export const getAchievementSealPreview = ({

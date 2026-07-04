@@ -5,6 +5,7 @@
  * @pos Component (Achievement Collection Tab)
  * @description Renders the history shelf, a compact seal entry button, a two-step seal modal, and archived bottle detail with shatter support.
  *
+ * @updated 2026-06-30: Blocks sealing when the active bottle balance is negative and surfaces the shared validation message before opening the seal flow.
  * @updated 2026-05-18: Added a render-time fallback that repairs stale default bottle file URLs back to the current bundled asset path before showing a placeholder.
  * @updated 2026-04-06: Simplified the collections page into a history shelf and moved sealing into a two-step modal flow.
  */
@@ -22,7 +23,11 @@ import {
 } from '../../constants/achievementCollections';
 import { useToast } from '../../contexts/ToastContext';
 import { getLocalDateTimeStr } from '../../utils/dateUtils';
-import { formatAchievementSignedStars, formatAchievementStars } from '../../utils/achievementUtils';
+import {
+  formatAchievementSignedStars,
+  formatAchievementStars,
+  getAchievementSealBlockedReason
+} from '../../utils/achievementUtils';
 import { AchievementDialog } from './AchievementDialog';
 
 if (typeof document !== 'undefined') {
@@ -195,8 +200,12 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
     ? archivedBottles.find((bottle) => bottle.id === selectedArchivedBottleId) || null
     : null;
 
-  const canOpenSealDialog = Boolean(sealPreview);
-  const canGoToStepTwo = Boolean(sealPreview && sealPreview.sealableStars > 0);
+  const sealBlockedReason = getAchievementSealBlockedReason({
+    sealPreview,
+    availableStars
+  });
+  const canOpenSealDialog = !sealBlockedReason;
+  const canGoToStepTwo = !sealBlockedReason;
   const canConfirmSeal = Boolean(canGoToStepTwo && selectedCollection);
 
   const closeSealDialog = () => {
@@ -250,7 +259,7 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
             type="button"
             onClick={() => {
               if (!canOpenSealDialog) {
-                addToast('info', '昨天之前还没有新的内容可以封瓶');
+                addToast('info', sealBlockedReason || '昨天之前还没有新的内容可以封瓶');
                 return;
               }
               setIsSealDialogOpen(true);

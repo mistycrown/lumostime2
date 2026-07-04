@@ -44,11 +44,22 @@ public class AppAccessibilityService extends AccessibilityService {
         }
 
         String currentPackage = event.getPackageName().toString();
+        boolean isAppAwarenessOverlayShowing = FloatingWindowService.isAppAwarenessOverlayShowing();
         if (currentPackage.equals(lastPackageName)) {
             return;
         }
 
+        if (currentPackage.equals(getPackageName()) && isAppAwarenessOverlayShowing) {
+            Log.d(TAG, "Ignoring host-app accessibility event while app-awareness overlay is showing");
+            return;
+        }
+
         if (!isInterestingApp(currentPackage)) {
+            if (isAppAwarenessOverlayShowing) {
+                Log.d(TAG, "Ignoring transient non-launchable window while app-awareness overlay is showing: " + currentPackage);
+                return;
+            }
+            AppUsagePlugin.dismissNativeAppAwarenessOverlay();
             Log.d(TAG, "Ignored non-launchable app: " + currentPackage);
             return;
         }
@@ -66,13 +77,21 @@ public class AppAccessibilityService extends AccessibilityService {
             Log.i(TAG, "APP SWITCHED (Self): " + lastPackageName + " -> " + currentPackage);
             lastPackageName = currentPackage;
 
+            AppUsagePlugin.dismissNativeAppAwarenessOverlay();
             FloatingWindowService.updateCurrentApp(currentPackage, appLabel);
             AppUsagePlugin.updateCurrentPackage(currentPackage);
             return;
         }
 
         // 2. 对于其他应用，按规则检查是否应该忽略
+        if (isAppAwarenessOverlayShowing
+                && AppUsagePlugin.isLikelyInputMethodPackage(getApplicationContext(), currentPackage, appLabel)) {
+            Log.d(TAG, "Ignoring input method while app-awareness overlay is showing: " + currentPackage);
+            return;
+        }
+
         if (AppUsagePlugin.shouldIgnoreApp(getApplicationContext(), currentPackage, appLabel)) {
+            AppUsagePlugin.dismissNativeAppAwarenessOverlay();
             Log.d(TAG, "Ignored app by default or user rule: " + currentPackage + " / " + appLabel);
             return;
         }

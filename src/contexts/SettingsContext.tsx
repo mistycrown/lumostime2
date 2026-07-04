@@ -6,6 +6,9 @@
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
+    AppAwarenessAppBinding,
+    AppAwarenessRun,
+    AppAwarenessWorkflowTemplate,
     AppView,
     AutoLinkRule,
     CustomStickerRecord,
@@ -16,6 +19,7 @@ import {
 } from '../types';
 import { DEFAULT_USER_PERSONAL_INFO } from '../constants';
 import { THEME_KEYS } from '../constants/storageKeys';
+import { appAwarenessService } from '../services/appAwarenessService';
 import { uiIconService } from '../services/uiIconService';
 import { fontService } from '../services/fontService';
 import {
@@ -158,6 +162,12 @@ interface SettingsContextType {
     // 应用规则
     appRules: { [packageName: string]: string };
     setAppRules: React.Dispatch<React.SetStateAction<{ [packageName: string]: string }>>;
+    appAwarenessTemplates: AppAwarenessWorkflowTemplate[];
+    setAppAwarenessTemplates: React.Dispatch<React.SetStateAction<AppAwarenessWorkflowTemplate[]>>;
+    appAwarenessBindings: AppAwarenessAppBinding[];
+    setAppAwarenessBindings: React.Dispatch<React.SetStateAction<AppAwarenessAppBinding[]>>;
+    appAwarenessActiveRun: AppAwarenessRun | null;
+    setAppAwarenessActiveRun: React.Dispatch<React.SetStateAction<AppAwarenessRun | null>>;
 
     // AI 设置
     customNarrativeTemplates: NarrativeTemplate[];
@@ -282,6 +292,15 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     });
 
     const [appRules, setAppRules] = useState<{ [packageName: string]: string }>({});
+    const [appAwarenessTemplates, setAppAwarenessTemplates] = useState<AppAwarenessWorkflowTemplate[]>(
+        () => appAwarenessService.getTemplates()
+    );
+    const [appAwarenessBindings, setAppAwarenessBindings] = useState<AppAwarenessAppBinding[]>(
+        () => appAwarenessService.getBindings()
+    );
+    const [appAwarenessActiveRun, setAppAwarenessActiveRun] = useState<AppAwarenessRun | null>(
+        () => appAwarenessService.getActiveRun()
+    );
 
     // AI 设置
     const [customNarrativeTemplates, setCustomNarrativeTemplates] = useState<NarrativeTemplate[]>(() => {
@@ -403,6 +422,18 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem('lumostime_autoApplyTodoLink', JSON.stringify(autoApplyTodoLink));
     }, [autoApplyTodoLink]);
+
+    useEffect(() => {
+        appAwarenessService.saveTemplates(appAwarenessTemplates);
+    }, [appAwarenessTemplates]);
+
+    useEffect(() => {
+        appAwarenessService.saveBindings(appAwarenessBindings);
+    }, [appAwarenessBindings]);
+
+    useEffect(() => {
+        appAwarenessService.saveActiveRun(appAwarenessActiveRun);
+    }, [appAwarenessActiveRun]);
 
     const [autoFocusNote, setAutoFocusNote] = useState<boolean>(() => {
         const stored = localStorage.getItem('lumostime_auto_focus_note');
@@ -640,7 +671,16 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         console.log(
             `[SettingsContext] Sync-relevant settings changed, updated local timestamp: ${previous} -> ${now} (${new Date(now).toLocaleTimeString()})`
         );
-    }, [autoLinkRules, customNarrativeTemplates, customStickerSets, customStickers, filters, userPersonalInfo]);
+    }, [
+        autoLinkRules,
+        appAwarenessTemplates,
+        appAwarenessBindings,
+        customNarrativeTemplates,
+        customStickerSets,
+        customStickers,
+        filters,
+        userPersonalInfo
+    ]);
 
     useEffect(() => {
         localStorage.setItem('lumostime_memoir_filter_config', JSON.stringify(memoirFilterConfig));
@@ -714,6 +754,12 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setDefaultSelectorPage,
             appRules,
             setAppRules,
+            appAwarenessTemplates,
+            setAppAwarenessTemplates,
+            appAwarenessBindings,
+            setAppAwarenessBindings,
+            appAwarenessActiveRun,
+            setAppAwarenessActiveRun,
             customNarrativeTemplates,
             setCustomNarrativeTemplates,
             userPersonalInfo,

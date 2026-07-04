@@ -4,6 +4,7 @@
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
+ * @updated 2026-06-21: Centralized active-session stop persistence so floating-ball stops and app-awareness finishes always submit logs through the same path.
  * @updated 2026-06-15: Added a sync conflict confirmation modal so timestamp-vs-size contradictions during cloud sync now pause before a smaller JSON can overwrite a larger one.
  * @updated 2026-05-21: Localized the todo deletion confirmation modal into Chinese so the warning copy and action labels match the rest of the app.
  * @updated 2026-05-18: Added a desktop AI widget shell route that reuses the full app provider tree but swaps the normal layout for a compact always-on-top quick-chat window.
@@ -30,6 +31,7 @@ import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { AppView } from './types';
+import type { ActiveSession, AppAwarenessSessionMeta, Log } from './types';
 import AssistantAgent from './plugins/AssistantAgentPlugin';
 
 import { ToastProvider, useToast } from './contexts/ToastContext';
@@ -65,6 +67,7 @@ import { useSearchManager } from './hooks/useSearchManager';
 import { useDeepLink } from './hooks/useDeepLink';
 import { useFloatingWindow } from './hooks/useFloatingWindow';
 import { useAppDetection } from './hooks/useAppDetection';
+import { useAppAwarenessRuntime } from './hooks/useAppAwarenessRuntime';
 import { useHardwareBackButton } from './hooks/useHardwareBackButton';
 import { useAppLifecycle } from './hooks/useAppLifecycle';
 import { useWidgetBridgeSync } from './hooks/useWidgetBridgeSync';
@@ -460,12 +463,20 @@ const AppContent: React.FC = () => {
   }, [activeSessions, focusDetailSessionId, setFocusDetailSessionId]);
   
   // Wrappers for Session Actions to match original signature (injecting autoLinkRules)
-  const handleStartActivityWrapper = (activity: any, categoryId: string, todoId?: string, scopeIdOrIds?: string | string[], note?: string, autoEnterFocus?: boolean) => {
+  const handleStartActivityWrapper = (
+    activity: any,
+    categoryId: string,
+    todoId?: string,
+    scopeIdOrIds?: string | string[],
+    note?: string,
+    autoEnterFocus?: boolean,
+    appAwarenessMeta?: AppAwarenessSessionMeta
+  ) => {
     const resolvedJumpMode = resolveAutoStartTimerJumpMode(autoStartTimerJumpMode, autoEnterFocus);
     setShouldAutoOpenFocus(shouldOpenFocusDetailForAutoStartTimerJumpMode(resolvedJumpMode));
     setShouldAutoEnterImmersive(shouldEnterImmersiveForAutoStartTimerJumpMode(resolvedJumpMode));
 
-    startActivity(activity, categoryId, autoLinkRules, todoId, scopeIdOrIds, note);
+    return startActivity(activity, categoryId, autoLinkRules, todoId, scopeIdOrIds, note, appAwarenessMeta);
   };
   
   const handleStartTodoFocusWrapper = (todo: TodoItem, autoEnterFocus?: boolean) => {
@@ -475,12 +486,16 @@ const AppContent: React.FC = () => {
 
     todoManager.handleStartTodoFocus(todo);
   };
-  
-  const handleStopActivityWrapper = (sessionId: string) => {
+
+  const persistStoppedSessionLogs = (stoppedLogs: Log[]) => {
+    stoppedLogs.forEach((log) => logManager.handleSaveLog(log));
+  };
+
+  const handleStopActivityWrapper = (sessionId: string, finalSessionData?: ActiveSession) => {
     stopActivity(
       sessionId,
-      undefined,
-      (logs) => logs.forEach(l => logManager.handleSaveLog(l))
+      finalSessionData,
+      persistStoppedSessionLogs
     );
   };
 
@@ -679,6 +694,10 @@ const AppContent: React.FC = () => {
   );
   useFloatingWindow(handleStopActivityWrapper);
   useAppDetection(handleStartActivityWrapper);
+  useAppAwarenessRuntime({
+    handleStartActivity: handleStartActivityWrapper,
+    handleStopActivity: handleStopActivityWrapper
+  });
   useWidgetBridgeSync();
   useFloatingWindowSync();
 
@@ -944,11 +963,7 @@ const AppContent: React.FC = () => {
               }}
               onCancel={cancelSession}
               onComplete={(finalSession) => {
-                stopActivity(
-                  finalSession.id,
-                  finalSession,
-                  (logs) => logs.forEach(l => logManager.handleSaveLog(l))
-                );
+                handleStopActivityWrapper(finalSession.id, finalSession);
                 setFocusDetailSessionId(null);
                 setShouldAutoEnterImmersive(false);
               }}
