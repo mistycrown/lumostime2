@@ -4,6 +4,7 @@
  * @output Workflow-template edits plus app-to-workflow binding updates
  * @pos View (Settings Sub-page)
  * @description Provides the in-app configuration surface for the Android-only app-awareness feature, including linear workflow template editing and target-app workflow bindings.
+ * @updated 2026-07-06: Added workflow viability validation before leaving the editor or binding apps so app-awareness cannot save dead-end overlays.
  * @updated 2026-06-21: Added enter-to-create choice options, space-delimited duration inputs, shared custom-select styling, and save-time validation that keeps `开始记录` at the end of the workflow.
  * @updated 2026-06-21: Let workflow number fields keep raw draft input so cooldown seconds, fixed duration, and duration-option lists can be fully cleared and rewritten.
  * @updated 2026-06-21: Rebuilt the settings UX with UTF-8-safe copy, top-level permission gating, cleaner toggle controls, and refined workflow node editors.
@@ -337,9 +338,45 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
     return startRecordIndex < 0 || startRecordIndex === template.steps.length - 1;
   };
 
+  const getTemplateValidationError = (template: AppAwarenessWorkflowTemplate): string | null => {
+    if (!canSaveTemplate(template)) {
+      return '“开始记录”节点必须放在工作流最后，调整后才能返回保存。';
+    }
+
+    const hasActionableStep = template.steps.some((step) => step.type !== 'cooldown_wait');
+    if (!hasActionableStep && template.allowClose === false) {
+      return '这个工作流没有可操作步骤，并且不允许关闭，会让悬浮面板卡住。';
+    }
+
+    for (const step of template.steps) {
+      if (step.type === 'single_choice' && step.options.length === 0) {
+        return '选择题至少需要 1 个选项。';
+      }
+
+      if (step.type === 'expected_duration' && step.durationMinutesOptions.length === 0) {
+        return '“预计时长”至少需要 1 个时长选项。';
+      }
+
+      if (step.type === 'start_record' && step.activityOptions.length === 0) {
+        return '“开始记录”至少需要选择 1 个可记录活动。';
+      }
+
+      if (
+        step.type === 'start_record' &&
+        step.allowContinueExtensions !== false &&
+        (step.extensionMinutesOptions || []).length === 0
+      ) {
+        return '允许延长时，“延长选项”至少需要 1 个时长。';
+      }
+    }
+
+    return null;
+  };
+
   const handleBackFromTemplateEditor = () => {
-    if (editingTemplate && !canSaveTemplate(editingTemplate)) {
-      addToast('error', '“开始记录”节点必须放在工作流最后，调整后才能返回保存。');
+    const validationError = editingTemplate ? getTemplateValidationError(editingTemplate) : null;
+    if (validationError) {
+      addToast('error', validationError);
       return;
     }
 
@@ -413,6 +450,15 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
   };
 
   const handleSelectBinding = (app: InstalledApp, workflowTemplateId: string | null) => {
+    const selectedTemplate = workflowTemplateId
+      ? appAwarenessTemplates.find((template) => template.id === workflowTemplateId)
+      : null;
+    const validationError = selectedTemplate ? getTemplateValidationError(selectedTemplate) : null;
+    if (validationError) {
+      addToast('error', validationError);
+      return;
+    }
+
     const nextBindings = workflowTemplateId
       ? [
           ...appAwarenessBindings.filter((binding) => binding.packageName !== app.packageName),

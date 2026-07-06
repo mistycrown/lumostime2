@@ -4,6 +4,7 @@
  * @output Structured local-query hits and compact text digests for foreground assistant retrieval loops
  * @pos Service (Assistant Local Query)
  * @description Executes foreground assistant local queries against shared custom-filter and search-all logic so the model can request focused local facts without forcing every turn through a retrieval pass.
+ * @updated 2026-07-06: Raised the default foreground local-query window to 20 items, allowed larger incremental limit requests, and kept total-hit counts separate from the current returned slice.
  * @updated 2026-07-06: Added skipped-query result shaping so duplicate foreground retrieval rounds can be surfaced clearly in chat and debug flows.
  * @updated 2026-07-05: Added a foreground-only local query service with filter-expression and keyword-search modes, result limiting, and assistant-facing digest formatting.
  */
@@ -43,8 +44,8 @@ interface AssistantLocalSearchParams extends AssistantLocalSearchContext {
   request: AssistantLocalQueryRequest;
 }
 
-const DEFAULT_QUERY_LIMIT = 6;
-const MAX_QUERY_LIMIT = 20;
+const DEFAULT_QUERY_LIMIT = 20;
+const MAX_QUERY_LIMIT = 100;
 
 const clampLimit = (value?: number): number => {
   if (!Number.isFinite(value)) {

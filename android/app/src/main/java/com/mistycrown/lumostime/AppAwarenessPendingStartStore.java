@@ -4,6 +4,7 @@
  * @output SharedPreferences-backed pending app-awareness start payload
  * @pos Native Helper
  * @description Persists the latest native app-awareness start payload so the Web layer can recover timer starts even when the Capacitor runtime is backgrounded.
+ * @updated 2026-07-06: Switched pending-start recovery to peek/ack semantics so failed Web reconciliation does not drop native events.
  * @updated 2026-06-21: Added consume semantics for app-awareness native-start recovery.
  */
 package com.mistycrown.lumostime;
@@ -31,14 +32,13 @@ public final class AppAwarenessPendingStartStore {
         prefs(context).edit().putString(KEY_PENDING_START_JSON, payload.toString()).apply();
     }
 
-    public static JSONObject consume(Context context) {
+    public static JSONObject peek(Context context) {
         if (context == null) {
             return null;
         }
 
         SharedPreferences sharedPreferences = prefs(context);
         String raw = sharedPreferences.getString(KEY_PENDING_START_JSON, "");
-        sharedPreferences.edit().remove(KEY_PENDING_START_JSON).apply();
 
         if (raw == null || raw.trim().isEmpty()) {
             return null;
@@ -50,6 +50,20 @@ public final class AppAwarenessPendingStartStore {
             Log.e(TAG, "Failed to parse pending start payload", error);
             return null;
         }
+    }
+
+    public static void acknowledge(Context context) {
+        if (context == null) {
+            return;
+        }
+
+        prefs(context).edit().remove(KEY_PENDING_START_JSON).apply();
+    }
+
+    public static JSONObject consume(Context context) {
+        JSONObject payload = peek(context);
+        acknowledge(context);
+        return payload;
     }
 
     private static SharedPreferences prefs(Context context) {
