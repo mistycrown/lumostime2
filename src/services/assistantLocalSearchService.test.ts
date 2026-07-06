@@ -54,6 +54,42 @@ describe('assistantLocalSearchService', () => {
     expect(result.digest).toContain('[category] 论文研究');
   });
 
+
+
+  it('defaults to returning up to 20 items while preserving the full hit count', () => {
+    const result = assistantLocalSearchService.runQuery({
+      round: 1,
+      request: {
+        mode: 'keyword_search',
+        targets: ['categories'],
+        query: '??'
+      },
+      logs: [],
+      categories: Array.from({ length: 25 }, (_, index) => ({
+        id: `category-${index + 1}`,
+        name: `???? ${index + 1}`,
+        icon: '??',
+        color: '#000000',
+        activities: []
+      })) as any,
+      todos: [],
+      todoCategories: [],
+      scopes: [],
+      dailyReviews: [],
+      weeklyReviews: [],
+      monthlyReviews: []
+    });
+
+    expect(result.hitCount).toBe(25);
+    expect(result.items).toHaveLength(20);
+  });
+
+  it('allows larger requested limits up to the safety cap', () => {
+    expect(assistantLocalSearchService.clampLimit()).toBe(20);
+    expect(assistantLocalSearchService.clampLimit(50)).toBe(50);
+    expect(assistantLocalSearchService.clampLimit(1000)).toBe(100);
+  });
+
   it('matches log records through filter-expression tag and scope names even when note text does not contain the keyword', () => {
     const result = assistantLocalSearchService.runQuery({
       round: 1,

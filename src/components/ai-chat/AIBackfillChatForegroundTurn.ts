@@ -464,7 +464,7 @@ export const normalizeLocalQueryRequestForExecution = (
 };
 
 const buildQuerySignature = (request: AssistantLocalQueryRequest): string => (
-  `${request.mode}|${request.targets.join(',')}|${request.query.trim().toLowerCase()}`
+  `${request.mode}|${request.targets.join(',')}|${request.query.trim().toLowerCase()}|${request.limit || 20}`
 );
 
 const buildQueryRequestSummary = (
@@ -474,7 +474,8 @@ const buildQueryRequestSummary = (
   `正在查询第 ${round} 轮`,
   `范围：${formatQueryTargets(request.targets)}`,
   `关键词：${request.query}`,
-  `方式：${request.mode === 'filter_expression' ? '筛选表达式' : '关键词检索'}`
+  `方式：${request.mode === 'filter_expression' ? '筛选表达式' : '关键词检索'}`,
+  `请求回灌：${request.limit || 20} 条`
 ].join('\n'));
 
 const buildQueryResultSummary = (result: AssistantLocalQueryResult): string => {
@@ -483,6 +484,7 @@ const buildQueryResultSummary = (result: AssistantLocalQueryResult): string => {
       `第 ${result.round} 轮未执行`,
       `范围：${formatQueryTargets(result.request.targets)}`,
       `关键词：${result.request.query}`,
+      `请求回灌：${result.request.limit || 20} 条`,
       result.statusMessage || '这轮查询与上一轮完全相同，已拒绝执行。'
     ].join('\n');
   }
@@ -493,7 +495,8 @@ const buildQueryResultSummary = (result: AssistantLocalQueryResult): string => {
     `第 ${result.round} 轮查询完成`,
     `范围：${formatQueryTargets(result.request.targets)}`,
     `关键词：${result.request.query}`,
-    `命中：${result.hitCount} 条${result.items.length !== result.hitCount ? `（当前展示 ${result.items.length} 条）` : ''}`,
+    `完整命中：${result.hitCount} 条`,
+    `当前回灌：${result.items.length} 条（请求 ${result.request.limit || 20} 条）`,
     ...(previewItems.length > 0
       ? [
         '前几条结果：',

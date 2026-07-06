@@ -4,6 +4,7 @@
  * @output Android floating overlay workflow orchestration for app-awareness prompts, countdowns, and overtime reminders
  * @pos Hook (System Integration)
  * @description Drives the native app-awareness floating workflow panel step-by-step without switching back to LumosTime, while reusing the existing session and log pipeline for actual timer records.
+ * @updated 2026-07-06: Acknowledges pending native app-awareness events only after successful reconciliation and retries foreground races so start/finish payloads are not dropped.
  * @updated 2026-06-21: Removed dismiss/close from the overtime finish prompt so expected-duration handling only offers extend or submit.
  * @updated 2026-06-21: Added the first-pass native overlay runtime for cooldown,问答,预计时长,开始记录 and overtime extension prompts.
  */
@@ -225,6 +226,8 @@ export const useAppAwarenessRuntime = ({
   const processedNativeStartIdsRef = useRef<Map<string, number>>(new Map());
   const handleStartActivityRef = useRef(handleStartActivity);
   const handleStopActivityRef = useRef(handleStopActivity);
+  const pendingNativeReconcileRetryRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const pendingNativeReconcileRetryCountRef = useRef(0);
 
   useEffect(() => {
     templatesRef.current = appAwarenessTemplates;
@@ -638,19 +641,19 @@ export const useAppAwarenessRuntime = ({
 
     const processNativeStartPayload = (
       detail: AppAwarenessNativeStartPayload | PendingAppAwarenessNativeStartPayload | null
-    ) => {
+    ): boolean => {
       if (!detail?.packageName || !detail.workflowTemplateId || !detail.selectedActivity?.categoryId || !detail.selectedActivity?.activityId) {
-        return;
+        return false;
       }
 
       if (!claimNativeStartId(detail.nativeTimerId)) {
-        return;
+        return true;
       }
 
       const template = templatesRef.current.find((item) => item.id === detail.workflowTemplateId);
       const startRecordStep = template?.steps.find((item): item is AppAwarenessStartRecordStep => item.type === 'start_record');
       if (!template || !startRecordStep) {
-        return;
+        return false;
       }
 
       const answers =
@@ -699,13 +702,14 @@ export const useAppAwarenessRuntime = ({
           nativeTimerId: detail.nativeTimerId
         }
       );
+      return true;
     };
 
     const processNativeFinishPayload = (
       detail: AppAwarenessNativeFinishPayload | PendingAppAwarenessNativeFinishPayload | null
-    ) => {
+    ): boolean => {
       if (!detail?.nativeTimerId) {
-        return;
+        return false;
       }
 
       const matchedSession = activeSessionsRef.current.find((session) =>
@@ -725,15 +729,32 @@ export const useAppAwarenessRuntime = ({
       if (matchedSession) {
         setAppAwarenessActiveRun(null);
         void hideOverlay();
+        return true;
       }
+
+      return false;
     };
 
     const handleNativeStart = (event: Event) => {
-      processNativeStartPayload(parseEventDetail<AppAwarenessNativeStartPayload>(event));
+      const handled = processNativeStartPayload(parseEventDetail<AppAwarenessNativeStartPayload>(event));
+      if (handled && typeof AppUsage.acknowledgePendingAppAwarenessStart === 'function') {
+        pendingNativeReconcileRetryCountRef.current = 0;
+        void AppUsage.acknowledgePendingAppAwarenessStart().catch((error) => {
+          console.error('[useAppAwarenessRuntime] Failed to acknowledge native start', error);
+        });
+      }
     };
 
     const handleNativeFinish = (event: Event) => {
-      processNativeFinishPayload(parseEventDetail<AppAwarenessNativeFinishPayload>(event));
+      const handled = processNativeFinishPayload(parseEventDetail<AppAwarenessNativeFinishPayload>(event));
+      if (handled && typeof AppUsage.acknowledgePendingAppAwarenessFinish === 'function') {
+        pendingNativeReconcileRetryCountRef.current = 0;
+        void AppUsage.acknowledgePendingAppAwarenessFinish().catch((error) => {
+          console.error('[useAppAwarenessRuntime] Failed to acknowledge native finish', error);
+        });
+      } else if (!handled) {
+        schedulePendingNativeEventRetry();
+      }
     };
 
     const consumePendingNativeStart = async () => {
@@ -747,7 +768,12 @@ export const useAppAwarenessRuntime = ({
           return;
         }
 
-        processNativeStartPayload(pending);
+        if (
+          processNativeStartPayload(pending) &&
+          typeof AppUsage.acknowledgePendingAppAwarenessStart === 'function'
+        ) {
+          await AppUsage.acknowledgePendingAppAwarenessStart();
+        }
       } catch (error) {
         console.error('[useAppAwarenessRuntime] Failed to consume pending native start', error);
       }
@@ -761,10 +787,19 @@ export const useAppAwarenessRuntime = ({
       try {
         const pending = await AppUsage.consumePendingAppAwarenessFinish();
         if (!pending.hasPending) {
+          pendingNativeReconcileRetryCountRef.current = 0;
           return;
         }
 
-        processNativeFinishPayload(pending);
+        const handled = processNativeFinishPayload(pending);
+        if (handled) {
+          pendingNativeReconcileRetryCountRef.current = 0;
+          if (typeof AppUsage.acknowledgePendingAppAwarenessFinish === 'function') {
+            await AppUsage.acknowledgePendingAppAwarenessFinish();
+          }
+        } else {
+          schedulePendingNativeEventRetry();
+        }
       } catch (error) {
         console.error('[useAppAwarenessRuntime] Failed to consume pending native finish', error);
       }
@@ -773,6 +808,22 @@ export const useAppAwarenessRuntime = ({
     const reconcilePendingNativeEvents = async () => {
       await consumePendingNativeStart();
       await consumePendingNativeFinish();
+    };
+
+    const schedulePendingNativeEventRetry = () => {
+      if (pendingNativeReconcileRetryRef.current) {
+        return;
+      }
+
+      if (pendingNativeReconcileRetryCountRef.current >= 20) {
+        return;
+      }
+      pendingNativeReconcileRetryCountRef.current += 1;
+
+      pendingNativeReconcileRetryRef.current = window.setTimeout(() => {
+        pendingNativeReconcileRetryRef.current = null;
+        void reconcilePendingNativeEvents();
+      }, 750);
     };
 
     window.addEventListener('appAwarenessDetected', handleDetected);
@@ -801,6 +852,11 @@ export const useAppAwarenessRuntime = ({
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (pendingNativeReconcileRetryRef.current) {
+        window.clearTimeout(pendingNativeReconcileRetryRef.current);
+        pendingNativeReconcileRetryRef.current = null;
+      }
+      pendingNativeReconcileRetryCountRef.current = 0;
       void appStateListener?.remove();
       window.removeEventListener('appAwarenessDetected', handleDetected);
       window.removeEventListener('appAwarenessOverlayAction', handleOverlayAction);

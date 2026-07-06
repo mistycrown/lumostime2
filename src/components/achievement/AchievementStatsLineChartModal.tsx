@@ -3,7 +3,11 @@
  * @input Active achievement daily snapshots
  * @output Bottom-sheet achievement stats drawer with a horizontally draggable positive/negative line chart
  * @pos Component (Achievement Stats)
- * @description Renders a flat drawer-style statistics view for the active achievement ledger with one draggable daily net-delta line chart.
+ * @description Renders an editorial print-inspired statistics drawer for the active achievement ledger with one draggable daily net-delta line chart.
+ * @updated 2026-07-06: Restored fixed horizontal spacing by preventing the scrollable plot from shrinking on mobile.
+ * @updated 2026-07-06: Moved the y-axis into a fixed safe gutter and expanded the x-axis to show every day label.
+ * @updated 2026-07-06: Tightened chart side gutters so sparse datasets still feel full-width without oversized margins.
+ * @updated 2026-07-06: Rebuilt the line chart into a flatter editorial style with axis labels, positive/negative bands, and lighter hover guides.
  * @updated 2026-07-05: Switched the stats view to a flat drawer that matches the supplement-log detail style and keeps only a draggable positive/negative line chart.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -19,7 +23,39 @@ interface AchievementStatsLineChartModalProps {
 }
 
 const CHART_HEIGHT = 320;
+const CHART_PANEL_HEIGHT = 360;
 const MIN_CHART_WIDTH = 960;
+const SPARSE_POINT_GAP = 132;
+const REGULAR_POINT_GAP = 72;
+const Y_AXIS_WIDTH = 88;
+
+const buildChartPath = (points: Array<{ x: number; y: number }>): string => {
+  if (points.length === 0) {
+    return '';
+  }
+
+  if (points.length === 1) {
+    return `M ${points[0].x} ${points[0].y}`;
+  }
+
+  if (points.length <= 3) {
+    return points
+      .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+      .join(' ');
+  }
+
+  let path = `M ${points[0].x} ${points[0].y}`;
+
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const current = points[index];
+    const next = points[index + 1];
+    const controlX = (current.x + next.x) / 2;
+
+    path += ` C ${controlX} ${current.y}, ${controlX} ${next.y}, ${next.x} ${next.y}`;
+  }
+
+  return path;
+};
 
 export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartModalProps> = ({
   isOpen,
@@ -29,6 +65,7 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
   const scrollerRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<{ pointerId: number; startX: number; startScrollLeft: number } | null>(null);
   const [activePointIndex, setActivePointIndex] = useState<number | null>(null);
+  const [viewportWidth, setViewportWidth] = useState(0);
 
   const orderedSnapshots = useMemo(() => (
     [...snapshots].sort((first, second) => first.date.localeCompare(second.date))
@@ -36,18 +73,29 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
 
   const chartData = useMemo(() => {
     const values = orderedSnapshots.map((snapshot) => snapshot.netDelta);
+    const count = orderedSnapshots.length;
     const maxAbs = values.reduce((max, value) => Math.max(max, Math.abs(value)), 0);
-    const domain = Math.max(5, Math.ceil(maxAbs));
+    const domain = Math.max(5, Math.ceil(maxAbs / 2) * 2);
     const minValue = -domain;
     const maxValue = domain;
-    const padding = { top: 24, right: 28, bottom: 42, left: 56 };
-    const innerWidth = Math.max(MIN_CHART_WIDTH - padding.left - padding.right, orderedSnapshots.length * 56);
+    const padding = { top: 36, right: 16, bottom: 52, left: 0 };
+    const isSparse = count <= 3;
+    const pointGap = isSparse ? SPARSE_POINT_GAP : REGULAR_POINT_GAP;
+    const occupiedWidth = Math.max(0, (count - 1) * pointGap);
+    const availableInnerWidth = Math.max(viewportWidth - Y_AXIS_WIDTH - padding.right, 0);
+    const innerWidth = isSparse
+      ? Math.max(320, availableInnerWidth, occupiedWidth + 160)
+      : Math.max(MIN_CHART_WIDTH - padding.left - padding.right, availableInnerWidth, occupiedWidth);
     const innerHeight = CHART_HEIGHT - padding.top - padding.bottom;
-    const divisor = Math.max(orderedSnapshots.length - 1, 1);
     const svgWidth = innerWidth + padding.left + padding.right;
+    const plotOffset = isSparse
+      ? Math.max((innerWidth - occupiedWidth) / 2, 0)
+      : 0;
 
     const points = orderedSnapshots.map((snapshot, index) => {
-      const x = padding.left + (index / divisor) * innerWidth;
+      const x = count === 1
+        ? padding.left + innerWidth / 2
+        : padding.left + plotOffset + index * pointGap;
       const normalized = (snapshot.netDelta - minValue) / (maxValue - minValue || 1);
       const y = CHART_HEIGHT - padding.bottom - normalized * innerHeight;
 
@@ -55,7 +103,8 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
         x,
         y,
         date: snapshot.date,
-        value: snapshot.netDelta
+        value: snapshot.netDelta,
+        shortDate: snapshot.date.slice(5)
       };
     });
 
@@ -69,9 +118,36 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
       maxValue,
       innerWidth,
       svgWidth,
-      isEmpty: values.length === 0
+      isSparse,
+      isEmpty: values.length === 0,
+      yTicks: [maxValue, maxValue / 2, 0, minValue / 2, minValue]
     };
-  }, [orderedSnapshots]);
+  }, [orderedSnapshots, viewportWidth]);
+
+  useEffect(() => {
+    if (!isOpen || !scrollerRef.current) {
+      return undefined;
+    }
+
+    const measure = () => {
+      setViewportWidth(scrollerRef.current?.clientWidth ?? 0);
+    };
+
+    measure();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
+    }
+
+    const observer = new ResizeObserver(() => {
+      measure();
+    });
+
+    observer.observe(scrollerRef.current);
+
+    return () => observer.disconnect();
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -84,24 +160,20 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
     setActivePointIndex(latestIndex);
 
     window.setTimeout(() => {
-      scrollerRef.current?.scrollTo({
-        left: Math.max(chartData.svgWidth - 640, 0),
-        behavior: 'smooth'
-      });
+      if (!chartData.isSparse) {
+        scrollerRef.current?.scrollTo({
+          left: Math.max(chartData.svgWidth - 640, 0),
+          behavior: 'smooth'
+        });
+      }
     }, 0);
-  }, [chartData.svgWidth, isOpen, orderedSnapshots.length]);
+  }, [chartData.isSparse, chartData.svgWidth, isOpen, orderedSnapshots.length]);
 
   if (!isOpen) {
     return null;
   }
 
-  const pathD = chartData.points
-    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
-    .join(' ');
-
-  const ticks = [-2, -1, 0, 1, 2].map((tick) => (
-    tick * Math.max(1, Math.floor(Math.max(Math.abs(chartData.minValue), Math.abs(chartData.maxValue)) / 2))
-  ));
+  const pathD = buildChartPath(chartData.points);
 
   const activePoint = activePointIndex !== null ? chartData.points[activePointIndex] : null;
 
@@ -162,110 +234,222 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
             <div className="w-10" />
           </div>
 
-          <div className="flex-1 overflow-hidden px-4 pt-4 pb-6">
+          <div className="flex-1 overflow-hidden px-2 pt-4 pb-6">
             {chartData.isEmpty ? (
               <div className="flex h-full items-center justify-center px-6 text-sm leading-7 text-stone-500">
                 还没有可统计的每日记录。
               </div>
             ) : (
               <div className="flex h-full flex-col">
-                <div className="mb-3 flex items-center justify-between px-2 text-xs text-stone-400">
-                  <span>{orderedSnapshots[0]?.date}</span>
-                  <span>{orderedSnapshots[orderedSnapshots.length - 1]?.date}</span>
+                <div className="mb-3 flex items-end justify-between gap-4 px-1">
+                  <div className="shrink-0 text-xs text-stone-400">{orderedSnapshots[0]?.date}</div>
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">Daily Net Delta</div>
+                  <div className="shrink-0 text-right text-xs text-stone-400">{orderedSnapshots[orderedSnapshots.length - 1]?.date}</div>
                 </div>
 
                 <div
-                  ref={scrollerRef}
-                  className="relative flex-1 overflow-x-auto overflow-y-hidden no-scrollbar cursor-grab active:cursor-grabbing touch-pan-x"
-                  onPointerDown={handlePointerDown}
-                  onPointerMove={handlePointerMove}
-                  onPointerUp={handlePointerEnd}
-                  onPointerCancel={handlePointerEnd}
+                  className="relative overflow-hidden md:h-[400px]"
+                  style={{ height: `${CHART_PANEL_HEIGHT}px` }}
                 >
-                  <div className="relative h-full" style={{ width: `${chartData.svgWidth}px` }}>
-                    <svg viewBox={`0 0 ${chartData.svgWidth} ${CHART_HEIGHT}`} className="block h-full w-full">
-                      <line
-                        x1={chartData.padding.left}
-                        y1={chartData.zeroY}
-                        x2={chartData.padding.left + chartData.innerWidth}
-                        y2={chartData.zeroY}
-                        stroke="#d6d3d1"
-                        strokeDasharray="4 4"
-                      />
+                  <div
+                    className="pointer-events-none absolute inset-y-0 left-0 z-10 bg-[#faf9f6]"
+                    style={{ width: `${Y_AXIS_WIDTH}px` }}
+                  >
+                    <svg viewBox={`0 0 ${Y_AXIS_WIDTH} ${CHART_HEIGHT}`} className="block h-full w-full">
+                      <text
+                        x="8"
+                        y={chartData.padding.top - 12}
+                        fill="#a8a29e"
+                        fontSize="10"
+                        letterSpacing="1.8"
+                      >
+                        POSITIVE
+                      </text>
+                      <text
+                        x="8"
+                        y={CHART_HEIGHT - chartData.padding.bottom + 28}
+                        fill="#a8a29e"
+                        fontSize="10"
+                        letterSpacing="1.8"
+                      >
+                        NEGATIVE
+                      </text>
 
-                      {ticks.map((value) => {
+                      {chartData.yTicks.map((value) => {
                         const normalized = (value - chartData.minValue) / (chartData.maxValue - chartData.minValue || 1);
                         const y = CHART_HEIGHT - chartData.padding.bottom - normalized * (CHART_HEIGHT - chartData.padding.top - chartData.padding.bottom);
+                        const isZero = value === 0;
 
                         return (
-                          <g key={value}>
-                            <line
-                              x1={chartData.padding.left}
-                              y1={y}
-                              x2={chartData.padding.left + chartData.innerWidth}
-                              y2={y}
-                              stroke="#f1efea"
-                            />
-                            <text
-                              x={chartData.padding.left - 10}
-                              y={y + 4}
-                              textAnchor="end"
-                              fill="#a8a29e"
-                              fontSize="10"
-                            >
-                              {formatAchievementSignedStars(value)}
-                            </text>
-                          </g>
-                        );
-                      })}
-
-                      {chartData.points.length > 1 && (
-                        <path
-                          d={pathD}
-                          fill="none"
-                          stroke="#1c1917"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      )}
-
-                      {chartData.points.map((point, index) => {
-                        const isActive = index === activePointIndex;
-
-                        return (
-                          <g
-                            key={`${point.date}-${index}`}
-                            onMouseEnter={() => setActivePointIndex(index)}
-                            onFocus={() => setActivePointIndex(index)}
-                            tabIndex={0}
+                          <text
+                            key={value}
+                            x={Y_AXIS_WIDTH - 10}
+                            y={y + 4}
+                            textAnchor="end"
+                            fill={isZero ? '#44403c' : '#8b8680'}
+                            fontSize="10"
                           >
-                            <circle
-                              cx={point.x}
-                              cy={point.y}
-                              r={isActive ? '5' : '4'}
-                              fill="#ffffff"
-                              stroke="#1c1917"
-                              strokeWidth={isActive ? '2.5' : '2'}
-                            />
-                            <text
-                              x={point.x}
-                              y={CHART_HEIGHT - 14}
-                              textAnchor="middle"
-                              fill="#a8a29e"
-                              fontSize="10"
-                            >
-                              {point.date.slice(5)}
-                            </text>
-                          </g>
+                            {formatAchievementSignedStars(value)}
+                          </text>
                         );
                       })}
                     </svg>
                   </div>
+
+                  <div
+                    ref={scrollerRef}
+                    className="relative h-full overflow-x-auto overflow-y-hidden no-scrollbar cursor-grab active:cursor-grabbing touch-pan-x"
+                    style={{ marginLeft: `${Y_AXIS_WIDTH}px` }}
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerEnd}
+                    onPointerCancel={handlePointerEnd}
+                  >
+                    <div
+                      className="relative h-full shrink-0"
+                      style={{ width: `${chartData.svgWidth}px`, minWidth: `${chartData.svgWidth}px` }}
+                    >
+                      <svg viewBox={`0 0 ${chartData.svgWidth} ${CHART_HEIGHT}`} className="block h-full w-full">
+                        <rect
+                          x={0}
+                          y={chartData.padding.top}
+                          width={chartData.innerWidth}
+                          height={chartData.zeroY - chartData.padding.top}
+                          fill="#fbfaf7"
+                        />
+                        <rect
+                          x={0}
+                          y={chartData.zeroY}
+                          width={chartData.innerWidth}
+                          height={CHART_HEIGHT - chartData.padding.bottom - chartData.zeroY}
+                          fill="#f7f4ef"
+                        />
+
+                        <line
+                          x1={0}
+                          y1={chartData.zeroY}
+                          x2={chartData.innerWidth}
+                          y2={chartData.zeroY}
+                          stroke="#6b6258"
+                          strokeWidth="1"
+                        />
+
+                        {chartData.yTicks.map((value) => {
+                          const normalized = (value - chartData.minValue) / (chartData.maxValue - chartData.minValue || 1);
+                          const y = CHART_HEIGHT - chartData.padding.bottom - normalized * (CHART_HEIGHT - chartData.padding.top - chartData.padding.bottom);
+                          const isZero = value === 0;
+
+                          return (
+                            <line
+                              key={value}
+                              x1={0}
+                              y1={y}
+                              x2={chartData.innerWidth}
+                              y2={y}
+                              stroke={isZero ? '#6b6258' : '#e8e2d8'}
+                              strokeDasharray={isZero ? undefined : '3 6'}
+                            />
+                          );
+                        })}
+
+                        {activePoint && (
+                          <line
+                            x1={activePoint.x}
+                            y1={chartData.padding.top}
+                            x2={activePoint.x}
+                            y2={CHART_HEIGHT - chartData.padding.bottom}
+                            stroke="#b8b1a8"
+                            strokeWidth="1"
+                            strokeDasharray="4 6"
+                          />
+                        )}
+
+                        <path
+                          d={pathD}
+                          fill="none"
+                          stroke="#c9c1b7"
+                          strokeWidth="5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          opacity="0.32"
+                        />
+                        <path
+                          d={pathD}
+                          fill="none"
+                          stroke="#231f1b"
+                          strokeWidth="1.9"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+
+                        {chartData.points.map((point, index) => {
+                          const isActive = index === activePointIndex;
+
+                          return (
+                            <g
+                              key={`${point.date}-${index}`}
+                              onMouseEnter={() => setActivePointIndex(index)}
+                            >
+                              <circle
+                                cx={point.x}
+                                cy={point.y}
+                                r="18"
+                                fill="transparent"
+                                className="cursor-pointer"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setActivePointIndex(index);
+                                }}
+                                onPointerDown={(event) => event.stopPropagation()}
+                              />
+                              <circle
+                                cx={point.x}
+                                cy={point.y}
+                                r={isActive ? '4.5' : '2.2'}
+                                fill={isActive ? '#231f1b' : '#6b6258'}
+                                opacity={isActive ? 1 : 0.55}
+                              />
+                              {isActive && (
+                                <>
+                                  <rect
+                                    x={point.x - 34}
+                                    y={point.y - 32}
+                                    width="68"
+                                    height="18"
+                                    rx="9"
+                                    fill="#f4efe7"
+                                  />
+                                  <text
+                                    x={point.x}
+                                    y={point.y - 19}
+                                    textAnchor="middle"
+                                    fill="#231f1b"
+                                    fontSize="10"
+                                    fontWeight="600"
+                                  >
+                                    {formatAchievementSignedStars(point.value)}
+                                  </text>
+                                </>
+                              )}
+                              <text
+                                x={point.x}
+                                y={CHART_HEIGHT - 16}
+                                textAnchor="middle"
+                                fill="#8b8680"
+                                fontSize="10"
+                              >
+                                {point.shortDate}
+                              </text>
+                            </g>
+                          );
+                        })}
+                      </svg>
+                    </div>
+                  </div>
                 </div>
 
                 {activePoint && (
-                  <div className="flex items-center justify-between border-t border-stone-100 px-2 pt-4 text-sm text-stone-500">
+                  <div className="flex items-center justify-between border-t border-stone-100 px-1 pt-4 text-sm text-stone-500">
                     <span>{activePoint.date}</span>
                     <span className="text-stone-900">{formatAchievementSignedStars(activePoint.value)}</span>
                   </div>

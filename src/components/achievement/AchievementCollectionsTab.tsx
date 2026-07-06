@@ -5,6 +5,7 @@
  * @pos Component (Achievement Collection Tab)
  * @description Renders the history shelf, a compact seal entry button, a two-step seal modal, and archived bottle detail with shatter support.
  *
+ * @updated 2026-07-06: Moved the archived bottle shatter action to the left side of the detail dialog footer to reduce accidental taps.
  * @updated 2026-06-30: Blocks sealing when the active bottle balance is negative and surfaces the shared validation message before opening the seal flow.
  * @updated 2026-05-18: Added a render-time fallback that repairs stale default bottle file URLs back to the current bundled asset path before showing a placeholder.
  * @updated 2026-04-06: Simplified the collections page into a history shelf and moved sealing into a two-step modal flow.
@@ -470,11 +471,6 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
         onClose={() => setSelectedArchivedBottleId(null)}
         footer={selectedArchivedBottle ? (
           <div className="flex items-center justify-between gap-3">
-            <div className="text-xs text-stone-400">
-              {selectedArchivedBottle.status === 'shattered'
-                ? `已于 ${selectedArchivedBottle.shatteredAt ? getLocalDateTimeStr(new Date(selectedArchivedBottle.shatteredAt)) : ''} 砸碎`
-                : '封存后只能通过砸碎把光点返还到当前瓶子'}
-            </div>
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -485,6 +481,11 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
                 <Hammer size={14} />
                 砸碎
               </button>
+            </div>
+            <div className="flex-1 text-right text-xs text-stone-400">
+              {selectedArchivedBottle.status === 'shattered'
+                ? `已于 ${selectedArchivedBottle.shatteredAt ? getLocalDateTimeStr(new Date(selectedArchivedBottle.shatteredAt)) : ''} 砸碎`
+                : '封存后只能通过砸碎把光点返还到当前瓶子'}
             </div>
           </div>
         ) : undefined}

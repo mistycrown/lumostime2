@@ -4,6 +4,7 @@
  * @output Native Usage Stats and App Rule State
  * @pos Native Plugin
  * @description Capacitor plugin exposing Android foreground-app access, app association rules, and per-app ignore state to the React application.
+ * @updated 2026-07-06: Added ack-based pending app-awareness reconciliation, overlay-permission guarded native workflows, and native required-text validation.
  */
 package com.mistycrown.lumostime;
 
@@ -203,7 +204,10 @@ public class AppUsagePlugin extends Plugin {
             SharedPreferences prefs = getPrefs(getContext());
             String workflowTemplateId = prefs.getString(packageName + APP_AWARENESS_SUFFIX, null);
             if (workflowTemplateId != null && !workflowTemplateId.isEmpty()) {
-                ensureFloatingWindowServiceRunning();
+                if (!ensureFloatingWindowServiceRunning()) {
+                    Log.w(TAG, "Skipping app-awareness workflow because floating overlay service is unavailable");
+                    return;
+                }
                 if (!startNativeAppAwarenessWorkflow(packageName, appLabel, workflowTemplateId)) {
                     triggerAppAwarenessDetected(packageName, appLabel, workflowTemplateId);
                 }
@@ -219,23 +223,25 @@ public class AppUsagePlugin extends Plugin {
             }
 
             String displayName = (activityName != null && !activityName.isEmpty()) ? activityName : appLabel;
-            ensureFloatingWindowServiceRunning();
+            if (!ensureFloatingWindowServiceRunning()) {
+                return;
+            }
             FloatingWindowService.showPrompt(packageName, displayName, appLabel, activityId);
         } catch (Exception e) {
             Log.e(TAG, "Failed to check and show prompt", e);
         }
     }
 
-    private void ensureFloatingWindowServiceRunning() {
+    private boolean ensureFloatingWindowServiceRunning() {
         Context context = getContext();
         if (context == null) {
             Log.w(TAG, "Unable to start FloatingWindowService: context is null");
-            return;
+            return false;
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
             Log.w(TAG, "Skipping FloatingWindowService start because overlay permission is missing");
-            return;
+            return false;
         }
 
         try {
@@ -245,8 +251,10 @@ public class AppUsagePlugin extends Plugin {
             } else {
                 context.startService(serviceIntent);
             }
+            return true;
         } catch (Exception e) {
             Log.e(TAG, "Failed to ensure FloatingWindowService is running", e);
+            return false;
         }
     }
 
@@ -513,7 +521,7 @@ public class AppUsagePlugin extends Plugin {
     @PluginMethod
     public void consumePendingAppAwarenessStart(PluginCall call) {
         JSObject ret = new JSObject();
-        org.json.JSONObject payload = AppAwarenessPendingStartStore.consume(getContext());
+        org.json.JSONObject payload = AppAwarenessPendingStartStore.peek(getContext());
         if (payload == null) {
             ret.put("hasPending", false);
             call.resolve(ret);
@@ -535,9 +543,15 @@ public class AppUsagePlugin extends Plugin {
     }
 
     @PluginMethod
+    public void acknowledgePendingAppAwarenessStart(PluginCall call) {
+        AppAwarenessPendingStartStore.acknowledge(getContext());
+        call.resolve();
+    }
+
+    @PluginMethod
     public void consumePendingAppAwarenessFinish(PluginCall call) {
         JSObject ret = new JSObject();
-        org.json.JSONObject payload = AppAwarenessPendingFinishStore.consume(getContext());
+        org.json.JSONObject payload = AppAwarenessPendingFinishStore.peek(getContext());
         if (payload == null) {
             ret.put("hasPending", false);
             call.resolve(ret);
@@ -559,6 +573,12 @@ public class AppUsagePlugin extends Plugin {
     }
 
     @PluginMethod
+    public void acknowledgePendingAppAwarenessFinish(PluginCall call) {
+        AppAwarenessPendingFinishStore.acknowledge(getContext());
+        call.resolve();
+    }
+
+    @PluginMethod
     public void showAppAwarenessOverlay(PluginCall call) {
         JSObject payload = call.getObject("payload");
         if (payload == null) {
@@ -566,7 +586,10 @@ public class AppUsagePlugin extends Plugin {
             return;
         }
 
-        ensureFloatingWindowServiceRunning();
+        if (!ensureFloatingWindowServiceRunning()) {
+            call.reject("Floating overlay permission missing or service unavailable");
+            return;
+        }
         FloatingWindowService.showAppAwarenessOverlay(payload.toString());
         call.resolve();
     }
@@ -763,7 +786,13 @@ public class AppUsagePlugin extends Plugin {
             }
 
             if ("text_question".equals(stepType) && "text-submit".equals(actionId)) {
-                runtime.answers.put(step.optString("answerKey", "purpose"), value == null ? "" : value.trim());
+                String textValue = value == null ? "" : value.trim();
+                if (step.optBoolean("required", true) && textValue.isEmpty()) {
+                    renderNativeAppAwarenessStep(runtime);
+                    return true;
+                }
+
+                runtime.answers.put(step.optString("answerKey", "purpose"), textValue);
                 runtime.currentStepIndex += 1;
                 renderNativeAppAwarenessStep(runtime);
                 return true;
@@ -905,7 +934,9 @@ public class AppUsagePlugin extends Plugin {
         String activityIcon = selectedActivity == null ? "" : selectedActivity.optString("icon", "");
         long startedAt = startPayload.optLong("startedAt", System.currentTimeMillis());
         if (!FloatingWindowService.updateFocusStateIfRunning(activityIcon, true, startedAt, null)) {
-            ensureFloatingWindowServiceRunning();
+            if (!ensureFloatingWindowServiceRunning()) {
+                return;
+            }
             FloatingWindowService.updateFocusStateIfRunning(activityIcon, true, startedAt, null);
         }
     }

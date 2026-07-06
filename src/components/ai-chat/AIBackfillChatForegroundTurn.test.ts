@@ -56,6 +56,75 @@ describe('foreground local-query normalization contract', () => {
     expect(normalized.reason).toBeUndefined();
   });
 
+
+
+  it('treats a larger limit on the same query as a valid progressive follow-up', () => {
+    const first = normalizeLocalQueryRequestForExecution(
+      '?????????????',
+      {
+        mode: 'filter_expression',
+        targets: ['logs'],
+        query: '#writing %paper',
+        limit: 20
+      },
+      [{
+        id: 'study',
+        name: '??',
+        icon: '??',
+        color: '#000000',
+        activities: [{
+          id: 'writing',
+          name: '??',
+          icon: '??',
+          color: '#000000'
+        }]
+      }] as any,
+      [{
+        id: 'paper',
+        name: '??',
+        icon: '??',
+        color: '#000000'
+      }] as any,
+      [],
+      []
+    );
+
+    const second = normalizeLocalQueryRequestForExecution(
+      '?????????????',
+      {
+        mode: 'filter_expression',
+        targets: ['logs'],
+        query: '#writing %paper',
+        limit: 50
+      },
+      [{
+        id: 'study',
+        name: '??',
+        icon: '??',
+        color: '#000000',
+        activities: [{
+          id: 'writing',
+          name: '??',
+          icon: '??',
+          color: '#000000'
+        }]
+      }] as any,
+      [{
+        id: 'paper',
+        name: '??',
+        icon: '??',
+        color: '#000000'
+      }] as any,
+      [],
+      []
+    );
+
+    expect(first.query).toBe('#?? %??');
+    expect(second.query).toBe('#?? %??');
+    expect(first.limit).toBe(20);
+    expect(second.limit).toBe(50);
+  });
+
   it('routes todo-like lookups to keyword search instead of log filter expressions', () => {
     const normalized = normalizeLocalQueryRequestForExecution(
       '帮我找一下论文相关待办',

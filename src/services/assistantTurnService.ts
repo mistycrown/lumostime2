@@ -5,6 +5,7 @@
  * @pos Service (Assistant Unified Turn)
  * @description Builds the single-turn prompt payload for the converged assistant architecture and forwards it through aiService so foreground and background flows can gradually migrate off the older multi-prompt planner stack.
  *
+ * @updated 2026-07-06: Tightened foreground local-query schema guidance so the model no longer has to emit `reason`, log lookups can be steered toward custom-filter expressions, and the default returned slice is now 20 items instead of 6.
  * @updated 2026-07-06: Tightened foreground local-query schema guidance so the model no longer has to emit `reason`, and log lookups can be steered toward custom-filter expressions instead of generic keyword retries.
  * @updated 2026-07-05: Added optional local-query history prompt injection plus foreground output-schema guidance for model-requested local retrieval rounds.
  * @updated 2026-05-15: Reordered unified assistant prompt assembly so the optional user persona layer is serialized before the base system prompt.
@@ -239,7 +240,7 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
             mode: 'filter_expression | keyword_search',
             targets: ['logs | todos | reviews | categories | activities | scopes | all'],
             query: 'string',
-            limit: 6
+            limit: 20
           },
           toolCalls: [],
           reminders: [],
@@ -254,7 +255,7 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
             mode: 'filter_expression | keyword_search',
             targets: ['logs | todos | reviews | categories | activities | scopes | all'],
             query: 'string',
-            limit: 6
+            limit: 20
           },
           toolCalls: [],
           reminders: [],

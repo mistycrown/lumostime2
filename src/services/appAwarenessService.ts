@@ -4,6 +4,7 @@
  * @output Normalized workflow templates, app bindings, and active run helpers
  * @pos Service
  * @description Centralizes persistence and normalization for the Android-only app-awareness feature so settings views and runtime hooks share one consistent data model.
+ * @updated 2026-07-06: Added non-empty option fallbacks for app-awareness duration and extension steps to prevent dead-end overlay payloads from persisted data.
  * @updated 2026-06-21: Renamed the preset workflow, removed the default text-length cap, and refreshed normalization copy for the latest app-awareness node model.
  */
 import {
@@ -58,6 +59,15 @@ const isActivityOption = (value: unknown): value is AppAwarenessActivityOption =
 const normalizeStepTitle = (value: unknown, fallback: string): string =>
   isNonEmptyString(value) ? value.trim() : fallback;
 
+const normalizePositiveNumberOptions = (value: unknown, fallback: number[]): number[] => {
+  if (!Array.isArray(value)) {
+    return fallback;
+  }
+
+  const options = value.filter(isFiniteNumber).map((item) => Math.max(1, Math.round(item)));
+  return options.length > 0 ? options : fallback;
+};
+
 const normalizeTextQuestionStep = (value: Partial<AppAwarenessTextQuestionStep>): AppAwarenessTextQuestionStep => ({
   id: isNonEmptyString(value.id) ? value.id : crypto.randomUUID(),
   type: 'text_question',
@@ -90,9 +100,7 @@ const normalizeExpectedDurationStep = (value: Partial<AppAwarenessExpectedDurati
   description: typeof value.description === 'string' ? value.description : undefined,
   required: value.required !== false,
   answerKey: isNonEmptyString(value.answerKey) ? value.answerKey : 'durationMinutes',
-  durationMinutesOptions: Array.isArray(value.durationMinutesOptions)
-    ? value.durationMinutesOptions.filter(isFiniteNumber).map((item) => Math.max(1, Math.round(item)))
-    : [5, 10, 20, 30],
+  durationMinutesOptions: normalizePositiveNumberOptions(value.durationMinutesOptions, [5, 10, 20, 30]),
   allowCustomDuration: value.allowCustomDuration === true
 });
 
@@ -114,9 +122,7 @@ const normalizeStartRecordStep = (value: Partial<AppAwarenessStartRecordStep>): 
     ? Math.max(1, Math.round(value.defaultDurationMinutes))
     : undefined,
   allowContinueExtensions: value.allowContinueExtensions !== false,
-  extensionMinutesOptions: Array.isArray(value.extensionMinutesOptions)
-    ? value.extensionMinutesOptions.filter(isFiniteNumber).map((item) => Math.max(1, Math.round(item)))
-    : [5, 15, 30]
+  extensionMinutesOptions: normalizePositiveNumberOptions(value.extensionMinutesOptions, [5, 15, 30])
 });
 
 const normalizeWorkflowStep = (value: unknown): AppAwarenessWorkflowStep | null => {

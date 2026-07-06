@@ -4,6 +4,7 @@
  * @output Modal Interaction (Edit Todo, View History)
  * @pos Component (Modal)
  * @description Displays detailed information for a specific Todo item, including its progress, planning fields, associated history logs, and focus stats.
+ * @updated 2026-07-06: Raised the overlay detail layer above collection and schedule popovers so collection-launched todo timeline entries remain visible.
  * @updated 2026-05-19: Replaced the hidden monthly fallback checkbox with a pure button toggle that blocks default mouse-down focus switching, fixing the desktop white-screen triggered by tapping `31 号无则月末`.
  * @updated 2026-05-18: Defaulted timeline metadata render options so detail-page log chips still render safely when callers omit the auxiliary collection-name payload.
  * @updated 2026-05-18: Changed task title editing to update only on blur (or Enter) to prevent live-updating and redundant auto-saves during typing.
@@ -981,7 +982,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const renderSquares = totalSquares > 3000 ? 3000 : totalSquares;
   const containerClassName = displayMode === 'page'
     ? 'h-full bg-[#faf9f6] flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]'
-    : `fixed inset-0 z-[100] bg-[#faf9f6] flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] ${isEntering ? 'animate-in slide-in-from-right duration-300' : ''}`;
+    : `fixed inset-0 z-[180] bg-[#faf9f6] flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] ${isEntering ? 'animate-in slide-in-from-right duration-300' : ''}`;
 
   return (
     <div
