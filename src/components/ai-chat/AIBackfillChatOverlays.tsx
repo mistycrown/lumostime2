@@ -4,12 +4,14 @@
  * @output Reusable full-screen overlays for AI background-history inspection and debug payload browsing
  * @pos Component Support (AI Integration)
  * @description Pulls the self-contained overlay render trees out of AIBackfillChatModal so the main modal can focus on conversation orchestration while keeping the overlay markup unchanged.
+ * @updated 2026-07-06: Removed the explicit assistant-letter header tag and normalized letter timestamps to local display strings with timezone.
  * @updated 2026-05-14: Extracted background-history and debug-viewer overlays from AIBackfillChatModal.
  */
 import React from 'react';
 import { ChevronDown, ChevronRight, X } from 'lucide-react';
 import type { AIDebugExchange } from '../../services/aiService';
 import type { AssistantLetter } from '../../types/assistant';
+import { formatAssistantDateTimeForDisplay } from '../../utils/assistantTime';
 import type {
   AssistantBackgroundTimelineEntry,
   AIChatDebugTextBlock,
@@ -222,7 +224,7 @@ export const AssistantLetterHistoryOverlay: React.FC<AssistantLetterHistoryOverl
                     </p>
                     <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: theme.textSecondary }}>
                       <span>{letter.personaName}</span>
-                      <span>{letter.sentAt}</span>
+                      <span>{formatAssistantDateTimeForDisplay(letter.sentAt)}</span>
                     </div>
                   </button>
                   <div className="mt-3 flex justify-end">
@@ -303,7 +305,6 @@ export const AssistantLetterDetailSheet: React.FC<AssistantLetterDetailSheetProp
       >
         <div className="flex items-center justify-between p-6 border-b border-stone-100 bg-white/50">
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-stone-400">AI 来信</p>
             <h3 className="mt-1 truncate font-serif text-[1.15rem] font-bold text-stone-900">{letter.title}</h3>
           </div>
           <button
@@ -318,7 +319,7 @@ export const AssistantLetterDetailSheet: React.FC<AssistantLetterDetailSheetProp
           <div className="mx-auto max-w-xl">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-stone-500">
               <span>{letter.personaName}</span>
-              <span>{letter.sentAt}</span>
+              <span>{formatAssistantDateTimeForDisplay(letter.sentAt)}</span>
             </div>
 
             <p className="mt-6 text-sm leading-7 text-stone-500">{letter.preview}</p>
