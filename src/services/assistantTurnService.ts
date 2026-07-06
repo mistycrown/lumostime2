@@ -238,7 +238,7 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
           assistantReply: 'string',
           localQueryRequest: {
             mode: 'filter_expression | keyword_search',
-            targets: ['logs | todos | reviews | categories | activities | scopes | all'],
+            targets: ['logs | todos | reviews | categories | activities | scopes | principles | selfBeliefs | all'],
             query: 'string',
             limit: 20
           },
@@ -253,7 +253,7 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
           assistantReply: 'string',
           localQueryRequest: {
             mode: 'filter_expression | keyword_search',
-            targets: ['logs | todos | reviews | categories | activities | scopes | all'],
+            targets: ['logs | todos | reviews | categories | activities | scopes | principles | selfBeliefs | all'],
             query: 'string',
             limit: 20
           },

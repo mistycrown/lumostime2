@@ -37,7 +37,20 @@
   - `mode: "keyword_search"`
   - `targets` 应明确对应对象，而不是默认 `all`
 
-### 3. 查询轮次约束
+### 3. 原则库 / 自我认知查询
+
+- 如果用户明确要求查看、调用、参考 `原则库 / 原则 / 自我认知 / 我是一个什么样的人 / 描述`，返回：
+  - `mode: "keyword_search"`
+  - `targets: ["principles"]`、`targets: ["selfBeliefs"]`，或同时返回两者
+- 如果你需要进行宏观原则引导、自我辅助、鼓励用户行动、帮助用户从低行动状态恢复，也可以主动查询：
+  - 需要行动原则时查 `principles`
+  - 需要用户能力、高光经历、自我确认材料时查 `selfBeliefs`
+- 原则库和自我认知内容通常很少，系统会直接返回完整列表，不需要你设计筛选词。
+- 这类查询的 `query` 只写意图即可，例如 `"原则引导"`、`"自我鼓励"`、`"用户自我认知"`。
+- 不要为了原则库或自我认知反复扩大 `limit`，拿到一次完整列表后直接使用。
+- 查询结果会提供每条原则或自我认知的 `id`。后续如果要更新旧条目，必须使用这个 `id`。
+
+### 4. 查询轮次约束
 
 - 不要为 `localQueryRequest` 填 `reason`。
 - 如果不写 `limit`，系统默认先回灌 `20` 条。
@@ -64,6 +77,8 @@
 3. `create_todo`
 4. `update_todo`
 5. `create_subtask`
+6. `create_principle`
+7. `create_self_belief`
 
 总规则：
 
@@ -105,7 +120,34 @@
 - `memory_relevant`
   memory / reminder 调用规则见 [memory-rules.md](./memory-rules.md)。
 
-## 第四阶段：log 类动作细则
+## 第四阶段：原则库 / 自我认知写入
+
+### 1. create_principle
+
+- 当用户在复盘、经验总结、行动策略沉淀中明确表达出可复用的行动原则时，可以返回 `create_principle`。
+- 返回 `create_principle` 前，必须先通过 `localQueryRequest` 查询 `principles`。如果没有查过，不要直接写入。
+- 如果已有原则和新内容相关，优先带上旧原则的 `id` 更新旧原则，而不是重复创建一条近似原则。
+- 带 `id` 时表示修改旧原则；不带 `id` 时表示创建新原则。
+- 原则应回答“我以后遇到类似情况该怎么做”。
+- `title` 写短标题。更新旧原则时，如果标题不需要变，可以省略。
+- `frontText` 写可以直接显示在原则卡片正面的原则句。新建时必填，更新时可省略。
+- `backText` 可选，用来写解释、适用场景、提醒或反例。更新旧原则时，只有需要改写才提供。
+- `descriptions` 可选，用来给旧原则追加适用场景、例子、说明或新经验；如果只是补充说明，优先追加 description，而不是重写整条原则。
+- 如果用户只是情绪表达，或内容还没有沉淀成稳定原则，不要强行添加。
+
+### 2. create_self_belief
+
+- 当用户提到稳定的自我认知、能力定义、身份定义、高光经历，或通过历史事实证明“我是一个什么样的人”时，可以返回 `create_self_belief`。
+- 返回 `create_self_belief` 前，必须先通过 `localQueryRequest` 查询 `selfBeliefs`。如果没有查过，不要直接写入。
+- 如果已有自我认知和新内容相关，优先带上旧自我认知的 `id` 更新旧条目，通常是追加新的 `descriptions`。
+- 带 `id` 时表示修改旧自我认知；不带 `id` 时表示创建新自我认知。
+- 自我认知应回答“我是一个什么样的人 / 我已经证明过什么”。
+- `title` 写成第一人称定义，例如“我是一个学习能力很强的人”。更新旧自我认知时，如果标题不需要变，可以省略。
+- `descriptions` 写支撑这个定义的具体经历、事实或对话中可见的证据。可以为空，但如果对话里有具体事实，优先写入。
+- 如果描述来自这次 AI 判断，source 由本地系统自动记为 `ai`，不要在参数里写 source。
+- 除非用户明确要求，否则不要把同一条内容同时写成 principle 和 self-belief。
+
+## 第五阶段：log 类动作细则
 
 ### 1. create_log
 
@@ -121,7 +163,7 @@
 - 如果用户说类似“我刚才那条记录时间写错了”，优先 `edit_log`，而不是 `create_log`。
 - 在当前前台上下文里，提供的 log candidates 可能只覆盖当前目标日。如果用户似乎在指更早或跨天的记录，优先 `clarify`，不要猜。
 
-## 第五阶段：todo 类动作细则
+## 第六阶段：todo 类动作细则
 
 ### 1. create_todo
 
@@ -153,7 +195,7 @@
 - `未来` 的含义：暂时不进入当前排期、先存档到未来池里的项目型事项，适合“以后可能要做”“这阵子先不排”的任务。调用时应把 `categoryId` 设为 `__virtual_future__`；按普通项目 todo 处理，仍需提供 `linkedActivityId`，并在可识别时提供对应的 `linkedCategoryId`。
 - 当用户明确说“放到未来”“丢进未来”“先记到未来，以后再做”时，优先返回 `categoryId: "__virtual_future__"` 的 `create_todo`，而不是塞进普通分类或直接排期。
 
-## 第六阶段：硬性安全约束
+## 第七阶段：硬性安全约束
 
 - 永远不要编造 ids。
 - 永远不要假装某个 tool action 成功了，除非它已经以结构形式返回。
@@ -259,6 +301,34 @@
         "note": "string",
         "scheduledDate": "YYYY-MM-DD",
         "deadlineDate": "YYYY-MM-DD"
+      }
+    },
+    {
+      "toolName": "create_principle",
+      "args": {
+        "id": "existing principle id | omit when creating",
+        "title": "string",
+        "frontText": "string",
+        "backText": "string",
+        "descriptions": [
+          {
+            "text": "string",
+            "date": "YYYY-MM-DD"
+          }
+        ]
+      }
+    },
+    {
+      "toolName": "create_self_belief",
+      "args": {
+        "id": "existing self-belief id | omit when creating",
+        "title": "string",
+        "descriptions": [
+          {
+            "text": "string",
+            "date": "YYYY-MM-DD"
+          }
+        ]
       }
     }
   ]

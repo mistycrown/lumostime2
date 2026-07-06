@@ -236,6 +236,163 @@ describe('aiService unified turn normalization', () => {
     }]);
   });
 
+  it('keeps principle-library create tool calls after normalization', async () => {
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockResolvedValue(createJsonTextResponse({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              outcome: 'reply',
+              assistantReply: 'ok',
+              memoryAction: 'no_update',
+              toolCalls: [{
+                toolName: 'create_principle',
+                args: {
+                  title: '先降低行动颗粒度',
+                  frontText: '卡住时先做一个小到不会害怕的动作。',
+                  backText: '适用于拖延、压力过载和启动困难。'
+                }
+              }]
+            })
+          }
+        }]
+      })),
+      configurable: true
+    });
+
+    const result = await aiService.requestAssistantUnifiedTurnWithDebug({
+      mode: 'foreground',
+      systemPrompt: 'system',
+      userPrompt: 'user'
+    });
+
+    expect(result.output.toolCalls).toEqual([{
+      toolName: 'create_principle',
+      args: {
+        title: '先降低行动颗粒度',
+        frontText: '卡住时先做一个小到不会害怕的动作。',
+        backText: '适用于拖延、压力过载和启动困难。'
+      }
+    }]);
+  });
+
+  it('keeps self-belief create tool calls and strips blank descriptions', async () => {
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockResolvedValue(createJsonTextResponse({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              outcome: 'reply',
+              assistantReply: 'ok',
+              memoryAction: 'no_update',
+              toolCalls: [{
+                toolName: 'create_self_belief',
+                args: {
+                  title: '我是一个学习能力很强的人',
+                  descriptions: [
+                    {
+                      text: '两周学完基础编程并做出第一个工具。',
+                      date: '2026-07-06'
+                    },
+                    {
+                      text: '   '
+                    }
+                  ]
+                }
+              }]
+            })
+          }
+        }]
+      })),
+      configurable: true
+    });
+
+    const result = await aiService.requestAssistantUnifiedTurnWithDebug({
+      mode: 'foreground',
+      systemPrompt: 'system',
+      userPrompt: 'user'
+    });
+
+    expect(result.output.toolCalls).toEqual([{
+      toolName: 'create_self_belief',
+      args: {
+        title: '我是一个学习能力很强的人',
+        descriptions: [{
+          text: '两周学完基础编程并做出第一个工具。',
+          date: '2026-07-06'
+        }]
+      }
+    }]);
+  });
+
+  it('keeps principle and self-belief update tool calls when they include existing ids', async () => {
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockResolvedValue(createJsonTextResponse({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              outcome: 'reply',
+              assistantReply: 'ok',
+              memoryAction: 'no_update',
+              toolCalls: [
+                {
+                  toolName: 'create_principle',
+                  args: {
+                    id: 'principle-1',
+                    descriptions: [{
+                      text: '新增一个适用场景。',
+                      date: '2026-07-06'
+                    }]
+                  }
+                },
+                {
+                  toolName: 'create_self_belief',
+                  args: {
+                    id: 'belief-1',
+                    descriptions: [{
+                      text: '新增一个自我认知描述。',
+                      date: '2026-07-06'
+                    }]
+                  }
+                }
+              ]
+            })
+          }
+        }]
+      })),
+      configurable: true
+    });
+
+    const result = await aiService.requestAssistantUnifiedTurnWithDebug({
+      mode: 'foreground',
+      systemPrompt: 'system',
+      userPrompt: 'user'
+    });
+
+    expect(result.output.toolCalls).toEqual([
+      {
+        toolName: 'create_principle',
+        args: {
+          id: 'principle-1',
+          descriptions: [{
+            text: '新增一个适用场景。',
+            date: '2026-07-06'
+          }]
+        }
+      },
+      {
+        toolName: 'create_self_belief',
+        args: {
+          id: 'belief-1',
+          descriptions: [{
+            text: '新增一个自我认知描述。',
+            date: '2026-07-06'
+          }]
+        }
+      }
+    ]);
+  });
+
   it('treats empty unified-turn content as a failed decision instead of a silent success', async () => {
     Object.defineProperty(globalThis, 'fetch', {
       value: vi.fn().mockResolvedValue(createJsonTextResponse({

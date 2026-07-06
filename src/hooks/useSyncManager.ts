@@ -4,6 +4,7 @@
  * @output Sync Operations (performSync, handleQuickSync, handleImageSync, handleSyncDataUpdate), Sync State (isSyncing, refreshKey), and size-conflict resolution state
  * @pos Hook (System Integration)
  * @description 同步管理 Hook - 处理数据和图片的云端同步，支持启动同步、恢复同步、手动同步、自动同步等多种模式，并在恢复筛选器时保持顺序稳定，同时保证空值恢复与 majorGoals 载荷一致。
+ * @updated 2026-07-06: Included the self-belief library in backup/sync payloads and restore handling so identity descriptions travel with user data.
  * @updated 2026-06-15: Added JSON-size conflict protection so timestamp-based cloud decisions now pause before any larger backup payload would be overwritten by a smaller one, letting the user choose upload vs restore explicitly.
  * @updated 2026-06-14: Prefer uploading confirmed pending local edits during auto-sync even when the local/cloud timestamps still fall inside the equal-tolerance window, so newly created todos are not skipped.
  * @updated 2026-05-18: Reduced timestamp comparison tolerance handling by routing sync direction through a shared helper, so fresh desktop edits are no longer swallowed as "equal" for several seconds after the previous sync.
@@ -183,6 +184,10 @@ export const useSyncManager = () => {
                 // 触发事件通知原则库页面更新
                 window.dispatchEvent(new Event('principleLibraryChanged'));
             }
+            if (hasField('selfBeliefs')) {
+                localStorage.setItem('lumostime_self_beliefs', JSON.stringify(data.selfBeliefs));
+                window.dispatchEvent(new Event('selfBeliefLibraryChanged'));
+            }
 
             if (hasField('customColorGroup')) {
                 customColorGroupService.saveGroup(data.customColorGroup);
@@ -220,6 +225,8 @@ export const useSyncManager = () => {
         // 从 localStorage 读取原则库
         const principlesStr = localStorage.getItem('lumostime_principles');
         const principles = principlesStr ? JSON.parse(principlesStr) : [];
+        const selfBeliefsStr = localStorage.getItem('lumostime_self_beliefs');
+        const selfBeliefs = selfBeliefsStr ? JSON.parse(selfBeliefsStr) : [];
         
         const customColorGroup = customColorGroupService.getGroup();
 
@@ -233,6 +240,7 @@ export const useSyncManager = () => {
             sceneTimeSlots,
             sceneGroupState,
             principles, // 添加原则库
+            selfBeliefs, // 添加自我认知库
             version: '1.0.0',
             timestamp: getLocalDataTimestamp() // Use the latest persisted tracking timestamp
         };

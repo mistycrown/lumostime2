@@ -1,10 +1,11 @@
 /**
  * @file assistantActionExecutor.ts
- * @input Current logs/todos plus runtime dictionaries and assistant tool-call payloads
+ * @input Current logs/todos plus runtime dictionaries, principle-library storage, and assistant tool-call payloads
  * @output Applied assistant action summaries together with the next local logs/todos state
  * @pos Service (Assistant Action Executor)
- * @description Executes AI-planned log/todo/subtask/edit tool calls against local app data using pure helpers so the UI can reuse one shared execution layer instead of keeping tool application logic inside a modal component.
+ * @description Executes AI-planned log/todo/subtask/edit/principle/self-belief tool calls against local app data using shared helpers so the UI can reuse one execution layer instead of keeping tool application logic inside a modal component.
  *
+ * @updated 2026-07-06: Added create_principle and create_self_belief tool-call execution with localStorage writeback and undo snapshots.
  * @updated 2026-05-18: `create_todo` actions can now create nested direct subtasks in the same pass, and the applied snapshot records those child ids so the UI can undo the whole bundle cleanly.
  * @updated 2026-05-13: Added explicit todo kind handling so assistant-created quick reminders can skip activity linkage while still resolving into the reserved 小事 category.
  * @updated 2026-04-26: Extracted local assistant tool-call execution, save/delete helpers, action snapshots, and subtask-date stripping into a shared service for the unified AI assistant architecture.
@@ -22,6 +23,8 @@ import type {
 import type {
   AIBackfillToolCall,
   AICreateSubtaskToolCall,
+  AICreatePrincipleToolCall,
+  AICreateSelfBeliefToolCall,
   AIEditLogToolCall,
   AITodoNestedSubtaskArgs,
   AITodoToolCall,
@@ -36,6 +39,7 @@ import {
   getQuickTodoCategory,
   QUICK_TODO_CATEGORY_ID
 } from '../utils/todoQuickCategoryUtils';
+import { updateLocalDataTimestamp } from '../utils/localDataTimestamp';
 
 export type AppliedActionStatus = 'applied' | 'undone' | 'failed';
 
@@ -131,12 +135,57 @@ export interface AppliedEditLogAction {
   errorMessage?: string;
 }
 
+export interface AppliedCreatePrincipleSnapshot {
+  principleId?: string;
+  previousPrinciple?: StoredPrinciple;
+  nextPrinciple?: StoredPrinciple;
+  title: string;
+  frontText?: string;
+  backText?: string;
+  descriptions?: AppliedCreateSelfBeliefDescriptionSnapshot[];
+}
+
+export interface AppliedCreatePrincipleAction {
+  actionId: string;
+  kind: 'create_principle';
+  status: AppliedActionStatus;
+  snapshot: AppliedCreatePrincipleSnapshot;
+  errorMessage?: string;
+}
+
+export interface AppliedCreateSelfBeliefDescriptionSnapshot {
+  id: string;
+  text: string;
+  date?: string;
+  source: 'manual' | 'ai';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AppliedCreateSelfBeliefSnapshot {
+  selfBeliefId?: string;
+  previousSelfBelief?: StoredSelfBelief;
+  nextSelfBelief?: StoredSelfBelief;
+  title: string;
+  descriptions: AppliedCreateSelfBeliefDescriptionSnapshot[];
+}
+
+export interface AppliedCreateSelfBeliefAction {
+  actionId: string;
+  kind: 'create_self_belief';
+  status: AppliedActionStatus;
+  snapshot: AppliedCreateSelfBeliefSnapshot;
+  errorMessage?: string;
+}
+
 export type AppliedChatAction =
   | AppliedCreateLogAction
   | AppliedCreateTodoAction
   | AppliedUpdateTodoAction
   | AppliedCreateSubtaskAction
-  | AppliedEditLogAction;
+  | AppliedEditLogAction
+  | AppliedCreatePrincipleAction
+  | AppliedCreateSelfBeliefAction;
 
 export interface AssistantActionExecutionContext {
   defaultDateKey: string;
@@ -391,8 +440,455 @@ export const applyLogDelete = (
 };
 
 const buildActionId = (): string => crypto.randomUUID();
+const PRINCIPLES_STORAGE_KEY = 'lumostime_principles';
+const SELF_BELIEFS_STORAGE_KEY = 'lumostime_self_beliefs';
+const PRINCIPLE_LIBRARY_CHANGED_EVENT = 'principleLibraryChanged';
+const SELF_BELIEF_LIBRARY_CHANGED_EVENT = 'selfBeliefLibraryChanged';
+
+export interface StoredPrinciple {
+  id: string;
+  title: string;
+  frontText: string;
+  backText: string;
+  descriptions?: AppliedCreateSelfBeliefDescriptionSnapshot[];
+}
+
+export interface StoredSelfBelief {
+  id: string;
+  title: string;
+  descriptions: AppliedCreateSelfBeliefDescriptionSnapshot[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+const readJsonArrayFromStorage = (key: string): unknown[] => {
+  if (typeof localStorage === 'undefined') {
+    return [];
+  }
+
+  const stored = localStorage.getItem(key);
+  if (!stored) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error(`[assistantActionExecutor] Failed to parse ${key}`, error);
+    return [];
+  }
+};
+
+const writeJsonArrayToStorage = (key: string, eventName: string, value: unknown[]) => {
+  if (typeof localStorage === 'undefined') {
+    return;
+  }
+
+  localStorage.setItem(key, JSON.stringify(value));
+  updateLocalDataTimestamp();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(eventName));
+  }
+};
+
+const normalizeStoredPrinciples = (value: unknown[]): StoredPrinciple[] => (
+  value.flatMap((item): StoredPrinciple[] => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+
+    const candidate = item as Partial<StoredPrinciple>;
+    const title = typeof candidate.title === 'string' ? candidate.title.trim() : '';
+    const frontText = typeof candidate.frontText === 'string' ? candidate.frontText.trim() : '';
+    if (!title || !frontText) {
+      return [];
+    }
+
+    return [{
+      id: typeof candidate.id === 'string' && candidate.id.trim() ? candidate.id.trim() : crypto.randomUUID(),
+      title,
+      frontText,
+      backText: typeof candidate.backText === 'string' ? candidate.backText.trim() : '',
+      ...(Array.isArray((candidate as Partial<StoredPrinciple>).descriptions)
+        ? { descriptions: normalizeStoredDescriptions((candidate as Partial<StoredPrinciple>).descriptions, formatTodayDateKey()) }
+        : {})
+    }];
+  })
+);
+
+const normalizeStoredDescriptions = (value: unknown, fallbackDate: string): AppliedCreateSelfBeliefDescriptionSnapshot[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item): AppliedCreateSelfBeliefDescriptionSnapshot[] => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+
+    const candidate = item as Partial<AppliedCreateSelfBeliefDescriptionSnapshot>;
+    const text = typeof candidate.text === 'string' ? candidate.text.trim() : '';
+    if (!text) {
+      return [];
+    }
+
+    const now = new Date().toISOString();
+    return [{
+      id: typeof candidate.id === 'string' && candidate.id.trim() ? candidate.id.trim() : crypto.randomUUID(),
+      text,
+      date: typeof candidate.date === 'string' && candidate.date.trim() ? candidate.date.trim() : fallbackDate,
+      source: candidate.source === 'manual' ? 'manual' : 'ai',
+      createdAt: typeof candidate.createdAt === 'string' && candidate.createdAt.trim() ? candidate.createdAt.trim() : now,
+      updatedAt: typeof candidate.updatedAt === 'string' && candidate.updatedAt.trim() ? candidate.updatedAt.trim() : now
+    }];
+  });
+};
+
+const normalizeStoredSelfBeliefs = (value: unknown[], fallbackDate: string): StoredSelfBelief[] => (
+  value.flatMap((item): StoredSelfBelief[] => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+
+    const candidate = item as Partial<StoredSelfBelief> & { evidence?: unknown[] };
+    const title = typeof candidate.title === 'string' ? candidate.title.trim() : '';
+    if (!title) {
+      return [];
+    }
+
+    const now = new Date().toISOString();
+    const rawDescriptions = Array.isArray(candidate.descriptions)
+      ? candidate.descriptions
+      : Array.isArray(candidate.evidence)
+        ? candidate.evidence
+        : [];
+
+    return [{
+      id: typeof candidate.id === 'string' && candidate.id.trim() ? candidate.id.trim() : crypto.randomUUID(),
+      title,
+      descriptions: normalizeStoredDescriptions(rawDescriptions, fallbackDate),
+      createdAt: typeof candidate.createdAt === 'string' && candidate.createdAt.trim() ? candidate.createdAt.trim() : now,
+      updatedAt: typeof candidate.updatedAt === 'string' && candidate.updatedAt.trim() ? candidate.updatedAt.trim() : now
+    }];
+  })
+);
+
+const formatTodayDateKey = (): string => formatDateKey(new Date());
+
+const loadStoredPrinciples = (): StoredPrinciple[] => normalizeStoredPrinciples(readJsonArrayFromStorage(PRINCIPLES_STORAGE_KEY));
+
+const saveStoredPrinciples = (principles: StoredPrinciple[]) => {
+  writeJsonArrayToStorage(PRINCIPLES_STORAGE_KEY, PRINCIPLE_LIBRARY_CHANGED_EVENT, principles);
+};
+
+const loadStoredSelfBeliefs = (): StoredSelfBelief[] => (
+  normalizeStoredSelfBeliefs(readJsonArrayFromStorage(SELF_BELIEFS_STORAGE_KEY), formatTodayDateKey())
+);
+
+const saveStoredSelfBeliefs = (selfBeliefs: StoredSelfBelief[]) => {
+  writeJsonArrayToStorage(SELF_BELIEFS_STORAGE_KEY, SELF_BELIEF_LIBRARY_CHANGED_EVENT, selfBeliefs);
+};
+
+export const removeStoredPrincipleById = (principleId: string): boolean => {
+  const principles = loadStoredPrinciples();
+  const nextPrinciples = principles.filter((principle) => principle.id !== principleId);
+  if (nextPrinciples.length === principles.length) {
+    return false;
+  }
+
+  saveStoredPrinciples(nextPrinciples);
+  return true;
+};
+
+export const restoreStoredPrinciple = (principle: StoredPrinciple): boolean => {
+  const principles = loadStoredPrinciples();
+  const exists = principles.some((item) => item.id === principle.id);
+  const nextPrinciples = exists
+    ? principles.map((item) => (item.id === principle.id ? principle : item))
+    : [principle, ...principles];
+  saveStoredPrinciples(nextPrinciples);
+  return true;
+};
+
+export const getStoredPrincipleById = (principleId: string): StoredPrinciple | undefined => (
+  loadStoredPrinciples().find((principle) => principle.id === principleId)
+);
+
+export const updateStoredPrinciple = (principle: StoredPrinciple): boolean => {
+  const principles = loadStoredPrinciples();
+  const exists = principles.some((item) => item.id === principle.id);
+  if (!exists) {
+    return false;
+  }
+
+  saveStoredPrinciples(principles.map((item) => (
+    item.id === principle.id ? principle : item
+  )));
+  return true;
+};
+
+export const removeStoredSelfBeliefById = (selfBeliefId: string): boolean => {
+  const selfBeliefs = loadStoredSelfBeliefs();
+  const nextSelfBeliefs = selfBeliefs.filter((selfBelief) => selfBelief.id !== selfBeliefId);
+  if (nextSelfBeliefs.length === selfBeliefs.length) {
+    return false;
+  }
+
+  saveStoredSelfBeliefs(nextSelfBeliefs);
+  return true;
+};
+
+export const restoreStoredSelfBelief = (selfBelief: StoredSelfBelief): boolean => {
+  const selfBeliefs = loadStoredSelfBeliefs();
+  const exists = selfBeliefs.some((item) => item.id === selfBelief.id);
+  const nextSelfBeliefs = exists
+    ? selfBeliefs.map((item) => (item.id === selfBelief.id ? selfBelief : item))
+    : [selfBelief, ...selfBeliefs];
+  saveStoredSelfBeliefs(nextSelfBeliefs);
+  return true;
+};
+
+export const getStoredSelfBeliefById = (selfBeliefId: string): StoredSelfBelief | undefined => (
+  loadStoredSelfBeliefs().find((selfBelief) => selfBelief.id === selfBeliefId)
+);
+
+export const updateStoredSelfBelief = (selfBelief: StoredSelfBelief): boolean => {
+  const selfBeliefs = loadStoredSelfBeliefs();
+  const exists = selfBeliefs.some((item) => item.id === selfBelief.id);
+  if (!exists) {
+    return false;
+  }
+
+  saveStoredSelfBeliefs(selfBeliefs.map((item) => (
+    item.id === selfBelief.id ? selfBelief : item
+  )));
+  return true;
+};
 
 export const assistantActionExecutor = {
+  buildRejectedPrincipleActions(toolCalls: AICreatePrincipleToolCall[], errorMessage: string): AppliedChatAction[] {
+    return toolCalls.map((toolCall) => ({
+      actionId: buildActionId(),
+      kind: 'create_principle',
+      status: 'failed',
+      errorMessage,
+      snapshot: {
+        principleId: toolCall.args.id,
+        title: toolCall.args.title?.trim() || '未保存原则',
+        ...(toolCall.args.frontText?.trim() ? { frontText: toolCall.args.frontText.trim() } : {}),
+        ...(toolCall.args.backText?.trim() ? { backText: toolCall.args.backText.trim() } : {})
+      }
+    }));
+  },
+
+  buildRejectedSelfBeliefActions(toolCalls: AICreateSelfBeliefToolCall[], errorMessage: string): AppliedChatAction[] {
+    return toolCalls.map((toolCall) => ({
+      actionId: buildActionId(),
+      kind: 'create_self_belief',
+      status: 'failed',
+      errorMessage,
+      snapshot: {
+        selfBeliefId: toolCall.args.id,
+        title: toolCall.args.title?.trim() || '未保存自我认知',
+        descriptions: []
+      }
+    }));
+  },
+
+  applyPrincipleToolCalls(toolCalls: AICreatePrincipleToolCall[]): AppliedChatAction[] {
+    const actions: AppliedChatAction[] = [];
+    const principles = loadStoredPrinciples();
+    let nextPrinciples = [...principles];
+
+    toolCalls.forEach((toolCall) => {
+      const targetId = toolCall.args.id?.trim();
+      const previousPrinciple = targetId
+        ? nextPrinciples.find((principle) => principle.id === targetId)
+        : undefined;
+      const title = toolCall.args.title?.trim() || previousPrinciple?.title || '';
+      const frontText = toolCall.args.frontText?.trim() || previousPrinciple?.frontText || '';
+      const backText = toolCall.args.backText?.trim() || '';
+      const now = new Date().toISOString();
+      const today = formatTodayDateKey();
+      const newDescriptions = (toolCall.args.descriptions || []).flatMap((description): AppliedCreateSelfBeliefDescriptionSnapshot[] => {
+        const text = description.text.trim();
+        if (!text) {
+          return [];
+        }
+
+        return [{
+          id: crypto.randomUUID(),
+          text,
+          date: description.date || today,
+          source: 'ai',
+          createdAt: now,
+          updatedAt: now
+        }];
+      });
+
+      if (targetId && !previousPrinciple) {
+        actions.push({
+          actionId: buildActionId(),
+          kind: 'create_principle',
+          status: 'failed',
+          errorMessage: '没有找到要修改的原则，我先没有自动保存。',
+          snapshot: {
+            principleId: targetId,
+            title: title || '未找到原则',
+            ...(frontText ? { frontText } : {}),
+            ...(backText ? { backText } : {}),
+            ...(newDescriptions.length > 0 ? { descriptions: newDescriptions } : {})
+          }
+        });
+        return;
+      }
+
+      if (!title || (!targetId && !frontText)) {
+        actions.push({
+          actionId: buildActionId(),
+          kind: 'create_principle',
+          status: 'failed',
+          errorMessage: '这条原则缺少标题或正面内容，我先没有自动保存。',
+          snapshot: {
+            title: title || '未命名原则',
+            ...(frontText ? { frontText } : {}),
+            ...(backText ? { backText } : {})
+          }
+        });
+        return;
+      }
+
+      const nextPrinciple: StoredPrinciple = {
+        id: previousPrinciple?.id || crypto.randomUUID(),
+        title,
+        frontText,
+        backText: toolCall.args.backText !== undefined
+          ? backText
+          : previousPrinciple?.backText || '',
+        descriptions: [
+          ...(previousPrinciple?.descriptions || []),
+          ...newDescriptions
+        ]
+      };
+      nextPrinciples = previousPrinciple
+        ? nextPrinciples.map((principle) => (principle.id === previousPrinciple.id ? nextPrinciple : principle))
+        : [nextPrinciple, ...nextPrinciples];
+      actions.push({
+        actionId: buildActionId(),
+        kind: 'create_principle',
+        status: 'applied',
+        snapshot: {
+          principleId: nextPrinciple.id,
+          ...(previousPrinciple ? { previousPrinciple } : {}),
+          nextPrinciple,
+          title: nextPrinciple.title,
+          frontText: nextPrinciple.frontText,
+          ...(nextPrinciple.backText ? { backText: nextPrinciple.backText } : {}),
+          ...(nextPrinciple.descriptions && nextPrinciple.descriptions.length > 0 ? { descriptions: nextPrinciple.descriptions } : {})
+        }
+      });
+    });
+
+    if (actions.some((action) => action.kind === 'create_principle' && action.status === 'applied')) {
+      saveStoredPrinciples(nextPrinciples);
+    }
+
+    return actions;
+  },
+
+  applySelfBeliefToolCalls(toolCalls: AICreateSelfBeliefToolCall[]): AppliedChatAction[] {
+    const actions: AppliedChatAction[] = [];
+    const selfBeliefs = loadStoredSelfBeliefs();
+    let nextSelfBeliefs = [...selfBeliefs];
+
+    toolCalls.forEach((toolCall) => {
+      const targetId = toolCall.args.id?.trim();
+      const previousSelfBelief = targetId
+        ? nextSelfBeliefs.find((selfBelief) => selfBelief.id === targetId)
+        : undefined;
+      const title = toolCall.args.title?.trim() || previousSelfBelief?.title || '';
+      if (targetId && !previousSelfBelief) {
+        actions.push({
+          actionId: buildActionId(),
+          kind: 'create_self_belief',
+          status: 'failed',
+          errorMessage: '没有找到要修改的自我认知，我先没有自动保存。',
+          snapshot: {
+            selfBeliefId: targetId,
+            title: title || '未找到自我认知',
+            descriptions: []
+          }
+        });
+        return;
+      }
+
+      if (!title) {
+        actions.push({
+          actionId: buildActionId(),
+          kind: 'create_self_belief',
+          status: 'failed',
+          errorMessage: '这条自我认知缺少标题，我先没有自动保存。',
+          snapshot: {
+            title: '未命名自我认知',
+            descriptions: []
+          }
+        });
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const today = formatTodayDateKey();
+      const descriptions = (toolCall.args.descriptions || []).flatMap((description): AppliedCreateSelfBeliefDescriptionSnapshot[] => {
+        const text = description.text.trim();
+        if (!text) {
+          return [];
+        }
+
+        return [{
+          id: crypto.randomUUID(),
+          text,
+          date: description.date || today,
+          source: 'ai',
+          createdAt: now,
+          updatedAt: now
+        }];
+      });
+      const newSelfBelief: StoredSelfBelief = {
+        id: previousSelfBelief?.id || crypto.randomUUID(),
+        title,
+        descriptions: [
+          ...(previousSelfBelief?.descriptions || []),
+          ...descriptions
+        ],
+        createdAt: previousSelfBelief?.createdAt || now,
+        updatedAt: now
+      };
+
+      nextSelfBeliefs = previousSelfBelief
+        ? nextSelfBeliefs.map((selfBelief) => (selfBelief.id === previousSelfBelief.id ? newSelfBelief : selfBelief))
+        : [newSelfBelief, ...nextSelfBeliefs];
+      actions.push({
+        actionId: buildActionId(),
+        kind: 'create_self_belief',
+        status: 'applied',
+        snapshot: {
+          selfBeliefId: newSelfBelief.id,
+          ...(previousSelfBelief ? { previousSelfBelief } : {}),
+          nextSelfBelief: newSelfBelief,
+          title: newSelfBelief.title,
+          descriptions: newSelfBelief.descriptions
+        }
+      });
+    });
+
+    if (actions.some((action) => action.kind === 'create_self_belief' && action.status === 'applied')) {
+      saveStoredSelfBeliefs(nextSelfBeliefs);
+    }
+
+    return actions;
+  },
+
   applyLogToolCalls(
     context: AssistantActionExecutionContext,
     toolCalls: AIBackfillToolCall[]

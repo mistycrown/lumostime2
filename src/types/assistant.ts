@@ -302,6 +302,8 @@ export type AssistantLocalQueryTarget =
   | 'categories'
   | 'activities'
   | 'scopes'
+  | 'principles'
+  | 'selfBeliefs'
   | 'all';
 
 export type AssistantLocalQueryMode = 'filter_expression' | 'keyword_search';
@@ -423,7 +425,7 @@ export interface AssistantLocalQueryRequest {
 }
 
 export interface AssistantLocalQueryResultItem {
-  itemType: 'log' | 'todo' | 'review' | 'category' | 'activity' | 'scope';
+  itemType: 'log' | 'todo' | 'review' | 'category' | 'activity' | 'scope' | 'principle' | 'selfBelief';
   id: string;
   title: string;
   summary: string;
@@ -548,12 +550,40 @@ export interface AssistantEditLogToolCall {
   };
 }
 
+export interface AssistantCreatePrincipleToolCall {
+  toolName: 'create_principle';
+  args: {
+    id?: string;
+    title?: string;
+    frontText?: string;
+    backText?: string;
+    descriptions?: Array<{
+      text: string;
+      date?: string;
+    }>;
+  };
+}
+
+export interface AssistantCreateSelfBeliefToolCall {
+  toolName: 'create_self_belief';
+  args: {
+    id?: string;
+    title?: string;
+    descriptions?: Array<{
+      text: string;
+      date?: string;
+    }>;
+  };
+}
+
 export type AssistantToolCall =
   | AssistantCreateLogToolCall
   | AssistantCreateTodoToolCall
   | AssistantUpdateTodoToolCall
   | AssistantCreateSubtaskToolCall
-  | AssistantEditLogToolCall;
+  | AssistantEditLogToolCall
+  | AssistantCreatePrincipleToolCall
+  | AssistantCreateSelfBeliefToolCall;
 
 export interface AssistantReasoningPart {
   text: string;

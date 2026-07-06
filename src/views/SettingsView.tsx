@@ -6,6 +6,7 @@
  * @description The central configuration hub. Manages Cloud Sync (WebDAV), AI integration (Providers/Presets), Data (Import/Export), and Application Preferences (Appearance, Habits, etc.), including settings subpage hierarchy state and in-session main-list scroll restoration while keeping manual sync payloads aligned with repository-backed data.
  *
  * 修改历史:
+ * - 2026-07-06: 将自我认知库纳入设置页手动同步载荷，保持与主同步 Hook 的备份字段一致。
  * - 2026-05-17: 新增“Windows 特性”设置分组，将“PC端小组件”与“导出到 Obsidian”归口至此分组并限定移动端不可见。
 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -656,6 +657,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         // 从 localStorage 读取原则库
         const principlesStr = localStorage.getItem('lumostime_principles');
         const principles = principlesStr ? JSON.parse(principlesStr) : [];
+        const selfBeliefsStr = localStorage.getItem('lumostime_self_beliefs');
+        const selfBeliefs = selfBeliefsStr ? JSON.parse(selfBeliefsStr) : [];
 
         const customColorGroup = customColorGroupService.getGroup();
 
@@ -681,6 +684,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             sceneGroupState, // 新版：场景组状态
             sceneTimeSlots, // 添加场景设置
             principles, // 添加原则库
+            selfBeliefs, // 添加自我认知库
             version: '1.0.0',
             timestamp: getLocalDataTimestamp()
         };

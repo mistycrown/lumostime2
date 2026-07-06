@@ -4,6 +4,7 @@
  * @output Shared foreground-turn preparation helpers and unified-turn runner for ordinary chat
  * @pos Component Support (AI Integration)
  * @description Extracts the pre-request foreground turn setup and the ordinary unified-turn execution path out of AIBackfillChatModal so the main send handler becomes a thin dispatcher.
+ * @updated 2026-07-06: Passes local-query history into foreground tool-call application so principle/self-belief writes can require a prior library lookup.
  * @updated 2026-07-06: Enforced structured log-query routing, duplicate-query rejection, and clearer local-query summaries so repeated foreground retrieval rounds must actually change the retrieval expression.
  * @updated 2026-07-05: Surfaced local-query keywords and hit summaries in pending chat feedback, and added debug sections for query request/result/retry rounds.
  * @updated 2026-07-05: Wired the foreground local-query loop back into real category/review data and fed accumulated query history into follow-up unified turns.
@@ -80,7 +81,7 @@ interface RunOrdinaryForegroundTurnOptions {
   activeRequestRef: { current: { controller: AbortController; pendingMessageId: string; sessionId: string } | null };
   applyAssistantMemoryPatch: (patch?: AssistantUnifiedTurnOutput['memoryPatch']) => AIChatMemoryUpdateSection[];
   applyUnifiedReminders: (output: AssistantUnifiedTurnOutput) => string[];
-  applyUnifiedToolCalls: (toolCalls: any[], sourceText: string) => AppliedChatAction[];
+  applyUnifiedToolCalls: (toolCalls: any[], sourceText: string, localQueryHistory?: AssistantLocalQueryResult[]) => AppliedChatAction[];
   assistantMemoryEnabled: boolean;
   buildDictionaryContext: () => AssistantTurnDictionaryContext | undefined;
   buildDreamContext: (query?: string) => string | undefined;
@@ -260,6 +261,14 @@ const resolveQueryRoute = (
   userMessage: string,
   request: AssistantLocalQueryRequest
 ): Pick<AssistantLocalQueryRequest, 'mode' | 'targets'> => {
+  const libraryTargets = request.targets.filter((target) => target === 'principles' || target === 'selfBeliefs');
+  if (libraryTargets.length > 0) {
+    return {
+      mode: 'keyword_search',
+      targets: Array.from(new Set(libraryTargets))
+    };
+  }
+
   if (isLikelyLogLookup(userMessage, request.targets)) {
     return {
       mode: 'filter_expression',
@@ -679,7 +688,7 @@ export const runOrdinaryForegroundTurn = async ({
 
     const toolCalls = outputForReply.toolCalls || [];
     const unifiedAppliedActions = toolCalls.length > 0
-      ? applyUnifiedToolCalls(toolCalls, trimmedText)
+      ? applyUnifiedToolCalls(toolCalls, trimmedText, localQueryHistory)
       : [];
     const unifiedSuccessCount = unifiedAppliedActions.filter((action) => action.status === 'applied').length;
 

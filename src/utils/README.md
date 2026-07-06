@@ -3,6 +3,7 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- Update 2026-07-06: `dataValidation.ts` now accepts `selfBeliefs` arrays in backup and cloud sync payloads so the self-belief library restores alongside principles.
 - Update 2026-06-21: `syncUtils.ts` now verifies the canonical `lumostime_backup.json` after upload by reading it back, and `syncPayloadMetadata.ts` centralizes payload timestamp/equality checks so stale cloud reads are rejected instead of treated as successful syncs.
 - Update 2026-06-15: `syncTimestampDirection.ts` now combines timestamp tolerance with full JSON-size comparison, letting cloud sync break timestamp ties by payload size and surface explicit conflicts whenever a smaller backup would overwrite a larger one.
 - Update 2026-06-13: `dataValidation.ts` now accepts data collections and collection entries in user backup payloads while preserving old backup files that omit those fields.

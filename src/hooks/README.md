@@ -1,5 +1,6 @@
 # Custom Hooks
 
+> `useSyncManager.ts` now includes the self-belief library in unified backup/sync payloads and restores it to local storage, so AI-created identity descriptions travel with the main user data.
 > `useSyncManager.ts` now forces a read of the canonical cloud main backup before making direction decisions, preferring the JSON payload timestamp over remote file metadata so stale `LastModified` values cannot drive old restores.
 > `useSyncManager.ts` now treats confirmed pending local auto-sync edits as upload-worthy even when the local/cloud timestamps are still within the equal-tolerance window, so creating a new todo right after a sync no longer gets skipped.
 > `useSyncManager.ts` now also compares the full local/cloud backup JSON sizes before overwrite operations, so any timestamp decision that would let a smaller payload replace a larger one now opens an explicit conflict chooser instead of silently overwriting data.

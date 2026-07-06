@@ -1,6 +1,24 @@
-import { describe, expect, it } from 'vitest';
-import { assistantActionExecutor, type AssistantActionExecutionContext } from './assistantActionExecutor';
-import type { AITodoToolCall } from './aiService';
+import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  assistantActionExecutor,
+  removeStoredPrincipleById,
+  removeStoredSelfBeliefById,
+  type AssistantActionExecutionContext
+} from './assistantActionExecutor';
+import type { AICreatePrincipleToolCall, AICreateSelfBeliefToolCall, AITodoToolCall } from './aiService';
+
+const installLocalStorageMock = () => {
+  const store = new Map<string, string>();
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => store.set(key, value),
+      removeItem: (key: string) => store.delete(key),
+      clear: () => store.clear()
+    }
+  });
+};
 
 const buildBaseContext = (): AssistantActionExecutionContext => ({
   defaultDateKey: '2026-05-15',
@@ -33,6 +51,10 @@ const buildBaseContext = (): AssistantActionExecutionContext => ({
 });
 
 describe('assistantActionExecutor applyTodoToolCalls', () => {
+  beforeEach(() => {
+    installLocalStorageMock();
+  });
+
   it('creates quick todos inside the reserved 小事 bucket without requiring linked activity', () => {
     const toolCalls: AITodoToolCall[] = [
       {
@@ -141,5 +163,160 @@ describe('assistantActionExecutor applyTodoToolCalls', () => {
     expect(citationTodo?.deadlineDate).toBeUndefined();
     expect(citationTodo?.note).toBe('Check Zotero tags');
     expect(action.snapshot.createdSubtaskIds).toHaveLength(2);
+  });
+});
+
+describe('assistantActionExecutor principle-library tool calls', () => {
+  beforeEach(() => {
+    installLocalStorageMock();
+  });
+
+  it('creates principles in localStorage and supports undo removal', () => {
+    const toolCalls: AICreatePrincipleToolCall[] = [{
+      toolName: 'create_principle',
+      args: {
+        title: '先降低行动颗粒度',
+        frontText: '卡住时先做一个小到不会害怕的动作。',
+        backText: '适用于启动困难。'
+      }
+    }];
+
+    const actions = assistantActionExecutor.applyPrincipleToolCalls(toolCalls);
+    const action = actions[0];
+    const stored = JSON.parse(localStorage.getItem('lumostime_principles') || '[]');
+
+    expect(action.kind).toBe('create_principle');
+    expect(action.status).toBe('applied');
+    expect(stored).toHaveLength(1);
+    expect(stored[0].title).toBe('先降低行动颗粒度');
+
+    if (action.kind !== 'create_principle' || !action.snapshot.principleId) {
+      throw new Error('Expected principle action snapshot.');
+    }
+
+    expect(removeStoredPrincipleById(action.snapshot.principleId)).toBe(true);
+    expect(JSON.parse(localStorage.getItem('lumostime_principles') || '[]')).toHaveLength(0);
+  });
+
+  it('updates existing principles by id and supports snapshot restore', () => {
+    localStorage.setItem('lumostime_principles', JSON.stringify([{
+      id: 'principle-1',
+      title: '启动要轻',
+      frontText: '卡住时先开始。',
+      backText: '旧解释'
+    }]));
+
+    const toolCalls: AICreatePrincipleToolCall[] = [{
+      toolName: 'create_principle',
+      args: {
+        id: 'principle-1',
+        descriptions: [{
+          text: '今天发现写一个最小步骤能缓解拖延。',
+          date: '2026-07-06'
+        }]
+      }
+    }];
+
+    const actions = assistantActionExecutor.applyPrincipleToolCalls(toolCalls);
+    const action = actions[0];
+    const stored = JSON.parse(localStorage.getItem('lumostime_principles') || '[]');
+
+    expect(action.kind).toBe('create_principle');
+    expect(action.status).toBe('applied');
+    expect(stored).toHaveLength(1);
+    expect(stored[0].id).toBe('principle-1');
+    expect(stored[0].descriptions[0]).toMatchObject({
+      text: '今天发现写一个最小步骤能缓解拖延。',
+      source: 'ai'
+    });
+
+    if (action.kind !== 'create_principle' || !action.snapshot.previousPrinciple) {
+      throw new Error('Expected principle update snapshot.');
+    }
+
+    expect(action.snapshot.previousPrinciple.backText).toBe('旧解释');
+    expect(action.snapshot.nextPrinciple?.descriptions).toHaveLength(1);
+  });
+
+  it('creates self-beliefs in localStorage with AI descriptions and supports undo removal', () => {
+    const toolCalls: AICreateSelfBeliefToolCall[] = [{
+      toolName: 'create_self_belief',
+      args: {
+        title: '我是一个学习能力很强的人',
+        descriptions: [{
+          text: '两周学完基础编程并做出第一个工具。',
+          date: '2026-07-06'
+        }]
+      }
+    }];
+
+    const actions = assistantActionExecutor.applySelfBeliefToolCalls(toolCalls);
+    const action = actions[0];
+    const stored = JSON.parse(localStorage.getItem('lumostime_self_beliefs') || '[]');
+
+    expect(action.kind).toBe('create_self_belief');
+    expect(action.status).toBe('applied');
+    expect(stored).toHaveLength(1);
+    expect(stored[0].title).toBe('我是一个学习能力很强的人');
+    expect(stored[0].descriptions[0]).toMatchObject({
+      text: '两周学完基础编程并做出第一个工具。',
+      date: '2026-07-06',
+      source: 'ai'
+    });
+
+    if (action.kind !== 'create_self_belief' || !action.snapshot.selfBeliefId) {
+      throw new Error('Expected self-belief action snapshot.');
+    }
+
+    expect(removeStoredSelfBeliefById(action.snapshot.selfBeliefId)).toBe(true);
+    expect(JSON.parse(localStorage.getItem('lumostime_self_beliefs') || '[]')).toHaveLength(0);
+  });
+
+  it('updates existing self-beliefs by id while preserving previous snapshot', () => {
+    localStorage.setItem('lumostime_self_beliefs', JSON.stringify([{
+      id: 'belief-1',
+      title: '我是一个学习能力很强的人',
+      descriptions: [{
+        id: 'description-old',
+        text: '以前两周学完基础编程。',
+        date: '2026-07-01',
+        source: 'manual',
+        createdAt: '2026-07-01T00:00:00.000Z',
+        updatedAt: '2026-07-01T00:00:00.000Z'
+      }],
+      createdAt: '2026-07-01T00:00:00.000Z',
+      updatedAt: '2026-07-01T00:00:00.000Z'
+    }]));
+
+    const toolCalls: AICreateSelfBeliefToolCall[] = [{
+      toolName: 'create_self_belief',
+      args: {
+        id: 'belief-1',
+        descriptions: [{
+          text: '今天又把原则库接入了 AI 写入流程。',
+          date: '2026-07-06'
+        }]
+      }
+    }];
+
+    const actions = assistantActionExecutor.applySelfBeliefToolCalls(toolCalls);
+    const action = actions[0];
+    const stored = JSON.parse(localStorage.getItem('lumostime_self_beliefs') || '[]');
+
+    expect(action.kind).toBe('create_self_belief');
+    expect(action.status).toBe('applied');
+    expect(stored).toHaveLength(1);
+    expect(stored[0].descriptions).toHaveLength(2);
+    expect(stored[0].descriptions[1]).toMatchObject({
+      text: '今天又把原则库接入了 AI 写入流程。',
+      source: 'ai'
+    });
+
+    if (action.kind !== 'create_self_belief' || !action.snapshot.previousSelfBelief) {
+      throw new Error('Expected self-belief update snapshot.');
+    }
+
+    expect(action.snapshot.previousSelfBelief.descriptions).toHaveLength(1);
+    expect(action.snapshot.nextSelfBelief?.descriptions).toHaveLength(2);
   });
 });
