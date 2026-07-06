@@ -48,7 +48,7 @@ describe('assistantLocalSearchService', () => {
 
     expect(result.hitCount).toBe(2);
     expect(result.items).toHaveLength(2);
-    expect(result.items.map((item) => item.itemType)).toEqual(['todo', 'category']);
+    expect(result.items.map((item) => item.itemType)).toEqual(['category', 'todo']);
     expect(result.digest).toContain('query=论文');
     expect(result.digest).toContain('[todo] 修改论文结构');
     expect(result.digest).toContain('[category] 论文研究');

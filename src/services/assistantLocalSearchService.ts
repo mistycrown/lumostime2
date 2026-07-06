@@ -207,6 +207,43 @@ const buildScopeItem = (scope: Scope): AssistantLocalQueryResultItem => ({
   }
 });
 
+const parseSortableDate = (value: unknown): number => {
+  if (typeof value !== 'string' || !value.trim()) {
+    return Number.NaN;
+  }
+
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : Number.NaN;
+};
+
+const buildLogSortTimestamp = (item: AssistantLocalQueryResultItem): number => {
+  const metadata = item.metadata || {};
+  const dateValue = typeof metadata.date === 'string' ? metadata.date : '';
+  const timeRangeValue = typeof metadata.timeRange === 'string' ? metadata.timeRange : '';
+  const startTime = timeRangeValue.split('-')[0] || '00:00';
+  return parseSortableDate(`${dateValue}T${startTime}:00`);
+};
+
+const sortQueryItems = (items: AssistantLocalQueryResultItem[]): AssistantLocalQueryResultItem[] => (
+  [...items].sort((left, right) => {
+    if (left.itemType === 'log' && right.itemType === 'log') {
+      return buildLogSortTimestamp(right) - buildLogSortTimestamp(left);
+    }
+
+    if (left.itemType === 'review' && right.itemType === 'review') {
+      const leftTimestamp = parseSortableDate(String(left.metadata?.date || ''));
+      const rightTimestamp = parseSortableDate(String(right.metadata?.date || ''));
+      return rightTimestamp - leftTimestamp;
+    }
+
+    if (left.itemType !== right.itemType) {
+      return left.itemType.localeCompare(right.itemType);
+    }
+
+    return left.title.localeCompare(right.title, 'zh-CN');
+  })
+);
+
 const buildResultDigest = (result: AssistantLocalQueryResult): string => {
   const header = [
     `Round ${result.round}`,
@@ -383,12 +420,13 @@ export const assistantLocalSearchService = {
     const rawItems = normalizedRequest.mode === 'filter_expression'
       ? runFilterExpressionQuery(normalizedRequest, context)
       : runKeywordSearchQuery(normalizedRequest, context);
-    const items = rawItems.slice(0, normalizedRequest.limit || DEFAULT_QUERY_LIMIT);
+    const sortedItems = sortQueryItems(rawItems);
+    const items = sortedItems.slice(0, normalizedRequest.limit || DEFAULT_QUERY_LIMIT);
     const result: AssistantLocalQueryResult = {
       round,
       request: normalizedRequest,
       status: 'executed',
-      hitCount: rawItems.length,
+      hitCount: sortedItems.length,
       items,
       digest: ''
     };

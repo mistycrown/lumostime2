@@ -649,7 +649,7 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
                   )}
                   {message.localQueryResults && message.localQueryResults.length > 0 && (
                     <>
-                      <span className="hidden text-[#b4a79a] sm:inline">路</span>
+                      <span className="hidden text-[#b4a79a] sm:inline">·</span>
                       <button
                         type="button"
                         onClick={() => setLocalQueryExpansion(message.id)}
@@ -895,9 +895,6 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
                         <p>范围：{result.request.targets.join(' / ')}</p>
                         <p>关键词：{result.request.query}</p>
                         <p>命中：{result.hitCount} 条</p>
-                        {result.request.reason && (
-                          <p style={{ color: theme.textSecondary }}>原因：{result.request.reason}</p>
-                        )}
                         {result.items.length > 0 ? (
                           result.items.map((item, itemIndex) => (
                             <p key={`${message.id}-local-query-${result.round}-${item.id}-${itemIndex}`}>

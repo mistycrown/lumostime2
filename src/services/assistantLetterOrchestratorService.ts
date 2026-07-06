@@ -8,7 +8,6 @@
  * @updated 2026-07-05: Added the first standalone assistant-letter orchestrator for scheduled AI letters with dedicated prompt mode, storage persistence, and post-send schedule updates.
  */
 
-import AssistantAgent from '../plugins/AssistantAgentPlugin';
 import type { AIConversationTurn, AIDebugExchange } from './aiService';
 import { aiService } from './aiService';
 import { assistantAgentConfigService } from './assistantAgentConfigService';
@@ -21,7 +20,6 @@ import {
   type AssistantBackgroundCallHistoryEntry
 } from './assistantOrchestratorService';
 import { assistantPromptService } from './assistantPromptService';
-import { resolveLatestOrdinaryAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
 import { normalizeAssistantDateTime } from '../utils/assistantTime';
 import type {
   AssistantAgentConfig,
@@ -40,7 +38,6 @@ interface AssistantLetterRunRequest {
   personaId?: string;
   personaName?: string;
   showSystemNotification?: boolean;
-  persistChatMessage?: boolean;
   currentDateTime: string;
   defaultDate: string;
   todayTimelineSummary: string;
@@ -63,32 +60,6 @@ interface AssistantLetterModelResult {
   decisionSummary?: string;
 }
 
-interface PersistedAIChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  createdAt: number;
-  tone?: 'normal' | 'system' | 'error' | 'pending';
-  assistantLetterResult?: AssistantLetterResultCard;
-  debugSections?: Array<{
-    label: string;
-    exchange: AIDebugExchange;
-  }>;
-}
-
-interface PersistedAIChatSession {
-  id: string;
-  title: string;
-  createdAt: number;
-  updatedAt: number;
-  personaId: string;
-  contextCacheEnabled: boolean;
-  messages: PersistedAIChatMessage[];
-  templateMeta?: {
-    templateType?: string;
-  };
-}
-
 interface AssistantLetterRunResult {
   letter: AssistantLetter;
   resultCard: AssistantLetterResultCard;
@@ -96,14 +67,6 @@ interface AssistantLetterRunResult {
   debug: AIDebugExchange;
   surfacedMessage?: string;
 }
-
-interface PersistedAssistantMessageLocation {
-  sessionId: string;
-  messageId: string;
-}
-
-const CHAT_SESSIONS_KEY = 'lumostime_ai_chat_sessions_v1';
-const ASSISTANT_DECISION_EVENT = 'lumostime:assistant-chat-updated';
 const DEFAULT_PERSONA_ID = 'builtin-default';
 
 const STRICT_JSON_OUTPUT_RULES = [
@@ -122,32 +85,6 @@ const createEphemeralMemory = (): AssistantMemory => ({
   activeReminders: [],
   recentDecisions: []
 });
-
-const createFallbackPersistedSession = (personaId?: string): PersistedAIChatSession => {
-  const now = Date.now();
-  return {
-    id: crypto.randomUUID(),
-    title: '新对话',
-    createdAt: now,
-    updatedAt: now,
-    personaId: personaId || DEFAULT_PERSONA_ID,
-    contextCacheEnabled: true,
-    messages: []
-  };
-};
-
-const safeParseJson = <T,>(raw: string | null, fallback: T): T => {
-  if (!raw) {
-    return fallback;
-  }
-
-  try {
-    return JSON.parse(raw) as T;
-  } catch (error) {
-    console.error('[assistantLetterOrchestratorService] Failed to parse JSON', error);
-    return fallback;
-  }
-};
 
 const normalizeStringList = (value: unknown): string[] => (
   Array.isArray(value)
@@ -304,77 +241,6 @@ const buildUserPrompt = (request: AssistantLetterRunRequest): string => (
   ].join('\n')
 );
 
-const loadPersistedSessions = (): PersistedAIChatSession[] => (
-  safeParseJson<PersistedAIChatSession[]>(localStorage.getItem(CHAT_SESSIONS_KEY), [])
-);
-
-const persistLetterChatEntry = (
-  letter: AssistantLetter,
-  targetSessionId?: string,
-  personaId?: string,
-  debug?: AIDebugExchange
-): PersistedAssistantMessageLocation | null => {
-  const existingSessions = loadPersistedSessions();
-  const sessions = existingSessions.length > 0
-    ? existingSessions
-    : [createFallbackPersistedSession(personaId)];
-  const resolvedTargetSessionId = (
-    targetSessionId
-    && sessions.some((session) => session.id === targetSessionId)
-  )
-    ? targetSessionId
-    : resolveLatestOrdinaryAssistantBackgroundSession(sessions)?.id || sessions[0]?.id;
-
-  if (!resolvedTargetSessionId) {
-    return null;
-  }
-
-  const resultCard: AssistantLetterResultCard = {
-    letterId: letter.id,
-    title: letter.title,
-    preview: letter.preview,
-    personaName: letter.personaName,
-    sentAt: letter.sentAt
-  };
-  const now = Date.now();
-  const nextMessage: PersistedAIChatMessage = {
-    id: crypto.randomUUID(),
-    role: 'assistant',
-    content: '收到了一封来信。',
-    createdAt: now,
-    tone: 'system',
-    assistantLetterResult: resultCard,
-    ...(debug
-      ? {
-        debugSections: [{
-          label: 'AI 来信调试',
-          exchange: debug
-        }]
-      }
-      : {})
-  };
-
-  const nextSessions = sessions.map((session) => (
-    session.id === resolvedTargetSessionId
-      ? {
-        ...session,
-        updatedAt: now,
-        messages: [...session.messages, nextMessage]
-      }
-      : session
-  ));
-
-  localStorage.setItem(CHAT_SESSIONS_KEY, JSON.stringify(nextSessions));
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent(ASSISTANT_DECISION_EVENT));
-  }
-
-  return {
-    sessionId: resolvedTargetSessionId,
-    messageId: nextMessage.id
-  };
-};
-
 export const assistantLetterOrchestratorService = {
   async runDueLetter(request: AssistantLetterRunRequest): Promise<AssistantLetterRunResult> {
     const assistantConfig = assistantAgentConfigService.getConfig();
@@ -499,10 +365,6 @@ export const assistantLetterOrchestratorService = {
       assistantAgentConfigService.saveConfig(schedulePatch as Partial<AssistantAgentConfig>);
     }
 
-    const persistedLocation = request.persistChatMessage === false
-      ? null
-      : persistLetterChatEntry(letter, request.targetSessionId, request.personaId, debug);
-
     const historyEntry: AssistantBackgroundCallHistoryEntry = {
       id: backgroundCallId,
       ...(request.trigger.id ? { triggerId: request.trigger.id } : {}),
@@ -517,21 +379,9 @@ export const assistantLetterOrchestratorService = {
       reminderCount: 0,
       message: '收到了一封来信。',
       decisionSummary: result.decisionSummary || `已生成来信《${letter.title}》`,
-      ...(persistedLocation ? { persistedMessageId: persistedLocation.messageId } : {}),
       debugExchange: debug
     };
     assistantOrchestratorService.upsertBackgroundCallHistoryEntry(historyEntry);
-
-    if (request.showSystemNotification && persistedLocation) {
-      void AssistantAgent.showAssistantNotification({
-        title: letter.personaName || 'AI 来信',
-        body: letter.preview,
-        targetSessionId: persistedLocation.sessionId,
-        targetMessageId: persistedLocation.messageId
-      }).catch((error) => {
-        console.error('[assistantLetterOrchestratorService] Failed to show assistant-letter notification', error);
-      });
-    }
 
     return {
       letter,
