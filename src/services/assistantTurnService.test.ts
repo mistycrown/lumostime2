@@ -193,11 +193,38 @@ describe('assistantTurnService', () => {
     expect(request?.systemPrompt).not.toContain('"toolCalls": []');
   });
 
+  it('injects accumulated local-query history into the system prompt when present', async () => {
+    await assistantTurnService.runUnifiedTurn(createInput({
+      localQueryHistory: [{
+        round: 1,
+        request: {
+          mode: 'keyword_search',
+          targets: ['logs', 'todos'],
+          query: '论文'
+        },
+        hitCount: 2,
+        items: [{
+          itemType: 'todo',
+          id: 'todo-1',
+          title: '修改论文',
+          summary: 'project | todo'
+        }],
+        digest: 'Round 1 | mode=keyword_search | targets=logs,todos | query=论文 | hitCount=2'
+      }]
+    }));
+
+    const request = vi.mocked(aiService.requestAssistantUnifiedTurnWithDebug).mock.calls[0]?.[0];
+    expect(request?.systemPrompt).toContain('=== Local Query Context ===');
+    expect(request?.systemPrompt).toContain('Round 1 | mode=keyword_search | targets=logs,todos | query=论文 | hitCount=2');
+  });
+
   it('uses a foreground-specific output schema without unsupported silent outcomes', async () => {
     await assistantTurnService.runUnifiedTurn(createInput());
 
     const request = vi.mocked(aiService.requestAssistantUnifiedTurnWithDebug).mock.calls[0]?.[0];
     expect(request?.systemPrompt).toContain('"outcome": "reply | clarify"');
+    expect(request?.systemPrompt).toContain('"localQueryRequest": {');
+    expect(request?.systemPrompt).not.toContain('"reason": "string"');
     expect(request?.systemPrompt).not.toContain('"outcome": "reply | clarify | silent"');
   });
 

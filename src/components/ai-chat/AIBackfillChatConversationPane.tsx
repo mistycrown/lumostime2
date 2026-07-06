@@ -15,6 +15,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import type { AppliedChatAction } from '../../services/assistantActionExecutor';
+import type { AssistantLocalQueryResult } from '../../types/assistant';
 import type {
   AIChatDailyNewspaperWritebackResult,
   AIChatDailyReviewWritebackResult,
@@ -66,6 +67,7 @@ interface AIBackfillChatConversationPaneProps {
   activeSession: AIChatSession | null;
   emptyPromptExampleGroups: EmptyPromptExampleGroup[];
   expandedDreamUpdateMessageIds: Set<string>;
+  expandedLocalQueryMessageIds: Set<string>;
   expandedMemoryUpdateMessageIds: Set<string>;
   expandedReasoningMessageIds: Set<string>;
   expandedReminderUpdateMessageIds: Set<string>;
@@ -79,6 +81,7 @@ interface AIBackfillChatConversationPaneProps {
   onOpenDailyReviewNarrative: (date: string) => void;
   onOpenDailyNewspaper: (date: string) => void;
   onOpenDebugViewer: (viewer: DebugViewerState) => void;
+  onOpenAssistantLetter: (letterId: string) => void;
   onOpenMonthlyNewspaper: (monthStartDate: string, monthEndDate: string) => void;
   onOpenMonthlyReviewNarrative: (monthStartDate: string, monthEndDate: string) => void;
   onOpenWeeklyNewspaper: (weekStartDate: string, weekEndDate: string) => void;
@@ -87,6 +90,7 @@ interface AIBackfillChatConversationPaneProps {
   renderAppliedAction: (messageId: string, action: AppliedChatAction) => React.ReactNode;
   revealedAssistantPartCounts: Record<string, number>;
   setDreamUpdateExpansion: (messageId: string) => void;
+  setLocalQueryExpansion: (messageId: string) => void;
   setMemoryUpdateExpansion: (messageId: string) => void;
   setReasoningExpansion: (messageId: string) => void;
   setReminderUpdateExpansion: (messageId: string) => void;
@@ -402,6 +406,7 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
   activeSession,
   emptyPromptExampleGroups,
   expandedDreamUpdateMessageIds,
+  expandedLocalQueryMessageIds,
   expandedMemoryUpdateMessageIds,
   expandedReasoningMessageIds,
   expandedReminderUpdateMessageIds,
@@ -415,6 +420,7 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
   onOpenDailyReviewNarrative,
   onOpenDailyNewspaper,
   onOpenDebugViewer,
+  onOpenAssistantLetter,
   onOpenMonthlyNewspaper,
   onOpenMonthlyReviewNarrative,
   onOpenWeeklyNewspaper,
@@ -423,6 +429,7 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
   renderAppliedAction,
   revealedAssistantPartCounts,
   setDreamUpdateExpansion,
+  setLocalQueryExpansion,
   setMemoryUpdateExpansion,
   setReasoningExpansion,
   setReminderUpdateExpansion,
@@ -449,6 +456,7 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
     const isMemoryUpdatesExpanded = expandedMemoryUpdateMessageIds.has(message.id);
     const isDreamUpdatesExpanded = expandedDreamUpdateMessageIds.has(message.id);
     const isReminderUpdatesExpanded = expandedReminderUpdateMessageIds.has(message.id);
+    const isLocalQueryExpanded = expandedLocalQueryMessageIds.has(message.id);
     const previousMessage = index > 0 ? messages[index - 1] : null;
     const showAvatar = !isUser || !previousMessage || previousMessage.role !== message.role;
 
@@ -639,6 +647,19 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
                       </button>
                     </>
                   )}
+                  {message.localQueryResults && message.localQueryResults.length > 0 && (
+                    <>
+                      <span className="hidden text-[#b4a79a] sm:inline">路</span>
+                      <button
+                        type="button"
+                        onClick={() => setLocalQueryExpansion(message.id)}
+                        className="transition-colors hover:opacity-100"
+                        style={{ color: theme.textMuted }}
+                      >
+                        本地查询 {message.localQueryResults.length}轮 · {isLocalQueryExpanded ? '收起' : '展开'}
+                      </button>
+                    </>
+                  )}
                   {messageDebugViewer && (
                     <>
                       <span className="hidden text-[#b4a79a] sm:inline">·</span>
@@ -656,7 +677,7 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
               </div>
             )}
 
-            {allDisplayPartsRevealed && ((message.appliedActions && message.appliedActions.length > 0) || message.dailyReviewWriteback || message.dailyNewspaperWriteback || message.weeklyNewspaperWriteback || message.weeklyReviewWriteback || message.monthlyNewspaperWriteback || message.monthlyReviewWriteback) && (
+            {allDisplayPartsRevealed && ((message.appliedActions && message.appliedActions.length > 0) || message.assistantLetterResult || message.dailyReviewWriteback || message.dailyNewspaperWriteback || message.weeklyNewspaperWriteback || message.weeklyReviewWriteback || message.monthlyNewspaperWriteback || message.monthlyReviewWriteback) && (
               <div
                 className="space-y-2 border-l pl-3 pr-1 py-1"
                 style={{
@@ -668,6 +689,48 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
                 </p>
                 <div className="space-y-2">
                   {message.appliedActions?.map((action) => renderAppliedAction(message.id, action))}
+                  {message.assistantLetterResult && (
+                    <div
+                      className="border-l-2 pl-3 pr-1 py-1"
+                      style={{ borderColor: theme.activeBorder }}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => onOpenAssistantLetter(message.assistantLetterResult!.letterId)}
+                            className="block w-full truncate text-left font-serif text-[1rem] leading-6 transition-colors hover:opacity-80"
+                            style={{ color: theme.textPrimary }}
+                            title="打开这封来信"
+                          >
+                            {message.assistantLetterResult.title}
+                          </button>
+                          <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: theme.textSecondary }}>
+                            {message.assistantLetterResult.preview}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: theme.textMuted }}>
+                        <span>{message.assistantLetterResult.personaName}</span>
+                        <span>{message.assistantLetterResult.sentAt}</span>
+                      </div>
+                      <div className="mt-2.5 flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onOpenAssistantLetter(message.assistantLetterResult!.letterId)}
+                          className="inline-flex h-8 items-center justify-center rounded-full border px-3 text-xs transition-colors"
+                          style={{
+                            borderColor: theme.chipBorder,
+                            backgroundColor: theme.inputBg,
+                            color: theme.textSecondary
+                          }}
+                          title="打开来信全文"
+                        >
+                          打开
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {message.dailyReviewWriteback && (
                     <DailyReviewWritebackResultCard
                       onOpen={() => onOpenDailyReviewNarrative(message.dailyReviewWriteback!.date)}
@@ -805,6 +868,46 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
                       <p className="text-[13px] leading-6" style={{ color: theme.textPrimary }}>
                         {item}
                       </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {allDisplayPartsRevealed && message.localQueryResults && message.localQueryResults.length > 0 && isLocalQueryExpanded && (
+              <div
+                className="space-y-2 border-l pl-3 pr-1 py-1"
+                style={{
+                  borderColor: theme.activeBorder
+                }}
+              >
+                <div className="space-y-2">
+                  {message.localQueryResults.map((result: AssistantLocalQueryResult) => (
+                    <div
+                      key={`${message.id}-local-query-${result.round}`}
+                      className="border-l-2 pl-3 pr-1 py-1"
+                      style={{ borderColor: theme.activeBorder }}
+                    >
+                      <p className="text-[11px] font-semibold" style={{ color: theme.textSecondary }}>
+                        第 {result.round} 轮 · {result.request.mode === 'filter_expression' ? '筛选表达式' : '关键词检索'}
+                      </p>
+                      <div className="mt-1.5 space-y-1 text-[13px] leading-6" style={{ color: theme.textPrimary }}>
+                        <p>范围：{result.request.targets.join(' / ')}</p>
+                        <p>关键词：{result.request.query}</p>
+                        <p>命中：{result.hitCount} 条</p>
+                        {result.request.reason && (
+                          <p style={{ color: theme.textSecondary }}>原因：{result.request.reason}</p>
+                        )}
+                        {result.items.length > 0 ? (
+                          result.items.map((item, itemIndex) => (
+                            <p key={`${message.id}-local-query-${result.round}-${item.id}-${itemIndex}`}>
+                              {itemIndex + 1}. [{item.itemType}] {item.title} | {item.summary}
+                            </p>
+                          ))
+                        ) : (
+                          <p style={{ color: theme.textSecondary }}>没有找到匹配结果。</p>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

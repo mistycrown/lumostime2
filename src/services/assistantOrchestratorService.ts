@@ -340,6 +340,8 @@ const upsertBackgroundCallHistory = (entry: AssistantBackgroundCallHistoryEntry)
 
 const getBackgroundDebugLabel = (triggerType: AssistantSystemTrigger['type']): string => {
   switch (triggerType) {
+    case 'assistant_letter_due':
+      return 'AI 来信调试';
     case 'reminder_due':
       return '后台 Reminder 调试';
     case 'checkin':
@@ -428,6 +430,8 @@ const parseNativeReminderDrafts = (value: unknown): AssistantReminderDraft[] => 
 
 const buildNativeTriggerText = (triggerType?: AssistantSystemTrigger['type']): string => {
   switch (triggerType) {
+    case 'assistant_letter_due':
+      return 'Native assistant-letter trigger';
     case 'reminder_due':
       return 'Native background reminder trigger';
     case 'manual_background_nudge':
@@ -700,6 +704,10 @@ export const assistantOrchestratorService = {
 
   listBackgroundCallHistory(): AssistantBackgroundCallHistoryEntry[] {
     return loadBackgroundCallHistory();
+  },
+
+  upsertBackgroundCallHistoryEntry(entry: AssistantBackgroundCallHistoryEntry): void {
+    upsertBackgroundCallHistory(entry);
   },
 
   clearBackgroundCallHistory(): void {

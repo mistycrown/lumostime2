@@ -33,10 +33,12 @@ describe('assistantAgentConfigService', () => {
     });
   });
 
-  it('returns defaults for the new log-submission trigger config', () => {
+  it('returns defaults for the new log-submission trigger config and letter config', () => {
     expect(assistantAgentConfigService.getConfig()).toEqual(expect.objectContaining({
       logSubmissionTriggerEnabled: false,
-      logSubmissionTriggerActivityIds: []
+      logSubmissionTriggerActivityIds: [],
+      letterEnabled: false,
+      letterFrequencyDays: 2
     }));
   });
 
@@ -51,31 +53,56 @@ describe('assistantAgentConfigService', () => {
       minimumNudgeGapMinutes: 30,
       longTermMemoryEnabled: true,
       logSubmissionTriggerEnabled: true,
-      logSubmissionTriggerActivityIds: [' coding ', '', 'coding', 123, 'reading']
+      logSubmissionTriggerActivityIds: [' coding ', '', 'coding', 123, 'reading'],
+      letterEnabled: true,
+      letterFrequencyDays: 0,
+      letterWindowStart: '20:00',
+      letterWindowEnd: '2200',
+      nextLetterAt: '2026-07-04T12:00:00+08:00',
+      lastLetterSentAt: 'invalid',
+      lastLetterScheduledAt: '2026-07-06T20:30:00+08:00'
     }));
 
     expect(assistantAgentConfigService.getConfig()).toEqual(expect.objectContaining({
       logSubmissionTriggerEnabled: true,
-      logSubmissionTriggerActivityIds: ['coding', 'reading']
+      logSubmissionTriggerActivityIds: ['coding', 'reading'],
+      letterEnabled: true,
+      letterFrequencyDays: 1,
+      letterWindowStart: '2000',
+      letterWindowEnd: '2200',
+      nextLetterAt: '2026-07-04T04:00:00.000Z',
+      lastLetterScheduledAt: '2026-07-06T12:30:00.000Z'
     }));
   });
 
-  it('persists new log-submission trigger updates alongside existing config', () => {
+  it('persists new log-submission trigger updates alongside existing config and letter config', () => {
     const saved = assistantAgentConfigService.saveConfig({
       enabled: true,
       logSubmissionTriggerEnabled: true,
-      logSubmissionTriggerActivityIds: ['writing', 'review']
+      logSubmissionTriggerActivityIds: ['writing', 'review'],
+      letterEnabled: true,
+      letterFrequencyDays: 3,
+      letterWindowStart: '2000',
+      letterWindowEnd: '2200'
     });
 
     expect(saved).toEqual(expect.objectContaining({
       enabled: true,
       logSubmissionTriggerEnabled: true,
-      logSubmissionTriggerActivityIds: ['writing', 'review']
+      logSubmissionTriggerActivityIds: ['writing', 'review'],
+      letterEnabled: true,
+      letterFrequencyDays: 3,
+      letterWindowStart: '2000',
+      letterWindowEnd: '2200'
     }));
     expect(assistantAgentConfigService.getConfig()).toEqual(expect.objectContaining({
       enabled: true,
       logSubmissionTriggerEnabled: true,
-      logSubmissionTriggerActivityIds: ['writing', 'review']
+      logSubmissionTriggerActivityIds: ['writing', 'review'],
+      letterEnabled: true,
+      letterFrequencyDays: 3,
+      letterWindowStart: '2000',
+      letterWindowEnd: '2200'
     }));
   });
 });

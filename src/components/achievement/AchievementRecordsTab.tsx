@@ -1,18 +1,20 @@
 ﻿/**
  * @file AchievementRecordsTab.tsx
  * @description Minimal ledger-style daily snapshot list with modal-based detail view and one-decimal achievement star values, including decimal-weighted check-category contributions.
+ * @updated 2026-07-05: Added a stats entry button beside Daily Records and a bottom-sheet chart modal for active daily star trends.
  * @updated 2026-04-25: Clarified check-category detail copy so streak-weighted completion values display with one decimal place.
  *
  * @updated 2026-04-17: Added filter-expression detail text for filter-duration rules.
  * @updated 2026-04-06: Removed archived bottle exchange records so the tab only shows the current active bottle ledger.
  */
 import React, { useMemo, useState } from 'react';
-import { ChevronRight, RotateCcw, Trash2 } from 'lucide-react';
+import { BarChart3, ChevronRight, RotateCcw, Trash2 } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import { AchievementDailySnapshot, AchievementRedemptionRecord } from '../../types';
 import { formatRelativeTime, getLocalDateTimeStr } from '../../utils/dateUtils';
 import { AchievementDialog } from './AchievementDialog';
 import { formatAchievementSignedStars, formatAchievementStars } from '../../utils/achievementUtils';
+import { AchievementStatsLineChartModal } from './AchievementStatsLineChartModal';
 
 interface AchievementRecordsTabProps {
   snapshots: AchievementDailySnapshot[];
@@ -40,6 +42,7 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
 }) => {
   const { addToast } = useToast();
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
 
   const orderedSnapshots = useMemo(() => {
     return [...snapshots].sort((first, second) => second.date.localeCompare(first.date));
@@ -72,10 +75,18 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
     <>
       <div className="space-y-6">
         <section>
-          <div className="flex items-center justify-between border-b border-stone-200 pb-[14px]">
+          <div className="flex items-center justify-between gap-3 border-b border-stone-200 pb-[14px]">
             <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">
               Daily Records / {orderedSnapshots.length}
             </div>
+            <button
+              type="button"
+              onClick={() => setIsStatsOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white/80 px-3 py-1.5 text-xs text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
+            >
+              <BarChart3 size={13} />
+              统计
+            </button>
           </div>
 
           {orderedSnapshots.length === 0 ? (
@@ -217,6 +228,12 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
           </div>
         )}
       </AchievementDialog>
+
+      <AchievementStatsLineChartModal
+        isOpen={isStatsOpen}
+        snapshots={orderedSnapshots}
+        onClose={() => setIsStatsOpen(false)}
+      />
     </>
   );
 };

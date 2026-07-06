@@ -4,6 +4,7 @@
  * @output Reusable AI chat model definitions, validation helpers, and small presentational components
  * @pos Component Support (AI Integration)
  * @description Centralizes the stable data model and low-risk helper/UI pieces used by AIBackfillChatModal so the main modal focuses on orchestration instead of carrying every type and validator inline.
+ * @updated 2026-07-05: Extended chat debug sections so foreground local-query rounds can persist structured text blocks alongside AI request exchanges.
  * @updated 2026-06-07: Added weekly/monthly newspaper result and confirmation types so periodic AI newspaper writeback can travel through chat state and guarded overwrite flows.
  * @updated 2026-05-16: Added daily newspaper result card types so AI chat can open lightweight structured newspaper pages stored on Daily Review.
  * @updated 2026-05-16: Added per-block enable flags for persona-scoped custom prompt blocks so each extra prompt snippet can be toggled independently.
@@ -19,6 +20,8 @@ import type { Log, TodoRecurrenceRule } from '../../types';
 import type {
   AssistantAgentConfig,
   AssistantEditableMemoryListKey,
+  AssistantLetterResultCard,
+  AssistantLocalQueryResult,
   AssistantReasoningSummary,
   AssistantReminder,
   AssistantScheduledTask,
@@ -40,9 +43,15 @@ import type {
 
 export type ChatTone = 'normal' | 'system' | 'error' | 'pending';
 
+export interface AIChatDebugTextBlock {
+  label: string;
+  content: string;
+}
+
 export interface AIChatDebugSection {
   label: string;
-  exchange: AIDebugExchange;
+  exchange?: AIDebugExchange;
+  blocks?: AIChatDebugTextBlock[];
 }
 
 export interface AIChatCustomPromptBlock {
@@ -139,12 +148,14 @@ export interface AIChatMessage {
   role: 'user' | 'assistant';
   content: string;
   reasoning?: AssistantReasoningSummary;
+  localQueryResults?: AssistantLocalQueryResult[];
   displayParts?: string[];
   createdAt: number;
   tone?: ChatTone;
   backgroundDebugHistoryId?: string;
   debugSections?: AIChatDebugSection[];
   appliedActions?: AppliedChatAction[];
+  assistantLetterResult?: AssistantLetterResultCard;
   memoryUpdates?: AIChatMemoryUpdateSection[];
   dreamUpdates?: AIChatDreamUpdateCard[];
   reminderUpdates?: string[];
@@ -265,6 +276,20 @@ export type AssistantAgentQuietHoursField = 'quietHoursStart' | 'quietHoursEnd';
 export type AssistantAgentQuietHoursDrafts = Record<AssistantAgentQuietHoursField, string>;
 
 export type AssistantAgentQuietHoursErrors = Record<AssistantAgentQuietHoursField, string | null>;
+
+export type AssistantLetterField = 'letterFrequencyDays' | 'letterWindowStart' | 'letterWindowEnd';
+
+export interface AssistantLetterDrafts {
+  letterFrequencyDays: string;
+  letterWindowStart: string;
+  letterWindowEnd: string;
+}
+
+export interface AssistantLetterDraftErrors {
+  letterFrequencyDays: string | null;
+  letterWindowStart: string | null;
+  letterWindowEnd: string | null;
+}
 
 export interface DebugViewerState {
   title: string;
@@ -393,6 +418,12 @@ const ASSISTANT_AGENT_INTERVAL_FIELD_META: Record<
   }
 };
 
+const ASSISTANT_LETTER_FREQUENCY_META = {
+  label: '来信频率',
+  minimum: 1,
+  maximum: 30
+} as const;
+
 const ASSISTANT_MULTI_BUBBLE_REVEAL_DURATION_MS = 320;
 const ASSISTANT_MULTI_BUBBLE_REVEAL_INITIAL_SCALE = 0.975;
 const ASSISTANT_MULTI_BUBBLE_REVEAL_BASE_OFFSET_PX = 10;
@@ -411,6 +442,12 @@ export const buildAssistantAgentIntervalDrafts = (config: AssistantAgentConfig):
 export const buildAssistantAgentQuietHoursDrafts = (config: AssistantAgentConfig): AssistantAgentQuietHoursDrafts => ({
   quietHoursStart: normalizeAssistantQuietHoursValue(config.quietHoursStart) || '',
   quietHoursEnd: normalizeAssistantQuietHoursValue(config.quietHoursEnd) || ''
+});
+
+export const buildAssistantLetterDrafts = (config: AssistantAgentConfig): AssistantLetterDrafts => ({
+  letterFrequencyDays: String(config.letterFrequencyDays || 2),
+  letterWindowStart: normalizeAssistantQuietHoursValue(config.letterWindowStart) || '',
+  letterWindowEnd: normalizeAssistantQuietHoursValue(config.letterWindowEnd) || ''
 });
 
 export const validateAssistantAgentIntervalDrafts = (
@@ -497,6 +534,63 @@ export const validateAssistantAgentQuietHoursDrafts = (
   ) {
     errors.quietHoursStart = '开始和结束保护时间不能相同';
     errors.quietHoursEnd = '开始和结束保护时间不能相同';
+  }
+
+  return errors;
+};
+
+export const validateAssistantLetterDrafts = (
+  drafts: AssistantLetterDrafts,
+  requireWindow = false
+): AssistantLetterDraftErrors => {
+  const errors: AssistantLetterDraftErrors = {
+    letterFrequencyDays: null,
+    letterWindowStart: null,
+    letterWindowEnd: null
+  };
+
+  const rawFrequency = drafts.letterFrequencyDays.trim();
+  if (!rawFrequency) {
+    errors.letterFrequencyDays = `${ASSISTANT_LETTER_FREQUENCY_META.label}不能为空`;
+  } else if (!/^\d+$/.test(rawFrequency)) {
+    errors.letterFrequencyDays = `${ASSISTANT_LETTER_FREQUENCY_META.label}只能输入正整数`;
+  } else {
+    const parsedValue = Number(rawFrequency);
+    if (
+      parsedValue < ASSISTANT_LETTER_FREQUENCY_META.minimum
+      || parsedValue > ASSISTANT_LETTER_FREQUENCY_META.maximum
+    ) {
+      errors.letterFrequencyDays = `${ASSISTANT_LETTER_FREQUENCY_META.label}需在 ${ASSISTANT_LETTER_FREQUENCY_META.minimum} 到 ${ASSISTANT_LETTER_FREQUENCY_META.maximum} 天之间`;
+    }
+  }
+
+  ([
+    ['letterWindowStart', '开始时间'],
+    ['letterWindowEnd', '结束时间']
+  ] as const).forEach(([field, label]) => {
+    const rawValue = drafts[field].trim();
+    if (!rawValue) {
+      if (requireWindow) {
+        errors[field] = `${label}不能为空`;
+      }
+      return;
+    }
+
+    if (!normalizeAssistantQuietHoursValue(rawValue)) {
+      errors[field] = `${label}需为四位数字时间`;
+    }
+  });
+
+  if (
+    errors.letterWindowStart === null
+    && errors.letterWindowEnd === null
+    && requireWindow
+    && drafts.letterWindowStart.trim()
+    && drafts.letterWindowEnd.trim()
+    && normalizeAssistantQuietHoursValue(drafts.letterWindowStart) === normalizeAssistantQuietHoursValue(drafts.letterWindowEnd)
+  ) {
+    errors.letterWindowStart = '开始和结束时间不能相同';
+    errors.letterWindowEnd = '开始和结束时间不能相同';
   }
 
   return errors;

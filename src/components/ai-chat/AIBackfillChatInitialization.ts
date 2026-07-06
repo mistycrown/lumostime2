@@ -23,6 +23,7 @@ import {
   loadInitialChatStateFromStorage,
   normalizeChatSessions
 } from './AIBackfillChatSessionHelpers';
+import type { AssistantLetterResultCard, AssistantLocalQueryResult } from '../../types/assistant';
 import type {
   AIChatCustomPromptBlock,
   AIChatDailyNewspaperWritebackResult,
@@ -140,13 +141,36 @@ const normalizeDebugSections = (value: unknown): AIChatDebugSection[] => {
 
     const candidate = item as AIChatDebugSection;
     const label = normalizeDebugSectionLabel(candidate.label);
-    if (!label || !candidate.exchange) {
+    const normalizedBlocks = Array.isArray(candidate.blocks)
+      ? candidate.blocks.flatMap((block) => {
+        if (!block || typeof block !== 'object') {
+          return [];
+        }
+
+        const blockCandidate = block as { label?: unknown; content?: unknown };
+        if (
+          typeof blockCandidate.label !== 'string'
+          || !blockCandidate.label.trim()
+          || typeof blockCandidate.content !== 'string'
+          || !blockCandidate.content.trim()
+        ) {
+          return [];
+        }
+
+        return [{
+          label: blockCandidate.label.trim(),
+          content: blockCandidate.content.trim()
+        }];
+      })
+      : [];
+    if (!label || (!candidate.exchange && normalizedBlocks.length === 0)) {
       return [];
     }
 
     return [{
-      ...candidate,
-      label
+      label,
+      ...(candidate.exchange ? { exchange: candidate.exchange } : {}),
+      ...(normalizedBlocks.length > 0 ? { blocks: normalizedBlocks } : {})
     }];
   });
 };
@@ -190,6 +214,65 @@ const normalizeReminderUpdates = (value: unknown): string[] => (
     ? value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean)
     : []
 );
+
+const normalizeLocalQueryResults = (value: unknown): AssistantLocalQueryResult[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+
+    const candidate = item as Partial<AssistantLocalQueryResult>;
+    if (
+      typeof candidate.round !== 'number'
+      || !candidate.request
+      || typeof candidate.hitCount !== 'number'
+      || !Array.isArray(candidate.items)
+      || typeof candidate.digest !== 'string'
+    ) {
+      return [];
+    }
+
+    return [candidate as AssistantLocalQueryResult];
+  });
+};
+
+const normalizeAssistantLetterResult = (value: unknown): AssistantLetterResultCard | undefined => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const candidate = value as Partial<AssistantLetterResultCard>;
+  if (
+    typeof candidate.letterId !== 'string'
+    || typeof candidate.title !== 'string'
+    || typeof candidate.preview !== 'string'
+    || typeof candidate.personaName !== 'string'
+    || typeof candidate.sentAt !== 'string'
+  ) {
+    return undefined;
+  }
+
+  const letterId = candidate.letterId.trim();
+  const title = candidate.title.trim();
+  const preview = candidate.preview.trim();
+  const personaName = candidate.personaName.trim();
+  const sentAt = candidate.sentAt.trim();
+  if (!letterId || !title || !preview || !personaName || !sentAt) {
+    return undefined;
+  }
+
+  return {
+    letterId,
+    title,
+    preview,
+    personaName,
+    sentAt
+  };
+};
 
 const normalizeCustomPromptBlocks = (value: unknown): AIChatCustomPromptBlock[] => {
   if (!Array.isArray(value)) {
@@ -613,6 +696,7 @@ const normalizeMessages = (value: unknown, getLocalDateStr: (date: Date) => stri
       role: candidate.role,
       content: normalizedContent,
       ...(normalizedReasoning ? { reasoning: normalizedReasoning } : {}),
+      ...(candidate.localQueryResults ? { localQueryResults: normalizeLocalQueryResults(candidate.localQueryResults) } : {}),
       ...(normalizedDisplayParts ? { displayParts: normalizedDisplayParts } : {}),
       createdAt: candidate.createdAt,
       ...(candidate.tone ? { tone: candidate.tone } : {}),
@@ -621,6 +705,9 @@ const normalizeMessages = (value: unknown, getLocalDateStr: (date: Date) => stri
         : {}),
       ...(candidate.debugSections ? { debugSections: normalizeDebugSections(candidate.debugSections) } : {}),
       ...(candidate.appliedActions ? { appliedActions: normalizeAppliedActions(candidate.appliedActions) } : {}),
+      ...(normalizeAssistantLetterResult(candidate.assistantLetterResult)
+        ? { assistantLetterResult: normalizeAssistantLetterResult(candidate.assistantLetterResult) }
+        : {}),
       ...(candidate.memoryUpdates ? { memoryUpdates: normalizeMemoryUpdates(candidate.memoryUpdates) } : {}),
       ...(candidate.dreamUpdates ? { dreamUpdates: normalizeDreamUpdates(candidate.dreamUpdates) } : {}),
       ...(candidate.reminderUpdates ? { reminderUpdates: normalizeReminderUpdates(candidate.reminderUpdates) } : {}),
@@ -650,10 +737,6 @@ const normalizeMessages = (value: unknown, getLocalDateStr: (date: Date) => stri
         ? { dreamRetryYearMonth: normalizeDreamRetryYearMonth(candidate.dreamRetryYearMonth, getLocalDateStr) }
         : {})
     };
-
-    if (normalizedMessage.tone === 'pending') {
-      return [];
-    }
 
     return [normalizedMessage];
   });

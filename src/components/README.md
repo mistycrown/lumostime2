@@ -209,7 +209,8 @@ Small, atomic display components.
 - `NoteTemplateEditorModal.tsx`: Shared add/edit modal for note template names and contents.
 - `achievement/AchievementEntryCard.tsx`: Timeline 顶部的成就入口卡片，展示当前可用光点并进入成就页。
 - `achievement/AchievementBottle.tsx`: 成就页光点瓶主容器，使用物理引擎驱动光点碰撞效果。
-- `achievement/AchievementRecordsTab.tsx`: 每日快照记录列表，支持展开查看规则命中明细。
+- `achievement/AchievementRecordsTab.tsx`: 每日快照记录列表，支持展开查看规则命中明细，并可打开活跃成就数据的积分趋势统计弹窗。
+- `achievement/AchievementStatsLineChartModal.tsx`: 当前活跃成就数据的底部统计弹窗，首版提供每日净积分折线图。
 - `achievement/AchievementRulesTab.tsx`: 成就规则编辑区，按活动标签配置获星与扣星规则。
 - `achievement/AchievementRedeemTab.tsx`: 奖励兑换与兑换记录管理区。
 

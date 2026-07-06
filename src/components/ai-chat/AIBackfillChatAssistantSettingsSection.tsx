@@ -20,6 +20,8 @@ import type {
   AssistantAgentQuietHoursDrafts,
   AssistantAgentQuietHoursErrors,
   AssistantAgentQuietHoursField,
+  AssistantLetterDraftErrors,
+  AssistantLetterDrafts,
   AssistantScheduledTaskDeleteTarget,
   AssistantScheduledTaskDrafts
 } from './AIBackfillChatShared';
@@ -44,6 +46,9 @@ interface AIBackfillChatAssistantSettingsSectionProps {
   assistantAgentIntervalErrors: AssistantAgentIntervalErrors;
   assistantAgentQuietHoursDrafts: AssistantAgentQuietHoursDrafts;
   assistantAgentQuietHoursErrors: AssistantAgentQuietHoursErrors;
+  assistantLetterDrafts: AssistantLetterDrafts;
+  assistantLetterDraftErrors: AssistantLetterDraftErrors;
+  nextLetterPreview: string;
   assistantScheduledTaskDrafts: AssistantScheduledTaskDrafts;
   isAssistantScheduledTaskComposerOpen: boolean;
   assistantScheduledTaskSnapshot: AssistantScheduledTask[];
@@ -56,6 +61,9 @@ interface AIBackfillChatAssistantSettingsSectionProps {
   onToggleQuietHours: () => void;
   onQuietHoursDraftChange: (field: AssistantAgentQuietHoursField, value: string) => void;
   onCommitQuietHoursDraft: () => void;
+  onToggleLetterEnabled: () => void;
+  onLetterDraftChange: (field: keyof AssistantLetterDrafts, value: string) => void;
+  onCommitLetterDraft: () => void;
   onOpenScheduledTaskComposer: () => void;
   onUpdateScheduledTaskDraft: <K extends keyof AssistantScheduledTaskDrafts>(
     key: K,
@@ -71,6 +79,7 @@ interface AIBackfillChatAssistantSettingsSectionProps {
   onOpenDreamViewer: () => void;
   onOpenAssistantMemoryViewer: () => void;
   onOpenAssistantBackgroundHistoryViewer: () => void;
+  onOpenAssistantLetterHistoryViewer: () => void;
 }
 
 export const AIBackfillChatAssistantSettingsSection: React.FC<AIBackfillChatAssistantSettingsSectionProps> = ({
@@ -80,6 +89,9 @@ export const AIBackfillChatAssistantSettingsSection: React.FC<AIBackfillChatAssi
   assistantAgentIntervalErrors,
   assistantAgentQuietHoursDrafts,
   assistantAgentQuietHoursErrors,
+  assistantLetterDrafts,
+  assistantLetterDraftErrors,
+  nextLetterPreview,
   assistantScheduledTaskDrafts,
   isAssistantScheduledTaskComposerOpen,
   assistantScheduledTaskSnapshot,
@@ -92,6 +104,9 @@ export const AIBackfillChatAssistantSettingsSection: React.FC<AIBackfillChatAssi
   onToggleQuietHours,
   onQuietHoursDraftChange,
   onCommitQuietHoursDraft,
+  onToggleLetterEnabled,
+  onLetterDraftChange,
+  onCommitLetterDraft,
   onOpenScheduledTaskComposer,
   onUpdateScheduledTaskDraft,
   onToggleScheduledTaskWeekday,
@@ -103,7 +118,8 @@ export const AIBackfillChatAssistantSettingsSection: React.FC<AIBackfillChatAssi
   onConfirmScheduledTaskDelete,
   onOpenDreamViewer,
   onOpenAssistantMemoryViewer,
-  onOpenAssistantBackgroundHistoryViewer
+  onOpenAssistantBackgroundHistoryViewer,
+  onOpenAssistantLetterHistoryViewer
 }) => (
   <section
     className="border-t pt-5"
@@ -436,6 +452,174 @@ export const AIBackfillChatAssistantSettingsSection: React.FC<AIBackfillChatAssi
             />
           </div>
         )}
+      </div>
+
+      <div className="border-t pt-4" style={{ borderColor: theme.panelBorder }}>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold" style={{ color: theme.textPrimary }}>AI 来信</p>
+            <p className="mt-1 text-xs leading-5" style={{ color: theme.textMuted }}>
+              按频率和时间窗定期生成一封独立来信，并保存在来信记录里。
+            </p>
+          </div>
+          <button
+            onClick={onToggleLetterEnabled}
+            className="inline-flex min-w-[72px] items-center justify-center rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors"
+            style={assistantAgentConfig.letterEnabled
+              ? {
+                borderColor: theme.activeBorder,
+                backgroundColor: theme.activeBg,
+                color: theme.textPrimary
+              }
+              : {
+                borderColor: theme.chipBorder,
+                backgroundColor: theme.inputBg,
+                color: theme.textMuted
+              }}
+          >
+            {assistantAgentConfig.letterEnabled ? '已开启' : '未开启'}
+          </button>
+        </div>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-stone-500">来信频率（天）</span>
+            <div className="relative">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={assistantLetterDrafts.letterFrequencyDays}
+                onChange={(event) => onLetterDraftChange('letterFrequencyDays', event.target.value)}
+                onBlur={onCommitLetterDraft}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    onCommitLetterDraft();
+                  }
+                }}
+                aria-invalid={!!assistantLetterDraftErrors.letterFrequencyDays}
+                className="w-full rounded-[1rem] border px-3 py-2 pr-9 text-sm outline-none"
+                style={{
+                  borderColor: assistantLetterDraftErrors.letterFrequencyDays ? '#ef4444' : theme.chipBorder,
+                  backgroundColor: theme.inputBg,
+                  color: theme.textPrimary
+                }}
+              />
+              {assistantLetterDraftErrors.letterFrequencyDays ? (
+                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-red-500">
+                  <XCircle size={15} aria-hidden="true" />
+                </span>
+              ) : null}
+            </div>
+            {assistantLetterDraftErrors.letterFrequencyDays ? (
+              <span className="mt-1 block text-xs font-medium text-red-500" role="alert">
+                {assistantLetterDraftErrors.letterFrequencyDays}
+              </span>
+            ) : null}
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-stone-500">开始时间</span>
+            <div className="relative">
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="2000"
+                value={assistantLetterDrafts.letterWindowStart}
+                onChange={(event) => onLetterDraftChange('letterWindowStart', event.target.value)}
+                onBlur={onCommitLetterDraft}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    onCommitLetterDraft();
+                  }
+                }}
+                aria-invalid={!!assistantLetterDraftErrors.letterWindowStart}
+                className="w-full rounded-[1rem] border px-3 py-2 pr-9 text-sm outline-none"
+                style={{
+                  borderColor: assistantLetterDraftErrors.letterWindowStart ? '#ef4444' : theme.chipBorder,
+                  backgroundColor: theme.inputBg,
+                  color: theme.textPrimary
+                }}
+              />
+              {assistantLetterDraftErrors.letterWindowStart ? (
+                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-red-500">
+                  <XCircle size={15} aria-hidden="true" />
+                </span>
+              ) : null}
+            </div>
+            {assistantLetterDraftErrors.letterWindowStart ? (
+              <span className="mt-1 block text-xs font-medium text-red-500" role="alert">
+                {assistantLetterDraftErrors.letterWindowStart}
+              </span>
+            ) : null}
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-stone-500">结束时间</span>
+            <div className="relative">
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="2200"
+                value={assistantLetterDrafts.letterWindowEnd}
+                onChange={(event) => onLetterDraftChange('letterWindowEnd', event.target.value)}
+                onBlur={onCommitLetterDraft}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    onCommitLetterDraft();
+                  }
+                }}
+                aria-invalid={!!assistantLetterDraftErrors.letterWindowEnd}
+                className="w-full rounded-[1rem] border px-3 py-2 pr-9 text-sm outline-none"
+                style={{
+                  borderColor: assistantLetterDraftErrors.letterWindowEnd ? '#ef4444' : theme.chipBorder,
+                  backgroundColor: theme.inputBg,
+                  color: theme.textPrimary
+                }}
+              />
+              {assistantLetterDraftErrors.letterWindowEnd ? (
+                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-red-500">
+                  <XCircle size={15} aria-hidden="true" />
+                </span>
+              ) : null}
+            </div>
+            {assistantLetterDraftErrors.letterWindowEnd ? (
+              <span className="mt-1 block text-xs font-medium text-red-500" role="alert">
+                {assistantLetterDraftErrors.letterWindowEnd}
+              </span>
+            ) : null}
+          </label>
+        </div>
+
+        <div
+          className="mt-4 rounded-[1rem] border px-4 py-3"
+          style={{
+            borderColor: theme.panelBorder,
+            backgroundColor: theme.panelBg
+          }}
+        >
+          <p className="text-[11px] uppercase tracking-[0.12em]" style={{ color: theme.textMuted }}>
+            下一次来信
+          </p>
+          <p className="mt-2 text-sm leading-6" style={{ color: theme.textPrimary }}>
+            {nextLetterPreview || '开启并保存后会自动计算'}
+          </p>
+          <div className="mt-3 flex justify-end">
+            <button
+              onClick={onOpenAssistantLetterHistoryViewer}
+              className="rounded-[0.75rem] border px-3 py-2 text-xs font-medium transition-colors hover:bg-white"
+              style={{
+                borderColor: theme.chipBorder,
+                backgroundColor: theme.inputBg,
+                color: theme.textSecondary
+              }}
+            >
+              查看来信记录
+            </button>
+          </div>
+        </div>
       </div>
 
       <AIBackfillChatScheduledTaskSection
