@@ -420,7 +420,6 @@ export interface AssistantLocalQueryRequest {
   targets: AssistantLocalQueryTarget[];
   query: string;
   limit?: number;
-  reason?: string;
 }
 
 export interface AssistantLocalQueryResultItem {

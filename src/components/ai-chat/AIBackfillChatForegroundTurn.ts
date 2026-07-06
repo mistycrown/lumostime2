@@ -407,6 +407,33 @@ const normalizeFilterExpressionNames = (
     .trim()
 );
 
+const normalizeKeywordQueryNames = (
+  query: string,
+  categories: Category[],
+  scopes: Scope[],
+  todos: TodoItem[],
+  todoCategories: TodoCategory[]
+): string => (
+  query
+    .split(/\s+/)
+    .map((token) => {
+      const normalized = token.trim();
+      if (!normalized) {
+        return normalized;
+      }
+
+      return resolveFilterTagName(
+        resolveFilterScopeName(
+          resolveFilterTodoName(normalized, todos, todoCategories),
+          scopes
+        ),
+        categories
+      );
+    })
+    .join(' ')
+    .trim()
+);
+
 export const normalizeLocalQueryRequestForExecution = (
   userMessage: string,
   request: AssistantLocalQueryRequest,
@@ -426,14 +453,13 @@ export const normalizeLocalQueryRequestForExecution = (
     : baseQuery;
   const query = route.mode === 'filter_expression'
     ? normalizeFilterExpressionNames(routedQuery, categories, scopes, todos, todoCategories)
-    : routedQuery;
+    : normalizeKeywordQueryNames(routedQuery, categories, scopes, todos, todoCategories);
 
   return {
     ...request,
     mode: route.mode,
     targets: route.targets,
-    query,
-    reason: undefined
+    query
   };
 };
 

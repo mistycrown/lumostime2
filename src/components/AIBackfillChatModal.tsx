@@ -1997,19 +1997,24 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     trigger: AssistantSystemTrigger,
     targetSession: AIChatSession,
     conversationHistory: AIConversationTurn[],
-    now = new Date()
+    options?: {
+      now?: Date;
+      pendingMessageId?: string;
+      retryInput?: string;
+      retrySourceUserMessageId?: string;
+    }
   ) => {
     if (isProcessingAssistantLetterRef.current) {
       return null;
     }
 
     isProcessingAssistantLetterRef.current = true;
-    const pendingMessageId = appendAssistantLetterPendingMessage(targetSession.id);
+    const now = options?.now || new Date();
+    const pendingMessageId = options?.pendingMessageId || appendAssistantLetterPendingMessage(targetSession.id);
 
     try {
       const result = await assistantLetterOrchestratorService.runDueLetter({
-        ...buildAssistantLetterRunRequest(trigger, now, targetSession, conversationHistory),
-        persistChatMessage: false
+        ...buildAssistantLetterRunRequest(trigger, now, targetSession, conversationHistory)
       });
 
       setAssistantAgentConfig(assistantAgentConfigService.getConfig());
@@ -2035,6 +2040,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         getRetryableAIErrorMessage(error),
         {
           tone: 'error',
+          ...(options?.retryInput ? { retryInput: options.retryInput } : {}),
+          ...(options?.retrySourceUserMessageId ? { retrySourceUserMessageId: options.retrySourceUserMessageId } : {}),
           debugSections: getErrorDebugSections(error, 'AI 来信调试', debugMode)
         }
       );
@@ -4634,40 +4641,19 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       }
     };
 
-    void assistantLetterOrchestratorService.runDueLetter(
-      {
-        ...buildAssistantLetterRunRequest(trigger, new Date(now), activeSession, historyBeforeCurrent),
-        showSystemNotification: false,
-        persistChatMessage: false
+    void runBackgroundAssistantLetter(trigger, activeSession, historyBeforeCurrent, {
+      now: new Date(now),
+      pendingMessageId,
+      retryInput: '/letter',
+      retrySourceUserMessageId: userMessageId
+    }).then((result) => {
+      if (!result) {
+        replacePendingWithResult(sessionId, pendingMessageId, '已经有一封来信在生成中。', {
+          tone: 'system'
+        });
       }
-    ).then((result) => {
-      setAssistantAgentConfig(assistantAgentConfigService.getConfig());
-      refreshAssistantLetterSnapshot();
-      refreshAssistantMemorySnapshot();
-
-      replacePendingWithResult(sessionId, pendingMessageId, '收到了一封来信。', {
-        tone: 'system',
-        assistantLetterResult: result.resultCard,
-        debugSections: debugMode
-          ? [{
-            label: 'AI 来信调试',
-            exchange: result.debug
-          }]
-          : undefined
-      });
     }).catch((error) => {
       console.error('[AIBackfillChatModal] Manual assistant letter debug failed', error);
-      replacePendingWithResult(
-        sessionId,
-        pendingMessageId,
-        getRetryableAIErrorMessage(error),
-        {
-          tone: 'error',
-          retryInput: '/letter',
-          retrySourceUserMessageId: userMessageId,
-          debugSections: getErrorDebugSections(error, 'AI 来信调试', debugMode)
-        }
-      );
     }).finally(() => {
       if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
         activeRequestRef.current = null;

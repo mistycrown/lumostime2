@@ -1207,10 +1207,6 @@ const normalizeAssistantLocalQueryRequest = (value: unknown): AssistantLocalQuer
         normalized.limit = Math.round(candidate.limit);
     }
 
-    if (typeof candidate.reason === 'string' && candidate.reason.trim()) {
-        normalized.reason = candidate.reason.trim();
-    }
-
     return normalized;
 };
 
