@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-07-06: Added assistant-created principle and self-belief tool-call writeback with in-chat undo support.
  * @updated 2026-07-05: Connected ordinary foreground assistant local-query turns to the real category/review datasets and fed local-query history back into follow-up unified turns.
  * @updated 2026-06-07: Added guarded review-command dispatch so weekly/monthly newspaper command setup errors now surface as chat error messages instead of failing silently.
  * @updated 2026-05-21: Synced native background conversation snapshots through the same timestamp-preserving serializer used by foreground assistant prompts so Android-side AI turns can distinguish old context from current context.
@@ -41,7 +42,9 @@ import {
   type AITodoToolCall,
   type AITodoUpdateToolCall,
   type AICreateSubtaskToolCall,
-  type AIEditLogToolCall
+  type AIEditLogToolCall,
+  type AICreatePrincipleToolCall,
+  type AICreateSelfBeliefToolCall
 } from '../services/aiService';
 import { useData } from '../contexts/DataContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
@@ -113,14 +116,26 @@ import {
   applyLogDelete,
   applyLogSave,
   applyTodoSave,
+  getStoredPrincipleById,
+  getStoredSelfBeliefById,
+  removeStoredPrincipleById,
+  removeStoredSelfBeliefById,
+  restoreStoredPrinciple,
+  restoreStoredSelfBelief,
+  updateStoredPrinciple,
+  updateStoredSelfBelief,
   type AppliedChatAction,
   type AppliedCreateLogAction,
+  type AppliedCreatePrincipleAction,
+  type AppliedCreateSelfBeliefAction,
   type AppliedCreateSubtaskAction,
   type AppliedCreateTodoAction,
   type AppliedEditLogAction,
   type AppliedUpdateTodoAction,
   type AppliedActionStatus
 } from '../services/assistantActionExecutor';
+import { PrincipleEditModal, type PrincipleEditFormData } from './PrincipleEditModal';
+import { SelfBeliefEditModal, type SelfBeliefDescriptionDraft } from './SelfBeliefEditModal';
 import {
   weeklyReviewTemplateService,
   type WeeklyReviewMethodId,
@@ -500,6 +515,16 @@ const clampNumber = (value: number, min: number, max: number): number => (
   Math.min(max, Math.max(min, value))
 );
 
+const createChatLibraryId = (prefix: string): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+};
+
+const getTodayDateKey = (): string => formatDateKey(new Date());
+
 export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   isOpen,
   onClose,
@@ -603,6 +628,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [expandedReminderUpdateMessageIds, setExpandedReminderUpdateMessageIds] = useState<Set<string>>(() => new Set());
   const [expandedLocalQueryMessageIds, setExpandedLocalQueryMessageIds] = useState<Set<string>>(() => new Set());
   const [revealedAssistantPartCounts, setRevealedAssistantPartCounts] = useState<Record<string, number>>({});
+  const [editingPrincipleId, setEditingPrincipleId] = useState<string | null>(null);
+  const [principleEditFormData, setPrincipleEditFormData] = useState<PrincipleEditFormData>({
+    title: '',
+    frontText: '',
+    backText: ''
+  });
+  const [editingSelfBeliefId, setEditingSelfBeliefId] = useState<string | null>(null);
+  const [selfBeliefTitleDraft, setSelfBeliefTitleDraft] = useState('');
+  const [selfBeliefDescriptionDrafts, setSelfBeliefDescriptionDrafts] = useState<SelfBeliefDescriptionDraft[]>([]);
+  const [newSelfBeliefDescriptionText, setNewSelfBeliefDescriptionText] = useState('');
+  const [editingSelfBeliefDescriptionId, setEditingSelfBeliefDescriptionId] = useState<string | null>(null);
+  const [editingSelfBeliefDescriptionText, setEditingSelfBeliefDescriptionText] = useState('');
   const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
   const activeRequestRef = useRef<ActiveRequestRef | null>(null);
   const isDesktopWidgetMode = displayMode === 'desktop-widget';
@@ -4784,6 +4821,25 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
     return result.actions;
   };
+
+  const hasLocalQueryTarget = (
+    localQueryHistory: AssistantLocalQueryResult[] | undefined,
+    target: 'principles' | 'selfBeliefs'
+  ): boolean => (
+    Boolean(localQueryHistory?.some((result) => (
+      result.status === 'executed'
+      && result.request.targets.includes(target)
+    )))
+  );
+
+  const applyPlannedPrincipleToolCalls = (toolCalls: AICreatePrincipleToolCall[]): AppliedChatAction[] => (
+    assistantActionExecutor.applyPrincipleToolCalls(toolCalls)
+  );
+
+  const applyPlannedSelfBeliefToolCalls = (toolCalls: AICreateSelfBeliefToolCall[]): AppliedChatAction[] => (
+    assistantActionExecutor.applySelfBeliefToolCalls(toolCalls)
+  );
+
   const handleUndoLogAction = (messageId: string, action: AppliedCreateLogAction) => {
     if (action.status !== 'applied' || !activeSession || !action.snapshot.logId) {
       return;
@@ -4849,19 +4905,239 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     addToast('success', '已撤销这次 AI 记录修改');
   };
 
-  const applyUnifiedToolCalls = (toolCalls: AssistantToolCall[], sourceText: string): AppliedChatAction[] => {
+  const handleUndoPrincipleAction = (messageId: string, action: AppliedCreatePrincipleAction) => {
+    if (action.status !== 'applied' || !activeSession || !action.snapshot.principleId) {
+      return;
+    }
+
+    if (action.snapshot.previousPrinciple) {
+      restoreStoredPrinciple(action.snapshot.previousPrinciple);
+    } else {
+      removeStoredPrincipleById(action.snapshot.principleId);
+    }
+    updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
+    addToast('success', action.snapshot.previousPrinciple ? '已恢复原则原文' : '已撤销这条 AI 原则');
+  };
+
+  const handleOpenPrincipleEditor = (principleId?: string) => {
+    if (!principleId) {
+      return;
+    }
+
+    const principle = getStoredPrincipleById(principleId);
+    if (!principle) {
+      addToast('error', '没有找到这条原则');
+      return;
+    }
+
+    setEditingPrincipleId(principle.id);
+    setPrincipleEditFormData({
+      title: principle.title,
+      frontText: principle.frontText,
+      backText: principle.backText
+    });
+  };
+
+  const handleCancelPrincipleEditor = () => {
+    setEditingPrincipleId(null);
+    setPrincipleEditFormData({
+      title: '',
+      frontText: '',
+      backText: ''
+    });
+  };
+
+  const handleSavePrincipleEditor = () => {
+    if (!editingPrincipleId) {
+      return;
+    }
+
+    const title = principleEditFormData.title.trim();
+    const frontText = principleEditFormData.frontText.trim();
+    if (!title || !frontText) {
+      return;
+    }
+
+    const currentPrinciple = getStoredPrincipleById(editingPrincipleId);
+    if (!currentPrinciple) {
+      addToast('error', '没有找到这条原则');
+      handleCancelPrincipleEditor();
+      return;
+    }
+
+    const saved = updateStoredPrinciple({
+      ...currentPrinciple,
+      title,
+      frontText,
+      backText: principleEditFormData.backText.trim()
+    });
+    if (!saved) {
+      addToast('error', '保存原则失败');
+      return;
+    }
+
+    addToast('success', '已保存原则');
+    handleCancelPrincipleEditor();
+  };
+
+  const handleOpenSelfBeliefEditor = (selfBeliefId?: string) => {
+    if (!selfBeliefId) {
+      return;
+    }
+
+    const selfBelief = getStoredSelfBeliefById(selfBeliefId);
+    if (!selfBelief) {
+      addToast('error', '没有找到这条自我认知');
+      return;
+    }
+
+    setEditingSelfBeliefId(selfBelief.id);
+    setSelfBeliefTitleDraft(selfBelief.title);
+    setSelfBeliefDescriptionDrafts(selfBelief.descriptions);
+    setNewSelfBeliefDescriptionText('');
+    setEditingSelfBeliefDescriptionId(null);
+    setEditingSelfBeliefDescriptionText('');
+  };
+
+  const handleCancelSelfBeliefEditor = () => {
+    setEditingSelfBeliefId(null);
+    setSelfBeliefTitleDraft('');
+    setSelfBeliefDescriptionDrafts([]);
+    setNewSelfBeliefDescriptionText('');
+    setEditingSelfBeliefDescriptionId(null);
+    setEditingSelfBeliefDescriptionText('');
+  };
+
+  const handleSaveSelfBeliefEditor = () => {
+    if (!editingSelfBeliefId) {
+      return;
+    }
+
+    const title = selfBeliefTitleDraft.trim();
+    if (!title) {
+      return;
+    }
+
+    const currentSelfBelief = getStoredSelfBeliefById(editingSelfBeliefId);
+    if (!currentSelfBelief) {
+      addToast('error', '没有找到这条自我认知');
+      handleCancelSelfBeliefEditor();
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const saved = updateStoredSelfBelief({
+      ...currentSelfBelief,
+      title,
+      descriptions: selfBeliefDescriptionDrafts,
+      updatedAt: now
+    });
+    if (!saved) {
+      addToast('error', '保存自我认知失败');
+      return;
+    }
+
+    addToast('success', '已保存自我认知');
+    handleCancelSelfBeliefEditor();
+  };
+
+  const handleAddSelfBeliefDescription = () => {
+    const text = newSelfBeliefDescriptionText.trim();
+    if (!text) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    setSelfBeliefDescriptionDrafts((current) => [
+      ...current,
+      {
+        id: createChatLibraryId('description'),
+        text,
+        date: getTodayDateKey(),
+        source: 'manual',
+        createdAt: now,
+        updatedAt: now
+      }
+    ]);
+    setNewSelfBeliefDescriptionText('');
+  };
+
+  const handleStartEditSelfBeliefDescription = (description: SelfBeliefDescriptionDraft) => {
+    setEditingSelfBeliefDescriptionId(description.id);
+    setEditingSelfBeliefDescriptionText(description.text);
+  };
+
+  const handleSaveSelfBeliefDescriptionEdit = () => {
+    if (!editingSelfBeliefDescriptionId) {
+      return;
+    }
+
+    const text = editingSelfBeliefDescriptionText.trim();
+    if (!text) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    setSelfBeliefDescriptionDrafts((current) => current.map((description) => (
+      description.id === editingSelfBeliefDescriptionId
+        ? { ...description, text, updatedAt: now }
+        : description
+    )));
+    setEditingSelfBeliefDescriptionId(null);
+    setEditingSelfBeliefDescriptionText('');
+  };
+
+  const handleCancelSelfBeliefDescriptionEdit = () => {
+    setEditingSelfBeliefDescriptionId(null);
+    setEditingSelfBeliefDescriptionText('');
+  };
+
+  const handleDeleteSelfBeliefDescription = (descriptionId: string) => {
+    setSelfBeliefDescriptionDrafts((current) => current.filter((description) => description.id !== descriptionId));
+    if (editingSelfBeliefDescriptionId === descriptionId) {
+      handleCancelSelfBeliefDescriptionEdit();
+    }
+  };
+
+  const handleUndoSelfBeliefAction = (messageId: string, action: AppliedCreateSelfBeliefAction) => {
+    if (action.status !== 'applied' || !activeSession || !action.snapshot.selfBeliefId) {
+      return;
+    }
+
+    if (action.snapshot.previousSelfBelief) {
+      restoreStoredSelfBelief(action.snapshot.previousSelfBelief);
+    } else {
+      removeStoredSelfBeliefById(action.snapshot.selfBeliefId);
+    }
+    updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
+    addToast('success', action.snapshot.previousSelfBelief ? '已恢复自我认知原文' : '已撤销这条 AI 自我认知');
+  };
+
+  const applyUnifiedToolCalls = (
+    toolCalls: AssistantToolCall[],
+    sourceText: string,
+    localQueryHistory?: AssistantLocalQueryResult[]
+  ): AppliedChatAction[] => {
     const logCalls = toolCalls.filter((toolCall): toolCall is AIBackfillToolCall => toolCall.toolName === 'create_log');
     const todoCalls = toolCalls.filter((toolCall): toolCall is AITodoToolCall => toolCall.toolName === 'create_todo');
     const todoUpdateCalls = toolCalls.filter((toolCall): toolCall is AITodoUpdateToolCall => toolCall.toolName === 'update_todo');
     const subtaskCalls = toolCalls.filter((toolCall): toolCall is AICreateSubtaskToolCall => toolCall.toolName === 'create_subtask');
     const editLogCalls = toolCalls.filter((toolCall): toolCall is AIEditLogToolCall => toolCall.toolName === 'edit_log');
+    const principleCalls = toolCalls.filter((toolCall): toolCall is AICreatePrincipleToolCall => toolCall.toolName === 'create_principle');
+    const selfBeliefCalls = toolCalls.filter((toolCall): toolCall is AICreateSelfBeliefToolCall => toolCall.toolName === 'create_self_belief');
 
     return [
       ...applyPlannedLogToolCalls(logCalls),
       ...applyPlannedTodoToolCalls(todoCalls, sourceText),
       ...applyPlannedTodoUpdateToolCalls(todoUpdateCalls),
       ...applyPlannedCreateSubtaskToolCalls(subtaskCalls, sourceText),
-      ...applyPlannedEditLogToolCalls(editLogCalls)
+      ...applyPlannedEditLogToolCalls(editLogCalls),
+      ...(hasLocalQueryTarget(localQueryHistory, 'principles')
+        ? applyPlannedPrincipleToolCalls(principleCalls)
+        : assistantActionExecutor.buildRejectedPrincipleActions(principleCalls, '添加或修改原则前需要先查询现有原则库。')),
+      ...(hasLocalQueryTarget(localQueryHistory, 'selfBeliefs')
+        ? applyPlannedSelfBeliefToolCalls(selfBeliefCalls)
+        : assistantActionExecutor.buildRejectedSelfBeliefActions(selfBeliefCalls, '添加或修改自我认知前需要先查询现有自我认知。'))
     ];
   };
 
@@ -6214,10 +6490,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       logs,
       messageId,
       onOpenLogEditor: handleOpenLogEditor,
+      onOpenPrincipleEditor: handleOpenPrincipleEditor,
+      onOpenSelfBeliefEditor: handleOpenSelfBeliefEditor,
       onOpenTodoDetail: handleOpenTodoDetail,
       onUndoCreateSubtaskAction: handleUndoCreateSubtaskAction,
       onUndoEditLogAction: handleUndoEditLogAction,
       onUndoLogAction: handleUndoLogAction,
+      onUndoPrincipleAction: handleUndoPrincipleAction,
+      onUndoSelfBeliefAction: handleUndoSelfBeliefAction,
       onUndoTodoAction: handleUndoTodoAction,
       onUndoUpdateTodoAction: handleUndoUpdateTodoAction,
       theme: AI_CHAT_THEME,
@@ -6896,6 +7176,37 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               });
             }}
             buildBlocks={buildDebugBlocks}
+          />
+            )}
+
+            {editingPrincipleId && (
+          <PrincipleEditModal
+            isEditing
+            formData={principleEditFormData}
+            onChange={setPrincipleEditFormData}
+            onSave={handleSavePrincipleEditor}
+            onCancel={handleCancelPrincipleEditor}
+          />
+            )}
+
+            {editingSelfBeliefId && (
+          <SelfBeliefEditModal
+            isEditing
+            title={selfBeliefTitleDraft}
+            descriptionDrafts={selfBeliefDescriptionDrafts}
+            newDescriptionText={newSelfBeliefDescriptionText}
+            editingDescriptionId={editingSelfBeliefDescriptionId}
+            editingDescriptionText={editingSelfBeliefDescriptionText}
+            onChange={setSelfBeliefTitleDraft}
+            onNewDescriptionTextChange={setNewSelfBeliefDescriptionText}
+            onAddDescription={handleAddSelfBeliefDescription}
+            onStartEditDescription={handleStartEditSelfBeliefDescription}
+            onEditingDescriptionTextChange={setEditingSelfBeliefDescriptionText}
+            onSaveDescriptionEdit={handleSaveSelfBeliefDescriptionEdit}
+            onCancelDescriptionEdit={handleCancelSelfBeliefDescriptionEdit}
+            onDeleteDescription={handleDeleteSelfBeliefDescription}
+            onSave={handleSaveSelfBeliefEditor}
+            onCancel={handleCancelSelfBeliefEditor}
           />
             )}
           </>

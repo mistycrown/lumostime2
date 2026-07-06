@@ -1,9 +1,10 @@
 /**
  * @file assistantLocalSearchService.ts
- * @input Assistant local-query requests plus local logs, todos, categories, scopes, and reviews
+ * @input Assistant local-query requests plus local logs, todos, categories, scopes, reviews, principles, and self-beliefs
  * @output Structured local-query hits and compact text digests for foreground assistant retrieval loops
  * @pos Service (Assistant Local Query)
  * @description Executes foreground assistant local queries against shared custom-filter and search-all logic so the model can request focused local facts without forcing every turn through a retrieval pass.
+ * @updated 2026-07-06: Added full-list principle and self-belief retrieval targets for foreground assistant local queries.
  * @updated 2026-07-06: Raised the default foreground local-query window to 20 items, allowed larger incremental limit requests, and kept total-hit counts separate from the current returned slice.
  * @updated 2026-07-06: Added skipped-query result shaping so duplicate foreground retrieval rounds can be surfaced clearly in chat and debug flows.
  * @updated 2026-07-05: Added a foreground-only local query service with filter-expression and keyword-search modes, result limiting, and assistant-facing digest formatting.
@@ -44,8 +45,35 @@ interface AssistantLocalSearchParams extends AssistantLocalSearchContext {
   request: AssistantLocalQueryRequest;
 }
 
+interface StoredPrinciple {
+  id: string;
+  title: string;
+  frontText?: string;
+  backText?: string;
+  descriptions?: StoredSelfBeliefDescription[];
+}
+
+interface StoredSelfBeliefDescription {
+  id: string;
+  text: string;
+  date?: string;
+  source?: 'manual' | 'ai';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface StoredSelfBelief {
+  id: string;
+  title: string;
+  descriptions: StoredSelfBeliefDescription[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 const DEFAULT_QUERY_LIMIT = 20;
 const MAX_QUERY_LIMIT = 100;
+const PRINCIPLES_STORAGE_KEY = 'lumostime_principles';
+const SELF_BELIEFS_STORAGE_KEY = 'lumostime_self_beliefs';
 
 const clampLimit = (value?: number): number => {
   if (!Number.isFinite(value)) {
@@ -208,6 +236,140 @@ const buildScopeItem = (scope: Scope): AssistantLocalQueryResultItem => ({
   }
 });
 
+const readJsonArrayFromStorage = (key: string): unknown[] => {
+  if (typeof localStorage === 'undefined') {
+    return [];
+  }
+
+  const stored = localStorage.getItem(key);
+  if (!stored) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error(`[assistantLocalSearchService] Failed to parse ${key}`, error);
+    return [];
+  }
+};
+
+const loadStoredPrinciples = (): StoredPrinciple[] => (
+  readJsonArrayFromStorage(PRINCIPLES_STORAGE_KEY).flatMap((item): StoredPrinciple[] => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+
+    const candidate = item as Partial<StoredPrinciple>;
+    const title = typeof candidate.title === 'string' ? candidate.title.trim() : '';
+    if (!title) {
+      return [];
+    }
+
+    const descriptions = Array.isArray((candidate as StoredPrinciple).descriptions)
+      ? normalizeSelfBeliefDescriptions((candidate as StoredPrinciple).descriptions)
+      : [];
+
+    return [{
+      id: typeof candidate.id === 'string' && candidate.id.trim() ? candidate.id.trim() : `principle-${title}`,
+      title,
+      ...(typeof candidate.frontText === 'string' && candidate.frontText.trim() ? { frontText: candidate.frontText.trim() } : {}),
+      ...(typeof candidate.backText === 'string' && candidate.backText.trim() ? { backText: candidate.backText.trim() } : {}),
+      ...(descriptions.length > 0 ? { descriptions } : {})
+    }];
+  })
+);
+
+const normalizeSelfBeliefDescriptions = (value: unknown): StoredSelfBeliefDescription[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item): StoredSelfBeliefDescription[] => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+
+    const candidate = item as Partial<StoredSelfBeliefDescription>;
+    const text = typeof candidate.text === 'string' ? candidate.text.trim() : '';
+    if (!text) {
+      return [];
+    }
+
+    return [{
+      id: typeof candidate.id === 'string' && candidate.id.trim() ? candidate.id.trim() : `description-${text}`,
+      text,
+      ...(typeof candidate.date === 'string' && candidate.date.trim() ? { date: candidate.date.trim() } : {}),
+      source: candidate.source === 'ai' ? 'ai' : 'manual',
+      ...(typeof candidate.createdAt === 'string' && candidate.createdAt.trim() ? { createdAt: candidate.createdAt.trim() } : {}),
+      ...(typeof candidate.updatedAt === 'string' && candidate.updatedAt.trim() ? { updatedAt: candidate.updatedAt.trim() } : {})
+    }];
+  });
+};
+
+const loadStoredSelfBeliefs = (): StoredSelfBelief[] => (
+  readJsonArrayFromStorage(SELF_BELIEFS_STORAGE_KEY).flatMap((item): StoredSelfBelief[] => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+
+    const candidate = item as Partial<StoredSelfBelief> & { evidence?: unknown[] };
+    const title = typeof candidate.title === 'string' ? candidate.title.trim() : '';
+    if (!title) {
+      return [];
+    }
+
+    const rawDescriptions = Array.isArray(candidate.descriptions)
+      ? candidate.descriptions
+      : Array.isArray(candidate.evidence)
+        ? candidate.evidence
+        : [];
+
+    return [{
+      id: typeof candidate.id === 'string' && candidate.id.trim() ? candidate.id.trim() : `self-belief-${title}`,
+      title,
+      descriptions: normalizeSelfBeliefDescriptions(rawDescriptions),
+      ...(typeof candidate.createdAt === 'string' && candidate.createdAt.trim() ? { createdAt: candidate.createdAt.trim() } : {}),
+      ...(typeof candidate.updatedAt === 'string' && candidate.updatedAt.trim() ? { updatedAt: candidate.updatedAt.trim() } : {})
+    }];
+  })
+);
+
+const buildPrincipleItem = (principle: StoredPrinciple): AssistantLocalQueryResultItem => ({
+  itemType: 'principle',
+  id: principle.id,
+  title: principle.title,
+  summary: [
+    principle.frontText ? `front: ${principle.frontText}` : '',
+    principle.backText ? `back: ${principle.backText}` : '',
+    principle.descriptions && principle.descriptions.length > 0
+      ? `descriptions: ${principle.descriptions.map((description, index) => `${index + 1}. ${description.text}${description.date ? ` (${description.date})` : ''}`).join(' | ')}`
+      : ''
+  ].filter(Boolean).join(' | ') || 'principle',
+  metadata: {
+    frontText: principle.frontText,
+    backText: principle.backText,
+    descriptions: principle.descriptions || []
+  }
+});
+
+const buildSelfBeliefItem = (selfBelief: StoredSelfBelief): AssistantLocalQueryResultItem => ({
+  itemType: 'selfBelief',
+  id: selfBelief.id,
+  title: selfBelief.title,
+  summary: selfBelief.descriptions.length > 0
+    ? selfBelief.descriptions.map((description, index) => (
+      `${index + 1}. ${description.text}${description.date ? ` (${description.date})` : ''}`
+    )).join(' | ')
+    : 'self-belief',
+  metadata: {
+    descriptions: selfBelief.descriptions,
+    createdAt: selfBelief.createdAt,
+    updatedAt: selfBelief.updatedAt
+  }
+});
+
 const parseSortableDate = (value: unknown): number => {
   if (typeof value !== 'string' || !value.trim()) {
     return Number.NaN;
@@ -265,7 +427,7 @@ const buildResultDigest = (result: AssistantLocalQueryResult): string => {
 
   return [
     header,
-    ...result.items.map((item, index) => `- ${index + 1}. [${item.itemType}] ${item.title} | ${item.summary}`)
+    ...result.items.map((item, index) => `- ${index + 1}. [${item.itemType}] id=${item.id} | ${item.title} | ${item.summary}`)
   ].join('\n');
 };
 
@@ -328,38 +490,49 @@ const runKeywordSearchQuery = (
         return ['activity'] as const;
       case 'scopes':
         return ['scope'] as const;
+      case 'principles':
+      case 'selfBeliefs':
+        return [];
       default:
         return [];
     }
   });
 
-  const searchResults = runSearchAll({
-    query: request.query,
-    searchMode: 'partial',
-    selectedTypes: Array.from(new Set(selectedTypes)),
-    logs: context.logs,
-    categories: context.categories,
-    todos: context.todos,
-    todoCategories: context.todoCategories,
-    scopes: context.scopes,
-    dailyReviews: context.dailyReviews,
-    weeklyReviews: context.weeklyReviews,
-    monthlyReviews: context.monthlyReviews
-  });
-
-  if (!searchResults) {
-    return [];
-  }
+  const searchResults = selectedTypes.length > 0
+    ? runSearchAll({
+      query: request.query,
+      searchMode: 'partial',
+      selectedTypes: Array.from(new Set(selectedTypes)),
+      logs: context.logs,
+      categories: context.categories,
+      todos: context.todos,
+      todoCategories: context.todoCategories,
+      scopes: context.scopes,
+      dailyReviews: context.dailyReviews,
+      weeklyReviews: context.weeklyReviews,
+      monthlyReviews: context.monthlyReviews
+    })
+    : undefined;
 
   return [
-    ...searchResults.records.map(({ log }) => buildLogItem(log, context)),
-    ...searchResults.todos.map(({ todo }) => buildTodoItem(todo, context)),
-    ...searchResults.reviews.map((review) => buildReviewItem(review)),
-    ...searchResults.categories.map((category) => buildCategoryItem(category)),
-    ...searchResults.activities.map(({ activity, category }) => buildActivityItem(activity, category)),
-    ...searchResults.scopes.map((scope) => buildScopeItem(scope))
+    ...(searchResults
+      ? [
+        ...searchResults.records.map(({ log }) => buildLogItem(log, context)),
+        ...searchResults.todos.map(({ todo }) => buildTodoItem(todo, context)),
+        ...searchResults.reviews.map((review) => buildReviewItem(review)),
+        ...searchResults.categories.map((category) => buildCategoryItem(category)),
+        ...searchResults.activities.map(({ activity, category }) => buildActivityItem(activity, category)),
+        ...searchResults.scopes.map((scope) => buildScopeItem(scope))
+      ]
+      : []),
+    ...(targets.includes('principles') ? loadStoredPrinciples().map(buildPrincipleItem) : []),
+    ...(targets.includes('selfBeliefs') ? loadStoredSelfBeliefs().map(buildSelfBeliefItem) : [])
   ];
 };
+
+const shouldReturnFullResult = (targets: AssistantLocalQueryTarget[]): boolean => (
+  targets.some((target) => target === 'principles' || target === 'selfBeliefs')
+);
 
 export const assistantLocalSearchService = {
   clampLimit,
@@ -422,7 +595,9 @@ export const assistantLocalSearchService = {
       ? runFilterExpressionQuery(normalizedRequest, context)
       : runKeywordSearchQuery(normalizedRequest, context);
     const sortedItems = sortQueryItems(rawItems);
-    const items = sortedItems.slice(0, normalizedRequest.limit || DEFAULT_QUERY_LIMIT);
+    const items = shouldReturnFullResult(normalizedRequest.targets)
+      ? sortedItems
+      : sortedItems.slice(0, normalizedRequest.limit || DEFAULT_QUERY_LIMIT);
     const result: AssistantLocalQueryResult = {
       round,
       request: normalizedRequest,

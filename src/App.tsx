@@ -5,6 +5,7 @@
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
  * @updated 2026-06-21: Centralized active-session stop persistence so floating-ball stops and app-awareness finishes always submit logs through the same path.
+ * @updated 2026-07-06: Included self-belief library data in user backup/export payloads and reset clearing so AI-created self-beliefs participate in cloud sync.
  * @updated 2026-06-15: Added a sync conflict confirmation modal so timestamp-vs-size contradictions during cloud sync now pause before a smaller JSON can overwrite a larger one.
  * @updated 2026-05-21: Localized the todo deletion confirmation modal into Chinese so the warning copy and action labels match the rest of the app.
  * @updated 2026-05-18: Added a desktop AI widget shell route that reuses the full app provider tree but swaps the normal layout for a compact always-on-top quick-chat window.
@@ -320,6 +321,8 @@ const AppContent: React.FC = () => {
     // 从 localStorage 读取原则库
     const principlesStr = localStorage.getItem('lumostime_principles');
     const principles = principlesStr ? JSON.parse(principlesStr) : [];
+    const selfBeliefsStr = localStorage.getItem('lumostime_self_beliefs');
+    const selfBeliefs = selfBeliefsStr ? JSON.parse(selfBeliefsStr) : [];
     const customColorGroup = customColorGroupService.getGroup();
     
     const data = {
@@ -332,6 +335,7 @@ const AppContent: React.FC = () => {
       sceneGroupState, // 新版：场景组状态
       sceneTimeSlots, // 添加场景设置
       principles, // 添加原则库
+      selfBeliefs, // 添加自我认知库
       version: '1.0.0',
       timestamp: getLocalDataTimestamp()
     };
@@ -724,7 +728,9 @@ const AppContent: React.FC = () => {
 
   const clearPrinciples = () => {
     localStorage.setItem('lumostime_principles', JSON.stringify([]));
+    localStorage.setItem('lumostime_self_beliefs', JSON.stringify([]));
     window.dispatchEvent(new Event('principleLibraryChanged'));
+    window.dispatchEvent(new Event('selfBeliefLibraryChanged'));
   };
 
   const resetSceneGroupsToDefaults = () => {
@@ -1130,7 +1136,8 @@ const AppContent: React.FC = () => {
               filters,
               customColorGroup: customColorGroupService.getGroup(),
               achievementData: buildAchievementBackupPayload(),
-              aiData: assistantBackupService.buildBackupPayload()
+              aiData: assistantBackupService.buildBackupPayload(),
+              selfBeliefs: JSON.parse(localStorage.getItem('lumostime_self_beliefs') || '[]')
             }}
             onEditTodo={todoManager.openEditTodoModal}
 

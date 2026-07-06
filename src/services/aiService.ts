@@ -3,6 +3,7 @@
  * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
  * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
  * @pos Service (AI Integration Layer)
+ * @updated 2026-07-06: Added principle-library and self-belief create tool-call payloads for foreground assistant writeback.
  * @updated 2026-05-18: `create_todo` unified-turn tool calls can now carry nested `subtasks`, letting one assistant action create a parent todo together with its direct children in one pass.
  * @updated 2026-05-17: AI preset/config writes now mark the unified AI backup state as changed so provider/preset edits participate in the main backup and cloud-sync timestamp.
  * @updated 2026-05-17: Structured-JSON requests now expose provider-native reasoning metadata to custom normalizers, allowing report/newspaper writeback flows to persist the same collapsible thinking block used by ordinary chat.
@@ -192,6 +193,35 @@ export interface AIEditLogArgs {
 export interface AIEditLogToolCall {
     toolName: 'edit_log';
     args: AIEditLogArgs;
+}
+
+export interface AICreatePrincipleArgs {
+    id?: string;
+    title?: string;
+    frontText?: string;
+    backText?: string;
+    descriptions?: AICreateSelfBeliefDescriptionArgs[];
+}
+
+export interface AICreatePrincipleToolCall {
+    toolName: 'create_principle';
+    args: AICreatePrincipleArgs;
+}
+
+export interface AICreateSelfBeliefDescriptionArgs {
+    text: string;
+    date?: string;
+}
+
+export interface AICreateSelfBeliefArgs {
+    id?: string;
+    title?: string;
+    descriptions?: AICreateSelfBeliefDescriptionArgs[];
+}
+
+export interface AICreateSelfBeliefToolCall {
+    toolName: 'create_self_belief';
+    args: AICreateSelfBeliefArgs;
 }
 
 export interface AIRequestOptions {
@@ -1174,6 +1204,8 @@ const ASSISTANT_LOCAL_QUERY_TARGETS: AssistantLocalQueryTarget[] = [
     'categories',
     'activities',
     'scopes',
+    'principles',
+    'selfBeliefs',
     'all'
 ];
 
@@ -1430,6 +1462,81 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
                         patch: normalizedPatch
                     }
                 }]
+                : [];
+        }
+
+        if (toolName === 'create_principle') {
+            const descriptions = Array.isArray(args.descriptions)
+                ? args.descriptions.flatMap((description: unknown) => {
+                    if (!description || typeof description !== 'object' || Array.isArray(description)) {
+                        return [];
+                    }
+
+                    const candidate = description as Record<string, unknown>;
+                    const text = typeof candidate.text === 'string' ? candidate.text.trim() : '';
+                    if (!text) {
+                        return [];
+                    }
+
+                    return [{
+                        text,
+                        ...(normalizeOptionalDateString(candidate.date) ? { date: normalizeOptionalDateString(candidate.date)! } : {})
+                    }];
+                })
+                : [];
+            const normalized = {
+                toolName: 'create_principle' as const,
+                args: {
+                    ...(typeof args.id === 'string' && args.id.trim() ? { id: args.id.trim() } : {}),
+                    ...(typeof args.title === 'string' && args.title.trim() ? { title: args.title.trim() } : {}),
+                    ...(typeof args.frontText === 'string' && args.frontText.trim() ? { frontText: args.frontText.trim() } : {}),
+                    ...(typeof args.backText === 'string' && args.backText.trim() ? { backText: args.backText.trim() } : {}),
+                    ...(descriptions.length > 0 ? { descriptions } : {})
+                }
+            };
+            const hasPatch = Boolean(
+                normalized.args.title
+                || normalized.args.frontText
+                || normalized.args.backText
+                || normalized.args.descriptions
+            );
+
+            return (normalized.args.id ? hasPatch : Boolean(normalized.args.title && normalized.args.frontText))
+                ? [normalized]
+                : [];
+        }
+
+        if (toolName === 'create_self_belief') {
+            const descriptions = Array.isArray(args.descriptions)
+                ? args.descriptions.flatMap((description: unknown) => {
+                    if (!description || typeof description !== 'object' || Array.isArray(description)) {
+                        return [];
+                    }
+
+                    const candidate = description as Record<string, unknown>;
+                    const text = typeof candidate.text === 'string' ? candidate.text.trim() : '';
+                    if (!text) {
+                        return [];
+                    }
+
+                    return [{
+                        text,
+                        ...(normalizeOptionalDateString(candidate.date) ? { date: normalizeOptionalDateString(candidate.date)! } : {})
+                    }];
+                })
+                : [];
+            const normalized = {
+                toolName: 'create_self_belief' as const,
+                args: {
+                    ...(typeof args.id === 'string' && args.id.trim() ? { id: args.id.trim() } : {}),
+                    ...(typeof args.title === 'string' && args.title.trim() ? { title: args.title.trim() } : {}),
+                    ...(descriptions.length > 0 ? { descriptions } : {})
+                }
+            };
+            const hasPatch = Boolean(normalized.args.title || normalized.args.descriptions);
+
+            return (normalized.args.id ? hasPatch : Boolean(normalized.args.title))
+                ? [normalized]
                 : [];
         }
 

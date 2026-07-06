@@ -4,6 +4,7 @@
  * @output Bottom-sheet achievement stats drawer with a horizontally draggable positive/negative line chart
  * @pos Component (Achievement Stats)
  * @description Renders an editorial print-inspired statistics drawer for the active achievement ledger with one draggable daily net-delta line chart.
+ * @updated 2026-07-06: Removed the y-axis title words and added a trailing empty day slot so the last-point label has breathing room.
  * @updated 2026-07-06: Restored fixed horizontal spacing by preventing the scrollable plot from shrinking on mobile.
  * @updated 2026-07-06: Moved the y-axis into a fixed safe gutter and expanded the x-axis to show every day label.
  * @updated 2026-07-06: Tightened chart side gutters so sparse datasets still feel full-width without oversized margins.
@@ -27,7 +28,14 @@ const CHART_PANEL_HEIGHT = 360;
 const MIN_CHART_WIDTH = 960;
 const SPARSE_POINT_GAP = 132;
 const REGULAR_POINT_GAP = 72;
-const Y_AXIS_WIDTH = 88;
+const Y_AXIS_WIDTH = 56;
+
+const addOneDay = (date: string): string => {
+  const nextDate = new Date(`${date}T00:00:00`);
+  nextDate.setDate(nextDate.getDate() + 1);
+
+  return nextDate.toISOString().slice(0, 10);
+};
 
 const buildChartPath = (points: Array<{ x: number; y: number }>): string => {
   if (points.length === 0) {
@@ -81,15 +89,20 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
     const padding = { top: 36, right: 16, bottom: 52, left: 0 };
     const isSparse = count <= 3;
     const pointGap = isSparse ? SPARSE_POINT_GAP : REGULAR_POINT_GAP;
-    const occupiedWidth = Math.max(0, (count - 1) * pointGap);
+    const axisDates = orderedSnapshots.map((snapshot) => snapshot.date);
+    const trailingDate = orderedSnapshots.length > 0
+      ? addOneDay(orderedSnapshots[orderedSnapshots.length - 1].date)
+      : null;
+    const axisLabels = trailingDate ? [...axisDates, trailingDate] : axisDates;
+    const axisOccupiedWidth = Math.max(0, (axisLabels.length - 1) * pointGap);
     const availableInnerWidth = Math.max(viewportWidth - Y_AXIS_WIDTH - padding.right, 0);
     const innerWidth = isSparse
-      ? Math.max(320, availableInnerWidth, occupiedWidth + 160)
-      : Math.max(MIN_CHART_WIDTH - padding.left - padding.right, availableInnerWidth, occupiedWidth);
+      ? Math.max(320, availableInnerWidth, axisOccupiedWidth + 120)
+      : Math.max(MIN_CHART_WIDTH - padding.left - padding.right, availableInnerWidth, axisOccupiedWidth);
     const innerHeight = CHART_HEIGHT - padding.top - padding.bottom;
     const svgWidth = innerWidth + padding.left + padding.right;
     const plotOffset = isSparse
-      ? Math.max((innerWidth - occupiedWidth) / 2, 0)
+      ? Math.max((innerWidth - axisOccupiedWidth) / 2, 0)
       : 0;
 
     const points = orderedSnapshots.map((snapshot, index) => {
@@ -118,6 +131,7 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
       maxValue,
       innerWidth,
       svgWidth,
+      axisLabels,
       isSparse,
       isEmpty: values.length === 0,
       yTicks: [maxValue, maxValue / 2, 0, minValue / 2, minValue]
@@ -256,25 +270,6 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
                     style={{ width: `${Y_AXIS_WIDTH}px` }}
                   >
                     <svg viewBox={`0 0 ${Y_AXIS_WIDTH} ${CHART_HEIGHT}`} className="block h-full w-full">
-                      <text
-                        x="8"
-                        y={chartData.padding.top - 12}
-                        fill="#a8a29e"
-                        fontSize="10"
-                        letterSpacing="1.8"
-                      >
-                        POSITIVE
-                      </text>
-                      <text
-                        x="8"
-                        y={CHART_HEIGHT - chartData.padding.bottom + 28}
-                        fill="#a8a29e"
-                        fontSize="10"
-                        letterSpacing="1.8"
-                      >
-                        NEGATIVE
-                      </text>
-
                       {chartData.yTicks.map((value) => {
                         const normalized = (value - chartData.minValue) / (chartData.maxValue - chartData.minValue || 1);
                         const y = CHART_HEIGHT - chartData.padding.bottom - normalized * (CHART_HEIGHT - chartData.padding.top - chartData.padding.bottom);
@@ -382,6 +377,25 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
                           strokeLinejoin="round"
                         />
 
+                        {chartData.axisLabels.map((label, index) => {
+                          const labelX = chartData.points.length === 1 && index === 0
+                            ? chartData.points[0].x
+                            : chartData.padding.left + (chartData.isSparse ? Math.max((chartData.innerWidth - Math.max(0, (chartData.axisLabels.length - 1) * (chartData.isSparse ? SPARSE_POINT_GAP : REGULAR_POINT_GAP))) / 2, 0) : 0) + index * (chartData.isSparse ? SPARSE_POINT_GAP : REGULAR_POINT_GAP);
+
+                          return (
+                            <text
+                              key={label}
+                              x={labelX}
+                              y={CHART_HEIGHT - 16}
+                              textAnchor="middle"
+                              fill="#8b8680"
+                              fontSize="10"
+                            >
+                              {label.slice(5)}
+                            </text>
+                          );
+                        })}
+
                         {chartData.points.map((point, index) => {
                           const isActive = index === activePointIndex;
 
@@ -431,15 +445,6 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
                                   </text>
                                 </>
                               )}
-                              <text
-                                x={point.x}
-                                y={CHART_HEIGHT - 16}
-                                textAnchor="middle"
-                                fill="#8b8680"
-                                fontSize="10"
-                              >
-                                {point.shortDate}
-                              </text>
                             </g>
                           );
                         })}

@@ -4,6 +4,7 @@
  * @output Reusable renderer for in-chat applied-action result cards
  * @pos Component Support (AI Integration)
  * @description Extracts the bulky applied-action JSX branches out of AIBackfillChatModal while keeping the same live-data lookups, undo affordances, and visual treatment.
+ * @updated 2026-07-06: Added rendering for AI-created principles and self-beliefs with undo affordances.
  * @updated 2026-05-15: Extracted create-log, create-todo, update-todo, and edit-log action rendering from AIBackfillChatModal.
  */
 import React from 'react';
@@ -12,6 +13,8 @@ import type { Category, Log, TodoCategory, TodoItem } from '../../types';
 import type {
   AppliedChatAction,
   AppliedCreateLogAction,
+  AppliedCreatePrincipleAction,
+  AppliedCreateSelfBeliefAction,
   AppliedCreateSubtaskAction,
   AppliedCreateTodoAction,
   AppliedEditLogAction,
@@ -53,10 +56,14 @@ interface AIBackfillChatAppliedActionRendererProps {
   logs: Log[];
   messageId: string;
   onOpenLogEditor: (logId?: string) => void;
+  onOpenPrincipleEditor: (principleId?: string) => void;
+  onOpenSelfBeliefEditor: (selfBeliefId?: string) => void;
   onOpenTodoDetail: (todoId?: string) => void;
   onUndoCreateSubtaskAction: (messageId: string, action: AppliedCreateSubtaskAction) => void;
   onUndoEditLogAction: (messageId: string, action: AppliedEditLogAction) => void;
   onUndoLogAction: (messageId: string, action: AppliedCreateLogAction) => void;
+  onUndoPrincipleAction: (messageId: string, action: AppliedCreatePrincipleAction) => void;
+  onUndoSelfBeliefAction: (messageId: string, action: AppliedCreateSelfBeliefAction) => void;
   onUndoTodoAction: (messageId: string, action: AppliedCreateTodoAction) => void;
   onUndoUpdateTodoAction: (messageId: string, action: AppliedUpdateTodoAction) => void;
   theme: AppliedActionTheme;
@@ -627,6 +634,172 @@ const RenderEditLogAction: React.FC<AIBackfillChatAppliedActionRendererProps & {
   );
 };
 
+const RenderPrincipleAction: React.FC<AIBackfillChatAppliedActionRendererProps & {
+  action: AppliedCreatePrincipleAction;
+}> = ({
+  action,
+  messageId,
+  onOpenPrincipleEditor,
+  onUndoPrincipleAction,
+  theme
+}) => (
+  <div
+    key={action.actionId}
+    className={`border-l-2 pl-3 pr-1 py-1 ${action.status === 'undone' ? 'opacity-70' : ''}`}
+    style={{ borderColor: getStatusBorderColor(action.status, theme) }}
+  >
+    <div className="min-w-0">
+      <span className="text-[11px]" style={{ color: theme.textMuted }}>
+        {action.snapshot.previousPrinciple ? '已更新原则' : '已添加原则'}
+      </span>
+      <p className="mt-1 font-serif text-[1rem] leading-6" style={{ color: theme.textPrimary }}>
+        {action.snapshot.title}
+      </p>
+      <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: theme.textSecondary }}>
+        {action.snapshot.frontText}
+      </p>
+      {action.snapshot.backText && (
+        <p className="mt-1 whitespace-pre-wrap break-words text-[12px] leading-5" style={{ color: theme.textMuted }}>
+          {action.snapshot.backText}
+        </p>
+      )}
+      {action.snapshot.descriptions && action.snapshot.descriptions.length > 0 && (
+        <div className="mt-2 border-t" style={{ borderColor: theme.chipBorder }}>
+          {action.snapshot.descriptions.slice(0, 3).map((description) => (
+            <div key={description.id} className="py-2 border-b last:border-b-0" style={{ borderColor: theme.chipBorder }}>
+              <p className="whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: theme.textSecondary }}>
+                {description.text}
+              </p>
+              {description.date && (
+                <p className="mt-0.5 text-[11px]" style={{ color: theme.textMuted }}>
+                  {description.date}
+                </p>
+              )}
+            </div>
+          ))}
+          {action.snapshot.descriptions.length > 3 && (
+            <p className="pt-2 text-[11px]" style={{ color: theme.textMuted }}>
+              还有 {action.snapshot.descriptions.length - 3} 条描述
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+
+    {action.errorMessage && (
+      <p className="mt-2 text-xs" style={{ color: theme.dangerText }}>{action.errorMessage}</p>
+    )}
+
+    <div className="mt-2.5 flex justify-end gap-2">
+      <button
+        onClick={() => onOpenPrincipleEditor(action.snapshot.principleId)}
+        disabled={!action.snapshot.principleId || action.status !== 'applied'}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+        style={{
+          borderColor: theme.chipBorder,
+          backgroundColor: theme.inputBg,
+          color: theme.textSecondary
+        }}
+        title="编辑"
+      >
+        <Pencil size={13} />
+      </button>
+      <button
+        onClick={() => onUndoPrincipleAction(messageId, action)}
+        disabled={action.status !== 'applied'}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+        style={{
+          borderColor: theme.chipBorder,
+          backgroundColor: theme.inputBg,
+          color: theme.textSecondary
+        }}
+        title="撤销"
+      >
+        <Undo2 size={13} />
+      </button>
+    </div>
+  </div>
+);
+
+const RenderSelfBeliefAction: React.FC<AIBackfillChatAppliedActionRendererProps & {
+  action: AppliedCreateSelfBeliefAction;
+}> = ({
+  action,
+  messageId,
+  onOpenSelfBeliefEditor,
+  onUndoSelfBeliefAction,
+  theme
+}) => (
+  <div
+    key={action.actionId}
+    className={`border-l-2 pl-3 pr-1 py-1 ${action.status === 'undone' ? 'opacity-70' : ''}`}
+    style={{ borderColor: getStatusBorderColor(action.status, theme) }}
+  >
+    <div className="min-w-0">
+      <span className="text-[11px]" style={{ color: theme.textMuted }}>
+        {action.snapshot.previousSelfBelief ? '已更新自我认知' : '已添加自我认知'}
+      </span>
+      <p className="mt-1 font-serif text-[1rem] leading-6" style={{ color: theme.textPrimary }}>
+        {action.snapshot.title}
+      </p>
+      {action.snapshot.descriptions.length > 0 && (
+        <div className="mt-2 border-t" style={{ borderColor: theme.chipBorder }}>
+          {action.snapshot.descriptions.slice(0, 3).map((description) => (
+            <div key={description.id} className="py-2 border-b last:border-b-0" style={{ borderColor: theme.chipBorder }}>
+              <p className="whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: theme.textSecondary }}>
+                {description.text}
+              </p>
+              {description.date && (
+                <p className="mt-0.5 text-[11px]" style={{ color: theme.textMuted }}>
+                  {description.date}
+                </p>
+              )}
+            </div>
+          ))}
+          {action.snapshot.descriptions.length > 3 && (
+            <p className="pt-2 text-[11px]" style={{ color: theme.textMuted }}>
+              还有 {action.snapshot.descriptions.length - 3} 条描述
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+
+    {action.errorMessage && (
+      <p className="mt-2 text-xs" style={{ color: theme.dangerText }}>{action.errorMessage}</p>
+    )}
+
+    <div className="mt-2.5 flex justify-end gap-2">
+      <button
+        onClick={() => onOpenSelfBeliefEditor(action.snapshot.selfBeliefId)}
+        disabled={!action.snapshot.selfBeliefId || action.status !== 'applied'}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+        style={{
+          borderColor: theme.chipBorder,
+          backgroundColor: theme.inputBg,
+          color: theme.textSecondary
+        }}
+        title="编辑"
+      >
+        <Pencil size={13} />
+      </button>
+      <button
+        onClick={() => onUndoSelfBeliefAction(messageId, action)}
+        disabled={action.status !== 'applied'}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+        style={{
+          borderColor: theme.chipBorder,
+          backgroundColor: theme.inputBg,
+          color: theme.textSecondary
+        }}
+        title="撤销"
+      >
+        <Undo2 size={13} />
+      </button>
+    </div>
+  </div>
+);
+
 export const renderAppliedChatAction = ({
   action,
   ...props
@@ -641,6 +814,14 @@ export const renderAppliedChatAction = ({
 
   if (action.kind === 'update_todo') {
     return <RenderUpdateTodoAction {...props} action={action} />;
+  }
+
+  if (action.kind === 'create_principle') {
+    return <RenderPrincipleAction {...props} action={action} />;
+  }
+
+  if (action.kind === 'create_self_belief') {
+    return <RenderSelfBeliefAction {...props} action={action} />;
   }
 
   return <RenderTodoAction {...props} action={action} />;

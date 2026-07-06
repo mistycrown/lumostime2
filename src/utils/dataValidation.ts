@@ -1,6 +1,7 @@
 /**
  * @file dataValidation.ts
  * @description Data validation helpers for backup, import, and cloud sync payloads.
+ * @updated 2026-07-06: Added validation support for self-belief library arrays so AI-created identity descriptions can sync with the main backup payload.
  * @updated 2026-06-13: Added validation support for data collections and collection entries in user backup payloads while preserving old backups that omit those fields.
  * @updated 2026-05-18: Added validation support for the nested `achievementData` backup block so achievement bottle progress can travel with user-data exports and sync restores.
  * @updated 2026-05-18: Added validation support for the nested `customColorGroup` backup block so custom palette swatches can travel with user-data exports and sync restores.
@@ -60,7 +61,8 @@ export function validateLocalData(data: any): ValidationResult {
     'onThisDayEntries',
     'customNarrativeTemplates',
     'filters',
-    'principles'
+    'principles',
+    'selfBeliefs'
   ];
 
   for (const field of arrayFields) {
@@ -146,6 +148,7 @@ export function validateAndFixData(data: any): { data: any; result: ValidationRe
     if (!fixedData.customNarrativeTemplates) fixedData.customNarrativeTemplates = [];
     if (!fixedData.filters) fixedData.filters = [];
     if (!fixedData.principles) fixedData.principles = [];
+    if (!fixedData.selfBeliefs) fixedData.selfBeliefs = [];
 
     if (!fixedData.version) fixedData.version = '1.0.0';
     if (!fixedData.timestamp) fixedData.timestamp = Date.now();

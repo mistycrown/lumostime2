@@ -7,10 +7,119 @@
  * @updated 2026-07-06: Added basic keyword-search coverage for todo/category hits and query-history digest formatting.
  */
 
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { assistantLocalSearchService } from './assistantLocalSearchService';
 
+const installLocalStorageMock = () => {
+  const store = new Map<string, string>();
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => store.set(key, value),
+      removeItem: (key: string) => store.delete(key),
+      clear: () => store.clear()
+    }
+  });
+};
+
 describe('assistantLocalSearchService', () => {
+  beforeEach(() => {
+    installLocalStorageMock();
+  });
+
+  it('returns all stored principles without keyword filtering or limit slicing', () => {
+    localStorage.setItem('lumostime_principles', JSON.stringify([
+      {
+        id: 'principle-1',
+        title: '拥抱现实',
+        frontText: '先看清事实',
+        backText: '现实不会因为回避而消失'
+      },
+      {
+        id: 'principle-2',
+        title: '五步流程',
+        frontText: '目标、问题、诊断、方案、执行',
+        backText: '慢慢走完整个闭环'
+      }
+    ]));
+
+    const result = assistantLocalSearchService.runQuery({
+      round: 1,
+      request: {
+        mode: 'keyword_search',
+        targets: ['principles'],
+        query: '自我鼓励',
+        limit: 1
+      },
+      logs: [],
+      categories: [],
+      todos: [],
+      todoCategories: [],
+      scopes: [],
+      dailyReviews: [],
+      weeklyReviews: [],
+      monthlyReviews: []
+    });
+
+    expect(result.hitCount).toBe(2);
+    expect(result.items).toHaveLength(2);
+    expect(result.items.map((item) => item.itemType)).toEqual(['principle', 'principle']);
+    expect(result.digest).toContain('[principle] id=principle-1 | 拥抱现实');
+    expect(result.digest).toContain('[principle] id=principle-2 | 五步流程');
+  });
+
+  it('returns all stored self-beliefs with description metadata and legacy evidence compatibility', () => {
+    localStorage.setItem('lumostime_self_beliefs', JSON.stringify([
+      {
+        id: 'belief-1',
+        title: '我是一个学习能力很强的人',
+        descriptions: [{
+          id: 'description-1',
+          text: '两周学完基础编程并做出第一个工具',
+          date: '2026-07-06',
+          source: 'manual'
+        }]
+      },
+      {
+        id: 'belief-2',
+        title: '我是一个勇于尝试的人',
+        evidence: [{
+          id: 'legacy-evidence-1',
+          text: '主动尝试把原则库接入 AI 对话',
+          date: '2026-07-06',
+          source: 'manual'
+        }]
+      }
+    ]));
+
+    const result = assistantLocalSearchService.runQuery({
+      round: 1,
+      request: {
+        mode: 'keyword_search',
+        targets: ['selfBeliefs'],
+        query: '用户自我认知',
+        limit: 1
+      },
+      logs: [],
+      categories: [],
+      todos: [],
+      todoCategories: [],
+      scopes: [],
+      dailyReviews: [],
+      weeklyReviews: [],
+      monthlyReviews: []
+    });
+
+    expect(result.hitCount).toBe(2);
+    expect(result.items).toHaveLength(2);
+    expect(result.items.map((item) => item.itemType)).toEqual(['selfBelief', 'selfBelief']);
+    expect(result.digest).toContain('[selfBelief] id=belief-1 | 我是一个学习能力很强的人');
+    expect(result.digest).toContain('两周学完基础编程');
+    expect(result.digest).toContain('[selfBelief] id=belief-2 | 我是一个勇于尝试的人');
+    expect(result.digest).toContain('主动尝试把原则库接入 AI 对话');
+  });
+
   it('returns bounded keyword-search hits across todo and category targets', () => {
     const result = assistantLocalSearchService.runQuery({
       round: 1,
@@ -50,8 +159,8 @@ describe('assistantLocalSearchService', () => {
     expect(result.items).toHaveLength(2);
     expect(result.items.map((item) => item.itemType)).toEqual(['category', 'todo']);
     expect(result.digest).toContain('query=论文');
-    expect(result.digest).toContain('[todo] 修改论文结构');
-    expect(result.digest).toContain('[category] 论文研究');
+    expect(result.digest).toContain('[todo] id=todo-1 | 修改论文结构');
+    expect(result.digest).toContain('[category] id=study | 论文研究');
   });
 
 
