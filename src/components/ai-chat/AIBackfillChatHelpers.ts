@@ -529,6 +529,8 @@ export const getAssistantBackgroundTriggerLabel = (triggerType?: string): string
   switch (triggerType) {
     case 'checkin':
       return '后台 check-in';
+    case 'assistant_letter_due':
+      return 'AI 来信';
     case 'manual_background_nudge':
       return '手动后台触发';
     case 'reminder_due':

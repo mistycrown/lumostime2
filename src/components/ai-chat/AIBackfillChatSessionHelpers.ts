@@ -182,9 +182,19 @@ export const replaceSessionMessage = (
 ): AIChatSession[] => (
   mutateChatSessions(sessions, sessionId, (session) => ({
     ...session,
-    messages: session.messages.map((message) => (
-      message.id === messageId ? nextMessage : message
-    ))
+    messages: (() => {
+      let found = false;
+      const replacedMessages = session.messages.map((message) => {
+        if (message.id !== messageId) {
+          return message;
+        }
+
+        found = true;
+        return nextMessage;
+      });
+
+      return found ? replacedMessages : [...replacedMessages, nextMessage];
+    })()
   }))
 );
 

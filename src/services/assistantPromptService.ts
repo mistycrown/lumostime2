@@ -10,6 +10,7 @@
 
 import assistantBasePromptSource from '../prompts/assistant/assistant-base.md?raw';
 import backgroundModePromptSource from '../prompts/assistant/background-mode.md?raw';
+import assistantLetterModePromptSource from '../prompts/assistant/assistant-letter-mode.md?raw';
 import foregroundModePromptSource from '../prompts/assistant/foreground-mode.md?raw';
 import foregroundToolsPromptSource from '../prompts/assistant/foreground-tools.md?raw';
 import memoryRulesPromptSource from '../prompts/assistant/memory-rules.md?raw';
@@ -18,6 +19,7 @@ type PromptAssetKey =
   | 'assistantBase'
   | 'foregroundMode'
   | 'backgroundMode'
+  | 'assistantLetterMode'
   | 'foregroundTools'
   | 'memoryRules';
 
@@ -33,6 +35,10 @@ const PROMPT_SOURCES: Record<PromptAssetKey, { assetPath: string; source: string
   backgroundMode: {
     assetPath: 'src/prompts/assistant/background-mode.md',
     source: backgroundModePromptSource
+  },
+  assistantLetterMode: {
+    assetPath: 'src/prompts/assistant/assistant-letter-mode.md',
+    source: assistantLetterModePromptSource
   },
   foregroundTools: {
     assetPath: 'src/prompts/assistant/foreground-tools.md',
@@ -70,6 +76,10 @@ export const assistantPromptService = {
 
   async getBackgroundModePrompt(): Promise<string> {
     return loadPromptAsset('backgroundMode');
+  },
+
+  async getAssistantLetterModePrompt(): Promise<string> {
+    return loadPromptAsset('assistantLetterMode');
   },
 
   async getForegroundToolsPrompt(): Promise<string> {

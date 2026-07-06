@@ -4,6 +4,7 @@
  * @output Unified AI backup payloads plus restore helpers for export/import/cloud sync
  * @pos Service (AI Backup)
  * @description Centralizes all AI-related data that should travel inside the app's main backup JSON, while explicitly excluding API keys and preserving any compatible local keys during restore.
+ * @updated 2026-07-04: Added assistant-letter export and restore so scheduled AI letters travel inside the unified backup payload.
  * @updated 2026-05-17: Added unified AI backup export/restore helpers covering chat sessions, persona settings, background assistant state, Dream state, and sanitized AI presets.
  */
 
@@ -20,6 +21,7 @@ import {
 import { aiService, type AIConfig, type AIPreset } from './aiService';
 import { assistantAgentConfigService } from './assistantAgentConfigService';
 import { assistantMemoryService } from './assistantMemoryService';
+import { assistantLetterService } from './assistantLetterService';
 import { assistantOrchestratorService } from './assistantOrchestratorService';
 import { assistantReminderQueueService } from './assistantReminderQueueService';
 import { assistantScheduledTaskService } from './assistantScheduledTaskService';
@@ -57,6 +59,7 @@ interface AIBackupAssistantState {
   reminders: unknown[];
   scheduledTasks: unknown[];
   backgroundCallHistory: unknown[];
+  letters: unknown[];
 }
 
 export interface AIBackupPayload {
@@ -234,7 +237,8 @@ export const assistantBackupService = {
         memory: assistantMemoryService.getMemory(),
         reminders: assistantReminderQueueService.listReminders(),
         scheduledTasks: assistantScheduledTaskService.listTasks(),
-        backgroundCallHistory: assistantOrchestratorService.listBackgroundCallHistory()
+        backgroundCallHistory: assistantOrchestratorService.listBackgroundCallHistory(),
+        letters: assistantLetterService.listLetters()
       },
       dream: dreamService.getState()
     };
@@ -301,6 +305,9 @@ export const assistantBackupService = {
           assistantOrchestratorService.getBackgroundCallHistoryStorageKey(),
           JSON.stringify(Array.isArray(assistant.backgroundCallHistory) ? assistant.backgroundCallHistory : [])
         );
+      }
+      if (hasOwn(assistant, 'letters')) {
+        assistantLetterService.replaceLetters(Array.isArray(assistant.letters) ? assistant.letters as any[] : []);
       }
     }
 

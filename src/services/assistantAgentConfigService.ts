@@ -5,6 +5,7 @@
  * @pos Service (Assistant Agent Config)
  * @description Stores the background assistant agent's runtime configuration, including polling, random check-in, and long-term-memory toggles, so the shared AI window and native plugin can stay in sync.
  *
+ * @updated 2026-07-04: Added assistant-letter scheduling config normalization, including frequency, time-window, and persisted next-send timestamps.
  * @updated 2026-05-17: Assistant-agent config writes now mark the unified AI backup state as changed so background-setting edits update sync timestamps too.
  * @updated 2026-05-16: Added normalization and persistence support for post-log assistant trigger toggles plus selected activity ids.
  * @updated 2026-05-12: Normalized assistant quiet-hours values to compact `HHMM` strings so the UI can accept user-entered four-digit random-check-in protection windows while still migrating older `HH:MM` data.
@@ -14,6 +15,7 @@
 import type { AssistantAgentConfig } from '../types/assistant';
 import { notifyAIBackupDataChanged } from '../utils/aiBackupChange';
 import { normalizeAssistantQuietHoursValue } from '../utils/assistantQuietHours';
+import { normalizeAssistantDateTime } from '../utils/assistantTime';
 
 const ASSISTANT_AGENT_CONFIG_KEY = 'lumostime_assistant_agent_config_v1';
 
@@ -27,7 +29,9 @@ const DEFAULT_ASSISTANT_AGENT_CONFIG: AssistantAgentConfig = {
   minimumNudgeGapMinutes: 45,
   longTermMemoryEnabled: true,
   logSubmissionTriggerEnabled: false,
-  logSubmissionTriggerActivityIds: []
+  logSubmissionTriggerActivityIds: [],
+  letterEnabled: false,
+  letterFrequencyDays: 2
 };
 
 const normalizeStringArray = (value: unknown): string[] => {
@@ -43,6 +47,15 @@ const normalizeStringArray = (value: unknown): string[] => {
 };
 
 const clampMinutes = (value: unknown, fallback: number, minimum: number, maximum: number): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.max(minimum, Math.min(maximum, Math.round(parsed)));
+};
+
+const clampDays = (value: unknown, fallback: number, minimum: number, maximum: number): number => {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) {
     return fallback;
@@ -84,7 +97,24 @@ const normalizeConfig = (value: unknown): AssistantAgentConfig => {
     ),
     longTermMemoryEnabled: candidate.longTermMemoryEnabled !== false,
     logSubmissionTriggerEnabled: candidate.logSubmissionTriggerEnabled === true,
-    logSubmissionTriggerActivityIds: normalizeStringArray(candidate.logSubmissionTriggerActivityIds)
+    logSubmissionTriggerActivityIds: normalizeStringArray(candidate.logSubmissionTriggerActivityIds),
+    letterEnabled: candidate.letterEnabled === true,
+    letterFrequencyDays: clampDays(candidate.letterFrequencyDays, DEFAULT_ASSISTANT_AGENT_CONFIG.letterFrequencyDays, 1, 30),
+    ...(normalizeAssistantQuietHoursValue(candidate.letterWindowStart)
+      ? { letterWindowStart: normalizeAssistantQuietHoursValue(candidate.letterWindowStart) }
+      : {}),
+    ...(normalizeAssistantQuietHoursValue(candidate.letterWindowEnd)
+      ? { letterWindowEnd: normalizeAssistantQuietHoursValue(candidate.letterWindowEnd) }
+      : {}),
+    ...(normalizeAssistantDateTime(candidate.nextLetterAt)
+      ? { nextLetterAt: normalizeAssistantDateTime(candidate.nextLetterAt)! }
+      : {}),
+    ...(normalizeAssistantDateTime(candidate.lastLetterSentAt)
+      ? { lastLetterSentAt: normalizeAssistantDateTime(candidate.lastLetterSentAt)! }
+      : {}),
+    ...(normalizeAssistantDateTime(candidate.lastLetterScheduledAt)
+      ? { lastLetterScheduledAt: normalizeAssistantDateTime(candidate.lastLetterScheduledAt)! }
+      : {})
   };
 };
 

@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-07-05: Connected ordinary foreground assistant local-query turns to the real category/review datasets and fed local-query history back into follow-up unified turns.
  * @updated 2026-06-07: Added guarded review-command dispatch so weekly/monthly newspaper command setup errors now surface as chat error messages instead of failing silently.
  * @updated 2026-05-21: Synced native background conversation snapshots through the same timestamp-preserving serializer used by foreground assistant prompts so Android-side AI turns can distinguish old context from current context.
  * @updated 2026-05-19: Added short desktop-widget hide/restore shell transitions so edge collapsing no longer hard-cuts between the full quick-chat panel and the hidden handle.
@@ -54,6 +55,9 @@ import type { DailyReview, Log, MonthlyReview, TodoItem, TodoRecurrenceRule, Wee
 import type {
   AssistantAgentConfig,
   AssistantEditableMemoryListKey,
+  AssistantLetter,
+  AssistantLetterResultCard,
+  AssistantLocalQueryResult,
   AssistantMemory,
   AssistantNativeDiagnosticEntry,
   AssistantReasoningSummary,
@@ -93,6 +97,9 @@ import { assistantMemoryService } from '../services/assistantMemoryService';
 import { dreamService } from '../services/dreamService';
 import { imageService } from '../services/imageService';
 import { assistantPromptService } from '../services/assistantPromptService';
+import { assistantLetterOrchestratorService } from '../services/assistantLetterOrchestratorService';
+import { assistantLetterScheduler } from '../services/assistantLetterScheduler';
+import { assistantLetterService } from '../services/assistantLetterService';
 import { assistantReminderQueueService } from '../services/assistantReminderQueueService';
 import { assistantScheduledTaskService } from '../services/assistantScheduledTaskService';
 import {
@@ -130,7 +137,9 @@ import { dailyReviewTemplateService } from '../services/dailyReviewTemplateServi
 import type { AssistantToolCall, AssistantUnifiedTurnOutput } from '../types/assistant';
 import {
   AIChatDebugViewerOverlay,
-  AssistantBackgroundHistoryOverlay
+  AssistantBackgroundHistoryOverlay,
+  AssistantLetterDetailSheet,
+  AssistantLetterHistoryOverlay
 } from './ai-chat/AIBackfillChatOverlays';
 import { AIBackfillChatAssistantSettingsSection } from './ai-chat/AIBackfillChatAssistantSettingsSection';
 import { renderAppliedChatAction } from './ai-chat/AIBackfillChatAppliedActionRenderer';
@@ -257,6 +266,7 @@ import {
   type AssistantAgentIntervalField,
   type AssistantAgentQuietHoursDrafts,
   type AssistantAgentQuietHoursField,
+  type AssistantLetterDrafts,
   type AssistantBackgroundTimelineEntry,
   type AssistantBackgroundTurnRequestOptions,
   type AssistantEditableMemoryDeleteTarget,
@@ -290,12 +300,14 @@ import {
   PersonaAvatar,
   buildAssistantAgentIntervalDrafts,
   buildAssistantAgentQuietHoursDrafts,
+  buildAssistantLetterDrafts,
   buildAssistantScheduledTaskRecurrenceRule,
   buildAssistantScheduledTaskTime,
   buildManualAssistantReminderDueAt,
   formatAssistantScheduledTaskRecurrence,
   validateAssistantAgentIntervalDrafts,
-  validateAssistantAgentQuietHoursDrafts
+  validateAssistantAgentQuietHoursDrafts,
+  validateAssistantLetterDrafts
 } from './ai-chat/AIBackfillChatShared';
 
 const CHAT_MARKDOWN_COMPONENTS = {
@@ -538,14 +550,22 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [assistantAgentQuietHoursDrafts, setAssistantAgentQuietHoursDrafts] = useState<AssistantAgentQuietHoursDrafts>(() => (
     buildAssistantAgentQuietHoursDrafts(assistantAgentConfigService.getConfig())
   ));
+  const [assistantLetterDrafts, setAssistantLetterDrafts] = useState<AssistantLetterDrafts>(() => (
+    buildAssistantLetterDrafts(assistantAgentConfigService.getConfig())
+  ));
   const [assistantMemorySnapshot, setAssistantMemorySnapshot] = useState<AssistantMemory>(() => assistantMemoryService.getMemory());
   const [dreamSnapshot, setDreamSnapshot] = useState<DreamState>(() => dreamService.getState());
   const [assistantReminderSnapshot, setAssistantReminderSnapshot] = useState<AssistantReminder[]>(() => assistantReminderQueueService.listReminders());
   const [assistantScheduledTaskSnapshot, setAssistantScheduledTaskSnapshot] = useState<AssistantScheduledTask[]>(
     () => assistantScheduledTaskService.listTasks()
   );
+  const [assistantLetterSnapshot, setAssistantLetterSnapshot] = useState<AssistantLetter[]>(() => assistantLetterService.listLetters());
   const [isAssistantMemoryViewerOpen, setIsAssistantMemoryViewerOpen] = useState(false);
   const [isDreamViewerOpen, setIsDreamViewerOpen] = useState(false);
+  const [isAssistantLetterHistoryViewerOpen, setIsAssistantLetterHistoryViewerOpen] = useState(false);
+  const [isAssistantLetterDetailSheetOpen, setIsAssistantLetterDetailSheetOpen] = useState(false);
+  const [selectedAssistantLetterId, setSelectedAssistantLetterId] = useState<string | null>(null);
+  const [assistantLetterDeleteTargetId, setAssistantLetterDeleteTargetId] = useState<string | null>(null);
   const [dreamMonthSelectionState, setDreamMonthSelectionState] = useState<DreamMonthSelectionState | null>(null);
   const [dailyReviewWritebackConfirmation, setDailyReviewWritebackConfirmation] = useState<DailyReviewWritebackConfirmationState | null>(null);
   const [dailyNewspaperWritebackConfirmation, setDailyNewspaperWritebackConfirmation] = useState<DailyNewspaperWritebackConfirmationState | null>(null);
@@ -581,6 +601,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [expandedReasoningMessageIds, setExpandedReasoningMessageIds] = useState<Set<string>>(() => new Set());
   const [expandedDreamUpdateMessageIds, setExpandedDreamUpdateMessageIds] = useState<Set<string>>(() => new Set());
   const [expandedReminderUpdateMessageIds, setExpandedReminderUpdateMessageIds] = useState<Set<string>>(() => new Set());
+  const [expandedLocalQueryMessageIds, setExpandedLocalQueryMessageIds] = useState<Set<string>>(() => new Set());
   const [revealedAssistantPartCounts, setRevealedAssistantPartCounts] = useState<Record<string, number>>({});
   const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
   const activeRequestRef = useRef<ActiveRequestRef | null>(null);
@@ -588,6 +609,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const isOpenRef = useRef(isOpen);
   const wasOpenRef = useRef(isOpen);
   const processingDueReminderIdsRef = useRef<Set<string>>(new Set());
+  const isProcessingAssistantLetterRef = useRef(false);
   const assistantPartRevealTimeoutsRef = useRef<Map<string, number[]>>(new Map());
   const revealedAssistantPartCountsRef = useRef<Record<string, number>>({});
   const hydratedRevealSessionIdsRef = useRef<Set<string>>(new Set());
@@ -683,6 +705,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       assistantAgentConfig.quietHoursEnabled
     ),
     [assistantAgentConfig.quietHoursEnabled, assistantAgentQuietHoursDrafts]
+  );
+  const assistantLetterDraftErrors = useMemo(
+    () => validateAssistantLetterDrafts(
+      assistantLetterDrafts,
+      assistantAgentConfig.letterEnabled
+    ),
+    [assistantAgentConfig.letterEnabled, assistantLetterDrafts]
+  );
+  const nextAssistantLetterPreview = useMemo(
+    () => assistantLetterScheduler.formatNextLetterPreview(assistantAgentConfig.nextLetterAt),
+    [assistantAgentConfig.nextLetterAt]
   );
   const weeklyReviewMethodOptions = useMemo(
     () => weeklyReviewTemplateService.listMethodOptions(),
@@ -840,6 +873,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   }, []);
   const toggleReminderUpdateExpansion = useCallback((messageId: string) => {
     setExpandedReminderUpdateMessageIds((current) => {
+      const next = new Set(current);
+      if (next.has(messageId)) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
+      }
+      return next;
+    });
+  }, []);
+  const toggleLocalQueryExpansion = useCallback((messageId: string) => {
+    setExpandedLocalQueryMessageIds((current) => {
       const next = new Set(current);
       if (next.has(messageId)) {
         next.delete(messageId);
@@ -1579,6 +1623,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setAssistantReminderSnapshot(assistantReminderQueueService.listReminders());
   };
 
+  const refreshAssistantLetterSnapshot = () => {
+    const letters = assistantLetterService.listLetters();
+    setAssistantLetterSnapshot(letters);
+    setSelectedAssistantLetterId((current) => (
+      current && letters.some((letter) => letter.id === current)
+        ? current
+        : letters[0]?.id || null
+    ));
+  };
+
   const syncAssistantScheduledTasks = useCallback((referenceNow = new Date()) => {
     const result = assistantScheduledTaskService.syncScheduledTaskReminders(referenceNow);
     setAssistantScheduledTaskSnapshot(result.tasks);
@@ -1818,6 +1872,48 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     });
   }, [categories, dailyReviews, logs, monthlyReviews, scopes, todoCategories, todos, weeklyReviews]);
 
+  const buildAssistantLetterRunRequest = useCallback((
+    trigger: AssistantSystemTrigger,
+    now: Date,
+    targetSession?: AIChatSession,
+    conversationHistory?: AIConversationTurn[]
+  ) => {
+    const reminderSummary = buildAssistantReminderSummary();
+    const userPersonaPrompt = buildBackgroundPersonaPrompt(targetSession);
+    const stateContext = buildAssistantStateContext(now, reminderSummary);
+    const personaName = targetSession
+      ? getBackgroundPersonaDisplayName(targetSession)
+      : 'AI';
+
+    return {
+      trigger,
+      ...(targetSession ? { targetSessionId: targetSession.id } : {}),
+      ...(targetSession?.personaId ? { personaId: targetSession.personaId } : {}),
+      ...(personaName ? { personaName } : {}),
+      showSystemNotification: shouldShowBackgroundSystemNotification(),
+      currentDateTime: stateContext.currentDateTime,
+      defaultDate: stateContext.stateContextDate,
+      todayTimelineSummary: stateContext.timelineSummaryForDate || '',
+      ...(stateContext.timelineSummaryForPreviousDate ? { yesterdayTimelineSummary: stateContext.timelineSummaryForPreviousDate } : {}),
+      ...(stateContext.timelineReviewSummary ? { timelineReviewSummary: stateContext.timelineReviewSummary } : {}),
+      ...(stateContext.activeSessionSummary ? { activeSessionSummary: stateContext.activeSessionSummary } : {}),
+      ...(stateContext.scheduledTodosForDateSummary ? { todayScheduledTodoSummary: stateContext.scheduledTodosForDateSummary } : {}),
+      ...(stateContext.pinnedTodoSummary ? { pinnedTodoSummary: stateContext.pinnedTodoSummary } : {}),
+      ...(stateContext.overdueTodoSummary ? { overdueTodoSummary: stateContext.overdueTodoSummary } : {}),
+      ...(reminderSummary ? { reminderSummary } : {}),
+      ...(userPersonaPrompt ? { userPersonaPrompt } : {}),
+      dictionaryContext: buildAssistantDictionaryContext(),
+      conversationHistory
+    };
+  }, [
+    buildAssistantDictionaryContext,
+    buildAssistantReminderSummary,
+    buildAssistantStateContext,
+    buildBackgroundPersonaPrompt,
+    getBackgroundPersonaDisplayName,
+    shouldShowBackgroundSystemNotification
+  ]);
+
   const buildBackgroundTurnRequest = useCallback(({
     trigger,
     now,
@@ -1857,6 +1953,102 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     buildBackgroundPersonaPrompt,
     debugMode,
     logs
+  ]);
+
+  const appendAssistantLetterPendingMessage = useCallback((
+    sessionId: string,
+    content = 'AI 正在撰写来信…'
+  ): string => {
+    const messageId = crypto.randomUUID();
+    setSessions((prev) => mutateChatSessions(prev, sessionId, (session) => ({
+      ...session,
+      messages: [
+        ...session.messages,
+        {
+          id: messageId,
+          role: 'assistant',
+          content,
+          createdAt: Date.now(),
+          tone: 'pending'
+        }
+      ]
+    })));
+    return messageId;
+  }, []);
+
+  const replaceAssistantLetterPendingMessage = useCallback((
+    sessionId: string,
+    pendingMessageId: string,
+    resultCard: AssistantLetterResultCard,
+    debugSections?: AIChatDebugSection[]
+  ) => {
+    setSessions((prev) => replaceSessionMessage(prev, sessionId, pendingMessageId, {
+      id: pendingMessageId,
+      role: 'assistant',
+      content: '收到了一封来信。',
+      createdAt: Date.now(),
+      tone: 'system',
+      assistantLetterResult: resultCard,
+      ...(debugSections && debugSections.length > 0 ? { debugSections } : {})
+    }));
+  }, []);
+
+  const runBackgroundAssistantLetter = useCallback(async (
+    trigger: AssistantSystemTrigger,
+    targetSession: AIChatSession,
+    conversationHistory: AIConversationTurn[],
+    now = new Date()
+  ) => {
+    if (isProcessingAssistantLetterRef.current) {
+      return null;
+    }
+
+    isProcessingAssistantLetterRef.current = true;
+    const pendingMessageId = appendAssistantLetterPendingMessage(targetSession.id);
+
+    try {
+      const result = await assistantLetterOrchestratorService.runDueLetter({
+        ...buildAssistantLetterRunRequest(trigger, now, targetSession, conversationHistory),
+        persistChatMessage: false
+      });
+
+      setAssistantAgentConfig(assistantAgentConfigService.getConfig());
+      refreshAssistantLetterSnapshot();
+      refreshAssistantMemorySnapshot();
+      replaceAssistantLetterPendingMessage(
+        targetSession.id,
+        pendingMessageId,
+        result.resultCard,
+        debugMode
+          ? [{
+            label: 'AI 来信调试',
+            exchange: result.debug
+          }]
+          : undefined
+      );
+
+      return result;
+    } catch (error) {
+      replacePendingWithResult(
+        targetSession.id,
+        pendingMessageId,
+        getRetryableAIErrorMessage(error),
+        {
+          tone: 'error',
+          debugSections: getErrorDebugSections(error, 'AI 来信调试', debugMode)
+        }
+      );
+      throw error;
+    } finally {
+      isProcessingAssistantLetterRef.current = false;
+    }
+  }, [
+    appendAssistantLetterPendingMessage,
+    buildAssistantLetterRunRequest,
+    debugMode,
+    getErrorDebugSections,
+    getRetryableAIErrorMessage,
+    replaceAssistantLetterPendingMessage
   ]);
 
   const completeReminderDueTrigger = useCallback((trigger: AssistantSystemTrigger) => {
@@ -1912,6 +2104,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const conversationHistory = conversationHistoryCache.get(targetSession.id) || [];
 
     try {
+      if (trigger.type === 'assistant_letter_due') {
+        const result = await runBackgroundAssistantLetter(trigger, targetSession, conversationHistory, new Date());
+        if (!result) {
+          return;
+        }
+        if (result.surfacedMessage && !isOpenRef.current) {
+          onUnreadAssistantMessage?.(1);
+          addToast('info', `${getBackgroundPersonaDisplayName(targetSession)}：${result.surfacedMessage}`);
+        }
+        return;
+      }
+
       const result = await assistantOrchestratorService.runSystemTurn(buildBackgroundTurnRequest({
         trigger,
         now: new Date(),
@@ -1936,10 +2140,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     buildBackgroundTurnRequest,
     completeReminderDueTrigger,
     conversationHistoryCache,
+    getBackgroundPersonaDisplayName,
     getBackgroundTargetSession,
     isAssistantBackgroundContextReady,
     onUnreadAssistantMessage,
     refreshAssistantNativeDiagnostics,
+    runBackgroundAssistantLetter,
     shouldShowBackgroundSystemNotification
   ]);
 
@@ -2180,6 +2386,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     assistantAgentConfig.quietHoursStart
   ]);
 
+  useEffect(() => {
+    setAssistantLetterDrafts(buildAssistantLetterDrafts(assistantAgentConfig));
+  }, [
+    assistantAgentConfig.letterFrequencyDays,
+    assistantAgentConfig.letterWindowEnd,
+    assistantAgentConfig.letterWindowStart
+  ]);
+
   const handleUpdateAssistantAgentConfig = (patch: Partial<AssistantAgentConfig>) => {
     const nextConfig = assistantAgentConfigService.saveConfig(patch);
     setAssistantAgentConfig(nextConfig);
@@ -2206,6 +2420,19 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setAssistantAgentQuietHoursDrafts((current) => ({
       ...current,
       [field]: digitsOnly
+    }));
+  };
+
+  const handleAssistantLetterDraftChange = (
+    field: keyof AssistantLetterDrafts,
+    nextValue: string
+  ) => {
+    const normalizedValue = field === 'letterFrequencyDays'
+      ? nextValue.replace(/\D+/g, '').slice(0, 2)
+      : nextValue.replace(/\D+/g, '').slice(0, 4);
+    setAssistantLetterDrafts((current) => ({
+      ...current,
+      [field]: normalizedValue
     }));
   };
 
@@ -2268,6 +2495,126 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       quietHoursEnd: nextDrafts.quietHoursEnd
     });
   };
+
+  const commitAssistantLetterDraft = () => {
+    const nextErrors = validateAssistantLetterDrafts(assistantLetterDrafts, true);
+    if (nextErrors.letterFrequencyDays || nextErrors.letterWindowStart || nextErrors.letterWindowEnd) {
+      return;
+    }
+
+    const basePatch: Partial<AssistantAgentConfig> = {
+      letterFrequencyDays: Number(assistantLetterDrafts.letterFrequencyDays.trim()),
+      letterWindowStart: assistantLetterDrafts.letterWindowStart.trim(),
+      letterWindowEnd: assistantLetterDrafts.letterWindowEnd.trim()
+    };
+    const nextSchedulePatch = assistantAgentConfig.letterEnabled
+      ? assistantLetterScheduler.buildNextSchedulePatch({
+        letterFrequencyDays: basePatch.letterFrequencyDays!,
+        letterWindowStart: basePatch.letterWindowStart,
+        letterWindowEnd: basePatch.letterWindowEnd,
+        lastLetterSentAt: assistantAgentConfig.lastLetterSentAt
+      }, {
+        now: new Date()
+      })
+      : null;
+    const nextConfig = assistantAgentConfigService.saveConfig({
+      ...basePatch,
+      ...(nextSchedulePatch || {})
+    });
+    setAssistantAgentConfig(nextConfig);
+  };
+
+  const handleToggleAssistantLetterEnabled = () => {
+    if (assistantAgentConfig.letterEnabled) {
+      const nextConfig = assistantAgentConfigService.saveConfig({
+        letterEnabled: false,
+        ...assistantLetterScheduler.clearSchedule()
+      });
+      setAssistantAgentConfig(nextConfig);
+      return;
+    }
+
+    const nextDrafts: AssistantLetterDrafts = {
+      letterFrequencyDays: assistantLetterDrafts.letterFrequencyDays.trim() || String(assistantAgentConfig.letterFrequencyDays || 2),
+      letterWindowStart: normalizeAssistantQuietHoursValue(assistantLetterDrafts.letterWindowStart) || '2000',
+      letterWindowEnd: normalizeAssistantQuietHoursValue(assistantLetterDrafts.letterWindowEnd) || '2200'
+    };
+    setAssistantLetterDrafts(nextDrafts);
+
+    const nextErrors = validateAssistantLetterDrafts(nextDrafts, true);
+    if (nextErrors.letterFrequencyDays || nextErrors.letterWindowStart || nextErrors.letterWindowEnd) {
+      return;
+    }
+
+    const nextSchedulePatch = assistantLetterScheduler.buildNextSchedulePatch({
+      letterFrequencyDays: Number(nextDrafts.letterFrequencyDays),
+      letterWindowStart: nextDrafts.letterWindowStart,
+      letterWindowEnd: nextDrafts.letterWindowEnd,
+      lastLetterSentAt: assistantAgentConfig.lastLetterSentAt
+    }, {
+      now: new Date()
+    });
+    const nextConfig = assistantAgentConfigService.saveConfig({
+      letterEnabled: true,
+      letterFrequencyDays: Number(nextDrafts.letterFrequencyDays),
+      letterWindowStart: nextDrafts.letterWindowStart,
+      letterWindowEnd: nextDrafts.letterWindowEnd,
+      ...(nextSchedulePatch || {})
+    });
+    setAssistantAgentConfig(nextConfig);
+  };
+
+  const flushDueAssistantLetter = useCallback(() => {
+    if (
+      !assistantAgentConfig.enabled
+      || !assistantAgentConfig.letterEnabled
+      || !isAssistantBackgroundContextReady
+      || isProcessingAssistantLetterRef.current
+      || !assistantLetterScheduler.isLetterDue(assistantAgentConfig, new Date())
+    ) {
+      return;
+    }
+
+    const targetSession = getBackgroundTargetSession();
+    if (!targetSession) {
+      return;
+    }
+
+    const now = new Date();
+    const scheduledFor = assistantAgentConfig.nextLetterAt || normalizeAssistantDateTime(now.toISOString()) || now.toISOString();
+    const trigger: AssistantSystemTrigger = {
+      id: `assistant_letter_due:${scheduledFor}`,
+      type: 'assistant_letter_due',
+      source: 'system',
+      createdAt: formatAssistantLocalDateTime(now),
+      text: 'Scheduled assistant letter is due',
+      metadata: {
+        scheduledFor
+      }
+    };
+    const conversationHistory = conversationHistoryCache.get(targetSession.id) || [];
+
+    void runBackgroundAssistantLetter(trigger, targetSession, conversationHistory, now).then((result) => {
+      if (!result) {
+        return;
+      }
+      if (result.surfacedMessage && !isOpenRef.current) {
+        onUnreadAssistantMessage?.(1);
+        addToast('info', `${getBackgroundPersonaDisplayName(targetSession)}：${result.surfacedMessage}`);
+      }
+    }).catch((error) => {
+      console.error('[AIBackfillChatModal] Assistant letter generation failed', error);
+    });
+  }, [
+    addToast,
+    assistantAgentConfig,
+    conversationHistoryCache,
+    getBackgroundPersonaDisplayName,
+    getBackgroundTargetSession,
+    isAssistantBackgroundContextReady,
+    onUnreadAssistantMessage,
+    runBackgroundAssistantLetter
+  ]);
 
   const buildReminderDueTrigger = (reminder: AssistantReminder): AssistantSystemTrigger => {
     const now = new Date();
@@ -2404,9 +2751,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   }, [isAssistantBackgroundHistoryViewerOpen, refreshAssistantNativeDiagnostics]);
 
   useEffect(() => {
+    if (!isAssistantLetterHistoryViewerOpen) {
+      return;
+    }
+
+    refreshAssistantLetterSnapshot();
+  }, [isAssistantLetterHistoryViewerOpen]);
+
+  useEffect(() => {
     const handleAssistantChatUpdated = () => {
       reloadPersistedChatSessions();
       refreshAssistantMemorySnapshot();
+      refreshAssistantLetterSnapshot();
       void hydrateAssistantReminderSnapshotFromNative();
       refreshAssistantBackgroundCallHistory();
       void refreshAssistantNativeDiagnostics();
@@ -2555,6 +2911,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       try {
         await hydrateAssistantReminderSnapshotFromNative();
         flushDueReminders();
+        flushDueAssistantLetter();
       } catch (error) {
         hasCompletedStartupReminderCatchupRef.current = false;
         console.error('[AIBackfillChatModal] Failed cold-start reminder catch-up', error);
@@ -2562,6 +2919,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     })();
   }, [
     assistantAgentConfig.enabled,
+    flushDueAssistantLetter,
     flushDueReminders,
     hydrateAssistantReminderSnapshotFromNative,
     isAssistantBackgroundContextReady
@@ -2569,6 +2927,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   useEffect(() => {
     flushDueReminders();
+    flushDueAssistantLetter();
 
     if (!assistantAgentConfig.enabled) {
       return;
@@ -2576,11 +2935,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
     const timer = window.setInterval(() => {
       flushDueReminders();
+      flushDueAssistantLetter();
     }, 60_000);
 
     return () => window.clearInterval(timer);
   }, [
     assistantAgentConfig.enabled,
+    flushDueAssistantLetter,
     flushDueReminders
   ]);
 
@@ -2591,9 +2952,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
     void hydrateAssistantReminderSnapshotFromNative();
     void drainPendingAssistantSystemTriggers();
+    flushDueAssistantLetter();
   }, [
     assistantAgentConfig.enabled,
     drainPendingAssistantSystemTriggers,
+    flushDueAssistantLetter,
     hydrateAssistantReminderSnapshotFromNative,
     isAssistantBackgroundContextReady
   ]);
@@ -3460,6 +3823,41 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setIsAssistantMemoryViewerOpen(false);
   };
 
+  const handleOpenAssistantLetterDetail = (letterId: string) => {
+    refreshAssistantLetterSnapshot();
+    setSelectedAssistantLetterId(letterId);
+    setIsAssistantLetterDetailSheetOpen(true);
+  };
+
+  const handleCloseAssistantLetterDetail = () => {
+    setIsAssistantLetterDetailSheetOpen(false);
+  };
+
+  const handleOpenAssistantLetterHistoryViewer = () => {
+    refreshAssistantLetterSnapshot();
+    setAssistantLetterDeleteTargetId(null);
+    setIsAssistantLetterHistoryViewerOpen(true);
+  };
+
+  const handleCloseAssistantLetterHistoryViewer = () => {
+    setAssistantLetterDeleteTargetId(null);
+    setIsAssistantLetterHistoryViewerOpen(false);
+  };
+
+  const handleToggleAssistantLetterDelete = (letterId: string) => {
+    setAssistantLetterDeleteTargetId((current) => current === letterId ? null : letterId);
+  };
+
+  const handleConfirmAssistantLetterDelete = (letterId: string) => {
+    assistantLetterService.deleteLetter(letterId);
+    setAssistantLetterDeleteTargetId((current) => current === letterId ? null : current);
+    refreshAssistantLetterSnapshot();
+    setIsAssistantLetterDetailSheetOpen((current) => (
+      selectedAssistantLetterId === letterId ? false : current
+    ));
+    addToast('success', '已删除来信');
+  };
+
   const handleOpenAssistantBackgroundHistoryViewer = () => {
     refreshAssistantBackgroundCallHistory();
     void refreshAssistantNativeDiagnostics();
@@ -3745,6 +4143,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return true;
     }
 
+    if (isAssistantLetterDetailSheetOpen) {
+      handleCloseAssistantLetterDetail();
+      return true;
+    }
+
+    if (isAssistantLetterHistoryViewerOpen) {
+      handleCloseAssistantLetterHistoryViewer();
+      return true;
+    }
+
     if (isAssistantBackgroundHistoryViewerOpen) {
       handleCloseAssistantBackgroundHistoryViewer();
       return true;
@@ -3867,6 +4275,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     deleteConfirmSessionId,
     editingSessionId,
     handleCancelAssistantEditableMemoryComposer,
+    handleCloseAssistantLetterDetail,
+    handleCloseAssistantLetterHistoryViewer,
     handleCancelRenameSession,
     handleCloseAssistantBackgroundHistoryViewer,
     handleCloseDreamViewer,
@@ -3874,7 +4284,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     dreamEntryDeleteTargetId,
     editingDreamEntryId,
     isDreamResetConfirmOpen,
+    isAssistantLetterDetailSheetOpen,
     isAssistantBackgroundHistoryViewerOpen,
+    isAssistantLetterHistoryViewerOpen,
     isDreamViewerOpen,
     isAssistantMemoryViewerOpen,
     isAssistantReminderComposerOpen,
@@ -4150,8 +4562,127 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     });
   };
 
+  const runManualAssistantLetterDebug = (options?: ForegroundSendOptions) => {
+    if (!activeSession || isLoading) {
+      return;
+    }
+
+    const sessionId = activeSession.id;
+    const now = Date.now();
+    const retryMessageId = options?.replaceMessageId;
+    const canRetryInPlace = Boolean(
+      retryMessageId && activeSession.messages.some((message) => message.id === retryMessageId)
+    );
+    const pendingMessageId = canRetryInPlace && retryMessageId
+      ? retryMessageId
+      : crypto.randomUUID();
+    const userMessageId = options?.retrySourceUserMessageId || crypto.randomUUID();
+    const historyBeforeCurrent = canRetryInPlace
+      ? buildRetryConversationHistory(sessionId, options?.retrySourceUserMessageId)
+      : (conversationHistoryCache.get(sessionId) || []);
+
+    if (canRetryInPlace) {
+      mutateSession(sessionId, (session) => ({
+        ...session,
+        messages: session.messages.map((message) => (
+          message.id === pendingMessageId
+            ? {
+              id: pendingMessageId,
+              role: 'assistant',
+              content: 'AI 正在撰写来信…',
+              createdAt: now,
+              tone: 'pending'
+            }
+            : message
+        ))
+      }));
+    } else {
+      mutateSession(sessionId, (session) => ({
+        ...session,
+        messages: [
+          ...session.messages,
+          {
+            id: userMessageId,
+            role: 'user',
+            content: '/letter',
+            createdAt: now
+          },
+          {
+            id: pendingMessageId,
+            role: 'assistant',
+            content: 'AI 正在撰写来信…',
+            createdAt: now + 1,
+            tone: 'pending'
+          }
+        ]
+      }));
+    }
+
+    if (!canRetryInPlace) {
+      setInputText('');
+    }
+    setIsLoading(true);
+
+    const trigger: AssistantSystemTrigger = {
+      id: crypto.randomUUID(),
+      type: 'assistant_letter_due',
+      source: 'system',
+      createdAt: formatAssistantLocalDateTime(new Date(now)),
+      text: 'Manual debug trigger for assistant letter',
+      metadata: {
+        scheduledFor: formatAssistantLocalDateTime(new Date(now))
+      }
+    };
+
+    void assistantLetterOrchestratorService.runDueLetter(
+      {
+        ...buildAssistantLetterRunRequest(trigger, new Date(now), activeSession, historyBeforeCurrent),
+        showSystemNotification: false,
+        persistChatMessage: false
+      }
+    ).then((result) => {
+      setAssistantAgentConfig(assistantAgentConfigService.getConfig());
+      refreshAssistantLetterSnapshot();
+      refreshAssistantMemorySnapshot();
+
+      replacePendingWithResult(sessionId, pendingMessageId, '收到了一封来信。', {
+        tone: 'system',
+        assistantLetterResult: result.resultCard,
+        debugSections: debugMode
+          ? [{
+            label: 'AI 来信调试',
+            exchange: result.debug
+          }]
+          : undefined
+      });
+    }).catch((error) => {
+      console.error('[AIBackfillChatModal] Manual assistant letter debug failed', error);
+      replacePendingWithResult(
+        sessionId,
+        pendingMessageId,
+        getRetryableAIErrorMessage(error),
+        {
+          tone: 'error',
+          retryInput: '/letter',
+          retrySourceUserMessageId: userMessageId,
+          debugSections: getErrorDebugSections(error, 'AI 来信调试', debugMode)
+        }
+      );
+    }).finally(() => {
+      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
+        activeRequestRef.current = null;
+      }
+      setIsLoading(false);
+    });
+  };
+
   const handleDebugCommand = (trimmedText: string, options?: ForegroundSendOptions): boolean => {
     const normalized = trimmedText.toLowerCase();
+    if (normalized === '/letter' && activeSession) {
+      runManualAssistantLetterDebug(options);
+      return true;
+    }
+
     if (normalized === '/agent checkin' && activeSession) {
       runManualAssistantCheckinDebug(options);
       return true;
@@ -4185,8 +4716,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           id: crypto.randomUUID(),
           role: 'assistant',
           content: nextDebugMode
-            ? '已开启调试模式，之后会保留每次 AI 请求和响应，方便查看两阶段调用细节。'
-            : '已关闭调试模式，之后的新消息将不再显示调试入口。',
+            ? '已开启调试模式。'
+            : '已关闭调试模式。',
           createdAt: now + 1,
           tone: 'system'
         }
@@ -4556,6 +5087,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       displayParts?: string[];
       debugSections?: AIChatDebugSection[];
       appliedActions?: AppliedChatAction[];
+      assistantLetterResult?: AssistantLetterResultCard;
+      localQueryResults?: AssistantLocalQueryResult[];
       memoryUpdates?: AIChatMemoryUpdateSection[];
       dreamUpdates?: AIChatDreamUpdateCard[];
       reminderUpdates?: string[];
@@ -4580,6 +5113,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       ...(options?.tone ? { tone: options.tone } : {}),
       ...(options?.debugSections && options.debugSections.length > 0 ? { debugSections: options.debugSections } : {}),
       ...(options?.appliedActions && options.appliedActions.length > 0 ? { appliedActions: options.appliedActions } : {}),
+      ...(options?.assistantLetterResult ? { assistantLetterResult: options.assistantLetterResult } : {}),
+      ...(options?.localQueryResults && options.localQueryResults.length > 0 ? { localQueryResults: options.localQueryResults } : {}),
       ...(options?.memoryUpdates && options.memoryUpdates.length > 0 ? { memoryUpdates: options.memoryUpdates } : {}),
       ...(options?.dreamUpdates && options.dreamUpdates.length > 0 ? { dreamUpdates: options.dreamUpdates } : {}),
       ...(options?.reminderUpdates && options.reminderUpdates.length > 0 ? { reminderUpdates: options.reminderUpdates } : {}),
@@ -5459,6 +5994,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         buildDreamContext,
         buildForegroundAssistantMemory,
         buildForegroundAssistantReminderSummary,
+        categories,
         buildPromptLayers: async () => {
           const [basePrompt, foregroundModePrompt] = await Promise.all([
             assistantPromptService.getAssistantBasePrompt(),
@@ -5468,7 +6004,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         },
         buildStateContext: buildAssistantStateContext,
         controller,
-        createTriggerCreatedAt: (date) => formatAssistantLocalDateTime(date),
         debugMode,
         getErrorDebugSections,
         getRetryableAIErrorMessage,
@@ -5490,10 +6025,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           conversation: args.conversation,
           stateContext: args.stateContext,
           ...(args.dictionaryContext ? { dictionaryContext: args.dictionaryContext } : {}),
+          ...(args.localQueryHistory?.length ? { localQueryHistory: args.localQueryHistory } : {}),
           ...(args.dreamContext ? { dreamContext: args.dreamContext } : {})
         }, runnerOptions),
         historyBeforeCurrent,
         isAbortError,
+        logs,
         narrowConversationContext: assistantContextBuilder.buildConversationContext,
         notifyAssistantTaskStateChanged,
         now,
@@ -5502,10 +6039,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         resolveAssistantDisplayParts,
         resolveAssistantReplyContent,
         resolveForegroundAssistantReply,
+        scopes,
         sessionId,
         setIsLoading,
+        todoCategories,
+        todos,
         trimmedText,
-        userMessageId
+        userMessageId,
+        weeklyReviews,
+        monthlyReviews,
+        dailyReviews
       });
       return;
     } catch (error) {
@@ -5907,6 +6450,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           emptyPromptExampleGroups={emptyPromptExampleGroups}
           emptyStateMaxWidthClassName={emptyStateMaxWidthClassName}
           expandedDreamUpdateMessageIds={expandedDreamUpdateMessageIds}
+          expandedLocalQueryMessageIds={expandedLocalQueryMessageIds}
           expandedMemoryUpdateMessageIds={expandedMemoryUpdateMessageIds}
           expandedReasoningMessageIds={expandedReasoningMessageIds}
           expandedReminderUpdateMessageIds={expandedReminderUpdateMessageIds}
@@ -5919,6 +6463,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           onMessageRef={handleMessageElementRef}
           onOpenDailyNewspaper={handleOpenDailyNewspaper}
           onOpenDailyReviewNarrative={handleOpenDailyReviewNarrative}
+          onOpenAssistantLetter={handleOpenAssistantLetterDetail}
           onOpenDebugViewer={setDebugViewer}
           onOpenMonthlyNewspaper={handleOpenMonthlyNewspaper}
           onOpenMonthlyReviewNarrative={handleOpenMonthlyReviewNarrative}
@@ -5928,6 +6473,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           renderAppliedAction={renderAppliedAction}
           revealedAssistantPartCounts={revealedAssistantPartCounts}
           setDreamUpdateExpansion={toggleDreamUpdateExpansion}
+          setLocalQueryExpansion={toggleLocalQueryExpansion}
           setMemoryUpdateExpansion={toggleMemoryUpdateExpansion}
           setReasoningExpansion={toggleReasoningExpansion}
           setReminderUpdateExpansion={toggleReminderUpdateExpansion}
@@ -6200,6 +6746,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     assistantAgentIntervalErrors={assistantAgentIntervalErrors}
                     assistantAgentQuietHoursDrafts={assistantAgentQuietHoursDrafts}
                     assistantAgentQuietHoursErrors={assistantAgentQuietHoursErrors}
+                    assistantLetterDrafts={assistantLetterDrafts}
+                    assistantLetterDraftErrors={assistantLetterDraftErrors}
+                    nextLetterPreview={nextAssistantLetterPreview}
                     assistantScheduledTaskDrafts={assistantScheduledTaskDrafts}
                     isAssistantScheduledTaskComposerOpen={isAssistantScheduledTaskComposerOpen}
                     assistantScheduledTaskSnapshot={assistantScheduledTaskSnapshot}
@@ -6212,6 +6761,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     onToggleQuietHours={handleToggleAssistantQuietHours}
                     onQuietHoursDraftChange={handleAssistantAgentQuietHoursDraftChange}
                     onCommitQuietHoursDraft={commitAssistantAgentQuietHoursDraft}
+                    onToggleLetterEnabled={handleToggleAssistantLetterEnabled}
+                    onLetterDraftChange={handleAssistantLetterDraftChange}
+                    onCommitLetterDraft={commitAssistantLetterDraft}
                     onOpenScheduledTaskComposer={handleOpenAssistantScheduledTaskComposer}
                     onUpdateScheduledTaskDraft={updateAssistantScheduledTaskDraft}
                     onToggleScheduledTaskWeekday={toggleAssistantScheduledTaskWeekday}
@@ -6224,6 +6776,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                     onOpenDreamViewer={handleOpenDreamViewer}
                     onOpenAssistantMemoryViewer={handleOpenAssistantMemoryViewer}
                     onOpenAssistantBackgroundHistoryViewer={handleOpenAssistantBackgroundHistoryViewer}
+                    onOpenAssistantLetterHistoryViewer={() => handleOpenAssistantLetterHistoryViewer()}
                   />
                   )}
                 />
@@ -6298,6 +6851,27 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             onToggleReminderDelete={handleToggleAssistantReminderDelete}
             onCancelReminderDelete={() => setAssistantReminderDeleteTarget(null)}
             onConfirmReminderDelete={handleConfirmAssistantReminderDelete}
+          />
+            )}
+
+            {isAssistantLetterHistoryViewerOpen && (
+          <AssistantLetterHistoryOverlay
+            letters={assistantLetterSnapshot}
+            activeLetterId={selectedAssistantLetterId}
+            deleteTargetId={assistantLetterDeleteTargetId}
+            theme={AI_CHAT_THEME}
+            onClose={handleCloseAssistantLetterHistoryViewer}
+            onOpenLetter={handleOpenAssistantLetterDetail}
+            onToggleDelete={handleToggleAssistantLetterDelete}
+            onConfirmDelete={handleConfirmAssistantLetterDelete}
+          />
+            )}
+
+            {isAssistantLetterDetailSheetOpen && (
+          <AssistantLetterDetailSheet
+            letter={assistantLetterSnapshot.find((letter) => letter.id === selectedAssistantLetterId) || null}
+            theme={AI_CHAT_THEME}
+            onClose={handleCloseAssistantLetterDetail}
           />
             )}
 

@@ -13,6 +13,8 @@
  */
 import { Scope, TodoKind, TodoRecurrenceRule } from '../types';
 import type {
+    AssistantLocalQueryRequest,
+    AssistantLocalQueryTarget,
     AssistantReasoningSummary,
     AssistantMemoryPatch,
     AssistantReminderDraft,
@@ -1165,6 +1167,53 @@ const normalizeAssistantSilentReason = (value: unknown): AssistantSilentReason |
         : undefined
 );
 
+const ASSISTANT_LOCAL_QUERY_TARGETS: AssistantLocalQueryTarget[] = [
+    'logs',
+    'todos',
+    'reviews',
+    'categories',
+    'activities',
+    'scopes',
+    'all'
+];
+
+const normalizeAssistantLocalQueryRequest = (value: unknown): AssistantLocalQueryRequest | undefined => {
+    if (!value || typeof value !== 'object') {
+        return undefined;
+    }
+
+    const candidate = value as Record<string, unknown>;
+    const mode = candidate.mode === 'filter_expression' || candidate.mode === 'keyword_search'
+        ? candidate.mode
+        : undefined;
+    const query = typeof candidate.query === 'string' ? candidate.query.trim() : '';
+    const targets = Array.isArray(candidate.targets)
+        ? candidate.targets
+            .map((item) => (typeof item === 'string' ? item.trim() : ''))
+            .filter((item): item is AssistantLocalQueryTarget => ASSISTANT_LOCAL_QUERY_TARGETS.includes(item as AssistantLocalQueryTarget))
+        : [];
+
+    if (!mode || !query || targets.length === 0) {
+        return undefined;
+    }
+
+    const normalized: AssistantLocalQueryRequest = {
+        mode,
+        query,
+        targets: Array.from(new Set(targets))
+    };
+
+    if (typeof candidate.limit === 'number' && Number.isFinite(candidate.limit)) {
+        normalized.limit = Math.round(candidate.limit);
+    }
+
+    if (typeof candidate.reason === 'string' && candidate.reason.trim()) {
+        normalized.reason = candidate.reason.trim();
+    }
+
+    return normalized;
+};
+
 const normalizeStringList = (value: unknown): string[] => (
     Array.isArray(value)
         ? value
@@ -1517,6 +1566,10 @@ const hasMeaningfulAssistantUnifiedTurnSignal = (mode: AssistantTurnMode, rawOut
     }
 
     if (mode === 'foreground' && normalizeAssistantToolCalls(candidate.toolCalls).length > 0) {
+        return true;
+    }
+
+    if (mode === 'foreground' && normalizeAssistantLocalQueryRequest(candidate.localQueryRequest)) {
         return true;
     }
 
@@ -2140,6 +2193,11 @@ Output:
 
             if (meta?.reasoning) {
                 normalized.reasoning = meta.reasoning;
+            }
+
+            const localQueryRequest = normalizeAssistantLocalQueryRequest(rawOutput?.localQueryRequest);
+            if (mode === 'foreground' && localQueryRequest) {
+                normalized.localQueryRequest = localQueryRequest;
             }
 
             const reminders = normalizeAssistantReminderDrafts(rawOutput?.reminders);

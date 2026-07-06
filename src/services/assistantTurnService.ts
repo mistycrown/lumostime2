@@ -5,6 +5,8 @@
  * @pos Service (Assistant Unified Turn)
  * @description Builds the single-turn prompt payload for the converged assistant architecture and forwards it through aiService so foreground and background flows can gradually migrate off the older multi-prompt planner stack.
  *
+ * @updated 2026-07-06: Tightened foreground local-query schema guidance so the model no longer has to emit `reason`, and log lookups can be steered toward custom-filter expressions instead of generic keyword retries.
+ * @updated 2026-07-05: Added optional local-query history prompt injection plus foreground output-schema guidance for model-requested local retrieval rounds.
  * @updated 2026-05-15: Reordered unified assistant prompt assembly so the optional user persona layer is serialized before the base system prompt.
  * @updated 2026-05-13: Unified visible-message output back around `assistantReply`, while instructing the model to use newline-separated paragraphs inside that single reply so the UI can split one complete answer into multiple bubbles without a second duplicate field.
  * @updated 2026-05-10: Reordered unified assistant prompt assembly so long-lived dictionary/state sections sit ahead of volatile anchors, improving provider-side prompt-cache reuse across repeated turns.
@@ -28,6 +30,7 @@ import { assistantContextBuilder } from './assistantContextBuilder';
 import { assistantPromptService } from './assistantPromptService';
 import { formatAssistantDateTimeForDisplay } from '../utils/assistantTime';
 import type {
+  AssistantLocalQueryResult,
   AssistantMemory,
   AssistantReminder,
   AssistantTurnTrigger,
@@ -75,6 +78,17 @@ const STRICT_JSON_OUTPUT_RULES = [
   'Every returned field must follow the provided schema exactly. If some field is not needed, omit it instead of explaining it in prose.',
   'Your entire response must be valid JSON parsable by JSON.parse with no cleanup step.'
 ].join('\n');
+
+const buildLocalQueryHistoryPrompt = (history?: AssistantLocalQueryResult[]): string | undefined => {
+  if (!Array.isArray(history) || history.length === 0) {
+    return undefined;
+  }
+
+  return [
+    '=== Local Query Context ===',
+    ...history.map((entry) => entry.digest)
+  ].join('\n\n');
+};
 
 const formatPromptDateTime = (value?: string | null): string | undefined => {
   if (typeof value !== 'string' || !value.trim()) {
@@ -221,6 +235,12 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
           mode: input.mode,
           outcome: 'reply | clarify',
           assistantReply: 'string',
+          localQueryRequest: {
+            mode: 'filter_expression | keyword_search',
+            targets: ['logs | todos | reviews | categories | activities | scopes | all'],
+            query: 'string',
+            limit: 6
+          },
           toolCalls: [],
           reminders: [],
           memoryAction: 'no_update | update_memory',
@@ -230,11 +250,18 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
           mode: input.mode,
           outcome: 'reply | clarify',
           assistantReply: 'string',
+          localQueryRequest: {
+            mode: 'filter_expression | keyword_search',
+            targets: ['logs | todos | reviews | categories | activities | scopes | all'],
+            query: 'string',
+            limit: 6
+          },
           toolCalls: [],
           reminders: [],
           memoryAction: 'no_update'
         }
     );
+  const localQueryHistoryPrompt = buildLocalQueryHistoryPrompt(input.localQueryHistory);
   return [
     ...(input.promptLayers.userPersonaPrompt ? ['=== User Persona Prompt ===', input.promptLayers.userPersonaPrompt, ''] : []),
     '=== Assistant Base Prompt ===',
@@ -252,6 +279,7 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
     '',
     '=== Dictionary Context ===',
     dictionaryDigest,
+    ...(localQueryHistoryPrompt ? ['', localQueryHistoryPrompt] : []),
     ...(Object.keys(stableStateContext).length > 0
       ? ['', '=== Stable State Context ===', stringifyJson(stableStateContext)]
       : []),

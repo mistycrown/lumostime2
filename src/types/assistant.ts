@@ -5,6 +5,7 @@
  * @pos Type Definitions (Assistant Agent)
  * @description Defines the structured contracts used by the Android-first assistant agent layer so background triggers, memory updates, reminder queues, and AI system-turn decisions can stay typed and stable across services and plugins.
  *
+ * @updated 2026-07-04: Added assistant-letter trigger, config, and persisted letter record types for scheduled AI letters with backup-safe local storage.
  * @updated 2026-05-16: Added log-submission trigger typing plus persisted assistant config fields for selected post-log AI reactions.
  * @updated 2026-05-18: Added optional nested `subtasks` typing under foreground `create_todo` tool calls so one assistant action can describe a parent todo plus its direct children.
  * @updated 2026-05-09: Added assistant scheduled-task template types so recurring AI task rules can materialize native reminders without overloading one-shot reminder records.
@@ -31,6 +32,7 @@ export type AssistantTriggerSource = 'user' | 'agent' | 'system';
 
 export type AssistantSystemTriggerType =
   | 'checkin'
+  | 'assistant_letter_due'
   | 'reminder_due'
   | 'long_idle'
   | 'log_submitted'
@@ -171,6 +173,41 @@ export interface AssistantAgentConfig {
   longTermMemoryEnabled: boolean;
   logSubmissionTriggerEnabled: boolean;
   logSubmissionTriggerActivityIds: string[];
+  letterEnabled: boolean;
+  letterFrequencyDays: number;
+  letterWindowStart?: string;
+  letterWindowEnd?: string;
+  nextLetterAt?: string;
+  lastLetterSentAt?: string;
+  lastLetterScheduledAt?: string;
+}
+
+export interface AssistantLetterDraft {
+  title: string;
+  preview: string;
+  content: string;
+}
+
+export interface AssistantLetter {
+  id: string;
+  title: string;
+  preview: string;
+  content: string;
+  personaId: string;
+  personaName: string;
+  scheduledFor: string;
+  sentAt: string;
+  createdAt: string;
+  sourceTriggerId?: string;
+  status: 'sent';
+}
+
+export interface AssistantLetterResultCard {
+  letterId: string;
+  title: string;
+  preview: string;
+  personaName: string;
+  sentAt: string;
 }
 
 export interface AssistantNotificationPayload {
@@ -257,6 +294,17 @@ export interface AssistantOrchestratorResult {
 export type AssistantTurnMode = 'foreground' | 'background';
 
 export type AssistantTurnOutcome = 'reply' | 'clarify' | 'silent';
+
+export type AssistantLocalQueryTarget =
+  | 'logs'
+  | 'todos'
+  | 'reviews'
+  | 'categories'
+  | 'activities'
+  | 'scopes'
+  | 'all';
+
+export type AssistantLocalQueryMode = 'filter_expression' | 'keyword_search';
 
 export type AssistantTurnTriggerType =
   | 'user_message'
@@ -367,6 +415,32 @@ export interface AssistantTurnDictionaryContext {
   logs?: AssistantLogDictionaryItem[];
 }
 
+export interface AssistantLocalQueryRequest {
+  mode: AssistantLocalQueryMode;
+  targets: AssistantLocalQueryTarget[];
+  query: string;
+  limit?: number;
+  reason?: string;
+}
+
+export interface AssistantLocalQueryResultItem {
+  itemType: 'log' | 'todo' | 'review' | 'category' | 'activity' | 'scope';
+  id: string;
+  title: string;
+  summary: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AssistantLocalQueryResult {
+  round: number;
+  request: AssistantLocalQueryRequest;
+  status?: 'executed' | 'rejected_duplicate';
+  statusMessage?: string;
+  hitCount: number;
+  items: AssistantLocalQueryResultItem[];
+  digest: string;
+}
+
 export interface AssistantUnifiedTurnInput {
   mode: AssistantTurnMode;
   trigger: AssistantTurnTrigger;
@@ -377,6 +451,7 @@ export interface AssistantUnifiedTurnInput {
   stateContext: AssistantTurnStateContext;
   dictionaryContext: AssistantTurnDictionaryContext;
   dreamContext?: string;
+  localQueryHistory?: AssistantLocalQueryResult[];
 }
 
 export interface AssistantReminderDraft {
@@ -495,6 +570,7 @@ export interface AssistantUnifiedTurnOutput {
   outcome: AssistantTurnOutcome;
   assistantReply?: string;
   reasoning?: AssistantReasoningSummary;
+  localQueryRequest?: AssistantLocalQueryRequest;
   toolCalls?: AssistantToolCall[];
   reminders?: AssistantReminderDraft[];
   memoryAction: AssistantMemoryAction;

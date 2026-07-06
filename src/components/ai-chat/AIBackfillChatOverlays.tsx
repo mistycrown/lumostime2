@@ -9,8 +9,10 @@
 import React from 'react';
 import { ChevronDown, ChevronRight, X } from 'lucide-react';
 import type { AIDebugExchange } from '../../services/aiService';
+import type { AssistantLetter } from '../../types/assistant';
 import type {
   AssistantBackgroundTimelineEntry,
+  AIChatDebugTextBlock,
   DebugViewerState
 } from './AIBackfillChatShared';
 
@@ -143,12 +145,199 @@ export const AssistantBackgroundHistoryOverlay: React.FC<AssistantBackgroundHist
   </div>
 );
 
+interface AssistantLetterHistoryOverlayProps {
+  letters: AssistantLetter[];
+  activeLetterId: string | null;
+  deleteTargetId: string | null;
+  theme: AIChatOverlayTheme;
+  onClose: () => void;
+  onOpenLetter: (letterId: string) => void;
+  onToggleDelete: (letterId: string) => void;
+  onConfirmDelete: (letterId: string) => void;
+}
+
+export const AssistantLetterHistoryOverlay: React.FC<AssistantLetterHistoryOverlayProps> = ({
+  letters,
+  activeLetterId,
+  deleteTargetId,
+  theme,
+  onClose,
+  onOpenLetter,
+  onToggleDelete,
+  onConfirmDelete
+}) => (
+  <div className="absolute inset-0 z-20 bg-[rgba(15,23,42,0.14)] backdrop-blur-[10px]">
+    <div
+      className="flex h-full flex-col bg-[#f3f4f6]"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)'
+      }}
+    >
+      <div className="flex h-14 items-center justify-between border-b border-[#e5e7eb] bg-[rgba(255,255,255,0.9)] px-4 backdrop-blur-md">
+        <div>
+          <h3 className="font-serif text-lg font-bold leading-none text-[#201c19]">来信记录</h3>
+        </div>
+        <button
+          onClick={onClose}
+          className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:border-[#cfd8e3] hover:bg-[#f9fafb] hover:text-[#111827]"
+        >
+          <X size={20} />
+        </button>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+        <div className="mx-auto max-w-3xl space-y-3">
+          {letters.length === 0 ? (
+            <div
+              className="rounded-[0.95rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-5"
+              style={{
+                borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
+                backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+              }}
+            >
+              <p className="text-sm leading-6 text-stone-600">还没有生成过来信。</p>
+            </div>
+          ) : (
+            letters.map((letter) => {
+              const isSelected = activeLetterId === letter.id;
+              const isDeleteConfirm = deleteTargetId === letter.id;
+
+              return (
+                <div
+                  key={letter.id}
+                  className="rounded-[1rem] border bg-[rgba(255,255,255,0.96)] p-4 transition-colors"
+                  style={{
+                    borderColor: isSelected ? theme.chipBorderStrong : theme.chipBorder
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onOpenLetter(letter.id)}
+                    className="block w-full text-left"
+                  >
+                    <p className="font-serif text-[1.08rem] leading-7 text-[#231f1b]">{letter.title}</p>
+                    <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: theme.textSecondary }}>
+                      {letter.preview}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: theme.textSecondary }}>
+                      <span>{letter.personaName}</span>
+                      <span>{letter.sentAt}</span>
+                    </div>
+                  </button>
+                  <div className="mt-3 flex justify-end">
+                    {isDeleteConfirm ? (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onToggleDelete(letter.id)}
+                          className="rounded-[0.7rem] border px-3 py-1.5 text-xs"
+                          style={{
+                            borderColor: theme.chipBorder,
+                            backgroundColor: theme.panelBg,
+                            color: theme.textSecondary
+                          }}
+                        >
+                          取消
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onConfirmDelete(letter.id)}
+                          className="rounded-[0.7rem] border px-3 py-1.5 text-xs"
+                          style={{
+                            borderColor: theme.dangerBorder,
+                            backgroundColor: theme.dangerBg,
+                            color: theme.dangerText
+                          }}
+                        >
+                          删除
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onToggleDelete(letter.id)}
+                        className="rounded-[0.7rem] border px-3 py-1.5 text-xs"
+                        style={{
+                          borderColor: theme.chipBorder,
+                          backgroundColor: theme.panelBg,
+                          color: theme.textSecondary
+                        }}
+                      >
+                        删除
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+interface AssistantLetterDetailSheetProps {
+  letter: AssistantLetter | null;
+  theme: AIChatOverlayTheme;
+  onClose: () => void;
+}
+
+export const AssistantLetterDetailSheet: React.FC<AssistantLetterDetailSheetProps> = ({
+  letter,
+  theme,
+  onClose
+}) => {
+  if (!letter) {
+    return null;
+  }
+
+  return (
+    <div className="absolute inset-0 z-30 flex items-end justify-center bg-stone-900/40 backdrop-blur-sm animate-fadeIn md:items-center">
+      <div
+        className="w-full h-[85vh] md:h-auto md:max-h-[85vh] md:max-w-2xl bg-[#faf9f6] rounded-t-[2rem] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative animate-slideUp"
+        style={{
+          paddingBottom: 'env(safe-area-inset-bottom)'
+        }}
+      >
+        <div className="flex items-center justify-between p-6 border-b border-stone-100 bg-white/50">
+          <div className="min-w-0">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-stone-400">AI 来信</p>
+            <h3 className="mt-1 truncate font-serif text-[1.15rem] font-bold text-stone-900">{letter.title}</h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-stone-100 transition-colors text-stone-500"
+          >
+            <X size={22} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-6">
+          <div className="mx-auto max-w-xl">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-stone-500">
+              <span>{letter.personaName}</span>
+              <span>{letter.sentAt}</span>
+            </div>
+
+            <p className="mt-6 text-sm leading-7 text-stone-500">{letter.preview}</p>
+            <div className="mt-8 whitespace-pre-wrap break-words font-serif text-[18px] leading-[2.1] text-stone-900">
+              {letter.content}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface AIChatDebugViewerOverlayProps {
   viewer: DebugViewerState;
   expandedBlockKeys: Set<string>;
   onClose: () => void;
   onToggleBlock: (blockKey: string) => void;
-  buildBlocks: (exchange: AIDebugExchange) => Array<{ label: string; content: string }>;
+  buildBlocks: (exchange: AIDebugExchange) => AIChatDebugTextBlock[];
 }
 
 export const AIChatDebugViewerOverlay: React.FC<AIChatDebugViewerOverlayProps> = ({
@@ -187,7 +376,7 @@ export const AIChatDebugViewerOverlay: React.FC<AIChatDebugViewerOverlayProps> =
             >
               <p className="px-1 font-serif text-xl text-[#231f1b]">{section.label}</p>
               <div className="mb-3 space-y-3">
-                {buildBlocks(section.exchange).map((block, index) => {
+                {(section.blocks || (section.exchange ? buildBlocks(section.exchange) : [])).map((block, index) => {
                   const blockKey = `${section.label}-${block.label}-${index}`;
                   const isExpanded = expandedBlockKeys.has(blockKey);
 
