@@ -577,6 +577,11 @@
             android:enabled="true"
             android:exported="false" />
 
+        <receiver
+            android:name=".AssistantLetterAlarmReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
         <service
             android:name=".WidgetTodoPinRemoteViewsService"
             android:enabled="true"

@@ -4,6 +4,7 @@
  * @output Persistent Android agent loop, shared runtime notification state, and bridge-triggered assistant events
  * @pos Native Service
  * @description Minimal Android foreground service scaffold for the background AI agent. Maintains a lightweight polling loop, shares one persistent Android status notification with the floating-window service, and emits assistant system-trigger events through the Capacitor plugin bridge.
+ * @updated 2026-07-07: Added native assistant-letter scheduling so Android can wake at nextLetterAt and dispatch one assistant_letter_due trigger.
  * @updated 2026-06-14: Persisted and reloaded the assistant enabled flag before non-start wakeups so stale reminder alarms or native repokes cannot restart polling after the user disables it.
  * @updated 2026-05-15: Remove a native reminder immediately after it has been persisted as a pending `reminder_due` trigger so background retries do not re-dispatch the same completed reminder every minute.
  * @updated 2026-05-14: Changed Android reminder alarms to dispatch one metadata-rich `reminder_due` trigger back to the Web layer, preserving the local-offset request path and preventing duplicate native-plus-web AI reminder runs.
@@ -36,6 +37,7 @@ public class AssistantAgentService extends Service {
     public static final String ACTION_UPDATE_CONFIG = "com.mistycrown.lumostime.action.ASSISTANT_AGENT_UPDATE_CONFIG";
     public static final String ACTION_TRIGGER_IMMEDIATE = "com.mistycrown.lumostime.action.ASSISTANT_AGENT_TRIGGER_IMMEDIATE";
     public static final String ACTION_TRIGGER_REMINDER_TIMER = "com.mistycrown.lumostime.action.ASSISTANT_TRIGGER_REMINDER_TIMER";
+    public static final String ACTION_TRIGGER_LETTER_TIMER = "com.mistycrown.lumostime.action.ASSISTANT_TRIGGER_LETTER_TIMER";
     public static final String ACTION_NOTIFY_USER_TURN = "com.mistycrown.lumostime.action.ASSISTANT_AGENT_NOTIFY_USER_TURN";
     public static final String ACTION_NOTIFY_TASK_STATE_CHANGED = "com.mistycrown.lumostime.action.ASSISTANT_AGENT_NOTIFY_TASK_STATE_CHANGED";
 
@@ -43,6 +45,9 @@ public class AssistantAgentService extends Service {
     private static final String KEY_LAST_USER_TURN_AT_MS = "last_user_turn_at_ms";
     private static final String KEY_LAST_TASK_STATE_CHANGED_AT_MS = "last_task_state_changed_at_ms";
     private static final String KEY_LAST_ASSISTANT_NUDGE_AT_MS = "last_assistant_nudge_at_ms";
+    private static final String KEY_LETTER_ENABLED = "letter_enabled";
+    private static final String KEY_NEXT_LETTER_AT = "next_letter_at";
+    private static final String KEY_LAST_LETTER_DISPATCHED_FOR = "last_letter_dispatched_for";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Random random = new Random();
@@ -56,9 +61,13 @@ public class AssistantAgentService extends Service {
     private String quietHoursStart = "";
     private String quietHoursEnd = "";
     private int minimumNudgeGapMinutes = 45;
+    private boolean letterEnabled = false;
+    private String nextLetterAt = "";
+    private String lastLetterDispatchedFor = "";
     private boolean loopStarted = false;
     private long nextRandomCheckinAtMs = 0L;
     private long nextReminderDispatchAtMs = 0L;
+    private long nextLetterDispatchAtMs = 0L;
     private long lastUserTurnAtMs = 0L;
     private long lastTaskStateChangedAtMs = 0L;
     private long lastAssistantNudgeAtMs = 0L;
@@ -92,6 +101,7 @@ public class AssistantAgentService extends Service {
                 buildPollDiagnosticContext(now)
             );
             dispatchDueNativeReminders(now);
+            dispatchDueAssistantLetter(now);
             if (enableRandomCheckin && nextRandomCheckinAtMs > 0L && now >= nextRandomCheckinAtMs) {
                 if (shouldDispatchRandomCheckin(now)) {
                     String triggerId;
@@ -162,6 +172,29 @@ public class AssistantAgentService extends Service {
             );
             dispatchDueNativeReminders(now);
             scheduleNextReminderDispatch(System.currentTimeMillis());
+            syncUnifiedStatusNotification();
+        }
+    };
+
+    private final Runnable letterDispatchRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!enabled) {
+                return;
+            }
+
+            long now = System.currentTimeMillis();
+            appendDiagnostic(
+                "letter_tick",
+                "info",
+                "Assistant letter timer fired",
+                null,
+                "assistant_letter_due",
+                null,
+                buildPollDiagnosticContext(now)
+            );
+            dispatchDueAssistantLetter(now);
+            scheduleNextAssistantLetterDispatch(System.currentTimeMillis());
             syncUnifiedStatusNotification();
         }
     };
@@ -315,6 +348,7 @@ public class AssistantAgentService extends Service {
                 loopStarted = true;
                 scheduleNextRandomCheckin(now);
                 scheduleNextReminderDispatch(now);
+                scheduleNextAssistantLetterDispatch(now);
                 handler.post(pollRunnable);
             }
             handler.removeCallbacks(reminderDispatchRunnable);
@@ -323,10 +357,26 @@ public class AssistantAgentService extends Service {
             return START_STICKY;
         }
 
+        if (ACTION_TRIGGER_LETTER_TIMER.equals(action)) {
+            long now = System.currentTimeMillis();
+            if (!loopStarted) {
+                loopStarted = true;
+                scheduleNextRandomCheckin(now);
+                scheduleNextReminderDispatch(now);
+                scheduleNextAssistantLetterDispatch(now);
+                handler.post(pollRunnable);
+            }
+            handler.removeCallbacks(letterDispatchRunnable);
+            handler.post(letterDispatchRunnable);
+            syncUnifiedStatusNotification();
+            return START_STICKY;
+        }
+
         if (!loopStarted) {
             loopStarted = true;
             scheduleNextRandomCheckin(System.currentTimeMillis());
             scheduleNextReminderDispatch(System.currentTimeMillis());
+            scheduleNextAssistantLetterDispatch(System.currentTimeMillis());
             handler.post(pollRunnable);
         } else {
             rescheduleAgentLoop();
@@ -354,9 +404,12 @@ public class AssistantAgentService extends Service {
         loopStarted = false;
         handler.removeCallbacks(pollRunnable);
         handler.removeCallbacks(reminderDispatchRunnable);
+        handler.removeCallbacks(letterDispatchRunnable);
         handler.removeCallbacks(notificationRefreshRunnable);
         AssistantReminderAlarmScheduler.cancel(this);
+        AssistantLetterAlarmScheduler.cancel(this);
         nextReminderDispatchAtMs = 0L;
+        nextLetterDispatchAtMs = 0L;
     }
 
     private void dispatchDueNativeReminders(long nowMs) {
@@ -410,11 +463,56 @@ public class AssistantAgentService extends Service {
         syncUnifiedStatusNotification();
     }
 
+    private void dispatchDueAssistantLetter(long nowMs) {
+        String normalizedNextLetterAt = safeTrim(nextLetterAt);
+        long dueAtMs = AssistantTimeParser.parseIsoDateTime(normalizedNextLetterAt);
+        if (
+            !enabled
+            || !letterEnabled
+            || normalizedNextLetterAt.isEmpty()
+            || dueAtMs <= 0L
+            || dueAtMs > nowMs
+            || normalizedNextLetterAt.equals(safeTrim(lastLetterDispatchedFor))
+        ) {
+            return;
+        }
+
+        String attemptedAt = formatTimestamp(nowMs);
+        String triggerId = "assistant_letter_due:" + normalizedNextLetterAt;
+        com.getcapacitor.JSObject metadata = new com.getcapacitor.JSObject();
+        metadata.put("scheduledFor", normalizedNextLetterAt);
+        metadata.put("actualDispatchAt", attemptedAt);
+        metadata.put("delayMinutes", Math.max(0L, Math.round((nowMs - dueAtMs) / 60000.0)));
+
+        triggerId = AssistantAgentPlugin.dispatchSystemTrigger(
+            this,
+            "assistant_letter_due",
+            "Scheduled assistant letter is due",
+            "system",
+            triggerId,
+            metadata
+        );
+        lastLetterDispatchedFor = normalizedNextLetterAt;
+        prefs().edit().putString(KEY_LAST_LETTER_DISPATCHED_FOR, lastLetterDispatchedFor).apply();
+
+        appendDiagnostic(
+            "assistant_letter_due_dispatched",
+            "success",
+            "Native poll dispatched an assistant_letter_due trigger to the Web layer",
+            triggerId,
+            "assistant_letter_due",
+            null,
+            buildPollDiagnosticContext(nowMs)
+        );
+    }
+
     private void rescheduleAgentLoop() {
         handler.removeCallbacks(pollRunnable);
         handler.removeCallbacks(reminderDispatchRunnable);
+        handler.removeCallbacks(letterDispatchRunnable);
         scheduleNextRandomCheckin(System.currentTimeMillis());
         scheduleNextReminderDispatch(System.currentTimeMillis());
+        scheduleNextAssistantLetterDispatch(System.currentTimeMillis());
         if (enabled) {
             handler.postDelayed(pollRunnable, Math.max(1, basePollMinutes) * 60_000L);
         }
@@ -457,6 +555,29 @@ public class AssistantAgentService extends Service {
         if (intent.hasExtra("minimumNudgeGapMinutes")) {
             minimumNudgeGapMinutes = Math.max(1, intent.getIntExtra("minimumNudgeGapMinutes", 45));
         }
+        if (intent.hasExtra("letterEnabled")) {
+            letterEnabled = intent.getBooleanExtra("letterEnabled", false);
+            prefs().edit().putBoolean(KEY_LETTER_ENABLED, letterEnabled).apply();
+        } else {
+            letterEnabled = prefs().getBoolean(KEY_LETTER_ENABLED, false);
+        }
+        if (intent.hasExtra("nextLetterAt")) {
+            String incomingNextLetterAt = safeTrim(intent.getStringExtra("nextLetterAt"));
+            if (!incomingNextLetterAt.equals(nextLetterAt)) {
+                nextLetterAt = incomingNextLetterAt;
+                if (!nextLetterAt.equals(safeTrim(lastLetterDispatchedFor))) {
+                    lastLetterDispatchedFor = "";
+                    prefs().edit().remove(KEY_LAST_LETTER_DISPATCHED_FOR).apply();
+                }
+            }
+            prefs().edit().putString(KEY_NEXT_LETTER_AT, nextLetterAt).apply();
+        } else {
+            nextLetterAt = safeTrim(prefs().getString(KEY_NEXT_LETTER_AT, ""));
+        }
+        if (!letterEnabled || nextLetterAt.isEmpty()) {
+            nextLetterDispatchAtMs = 0L;
+            AssistantLetterAlarmScheduler.cancel(this);
+        }
     }
 
     private void scheduleNextRandomCheckin(long nowMs) {
@@ -494,6 +615,35 @@ public class AssistantAgentService extends Service {
         }
 
         AssistantReminderAlarmScheduler.schedule(this, nextEligibleAtMs);
+    }
+
+    private void scheduleNextAssistantLetterDispatch(long nowMs) {
+        handler.removeCallbacks(letterDispatchRunnable);
+        AssistantLetterAlarmScheduler.cancel(this);
+        nextLetterDispatchAtMs = 0L;
+
+        String normalizedNextLetterAt = safeTrim(nextLetterAt);
+        if (!enabled || !letterEnabled || normalizedNextLetterAt.isEmpty()) {
+            return;
+        }
+
+        long nextLetterAtMs = AssistantTimeParser.parseIsoDateTime(normalizedNextLetterAt);
+        if (nextLetterAtMs <= 0L) {
+            return;
+        }
+
+        if (nextLetterAtMs <= nowMs && normalizedNextLetterAt.equals(safeTrim(lastLetterDispatchedFor))) {
+            return;
+        }
+
+        nextLetterDispatchAtMs = nextLetterAtMs;
+        long delayMs = Math.max(0L, nextLetterAtMs - nowMs);
+        if (delayMs <= 0L) {
+            handler.post(letterDispatchRunnable);
+            return;
+        }
+
+        AssistantLetterAlarmScheduler.schedule(this, nextLetterAtMs);
     }
 
     private boolean shouldDispatchRandomCheckin(long nowMs) {
@@ -591,6 +741,9 @@ public class AssistantAgentService extends Service {
         lastUserTurnAtMs = Math.max(0L, sharedPreferences.getLong(KEY_LAST_USER_TURN_AT_MS, 0L));
         lastTaskStateChangedAtMs = Math.max(0L, sharedPreferences.getLong(KEY_LAST_TASK_STATE_CHANGED_AT_MS, 0L));
         lastAssistantNudgeAtMs = Math.max(0L, sharedPreferences.getLong(KEY_LAST_ASSISTANT_NUDGE_AT_MS, 0L));
+        letterEnabled = sharedPreferences.getBoolean(KEY_LETTER_ENABLED, false);
+        nextLetterAt = safeTrim(sharedPreferences.getString(KEY_NEXT_LETTER_AT, ""));
+        lastLetterDispatchedFor = safeTrim(sharedPreferences.getString(KEY_LAST_LETTER_DISPATCHED_FOR, ""));
     }
 
     private void recordUserTurn(long atMs) {
@@ -669,6 +822,15 @@ public class AssistantAgentService extends Service {
         context.put("nextRandomCheckinAtLocal", formatTimestamp(nextRandomCheckinAtMs));
         context.put("nextReminderDispatchAtMs", String.valueOf(nextReminderDispatchAtMs));
         context.put("nextReminderDispatchAtLocal", formatTimestamp(nextReminderDispatchAtMs));
+        context.put("letterEnabled", String.valueOf(letterEnabled));
+        if (!safeTrim(nextLetterAt).isEmpty()) {
+            context.put("nextLetterAt", safeTrim(nextLetterAt));
+        }
+        context.put("nextLetterDispatchAtMs", String.valueOf(nextLetterDispatchAtMs));
+        context.put("nextLetterDispatchAtLocal", formatTimestamp(nextLetterDispatchAtMs));
+        if (!safeTrim(lastLetterDispatchedFor).isEmpty()) {
+            context.put("lastLetterDispatchedFor", safeTrim(lastLetterDispatchedFor));
+        }
         context.put("lastUserTurnAtMs", String.valueOf(lastUserTurnAtMs));
         context.put("lastUserTurnAtLocal", formatTimestamp(lastUserTurnAtMs));
         context.put("lastTaskStateChangedAtMs", String.valueOf(lastTaskStateChangedAtMs));

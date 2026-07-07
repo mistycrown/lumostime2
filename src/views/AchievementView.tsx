@@ -5,6 +5,7 @@
  * @pos View (Achievement Overlay)
  * @description Achievement bottle full-screen page opened from Timeline. The collapsed state emphasizes the bottle, while the expanded state turns the screen into a full ledger workspace.
  *
+ * @updated 2026-07-07: Shows split current/history bottle balances and feeds sealing with the shared achievement account summary.
  * @updated 2026-04-06: Collections tab now drives fixed-range sealing, archived bottle browsing, and shatter actions.
  */
 import React, { useEffect, useMemo, useState } from 'react';
@@ -43,6 +44,7 @@ export const AchievementView: React.FC = () => {
     redemptionRecords,
     archivedBottles,
     sealPreview,
+    accountSummary,
     availableStars,
     ensureRecentSnapshots,
     recomputeSnapshotForDate,
@@ -156,7 +158,7 @@ export const AchievementView: React.FC = () => {
 
     return (
       <AchievementCollectionsTab
-        availableStars={availableStars}
+        accountSummary={accountSummary}
         collections={collections}
         archivedBottles={archivedBottles}
         sealPreview={sealPreview}
@@ -165,6 +167,7 @@ export const AchievementView: React.FC = () => {
       />
     );
   }, [
+    accountSummary,
     activeTab,
     availableStars,
     archivedBottles,
@@ -205,6 +208,8 @@ export const AchievementView: React.FC = () => {
       >
         <AchievementBottle
           starCount={availableStars}
+          currentStarCount={accountSummary.currentStars}
+          historyStarCount={accountSummary.historyStars}
           rebuildToken={renderedBottleStars}
           compact={false}
           styleVariant={achievementBottleStyle}

@@ -2,6 +2,7 @@
  * @file AchievementBottle.tsx
  * @description Physics-driven achievement bottle visualization with switchable bottle skins for the achievement page and sponsorship previews.
  *
+ * @updated 2026-07-07: Displays split current/history bottle balances beside the total star count.
  * @updated 2026-04-07: Clamp live-mode spawn points so low-count bottle items always start inside the visible chamber.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -26,6 +27,8 @@ import { getAchievementBottleSpawnPoint } from '../../utils/achievementBottleLay
 
 interface AchievementBottleProps {
   starCount: number;
+  currentStarCount?: number;
+  historyStarCount?: number;
   rebuildToken: number;
   compact?: boolean;
   styleVariant?: AchievementBottleStyle;
@@ -585,6 +588,8 @@ const isAndroidTiltSupported = (): boolean => {
 
 export const AchievementBottle: React.FC<AchievementBottleProps> = ({
   starCount,
+  currentStarCount,
+  historyStarCount,
   rebuildToken,
   compact = false,
   styleVariant = DEFAULT_ACHIEVEMENT_BOTTLE_STYLE,
@@ -600,6 +605,8 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
 
   const palette = getPalette(styleVariant);
   const normalizedStarCount = normalizeAchievementStarValue(starCount);
+  const normalizedCurrentStarCount = normalizeAchievementStarValue(currentStarCount ?? starCount);
+  const normalizedHistoryStarCount = normalizeAchievementStarValue(historyStarCount ?? 0);
   const renderableStarCount = getAchievementRenderableStarCount(normalizedStarCount);
   const visibleCount = Math.max(0, Math.min(MAX_VISIBLE_STARS, renderableStarCount));
   const overflowCount = Math.max(0, renderableStarCount - visibleCount);
@@ -939,19 +946,55 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
       )}
 
       <div className={`absolute inset-x-6 z-20 flex justify-center ${compact ? 'top-3.5' : 'top-6'}`}>
-        <div className="flex flex-col items-center text-center">
-          <div
-            className="text-[10px] font-semibold uppercase tracking-[0.32em]"
-            style={{ color: palette.eyebrowColor }}
-          >
-            Bottle
+        <div className="grid w-full max-w-[20rem] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-3 text-center">
+          {!compact && (
+            <div className="pb-0.5 text-right">
+              <div
+                className="text-[9px] font-semibold tracking-[0.18em]"
+                style={{ color: palette.eyebrowColor }}
+              >
+                当前瓶
+              </div>
+              <div
+                className="mt-1 text-[0.82rem] font-semibold leading-none"
+                style={{ color: palette.countColor }}
+              >
+                {formatAchievementStars(normalizedCurrentStarCount)}
+              </div>
+            </div>
+          )}
+          {compact && <span />}
+          <div className="flex flex-col items-center text-center">
+            <div
+              className="text-[10px] font-semibold uppercase tracking-[0.32em]"
+              style={{ color: palette.eyebrowColor }}
+            >
+              Bottle
+            </div>
+            <div
+              className="mt-1 text-[1.85rem] font-semibold leading-none tracking-[-0.045em]"
+              style={{ color: palette.countColor }}
+            >
+              {formatAchievementStars(normalizedStarCount)}
+            </div>
           </div>
-          <div
-            className="mt-1 text-[1.85rem] font-semibold leading-none tracking-[-0.045em]"
-            style={{ color: palette.countColor }}
-          >
-            {formatAchievementStars(normalizedStarCount)}
-          </div>
+          {!compact && (
+            <div className="pb-0.5 text-left">
+              <div
+                className="text-[9px] font-semibold tracking-[0.18em]"
+                style={{ color: palette.eyebrowColor }}
+              >
+                历史瓶
+              </div>
+              <div
+                className="mt-1 text-[0.82rem] font-semibold leading-none"
+                style={{ color: palette.countColor }}
+              >
+                {formatAchievementStars(normalizedHistoryStarCount)}
+              </div>
+            </div>
+          )}
+          {compact && <span />}
         </div>
       </div>
 

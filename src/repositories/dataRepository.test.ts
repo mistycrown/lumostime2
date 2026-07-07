@@ -297,6 +297,48 @@ describe('DataRepository', () => {
     ]);
   });
 
+  it('rebuilds missing achievement carryover meta from shattered archived bottles', async () => {
+    const repository = new InMemoryStorageRepository();
+
+    repository.data.set(REPOSITORY_KEYS.ACHIEVEMENT_META, {
+      achievementStartDate: '2026-04-01'
+    });
+    repository.data.set(REPOSITORY_KEYS.ACHIEVEMENT_ARCHIVED_BOTTLES, [
+      {
+        id: 'archive-1',
+        collectionId: 'default-bottle-02',
+        collectionName: '鑺辩摱',
+        imagePath: '/bottle/02.png',
+        periodStartDate: '2026-04-01',
+        periodEndDate: '2026-04-05',
+        earnedStars: 10,
+        spentStars: 2,
+        sealedAmount: 8,
+        status: 'shattered',
+        sealedAt: 1,
+        shatteredAt: 2,
+        dailySnapshots: [],
+        redemptionRecords: []
+      }
+    ]);
+    repository.data.set(REPOSITORY_KEYS.ACHIEVEMENT_REDEMPTION_RECORDS, [
+      {
+        id: 'redeem-1',
+        rewardId: 'reward-1',
+        rewardName: 'Tea',
+        cost: 3,
+        redeemedAt: 3,
+        paidFromCarryover: 3,
+        paidFromLiveStars: 0
+      }
+    ]);
+
+    const dataRepository = new DataRepository(repository, createLegacyStorageAdapter(new Map()).adapter);
+    const snapshot = await dataRepository.loadAchievementSnapshot();
+
+    expect(snapshot.meta.activeBottleCarryoverStars).toBe(5);
+  });
+
   it('syncs default achievement bottle metadata from presets across collections, records, and archived bottles', async () => {
     const repository = new InMemoryStorageRepository();
 

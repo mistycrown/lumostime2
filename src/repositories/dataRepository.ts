@@ -6,6 +6,7 @@
  * @description Loads and persists large core datasets through a single async repository and migrates legacy localStorage payloads into IndexedDB on first run.
  *
  * @updated 2026-06-07: Normalized weekly and monthly review payloads during repository hydration so periodic AI newspaper fields survive reloads with the same guarantees as daily reviews.
+ * @updated 2026-07-07: Reconstructs missing achievement carryover meta from shattered archived bottles for older achievement ledgers.
  * @updated 2026-05-18: Parallelized snapshot hydration reads and added startup timing logs so Electron boot can diagnose slow IndexedDB-backed loads faster.
  * @updated 2026-05-18: Repaired default achievement bottle image paths by id, preset name, and stale bottle asset URLs so desktop updates keep bottle artwork visible.
  * @updated 2026-05-12: Added repository-backed `DataCollection` and `DataCollectionEntry` persistence to the core data snapshot.
@@ -45,6 +46,7 @@ import {
   WeeklyReview
 } from '../types';
 import { normalizeDailyReviews, normalizeMonthlyReviews, normalizeWeeklyReviews } from '../utils/checkItemNormalizer';
+import { normalizeAchievementRedemptionRecordFunding, normalizeAchievementStarValue } from '../utils/achievementUtils';
 import { storageRepository, StorageRepository } from './storageRepository';
 
 const CORE_DATA_MIGRATION_META_KEY = 'core-data-migration-v2';
@@ -210,6 +212,30 @@ const migrateDefaultAchievementArchivedBottle = (
     collectionName: preset.name,
     imagePath: preset.imagePath
   };
+};
+
+const hasOwnProperty = (value: object, key: string): boolean => (
+  Object.prototype.hasOwnProperty.call(value, key)
+);
+
+const deriveLegacyAchievementCarryoverStars = ({
+  archivedBottles,
+  redemptionRecords,
+  collectionRecords
+}: {
+  archivedBottles: AchievementArchivedBottle[];
+  redemptionRecords: AchievementRedemptionRecord[];
+  collectionRecords: AchievementCollectionRecord[];
+}): number => {
+  const shatteredStars = archivedBottles.reduce((sum, bottle) => (
+    bottle.status === 'shattered' ? sum + Math.max(0, bottle.sealedAmount || 0) : sum
+  ), 0);
+  const spentFromCarryover = [...redemptionRecords, ...collectionRecords].reduce((sum, record) => {
+    const normalized = normalizeAchievementRedemptionRecordFunding(record);
+    return sum + normalized.paidFromCarryover;
+  }, 0);
+
+  return Math.max(0, normalizeAchievementStarValue(shatteredStars - spentFromCarryover));
 };
 
 export class DataRepository {
@@ -390,6 +416,14 @@ export class DataRepository {
     const safeCollectionRecords = (collectionRecords ?? []).map(migrateDefaultAchievementCollectionRecord);
     const safeArchivedBottles = (archivedBottles ?? []).map(migrateDefaultAchievementArchivedBottle);
     const safeBottleActionRecords = bottleActionRecords ?? [];
+    const hasStoredCarryoverStars = storedMeta ? hasOwnProperty(storedMeta, 'activeBottleCarryoverStars') : false;
+    const activeBottleCarryoverStars = hasStoredCarryoverStars
+      ? meta.activeBottleCarryoverStars ?? 0
+      : deriveLegacyAchievementCarryoverStars({
+        archivedBottles: safeArchivedBottles,
+        redemptionRecords: safeRedemptionRecords,
+        collectionRecords: safeCollectionRecords
+      });
 
     console.info(
       `[DataRepository] loadAchievementSnapshot resolved in ${(getTimingNow() - startedAt).toFixed(1)}ms`
@@ -398,7 +432,7 @@ export class DataRepository {
     return {
       meta: {
         achievementStartDate: meta.achievementStartDate ?? null,
-        activeBottleCarryoverStars: meta.activeBottleCarryoverStars ?? 0
+        activeBottleCarryoverStars
       },
       rules: safeRules,
       rewards: safeRewards,

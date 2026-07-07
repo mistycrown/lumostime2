@@ -5,6 +5,7 @@
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
  * @updated 2026-06-13: Added local daily newspaper comment-thread types so users can reply to AI annotations without entering global chat history.
+ * @updated 2026-07-07: Added achievement account summary fields so current-bottle and history-bottle balances can stay explicit across UI and sealing logic.
  * @updated 2026-06-07: Added structured weekly/monthly AI newspaper types so periodic reviews can persist editorial summary pages alongside existing narratives.
  * @updated 2026-05-21: Added optional todo `createdAt` metadata so collection timelines and older persisted task flows can share one creation-time fallback.
  * @updated 2026-05-16: Added lightweight daily AI newspaper types so Daily Review can persist structured editorial timeline commentary by log ID.
@@ -530,6 +531,8 @@ export interface AchievementCollectionRecord {
   cost: number;
   imagePath?: string;
   redeemedAt: number;
+  paidFromCarryover?: number;
+  paidFromLiveStars?: number;
   note?: string;
 }
 
@@ -573,9 +576,17 @@ export interface AchievementSealPreview {
   endDate: string;
   earnedStars: number;
   spentStars: number;
+  liveSpentStars: number;
+  carryoverSpentStars: number;
   sealableStars: number;
   snapshotIds: string[];
   redemptionRecordIds: string[];
+}
+
+export interface AchievementAccountSummary {
+  currentStars: number;
+  historyStars: number;
+  totalStars: number;
 }
 
 export interface AchievementMeta {

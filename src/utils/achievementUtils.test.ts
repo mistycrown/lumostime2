@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   calculateAchievementAvailableStars,
+  calculateAchievementAccountSummary,
   getAchievementActiveStartDate,
   getAchievementSealBlockedReason,
   getAchievementSealPreview,
@@ -11,6 +12,7 @@ import {
   normalizeAchievementRedemptionRecordFunding,
   normalizeAchievementRule,
   normalizeAchievementStarValue,
+  partitionAchievementCollectionRecordsForSeal,
   partitionAchievementRedemptionsForSeal
 } from './achievementUtils';
 import type { AchievementRule, CheckStreakConfig, CheckTemplate, DailyReview, Log, TodoItem } from '../types';
@@ -251,6 +253,37 @@ describe('achievementUtils decimal stars', () => {
     )).toBe(1000);
   });
 
+  it('splits the active achievement balance into current and history accounts', () => {
+    expect(calculateAchievementAccountSummary(
+      [
+        {
+          id: 'snapshot-1',
+          date: '2026-04-01',
+          netDelta: 10,
+          ruleBreakdown: [],
+          computedAt: 1
+        }
+      ],
+      [
+        {
+          id: 'redeem-1',
+          rewardId: 'reward-1',
+          rewardName: 'Tea',
+          cost: 6,
+          redeemedAt: 2,
+          paidFromCarryover: 4,
+          paidFromLiveStars: 2
+        }
+      ],
+      [],
+      3
+    )).toEqual({
+      currentStars: 8,
+      historyStars: 3,
+      totalStars: 11
+    });
+  });
+
   it('excludes carryover-funded redemption cost from the sealable live balance', () => {
     const preview = getAchievementSealPreview({
       achievementStartDate: '2026-04-01',
@@ -280,6 +313,46 @@ describe('achievementUtils decimal stars', () => {
 
     expect(preview?.sealableStars).toBe(600);
     expect(preview?.spentStars).toBe(700);
+    expect(preview?.liveSpentStars).toBe(400);
+    expect(preview?.carryoverSpentStars).toBe(300);
+  });
+
+  it('includes legacy collection spending in the current-account seal preview', () => {
+    const preview = getAchievementSealPreview({
+      achievementStartDate: '2026-06-28',
+      archivedBottles: [],
+      dailySnapshots: [
+        {
+          id: 'snapshot-1',
+          date: '2026-07-01',
+          netDelta: 119.9,
+          ruleBreakdown: [],
+          computedAt: 1
+        },
+        {
+          id: 'snapshot-2',
+          date: '2026-07-02',
+          netDelta: -24,
+          ruleBreakdown: [],
+          computedAt: 2
+        }
+      ],
+      spendRecords: [
+        {
+          id: 'redeem-1',
+          rewardId: 'reward-1',
+          rewardName: 'Reward',
+          cost: 85.7,
+          redeemedAt: new Date('2026-07-03T12:00:00+08:00').getTime()
+        }
+      ],
+      redemptionRecords: [],
+      today: new Date('2026-07-06T12:00:00+08:00')
+    });
+
+    expect(preview?.earnedStars).toBe(119.9);
+    expect(preview?.liveSpentStars).toBe(109.7);
+    expect(preview?.sealableStars).toBe(10.2);
   });
 
   it('archives only the live-funded portion of mixed redemptions during sealing', () => {
@@ -419,10 +492,50 @@ describe('achievementUtils decimal stars', () => {
       endDate: '2026-04-05',
       earnedStars: 7,
       spentStars: 3,
+      liveSpentStars: 3,
+      carryoverSpentStars: 0,
       sealableStars: 4,
       snapshotIds: ['snapshot-3', 'snapshot-4', 'snapshot-5'],
       redemptionRecordIds: ['redeem-2']
     });
+  });
+
+  it('archives live-funded legacy collection records and keeps carryover-funded portions active', () => {
+    const result = partitionAchievementCollectionRecordsForSeal({
+      startDate: '2026-04-01',
+      endDate: '2026-04-02',
+      collectionRecords: [
+        {
+          id: 'collection-record-1',
+          collectionId: 'default-bottle-01',
+          collectionName: 'Glass bottle',
+          cost: 10,
+          imagePath: '/bottle/01.png',
+          redeemedAt: new Date('2026-04-01T12:00:00+08:00').getTime(),
+          paidFromCarryover: 3,
+          paidFromLiveStars: 7
+        }
+      ]
+    });
+
+    expect(result.archivedRecords).toEqual([
+      expect.objectContaining({
+        sourceRecordId: 'collection-record-1',
+        rewardId: 'collection:default-bottle-01',
+        rewardName: '收藏：Glass bottle',
+        cost: 7,
+        paidFromCarryover: 0,
+        paidFromLiveStars: 7
+      })
+    ]);
+    expect(result.remainingActiveRecords).toEqual([
+      expect.objectContaining({
+        id: 'collection-record-1',
+        cost: 3,
+        paidFromCarryover: 3,
+        paidFromLiveStars: undefined
+      })
+    ]);
   });
 
   it('blocks sealing when the current available stars are negative even if the period preview is positive', () => {

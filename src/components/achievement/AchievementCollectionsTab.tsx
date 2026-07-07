@@ -5,6 +5,7 @@
  * @pos Component (Achievement Collection Tab)
  * @description Renders the history shelf, a compact seal entry button, a two-step seal modal, and archived bottle detail with shatter support.
  *
+ * @updated 2026-07-07: Split seal preview rows into current-bottle and history-bottle account balances.
  * @updated 2026-07-06: Moved the archived bottle shatter action to the left side of the detail dialog footer to reduce accidental taps.
  * @updated 2026-06-30: Blocks sealing when the active bottle balance is negative and surfaces the shared validation message before opening the seal flow.
  * @updated 2026-05-18: Added a render-time fallback that repairs stale default bottle file URLs back to the current bundled asset path before showing a placeholder.
@@ -14,6 +15,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Archive, Check, ChevronLeft, ChevronRight, Hammer, ImageOff, Plus, Sparkles } from 'lucide-react';
 import {
   AchievementArchivedBottle,
+  AchievementAccountSummary,
   AchievementCollection,
   AchievementSealPreview
 } from '../../types';
@@ -53,7 +55,7 @@ if (typeof document !== 'undefined') {
 }
 
 interface AchievementCollectionsTabProps {
-  availableStars: number;
+  accountSummary: AchievementAccountSummary;
   collections: AchievementCollection[];
   archivedBottles: AchievementArchivedBottle[];
   sealPreview: AchievementSealPreview | null;
@@ -138,7 +140,7 @@ const BottlePreview: React.FC<{
 };
 
 export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps> = ({
-  availableStars,
+  accountSummary,
   collections,
   archivedBottles,
   sealPreview,
@@ -203,7 +205,7 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
 
   const sealBlockedReason = getAchievementSealBlockedReason({
     sealPreview,
-    availableStars
+    availableStars: accountSummary.currentStars
   });
   const canOpenSealDialog = !sealBlockedReason;
   const canGoToStepTwo = !sealBlockedReason;
@@ -398,17 +400,20 @@ export const AchievementCollectionsTab: React.FC<AchievementCollectionsTabProps>
               </div>
 
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 gap-y-3 border-t border-stone-200 pt-5 text-[15px] leading-7">
-                <div className="text-stone-500">当前活跃瓶余额</div>
-                <div>{formatAchievementStars(availableStars)} 光点</div>
+                <div className="text-stone-500">当前瓶（本次封存）</div>
+                <div>{formatAchievementStars(sealPreview.sealableStars)} 光点</div>
 
-                <div className="text-stone-500">这段时间获得了</div>
+                <div className="text-stone-500">历史瓶（不参与封存）</div>
+                <div>{formatAchievementStars(accountSummary.historyStars)} 光点</div>
+
+                <div className="text-stone-500">当前瓶获得</div>
                 <div>{formatAchievementStars(sealPreview.earnedStars)} 光点</div>
 
-                <div className="text-stone-500">这段时间消费了</div>
-                <div>{formatAchievementStars(sealPreview.spentStars)} 光点</div>
+                <div className="text-stone-500">当前瓶消费</div>
+                <div>{formatAchievementStars(sealPreview.liveSpentStars)} 光点</div>
 
-                <div className="text-stone-500">真正会被封进瓶里的余额</div>
-                <div>{formatAchievementStars(sealPreview.sealableStars)} 光点</div>
+                <div className="text-stone-500">历史瓶消费</div>
+                <div>{formatAchievementStars(sealPreview.carryoverSpentStars)} 光点</div>
               </div>
 
               <div className="border-t border-stone-200 pt-5 text-sm leading-7 text-stone-500">

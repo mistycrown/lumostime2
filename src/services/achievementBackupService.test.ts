@@ -121,4 +121,43 @@ describe('achievementBackupService', () => {
   it('ignores objects that do not contain any recognized achievement backup fields', () => {
     expect(achievementBackupService.readBackupPayload({ version: 1, exportedAt: '2026-05-18T00:00:00.000Z' })).toBeNull();
   });
+
+  it('rebuilds missing carryover meta when reading an older backup with shattered bottles', () => {
+    const restored = achievementBackupService.readBackupPayload({
+      meta: {
+        achievementStartDate: '2026-05-01'
+      },
+      redemptionRecords: [
+        {
+          id: 'redeem-1',
+          rewardId: 'reward-1',
+          rewardName: 'Coffee',
+          cost: 2,
+          redeemedAt: 8,
+          paidFromCarryover: 2,
+          paidFromLiveStars: 0
+        }
+      ],
+      collectionRecords: [],
+      archivedBottles: [
+        {
+          id: 'archive-1',
+          collectionId: 'collection-1',
+          collectionName: 'Glass bottle',
+          periodStartDate: '2026-05-01',
+          periodEndDate: '2026-05-10',
+          earnedStars: 10,
+          spentStars: 3,
+          sealedAmount: 7,
+          status: 'shattered',
+          sealedAt: 10,
+          shatteredAt: 11,
+          dailySnapshots: [],
+          redemptionRecords: []
+        }
+      ]
+    });
+
+    expect(restored?.meta.activeBottleCarryoverStars).toBe(5);
+  });
 });
