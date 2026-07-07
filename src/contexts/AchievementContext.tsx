@@ -2,6 +2,7 @@
  * @file AchievementContext.tsx
  * @description Manages achievement bottle data, live snapshots, archived bottles, and reward redemption records with repository hydration and selective recent-day recomputation.
  * @updated 2026-07-04: Auto-resyncs active achievement snapshots whenever source logs, todos, reviews, or filter context data change so balances stay fresh outside the achievement page.
+ * @updated 2026-07-07: Exposed explicit current/history achievement accounts and made sealing migrate only current-account stars.
  * @updated 2026-06-30: Prevents sealing bottles while the current active star balance is negative, with a shared validation message for UI and logic.
  * @updated 2026-05-18: Added unified achievement backup export/restore helpers so bottle data can travel through app export/import and cloud sync.
  * @updated 2026-04-25: Added global check streak config plus active-period recomputation for streak-weighted check-category rules.
@@ -12,6 +13,7 @@ import React, { createContext, ReactNode, useContext, useEffect, useRef, useStat
 import { AchievementSnapshot, dataRepository } from '../repositories/dataRepository';
 import {
   AchievementArchivedBottle,
+  AchievementAccountSummary,
   AchievementBottleActionRecord,
   AchievementCollection,
   AchievementCollectionRecord,
@@ -25,6 +27,7 @@ import {
 } from '../types';
 import {
   calculateAchievementAvailableStars,
+  calculateAchievementAccountSummary,
   calculateAchievementTotalEarned,
   calculateAchievementTotalRedeemed,
   computeAchievementDailySnapshot,
@@ -37,6 +40,7 @@ import {
   normalizeAchievementStarValue,
   normalizeAchievementRule,
   normalizeAchievementSnapshot,
+  partitionAchievementCollectionRecordsForSeal,
   partitionAchievementRedemptionsForSeal,
   sortAchievementSnapshots
 } from '../utils/achievementUtils';
@@ -84,6 +88,7 @@ interface AchievementContextType {
   archivedBottles: AchievementArchivedBottle[];
   bottleActionRecords: AchievementBottleActionRecord[];
   sealPreview: AchievementSealPreview | null;
+  accountSummary: AchievementAccountSummary;
   availableStars: number;
   totalEarnedStars: number;
   totalRedeemedStars: number;
@@ -143,8 +148,10 @@ const normalizeRedemptionRecord = (record: AchievementRedemptionRecord): Achieve
 };
 
 const normalizeCollectionRecord = (record: AchievementCollectionRecord): AchievementCollectionRecord => ({
-  ...record,
-  cost: Math.max(0.1, normalizeAchievementStarValue(record.cost || 0.1)),
+  ...normalizeAchievementRedemptionRecordFunding({
+    ...record,
+    cost: Math.max(0.1, normalizeAchievementStarValue(record.cost || 0.1))
+  }),
   imagePath: record.imagePath?.trim() || undefined,
   note: record.note?.trim() || undefined
 });
@@ -551,13 +558,14 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     achievementStartDate: meta.achievementStartDate,
     archivedBottles,
     dailySnapshots,
+    spendRecords: [...redemptionRecords, ...collectionRecords],
     redemptionRecords
   });
 
   const sealBottle = (collection: AchievementCollection) => {
     const sealBlockedReason = getAchievementSealBlockedReason({
       sealPreview,
-      availableStars
+      availableStars: accountSummary.currentStars
     });
 
     if (sealBlockedReason) {
@@ -574,6 +582,14 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       startDate: activeSealPreview.startDate,
       endDate: activeSealPreview.endDate,
       redemptionRecords
+    });
+    const {
+      archivedRecords: collectionRecordsToArchive,
+      remainingActiveRecords: nextActiveCollectionRecords
+    } = partitionAchievementCollectionRecordsForSeal({
+      startDate: activeSealPreview.startDate,
+      endDate: activeSealPreview.endDate,
+      collectionRecords
     });
     const redemptionsToArchive = archivedRecords.map((record) => {
       const originalRecord = redemptionRecords.find((item) => item.id === record.sourceRecordId);
@@ -601,7 +617,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       };
     });
 
-    if (!snapshotsToArchive.length && !redemptionsToArchive.length) {
+    if (!snapshotsToArchive.length && !redemptionsToArchive.length && !collectionRecordsToArchive.length) {
       return {
         ok: false,
         message: '昨天之前还没有新的历史可封存'
@@ -622,7 +638,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       status: 'sealed',
       sealedAt: now,
       dailySnapshots: snapshotsToArchive,
-      redemptionRecords: redemptionsToArchive
+      redemptionRecords: [...redemptionsToArchive, ...collectionRecordsToArchive]
     };
     const nextActionRecord: AchievementBottleActionRecord = {
       id: crypto.randomUUID(),
@@ -636,6 +652,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     setBottleActionRecords((previous) => [nextActionRecord, ...previous]);
     setDailySnapshots((previous) => previous.filter((snapshot) => !snapshotMap.has(snapshot.id)));
     setRedemptionRecords(nextActiveRedemptions);
+    setCollectionRecords(nextActiveCollectionRecords);
 
     return {
       ok: true,
@@ -728,12 +745,13 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
   };
 
   const spendRecords = [...redemptionRecords, ...collectionRecords];
-  const availableStars = calculateAchievementAvailableStars(
+  const accountSummary = calculateAchievementAccountSummary(
     dailySnapshots,
     spendRecords,
     bottleActionRecords,
     meta.activeBottleCarryoverStars
   );
+  const availableStars = accountSummary.totalStars;
   const totalEarnedStars = calculateAchievementTotalEarned(dailySnapshots);
   const totalRedeemedStars = calculateAchievementTotalRedeemed(spendRecords);
 
@@ -855,6 +873,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         archivedBottles,
         bottleActionRecords,
         sealPreview,
+        accountSummary,
         availableStars,
         totalEarnedStars,
         totalRedeemedStars,
