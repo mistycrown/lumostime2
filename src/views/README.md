@@ -2,6 +2,10 @@
 
 The `views/` directory contains all the React components that represent the distinct screens or pages of the LumosTime application. This layer is responsible for the presentation logic and user interaction.
 
+- Update 2026-07-11: `AchievementView.tsx` now wires the records tab to the full achievement recomputation action for rebuilding archived and active ledger data together.
+
+- Update 2026-07-11: `settings/CollectionSettingsView.tsx` now pauses its collection-detail hardware-back handler while global log or todo details are open, preserving the intended record > todo > collection detail > collection list return stack.
+
 - Update 2026-06-21: `SettingsView.tsx` now builds manual cloud-sync uploads from the complete app sync payload passed by `App.tsx`, so settings-page uploads no longer omit collections, AI, achievements, stickers, or other backup-only fields.
 
 - Update 2026-06-13: `DailyNewspaperView.tsx` now renders local per-annotation comment threads beneath AI newspaper annotations, keeping replies visually quiet in the existing print-inspired layout.

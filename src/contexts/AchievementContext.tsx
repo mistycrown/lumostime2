@@ -1,6 +1,8 @@
 ﻿/**
  * @file AchievementContext.tsx
  * @description Manages achievement bottle data, live snapshots, archived bottles, and reward redemption records with repository hydration and selective recent-day recomputation.
+ * @updated 2026-07-11: Persists per-rule todo subtask inclusion settings for todo-category achievement rules.
+ * @updated 2026-07-11: Added full achievement recomputation that clears archived bottles, restores historical ledgers, and rebuilds all daily snapshots.
  * @updated 2026-07-04: Auto-resyncs active achievement snapshots whenever source logs, todos, reviews, or filter context data change so balances stay fresh outside the achievement page.
  * @updated 2026-07-07: Exposed explicit current/history achievement accounts and made sealing migrate only current-account stars.
  * @updated 2026-06-30: Prevents sealing bottles while the current active star balance is negative, with a shared validation message for UI and logic.
@@ -42,6 +44,7 @@ import {
   normalizeAchievementSnapshot,
   partitionAchievementCollectionRecordsForSeal,
   partitionAchievementRedemptionsForSeal,
+  rebuildAchievementRedemptionRecordsForFullRecompute,
   sortAchievementSnapshots
 } from '../utils/achievementUtils';
 import { getDefaultCheckStreakConfig, normalizeCheckStreakConfig } from '../utils/checkStreakUtils';
@@ -61,6 +64,7 @@ interface CreateAchievementRuleInput {
   targetType: AchievementRule['targetType'];
   targetIds: string[];
   useCheckStreakMultiplier?: boolean;
+  includeSubtasks?: boolean;
   filterExpression?: string;
   unitAmount: number;
   deltaPerUnit: number;
@@ -96,6 +100,7 @@ interface AchievementContextType {
   applyBackupPayload: (value: unknown) => boolean;
   ensureRecentSnapshots: () => Promise<void>;
   recomputeSnapshotForDate: (date: string) => { ok: boolean; message?: string };
+  recomputeAllAchievementData: () => { ok: boolean; message?: string; snapshotCount?: number; redemptionCount?: number };
   updateCheckStreakConfig: (config: CheckStreakConfig) => void;
   createRule: (input: CreateAchievementRuleInput) => void;
   updateRule: (rule: AchievementRule) => void;
@@ -408,6 +413,60 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     return { ok: true };
   };
 
+  const recomputeAllAchievementData = () => {
+    if (!isDataReady || !isReviewReady || !isCategoryScopeReady) {
+      return {
+        ok: false,
+        message: '基础数据还在加载中，请稍后再试'
+      };
+    }
+
+    const today = getLocalDateStr(new Date());
+    const allKnownSnapshotDates = [
+      ...dailySnapshots.map((snapshot) => snapshot.date),
+      ...archivedBottles.flatMap((bottle) => [
+        bottle.periodStartDate,
+        ...bottle.dailySnapshots.map((snapshot) => snapshot.date)
+      ])
+    ].filter(Boolean);
+    const startDate = meta.achievementStartDate
+      || allKnownSnapshotDates.sort((first, second) => first.localeCompare(second))[0]
+      || today;
+    const normalizedCheckStreakConfig = normalizeCheckStreakConfig(meta.checkStreakConfig);
+    const recomputedSnapshots = reconcileSnapshots(
+      startDate,
+      [],
+      rules,
+      true,
+      normalizedCheckStreakConfig
+    );
+    const recomputedRedemptionRecords = rebuildAchievementRedemptionRecordsForFullRecompute({
+      redemptionRecords,
+      collectionRecords,
+      archivedBottles,
+      rewards,
+      collections
+    }).map(normalizeRedemptionRecord);
+
+    setMeta((previous) => ({
+      ...previous,
+      achievementStartDate: startDate,
+      activeBottleCarryoverStars: 0,
+      checkStreakConfig: normalizedCheckStreakConfig
+    }));
+    setDailySnapshots(recomputedSnapshots);
+    setRedemptionRecords(recomputedRedemptionRecords);
+    setCollectionRecords([]);
+    setArchivedBottles([]);
+    setBottleActionRecords([]);
+
+    return {
+      ok: true,
+      snapshotCount: recomputedSnapshots.length,
+      redemptionCount: recomputedRedemptionRecords.length
+    };
+  };
+
   const updateCheckStreakConfig = (config: CheckStreakConfig) => {
     const normalizedConfig = normalizeCheckStreakConfig(config);
     setMeta((previous) => ({
@@ -427,6 +486,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       targetType: input.targetType,
       targetIds: input.targetType === 'filterDuration' ? [] : input.targetIds,
       useCheckStreakMultiplier: input.targetType === 'checkCategory' ? input.useCheckStreakMultiplier === true : false,
+      includeSubtasks: input.targetType === 'todoCategory' ? input.includeSubtasks === true : false,
       filterExpression: input.filterExpression?.trim() || undefined,
       unitAmount: Math.max(1, Math.floor(input.unitAmount)),
       deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(input.deltaPerUnit || 0.1)),
@@ -449,6 +509,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
           name: rule.name.trim() || '未命名规则',
           targetIds: rule.targetType === 'filterDuration' ? [] : rule.targetIds,
           useCheckStreakMultiplier: rule.targetType === 'checkCategory' ? rule.useCheckStreakMultiplier === true : false,
+          includeSubtasks: rule.targetType === 'todoCategory' ? rule.includeSubtasks === true : false,
           filterExpression: rule.filterExpression?.trim() || undefined,
           unitAmount: Math.max(1, Math.floor(rule.unitAmount)),
           deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(rule.deltaPerUnit || 0.1)),
@@ -881,6 +942,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         applyBackupPayload,
         ensureRecentSnapshots,
         recomputeSnapshotForDate,
+        recomputeAllAchievementData,
         updateCheckStreakConfig,
         createRule,
         updateRule,

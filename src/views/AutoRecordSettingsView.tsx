@@ -4,7 +4,7 @@
  * @output Accessibility permission request plus app association rule editing
  * @pos View (Settings Sub-page)
  * @description Allows users to grant accessibility permissions, configure app-to-activity associations, and mark apps to be ignored by floating-window detection.
- * @updated 2026-06-21: Removed duplicated app-awareness override copy and refreshed the visible Chinese labels with UTF-8-safe text.
+ * @updated 2026-07-11: Stopped list ignore toggle clicks from bubbling into app detail navigation.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Check, ShieldAlert, Smartphone, ChevronRight, X, Search, Trash2 } from 'lucide-react';
@@ -153,7 +153,10 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
     <button
       type="button"
       aria-pressed={isIgnored}
-      onClick={onClick}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
       className={`rounded-full font-medium transition-colors ${
         compact ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'
       } ${

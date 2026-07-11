@@ -7,6 +7,7 @@
  * @updated 2026-05-09: Persisted floating-window stop requests and exposed a consume hook so background stops can reconcile after the Web runtime resumes.
  * @updated 2026-05-09: Added active focus-session syncing so native Android can render app timer labels inside the shared persistent notification title.
  * @updated 2026-04-15: Switched floating-window launches to foreground-service startup on Android 8+.
+ * @updated 2026-07-11: Prevent idle updateFloatingWindow calls from starting the floating-window service when it is not already running.
  * @updated 2026-06-13: Prefer direct memory state update in updateFloatingWindow to avoid Android 12+ background startForegroundService limitations.
   */
 package com.mistycrown.lumostime;
@@ -204,6 +205,12 @@ public class FocusNotificationPlugin extends Plugin {
         // 优先在内存中直接更新状态，避免因为应用在后台而被 Android 系统限制 startForegroundService 导致更新失败
         if (FloatingWindowService.updateFocusStateIfRunning(icon, isFocusing, start, sessionId)) {
             Log.d(TAG, "✅ Updated floating window state via direct memory call");
+            call.resolve();
+            return;
+        }
+
+        if (!isFocusing) {
+            Log.d(TAG, "Floating window service is not running; ignored idle update without starting service");
             call.resolve();
             return;
         }

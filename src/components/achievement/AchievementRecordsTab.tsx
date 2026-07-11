@@ -1,6 +1,8 @@
 ﻿/**
  * @file AchievementRecordsTab.tsx
  * @description Minimal ledger-style daily snapshot list with modal-based detail view and one-decimal achievement star values, including decimal-weighted check-category contributions.
+ * @updated 2026-07-11: Shows todo-completion rule subtask counting scope in daily rule details.
+ * @updated 2026-07-11: Added a low-key full recomputation entry with confirmation for restoring archived achievement data into the active ledger.
  * @updated 2026-07-05: Added a stats entry button beside Daily Records and a bottom-sheet chart modal for active daily star trends.
  * @updated 2026-04-25: Clarified check-category detail copy so streak-weighted completion values display with one decimal place.
  *
@@ -8,7 +10,7 @@
  * @updated 2026-04-06: Removed archived bottle exchange records so the tab only shows the current active bottle ledger.
  */
 import React, { useMemo, useState } from 'react';
-import { BarChart3, ChevronRight, RotateCcw, Trash2 } from 'lucide-react';
+import { AlertTriangle, BarChart3, ChevronRight, RotateCcw, Trash2 } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import { AchievementDailySnapshot, AchievementRedemptionRecord } from '../../types';
 import { formatRelativeTime, getLocalDateTimeStr } from '../../utils/dateUtils';
@@ -21,6 +23,7 @@ interface AchievementRecordsTabProps {
   redemptionRecords: AchievementRedemptionRecord[];
   onDeleteRedemptionRecord: (recordId: string) => void;
   onRecomputeSnapshot: (date: string) => { ok: boolean; message?: string };
+  onRecomputeAllData: () => { ok: boolean; message?: string; snapshotCount?: number; redemptionCount?: number };
 }
 
 const PAGE_SIZE = 10;
@@ -38,11 +41,13 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
   snapshots,
   redemptionRecords,
   onDeleteRedemptionRecord,
-  onRecomputeSnapshot
+  onRecomputeSnapshot,
+  onRecomputeAllData
 }) => {
   const { addToast } = useToast();
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const [isRecomputeAllDialogOpen, setIsRecomputeAllDialogOpen] = useState(false);
 
   const orderedSnapshots = useMemo(() => {
     return [...snapshots].sort((first, second) => second.date.localeCompare(first.date));
@@ -69,6 +74,17 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
     }
 
     addToast('error', result.message || '重新计算失败，请稍后重试');
+  };
+
+  const handleRecomputeAllData = () => {
+    const result = onRecomputeAllData();
+    if (!result.ok) {
+      addToast('error', result.message || '全部重算失败，请稍后重试');
+      return;
+    }
+
+    addToast('success', `已重算 ${result.snapshotCount || 0} 天记录，恢复 ${result.redemptionCount || 0} 条兑换`);
+    setIsRecomputeAllDialogOpen(false);
   };
 
   return (
@@ -172,6 +188,17 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
             </div>
           )}
         </section>
+
+        <section className="border-t border-stone-200/80 pt-4">
+          <button
+            type="button"
+            onClick={() => setIsRecomputeAllDialogOpen(true)}
+            className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-transparent px-3 py-1.5 text-[12px] text-stone-400 transition-colors hover:border-stone-300 hover:text-stone-700"
+          >
+            <RotateCcw size={13} />
+            全部重算
+          </button>
+        </section>
       </div>
 
       <AchievementDialog
@@ -219,6 +246,11 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
                     表达式：{item.filterExpression}
                   </div>
                 )}
+                {item.targetType === 'todoCategory' && (
+                  <div className="mt-1 text-xs leading-6 text-stone-400">
+                    统计口径：{item.includeSubtasks !== false ? '含子任务' : '仅父任务'}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -234,6 +266,46 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
         snapshots={orderedSnapshots}
         onClose={() => setIsStatsOpen(false)}
       />
+
+      <AchievementDialog
+        isOpen={isRecomputeAllDialogOpen}
+        title="全部重算"
+        subtitle="这会清空收藏瓶，并把历史封存内容还原到当前账本后重新计算。"
+        onClose={() => setIsRecomputeAllDialogOpen(false)}
+        footer={(
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setIsRecomputeAllDialogOpen(false)}
+              className="rounded-full border border-stone-200 px-4 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-50"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={handleRecomputeAllData}
+              className="inline-flex items-center gap-2 rounded-full bg-stone-900 px-4 py-2 text-sm text-white transition-colors hover:bg-stone-800"
+            >
+              <RotateCcw size={14} />
+              确认全部重算
+            </button>
+          </div>
+        )}
+      >
+        <div className="space-y-4 text-sm leading-7 text-stone-600">
+          <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-amber-800">
+            <AlertTriangle size={17} className="mt-1 shrink-0" />
+            <div>
+              重算后，已封存和已砸碎的历史瓶会被清空；原来瓶中的每日记录会按当前规则重新生成。
+            </div>
+          </div>
+          <div className="grid gap-3 border-t border-stone-200 pt-4">
+            <div>Daily Records：从成就开始日期到今天全部重算，包括历史已封存记录。</div>
+            <div>兑换记录：当前、已收藏、已封存的兑换会统一回到兑换记录中。</div>
+            <div>Reward 成本：仍存在的奖品按当前成本计算；已删除的奖品保留历史实际点数。</div>
+          </div>
+        </div>
+      </AchievementDialog>
     </>
   );
 };

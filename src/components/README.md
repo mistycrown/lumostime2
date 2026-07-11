@@ -3,6 +3,8 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-07-11: `achievement/AchievementRecordsTab.tsx` now adds a low-key full recomputation action at the bottom of the records tab with a confirmation dialog for clearing archived bottles and rebuilding the achievement ledger.
+- Update 2026-07-11: `AddLogModal.tsx` now renders above todo detail overlays, so opening a timeline record from a collection-launched todo detail shows the record editor as the topmost layer.
 - Update 2026-06-16: `GoalEditor.tsx` now includes a `本周` quick date-range shortcut in the goal time-window toolbar, filling the current Monday-through-Sunday span alongside the existing `本月 / 本季度 / 本年` chips.
 - Update 2026-06-16: `TodoMonthView.tsx` now darkens unfinished `Arrange` / `Due` / `Repeat` / `Maybe` entry titles in both month-grid cells and expanded day details, improving contrast against the translucent calendar surface while keeping completed and trace rows muted.
 - Update 2026-06-13: `AssociatedTodoList.tsx` now provides a shared parent/subtask-aware associated-todo card for tag, category, and scope detail pages, keeping child todos visually nested beneath their parent rows.
