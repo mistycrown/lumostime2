@@ -3,12 +3,13 @@
  * @input Achievement rules plus category, scope, todo, and daily-check metadata for editing targets
  * @output Rule list rows and a modal editor that can safely edit temporary empty numeric input states
  * @description Achievement rule list and modal editor, reusing the shared selectors plus inline filter expressions for duration-based custom matching.
+ * @updated 2026-07-11: Added a custom styled todo subtask inclusion checkbox for todo-completion achievement rules.
  * @updated 2026-06-06: Clarified custom-filter help text so `@` expressions cover todo titles and todo category names.
  * @updated 2026-04-25: Added a fixed per-rule streak toggle for check-category rules without exposing custom streak-tier editing in the UI.
  * @updated 2026-04-17: Added filter-duration rules backed by inline custom filter expressions.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Plus } from 'lucide-react';
+import { Check, ChevronRight, Plus } from 'lucide-react';
 import { AchievementRule, Category, CheckTemplate, Scope, TodoCategory } from '../../types';
 import { AchievementDialog } from './AchievementDialog';
 import { TagMultipleAssociation } from '../TagMultipleAssociation';
@@ -27,6 +28,7 @@ interface AchievementRulesTabProps {
     targetType: AchievementRule['targetType'];
     targetIds: string[];
     useCheckStreakMultiplier?: boolean;
+    includeSubtasks?: boolean;
     filterExpression?: string;
     unitAmount: number;
     deltaPerUnit: number;
@@ -42,6 +44,7 @@ interface RuleDraft {
   targetType: AchievementRule['targetType'];
   targetIds: string[];
   useCheckStreakMultiplier: boolean;
+  includeSubtasks: boolean;
   filterExpression: string;
   unitAmount: number;
   deltaPerUnit: number;
@@ -69,6 +72,7 @@ const createEmptyDraft = (): RuleDraft => ({
   targetType: 'activity',
   targetIds: [],
   useCheckStreakMultiplier: false,
+  includeSubtasks: false,
   filterExpression: '',
   unitAmount: 30,
   deltaPerUnit: 1,
@@ -110,6 +114,7 @@ const isSameRuleDraft = (left: RuleDraft, right: RuleDraft) => (
   left.unitAmount === right.unitAmount &&
   left.deltaPerUnit === right.deltaPerUnit &&
   left.useCheckStreakMultiplier === right.useCheckStreakMultiplier &&
+  left.includeSubtasks === right.includeSubtasks &&
   left.filterExpression === right.filterExpression &&
   left.note === right.note &&
   left.targetIds.length === right.targetIds.length &&
@@ -214,6 +219,37 @@ const TargetMultiSelector: React.FC<{
   );
 };
 
+const TodoSubtaskInclusionToggle: React.FC<{
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}> = ({ checked, onChange }) => (
+  <button
+    type="button"
+    role="checkbox"
+    aria-checked={checked}
+    onClick={() => onChange(!checked)}
+    className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors ${
+      checked
+        ? 'border-stone-300 bg-stone-100 text-stone-900'
+        : 'border-stone-200 bg-white text-stone-600 hover:border-stone-300'
+    }`}
+  >
+    <span
+      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
+        checked
+          ? 'border-stone-900 bg-stone-900 text-white'
+          : 'border-stone-300 bg-stone-50 text-transparent'
+      }`}
+    >
+      <Check size={13} strokeWidth={2.4} />
+    </span>
+    <span className="min-w-0">
+      <span className="block text-sm leading-5">包括子任务</span>
+      <span className="mt-1 block text-xs leading-5 text-stone-500">勾选后，完成子任务也会计入这条待办完成规则。</span>
+    </span>
+  </button>
+);
+
 export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
   categories,
   scopes,
@@ -245,6 +281,9 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
         targetType: selectedRule.targetType,
         targetIds: selectedRule.targetIds,
         useCheckStreakMultiplier: selectedRule.useCheckStreakMultiplier === true,
+        includeSubtasks: selectedRule.targetType === 'todoCategory'
+          ? selectedRule.includeSubtasks !== false
+          : false,
         filterExpression: selectedRule.filterExpression || '',
         unitAmount: selectedRule.unitAmount,
         deltaPerUnit: selectedRule.deltaPerUnit,
@@ -356,6 +395,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
       targetType,
       targetIds: targetType === 'filterDuration' ? previous.targetIds : [],
       useCheckStreakMultiplier: targetType === 'checkCategory' ? previous.useCheckStreakMultiplier : false,
+      includeSubtasks: targetType === 'todoCategory' ? previous.includeSubtasks : false,
       unitAmount: nextUnitAmount
     }));
   };
@@ -377,6 +417,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
         targetType: draft.targetType,
         targetIds: normalizedTargetIds,
         useCheckStreakMultiplier: draft.targetType === 'checkCategory' ? draft.useCheckStreakMultiplier : false,
+        includeSubtasks: draft.targetType === 'todoCategory' ? draft.includeSubtasks : false,
         filterExpression: normalizedFilterExpression,
         unitAmount: normalizedUnitAmount,
         deltaPerUnit: normalizedDeltaPerUnit,
@@ -394,6 +435,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
         targetType: draft.targetType,
         targetIds: normalizedTargetIds,
         useCheckStreakMultiplier: draft.targetType === 'checkCategory' ? draft.useCheckStreakMultiplier : false,
+        includeSubtasks: draft.targetType === 'todoCategory' ? draft.includeSubtasks : false,
         filterExpression: normalizedFilterExpression,
         unitAmount: normalizedUnitAmount,
         deltaPerUnit: normalizedDeltaPerUnit,
@@ -463,6 +505,9 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
                   <div className="text-[16px] leading-none text-stone-900">{rule.name}</div>
                   <div className="mt-[6px] text-[13px] leading-6 text-stone-500">
                     {summaryText}
+                    {rule.targetType === 'todoCategory'
+                      ? ` · ${rule.includeSubtasks !== false ? '含子任务' : '仅父任务'}`
+                      : ''}
                     {targetPreview ? ` · ${targetPreview}` : ''}
                   </div>
                 </div>
@@ -687,13 +732,19 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
               </p>
             </label>
           ) : draft.targetType === 'todoCategory' ? (
-            <TargetMultiSelector
-              label="待办分类"
-              description="选择要统计的待办分类。当日完成该分类下的待办后，就会按条目数结算光点。"
-              options={todoTargetOptions}
-              selectedIds={draft.targetIds}
-              onChange={(targetIds) => setDraft((previous) => ({ ...previous, targetIds }))}
-            />
+            <>
+              <TargetMultiSelector
+                label="待办分类"
+                description="选择要统计的待办分类。当日完成该分类下的待办后，就会按条目数结算光点。"
+                options={todoTargetOptions}
+                selectedIds={draft.targetIds}
+                onChange={(targetIds) => setDraft((previous) => ({ ...previous, targetIds }))}
+              />
+              <TodoSubtaskInclusionToggle
+                checked={draft.includeSubtasks}
+                onChange={(includeSubtasks) => setDraft((previous) => ({ ...previous, includeSubtasks }))}
+              />
+            </>
           ) : (
             <TargetMultiSelector
               label="日课组"

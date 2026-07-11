@@ -5,6 +5,7 @@
  * @pos View (Settings sub-page)
  * @description Presents collections with compact title-led rows and a detail page that uses its own lightweight timeline cards instead of reusing the shared memoir timeline UI.
  * @updated 2026-06-06: Added a delete-impact confirmation step to Collection batch-management save so collection removals warn about how many membership links will be unbound before applying.
+ * @updated 2026-07-11: Paused the collection-detail hardware-back handler while global log or todo detail overlays are open so Android back unwinds record > todo > collection detail > collection list in order.
  * @updated 2026-06-06: Added a dedicated Collection management sub-page with manual ordering, rename/create/delete controls, and delete-time unlink cleanup for related log/todo memberships.
  * @updated 2026-06-06: Made the Collection settings page use its own scroll container so long lists keep scrolling and newly opened create rows stay reachable past the first ten items.
  * @updated 2026-05-21: Collection add-modal todo browsing now opens at the category level, while log search stays empty until users explicitly search to avoid rendering huge record lists.
@@ -31,6 +32,7 @@ import { IconRenderer } from '../../components/IconRenderer';
 import { registerHardwareBackHandler } from '../../utils/hardwareBackHandlerStack';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { CollectionManageView } from '../CollectionManageView';
+import { useNavigation } from '../../contexts/NavigationContext';
 
 interface CollectionSettingsViewProps {
   onBack: () => void;
@@ -688,6 +690,10 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
   const { collections, setCollections, collectionEntries, setCollectionEntries, logs, todos, todoCategories } = useData();
   const { categories, scopes } = useCategoryScope();
   const { uiTheme } = useSettings();
+  const {
+    isAddModalOpen: isGlobalLogModalOpen,
+    isTodoModalOpen: isGlobalTodoDetailOpen
+  } = useNavigation();
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [draftName, setDraftName] = useState('');
@@ -750,7 +756,7 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
   }, [selectedCollection]);
 
   useEffect(() => {
-    if (!selectedCollectionId) {
+    if (!selectedCollectionId || isGlobalLogModalOpen || isGlobalTodoDetailOpen) {
       return;
     }
 
@@ -758,7 +764,7 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
       setSelectedCollectionId(null);
       return true;
     });
-  }, [selectedCollectionId]);
+  }, [isGlobalLogModalOpen, isGlobalTodoDetailOpen, selectedCollectionId]);
 
   useEffect(() => {
     if (!isManagingCollections) {

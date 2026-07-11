@@ -5,6 +5,8 @@
  * @pos Utility (Achievement)
  * @description 成就系统计算工具 - 负责每日快照计算、日期枚举和账本汇总。
  *
+ * @updated 2026-07-11: Added full-ledger redemption rebuild helpers for achievement all-data recomputation.
+ * @updated 2026-07-11: Added todo-category subtask inclusion handling so achievement rules can count parent tasks only unless explicitly configured otherwise.
  * @updated 2026-06-30: Added shared seal validation so bottles cannot be sealed while the current active balance is negative.
  * @updated 2026-07-07: Added explicit current/history account summaries and made seal previews use the current-bottle account balance.
  * @updated 2026-04-25: Added check-category streak weighting so daily check rules can sum per-item multiplier contributions.
@@ -18,9 +20,11 @@ import {
   AchievementDailySnapshot,
   AchievementDailyRuleBreakdown,
   AchievementAccountSummary,
+  AchievementCollection,
   CheckStreakConfig,
   CheckTemplate,
   AchievementRedemptionRecord,
+  AchievementReward,
   AchievementSealPreview,
   AchievementRule,
   DailyReview,
@@ -54,6 +58,14 @@ interface AchievementFundingLike {
   cost: number;
   paidFromCarryover?: number;
   paidFromLiveStars?: number;
+}
+
+interface RebuildAchievementRedemptionRecordsInput {
+  redemptionRecords: AchievementRedemptionRecord[];
+  collectionRecords: AchievementCollectionRecord[];
+  archivedBottles: AchievementArchivedBottle[];
+  rewards: AchievementReward[];
+  collections: AchievementCollection[];
 }
 
 interface AchievementSealRedemptionFragment extends AchievementRedemptionRecord {
@@ -136,6 +148,9 @@ export const normalizeAchievementRule = (
   ...rule,
   targetType: rule.targetType ?? 'activity',
   useCheckStreakMultiplier: rule.useCheckStreakMultiplier === true,
+  includeSubtasks: (rule.targetType ?? 'activity') === 'todoCategory'
+    ? rule.includeSubtasks !== false
+    : false,
   filterExpression: rule.filterExpression?.trim() || undefined,
   unitAmount: normalizeUnitAmount(rule),
   deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(rule.deltaPerUnit || 1)),
@@ -157,6 +172,9 @@ export const normalizeAchievementSnapshot = (
     ...item,
     targetType: item.targetType ?? 'activity',
     useCheckStreakMultiplier: item.useCheckStreakMultiplier === true,
+    includeSubtasks: (item.targetType ?? 'activity') === 'todoCategory'
+      ? item.includeSubtasks !== false
+      : false,
     filterExpression: item.filterExpression?.trim() || undefined,
     matchedValue: Math.max(0, normalizeAchievementStarValue(item.matchedValue ?? item.matchedMinutes ?? 0)),
     unitAmount: Math.max(1, Math.floor(item.unitAmount ?? item.unitMinutes ?? 1)),
@@ -254,7 +272,10 @@ export const computeAchievementDailySnapshot = (
       }
 
       if (rule.targetType === 'todoCategory') {
-        return completedTodos.filter((todo) => rule.targetIds.includes(todo.categoryId)).length;
+        return completedTodos.filter((todo) => (
+          rule.targetIds.includes(todo.categoryId)
+          && (rule.includeSubtasks === true || !todo.parentTodoId)
+        )).length;
       }
 
       return normalizeAchievementStarValue(rule.targetIds.reduce((sum, categoryId) => {
@@ -285,6 +306,7 @@ export const computeAchievementDailySnapshot = (
       targetType: rule.targetType,
       matchedValue,
       useCheckStreakMultiplier: rule.useCheckStreakMultiplier === true,
+      includeSubtasks: rule.targetType === 'todoCategory' ? rule.includeSubtasks === true : false,
       filterExpression: rule.filterExpression,
       unitAmount: rule.unitAmount,
       deltaPerUnit: rule.deltaPerUnit,
@@ -376,6 +398,87 @@ export const calculateAchievementTotalEarned = (snapshots: AchievementDailySnaps
 
 export const calculateAchievementTotalRedeemed = (spendRecords: AchievementSpendRecordLike[]): number => {
   return normalizeAchievementStarValue(spendRecords.reduce((sum, item) => sum + item.cost, 0));
+};
+
+const getRecomputeRedemptionGroupKey = (record: AchievementRedemptionRecord): string => {
+  return [
+    record.rewardId,
+    record.redeemedAt,
+    record.note?.trim() || ''
+  ].join('\u001f');
+};
+
+const normalizeRecomputeRedemptionCost = (cost: number): number => (
+  Math.max(0.1, normalizeAchievementStarValue(cost || 0.1))
+);
+
+const convertCollectionRecordToRedemptionRecord = (
+  record: AchievementCollectionRecord
+): AchievementRedemptionRecord => ({
+  id: record.id,
+  rewardId: `collection:${record.collectionId}`,
+  rewardName: `收藏：${record.collectionName}`,
+  cost: record.cost,
+  redeemedAt: record.redeemedAt,
+  paidFromCarryover: record.paidFromCarryover,
+  paidFromLiveStars: record.paidFromLiveStars,
+  note: record.note
+});
+
+export const rebuildAchievementRedemptionRecordsForFullRecompute = ({
+  redemptionRecords,
+  collectionRecords,
+  archivedBottles,
+  rewards,
+  collections
+}: RebuildAchievementRedemptionRecordsInput): AchievementRedemptionRecord[] => {
+  const rewardMap = new Map(rewards.map((reward) => [reward.id, reward]));
+  const collectionMap = new Map(collections.map((collection) => [collection.id, collection]));
+  const allRecords = [
+    ...redemptionRecords,
+    ...collectionRecords.map(convertCollectionRecordToRedemptionRecord),
+    ...archivedBottles.flatMap((bottle) => bottle.redemptionRecords || [])
+  ];
+  const groupedRecords = new Map<string, AchievementRedemptionRecord[]>();
+
+  allRecords.forEach((record) => {
+    const key = getRecomputeRedemptionGroupKey(record);
+    const previous = groupedRecords.get(key) || [];
+    groupedRecords.set(key, [...previous, record]);
+  });
+
+  return Array.from(groupedRecords.values())
+    .map((records) => {
+      const [firstRecord] = records;
+      const historicalCost = normalizeRecomputeRedemptionCost(
+        records.reduce((sum, record) => sum + normalizeAchievementRedemptionRecordFunding(record).cost, 0)
+      );
+      const collectionId = firstRecord.rewardId.startsWith('collection:')
+        ? firstRecord.rewardId.slice('collection:'.length)
+        : null;
+      const currentReward = rewardMap.get(firstRecord.rewardId);
+      const currentCollection = collectionId ? collectionMap.get(collectionId) : null;
+      const nextCost = currentReward
+        ? normalizeRecomputeRedemptionCost(currentReward.cost)
+        : currentCollection
+          ? normalizeRecomputeRedemptionCost(currentCollection.cost)
+          : historicalCost;
+      const nextRewardName = currentReward
+        ? currentReward.name
+        : currentCollection
+          ? `收藏：${currentCollection.name}`
+          : firstRecord.rewardName;
+
+      return {
+        ...firstRecord,
+        rewardName: nextRewardName,
+        cost: nextCost,
+        paidFromCarryover: undefined,
+        paidFromLiveStars: nextCost,
+        note: firstRecord.note?.trim() || undefined
+      };
+    })
+    .sort((first, second) => second.redeemedAt - first.redeemedAt);
 };
 
 export const getAchievementSealBlockedReason = ({

@@ -13,9 +13,10 @@ import {
   normalizeAchievementRule,
   normalizeAchievementStarValue,
   partitionAchievementCollectionRecordsForSeal,
-  partitionAchievementRedemptionsForSeal
+  partitionAchievementRedemptionsForSeal,
+  rebuildAchievementRedemptionRecordsForFullRecompute
 } from './achievementUtils';
-import type { AchievementRule, CheckStreakConfig, CheckTemplate, DailyReview, Log, TodoItem } from '../types';
+import type { AchievementArchivedBottle, AchievementCollection, AchievementRule, AchievementReward, CheckStreakConfig, CheckTemplate, DailyReview, Log, TodoItem } from '../types';
 
 describe('achievementUtils decimal stars', () => {
   it('normalizes decimal star values and floors only the rendered bottle count', () => {
@@ -175,6 +176,94 @@ describe('achievementUtils decimal stars', () => {
     });
   });
 
+  it('counts only parent todos for todo-category rules when subtasks are excluded', () => {
+    const rules: AchievementRule[] = [
+      {
+        id: 'rule-todo-parent-only',
+        name: 'Todo parent only',
+        enabled: true,
+        effectType: 'earn',
+        targetType: 'todoCategory',
+        targetIds: ['todo-category-1'],
+        includeSubtasks: false,
+        unitAmount: 1,
+        deltaPerUnit: 1,
+        roundingMode: 'floor',
+        createdAt: 0,
+        updatedAt: 0
+      }
+    ];
+    const todos: TodoItem[] = [
+      {
+        id: 'todo-parent',
+        categoryId: 'todo-category-1',
+        title: 'Parent task',
+        isCompleted: true,
+        completedAt: '2026-03-28T09:00:00+08:00'
+      },
+      {
+        id: 'todo-child',
+        categoryId: 'todo-category-1',
+        parentTodoId: 'todo-parent',
+        title: 'Child task',
+        isCompleted: true,
+        completedAt: '2026-03-28T10:00:00+08:00'
+      }
+    ];
+
+    const snapshot = computeAchievementDailySnapshot('2026-03-28', [], todos, [], rules);
+
+    expect(snapshot.netDelta).toBe(1);
+    expect(snapshot.ruleBreakdown[0]).toMatchObject({
+      targetType: 'todoCategory',
+      matchedValue: 1,
+      includeSubtasks: false
+    });
+  });
+
+  it('keeps legacy todo-category rules counting subtasks when the flag is missing', () => {
+    const legacyRule = normalizeAchievementRule({
+      id: 'rule-todo-legacy',
+      name: 'Todo legacy',
+      enabled: true,
+      effectType: 'earn',
+      targetType: 'todoCategory',
+      targetIds: ['todo-category-1'],
+      unitAmount: 1,
+      deltaPerUnit: 1,
+      roundingMode: 'floor',
+      createdAt: 0,
+      updatedAt: 0
+    });
+    const todos: TodoItem[] = [
+      {
+        id: 'todo-parent',
+        categoryId: 'todo-category-1',
+        title: 'Parent task',
+        isCompleted: true,
+        completedAt: '2026-03-28T09:00:00+08:00'
+      },
+      {
+        id: 'todo-child',
+        categoryId: 'todo-category-1',
+        parentTodoId: 'todo-parent',
+        title: 'Child task',
+        isCompleted: true,
+        completedAt: '2026-03-28T10:00:00+08:00'
+      }
+    ];
+
+    const snapshot = computeAchievementDailySnapshot('2026-03-28', [], todos, [], [legacyRule]);
+
+    expect(legacyRule.includeSubtasks).toBe(true);
+    expect(snapshot.netDelta).toBe(2);
+    expect(snapshot.ruleBreakdown[0]).toMatchObject({
+      targetType: 'todoCategory',
+      matchedValue: 2,
+      includeSubtasks: true
+    });
+  });
+
   it('normalizes legacy redemption records into explicit carryover and live funding', () => {
     expect(normalizeAchievementRedemptionRecordFunding({
       id: 'redeem-1',
@@ -188,6 +277,134 @@ describe('achievementUtils decimal stars', () => {
       paidFromCarryover: 3,
       paidFromLiveStars: 7
     });
+  });
+
+  it('rebuilds full recompute redemptions with current reward and collection costs when they still exist', () => {
+    const rewards: AchievementReward[] = [
+      {
+        id: 'reward-1',
+        name: 'Current Tea',
+        cost: 12,
+        enabled: true,
+        createdAt: 1,
+        updatedAt: 2
+      }
+    ];
+    const collections: AchievementCollection[] = [
+      {
+        id: 'default-bottle-01',
+        name: 'Current Bottle',
+        cost: 5,
+        enabled: true,
+        createdAt: 1,
+        updatedAt: 2
+      }
+    ];
+
+    const result = rebuildAchievementRedemptionRecordsForFullRecompute({
+      rewards,
+      collections,
+      redemptionRecords: [
+        {
+          id: 'redeem-active',
+          rewardId: 'reward-1',
+          rewardName: 'Old Tea',
+          cost: 7,
+          redeemedAt: 1000,
+          paidFromCarryover: 7,
+          paidFromLiveStars: 0
+        }
+      ],
+      collectionRecords: [
+        {
+          id: 'collection-active',
+          collectionId: 'default-bottle-01',
+          collectionName: 'Old Bottle',
+          cost: 2,
+          redeemedAt: 900,
+          paidFromCarryover: 2,
+          paidFromLiveStars: 0
+        }
+      ],
+      archivedBottles: []
+    });
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: 'redeem-active',
+        rewardId: 'reward-1',
+        rewardName: 'Current Tea',
+        cost: 12,
+        paidFromCarryover: undefined,
+        paidFromLiveStars: 12
+      }),
+      expect.objectContaining({
+        id: 'collection-active',
+        rewardId: 'collection:default-bottle-01',
+        rewardName: '收藏：Current Bottle',
+        cost: 5,
+        paidFromCarryover: undefined,
+        paidFromLiveStars: 5
+      })
+    ]);
+  });
+
+  it('rebuilds full recompute redemptions by merging deleted reward fragments at historical cost', () => {
+    const archivedBottles: AchievementArchivedBottle[] = [
+      {
+        id: 'archive-1',
+        collectionId: 'default-bottle-01',
+        collectionName: 'Old Bottle',
+        sealedAmount: 7,
+        earnedStars: 10,
+        spentStars: 3,
+        periodStartDate: '2026-04-01',
+        periodEndDate: '2026-04-02',
+        status: 'sealed',
+        sealedAt: 10,
+        dailySnapshots: [],
+        redemptionRecords: [
+          {
+            id: 'redeem-archived-live',
+            rewardId: 'deleted-reward',
+            rewardName: 'Deleted Snack',
+            cost: 7,
+            redeemedAt: 1000,
+            paidFromCarryover: 0,
+            paidFromLiveStars: 7
+          }
+        ]
+      }
+    ];
+
+    const result = rebuildAchievementRedemptionRecordsForFullRecompute({
+      rewards: [],
+      collections: [],
+      redemptionRecords: [
+        {
+          id: 'redeem-active-carryover',
+          rewardId: 'deleted-reward',
+          rewardName: 'Deleted Snack',
+          cost: 3,
+          redeemedAt: 1000,
+          paidFromCarryover: 3,
+          paidFromLiveStars: 0
+        }
+      ],
+      collectionRecords: [],
+      archivedBottles
+    });
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: 'redeem-active-carryover',
+        rewardId: 'deleted-reward',
+        rewardName: 'Deleted Snack',
+        cost: 10,
+        paidFromCarryover: undefined,
+        paidFromLiveStars: 10
+      })
+    ]);
   });
 
   it('adds shattered bottle returns back into the active bottle while ignoring seal actions', () => {

@@ -4,6 +4,7 @@
  * @output Android floating window runtime synchronization
  * @pos Hook (System Integration)
  * @description Keeps the Android floating window aligned with the latest active session, while allowing app-awareness timers to force status syncing even when the general floating-ball toggle is off.
+ * @updated 2026-07-11: Stop the Android floating-window service when the global floating-ball switch is off instead of sending an idle update that can restart the service.
  * @updated 2026-06-21: Re-sync the floating ball when app-awareness timer state changes so overtime prompts and extensions do not drop the positive timer display.
  * @updated 2026-06-21: Let app-awareness sessions keep floating-window timer/status sync alive independently from the global floating-ball switch.
  */
@@ -12,6 +13,7 @@ import { Capacitor } from '@capacitor/core';
 import { useSession } from '../contexts/SessionContext';
 import { useSettings } from '../contexts/SettingsContext';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
+import { resolveFloatingWindowSyncAction } from '../utils/floatingWindowSyncDecision';
 
 export const useFloatingWindowSync = () => {
   const { activeSessions } = useSession();
@@ -26,19 +28,6 @@ export const useFloatingWindowSync = () => {
     const floatingWindowEnabled = localStorage.getItem('floating_window_enabled') === 'true';
     const latestSession = activeSessions.length > 0 ? activeSessions[activeSessions.length - 1] : null;
     const shouldForceFloatingWindow = Boolean(latestSession?.appAwarenessMeta) || Boolean(appAwarenessActiveRun);
-
-    if (!floatingWindowEnabled && !shouldForceFloatingWindow) {
-      if (lastSyncedSignatureRef.current === 'hidden') {
-        return;
-      }
-
-      lastSyncedSignatureRef.current = 'hidden';
-      FocusNotification.updateFloatingWindow({ isFocusing: false }).catch((error) => {
-        console.error('[useFloatingWindowSync] Failed to hide floating window', error);
-      });
-      return;
-    }
-
     const appAwarenessSyncKey = appAwarenessActiveRun
       ? `${appAwarenessActiveRun.status}:${appAwarenessActiveRun.linkedSessionId || ''}:${appAwarenessActiveRun.expectedTimer?.scheduledEndAt || 0}`
       : 'none';
@@ -46,16 +35,35 @@ export const useFloatingWindowSync = () => {
       ? `${latestSession.id}:${latestSession.activityIcon || ''}:${latestSession.startTime}:${shouldForceFloatingWindow ? 'app-awareness' : 'default'}:${appAwarenessSyncKey}`
       : `idle:${appAwarenessSyncKey}`;
 
-    if (lastSyncedSignatureRef.current === nextSignature) {
+    const { action, signature } = resolveFloatingWindowSyncAction({
+      floatingWindowEnabled,
+      shouldForceFloatingWindow,
+      hasLatestSession: Boolean(latestSession),
+      lastSyncedSignature: lastSyncedSignatureRef.current,
+      nextSignature,
+    });
+
+    if (action === 'none') {
       return;
     }
 
-    lastSyncedSignatureRef.current = nextSignature;
+    lastSyncedSignatureRef.current = signature;
 
-    if (!latestSession) {
+    if (action === 'stop') {
+      FocusNotification.stopFloatingWindow().catch((error) => {
+        console.error('[useFloatingWindowSync] Failed to stop disabled floating window', error);
+      });
+      return;
+    }
+
+    if (action === 'reset') {
       FocusNotification.updateFloatingWindow({ isFocusing: false }).catch((error) => {
         console.error('[useFloatingWindowSync] Failed to reset floating window', error);
       });
+      return;
+    }
+
+    if (!latestSession) {
       return;
     }
 

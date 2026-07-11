@@ -4,6 +4,7 @@
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
  * @description Defines the core data structures (Log, TodoItem, Category, Activity, Filter order metadata, etc.) used throughout the application.
+ * @updated 2026-07-11: Added per-achievement todo completion subtask inclusion flags so todo-category rules can distinguish parent tasks from subtasks.
  * @updated 2026-06-13: Added local daily newspaper comment-thread types so users can reply to AI annotations without entering global chat history.
  * @updated 2026-07-07: Added achievement account summary fields so current-bottle and history-bottle balances can stay explicit across UI and sealing logic.
  * @updated 2026-06-07: Added structured weekly/monthly AI newspaper types so periodic reviews can persist editorial summary pages alongside existing narratives.
@@ -459,6 +460,7 @@ export interface AchievementRule {
   targetType: AchievementRuleTargetType;
   targetIds: string[];
   useCheckStreakMultiplier?: boolean;
+  includeSubtasks?: boolean;
   filterExpression?: string;
   unitAmount: number;
   deltaPerUnit: number;
@@ -475,6 +477,7 @@ export interface AchievementDailyRuleBreakdown {
   targetType: AchievementRuleTargetType;
   matchedValue: number;
   useCheckStreakMultiplier?: boolean;
+  includeSubtasks?: boolean;
   filterExpression?: string;
   unitAmount: number;
   deltaPerUnit: number;
