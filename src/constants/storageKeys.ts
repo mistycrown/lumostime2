@@ -39,6 +39,7 @@ export const THEME_KEYS = {
     /** 日程图样式 */
     SCHEDULE_STYLE: 'lumostime_schedule_style',
     CALENDAR_NUMBER_STYLE: 'lumostime_calendar_number_style',
+    CALENDAR_LUNAR_DISPLAY: 'lumostime_calendar_lunar_display',
     TIMELINE_STYLE_THEME: 'lumostime_timeline_style_theme',
     TIMELINE_STYLE_CONFIGS: 'lumostime_timeline_style_configs',
     ACHIEVEMENT_BOTTLE_STYLE: 'lumostime_achievement_bottle_style',

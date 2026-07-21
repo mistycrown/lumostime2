@@ -11,7 +11,7 @@
  * @updated 2026-06-13: 调整显示设置弹窗中已选择选项的背景和文字对比度，将更浅的 bg-stone-100 调整为 bg-stone-200，并加深字体颜色。
  * @updated 2026-06-13: 调整月视图中各条目的颜色：Trace 和已完成任务（Completed）使用灰色，而 Maybe, Arrange, Due, Repeat 任务使用较黑的颜色以示区分。
  * Once I am updated, be sure to update my header comment and the folder's md.
- * @updated 2026-07-21: Reads the shared calendar number style so modern typography applies consistently with the desktop month calendar.
+ * @updated 2026-07-21: Unified dark-mode month headers and corrected schedule-entry text contrast.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -43,7 +43,9 @@ import {
 import { getParentTodo } from '../utils/todoHierarchyUtils';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 import {
+  getCalendarLunarLabel,
   getCalendarNumberTextStyle,
+  useCalendarLunarDisplay,
   useCalendarNumberStyle
 } from '../services/calendarNumberStyleService';
 import { hexToRgba } from '../utils/colorUtils';
@@ -246,6 +248,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   isScheduleLocked = false,
   onToggleScheduleLock
 }) => {
+  const showCalendarLunar = useCalendarLunarDisplay();
   const calendarNumberStyle = useCalendarNumberStyle();
   const today = useMemo(() => new Date(), []);
   const initialMonthRange = useMemo(
@@ -1191,7 +1194,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
       <div className={`flex min-h-0 flex-1 flex-col ${isDensityMenuOpen ? 'pointer-events-none blur-[6px] opacity-90' : ''}`}>
         <div
           ref={headerRef}
-          className={`shrink-0 bg-[rgba(250,249,246,0.34)] ${useReducedEffects ? '' : ''}`}
+          className={`month-view-header shrink-0 bg-[rgba(250,249,246,0.34)] ${useReducedEffects ? '' : ''}`}
         >
           <div className="flex items-center justify-between border-b border-black px-3 py-2.5">
             <div className="flex items-center space-x-1 select-none">
@@ -1279,7 +1282,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
             </div>
           </div>
 
-          <div className={`${MONTH_VIEW_CALENDAR_SIDE_INSET_CLASS_NAME} grid grid-cols-7 border-b border-black/90 bg-[rgba(250,249,246,0.16)] py-1.5 text-[0.6rem] font-bold uppercase tracking-widest`}>
+          <div className={`month-view-weekday-header ${MONTH_VIEW_CALENDAR_SIDE_INSET_CLASS_NAME} grid grid-cols-7 border-b border-black/90 bg-[rgba(250,249,246,0.16)] py-1.5 text-[0.6rem] font-bold uppercase tracking-widest`}>
             {WEEKDAY_LABELS.map((label) => (
               <div key={label} className="text-center opacity-40">
                 {label}
@@ -1409,6 +1412,11 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                             >
                               {format(day, 'dd')}
                             </button>
+                            {showCalendarLunar && (
+                              <span className="ml-1 self-center text-[9px] leading-none text-stone-400">
+                                {getCalendarLunarLabel(day)}
+                              </span>
+                            )}
                           </div>
 
                           <div

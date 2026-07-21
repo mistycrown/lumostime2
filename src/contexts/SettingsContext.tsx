@@ -157,6 +157,8 @@ interface SettingsContextType {
     setScheduleStyle: React.Dispatch<React.SetStateAction<ScheduleStyle>>;
     calendarNumberStyle: CalendarNumberStyle;
     setCalendarNumberStyle: React.Dispatch<React.SetStateAction<CalendarNumberStyle>>;
+    calendarLunarDisplay: boolean;
+    setCalendarLunarDisplay: React.Dispatch<React.SetStateAction<boolean>>;
     achievementBottleStyle: AchievementBottleStyle;
     setAchievementBottleStyle: React.Dispatch<React.SetStateAction<AchievementBottleStyle>>;
     achievementBottleIconPack: AchievementBottleIconPack;
@@ -562,6 +564,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             : DEFAULT_CALENDAR_NUMBER_STYLE;
     });
 
+    const [calendarLunarDisplay, setCalendarLunarDisplay] = useState<boolean>(() => (
+        localStorage.getItem(THEME_KEYS.CALENDAR_LUNAR_DISPLAY) === 'true'
+    ));
+
     const [achievementBottleStyle, setAchievementBottleStyle] = useState<AchievementBottleStyle>(() => {
         const stored = localStorage.getItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_STYLE);
         return isAchievementBottleStyle(stored)
@@ -652,6 +658,11 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         localStorage.setItem(THEME_KEYS.CALENDAR_NUMBER_STYLE, calendarNumberStyle);
         window.dispatchEvent(new Event('lumostime:calendar-number-style-changed'));
     }, [calendarNumberStyle]);
+
+    useEffect(() => {
+        localStorage.setItem(THEME_KEYS.CALENDAR_LUNAR_DISPLAY, String(calendarLunarDisplay));
+        window.dispatchEvent(new Event('lumostime:calendar-lunar-display-changed'));
+    }, [calendarLunarDisplay]);
 
     useEffect(() => {
         localStorage.setItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_STYLE, achievementBottleStyle);
@@ -793,6 +804,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setScheduleStyle,
             calendarNumberStyle,
             setCalendarNumberStyle,
+            calendarLunarDisplay,
+            setCalendarLunarDisplay,
             achievementBottleStyle,
             setAchievementBottleStyle,
             achievementBottleIconPack,

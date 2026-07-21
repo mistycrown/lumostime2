@@ -38,7 +38,9 @@ import {
 } from '../../services/todoScheduleColorService';
 import { resolveDesktopTodoQuickEditorScreenAnchor } from '../../utils/desktopTodoQuickEditorAnchorUtils';
 import {
+  getCalendarLunarLabel,
   getCalendarNumberTextStyle,
+  useCalendarLunarDisplay,
   useCalendarNumberStyle
 } from '../../services/calendarNumberStyleService';
 
@@ -117,6 +119,7 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
   entryBackgroundOpacity = 0.08,
   onWheelPageChange
 }) => {
+  const showCalendarLunar = useCalendarLunarDisplay();
   const calendarNumberStyle = useCalendarNumberStyle();
   const today = useMemo(() => new Date(), []);
   const todayDateKey = useMemo(() => formatDateKey(today), [today]);
@@ -429,14 +432,21 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
                         className="flex justify-start px-2"
                         style={{ minHeight: `${MONTH_DAY_NUMBER_ROW_HEIGHT_PX}px` }}
                       >
-                        <span
-                          className={`rounded-sm text-[1.02rem] leading-none ${isDark ? 'text-stone-100' : 'text-stone-800'}`}
-                          style={{
-                            ...getCalendarNumberTextStyle(calendarNumberStyle),
-                            lineHeight: `${MONTH_DAY_NUMBER_ROW_HEIGHT_PX}px`
-                          }}
-                        >
-                          {format(day, 'dd')}
+                        <span className="flex items-center gap-1">
+                          <span
+                            className={`rounded-sm text-[1.02rem] leading-none ${isDark ? 'text-stone-100' : 'text-stone-800'}`}
+                            style={{
+                              ...getCalendarNumberTextStyle(calendarNumberStyle),
+                              lineHeight: `${MONTH_DAY_NUMBER_ROW_HEIGHT_PX}px`
+                            }}
+                          >
+                            {format(day, 'dd')}
+                          </span>
+                          {showCalendarLunar && (
+                            <span className={`text-[9px] leading-none ${isDark ? 'text-stone-400' : 'text-stone-400'}`}>
+                              {getCalendarLunarLabel(day)}
+                            </span>
+                          )}
                         </span>
                       </div>
 

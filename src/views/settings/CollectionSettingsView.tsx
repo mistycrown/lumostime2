@@ -1,5 +1,6 @@
 /**
  * @file CollectionSettingsView.tsx
+ * @updated 2026-07-21: Added dark-mode outline treatment for selected collection rows.
  * @input Collection data from DataContext plus edit handlers for logs and todos
  * @output A settings-level Collection list plus mixed-item detail timeline
  * @pos View (Settings sub-page)
@@ -480,7 +481,7 @@ const CollectionAddModal: React.FC<CollectionAddModalProps> = ({
         onClick={() => onToggle(option.id)}
         className={`grid w-full grid-cols-[1.25rem_minmax(0,1fr)_auto] gap-x-3 px-2 py-3 text-left transition-colors ${
           isSelected
-            ? 'bg-stone-100/85'
+            ? 'collection-option-selected bg-stone-100/85'
             : 'bg-transparent hover:bg-stone-50/70'
         }`}
       >

@@ -9,15 +9,16 @@
  * @updated 2026-05-05: Softened the custom-background sidebar scrim with a warm bridge into the main panel so the record layout no longer shows a visible wallpaper seam.
  * @updated 2026-05-04: Added a custom-background-only sidebar scrim so left-rail category buttons stay legible over busy wallpapers.
  * @updated 2026-04-12: Softened the sidebar toggle button styling to reduce visual weight and keep it aligned with TodoView controls.
+ * @updated 2026-07-21: Muted activity icon circles in dark mode while preserving each activity color as a low-contrast accent.
  * @updated 2026-04-20: Switched custom background rendering to the shared preloaded display hook and reduced mobile blur cost.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, type CSSProperties } from 'react';
 import { Category, Activity } from '../types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { IconRenderer } from '../components/IconRenderer';
-import { getSoftColorCircleStyle } from '../utils/colorAdapterUtils';
+import { getColorHexForCharts, getSoftColorCircleStyle } from '../utils/colorAdapterUtils';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 
 
@@ -64,8 +65,11 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
   // Note: 'recent' logic was not fully implemented in previous code, it just defaulted to CATEGORIES[0] if not found.
   const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
 
-  const getActivityButtonStyle = (activity: Activity) => {
-    return getSoftColorCircleStyle(activity.color || '', 0.15);
+  const getActivityButtonStyle = (activity: Activity): CSSProperties => {
+    return {
+      ...getSoftColorCircleStyle(activity.color || '', 0.15),
+      '--record-activity-accent': getColorHexForCharts(activity.color || '')
+    } as CSSProperties;
   };
 
   return (
@@ -176,7 +180,7 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
             >
               {/* Use activity.color for background */}
               <div
-                className="w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center text-3xl md:text-4xl shadow-sm"
+                className="record-activity-icon w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center text-3xl md:text-4xl shadow-sm"
                 style={getActivityButtonStyle(activity)}
               >
                 <IconRenderer 

@@ -1,5 +1,6 @@
 /**
  * @file AddLogModal.tsx
+ * @updated 2026-07-21: Added dark-mode detail outlines and high-contrast time range slider handles.
  * @input props: initialLog, time ranges, categories, todos, etc.
  * @output Modal Interaction (Save/Delete Log)
  * @pos Component (Modal)
@@ -643,12 +644,12 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     >
       {/* Modal Content - Bottom Sheet on Mobile, Center on Desktop */}
       <div
-        className="w-full h-[85vh] md:h-auto md:max-h-[85vh] md:max-w-2xl bg-[#faf9f6] rounded-t-[2rem] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative animate-slideUp"
+        className="record-detail-modal w-full h-[85vh] md:h-auto md:max-h-[85vh] md:max-w-2xl bg-[#faf9f6] rounded-t-[2rem] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative animate-slideUp"
         onClick={(e) => e.stopPropagation()}
       >
 
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-stone-100 bg-white/50">
+        <div className="record-detail-modal-header flex items-center justify-between p-6 border-b border-stone-100 bg-white/50">
           <button onClick={handleClose} className="p-2 -ml-2 hover:bg-stone-100 rounded-full text-stone-500 transition-colors">
             <X size={24} />
           </button>
@@ -792,7 +793,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
             <div className="px-2 pt-4 pb-2">
               <div
                 ref={sliderRef}
-                className="relative h-2 bg-stone-200 rounded-full w-full touch-none"
+                className="log-time-slider relative h-2 bg-stone-200 rounded-full w-full touch-none"
               >
                 {/* Track Fill */}
                 <div
@@ -808,7 +809,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 <div
                   onMouseDown={() => setIsDraggingStart(true)}
                   onTouchStart={(e) => { e.stopPropagation(); setIsDraggingStart(true); }}
-                  className="absolute top-1/2 -translate-y-1/2 w-6 h-6 bg-white border-2 rounded-full shadow-md z-10 flex items-center justify-center hover:scale-110 transition-transform cursor-grab active:cursor-grabbing"
+                  className="log-time-slider-handle absolute top-1/2 -translate-y-1/2 w-6 h-6 bg-white border-2 rounded-full z-10 flex items-center justify-center hover:scale-110 transition-transform cursor-grab active:cursor-grabbing"
                   style={{ 
                     left: `calc(${timeCalc.startPercent}% - 12px)`,
                     borderColor: 'var(--accent-color)'
@@ -821,7 +822,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 <div
                   onMouseDown={() => setIsDraggingEnd(true)}
                   onTouchStart={(e) => { e.stopPropagation(); setIsDraggingEnd(true); }}
-                  className="absolute top-1/2 -translate-y-1/2 w-6 h-6 border-2 rounded-full shadow-md z-10 flex items-center justify-center hover:scale-110 transition-transform cursor-grab active:cursor-grabbing"
+                  className="log-time-slider-handle absolute top-1/2 -translate-y-1/2 w-6 h-6 border-2 rounded-full z-10 flex items-center justify-center hover:scale-110 transition-transform cursor-grab active:cursor-grabbing"
                   style={{ 
                     left: `calc(${timeCalc.endPercent}% - 12px)`,
                     backgroundColor: 'var(--accent-color)',

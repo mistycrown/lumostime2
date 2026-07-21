@@ -1,3 +1,8 @@
+/**
+ * @file NFCSettingsView.tsx
+ * @description Configures NFC tag read and write actions.
+ * @updated 2026-07-21: Unified dark-mode NFC action buttons and disabled states.
+ */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Nfc, Crosshair, Tag, Search, Trash2, CheckCircle2 } from 'lucide-react';
 import { ToastType } from '../../components/Toast';
@@ -323,7 +328,7 @@ export const NFCSettingsView: React.FC<NFCSettingsViewProps> = ({
                 successMessage: '快速打点标签写入成功',
                 errorPrefix: '快速打点标签写入失败：'
               })}
-              className="w-full py-3 bg-stone-800 text-white rounded-xl font-bold shadow-lg shadow-stone-200 active:scale-[0.98] transition-all"
+              className="nfc-action-button w-full py-3 bg-stone-800 text-white rounded-xl font-bold shadow-lg shadow-stone-200 active:scale-[0.98] transition-all"
             >
               写入快速打点标签
             </button>
@@ -388,7 +393,7 @@ export const NFCSettingsView: React.FC<NFCSettingsViewProps> = ({
                   errorPrefix: '活动标签写入失败：'
                 }
               )}
-              className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 active:scale-[0.98] transition-all disabled:opacity-50 disabled:shadow-none"
+              className="nfc-action-button w-full py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 active:scale-[0.98] transition-all disabled:opacity-50 disabled:shadow-none"
             >
               写入活动标签
             </button>
@@ -428,7 +433,7 @@ export const NFCSettingsView: React.FC<NFCSettingsViewProps> = ({
                   errorPrefix: '日课标签写入失败：'
                 }
               )}
-              className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-200 active:scale-[0.98] transition-all disabled:opacity-50 disabled:shadow-none"
+              className="nfc-action-button w-full py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-200 active:scale-[0.98] transition-all disabled:opacity-50 disabled:shadow-none"
             >
               写入日课标签
             </button>
@@ -479,7 +484,7 @@ export const NFCSettingsView: React.FC<NFCSettingsViewProps> = ({
                 successMessage: '标签内容已清除',
                 errorPrefix: '清除失败：'
               })}
-              className="w-full py-3 bg-red-50 text-red-500 border border-red-100 rounded-xl font-bold active:scale-[0.98] transition-all"
+              className="nfc-action-button nfc-danger-action w-full py-3 bg-red-50 text-red-500 border border-red-100 rounded-xl font-bold active:scale-[0.98] transition-all"
             >
               清除标签内容
             </button>

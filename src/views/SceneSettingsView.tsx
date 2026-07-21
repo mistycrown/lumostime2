@@ -2,6 +2,7 @@
  * @file SceneSettingsView.tsx
  * @description 场景设置页面 - 管理场景组、时间段和快捷方式
  *
+ * @updated 2026-07-21: Replaced shadow-only scene-mode selection with a dark-mode outline state.
  * @updated 2026-05-11: Added manual-mode scene-group ordering controls via a shared order-list component.
  * 修改历史:
  * - 2026-03-19: 调整根布局为全屏覆盖层，修复页面白屏无法打开的问题。
@@ -1261,7 +1262,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
                     onClick={() => updateSwitchMode('manual')}
                     className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
                       switchMode === 'manual'
-                        ? 'bg-white text-stone-900 shadow-sm'
+                        ? 'scene-mode-selected bg-white text-stone-900'
                         : 'text-stone-600 hover:text-stone-800'
                     }`}
                   >
@@ -1271,7 +1272,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
                     onClick={() => updateSwitchMode('auto')}
                     className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
                       switchMode === 'auto'
-                        ? 'bg-white text-stone-900 shadow-sm'
+                        ? 'scene-mode-selected bg-white text-stone-900'
                         : 'text-stone-600 hover:text-stone-800'
                     }`}
                   >

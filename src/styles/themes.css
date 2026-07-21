@@ -1931,6 +1931,7 @@ html[data-theme-mode=dark] {
   --icon-button-icon: #fafaf9;
   --icon-button-hover-bg: rgba(250, 250, 249, 0.14);
   --progress-bar-bg: #44403c;
+  --progress-bar-fill: #d6d3d1;
   --card-bg: #292524;
   --card-border: #57534e;
   --card-hover-border: #78716c;
@@ -1956,6 +1957,11 @@ html[data-theme-mode=dark] #root {
 html[data-theme-mode=dark] .bg-white,
 html[data-theme-mode=dark] .bg-\[\#fdfbf7\],
 html[data-theme-mode=dark] .bg-\[\#fafaf9\] { background-color: #292524; }
+html[data-theme-mode=dark] .bg-\[\#faf9f6\],
+html[data-theme-mode=dark] [class*="bg-\[\#fdfbf7\]"],
+html[data-theme-mode=dark] [class*="bg-\[\#fafaf9\]"],
+html[data-theme-mode=dark] [class*="bg-\[\#faf9f6\]"] { background-color: #1c1917 !important; }
+html[data-theme-mode=dark] [class*="bg-white/"] { background-color: rgba(41, 37, 36, 0.9) !important; }
 html[data-theme-mode=dark] .bg-stone-50 { background-color: #292524; }
 html[data-theme-mode=dark] .bg-stone-100 { background-color: #44403c; }
 html[data-theme-mode=dark] .bg-stone-200 { background-color: #57534e; }
@@ -1970,3 +1976,525 @@ html[data-theme-mode=dark] .border-stone-50,
 html[data-theme-mode=dark] .border-stone-100,
 html[data-theme-mode=dark] .border-stone-200 { border-color: #44403c; }
 html[data-theme-mode=dark] ::-webkit-scrollbar-thumb { background: #57534e; }
+
+html[data-theme-mode=dark] header,
+html[data-theme-mode=dark] nav,
+html[data-theme-mode=dark] [class*="backdrop-blur"] {
+  border-color: #44403c;
+}
+
+/* Main view compatibility for legacy Tailwind utility colors. */
+html[data-theme-mode=dark] .bg-white,
+html[data-theme-mode=dark] .bg-stone-50,
+html[data-theme-mode=dark] .bg-stone-50\/30,
+html[data-theme-mode=dark] .bg-stone-50\/50,
+html[data-theme-mode=dark] .bg-stone-50\/60,
+html[data-theme-mode=dark] .bg-stone-50\/70,
+html[data-theme-mode=dark] .bg-stone-50\/80,
+html[data-theme-mode=dark] .bg-stone-100,
+html[data-theme-mode=dark] .bg-stone-100\/30,
+html[data-theme-mode=dark] .bg-stone-100\/50,
+html[data-theme-mode=dark] .bg-stone-100\/60,
+html[data-theme-mode=dark] .bg-stone-100\/70,
+html[data-theme-mode=dark] .bg-stone-100\/80 { background-color: #292524 !important; }
+
+html[data-theme-mode=dark] .text-stone-900,
+html[data-theme-mode=dark] .text-stone-800,
+html[data-theme-mode=dark] .text-stone-700,
+html[data-theme-mode=dark] .text-slate-700 { color: #f5f5f4 !important; }
+
+html[data-theme-mode=dark] .text-stone-600,
+html[data-theme-mode=dark] .text-stone-500,
+html[data-theme-mode=dark] .text-slate-600,
+html[data-theme-mode=dark] .text-slate-500 { color: #d6d3d1 !important; }
+
+html[data-theme-mode=dark] .text-stone-400,
+html[data-theme-mode=dark] .text-stone-300,
+html[data-theme-mode=dark] .text-slate-400 { color: #a8a29e !important; }
+
+html[data-theme-mode=dark] .border-stone-100,
+html[data-theme-mode=dark] .border-stone-200,
+html[data-theme-mode=dark] .border-stone-300,
+html[data-theme-mode=dark] .border-stone-300\/70,
+html[data-theme-mode=dark] .border-stone-200\/80,
+html[data-theme-mode=dark] .border-\[\#faf9f6\] { border-color: #57534e !important; }
+
+html[data-theme-mode=dark] .hover\:bg-stone-50:hover,
+html[data-theme-mode=dark] .hover\:bg-stone-100:hover { background-color: #44403c !important; }
+
+/* Page shells still using inline paper colors. Keep custom-image branches transparent. */
+html[data-theme-mode=dark] [style*="250, 249, 246"],
+html[data-theme-mode=dark] [style*="250,249,246"],
+html[data-theme-mode=dark] [style*="250, 249, 246" i] {
+  background-color: #1c1917 !important;
+}
+
+html[data-theme-mode=dark] [style*="#faf9f6"] {
+  background-color: #1c1917 !important;
+}
+
+html[data-theme-mode=dark] [style*="255, 255, 255"],
+html[data-theme-mode=dark] [style*="255,255,255"] {
+  background-color: #292524 !important;
+}
+
+/* Buttons use a compact depth cue in dark mode, never a pale outer glow. */
+html[data-theme-mode=dark] button.shadow-sm,
+html[data-theme-mode=dark] button.shadow-md,
+html[data-theme-mode=dark] button.shadow-lg,
+html[data-theme-mode=dark] button[class*="shadow-stone"],
+html[data-theme-mode=dark] button[class*="shadow-green"],
+html[data-theme-mode=dark] button[class*="shadow-red"],
+html[data-theme-mode=dark] button[class*="shadow-blue"] {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.38) !important;
+}
+
+/* Rule creation states: selection and commit must remain legible in dark mode. */
+html[data-theme-mode=dark] .rule-category-selected {
+  background-color: #57534e !important;
+  border-color: #a8a29e !important;
+  color: #fafaf9 !important;
+  box-shadow: inset 0 0 0 1px rgba(250, 250, 249, 0.12);
+}
+
+html[data-theme-mode=dark] .rule-activity-selected {
+  background-color: rgba(68, 64, 60, 0.72);
+  box-shadow: inset 0 0 0 1px #a8a29e;
+}
+
+html[data-theme-mode=dark] .rule-scope-selected {
+  background-color: #57534e !important;
+  border-color: #a8a29e !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35) !important;
+}
+
+html[data-theme-mode=dark] .rule-confirm-action {
+  background-color: #292524 !important;
+  border-color: #78716c !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35) !important;
+}
+
+html[data-theme-mode=dark] .rule-confirm-action:hover {
+  background-color: #44403c !important;
+}
+
+/* Preference toggles retain a bright thumb and clear enabled state in dark mode. */
+html[data-theme-mode=dark] button.w-12.h-7.rounded-full {
+  border: 1px solid #78716c;
+  background-color: #57534e !important;
+}
+
+html[data-theme-mode=dark] button.w-12.h-7.rounded-full.bg-stone-800 {
+  border-color: #4ade80;
+  background-color: #15803d !important;
+}
+
+html[data-theme-mode=dark] button.w-12.h-7.rounded-full > div.w-5.h-5.bg-white {
+  background-color: #fafaf9 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.48) !important;
+}
+
+/* Default record, archive, and index segmented selectors. */
+html[data-theme-mode=dark] .flex.items-center.gap-1.bg-stone-100 > button.bg-white {
+  background-color: #57534e !important;
+  color: #fafaf9 !important;
+  box-shadow: inset 0 0 0 1px #a8a29e, 0 1px 2px rgba(0, 0, 0, 0.32) !important;
+}
+
+/* Effect notices remain informative without carrying a day-mode paper background. */
+html[data-theme-mode=dark] .effect-note {
+  border: 1px solid rgba(180, 83, 9, 0.55);
+  background-color: rgba(120, 53, 15, 0.24);
+  color: #d6d3d1 !important;
+}
+
+html[data-theme-mode=dark] .effect-note-title,
+html[data-theme-mode=dark] .effect-note-label {
+  color: #fcd34d !important;
+  background-color: transparent !important;
+}
+
+/* Checkbox-based setting toggles use the same high-contrast enabled state. */
+html[data-theme-mode=dark] label.relative.inline-flex.items-center.cursor-pointer input.peer:checked + div.w-11.h-6 {
+  border: 1px solid #4ade80 !important;
+  background-color: #15803d !important;
+}
+
+html[data-theme-mode=dark] label.relative.inline-flex.items-center.cursor-pointer input.peer + div.w-11.h-6 {
+  border: 1px solid #78716c;
+  background-color: #57534e !important;
+}
+
+html[data-theme-mode=dark] label.relative.inline-flex.items-center.cursor-pointer input.peer:checked + div.w-11.h-6::after {
+  border-color: #fafaf9 !important;
+  background-color: #fafaf9 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.48);
+}
+
+/* Selects and segmented modes use white outlines rather than shadow-only selection. */
+html[data-theme-mode=dark] .scene-mode-selected {
+  background-color: #57534e !important;
+  color: #fafaf9 !important;
+  box-shadow: inset 0 0 0 1px #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .theme-select-trigger {
+  border-color: #78716c !important;
+  background-color: #292524 !important;
+  color: #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .theme-select-trigger .text-stone-900 {
+  color: #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .theme-select-option-selected {
+  background-color: #57534e !important;
+  color: #fafaf9 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .theme-select-option-check {
+  color: #fafaf9 !important;
+}
+
+/* Record detail associations: outlines identify only selected tags. */
+html[data-theme-mode=dark] .record-association-selected {
+  background-color: #44403c !important;
+  border-color: #f5f5f4 !important;
+  color: #fafaf9 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .record-association-activity-selected {
+  outline: 2px solid #f5f5f4;
+  outline-offset: 2px;
+}
+
+html[data-theme-mode=dark] .record-detail-modal {
+  background-color: #292524 !important;
+  border: 1px solid #57534e;
+}
+
+html[data-theme-mode=dark] .record-detail-modal-header {
+  border-color: #57534e !important;
+  background-color: #292524 !important;
+}
+
+/* Todo calendars share a neutral black header and readable schedule text. */
+html[data-theme-mode=dark] .week-date-column {
+  background-color: transparent !important;
+}
+
+html[data-theme-mode=dark] .month-view-header,
+html[data-theme-mode=dark] .month-view-weekday-header {
+  background-color: #1c1917 !important;
+  border-color: #57534e !important;
+}
+
+html[data-theme-mode=dark] .text-stone-950,
+html[data-theme-mode=dark] .dark\:text-stone-100 {
+  color: #f5f5f4 !important;
+}
+
+/* Standalone date picker surfaces and calendar selections. */
+html[data-theme-mode=dark] .todo-date-picker-backdrop {
+  background-color: rgba(0, 0, 0, 0.66) !important;
+}
+
+html[data-theme-mode=dark] .todo-date-picker {
+  border-color: #78716c !important;
+  background-color: #292524 !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.48) !important;
+}
+
+html[data-theme-mode=dark] .todo-date-picker .border-stone-200 {
+  border-color: #57534e !important;
+}
+
+/* Detail heatmaps and record-duration range sliders. */
+html[data-theme-mode=dark] .detail-heatmap-cell.bg-stone-50 {
+  background-color: #292524 !important;
+}
+
+html[data-theme-mode=dark] .log-time-slider {
+  background-color: #57534e !important;
+}
+
+html[data-theme-mode=dark] .log-time-slider-handle {
+  border-color: #f5f5f4 !important;
+  background-color: #292524 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .log-time-slider-handle > div {
+  background-color: #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .date-picker-selected {
+  border-color: #f5f5f4 !important;
+  background-color: #57534e !important;
+  box-shadow: none !important;
+}
+
+/* Collection picker rows use an outline, not a light day-mode fill. */
+html[data-theme-mode=dark] .collection-option-selected {
+  background-color: #44403c !important;
+  box-shadow: inset 0 0 0 1px #f5f5f4 !important;
+}
+
+/* NFC writing actions use restrained dark surfaces instead of day-mode color fills. */
+html[data-theme-mode=dark] .nfc-action-button {
+  border: 1px solid #78716c !important;
+  background-color: #292524 !important;
+  color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .nfc-action-button:hover:not(:disabled) {
+  background-color: #44403c !important;
+}
+
+html[data-theme-mode=dark] .nfc-action-button:disabled {
+  border-color: #44403c !important;
+  background-color: #292524 !important;
+  color: #78716c !important;
+  opacity: 1 !important;
+}
+
+html[data-theme-mode=dark] .nfc-danger-action {
+  border-color: #991b1b !important;
+  background-color: rgba(127, 29, 29, 0.28) !important;
+  color: #fca5a5 !important;
+}
+
+/* App association rules keep information and permission states readable in dark mode. */
+html[data-theme-mode=dark] .app-rule-info-notice {
+  border: 1px solid rgba(3, 105, 161, 0.72);
+  background-color: rgba(12, 74, 110, 0.28) !important;
+  color: #dbeafe !important;
+}
+
+html[data-theme-mode=dark] .app-rule-info-notice .text-blue-700 {
+  color: #bfdbfe !important;
+}
+
+html[data-theme-mode=dark] .app-rule-permission-notice {
+  border-color: rgba(217, 119, 6, 0.72) !important;
+  background-color: rgba(120, 53, 15, 0.24) !important;
+}
+
+html[data-theme-mode=dark] .app-rule-permission-notice .text-amber-900,
+html[data-theme-mode=dark] .app-rule-permission-notice .text-amber-700 {
+  color: #fde68a !important;
+}
+
+html[data-theme-mode=dark] .app-rule-search,
+html[data-theme-mode=dark] .app-rule-list {
+  border-color: #57534e !important;
+  background-color: #292524 !important;
+  box-shadow: none !important;
+}
+
+/* App-awareness workflow surfaces use the same restrained dark hierarchy. */
+html[data-theme-mode=dark] .app-awareness-permission-notice {
+  border-color: rgba(217, 119, 6, 0.72) !important;
+  background-color: rgba(120, 53, 15, 0.24) !important;
+}
+
+html[data-theme-mode=dark] .app-awareness-permission-notice .bg-amber-100 {
+  background-color: rgba(120, 53, 15, 0.48) !important;
+}
+
+html[data-theme-mode=dark] .app-awareness-permission-notice .text-amber-950,
+html[data-theme-mode=dark] .app-awareness-permission-notice .text-amber-800 {
+  color: #fde68a !important;
+}
+
+html[data-theme-mode=dark] .app-awareness-info-notice {
+  border-color: rgba(3, 105, 161, 0.72) !important;
+  background-color: rgba(12, 74, 110, 0.28) !important;
+  color: #dbeafe !important;
+}
+
+html[data-theme-mode=dark] .app-awareness-info-notice .text-blue-900,
+html[data-theme-mode=dark] .app-awareness-info-notice .text-blue-700 {
+  color: #bfdbfe !important;
+}
+
+html[data-theme-mode=dark] .app-awareness-toggle {
+  border-color: #57534e !important;
+  background-color: #292524 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .app-awareness-toggle-track.bg-stone-800 {
+  border: 1px solid #f5f5f4;
+  background-color: #57534e !important;
+}
+
+html[data-theme-mode=dark] .app-awareness-toggle-track.bg-stone-200 {
+  border: 1px solid #78716c;
+  background-color: #44403c !important;
+}
+
+html[data-theme-mode=dark] .app-awareness-toggle-track > span {
+  background-color: #fafaf9 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .app-awareness-activity-selected {
+  border-color: #f5f5f4 !important;
+  background-color: #44403c !important;
+  color: #fafaf9 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .app-awareness-view .border-stone-700.bg-stone-100 {
+  border-color: #f5f5f4 !important;
+  background-color: #44403c !important;
+  color: #fafaf9 !important;
+  box-shadow: none !important;
+}
+
+/* Record activity badges retain category cues without day-mode pastel disks. */
+html[data-theme-mode=dark] .record-activity-icon {
+  border: 1px solid color-mix(in srgb, var(--record-activity-accent) 44%, #57534e) !important;
+  background-color: color-mix(in srgb, var(--record-activity-accent) 14%, #292524) !important;
+  box-shadow: none !important;
+}
+
+/* Floating timers use the same graphite surface and crisp outline as active states. */
+html[data-theme-mode=dark] .timer-floating-panel {
+  border: 1px solid #d6d3d1 !important;
+  background-color: rgba(41, 37, 36, 0.97) !important;
+  color: #f5f5f4 !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.42) !important;
+}
+
+html[data-theme-mode=dark] .timer-floating-icon {
+  background-color: #292524 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .timer-floating-panel .text-stone-700 {
+  color: #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .timer-floating-panel .bg-stone-100 {
+  background-color: #44403c !important;
+}
+
+html[data-theme-mode=dark] .timer-floating-panel .border-stone-100 {
+  border-color: #57534e !important;
+  background-color: transparent !important;
+}
+
+html[data-theme-mode=dark] .timer-floating-panel span[style*="--accent-color"] {
+  color: #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .timer-floating-confirm {
+  color: #f5f5f4 !important;
+}
+
+/* Widget template creation uses an outline only for the selected type and size. */
+html[data-theme-mode=dark] .widget-template-choice {
+  border-color: transparent !important;
+  background-color: transparent !important;
+  color: #d6d3d1 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .widget-template-choice:hover {
+  background-color: #292524 !important;
+}
+
+html[data-theme-mode=dark] .widget-template-choice-selected {
+  border-color: #f5f5f4 !important;
+  background-color: #44403c !important;
+  color: #fafaf9 !important;
+}
+
+/* Obsidian export fields and help notes remain distinct on graphite surfaces. */
+html[data-theme-mode=dark] .obsidian-export-view .bg-stone-50.focus-within\:ring-2,
+html[data-theme-mode=dark] .obsidian-export-view input.bg-white.border-stone-200 {
+  border: 1px solid #78716c !important;
+  background-color: #292524 !important;
+  color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .obsidian-export-view .bg-stone-50.focus-within\:ring-2:focus-within,
+html[data-theme-mode=dark] .obsidian-export-view input.bg-white.border-stone-200:focus {
+  border-color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .obsidian-export-view input::placeholder {
+  color: #a8a29e !important;
+}
+
+html[data-theme-mode=dark] .obsidian-save-action {
+  border: 1px solid #78716c !important;
+  background-color: #292524 !important;
+  color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .obsidian-save-action:hover {
+  background-color: #44403c !important;
+}
+
+html[data-theme-mode=dark] .obsidian-export-help {
+  border: 1px solid rgba(3, 105, 161, 0.72);
+  background-color: rgba(12, 74, 110, 0.28) !important;
+  color: #bfdbfe !important;
+}
+
+/* Review template controls use outlines only to identify active selections. */
+html[data-theme-mode=dark] .review-add-question {
+  border: 1px solid #78716c;
+  background-color: #292524 !important;
+  color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .review-add-question:hover {
+  background-color: #44403c !important;
+}
+
+html[data-theme-mode=dark] .review-question-type-group {
+  background-color: #292524 !important;
+}
+
+html[data-theme-mode=dark] .review-question-type-option {
+  border: 1px solid transparent;
+  background-color: transparent !important;
+  color: #a8a29e !important;
+}
+
+html[data-theme-mode=dark] .review-question-type-selected {
+  border: 1px solid #f5f5f4 !important;
+  background-color: #44403c !important;
+  color: #fafaf9 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .review-question-type-badge {
+  border: 1px solid #57534e;
+  background-color: #292524 !important;
+  color: #d6d3d1 !important;
+}
+
+html[data-theme-mode=dark] .review-question-color-option {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .review-question-color-selected {
+  border-color: #f5f5f4 !important;
+  outline: 2px solid #f5f5f4;
+  outline-offset: 2px;
+  box-shadow: none !important;
+}

@@ -1,5 +1,6 @@
 /**
  * @file ScopeAssociation.tsx
+ * @updated 2026-07-21: Updated record-detail scope chips to use outline-only selection.
  * @input scopes list, selected IDs
  * @output Scope Selection Grid
  * @pos Component (Input)
@@ -58,8 +59,8 @@ export const ScopeAssociation: React.FC<ScopeAssociationProps> = ({ scopes, sele
                             key={scope.id}
                             onClick={() => handleToggle(scope.id)}
                             className={`px-2 py-2 rounded-lg text-[10px] font-medium text-center transition-colors flex items-center justify-center gap-1.5 truncate ${isSelected
-                                ? 'btn-template-filled'
-                                : 'bg-stone-50 text-stone-500 border border-stone-100 hover:bg-stone-100'
+                                ? 'record-association-selected bg-stone-800 text-white border border-stone-500'
+                                : 'bg-transparent text-stone-500 hover:bg-stone-100'
                                 }`}
                         >
                             <IconRenderer icon={scope.icon || '📍'} uiIcon={scope.uiIcon} className="text-xs" />
