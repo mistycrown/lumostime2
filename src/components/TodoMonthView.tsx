@@ -11,6 +11,7 @@
  * @updated 2026-06-13: 调整显示设置弹窗中已选择选项的背景和文字对比度，将更浅的 bg-stone-100 调整为 bg-stone-200，并加深字体颜色。
  * @updated 2026-06-13: 调整月视图中各条目的颜色：Trace 和已完成任务（Completed）使用灰色，而 Maybe, Arrange, Due, Repeat 任务使用较黑的颜色以示区分。
  * Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-07-21: Reads the shared calendar number style so modern typography applies consistently with the desktop month calendar.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -41,6 +42,10 @@ import {
 } from '../utils/todoScheduleUtils';
 import { getParentTodo } from '../utils/todoHierarchyUtils';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
+import {
+  getCalendarNumberTextStyle,
+  useCalendarNumberStyle
+} from '../services/calendarNumberStyleService';
 import { hexToRgba } from '../utils/colorUtils';
 import { matchesTodoFilterExpression } from '../utils/filterUtils';
 import { TodoScheduleTypeColorSettings as TodoScheduleTypeColorSettingsPanel } from './TodoScheduleTypeColorSettings';
@@ -66,6 +71,7 @@ interface TodoMonthViewProps {
   onOpenTodo?: (todo: TodoItem) => void;
   isScheduleLocked?: boolean;
   onToggleScheduleLock?: () => void;
+
 }
 
 interface TodoMonthWeek {
@@ -240,6 +246,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   isScheduleLocked = false,
   onToggleScheduleLock
 }) => {
+  const calendarNumberStyle = useCalendarNumberStyle();
   const today = useMemo(() => new Date(), []);
   const initialMonthRange = useMemo(
     () => createLoadedMonthRange(startOfMonth(today)),
@@ -1395,7 +1402,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                               onClick={(event) => handleMonthDayNumberClick(event, dateKey)}
                               className={`rounded-sm text-[1.02rem] leading-none transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-500/70 ${dayNumberTextClassName}`}
                               style={{
-                                fontFamily: "'Bilbo Swash Caps', 'Georgia', 'Times New Roman', cursive, serif",
+                                ...getCalendarNumberTextStyle(calendarNumberStyle),
                                 lineHeight: `${MONTH_VIEW_DAY_NUMBER_ROW_HEIGHT_PX}px`
                               }}
                               aria-label={`Quick add task for ${format(day, 'yyyy-MM-dd')}`}

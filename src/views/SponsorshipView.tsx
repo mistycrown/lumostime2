@@ -7,6 +7,7 @@
  * @updated 2026-04-19: Switched custom sticker set management to a centered modal editor with fixed 16-slot uploads, small-square tiles, and direct delete confirmations.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-07-21: Added the synchronized month-calendar number style selector to the style tab.
  */
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, Fish, Check, X, Plus } from 'lucide-react';
@@ -22,6 +23,7 @@ import { ColorSchemeSelector } from '../components/ColorSchemeSelector';
 import { CustomColorGroupManager } from '../components/CustomColorGroupManager';
 import { AchievementBottleIconPackSelector } from '../components/achievement/AchievementBottleIconPackSelector';
 import { AchievementBottleStyleSelector } from '../components/achievement/AchievementBottleStyleSelector';
+import { CalendarNumberStyleSelector } from '../components/CalendarNumberStyleSelector';
 import { iconService, ICON_OPTIONS } from '../services/iconService';
 import { Category } from '../types';
 import { useSettings } from '../contexts/SettingsContext';
@@ -1487,6 +1489,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                 <div className="pt-2 space-y-4">
                                     <AchievementBottleIconPackSelector />
                                     <AchievementBottleStyleSelector />
+                                    <CalendarNumberStyleSelector />
                                     <TimelineStyleSelector onToast={onToast} />
                                     <ScheduleStyleSelector />
                                 </div>

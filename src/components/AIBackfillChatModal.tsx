@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-07-21: Kept the composer Stop state tied to the active foreground request so ordinary requests remain cancellable even if a loading branch resets early.
  * @updated 2026-07-06: Added assistant-created principle and self-belief tool-call writeback with in-chat undo support.
  * @updated 2026-07-05: Connected ordinary foreground assistant local-query turns to the real category/review datasets and fed local-query history back into follow-up unified turns.
  * @updated 2026-06-07: Added guarded review-command dispatch so weekly/monthly newspaper command setup errors now surface as chat error messages instead of failing silently.
@@ -552,6 +553,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [userProfile, setUserProfile] = useState<AIChatUserProfile>(initialState.userProfile);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
   const [isPersonaPanelOpen, setIsPersonaPanelOpen] = useState(false);
   const [isNewSessionDialogOpen, setIsNewSessionDialogOpen] = useState(false);
@@ -642,6 +644,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [editingSelfBeliefDescriptionText, setEditingSelfBeliefDescriptionText] = useState('');
   const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
   const activeRequestRef = useRef<ActiveRequestRef | null>(null);
+  const isStopActionVisible = isLoading || activeRequestId !== null;
   const isDesktopWidgetMode = displayMode === 'desktop-widget';
   const isOpenRef = useRef(isOpen);
   const wasOpenRef = useRef(isOpen);
@@ -6013,7 +6016,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   const handleSend = async (overrideText?: string, options?: ForegroundSendOptions) => {
     const trimmedText = (overrideText ?? inputText).trim();
-    if (!trimmedText || isLoading || !activeSession) {
+    if (!trimmedText || isStopActionVisible || !activeSession) {
       return;
     }
 
@@ -6189,6 +6192,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       sessionId,
       pendingMessageId
     };
+    setActiveRequestId(pendingMessageId);
 
     try {
       if (isWeeklyReviewTemplateSession) {
@@ -6339,6 +6343,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     } finally {
       if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
         activeRequestRef.current = null;
+        setActiveRequestId(null);
         setIsLoading(false);
       }
     }
@@ -6347,11 +6352,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const handleStopRequest = () => {
     const activeRequest = activeRequestRef.current;
     if (!activeRequest) {
+      setActiveRequestId(null);
+      setIsLoading(false);
       return;
     }
 
     activeRequest.controller.abort();
     activeRequestRef.current = null;
+    setActiveRequestId(null);
     setIsLoading(false);
     replacePendingWithResult(activeRequest.sessionId, activeRequest.pendingMessageId, '已停止这次请求。', {
       tone: 'system'
@@ -6889,16 +6897,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               )}
               <button
                 onClick={() => {
-                  if (isLoading) {
+                  if (isStopActionVisible) {
                     handleStopRequest();
                     return;
                   }
                   void handleSend();
                 }}
-                disabled={!isLoading && !inputText.trim()}
+                disabled={!isStopActionVisible && !inputText.trim()}
                 className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-[0.8rem] border transition-all disabled:cursor-not-allowed disabled:opacity-50"
                 style={
-                  isLoading
+                  isStopActionVisible
                     ? {
                         border: `1px solid ${AI_CHAT_THEME.chipBorder}`,
                         backgroundColor: AI_CHAT_THEME.inputBg,
@@ -6910,9 +6918,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                         color: AI_CHAT_THEME.primaryButtonText
                       }
                 }
-                title={isLoading ? '停止' : '发送'}
+                title={isStopActionVisible ? '停止' : '发送'}
               >
-                {isLoading ? <Square size={16} /> : <Send size={16} />}
+                {isStopActionVisible ? <Square size={16} /> : <Send size={16} />}
               </button>
             </div>
           </div>

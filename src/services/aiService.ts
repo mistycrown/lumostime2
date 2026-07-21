@@ -3,6 +3,7 @@
  * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
  * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
  * @pos Service (AI Integration Layer)
+ * @updated 2026-07-21: Corrected Android native AI request timeout to 120 seconds; the HTTP plugin timeout unit is seconds.
  * @updated 2026-07-06: Added principle-library and self-belief create tool-call payloads for foreground assistant writeback.
  * @updated 2026-05-18: `create_todo` unified-turn tool calls can now carry nested `subtasks`, letting one assistant action create a parent todo together with its direct children in one pass.
  * @updated 2026-05-17: AI preset/config writes now mark the unified AI backup state as changed so provider/preset edits participate in the main backup and cloud-sync timestamp.
@@ -542,7 +543,7 @@ const nativeFetch = async (url: string, options: any) => {
         method: (options.method || 'GET').toLowerCase(),
         data: options.body ? JSON.parse(options.body) : {},
         headers: options.headers,
-        timeout: 60000 // 60s timeout for AI
+        timeout: 120 // Native HTTP plugin timeout is measured in seconds.
     };
 
     if (signal?.aborted) {

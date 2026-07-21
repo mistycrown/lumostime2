@@ -3,6 +3,7 @@
  * @description 管理应用设置和用户偏好（不包括 Review 系统，Review 由 ReviewContext 管理），并兼容自定义筛选器排序。
  * @updated 2026-05-10: Replaced the old boolean timer auto-open flag with a three-state post-start jump mode and legacy storage migration.
  * @updated 2026-04-25: Added configurable timeline quick-action preferences for the timeline header.
+ * @updated 2026-07-21: Added persistent calendar number typography preferences shared by app and desktop month views.
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
@@ -40,6 +41,11 @@ import {
     DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK,
     isAchievementBottleIconPack
 } from '../services/achievementBottleIconPackService';
+import {
+    DEFAULT_CALENDAR_NUMBER_STYLE,
+    isCalendarNumberStyle,
+    type CalendarNumberStyle
+} from '../services/calendarNumberStyleService';
 import { normalizeFiltersOrder } from '../utils/filterUtils';
 import {
     getLocalDataTimestamp,
@@ -62,6 +68,12 @@ import {
     readStoredAutoStartTimerJumpMode,
     type AutoStartTimerJumpMode
 } from '../utils/autoStartTimerJumpMode';
+import {
+    applyThemeMode,
+    DISPLAY_MODE_STORAGE_KEY,
+    readStoredThemeMode,
+    type ThemeMode
+} from '../utils/displayMode';
 
 export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
 export type DefaultIndexView = 'TAGS' | 'SCOPE';
@@ -74,6 +86,7 @@ export type SceneCardTimerMode = 'realtime' | 'backfill'; // 'realtime' 正计�
 export type { ImmersiveTimerOrientation } from '../utils/immersiveOrientation';
 export type { TimelineQuickActionKey } from '../constants/timelineQuickActions';
 export type { AutoStartTimerJumpMode } from '../utils/autoStartTimerJumpMode';
+export type { ThemeMode } from '../utils/displayMode';
 
 interface SettingsContextType {
     // 基础偏好设置
@@ -132,6 +145,9 @@ interface SettingsContextType {
     colorScheme: string;
     setColorScheme: React.Dispatch<React.SetStateAction<string>>;
 
+    themeMode: ThemeMode;
+    setThemeMode: React.Dispatch<React.SetStateAction<ThemeMode>>;
+
     // 字体设置
     fontFamily: string;
     setFontFamily: React.Dispatch<React.SetStateAction<string>>;
@@ -139,6 +155,8 @@ interface SettingsContextType {
     // 日程图样式
     scheduleStyle: ScheduleStyle;
     setScheduleStyle: React.Dispatch<React.SetStateAction<ScheduleStyle>>;
+    calendarNumberStyle: CalendarNumberStyle;
+    setCalendarNumberStyle: React.Dispatch<React.SetStateAction<CalendarNumberStyle>>;
     achievementBottleStyle: AchievementBottleStyle;
     setAchievementBottleStyle: React.Dispatch<React.SetStateAction<AchievementBottleStyle>>;
     achievementBottleIconPack: AchievementBottleIconPack;
@@ -521,6 +539,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         return stored || 'default';
     });
 
+    const [themeMode, setThemeMode] = useState<ThemeMode>(() => readStoredThemeMode(localStorage));
+
     const [fontFamily, setFontFamily] = useState<string>(() => {
         const stored = localStorage.getItem('lumostime_font_family');
         return stored || 'default';
@@ -533,6 +553,13 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             return stored;
         }
         return 'default';
+    });
+
+    const [calendarNumberStyle, setCalendarNumberStyle] = useState<CalendarNumberStyle>(() => {
+        const stored = localStorage.getItem(THEME_KEYS.CALENDAR_NUMBER_STYLE);
+        return isCalendarNumberStyle(stored)
+            ? stored
+            : DEFAULT_CALENDAR_NUMBER_STYLE;
     });
 
     const [achievementBottleStyle, setAchievementBottleStyle] = useState<AchievementBottleStyle>(() => {
@@ -593,6 +620,25 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, [colorScheme]);
 
     useEffect(() => {
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const applyCurrentMode = () => applyThemeMode(
+            document.documentElement,
+            themeMode,
+            mediaQuery.matches
+        );
+
+        localStorage.setItem(DISPLAY_MODE_STORAGE_KEY, themeMode);
+        applyCurrentMode();
+
+        if (themeMode !== 'system') {
+            return undefined;
+        }
+
+        mediaQuery.addEventListener('change', applyCurrentMode);
+        return () => mediaQuery.removeEventListener('change', applyCurrentMode);
+    }, [themeMode]);
+
+    useEffect(() => {
         localStorage.setItem('lumostime_font_family', fontFamily);
         // 同步到 fontService
         fontService.setFont(fontFamily);
@@ -601,6 +647,11 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem(THEME_KEYS.SCHEDULE_STYLE, scheduleStyle);
     }, [scheduleStyle]);
+
+    useEffect(() => {
+        localStorage.setItem(THEME_KEYS.CALENDAR_NUMBER_STYLE, calendarNumberStyle);
+        window.dispatchEvent(new Event('lumostime:calendar-number-style-changed'));
+    }, [calendarNumberStyle]);
 
     useEffect(() => {
         localStorage.setItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_STYLE, achievementBottleStyle);
@@ -734,10 +785,14 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setUiIconTheme,
             colorScheme,
             setColorScheme,
+            themeMode,
+            setThemeMode,
             fontFamily,
             setFontFamily,
             scheduleStyle,
             setScheduleStyle,
+            calendarNumberStyle,
+            setCalendarNumberStyle,
             achievementBottleStyle,
             setAchievementBottleStyle,
             achievementBottleIconPack,

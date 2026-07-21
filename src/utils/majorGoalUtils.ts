@@ -4,11 +4,12 @@
  * @output Progress calculations, time range calculations, validation functions for MajorGoals
  * @pos Utility (MajorGoal Logic)
  * @description Pure functions for managing major goals, including progress calculation, time range management, and validation.
+ * @updated 2026-07-21: Use explicit local calendar-day boundaries for inclusive goal ranges.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { MajorGoal, Goal, Log, TodoItem } from '../types';
-import { calculateGoalProgress } from './goalUtils';
+import { calculateGoalProgress, getGoalDateRange } from './goalUtils';
 
 /**
  * 计算大目标的总进度
@@ -51,8 +52,7 @@ export const calculateMajorGoalProgress = (
   let totalCurrent = 0;
   
   // 转换日期为时间戳
-  const start = new Date(majorGoal.startDate).getTime();
-  const end = new Date(majorGoal.endDate).setHours(23, 59, 59, 999);
+  const { start, end } = getGoalDateRange(majorGoal.startDate, majorGoal.endDate);
   
   if (majorGoal.metric === 'task_count') {
     // 任务数量：统计完成的待办
