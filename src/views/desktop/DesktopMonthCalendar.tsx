@@ -13,6 +13,7 @@
  * @updated 2026-05-17: Wired up click handlers on monthly trace segments to trigger the quick actions popover outside widget bounds.
  * @updated 2026-05-17: Switched desktop month-entry marker colors to the shared `primaryKind`, so completed rows now keep completed styling even when due/arrange/maybe badges also match on the same day.
  * @updated 2026-05-17: 支持在月视图中如果是 due 则在任务名称后显示 flag 图标，如果是 trace 则将文字设为灰色。
+ * @updated 2026-07-21: Reads the shared calendar number style so desktop and app month grids stay synchronized.
  */
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Flag, Repeat2 } from 'lucide-react';
@@ -36,6 +37,10 @@ import {
   type TodoScheduleTypeColorSettings
 } from '../../services/todoScheduleColorService';
 import { resolveDesktopTodoQuickEditorScreenAnchor } from '../../utils/desktopTodoQuickEditorAnchorUtils';
+import {
+  getCalendarNumberTextStyle,
+  useCalendarNumberStyle
+} from '../../services/calendarNumberStyleService';
 
 const WEEKDAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 const MONTH_CELL_VERTICAL_PADDING_PX = 6;
@@ -112,6 +117,7 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
   entryBackgroundOpacity = 0.08,
   onWheelPageChange
 }) => {
+  const calendarNumberStyle = useCalendarNumberStyle();
   const today = useMemo(() => new Date(), []);
   const todayDateKey = useMemo(() => formatDateKey(today), [today]);
   const calendarBodyRef = useRef<HTMLDivElement | null>(null);
@@ -426,7 +432,7 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
                         <span
                           className={`rounded-sm text-[1.02rem] leading-none ${isDark ? 'text-stone-100' : 'text-stone-800'}`}
                           style={{
-                            fontFamily: '\'Bilbo Swash Caps\', \'Georgia\', \'Times New Roman\', cursive, serif',
+                            ...getCalendarNumberTextStyle(calendarNumberStyle),
                             lineHeight: `${MONTH_DAY_NUMBER_ROW_HEIGHT_PX}px`
                           }}
                         >

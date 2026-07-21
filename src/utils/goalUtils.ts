@@ -4,10 +4,21 @@
  * @output Progress calculations (current value, target value, percentage) for Goals
  * @pos Utility (Goal Logic)
  * @description Pure functions for calculating goal progress based on different metrics (duration, task count, frequency, etc.).
+ * @updated 2026-07-21: Use explicit local calendar-day boundaries for inclusive goal ranges.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { Goal, Log, TodoItem } from '../types';
+
+export const getGoalDateRange = (startDate: string, endDate: string): { start: number; end: number } => {
+    const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+    const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+
+    return {
+        start: new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0).getTime(),
+        end: new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999).getTime()
+    };
+};
 
 /**
  * 计算目标的当前进度值
@@ -20,8 +31,7 @@ export const calculateGoalProgress = (
     const { metric, targetValue, scopeId, filterActivityIds, filterTodoCategories, startDate, endDate } = goal;
 
     // 转换日期为时间戳
-    const start = new Date(startDate).getTime();
-    const end = new Date(endDate).setHours(23, 59, 59, 999);
+    const { start, end } = getGoalDateRange(startDate, endDate);
 
     // 过滤符合条件的logs
     let relevantLogs = logs.filter(log => {

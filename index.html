@@ -26,6 +26,12 @@
         };
         const fontFamily = fontMap[savedFont] || fontMap.default;
         document.documentElement.style.setProperty('--font-family', fontFamily);
+        const storedThemeMode = localStorage.getItem('lumostime_theme_mode');
+        const themeMode = ['light', 'dark', 'system'].includes(storedThemeMode) ? storedThemeMode : 'system';
+        const resolvedThemeMode = themeMode === 'system'
+          ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+          : themeMode;
+        document.documentElement.setAttribute('data-theme-mode', resolvedThemeMode);
         console.log('[Font Init] Applied font:', savedFont || 'default', '->', fontFamily);
       } catch (error) {
         console.error('[Font Init] Failed:', error);

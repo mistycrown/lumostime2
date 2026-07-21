@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus, X } from 'lucide-react';
 import { ToastType } from '../../components/Toast';
+import { useSettings } from '../../contexts/SettingsContext';
 import { AutoStartTimerJumpMode, DefaultArchiveView, DefaultIndexView, DefaultRecordView, ImmersiveTimerOrientation, SceneCardTimerMode, TimelineQuickActionKey, TimelineSortOrder } from '../../contexts/SettingsContext';
 import { TIMELINE_QUICK_ACTION_MAX, TIMELINE_QUICK_ACTION_OPTIONS } from '../../constants/timelineQuickActions';
 import {
@@ -115,6 +116,7 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     sceneCardTimerMode = 'realtime',
     onSetSceneCardTimerMode
 }) => {
+    const { themeMode, setThemeMode } = useSettings();
     const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
     const [isAutoStartTimerJumpModeDropdownOpen, setIsAutoStartTimerJumpModeDropdownOpen] = useState(false);
     const [isTimelineQuickActionsExpanded, setIsTimelineQuickActionsExpanded] = useState(false);
@@ -159,6 +161,18 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-40">
+                <div className="space-y-3">
+                    <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">{'\u663e\u793a\u6a21\u5f0f'}</h3>
+                    <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)] p-2 grid grid-cols-3 gap-1">
+                        {([['light', '\u6d45\u8272'], ['dark', '\u6df1\u8272'], ['system', '\u8ddf\u968f\u7cfb\u7edf']] as const).map(([mode, label]) => (
+                            <button key={mode} type="button" onClick={() => setThemeMode(mode)} className={`min-h-10 px-2 text-xs font-bold rounded-lg transition-colors ${themeMode === mode ? 'bg-stone-800 text-white shadow-sm' : 'text-stone-500 hover:bg-stone-50 hover:text-stone-700'}`}>
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Privacy Mode */}
                 {/* 通用设置 */}
                 <div className="space-y-3">
                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">通用</h3>
