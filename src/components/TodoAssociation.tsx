@@ -1,5 +1,6 @@
 /**
  * @file TodoAssociation.tsx
+ * @updated 2026-07-21: Updated record-detail category chips to use outline-only selection.
  * @input todos, categories, linked ID, optional hierarchy toggle
  * @output Todo Selection UI
  * @pos Component (Input)
@@ -192,8 +193,8 @@ export const TodoAssociation: React.FC<TodoAssociationProps> = ({
             className={`
               px-2 py-2 rounded-lg text-[10px] font-medium text-center transition-colors flex items-center justify-center gap-1.5 truncate
               ${selectedCatId === category.id
-                ? 'btn-template-filled'
-                : 'bg-stone-50 text-stone-500 border border-stone-100 hover:bg-stone-100'
+                ? 'record-association-selected bg-stone-800 text-white border border-stone-500'
+                : 'bg-transparent text-stone-500 hover:bg-stone-100'
               }
             `}
           >

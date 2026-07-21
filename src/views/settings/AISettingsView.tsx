@@ -1,6 +1,7 @@
 /**
  * @file AISettingsView.tsx
  * @description AI API configuration screen with preset management, provider templates, and model preset selection.
+ * @updated 2026-07-21: Replaced dark-mode save and delete glows with compact semantic borders and surfaces.
  * @updated 2026-05-14: Restyled the selectors to match the preference settings dropdown pattern and changed model selection to preset-first with a custom-input fallback.
  */
 import React, { useEffect, useMemo, useState } from 'react';
@@ -518,7 +519,7 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({ onBack, onToast 
               className={`flex-1 min-w-0 px-3 py-2 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
                 isDefaultPreset
                   ? 'bg-stone-100 text-stone-300 cursor-not-allowed'
-                  : 'bg-red-50 text-red-500 hover:bg-red-100'
+                  : 'border border-red-800/70 bg-red-950/45 text-red-300 hover:bg-red-900/60'
               }`}
             >
               <Trash2 size={16} />
@@ -591,14 +592,14 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({ onBack, onToast 
             <button
               onClick={handleSaveAIConfig}
               disabled={aiTestStatus === 'testing'}
-              className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl font-medium active:scale-[0.98] transition-all shadow-lg mt-4 ${
+              className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl border font-medium active:scale-[0.98] transition-all shadow-sm mt-4 ${
                 aiTestStatus === 'testing'
-                  ? 'bg-stone-400 text-white cursor-not-allowed'
+                  ? 'border-stone-500 bg-stone-400 text-white cursor-not-allowed'
                   : aiTestStatus === 'success'
-                    ? 'bg-green-500 text-white shadow-green-200'
+                    ? 'border-green-400 bg-green-500 text-white'
                     : aiTestStatus === 'error'
-                      ? 'bg-red-500 text-white shadow-red-200'
-                      : 'bg-stone-800 text-white shadow-stone-300 hover:bg-stone-900'
+                      ? 'border-red-400 bg-red-500 text-white'
+                      : 'border-stone-600 bg-stone-800 text-white hover:bg-stone-900'
               }`}
             >
               {aiTestStatus === 'testing' && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}

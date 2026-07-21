@@ -4,8 +4,9 @@
  * @output 导出操作, 配置更新
  * @pos View (Obsidian导出设置)
  * @description Obsidian 导出配置界面,允许用户设置笔记库路径和格式,并执行导出操作
- * @updated 2026-04-09: Added image folder configuration and attachment export handling.
- * 
+ * @updated 2026-07-21: Added semantic dark-mode styles for path inputs, configuration save action, and usage notes.
+ * @updated 2026-04-09: Added image folder configuration and attachment export handling.
+ *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
@@ -432,7 +433,7 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
 
 
     return (
-        <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+        <div className="obsidian-export-view fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             {/* Header */}
             <div
                 className="flex items-center px-4 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md shrink-0 z-10 gap-3 sticky top-0 box-border"
@@ -576,7 +577,7 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                     {/* 保存配置按钮 */}
                     <button
                         onClick={handleSave}
-                        className="flex items-center justify-center gap-2 w-full py-3 bg-stone-800 text-white rounded-xl font-medium active:scale-[0.98] transition-transform shadow-lg shadow-stone-200"
+                        className="obsidian-save-action flex items-center justify-center gap-2 w-full py-3 bg-stone-800 text-white rounded-xl font-medium active:scale-[0.98] transition-transform shadow-lg shadow-stone-200"
                     >
                         <CheckCircle2 size={18} />
                         保存配置
@@ -802,7 +803,7 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
 
 
                 {/* 说明卡片 */}
-                <div className="flex gap-3 p-4 bg-blue-50 rounded-xl text-blue-700 text-sm">
+                <div className="obsidian-export-help flex gap-3 p-4 bg-blue-50 rounded-xl text-blue-700 text-sm">
                     <AlertCircle size={20} className="shrink-0 mt-0.5" />
                     <div>
                         <p className="font-bold mb-1">使用说明</p>

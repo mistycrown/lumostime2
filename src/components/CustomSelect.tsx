@@ -1,5 +1,6 @@
 /**
  * @file CustomSelect.tsx
+ * @updated 2026-07-21: Added semantic hooks for high-contrast dark-mode select states.
  * @description 自定义下拉选择组件 - 与应用主题风格一致
  */
 
@@ -89,7 +90,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
           setIsOpen(!isOpen);
         }}
         disabled={disabled}
-        className={`w-full rounded-xl border px-4 py-2 text-sm outline-none transition-all flex items-center justify-between text-left ${
+        className={`theme-select-trigger w-full rounded-xl border px-4 py-2 text-sm outline-none transition-all flex items-center justify-between text-left ${
           disabled
             ? 'cursor-not-allowed border-stone-200 bg-stone-100 text-stone-400'
             : 'bg-stone-50 border-stone-200 hover:border-stone-300'
@@ -129,12 +130,8 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                   handleSelect(option.value);
                 }}
                 className={`w-full px-4 py-2.5 text-sm text-left hover:bg-stone-50 transition-colors flex items-center justify-between ${
-                  option.value === value ? 'font-bold' : 'text-stone-700'
+                  option.value === value ? 'theme-select-option-selected font-bold' : 'text-stone-700'
                 }`}
-                style={option.value === value ? {
-                  backgroundColor: 'color-mix(in srgb, var(--accent-color) 12%, transparent)',
-                  color: 'var(--accent-color)'
-                } : undefined}
               >
                 <span className="flex min-w-0 items-center gap-2">
                   {option.icon && (
@@ -145,7 +142,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                   <span className="truncate">{option.label}</span>
                 </span>
                 {option.value === value && (
-                  <Check size={16} style={{ color: 'var(--accent-color)' }} />
+                  <Check size={16} className="theme-select-option-check" />
                 )}
               </button>
             ))}

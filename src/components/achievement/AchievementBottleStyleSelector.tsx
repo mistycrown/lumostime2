@@ -137,7 +137,6 @@ export const AchievementBottleStyleSelector: React.FC = () => {
   return (
     <CompactPreviewCardSelector
       title="成就瓶样式"
-      description="用于切换成就页成就瓶的瓶身配色与玻璃气质。"
       options={ACHIEVEMENT_BOTTLE_STYLE_OPTIONS}
       selectedValue={achievementBottleStyle}
       onSelect={(value) => setAchievementBottleStyle(value as AchievementBottleStyle)}

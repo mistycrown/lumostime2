@@ -4,7 +4,8 @@
  * @output Created/Updated/Deleted Templates
  * @pos View (Settings Sub-page)
  * @description A dedicated interface for managing review templates. Allows users to create, edit, reorder, and delete templates and their associated questions.
- * 
+ * @updated 2026-07-21: Added semantic dark-mode states for question creation and type/color selection.
+ *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState } from 'react';
@@ -371,7 +372,7 @@ const TemplateEditor: React.FC<{
             <div className="space-y-3">
                 <div className="flex items-center justify-between px-2">
                     <label className="text-xs font-bold text-stone-400 uppercase">当前问题 ({template.questions.length})</label>
-                    <button onClick={handleAddQuestion} className="flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded hover:bg-blue-100">
+                    <button onClick={handleAddQuestion} className="review-add-question flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded hover:bg-blue-100">
                         <Plus size={14} /> 添加问题
                     </button>
                 </div>
@@ -396,7 +397,7 @@ const TemplateEditor: React.FC<{
                                 </div>
                                 <div className="flex-1" onClick={() => setEditingQuestionId(q.id)}>
                                     <div className="flex items-center gap-2 mb-1">
-                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${q.type === 'text' ? 'bg-stone-100 text-stone-500' :
+                                        <span className={`review-question-type-badge text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${q.type === 'text' ? 'bg-stone-100 text-stone-500' :
                                             q.type === 'rating' ? 'bg-orange-50 text-orange-500' : 'bg-purple-50 text-purple-500'
                                             }`}>
                                             {q.type === 'text' ? '文本' : q.type === 'rating' ? '评分' : '单选'}
@@ -440,14 +441,14 @@ const QuestionEditor: React.FC<{
 
             <div className="space-y-1">
                 <label className="text-[10px] font-bold text-stone-400 uppercase">类型</label>
-                <div className="flex bg-stone-100 p-1 rounded-xl">
+                <div className="review-question-type-group flex bg-stone-100 p-1 rounded-xl">
                     {(['text', 'rating', 'choice'] as QuestionType[]).map(t => (
                         <button
                             key={t}
                             onClick={() => onUpdate({ ...question, type: t })}
                             className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${question.type === t
-                                ? 'bg-white text-stone-800 shadow-sm'
-                                : 'text-stone-400 hover:text-stone-600'
+                                ? 'review-question-type-selected bg-white text-stone-800 shadow-sm'
+                                : 'review-question-type-option text-stone-400 hover:text-stone-600'
                                 }`}
                         >
                             {{ text: '文本', rating: '评分', choice: '单选' }[t]}
@@ -475,8 +476,8 @@ const QuestionEditor: React.FC<{
                                     key={color.id}
                                     onClick={() => onUpdate({ ...question, colorId: color.id })}
                                     className={`w-6 h-6 rounded-full transition-all border ${question.colorId === color.id
-                                        ? `ring-2 ring-offset-1 ring-stone-300 scale-110 ${(color as any).picker} ${color.border}`
-                                        : `hover:scale-105 opacity-60 hover:opacity-100 ${(color as any).picker} border-transparent`
+                                        ? `review-question-color-selected ring-2 ring-offset-1 ring-stone-300 scale-110 ${(color as any).picker} ${color.border}`
+                                        : `review-question-color-option hover:scale-105 opacity-60 hover:opacity-100 ${(color as any).picker} border-transparent`
                                         }`}
                                     title={color.label}
                                 />

@@ -1,9 +1,11 @@
 /**
  * @file TodoView.tsx
+ * @updated 2026-07-21: Kept week-view date columns transparent in dark mode.
  * @input Todos, Categories, Scopes
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes reserved `小事` / `未来` buckets plus a week planning view with schedule and history badges.
+ * @updated 2026-07-21: Applied the shared calendar number typography to the single-column week view.
  * @updated 2026-05-18: Hid pinned recurring todos from the mobile `今天 + Pin` section when today's occurrence is explicitly skipped, while still preserving pin-only rows and other explicit today matches.
  * @updated 2026-05-14: Added a persisted schedule lock toggle across the standard week, bento week, and month planners so schedule and deadline rows can be frozen against drag-to-move until explicitly unlocked.
  * @updated 2026-05-18: 支持点击周视图一列（标准周视图）下循环排期的 Repeat 标签以唤起快捷编辑栏。
@@ -41,6 +43,12 @@ import { TodoDuplicateModal } from '../components/TodoDuplicateModal';
 import { TodoQuickActionsModal } from '../components/TodoQuickActionsModal';
 import { TodoMonthView } from '../components/TodoMonthView';
 import { TodoBentoWeekView } from '../components/TodoBentoWeekView';
+import {
+  getCalendarLunarLabel,
+  getCalendarNumberTextStyle,
+  useCalendarLunarDisplay,
+  useCalendarNumberStyle
+} from '../services/calendarNumberStyleService';
 import { useTodoQuickActions } from '../hooks/useTodoQuickActions';
 import { getTodoRowGestureIntent, getTodoRowReleaseAction, TodoRowGestureIntent } from '../utils/todoRowInteraction';
 import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodosForDisplay, getParentTodo, isIncompleteSubtaskHiddenByCompletedParent } from '../utils/todoHierarchyUtils';
@@ -993,6 +1001,8 @@ const WeekTodoLineItem: React.FC<{
 };
 
 export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo, onSaveTodo, onDeleteTodo, autoLinkRules = [] }) => {
+  const showCalendarLunar = useCalendarLunarDisplay();
+  const calendarNumberStyle = useCalendarNumberStyle();
   const normalizedTodoCategories = useMemo(() => ensureQuickTodoCategory(categories), [categories]);
   const projectTodoCategories = useMemo(() => getRealTodoCategories(normalizedTodoCategories), [normalizedTodoCategories]);
   const standardTodoCategories = useMemo(() => getStandardTodoCategories(normalizedTodoCategories), [normalizedTodoCategories]);
@@ -2375,16 +2385,23 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                             setAssignModalDate(bucket.date);
                             setAssignModalType('scheduled');
                           }}
-                          className="flex flex-col justify-center border-r border-stone-300/70 px-2 py-3 text-center transition-colors hover:bg-white/40 md:px-3"
+                          className="week-date-column flex flex-col justify-center border-r border-stone-300/70 px-2 py-3 text-center transition-colors hover:bg-transparent md:px-3"
                         >
                           <div className={`text-[12px] tracking-[0.02em] ${isToday ? 'text-stone-600' : 'text-stone-500'}`}>
                             {WEEKDAY_ROW_LABELS[index]}
                           </div>
-                          <div
-                            className={`mt-1 text-[19px] leading-none md:text-[22px] ${isToday ? 'font-semibold text-stone-800' : 'font-medium text-stone-700'}`}
-                            style={{ fontFamily: "'Bilbo Swash Caps', 'Georgia', 'Times New Roman', cursive, serif" }}
-                          >
-                            {bucketDate?.getDate() || '--'}
+                          <div className="mt-1 flex items-center justify-center gap-1">
+                            <span
+                              className={`text-[19px] leading-none md:text-[22px] ${isToday ? 'font-semibold text-stone-800' : 'font-medium text-stone-700'}`}
+                              style={getCalendarNumberTextStyle(calendarNumberStyle)}
+                            >
+                              {bucketDate?.getDate() || '--'}
+                            </span>
+                            {showCalendarLunar && bucketDate && (
+                              <span className="text-[9px] leading-none text-stone-400">
+                                {getCalendarLunarLabel(bucketDate)}
+                              </span>
+                            )}
                           </div>
                           <div className="mt-1 text-[10px] tracking-[0.02em] text-stone-400">
                             {bucketDate ? `${bucketDate.getMonth() + 1}月` : ''}

@@ -1,6 +1,7 @@
 /**
  * @file PreferencesSettingsView.tsx
  * @description 偏好设置页面
+ * @updated 2026-07-21: Replaced the display-mode segmented control with a settings-style dropdown and improved dark-mode toggle contrast.
  * @updated 2026-05-10: Replaced the old timer auto-open toggle with a three-option dropdown that reuses the existing settings selector style.
  * @updated 2026-04-25: Added timeline quick-action customization controls under display preferences.
  */
@@ -117,6 +118,7 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     onSetSceneCardTimerMode
 }) => {
     const { themeMode, setThemeMode } = useSettings();
+    const [isThemeModeDropdownOpen, setIsThemeModeDropdownOpen] = useState(false);
     const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
     const [isAutoStartTimerJumpModeDropdownOpen, setIsAutoStartTimerJumpModeDropdownOpen] = useState(false);
     const [isTimelineQuickActionsExpanded, setIsTimelineQuickActionsExpanded] = useState(false);
@@ -163,12 +165,45 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
             <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-40">
                 <div className="space-y-3">
                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">{'\u663e\u793a\u6a21\u5f0f'}</h3>
-                    <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)] p-2 grid grid-cols-3 gap-1">
-                        {([['light', '\u6d45\u8272'], ['dark', '\u6df1\u8272'], ['system', '\u8ddf\u968f\u7cfb\u7edf']] as const).map(([mode, label]) => (
-                            <button key={mode} type="button" onClick={() => setThemeMode(mode)} className={`min-h-10 px-2 text-xs font-bold rounded-lg transition-colors ${themeMode === mode ? 'bg-stone-800 text-white shadow-sm' : 'text-stone-500 hover:bg-stone-50 hover:text-stone-700'}`}>
-                                {label}
-                            </button>
-                        ))}
+                    <div className="bg-white rounded-2xl overflow-visible shadow-[0_2px_10px_rgba(0,0,0,0.03)] relative">
+                        <div className="flex items-center justify-between p-4">
+                            <span className="font-bold text-stone-700">{'\u663e\u793a\u6a21\u5f0f'}</span>
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsThemeModeDropdownOpen((open) => !open)}
+                                    className="flex items-center gap-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-bold px-4 py-2 rounded-lg transition-colors"
+                                    aria-haspopup="listbox"
+                                    aria-expanded={isThemeModeDropdownOpen}
+                                >
+                                    <span>{themeMode === 'light' ? '\u6d45\u8272' : themeMode === 'dark' ? '\u6df1\u8272' : '\u8ddf\u968f\u7cfb\u7edf'}</span>
+                                    <ChevronDown size={14} className={`transition-transform ${isThemeModeDropdownOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                {isThemeModeDropdownOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-[100]" onClick={() => setIsThemeModeDropdownOpen(false)} />
+                                        <div role="listbox" className="absolute right-0 top-full mt-2 w-32 bg-white rounded-xl shadow-xl border border-stone-100 overflow-hidden z-[110] flex flex-col py-1 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                                            {([['light', '\u6d45\u8272'], ['dark', '\u6df1\u8272'], ['system', '\u8ddf\u968f\u7cfb\u7edf']] as const).map(([mode, label]) => (
+                                                <button
+                                                    key={mode}
+                                                    type="button"
+                                                    role="option"
+                                                    aria-selected={themeMode === mode}
+                                                    onClick={() => {
+                                                        setThemeMode(mode);
+                                                        setIsThemeModeDropdownOpen(false);
+                                                    }}
+                                                    className={`px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-stone-50 flex items-center justify-between ${themeMode === mode ? 'text-stone-900 bg-stone-50' : 'text-stone-500'}`}
+                                                >
+                                                    {label}
+                                                    {themeMode === mode && <div className="w-1.5 h-1.5 rounded-full bg-stone-800" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
 

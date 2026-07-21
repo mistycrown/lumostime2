@@ -4,6 +4,7 @@
  * @output Confirmation Dialog
  * @pos Component (Modal)
  * @description A generic modal for confirming user actions (e.g., delete, archive) with configurable types (danger, warning, info).
+ * @updated 2026-07-21: Simplified the confirmation icon and description treatment for dark-mode clarity.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -71,14 +72,6 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         }
     };
 
-    const getIconBg = () => {
-        switch (type) {
-            case 'danger': return 'bg-red-50';
-            case 'warning': return 'bg-amber-50';
-            case 'info': return 'bg-blue-50';
-        }
-    };
-
     const getConfirmBtnClass = () => {
         switch (type) {
             case 'danger': return 'bg-white border border-red-200 text-red-500 hover:bg-red-50 shadow-sm';
@@ -93,13 +86,13 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
                 {/* Header / Content Wrapper */}
                 <div className="p-8 flex flex-col items-center text-center">
 
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 ${getIconBg()}`}>
+                    <div className="w-16 h-16 flex items-center justify-center mb-6">
                         {getIcon()}
                     </div>
 
                     <h3 className="text-xl font-bold text-stone-800 mb-3">{title}</h3>
 
-                    <div className="text-stone-500 leading-relaxed whitespace-pre-wrap text-left text-sm max-h-[50vh] overflow-y-auto w-full bg-stone-50 p-3 rounded-lg border border-stone-100 select-all">
+                    <div className="text-stone-500 leading-relaxed whitespace-pre-wrap text-left text-sm max-h-[50vh] overflow-y-auto w-full select-all">
                         {description}
                     </div>
                 </div>

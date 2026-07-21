@@ -1,5 +1,6 @@
 /**
  * @file TagAssociation.tsx
+ * @updated 2026-07-21: Replaced record-detail selection shadows with outline-based dark-mode states.
  * @input categories, activities, selected IDs
  * @output Tag Selection UI
  * @pos Component (Input)
@@ -45,8 +46,8 @@ export const TagAssociation: React.FC<TagAssociationProps> = ({
                         className={`
                             px-2 py-2 rounded-lg text-[10px] font-medium text-center transition-colors flex items-center justify-center gap-1.5 truncate
                             ${selectedCategoryId === cat.id
-                                ? 'btn-template-filled'
-                                : 'bg-stone-50 text-stone-500 border border-stone-100 hover:bg-stone-100'}
+                                ? 'record-association-selected bg-stone-800 text-white border border-stone-500'
+                                : 'bg-transparent text-stone-500 hover:bg-stone-100'}
                         `}
                     >
                         <IconRenderer icon={cat.icon} uiIcon={cat.uiIcon} className="text-xs" />
@@ -67,17 +68,15 @@ export const TagAssociation: React.FC<TagAssociationProps> = ({
                             className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-200 active:scale-95 hover:bg-stone-50"
                         >
                             <div
+                                style={{
+                                    ...colorPresentation.style,
+                                    ...(isActive ? { transform: 'scale(1.1)' } : {})
+                                }}
                                 className={`
                                     w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all
                                     ${colorPresentation.className}
+                                    ${isActive ? 'record-association-activity-selected' : ''}
                                 `}
-                                style={{
-                                    ...colorPresentation.style,
-                                    ...(isActive ? {
-                                        boxShadow: `0 0 0 1px var(--accent-color)`,
-                                        transform: 'scale(1.1)'
-                                    } : {})
-                                }}
                             >
                                 <IconRenderer icon={act.icon} uiIcon={act.uiIcon} className="text-xl" />
                             </div>

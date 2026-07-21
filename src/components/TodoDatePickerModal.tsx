@@ -1,5 +1,6 @@
 /**
  * @file TodoDatePickerModal.tsx
+ * @updated 2026-07-21: Added dark-mode date-picker surface and outline-based selected dates.
  * @input open state, selected date/month value, optional multi-date value set, initial month value, callbacks
  * @output Standalone date/month picker modal for todo planning fields, Maybe-date multi-select, and Memoir month jumping
  * @pos Component (Modal)
@@ -229,8 +230,8 @@ const TodoDatePickerModalContent: React.FC<TodoDatePickerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(245,241,236,0.72)] px-5 py-8 backdrop-blur-sm">
-      <div className="w-full max-w-[23rem] overflow-hidden rounded-[2rem] border border-stone-200 bg-[#fbf8f3] shadow-[0_24px_60px_rgba(0,0,0,0.08)]">
+    <div className="todo-date-picker-backdrop fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(245,241,236,0.72)] px-5 py-8 backdrop-blur-sm">
+      <div className="todo-date-picker w-full max-w-[23rem] overflow-hidden rounded-[2rem] border border-stone-200 bg-[#fbf8f3] shadow-[0_24px_60px_rgba(0,0,0,0.08)]">
         <div className="border-b border-stone-200 px-5 py-4">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -328,7 +329,7 @@ const TodoDatePickerModalContent: React.FC<TodoDatePickerModalProps> = ({
                     disabled={isDisabled}
                     className={`relative mx-auto flex h-10 w-10 items-center justify-center rounded-full text-sm transition-all ${
                       isSelected
-                        ? 'bg-stone-900 text-white shadow-[0_10px_22px_rgba(0,0,0,0.14)]'
+                        ? 'date-picker-selected border border-stone-900 bg-stone-900 text-white'
                         : isDisabled
                           ? 'cursor-not-allowed text-stone-300 opacity-50'
                           : outsideMonth
@@ -360,7 +361,7 @@ const TodoDatePickerModalContent: React.FC<TodoDatePickerModalProps> = ({
                       onClick={() => handleMonthSelect(monthIndex)}
                       className={`rounded-2xl border px-3 py-3 text-sm transition-all ${
                         isActive
-                          ? 'border-stone-900 bg-stone-900 text-white shadow-[0_10px_22px_rgba(0,0,0,0.12)]'
+                          ? 'date-picker-selected border-stone-900 bg-stone-900 text-white'
                           : 'border-transparent text-stone-600 hover:border-stone-200 hover:bg-white hover:text-stone-900'
                       }`}
                     >

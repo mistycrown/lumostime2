@@ -5,6 +5,7 @@
  * @pos View (Settings Sub-page)
  * @description Allows users to grant accessibility permissions, configure app-to-activity associations, and mark apps to be ignored by floating-window detection.
  * @updated 2026-07-11: Stopped list ignore toggle clicks from bubbling into app detail navigation.
+ * @updated 2026-07-21: Added semantic surfaces for dark-mode app-association notices and list states.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Check, ShieldAlert, Smartphone, ChevronRight, X, Search, Trash2 } from 'lucide-react';
@@ -311,7 +312,7 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
 
       <main className="flex-1 overflow-y-auto">
         <div className="space-y-6 p-4 pb-20">
-          <div className="rounded-xl bg-blue-50 p-4 text-sm leading-relaxed text-blue-700">
+          <div className="app-rule-info-notice rounded-xl bg-blue-50 p-4 text-sm leading-relaxed text-blue-700">
             <p className="mb-1 font-bold">功能说明</p>
             <p>需要先开启无障碍权限。进入对应应用后，悬浮球会根据这里的规则识别和关联活动标签。</p>
           </div>
@@ -319,7 +320,7 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
           {!hasPermission && (
             <div
               onClick={handlePermissionClick}
-              className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-4"
+              className="app-rule-permission-notice flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-4"
             >
               <div className="flex items-center gap-3">
                 <ShieldAlert className="text-amber-600" size={24} />
@@ -346,14 +347,14 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
                 placeholder="搜索应用..."
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                className="w-full rounded-xl border border-stone-100 bg-white py-2 pl-9 pr-4 text-sm text-stone-800 placeholder-stone-400 transition-colors focus:border-stone-300 focus:outline-none"
+                className="app-rule-search w-full rounded-xl border border-stone-100 bg-white py-2 pl-9 pr-4 text-sm text-stone-800 placeholder-stone-400 transition-colors focus:border-stone-300 focus:outline-none"
               />
             </div>
 
             {isLoading ? (
               <div className="py-10 text-center text-stone-300">加载中...</div>
             ) : (
-              <div className="overflow-hidden rounded-2xl border border-stone-100 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
+              <div className="app-rule-list overflow-hidden rounded-2xl border border-stone-100 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
                 {filteredApps.map((app, index) => {
                   const ruleId = rules[app.packageName];
                   const matched = ruleId ? getActivityById(ruleId) : null;

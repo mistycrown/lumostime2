@@ -1,5 +1,6 @@
 ﻿/**
  * @file EmojiSettingsView.tsx
+ * @updated 2026-07-21: Reworked effect notices and edit controls for dark-mode contrast.
  * @description Emoji 和 Sticker 设置页面 - 管理心情日历的 emoji 组、emoji 渲染风格和 Selector 默认页
  */
 import React, { useState, useEffect, useRef } from 'react';
@@ -487,7 +488,7 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
                                                 e.stopPropagation();
                                                 handleEditGroup(group);
                                             }}
-                                            className="p-1 hover:bg-blue-50 rounded transition-colors"
+                                            className="rounded border border-transparent p-1 transition-colors hover:border-blue-400/70"
                                             title="编辑"
                                         >
                                             <Edit2 size={14} className="text-blue-500" />
@@ -696,8 +697,8 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
                             </button>
 
                             {customReactions.length === 0 && (
-                                <div className="text-xs text-stone-400 bg-amber-50 border border-amber-100 rounded-lg p-3">
-                                    <p className="font-medium text-amber-700 mb-1">💡 关于特效</p>
+                                <div className="effect-note text-xs text-stone-400 rounded-lg p-3">
+                                    <p className="effect-note-title font-medium mb-1">💡 关于特效</p>
                                     <p>默认的 6 个图标带有动画特效。自定义后将仅支持静态显示。</p>
                                 </div>
                             )}
@@ -709,7 +710,7 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
                         <div className="border border-stone-300 rounded-lg p-4 space-y-3">
                             <div className="flex items-center justify-between mb-2">
                                 <h4 className="text-sm font-bold text-stone-700">编辑 Reaction 图标</h4>
-                                <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                                <span className="effect-note-label text-xs text-amber-600 px-2 py-1 rounded">
                                     自定义后将无动画特效
                                 </span>
                             </div>

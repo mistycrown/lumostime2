@@ -4,6 +4,7 @@
  * @output Global Memoir Filter Updates
  * @pos View (Settings Sub-page)
  * @description Provides a UI to configure global filters for the Memoir (Journal) view: Has Image, Min Length, Related Tags, Related Domains.
+ * @updated 2026-07-21: Clarified dark-mode checkbox toggles and filter-chip selection states.
  * @updated 2026-05-09: Sorted related-scope filter chips by shared scope selection order so they match scope-management ordering.
  */
 import React, { useState, useEffect, useMemo } from 'react';
@@ -212,8 +213,8 @@ export const MemoirSettingsView: React.FC<MemoirSettingsViewProps> = ({ onBack }
                                         key={act.id}
                                         onClick={() => toggleTag(act.id)}
                                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${isSelected
-                                            ? 'bg-stone-800 text-white shadow-md'
-                                            : 'bg-stone-50 text-stone-600 hover:bg-stone-100 border border-stone-100'
+                                            ? 'bg-stone-800 text-white border border-stone-500'
+                                            : 'bg-transparent text-stone-600 hover:bg-stone-100'
                                             }`}
                                     >
                                         <span>{act.icon}</span>
@@ -246,8 +247,8 @@ export const MemoirSettingsView: React.FC<MemoirSettingsViewProps> = ({ onBack }
                                     key={scope.id}
                                     onClick={() => toggleScope(scope.id)}
                                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${isSelected
-                                        ? 'bg-stone-800 text-white shadow-md'
-                                        : 'bg-stone-50 text-stone-600 hover:bg-stone-100 border border-stone-100'
+                                        ? 'bg-stone-800 text-white border border-stone-500'
+                                        : 'bg-transparent text-stone-600 hover:bg-stone-100'
                                         }`}
                                 >
                                     <span className="text-sm">{scope.icon}</span>

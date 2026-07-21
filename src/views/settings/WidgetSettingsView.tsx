@@ -11,6 +11,7 @@
  * @updated 2026-05-03: Removed bound desktop instance counts from the widget template list.
  * @updated 2026-05-03: Reduced load-time template writes so opening the widget settings page no longer triggers unnecessary local/native saves.
  * @updated 2026-05-03: Tightened the 2x2 tracking-calendar preview with smaller date numbers and narrower horizontal calendar padding.
+ * @updated 2026-07-21: Added semantic create-template choice states for dark-mode outline selection.
  * @updated 2026-05-05: Rewrote the widget home guide copy to distinguish direct-add desktop widgets from configurable templates.
  */
 import React, { useEffect, useMemo, useState } from 'react';
@@ -1066,8 +1067,8 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                       type="button"
                       onClick={() => setSelectedCreateTemplateType(option.value)}
                       className={isActive
-                        ? 'rounded-2xl border border-stone-800 bg-stone-800 px-4 py-4 text-sm font-medium text-white shadow-sm'
-                        : 'rounded-2xl border border-stone-200 bg-white px-4 py-4 text-sm font-medium text-stone-600 transition-all hover:border-stone-300'}
+                        ? 'widget-template-choice widget-template-choice-selected rounded-2xl border border-stone-800 bg-stone-800 px-4 py-4 text-sm font-medium text-white shadow-sm'
+                        : 'widget-template-choice rounded-2xl border border-stone-200 bg-white px-4 py-4 text-sm font-medium text-stone-600 transition-all hover:border-stone-300'}
                     >
                       {option.label}
                     </button>
@@ -1088,8 +1089,8 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
                         type="button"
                         onClick={() => setSelectedCreateSize(size)}
                         className={isActive
-                          ? 'rounded-2xl border border-stone-800 bg-stone-800 px-4 py-3 text-sm font-medium text-white shadow-sm'
-                          : 'rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-600 transition-all hover:border-stone-300'}
+                          ? 'widget-template-choice widget-template-choice-selected rounded-2xl border border-stone-800 bg-stone-800 px-4 py-3 text-sm font-medium text-white shadow-sm'
+                          : 'widget-template-choice rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-stone-600 transition-all hover:border-stone-300'}
                       >
                         {getWidgetSizeLabel(size)}
                       </button>

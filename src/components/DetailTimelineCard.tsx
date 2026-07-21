@@ -3,6 +3,7 @@
  * @input Filtered logs, display date, entity info
  * @output Timeline UI with detail-page month heatmap duration captions, stats, history, and shared custom timeline styling with per-day rail termination, English day-total duration labels, plus month-based quick navigation in all-record mode
  * @pos Component (Shared Detail View UI)
+ * @updated 2026-07-21: Added dark-mode heatmap surface hooks and a readable neutral duration scale.
  * @updated 2026-05-14: Detail timelines now resolve `◬ Collection` membership for each log and pass those names into both the default metadata row and custom metadata renderers shared by detail pages.
  * @updated 2026-05-10: Added compact `4H5M`-style duration captions beneath day numbers in the detail-page month heatmap only, with automatic white-text switching on darker heatmap cells.
  * @updated 2026-04-16: Added English `h`/`m` formatting for detail-page day-total duration labels.
@@ -689,7 +690,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                         cells.push(
                                             <div
                                                 key={day}
-                                                className={`aspect-square rounded-lg flex flex-col items-center justify-center transition-colors cursor-pointer ${colors.useTheme ? '' : colors.bg}`}
+                                                className={`detail-heatmap-cell aspect-square rounded-lg flex flex-col items-center justify-center transition-colors cursor-pointer ${colors.useTheme ? '' : colors.bg}`}
                                                 style={colors.useTheme ? {
                                                     backgroundColor: `color-mix(in srgb, var(--progress-bar-fill) ${colors.opacity * 100}%, transparent)`
                                                 } : undefined}

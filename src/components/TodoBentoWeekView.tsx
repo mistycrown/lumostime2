@@ -4,6 +4,7 @@
  * @output Single-week 2x4 bento schedule UI backed by real todo data
  * @pos Component (Todo scheduling)
  * @description Renders one selected week at a time in the bento layout so the mini calendar, header range, and visible day cells always describe the same week.
+ * @updated 2026-07-21: Applied the shared calendar number typography to the two-column week view.
  * @updated 2026-06-13: 调整显示设置弹窗中已选择选项的视觉效果，移除背景加深，改为下划线指示器。
  * @updated 2026-06-13: 调整显示设置弹窗中已选择选项的背景和文字对比度，将 bg-stone-100 更改为更明显的 bg-stone-200，并加深文字颜色。
  * @updated 2026-06-06: Reused the shared schedule primary-kind priority for bento marker colors so overlapping badges now follow the same Done > Due > Arrange > Repeat > Maybe > Trace precedence as month view.
@@ -38,6 +39,12 @@ import {
   WeekTodoEntry
 } from '../utils/todoScheduleUtils';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
+import {
+  getCalendarLunarLabel,
+  getCalendarNumberTextStyle,
+  useCalendarLunarDisplay,
+  useCalendarNumberStyle
+} from '../services/calendarNumberStyleService';
 import { TodoScheduleTypeColorSettings as TodoScheduleTypeColorSettingsPanel } from './TodoScheduleTypeColorSettings';
 import {
   getResolvedTodoScheduleTypeColors,
@@ -194,6 +201,8 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
   useReducedEffects = false,
   viewMenuNode
 }) => {
+  const showCalendarLunar = useCalendarLunarDisplay();
+  const calendarNumberStyle = useCalendarNumberStyle();
   const today = useMemo(() => new Date(), []);
   const todayDateKey = useMemo(() => formatDateKey(today), [today]);
   const touchDragActivatedRef = useRef(false);
@@ -850,14 +859,21 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                           data-bento-week-swipe-ignore="true"
                           className="mb-2 flex items-start justify-between gap-2 text-left"
                         >
-                          <span
-                            className={`text-[1.55rem] italic leading-none md:text-[1.95rem] ${
-                              isTodayCell ? 'text-stone-900' : 'text-stone-800'
-                            }`}
-                            style={{ fontFamily: "'Bilbo Swash Caps', 'Georgia', 'Times New Roman', cursive, serif" }}
-                      >
-                        {format(day, 'dd')}
-                      </span>
+                          <span className="flex items-center gap-1">
+                            <span
+                              className={`text-[1.55rem] italic leading-none md:text-[1.95rem] ${
+                                isTodayCell ? 'text-stone-900' : 'text-stone-800'
+                              }`}
+                              style={getCalendarNumberTextStyle(calendarNumberStyle)}
+                            >
+                              {format(day, 'dd')}
+                            </span>
+                            {showCalendarLunar && (
+                              <span className="text-[9px] leading-none text-stone-400">
+                                {getCalendarLunarLabel(day)}
+                              </span>
+                            )}
+                          </span>
                           <span className="text-[0.52rem] font-bold uppercase tracking-[0.18em] text-stone-400 md:text-[0.6rem]">
                             {weekdayLabel}
                           </span>

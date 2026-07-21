@@ -4,6 +4,7 @@
  * @output User Interaction (Rules Configuration)
  * @pos View (Settings Sub-page)
  * @description Provides a UI for managing automatic association rules between Tags (Activities) and Scopes (Domains), allowing users to define default scopes for specific activities.
+ * @updated 2026-07-21: Strengthened dark-mode guidance, selection, and confirm states for rule creation.
  * @updated 2026-05-09: Sorted selectable scopes by shared scope order so auto-link scope buttons match scope-management ordering.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -105,7 +106,7 @@ export const AutoLinkView: React.FC<AutoLinkViewProps> = ({
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-40">
                 {/* 说明 */}
-                <div className="bg-blue-50 rounded-xl p-4 text-sm text-blue-700 leading-relaxed">
+                <div className="rounded-xl border border-sky-800/70 bg-sky-950/45 p-4 text-sm leading-relaxed text-sky-100">
                     <p className="font-bold mb-1">💡 功能说明</p>
                     <p>为标签设置默认的关联的领域，开始计时或者补计时系统会提醒您应用这些规则。</p>
                 </div>
@@ -171,7 +172,7 @@ export const AutoLinkView: React.FC<AutoLinkViewProps> = ({
                                             className={`
                                                 px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 truncate
                                                 ${selectedCategoryId === cat.id
-                                                    ? 'bg-stone-900 text-white border-stone-900'
+                                                    ? 'rule-category-selected bg-stone-900 text-white border-stone-900'
                                                     : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
                                             `}
                                         >
@@ -196,7 +197,7 @@ export const AutoLinkView: React.FC<AutoLinkViewProps> = ({
                                                 <button
                                                     key={act.id}
                                                     onClick={() => setSelectedActivityId(act.id)}
-                                                    className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-200 active:scale-95 hover:bg-stone-50"
+                                                    className={`flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-200 active:scale-95 hover:bg-stone-50 ${isActive ? 'rule-activity-selected' : ''}`}
                                                 >
                                                     <div className={`
                                                         w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all
@@ -227,7 +228,7 @@ export const AutoLinkView: React.FC<AutoLinkViewProps> = ({
                                                     key={scope.id}
                                                     onClick={() => setSelectedScopeId(scope.id)}
                                                     className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${selectedScopeId === scope.id
-                                                        ? 'bg-stone-800 text-white shadow-md'
+                                                        ? 'rule-scope-selected bg-stone-800 text-white border border-stone-500'
                                                         : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                                                         }`}
                                                 >
@@ -244,7 +245,7 @@ export const AutoLinkView: React.FC<AutoLinkViewProps> = ({
                                 <div className="pt-2">
                                     <button
                                         onClick={handleAddRule}
-                                        className="w-full py-3 bg-stone-800 text-white rounded-xl font-medium active:scale-[0.98] transition-all shadow-lg"
+                                        className="rule-confirm-action w-full rounded-xl border border-stone-600 bg-stone-800 py-3 font-medium text-white transition-all hover:bg-stone-900 active:scale-[0.98]"
                                     >
                                         确认添加
                                     </button>

@@ -5,6 +5,7 @@
  * @pos Component (Global UI)
  * @description Renders floating timer bubbles for active sessions, with responsive action visibility that keeps the confirm button aligned on narrow layouts.
  * @updated 2026-04-21: Narrowed Todo-view floating timers to the same avoidance scale used by Record-style layouts so they no longer collide with the bottom-right floating action button.
+ * @updated 2026-07-21: Added semantic dark-mode surfaces for the floating timer panel and its activity icon.
  * @updated 2026-03-24
  */
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -233,7 +234,7 @@ const SingleTimer: React.FC<{
     <div
       ref={containerRef}
       onClick={onClick}
-      className={`relative bg-white/95 backdrop-blur-sm text-stone-800 flex items-center cursor-pointer active:scale-[0.99] overflow-hidden ${
+      className={`timer-floating-panel relative bg-white/95 backdrop-blur-sm text-stone-800 flex items-center cursor-pointer active:scale-[0.99] overflow-hidden ${
         isCollapsed
           ? `rounded-full justify-center items-center p-0 transition-all duration-500 ease-out ${
               isBorderAnimating ? 'w-12 h-12' : 'w-[3.5rem] h-[3.5rem]'
@@ -271,7 +272,7 @@ const SingleTimer: React.FC<{
       {isCollapsed ? (
         <div
           onClick={toggleCollapse}
-          className={`flex items-center justify-center hover:scale-110 transition-all cursor-pointer ${
+          className={`timer-floating-icon flex items-center justify-center hover:scale-110 transition-all cursor-pointer ${
             isBorderAnimating
               ? 'w-8 h-8 text-2xl duration-300'
               : 'w-10 h-10 text-xl rounded-full shadow-inner duration-500'
@@ -307,7 +308,7 @@ const SingleTimer: React.FC<{
             <div className="flex items-center gap-3 relative">
               <div
                 onClick={toggleCollapse}
-                className="w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-inner shrink-0 transition-colors cursor-pointer absolute left-0"
+                className="timer-floating-icon w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-inner shrink-0 transition-colors cursor-pointer absolute left-0"
                 style={{
                   backgroundColor: 'color-mix(in srgb, var(--accent-color) 10%, white)'
                 }}
@@ -352,7 +353,7 @@ const SingleTimer: React.FC<{
               >
                 <div
                   onClick={toggleCollapse}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-inner shrink-0 transition-colors cursor-pointer ${
+                  className={`timer-floating-icon w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-inner shrink-0 transition-colors cursor-pointer ${
                     !isGroupThree ? 'absolute left-0' : ''
                   }`}
                   style={{
@@ -421,7 +422,7 @@ const SingleTimer: React.FC<{
                 )}
                 <button
                   onClick={onStop}
-                  className="shrink-0 p-2 rounded-full transition-colors"
+                  className="timer-floating-confirm shrink-0 p-2 rounded-full transition-colors"
                   style={{
                     color: 'var(--accent-color)',
                     backgroundColor: 'transparent'

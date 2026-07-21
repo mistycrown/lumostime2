@@ -8,6 +8,7 @@
  * @updated 2026-06-21: Added enter-to-create choice options, space-delimited duration inputs, shared custom-select styling, and save-time validation that keeps `开始记录` at the end of the workflow.
  * @updated 2026-06-21: Let workflow number fields keep raw draft input so cooldown seconds, fixed duration, and duration-option lists can be fully cleared and rewritten.
  * @updated 2026-06-21: Rebuilt the settings UX with UTF-8-safe copy, top-level permission gating, cleaner toggle controls, and refined workflow node editors.
+ * @updated 2026-07-21: Added dark-mode semantic states for notices, toggles, and selected workflow activities.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -496,12 +497,12 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
     <button
       type="button"
       onClick={onToggle}
-      className="w-full rounded-2xl border border-stone-200 bg-[#fdfbf7] px-4 py-3 text-stone-700 transition-colors hover:bg-stone-50"
+      className="app-awareness-toggle w-full rounded-2xl border border-stone-200 bg-[#fdfbf7] px-4 py-3 text-stone-700 transition-colors hover:bg-stone-50"
     >
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-medium">{label}</span>
         <span
-          className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
+          className={`app-awareness-toggle-track relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${
             checked ? 'bg-stone-800' : 'bg-stone-200'
           }`}
         >
@@ -533,7 +534,7 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
             void FocusNotification.requestFloatingPermission().catch((error) => console.error(error));
           }
         }}
-        className="flex cursor-pointer items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 p-4"
+        className="app-awareness-permission-notice flex cursor-pointer items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 p-4"
       >
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100">
@@ -561,7 +562,7 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
       <div className="flex-1 overflow-y-auto p-4 space-y-5">
         {renderPermissionCard()}
 
-        <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm leading-relaxed text-blue-700">
+        <div className="app-awareness-info-notice rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm leading-relaxed text-blue-700">
           <div className="font-bold text-blue-900 mb-1">应用感知覆盖说明</div>
           <p>检测到已绑定应用打开后，应用感知会优先于“应用关联标签规则”生效，并通过悬浮工作流逐步引导用户明确目的、预计时长和活动记录。</p>
         </div>
@@ -1087,7 +1088,7 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
                                 }))}
                                 className={`rounded-xl border px-3 py-2 text-left text-sm transition-colors ${
                                   selected
-                                    ? 'border-stone-700 bg-stone-100 text-stone-900'
+                                    ? 'app-awareness-activity-selected border-stone-700 bg-stone-100 text-stone-900'
                                     : 'border-stone-200 bg-[#fdfbf7] text-stone-600 hover:bg-stone-50'
                                 }`}
                               >
@@ -1242,16 +1243,16 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
   );
 
   if (mode === 'templates') {
-    return <div className="fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] font-serif">{renderTemplates()}</div>;
+    return <div className="app-awareness-view fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] font-serif">{renderTemplates()}</div>;
   }
 
   if (mode === 'template-editor') {
-    return <div className="fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] font-serif">{renderTemplateEditor()}</div>;
+    return <div className="app-awareness-view fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] font-serif">{renderTemplateEditor()}</div>;
   }
 
   if (mode === 'bindings') {
-    return <div className="fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] font-serif">{renderBindings()}</div>;
+    return <div className="app-awareness-view fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] font-serif">{renderBindings()}</div>;
   }
 
-  return <div className="fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] font-serif">{renderHome()}</div>;
+  return <div className="app-awareness-view fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] font-serif">{renderHome()}</div>;
 };
