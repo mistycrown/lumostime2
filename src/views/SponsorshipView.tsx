@@ -1215,7 +1215,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                     </button>
 
                                     {/* 提示信息 */}
-                                    <div className="mt-4 p-2.5 bg-blue-50 border border-blue-200 rounded-xl">
+                                    <div className="sponsorship-info-note mt-4 p-2.5 bg-blue-50 border border-blue-200 rounded-xl">
                                         <p className="text-xs text-blue-800 text-center">
                                             💡 首次应用需要打开导航栏调试，调整导航栏的位置
                                         </p>
@@ -1282,7 +1282,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                     </div>
 
                                     {/* 重装提醒 */}
-                                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-center">
+                                    <div className="sponsorship-warning-note p-3 bg-amber-50 border border-amber-200 rounded-lg text-center">
                                         <p className="text-sm text-amber-800">
                                             重装应用前需切回默认图标，部分机型暂不可用。
                                         </p>
@@ -1610,4 +1610,3 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         </div>
     );
 };
-

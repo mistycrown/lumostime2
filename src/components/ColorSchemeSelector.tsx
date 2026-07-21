@@ -365,7 +365,7 @@ export const ColorSchemeSelector: React.FC<ColorSchemeSelectorProps> = ({
                                 <button
                                     key={scheme.id}
                                     onClick={() => onSchemeChange(scheme.id)}
-                                    className={`relative rounded-lg transition-all overflow-hidden ${
+                                    className={`color-scheme-preview-option ${currentScheme === scheme.id ? 'color-scheme-preview-option-selected' : ''} relative rounded-lg transition-all overflow-hidden ${
                                         currentScheme === scheme.id
                                             ? `ring-2`
                                             : 'ring-1 ring-stone-200 hover:ring-stone-300'

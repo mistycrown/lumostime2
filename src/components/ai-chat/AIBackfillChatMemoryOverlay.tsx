@@ -4,6 +4,7 @@
  * @output Full-screen assistant memory overlay for manual memory and reminder management
  * @pos Component Support (AI Integration)
  * @description Extracts the long-term-memory viewer out of AIBackfillChatModal so the modal can stay focused on orchestration while this overlay keeps its existing UI and event behavior.
+ * @updated 2026-07-22: Added a shared dark-theme hook for memory cards, inputs, and actions.
  * @updated 2026-05-15: Extracted the assistant memory overlay from AIBackfillChatModal.
  */
 import React from 'react';
@@ -91,7 +92,7 @@ export const AIBackfillChatMemoryOverlay: React.FC<AIBackfillChatMemoryOverlayPr
   onCancelReminderDelete,
   onConfirmReminderDelete
 }) => (
-  <div className="absolute inset-0 z-20 bg-[rgba(15,23,42,0.14)] backdrop-blur-[10px]">
+  <div className="ai-chat-overlay absolute inset-0 z-20 bg-[rgba(15,23,42,0.14)] backdrop-blur-[10px]">
     <div
       className="flex h-full flex-col bg-[#f3f4f6]"
       style={{
@@ -99,7 +100,7 @@ export const AIBackfillChatMemoryOverlay: React.FC<AIBackfillChatMemoryOverlayPr
         paddingBottom: 'env(safe-area-inset-bottom)'
       }}
     >
-      <div className="flex h-14 items-center justify-between border-b border-[#e5e7eb] bg-[rgba(255,255,255,0.9)] px-4 backdrop-blur-md">
+      <div className="ai-chat-overlay-header flex h-14 items-center justify-between border-b border-[#e5e7eb] bg-[rgba(255,255,255,0.9)] px-4 backdrop-blur-md">
         <div>
           <h3 className="font-serif text-lg font-bold leading-none text-[#201c19]">长期记忆</h3>
         </div>

@@ -1,6 +1,7 @@
 /**
  * @file DataManagementView.tsx
  * @description 数据管理页面 - 备份、导入、导出、清理等
+ * @updated 2026-07-21: Replaced backup and image-list native confirmations with in-app confirmation modals and dark-mode image controls.
  * @updated 2026-03-24: 图片备份支持自定义每包张数的分块导出，降低移动端导出时的内存压力。
  */
 import React, { useState, useRef } from 'react';
@@ -64,7 +65,9 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
     const [isCleaningImages, setIsCleaningImages] = useState(false);
     const [imageCleanupReport, setImageCleanupReport] = useState<string>('');
     const [isImageCleanupConfirmOpen, setIsImageCleanupConfirmOpen] = useState(false);
+    const [isFixImageListConfirmOpen, setIsFixImageListConfirmOpen] = useState(false);
     const [isCleaningBackups, setIsCleaningBackups] = useState(false);
+    const [isBackupCleanupConfirmOpen, setIsBackupCleanupConfirmOpen] = useState(false);
     const [isCheckingCloudImages, setIsCheckingCloudImages] = useState(false);
     const [isCleaningCloudImages, setIsCleaningCloudImages] = useState(false);
     const [cloudConsistencyReport, setCloudConsistencyReport] = useState('');
@@ -259,6 +262,8 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
     };
 
     const handleFixImageList = async () => {
+        // The visible flow now confirms through ConfirmModal before invoking this legacy helper.
+        const confirm = () => true;
         if (!confirm('这将根据本地数据引用和本地实际存在的图片文件重建图片列表，建议在同步前执行。是否继续？')) {
             return;
         }
@@ -270,6 +275,21 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
             onToast('success', `图片列表重建完成，当前有效图片引用 ${list.length} 个`);
         } catch (error: any) {
             console.error('修复图片列表失败:', error);
+            onToast('error', `修复失败: ${error.message}`);
+        } finally {
+            setIsCheckingImages(false);
+        }
+    };
+
+    const handleConfirmFixImageList = async () => {
+        setIsFixImageListConfirmOpen(false);
+        setIsCheckingImages(true);
+        try {
+            const { customStickerSets, customStickers } = getStoredCustomStickerState();
+            const list = await imageService.rebuildReferencedListFromLogs(logs, todos, dailyReviews, customStickerSets, customStickers);
+            onToast('success', `图片列表重建完成，当前有效图片引用 ${list.length} 项`);
+        } catch (error: any) {
+            console.error('Failed to rebuild image list:', error);
             onToast('error', `修复失败: ${error.message}`);
         } finally {
             setIsCheckingImages(false);
@@ -321,6 +341,16 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
         setIsCleaningBackups(true);
         await onCleanupCloudBackups();
         setIsCleaningBackups(false);
+    };
+
+    const handleConfirmBackupCleanup = async () => {
+        setIsBackupCleanupConfirmOpen(false);
+        setIsCleaningBackups(true);
+        try {
+            await onCleanupCloudBackups();
+        } finally {
+            setIsCleaningBackups(false);
+        }
     };
 
     const handleCheckCloudConsistency = async () => {
@@ -437,7 +467,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+        <div className="data-management-view fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0">
                 <button onClick={onBack} className="text-stone-400 hover:text-stone-600 p-1">
                     <ChevronLeft size={24} />
@@ -517,7 +547,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                     </p>
 
                     <button
-                        onClick={handleCleanupBackups}
+                        onClick={() => setIsBackupCleanupConfirmOpen(true)}
                         disabled={isCleaningBackups}
                         className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl font-medium active:scale-[0.98] transition-transform ${isCleaningBackups
                             ? 'bg-stone-400 text-white cursor-not-allowed'
@@ -713,7 +743,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                                     setImageChunkSizeInput(value);
                                 }}
                                 placeholder={imageExportSummary ? String(imageExportSummary.totalImages) : '留空则单包导出'}
-                                className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300"
+                                className="data-image-input w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300"
                             />
                             <p className="text-[11px] leading-relaxed text-stone-400">
                                 默认值等于当前全部图片张数，不改就是单包导出；改小后会拆成多个 ZIP 压缩包。
@@ -794,9 +824,9 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                         <p className="text-xs font-bold text-stone-400 uppercase tracking-widest px-1">图片清理</p>
                         <div className="grid grid-cols-1 gap-3">
                             <button
-                                onClick={handleFixImageList}
+                                onClick={() => setIsFixImageListConfirmOpen(true)}
                                 disabled={isCheckingImages}
-                                className="flex items-center justify-center gap-2 w-full py-3 bg-blue-500 text-white rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600"
+                                className="data-image-action data-image-primary-action flex items-center justify-center gap-2 w-full py-3 bg-blue-500 text-white rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600"
                             >
                                 {isCheckingImages ? (
                                     <>
@@ -860,6 +890,26 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                 </div>
             </div>
 
+            <ConfirmModal
+                isOpen={isBackupCleanupConfirmOpen}
+                onClose={() => setIsBackupCleanupConfirmOpen(false)}
+                onConfirm={handleConfirmBackupCleanup}
+                title="清理旧备份"
+                description="将检查云端 backups 文件夹，仅保留最新的一个备份文件，其余备份将被永久删除。此操作不可撤销。"
+                confirmText="清理旧备份"
+                cancelText="取消"
+                type="danger"
+            />
+            <ConfirmModal
+                isOpen={isFixImageListConfirmOpen}
+                onClose={() => setIsFixImageListConfirmOpen(false)}
+                onConfirm={handleConfirmFixImageList}
+                title="修复图片列表"
+                description="将根据本地数据引用与实际图片文件重建图片列表，建议在同步前执行。"
+                confirmText="开始修复"
+                cancelText="取消"
+                type="warning"
+            />
             <ConfirmModal
                 isOpen={isImageCleanupConfirmOpen}
                 onClose={() => setIsImageCleanupConfirmOpen(false)}

@@ -1,6 +1,8 @@
 /**
  * @file S3SyncSettingsView.tsx
  * @description Cloud sync settings for Tencent Cloud COS and generic compatible S3 storage.
+ * @updated 2026-07-21: Replaced COS and compatible-S3 configuration clearing with in-app confirmation modals.
+ * @updated 2026-07-21: Added semantic dark-mode states for providers, sync actions, and status feedback.
  */
 import React, { useEffect, useState } from 'react';
 import {
@@ -23,6 +25,7 @@ import {
 import { s3Service, S3Config } from '../../services/s3Service';
 import { compatibleS3Service, CompatibleS3Config } from '../../services/compatibleS3Service';
 import { ToastType } from '../../components/Toast';
+import { ConfirmModal } from '../../components/ConfirmModal';
 
 interface S3SyncSettingsViewProps {
   onBack: () => void;
@@ -95,6 +98,40 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
   const [isSyncing, setIsSyncing] = useState(false);
   const [showCosPassword, setShowCosPassword] = useState(false);
   const [showCompatiblePassword, setShowCompatiblePassword] = useState(false);
+  const [pendingClearConfig, setPendingClearConfig] = useState<'cos' | 'compatible' | null>(null);
+
+  const confirm = () => {
+    setPendingClearConfig(activeTab === 'cos' ? 'cos' : 'compatible');
+    return false;
+  };
+  const window = { confirm };
+
+  const handleConfirmClearConfig = () => {
+    if (pendingClearConfig === 'cos') {
+      s3Service.clearStorage();
+      setS3Config(null);
+      setCosForm({
+        bucketName: '',
+        region: '',
+        secretId: '',
+        secretKey: '',
+        endpoint: ''
+      });
+      clearDraftKeys(COS_DRAFT_KEYS);
+      onToast('info', '腾讯云 COS 配置已清空');
+    }
+
+    if (pendingClearConfig === 'compatible') {
+      compatibleS3Service.clearStorage();
+      setCompatibleS3Config(null);
+      setCompatibleForm(DEFAULT_COMPATIBLE_CONFIG());
+      localStorage.removeItem(LEGACY_COMPATIBLE_PROVIDER_DRAFT_KEY);
+      clearDraftKeys(COMPATIBLE_DRAFT_KEYS);
+      onToast('info', '兼容 S3 配置已清空');
+    }
+
+    setPendingClearConfig(null);
+  };
 
   useEffect(() => {
     if (s3Config) {
@@ -276,8 +313,8 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
     onDisconnect: () => void,
     onClear: () => void
   ) => (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3 rounded-xl border border-green-100 bg-green-50 p-3 text-green-700">
+    <div className="sync-connected-actions space-y-6">
+      <div className="sync-connected-status flex items-center gap-3 rounded-xl border border-green-100 bg-green-50 p-3 text-green-700">
         <CheckCircle2 size={20} className="shrink-0" />
         <div className="overflow-hidden">
           <p className="truncate font-medium">{label}</p>
@@ -293,7 +330,7 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
             setIsSyncing(false);
           }}
           disabled={isSyncing}
-          className="flex flex-col items-center justify-center gap-2 rounded-xl bg-stone-800 py-4 font-medium text-white transition-transform active:scale-[0.98] disabled:opacity-70"
+          className="sync-upload-action flex flex-col items-center justify-center gap-2 rounded-xl bg-stone-800 py-4 font-medium text-white transition-transform active:scale-[0.98] disabled:opacity-70"
         >
           <Upload size={20} className={isSyncing ? 'animate-pulse' : ''} />
           <span>上传</span>
@@ -306,7 +343,7 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
             setIsSyncing(false);
           }}
           disabled={isSyncing}
-          className="flex flex-col items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white py-4 font-medium text-stone-700 transition-transform hover:bg-stone-50 active:scale-[0.98] disabled:opacity-70"
+          className="sync-restore-action flex flex-col items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white py-4 font-medium text-stone-700 transition-transform hover:bg-stone-50 active:scale-[0.98] disabled:opacity-70"
         >
           <Download size={20} className={isSyncing ? 'animate-pulse' : ''} />
           <span>恢复</span>
@@ -316,7 +353,7 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
       <div className="border-t border-stone-100 pt-4">
         <button
           onClick={onDisconnect}
-          className="flex w-full items-center justify-center gap-2 rounded-lg py-2 text-sm text-red-400 transition-colors hover:bg-red-50 hover:text-red-500"
+          className="sync-danger-action flex w-full items-center justify-center gap-2 rounded-lg py-2 text-sm text-red-400 transition-colors hover:bg-red-50 hover:text-red-500"
         >
           <LogOut size={16} />
           断开连接
@@ -324,7 +361,7 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
 
         <button
           onClick={onClear}
-          className="mt-1 flex w-full items-center justify-center gap-2 rounded-lg py-2 text-xs text-red-300 transition-colors hover:bg-red-50 hover:text-red-400"
+          className="sync-danger-action mt-1 flex w-full items-center justify-center gap-2 rounded-lg py-2 text-xs text-red-300 transition-colors hover:bg-red-50 hover:text-red-400"
         >
           <Trash2 size={14} />
           清空配置
@@ -430,7 +467,7 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
         <button
           onClick={handleCosSaveConfig}
           disabled={isSyncing}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-stone-800 py-3 font-medium text-white shadow-lg shadow-stone-200 transition-transform active:scale-[0.98] disabled:opacity-70"
+          className="sync-save-action flex w-full items-center justify-center gap-2 rounded-xl bg-stone-800 py-3 font-medium text-white shadow-lg shadow-stone-200 transition-transform active:scale-[0.98] disabled:opacity-70"
         >
           {isSyncing ? <RefreshCw size={18} className="animate-spin" /> : <Save size={18} />}
           {isSyncing ? '连接中...' : '保存并连接'}
@@ -554,7 +591,7 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
               <div className="font-medium">Force Path Style</div>
               <div className="mt-1 text-xs text-stone-500">需要时按对象存储服务商要求调整。</div>
             </div>
-            <div className={`h-6 w-10 rounded-full transition-colors ${compatibleForm.forcePathStyle ? 'bg-green-500' : 'bg-stone-200'}`}>
+            <div className={`sync-force-path-switch h-6 w-10 rounded-full transition-colors ${compatibleForm.forcePathStyle ? 'sync-force-path-switch-on bg-green-500' : 'bg-stone-200'}`}>
               <div className={`relative top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${compatibleForm.forcePathStyle ? 'left-5' : 'left-1'}`} />
             </div>
           </button>
@@ -563,7 +600,7 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
         <button
           onClick={handleCompatibleSaveConfig}
           disabled={isSyncing}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-stone-800 py-3 font-medium text-white shadow-lg shadow-stone-200 transition-transform active:scale-[0.98] disabled:opacity-70"
+          className="sync-save-action flex w-full items-center justify-center gap-2 rounded-xl bg-stone-800 py-3 font-medium text-white shadow-lg shadow-stone-200 transition-transform active:scale-[0.98] disabled:opacity-70"
         >
           {isSyncing ? <RefreshCw size={18} className="animate-spin" /> : <Save size={18} />}
           {isSyncing ? '连接中...' : '保存并连接'}
@@ -573,7 +610,7 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] font-serif animate-in slide-in-from-right duration-300">
+    <div className="sync-settings-view fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] font-serif animate-in slide-in-from-right duration-300">
       <div className="sticky top-0 flex h-14 items-center gap-3 border-b border-stone-100 bg-[#fdfbf7]/80 px-4 backdrop-blur-md">
         <button onClick={onBack} className="p-1 text-stone-400 hover:text-stone-600">
           <ChevronLeft size={24} />
@@ -585,13 +622,13 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
         <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl bg-stone-100 p-1">
           <button
             onClick={() => setActiveTab('cos')}
-            className={`rounded-xl px-3 py-2 text-sm font-medium transition-colors ${activeTab === 'cos' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500'}`}
+            className={`sync-provider-tab ${activeTab === 'cos' ? 'sync-provider-tab-selected bg-white text-stone-800 shadow-sm' : 'text-stone-500'} rounded-xl px-3 py-2 text-sm font-medium transition-colors`}
           >
             腾讯云 COS
           </button>
           <button
             onClick={() => setActiveTab('compatible-s3')}
-            className={`rounded-xl px-3 py-2 text-sm font-medium transition-colors ${activeTab === 'compatible-s3' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500'}`}
+            className={`sync-provider-tab ${activeTab === 'compatible-s3' ? 'sync-provider-tab-selected bg-white text-stone-800 shadow-sm' : 'text-stone-500'} rounded-xl px-3 py-2 text-sm font-medium transition-colors`}
           >
             兼容 S3
           </button>
@@ -610,12 +647,22 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
           {activeTab === 'cos' ? renderCosSection() : renderCompatibleSection()}
         </div>
 
-        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="sync-advice mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           <p className="font-medium">使用建议</p>
           <p className="mt-1">1. 自动同步还不是很稳定，建议使用手动同步</p>
           <p className="mt-1">2. 上传之后不能马上下载，需要等一会儿</p>
         </div>
       </div>
+      <ConfirmModal
+        isOpen={pendingClearConfig !== null}
+        onClose={() => setPendingClearConfig(null)}
+        onConfirm={handleConfirmClearConfig}
+        title={pendingClearConfig === 'cos' ? '清空腾讯云 COS 配置' : '清空兼容 S3 配置'}
+        description="将删除本设备保存的连接配置。下次同步需要重新填写。"
+        confirmText="清空配置"
+        cancelText="取消"
+        type="danger"
+      />
     </div>
   );
 };

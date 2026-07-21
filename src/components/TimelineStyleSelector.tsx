@@ -131,7 +131,7 @@ export const TimelineStyleSelector: React.FC<TimelineStyleSelectorProps> = ({ on
         <button
           type="button"
           onClick={handleAdjust}
-          className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+          className={`timeline-style-adjust flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
             canAdjust ? 'bg-stone-100 text-stone-700 hover:bg-stone-200' : 'bg-stone-50 text-stone-300'
           }`}
         >

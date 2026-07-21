@@ -1,3 +1,8 @@
+/**
+ * @file NarrativeSettingsView.tsx
+ * @description Configures AI narrative templates and their applicability periods.
+ * @updated 2026-07-21: Applied outline-only selection states for dark-mode applicability controls.
+ */
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, User, Sparkles, PlusCircle, Edit2, Trash2, X } from 'lucide-react';
 import { ToastType } from '../../components/Toast';
@@ -274,8 +279,8 @@ export const NarrativeSettingsView: React.FC<NarrativeSettingsViewProps> = ({
                                         type="button"
                                         onClick={() => setModalIsDaily(!modalIsDaily)}
                                         className={`px-2 py-3 rounded-xl text-xs font-bold text-center border transition-all flex items-center justify-center gap-1.5 truncate ${modalIsDaily
-                                            ? 'bg-stone-900 text-white border-stone-900 shadow-md transform scale-[1.02]'
-                                            : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'
+                                            ? 'narrative-applicability-option narrative-applicability-selected bg-stone-900 text-white border-stone-900 shadow-md transform scale-[1.02]'
+                                            : 'narrative-applicability-option bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'
                                             }`}
                                     >
                                         <span className="text-sm">☀️</span>
@@ -285,8 +290,8 @@ export const NarrativeSettingsView: React.FC<NarrativeSettingsViewProps> = ({
                                         type="button"
                                         onClick={() => setModalIsWeekly(!modalIsWeekly)}
                                         className={`px-2 py-3 rounded-xl text-xs font-bold text-center border transition-all flex items-center justify-center gap-1.5 truncate ${modalIsWeekly
-                                            ? 'bg-stone-900 text-white border-stone-900 shadow-md transform scale-[1.02]'
-                                            : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'
+                                            ? 'narrative-applicability-option narrative-applicability-selected bg-stone-900 text-white border-stone-900 shadow-md transform scale-[1.02]'
+                                            : 'narrative-applicability-option bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'
                                             }`}
                                     >
                                         <span className="text-sm">📅</span>
@@ -296,8 +301,8 @@ export const NarrativeSettingsView: React.FC<NarrativeSettingsViewProps> = ({
                                         type="button"
                                         onClick={() => setModalIsMonthly(!modalIsMonthly)}
                                         className={`px-2 py-3 rounded-xl text-xs font-bold text-center border transition-all flex items-center justify-center gap-1.5 truncate ${modalIsMonthly
-                                            ? 'bg-stone-900 text-white border-stone-900 shadow-md transform scale-[1.02]'
-                                            : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'
+                                            ? 'narrative-applicability-option narrative-applicability-selected bg-stone-900 text-white border-stone-900 shadow-md transform scale-[1.02]'
+                                            : 'narrative-applicability-option bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'
                                             }`}
                                     >
                                         <span className="text-sm">🌙</span>

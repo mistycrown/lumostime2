@@ -58,7 +58,7 @@ export const ScheduleStyleSelector: React.FC = () => {
                 key={option.value}
                 type="button"
                 onClick={() => setScheduleStyle(option.value)}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                className={`schedule-style-option ${isSelected ? 'schedule-style-option-selected' : ''} inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
                   isSelected
                     ? 'border-stone-700 bg-stone-700 text-white shadow-[0_6px_16px_rgba(41,37,36,0.16)]'
                     : 'border-stone-200 bg-stone-50 text-stone-600 hover:border-stone-300 hover:bg-stone-100'

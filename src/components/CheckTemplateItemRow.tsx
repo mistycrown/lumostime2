@@ -5,6 +5,7 @@
  * @pos Component (Check Template)
  * @description 日课模板条目编辑行，支持手动/自动模式切换、次数目标输入、自动规则配置，以及可选的 UI icon 选择。
  * @updated 2026-05-14: Keep index and input on one line, move action buttons to a right-aligned second row on small screens.
+ * @updated 2026-07-21: Added semantic dark-mode surfaces for daily-check item inputs and auto-rule controls.
  * @updated 2026-05-03: Rewrote the row in UTF-8 and added supporter-gated UI icon selection support.
  * @updated 2026-04-15: Added nightLatestStart summary rendering for auto rules.
  */
@@ -171,7 +172,7 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
               type="text"
               value={displayValue}
               onChange={(e) => handleContentChange(e.target.value)}
-              className="min-w-0 flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none transition-all font-serif focus:border-stone-400 focus:ring-2 focus:ring-stone-100"
+              className="daily-check-item-input min-w-0 flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none transition-all font-serif focus:border-stone-400 focus:ring-2 focus:ring-stone-100"
               placeholder={isAuto ? '⚡ 输入自动日课名称...' : '📝 输入日课名称（首字符作为 emoji 图标）...'}
             />
           </div>
@@ -216,7 +217,7 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
           {isAuto && (
             <div
               onClick={() => setShowAutoEditor(true)}
-              className={`ml-6 min-w-0 cursor-pointer rounded-lg px-3 py-2 text-xs transition-colors active:opacity-80 flex items-center gap-2 ${
+              className={`daily-check-auto-rule ml-6 min-w-0 cursor-pointer rounded-lg px-3 py-2 text-xs transition-colors active:opacity-80 flex items-center gap-2 ${
                 item.autoConfig
                   ? 'bg-blue-50 text-blue-600'
                   : 'bg-amber-50 text-amber-600 animate-pulse'
@@ -233,7 +234,7 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
               <button
                 type="button"
                 onClick={() => setShowIconSelector((prev) => !prev)}
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all ${
+                className={`daily-check-icon-button flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all ${
                   showIconSelector
                     ? 'bg-[var(--accent-color)]/10'
                     : 'border border-stone-200 bg-white hover:border-stone-300'
@@ -253,7 +254,7 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
               <button
                 type="button"
                 onClick={handleCycleMode}
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                className={`daily-check-mode-button ${isAuto ? 'daily-check-mode-button-auto' : ''} flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
                   isAuto
                     ? 'bg-blue-50 text-blue-600'
                     : isCountManual

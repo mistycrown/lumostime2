@@ -4,6 +4,7 @@
  * @output Updated CheckTemplateItem with auto config
  * @pos Component (Auto Check Editor)
  * @description 自动日课配置编辑器 - 用于配置自动判断规则
+ * @updated 2026-07-21: Added semantic dark-mode styles for automatic daily-check configuration surfaces.
  * @updated 2026-04-15: Added nightLatestStart configuration support for sleep rules.
  */
 
@@ -159,10 +160,10 @@ export const AutoCheckItemEditor: React.FC<AutoCheckItemEditorProps> = ({
       }}
     >
       <div 
-        className="bg-white rounded-2xl w-full max-w-md shadow-xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden"
+        className="daily-auto-check-modal bg-white rounded-2xl w-full max-w-md shadow-xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-4 border-b border-stone-100 flex justify-between items-center bg-blue-50/50">
+        <div className="daily-auto-check-modal-header p-4 border-b border-stone-100 flex justify-between items-center bg-blue-50/50">
           <div className="flex items-center gap-2">
             <Zap size={20} className="text-blue-600" />
             <h3 className="font-bold text-stone-800">配置自动日课</h3>
@@ -173,7 +174,7 @@ export const AutoCheckItemEditor: React.FC<AutoCheckItemEditorProps> = ({
         </div>
 
         <div className="p-5 space-y-4">
-          <div className="bg-blue-50 text-blue-700 text-xs p-3 rounded-xl">
+          <div className="daily-auto-check-info bg-blue-50 text-blue-700 text-xs p-3 rounded-xl">
             <p>自动日课会根据当天的活动记录自动判断完成状态，无需手动勾选。</p>
           </div>
 
@@ -190,7 +191,7 @@ export const AutoCheckItemEditor: React.FC<AutoCheckItemEditorProps> = ({
                 setConfig({ ...config, filterExpression: e.target.value });
               }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-blue-400 transition-all font-serif"
+              className="daily-auto-check-input w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-blue-400 transition-all font-serif"
               placeholder="例如：#学习 %专业输入"
             />
             <p className="text-xs text-stone-400 mt-1">
@@ -259,7 +260,7 @@ export const AutoCheckItemEditor: React.FC<AutoCheckItemEditorProps> = ({
                 }
               }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-blue-400 transition-all font-mono"
+              className="daily-auto-check-input w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-blue-400 transition-all font-mono"
               placeholder={getInputPlaceholder()}
             />
             <p className="text-xs text-stone-400 mt-1">
@@ -275,7 +276,7 @@ export const AutoCheckItemEditor: React.FC<AutoCheckItemEditorProps> = ({
           </div>
 
           {/* 预览 */}
-          <div className="bg-stone-50 rounded-xl p-3 text-xs text-stone-600">
+          <div className="daily-auto-check-preview bg-stone-50 rounded-xl p-3 text-xs text-stone-600">
             <p className="font-bold mb-1">规则预览：</p>
             <p>
               当 <span className="text-blue-600 font-mono">{config.filterExpression || '(未设置)'}</span> 的
@@ -310,7 +311,7 @@ export const AutoCheckItemEditor: React.FC<AutoCheckItemEditorProps> = ({
             <button
               onClick={handleSave}
               disabled={!config.filterExpression.trim()}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="daily-auto-check-save flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <Zap size={14} />
               保存配置

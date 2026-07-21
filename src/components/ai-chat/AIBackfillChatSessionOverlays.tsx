@@ -4,6 +4,7 @@
  * @output History-session overlay and new-session dialog for AIBackfillChatModal
  * @pos Component Support (AI Integration)
  * @description Extracts the session-history and session-creation overlays out of AIBackfillChatModal so the modal can focus on orchestration while these presentation-heavy surfaces preserve their existing behavior.
+ * @updated 2026-07-22: Replaced legacy fixed session-list text colors with shared theme tokens for dark-mode readability.
  * @updated 2026-05-15: Extracted the history overlay and new-session dialog from AIBackfillChatModal.
  */
 import React from 'react';
@@ -105,7 +106,7 @@ export const AIBackfillChatHistoryOverlay: React.FC<AIBackfillChatHistoryOverlay
           }}
         >
           <div>
-            <h3 className="text-base font-bold text-stone-800">历史对话</h3>
+            <h3 className="text-base font-bold" style={{ color: theme.textPrimary }}>历史对话</h3>
           </div>
           <button
             onClick={onClose}
@@ -208,16 +209,16 @@ export const AIBackfillChatHistoryOverlay: React.FC<AIBackfillChatHistoryOverlay
                               autoFocus
                             />
                           ) : (
-                            <p className="truncate font-serif text-[1.05rem] text-[#26211d]">{session.title}</p>
+                            <p className="truncate font-serif text-[1.05rem]" style={{ color: theme.textPrimary }}>{session.title}</p>
                           )}
-                          <span className="shrink-0 text-[11px] text-[#978d82]">
+                          <span className="shrink-0 text-[11px]" style={{ color: theme.textMuted }}>
                             {formatConversationTime(session.updatedAt)}
                           </span>
                         </div>
-                        <p className="mt-1 truncate text-xs text-[#69615a]">
+                        <p className="mt-1 truncate text-xs" style={{ color: theme.textSecondary }}>
                           {lastMessage?.content || '还没有消息'}
                         </p>
-                        <div className="mt-2 flex items-center gap-2 text-[11px] text-[#91877d]">
+                        <div className="mt-2 flex items-center gap-2 text-[11px]" style={{ color: theme.textMuted }}>
                           <span>{sessionPersona.name}</span>
                           <span>·</span>
                           <span>{session.contextCacheEnabled ? `上下文 ${sessionPersona.contextMessageLimit}轮` : '单轮'}</span>

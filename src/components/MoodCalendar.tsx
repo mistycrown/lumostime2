@@ -1,6 +1,7 @@
 /**
  * @file MoodCalendar.tsx
  * @description 心情日历组件 - 显示当月每日的心情 emoji/贴纸（基于 monomood 设计）
+ * @updated 2026-07-21: Added semantic class hooks for Memoir dark-mode calendar colors.
  */
 import React, { useMemo, useState } from 'react';
 import { DailyReview } from '../types';
@@ -130,11 +131,11 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
 
     return (
         <>
-            <div className="bg-stone-50 shadow-sm p-6 rounded-2xl mb-6">
+            <div className="memoir-mood-calendar bg-stone-50 shadow-sm p-6 rounded-2xl mb-6">
                 {/* Weekday Headers */}
                 <div className="grid grid-cols-7 mb-4">
                     {WEEK_DAYS.map((day, i) => (
-                        <div key={i} className="text-center text-sm text-stone-400 font-light">
+                        <div key={i} className="memoir-calendar-weekday text-center text-sm text-stone-400 font-light">
                             {day}
                         </div>
                     ))}
@@ -175,8 +176,8 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
                                     <span 
                                         className={`text-sm font-handwriting ${
                                             today 
-                                                ? 'text-stone-900 font-bold' 
-                                                : 'text-stone-400'
+                                                ? 'memoir-calendar-today text-stone-900 font-bold'
+                                                : 'memoir-calendar-day text-stone-400'
                                         }`}
                                     >
                                         {day}

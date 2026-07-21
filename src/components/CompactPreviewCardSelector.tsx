@@ -71,7 +71,7 @@ export const CompactPreviewCardSelector = <T extends string,>({
                 onClick={() => onSelect(option.value)}
                 title={showLabels ? (option.description ? `${option.label} - ${option.description}` : option.label) : undefined}
                 aria-pressed={isSelected}
-                className={`group relative w-full overflow-hidden rounded-xl bg-white transition-all ${
+                className={`compact-preview-option ${isSelected ? 'compact-preview-option-selected' : ''} group relative w-full overflow-hidden rounded-xl bg-white transition-all ${
                   isSelected
                     ? 'ring-2 ring-stone-300 shadow-[0_6px_18px_rgba(120,113,108,0.18)]'
                     : 'ring-1 ring-stone-200 hover:ring-stone-300'

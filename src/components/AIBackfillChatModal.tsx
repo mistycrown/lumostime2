@@ -7,6 +7,7 @@
  * @updated 2026-07-21: Kept the composer Stop state tied to the active foreground request so ordinary requests remain cancellable even if a loading branch resets early.
  * @updated 2026-07-06: Added assistant-created principle and self-belief tool-call writeback with in-chat undo support.
  * @updated 2026-07-05: Connected ordinary foreground assistant local-query turns to the real category/review datasets and fed local-query history back into follow-up unified turns.
+ * @updated 2026-07-21: Added a dedicated dark-mode AI chat theme for shell, messages, cards, and composer controls.
  * @updated 2026-06-07: Added guarded review-command dispatch so weekly/monthly newspaper command setup errors now surface as chat error messages instead of failing silently.
  * @updated 2026-05-21: Synced native background conversation snapshots through the same timestamp-preserving serializer used by foreground assistant prompts so Android-side AI turns can distinguish old context from current context.
  * @updated 2026-05-19: Added short desktop-widget hide/restore shell transitions so edge collapsing no longer hard-cuts between the full quick-chat panel and the hidden handle.
@@ -460,7 +461,56 @@ const ACCENT_AI_CHAT_THEME = {
   avatarShadow: '0 2px 8px rgba(52, 38, 27, 0.035)'
 } as const;
 
-const getAIChatTheme = (isDefaultTheme: boolean) => {
+const DARK_AI_CHAT_THEME = {
+  shellBg: '#1c1917',
+  shellLayerBg: '#1c1917',
+  panelBg: '#292524',
+  panelBgStrong: '#292524',
+  panelBgSoft: '#292524',
+  panelBgMuted: '#44403c',
+  panelBorder: '#57534e',
+  panelBorderStrong: '#78716c',
+  chipBg: '#292524',
+  chipBorder: '#57534e',
+  chipBorderStrong: '#78716c',
+  inputBg: '#292524',
+  inputBgStrong: '#44403c',
+  activeBg: '#44403c',
+  activeBorder: '#f5f5f4',
+  avatarBg: '#292524',
+  textPrimary: '#f5f5f4',
+  textSecondary: '#d6d3d1',
+  textMuted: '#a8a29e',
+  textFaint: '#78716c',
+  primaryButtonBg: '#292524',
+  primaryButtonHoverBg: '#44403c',
+  primaryButtonBorder: '#78716c',
+  primaryButtonText: '#f5f5f4',
+  successBg: '#1f3d2b',
+  successBorder: '#4ade80',
+  successText: '#bbf7d0',
+  undoneBg: '#292524',
+  undoneBorder: '#57534e',
+  undoneText: '#a8a29e',
+  dangerBg: '#3f1d1d',
+  dangerBorder: '#991b1b',
+  dangerText: '#fecaca',
+  pendingBg: '#292524',
+  pendingBorder: '#57534e',
+  codeBg: '#171412',
+  codeBorder: '#57534e',
+  codeText: '#efe7db',
+  overlayDark: 'rgba(0, 0, 0, 0.48)',
+  overlayLight: 'rgba(41, 37, 36, 0.94)',
+  cardShadow: 'none',
+  cardShadowStrong: 'none',
+  avatarShadow: 'none'
+} as const;
+
+const getAIChatTheme = (isDefaultTheme: boolean, isDarkTheme: boolean) => {
+  if (isDarkTheme) {
+    return DARK_AI_CHAT_THEME;
+  }
   if (isDefaultTheme) {
     return {
       shellBg: '#f5f5f5',
@@ -716,8 +766,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setIsMonthlyReviewOpen
   } = useNavigation();
   const { addToast } = useToast();
-  const { autoLinkRules, autoApplyAutoLinkRules, colorScheme } = useSettings();
-  const AI_CHAT_THEME = useMemo(() => getAIChatTheme(colorScheme === 'default'), [colorScheme]);
+  const { autoLinkRules, autoApplyAutoLinkRules, colorScheme, themeMode } = useSettings();
+  const AI_CHAT_THEME = useMemo(
+    () => getAIChatTheme(colorScheme === 'default', themeMode === 'dark'),
+    [colorScheme, themeMode]
+  );
 
   const defaultTargetDate = useMemo(() => {
     if (targetDate) {

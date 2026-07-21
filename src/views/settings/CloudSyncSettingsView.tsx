@@ -1,11 +1,14 @@
 /**
  * @file CloudSyncSettingsView.tsx
  * @description WebDAV 云同步配置页面
+ * @updated 2026-07-21: Replaced WebDAV configuration clearing with an in-app confirmation modal.
+ * @updated 2026-07-21: Added semantic dark-mode styles for WebDAV sync surfaces and actions.
  */
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, Server, User, Globe, Save, RefreshCw, Upload, Download, CheckCircle2, LogOut, Trash2, Eye, EyeOff } from 'lucide-react';
 import { webdavService, WebDAVConfig } from '../../services/webdavService';
 import { ToastType } from '../../components/Toast';
+import { ConfirmModal } from '../../components/ConfirmModal';
 
 interface CloudSyncSettingsViewProps {
     onBack: () => void;
@@ -27,6 +30,12 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
     const [configForm, setConfigForm] = useState<WebDAVConfig>({ url: '', username: '', password: '' });
     const [isSyncing, setIsSyncing] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [isClearConfigConfirmOpen, setIsClearConfigConfirmOpen] = useState(false);
+
+    const confirm = () => {
+        setIsClearConfigConfirmOpen(true);
+        return false;
+    };
 
     useEffect(() => {
         const config = webdavService.getConfig();
@@ -85,6 +94,14 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
         onToast('info', '已断开 WebDAV 服务器连接 (配置已保存)');
     };
 
+    const handleConfirmClearConfig = () => {
+        setIsClearConfigConfirmOpen(false);
+        webdavService.clearAllConfig();
+        setWebdavConfig(null);
+        setConfigForm({ url: '', username: '', password: '' });
+        onToast('info', 'WebDAV configuration completely cleared');
+    };
+
     const handleSyncUpload = async () => {
         setIsSyncing(true);
         await onSyncUpload();
@@ -98,7 +115,7 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+        <div className="sync-settings-view fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0">
                 <button onClick={onBack} className="text-stone-400 hover:text-stone-600 p-1">
                     <ChevronLeft size={24} />
@@ -172,7 +189,7 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
                         <div className="space-y-4">
                             <div className="text-sm text-stone-500 leading-relaxed space-y-2">
                                 <p>Connect to any WebDAV compatible storage (e.g., Nextcloud, Nutstore).</p>
-                                <div className="bg-blue-50 text-blue-700 p-3 rounded-xl text-xs space-y-1">
+                                <div className="sync-info bg-blue-50 text-blue-700 p-3 rounded-xl text-xs space-y-1">
                                     <p className="font-bold">⚠️ 配置说明：</p>
                                     <p>1. 请在网盘根目录新建 <b>Lumostime</b> 文件夹。</p>
                                     <p>2. 在 Lumostime 文件夹内新建 <b>backups</b> 和 <b>images</b> 两个子文件夹。</p>
@@ -183,7 +200,7 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
                             <div className="space-y-3">
                                 <div>
                                     <label className="text-xs font-bold text-stone-400 uppercase ml-1">Server URL</label>
-                                    <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
+                                    <div className="sync-input flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
                                         <Globe size={18} className="text-stone-400" />
                                         <input
                                             type="text"
@@ -197,7 +214,7 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
 
                                 <div>
                                     <label className="text-xs font-bold text-stone-400 uppercase ml-1">Username</label>
-                                    <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
+                                    <div className="sync-input flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
                                         <User size={18} className="text-stone-400" />
                                         <input
                                             type="text"
@@ -211,7 +228,7 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
 
                                 <div>
                                     <label className="text-xs font-bold text-stone-400 uppercase ml-1">Password</label>
-                                    <div className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
+                                    <div className="sync-input flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-xl mt-1 focus-within:ring-2 focus-within:ring-stone-200 transition-all">
                                         <div className="w-[18px] flex justify-center"><Server size={14} className="text-stone-400" /></div>
                                         <input
                                             type={showPassword ? "text" : "password"}
@@ -236,7 +253,7 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
                                 <button
                                     onClick={handleSaveConfig}
                                     disabled={isSyncing}
-                                    className="flex items-center justify-center gap-2 w-full py-3 bg-stone-800 text-white rounded-xl font-medium active:scale-[0.98] transition-transform shadow-lg shadow-stone-200 disabled:opacity-70"
+                                    className="sync-save-action flex items-center justify-center gap-2 w-full py-3 bg-stone-800 text-white rounded-xl font-medium active:scale-[0.98] transition-transform shadow-lg shadow-stone-200 disabled:opacity-70"
                                 >
                                     {isSyncing ? (
                                         <RefreshCw size={18} className="animate-spin" />
@@ -254,7 +271,7 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
                 </div>
 
                 {/* 提示信息框 */}
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                <div className="sync-advice bg-amber-50 border border-amber-200 rounded-2xl p-4">
                     <div className="text-sm text-amber-800 space-y-1.5">
                         <p className="font-medium">使用建议：</p>
                         <p>1. S3 对象存储会比 WebDAV 同步速度快</p>
@@ -263,6 +280,16 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
                     </div>
                 </div>
             </div>
+            <ConfirmModal
+                isOpen={isClearConfigConfirmOpen}
+                onClose={() => setIsClearConfigConfirmOpen(false)}
+                onConfirm={handleConfirmClearConfig}
+                title="清空 WebDAV 配置"
+                description="将删除本设备保存的 WebDAV 地址、用户名和密钥。下次同步需要重新填写。"
+                confirmText="清空配置"
+                cancelText="取消"
+                type="danger"
+            />
         </div>
     );
 };

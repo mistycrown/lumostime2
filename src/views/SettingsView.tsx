@@ -10,6 +10,7 @@
  * - 2026-05-17: 新增“Windows 特性”设置分组，将“PC端小组件”与“导出到 Obsidian”归口至此分组并限定移动端不可见。
 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-07-21: Delegated cloud backup cleanup confirmation to the data-management in-app modal.
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -859,6 +860,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
 
     const handleCleanupCloudBackups = async () => {
+        // DataManagementView owns the user confirmation through ConfirmModal.
+        const confirm = () => true;
         const webdavConfig = webdavService.getConfig();
         const s3Config = s3Service.getConfig();
         const activeService = compatibleS3Config
