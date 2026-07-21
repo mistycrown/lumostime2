@@ -1,6 +1,7 @@
 /**
  * @file ShareView.tsx
  * @description Share card generation view for exporting time records as beautiful images
+ * @updated 2026-07-21: Raised the share overlay above record-detail modals so it remains the topmost visible view.
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, Download, Palette, Layout } from 'lucide-react';
@@ -198,7 +199,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
   };
 
   return (
-    <div className="fixed inset-0 z-[110] bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+    <div className="fixed inset-0 z-[230] bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       {/* Header */}
       <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md z-10">
         <button

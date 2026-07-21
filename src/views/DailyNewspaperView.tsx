@@ -4,6 +4,7 @@
  * @output Full-screen editorial newspaper page for one day
  * @pos View (Review System)
  * @description Renders a dedicated daily AI newspaper page based on lightweight Daily Review storage plus real timeline data resolved by log ID.
+ * @updated 2026-07-21: Added shared semantic classes for dark-mode newspaper reading surfaces.
  * @updated 2026-06-13: Collapsed newspaper reply inputs behind a comment button and switched assistant labels to the active persona display name.
  * @updated 2026-06-13: Added per-annotation local comment threads with compact editorial reply inputs for AI follow-up discussion.
  * @updated 2026-05-16: Switched per-log metadata to shared timeline-style pills, kept only notes as body text, tightened typography, and rendered all real logs for the target day while preserving orphaned annotations whose source logs were later deleted.
@@ -229,7 +230,7 @@ export const DailyNewspaperView: React.FC<DailyNewspaperViewProps> = ({
 
   if (!newspaper) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#f8f7f5] px-6">
+      <div className="newspaper-view flex h-full items-center justify-center bg-[#f8f7f5] px-6">
         <div className="max-w-md text-center text-sm leading-7 text-stone-500">
           这一天还没有生成 AI 小报。
         </div>
@@ -238,8 +239,8 @@ export const DailyNewspaperView: React.FC<DailyNewspaperViewProps> = ({
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-[#f8f7f5]">
-      <div className="mx-auto min-h-full w-full max-w-3xl bg-white px-6 pb-16 pt-7 shadow-[0_10px_40px_rgba(15,23,42,0.04)] sm:px-10 sm:pt-8">
+    <div className="newspaper-view h-full overflow-y-auto bg-[#f8f7f5]">
+      <div className="newspaper-paper mx-auto min-h-full w-full max-w-3xl bg-white px-6 pb-16 pt-7 shadow-[0_10px_40px_rgba(15,23,42,0.04)] sm:px-10 sm:pt-8">
         <header className="border-b border-[#efede8] pb-5">
           <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[#91867a]">
             {formatDateLabel(date)}

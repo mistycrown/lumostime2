@@ -35,7 +35,7 @@ export const CalendarNumberStyleSelector: React.FC = () => {
                 key={option.value}
                 type="button"
                 onClick={() => setCalendarNumberStyle(option.value as CalendarNumberStyle)}
-                className={`relative flex min-h-[64px] flex-col items-center justify-center rounded-lg border px-1.5 py-1.5 transition-colors ${isSelected
+                className={`calendar-number-option ${isSelected ? 'calendar-number-option-selected' : ''} relative flex min-h-[64px] flex-col items-center justify-center rounded-lg border px-1.5 py-1.5 transition-colors ${isSelected
                   ? 'border-stone-700 bg-stone-50 text-stone-800 shadow-[0_4px_12px_rgba(41,37,36,0.08)]'
                   : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300 hover:bg-stone-50/60'}`}
               >
@@ -52,7 +52,7 @@ export const CalendarNumberStyleSelector: React.FC = () => {
             );
           })}
         </div>
-        <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-3">
+        <div className="mt-3 flex min-h-5 items-center justify-between border-t border-stone-100 pt-3">
           <span className="text-xs font-medium text-stone-600">显示农历</span>
           <button
             type="button"
@@ -60,9 +60,9 @@ export const CalendarNumberStyleSelector: React.FC = () => {
             aria-checked={calendarLunarDisplay}
             aria-label="显示农历"
             onClick={() => setCalendarLunarDisplay((current) => !current)}
-            className={`relative h-5 w-9 rounded-full transition-colors ${calendarLunarDisplay ? 'bg-stone-700' : 'bg-stone-200'}`}
+            className={`inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors ${calendarLunarDisplay ? 'bg-stone-700' : 'bg-stone-200'}`}
           >
-            <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${calendarLunarDisplay ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            <span className={`h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${calendarLunarDisplay ? 'translate-x-4' : 'translate-x-0'}`} />
           </button>
         </div>
       </div>

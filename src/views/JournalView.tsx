@@ -9,6 +9,7 @@
  * @updated 2026-05-14: Memoir log entries now inherit `◬ Collection` chips from data-collection membership so archive rows match the main timeline metadata treatment.
  * @updated 2026-04-20: Replaced the top-left Memoir month dropdown with the shared centered month picker modal used by todo scheduling.
  * @updated 2026-04-20: Enabled the mood calendar modal date title to jump directly into that day's daily review.
+ * @updated 2026-07-21: Added dark-mode semantic hooks for the Memoir calendar, timeline, and date navigation rail.
  */
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { DailyReview, Log, WeeklyReview, MonthlyReview } from '../types';
@@ -80,7 +81,7 @@ const DateNavigationSidebar: React.FC<{
     return (
         <div
             ref={containerRef}
-            className={`fixed right-0 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-3 py-4 rounded-l-xl h-[216px] overflow-y-auto no-scrollbar scroll-smooth transition-opacity duration-300 ${visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            className={`memoir-date-rail fixed right-0 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-3 py-4 rounded-l-xl h-[216px] overflow-y-auto no-scrollbar scroll-smooth transition-opacity duration-300 ${visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         >
             {days.map(({ dayStr }) => {
                 const isActive = activeDay === dayStr;
@@ -93,13 +94,13 @@ const DateNavigationSidebar: React.FC<{
                         <span className={`
                font-serif text-[10px] transition-all duration-300
                ${isActive
-                                ? 'text-stone-900 font-bold scale-150 origin-right'
+                                ? 'memoir-date-rail-active text-stone-900 font-bold scale-150 origin-right'
                                 : 'text-stone-300 font-medium group-hover:text-stone-500'}
              `}>
                             {dayStr.padStart(2, '0')}
                         </span>
                         <div className={`
-               absolute -left-1 w-1 h-1 rounded-full bg-stone-900 transition-all duration-300
+               memoir-date-rail-marker absolute -left-1 w-1 h-1 rounded-full bg-stone-900 transition-all duration-300
                ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}
              `}></div>
                     </button>
@@ -697,7 +698,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
     return (
         <div 
-            className="flex flex-col h-full relative"
+            className="memoir-view flex flex-col h-full relative"
             style={{ backgroundColor: hasBackground ? 'transparent' : '#faf9f6' }}
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
@@ -716,7 +717,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 />
             )}
             <div
-                className="absolute inset-0 -z-10"
+                className="memoir-surface-overlay absolute inset-0 -z-10"
                 style={{ backgroundColor: `rgba(250, 249, 246, ${panelOverlayOpacity})` }}
             />
 
@@ -858,12 +859,12 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                             {/* Left: Sticky Date */}
                                             <div className="relative w-12 flex-shrink-0">
                                                 <div className="sticky top-6 pr-3 text-right">
-                                                    <span className="block font-serif text-xl md:text-2xl text-gray-900 font-semibold leading-none">{day}</span>
-                                                    <span className="block font-sans text-[10px] font-bold text-subtle tracking-widest mt-1">{month}</span>
+                                                    <span className="memoir-timeline-day block font-serif text-xl md:text-2xl text-gray-900 font-semibold leading-none">{day}</span>
+                                                    <span className="memoir-timeline-month block font-sans text-[10px] font-bold text-subtle tracking-widest mt-1">{month}</span>
                                                 </div>
                                                 {/* Vertical line */}
                                                 {timelineStyleTheme === 'default' && (
-                                                    <div className="absolute top-0 right-0 w-px bg-gray-200 h-full" />
+                                                    <div className="memoir-timeline-rail absolute top-0 right-0 w-px bg-gray-200 h-full" />
                                                 )}
                                             </div>
 

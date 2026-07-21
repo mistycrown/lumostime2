@@ -1,3 +1,8 @@
+/**
+ * @file UserGuideView.tsx
+ * @description Renders the in-app guide chapter list and Markdown reading view.
+ * @updated 2026-07-21: Added semantic dark-mode surfaces for guide cards and text emphasis.
+ */
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -38,7 +43,7 @@ const processHighlight = (text: string) => {
             return (
                 <span
                     key={index}
-                    className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-sm font-mono border border-amber-100"
+                    className="guide-highlight text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-sm font-mono border border-amber-100"
                 >
                     {part.slice(2, -2)}
                 </span>
@@ -92,7 +97,7 @@ export const UserGuideView: React.FC<UserGuideViewProps> = ({ onBack }) => {
         if (!section) return null;
 
         return (
-            <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+            <div className="user-guide-view fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
                 <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0 z-10">
                     <button
                         onClick={() => setSelectedSection(null)}
@@ -105,7 +110,7 @@ export const UserGuideView: React.FC<UserGuideViewProps> = ({ onBack }) => {
 
                 <div ref={articleScrollRef} className="flex-1 overflow-y-auto overscroll-contain pb-40">
                     <div className="max-w-2xl mx-auto px-6 py-8">
-                        <div className="markdown-content prose prose-stone">
+                        <div className="guide-markdown markdown-content prose prose-stone">
                             <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 components={{
@@ -139,23 +144,23 @@ export const UserGuideView: React.FC<UserGuideViewProps> = ({ onBack }) => {
                                         </li>
                                     ),
                                     strong: ({ node, ...props }) => (
-                                        <strong className="text-stone-900 font-bold bg-amber-50 px-1 rounded" {...props} />
+                                        <strong className="guide-strong text-stone-900 font-bold bg-amber-50 px-1 rounded" {...props} />
                                     ),
                                     code: ({ node, inline, className, children, ...props }: any) =>
                                         inline ? (
                                             <span 
-                                                className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-sm font-mono border border-amber-100 whitespace-nowrap"
+                                                className="guide-inline-code text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-sm font-mono border border-amber-100 whitespace-nowrap"
                                                 {...props}
                                             >
                                                 {children}
                                             </span>
                                         ) : (
-                                            <code className="block bg-stone-50 border border-stone-200 rounded-xl p-5 text-sm font-mono leading-relaxed shadow-sm overflow-x-auto" style={{ wordBreak: 'break-all', whiteSpace: 'pre-wrap' }} {...props}>
+                                            <code className="guide-code-block block bg-stone-50 border border-stone-200 rounded-xl p-5 text-sm font-mono leading-relaxed shadow-sm overflow-x-auto" style={{ wordBreak: 'break-all', whiteSpace: 'pre-wrap' }} {...props}>
                                                 {children}
                                             </code>
                                         ),
                                     blockquote: ({ node, ...props }) => (
-                                        <blockquote className="border-l-4 border-amber-400 bg-amber-50/50 pl-5 pr-4 py-3 italic text-stone-600 my-6 rounded-r-lg" {...props} />
+                                        <blockquote className="guide-blockquote border-l-4 border-amber-400 bg-amber-50/50 pl-5 pr-4 py-3 italic text-stone-600 my-6 rounded-r-lg" {...props} />
                                     ),
                                     hr: ({ node, ...props }) => (
                                         <hr className="border-stone-200 my-8" {...props} />
@@ -189,7 +194,7 @@ export const UserGuideView: React.FC<UserGuideViewProps> = ({ onBack }) => {
 
     // 显示章节列表
     return (
-        <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+        <div className="user-guide-view fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0 z-10">
                 <button
                     onClick={onBack}
@@ -203,7 +208,7 @@ export const UserGuideView: React.FC<UserGuideViewProps> = ({ onBack }) => {
             <div ref={listScrollRef} className="flex-1 overflow-y-auto overscroll-contain p-4 pb-40">
                 <div className="space-y-4">
                     {/* 欢迎语 */}
-                    <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-6 mb-2 border border-amber-100/50">
+                    <div className="guide-welcome bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-6 mb-2 border border-amber-100/50">
                         <h2 className="text-xl font-bold text-stone-800 mb-2">欢迎使用 LumosTime ✨</h2>
                         <p className="text-sm text-stone-600 leading-relaxed">
                             LumosTime是一个结合柳比歇夫时间记录法和间歇日志方法的记录工具，让我们一起将被动的时间流逝转化为主动生命积累吧！
@@ -216,11 +221,11 @@ export const UserGuideView: React.FC<UserGuideViewProps> = ({ onBack }) => {
                             <div
                                 key={section.id}
                                 onClick={() => setSelectedSection(section.id)}
-                                className="bg-white rounded-xl p-4 active:scale-[0.98] transition-all cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] border border-stone-100"
+                                className="guide-section-card bg-white rounded-xl p-4 active:scale-[0.98] transition-all cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] border border-stone-100"
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-4 flex-1">
-                                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center text-2xl flex-shrink-0">
+                                        <div className="guide-section-icon w-12 h-12 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center text-2xl flex-shrink-0">
                                             {section.icon}
                                         </div>
                                         <div className="flex-1 min-w-0">

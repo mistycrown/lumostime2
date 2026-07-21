@@ -2498,3 +2498,628 @@ html[data-theme-mode=dark] .review-question-color-selected {
   outline-offset: 2px;
   box-shadow: none !important;
 }
+
+/* Daily-check history batch actions preserve input and destructive-state clarity. */
+html[data-theme-mode=dark] .daily-batch-modal {
+  border: 1px solid #57534e;
+  background-color: #292524 !important;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.48) !important;
+}
+
+html[data-theme-mode=dark] .daily-batch-modal input {
+  border-color: #78716c !important;
+  background-color: #292524 !important;
+  color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .daily-batch-modal input:focus {
+  border-color: #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .daily-batch-warning {
+  border: 1px solid rgba(217, 119, 6, 0.72);
+  background-color: rgba(120, 53, 15, 0.24) !important;
+  color: #fde68a !important;
+}
+
+html[data-theme-mode=dark] .daily-batch-tab-selected {
+  border-color: #f5f5f4 !important;
+  color: #fafaf9 !important;
+}
+
+html[data-theme-mode=dark] .daily-batch-action {
+  border: 1px solid #78716c !important;
+  background-color: #292524 !important;
+  color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .daily-batch-action-danger {
+  border-color: #991b1b !important;
+  background-color: rgba(127, 29, 29, 0.35) !important;
+  color: #fecaca !important;
+}
+
+html[data-theme-mode=dark] .daily-batch-action:disabled {
+  border-color: #44403c !important;
+  background-color: #292524 !important;
+  color: #78716c !important;
+  opacity: 1 !important;
+}
+
+/* Daily-check item editing keeps rule semantics without day-mode blue panels. */
+html[data-theme-mode=dark] .daily-check-item-input {
+  border-color: #78716c !important;
+  background-color: #292524 !important;
+  color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .daily-check-item-input:focus {
+  border-color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .daily-check-auto-rule {
+  border: 1px solid rgba(3, 105, 161, 0.72);
+  background-color: rgba(12, 74, 110, 0.28) !important;
+  color: #bfdbfe !important;
+}
+
+html[data-theme-mode=dark] .daily-check-icon-button,
+html[data-theme-mode=dark] .daily-check-mode-button {
+  border: 1px solid #78716c !important;
+  background-color: #292524 !important;
+  color: #d6d3d1 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .daily-check-mode-button-auto {
+  border-color: #93c5fd !important;
+  background-color: rgba(12, 74, 110, 0.28) !important;
+  color: #bfdbfe !important;
+}
+
+/* Automatic daily-check configuration uses the same dark information hierarchy. */
+html[data-theme-mode=dark] .daily-auto-check-modal {
+  border: 1px solid #57534e;
+  background-color: #292524 !important;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.48) !important;
+}
+
+html[data-theme-mode=dark] .daily-auto-check-modal-header {
+  border-color: #57534e !important;
+  background-color: #292524 !important;
+}
+
+html[data-theme-mode=dark] .daily-auto-check-info {
+  border: 1px solid rgba(3, 105, 161, 0.72);
+  background-color: rgba(12, 74, 110, 0.28) !important;
+  color: #bfdbfe !important;
+}
+
+html[data-theme-mode=dark] .daily-auto-check-input {
+  border-color: #78716c !important;
+  background-color: #292524 !important;
+  color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .daily-auto-check-input:focus {
+  border-color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .daily-auto-check-preview {
+  border: 1px solid #57534e;
+  background-color: #292524 !important;
+  color: #d6d3d1 !important;
+}
+
+html[data-theme-mode=dark] .daily-auto-check-save {
+  border: 1px solid #78716c !important;
+  background-color: #292524 !important;
+  color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .daily-auto-check-save:hover {
+  background-color: #44403c !important;
+}
+
+html[data-theme-mode=dark] .daily-auto-check-save:disabled {
+  border-color: #44403c !important;
+  background-color: #292524 !important;
+  color: #78716c !important;
+  opacity: 1 !important;
+}
+
+/* Enabled daily templates use a white outline; disabled templates stay unoutlined. */
+html[data-theme-mode=dark] .daily-template-enabled-toggle {
+  border: 1px solid transparent;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .daily-template-enabled-toggle-on {
+  border-color: #f5f5f4 !important;
+  background-color: #44403c !important;
+  color: #86efac !important;
+}
+
+/* Narrative template applicability uses an outline-only selected state. */
+html[data-theme-mode=dark] .narrative-applicability-option {
+  border-color: transparent !important;
+  background-color: transparent !important;
+  color: #a8a29e !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+html[data-theme-mode=dark] .narrative-applicability-option:hover {
+  background-color: #292524 !important;
+}
+
+html[data-theme-mode=dark] .narrative-applicability-selected {
+  border-color: #f5f5f4 !important;
+  background-color: #44403c !important;
+  color: #fafaf9 !important;
+}
+
+/* WebDAV and S3 sync controls share deep surfaces with clear state boundaries. */
+html[data-theme-mode=dark] .sync-info {
+  border: 1px solid rgba(3, 105, 161, 0.72);
+  background-color: rgba(12, 74, 110, 0.28) !important;
+  color: #bfdbfe !important;
+}
+
+html[data-theme-mode=dark] .sync-advice {
+  border-color: rgba(217, 119, 6, 0.72) !important;
+  background-color: rgba(120, 53, 15, 0.24) !important;
+  color: #fde68a !important;
+}
+
+html[data-theme-mode=dark] .sync-input,
+html[data-theme-mode=dark] .sync-settings-view .bg-stone-50.focus-within\:ring-2 {
+  border: 1px solid #78716c !important;
+  background-color: #292524 !important;
+  color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .sync-input:focus-within,
+html[data-theme-mode=dark] .sync-settings-view .bg-stone-50.focus-within\:ring-2:focus-within {
+  border-color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .sync-settings-view input::placeholder {
+  color: #a8a29e !important;
+}
+
+html[data-theme-mode=dark] .sync-save-action,
+html[data-theme-mode=dark] .sync-upload-action,
+html[data-theme-mode=dark] .sync-restore-action {
+  border: 1px solid #78716c !important;
+  background-color: #292524 !important;
+  color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .sync-save-action:hover,
+html[data-theme-mode=dark] .sync-upload-action:hover,
+html[data-theme-mode=dark] .sync-restore-action:hover {
+  background-color: #44403c !important;
+}
+
+html[data-theme-mode=dark] .sync-save-action:disabled,
+html[data-theme-mode=dark] .sync-upload-action:disabled,
+html[data-theme-mode=dark] .sync-restore-action:disabled {
+  border-color: #44403c !important;
+  background-color: #292524 !important;
+  color: #78716c !important;
+  opacity: 1 !important;
+}
+
+html[data-theme-mode=dark] .sync-connected-status {
+  border-color: rgba(22, 163, 74, 0.72) !important;
+  background-color: rgba(20, 83, 45, 0.28) !important;
+  color: #bbf7d0 !important;
+}
+
+html[data-theme-mode=dark] .sync-danger-action {
+  border: 1px solid transparent;
+  background-color: transparent !important;
+  color: #fca5a5 !important;
+}
+
+html[data-theme-mode=dark] .sync-danger-action:hover {
+  border-color: #991b1b;
+  background-color: rgba(127, 29, 29, 0.28) !important;
+}
+
+html[data-theme-mode=dark] .sync-provider-tab {
+  border: 1px solid transparent;
+  background-color: transparent !important;
+  color: #a8a29e !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .sync-provider-tab-selected {
+  border-color: #f5f5f4 !important;
+  background-color: #44403c !important;
+  color: #fafaf9 !important;
+}
+
+html[data-theme-mode=dark] .sync-force-path-switch {
+  border: 1px solid #78716c;
+  background-color: #44403c !important;
+}
+
+html[data-theme-mode=dark] .sync-force-path-switch-on {
+  border-color: #f5f5f4;
+  background-color: #44403c !important;
+}
+
+html[data-theme-mode=dark] .sync-force-path-switch > div {
+  background-color: #fafaf9 !important;
+  box-shadow: none !important;
+}
+
+/* Data-management image tools use visible boundaries without day-mode fills. */
+html[data-theme-mode=dark] .data-image-input {
+  border-color: #78716c !important;
+  background-color: #292524 !important;
+  color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .data-image-input:focus {
+  border-color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .data-image-action,
+html[data-theme-mode=dark] .data-management-view button.bg-white.border-stone-200 {
+  border: 1px solid #78716c !important;
+  background-color: #292524 !important;
+  color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .data-image-action:hover,
+html[data-theme-mode=dark] .data-management-view button.bg-white.border-stone-200:hover {
+  background-color: #44403c !important;
+}
+
+html[data-theme-mode=dark] .data-image-primary-action {
+  border: 1px solid #78716c !important;
+  background-color: #292524 !important;
+  color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .data-management-view button:disabled {
+  opacity: 1 !important;
+}
+
+/* User-guide reading and navigation surfaces avoid paper highlights in dark mode. */
+html[data-theme-mode=dark] .guide-welcome {
+  border-color: rgba(3, 105, 161, 0.72) !important;
+  background: rgba(12, 74, 110, 0.28) !important;
+}
+
+html[data-theme-mode=dark] .guide-welcome .text-stone-800,
+html[data-theme-mode=dark] .guide-welcome .text-stone-600 {
+  color: #dbeafe !important;
+}
+
+html[data-theme-mode=dark] .guide-section-card {
+  border-color: #57534e !important;
+  background-color: #292524 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .guide-section-card:hover {
+  border-color: #78716c !important;
+  background-color: #44403c !important;
+}
+
+html[data-theme-mode=dark] .guide-section-icon {
+  background: #44403c !important;
+}
+
+html[data-theme-mode=dark] .guide-highlight,
+html[data-theme-mode=dark] .guide-inline-code {
+  border-color: rgba(3, 105, 161, 0.72) !important;
+  background-color: rgba(12, 74, 110, 0.28) !important;
+  color: #bfdbfe !important;
+}
+
+html[data-theme-mode=dark] .guide-strong {
+  background-color: rgba(120, 53, 15, 0.28) !important;
+  color: #fde68a !important;
+}
+
+html[data-theme-mode=dark] .guide-code-block {
+  border-color: #57534e !important;
+  background-color: #292524 !important;
+  color: #d6d3d1 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .guide-blockquote {
+  border-color: #93c5fd !important;
+  background-color: rgba(12, 74, 110, 0.18) !important;
+  color: #d6d3d1 !important;
+}
+
+/* Sponsorship style previews retain their content while losing paper-white surfaces. */
+html[data-theme-mode=dark] .compact-preview-option,
+html[data-theme-mode=dark] .color-scheme-preview-option,
+html[data-theme-mode=dark] .calendar-number-option {
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .compact-preview-option-selected,
+html[data-theme-mode=dark] .color-scheme-preview-option-selected,
+html[data-theme-mode=dark] .calendar-number-option-selected {
+  border-color: #f5f5f4 !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .compact-preview-option > div::after,
+html[data-theme-mode=dark] .color-scheme-preview-option > div::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background-color: rgba(0, 0, 0, 0.34);
+  content: '';
+  pointer-events: none;
+}
+
+html[data-theme-mode=dark] .compact-preview-option > div,
+html[data-theme-mode=dark] .color-scheme-preview-option > div {
+  filter: brightness(0.58) saturate(0.72);
+}
+
+html[data-theme-mode=dark] .compact-preview-option-selected > div,
+html[data-theme-mode=dark] .color-scheme-preview-option-selected > div {
+  filter: brightness(0.74) saturate(0.82);
+}
+
+html[data-theme-mode=dark] .compact-preview-option-selected > div::after,
+html[data-theme-mode=dark] .color-scheme-preview-option-selected > div::after {
+  background-color: rgba(0, 0, 0, 0.16);
+}
+
+html[data-theme-mode=dark] .compact-preview-option > div > *,
+html[data-theme-mode=dark] .color-scheme-preview-option > div > * {
+  position: relative;
+  z-index: 2;
+}
+
+html[data-theme-mode=dark] .calendar-number-option {
+  background-color: #292524 !important;
+  color: #a8a29e !important;
+}
+
+html[data-theme-mode=dark] .calendar-number-option-selected {
+  background-color: #44403c !important;
+  color: #fafaf9 !important;
+}
+
+html[data-theme-mode=dark] .sponsorship-info-note {
+  border-color: rgba(3, 105, 161, 0.72) !important;
+  background-color: rgba(12, 74, 110, 0.28) !important;
+}
+
+html[data-theme-mode=dark] .sponsorship-info-note .text-blue-800 {
+  color: #bfdbfe !important;
+}
+
+html[data-theme-mode=dark] .sponsorship-warning-note {
+  border-color: rgba(217, 119, 6, 0.72) !important;
+  background-color: rgba(120, 53, 15, 0.24) !important;
+}
+
+html[data-theme-mode=dark] .sponsorship-warning-note .text-amber-800 {
+  color: #fde68a !important;
+}
+
+html[data-theme-mode=dark] .schedule-style-option {
+  border-color: transparent !important;
+  background-color: transparent !important;
+  color: #a8a29e !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .schedule-style-option-selected {
+  border-color: #f5f5f4 !important;
+  background-color: #44403c !important;
+  color: #fafaf9 !important;
+}
+
+html[data-theme-mode=dark] .timeline-style-adjust {
+  border: 1px solid #78716c;
+  background-color: #292524 !important;
+  color: #d6d3d1 !important;
+  box-shadow: none !important;
+}
+
+/* AI newspaper entry cards and editorial reading surfaces remain readable in dark mode. */
+html[data-theme-mode=dark] .review-newspaper-entry {
+  border-color: #78716c !important;
+  background-color: #292524 !important;
+  color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .review-newspaper-entry:hover {
+  border-color: #f5f5f4 !important;
+  background-color: #44403c !important;
+}
+
+html[data-theme-mode=dark] .newspaper-view {
+  background-color: #1c1917 !important;
+  color: #d6d3d1 !important;
+}
+
+html[data-theme-mode=dark] .newspaper-paper {
+  background-color: #292524 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .newspaper-view .text-black,
+html[data-theme-mode=dark] .newspaper-view [class*="text-\[\#"] {
+  color: #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .newspaper-view [class*="border-\[\#"],
+html[data-theme-mode=dark] .newspaper-view .border-stone-200,
+html[data-theme-mode=dark] .newspaper-view .border-stone-300 {
+  border-color: #57534e !important;
+}
+
+html[data-theme-mode=dark] .newspaper-view [class*="bg-\[\#"],
+html[data-theme-mode=dark] .newspaper-view .bg-white,
+html[data-theme-mode=dark] .newspaper-view .bg-stone-50 {
+  background-color: #292524 !important;
+}
+
+/* Memoir timeline, calendar, and right-edge date rail retain readable archival contrast. */
+html[data-theme-mode=dark] .memoir-view {
+  background-color: #1c1917 !important;
+}
+
+html[data-theme-mode=dark] .memoir-surface-overlay {
+  background-color: rgba(28, 25, 23, 0.82) !important;
+}
+
+html[data-theme-mode=dark] .memoir-mood-calendar {
+  border: 1px solid #57534e;
+  background-color: #292524 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .memoir-calendar-weekday,
+html[data-theme-mode=dark] .memoir-calendar-day,
+html[data-theme-mode=dark] .memoir-timeline-month {
+  color: #a8a29e !important;
+}
+
+html[data-theme-mode=dark] .memoir-calendar-today,
+html[data-theme-mode=dark] .memoir-timeline-day {
+  color: #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .memoir-timeline-rail {
+  background-color: #57534e !important;
+}
+
+html[data-theme-mode=dark] .memoir-date-rail {
+  border: 1px solid #57534e;
+  border-right: 0;
+  background-color: rgba(41, 37, 36, 0.94);
+}
+
+html[data-theme-mode=dark] .memoir-date-rail-active {
+  color: #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .memoir-date-rail-marker {
+  background-color: #f5f5f4 !important;
+}
+
+/* AI assistant overlays use semantic dark surfaces instead of their legacy light paper palette. */
+html[data-theme-mode=dark] .ai-chat-overlay > div {
+  background-color: #1c1917 !important;
+  background-image: none !important;
+  color: #e7e5e4;
+}
+
+html[data-theme-mode=dark] .ai-chat-overlay-header {
+  background-color: #1c1917 !important;
+  border-color: #57534e !important;
+}
+
+html[data-theme-mode=dark] .ai-chat-overlay-header h3 {
+  color: #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .ai-chat-overlay-header button:not([style]) {
+  border-color: #57534e !important;
+  background-color: #292524 !important;
+  color: #d6d3d1 !important;
+}
+
+html[data-theme-mode=dark] .ai-chat-overlay [class*="bg-white"],
+html[data-theme-mode=dark] .ai-chat-overlay [class*="bg-[#f3f4f6]"],
+html[data-theme-mode=dark] .ai-chat-overlay [class*="bg-[#faf9f6]"],
+html[data-theme-mode=dark] .ai-chat-overlay [class*="bg-[linear-gradient"] {
+  background-color: #292524 !important;
+}
+
+html[data-theme-mode=dark] .ai-chat-overlay [class*="border-[#e5e7eb]"],
+html[data-theme-mode=dark] .ai-chat-overlay [class*="border-[#d8d2ca]"],
+html[data-theme-mode=dark] .ai-chat-overlay [class*="border-[#e3ddd4]"],
+html[data-theme-mode=dark] .ai-chat-overlay [class*="border-stone-100"] {
+  border-color: #57534e !important;
+}
+
+html[data-theme-mode=dark] .ai-chat-overlay [class*="text-[#"],
+html[data-theme-mode=dark] .ai-chat-overlay [class*="text-stone-9"] {
+  color: #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .ai-chat-overlay [class*="text-stone-"],
+html[data-theme-mode=dark] .ai-chat-overlay [class*="text-[#6b7280]"] {
+  color: #a8a29e !important;
+}
+
+html[data-theme-mode=dark] .ai-chat-overlay [style*="white"],
+html[data-theme-mode=dark] .ai-chat-overlay [style*="#f3f4f6"],
+html[data-theme-mode=dark] .ai-chat-overlay [style*="#f7f5f1"],
+html[data-theme-mode=dark] .ai-chat-overlay [style*="rgba(247"] {
+  background-color: #292524 !important;
+}
+
+html[data-theme-mode=dark] .ai-chat-overlay input,
+html[data-theme-mode=dark] .ai-chat-overlay textarea {
+  background-color: #1c1917 !important;
+  border-color: #57534e !important;
+  color: #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .ai-chat-overlay input::placeholder,
+html[data-theme-mode=dark] .ai-chat-overlay textarea::placeholder {
+  color: #78716c !important;
+}
+
+html[data-theme-mode=dark] .ai-chat-debug-block {
+  border-color: #57534e !important;
+  background-color: #171412 !important;
+}
+
+html[data-theme-mode=dark] .ai-chat-debug-block-toggle,
+html[data-theme-mode=dark] .ai-chat-debug-block-toggle:hover {
+  background-color: #171412 !important;
+  color: #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .ai-chat-debug-block-toggle span {
+  color: #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .dream-aspect-tab {
+  color: #a8a29e !important;
+  border-bottom-color: transparent !important;
+}
+
+html[data-theme-mode=dark] .dream-aspect-tab-active {
+  color: #f5f5f4 !important;
+  border-bottom-color: #f5f5f4 !important;
+}

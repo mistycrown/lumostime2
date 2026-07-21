@@ -4,6 +4,7 @@
  * @output Full-screen editorial newspaper page for one month
  * @pos View (Review System)
  * @description Renders a dedicated monthly AI newspaper page using the persisted structured monthly newspaper payload on `MonthlyReview`.
+ * @updated 2026-07-21: Added shared semantic classes for dark-mode newspaper reading surfaces.
  * @updated 2026-06-07: Added the first monthly newspaper full-screen view with overview, weekly sections, monthly theme, and next-period plan blocks.
  */
 import React from 'react';
@@ -44,7 +45,7 @@ export const MonthlyNewspaperView: React.FC<MonthlyNewspaperViewProps> = ({
 
   if (!newspaper) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#f8f7f5] px-6">
+      <div className="newspaper-view flex h-full items-center justify-center bg-[#f8f7f5] px-6">
         <div className="max-w-md text-center text-sm leading-7 text-stone-500">
           这个月还没有生成 AI 小报。
         </div>
@@ -53,8 +54,8 @@ export const MonthlyNewspaperView: React.FC<MonthlyNewspaperViewProps> = ({
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-[#f8f7f5]">
-      <div className="mx-auto min-h-full w-full max-w-3xl bg-white px-6 pb-16 pt-7 shadow-[0_10px_40px_rgba(15,23,42,0.04)] sm:px-10 sm:pt-8">
+    <div className="newspaper-view h-full overflow-y-auto bg-[#f8f7f5]">
+      <div className="newspaper-paper mx-auto min-h-full w-full max-w-3xl bg-white px-6 pb-16 pt-7 shadow-[0_10px_40px_rgba(15,23,42,0.04)] sm:px-10 sm:pt-8">
         <header className="border-b border-[#efede8] pb-5">
           <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[#91867a]">
             {formatMonthLabel(monthStartDate)}

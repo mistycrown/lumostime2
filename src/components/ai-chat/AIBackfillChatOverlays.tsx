@@ -4,6 +4,7 @@
  * @output Reusable full-screen overlays for AI background-history inspection and debug payload browsing
  * @pos Component Support (AI Integration)
  * @description Pulls the self-contained overlay render trees out of AIBackfillChatModal so the main modal can focus on conversation orchestration while keeping the overlay markup unchanged.
+ * @updated 2026-07-22: Added shared dark-theme hooks for assistant letter and background history overlays.
  * @updated 2026-07-06: Removed the explicit assistant-letter header tag and normalized letter timestamps to local display strings with timezone.
  * @updated 2026-05-14: Extracted background-history and debug-viewer overlays from AIBackfillChatModal.
  */
@@ -48,7 +49,7 @@ export const AssistantBackgroundHistoryOverlay: React.FC<AssistantBackgroundHist
   getTriggerLabel,
   getRequestStatusLabel
 }) => (
-  <div className="absolute inset-0 z-20 bg-[rgba(15,23,42,0.14)] backdrop-blur-[10px]">
+  <div className="ai-chat-overlay absolute inset-0 z-20 bg-[rgba(15,23,42,0.14)] backdrop-blur-[10px]">
     <div
       className="flex h-full flex-col bg-[#f3f4f6]"
       style={{
@@ -56,7 +57,7 @@ export const AssistantBackgroundHistoryOverlay: React.FC<AssistantBackgroundHist
         paddingBottom: 'env(safe-area-inset-bottom)'
       }}
     >
-      <div className="flex h-14 items-center justify-between border-b border-[#e5e7eb] bg-[rgba(255,255,255,0.9)] px-4 backdrop-blur-md">
+      <div className="ai-chat-overlay-header flex h-14 items-center justify-between border-b border-[#e5e7eb] bg-[rgba(255,255,255,0.9)] px-4 backdrop-blur-md">
         <div>
           <h3 className="font-serif text-lg font-bold leading-none text-[#201c19]">后台调用记录</h3>
         </div>
@@ -168,7 +169,7 @@ export const AssistantLetterHistoryOverlay: React.FC<AssistantLetterHistoryOverl
   onToggleDelete,
   onConfirmDelete
 }) => (
-  <div className="absolute inset-0 z-20 bg-[rgba(15,23,42,0.14)] backdrop-blur-[10px]">
+  <div className="ai-chat-overlay absolute inset-0 z-20 bg-[rgba(15,23,42,0.14)] backdrop-blur-[10px]">
     <div
       className="flex h-full flex-col bg-[#f3f4f6]"
       style={{
@@ -176,7 +177,7 @@ export const AssistantLetterHistoryOverlay: React.FC<AssistantLetterHistoryOverl
         paddingBottom: 'env(safe-area-inset-bottom)'
       }}
     >
-      <div className="flex h-14 items-center justify-between border-b border-[#e5e7eb] bg-[rgba(255,255,255,0.9)] px-4 backdrop-blur-md">
+      <div className="ai-chat-overlay-header flex h-14 items-center justify-between border-b border-[#e5e7eb] bg-[rgba(255,255,255,0.9)] px-4 backdrop-blur-md">
         <div>
           <h3 className="font-serif text-lg font-bold leading-none text-[#201c19]">来信记录</h3>
         </div>
@@ -296,7 +297,7 @@ export const AssistantLetterDetailSheet: React.FC<AssistantLetterDetailSheetProp
   }
 
   return (
-    <div className="absolute inset-0 z-30 flex items-end justify-center bg-stone-900/40 backdrop-blur-sm animate-fadeIn md:items-center">
+    <div className="ai-chat-overlay absolute inset-0 z-30 flex items-end justify-center bg-stone-900/40 backdrop-blur-sm animate-fadeIn md:items-center">
       <div
         className="w-full h-[85vh] md:h-auto md:max-h-[85vh] md:max-w-2xl bg-[#faf9f6] rounded-t-[2rem] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative animate-slideUp"
         style={{
@@ -348,7 +349,7 @@ export const AIChatDebugViewerOverlay: React.FC<AIChatDebugViewerOverlayProps> =
   onToggleBlock,
   buildBlocks
 }) => (
-  <div className="absolute inset-0 z-20 bg-[rgba(15,23,42,0.14)] backdrop-blur-[10px]">
+  <div className="ai-chat-overlay absolute inset-0 z-20 bg-[rgba(15,23,42,0.14)] backdrop-blur-[10px]">
     <div
       className="flex h-full flex-col bg-[#f3f4f6]"
       style={{
@@ -356,7 +357,7 @@ export const AIChatDebugViewerOverlay: React.FC<AIChatDebugViewerOverlayProps> =
         paddingBottom: 'env(safe-area-inset-bottom)'
       }}
     >
-      <div className="flex h-14 items-center justify-between border-b border-[#e5e7eb] bg-[rgba(255,255,255,0.9)] px-4 backdrop-blur-md">
+      <div className="ai-chat-overlay-header flex h-14 items-center justify-between border-b border-[#e5e7eb] bg-[rgba(255,255,255,0.9)] px-4 backdrop-blur-md">
         <div>
           <h3 className="font-serif text-lg font-bold leading-none text-[#201c19]">{viewer.title}</h3>
         </div>
@@ -384,12 +385,12 @@ export const AIChatDebugViewerOverlay: React.FC<AIChatDebugViewerOverlayProps> =
                   return (
                     <div
                       key={blockKey}
-                      className="overflow-hidden rounded-[0.85rem] border border-[#d8d2ca] bg-[rgba(255,255,255,0.72)]"
+                      className="ai-chat-debug-block overflow-hidden rounded-[0.85rem] border border-[#d8d2ca] bg-[rgba(255,255,255,0.72)]"
                     >
                       <button
                         type="button"
                         onClick={() => onToggleBlock(blockKey)}
-                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[rgba(255,255,255,0.58)]"
+                        className="ai-chat-debug-block-toggle flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[rgba(255,255,255,0.58)]"
                       >
                         <span className="text-xs font-bold uppercase tracking-[0.2em] text-stone-500">{block.label}</span>
                         <span className="flex items-center gap-2 text-[11px] font-medium text-stone-400">

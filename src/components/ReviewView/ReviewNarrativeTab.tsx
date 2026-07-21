@@ -1,6 +1,7 @@
 /**
  * @file ReviewNarrativeTab.tsx
  * @description Shared Narrative Tab component for Review Views with Reading/Editing modes
+ * @updated 2026-07-21: Added a semantic dark-mode surface for the AI newspaper entry card.
  * @updated 2026-06-07: Made the newspaper row reusable for weekly and monthly reviews by allowing custom labels and empty-state copy while keeping the daily mood flow intact.
  * @updated 2026-05-16: Split the narrative page into summary, newspaper, and AI narrative sections with a single-line newspaper card.
  */
@@ -190,7 +191,7 @@ export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
           type="button"
           onClick={newspaperTitle ? onOpenNewspaper : onGenerateNewspaper}
           disabled={!newspaperTitle && !onGenerateNewspaper}
-          className="block w-full rounded-2xl border border-stone-200 bg-[#faf8f4] px-4 py-3 text-left transition-colors hover:border-stone-300 hover:bg-[#f6f2eb] disabled:cursor-not-allowed disabled:opacity-60"
+          className="review-newspaper-entry block w-full rounded-2xl border border-stone-200 bg-[#faf8f4] px-4 py-3 text-left transition-colors hover:border-stone-300 hover:bg-[#f6f2eb] disabled:cursor-not-allowed disabled:opacity-60"
         >
           <div className="line-clamp-1 font-serif text-[1.02rem] leading-7 text-stone-900">
             {newspaperTitle || newspaperEmptyText}

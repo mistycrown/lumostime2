@@ -4,6 +4,7 @@
  * @output Full-screen Dream viewer overlay for aspect and entry management
  * @pos Component Support (AI Integration)
  * @description Extracts the Dream viewer UI out of AIBackfillChatModal so the modal can stay focused on state orchestration and command handling while this overlay preserves the existing interactions.
+ * @updated 2026-07-22: Added a shared dark-theme hook for Dream controls, tabs, and content surfaces.
  * @updated 2026-05-15: Extracted the Dream viewer overlay from AIBackfillChatModal.
  */
 import React from 'react';
@@ -93,7 +94,7 @@ export const AIBackfillChatDreamOverlay: React.FC<AIBackfillChatDreamOverlayProp
   onUpdateDreamEntryDraft,
   onUpdateDreamTopicDraft
 }) => (
-  <div className="absolute inset-0 z-20 bg-[rgba(15,23,42,0.12)] backdrop-blur-[10px]">
+  <div className="ai-chat-overlay absolute inset-0 z-20 bg-[rgba(15,23,42,0.12)] backdrop-blur-[10px]">
     <div
       className="flex h-full flex-col bg-[linear-gradient(180deg,#f7f5f1_0%,#f3f1ec_100%)]"
       style={{
@@ -101,7 +102,7 @@ export const AIBackfillChatDreamOverlay: React.FC<AIBackfillChatDreamOverlayProp
         paddingBottom: 'env(safe-area-inset-bottom)'
       }}
     >
-      <div className="flex h-14 items-center justify-between border-b border-[rgba(32,28,25,0.12)] bg-[rgba(247,245,241,0.92)] px-4 backdrop-blur-md">
+      <div className="ai-chat-overlay-header flex h-14 items-center justify-between border-b border-[rgba(32,28,25,0.12)] bg-[rgba(247,245,241,0.92)] px-4 backdrop-blur-md">
         <div>
           <h3 className="font-serif text-[1.02rem] font-bold leading-none text-[#201c19]">Dream</h3>
         </div>
@@ -291,9 +292,9 @@ export const AIBackfillChatDreamOverlay: React.FC<AIBackfillChatDreamOverlayProp
                         key={topic.id}
                         type="button"
                         onClick={() => onSelectDreamTopic(topic.id)}
-                        className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors border-b-2 ${
+                        className={`dream-aspect-tab pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors border-b-2 ${
                           isActive
-                            ? 'font-bold'
+                            ? 'dream-aspect-tab-active font-bold'
                             : 'hover:text-stone-600'
                         }`}
                         style={{

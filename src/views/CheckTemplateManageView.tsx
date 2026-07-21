@@ -4,6 +4,7 @@
  * @output Updated daily check templates and optional historical review mutations
  * @pos Settings > Daily Review > Check Templates
  * @description 日课模板管理页，支持增删改排序、历史数据批量修正，以及赞赏码校验后的 UI icon 编辑入口。
+ * @updated 2026-07-21: Added semantic dark-mode styles for historical daily-check batch operations.
  * @updated 2026-05-03: Rewrote the view in UTF-8 and added supporter-gated template/item UI icon editing.
  */
 
@@ -454,7 +455,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                         </button>
                         <button
                           onClick={(event) => handleToggleEnabled(template, event)}
-                          className={`p-2 rounded-lg transition-colors ${template.enabled ? 'text-green-500 bg-green-50 hover:bg-green-100' : 'text-stone-300 hover:bg-stone-50'}`}
+                          className={`daily-template-enabled-toggle ${template.enabled ? 'daily-template-enabled-toggle-on text-green-500 bg-green-50 hover:bg-green-100' : 'text-stone-300 hover:bg-stone-50'} p-2 rounded-lg transition-colors`}
                           title={template.enabled ? '点击停用' : '点击启用'}
                         >
                           <CheckCircle2 size={16} />
@@ -618,7 +619,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
 
       {showBatchModal && (
         <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+          <div className="daily-batch-modal bg-white rounded-2xl w-full max-w-sm shadow-xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
             <div className="p-4 border-b border-stone-100 flex justify-between items-center bg-stone-50/50">
               <h3 className="font-bold text-stone-800">批量修改历史日课</h3>
               <button onClick={() => setShowBatchModal(false)} className="text-stone-400 hover:text-stone-600">
@@ -629,20 +630,20 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
             <div className="flex border-b border-stone-100">
               <button
                 onClick={() => setBatchTab('rename')}
-                className={`flex-1 py-3 text-sm font-bold transition-colors ${batchTab === 'rename' ? 'text-stone-800 border-b-2 border-stone-800' : 'text-stone-400 hover:text-stone-600'}`}
+                className={`daily-batch-tab flex-1 py-3 text-sm font-bold transition-colors ${batchTab === 'rename' ? 'daily-batch-tab-selected text-stone-800 border-b-2 border-stone-800' : 'text-stone-400 hover:text-stone-600'}`}
               >
                 批量重命名
               </button>
               <button
                 onClick={() => setBatchTab('delete')}
-                className={`flex-1 py-3 text-sm font-bold transition-colors ${batchTab === 'delete' ? 'text-red-600 border-b-2 border-red-600' : 'text-stone-400 hover:text-stone-600'}`}
+                className={`daily-batch-tab flex-1 py-3 text-sm font-bold transition-colors ${batchTab === 'delete' ? 'daily-batch-tab-selected text-red-600 border-b-2 border-red-600' : 'text-stone-400 hover:text-stone-600'}`}
               >
                 批量删除
               </button>
             </div>
 
             <div className="p-5 space-y-4">
-              <div className="bg-amber-50 text-amber-700 text-xs p-3 rounded-xl flex gap-2 items-start">
+              <div className="daily-batch-warning bg-amber-50 text-amber-700 text-xs p-3 rounded-xl flex gap-2 items-start">
                 <AlertCircle size={14} className="shrink-0 mt-0.5" />
                 <p>这个操作会遍历历史日报，修改或删除指定的日课条目，请谨慎操作。</p>
               </div>
@@ -681,7 +682,7 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
               <button
                 onClick={handleBatchProcess}
                 disabled={!batchTargetContent.trim() || (batchTab === 'rename' && !batchNewContent.trim())}
-                className={`w-full py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
+                className={`daily-batch-action ${batchTab === 'delete' ? 'daily-batch-action-danger' : ''} w-full py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
                   batchTab === 'delete'
                     ? 'bg-red-500 hover:bg-red-600 shadow-red-200'
                     : 'bg-stone-800 hover:bg-stone-700 shadow-stone-200'
