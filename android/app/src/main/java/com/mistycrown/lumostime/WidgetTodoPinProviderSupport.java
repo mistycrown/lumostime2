@@ -373,7 +373,13 @@ public final class WidgetTodoPinProviderSupport {
                 System.currentTimeMillis(), updatedSourceTodos, payload.getSourceCategories());
         WidgetStores.INSTANCE.saveTodoPinPayload(context, updatedPayload);
         WidgetStores.INSTANCE.appendPendingTodoPinAction(context, new WidgetPendingTodoPinAction(
-                "todo-pin-" + todoId + "-" + System.currentTimeMillis(), todoId, isCompleted, System.currentTimeMillis()));
+                "todo-pin-" + todoId + "-" + System.currentTimeMillis(),
+                todoId,
+                isCompleted,
+                System.currentTimeMillis(),
+                "completion",
+                null
+        ));
         return true;
     }
 

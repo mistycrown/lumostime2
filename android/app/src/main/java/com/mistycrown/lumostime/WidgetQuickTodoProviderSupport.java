@@ -12,6 +12,7 @@ import android.widget.RemoteViews;
 public final class WidgetQuickTodoProviderSupport {
     public static final String ACTION_COMPLETE = "com.mistycrown.lumostime.action.COMPLETE_QUICK_TODO";
     public static final String ACTION_REFRESH = "com.mistycrown.lumostime.action.REFRESH_QUICK_TODO";
+    private static final String ACTION_OPEN_ADD_DIALOG = "com.mistycrown.lumostime.action.OPEN_QUICK_TODO_ADD_DIALOG";
     public static final String EXTRA_TODO_ID = "quick_todo_id";
 
     private WidgetQuickTodoProviderSupport() {}
@@ -23,6 +24,29 @@ public final class WidgetQuickTodoProviderSupport {
         if (!ACTION_COMPLETE.equals(action)) return false;
         String todoId = intent.getStringExtra(EXTRA_TODO_ID);
         return todoId != null && WidgetTodoPinProviderSupport.toggleTodoCompletion(context, todoId);
+    }
+
+    public static void addQuickTodo(Context context, String title) {
+        String normalizedTitle = title == null ? "" : title.trim();
+        if (normalizedTitle.isEmpty()) return;
+
+        WidgetTodoPinPayload payload = WidgetStores.INSTANCE.loadTodoPinPayload(context);
+        if (payload == null) return;
+        long now = System.currentTimeMillis();
+        String todoId = "widget-quick-" + now;
+        java.util.List<WidgetTodoPinSourceTodo> sourceTodos = new java.util.ArrayList<>(payload.getSourceTodos());
+        sourceTodos.add(new WidgetTodoPinSourceTodo(
+                todoId, normalizedTitle, "quick", false, null, null, null,
+                java.util.Collections.<String>emptyList(), false, null, null,
+                java.util.Collections.<String>emptyList(), null
+        ));
+        WidgetStores.INSTANCE.saveTodoPinPayload(context, new WidgetTodoPinPayload(
+                payload.getDate(), payload.getItems(), now, sourceTodos, payload.getSourceCategories()
+        ));
+        WidgetStores.INSTANCE.appendPendingTodoPinAction(context, new WidgetPendingTodoPinAction(
+                "quick-create-" + todoId, todoId, false, now, "create", normalizedTitle
+        ));
+        WidgetRefreshCoordinator.INSTANCE.refreshTodoPinWidgets(context);
     }
 
     public static void updateWidgets(
@@ -62,8 +86,9 @@ public final class WidgetQuickTodoProviderSupport {
     }
 
     private static PendingIntent addIntent(Context context, int appWidgetId) {
-        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("lumostime://quick-todo/new"));
-        intent.setPackage(context.getPackageName());
+        Intent intent = new Intent(context, QuickTodoAddActivity.class);
+        intent.setAction(ACTION_OPEN_ADD_DIALOG);
+        intent.setData(Uri.parse("lumostime-widget://quick-todo/add/" + appWidgetId));
         intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
         return PendingIntent.getActivity(context, appWidgetId + 7800, intent, immutableFlags());
     }

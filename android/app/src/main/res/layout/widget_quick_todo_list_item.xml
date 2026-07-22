@@ -12,6 +12,15 @@
         android:paddingTop="2dp"
         android:paddingBottom="3dp">
 
+        <ImageView
+            android:id="@+id/widget_quick_todo_complete_button"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginEnd="6dp"
+            android:contentDescription="@null"
+            android:padding="3dp"
+            android:src="@drawable/widget_todo_pin_checkbox_unchecked" />
+
         <TextView
             android:id="@+id/widget_quick_todo_title"
             android:layout_width="0dp"
@@ -22,15 +31,6 @@
             android:maxLines="1"
             android:textColor="#2E2822"
             android:textSize="12sp" />
-
-        <ImageView
-            android:id="@+id/widget_quick_todo_complete_button"
-            android:layout_width="28dp"
-            android:layout_height="24dp"
-            android:layout_marginStart="6dp"
-            android:contentDescription="@null"
-            android:padding="3dp"
-            android:src="@drawable/widget_todo_pin_checkbox_unchecked" />
     </LinearLayout>
 
     <TextView

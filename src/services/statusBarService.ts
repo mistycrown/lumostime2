@@ -17,6 +17,7 @@
 import { EdgeToEdge } from '@capawesome/capacitor-android-edge-to-edge-support';
 import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
+import NativeStatusBarAppearance from '../plugins/NativeStatusBarAppearancePlugin';
 import { applyAndroidEdgeToEdgeBackgroundColor } from '../utils/statusBarTransitions';
 
 // 动态导入 EdgeToEdge 插件（仅 Android）
@@ -36,6 +37,11 @@ class StatusBarService {
     private imageAnalysisCache = new Map<string, ColorAnalysis>();
     private currentBackgroundUrl: string | null = null;
 
+    private async applyAndroidStatusBarAppearance(color: string, lightIcons: boolean): Promise<void> {
+        await applyAndroidEdgeToEdgeBackgroundColor(EdgeToEdge, color);
+        await NativeStatusBarAppearance.apply({ color, lightIcons });
+    }
+
     /**
      * 初始化状态栏服务 - 设置为透明背景
      */
@@ -52,7 +58,7 @@ class StatusBarService {
             // Android: 使用 EdgeToEdge 设置透明状态栏
             if (platform === 'android' && EdgeToEdge) {
                 // 设置状态栏背景为透明
-                await applyAndroidEdgeToEdgeBackgroundColor(EdgeToEdge, MANAGED_ANDROID_STATUS_BAR_BACKGROUND);
+                await this.applyAndroidStatusBarAppearance(MANAGED_ANDROID_STATUS_BAR_BACKGROUND, false);
                 console.log('✅ Android: Status bar set to transparent');
             }
             
@@ -172,7 +178,7 @@ class StatusBarService {
 
             if (isDarkMode) {
                 if (platform === 'android' && EdgeToEdge) {
-                    await applyAndroidEdgeToEdgeBackgroundColor(EdgeToEdge, DARK_ANDROID_STATUS_BAR_BACKGROUND);
+                    await this.applyAndroidStatusBarAppearance(DARK_ANDROID_STATUS_BAR_BACKGROUND, true);
                 } else if (platform === 'ios') {
                     await StatusBar.setOverlaysWebView({ overlay: true });
                 }
@@ -183,7 +189,7 @@ class StatusBarService {
 
             // 确保状态栏背景保持透明
             if (platform === 'android' && EdgeToEdge) {
-                await applyAndroidEdgeToEdgeBackgroundColor(EdgeToEdge, MANAGED_ANDROID_STATUS_BAR_BACKGROUND);
+                await this.applyAndroidStatusBarAppearance(MANAGED_ANDROID_STATUS_BAR_BACKGROUND, false);
             } else if (platform === 'ios') {
                 await StatusBar.setOverlaysWebView({ overlay: true });
             }
@@ -235,7 +241,7 @@ class StatusBarService {
         const platform = Capacitor.getPlatform();
         
         if (platform === 'android' && EdgeToEdge) {
-            await applyAndroidEdgeToEdgeBackgroundColor(EdgeToEdge, MANAGED_ANDROID_STATUS_BAR_BACKGROUND);
+            await this.applyAndroidStatusBarAppearance(MANAGED_ANDROID_STATUS_BAR_BACKGROUND, false);
         } else if (platform === 'ios') {
             await StatusBar.setOverlaysWebView({ overlay: true });
         }

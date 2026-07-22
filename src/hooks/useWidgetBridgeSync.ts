@@ -245,17 +245,35 @@ export const useWidgetBridgeSync = () => {
 
         if (todoPinActions.length > 0) {
           const completedAt = new Date().toISOString();
-          setTodos((prevTodos) => syncSubtaskProgressToParentTodos(prevTodos.map((todo) => {
-            const action = todoPinActions.find((item) => item.todoId === todo.id);
-            if (!action || todo.isCompleted === action.isCompleted) {
-              return todo;
-            }
-            return {
-              ...todo,
-              isCompleted: action.isCompleted,
-              completedAt: action.isCompleted ? todo.completedAt || completedAt : undefined
-            };
-          })));
+          setTodos((prevTodos) => {
+            const createdTodos = todoPinActions
+              .filter((action) => action.actionType === 'create' && action.title?.trim())
+              .filter((action) => !prevTodos.some((todo) => todo.id === action.todoId))
+              .map((action) => ({
+                id: action.todoId,
+                categoryId: '__virtual_quick__',
+                kind: 'quick' as const,
+                title: action.title!.trim(),
+                isCompleted: false,
+                pin: false,
+                completedUnits: 0
+              }));
+            const currentTodos = [...prevTodos, ...createdTodos];
+
+            return syncSubtaskProgressToParentTodos(currentTodos.map((todo) => {
+              const action = todoPinActions.find(
+                (item) => item.actionType !== 'create' && item.todoId === todo.id
+              );
+              if (!action || todo.isCompleted === action.isCompleted) {
+                return todo;
+              }
+              return {
+                ...todo,
+                isCompleted: action.isCompleted,
+                completedAt: action.isCompleted ? todo.completedAt || completedAt : undefined
+              };
+            }));
+          });
           await WidgetBridge.clearPendingTodoPinActions({ ids: todoPinActions.map((action) => action.id) });
         }
 

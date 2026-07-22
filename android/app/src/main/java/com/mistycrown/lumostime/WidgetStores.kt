@@ -533,7 +533,9 @@ object WidgetStores {
                         id = item.getString("id"),
                         todoId = item.getString("todoId"),
                         isCompleted = item.optBoolean("isCompleted", false),
-                        createdAt = item.getLong("createdAt")
+                        createdAt = item.getLong("createdAt"),
+                        actionType = item.optString("actionType", "completion"),
+                        title = parseNullableString(item.optString("title"))
                     ))
                 }
             }
@@ -1107,6 +1109,8 @@ object WidgetStores {
                 put("todoId", action.todoId)
                 put("isCompleted", action.isCompleted)
                 put("createdAt", action.createdAt)
+                put("actionType", action.actionType)
+                put("title", action.title ?: JSONObject.NULL)
             })
         }
         prefs(context).edit().putString(KEY_PENDING_TODO_PIN_ACTIONS, array.toString()).commit()
