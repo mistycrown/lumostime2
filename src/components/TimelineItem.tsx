@@ -3,6 +3,7 @@
  * @input DiaryEntry data, timeline callbacks, shared timeline style settings
  * @output Memoir/timeline entry cards with text, media, reactions, and comments
  * @description Renders a single timeline entry, including media grids that keep image containers and images aligned across different image counts, plus shared metadata chips such as todo, collection, tag, and domain badges.
+ * @updated 2026-07-22: Added Memoir-specific text hooks so entry titles and body content remain readable in dark mode.
  */
 import React, { useState, useEffect } from 'react';
 import { DiaryEntry } from '../views/journalTypes';
@@ -334,7 +335,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                     if (!displayTitle && !entry.mood) return null;
 
                     return (
-                        <h3 className={`text-gray-900 font-bold leading-tight ${isSummary ? 'text-[16px]' : 'text-[16px]'} transition-all duration-500 flex items-center gap-2`}>
+                        <h3 className={`memoir-entry-title text-gray-900 font-bold leading-tight ${isSummary ? 'text-[16px]' : 'text-[16px]'} transition-all duration-500 flex items-center gap-2`}>
                             {displayTitle && <span>{displayTitle}</span>}
                             {entry.mood && (
                                 <span className="text-base leading-none">
@@ -349,7 +350,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                 <CollapsibleText
                     text={entry.content}
                     threshold={collapseThreshold}
-                    className={`text-sm text-stone-500 leading-relaxed font-light ${isSummary ? 'mt-2' : 'mb-1'} ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
+                    className={`memoir-entry-body text-sm text-stone-500 leading-relaxed font-light ${isSummary ? 'mt-2' : 'mb-1'} ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
                 />
 
                 {/* Metadata Chips: @ (Todo), # (Tags), % (Domain) - HIDDEN FOR SUMMARIES */}

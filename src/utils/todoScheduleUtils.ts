@@ -419,6 +419,10 @@ export const getTodoAssociationTodayTodos = (
   .filter((todo) => options?.includeCompleted || !todo.isCompleted)
   .filter((todo) => isTodoInAssociationTodayCategory(todo, referenceDate))
   .sort((left, right) => {
+    if (left.isCompleted !== right.isCompleted) {
+      return Number(left.isCompleted) - Number(right.isCompleted);
+    }
+
     if (Boolean(left.pin) !== Boolean(right.pin)) {
       return Number(Boolean(right.pin)) - Number(Boolean(left.pin));
     }

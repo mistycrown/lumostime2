@@ -1050,6 +1050,16 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   const [duplicatingTodo, setDuplicatingTodo] = useState<TodoItem | null>(null);
   const [isQuickAddInputVisible, setIsQuickAddInputVisible] = useState(false);
   const [quickAddTitle, setQuickAddTitle] = useState('');
+
+  useEffect(() => {
+    const openQuickTodoAdd = () => {
+      setSelectedCategoryId(QUICK_TODO_CATEGORY_ID);
+      setIsQuickAddInputVisible(true);
+    };
+
+    window.addEventListener('lumostime:open-quick-todo-add', openQuickTodoAdd);
+    return () => window.removeEventListener('lumostime:open-quick-todo-add', openQuickTodoAdd);
+  }, []);
   const weekScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const scheduleViewMenuRef = useRef<HTMLDivElement | null>(null);
   const quickAddInputRef = useRef<HTMLInputElement | null>(null);

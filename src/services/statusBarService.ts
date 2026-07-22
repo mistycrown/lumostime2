@@ -11,6 +11,7 @@
  * - 根据背景亮度自动调整状态栏图标颜色
  * @updated 2026-05-03: Switched EdgeToEdge access from CommonJS `require()` to the plugin's ESM entry so Android WebView bundles can initialize without browser-side `require` failures.
  * @updated 2026-04-20: Cached per-image analysis results so background opacity tweaks no longer trigger redundant mobile image sampling.
+ * @updated 2026-07-22: Keeps the native status bar black while the app is in dark mode.
  */
 
 import { EdgeToEdge } from '@capawesome/capacitor-android-edge-to-edge-support';
@@ -21,6 +22,7 @@ import { applyAndroidEdgeToEdgeBackgroundColor } from '../utils/statusBarTransit
 // 动态导入 EdgeToEdge 插件（仅 Android）
 
 const MANAGED_ANDROID_STATUS_BAR_BACKGROUND = '#fdfbf7';
+const DARK_ANDROID_STATUS_BAR_BACKGROUND = '#000000';
 
 interface ColorAnalysis {
     isDark: boolean;
@@ -32,6 +34,7 @@ class StatusBarService {
     private currentStyle: Style = Style.Light;
     private isInitialized = false;
     private imageAnalysisCache = new Map<string, ColorAnalysis>();
+    private currentBackgroundUrl: string | null = null;
 
     /**
      * 初始化状态栏服务 - 设置为透明背景
@@ -64,6 +67,12 @@ class StatusBarService {
             this.currentStyle = Style.Light;
             
             this.isInitialized = true;
+            new MutationObserver(() => {
+                void this.updateForBackground(this.currentBackgroundUrl);
+            }).observe(document.documentElement, {
+                attributes: true,
+                attributeFilter: ['data-theme-mode']
+            });
             console.log('✅ StatusBar service initialized with transparent background');
         } catch (error) {
             console.error('❌ StatusBar initialization failed:', error);
@@ -151,12 +160,27 @@ class StatusBarService {
      * 根据背景图片URL更新状态栏（保持透明背景，调整图标颜色）
      */
     async updateForBackground(backgroundUrl: string | null): Promise<void> {
+        this.currentBackgroundUrl = backgroundUrl;
+
         const platform = Capacitor.getPlatform();
         if (platform !== 'android' && platform !== 'ios') {
             return;
         }
 
         try {
+            const isDarkMode = document.documentElement.getAttribute('data-theme-mode') === 'dark';
+
+            if (isDarkMode) {
+                if (platform === 'android' && EdgeToEdge) {
+                    await applyAndroidEdgeToEdgeBackgroundColor(EdgeToEdge, DARK_ANDROID_STATUS_BAR_BACKGROUND);
+                } else if (platform === 'ios') {
+                    await StatusBar.setOverlaysWebView({ overlay: true });
+                }
+
+                await this.setIconStyle(Style.Dark);
+                return;
+            }
+
             // 确保状态栏背景保持透明
             if (platform === 'android' && EdgeToEdge) {
                 await applyAndroidEdgeToEdgeBackgroundColor(EdgeToEdge, MANAGED_ANDROID_STATUS_BAR_BACKGROUND);

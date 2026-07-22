@@ -2217,6 +2217,11 @@ html[data-theme-mode=dark] .detail-heatmap-cell.bg-stone-50 {
   background-color: #292524 !important;
 }
 
+html[data-theme-mode=dark] .detail-heatmap-cell > span {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
 html[data-theme-mode=dark] .log-time-slider {
   background-color: #57534e !important;
 }
@@ -3020,10 +3025,16 @@ html[data-theme-mode=dark] .memoir-timeline-rail {
   background-color: #57534e !important;
 }
 
+/* Custom timeline node shapes must remain icon-only on dark surfaces. */
+html[data-theme-mode=dark] .timeline-rail-custom-node {
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
 html[data-theme-mode=dark] .memoir-date-rail {
-  border: 1px solid #57534e;
-  border-right: 0;
-  background-color: rgba(41, 37, 36, 0.94);
+  border: 0;
+  background-color: transparent;
 }
 
 html[data-theme-mode=dark] .memoir-date-rail-active {
@@ -3032,6 +3043,136 @@ html[data-theme-mode=dark] .memoir-date-rail-active {
 
 html[data-theme-mode=dark] .memoir-date-rail-marker {
   background-color: #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .memoir-entry-title {
+  color: #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .memoir-entry-body {
+  color: #d6d3d1 !important;
+}
+
+/* Statistics schedule calendar: keep calendar structure distinct without muting its data. */
+html[data-theme-mode=dark] .stats-schedule-view,
+html[data-theme-mode=dark] .stats-month-heatmap {
+  background-color: #1c1917;
+}
+
+html[data-theme-mode=dark] .stats-schedule-view .schedule-time-rail,
+html[data-theme-mode=dark] .stats-month-heatmap .schedule-time-rail,
+html[data-theme-mode=dark] .stats-schedule-view .schedule-week-header,
+html[data-theme-mode=dark] .stats-schedule-view .schedule-week-corner {
+  border-color: #57534e !important;
+  background-color: #292524 !important;
+}
+
+html[data-theme-mode=dark] .stats-schedule-view .schedule-week-day {
+  border-color: #57534e !important;
+  background-color: #1c1917 !important;
+}
+
+html[data-theme-mode=dark] .stats-schedule-view .schedule-week-day.bg-stone-100 {
+  background-color: #44403c !important;
+}
+
+html[data-theme-mode=dark] .stats-schedule-view .schedule-grid-line,
+html[data-theme-mode=dark] .stats-month-heatmap .schedule-grid-line,
+html[data-theme-mode=dark] .stats-schedule-view .schedule-day-column,
+html[data-theme-mode=dark] .stats-month-heatmap .schedule-day-column,
+html[data-theme-mode=dark] .stats-month-heatmap .schedule-legend {
+  border-color: #44403c !important;
+}
+
+html[data-theme-mode=dark] .stats-schedule-view .schedule-time-label {
+  color: #a8a29e !important;
+}
+
+html[data-theme-mode=dark] .stats-schedule-view .schedule-week-day .text-stone-900,
+html[data-theme-mode=dark] .stats-schedule-view .schedule-week-day .text-stone-600 {
+  color: #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .stats-schedule-view .schedule-week-day .text-stone-400,
+html[data-theme-mode=dark] .stats-month-heatmap .schedule-time-label,
+html[data-theme-mode=dark] .stats-month-heatmap .schedule-legend-label {
+  color: #a8a29e !important;
+}
+
+html[data-theme-mode=dark] .stats-schedule-view .schedule-event {
+  color: #f5f5f4 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .stats-schedule-view .schedule-event-default {
+  border-color: color-mix(in srgb, var(--schedule-accent) 62%, #57534e) !important;
+  border-left: 3px solid var(--schedule-accent) !important;
+  background-color: color-mix(in srgb, var(--schedule-accent) 14%, #292524) !important;
+}
+
+html[data-theme-mode=dark] .stats-schedule-view .schedule-event-solid {
+  border-color: color-mix(in srgb, var(--schedule-accent) 72%, #57534e) !important;
+  background-color: color-mix(in srgb, var(--schedule-accent) 48%, #171412) !important;
+}
+
+/* Daily-check statistics retain a visible grid at every time range. */
+html[data-theme-mode=dark] .daily-check-stats .text-stone-900,
+html[data-theme-mode=dark] .daily-check-stats .text-stone-800 {
+  color: #f5f5f4 !important;
+}
+
+html[data-theme-mode=dark] .daily-check-stats .text-stone-500,
+html[data-theme-mode=dark] .daily-check-stats .text-stone-400 {
+  color: #a8a29e !important;
+}
+
+html[data-theme-mode=dark] .daily-check-stats .bg-stone-200 {
+  background-color: #57534e !important;
+}
+
+html[data-theme-mode=dark] .daily-check-stats .border-stone-200,
+html[data-theme-mode=dark] .daily-check-stats .border-stone-50 {
+  border-color: #57534e !important;
+}
+
+html[data-theme-mode=dark] .daily-check-stat-card {
+  border-color: #57534e !important;
+  background-color: #292524 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme-mode=dark] .daily-check-week-cell:not(.daily-check-cell-complete),
+html[data-theme-mode=dark] .daily-check-month-cell:not(.daily-check-cell-complete),
+html[data-theme-mode=dark] .daily-check-year-cell:not(.daily-check-cell-complete) {
+  border: 1px solid #57534e !important;
+  background-color: #44403c !important;
+  color: #a8a29e !important;
+}
+
+html[data-theme-mode=dark] .daily-check-week-cell.daily-check-cell-complete,
+html[data-theme-mode=dark] .daily-check-month-cell.daily-check-cell-complete,
+html[data-theme-mode=dark] .daily-check-year-cell.daily-check-cell-complete {
+  border: 1px solid color-mix(in srgb, currentColor 52%, #f5f5f4) !important;
+}
+
+/* Scope goal-state prompts retain their warning hierarchy without a light panel. */
+html[data-theme-mode=dark] .goal-status-alert {
+  border-color: #92400e !important;
+  background-color: #2b2119 !important;
+}
+
+html[data-theme-mode=dark] .goal-status-alert h3 {
+  color: #fdba74 !important;
+}
+
+html[data-theme-mode=dark] .goal-status-alert p {
+  color: #fed7aa !important;
+}
+
+html[data-theme-mode=dark] .goal-status-alert .bg-white {
+  border-color: #b45309 !important;
+  background-color: #1c1917 !important;
+  color: #fdba74 !important;
 }
 
 /* AI assistant overlays use semantic dark surfaces instead of their legacy light paper palette. */

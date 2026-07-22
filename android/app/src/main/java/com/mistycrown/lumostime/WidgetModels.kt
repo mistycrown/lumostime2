@@ -334,6 +334,7 @@ data class WidgetDailyRuntimePayload(
 data class WidgetTodoPinItem(
     val todoId: String,
     val title: String,
+    val isCompleted: Boolean = false,
     val badgeLabel: String,
     val categoryId: String? = null,
     val activityId: String? = null,
@@ -355,6 +356,13 @@ data class WidgetTodoPinPayload(
     val sourceCategories: List<WidgetTodoPinSourceCategory> = emptyList()
 )
 
+data class WidgetPendingTodoPinAction(
+    val id: String,
+    val todoId: String,
+    val isCompleted: Boolean,
+    val createdAt: Long
+)
+
 data class WidgetTodoPinSourceRecurrenceRule(
     val frequency: String,
     val startDate: String,
@@ -369,6 +377,7 @@ data class WidgetTodoPinSourceRecurrenceRule(
 data class WidgetTodoPinSourceTodo(
     val id: String,
     val title: String,
+    val kind: String = "project",
     val isCompleted: Boolean = false,
     val parentTodoId: String? = null,
     val linkedCategoryId: String? = null,

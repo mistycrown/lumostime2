@@ -11,6 +11,7 @@ import org.json.JSONObject
 
 /**
  * Capacitor bridge for widget templates, instance binding state, runtime synchronization, and pending action import.
+ * Updated 2026-07-22: Exposes queued TODAY + PIN checkbox changes so the app can persist widget-side todo completion updates.
  * Updated 2026-05-21: Expanded TODAY + PIN sync parsing to accept mirrored todo `maybeDates` and recurrence `skipDates`, matching app-side today visibility during native rebuilds.
  * Updated 2026-05-02: Added dedicated scene widget payload sync support for the Android 4x3 scene widget.
  * Updated 2026-05-03: Routed widget sync calls to targeted widget-family refresh helpers instead of always refreshing every widget provider.
@@ -116,6 +117,26 @@ class WidgetBridgePlugin : Plugin() {
         }
 
         WidgetStores.clearPendingDailyActions(context, ids)
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun getPendingTodoPinActions(call: PluginCall) {
+        val result = JSObject()
+        val actions = JSArray()
+        WidgetStores.loadPendingTodoPinActions(context).forEach { actions.put(todoPinActionToJs(it)) }
+        result.put("actions", actions)
+        call.resolve(result)
+    }
+
+    @PluginMethod
+    fun clearPendingTodoPinActions(call: PluginCall) {
+        val idsArray = call.getArray("ids") ?: JSArray()
+        val ids = mutableSetOf<String>()
+        for (index in 0 until idsArray.length()) {
+            parseNullableString(idsArray.optString(index))?.let(ids::add)
+        }
+        WidgetStores.clearPendingTodoPinActions(context, ids)
         call.resolve()
     }
 
@@ -428,6 +449,15 @@ class WidgetBridgePlugin : Plugin() {
         }
     }
 
+    private fun todoPinActionToJs(action: WidgetPendingTodoPinAction): JSObject {
+        return JSObject().apply {
+            put("id", action.id)
+            put("todoId", action.todoId)
+            put("isCompleted", action.isCompleted)
+            put("createdAt", action.createdAt)
+        }
+    }
+
     private fun runtimeToJs(runtimeState: WidgetRuntimeState): JSObject {
         return JSObject().apply {
             put("id", runtimeState.id)
@@ -649,6 +679,7 @@ class WidgetBridgePlugin : Plugin() {
                 WidgetTodoPinItem(
                     todoId = todoId,
                     title = title,
+                    isCompleted = item.optBoolean("isCompleted", false),
                     badgeLabel = parseNullableString(item.optString("badgeLabel")) ?: "TODAY",
                     categoryId = parseNullableString(item.optString("categoryId")),
                     activityId = parseNullableString(item.optString("activityId")),
@@ -676,6 +707,7 @@ class WidgetBridgePlugin : Plugin() {
                 WidgetTodoPinSourceTodo(
                     id = id,
                     title = title,
+                    kind = parseNullableString(item.optString("kind")) ?: "project",
                     isCompleted = item.optBoolean("isCompleted", false),
                     parentTodoId = parseNullableString(item.optString("parentTodoId")),
                     linkedCategoryId = parseNullableString(item.optString("linkedCategoryId")),

@@ -72,6 +72,7 @@ object WidgetRefreshCoordinator {
     fun refreshTodoPinWidgets(context: Context) {
         QuickLogWidgetTodoPin4x2.refreshAllAsync(context)
         QuickLogWidgetTodoPin4x3.refreshAllAsync(context)
+        QuickLogWidgetQuickTodo4x2.refreshAllAsync(context)
     }
 
     fun refreshSceneWidgets(context: Context) {
@@ -112,6 +113,8 @@ object WidgetRefreshCoordinator {
                 QuickLogWidgetTodoPin4x2.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidgetTodoPin4x3::class.java).className ->
                 QuickLogWidgetTodoPin4x3.refreshWidget(context, appWidgetId)
+            ComponentName(context, QuickLogWidgetQuickTodo4x2::class.java).className ->
+                QuickLogWidgetQuickTodo4x2.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidgetScene4x3::class.java).className ->
                 QuickLogWidgetScene4x3.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidgetDailyRuntime4x4::class.java).className ->

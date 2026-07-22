@@ -25,7 +25,13 @@ export type ParsedLumosTimeWidgetUrl = {
   action: string | null;
 };
 
-export type ParsedLumosTimeUrl = ParsedLumosTimeRecordUrl | ParsedLumosTimeWidgetUrl;
+export type ParsedLumosTimeQuickTodoUrl = {
+  type: 'quick_todo';
+  rawValue: string;
+  action: 'new';
+};
+
+export type ParsedLumosTimeUrl = ParsedLumosTimeRecordUrl | ParsedLumosTimeWidgetUrl | ParsedLumosTimeQuickTodoUrl;
 
 const LUMOS_SCHEME = 'lumostime:';
 const RECORD_ACTION_ALIASES = new Map<string, LumosTimeRecordAction>([
@@ -95,7 +101,7 @@ const getUrlSegments = (value: string): string[] => {
   }
 };
 
-const resolveTargetAndPathAction = (segments: string[]): { target: 'record' | 'widget'; pathAction: string | null } | null => {
+const resolveTargetAndPathAction = (segments: string[]): { target: 'record' | 'widget' | 'quick_todo'; pathAction: string | null } | null => {
   const [first, second] = segments;
   if (!first) {
     return null;
@@ -106,6 +112,10 @@ const resolveTargetAndPathAction = (segments: string[]): { target: 'record' | 'w
       target: first,
       pathAction: second || null
     };
+  }
+
+  if ((first === 'quick-todo' || first === 'quick_todo') && second === 'new') {
+    return { target: 'quick_todo', pathAction: second };
   }
 
   if (RECORD_ACTION_ALIASES.has(first)) {
@@ -148,6 +158,10 @@ export const parseLumosTimeUrl = (value: string | null | undefined): ParsedLumos
   }
 
   const params = new URLSearchParams(getQueryString(trimmed));
+  if (resolved.target === 'quick_todo') {
+    return { type: 'quick_todo', rawValue: trimmed, action: 'new' };
+  }
+
   if (resolved.target === 'widget') {
     return {
       type: 'widget',
@@ -172,6 +186,10 @@ export const parseLumosTimeUrl = (value: string | null | undefined): ParsedLumos
 export const buildLumosTimeExecutionKey = (parsedUrl: ParsedLumosTimeUrl): string => {
   if (parsedUrl.type === 'widget') {
     return `widget:${parsedUrl.action || 'unknown'}`;
+  }
+
+  if (parsedUrl.type === 'quick_todo') {
+    return 'quick_todo:new';
   }
 
   if (parsedUrl.action === 'start') {

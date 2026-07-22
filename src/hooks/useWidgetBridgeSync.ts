@@ -4,6 +4,7 @@
  * @output Runtime reconciliation between the Android widget layer and the React app
  * @pos Hook
  * @description Imports completed timer widget actions into logs, mirrors timer runtime state, syncs daily widget progress to native, and replays queued daily taps back into review state.
+ * @updated 2026-07-22: Replays TODAY + PIN checkbox changes from Android widgets into persisted todo completion state.
  * @updated 2026-05-18: Catches both synchronous and async native bridge failures during widget payload sync so newly extended todo recurrence payloads cannot white-screen the app.
  * @updated 2026-05-14: Stops native app-sourced runtime echoes from restoring a just-stopped in-app session back into React state during NFC flows.
  * @updated 2026-04-25: Syncs today's DAILY_RUNTIME heatmap payload so the dedicated 4x4 widget reflects logs and live sessions.
@@ -44,6 +45,7 @@ import {
 } from '../services/widgetService';
 import { buildSceneWidgetPayloadFromStorage } from '../services/widgetSceneService';
 import { applyDailyCheckActionForDate } from '../utils/dailyCheckUtils';
+import { syncSubtaskProgressToParentTodos } from '../utils/todoProgressUtils';
 
 const fireAndForgetWidgetBridgeCall = (
   label: string,
@@ -60,7 +62,7 @@ const fireAndForgetWidgetBridgeCall = (
 
 export const useWidgetBridgeSync = () => {
   const { categories, scopes } = useCategoryScope();
-  const { logs, todos, setLogs } = useData();
+  const { logs, todos, setLogs, setTodos } = useData();
   const { activeSessions, setActiveSessions } = useSession();
   const { dailyReviews, setDailyReviews, checkTemplates, reviewTemplates } = useReview();
   const [hasHydratedNativeState, setHasHydratedNativeState] = useState(!isNativeAndroidWidgetSupported());
@@ -181,10 +183,11 @@ export const useWidgetBridgeSync = () => {
     const reconcileFromNative = async () => {
       try {
         let reconciledDailyState = latestDailyStateRef.current;
-        const [{ actions }, { runtimeState }, { actions: dailyActions }] = await Promise.all([
+        const [{ actions }, { runtimeState }, { actions: dailyActions }, { actions: todoPinActions }] = await Promise.all([
           WidgetBridge.getPendingActions(),
           WidgetBridge.getRuntimeState(),
-          WidgetBridge.getPendingDailyActions()
+          WidgetBridge.getPendingDailyActions(),
+          WidgetBridge.getPendingTodoPinActions()
         ]);
 
         if (cancelled) {
@@ -238,6 +241,22 @@ export const useWidgetBridgeSync = () => {
           }
 
           await WidgetBridge.clearPendingDailyActions({ ids: dailyActions.map((action) => action.id) });
+        }
+
+        if (todoPinActions.length > 0) {
+          const completedAt = new Date().toISOString();
+          setTodos((prevTodos) => syncSubtaskProgressToParentTodos(prevTodos.map((todo) => {
+            const action = todoPinActions.find((item) => item.todoId === todo.id);
+            if (!action || todo.isCompleted === action.isCompleted) {
+              return todo;
+            }
+            return {
+              ...todo,
+              isCompleted: action.isCompleted,
+              completedAt: action.isCompleted ? todo.completedAt || completedAt : undefined
+            };
+          })));
+          await WidgetBridge.clearPendingTodoPinActions({ ids: todoPinActions.map((action) => action.id) });
         }
 
         const payload = buildDailyWidgetSyncPayload({
@@ -315,7 +334,7 @@ export const useWidgetBridgeSync = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       void appStateHandle?.remove();
     };
-  }, [categories, setActiveSessions, setDailyReviews, setLogs]);
+  }, [categories, setActiveSessions, setDailyReviews, setLogs, setTodos]);
 
   useEffect(() => {
     if (!isNativeAndroidWidgetSupported() || !hasHydratedNativeState) {
