@@ -10,6 +10,7 @@
  * @updated 2026-04-20: Replaced the top-left Memoir month dropdown with the shared centered month picker modal used by todo scheduling.
  * @updated 2026-04-20: Enabled the mood calendar modal date title to jump directly into that day's daily review.
  * @updated 2026-07-21: Added dark-mode semantic hooks for the Memoir calendar, timeline, and date navigation rail.
+ * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
  */
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { DailyReview, Log, WeeklyReview, MonthlyReview } from '../types';
@@ -698,7 +699,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
     return (
         <div 
-            className="memoir-view flex flex-col h-full relative"
+            className="memoir-view flex flex-col h-full relative isolate"
             style={{ backgroundColor: hasBackground ? 'transparent' : '#faf9f6' }}
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
@@ -717,7 +718,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 />
             )}
             <div
-                className="memoir-surface-overlay absolute inset-0 -z-10"
+                className="memoir-surface-overlay page-background-overlay absolute inset-0 -z-10"
                 style={{ backgroundColor: `rgba(250, 249, 246, ${panelOverlayOpacity})` }}
             />
 

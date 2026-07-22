@@ -12,7 +12,7 @@ import android.widget.RemoteViews;
 public final class WidgetQuickTodoProviderSupport {
     public static final String ACTION_COMPLETE = "com.mistycrown.lumostime.action.COMPLETE_QUICK_TODO";
     public static final String ACTION_REFRESH = "com.mistycrown.lumostime.action.REFRESH_QUICK_TODO";
-    private static final String ACTION_OPEN_ADD_DIALOG = "com.mistycrown.lumostime.action.OPEN_QUICK_TODO_ADD_DIALOG";
+    public static final String ACTION_OPEN_ADD_DIALOG = "com.mistycrown.lumostime.action.OPEN_QUICK_TODO_ADD_DIALOG";
     public static final String EXTRA_TODO_ID = "quick_todo_id";
 
     private WidgetQuickTodoProviderSupport() {}
@@ -21,6 +21,16 @@ public final class WidgetQuickTodoProviderSupport {
         if (intent == null) return false;
         String action = intent.getAction();
         if (ACTION_REFRESH.equals(action)) return true;
+        if (ACTION_OPEN_ADD_DIALOG.equals(action)) {
+            Intent addIntent = new Intent(context, QuickTodoAddActivity.class);
+            addIntent.addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK
+                            | Intent.FLAG_ACTIVITY_MULTIPLE_TASK
+                            | Intent.FLAG_ACTIVITY_SINGLE_TOP
+            );
+            context.startActivity(addIntent);
+            return false;
+        }
         if (!ACTION_COMPLETE.equals(action)) return false;
         String todoId = intent.getStringExtra(EXTRA_TODO_ID);
         return todoId != null && WidgetTodoPinProviderSupport.toggleTodoCompletion(context, todoId);
@@ -55,16 +65,29 @@ public final class WidgetQuickTodoProviderSupport {
             int[] ids,
             Class<? extends android.appwidget.AppWidgetProvider> providerClass
     ) {
+        updateWidgets(context, manager, ids, providerClass, R.layout.widget_layout_quick_todo_4x2);
+    }
+
+    public static void updateWidgets(
+            Context context,
+            AppWidgetManager manager,
+            int[] ids,
+            Class<? extends android.appwidget.AppWidgetProvider> providerClass,
+            int layoutId
+    ) {
         if (ids == null || ids.length == 0) return;
         for (int appWidgetId : ids) {
-            RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_layout_quick_todo_4x2);
+            RemoteViews views = new RemoteViews(context.getPackageName(), layoutId);
             Intent serviceIntent = new Intent(context, WidgetQuickTodoRemoteViewsService.class);
             serviceIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
             serviceIntent.setData(Uri.parse(serviceIntent.toUri(Intent.URI_INTENT_SCHEME)));
             views.setRemoteAdapter(R.id.widget_quick_todo_list, serviceIntent);
             views.setEmptyView(R.id.widget_quick_todo_list, R.id.widget_quick_todo_empty);
             views.setOnClickPendingIntent(R.id.widget_quick_todo_refresh_button, refreshIntent(context, appWidgetId, providerClass));
-            views.setOnClickPendingIntent(R.id.widget_quick_todo_add_button, addIntent(context, appWidgetId));
+            views.setOnClickPendingIntent(
+                    R.id.widget_quick_todo_add_button,
+                    addIntent(context, appWidgetId, providerClass)
+            );
             views.setPendingIntentTemplate(R.id.widget_quick_todo_list, completionTemplate(context, appWidgetId, providerClass));
             manager.notifyAppWidgetViewDataChanged(new int[] { appWidgetId }, R.id.widget_quick_todo_list);
             manager.updateAppWidget(appWidgetId, views);
@@ -85,12 +108,12 @@ public final class WidgetQuickTodoProviderSupport {
         return PendingIntent.getBroadcast(context, appWidgetId + 7700, intent, mutableFlags());
     }
 
-    private static PendingIntent addIntent(Context context, int appWidgetId) {
-        Intent intent = new Intent(context, QuickTodoAddActivity.class);
+    private static PendingIntent addIntent(Context context, int appWidgetId, Class<?> providerClass) {
+        Intent intent = new Intent(context, providerClass);
         intent.setAction(ACTION_OPEN_ADD_DIALOG);
         intent.setData(Uri.parse("lumostime-widget://quick-todo/add/" + appWidgetId));
         intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
-        return PendingIntent.getActivity(context, appWidgetId + 7800, intent, immutableFlags());
+        return PendingIntent.getBroadcast(context, appWidgetId + 7800, intent, immutableFlags());
     }
 
     private static int immutableFlags() {

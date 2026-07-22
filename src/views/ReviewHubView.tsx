@@ -5,6 +5,7 @@
  * @pos View (Main Tab)
  * @description The central dashboard for accessing past reviews. Displays summaries and entry points for Daily, Weekly, and Monthly reviews, often using carousels or lists, with Android-compatible card rendering fallbacks for archive themes.
  * @updated 2026-04-17: Replaced Chronicle card color-mix shadows and blur-only surfaces with Android-safe fallbacks to avoid HarmonyOS gradient artifacts behind archive cards, then softened the archive card shadows for a lighter page feel.
+ * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
  *
  * 鈿狅笍 Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -238,7 +239,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
 
   return (
     <div
-      className="flex flex-col h-full relative"
+      className="flex flex-col h-full relative isolate"
       style={{ backgroundColor: hasBackground ? 'transparent' : '#faf9f6' }}
     >
       {hasBackground && (
@@ -254,7 +255,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
         />
       )}
       <div
-        className="absolute inset-0 -z-10"
+        className="page-background-overlay absolute inset-0 -z-10"
         style={{ backgroundColor: `rgba(250, 249, 246, ${panelOverlayOpacity})` }}
       />
       <header

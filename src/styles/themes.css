@@ -3264,3 +3264,27 @@ html[data-theme-mode=dark] .dream-aspect-tab-active {
   color: #f5f5f4 !important;
   border-bottom-color: #f5f5f4 !important;
 }
+
+/* Time Pal uses a gradient, so generic dark-mode background-color overrides cannot cover it. */
+html[data-theme-mode=dark] .time-pal-card {
+  background-image: linear-gradient(135deg, #292524 0%, #1c1917 100%) !important;
+  border-color: #57534e !important;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 35%) !important;
+}
+
+html[data-theme-mode=dark] .time-pal-card-description {
+  color: #d6d3d1 !important;
+}
+
+html[data-theme-mode=dark] .time-pal-card .bg-stone-200 {
+  background-color: #57534e !important;
+}
+
+/* Preserve user-selected page backgrounds while keeping main-tab content legible. */
+html[data-theme-mode=dark] .page-background-overlay {
+  background-color: rgb(28 25 23 / 72%) !important;
+}
+
+html[data-theme-mode=dark] .page-content-panel {
+  background-color: rgb(28 25 23 / 24%) !important;
+}

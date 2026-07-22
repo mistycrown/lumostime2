@@ -6,6 +6,8 @@
  * @description The main Android activity provided by Capacitor. Serves as the WebView container, configures edge-to-edge window behavior, and registers native plugins.
  * @updated 2026-04-26: Captures assistant-notification navigation intents so the Web layer can reopen the shared AI chat at the targeted background reply after resume or cold start.
  * @updated 2026-07-22: Registers the native status-bar appearance bridge for display-mode synchronization.
+ * @updated 2026-07-22: Draws an explicit top inset backdrop beneath Android 15's transparent status bar.
+ * @updated 2026-07-22: Configures edge-to-edge before Capacitor creates the WebView so the status-bar backdrop is visible.
  */
 package com.mistycrown.lumostime;
 
@@ -34,6 +36,7 @@ public class MainActivity extends BridgeActivity {
     private View immersiveProtectionBottomView;
     private View immersiveProtectionLeftView;
     private View immersiveProtectionRightView;
+    private View statusBarBackdropView;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -46,10 +49,15 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ImmersiveModePlugin.class);
         registerPlugin(NativeStatusBarAppearancePlugin.class);
         registerPlugin(WidgetBridgePlugin.class);
+        // BridgeActivity creates the WebView during super.onCreate(). Configure this first so
+        // its content is laid out behind the transparent Android 15 status bar.
+        configureWindowForEdgeToEdge();
         super.onCreate(savedInstanceState);
 
+        // Reapply after Capacitor's own window setup in case a plugin updates these flags.
         configureWindowForEdgeToEdge();
         AssistantNotificationNavigationStore.captureFromIntent(this, getIntent());
+        ensureStatusBarBackdrop();
         ensureImmersiveProtectionOverlay();
         initializeIconState();
     }
@@ -90,6 +98,54 @@ public class MainActivity extends BridgeActivity {
             immersiveProtectionOverlay.bringToFront();
             ViewCompat.requestApplyInsets(immersiveProtectionOverlay);
         }
+    }
+
+    public void setStatusBarBackdropColor(int color) {
+        ensureStatusBarBackdrop();
+        if (statusBarBackdropView == null) {
+            return;
+        }
+
+        statusBarBackdropView.setBackgroundColor(color);
+        statusBarBackdropView.bringToFront();
+        ViewCompat.requestApplyInsets(statusBarBackdropView);
+    }
+
+    private void ensureStatusBarBackdrop() {
+        if (statusBarBackdropView != null) {
+            return;
+        }
+
+        FrameLayout contentView = getWindow().findViewById(android.R.id.content);
+        if (contentView == null) {
+            return;
+        }
+
+        statusBarBackdropView = new View(this);
+        statusBarBackdropView.setBackgroundColor(Color.BLACK);
+        statusBarBackdropView.setClickable(false);
+        statusBarBackdropView.setFocusable(false);
+        statusBarBackdropView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        contentView.addView(
+            statusBarBackdropView,
+            new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                0,
+                Gravity.TOP
+            )
+        );
+
+        ViewCompat.setOnApplyWindowInsetsListener(statusBarBackdropView, (view, insets) -> {
+            Insets statusBarInsets = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.statusBars());
+            FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) view.getLayoutParams();
+            if (params.height != statusBarInsets.top) {
+                params.height = statusBarInsets.top;
+                params.gravity = Gravity.TOP;
+                view.setLayoutParams(params);
+            }
+            return insets;
+        });
+        ViewCompat.requestApplyInsets(statusBarBackdropView);
     }
 
     private void ensureImmersiveProtectionOverlay() {
