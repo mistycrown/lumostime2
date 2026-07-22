@@ -258,6 +258,8 @@ export interface WidgetBridgePendingTodoPinAction {
   todoId: string;
   isCompleted: boolean;
   createdAt: number;
+  actionType?: 'completion' | 'create';
+  title?: string | null;
 }
 
 export interface WidgetBridgeTrackingCalendarEntry {

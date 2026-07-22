@@ -360,7 +360,9 @@ data class WidgetPendingTodoPinAction(
     val id: String,
     val todoId: String,
     val isCompleted: Boolean,
-    val createdAt: Long
+    val createdAt: Long,
+    val actionType: String = "completion",
+    val title: String? = null
 )
 
 data class WidgetTodoPinSourceRecurrenceRule(

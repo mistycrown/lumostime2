@@ -39,6 +39,12 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".QuickTodoAddActivity"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:excludeFromRecents="true"
+            android:exported="false" />
+
         <!-- 图标别名 - 默认图标（始终启用其中之一作为启动器入口） -->
         <activity-alias
             android:name=".MainActivityDefault"

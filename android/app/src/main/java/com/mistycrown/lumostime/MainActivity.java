@@ -5,6 +5,7 @@
  * @pos Android Entry Point
  * @description The main Android activity provided by Capacitor. Serves as the WebView container, configures edge-to-edge window behavior, and registers native plugins.
  * @updated 2026-04-26: Captures assistant-notification navigation intents so the Web layer can reopen the shared AI chat at the targeted background reply after resume or cold start.
+ * @updated 2026-07-22: Registers the native status-bar appearance bridge for display-mode synchronization.
  */
 package com.mistycrown.lumostime;
 
@@ -43,6 +44,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(IconPlugin.class);
         registerPlugin(AppLauncherPlugin.class);
         registerPlugin(ImmersiveModePlugin.class);
+        registerPlugin(NativeStatusBarAppearancePlugin.class);
         registerPlugin(WidgetBridgePlugin.class);
         super.onCreate(savedInstanceState);
 

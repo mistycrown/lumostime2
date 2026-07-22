@@ -455,6 +455,8 @@ class WidgetBridgePlugin : Plugin() {
             put("todoId", action.todoId)
             put("isCompleted", action.isCompleted)
             put("createdAt", action.createdAt)
+            put("actionType", action.actionType)
+            put("title", action.title)
         }
     }
 

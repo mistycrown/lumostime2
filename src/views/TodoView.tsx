@@ -12,7 +12,7 @@
  * @updated 2026-06-13: 解构并传递 handleQuickActionUpdateTitle 给 TodoQuickActionsModal 从而支持快捷编辑栏中的标题内联编辑和自动保存。
  * @updated 2026-05-21: Unified the expanded left-sidebar entry heights with the collapsed rail so opening the Todo sidebar no longer stretches the column and pushes the bottom toggle under the fixed navigation.
  */
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log, TodoDuplicateOptions } from '../types';
 import { PlayCircle, Check, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, ChevronDown, Diff, LayoutList, Rows, Sparkles, SlidersHorizontal, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo, CircleAlert, PanelRightOpen, Pin } from 'lucide-react';
 import { usePrivacy } from '../contexts/PrivacyContext';
