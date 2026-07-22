@@ -6,6 +6,7 @@
  * @input categories: Category[] - 分类列表
  * @input activeSessions?: ActiveSession[] - 正在进行中的会话
  * @output 顶部时光小友卡片
+ * @updated 2026-07-22: Added dark mode colors for the Time Pal card surface and content.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Log, Category, ActiveSession } from '../types';
@@ -260,8 +261,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
     return (
         <div className="mb-4">
             <div
-                className="relative bg-gradient-to-br from-white/70 to-stone-50/70 rounded-2xl border border-stone-200 p-4 flex items-center gap-4 transition-shadow"
-                style={{ boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)' }}
+                className="time-pal-card relative bg-gradient-to-br from-white/70 to-stone-50/70 rounded-2xl border border-stone-200 p-4 flex items-center gap-4 shadow-sm transition-shadow"
             >
                 <button
                     type="button"
@@ -286,12 +286,12 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
 
                 <div className="flex-1 flex flex-col justify-center min-w-0">
                     <div
-                        className="text-2xl font-bold tabular-nums leading-none text-stone-800"
+                        className="text-2xl font-bold tabular-nums leading-none text-stone-800 dark:text-stone-100"
                         style={{ fontFamily: '"Playfair Display", "Noto Serif SC", Georgia, serif', letterSpacing: '0.08em' }}
                     >
                         {timeDisplay}
                     </div>
-                    <div className="mt-1.5 text-xs text-stone-500 leading-relaxed">
+                    <div className="time-pal-card-description mt-1.5 text-xs text-stone-500 leading-relaxed">
                         <span className="font-medium" style={{ color: 'var(--accent-color)' }}>{formDesc}</span>
                         <span> · {quote}</span>
                     </div>

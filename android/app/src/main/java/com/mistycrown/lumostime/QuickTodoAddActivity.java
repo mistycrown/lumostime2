@@ -1,49 +1,52 @@
 package com.mistycrown.lumostime;
 
-import android.app.Activity;
-import android.content.Context;
 import android.os.Bundle;
+import android.os.Build;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
-import android.widget.LinearLayout;
+import android.widget.TextView;
 
-import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
 
 /** Lightweight input surface launched from the quick-todo widget. */
-public class QuickTodoAddActivity extends Activity {
+public class QuickTodoAddActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_quick_todo_add);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            getWindow().setBackgroundBlurRadius(dp(28));
+        }
 
-        EditText input = new EditText(this);
-        input.setSingleLine(true);
-        input.setHint("Add a quick todo");
+        EditText input = findViewById(R.id.quick_todo_input);
+        TextView cancel = findViewById(R.id.quick_todo_cancel);
+        TextView add = findViewById(R.id.quick_todo_add);
 
-        int horizontalPadding = (int) (20 * getResources().getDisplayMetrics().density);
-        LinearLayout container = new LinearLayout(this);
-        container.setPadding(horizontalPadding, 0, horizontalPadding, 0);
-        container.addView(input, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Quick Todo")
-                .setView(container)
-                .setNegativeButton(android.R.string.cancel, (ignored, which) -> finish())
-                .setPositiveButton(android.R.string.ok, (ignored, which) -> {
-                    WidgetQuickTodoProviderSupport.addQuickTodo(this, input.getText().toString());
-                    finish();
-                })
-                .create();
-        dialog.setOnDismissListener(ignored -> finish());
-        dialog.setOnShowListener(ignored -> {
-            input.requestFocus();
-            dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
-            ((InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE))
-                    .showSoftInput(input, InputMethodManager.SHOW_IMPLICIT);
+        cancel.setOnClickListener(view -> finish());
+        add.setOnClickListener(view -> submit(input));
+        input.setOnEditorActionListener((view, actionId, event) -> {
+            submit(input);
+            return true;
         });
-        dialog.show();
+
+        input.requestFocus();
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+        input.postDelayed(() -> ((InputMethodManager) getSystemService(INPUT_METHOD_SERVICE))
+                .showSoftInput(input, InputMethodManager.SHOW_IMPLICIT), 180);
+    }
+
+    private void submit(EditText input) {
+        String title = input.getText().toString().trim();
+        if (title.isEmpty()) {
+            input.setError("写下一件小事");
+            return;
+        }
+        WidgetQuickTodoProviderSupport.addQuickTodo(this, title);
+        finish();
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 }

@@ -13,6 +13,7 @@
  * @updated 2026-04-22: The floating AI button now opens the app-level shared AI window so closing the modal does not interrupt an in-flight request.
  * @updated 2026-04-22: Replaced the old AI backfill entry with a local-history chat modal for the first-step conversational AI flow.
  * @updated 2026-04-20: Switched the timeline screen to the shared lightweight custom-background pipeline.
+ * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
  */
 import React, { useMemo, useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -1130,7 +1131,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
 
     return (
         <div
-            className="h-full flex flex-col relative text-stone-900"
+            className="h-full flex flex-col relative isolate text-stone-900"
             style={{ backgroundColor: hasBackground ? 'transparent' : '#faf9f6' }}
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
@@ -1149,7 +1150,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                 />
             )}
             <div
-                className="absolute inset-0 -z-10"
+                className="page-background-overlay absolute inset-0 -z-10"
                 style={{ backgroundColor: `rgba(250, 249, 246, ${panelOverlayOpacity})` }}
             />
 

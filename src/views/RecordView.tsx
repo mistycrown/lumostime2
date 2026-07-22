@@ -10,6 +10,7 @@
  * @updated 2026-05-04: Added a custom-background-only sidebar scrim so left-rail category buttons stay legible over busy wallpapers.
  * @updated 2026-04-12: Softened the sidebar toggle button styling to reduce visual weight and keep it aligned with TodoView controls.
  * @updated 2026-07-21: Muted activity icon circles in dark mode while preserving each activity color as a low-contrast accent.
+ * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
  * @updated 2026-04-20: Switched custom background rendering to the shared preloaded display hook and reduced mobile blur cost.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -74,7 +75,7 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
 
   return (
     <div 
-      className="flex h-full relative"
+      className="flex h-full relative isolate"
       style={{
         backgroundColor: hasBackground ? 'transparent' : '#faf9f6'
       }}
@@ -94,7 +95,7 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
       )}
       
       {/* 全局半透明遮罩层 - 覆盖整个下半部分 */}
-      <div className="absolute inset-0 -z-10" style={{ backgroundColor: pageSurfaceColor }}></div>
+      <div className="page-background-overlay absolute inset-0 -z-10" style={{ backgroundColor: pageSurfaceColor }}></div>
       
       {/* Left Sidebar - Categories */}
       <div
@@ -156,7 +157,7 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
       >
         {/* 半透明白色遮罩层 - 透明度根据用户设置动态调整 */}
         <div 
-          className={`absolute inset-0 -z-10 rounded-tl-[2rem] ${useReducedEffects ? '' : 'backdrop-blur-sm'}`}
+          className={`page-content-panel absolute inset-0 -z-10 rounded-tl-[2rem] ${useReducedEffects ? '' : 'backdrop-blur-sm'}`}
           style={{
             backgroundColor: panelSurfaceColor
           }}

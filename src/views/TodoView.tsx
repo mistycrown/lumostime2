@@ -1,6 +1,7 @@
 /**
  * @file TodoView.tsx
  * @updated 2026-07-21: Kept week-view date columns transparent in dark mode.
+ * @updated 2026-07-22: Preserved custom background images behind readable dark-mode page overlays.
  * @input Todos, Categories, Scopes
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
@@ -2271,7 +2272,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   if (screenMode === 'week') {
     return (
       <div
-        className="relative h-full overflow-hidden"
+        className="relative isolate h-full overflow-hidden"
         style={{
           backgroundColor: hasBackground ? 'transparent' : 'rgb(250, 249, 246)'
         }}
@@ -2289,7 +2290,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           />
         )}
 
-        <div className="absolute inset-0 -z-10" style={{ backgroundColor: 'rgba(250, 249, 246, 0.92)' }}></div>
+        <div className="page-background-overlay absolute inset-0 -z-10" style={{ backgroundColor: 'rgba(250, 249, 246, 0.92)' }}></div>
 
         <div className={`relative z-10 flex h-full flex-col pb-[calc(3rem+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] ${isWeekScheduleView ? 'px-4 md:px-8' : ''} ${useReducedEffects ? '' : 'backdrop-blur-[2px]'}`}>
           {isWeekScheduleView ? (
@@ -2556,7 +2557,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
   return (
     <div 
-      className="flex h-full relative pb-[calc(3rem+env(safe-area-inset-bottom))] md:pb-16"
+      className="flex h-full relative isolate pb-[calc(3rem+env(safe-area-inset-bottom))] md:pb-16"
       style={{
         backgroundColor: hasBackground ? 'transparent' : '#faf9f6'
       }}
@@ -2576,7 +2577,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       )}
       
       {/* 闁稿繈鍔岄惇顒勫础婵犲洠鍋撹箛鏃€顫栭梺顒夊枤閸嶇數浠?- 閻熸洖妫涘ú濠囧极缂堢娀鍤嬪☉鎾愁儏瀹曟劙鏌堥妸銉ョ€?*/}
-      <div className="absolute inset-0 -z-10" style={{ backgroundColor: pageSurfaceColor }}></div>
+      <div className="page-background-overlay absolute inset-0 -z-10" style={{ backgroundColor: pageSurfaceColor }}></div>
       
       {/* Left Sidebar - Todo Categories */}
       <div
@@ -2733,7 +2734,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       >
         {/* 闁告锕埀顒€绻戝Σ鎴︽儌閸婄喎顥忛梺顒夊枤閸嶇數浠?- 闂侇偄绻戝Σ鎴炴償閿旂晫澹岄柟璇″枤閺併倝骞嬮悿顖ｅ晭缂傚喚鍠栨慨鈺呭箑娴ｇ晫娈堕柡?*/}
         <div 
-          className={`absolute inset-0 -z-10 rounded-tl-[2rem] ${useReducedEffects ? '' : 'backdrop-blur-sm'}`}
+          className={`page-content-panel absolute inset-0 -z-10 rounded-tl-[2rem] ${useReducedEffects ? '' : 'backdrop-blur-sm'}`}
           style={{
             backgroundColor: panelSurfaceColor
           }}

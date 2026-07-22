@@ -1,5 +1,6 @@
 /**
  * @file SceneView.tsx
+ * @updated 2026-07-22: Added the shared dark-mode background layering used by the main tab pages.
  * @description 闂傚倷绶氬缁樹繆閸ヮ剙纾块柕鍫濇噳閺嬪秵绻涢崱妯诲碍缂佲偓瀹€鍕厸鐎广儱鍟俊鑺ャ亜锜婚崶銊㈡嫽闂佺鏈銊╁箺閻樼偨浜滈柡鍌濇硶閻忛亶鏌熼崣澶嬪唉鐎规洖宕灃濞达絼璀﹀ú?- 闂傚倷鑳剁涵鍫曞疾閻愬樊娴栭柕濞у棗小濡炪倖甯掗崯銊︾瑜版帗鐓欓柟顖嗗啯姣愬銈冨€曢幊蹇曟崲濠靛牆鏋堟俊顖濇〃婢规洘绻濋悽闈涗哗閻忓浚浜、姘愁槻闁崇懓鍟撮崺鈧い鎺戝閻撴盯鏌涘鈧粈渚€鎮橀敐鍥╃＜妞ゆ棁鍋愯倴婵炲濯寸粻鎾愁嚕閹绢喗鍋愭い鏃囧吹妞规娊姊绘担鍛婂暈妞ゃ劍鍔楀Σ鎰板即閻斿憡鐝烽梺鍝勮癁鐏炶姤顓块梻濠庡亜濞诧箑顫忚ぐ鎹ゅ洩顦规慨濠傤煼瀹曟帒顫濇潏銊﹀枛婵＄偑鍊栭弻銊╂儗閸屾氨鏆︽慨妞诲亾鐎规洏鍔戦、妯款槻闁?
  * @updated 2026-05-11: Manual scene-group quick switching now follows the saved group order from SceneSettingsView.
  * @updated 2026-05-10: Timer and todo scene cards now auto-flip only when the current slot has a matching timeline record, and that forced back side disables swipe-to-front until the record condition clears.
@@ -1075,7 +1076,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
   return (
     <div 
-      className="flex h-full min-h-0 relative"
+      className="flex h-full min-h-0 relative isolate"
       style={{
         backgroundColor: hasBackground ? 'transparent' : '#faf9f6'
       }}
@@ -1095,7 +1096,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
       )}
       
       {/* 闂傚倷鑳堕…鍫㈡崲閸儱绀夌€光偓閸曨剙鍓冲銈嗗笒鐎氼剛娑甸埀顒佺節閻㈤潧孝婵炶尙濞€瀹曟垿骞橀崷顓犳澑闂佸搫鍟犻崑鎾淬亜椤愶絿澧垫慨濠冩そ椤㈡寰勬繝鍐壕闂備胶顭堢粔鍫曞极閸涘﹦顩?*/}
-      <div className="absolute inset-0 -z-10" style={{ backgroundColor: pageSurfaceColor }}></div>
+      <div className="page-background-overlay absolute inset-0 -z-10" style={{ backgroundColor: pageSurfaceColor }}></div>
 
       {/* 闂佽楠哥紞濠傤焽閼姐倗纾芥慨妯挎硾閻ら箖鏌ょ粙璺ㄤ粵缂傚秴娲幃宄扳枎韫囨搩浼€闂?- 闂傚倷绀侀幖顐﹀疮椤愶附鍋夐柣鎾冲濞戙垹鍨傛い鏃囶潐閻忎線姊婚崒姘卞缂佸鍨块幃妯衡枎閹炬潙浠?*/}
       <div className="flex-shrink-0 flex h-full min-h-0 flex-col overflow-y-auto pt-6 pb-20 pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative w-16 items-center">
@@ -1142,7 +1143,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
       >
         {/* 闂傚倷绀侀幉锟犮€冮崨瀛樻櫇妞ゅ繐鐗嗛悞鍨亜閹哄棗浜剧紓浣虹帛閸ㄩ潧宓勯梺纭呮彧闂勫嫰宕曞畝鍕厱濠电姴瀚弸搴亜閵夈儳绠绘慨濠冩そ椤㈡寰勬繝鍐壕闂備胶顭堢粔鍫曞极閸涘﹦顩?*/}
         <div 
-          className={`absolute inset-0 -z-10 rounded-tl-[2rem] ${useReducedEffects ? '' : 'backdrop-blur-sm'}`}
+          className={`page-content-panel absolute inset-0 -z-10 rounded-tl-[2rem] ${useReducedEffects ? '' : 'backdrop-blur-sm'}`}
           style={{
             backgroundColor: panelSurfaceColor
           }}

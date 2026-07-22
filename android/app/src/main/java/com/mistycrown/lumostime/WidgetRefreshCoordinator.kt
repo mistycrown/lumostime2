@@ -11,6 +11,7 @@ import android.os.Looper
  * Updated 2026-05-02: Added the dedicated scene 4x3 widget provider to global refresh routing.
  * Updated 2026-05-03: Added widget-family refresh helpers so bridge sync calls can refresh only the providers that depend on each payload.
  * Updated 2026-05-05: Extended tap-feedback refresh frames so shortcut success states can animate back after one second.
+ * Updated 2026-07-22: Registered the quick-todo 4x3 provider in global and targeted refresh routing.
  */
 object WidgetRefreshCoordinator {
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -73,6 +74,7 @@ object WidgetRefreshCoordinator {
         QuickLogWidgetTodoPin4x2.refreshAllAsync(context)
         QuickLogWidgetTodoPin4x3.refreshAllAsync(context)
         QuickLogWidgetQuickTodo4x2.refreshAllAsync(context)
+        QuickLogWidgetQuickTodo4x3.refreshAllAsync(context)
     }
 
     fun refreshSceneWidgets(context: Context) {
@@ -115,6 +117,8 @@ object WidgetRefreshCoordinator {
                 QuickLogWidgetTodoPin4x3.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidgetQuickTodo4x2::class.java).className ->
                 QuickLogWidgetQuickTodo4x2.refreshWidget(context, appWidgetId)
+            ComponentName(context, QuickLogWidgetQuickTodo4x3::class.java).className ->
+                QuickLogWidgetQuickTodo4x3.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidgetScene4x3::class.java).className ->
                 QuickLogWidgetScene4x3.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidgetDailyRuntime4x4::class.java).className ->

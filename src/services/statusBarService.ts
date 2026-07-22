@@ -12,6 +12,8 @@
  * @updated 2026-05-03: Switched EdgeToEdge access from CommonJS `require()` to the plugin's ESM entry so Android WebView bundles can initialize without browser-side `require` failures.
  * @updated 2026-04-20: Cached per-image analysis results so background opacity tweaks no longer trigger redundant mobile image sampling.
  * @updated 2026-07-22: Keeps the native status bar black while the app is in dark mode.
+ * @updated 2026-07-22: Applies the direct native surface before optional EdgeToEdge updates so a bridge failure cannot leave the status bar stale.
+ * @updated 2026-07-22: Reads the resolved display mode during initialization so dark mode never flashes back to a light status bar.
  */
 
 import { EdgeToEdge } from '@capawesome/capacitor-android-edge-to-edge-support';
@@ -38,8 +40,10 @@ class StatusBarService {
     private currentBackgroundUrl: string | null = null;
 
     private async applyAndroidStatusBarAppearance(color: string, lightIcons: boolean): Promise<void> {
-        await applyAndroidEdgeToEdgeBackgroundColor(EdgeToEdge, color);
         await NativeStatusBarAppearance.apply({ color, lightIcons });
+        await applyAndroidEdgeToEdgeBackgroundColor(EdgeToEdge, color).catch((error) => {
+            console.warn('Failed to update EdgeToEdge background color:', error);
+        });
     }
 
     /**
@@ -56,9 +60,14 @@ class StatusBarService {
 
         try {
             // Android: 使用 EdgeToEdge 设置透明状态栏
-            if (platform === 'android' && EdgeToEdge) {
+            const isDarkMode = document.documentElement.getAttribute('data-theme-mode') === 'dark';
+
+            if (platform === 'android') {
                 // 设置状态栏背景为透明
-                await this.applyAndroidStatusBarAppearance(MANAGED_ANDROID_STATUS_BAR_BACKGROUND, false);
+                await this.applyAndroidStatusBarAppearance(
+                    isDarkMode ? DARK_ANDROID_STATUS_BAR_BACKGROUND : MANAGED_ANDROID_STATUS_BAR_BACKGROUND,
+                    isDarkMode
+                );
                 console.log('✅ Android: Status bar set to transparent');
             }
             
@@ -69,8 +78,9 @@ class StatusBarService {
             }
             
             // 设置默认图标样式
-            await StatusBar.setStyle({ style: Style.Light });
-            this.currentStyle = Style.Light;
+            const initialStyle = isDarkMode ? Style.Dark : Style.Light;
+            await StatusBar.setStyle({ style: initialStyle });
+            this.currentStyle = initialStyle;
             
             this.isInitialized = true;
             new MutationObserver(() => {
@@ -177,7 +187,7 @@ class StatusBarService {
             const isDarkMode = document.documentElement.getAttribute('data-theme-mode') === 'dark';
 
             if (isDarkMode) {
-                if (platform === 'android' && EdgeToEdge) {
+                if (platform === 'android') {
                     await this.applyAndroidStatusBarAppearance(DARK_ANDROID_STATUS_BAR_BACKGROUND, true);
                 } else if (platform === 'ios') {
                     await StatusBar.setOverlaysWebView({ overlay: true });
@@ -188,7 +198,7 @@ class StatusBarService {
             }
 
             // 确保状态栏背景保持透明
-            if (platform === 'android' && EdgeToEdge) {
+            if (platform === 'android') {
                 await this.applyAndroidStatusBarAppearance(MANAGED_ANDROID_STATUS_BAR_BACKGROUND, false);
             } else if (platform === 'ios') {
                 await StatusBar.setOverlaysWebView({ overlay: true });
@@ -240,7 +250,7 @@ class StatusBarService {
     async reset(): Promise<void> {
         const platform = Capacitor.getPlatform();
         
-        if (platform === 'android' && EdgeToEdge) {
+        if (platform === 'android') {
             await this.applyAndroidStatusBarAppearance(MANAGED_ANDROID_STATUS_BAR_BACKGROUND, false);
         } else if (platform === 'ios') {
             await StatusBar.setOverlaysWebView({ overlay: true });

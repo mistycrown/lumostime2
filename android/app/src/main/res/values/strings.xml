@@ -24,5 +24,6 @@
     <string name="widget_label_todo_pin_4x2">TODO + PIN 4x2</string>
     <string name="widget_label_todo_pin_4x3">TODO + PIN 4x3</string>
     <string name="widget_label_quick_todo_4x2">&#x5C0F;&#x4E8B; 4x2</string>
+    <string name="widget_label_quick_todo_4x3">&#x5C0F;&#x4E8B; 4x3</string>
     <string name="widget_label_scene_4x3">&#x573A;&#x666F; 4x3</string>
 </resources>

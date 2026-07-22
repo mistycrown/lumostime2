@@ -1,16 +1,17 @@
 /**
  * @file NativeStatusBarAppearancePlugin.java
  * @input Status-bar color plus light-icon preference from the Web layer
- * @output Android Window status-bar color and icon appearance
+ * @output Android root backdrop color and status-bar icon appearance
  * @pos Native Plugin
- * @description Applies status-bar appearance directly to the Android Window so edge-to-edge WebView layout does not leave a stale system-bar color.
- * @updated 2026-07-22: Added native bridge for display-mode status-bar synchronization.
+ * @description Paints the transparent system-bar backdrop through the Android root view while updating icon appearance.
+ * @updated 2026-07-22: Uses a dedicated top-inset backdrop so Android 15's transparent status bar has a deterministic color.
  */
 package com.mistycrown.lumostime;
 
 import android.graphics.Color;
+import android.util.Log;
 import android.view.View;
-import android.view.Window;
+import android.view.ViewGroup;
 
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
@@ -22,6 +23,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 @CapacitorPlugin(name = "NativeStatusBarAppearance")
 public class NativeStatusBarAppearancePlugin extends Plugin {
+    private static final String TAG = "NativeStatusBarAppearance";
 
     @PluginMethod
     public void apply(PluginCall call) {
@@ -40,13 +42,24 @@ public class NativeStatusBarAppearancePlugin extends Plugin {
 
         getActivity().runOnUiThread(() -> {
             try {
-                Window window = getActivity().getWindow();
-                View decorView = window.getDecorView();
-                WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, decorView);
-                window.setStatusBarColor(Color.parseColor(color));
+                int parsedColor = Color.parseColor(color);
+                View decorView = getActivity().getWindow().getDecorView();
+                ViewGroup contentView = getActivity().findViewById(android.R.id.content);
+                WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getActivity().getWindow(), decorView);
+
+                // Android 15 renders the status bar transparently. The color must come from
+                // the root view behind it instead of Window#setStatusBarColor.
+                decorView.setBackgroundColor(parsedColor);
+                if (contentView != null) {
+                    contentView.setBackgroundColor(parsedColor);
+                }
+                if (getActivity() instanceof MainActivity) {
+                    ((MainActivity) getActivity()).setStatusBarBackdropColor(parsedColor);
+                }
                 if (controller != null) {
                     controller.setAppearanceLightStatusBars(!lightIcons);
                 }
+                Log.d(TAG, "Applied status bar color=" + color + ", lightIcons=" + lightIcons);
                 call.resolve();
             } catch (Exception exception) {
                 call.reject(exception.getMessage());
