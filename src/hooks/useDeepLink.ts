@@ -59,7 +59,8 @@ export const useDeepLink = (
   handleStartActivity: (activity: any, categoryId: string, todoId?: string, scopeIdOrIds?: string | string[], note?: string) => void,
   handleStopActivity: (sessionId: string) => void,
   handleRequestStopActivity: (sessionId: string) => void,
-  handleWidgetShortcutAction?: (action: ShortcutWidgetAction) => void
+  handleWidgetShortcutAction?: (action: ShortcutWidgetAction) => void,
+  handleOpenQuickTodoAdd?: () => void
 ) => {
   const { categories } = useCategoryScope();
   const { activeSessions } = useSession();
@@ -78,6 +79,7 @@ export const useDeepLink = (
   const stopActivityRef = useRef(handleStopActivity);
   const requestStopActivityRef = useRef(handleRequestStopActivity);
   const widgetShortcutActionRef = useRef(handleWidgetShortcutAction);
+  const openQuickTodoAddRef = useRef(handleOpenQuickTodoAdd);
   const addToastRef = useRef(addToast);
   const setDailyReviewsRef = useRef(setDailyReviews);
   const lastHandledUrlRef = useRef<{ key: string; timestamp: number } | null>(null);
@@ -114,6 +116,10 @@ export const useDeepLink = (
   useEffect(() => {
     widgetShortcutActionRef.current = handleWidgetShortcutAction;
   }, [handleWidgetShortcutAction]);
+
+  useEffect(() => {
+    openQuickTodoAddRef.current = handleOpenQuickTodoAdd;
+  }, [handleOpenQuickTodoAdd]);
 
   useEffect(() => {
     addToastRef.current = addToast;
@@ -199,6 +205,11 @@ export const useDeepLink = (
       actId: string,
       toggleExisting: boolean
     ) => {
+      if (parsedUrl.type === 'quick_todo') {
+        openQuickTodoAddRef.current?.();
+        return true;
+      }
+
       const { categories: currentCategories, activeSessions: currentActiveSessions } = latestStateRef.current;
       const category = currentCategories.find((entry) => entry.id === catId);
       const activity = category?.activities.find((entry) => entry.id === actId);

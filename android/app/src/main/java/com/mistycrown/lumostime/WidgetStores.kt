@@ -8,6 +8,7 @@ import org.json.JSONObject
 /**
  * SharedPreferences-backed storage for widget templates, instance bindings, runtime state,
  * pending imports, and the daily widget's mirrored review snapshot.
+ * Updated 2026-07-22: Persists queued TODAY + PIN checkbox changes until the app writes them back to todo storage.
  * Updated 2026-05-21: Expanded TODAY + PIN payload storage to persist mirrored todo `maybeDates` and recurrence `skipDates`, keeping native rebuild visibility aligned with the app's today schedule.
  * Updated 2026-05-02: Added scene widget payload storage plus per-instance selected-tab persistence.
  * Updated 2026-05-05: Added scene-widget morning refresh date tracking so the first morning unlock only refreshes once per day.
@@ -20,6 +21,7 @@ object WidgetStores {
     private const val KEY_RUNTIME = "runtime_v1"
     private const val KEY_PENDING_ACTIONS = "pending_actions_v1"
     private const val KEY_PENDING_DAILY_ACTIONS = "pending_daily_actions_v1"
+    private const val KEY_PENDING_TODO_PIN_ACTIONS = "pending_todo_pin_actions_v1"
     private const val KEY_DAILY_SYNC = "daily_sync_v1"
     private const val KEY_DAILY_RUNTIME_SYNC = "daily_runtime_sync_v1"
     private const val KEY_TODO_PIN_SYNC = "todo_pin_sync_v1"
@@ -517,6 +519,38 @@ object WidgetStores {
 
         val remaining = loadPendingDailyActions(context).filterNot { ids.contains(it.id) }
         savePendingDailyActions(context, remaining)
+    }
+
+    fun loadPendingTodoPinActions(context: Context): List<WidgetPendingTodoPinAction> {
+        val raw = prefs(context).getString(KEY_PENDING_TODO_PIN_ACTIONS, null)
+        if (raw.isNullOrBlank()) return emptyList()
+        return runCatching {
+            val array = JSONArray(raw)
+            buildList {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    add(WidgetPendingTodoPinAction(
+                        id = item.getString("id"),
+                        todoId = item.getString("todoId"),
+                        isCompleted = item.optBoolean("isCompleted", false),
+                        createdAt = item.getLong("createdAt")
+                    ))
+                }
+            }
+        }.getOrElse { emptyList() }
+    }
+
+    fun appendPendingTodoPinAction(context: Context, action: WidgetPendingTodoPinAction) {
+        val actions = loadPendingTodoPinActions(context)
+            .filterNot { it.todoId == action.todoId }
+            .toMutableList()
+        actions.add(action)
+        savePendingTodoPinActions(context, actions)
+    }
+
+    fun clearPendingTodoPinActions(context: Context, ids: Set<String>) {
+        if (ids.isEmpty()) return
+        savePendingTodoPinActions(context, loadPendingTodoPinActions(context).filterNot { ids.contains(it.id) })
     }
 
     fun loadDailySyncPayload(context: Context): WidgetDailySyncPayload? {
@@ -1065,6 +1099,19 @@ object WidgetStores {
         prefs(context).edit().putString(KEY_PENDING_DAILY_ACTIONS, array.toString()).commit()
     }
 
+    private fun savePendingTodoPinActions(context: Context, actions: List<WidgetPendingTodoPinAction>) {
+        val array = JSONArray()
+        actions.forEach { action ->
+            array.put(JSONObject().apply {
+                put("id", action.id)
+                put("todoId", action.todoId)
+                put("isCompleted", action.isCompleted)
+                put("createdAt", action.createdAt)
+            })
+        }
+        prefs(context).edit().putString(KEY_PENDING_TODO_PIN_ACTIONS, array.toString()).commit()
+    }
+
     private fun pruneStaleBindings(
         context: Context,
         bindings: List<WidgetInstanceBinding>
@@ -1461,6 +1508,7 @@ object WidgetStores {
                     WidgetTodoPinItem(
                         todoId = todoId,
                         title = title,
+                        isCompleted = item.optBoolean("isCompleted", false),
                         badgeLabel = parseNullableString(item.optString("badgeLabel")) ?: "TODAY",
                         categoryId = parseNullableString(item.optString("categoryId")),
                         activityId = parseNullableString(item.optString("activityId")),
@@ -1480,6 +1528,7 @@ object WidgetStores {
             array.put(JSONObject().apply {
                 put("todoId", item.todoId)
                 put("title", item.title)
+                put("isCompleted", item.isCompleted)
                 put("badgeLabel", item.badgeLabel)
                 put("categoryId", item.categoryId ?: JSONObject.NULL)
                 put("activityId", item.activityId ?: JSONObject.NULL)
@@ -1506,6 +1555,7 @@ object WidgetStores {
                     WidgetTodoPinSourceTodo(
                         id = id,
                         title = title,
+                        kind = parseNullableString(item.optString("kind")) ?: "project",
                         isCompleted = item.optBoolean("isCompleted", false),
                         parentTodoId = parseNullableString(item.optString("parentTodoId")),
                         linkedCategoryId = parseNullableString(item.optString("linkedCategoryId")),
@@ -1586,6 +1636,7 @@ object WidgetStores {
             array.put(JSONObject().apply {
                 put("id", item.id)
                 put("title", item.title)
+                put("kind", item.kind)
                 put("isCompleted", item.isCompleted)
                 put("parentTodoId", item.parentTodoId ?: JSONObject.NULL)
                 put("linkedCategoryId", item.linkedCategoryId ?: JSONObject.NULL)

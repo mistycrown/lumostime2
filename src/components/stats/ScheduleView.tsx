@@ -11,6 +11,7 @@
  * 3. Month - 月度热力图（使用 MonthHeatmap 组件）
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-07-22: Added semantic hooks for dark-mode schedule grids, time rails, headers, and event labels.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -26,6 +27,7 @@ import {
   generateWeekDays
 } from '../../utils/scheduleUtils';
 import { getScheduleStyle } from '../../utils/chartUtils';
+import { getChartStrokeColor } from '../../utils/colorAdapterUtils';
 
 export interface ScheduleViewProps {
   filteredLogs: Log[];
@@ -129,7 +131,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     const layout = layoutDayEvents(filteredLogs);
     
     return (
-      <div className={`animate-in fade-in zoom-in-95 duration-300 ${isFullScreen ? 'flex-1 flex flex-col' : 'flex-1 flex flex-col px-5'}`}>
+      <div className={`stats-schedule-view animate-in fade-in zoom-in-95 duration-300 ${isFullScreen ? 'flex-1 flex flex-col' : 'flex-1 flex flex-col px-5'}`}>
         <div 
           ref={containerRef}
           className={containerClasses}
@@ -139,11 +141,11 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         >
           <div className="relative w-full flex" style={{ minHeight: TOTAL_HEIGHT }}>
             {/* Hour Labels */}
-            <div className="w-12 border-r border-stone-100 bg-stone-50/50 relative shrink-0 sticky left-0 z-10" style={{ minHeight: TOTAL_HEIGHT }}>
+            <div className="schedule-time-rail w-12 border-r border-stone-100 bg-stone-50/50 relative shrink-0 sticky left-0 z-10" style={{ minHeight: TOTAL_HEIGHT }}>
               {Array.from({ length: 24 }, (_, i) => (
                 <div 
                   key={i} 
-                  className="absolute w-full text-xs font-medium text-stone-400 font-mono text-center pt-1" 
+                  className="schedule-time-label absolute w-full text-xs font-medium text-stone-400 font-mono text-center pt-1"
                   style={{ top: i * HOUR_HEIGHT }}
                 >
                   {i}:00
@@ -157,7 +159,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
               {Array.from({ length: 24 }, (_, h) => (
                 <div 
                   key={h} 
-                  className="absolute w-full border-b border-stone-50" 
+                  className="schedule-grid-line absolute w-full border-b border-stone-50"
                   style={{ top: h * HOUR_HEIGHT, height: HOUR_HEIGHT }} 
                 />
               ))}
@@ -185,14 +187,15 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 return (
                   <div 
                     key={log.id} 
-                    className={`${dayEventFrameClassName} ${stylePresentation.className}`}
+                    className={`schedule-event schedule-event-${scheduleStyle} ${dayEventFrameClassName} ${stylePresentation.className}`}
                     style={{ 
                       ...stylePresentation.style,
+                      '--schedule-accent': getChartStrokeColor(act?.color || cat?.themeColor),
                       top: top + 1, 
                       height: height, 
                       left: `calc(${lay.left} + 2px)`, 
                       width: `calc(${lay.width} - 4px)` 
-                    }}
+                    } as React.CSSProperties}
                   >
                     <span className="font-bold text-[11px] leading-tight block truncate">
                       {act?.name || cat?.name}
@@ -227,16 +230,16 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     const weekDays = generateWeekDays(rangeStart);
 
     return (
-      <div className={`animate-in fade-in zoom-in-95 duration-300 ${isFullScreen ? 'flex-1 flex flex-col' : 'flex-1 flex flex-col px-5'}`}>
+      <div className={`stats-schedule-view animate-in fade-in zoom-in-95 duration-300 ${isFullScreen ? 'flex-1 flex flex-col' : 'flex-1 flex flex-col px-5'}`}>
         {/* Week Header - 与背景色一致，紧贴顶部无缝隙 */}
-        <div className={`flex border-b border-stone-100 shrink-0 sticky top-0 z-30 ${
+        <div className={`schedule-week-header flex border-b border-stone-100 shrink-0 sticky top-0 z-30 ${
           isFullScreen ? 'bg-stone-50' : 'bg-[#faf9f6]'
         }`}>
-          <div className={`w-10 shrink-0 border-r border-stone-100 ${isFullScreen ? 'bg-stone-50' : 'bg-[#faf9f6]'}`}></div>
+          <div className={`schedule-week-corner w-10 shrink-0 border-r border-stone-100 ${isFullScreen ? 'bg-stone-50' : 'bg-[#faf9f6]'}`}></div>
           {weekDays.map((d, i) => (
             <div 
               key={i} 
-              className={`flex-1 text-center py-2 border-r border-stone-100 last:border-none ${
+              className={`schedule-week-day flex-1 text-center py-2 border-r border-stone-100 last:border-none ${
                 d.toDateString() === new Date().toDateString() 
                   ? 'bg-stone-100' 
                   : isFullScreen ? 'bg-stone-50' : 'bg-[#faf9f6]'
@@ -264,11 +267,11 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         >
           <div className="relative w-full" style={{ minHeight: TOTAL_HEIGHT }}>
             {/* Hour Labels */}
-            <div className="absolute left-0 top-0 bottom-0 w-10 border-r border-stone-100 bg-stone-50/50 z-10">
+            <div className="schedule-time-rail absolute left-0 top-0 bottom-0 w-10 border-r border-stone-100 bg-stone-50/50 z-10">
               {Array.from({ length: 24 }, (_, i) => (
                 <div 
                   key={i} 
-                  className="absolute w-full text-[10px] text-stone-300 font-mono text-center pt-1" 
+                  className="schedule-time-label absolute w-full text-[10px] text-stone-300 font-mono text-center pt-1"
                   style={{ top: i * HOUR_HEIGHT }}
                 >
                   {i}
@@ -283,7 +286,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 {Array.from({ length: 24 }, (_, h) => (
                   <div 
                     key={h} 
-                    className="w-full border-b border-stone-50" 
+                    className="schedule-grid-line w-full border-b border-stone-50"
                     style={{ top: h * HOUR_HEIGHT, height: HOUR_HEIGHT, position: 'absolute' }} 
                   />
                 ))}
@@ -297,7 +300,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 return (
                   <div 
                     key={i} 
-                    className="flex-1 border-r border-stone-50 relative last:border-none" 
+                    className="schedule-day-column flex-1 border-r border-stone-50 relative last:border-none"
                     style={{ minHeight: TOTAL_HEIGHT }}
                   >
                     {dayLogs.map(log => {
@@ -320,14 +323,15 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                       return (
                         <div 
                           key={log.id} 
-                          className={`${weekEventFrameClassName} ${stylePresentation.className}`}
+                          className={`schedule-event schedule-event-${scheduleStyle} ${weekEventFrameClassName} ${stylePresentation.className}`}
                           style={{ 
                             ...stylePresentation.style,
+                            '--schedule-accent': getChartStrokeColor(act?.color || cat?.themeColor),
                             top: top + 1, 
                             height: height, 
                             left: lay.left, 
                             width: `calc(${lay.width} - 2px)` 
-                          }}
+                          } as React.CSSProperties}
                         >
                           <span className={`font-bold block w-full leading-tight truncate ${
                             height < 20 ? 'text-[9px]' : 'text-[11px]'
@@ -363,7 +367,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
   // Month View (Heatmap)
   return (
-    <div className={`animate-in fade-in zoom-in-95 duration-300 ${isFullScreen ? 'flex-1 flex flex-col' : ''}`}>
+    <div className={`stats-schedule-view animate-in fade-in zoom-in-95 duration-300 ${isFullScreen ? 'flex-1 flex flex-col' : ''}`}>
       <div 
         className={`${containerClasses} p-1`} 
         style={{ minHeight: isFullScreen ? '100%' : '700px', height: isFullScreen ? '100%' : 'auto' }}

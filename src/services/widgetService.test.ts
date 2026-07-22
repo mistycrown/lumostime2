@@ -4,6 +4,7 @@
  * @output Regression coverage for pinned/recurring TODAY + PIN widget payload items and native refresh bindings
  * @pos Test (widget service)
  * @description Verifies pinned and recurring-today todos can populate the TODAY + PIN widget payload, preserves mirrored source snapshots for native rebuilds, and guards the dedicated refresh-button wiring.
+ * @updated 2026-07-22: Covers completed TODAY + PIN todos remaining visible after unfinished rows with completion state included in the native payload.
  * @updated 2026-05-21: Added TODAY + PIN native-rebuild regression coverage for mirrored `maybeDates` and recurrence `skipDates` so Android widget refreshes match app-side today visibility.
  * @updated 2026-04-27: Added regression coverage so recurring todos that match today are included in the TODAY + PIN widget payload.
  * @updated 2026-04-26: Added regression coverage for pinned todo actionability and removed header click bindings from the dedicated TODAY + PIN widgets.
@@ -100,6 +101,23 @@ const buildTodo = (overrides: Partial<TodoItem>): TodoItem => ({
 });
 
 describe('buildTodoPinWidgetPayload', () => {
+  it('keeps completed today todos after unfinished todos with their completion state', () => {
+    const payload = buildTodoPinWidgetPayload({
+      todos: [
+        buildTodo({ id: 'completed', title: 'Completed', pin: true, isCompleted: true }),
+        buildTodo({ id: 'unfinished', title: 'Unfinished', pin: true, isCompleted: false })
+      ],
+      categories,
+      date: REFERENCE_DATE,
+      now: 123456789
+    });
+
+    expect(payload.items).toEqual([
+      expect.objectContaining({ todoId: 'unfinished', isCompleted: false }),
+      expect.objectContaining({ todoId: 'completed', isCompleted: true })
+    ]);
+  });
+
   it('keeps pinned todos startable when they inherit linked activity metadata from the parent todo', () => {
     const todos: TodoItem[] = [
       buildTodo({
@@ -126,6 +144,7 @@ describe('buildTodoPinWidgetPayload', () => {
     expect(payload.items).toHaveLength(1);
     expect(payload.items[0]).toMatchObject({
       todoId: 'child-pinned-todo',
+      title: 'Pinned child todo · Parent todo',
       badgeLabel: 'PIN',
       categoryId: 'focus-category',
       activityId: 'writing-activity',

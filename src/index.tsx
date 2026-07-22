@@ -4,6 +4,7 @@
  * @output Mounted React Application
  * @pos Entry Point (Bootstrapping)
  * @description The entry point that mounts the React App component, keeps the native loading screen until data hydration is ready, and handles polyfills.
+ * @updated 2026-07-22: Desktop widget renderer windows now opt out of the main app's global dark-mode attribute.
  * @updated 2026-05-17: 扩展了桌面小组件的分流路由逻辑，新增对 DesktopTimerWidgetView（计时器小组件）的渲染路由分发。
  * @updated 2026-05-17: 扩展了桌面小组件的分流路由逻辑，新增对 DesktopQuickWidgetView（小事清单小组件）的渲染路由分发。
  * @updated 2026-05-17: Added a dedicated transparent desktop quick-editor window route to the widget boot switch.
@@ -60,9 +61,20 @@ const root = ReactDOM.createRoot(rootElement);
 console.info(
   `[RendererBoot] React root created at ${(getRendererBootTimingNow() - rendererBootStartedAt).toFixed(1)}ms after index evaluation`
 );
+const isDesktopWidgetRenderer = isDesktopWidgetWindow();
+
+if (isDesktopWidgetRenderer) {
+  const disableGlobalThemeMode = () => document.documentElement.removeAttribute('data-theme-mode');
+  disableGlobalThemeMode();
+  new MutationObserver(disableGlobalThemeMode).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme-mode']
+  });
+}
+
 root.render(
   <React.StrictMode>
-    {isDesktopWidgetWindow() ? (
+    {isDesktopWidgetRenderer ? (
       getDesktopWidgetType() === 'month' ? (
         <DesktopMonthWidgetView />
       ) : getDesktopWidgetType() === 'quick' ? (

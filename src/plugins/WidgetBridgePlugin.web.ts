@@ -17,6 +17,7 @@ import type {
   WidgetBridgeInstanceBinding,
   WidgetBridgePendingAction,
   WidgetBridgePendingDailyAction,
+  WidgetBridgePendingTodoPinAction,
   WidgetBridgePlugin,
   WidgetBridgeScenePayload,
   WidgetBridgeRuntimeState,
@@ -53,6 +54,12 @@ export class WidgetBridgeWeb extends WebPlugin implements WidgetBridgePlugin {
   }
 
   async clearPendingDailyActions(): Promise<void> {}
+
+  async getPendingTodoPinActions(): Promise<{ actions: WidgetBridgePendingTodoPinAction[] }> {
+    return { actions: [] };
+  }
+
+  async clearPendingTodoPinActions(): Promise<void> {}
 
   async syncDailyWidgetData(_options?: { payload: WidgetBridgeDailySyncPayload | null }): Promise<void> {}
 

@@ -6,6 +6,7 @@
  * @description Displays interactive alert cards for different goal statuses. Supports both independent goals and goals within a major goal series.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-07-22: Added shared dark-mode hooks for goal status alert surfaces and actions.
  */
 import React from 'react';
 import confetti from 'canvas-confetti';
@@ -82,7 +83,7 @@ export const GoalStatusAlert: React.FC<GoalStatusAlertProps> = ({
     if (isArchived) {
       // 第二步：引导创建新目标
       return (
-        <div className="rounded-xl p-4 mb-4" style={{ 
+        <div className="goal-status-alert rounded-xl p-4 mb-4" style={{
           backgroundColor: 'color-mix(in srgb, var(--accent-color) 8%, white)',
           borderColor: 'color-mix(in srgb, var(--accent-color) 20%, white)',
           borderWidth: '1px'
@@ -142,7 +143,7 @@ export const GoalStatusAlert: React.FC<GoalStatusAlertProps> = ({
     const controlRate = isLimitGoal ? ((progress.target - progress.current) / progress.target * 100).toFixed(0) : 0;
 
     return (
-      <div className="rounded-xl p-4 mb-4" style={{ 
+      <div className="goal-status-alert rounded-xl p-4 mb-4" style={{
         backgroundColor: 'color-mix(in srgb, var(--accent-color) 8%, white)',
         borderColor: 'color-mix(in srgb, var(--accent-color) 20%, white)',
         borderWidth: '1px'
@@ -217,7 +218,7 @@ export const GoalStatusAlert: React.FC<GoalStatusAlertProps> = ({
     const complementColor = '#e67e22'; // 橙色作为互补色
 
     return (
-      <div className="rounded-xl p-4 mb-4" style={{ 
+      <div className="goal-status-alert rounded-xl p-4 mb-4" style={{
         backgroundColor: 'color-mix(in srgb, #e67e22 8%, white)',
         borderColor: 'color-mix(in srgb, #e67e22 20%, white)',
         borderWidth: '1px'

@@ -74,6 +74,10 @@ public class WidgetTodoPinRemoteViewsService extends RemoteViewsService {
 
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_todo_pin_list_item);
             views.setTextViewText(R.id.widget_todo_pin_title, item.getTitle());
+            views.setImageViewResource(
+                    R.id.widget_todo_pin_checkbox,
+                    item.isCompleted() ? R.drawable.widget_todo_pin_checkbox_checked : R.drawable.widget_todo_pin_checkbox_unchecked
+            );
             views.setViewVisibility(
                     R.id.widget_todo_pin_button_start,
                     isActionable && !isRunning ? View.VISIBLE : View.GONE
@@ -96,6 +100,12 @@ public class WidgetTodoPinRemoteViewsService extends RemoteViewsService {
             fillInIntent.putExtra(WidgetTodoPinProviderSupport.EXTRA_TODO_ID, item.getTodoId());
             views.setOnClickFillInIntent(R.id.widget_todo_pin_row, fillInIntent);
             views.setOnClickFillInIntent(R.id.widget_todo_pin_action_button, fillInIntent);
+            Intent completionFillInIntent = new Intent(fillInIntent);
+            completionFillInIntent.putExtra(
+                    WidgetTodoPinProviderSupport.EXTRA_TODO_PIN_ACTION,
+                    WidgetTodoPinProviderSupport.TODO_PIN_ACTION_COMPLETE
+            );
+            views.setOnClickFillInIntent(R.id.widget_todo_pin_checkbox, completionFillInIntent);
             return views;
         }
 

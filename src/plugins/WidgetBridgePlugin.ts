@@ -194,6 +194,7 @@ export interface WidgetBridgeDailyRuntimePayload {
 export interface WidgetBridgeTodoPinItem {
   todoId: string;
   title: string;
+  isCompleted: boolean;
   badgeLabel: 'TODAY' | 'PIN';
   categoryId: string | null;
   activityId: string | null;
@@ -217,6 +218,7 @@ export interface WidgetBridgeTodoPinSourceRecurrenceRule {
 export interface WidgetBridgeTodoPinSourceTodo {
   id: string;
   title: string;
+  kind?: 'quick' | 'project';
   isCompleted: boolean;
   parentTodoId?: string | null;
   linkedCategoryId?: string | null;
@@ -249,6 +251,13 @@ export interface WidgetBridgeTodoPinPayload {
   syncedAt: number;
   sourceTodos?: WidgetBridgeTodoPinSourceTodo[];
   sourceCategories?: WidgetBridgeTodoPinSourceCategory[];
+}
+
+export interface WidgetBridgePendingTodoPinAction {
+  id: string;
+  todoId: string;
+  isCompleted: boolean;
+  createdAt: number;
 }
 
 export interface WidgetBridgeTrackingCalendarEntry {
@@ -328,6 +337,8 @@ export interface WidgetBridgePlugin {
   syncRuntimeState(options: { runtimeState: WidgetBridgeRuntimeState | null }): Promise<void>;
   getPendingDailyActions(): Promise<{ actions: WidgetBridgePendingDailyAction[] }>;
   clearPendingDailyActions(options: { ids: string[] }): Promise<void>;
+  getPendingTodoPinActions(): Promise<{ actions: WidgetBridgePendingTodoPinAction[] }>;
+  clearPendingTodoPinActions(options: { ids: string[] }): Promise<void>;
   syncDailyWidgetData(options: { payload: WidgetBridgeDailySyncPayload | null }): Promise<void>;
   syncDailyRuntimeWidgetData(options: { payload: WidgetBridgeDailyRuntimePayload | null }): Promise<void>;
   syncTodoPinWidgetData(options: { payload: WidgetBridgeTodoPinPayload | null }): Promise<void>;

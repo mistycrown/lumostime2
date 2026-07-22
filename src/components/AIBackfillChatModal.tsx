@@ -378,6 +378,7 @@ interface AIBackfillChatModalProps {
   isOpen: boolean;
   onClose: () => void;
   displayMode?: 'modal' | 'desktop-widget';
+  forceLightTheme?: boolean;
   desktopWidgetTransitionPhase?: 'idle' | 'hiding' | 'showing';
   edgeHidden?: boolean;
   hiddenEdge?: 'left' | 'right' | null;
@@ -580,6 +581,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   isOpen,
   onClose,
   displayMode = 'modal',
+  forceLightTheme = false,
   desktopWidgetTransitionPhase = 'idle',
   edgeHidden = false,
   hiddenEdge = null,
@@ -768,8 +770,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const { addToast } = useToast();
   const { autoLinkRules, autoApplyAutoLinkRules, colorScheme, themeMode } = useSettings();
   const AI_CHAT_THEME = useMemo(
-    () => getAIChatTheme(colorScheme === 'default', themeMode === 'dark'),
-    [colorScheme, themeMode]
+    () => getAIChatTheme(colorScheme === 'default', !forceLightTheme && themeMode === 'dark'),
+    [colorScheme, forceLightTheme, themeMode]
   );
 
   const defaultTargetDate = useMemo(() => {

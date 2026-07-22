@@ -25,6 +25,7 @@ import java.util.Set;
 
 /**
  * Shared rendering and tap handling for the dedicated TODAY + PIN widgets.
+ * Updated 2026-07-22: Appends a subtask's parent title when rebuilding TODAY + PIN widget rows from mirrored sources.
  * Updated 2026-05-21: Matched native TODAY + PIN rebuild visibility to the app's today schedule helper, including `maybeDates` and recurrence `skipDates` suppression.
  */
 public final class WidgetTodoPinProviderSupport {
@@ -33,6 +34,8 @@ public final class WidgetTodoPinProviderSupport {
     public static final String ACTION_REFRESH_TODO_PIN =
             "com.mistycrown.lumostime.action.REFRESH_TODO_PIN";
     public static final String EXTRA_TODO_ID = "todo_pin_todo_id";
+    public static final String EXTRA_TODO_PIN_ACTION = "todo_pin_action";
+    public static final String TODO_PIN_ACTION_COMPLETE = "complete";
     private static final long TODO_PIN_REFRESH_ANIMATION_DURATION_MS = 420L;
 
     private WidgetTodoPinProviderSupport() {}
@@ -79,6 +82,12 @@ public final class WidgetTodoPinProviderSupport {
             );
             String todoId = intent.getStringExtra(EXTRA_TODO_ID);
             if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID && todoId != null && !todoId.trim().isEmpty()) {
+                if (TODO_PIN_ACTION_COMPLETE.equals(intent.getStringExtra(EXTRA_TODO_PIN_ACTION))) {
+                    if (toggleTodoCompletion(context, todoId)) {
+                        WidgetRefreshCoordinator.INSTANCE.refreshTodoPinWidgets(context);
+                    }
+                    return true;
+                }
                 WidgetTodoPinPayload payload = WidgetStores.INSTANCE.loadTodoPinPayload(context);
                 WidgetTodoPinItem item = findItem(payload, todoId);
                 if (item != null && item.isActionable()) {
@@ -292,9 +301,6 @@ public final class WidgetTodoPinProviderSupport {
 
         List<WidgetTodoPinSourceTodo> visibleTodos = new ArrayList<>();
         for (WidgetTodoPinSourceTodo todo : sourceTodos) {
-            if (todo.isCompleted()) {
-                continue;
-            }
             if (isTodoInAssociationTodayCategory(todo, targetDate)) {
                 visibleTodos.add(todo);
             }
@@ -303,6 +309,9 @@ public final class WidgetTodoPinProviderSupport {
         Collections.sort(visibleTodos, new Comparator<WidgetTodoPinSourceTodo>() {
             @Override
             public int compare(WidgetTodoPinSourceTodo left, WidgetTodoPinSourceTodo right) {
+                if (left.isCompleted() != right.isCompleted()) {
+                    return left.isCompleted() ? 1 : -1;
+                }
                 if (left.getPin() != right.getPin()) {
                     return left.getPin() ? -1 : 1;
                 }
@@ -320,7 +329,8 @@ public final class WidgetTodoPinProviderSupport {
             );
             items.add(new WidgetTodoPinItem(
                     todo.getId(),
-                    todo.getTitle(),
+                    formatTodoPinTitle(todo, todoById),
+                    todo.isCompleted(),
                     todo.getPin() ? "PIN" : "TODAY",
                     linkedTarget.categoryId,
                     linkedTarget.activityId,
@@ -331,6 +341,53 @@ public final class WidgetTodoPinProviderSupport {
             ));
         }
         return items;
+    }
+
+    public static boolean toggleTodoCompletion(Context context, String todoId) {
+        WidgetTodoPinPayload payload = WidgetStores.INSTANCE.loadTodoPinPayload(context);
+        if (payload == null) return false;
+
+        WidgetTodoPinSourceTodo target = null;
+        for (WidgetTodoPinSourceTodo todo : payload.getSourceTodos()) {
+            if (todoId.equals(todo.getId())) {
+                target = todo;
+                break;
+            }
+        }
+        if (target == null) return false;
+
+        boolean isCompleted = !target.isCompleted();
+        List<WidgetTodoPinSourceTodo> updatedSourceTodos = new ArrayList<>();
+        for (WidgetTodoPinSourceTodo todo : payload.getSourceTodos()) {
+            updatedSourceTodos.add(todoId.equals(todo.getId())
+                    ? new WidgetTodoPinSourceTodo(
+                            todo.getId(), todo.getTitle(), todo.getKind(), isCompleted, todo.getParentTodoId(),
+                            todo.getLinkedCategoryId(), todo.getLinkedActivityId(), todo.getDefaultScopeIds(),
+                            todo.getPin(), todo.getScheduledDate(), todo.getDeadlineDate(), todo.getMaybeDates(),
+                            todo.getRecurrenceRule())
+                    : todo);
+        }
+        WidgetTodoPinPayload updatedPayload = new WidgetTodoPinPayload(
+                payload.getDate(),
+                buildTodoPinItemsForDate(updatedSourceTodos, payload.getSourceCategories(), payload.getDate()),
+                System.currentTimeMillis(), updatedSourceTodos, payload.getSourceCategories());
+        WidgetStores.INSTANCE.saveTodoPinPayload(context, updatedPayload);
+        WidgetStores.INSTANCE.appendPendingTodoPinAction(context, new WidgetPendingTodoPinAction(
+                "todo-pin-" + todoId + "-" + System.currentTimeMillis(), todoId, isCompleted, System.currentTimeMillis()));
+        return true;
+    }
+
+    private static String formatTodoPinTitle(
+            WidgetTodoPinSourceTodo todo,
+            Map<String, WidgetTodoPinSourceTodo> todoById
+    ) {
+        String parentTodoId = todo.getParentTodoId();
+        WidgetTodoPinSourceTodo parentTodo = parentTodoId == null ? null : todoById.get(parentTodoId);
+        String parentTitle = parentTodo == null ? null : parentTodo.getTitle();
+        if (parentTitle == null || parentTitle.trim().isEmpty()) {
+            return todo.getTitle();
+        }
+        return String.format("%s %c %s", todo.getTitle(), 0x00B7, parentTitle.trim());
     }
 
     private static boolean isTodoInAssociationTodayCategory(

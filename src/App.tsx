@@ -589,6 +589,11 @@ const AppContent: React.FC = () => {
     setIsSettingsOpen
   ]);
 
+  const handleOpenQuickTodoAdd = React.useCallback(() => {
+    setCurrentView(AppView.TODO);
+    window.dispatchEvent(new Event('lumostime:open-quick-todo-add'));
+  }, [setCurrentView]);
+
   const handleDesktopWidgetAction = React.useCallback((action: DesktopWidgetBridgeAction) => {
     closeFiltersOverlay();
     setIsSettingsOpen(false);
@@ -694,7 +699,8 @@ const AppContent: React.FC = () => {
     handleStartActivityWrapper,
     handleStopActivityWrapper,
     handleRequestStopActivityWrapper,
-    handleWidgetShortcutAction
+    handleWidgetShortcutAction,
+    handleOpenQuickTodoAdd
   );
   useFloatingWindow(handleStopActivityWrapper);
   useAppDetection(handleStartActivityWrapper);

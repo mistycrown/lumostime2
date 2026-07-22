@@ -212,6 +212,7 @@ export const DesktopAIWidgetView: React.FC = () => {
         isOpen
         onClose={() => window.desktopWidget?.closeAI?.()}
         displayMode="desktop-widget"
+        forceLightTheme
         desktopWidgetTransitionPhase={transitionPhase}
         edgeHidden={windowState.isHiddenToEdge}
         hiddenEdge={windowState.hiddenEdge}

@@ -8,6 +8,7 @@
  * 修改历史:
  * - 2026-03-03: 数字类型（manual count）日课改为展示完成次数，而不是仅展示是否完成。
  * - 2026-03-03: 月视图中数字类型日课的完成天数改为按“达标天数（value >= target）”计算并渲染。
+ * - 2026-07-22: Added semantic hooks for dark-mode weekly, monthly, and yearly habit-stat grids.
  */
 
 import React from 'react';
@@ -59,7 +60,7 @@ export const CheckView: React.FC<CheckViewProps> = ({
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+    <div className="daily-check-stats space-y-6 animate-in fade-in zoom-in-95 duration-300">
       {/* Week View */}
       {pieRange === 'week' && (
         <div className="space-y-8">
@@ -103,7 +104,7 @@ export const CheckView: React.FC<CheckViewProps> = ({
                                   ? `${date.toLocaleDateString()} ${countValue}次`
                                   : `${date.toLocaleDateString()} ${isChecked ? '已完成' : '未完成'}${detail ? ` (${detail.value}/${detail.target}次)` : ''}`
                                 }
-                                className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all ${
+                                className={`daily-check-week-cell ${isChecked ? 'daily-check-cell-complete' : ''} w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all ${
                                   isChecked
                                     ? `${style.fill} ${style.text}`
                                     : 'bg-white border border-stone-200'
@@ -146,7 +147,7 @@ export const CheckView: React.FC<CheckViewProps> = ({
             const completionPercent = Math.round((completedDisplay / (checkStats.allDays.length || 1)) * 100);
 
             return (
-              <div key={`${cat.name}-${habit.name}`} className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 flex flex-col">
+              <div key={`${cat.name}-${habit.name}`} className="daily-check-stat-card bg-white rounded-2xl p-4 shadow-sm border border-stone-100 flex flex-col">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
@@ -184,7 +185,7 @@ export const CheckView: React.FC<CheckViewProps> = ({
                               title={isCountMode
                                 ? `${dayStr} ${countValue}/${targetValue}次${isChecked ? '（达标）' : '（未达标）'}`
                                 : (detail ? `${dayStr} ${detail.value}/${detail.target}次` : dayStr)}
-                              className={`aspect-square rounded-md flex items-center justify-center text-[10px] font-medium transition-colors ${
+                              className={`daily-check-month-cell ${isChecked ? 'daily-check-cell-complete' : ''} aspect-square rounded-md flex items-center justify-center text-[10px] font-medium transition-colors ${
                                 isChecked ? `${style.fill} text-white` : 'bg-stone-50 text-stone-300'
                               }`}
                             >
@@ -232,7 +233,7 @@ export const CheckView: React.FC<CheckViewProps> = ({
               : habit.stats.checked;
 
             return (
-              <div key={`${cat.name}-${habit.name}`} className="bg-white rounded-xl py-4 shadow-sm border border-stone-100 overflow-hidden">
+              <div key={`${cat.name}-${habit.name}`} className="daily-check-stat-card bg-white rounded-xl py-4 shadow-sm border border-stone-100 overflow-hidden">
                 <div className="flex items-center gap-3 mb-4 px-4">
                   <IconRenderer
                     icon={habit.icon}
@@ -282,7 +283,7 @@ export const CheckView: React.FC<CheckViewProps> = ({
                                     ? `${dayStr} ${countValue}次`
                                     : `${dayStr}${isChecked ? ' 已完成' : ''}${detail ? ` (${detail.value}/${detail.target}次)` : ''}`
                                   }
-                                  className={`w-3 h-3 rounded-[2px] transition-colors flex items-center justify-center ${
+                                  className={`daily-check-year-cell ${isChecked ? 'daily-check-cell-complete' : ''} w-3 h-3 rounded-[2px] transition-colors flex items-center justify-center ${
                                     isChecked
                                       ? style.fill
                                       : 'bg-stone-100'

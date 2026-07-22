@@ -4,6 +4,7 @@
  * @output Widget template persistence helpers and app/native conversion utilities
  * @pos Service
  * @description Centralizes the shared types and conversions used by the Android widget system while keeping timer, daily, and shortcut slots on one contract.
+ * @updated 2026-07-22: Appends the parent todo title to TODAY + PIN widget subtask titles so nested items remain identifiable in the Android widget.
  * @updated 2026-05-21: Mirrored todo `maybeDates` plus recurrence `skipDates` into TODAY + PIN native source snapshots so Android widget refreshes stay aligned with the app's current-day schedule rows.
  * @updated 2026-05-13: Mirrored monthly recurrence month-end fallback metadata into widget todo snapshots so native refreshes keep the same monthly matching semantics.
  * @updated 2026-04-25: Added DAILY_RUNTIME dual-view payload builders so native heatmap widgets can toggle between category and activity coloring.
@@ -1289,10 +1290,19 @@ export const buildDailyRuntimeWidgetPayload = ({
 const TODO_PIN_BADGE_PIN: WidgetBridgeTodoPinItem['badgeLabel'] = 'PIN';
 const TODO_PIN_BADGE_TODAY: WidgetBridgeTodoPinItem['badgeLabel'] = 'TODAY';
 
+const formatTodoPinTitle = (todo: TodoItem, todos: TodoItem[]): string => {
+  const parentTitle = todo.parentTodoId
+    ? todos.find((item) => item.id === todo.parentTodoId)?.title.trim()
+    : null;
+
+  return parentTitle ? `${todo.title} · ${parentTitle}` : todo.title;
+};
+
 const buildTodoPinSourceTodos = (todos: TodoItem[]): WidgetBridgeTodoPinSourceTodo[] =>
   todos.map((todo) => ({
     id: todo.id,
     title: todo.title,
+    kind: todo.kind === 'quick' ? 'quick' : 'project',
     isCompleted: todo.isCompleted,
     parentTodoId: todo.parentTodoId ?? null,
     linkedCategoryId: todo.linkedCategoryId ?? null,
@@ -1397,7 +1407,7 @@ export const buildTodoPinWidgetPayload = ({
   date?: Date;
   now?: number;
 }): WidgetBridgeTodoPinPayload => {
-  const visibleTodos = getTodoAssociationTodayTodos(todos, date);
+  const visibleTodos = getTodoAssociationTodayTodos(todos, date, { includeCompleted: true });
 
   return {
     date: getLocalDateStr(date),
@@ -1406,7 +1416,8 @@ export const buildTodoPinWidgetPayload = ({
 
       return {
         todoId: todo.id,
-        title: todo.title,
+        title: formatTodoPinTitle(todo, todos),
+        isCompleted: todo.isCompleted,
         badgeLabel: todo.pin ? TODO_PIN_BADGE_PIN : TODO_PIN_BADGE_TODAY,
         categoryId: linkedTarget.categoryId,
         activityId: linkedTarget.activityId,

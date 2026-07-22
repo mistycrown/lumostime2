@@ -6,6 +6,7 @@
  * @description 时间线样式轨道组件 - 复用参考项目的节点与连线逻辑，用于普通时间记录节点，并支持在最后一个节点处截断连线、整体锚点偏移以及强制圆点节点
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-07-22: Removes the pale halo from custom timeline node shapes.
  */
 
 import React from 'react';
@@ -222,12 +223,11 @@ export const TimelineStyleRail: React.FC<TimelineStyleRailProps> = ({
 
         return (
             <div
-                className="absolute top-1 left-0 -translate-x-1/2 z-10 transition-all duration-500 flex items-center justify-center"
+                className="timeline-rail-custom-node absolute top-1 left-0 -translate-x-1/2 z-10 transition-all duration-500 flex items-center justify-center"
                 style={{
                     marginLeft: `${sharedOffsetX}px`,
                     marginTop: `${timeNodeOffsetY}px`,
-                    color: resolvedNodeColor,
-                    filter: 'drop-shadow(0 0 1px #faf9f6) drop-shadow(0 0 1px #faf9f6)'
+                    color: resolvedNodeColor
                 }}
             >
                 <div style={{ transform: `rotate(${currentAngle}deg)`, display: 'flex', transition: 'transform 0.3s ease' }}>

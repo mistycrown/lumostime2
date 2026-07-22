@@ -1,0 +1,41 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="28dp"
+        android:orientation="horizontal"
+        android:paddingTop="2dp"
+        android:paddingBottom="3dp">
+
+        <TextView
+            android:id="@+id/widget_quick_todo_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-light"
+            android:maxLines="1"
+            android:textColor="#2E2822"
+            android:textSize="12sp" />
+
+        <ImageView
+            android:id="@+id/widget_quick_todo_complete_button"
+            android:layout_width="28dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="6dp"
+            android:contentDescription="@null"
+            android:padding="3dp"
+            android:src="@drawable/widget_todo_pin_checkbox_unchecked" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_quick_todo_divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#14362C21" />
+</LinearLayout>

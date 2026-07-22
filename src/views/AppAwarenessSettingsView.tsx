@@ -9,6 +9,7 @@
  * @updated 2026-06-21: Let workflow number fields keep raw draft input so cooldown seconds, fixed duration, and duration-option lists can be fully cleared and rewritten.
  * @updated 2026-06-21: Rebuilt the settings UX with UTF-8-safe copy, top-level permission gating, cleaner toggle controls, and refined workflow node editors.
  * @updated 2026-07-21: Added dark-mode semantic states for notices, toggles, and selected workflow activities.
+ * @updated 2026-07-22: Preserve native line breaks while editing single-choice option lists.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -870,38 +871,20 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
                       <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-stone-400">选项列表</div>
                       <textarea
                         rows={4}
-                        value={serializeChoiceOptions(step.options)}
-                        onKeyDown={(event) => {
-                          if (event.key !== 'Enter' || event.nativeEvent.isComposing) {
-                            return;
-                          }
-
-                          event.preventDefault();
-                          const target = event.currentTarget;
-                          const nextValue = `${target.value}\n`;
-                          const nextCursor = target.selectionStart + 1;
+                        value={readStepFieldDraft(step.id, 'choiceOptions', serializeChoiceOptions(step.options))}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          writeStepFieldDraft(step.id, 'choiceOptions', value);
                           updateTemplate(editingTemplate.id, (template) => ({
                             ...template,
                             steps: template.steps.map((item) => item.id === step.id ? {
                               ...item,
-                              options: buildChoiceOptionsFromText(nextValue)
+                              options: buildChoiceOptionsFromText(value)
                             } as AppAwarenessSingleChoiceStep : item),
                             updatedAt: Date.now()
                           }));
-
-                          window.requestAnimationFrame(() => {
-                            target.focus();
-                            target.setSelectionRange(nextCursor, nextCursor);
-                          });
                         }}
-                        onChange={(event) => updateTemplate(editingTemplate.id, (template) => ({
-                          ...template,
-                          steps: template.steps.map((item) => item.id === step.id ? {
-                            ...item,
-                            options: buildChoiceOptionsFromText(event.target.value)
-                          } as AppAwarenessSingleChoiceStep : item),
-                          updatedAt: Date.now()
-                        }))}
+                        onBlur={() => clearStepFieldDraft(step.id, 'choiceOptions')}
                         className="w-full rounded-xl border border-stone-200 bg-[#fdfbf7] px-3 py-2 text-sm text-stone-800 focus:border-stone-400 focus:outline-none"
                         placeholder={'网上冲浪\n搜索东西\n处理消息'}
                       />

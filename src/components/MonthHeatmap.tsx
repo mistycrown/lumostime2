@@ -6,6 +6,7 @@
  * @description 展示一个月的时间分布热力图，纵轴为日期，横轴为24小时，使用统一颜色适配层渲染活动颜色。
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-07-22: Added semantic hooks for dark-mode month schedule grids, labels, and legends.
  */
 import React, { useMemo } from 'react';
 import { Log, Category } from '../types';
@@ -103,13 +104,13 @@ export const MonthHeatmap: React.FC<MonthHeatmapProps> = ({ logs, categories, mo
     }, [logs, categories, year, monthIndex]);
 
     return (
-        <div className="w-full flex flex-col">
+        <div className="stats-month-heatmap w-full flex flex-col">
             <div className="flex shrink-0" style={{ height: TOTAL_HEIGHT }}>
-                <div className="w-6 shrink-0 border-r border-stone-100 bg-stone-50/50 relative" style={{ height: TOTAL_HEIGHT }}>
+                <div className="schedule-time-rail w-6 shrink-0 border-r border-stone-100 bg-stone-50/50 relative" style={{ height: TOTAL_HEIGHT }}>
                     {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(date => (
                         <div
                             key={date}
-                            className="absolute w-full text-[8px] text-stone-400 font-medium text-right pr-0.5"
+                            className="schedule-time-label absolute w-full text-[8px] text-stone-400 font-medium text-right pr-0.5"
                             style={{ top: (date - 1) * ROW_HEIGHT, height: ROW_HEIGHT, lineHeight: `${ROW_HEIGHT}px` }}
                         >
                             {String(date).padStart(2, '0')}
@@ -122,7 +123,7 @@ export const MonthHeatmap: React.FC<MonthHeatmapProps> = ({ logs, categories, mo
                         {Array.from({ length: 24 }, (_, h) => (
                             <div
                                 key={h}
-                                className="flex-1 border-r border-stone-50 last:border-r-0"
+                                className="schedule-day-column flex-1 border-r border-stone-50 last:border-r-0"
                             />
                         ))}
                     </div>
@@ -131,7 +132,7 @@ export const MonthHeatmap: React.FC<MonthHeatmapProps> = ({ logs, categories, mo
                         {Array.from({ length: 24 }, (_, h) => (
                             <div
                                 key={h}
-                                className="flex-1 text-[8px] text-stone-400 font-medium text-center"
+                                className="schedule-time-label flex-1 text-[8px] text-stone-400 font-medium text-center"
                                 style={{ transform: 'translateY(-12px)' }}
                             >
                                 {h % HOUR_LABEL_INTERVAL === 0 ? h : ''}
@@ -142,7 +143,7 @@ export const MonthHeatmap: React.FC<MonthHeatmapProps> = ({ logs, categories, mo
                     {Array.from({ length: daysInMonth }, (_, i) => (
                         <div
                             key={i}
-                            className="absolute w-full border-b border-stone-50"
+                            className="schedule-grid-line absolute w-full border-b border-stone-50"
                             style={{ top: i * ROW_HEIGHT, height: ROW_HEIGHT }}
                         />
                     ))}
@@ -192,7 +193,7 @@ export const MonthHeatmap: React.FC<MonthHeatmapProps> = ({ logs, categories, mo
             </div>
 
             {activityLegend.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-stone-100">
+                <div className="schedule-legend mt-4 pt-3 border-t border-stone-100">
                     <div className="flex flex-wrap gap-x-3 gap-y-1.5 justify-center px-2">
                         {activityLegend.map((activity, idx) => (
                             <div key={idx} className="flex items-center gap-1">
@@ -200,7 +201,7 @@ export const MonthHeatmap: React.FC<MonthHeatmapProps> = ({ logs, categories, mo
                                     className="w-3 h-3 rounded-sm shrink-0"
                                     style={{ backgroundColor: getHeatmapFillColor(activity.color) }}
                                 />
-                                <span className="text-[10px] text-stone-600 whitespace-nowrap flex items-center gap-0.5">
+                                <span className="schedule-legend-label text-[10px] text-stone-600 whitespace-nowrap flex items-center gap-0.5">
                                     <IconRenderer
                                         icon={activity.icon}
                                         uiIcon={activity.uiIcon}
