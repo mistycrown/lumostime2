@@ -1,10 +1,10 @@
 /**
  * @file TimelineScheduleCanvas.tsx
- * @input Selected date, logs, categories, default scroll hour, leading scroll content, and record callbacks
- * @output A full-day scrollable schedule canvas with touch pinch zoom and scrollable leading content
+ * @input Selected date, logs, categories, resolved display mode, and record callbacks
+ * @output A full-day scrollable schedule canvas with parallel blocks, current-time marker, and touch pinch zoom
  * @pos Component
  * @description Positions real records on a 00:00-24:00 time grid for the Chronicle timeline-and-todo layout.
- * @updated 2026-07-29: Moved the review area into the canvas scroll flow and placed zoom controls at the canvas end.
+ * @updated 2026-07-29: Added overlap-column layout, today-only current-time marker, and end-of-canvas zoom controls.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
@@ -21,9 +21,15 @@ interface TimelineScheduleCanvasProps {
   logs: Log[];
   categories: Category[];
   todos: TodoItem[];
-  defaultStartHour: number;
+  isDarkMode: boolean;
   onEditLog: (log: Log) => void;
-  children?: React.ReactNode;
+}
+
+interface ScheduleBlockLayout {
+  startMinutes: number;
+  endMinutes: number;
+  column: number;
+  columnCount: number;
 }
 
 const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max);
@@ -35,20 +41,47 @@ const getTouchDistance = (first: Touch, second: Touch): number => Math.hypot(
 
 const formatTime = (value: Date): string => `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
 
+export const layoutParallelScheduleBlocks = <T extends { startMinutes: number; endMinutes: number },>(blocks: T[]): Array<T & ScheduleBlockLayout> => {
+  const sorted = [...blocks].sort((left, right) => left.startMinutes - right.startMinutes || left.endMinutes - right.endMinutes);
+  const laidOut: Array<T & ScheduleBlockLayout> = [];
+  let active: Array<T & ScheduleBlockLayout> = [];
+  let group: Array<T & ScheduleBlockLayout> = [];
+
+  const finalizeGroup = () => {
+    const columnCount = Math.max(1, ...group.map((block) => block.column + 1));
+    group.forEach((block) => { block.columnCount = columnCount; });
+    group = [];
+  };
+
+  sorted.forEach((block) => {
+    active = active.filter((entry) => entry.endMinutes > block.startMinutes);
+    if (active.length === 0 && group.length > 0) finalizeGroup();
+    const usedColumns = new Set(active.map((entry) => entry.column));
+    let column = 0;
+    while (usedColumns.has(column)) column += 1;
+    const laidOutBlock = { ...block, column, columnCount: 1 };
+    active.push(laidOutBlock);
+    group.push(laidOutBlock);
+    laidOut.push(laidOutBlock);
+  });
+
+  if (group.length > 0) finalizeGroup();
+  return laidOut;
+};
+
 export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
   currentDate,
   logs,
   categories,
   todos,
-  defaultStartHour,
   onEditLog,
-  children
+  isDarkMode
 }) => {
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const leadingContentRef = useRef<HTMLDivElement | null>(null);
   const pinchRef = useRef<{ distance: number; hourHeight: number } | null>(null);
   const initializedDateRef = useRef<string>('');
   const [hourHeight, setHourHeight] = useState(DEFAULT_HOUR_HEIGHT);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
 
   const dateKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}`;
   const dayStart = useMemo(() => {
@@ -58,9 +91,15 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
   }, [dateKey]);
   const dayEnd = useMemo(() => dayStart.getTime() + 24 * 60 * 60 * 1000, [dayStart]);
   const canvasHeight = 24 * hourHeight;
-  const getLeadingContentHeight = () => leadingContentRef.current?.offsetHeight || 0;
+  const isToday = dateKey === `${currentTime.getFullYear()}-${currentTime.getMonth()}-${currentTime.getDate()}`;
+  const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes() + currentTime.getSeconds() / 60;
+  const surfaceClassName = isDarkMode ? 'border-stone-700 bg-stone-950/95' : 'border-stone-200/80 bg-[#fdfbf7]/72';
+  const hourLineClassName = isDarkMode ? 'border-stone-700' : 'border-stone-200/80';
+  const halfHourLineClassName = isDarkMode ? 'border-stone-800' : 'border-stone-100';
+  const timeLabelClassName = isDarkMode ? 'text-stone-300' : 'text-stone-400';
+  const zoomControlClassName = isDarkMode ? 'border-stone-700 bg-stone-900/95 text-stone-300 hover:bg-stone-800 hover:text-white' : 'border-stone-200 bg-white/95 text-stone-400 hover:bg-stone-50 hover:text-stone-700';
 
-  const scheduledLogs = useMemo(() => logs
+  const scheduledLogs = useMemo(() => layoutParallelScheduleBlocks(logs
     .filter((log) => log.startTime < dayEnd && log.endTime > dayStart.getTime())
     .map((log) => {
       const displayStart = Math.max(log.startTime, dayStart.getTime());
@@ -74,6 +113,8 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
 
       return {
         log,
+        startMinutes: topMinutes,
+        endMinutes: topMinutes + durationMinutes,
         top: (topMinutes / 60) * hourHeight,
         height: Math.max(42, (durationMinutes / 60) * hourHeight),
         color: toCssColor(colorSource, 'fill'),
@@ -83,28 +124,31 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
         categoryLabel: activity?.name || category?.name || '未分类',
         linkedTodoLabel: linkedTodo?.title
       };
-    }), [logs, categories, todos, dayStart, dayEnd, hourHeight]);
+    })), [logs, categories, todos, dayStart, dayEnd, hourHeight]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setCurrentTime(new Date()), 30000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     if (!scrollRef.current || initializedDateRef.current === dateKey) return;
     initializedDateRef.current = dateKey;
     requestAnimationFrame(() => {
       if (scrollRef.current) {
-        scrollRef.current.scrollTop = getLeadingContentHeight() + defaultStartHour * hourHeight;
+        scrollRef.current.scrollTop = isToday ? (currentMinutes / 60) * hourHeight : 0;
       }
     });
-  }, [dateKey, defaultStartHour, hourHeight]);
+  }, [dateKey, hourHeight, isToday, currentMinutes]);
 
   const setCanvasScale = (nextHourHeight: number) => {
     const next = clamp(nextHourHeight, MIN_HOUR_HEIGHT, MAX_HOUR_HEIGHT);
     const scrollContainer = scrollRef.current;
-    const visibleMinute = scrollContainer
-      ? Math.max(0, ((scrollContainer.scrollTop - getLeadingContentHeight()) / hourHeight) * 60)
-      : 0;
+    const visibleMinute = scrollContainer ? Math.max(0, (scrollContainer.scrollTop / hourHeight) * 60) : 0;
     setHourHeight(next);
     requestAnimationFrame(() => {
       if (scrollContainer) {
-        scrollContainer.scrollTop = getLeadingContentHeight() + (visibleMinute / 60) * next;
+        scrollContainer.scrollTop = (visibleMinute / 60) * next;
       }
     });
   };
@@ -134,7 +178,7 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
   };
 
   return (
-    <section className="relative min-h-0 min-w-0 flex-1 overflow-hidden border-t border-stone-200/80 bg-[#fdfbf7]/72" aria-label="全天时间轴">
+    <section className={`relative min-h-0 min-w-0 flex-1 overflow-hidden border-t ${surfaceClassName}`} aria-label="全天时间轴">
       <div
         ref={scrollRef}
         className="h-full overflow-y-auto overscroll-contain pb-28 touch-pan-y [scrollbar-color:#d6d3d1_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300"
@@ -143,15 +187,14 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
       >
-        <div ref={leadingContentRef}>{children}</div>
         <div className="relative min-w-0" style={{ height: `${canvasHeight}px` }}>
           {Array.from({ length: 25 }, (_, hour) => {
             const top = hour * hourHeight;
             return (
               <React.Fragment key={hour}>
-                <div className="absolute left-0 right-0 border-t border-stone-200/80" style={{ top }} />
-                {hour < 24 && <div className="absolute left-14 right-0 border-t border-dashed border-stone-100" style={{ top: top + hourHeight / 2 }} />}
-                <span className="absolute left-0 w-12 -translate-y-1/2 pr-2 text-right text-[10px] font-bold tabular-nums text-stone-400" style={{ top }}>
+                <div className={`absolute left-0 right-0 border-t ${hourLineClassName}`} style={{ top }} />
+                {hour < 24 && <div className={`absolute left-14 right-0 border-t border-dashed ${halfHourLineClassName}`} style={{ top: top + hourHeight / 2 }} />}
+                <span className={`absolute left-0 w-12 -translate-y-1/2 pr-2 text-right text-[10px] font-bold tabular-nums ${timeLabelClassName}`} style={{ top }}>
                   {String(hour).padStart(2, '0')}:00
                 </span>
               </React.Fragment>
@@ -159,13 +202,20 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
           })}
 
           <div className="absolute inset-y-0 left-14 right-3">
-            {scheduledLogs.map(({ log, top, height, color, background, startLabel, endLabel, categoryLabel, linkedTodoLabel }) => (
+            {scheduledLogs.map(({ log, top, height, color, background, startLabel, endLabel, categoryLabel, linkedTodoLabel, column, columnCount }) => (
               <button
                 key={log.id}
                 type="button"
                 onClick={() => onEditLog(log)}
-                className="absolute left-0 right-0 overflow-hidden border-l-[3px] px-3 py-2 text-left shadow-[0_1px_2px_rgba(28,25,23,0.06)] transition-shadow hover:shadow-[0_5px_16px_rgba(28,25,23,0.14)]"
-                style={{ top: `${top}px`, height: `${height}px`, borderColor: color, backgroundColor: background }}
+                className="absolute overflow-hidden border-l-[3px] px-3 py-2 text-left shadow-[0_1px_2px_rgba(28,25,23,0.06)] transition-shadow hover:shadow-[0_5px_16px_rgba(28,25,23,0.14)]"
+                style={{
+                  top: `${top}px`,
+                  height: `${height}px`,
+                  left: `calc(${(column / columnCount) * 100}% + ${(column * (columnCount - 1) * 4) / columnCount}px)`,
+                  width: `calc(${100 / columnCount}% - ${((columnCount - 1) * 4) / columnCount}px)`,
+                  borderColor: color,
+                  backgroundColor: background
+                }}
               >
                 <span className="block truncate text-sm font-bold leading-5 text-stone-800">{log.note?.split('\n')[0] || categoryLabel}</span>
                 <span className="mt-0.5 block text-[11px] font-medium tabular-nums text-stone-500">{startLabel} - {endLabel}</span>
@@ -175,13 +225,19 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
               </button>
             ))}
           </div>
+          {isToday && (
+            <div className="pointer-events-none absolute left-14 right-3 z-10 flex items-center" style={{ top: `${(currentMinutes / 60) * hourHeight}px` }}>
+              <span className="h-2 w-2 shrink-0 -translate-x-1/2 rounded-full" style={{ backgroundColor: isDarkMode ? '#ffffff' : 'var(--accent-color, #1c1917)' }} />
+              <span className="h-px flex-1" style={{ backgroundColor: isDarkMode ? '#ffffff' : 'var(--accent-color, #1c1917)' }} />
+            </div>
+          )}
         </div>
-        <div className="flex justify-end border-t border-stone-200/80 px-3 py-3">
-          <div className="flex overflow-hidden rounded-lg border border-stone-200 bg-white/95 shadow-sm">
-            <button type="button" onClick={() => setCanvasScale(hourHeight - 16)} className="p-2 text-stone-400 transition-colors hover:bg-stone-50 hover:text-stone-700" aria-label="缩小时间轴">
+        <div className={`flex justify-end border-t px-3 py-3 ${hourLineClassName}`}>
+          <div className={`flex overflow-hidden rounded-lg border shadow-sm ${zoomControlClassName}`}>
+            <button type="button" onClick={() => setCanvasScale(hourHeight - 16)} className="p-2 transition-colors" aria-label="缩小时间轴">
               <Minus size={15} />
             </button>
-            <button type="button" onClick={() => setCanvasScale(hourHeight + 16)} className="border-l border-stone-100 p-2 text-stone-400 transition-colors hover:bg-stone-50 hover:text-stone-700" aria-label="放大时间轴">
+            <button type="button" onClick={() => setCanvasScale(hourHeight + 16)} className={`border-l p-2 transition-colors ${hourLineClassName}`} aria-label="放大时间轴">
               <Plus size={15} />
             </button>
           </div>

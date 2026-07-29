@@ -2,7 +2,7 @@
 
 The `views/` directory contains all the React components that represent the distinct screens or pages of the LumosTime application. This layer is responsible for the presentation logic and user interaction.
 
-- Update 2026-07-29: `TimelineView.tsx` now supports a persistent schedule-and-todo split workspace with a 00:00-24:00 pinch-zoom timeline, default 08:00 viewport, a review stack that scrolls with the canvas, and a same-level todo column controlled from the right screen edge; its daily-check group reads templates, refreshes automatic checks on entry, and writes manual actions to Daily Review.
+- Update 2026-07-29: `TimelineView.tsx` now supports a persistent schedule-and-todo split workspace with a 00:00-24:00 pinch-zoom timeline, today-current-time positioning, frozen Daily/Weekly/Monthly review cards, and a same-level todo column controlled from the right screen edge; its daily-check group reads templates, refreshes automatic checks on entry, and writes manual actions to Daily Review.
 
 - Update 2026-07-11: `AchievementView.tsx` now wires the records tab to the full achievement recomputation action for rebuilding archived and active ledger data together.
 

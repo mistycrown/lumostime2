@@ -14,7 +14,7 @@
  * @updated 2026-04-22: Replaced the old AI backfill entry with a local-history chat modal for the first-step conversational AI flow.
  * @updated 2026-04-20: Switched the timeline screen to the shared lightweight custom-background pipeline.
  * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
- * @updated 2026-07-29: Added persistent todo-column state and template-backed daily check actions to the split workspace.
+ * @updated 2026-07-29: Added parallel time blocks, today-only current-time marker, and frozen review cards to the split workspace.
  */
 import React, { useMemo, useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -246,11 +246,16 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
         timelineLayout,
         timelineTodoSidebarCollapsed,
         setTimelineTodoSidebarCollapsed,
-        timelineCanvasStartHour,
+        themeMode,
         timelineStyleAdjusterOpen,
         setTimelineStyleAdjusterOpen
     } = useSettings();
     const timelineDateString = getLocalDateStr(currentDate);
+    const isDarkMode = themeMode === 'dark' || (
+        themeMode === 'system'
+        && typeof window !== 'undefined'
+        && window.matchMedia('(prefers-color-scheme: dark)').matches
+    );
     const activeSidebarDailyReview = dailyReviews.find((review) => review.date === timelineDateString) || dailyReview;
     const sidebarCheckItems = useMemo(() => {
         const sourceItems = activeSidebarDailyReview?.checkItems || buildDailyCheckItems(checkTemplates);
@@ -2055,30 +2060,31 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             </div>
 
             {timelineLayout === 'timeline-todo' && (
+                <TimelineReviewStack
+                    dailyReview={dailyReview}
+                    weeklyReview={weeklyReviewData.weeklyReview}
+                    monthlyReview={monthlyReviewData.monthlyReview}
+                    showWeekly={weeklyReviewData.isLastDayOfWeek}
+                    showMonthly={monthlyReviewData.isLastDayOfMonth}
+                    onOpenDaily={() => onOpenDailyReview?.()}
+                    onOpenWeekly={() => onOpenWeeklyReview?.(weeklyReviewData.weekStart, weeklyReviewData.weekEnd)}
+                    onOpenMonthly={() => onOpenMonthlyReview?.(monthlyReviewData.monthStart, monthlyReviewData.monthEnd)}
+                />
+            )}
+
+            {timelineLayout === 'timeline-todo' && (
                 <div className="min-h-0 flex flex-1 overflow-hidden">
                     <TimelineScheduleCanvas
                         currentDate={currentDate}
                         logs={logs}
                         categories={categories}
                         todos={todos}
-                        defaultStartHour={timelineCanvasStartHour}
+                        isDarkMode={isDarkMode}
                         onEditLog={onEditLog}
-                    >
-                        <TimelineReviewStack
-                            dailyReview={dailyReview}
-                            weeklyReview={weeklyReviewData.weeklyReview}
-                            monthlyReview={monthlyReviewData.monthlyReview}
-                            showWeekly={weeklyReviewData.isLastDayOfWeek}
-                            showMonthly={monthlyReviewData.isLastDayOfMonth}
-                            onOpenDaily={() => onOpenDailyReview?.()}
-                            onOpenWeekly={() => onOpenWeeklyReview?.(weeklyReviewData.weekStart, weeklyReviewData.weekEnd)}
-                            onOpenMonthly={() => onOpenMonthlyReview?.(monthlyReviewData.monthStart, monthlyReviewData.monthEnd)}
-                        />
-                    </TimelineScheduleCanvas>
+                    />
                     {!timelineTodoSidebarCollapsed && (
                         <TimelineTodoSidebar
                             todos={todos}
-                            todoCategories={todoCategories}
                             checkItems={sidebarCheckItems}
                             onSelectTodo={(todo) => onNavigateToTodo?.(todo)}
                             onCheckItemClick={handleSidebarCheckItemClick}

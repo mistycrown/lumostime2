@@ -1,6 +1,6 @@
 # Services Architecture
 
-Update 2026-07-29: `timelineLayoutService.ts` centralizes supported Chronicle layout modes plus valid schedule-canvas default hours, preserving the existing timeline-only view and 08:00 canvas start as safe fallbacks.
+Update 2026-07-29: `timelineLayoutService.ts` centralizes supported Chronicle layout modes while the schedule canvas now positions itself from the current time instead of a saved start hour.
 
 Update 2026-07-06: `updateService.ts` now reports shipped app version `1.6.3` for the 1.6.3 release line.
 Update 2026-07-05: `assistantLocalSearchService.ts`, `assistantTurnService.ts`, and the foreground AI chat runner now support model-requested local retrieval rounds, reusing shared search/filter logic, surfacing pending progress text, and feeding accumulated local-query digests back into follow-up unified turns.

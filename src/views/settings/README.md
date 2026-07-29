@@ -4,7 +4,7 @@
 
 ## Updates
 
-- 2026-07-29: `PreferencesSettingsView.tsx` adds Display-section Chronicle layout and schedule-canvas default-hour selectors using the existing anchored dropdown/listbox pattern.
+- 2026-07-29: `PreferencesSettingsView.tsx` keeps the Display-section Chronicle layout selector; the schedule canvas now starts from the current time and no longer exposes a default-hour selector.
 - 2026-06-06: `FiltersSettingsView.tsx` now labels `@` syntax as `待办/分类`, aligning the settings help text with the shared custom-filter behavior for linked-log todo matches.
 - 2026-05-17: 重构设置菜单布局，新增了“Windows 特性”分组，将“PC端小组件”与原在数据同步分类下的“导出到 Obsidian”归拢在此专有分组下，并确保其在安卓端不可见。
 - 2026-05-17: 优化了显示条件，结合 !Capacitor.isNativePlatform() 逻辑彻底确保“PC端小组件”设置项在 Android 端隐藏。
