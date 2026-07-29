@@ -10,11 +10,15 @@ import { useSession } from '../contexts/SessionContext';
 import { useGoalManager } from '../hooks/useGoalManager';
 import { useMajorGoalManager } from '../hooks/useMajorGoalManager';
 import { useReviewManager } from '../hooks/useReviewManager';
+import { useTodoQuickActions } from '../hooks/useTodoQuickActions';
 import { aiService } from '../services/aiService';
 import { dailyNewspaperService } from '../services/dailyNewspaperService';
 import { getLocalDateStr } from '../utils/dateUtils';
 import { ACTIVE_SESSION_KEY, CHAT_PERSONAS_KEY, CHAT_SESSIONS_KEY, DEFAULT_AI_PERSONAS } from './ai-chat/AIBackfillChatInitialization';
 import type { AIChatPersona, AIChatSession } from './ai-chat/AIBackfillChatShared';
+import { TodoQuickActionsModal } from './TodoQuickActionsModal';
+import { isQuickTodo } from '../utils/todoKindUtils';
+import { getRealTodoCategories } from '../utils/todoQuickCategoryUtils';
 
 // Views
 import { DailyReviewView } from '../views/DailyReviewView';
@@ -169,6 +173,29 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
 
     const { setSelectedTagId, setSelectedCategoryId } = useNavigation();
     const handleSelectTag = (id: string) => setSelectedTagId(id);
+    const {
+        quickActionTodo,
+        quickActionOpenedAt,
+        openQuickActions,
+        closeQuickActions,
+        handleQuickActionMove,
+        handleQuickActionOpenDetail,
+        handleQuickActionComplete,
+        handleQuickActionUndoComplete,
+        handleQuickActionClearDate,
+        handleQuickActionTogglePin,
+        handleQuickActionMaybeDates,
+        handleQuickActionSkipNextRecurrence,
+        handleQuickActionSkipToMaybeDate,
+        handleQuickActionMoveCategory,
+        handleQuickActionUpgradeToProject,
+        handleQuickActionDelete,
+        handleQuickActionUpdateTitle
+    } = useTodoQuickActions({
+        onSaveTodo: handleSaveTodo,
+        onEditTodo: openEditTodoModal,
+        onDeleteTodo: handleDeleteTodo
+    });
 
     const handleUpdateLog = (updatedLog: Log) => {
         setLogs(prev => prev.map(l => l.id === updatedLog.id ? updatedLog : l));
@@ -455,6 +482,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
             />;
         case AppView.TIMELINE:
             return (
+                <>
                 <TimelineView
                     key={`timeline-${refreshKey}`}
                     refreshKey={refreshKey}
@@ -479,8 +507,8 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     onQuickPunch={handleQuickPunch}
                     activeSessions={activeSessions}
                     onNavigateToTodo={(todo) => {
-                        // 直接打开待办详情
-                        openEditTodoModal(todo);
+                        // Reuse the Todo page quick-actions sheet from the Chronicle sidebar.
+                        openQuickActions(todo);
                     }}
                     onNavigateToGoal={(goal) => {
                         // 直接打开目标编辑器
@@ -507,6 +535,29 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     timelineGalleryMode={timelineGalleryMode}
                     collapseThreshold={collapseThreshold}
                 />
+                <TodoQuickActionsModal
+                    isOpen={quickActionTodo !== null}
+                    todo={quickActionTodo}
+                    todoCategories={getRealTodoCategories(todoCategories)}
+                    onMoveDate={handleQuickActionMove}
+                    onClearDate={handleQuickActionClearDate}
+                    onOpenDetail={handleQuickActionOpenDetail}
+                    onComplete={handleQuickActionComplete}
+                    onUndoComplete={handleQuickActionUndoComplete}
+                    onTogglePin={handleQuickActionTogglePin}
+                    onEditMaybeDates={handleQuickActionMaybeDates}
+                    onSkipNextRecurrence={handleQuickActionSkipNextRecurrence}
+                    onSkipToMaybeDate={handleQuickActionSkipToMaybeDate}
+                    onMoveCategory={handleQuickActionMoveCategory}
+                    onUpgradeToProject={handleQuickActionUpgradeToProject}
+                    onDelete={handleQuickActionDelete}
+                    onClose={closeQuickActions}
+                    onForceClose={() => closeQuickActions(true)}
+                    openedAt={quickActionOpenedAt}
+                    showUpgradeToProject={Boolean(quickActionTodo && isQuickTodo(quickActionTodo))}
+                    onUpdateTitle={handleQuickActionUpdateTitle}
+                />
+                </>
             );
         case AppView.STATS:
             return (
