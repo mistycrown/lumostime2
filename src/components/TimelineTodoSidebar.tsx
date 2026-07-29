@@ -4,7 +4,7 @@
  * @output Collapsible desktop sidebar and mobile todo drawer for the Chronicle layout
  * @pos Component
  * @description Renders read-only pinned and today todo groups without duplicating Todo view mutation controls.
- * @updated 2026-07-29: Added the initial Chronicle timeline-and-todo layout sidebar.
+ * @updated 2026-07-29: Reserved bottom scroll room so floating timeline controls never cover final todos.
  */
 import React, { useMemo } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, ListTodo, Pin } from 'lucide-react';
@@ -117,7 +117,7 @@ const TodoGroups: React.FC<{
   );
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-5">
+    <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-40">
       {renderGroup('置顶', <Pin size={12} />, pinnedTodos, false)}
       {renderGroup('今天', <CalendarDays size={12} />, todayTodos, true)}
     </div>

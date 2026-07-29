@@ -3,6 +3,7 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-07-29: `TimelineScheduleCanvas.tsx` renders the 00:00-24:00 Chronicle schedule with real log blocks, default-hour positioning, and bounded two-finger zoom; `TimelineReviewStack.tsx` places Daily/Weekly/Monthly review entry cards above it.
 - Update 2026-07-29: `TimelineTodoSidebar.tsx` adds the read-only pinned/today todo sidebar for the optional Chronicle layout, with desktop collapse and a mobile drawer; its rows reuse `TodoQuickActionsModal` rather than introducing another editor.
 - Update 2026-07-11: `achievement/AchievementRecordsTab.tsx` now adds a low-key full recomputation action at the bottom of the records tab with a confirmation dialog for clearing archived bottles and rebuilding the achievement ledger.
 - Update 2026-07-11: `AddLogModal.tsx` now renders above todo detail overlays, so opening a timeline record from a collection-launched todo detail shows the record editor as the topmost layer.
