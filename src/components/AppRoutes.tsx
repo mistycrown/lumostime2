@@ -515,6 +515,9 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                         handleEditGoal(goal);
                     }}
                     dailyReview={dailyReviews.find(r => r.date === getLocalDateStr(currentDate))}
+                    dailyReviews={dailyReviews}
+                    checkTemplates={checkTemplates}
+                    onUpdateDailyReview={handleUpdateReview}
                     onOpenDailyReview={handleOpenDailyReview}
                     onCreateDailyReviewSilently={handleCreateDailyReviewSilently}
                     templates={reviewTemplates}

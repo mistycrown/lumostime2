@@ -4,7 +4,7 @@
  * @updated 2026-05-10: Replaced the old boolean timer auto-open flag with a three-state post-start jump mode and legacy storage migration.
  * @updated 2026-04-25: Added configurable timeline quick-action preferences for the timeline header.
  * @updated 2026-07-21: Added persistent calendar number typography preferences shared by app and desktop month views.
- * @updated 2026-07-29: Added persistent Chronicle page layout and schedule-canvas start preferences.
+ * @updated 2026-07-29: Added persistent Chronicle layout, todo-column collapse state, and schedule-canvas start preferences.
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
@@ -143,6 +143,8 @@ interface SettingsContextType {
     setTimelineQuickActions: React.Dispatch<React.SetStateAction<TimelineQuickActionKey[]>>;
     timelineLayout: TimelineLayoutMode;
     setTimelineLayout: React.Dispatch<React.SetStateAction<TimelineLayoutMode>>;
+    timelineTodoSidebarCollapsed: boolean;
+    setTimelineTodoSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
     timelineCanvasStartHour: number;
     setTimelineCanvasStartHour: React.Dispatch<React.SetStateAction<number>>;
 
@@ -617,6 +619,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         const stored = localStorage.getItem(THEME_KEYS.TIMELINE_LAYOUT);
         return isTimelineLayoutMode(stored) ? stored : DEFAULT_TIMELINE_LAYOUT_MODE;
     });
+    const [timelineTodoSidebarCollapsed, setTimelineTodoSidebarCollapsed] = useState<boolean>(() => (
+        localStorage.getItem(THEME_KEYS.TIMELINE_TODO_SIDEBAR_COLLAPSED) === 'true'
+    ));
     const [timelineCanvasStartHour, setTimelineCanvasStartHour] = useState<number>(() => {
         const stored = Number(localStorage.getItem(THEME_KEYS.TIMELINE_CANVAS_START_HOUR));
         return isTimelineCanvasStartHour(stored) ? stored : DEFAULT_TIMELINE_CANVAS_START_HOUR;
@@ -705,6 +710,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem(THEME_KEYS.TIMELINE_LAYOUT, timelineLayout);
     }, [timelineLayout]);
+
+    useEffect(() => {
+        localStorage.setItem(THEME_KEYS.TIMELINE_TODO_SIDEBAR_COLLAPSED, String(timelineTodoSidebarCollapsed));
+    }, [timelineTodoSidebarCollapsed]);
 
     useEffect(() => {
         localStorage.setItem(THEME_KEYS.TIMELINE_CANVAS_START_HOUR, String(timelineCanvasStartHour));
@@ -822,6 +831,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setTimelineQuickActions,
             timelineLayout,
             setTimelineLayout,
+            timelineTodoSidebarCollapsed,
+            setTimelineTodoSidebarCollapsed,
             timelineCanvasStartHour,
             setTimelineCanvasStartHour,
             collapseThreshold,

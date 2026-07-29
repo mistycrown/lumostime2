@@ -4,7 +4,7 @@
  * @output A full-day scrollable schedule canvas with touch pinch zoom and scrollable leading content
  * @pos Component
  * @description Positions real records on a 00:00-24:00 time grid for the Chronicle timeline-and-todo layout.
- * @updated 2026-07-29: Moved the review area into the canvas scroll flow so it scrolls with the day grid.
+ * @updated 2026-07-29: Moved the review area into the canvas scroll flow and placed zoom controls at the canvas end.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
@@ -135,17 +135,9 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
 
   return (
     <section className="relative min-h-0 min-w-0 flex-1 overflow-hidden border-t border-stone-200/80 bg-[#fdfbf7]/72" aria-label="全天时间轴">
-      <div className="absolute right-3 top-3 z-10 flex overflow-hidden rounded-lg border border-stone-200 bg-white/95 shadow-sm">
-        <button type="button" onClick={() => setCanvasScale(hourHeight - 16)} className="p-2 text-stone-400 transition-colors hover:bg-stone-50 hover:text-stone-700" aria-label="缩小时间轴">
-          <Minus size={15} />
-        </button>
-        <button type="button" onClick={() => setCanvasScale(hourHeight + 16)} className="border-l border-stone-100 p-2 text-stone-400 transition-colors hover:bg-stone-50 hover:text-stone-700" aria-label="放大时间轴">
-          <Plus size={15} />
-        </button>
-      </div>
       <div
         ref={scrollRef}
-        className="h-full overflow-y-auto overscroll-contain pb-28 touch-pan-y"
+        className="h-full overflow-y-auto overscroll-contain pb-28 touch-pan-y [scrollbar-color:#d6d3d1_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -182,6 +174,16 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
                 )}
               </button>
             ))}
+          </div>
+        </div>
+        <div className="flex justify-end border-t border-stone-200/80 px-3 py-3">
+          <div className="flex overflow-hidden rounded-lg border border-stone-200 bg-white/95 shadow-sm">
+            <button type="button" onClick={() => setCanvasScale(hourHeight - 16)} className="p-2 text-stone-400 transition-colors hover:bg-stone-50 hover:text-stone-700" aria-label="缩小时间轴">
+              <Minus size={15} />
+            </button>
+            <button type="button" onClick={() => setCanvasScale(hourHeight + 16)} className="border-l border-stone-100 p-2 text-stone-400 transition-colors hover:bg-stone-50 hover:text-stone-700" aria-label="放大时间轴">
+              <Plus size={15} />
+            </button>
           </div>
         </div>
       </div>
