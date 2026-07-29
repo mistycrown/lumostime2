@@ -1,10 +1,10 @@
 /**
  * @file TimelineScheduleCanvas.tsx
- * @input Selected date, logs, categories, default scroll hour, and record callbacks
- * @output A full-day scrollable schedule canvas with touch pinch zoom
+ * @input Selected date, logs, categories, default scroll hour, leading scroll content, and record callbacks
+ * @output A full-day scrollable schedule canvas with touch pinch zoom and scrollable leading content
  * @pos Component
  * @description Positions real records on a 00:00-24:00 time grid for the Chronicle timeline-and-todo layout.
- * @updated 2026-07-29: Added the initial full-day visual schedule canvas and two-finger zoom support.
+ * @updated 2026-07-29: Moved the review area into the canvas scroll flow so it scrolls with the day grid.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
@@ -23,6 +23,7 @@ interface TimelineScheduleCanvasProps {
   todos: TodoItem[];
   defaultStartHour: number;
   onEditLog: (log: Log) => void;
+  children?: React.ReactNode;
 }
 
 const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max);
@@ -40,9 +41,11 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
   categories,
   todos,
   defaultStartHour,
-  onEditLog
+  onEditLog,
+  children
 }) => {
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const leadingContentRef = useRef<HTMLDivElement | null>(null);
   const pinchRef = useRef<{ distance: number; hourHeight: number } | null>(null);
   const initializedDateRef = useRef<string>('');
   const [hourHeight, setHourHeight] = useState(DEFAULT_HOUR_HEIGHT);
@@ -55,6 +58,7 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
   }, [dateKey]);
   const dayEnd = useMemo(() => dayStart.getTime() + 24 * 60 * 60 * 1000, [dayStart]);
   const canvasHeight = 24 * hourHeight;
+  const getLeadingContentHeight = () => leadingContentRef.current?.offsetHeight || 0;
 
   const scheduledLogs = useMemo(() => logs
     .filter((log) => log.startTime < dayEnd && log.endTime > dayStart.getTime())
@@ -86,7 +90,7 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
     initializedDateRef.current = dateKey;
     requestAnimationFrame(() => {
       if (scrollRef.current) {
-        scrollRef.current.scrollTop = defaultStartHour * hourHeight;
+        scrollRef.current.scrollTop = getLeadingContentHeight() + defaultStartHour * hourHeight;
       }
     });
   }, [dateKey, defaultStartHour, hourHeight]);
@@ -94,11 +98,13 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
   const setCanvasScale = (nextHourHeight: number) => {
     const next = clamp(nextHourHeight, MIN_HOUR_HEIGHT, MAX_HOUR_HEIGHT);
     const scrollContainer = scrollRef.current;
-    const visibleMinute = scrollContainer ? (scrollContainer.scrollTop / hourHeight) * 60 : 0;
+    const visibleMinute = scrollContainer
+      ? Math.max(0, ((scrollContainer.scrollTop - getLeadingContentHeight()) / hourHeight) * 60)
+      : 0;
     setHourHeight(next);
     requestAnimationFrame(() => {
       if (scrollContainer) {
-        scrollContainer.scrollTop = (visibleMinute / 60) * next;
+        scrollContainer.scrollTop = getLeadingContentHeight() + (visibleMinute / 60) * next;
       }
     });
   };
@@ -128,7 +134,7 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
   };
 
   return (
-    <section className="relative min-h-0 flex-1 overflow-hidden border-t border-stone-200/80 bg-[#fdfbf7]/72" aria-label="全天时间轴">
+    <section className="relative min-h-0 min-w-0 flex-1 overflow-hidden border-t border-stone-200/80 bg-[#fdfbf7]/72" aria-label="全天时间轴">
       <div className="absolute right-3 top-3 z-10 flex overflow-hidden rounded-lg border border-stone-200 bg-white/95 shadow-sm">
         <button type="button" onClick={() => setCanvasScale(hourHeight - 16)} className="p-2 text-stone-400 transition-colors hover:bg-stone-50 hover:text-stone-700" aria-label="缩小时间轴">
           <Minus size={15} />
@@ -145,6 +151,7 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
       >
+        <div ref={leadingContentRef}>{children}</div>
         <div className="relative min-w-0" style={{ height: `${canvasHeight}px` }}>
           {Array.from({ length: 25 }, (_, hour) => {
             const top = hour * hourHeight;

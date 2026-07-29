@@ -14,14 +14,14 @@
  * @updated 2026-04-22: Replaced the old AI backfill entry with a local-history chat modal for the first-step conversational AI flow.
  * @updated 2026-04-20: Switched the timeline screen to the shared lightweight custom-background pipeline.
  * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
- * @updated 2026-07-29: Rebuilt the optional Chronicle todo layout around a full-day pinch-zoom schedule canvas and review stack.
+ * @updated 2026-07-29: Rebuilt the optional Chronicle todo layout as a same-level split workspace with a scrolling review-and-schedule column.
  */
 import React, { useMemo, useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule, Goal } from '../types';
 import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
-import { Plus, MoreHorizontal, BarChart2, BookOpen, FlaskConical, RefreshCw, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon, Star, ListTodo } from 'lucide-react';
+import { Plus, MoreHorizontal, BarChart2, BookOpen, FlaskConical, RefreshCw, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon, Star, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { ParsedTimeEntry } from '../services/aiService';
 import { ToastType } from '../components/Toast';
@@ -243,7 +243,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
         setTimelineStyleAdjusterOpen
     } = useSettings();
     const [isTodoSidebarCollapsed, setIsTodoSidebarCollapsed] = useState(false);
-    const [isTodoSidebarOpen, setIsTodoSidebarOpen] = useState(false);
 
     // 监听 TimePal 调试器的开关
     React.useEffect(() => {
@@ -1139,7 +1138,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
 
     return (
         <div
-            className={`h-full flex flex-col relative isolate text-stone-900 ${timelineLayout === 'timeline-todo' ? (isTodoSidebarCollapsed ? 'lg:pr-14' : 'lg:pr-[22rem]') : ''}`}
+            className="h-full flex flex-col relative isolate text-stone-900"
             style={{ backgroundColor: hasBackground ? 'transparent' : '#faf9f6' }}
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
@@ -1176,17 +1175,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                     todos={todos}
                     extraHeaderControls={
                         <>
-                            {timelineLayout === 'timeline-todo' && (
-                                <button
-                                    type="button"
-                                    onClick={() => setIsTodoSidebarOpen(true)}
-                                    className="rounded-full p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 lg:hidden"
-                                    title="今日待办"
-                                    aria-label="打开今日待办"
-                                >
-                                    <ListTodo size={20} />
-                                </button>
-                            )}
                             {configuredQuickActions.map((action) => (
                                 <button
                                     key={action.label}
@@ -2025,17 +2013,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             </div>
 
             {timelineLayout === 'timeline-todo' && (
-                <>
-                    <TimelineReviewStack
-                        dailyReview={dailyReview}
-                        weeklyReview={weeklyReviewData.weeklyReview}
-                        monthlyReview={monthlyReviewData.monthlyReview}
-                        showWeekly={weeklyReviewData.isLastDayOfWeek}
-                        showMonthly={monthlyReviewData.isLastDayOfMonth}
-                        onOpenDaily={() => onOpenDailyReview?.()}
-                        onOpenWeekly={() => onOpenWeeklyReview?.(weeklyReviewData.weekStart, weeklyReviewData.weekEnd)}
-                        onOpenMonthly={() => onOpenMonthlyReview?.(monthlyReviewData.monthStart, monthlyReviewData.monthEnd)}
-                    />
+                <div className="min-h-0 flex flex-1 overflow-hidden">
                     <TimelineScheduleCanvas
                         currentDate={currentDate}
                         logs={logs}
@@ -2043,8 +2021,38 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                         todos={todos}
                         defaultStartHour={timelineCanvasStartHour}
                         onEditLog={onEditLog}
-                    />
-                </>
+                    >
+                        <TimelineReviewStack
+                            dailyReview={dailyReview}
+                            weeklyReview={weeklyReviewData.weeklyReview}
+                            monthlyReview={monthlyReviewData.monthlyReview}
+                            showWeekly={weeklyReviewData.isLastDayOfWeek}
+                            showMonthly={monthlyReviewData.isLastDayOfMonth}
+                            onOpenDaily={() => onOpenDailyReview?.()}
+                            onOpenWeekly={() => onOpenWeeklyReview?.(weeklyReviewData.weekStart, weeklyReviewData.weekEnd)}
+                            onOpenMonthly={() => onOpenMonthlyReview?.(monthlyReviewData.monthStart, monthlyReviewData.monthEnd)}
+                        />
+                    </TimelineScheduleCanvas>
+                    {!isTodoSidebarCollapsed && (
+                        <TimelineTodoSidebar
+                            todos={todos}
+                            todoCategories={todoCategories}
+                            onSelectTodo={(todo) => onNavigateToTodo?.(todo)}
+                        />
+                    )}
+                </div>
+            )}
+
+            {timelineLayout === 'timeline-todo' && (
+                <button
+                    type="button"
+                    onClick={() => setIsTodoSidebarCollapsed((collapsed) => !collapsed)}
+                    className="absolute right-0 top-1/2 z-30 -translate-y-1/2 rounded-l-lg border border-r-0 border-stone-200 bg-[#fdfbf7]/95 p-2 text-stone-500 shadow-[-3px_2px_12px_rgba(28,25,23,0.08)] backdrop-blur-md transition-colors hover:bg-white hover:text-stone-800"
+                    title={isTodoSidebarCollapsed ? '展开待办' : '收起待办'}
+                    aria-label={isTodoSidebarCollapsed ? '展开待办' : '收起待办'}
+                >
+                    {isTodoSidebarCollapsed ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+                </button>
             )}
 
             {/* Floating AI Button (Above Add) */}
@@ -2113,21 +2121,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
 
             {timelineStyleAdjusterOpen && timelineStyleTheme !== 'default' && (
                 <TimelineStyleAdjuster onClose={() => setTimelineStyleAdjusterOpen(false)} />
-            )}
-
-            {timelineLayout === 'timeline-todo' && (
-                <TimelineTodoSidebar
-                    todos={todos}
-                    todoCategories={todoCategories}
-                    isCollapsed={isTodoSidebarCollapsed}
-                    isMobileOpen={isTodoSidebarOpen}
-                    onToggleCollapsed={() => setIsTodoSidebarCollapsed((collapsed) => !collapsed)}
-                    onCloseMobile={() => setIsTodoSidebarOpen(false)}
-                    onSelectTodo={(todo) => {
-                        setIsTodoSidebarOpen(false);
-                        onNavigateToTodo?.(todo);
-                    }}
-                />
             )}
 
             {/* 画廊视图 */}
