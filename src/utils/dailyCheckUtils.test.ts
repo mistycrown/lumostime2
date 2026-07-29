@@ -151,6 +151,39 @@ describe('dailyCheckUtils', () => {
     expect(limitReached.item?.currentCount).toBe(3);
   });
 
+  it('resets a completed count manual check for the next sidebar click cycle', () => {
+    const completedReview: DailyReview = {
+      id: 'review-3',
+      date: '2026-03-14',
+      createdAt: 1,
+      updatedAt: 1,
+      answers: [],
+      checkItems: [{
+        id: 'check-count',
+        category: '晨间',
+        content: '拉伸',
+        isCompleted: true,
+        type: 'manual',
+        manualMode: 'count',
+        currentCount: 3,
+        targetCount: 3
+      }]
+    };
+
+    const result = applyDailyCheckActionForDate({
+      dateStr: '2026-03-14',
+      dailyReviews: [completedReview],
+      checkTemplates,
+      reviewTemplates,
+      checkItemId: 'check-count',
+      actionMode: 'reset'
+    });
+
+    expect(result.status).toBe('reset');
+    expect(result.item?.currentCount).toBe(0);
+    expect(result.item?.isCompleted).toBe(false);
+  });
+
   it('exposes only enabled manual daily checks for NFC selection', () => {
     const eligible = getEligibleNfcDailyCheckItems(checkTemplates);
 
