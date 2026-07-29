@@ -1,6 +1,7 @@
 /**
  * @file storageKeys.ts
  * @description localStorage 键名统一管理
+ * @updated 2026-07-29: Added persistent Chronicle layout preference storage.
  * 
  * 集中管理所有 localStorage 键名，避免硬编码字符串分散在各处
  * 便于维护和重构
@@ -42,6 +43,7 @@ export const THEME_KEYS = {
     CALENDAR_LUNAR_DISPLAY: 'lumostime_calendar_lunar_display',
     TIMELINE_STYLE_THEME: 'lumostime_timeline_style_theme',
     TIMELINE_STYLE_CONFIGS: 'lumostime_timeline_style_configs',
+    TIMELINE_LAYOUT: 'lumostime_timeline_layout',
     ACHIEVEMENT_BOTTLE_STYLE: 'lumostime_achievement_bottle_style',
     ACHIEVEMENT_BOTTLE_ICON_PACK: 'lumostime_achievement_bottle_icon_pack',
     /** 自定义色组 */

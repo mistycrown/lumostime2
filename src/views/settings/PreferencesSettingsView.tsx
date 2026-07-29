@@ -4,6 +4,7 @@
  * @updated 2026-07-21: Replaced the display-mode segmented control with a settings-style dropdown and improved dark-mode toggle contrast.
  * @updated 2026-05-10: Replaced the old timer auto-open toggle with a three-option dropdown that reuses the existing settings selector style.
  * @updated 2026-04-25: Added timeline quick-action customization controls under display preferences.
+ * @updated 2026-07-29: Added Chronicle layout selection with the shared settings dropdown style.
  */
 import React, { useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus, X } from 'lucide-react';
@@ -15,6 +16,7 @@ import {
     AUTO_START_TIMER_JUMP_MODE_OPTIONS,
     getAutoStartTimerJumpModeLabel
 } from '../../utils/autoStartTimerJumpMode';
+import { TIMELINE_LAYOUT_OPTIONS } from '../../services/timelineLayoutService';
 
 interface PreferencesSettingsViewProps {
     onBack: () => void;
@@ -117,10 +119,11 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     sceneCardTimerMode = 'realtime',
     onSetSceneCardTimerMode
 }) => {
-    const { themeMode, setThemeMode } = useSettings();
+    const { themeMode, setThemeMode, timelineLayout, setTimelineLayout } = useSettings();
     const [isThemeModeDropdownOpen, setIsThemeModeDropdownOpen] = useState(false);
     const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
     const [isAutoStartTimerJumpModeDropdownOpen, setIsAutoStartTimerJumpModeDropdownOpen] = useState(false);
+    const [isTimelineLayoutDropdownOpen, setIsTimelineLayoutDropdownOpen] = useState(false);
     const [isTimelineQuickActionsExpanded, setIsTimelineQuickActionsExpanded] = useState(false);
     const selectedQuickActionOptions = timelineQuickActions
         .map((key) => TIMELINE_QUICK_ACTION_OPTIONS.find((option) => option.key === key))
@@ -534,6 +537,46 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                 <div className="space-y-3">
                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">显示</h3>
                     <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
+                        <div className="flex items-center justify-between gap-3 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                            <div className="min-w-0 flex-1">
+                                <h4 className="font-bold text-stone-700">脉络布局</h4>
+                            </div>
+                            <div className="relative shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsTimelineLayoutDropdownOpen((open) => !open)}
+                                    className="flex items-center gap-2 rounded-lg bg-stone-100 px-4 py-2 text-sm font-bold text-stone-700 transition-colors hover:bg-stone-200"
+                                    aria-haspopup="listbox"
+                                    aria-expanded={isTimelineLayoutDropdownOpen}
+                                >
+                                    <span>{TIMELINE_LAYOUT_OPTIONS.find((option) => option.value === timelineLayout)?.label}</span>
+                                    <ChevronDown size={14} className={`transition-transform ${isTimelineLayoutDropdownOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                {isTimelineLayoutDropdownOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-[100]" onClick={() => setIsTimelineLayoutDropdownOpen(false)} />
+                                        <div role="listbox" className="absolute right-0 top-full z-[110] mt-2 flex min-w-40 flex-col overflow-hidden rounded-xl border border-stone-100 bg-white py-1 shadow-xl animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                                            {TIMELINE_LAYOUT_OPTIONS.map((option) => (
+                                                <button
+                                                    key={option.value}
+                                                    type="button"
+                                                    role="option"
+                                                    aria-selected={timelineLayout === option.value}
+                                                    onClick={() => {
+                                                        setTimelineLayout(option.value);
+                                                        setIsTimelineLayoutDropdownOpen(false);
+                                                    }}
+                                                    className={`flex items-center justify-between px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-stone-50 ${timelineLayout === option.value ? 'bg-stone-50 text-stone-900' : 'text-stone-500'}`}
+                                                >
+                                                    {option.label}
+                                                    {timelineLayout === option.value && <span className="h-1.5 w-1.5 rounded-full bg-stone-800" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
                         <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
                             <div>
                                 <h4 className="font-bold text-stone-700">沉浸式计时默认方向</h4>
