@@ -3,8 +3,9 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
-- Update 2026-07-29: `TimelineScheduleCanvas.tsx` renders the 00:00-24:00 Chronicle schedule with overlap-aware columns, a today-only current-time marker, bounded two-finger zoom, a thin scrollbar, and end-of-canvas zoom controls.
-- Update 2026-07-29: `TimelineTodoSidebar.tsx` adds pinned, today, and template-backed daily-check groups to the optional Chronicle split workspace; todo rows use the shared schedule-type leading icons while manual checks write through the shared Daily Review path.
+- Update 2026-07-29: `TimelineScheduleCanvas.tsx` renders the 00:00-24:00 Chronicle schedule with overlap-aware columns, a today-only current-time marker, bounded two-finger zoom, a thin scrollbar, end-of-canvas zoom controls, and time/link/note block content.
+- Update 2026-07-30: `TimelineTodoSidebar.tsx` reads the selected day's shared scheduling entries, retains same-day completed entries while excluding Trace, uses completion circles plus `DUE/ARR/REP/MAY/DONE` labels, hides daily checks for future dates, and renders manual/auto/count checks as compact single-line markers.
+- Update 2026-07-30: `TimelineReviewStack.tsx` aligns its compact review entries to the todo sidebar's list rhythm instead of presenting a separate card-like strip.
 - Update 2026-07-11: `achievement/AchievementRecordsTab.tsx` now adds a low-key full recomputation action at the bottom of the records tab with a confirmation dialog for clearing archived bottles and rebuilding the achievement ledger.
 - Update 2026-07-11: `AddLogModal.tsx` now renders above todo detail overlays, so opening a timeline record from a collection-launched todo detail shows the record editor as the topmost layer.
 - Update 2026-06-16: `GoalEditor.tsx` now includes a `本周` quick date-range shortcut in the goal time-window toolbar, filling the current Monday-through-Sunday span alongside the existing `本月 / 本季度 / 本年` chips.
