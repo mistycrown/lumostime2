@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-07-29: `timelineLayoutService.ts` centralizes supported Chronicle layout modes and validation for persisted preferences, preserving the existing timeline-only view as the fallback.
+
 Update 2026-07-06: `updateService.ts` now reports shipped app version `1.6.3` for the 1.6.3 release line.
 Update 2026-07-05: `assistantLocalSearchService.ts`, `assistantTurnService.ts`, and the foreground AI chat runner now support model-requested local retrieval rounds, reusing shared search/filter logic, surfacing pending progress text, and feeding accumulated local-query digests back into follow-up unified turns.
 Update 2026-06-21: `webdavService.ts`, `s3Service.ts`, and `compatibleS3Service.ts` now harden canonical JSON backup reads with cache-busting / no-cache behavior so sync verification reads the current `lumostime_backup.json` instead of stale responses.

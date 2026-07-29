@@ -2,6 +2,8 @@
 
 The `views/` directory contains all the React components that represent the distinct screens or pages of the LumosTime application. This layer is responsible for the presentation logic and user interaction.
 
+- Update 2026-07-29: `TimelineView.tsx` now supports a persistent timeline-and-todo layout that retains the existing record flow and opens a responsive read-only todo sidebar for incomplete pinned and today tasks.
+
 - Update 2026-07-11: `AchievementView.tsx` now wires the records tab to the full achievement recomputation action for rebuilding archived and active ledger data together.
 
 - Update 2026-07-11: `settings/CollectionSettingsView.tsx` now pauses its collection-detail hardware-back handler while global log or todo details are open, preserving the intended record > todo > collection detail > collection list return stack.

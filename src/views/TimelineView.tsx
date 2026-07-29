@@ -14,13 +14,14 @@
  * @updated 2026-04-22: Replaced the old AI backfill entry with a local-history chat modal for the first-step conversational AI flow.
  * @updated 2026-04-20: Switched the timeline screen to the shared lightweight custom-background pipeline.
  * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
+ * @updated 2026-07-29: Added an optional responsive todo sidebar layout driven by the Chronicle preference.
  */
 import React, { useMemo, useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule, Goal } from '../types';
 import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
-import { Plus, MoreHorizontal, BarChart2, BookOpen, FlaskConical, RefreshCw, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon, Star } from 'lucide-react';
+import { Plus, MoreHorizontal, BarChart2, BookOpen, FlaskConical, RefreshCw, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon, Star, ListTodo } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { ParsedTimeEntry } from '../services/aiService';
 import { ToastType } from '../components/Toast';
@@ -48,6 +49,7 @@ import { TimelineStyleAdjuster } from '../components/TimelineStyleAdjuster';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 import { type TimelineQuickActionKey } from '../constants/timelineQuickActions';
 import { formatCompletedTodoLabel } from '../utils/todoHierarchyUtils';
+import { TimelineTodoSidebar } from '../components/TimelineTodoSidebar';
 
 // Image Thumbnail Component
 const TimelineImage: React.FC<{ filename: string, className?: string, useThumbnail?: boolean, refreshKey?: number }> = ({ filename, className = "w-16 h-16", useThumbnail = false, refreshKey = 0 }) => {
@@ -233,9 +235,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
         timelineStyleConfigs,
         timelineSortOrder,
         timelineQuickActions,
+        timelineLayout,
         timelineStyleAdjusterOpen,
         setTimelineStyleAdjusterOpen
     } = useSettings();
+    const [isTodoSidebarCollapsed, setIsTodoSidebarCollapsed] = useState(false);
+    const [isTodoSidebarOpen, setIsTodoSidebarOpen] = useState(false);
 
     // 监听 TimePal 调试器的开关
     React.useEffect(() => {
@@ -1131,7 +1136,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
 
     return (
         <div
-            className="h-full flex flex-col relative isolate text-stone-900"
+            className={`h-full flex flex-col relative isolate text-stone-900 ${timelineLayout === 'timeline-todo' ? (isTodoSidebarCollapsed ? 'lg:pr-14' : 'lg:pr-[22rem]') : ''}`}
             style={{ backgroundColor: hasBackground ? 'transparent' : '#faf9f6' }}
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
@@ -1168,6 +1173,17 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                     todos={todos}
                     extraHeaderControls={
                         <>
+                            {timelineLayout === 'timeline-todo' && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsTodoSidebarOpen(true)}
+                                    className="rounded-full p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 lg:hidden"
+                                    title="今日待办"
+                                    aria-label="打开今日待办"
+                                >
+                                    <ListTodo size={20} />
+                                </button>
+                            )}
                             {configuredQuickActions.map((action) => (
                                 <button
                                     key={action.label}
@@ -2071,6 +2087,21 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
 
             {timelineStyleAdjusterOpen && timelineStyleTheme !== 'default' && (
                 <TimelineStyleAdjuster onClose={() => setTimelineStyleAdjusterOpen(false)} />
+            )}
+
+            {timelineLayout === 'timeline-todo' && (
+                <TimelineTodoSidebar
+                    todos={todos}
+                    todoCategories={todoCategories}
+                    isCollapsed={isTodoSidebarCollapsed}
+                    isMobileOpen={isTodoSidebarOpen}
+                    onToggleCollapsed={() => setIsTodoSidebarCollapsed((collapsed) => !collapsed)}
+                    onCloseMobile={() => setIsTodoSidebarOpen(false)}
+                    onSelectTodo={(todo) => {
+                        setIsTodoSidebarOpen(false);
+                        onNavigateToTodo?.(todo);
+                    }}
+                />
             )}
 
             {/* 画廊视图 */}

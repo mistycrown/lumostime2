@@ -4,6 +4,7 @@
  * @updated 2026-05-10: Replaced the old boolean timer auto-open flag with a three-state post-start jump mode and legacy storage migration.
  * @updated 2026-04-25: Added configurable timeline quick-action preferences for the timeline header.
  * @updated 2026-07-21: Added persistent calendar number typography preferences shared by app and desktop month views.
+ * @updated 2026-07-29: Added persistent Chronicle page layout preferences.
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
@@ -31,6 +32,11 @@ import {
     isTimelineStyleTheme,
     normalizeTimelineStyleConfigs
 } from '../services/timelineStyleService';
+import {
+    DEFAULT_TIMELINE_LAYOUT_MODE,
+    isTimelineLayoutMode,
+    type TimelineLayoutMode
+} from '../services/timelineLayoutService';
 import {
     AchievementBottleStyle,
     DEFAULT_ACHIEVEMENT_BOTTLE_STYLE,
@@ -87,6 +93,7 @@ export type { ImmersiveTimerOrientation } from '../utils/immersiveOrientation';
 export type { TimelineQuickActionKey } from '../constants/timelineQuickActions';
 export type { AutoStartTimerJumpMode } from '../utils/autoStartTimerJumpMode';
 export type { ThemeMode } from '../utils/displayMode';
+export type { TimelineLayoutMode } from '../services/timelineLayoutService';
 
 interface SettingsContextType {
     // 基础偏好设置
@@ -132,6 +139,8 @@ interface SettingsContextType {
     setTimelineSortOrder: React.Dispatch<React.SetStateAction<TimelineSortOrder>>;
     timelineQuickActions: TimelineQuickActionKey[];
     setTimelineQuickActions: React.Dispatch<React.SetStateAction<TimelineQuickActionKey[]>>;
+    timelineLayout: TimelineLayoutMode;
+    setTimelineLayout: React.Dispatch<React.SetStateAction<TimelineLayoutMode>>;
 
     // 折叠字数设置
     collapseThreshold: number;
@@ -600,6 +609,11 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     });
     const [timelineStyleAdjusterOpen, setTimelineStyleAdjusterOpen] = useState(false);
 
+    const [timelineLayout, setTimelineLayout] = useState<TimelineLayoutMode>(() => {
+        const stored = localStorage.getItem(THEME_KEYS.TIMELINE_LAYOUT);
+        return isTimelineLayoutMode(stored) ? stored : DEFAULT_TIMELINE_LAYOUT_MODE;
+    });
+
     const [emojiStyle, setEmojiStyle] = useState<EmojiStyle>(() => {
         const stored = localStorage.getItem('lumostime_emoji_style');
         // 向后兼容：如果之前使用 useTwemoji，转换为新格式
@@ -679,6 +693,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem(THEME_KEYS.TIMELINE_STYLE_CONFIGS, JSON.stringify(timelineStyleConfigs));
     }, [timelineStyleConfigs]);
+
+    useEffect(() => {
+        localStorage.setItem(THEME_KEYS.TIMELINE_LAYOUT, timelineLayout);
+    }, [timelineLayout]);
 
     useEffect(() => {
         localStorage.setItem('lumostime_emoji_style', emojiStyle);
@@ -790,6 +808,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setTimelineSortOrder,
             timelineQuickActions,
             setTimelineQuickActions,
+            timelineLayout,
+            setTimelineLayout,
             collapseThreshold,
             setCollapseThreshold,
             uiIconTheme,
