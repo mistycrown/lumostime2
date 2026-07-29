@@ -1169,7 +1169,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
                 <ChevronDown size={12} className={`transition-transform ${isGroupMenuOpen ? 'rotate-180' : ''}`} />
               </button>
               {isGroupMenuOpen && (
-                <div className="absolute right-0 top-full z-30 mt-2 min-w-[10rem] overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-[0_12px_32px_rgba(0,0,0,0.12)]">
+                <div className="scene-group-menu absolute right-0 top-full z-30 mt-2 min-w-[10rem] overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-[0_12px_32px_rgba(0,0,0,0.12)]">
                   <div className="max-h-72 overflow-y-auto py-1">
                     {sceneGroupState.groups.map((group) => {
                       const isSelected = group.id === sceneGroupState.activeGroupId;
@@ -1179,7 +1179,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
                           type="button"
                           onClick={() => handleManualGroupSelect(group.id)}
                           className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition-colors ${
-                            isSelected ? 'font-bold' : 'text-stone-700 hover:bg-stone-50'
+                            isSelected ? 'scene-group-menu-selected font-bold' : 'text-stone-700 hover:bg-stone-50'
                           }`}
                           style={isSelected ? {
                             backgroundColor: 'color-mix(in srgb, var(--accent-color) 12%, white)',

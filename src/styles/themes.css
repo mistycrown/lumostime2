@@ -2159,6 +2159,26 @@ html[data-theme-mode=dark] .theme-select-option-check {
 }
 
 /* Record detail associations: outlines identify only selected tags. */
+html:not([data-theme-mode=dark]) .record-association-selected {
+  background-color: transparent !important;
+  border-color: #57534e !important;
+  color: #292524 !important;
+  box-shadow: none !important;
+}
+
+html:not([data-theme-mode=dark]) .record-association-activity-selected {
+  outline: 2px solid #78716c;
+  outline-offset: 2px;
+}
+
+html:not([data-theme-mode=dark])[data-color-scheme]:not([data-color-scheme="default"]) .record-association-selected {
+  border-color: var(--accent-color) !important;
+}
+
+html:not([data-theme-mode=dark])[data-color-scheme]:not([data-color-scheme="default"]) .record-association-activity-selected {
+  outline-color: var(--accent-color);
+}
+
 html[data-theme-mode=dark] .record-association-selected {
   background-color: #44403c !important;
   border-color: #f5f5f4 !important;
@@ -3287,4 +3307,23 @@ html[data-theme-mode=dark] .page-background-overlay {
 
 html[data-theme-mode=dark] .page-content-panel {
   background-color: rgb(28 25 23 / 24%) !important;
+}
+
+html[data-theme-mode=dark] .scene-group-menu {
+  background-color: #292524 !important;
+  border-color: #57534e !important;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 42%) !important;
+}
+
+html[data-theme-mode=dark] .scene-group-menu-selected {
+  background-color: color-mix(in srgb, var(--accent-color) 22%, #292524) !important;
+  color: var(--accent-color) !important;
+}
+
+html[data-theme-mode=dark] .scene-group-menu > div > button:not(.scene-group-menu-selected) {
+  color: #e7e5e4 !important;
+}
+
+html[data-theme-mode=dark] .scene-group-menu > div > button:not(.scene-group-menu-selected):hover {
+  background-color: #44403c !important;
 }
