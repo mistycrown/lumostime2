@@ -1,14 +1,14 @@
 /**
  * @file TimelineScheduleCanvas.tsx
- * @input Selected date, logs, categories, resolved display mode, and record callbacks
+ * @input Selected date, logs, categories, scopes, resolved display mode, and record callbacks
  * @output A full-day scrollable schedule canvas with parallel blocks, current-time marker, and touch pinch zoom
  * @pos Component
  * @description Positions real records on a 00:00-24:00 time grid for the Chronicle timeline-and-todo layout.
- * @updated 2026-07-29: Added overlap-column layout, today-only current-time marker, and end-of-canvas zoom controls.
+ * @updated 2026-07-29: Added ordered time, link metadata, and truncated note content for each schedule block.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
-import { Category, Log, TodoItem } from '../types';
+import { Category, Log, Scope, TodoItem } from '../types';
 import { toCssColor } from '../utils/colorUtils';
 
 const MIN_HOUR_HEIGHT = 52;
@@ -20,6 +20,7 @@ interface TimelineScheduleCanvasProps {
   currentDate: Date;
   logs: Log[];
   categories: Category[];
+  scopes: Scope[];
   todos: TodoItem[];
   isDarkMode: boolean;
   onEditLog: (log: Log) => void;
@@ -73,6 +74,7 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
   currentDate,
   logs,
   categories,
+  scopes,
   todos,
   onEditLog,
   isDarkMode
@@ -109,6 +111,9 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
       const category = categories.find((item) => item.id === log.categoryId);
       const activity = category?.activities.find((item) => item.id === log.activityId);
       const linkedTodo = todos.find((item) => item.id === log.linkedTodoId);
+      const linkedScopeNames = (log.scopeIds || [])
+        .map((scopeId) => scopes.find((scope) => scope.id === scopeId)?.name)
+        .filter((name): name is string => Boolean(name));
       const colorSource = activity?.color || category?.themeColor || '';
 
       return {
@@ -121,10 +126,11 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
         background: toCssColor(colorSource, 'background', 0.34),
         startLabel: formatTime(new Date(log.startTime)),
         endLabel: formatTime(new Date(log.endTime)),
-        categoryLabel: activity?.name || category?.name || '未分类',
-        linkedTodoLabel: linkedTodo?.title
+        activityLabel: activity?.name || category?.name,
+        linkedTodoLabel: linkedTodo?.title,
+        linkedScopeNames
       };
-    })), [logs, categories, todos, dayStart, dayEnd, hourHeight]);
+    })), [logs, categories, scopes, todos, dayStart, dayEnd, hourHeight]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setCurrentTime(new Date()), 30000);
@@ -202,12 +208,12 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
           })}
 
           <div className="absolute inset-y-0 left-14 right-3">
-            {scheduledLogs.map(({ log, top, height, color, background, startLabel, endLabel, categoryLabel, linkedTodoLabel, column, columnCount }) => (
+            {scheduledLogs.map(({ log, top, height, color, background, startLabel, endLabel, activityLabel, linkedTodoLabel, linkedScopeNames, column, columnCount }) => (
               <button
                 key={log.id}
                 type="button"
                 onClick={() => onEditLog(log)}
-                className="absolute overflow-hidden border-l-[3px] px-3 py-2 text-left shadow-[0_1px_2px_rgba(28,25,23,0.06)] transition-shadow hover:shadow-[0_5px_16px_rgba(28,25,23,0.14)]"
+                className="absolute overflow-hidden rounded-[4px] border-l-[3px] px-3 py-2 text-left shadow-[0_1px_2px_rgba(28,25,23,0.06)] transition-shadow hover:shadow-[0_5px_16px_rgba(28,25,23,0.14)]"
                 style={{
                   top: `${top}px`,
                   height: `${height}px`,
@@ -217,11 +223,13 @@ export const TimelineScheduleCanvas: React.FC<TimelineScheduleCanvasProps> = ({
                   backgroundColor: background
                 }}
               >
-                <span className="block truncate text-sm font-bold leading-5 text-stone-800">{log.note?.split('\n')[0] || categoryLabel}</span>
-                <span className="mt-0.5 block text-[11px] font-medium tabular-nums text-stone-500">{startLabel} - {endLabel}</span>
-                {height >= 66 && (
-                  <span className="mt-1 block truncate text-[11px] text-stone-500">{linkedTodoLabel ? `@ ${linkedTodoLabel}` : categoryLabel}</span>
+                <span className="block truncate text-[11px] font-bold tabular-nums text-stone-600">{startLabel} - {endLabel}</span>
+                {(activityLabel || linkedTodoLabel || linkedScopeNames.length > 0) && (
+                  <span className="mt-0.5 block truncate text-[11px] font-medium text-stone-700">
+                    {activityLabel && `#${activityLabel}`}{linkedTodoLabel && `${activityLabel ? ' ' : ''}@${linkedTodoLabel}`}{linkedScopeNames.map((scopeName) => ` %${scopeName}`).join('')}
+                  </span>
                 )}
+                {log.note && <span className="mt-0.5 block truncate text-[11px] leading-4 text-stone-500">{log.note.replace(/\s+/g, ' ')}</span>}
               </button>
             ))}
           </div>

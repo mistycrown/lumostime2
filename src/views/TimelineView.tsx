@@ -14,7 +14,7 @@
  * @updated 2026-04-22: Replaced the old AI backfill entry with a local-history chat modal for the first-step conversational AI flow.
  * @updated 2026-04-20: Switched the timeline screen to the shared lightweight custom-background pipeline.
  * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
- * @updated 2026-07-29: Added parallel time blocks, today-only current-time marker, and frozen review cards to the split workspace.
+ * @updated 2026-07-29: Added compact sidebar review entries, persistent long-press resizing, and enriched parallel time blocks to the split workspace.
  */
 import React, { useMemo, useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -246,6 +246,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
         timelineLayout,
         timelineTodoSidebarCollapsed,
         setTimelineTodoSidebarCollapsed,
+        timelineTodoSidebarWidth,
+        setTimelineTodoSidebarWidth,
         themeMode,
         timelineStyleAdjusterOpen,
         setTimelineStyleAdjusterOpen
@@ -289,6 +291,64 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
         if (result.updatedReview) {
             onUpdateDailyReview(result.updatedReview);
         }
+    };
+
+    const timelineWorkspaceRef = useRef<HTMLDivElement>(null);
+    const sidebarResizeRef = useRef<{
+        startX: number;
+        startWidth: number;
+        active: boolean;
+        timerId: number | null;
+    } | null>(null);
+    const [isTimelineSidebarResizing, setIsTimelineSidebarResizing] = useState(false);
+
+    const clearSidebarResize = () => {
+        const session = sidebarResizeRef.current;
+        if (session?.timerId !== null) {
+            window.clearTimeout(session.timerId);
+        }
+        sidebarResizeRef.current = null;
+        setIsTimelineSidebarResizing(false);
+    };
+
+    const handleSidebarDividerPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+        if (timelineTodoSidebarCollapsed) return;
+        const session = {
+            startX: event.clientX,
+            startWidth: timelineTodoSidebarWidth,
+            active: false,
+            timerId: null as number | null
+        };
+        sidebarResizeRef.current = session;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        session.timerId = window.setTimeout(() => {
+            if (sidebarResizeRef.current === session) {
+                session.active = true;
+                setIsTimelineSidebarResizing(true);
+            }
+        }, 300);
+    };
+
+    const handleSidebarDividerPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+        const session = sidebarResizeRef.current;
+        if (!session) return;
+
+        if (!session.active) {
+            if (Math.abs(event.clientX - session.startX) > 5) {
+                clearSidebarResize();
+            }
+            return;
+        }
+
+        const workspaceWidth = timelineWorkspaceRef.current?.clientWidth || 0;
+        const minimumWidth = 240;
+        const maximumWidth = Math.max(minimumWidth, Math.floor(workspaceWidth * 0.5));
+        const nextWidth = Math.round(Math.min(
+            Math.max(session.startWidth + session.startX - event.clientX, minimumWidth),
+            maximumWidth
+        ));
+        event.preventDefault();
+        setTimelineTodoSidebarWidth(nextWidth);
     };
 
     // 监听 TimePal 调试器的开关
@@ -2060,35 +2120,52 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             </div>
 
             {timelineLayout === 'timeline-todo' && (
-                <TimelineReviewStack
-                    dailyReview={dailyReview}
-                    weeklyReview={weeklyReviewData.weeklyReview}
-                    monthlyReview={monthlyReviewData.monthlyReview}
-                    showWeekly={weeklyReviewData.isLastDayOfWeek}
-                    showMonthly={monthlyReviewData.isLastDayOfMonth}
-                    onOpenDaily={() => onOpenDailyReview?.()}
-                    onOpenWeekly={() => onOpenWeeklyReview?.(weeklyReviewData.weekStart, weeklyReviewData.weekEnd)}
-                    onOpenMonthly={() => onOpenMonthlyReview?.(monthlyReviewData.monthStart, monthlyReviewData.monthEnd)}
-                />
-            )}
-
-            {timelineLayout === 'timeline-todo' && (
-                <div className="min-h-0 flex flex-1 overflow-hidden">
+                <div ref={timelineWorkspaceRef} className="min-h-0 flex flex-1 overflow-hidden">
                     <TimelineScheduleCanvas
                         currentDate={currentDate}
                         logs={logs}
                         categories={categories}
+                        scopes={scopes}
                         todos={todos}
                         isDarkMode={isDarkMode}
                         onEditLog={onEditLog}
                     />
                     {!timelineTodoSidebarCollapsed && (
-                        <TimelineTodoSidebar
-                            todos={todos}
-                            checkItems={sidebarCheckItems}
-                            onSelectTodo={(todo) => onNavigateToTodo?.(todo)}
-                            onCheckItemClick={handleSidebarCheckItemClick}
-                        />
+                        <>
+                            <div
+                                role="separator"
+                                aria-label="长按后拖动以调整待办栏宽度"
+                                aria-orientation="vertical"
+                                onPointerDown={handleSidebarDividerPointerDown}
+                                onPointerMove={handleSidebarDividerPointerMove}
+                                onPointerUp={clearSidebarResize}
+                                onPointerCancel={clearSidebarResize}
+                                className={`group relative z-20 w-2 shrink-0 touch-none cursor-col-resize ${isTimelineSidebarResizing ? 'bg-stone-300/80 dark:bg-stone-600/80' : 'bg-transparent hover:bg-stone-200/60 dark:hover:bg-stone-700/60'}`}
+                            >
+                                <span className={`absolute inset-y-0 left-1/2 w-px -translate-x-1/2 ${isTimelineSidebarResizing ? 'bg-stone-500 dark:bg-stone-300' : 'bg-stone-200/80 dark:bg-stone-700'}`} />
+                            </div>
+                            <TimelineTodoSidebar
+                                todos={todos}
+                                logs={logs}
+                                checkItems={sidebarCheckItems}
+                                currentDate={currentDate}
+                                width={timelineTodoSidebarWidth}
+                                reviewSlot={(
+                                    <TimelineReviewStack
+                                        dailyReview={activeSidebarDailyReview}
+                                        weeklyReview={weeklyReviewData.weeklyReview}
+                                        monthlyReview={monthlyReviewData.monthlyReview}
+                                        showWeekly={weeklyReviewData.isLastDayOfWeek}
+                                        showMonthly={monthlyReviewData.isLastDayOfMonth}
+                                        onOpenDaily={() => onOpenDailyReview?.()}
+                                        onOpenWeekly={() => onOpenWeeklyReview?.(weeklyReviewData.weekStart, weeklyReviewData.weekEnd)}
+                                        onOpenMonthly={() => onOpenMonthlyReview?.(monthlyReviewData.monthStart, monthlyReviewData.monthEnd)}
+                                    />
+                                )}
+                                onSelectTodo={(todo) => onNavigateToTodo?.(todo)}
+                                onCheckItemClick={handleSidebarCheckItemClick}
+                            />
+                        </>
                     )}
                 </div>
             )}
