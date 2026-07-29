@@ -4,7 +4,8 @@
  * @updated 2026-07-21: Replaced the display-mode segmented control with a settings-style dropdown and improved dark-mode toggle contrast.
  * @updated 2026-05-10: Replaced the old timer auto-open toggle with a three-option dropdown that reuses the existing settings selector style.
  * @updated 2026-04-25: Added timeline quick-action customization controls under display preferences.
- * @updated 2026-07-29: Added Chronicle layout selection with the shared settings dropdown style.
+ * @updated 2026-07-29: Added Chronicle layout and schedule-canvas start selection with shared settings dropdown styles.
+ * @updated 2026-07-29: Moved display mode into the general settings group.
  */
 import React, { useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus, X } from 'lucide-react';
@@ -16,7 +17,7 @@ import {
     AUTO_START_TIMER_JUMP_MODE_OPTIONS,
     getAutoStartTimerJumpModeLabel
 } from '../../utils/autoStartTimerJumpMode';
-import { TIMELINE_LAYOUT_OPTIONS } from '../../services/timelineLayoutService';
+import { TIMELINE_CANVAS_START_HOUR_OPTIONS, TIMELINE_LAYOUT_OPTIONS } from '../../services/timelineLayoutService';
 
 interface PreferencesSettingsViewProps {
     onBack: () => void;
@@ -119,11 +120,12 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     sceneCardTimerMode = 'realtime',
     onSetSceneCardTimerMode
 }) => {
-    const { themeMode, setThemeMode, timelineLayout, setTimelineLayout } = useSettings();
+    const { themeMode, setThemeMode, timelineLayout, setTimelineLayout, timelineCanvasStartHour, setTimelineCanvasStartHour } = useSettings();
     const [isThemeModeDropdownOpen, setIsThemeModeDropdownOpen] = useState(false);
     const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
     const [isAutoStartTimerJumpModeDropdownOpen, setIsAutoStartTimerJumpModeDropdownOpen] = useState(false);
     const [isTimelineLayoutDropdownOpen, setIsTimelineLayoutDropdownOpen] = useState(false);
+    const [isTimelineCanvasStartHourDropdownOpen, setIsTimelineCanvasStartHourDropdownOpen] = useState(false);
     const [isTimelineQuickActionsExpanded, setIsTimelineQuickActionsExpanded] = useState(false);
     const selectedQuickActionOptions = timelineQuickActions
         .map((key) => TIMELINE_QUICK_ACTION_OPTIONS.find((option) => option.key === key))
@@ -167,9 +169,9 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
 
             <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-40">
                 <div className="space-y-3">
-                    <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">{'\u663e\u793a\u6a21\u5f0f'}</h3>
+                    <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">通用</h3>
                     <div className="bg-white rounded-2xl overflow-visible shadow-[0_2px_10px_rgba(0,0,0,0.03)] relative">
-                        <div className="flex items-center justify-between p-4">
+                        <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors rounded-t-2xl">
                             <span className="font-bold text-stone-700">{'\u663e\u793a\u6a21\u5f0f'}</span>
                             <div className="relative">
                                 <button
@@ -207,14 +209,6 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                 )}
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                {/* Privacy Mode */}
-                {/* 通用设置 */}
-                <div className="space-y-3">
-                    <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">通用</h3>
-                    <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
                         {/* Privacy Mode Toggle */}
                         <div className="flex items-center justify-between gap-3 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
                             <div className="flex-1 min-w-0">
@@ -236,7 +230,7 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                         </div>
                         
                         {/* Manual Sync Mode Toggle */}
-                        <div className="flex items-center justify-between gap-3 p-4 hover:bg-stone-50 transition-colors">
+                        <div className="flex items-center justify-between gap-3 p-4 hover:bg-stone-50 transition-colors rounded-b-2xl">
                             <div className="flex-1 min-w-0">
                                 <h4 className="font-bold text-stone-700">手动同步模式</h4>
                                 <p className="text-xs text-stone-400 mt-1">开启后点击同步按钮将弹出方向选择，关闭则自动检测</p>
@@ -570,6 +564,45 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                                 >
                                                     {option.label}
                                                     {timelineLayout === option.value && <span className="h-1.5 w-1.5 rounded-full bg-stone-800" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-3 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                            <div className="min-w-0 flex-1">
+                                <h4 className="font-bold text-stone-700">时间轴默认定位</h4>
+                            </div>
+                            <div className="relative shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsTimelineCanvasStartHourDropdownOpen((open) => !open)}
+                                    className="flex items-center gap-2 rounded-lg bg-stone-100 px-4 py-2 text-sm font-bold text-stone-700 transition-colors hover:bg-stone-200"
+                                    aria-haspopup="listbox"
+                                    aria-expanded={isTimelineCanvasStartHourDropdownOpen}
+                                >
+                                    <span>{String(timelineCanvasStartHour).padStart(2, '0')}:00</span>
+                                    <ChevronDown size={14} className={`transition-transform ${isTimelineCanvasStartHourDropdownOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                {isTimelineCanvasStartHourDropdownOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-[100]" onClick={() => setIsTimelineCanvasStartHourDropdownOpen(false)} />
+                                        <div role="listbox" className="absolute right-0 top-full z-[110] mt-2 grid w-44 grid-cols-3 overflow-hidden rounded-xl border border-stone-100 bg-white py-1 shadow-xl animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                                            {TIMELINE_CANVAS_START_HOUR_OPTIONS.map((hour) => (
+                                                <button
+                                                    key={hour}
+                                                    type="button"
+                                                    role="option"
+                                                    aria-selected={timelineCanvasStartHour === hour}
+                                                    onClick={() => {
+                                                        setTimelineCanvasStartHour(hour);
+                                                        setIsTimelineCanvasStartHourDropdownOpen(false);
+                                                    }}
+                                                    className={`px-2 py-2 text-center text-xs font-bold transition-colors hover:bg-stone-50 ${timelineCanvasStartHour === hour ? 'bg-stone-100 text-stone-900' : 'text-stone-500'}`}
+                                                >
+                                                    {String(hour).padStart(2, '0')}:00
                                                 </button>
                                             ))}
                                         </div>

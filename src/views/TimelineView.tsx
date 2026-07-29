@@ -14,7 +14,7 @@
  * @updated 2026-04-22: Replaced the old AI backfill entry with a local-history chat modal for the first-step conversational AI flow.
  * @updated 2026-04-20: Switched the timeline screen to the shared lightweight custom-background pipeline.
  * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
- * @updated 2026-07-29: Added an optional responsive todo sidebar layout driven by the Chronicle preference.
+ * @updated 2026-07-29: Rebuilt the optional Chronicle todo layout around a full-day pinch-zoom schedule canvas and review stack.
  */
 import React, { useMemo, useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -50,6 +50,8 @@ import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 import { type TimelineQuickActionKey } from '../constants/timelineQuickActions';
 import { formatCompletedTodoLabel } from '../utils/todoHierarchyUtils';
 import { TimelineTodoSidebar } from '../components/TimelineTodoSidebar';
+import { TimelineScheduleCanvas } from '../components/TimelineScheduleCanvas';
+import { TimelineReviewStack } from '../components/TimelineReviewStack';
 
 // Image Thumbnail Component
 const TimelineImage: React.FC<{ filename: string, className?: string, useThumbnail?: boolean, refreshKey?: number }> = ({ filename, className = "w-16 h-16", useThumbnail = false, refreshKey = 0 }) => {
@@ -236,6 +238,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
         timelineSortOrder,
         timelineQuickActions,
         timelineLayout,
+        timelineCanvasStartHour,
         timelineStyleAdjusterOpen,
         setTimelineStyleAdjusterOpen
     } = useSettings();
@@ -1205,7 +1208,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
             {/* Timeline List */}
             <div 
                 ref={scrollContainerRef}
-                className="flex-1 overflow-y-auto overflow-x-hidden px-7 py-6 pb-24 no-scrollbar"
+                className={timelineLayout === 'timeline-todo' ? 'hidden' : 'flex-1 overflow-y-auto overflow-x-hidden px-7 py-6 pb-24 no-scrollbar'}
                 id="timeline-content"
             >
                 <div
@@ -2020,6 +2023,29 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                     </div>
                 )}
             </div>
+
+            {timelineLayout === 'timeline-todo' && (
+                <>
+                    <TimelineReviewStack
+                        dailyReview={dailyReview}
+                        weeklyReview={weeklyReviewData.weeklyReview}
+                        monthlyReview={monthlyReviewData.monthlyReview}
+                        showWeekly={weeklyReviewData.isLastDayOfWeek}
+                        showMonthly={monthlyReviewData.isLastDayOfMonth}
+                        onOpenDaily={() => onOpenDailyReview?.()}
+                        onOpenWeekly={() => onOpenWeeklyReview?.(weeklyReviewData.weekStart, weeklyReviewData.weekEnd)}
+                        onOpenMonthly={() => onOpenMonthlyReview?.(monthlyReviewData.monthStart, monthlyReviewData.monthEnd)}
+                    />
+                    <TimelineScheduleCanvas
+                        currentDate={currentDate}
+                        logs={logs}
+                        categories={categories}
+                        todos={todos}
+                        defaultStartHour={timelineCanvasStartHour}
+                        onEditLog={onEditLog}
+                    />
+                </>
+            )}
 
             {/* Floating AI Button (Above Add) */}
             <FloatingButton
