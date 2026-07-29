@@ -46,7 +46,7 @@ export const TagAssociation: React.FC<TagAssociationProps> = ({
                         className={`
                             px-2 py-2 rounded-lg text-[10px] font-medium text-center transition-colors flex items-center justify-center gap-1.5 truncate
                             ${selectedCategoryId === cat.id
-                                ? 'record-association-selected bg-stone-800 text-white border border-stone-500'
+                                ? 'record-association-selected border border-stone-700 text-stone-800'
                                 : 'bg-transparent text-stone-500 hover:bg-stone-100'}
                         `}
                     >

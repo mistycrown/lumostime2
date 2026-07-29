@@ -4,6 +4,7 @@
  * @output Bottom-sheet achievement stats drawer with a horizontally draggable positive/negative line chart
  * @pos Component (Achievement Stats)
  * @description Renders an editorial print-inspired statistics drawer for the active achievement ledger with one draggable daily net-delta line chart.
+ * @updated 2026-07-24: Anchored the opening scroll position to the latest daily point instead of a fixed viewport guess.
  * @updated 2026-07-06: Removed the y-axis title words and added a trailing empty day slot so the last-point label has breathing room.
  * @updated 2026-07-06: Restored fixed horizontal spacing by preventing the scrollable plot from shrinking on mobile.
  * @updated 2026-07-06: Moved the y-axis into a fixed safe gutter and expanded the x-axis to show every day label.
@@ -29,6 +30,7 @@ const MIN_CHART_WIDTH = 960;
 const SPARSE_POINT_GAP = 132;
 const REGULAR_POINT_GAP = 72;
 const Y_AXIS_WIDTH = 56;
+const LATEST_POINT_RIGHT_INSET = 96;
 
 const addOneDay = (date: string): string => {
   const nextDate = new Date(`${date}T00:00:00`);
@@ -174,14 +176,21 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
     setActivePointIndex(latestIndex);
 
     window.setTimeout(() => {
-      if (!chartData.isSparse) {
-        scrollerRef.current?.scrollTo({
-          left: Math.max(chartData.svgWidth - 640, 0),
+      const scroller = scrollerRef.current;
+      const latestPoint = chartData.points[latestIndex];
+
+      if (!chartData.isSparse && scroller && latestPoint) {
+        const maxScrollLeft = Math.max(chartData.svgWidth - scroller.clientWidth, 0);
+        const rightInset = Math.min(LATEST_POINT_RIGHT_INSET, Math.max(scroller.clientWidth * 0.25, 0));
+        const targetScrollLeft = Math.max(latestPoint.x - scroller.clientWidth + rightInset, 0);
+
+        scroller.scrollTo({
+          left: Math.min(targetScrollLeft, maxScrollLeft),
           behavior: 'smooth'
         });
       }
     }, 0);
-  }, [chartData.isSparse, chartData.svgWidth, isOpen, orderedSnapshots.length]);
+  }, [chartData.isSparse, chartData.points, chartData.svgWidth, isOpen, orderedSnapshots.length]);
 
   if (!isOpen) {
     return null;
