@@ -4,6 +4,7 @@
  * @output Auto-check completion status
  * @pos Utility (Auto Check)
  * @description 自动日课判断逻辑 - 根据筛选条件和统计规则自动判断日课完成状态
+ * @updated 2026-07-30: Added reorder-safe auto-check completion change detection for Daily Review refreshes.
  * @updated 2026-04-15: Added nightLatestStart support for cross-midnight sleep auto checks.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -210,6 +211,21 @@ export function updateAutoCheckItems(
     }
     return item;
   });
+}
+
+export function hasAutoCheckItemCompletionChanges(
+  previousItems: CheckItem[] | undefined,
+  nextItems: CheckItem[]
+): boolean {
+  const previousAutoItemsById = new Map(
+    (previousItems || [])
+      .filter((item) => item.type === 'auto')
+      .map((item) => [item.id, item.isCompleted] as const)
+  );
+
+  return nextItems.some((item) => (
+    item.type === 'auto' && previousAutoItemsById.get(item.id) !== item.isCompleted
+  ));
 }
 
 /**

@@ -6,7 +6,7 @@ Update 2026-05-18: `achievementCollections.ts` now recognizes default bottle pre
 
 Update 2026-07-29: `storageKeys.ts` now persists the Chronicle layout, todo-column collapse state, and resized todo-column width; the obsolete default schedule-hour key was removed.
 
-Update 2026-07-30: `storageKeys.ts` now also persists the quick-color split sidebar width so its divider-resized layout survives reloads.
+Update 2026-07-30: `storageKeys.ts` now persists the todo and quick-color split sidebars as responsive 26%-70% ratios, migrating old pixel widths where needed.
 
 Update 2026-05-12: `timelineQuickActions.ts` now includes a `collections` quick-action key so the timeline header can deep-link into `设置 > 内容 > Collections`.
 Update 2026-05-13: `dreamModePrompt.ts` now frames Dream as a long-horizon person-understanding workflow centered on inner traits, rhythms, wellbeing, and execution-pressure patterns, while `dreamTopicPresets.ts` now seeds those four newer built-in domains with longer prompt-style notes.

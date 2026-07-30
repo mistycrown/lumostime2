@@ -4,6 +4,7 @@
  * @output Updated daily check templates and optional historical review mutations
  * @pos Settings > Daily Review > Check Templates
  * @description 日课模板管理页，支持增删改排序、历史数据批量修正，以及赞赏码校验后的 UI icon 编辑入口。
+ * @updated 2026-07-30: Added per-item daily check enabled state editing and list styling.
  * @updated 2026-07-21: Added semantic dark-mode styles for historical daily-check batch operations.
  * @updated 2026-05-03: Rewrote the view in UTF-8 and added supporter-gated template/item UI icon editing.
  */
@@ -50,6 +51,7 @@ const createDefaultTemplateItem = (): CheckTemplateItem => ({
   id: crypto.randomUUID(),
   content: '',
   icon: '🔵',
+  enabled: true,
   type: 'manual',
   manualMode: 'binary'
 });
@@ -63,6 +65,7 @@ const createDefaultTemplate = (templates: CheckTemplate[]): CheckTemplate => ({
       id: crypto.randomUUID(),
       content: '日课 1',
       icon: '🔵',
+      enabled: true,
       type: 'manual',
       manualMode: 'binary'
     }
@@ -430,7 +433,9 @@ export const CheckTemplateManageView: React.FC<CheckTemplateManageViewProps> = (
                           {template.items.map((item) => (
                             <div
                               key={item.id}
-                              className="px-2 py-1.5 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 bg-stone-50 text-stone-500 border-stone-100"
+                              className={`px-2 py-1.5 rounded-lg text-[10px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 bg-stone-50 border-stone-100 ${
+                                item.enabled === false ? 'text-stone-300 opacity-60' : 'text-stone-500'
+                              }`}
                             >
                               {(item.icon || item.uiIcon) && (
                                 <IconRenderer icon={item.icon || ''} uiIcon={item.uiIcon} className="text-xs" />

@@ -4,11 +4,15 @@
  * @output A full-day scrollable schedule canvas with plan drops, quick-color record creation, editable time bounds, and touch pinch zoom
  * @pos Component
  * @description Positions real records and virtual planning blocks on a 00:00-24:00 time grid for the Chronicle split layout.
- * @updated 2026-07-30: Keeps quick-color creations out of edit mode so resizing only starts from a later long press.
+ * @updated 2026-07-30: Displays compact two-digit hour-only grid labels while preserving full block start/end times.
  * @updated 2026-07-30: Locks recurring auto-Plan deletion while the source Repeat todo still has auto generation enabled.
  * @updated 2026-07-30: Added quick-color range dragging plus direct 30-minute activity drops for formal record creation.
- * @updated 2026-07-30: Hardens mobile record taps with a click fallback while preserving long-press resizing.
+ * @updated 2026-07-30: Makes record taps more reliable by using a single pointer-up detail path and a longer edit long-press.
  * @updated 2026-07-30: Lets edited schedule blocks drag their middle body to move the whole range while keeping edge handles independent.
+ * @updated 2026-07-30: Locks edit-mode taps to the active block and suppresses pinch-zoom release taps from reopening record detail.
+ * @updated 2026-07-30: Restores a guarded click fallback so still taps open block detail without requiring pointer movement.
+ * @updated 2026-07-30: Tightens the schedule gutters and hides the in-panel scrollbar for a denser split workspace.
+ * @updated 2026-07-30: Suppresses the synthetic click after real-record taps so the detail modal is not immediately backdrop-closed.
  */
 import React, { useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -24,6 +28,11 @@ const DAY_MINUTES = 24 * 60;
 const TIME_SNAP_MINUTES = 5;
 export const TIMELINE_TOP_PADDING = 12;
 export const MIN_SCHEDULE_BLOCK_HEIGHT = 12;
+const BLOCK_GESTURE_THRESHOLD = 6;
+const LONG_PRESS_EDIT_DELAY = 500;
+const PINCH_BLOCK_TAP_SUPPRESSION_MS = 300;
+const BLOCK_CLICK_FALLBACK_SUPPRESSION_MS = 160;
+const RECORD_DETAIL_BACKDROP_CLICK_SUPPRESSION_MS = 320;
 
 interface TimelineScheduleCanvasProps {
   currentDate: Date;
@@ -95,6 +104,8 @@ interface QuickColorRangeSession {
   hasMoved: boolean;
 }
 
+type BlockPressMode = 'detail' | 'edit';
+
 const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max);
 
 const getTouchDistance = (first: Touch, second: Touch): number => Math.hypot(
@@ -103,6 +114,10 @@ const getTouchDistance = (first: Touch, second: Touch): number => Math.hypot(
 );
 
 const formatTime = (value: Date): string => `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
+
+export const formatTimelineHourLabel = (hour: number): string => (
+  hour === 0 ? '' : String(hour).padStart(2, '0')
+);
 
 const snapMinute = (minute: number): number => clamp(
   Math.round(minute / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES,
@@ -215,8 +230,11 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
 }, ref) => {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const pinchRef = useRef<{ distance: number; hourHeight: number } | null>(null);
+  const pinchBlockTapSuppressionUntilRef = useRef<number>(0);
+  const blockClickFallbackSuppressionUntilRef = useRef<number>(0);
+  const recordDetailBackdropClickSuppressionUntilRef = useRef<number>(0);
   const initializedDateRef = useRef<string>('');
-  const longPressRef = useRef<{ logId: string; startX: number; startY: number; timerId: number | null; active: boolean } | null>(null);
+  const longPressRef = useRef<{ logId: string; pointerId: number; startX: number; startY: number; timerId: number | null; active: boolean; mode: BlockPressMode } | null>(null);
   const resizeRef = useRef<{ log: Log; edge: 'start' | 'end' } | null>(null);
   const moveRef = useRef<{
     log: Log;
@@ -238,7 +256,11 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   const [timeOverrides, setTimeOverrides] = useState<Record<string, TimeOverride>>({});
   const createdPlanTimerRef = useRef<number | null>(null);
   const recordDetailOpenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const recordTapGuardRef = useRef<{ logId: string; timerId: ReturnType<typeof setTimeout> } | null>(null);
+  const editingLogIdRef = useRef<string | null>(null);
+  const setEditingMode = (nextEditingLogId: string | null) => {
+    editingLogIdRef.current = nextEditingLogId;
+    setEditingLogId(nextEditingLogId);
+  };
 
   const dateKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}`;
   const dayStart = useMemo(() => {
@@ -330,6 +352,72 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   }, [activePlanLog, planActionLogId]);
 
   useEffect(() => {
+    editingLogIdRef.current = editingLogId;
+  }, [editingLogId]);
+
+  useEffect(() => {
+    const handleDocumentPointerDownCapture = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const activeEditingLogId = editingLogIdRef.current;
+      const targetBlock = target.closest('[data-schedule-block]') as HTMLElement | null;
+      const targetBlockId = targetBlock?.dataset.logId || null;
+      const isEditingBlock = Boolean(activeEditingLogId && targetBlockId === activeEditingLogId);
+      const isTouchSuppressed = event.pointerType === 'touch'
+        && (pinchRef.current !== null || Date.now() < pinchBlockTapSuppressionUntilRef.current);
+
+      if (isTouchSuppressed) {
+        if (targetBlock) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return;
+      }
+
+      if (!activeEditingLogId || isEditingBlock) return;
+
+      clearLongPress();
+      pinchBlockTapSuppressionUntilRef.current = Date.now() + PINCH_BLOCK_TAP_SUPPRESSION_MS;
+      setEditingMode(null);
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    const handleDocumentClickCapture = (event: MouseEvent) => {
+      const now = Date.now();
+      if (
+        now < pinchBlockTapSuppressionUntilRef.current
+        || now < recordDetailBackdropClickSuppressionUntilRef.current
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
+      const activeEditingLogId = editingLogIdRef.current;
+      if (!activeEditingLogId) return;
+
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const targetBlock = target.closest('[data-schedule-block]') as HTMLElement | null;
+      if (targetBlock?.dataset.logId === activeEditingLogId) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      clearLongPress();
+      setEditingMode(null);
+    };
+
+    document.addEventListener('pointerdown', handleDocumentPointerDownCapture, true);
+    document.addEventListener('click', handleDocumentClickCapture, true);
+    return () => {
+      document.removeEventListener('pointerdown', handleDocumentPointerDownCapture, true);
+      document.removeEventListener('click', handleDocumentClickCapture, true);
+    };
+  }, []);
+
+  useEffect(() => {
     quickColorRangeRef.current = null;
     setQuickColorRangePreview(null);
     setQuickColorDropPreview(null);
@@ -348,7 +436,9 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   useEffect(() => () => {
     if (createdPlanTimerRef.current !== null) window.clearTimeout(createdPlanTimerRef.current);
     if (recordDetailOpenTimerRef.current !== null) clearTimeout(recordDetailOpenTimerRef.current);
-    if (recordTapGuardRef.current !== null) clearTimeout(recordTapGuardRef.current.timerId);
+    if (longPressRef.current?.timerId !== null && longPressRef.current?.timerId !== undefined) {
+      window.clearTimeout(longPressRef.current.timerId);
+    }
     moveRef.current = null;
   }, []);
 
@@ -490,19 +580,32 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   };
 
   const handleBlockPointerDown = (log: Log, event: React.PointerEvent<HTMLDivElement>) => {
-    if (editingLogId === log.id) {
-      startMove(log, event);
+    if (event.pointerType === 'touch' && (pinchRef.current !== null || Date.now() < pinchBlockTapSuppressionUntilRef.current)) {
+      event.preventDefault();
+      event.stopPropagation();
       return;
     }
+    if (editingLogIdRef.current && editingLogIdRef.current !== log.id) return;
     event.currentTarget.setPointerCapture(event.pointerId);
-    const press = { logId: log.id, startX: event.clientX, startY: event.clientY, timerId: null as number | null, active: false };
+    const pressMode: BlockPressMode = editingLogIdRef.current === log.id ? 'edit' : 'detail';
+    const press = {
+      logId: log.id,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      timerId: null as number | null,
+      active: false,
+      mode: pressMode
+    };
     longPressRef.current = press;
-    press.timerId = window.setTimeout(() => {
-      if (longPressRef.current === press) {
-        press.active = true;
-        setEditingLogId(log.id);
-      }
-    }, 350);
+    if (pressMode === 'detail') {
+      press.timerId = window.setTimeout(() => {
+        if (longPressRef.current === press) {
+          press.active = true;
+          setEditingMode(log.id);
+        }
+      }, LONG_PRESS_EDIT_DELAY);
+    }
   };
 
   const handleBlockPointerMove = (log: Log, event: React.PointerEvent<HTMLDivElement>) => {
@@ -514,32 +617,37 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
     }
 
     const press = longPressRef.current;
-    if (!press || press.logId !== log.id) return;
+    if (!press || press.logId !== log.id || press.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - press.startX;
+    const deltaY = event.clientY - press.startY;
+    const distance = Math.hypot(deltaX, deltaY);
+
+    if (press.mode === 'edit') {
+      if (!moveRef.current && distance > BLOCK_GESTURE_THRESHOLD) {
+        startMove(log, event);
+        updateMoveDraft(event.clientY);
+      }
+      return;
+    }
+
     if (press.active && !moveRef.current) {
       startMove(log, event);
       updateMoveDraft(event.clientY);
       return;
     }
     if (press.active) return;
-    if (Math.hypot(event.clientX - press.startX, event.clientY - press.startY) > 6) {
+    if (distance > BLOCK_GESTURE_THRESHOLD) {
       clearLongPress();
     }
   };
 
   const scheduleRecordDetailOpen = (log: Log) => {
-    if (recordTapGuardRef.current?.logId === log.id) return;
     if (recordDetailOpenTimerRef.current !== null) clearTimeout(recordDetailOpenTimerRef.current);
+    recordDetailBackdropClickSuppressionUntilRef.current = Date.now() + RECORD_DETAIL_BACKDROP_CLICK_SUPPRESSION_MS;
     recordDetailOpenTimerRef.current = scheduleTimelineRecordDetailOpen(() => {
       recordDetailOpenTimerRef.current = null;
       onEditLog(log);
     });
-    if (recordTapGuardRef.current !== null) clearTimeout(recordTapGuardRef.current.timerId);
-    recordTapGuardRef.current = {
-      logId: log.id,
-      timerId: setTimeout(() => {
-        recordTapGuardRef.current = null;
-      }, 400)
-    };
   };
 
   const handleBlockPointerUp = (log: Log, event: React.PointerEvent<HTMLDivElement>) => {
@@ -551,18 +659,38 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
       return;
     }
 
-    if (editingLogId === log.id) {
-      clearLongPress();
+    if (event.pointerType === 'touch' && (pinchRef.current !== null || Date.now() < pinchBlockTapSuppressionUntilRef.current)) {
+      event.preventDefault();
+      event.stopPropagation();
       return;
     }
-    const wasLongPress = longPressRef.current?.logId === log.id && longPressRef.current.active;
+
+    const press = longPressRef.current;
+    const wasLongPress = press?.logId === log.id && press.pointerId === event.pointerId && press.mode === 'detail' && press.active;
     clearLongPress();
+    if (editingLogIdRef.current) return;
     if (!wasLongPress) {
+      blockClickFallbackSuppressionUntilRef.current = Date.now() + BLOCK_CLICK_FALLBACK_SUPPRESSION_MS;
       if (log.isPlanned) {
         setPlanActionLogId(log.id);
       } else {
         scheduleRecordDetailOpen(log);
       }
+    }
+  };
+
+  const handleBlockClick = (log: Log, event: React.MouseEvent<HTMLDivElement>) => {
+    if (Date.now() < blockClickFallbackSuppressionUntilRef.current) return;
+    if (Date.now() < pinchBlockTapSuppressionUntilRef.current) return;
+    if (editingLogIdRef.current) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    clearLongPress();
+    if (log.isPlanned) {
+      setPlanActionLogId(log.id);
+    } else {
+      scheduleRecordDetailOpen(log);
     }
   };
 
@@ -573,12 +701,9 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
       return;
     }
 
-    clearLongPress();
-  };
-
-  const handleBlockClick = (log: Log) => {
-    if (log.isPlanned || editingLogId === log.id) return;
-    scheduleRecordDetailOpen(log);
+    if (longPressRef.current?.logId === log.id && longPressRef.current?.pointerId === event.pointerId) {
+      clearLongPress();
+    }
   };
 
   const handleResizePointerDown = (log: Log, edge: 'start' | 'end', event: React.PointerEvent<HTMLButtonElement>) => {
@@ -619,11 +744,14 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
 
   const handleTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
     event.stopPropagation();
-    if (event.touches.length < 2) pinchRef.current = null;
+    if (pinchRef.current && event.touches.length < 2) {
+      pinchBlockTapSuppressionUntilRef.current = Date.now() + PINCH_BLOCK_TAP_SUPPRESSION_MS;
+      pinchRef.current = null;
+    }
   };
 
   const showCreatedLogFeedback = (log: Log, enterEditMode = true) => {
-    setEditingLogId(enterEditMode ? log.id : null);
+    setEditingMode(enterEditMode ? log.id : null);
     if (createdPlanTimerRef.current !== null) window.clearTimeout(createdPlanTimerRef.current);
     setCreatedPlanLogId(log.id);
     createdPlanTimerRef.current = window.setTimeout(() => {
@@ -791,7 +919,7 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
     <section className={`relative min-h-0 min-w-0 flex-1 overflow-hidden border-t ${surfaceClassName}`} aria-label="全天时间轴">
       <div
         ref={scrollRef}
-        className={`h-full overflow-y-auto overscroll-contain pb-28 [scrollbar-color:#d6d3d1_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 ${quickColorSelection ? 'touch-none' : 'touch-pan-y'}`}
+        className={`h-full overflow-y-auto overscroll-contain pb-28 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${quickColorSelection ? 'touch-none' : 'touch-pan-y'}`}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -802,7 +930,7 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
           style={{ height: `${canvasHeight}px` }}
           onPointerDown={(event) => {
             if (!(event.target as HTMLElement).closest('[data-schedule-block]')) {
-              setEditingLogId(null);
+              setEditingMode(null);
               handleQuickColorCanvasPointerDown(event);
             }
           }}
@@ -815,15 +943,15 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
             return (
               <React.Fragment key={hour}>
                 <div className={`absolute left-0 right-0 border-t ${hourLineClassName}`} style={{ top }} />
-                {hour < 24 && <div className={`absolute left-14 right-0 border-t border-dashed ${halfHourLineClassName}`} style={{ top: top + hourHeight / 2 }} />}
-                <span className={`absolute left-0 w-12 -translate-y-1/2 pr-2 text-right text-[10px] font-bold tabular-nums ${timeLabelClassName}`} style={{ top }}>
-                  {String(hour).padStart(2, '0')}:00
+                {hour < 24 && <div className={`absolute left-10 right-0 border-t border-dashed ${halfHourLineClassName}`} style={{ top: top + hourHeight / 2 }} />}
+                <span className={`absolute left-0 w-8 -translate-y-1/2 pr-1 text-right text-[10px] font-bold tabular-nums ${timeLabelClassName}`} style={{ top }}>
+                  {formatTimelineHourLabel(hour)}
                 </span>
               </React.Fragment>
             );
           })}
 
-          <div className="absolute inset-y-0 left-14 right-3">
+          <div className="absolute inset-y-0 left-10 right-1">
             {todoDropPreview && (
               <div
                 className="pointer-events-none absolute z-10 rounded-[4px] border border-dashed px-3 py-2 opacity-90"
@@ -871,13 +999,14 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
                 <div
                   key={log.id}
                   data-schedule-block
+                  data-log-id={log.id}
                   role="button"
                   tabIndex={0}
                   onPointerDown={(event) => handleBlockPointerDown(log, event)}
                   onPointerMove={(event) => handleBlockPointerMove(log, event)}
                   onPointerUp={(event) => handleBlockPointerUp(log, event)}
                   onPointerCancel={(event) => handleBlockPointerCancel(log, event)}
-                  onClick={() => handleBlockClick(log)}
+                  onClick={(event) => handleBlockClick(log, event)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       if (log.isPlanned) {
@@ -923,7 +1052,7 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
             })}
           </div>
           {isToday && (
-            <div className="pointer-events-none absolute left-14 right-3 z-10 flex items-center" style={{ top: `${TIMELINE_TOP_PADDING + (currentMinutes / 60) * hourHeight}px` }}>
+            <div className="pointer-events-none absolute left-10 right-1 z-10 flex items-center" style={{ top: `${TIMELINE_TOP_PADDING + (currentMinutes / 60) * hourHeight}px` }}>
               <span className="h-2 w-2 shrink-0 -translate-x-1/2 rounded-full" style={{ backgroundColor: isDarkMode ? '#ffffff' : 'var(--accent-color, #1c1917)' }} />
               <span className="h-px flex-1" style={{ backgroundColor: isDarkMode ? '#ffffff' : 'var(--accent-color, #1c1917)' }} />
             </div>
