@@ -14,6 +14,7 @@ Add a second right-side split panel to the timeline workspace for quick coloring
   - Expanded state shows a collapse icon.
 - The quick color panel lists normal record labels by first-level category and second-level activity.
 - User selects an activity in the right panel, then drags on the left timeline from start time to end time.
+- User can also drag an activity directly from the quick color panel to the timeline. That path creates a default 30-minute formal record at the drop time, then the user can adjust the block boundary with the existing timeline handles.
 - Releasing the drag creates a formal `Log`, not a planned block.
 
 ## Data Flow
@@ -28,6 +29,8 @@ Add a second right-side split panel to the timeline workspace for quick coloring
 - Time snapping follows the existing 5-minute grid.
 - The minimum created record duration is 5 minutes.
 - While dragging, the canvas shows a translucent preview block using the selected activity color.
+- Clicking an activity keeps it selected and shows a brief hint telling the user to drag on the left timeline to create a record.
+- Directly dragging an activity from the panel skips the hint.
 - If no quick-color activity is selected, timeline dragging behaves normally.
 - The todo drag-to-plan interaction remains unchanged.
 
