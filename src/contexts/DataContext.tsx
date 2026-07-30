@@ -1,6 +1,7 @@
 /**
  * @file DataContext.tsx
  * @description Manages core application data state (logs, todos, todoCategories, and data collections) with async repository hydration and persistence.
+ * @updated 2026-07-30: Normalizes hydrated recurring auto-Plan settings alongside Maybe dates.
  * @updated 2026-05-23: Broadcasts desktop todo sync events after persisted todo writes and rehydrates todos from external desktop-window edits so Electron widgets and the main app stay aligned.
  * @updated 2026-05-14: Normalizes hydrated todo `maybeDates` on load so stale past `Maybe Date` entries are cleaned automatically when the app opens on a later day.
  */
@@ -13,6 +14,7 @@ import {
 } from '../services/desktopWidgetService';
 import { DataCollection, DataCollectionEntry, Log, TodoCategory, TodoItem } from '../types';
 import { normalizeTodoMaybeDates } from '../utils/todoScheduleUtils';
+import { normalizeTodoRecurringPlanConfig } from '../utils/todoRecurringPlanUtils';
 import {
   getLocalDataTimestamp,
   isLocalDataTimestampUpdateLocked,
@@ -100,7 +102,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         hydratedSuccessfully = true;
-        const normalizedTodos = snapshot.todos.map((todo) => normalizeTodoMaybeDates(todo));
+        const normalizedTodos = snapshot.todos.map((todo) => normalizeTodoMaybeDates({
+          ...todo,
+          recurringPlan: todo.recurrenceRule && !todo.parentTodoId && todo.kind !== 'quick'
+            ? normalizeTodoRecurringPlanConfig(todo.recurringPlan)
+            : undefined
+        }));
         setLogs(snapshot.logs);
         setTodos(normalizedTodos);
         setTodoCategories(snapshot.todoCategories);
@@ -166,7 +173,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       void (async () => {
         try {
           const snapshot = await dataRepository.loadDataContextSnapshot();
-          const normalizedTodos = snapshot.todos.map((todo) => normalizeTodoMaybeDates(todo));
+          const normalizedTodos = snapshot.todos.map((todo) => normalizeTodoMaybeDates({
+            ...todo,
+            recurringPlan: todo.recurrenceRule && !todo.parentTodoId && todo.kind !== 'quick'
+              ? normalizeTodoRecurringPlanConfig(todo.recurringPlan)
+              : undefined
+          }));
           const currentSerializedTodos = JSON.stringify(latestTodosRef.current);
           const nextSerializedTodos = JSON.stringify(normalizedTodos);
 

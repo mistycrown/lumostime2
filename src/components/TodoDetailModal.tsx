@@ -4,6 +4,7 @@
  * @output Modal Interaction (Edit Todo, View History)
  * @pos Component (Modal)
  * @description Displays detailed information for a specific Todo item, including its progress, planning fields, associated history logs, and focus stats.
+ * @updated 2026-07-30: Added Repeat auto-Plan settings for fixed timeline blocks with finite future occurrence generation.
  * @updated 2026-07-30: Completed todos now expose an editable completion-date field that reuses the planning date picker while preserving the stored local completion time.
  * @updated 2026-07-06: Raised the overlay detail layer above collection and schedule popovers so collection-launched todo timeline entries remain visible.
  * @updated 2026-05-19: Replaced the hidden monthly fallback checkbox with a pure button toggle that blocks default mouse-down focus switching, fixing the desktop white-screen triggered by tapping `31 号无则月末`.
@@ -35,7 +36,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { TodoItem, TodoCategory, Log, Category, Scope, TodoProgressTrackingMode, TodoRecurrenceFrequency, TodoRecurrenceRule } from '../types';
+import { TodoItem, TodoCategory, Log, Category, Scope, TodoProgressTrackingMode, TodoRecurrenceFrequency, TodoRecurrenceRule, TodoRecurringPlanConfig } from '../types';
 import { ScopeAssociation } from './ScopeAssociation';
 import { TagAssociation } from './TagAssociation';
 import { Trash2, Check, CheckCircle2, TrendingUp, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Pin, RotateCcw, CalendarDays, Flag, Repeat2, Plus, X } from 'lucide-react';
@@ -57,6 +58,16 @@ import {
 import { canTodoUseSubtaskProgress, getTodoProgressSnapshot, getTodoProgressTrackingMode } from '../utils/todoProgressUtils';
 import { getTodoKind, isQuickTodo } from '../utils/todoKindUtils';
 import { getRealTodoCategories, QUICK_TODO_CATEGORY_ID } from '../utils/todoQuickCategoryUtils';
+import {
+  DEFAULT_RECURRING_PLAN_END_MINUTES,
+  DEFAULT_RECURRING_PLAN_HORIZON_COUNT,
+  DEFAULT_RECURRING_PLAN_START_MINUTES,
+  MAX_RECURRING_PLAN_HORIZON_COUNT,
+  formatClockMinutes,
+  normalizeRecurringPlanHorizonCount,
+  normalizeTodoRecurringPlanConfig,
+  parseClockMinutes
+} from '../utils/todoRecurringPlanUtils';
 
 interface TodoDetailModalProps {
   initialTodo?: TodoItem | null;
@@ -139,6 +150,9 @@ const normalizeSkipDates = (value?: string[]): string[] => {
 };
 
 const normalizeRecurrenceRuleForComparison = (value?: TodoRecurrenceRule): string => JSON.stringify(value ?? null);
+const normalizeRecurringPlanForComparison = (value?: TodoRecurringPlanConfig): string => JSON.stringify(
+  normalizeTodoRecurringPlanConfig(value) ?? null
+);
 
 const MonthEndFallbackToggle: React.FC<{
   checked: boolean;
@@ -246,6 +260,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const initialDeadlineDate = initialTodo?.deadlineDate || initialDraft?.deadlineDate || '';
   const initialMaybeDates = normalizeMaybeDates(initialTodo?.maybeDates || initialDraft?.maybeDates) || [];
   const initialRecurrenceRule = initialTodo?.recurrenceRule || initialDraft?.recurrenceRule;
+  const initialRecurringPlan = normalizeTodoRecurringPlanConfig(initialTodo?.recurringPlan || initialDraft?.recurringPlan);
   const initialSkipDates = normalizeSkipDates(initialRecurrenceRule?.skipDates);
   const initialParentTodoId = initialTodo?.parentTodoId || initialDraft?.parentTodoId;
   const initialChildOrder = initialTodo?.childOrder ?? initialDraft?.childOrder;
@@ -320,6 +335,16 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const [recurrenceFallbackToMonthEnd, setRecurrenceFallbackToMonthEnd] = useState(
     initialRecurrenceRule?.fallbackToMonthEnd === true
   );
+  const [recurringPlanEnabled, setRecurringPlanEnabled] = useState(initialRecurringPlan?.enabled === true);
+  const [recurringPlanStartTime, setRecurringPlanStartTime] = useState(formatClockMinutes(
+    initialRecurringPlan?.startMinutes ?? DEFAULT_RECURRING_PLAN_START_MINUTES
+  ));
+  const [recurringPlanEndTime, setRecurringPlanEndTime] = useState(formatClockMinutes(
+    initialRecurringPlan?.endMinutes ?? DEFAULT_RECURRING_PLAN_END_MINUTES
+  ));
+  const [recurringPlanHorizonInput, setRecurringPlanHorizonInput] = useState(String(
+    initialRecurringPlan?.horizonCount ?? DEFAULT_RECURRING_PLAN_HORIZON_COUNT
+  ));
   const [activeDatePicker, setActiveDatePicker] = useState<DatePickerField>(null);
   const parsedRecurrenceMonthDays = useMemo(
     () => parseMonthlyDayInput(recurrenceMonthDaysInput),
@@ -534,6 +559,35 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     recurrenceWeekdays
   ]);
 
+  const recurringPlanConfig = useMemo<TodoRecurringPlanConfig | undefined>(() => {
+    if (isSubtask || isQuickReminder || !recurrenceRule) {
+      return undefined;
+    }
+
+    const startMinutes = parseClockMinutes(recurringPlanStartTime);
+    const endMinutes = parseClockMinutes(recurringPlanEndTime);
+    const hasValidTimeRange = startMinutes !== null && endMinutes !== null && endMinutes > startMinutes;
+
+    return normalizeTodoRecurringPlanConfig({
+      enabled: recurringPlanEnabled && hasValidTimeRange,
+      startMinutes: startMinutes ?? DEFAULT_RECURRING_PLAN_START_MINUTES,
+      endMinutes: endMinutes ?? DEFAULT_RECURRING_PLAN_END_MINUTES,
+      horizonCount: normalizeRecurringPlanHorizonCount(recurringPlanHorizonInput)
+    });
+  }, [
+    isQuickReminder,
+    isSubtask,
+    recurrenceRule,
+    recurringPlanEnabled,
+    recurringPlanEndTime,
+    recurringPlanHorizonInput,
+    recurringPlanStartTime
+  ]);
+
+  const isRecurringPlanTimeInvalid = recurringPlanEnabled
+    && recurrenceFrequency !== 'none'
+    && recurringPlanConfig?.enabled !== true;
+
   const handleRecurrenceFrequencyChange = (nextFrequency: RecurrenceFrequencyMode) => {
     if (isSubtask) {
       return;
@@ -543,6 +597,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
 
     if (nextFrequency === 'none') {
       setSkipDates([]);
+      setRecurringPlanEnabled(false);
     }
 
     if (nextFrequency !== 'none') {
@@ -584,6 +639,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     setRecurrenceWeekdays([]);
     setRecurrenceMonthDaysInput(String(parseDateKey(recurrenceStartDate)?.getDate() || new Date().getDate()));
     setSkipDates([]);
+    setRecurringPlanEnabled(false);
   };
 
   const datePickerTitle = activeDatePicker === 'scheduledDate'
@@ -718,6 +774,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     deadlineDate: deadlineDate || undefined,
     maybeDates: maybeDates.length > 0 ? maybeDates : undefined,
     recurrenceRule: isSubtask || isQuickReminder ? undefined : recurrenceRule,
+    recurringPlan: isSubtask || isQuickReminder || !recurrenceRule ? undefined : recurringPlanConfig,
     ...overrides
   });
 
@@ -750,13 +807,14 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
         scheduledDate !== normalizeOptionalText(persistedTodo.scheduledDate) ||
         deadlineDate !== normalizeOptionalText(persistedTodo.deadlineDate) ||
         normalizeMaybeDateListForComparison(maybeDates) !== normalizeMaybeDateListForComparison(persistedTodo.maybeDates) ||
-        normalizeRecurrenceRuleForComparison(isSubtask || isQuickReminder ? undefined : recurrenceRule) !== normalizeRecurrenceRuleForComparison(persistedTodo.recurrenceRule);
+        normalizeRecurrenceRuleForComparison(isSubtask || isQuickReminder ? undefined : recurrenceRule) !== normalizeRecurrenceRuleForComparison(persistedTodo.recurrenceRule) ||
+        normalizeRecurringPlanForComparison(isSubtask || isQuickReminder || !recurrenceRule ? undefined : recurringPlanConfig) !== normalizeRecurringPlanForComparison(persistedTodo.recurringPlan);
       
       if (!hasChanges) return;
     }
 
     onSave(buildTodoPayload());
-  }, [selectedCategoryId, title, note, isCompleted, completedAt, linkedCategoryId, linkedActivityId, defaultScopeIds, resolvedProgressTrackingMode, isManualProgress, totalAmount, unitAmount, completedUnits, heatmapMin, heatmapMax, pin, coverImage, parentTodoId, childOrder, scheduledDate, deadlineDate, isSubtask, recurrenceRule, initialTodo, onSave, todos]); // 监听所有状态变化
+  }, [selectedCategoryId, title, note, isCompleted, completedAt, linkedCategoryId, linkedActivityId, defaultScopeIds, resolvedProgressTrackingMode, isManualProgress, totalAmount, unitAmount, completedUnits, heatmapMin, heatmapMax, pin, coverImage, parentTodoId, childOrder, scheduledDate, deadlineDate, isSubtask, recurrenceRule, recurringPlanConfig, initialTodo, onSave, todos]); // 监听所有状态变化
 
   React.useEffect(() => {
     if (!title.trim()) return;
@@ -1689,6 +1747,67 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                                   <X size={12} />
                                 </button>
                               ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-3 border-t border-stone-100 pt-4">
+                          <button
+                            type="button"
+                            aria-pressed={recurringPlanEnabled}
+                            onClick={() => setRecurringPlanEnabled((previous) => !previous)}
+                            className="flex w-full items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-stone-300"
+                          >
+                            <span className="flex min-w-0 items-center gap-2 text-xs font-medium text-stone-600">
+                              <CalendarDays size={12} className="text-stone-400" />
+                              <span className="truncate">自动排入时间轴</span>
+                            </span>
+                            <span
+                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[0.35rem] border transition-colors ${
+                                recurringPlanEnabled
+                                  ? 'border-stone-900 bg-stone-900 text-white'
+                                  : 'border-stone-300 bg-white text-transparent'
+                              }`}
+                            >
+                              <Check size={10} strokeWidth={3} />
+                            </span>
+                          </button>
+
+                          {recurringPlanEnabled && (
+                            <div className="grid gap-3 md:grid-cols-3">
+                              <div className="space-y-1.5">
+                                <label className="text-[11px] font-medium text-stone-400">开始时间</label>
+                                <input
+                                  type="time"
+                                  value={recurringPlanStartTime}
+                                  onChange={(event) => setRecurringPlanStartTime(event.target.value)}
+                                  className={`w-full rounded-xl border bg-white px-3 py-2.5 text-sm text-stone-700 outline-none transition-colors focus:border-stone-400 ${
+                                    isRecurringPlanTimeInvalid ? 'border-red-200' : 'border-stone-200'
+                                  }`}
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-[11px] font-medium text-stone-400">结束时间</label>
+                                <input
+                                  type="time"
+                                  value={recurringPlanEndTime}
+                                  onChange={(event) => setRecurringPlanEndTime(event.target.value)}
+                                  className={`w-full rounded-xl border bg-white px-3 py-2.5 text-sm text-stone-700 outline-none transition-colors focus:border-stone-400 ${
+                                    isRecurringPlanTimeInvalid ? 'border-red-200' : 'border-stone-200'
+                                  }`}
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-[11px] font-medium text-stone-400">往后周期</label>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={recurringPlanHorizonInput}
+                                  onChange={(event) => setRecurringPlanHorizonInput(event.target.value.replace(/[^\d]/g, '').slice(0, 2))}
+                                  onBlur={() => setRecurringPlanHorizonInput(String(normalizeRecurringPlanHorizonCount(recurringPlanHorizonInput)))}
+                                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-700 outline-none transition-colors focus:border-stone-400"
+                                />
+                              </div>
                             </div>
                           )}
                         </div>

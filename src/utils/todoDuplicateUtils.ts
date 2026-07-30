@@ -4,11 +4,13 @@
  * @output Pure helpers for todo duplication and schedule-field normalization
  * @pos Utility
  * @description Centralizes todo duplicate shaping so copy flows can be tested without booting React hook context dependencies.
+ * @updated 2026-07-30: Normalizes recurring auto-Plan settings with the rest of todo planning fields.
  * @updated 2026-06-06: Added duplicate helpers that clear copied cover images by default while preserving existing date/tag/scope cleanup rules.
  */
 
 import { TodoDuplicateOptions, TodoItem } from '../types';
 import { normalizeMaybeDates } from './todoScheduleUtils';
+import { normalizeTodoRecurringPlanConfig } from './todoRecurringPlanUtils';
 
 export const normalizeTodoScheduleFields = (todo: TodoItem): TodoItem => {
   const skipDates = todo.recurrenceRule?.skipDates?.length
@@ -22,6 +24,9 @@ export const normalizeTodoScheduleFields = (todo: TodoItem): TodoItem => {
   return {
     ...todo,
     maybeDates: normalizeMaybeDates(todo.maybeDates),
+    recurringPlan: todo.recurrenceRule && !todo.parentTodoId && todo.kind !== 'quick'
+      ? normalizeTodoRecurringPlanConfig(todo.recurringPlan)
+      : undefined,
     recurrenceRule: todo.recurrenceRule
       ? {
           ...todo.recurrenceRule,
@@ -54,6 +59,7 @@ export const buildDuplicatedTodo = (
     scheduledDate: clearDates ? undefined : todo.scheduledDate,
     deadlineDate: clearDates ? undefined : todo.deadlineDate,
     recurrenceRule: clearDates || todo.parentTodoId ? undefined : todo.recurrenceRule,
+    recurringPlan: clearDates || todo.parentTodoId ? undefined : todo.recurringPlan,
     maybeDates: clearDates ? undefined : todo.maybeDates,
     linkedActivityId: clearTags ? undefined : todo.linkedActivityId,
     linkedCategoryId: clearTags ? undefined : todo.linkedCategoryId,

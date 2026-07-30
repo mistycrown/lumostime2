@@ -3,6 +3,7 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- Update 2026-07-30: `todoRecurringPlanUtils.ts` centralizes finite Repeat auto-Plan occurrence windows, generated Plan log metadata, same-day time normalization, and delete-lock checks.
 - Update 2026-07-11: `achievementUtils.ts` now rebuilds achievement redemption records for full recomputation, merging archived fragments and refreshing costs for rewards or collection bottles that still exist.
 - Update 2026-07-11: `hardwareBackHandlerStack.test.ts` now covers topmost-handler priority and fallthrough, guarding the shared Android back stack used by nested collection, todo, and record overlays.
 - Update 2026-07-06: `dataValidation.ts` now accepts `selfBeliefs` arrays in backup and cloud sync payloads so the self-belief library restores alongside principles.
@@ -32,6 +33,7 @@ Contains pure utility functions for data processing and business logic calculati
 - `aiBackupChange.ts`: [Active] - Marks AI-only local persistence updates as sync-relevant by updating the shared local timestamp and dispatching a dedicated AI backup change event.
 - `assistantLogSubmissionTrigger.ts`: [Active] - Emits the shared submitted-log event, matches newly created logs against the assistant's selected activity ids, builds the fixed `System: 用户刚才完成了一条时间记录` trigger text, and provides a temporary log-upsert helper so background turns can see a just-saved record immediately.
 - `syncTimestampDirection.ts`: [Active] - Resolves local/cloud sync direction from timestamp tolerance, pending-auto-sync state, and full JSON byte size so larger payloads can block contradictory overwrite decisions before data is lost.
+- `todoRecurringPlanUtils.ts`: [Active] - Builds finite auto-generated timeline Plan windows for recurring todos, normalizes stored plan settings, skips already-planned occurrence dates without extending the horizon, and locks deletion while the source todo remains enabled.
 - `todoScheduleUtils.ts`: [Active] - Shared todo planning helpers for Arrange / Due / Repeat / Done / Trace surfaces, including compact recurrence summaries like `每天`, `每周一三五`, and `每月 1,15,31` for lightweight UI metadata.
 - `todoScheduleAssignUtils.ts`: [Active] - Filters, sorts, and builds hierarchy rows for arrange/due picker todos, including the rules that unfinished subtasks disappear when their parent todo is already completed, recurring todos and the reserved `鏈潵` category stay out of quick scheduling, and title search keeps matched subtasks attached to their parent rows.
 - `todoQuickCategoryUtils.ts`: [Active] - Synthesizes the reserved `未来` and `小事` buckets, separates project-available categories from quick-schedule-available ones, and keeps quick reminders normalized onto the `小事` category id.
