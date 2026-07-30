@@ -4,6 +4,7 @@
  * @output Modal Interaction (Edit Todo, View History)
  * @pos Component (Modal)
  * @description Displays detailed information for a specific Todo item, including its progress, planning fields, associated history logs, and focus stats.
+ * @updated 2026-07-30: Completed todos now expose an editable completion-date field that reuses the planning date picker while preserving the stored local completion time.
  * @updated 2026-07-06: Raised the overlay detail layer above collection and schedule popovers so collection-launched todo timeline entries remain visible.
  * @updated 2026-05-19: Replaced the hidden monthly fallback checkbox with a pure button toggle that blocks default mouse-down focus switching, fixing the desktop white-screen triggered by tapping `31 号无则月末`.
  * @updated 2026-05-18: Defaulted timeline metadata render options so detail-page log chips still render safely when callers omit the auxiliary collection-name payload.
@@ -43,7 +44,7 @@ import { TimelineImage } from './TimelineImage';
 import { imageService } from '../services/imageService';
 import { IconRenderer } from './IconRenderer';
 import { useToast } from '../contexts/ToastContext';
-import { formatMonthlyDayInput, getTodayDateKey, matchesRecurrenceRule, normalizeMaybeDates, normalizeMonthlyDayInput, parseDateKey, parseMonthlyDayInput } from '../utils/todoScheduleUtils';
+import { formatDateKey, formatMonthlyDayInput, getTodayDateKey, matchesRecurrenceRule, normalizeMaybeDates, normalizeMonthlyDayInput, parseDateKey, parseMonthlyDayInput } from '../utils/todoScheduleUtils';
 import { TodoDatePickerModal } from './TodoDatePickerModal';
 import { DataCollectionSelector } from './DataCollectionSelector';
 import {
@@ -78,7 +79,7 @@ interface TodoDetailModalProps {
 
 type Tab = '细节' | '子任务' | '时间线';
 type RecurrenceFrequencyMode = TodoRecurrenceFrequency | 'none';
-type DatePickerField = 'scheduledDate' | 'deadlineDate' | 'maybeDates' | 'skipDates' | 'recurrenceStartDate' | 'recurrenceEndDate' | null;
+type DatePickerField = 'scheduledDate' | 'deadlineDate' | 'completedDate' | 'maybeDates' | 'skipDates' | 'recurrenceStartDate' | 'recurrenceEndDate' | null;
 
 const WEEKDAY_OPTIONS: Array<{ label: string; value: number }> = [
   { label: '一', value: 1 },
@@ -97,6 +98,22 @@ const formatDateFieldValue = (value?: string): string => {
   const month = `${parsed.getMonth() + 1}`.padStart(2, '0');
   const day = `${parsed.getDate()}`.padStart(2, '0');
   return `${parsed.getFullYear()}.${month}.${day}`;
+};
+
+export const replaceCompletedAtDate = (completedAt: string | undefined, dateKey: string): string => {
+  const selectedDate = parseDateKey(dateKey);
+  const originalDate = completedAt ? new Date(completedAt) : new Date();
+
+  if (!selectedDate || Number.isNaN(originalDate.getTime())) {
+    return completedAt || new Date().toISOString();
+  }
+
+  originalDate.setFullYear(
+    selectedDate.getFullYear(),
+    selectedDate.getMonth(),
+    selectedDate.getDate()
+  );
+  return originalDate.toISOString();
 };
 
 const normalizeOptionalText = (value?: string): string => value || '';
@@ -212,6 +229,9 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const initialTitle = initialTodo?.title || initialDraft?.title || '';
   const initialNote = initialTodo?.note || initialDraft?.note || '';
   const initialIsCompleted = initialTodo?.isCompleted || initialDraft?.isCompleted || false;
+  const initialCompletedAt = initialTodo?.completedAt
+    || initialDraft?.completedAt
+    || (initialIsCompleted ? new Date().toISOString() : '');
   const initialLinkedCategoryId = initialTodo?.linkedCategoryId || initialDraft?.linkedCategoryId || '';
   const initialLinkedActivityId = initialTodo?.linkedActivityId || initialDraft?.linkedActivityId || '';
   const initialDefaultScopeIds = initialTodo?.defaultScopeIds || initialDraft?.defaultScopeIds;
@@ -246,6 +266,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
 
   const [note, setNote] = useState(initialNote);
   const [isCompleted, setIsCompleted] = useState(initialIsCompleted);
+  const [completedAt, setCompletedAt] = useState(initialCompletedAt);
 
   // Link to Record Activity
   const [linkedCategoryId, setLinkedCategoryId] = useState<string>(initialLinkedCategoryId);
@@ -569,6 +590,8 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     ? '选择分配日期'
     : activeDatePicker === 'deadlineDate'
       ? '选择截止日期'
+      : activeDatePicker === 'completedDate'
+        ? '选择完成日期'
       : activeDatePicker === 'recurrenceStartDate'
         ? '选择循环开始日期'
         : activeDatePicker === 'recurrenceEndDate'
@@ -579,6 +602,8 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     ? scheduledDate
     : activeDatePicker === 'deadlineDate'
       ? deadlineDate
+      : activeDatePicker === 'completedDate'
+        ? formatDateKey(new Date(completedAt || new Date().toISOString()))
       : activeDatePicker === 'recurrenceStartDate'
         ? recurrenceStartDate
         : activeDatePicker === 'recurrenceEndDate'
@@ -598,6 +623,9 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
         if (recurrenceFrequency !== 'none') {
           clearRecurrence();
         }
+        break;
+      case 'completedDate':
+        setCompletedAt((previous) => replaceCompletedAtDate(previous, value));
         break;
       case 'recurrenceStartDate':
         setRecurrenceStartDate(value);
@@ -671,7 +699,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     title: title.trim(),
     isCompleted,
     completedAt: isCompleted
-      ? (persistedTodo?.isCompleted ? persistedTodo.completedAt : new Date().toISOString())
+      ? (completedAt || (persistedTodo?.isCompleted ? persistedTodo.completedAt : new Date().toISOString()))
       : undefined,
     note: note.trim(),
     linkedCategoryId: isQuickReminder ? undefined : (effectiveLinkedCategoryId || undefined),
@@ -705,6 +733,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
         title.trim() !== persistedTodo.title ||
         note.trim() !== normalizeOptionalText(persistedTodo.note) ||
         isCompleted !== persistedTodo.isCompleted ||
+        (isCompleted ? completedAt : undefined) !== persistedTodo.completedAt ||
         (isQuickReminder ? '' : effectiveLinkedCategoryId) !== normalizeOptionalText(persistedTodo.linkedCategoryId) ||
         (isQuickReminder ? '' : resolvedLinkedActivityId) !== normalizeOptionalText(persistedTodo.linkedActivityId) ||
         JSON.stringify(normalizeOptionalScopeIds(isQuickReminder ? undefined : resolvedDefaultScopeIds)) !== JSON.stringify(normalizeOptionalScopeIds(persistedTodo.defaultScopeIds)) ||
@@ -727,7 +756,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     }
 
     onSave(buildTodoPayload());
-  }, [selectedCategoryId, title, note, isCompleted, linkedCategoryId, linkedActivityId, defaultScopeIds, resolvedProgressTrackingMode, isManualProgress, totalAmount, unitAmount, completedUnits, heatmapMin, heatmapMax, pin, coverImage, parentTodoId, childOrder, scheduledDate, deadlineDate, isSubtask, recurrenceRule, initialTodo, onSave, todos]); // 监听所有状态变化
+  }, [selectedCategoryId, title, note, isCompleted, completedAt, linkedCategoryId, linkedActivityId, defaultScopeIds, resolvedProgressTrackingMode, isManualProgress, totalAmount, unitAmount, completedUnits, heatmapMin, heatmapMax, pin, coverImage, parentTodoId, childOrder, scheduledDate, deadlineDate, isSubtask, recurrenceRule, initialTodo, onSave, todos]); // 监听所有状态变化
 
   React.useEffect(() => {
     if (!title.trim()) return;
@@ -747,6 +776,17 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
 
   const handleTogglePin = () => {
     setPin((prev) => !prev);
+  };
+
+  const handleCompletionToggle = () => {
+    if (isCompleted) {
+      setCompletedAt('');
+      setIsCompleted(false);
+      return;
+    }
+
+    setCompletedAt(new Date().toISOString());
+    setIsCompleted(true);
   };
 
   const handleUpgradeQuickTodoToProject = () => {
@@ -1059,7 +1099,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest">基本信息</h3>
                 <button
-                  onClick={() => setIsCompleted(!isCompleted)}
+                  onClick={handleCompletionToggle}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${isCompleted ? 'bg-stone-900 text-white shadow-md' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'}`}
                 >
                   {isCompleted ? <CheckCircle2 size={14} /> : <Circle size={14} />}
@@ -1372,6 +1412,22 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
               </div>
 
                 <div className="space-y-4">
+                  {isCompleted && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-stone-400 font-medium flex items-center gap-1.5">
+                        <CheckCircle2 size={12} />
+                        完成日期
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setActiveDatePicker('completedDate')}
+                        className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
+                      >
+                        {formatDateFieldValue(formatDateKey(new Date(completedAt || new Date().toISOString())))}
+                      </button>
+                    </div>
+                  )}
+
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <label className="text-xs text-stone-400 font-medium flex items-center gap-1.5">
@@ -1899,7 +1955,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
 
           handleMaybeDatesSelect(values);
         }}
-        onClear={() => {
+        onClear={activeDatePicker === 'completedDate' ? undefined : () => {
           if (activeDatePicker === 'skipDates') {
             setSkipDates([]);
             return;

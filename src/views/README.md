@@ -3,6 +3,12 @@
 The `views/` directory contains all the React components that represent the distinct screens or pages of the LumosTime application. This layer is responsible for the presentation logic and user interaction.
 
 - Update 2026-07-30: `TimelineView.tsx` passes the selected timeline date and logs into the split-workspace todo sidebar so it shares the schedule page's date-specific entries, including same-day completions and excluding Trace; future dates omit the daily-check list.
+- Update 2026-07-30: `TimelineView.tsx` now forwards todo drops into the schedule canvas for virtual planning-block creation and hardens the long-press sidebar-resize cleanup path when a pointer session has already ended.
+- Update 2026-07-30: `TimelineView.tsx` disables root swipe-date navigation only in the timeline-and-todo layout, preventing todo drag gestures from being claimed before they reach the schedule canvas.
+- Update 2026-07-30: `TimelineView.tsx` forwards sidebar completion-circle clicks through the shared todo save flow, while todo bodies remain dedicated to quick editing and plan dragging.
+- Update 2026-07-30: `TimelineView.tsx` routes plan-block start actions into the shared todo focus launcher and removes only the selected virtual plan block through a dedicated callback.
+- Update 2026-07-30: `TimelineView.tsx` coordinates sidebar drag movement, cancellation, and drop outcomes with the schedule canvas so drag feedback remains live across both workspace panels.
+- Update 2026-07-30: `TimelineView.tsx` continues to route direct mobile drag outcomes into the full-viewport plan action experience rendered by the schedule canvas.
 
 - Update 2026-07-11: `AchievementView.tsx` now wires the records tab to the full achievement recomputation action for rebuilding archived and active ledger data together.
 

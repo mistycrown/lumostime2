@@ -4,13 +4,19 @@
  * @output Compact review entry buttons for the Chronicle todo sidebar
  * @pos Component
  * @description Keeps review entry points visible without freezing or duplicating review details in the schedule workspace.
- * @updated 2026-07-30: Aligned compact review entries to the sidebar list rhythm.
+ * @updated 2026-07-30: Uses compact weekly and monthly labels to fit the sidebar on mobile.
  */
 import React from 'react';
 import { CalendarDays, CalendarRange, ClipboardCheck, FilePlus2 } from 'lucide-react';
 import { DailyReview, MonthlyReview, WeeklyReview } from '../types';
 
 type TimelineReview = DailyReview | WeeklyReview | MonthlyReview;
+
+export const TIMELINE_REVIEW_TITLES = {
+  daily: '每日回顾',
+  weekly: '本周',
+  monthly: '本月'
+} as const;
 
 interface ReviewEntryProps {
   title: string;
@@ -59,8 +65,8 @@ export const TimelineReviewStack: React.FC<TimelineReviewStackProps> = ({
   onOpenMonthly
 }) => (
   <div className="flex min-h-10 shrink-0 items-center overflow-x-auto border-b border-stone-200 px-3 dark:border-stone-700">
-    <ReviewEntry title="每日回顾" review={dailyReview} icon={<ClipboardCheck size={15} strokeWidth={1.8} />} onOpen={onOpenDaily} />
-    {showWeekly && <ReviewEntry title="每周回顾" review={weeklyReview} icon={<CalendarRange size={15} strokeWidth={1.8} />} onOpen={onOpenWeekly} />}
-    {showMonthly && <ReviewEntry title="每月回顾" review={monthlyReview} icon={<CalendarDays size={15} strokeWidth={1.8} />} onOpen={onOpenMonthly} />}
+    <ReviewEntry title={TIMELINE_REVIEW_TITLES.daily} review={dailyReview} icon={<ClipboardCheck size={15} strokeWidth={1.8} />} onOpen={onOpenDaily} />
+    {showWeekly && <ReviewEntry title={TIMELINE_REVIEW_TITLES.weekly} review={weeklyReview} icon={<CalendarRange size={15} strokeWidth={1.8} />} onOpen={onOpenWeekly} />}
+    {showMonthly && <ReviewEntry title={TIMELINE_REVIEW_TITLES.monthly} review={monthlyReview} icon={<CalendarDays size={15} strokeWidth={1.8} />} onOpen={onOpenMonthly} />}
   </div>
 );
