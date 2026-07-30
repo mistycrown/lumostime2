@@ -2,8 +2,10 @@
 
 The `views/` directory contains all the React components that represent the distinct screens or pages of the LumosTime application. This layer is responsible for the presentation logic and user interaction.
 
+- Update 2026-07-30: `TimelineView.tsx` and `DailyReviewView.tsx` now use the shared auto-check change detector so reorder-only refreshes do not trigger redundant review writes.
+- Update 2026-07-30: `TimelineView.tsx` now resizes both the todo and quick-color split sidebars by the same persisted 26%-70% workspace ratio.
 - Update 2026-07-30: `TimelineView.tsx` passes the selected timeline date and logs into the split-workspace todo sidebar so it shares the schedule page's date-specific entries, including same-day completions and excluding Trace; future dates omit the daily-check list.
-- Update 2026-07-30: `TimelineView.tsx` adds long-press resizing to the quick-color divider and unifies the todo and quick-color right sidebar minimum widths at 220px.
+- Update 2026-07-30: `TimelineView.tsx` adds long-press resizing to the quick-color divider and unifies the todo and quick-color right sidebar minimum widths.
 - Update 2026-07-30: `TimelineView.tsx` adds quick-color continuous-create state: the default one-shot mode clears the selected activity after one record, while checked continuous mode preserves it for repeated range creation.
 - Update 2026-07-30: `TimelineView.tsx` scopes the right-edge split buttons by active panel: collapsed mode shows Plan Todo and Quick Color entries, Plan Todo shows Collapse plus Switch List, and Quick Color shows only Collapse.
 - Update 2026-07-30: `TimelineView.tsx` makes the todo-plan and quick-color side panels mutually exclusive and groups their collapsed entry buttons into a tight right-edge control stack.
@@ -192,3 +194,4 @@ The views are designed as "dumb" or "presentational" components where possible, 
 - `ObsidianExportView.tsx`: Added image folder configuration, image-section rendering, and attachment export flow for the desktop Obsidian export tool.
 - `StatsView.tsx`: Reused the shared week range helper so matrix weeks no longer overflow when a week spans two months.
 - `FocusDetailView.tsx`: Updated progress display logic to dynamically show progress increments.
+- Update 2026-07-30: `TimelineView.tsx` sizes and resizes split sidebars as persisted 26%-70% workspace ratios, so mobile screens do not inherit fixed desktop pixel constraints.

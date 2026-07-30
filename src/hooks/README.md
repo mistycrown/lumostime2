@@ -1,5 +1,7 @@
 # Custom Hooks
 
+> `usePointerDrag.ts` now centralizes the shared pointer capture, document listener, and drag ghost lifecycle used by the timeline todo and quick-color sidebars.
+
 > `useRecurringPlanAutoCreation.ts` now materializes enabled Repeat todo auto-Plan windows once per local day and immediately after relevant todo planning config edits.
 
 > `useReviewManager.ts` now upserts a Daily Review when a first-time sidebar check-in returns a newly created review, so the check-in and generated review are persisted together.

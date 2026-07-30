@@ -3,15 +3,23 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-07-30: `TimelineTodoSidebar.tsx` and `TimelineQuickColorSidebar.tsx` now share a common pointer-drag hook, trimming the duplicate document listener and drag ghost code from both row renderers.
+- Update 2026-07-30: `TimelineTodoSidebar.tsx` removes the dead schedule-label export and keeps only the row/grouping helpers that the sidebar and tests actually use.
+- Update 2026-07-30: `TimelineScheduleCanvas.tsx` suppresses the synthetic click following real-record taps so the detail modal stays open on still mobile taps.
+- Update 2026-07-30: `TimelineScheduleCanvas.tsx` tightens its hour-label gutter and right edge while hiding the internal scrollbar in split mode.
+- Update 2026-07-30: `TimelineTodoSidebar.tsx` reduces the list-side gutter and shares 26%-70% split ratio bounds with `TimelineQuickColorSidebar.tsx`.
+- Update 2026-07-30: `TimelineQuickColorSidebar.tsx` now receives a responsive split ratio instead of a fixed pixel width.
+- Update 2026-07-30: `TimelineScheduleCanvas.tsx` adds a deduplicated click fallback so still taps on schedule blocks open details without weakening edit-mode or pinch suppression.
+- Update 2026-07-30: `TimelineScheduleCanvas.tsx` now keeps edit-mode taps limited to the active block, clears focus on outside clicks, and suppresses pinch-zoom release taps from reopening record detail.
 - Update 2026-07-30: `TimelineQuickColorSidebar.tsx` relaxes the activity drag gesture so a clearer leftward horizontal move starts timeline record creation more reliably.
-- Update 2026-07-30: `TimelineQuickColorSidebar.tsx` replaces the quick-color count badge with a `批量` checkbox label, flattens the control to one square, and shares the 220px compact minimum width with `TimelineTodoSidebar.tsx`.
+- Update 2026-07-30: `TimelineQuickColorSidebar.tsx` replaces the quick-color count badge with a `批量` checkbox label, flattens the control to one square, and shares compact split bounds with `TimelineTodoSidebar.tsx`.
 - Update 2026-07-30: `TimelineQuickColorSidebar.tsx` adds a top-right continuous-create checkbox, removes the selected-row fill, and keeps selection feedback to the trailing checkmark.
 - Update 2026-07-30: `TimelineScheduleCanvas.tsx` now keeps quick-color-created records out of boundary edit mode; newly created blocks flash briefly, and later resizing still starts from long press.
 - Update 2026-07-30: `TimelineQuickColorSidebar.tsx` removes per-label UI icons and uses only color swatches for category and activity rows in the quick-color panel.
 - Update 2026-07-30: `TimelineQuickColorSidebar.tsx` adds the Chronicle quick-color activity panel, allowing click selection for range dragging and direct activity dragging into `TimelineScheduleCanvas.tsx` to create formal records.
 - Update 2026-07-30: `TimelineScheduleCanvas.tsx` now supports quick-color range previews, direct 30-minute activity drops, and formal record creation callbacks alongside the existing todo plan-drop flow.
 - Update 2026-07-30: `TodoDetailModal.tsx` shows an editable `完成日期` only for completed todos, reusing the shared date picker and preserving the original completion time when its date changes.
-- Update 2026-07-29: `TimelineScheduleCanvas.tsx` renders the 00:00-24:00 Chronicle schedule with overlap-aware columns, a today-only current-time marker, bounded two-finger zoom, a thin scrollbar, end-of-canvas zoom controls, and time/link/note block content.
+- Update 2026-07-30: `TimelineScheduleCanvas.tsx` renders the 00:00-24:00 Chronicle schedule with compact two-digit hour-only grid labels, overlap-aware columns, a today-only current-time marker, bounded two-finger zoom, a thin scrollbar, end-of-canvas zoom controls, and time/link/note block content.
 - Update 2026-07-30: `TimelineTodoSidebar.tsx` reads the selected day's shared scheduling entries, retains same-day completed entries while excluding Trace, uses completion circles plus `DUE/ARR/REP/MAY/DONE` labels, hides daily checks for future dates, and renders manual/auto/count checks as compact single-line markers.
 - Update 2026-07-30: `TimelineReviewStack.tsx` aligns its compact review entries to the todo sidebar's list rhythm instead of presenting a separate card-like strip.
 - Update 2026-07-30: `TimelineScheduleCanvas.tsx` leaves breathing space above 00:00, accepts todo drops as 30-minute virtual `计划` blocks, and supports long-press boundary editing with five-minute snapping; `AppRoutes.tsx` persists those blocks as `isPlanned` logs outside user activity categories.
@@ -24,7 +32,7 @@ This directory contains the reusable React components for the application. They 
 - Update 2026-07-30: `TimelineTodoSidebar.tsx` activates direct cross-panel dragging after two pixels and captures the pointer; `TimelineScheduleCanvas.tsx` now portals its plan actions into a full-viewport quick-action sheet with vertical rounded rows and visibly lighter fills.
 - Update 2026-07-30: `TimelineScheduleCanvas.tsx` defers normal time-block detail opening until after the source pointer sequence, preventing the newly mounted log modal from consuming that same click as a backdrop dismissal.
 - Update 2026-07-30: `TimelineScheduleCanvas.tsx` also falls back to a deduplicated click path for mobile detail opening; `TimelineTodoSidebar.tsx` keeps parent rows collapsed by default, expands only direct children, and leaves child-only schedules independent.
-- Update 2026-07-30: `TimelineTodoSidebar.tsx` restores shared parent/child tree rendering for visible parent rows, keeps its fixed expand control inside narrow sidebars, hides completed items in selected concrete task lists while retaining date-matched completions in Today, and restricts schedule badges to Today while preserving `PIN` in every list.
+- Update 2026-07-30: `TimelineTodoSidebar.tsx` restores shared parent/child tree rendering for visible parent rows, keeps its fixed expand control inside narrow sidebars, hides completed items in selected concrete task lists while retaining date-matched completions in Today, and suppresses all schedule and PIN badges to preserve title space.
 - Update 2026-07-11: `achievement/AchievementRecordsTab.tsx` now adds a low-key full recomputation action at the bottom of the records tab with a confirmation dialog for clearing archived bottles and rebuilding the achievement ledger.
 - Update 2026-07-11: `AddLogModal.tsx` now renders above todo detail overlays, so opening a timeline record from a collection-launched todo detail shows the record editor as the topmost layer.
 - Update 2026-06-16: `GoalEditor.tsx` now includes a `本周` quick date-range shortcut in the goal time-window toolbar, filling the current Monday-through-Sunday span alongside the existing `本月 / 本季度 / 本年` chips.

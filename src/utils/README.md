@@ -3,6 +3,7 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- Update 2026-07-30: `autoCheckUtils.ts` now exposes a shared id-keyed change detector for auto-check completion refreshes, so views can ignore harmless array reordering before persisting review data.
 - Update 2026-07-30: `todoRecurringPlanUtils.ts` centralizes finite Repeat auto-Plan occurrence windows, generated Plan log metadata, same-day time normalization, and delete-lock checks.
 - Update 2026-07-11: `achievementUtils.ts` now rebuilds achievement redemption records for full recomputation, merging archived fragments and refreshing costs for rewards or collection bottles that still exist.
 - Update 2026-07-11: `hardwareBackHandlerStack.test.ts` now covers topmost-handler priority and fallthrough, guarding the shared Android back stack used by nested collection, todo, and record overlays.
@@ -73,3 +74,4 @@ Contains pure utility functions for data processing and business logic calculati
 - `nfcStartActionDecision.ts`: [Active] - Decides whether an NFC activity-tag scan should stop only its own matching sessions or start a new concurrent activity when the scanned tag is different from the currently running ones.
 
 > Once the folder I belong to changes, please update me.
+Update 2026-07-30: `timelineSidebarRatioUtils.ts` centralizes Chronicle todo-sidebar ratio bounds, defaults, and migration from the former pixel-width preference.

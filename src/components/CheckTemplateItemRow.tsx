@@ -4,6 +4,7 @@
  * @output UI row for editing one daily check template item
  * @pos Component (Check Template)
  * @description 日课模板条目编辑行，支持手动/自动模式切换、次数目标输入、自动规则配置，以及可选的 UI icon 选择。
+ * @updated 2026-07-30: Added an item-level enable toggle beside the delete action.
  * @updated 2026-05-14: Keep index and input on one line, move action buttons to a right-aligned second row on small screens.
  * @updated 2026-07-21: Added semantic dark-mode surfaces for daily-check item inputs and auto-rule controls.
  * @updated 2026-05-03: Rewrote the row in UTF-8 and added supporter-gated UI icon selection support.
@@ -11,7 +12,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { X, Zap, Circle, ChevronUp, ChevronDown } from 'lucide-react';
+import { X, Zap, Circle, ChevronUp, ChevronDown, CheckCircle2, CircleOff } from 'lucide-react';
 import { CheckTemplateItem } from '../types';
 import { AutoCheckItemEditor } from './AutoCheckItemEditor';
 import { UIIconSelectorCompact } from './UIIconSelector';
@@ -110,6 +111,11 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
   const displayValue = `${item.icon || ''}${item.content || ''}`;
   const isAuto = item.type === 'auto';
   const isCountManual = !isAuto && item.manualMode === 'count';
+  const isItemEnabled = item.enabled !== false;
+
+  const handleToggleEnabled = () => {
+    onUpdate(index, { ...item, enabled: !isItemEnabled });
+  };
 
   const [targetCountText, setTargetCountText] = useState<string>(
     item.targetCount === undefined ? '' : String(item.targetCount)
@@ -172,7 +178,9 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
               type="text"
               value={displayValue}
               onChange={(e) => handleContentChange(e.target.value)}
-              className="daily-check-item-input min-w-0 flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none transition-all font-serif focus:border-stone-400 focus:ring-2 focus:ring-stone-100"
+              className={`daily-check-item-input min-w-0 flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none transition-all font-serif focus:border-stone-400 focus:ring-2 focus:ring-stone-100 ${
+                isItemEnabled ? 'text-stone-800' : 'bg-stone-50 text-stone-400'
+              }`}
               placeholder={isAuto ? '⚡ 输入自动日课名称...' : '📝 输入日课名称（首字符作为 emoji 图标）...'}
             />
           </div>
@@ -289,14 +297,29 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
             )}
 
             {!sortingMode && (
-              <button
-                type="button"
-                onClick={() => onDelete(index)}
-                className="flex h-9 w-9 shrink-0 items-center justify-center text-stone-300 transition-colors active:text-red-500"
-                tabIndex={-1}
-              >
-                <X size={16} />
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleToggleEnabled}
+                  className={`daily-check-item-enabled-toggle flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                    isItemEnabled
+                      ? 'bg-green-50 text-green-500 hover:bg-green-100'
+                      : 'bg-stone-50 text-stone-300 hover:bg-stone-100'
+                  }`}
+                  title={isItemEnabled ? '点击停用此日课' : '点击启用此日课'}
+                  aria-label={isItemEnabled ? '停用此日课' : '启用此日课'}
+                >
+                  {isItemEnabled ? <CheckCircle2 size={16} /> : <CircleOff size={16} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(index)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center text-stone-300 transition-colors active:text-red-500"
+                  tabIndex={-1}
+                >
+                  <X size={16} />
+                </button>
+              </>
             )}
           </div>
         </div>

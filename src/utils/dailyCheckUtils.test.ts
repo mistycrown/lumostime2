@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { CheckTemplate, DailyReview, ReviewTemplate } from '../types';
 import {
   applyDailyCheckActionForDate,
+  buildDailyCheckItems,
+  getDailyCheckTemplateMeta,
   getEligibleNfcDailyCheckItems,
   getEligibleTrackingCalendarDailyCheckItems
 } from './dailyCheckUtils';
@@ -195,5 +197,63 @@ describe('dailyCheckUtils', () => {
 
     expect(eligible.map(item => item.checkItemId)).toEqual(['check-binary', 'check-count', 'check-auto']);
     expect(eligible.find(item => item.checkItemId === 'check-auto')?.type).toBe('auto');
+  });
+
+  it('treats missing template item enabled flags as enabled', () => {
+    const items = buildDailyCheckItems(checkTemplates);
+
+    expect(items.map(item => item.id)).toEqual(['check-binary', 'check-count', 'check-auto']);
+  });
+
+  it('filters disabled template items from generated checks and external bindings', () => {
+    const templatesWithDisabledItems: CheckTemplate[] = [
+      {
+        ...checkTemplates[0],
+        items: [
+          ...checkTemplates[0].items,
+          {
+            id: 'check-disabled',
+            content: '暂停项',
+            enabled: false,
+            type: 'manual',
+            manualMode: 'binary'
+          },
+          {
+            id: 'check-disabled-auto',
+            content: '暂停自动项',
+            enabled: false,
+            type: 'auto'
+          }
+        ]
+      }
+    ];
+
+    expect(buildDailyCheckItems(templatesWithDisabledItems).map(item => item.id)).toEqual([
+      'check-binary',
+      'check-count',
+      'check-auto'
+    ]);
+    expect(getEligibleNfcDailyCheckItems(templatesWithDisabledItems).map(item => item.checkItemId)).toEqual([
+      'check-binary',
+      'check-count'
+    ]);
+    expect(getEligibleTrackingCalendarDailyCheckItems(templatesWithDisabledItems).map(item => item.checkItemId)).toEqual([
+      'check-binary',
+      'check-count',
+      'check-auto'
+    ]);
+    expect(getDailyCheckTemplateMeta(templatesWithDisabledItems, 'check-disabled')).toBeNull();
+
+    const result = applyDailyCheckActionForDate({
+      dateStr: '2026-03-14',
+      dailyReviews: [],
+      checkTemplates: templatesWithDisabledItems,
+      reviewTemplates,
+      checkItemId: 'check-disabled',
+      actionMode: 'complete_once'
+    });
+
+    expect(result.status).toBe('not_found');
+    expect(result.createdReview).toBe(false);
   });
 });

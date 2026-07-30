@@ -5,10 +5,10 @@
  * @pos Test
  * @updated 2026-07-30: Covers whole-block drag shifting while preserving duration and daily bounds.
  * @updated 2026-07-30: Covers quick-color range minimums for click-to-drag formal record creation.
- * @updated 2026-07-30: Covers alpha backgrounds for Tailwind and hexadecimal timeline activity colors.
+ * @updated 2026-07-30: Covers compact two-digit hour-only grid labels and alpha backgrounds for timeline activity colors.
  */
 import { describe, expect, test, vi } from 'vitest';
-import { getMinimumTimelineRange, getPlannedTimeRange, getScheduleBlockHeight, getTimelineBlockBackground, layoutParallelScheduleBlocks, MIN_SCHEDULE_BLOCK_HEIGHT, scheduleTimelineRecordDetailOpen, shiftTimeRangeWithinDay, TIMELINE_TOP_PADDING } from './TimelineScheduleCanvas';
+import { formatTimelineHourLabel, getMinimumTimelineRange, getPlannedTimeRange, getScheduleBlockHeight, getTimelineBlockBackground, layoutParallelScheduleBlocks, MIN_SCHEDULE_BLOCK_HEIGHT, scheduleTimelineRecordDetailOpen, shiftTimeRangeWithinDay, TIMELINE_TOP_PADDING } from './TimelineScheduleCanvas';
 
 describe('layoutParallelScheduleBlocks', () => {
   test('places overlapping records in separate equal-width columns', () => {
@@ -39,6 +39,13 @@ describe('layoutParallelScheduleBlocks', () => {
 
   test('keeps a small breathing space before the 00:00 line', () => {
     expect(TIMELINE_TOP_PADDING).toBe(12);
+  });
+
+  test('uses compact two-digit hour labels and hides only the top 00 label', () => {
+    expect(formatTimelineHourLabel(0)).toBe('');
+    expect(formatTimelineHourLabel(1)).toBe('01');
+    expect(formatTimelineHourLabel(12)).toBe('12');
+    expect(formatTimelineHourLabel(24)).toBe('24');
   });
 
   test('creates 30-minute plans snapped to five-minute boundaries within the day', () => {

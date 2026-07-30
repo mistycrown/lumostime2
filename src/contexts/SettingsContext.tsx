@@ -5,7 +5,8 @@
  * @updated 2026-04-25: Added configurable timeline quick-action preferences for the timeline header.
  * @updated 2026-07-21: Added persistent calendar number typography preferences shared by app and desktop month views.
  * @updated 2026-07-29: Added persistent Chronicle layout, todo-column collapse state, and width preferences.
- * @updated 2026-07-30: Added a separate persistent width preference for the quick-color split sidebar.
+ * @updated 2026-07-30: Migrates the Chronicle todo split sidebar from a pixel width to a responsive persisted ratio.
+ * @updated 2026-07-30: Migrates the Chronicle quick-color split sidebar to the same responsive ratio model.
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
@@ -81,6 +82,7 @@ import {
     readStoredThemeMode,
     type ThemeMode
 } from '../utils/displayMode';
+import { readTimelineQuickColorSidebarRatio, readTimelineTodoSidebarRatio } from '../utils/timelineSidebarRatioUtils';
 
 export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
 export type DefaultIndexView = 'TAGS' | 'SCOPE';
@@ -144,10 +146,10 @@ interface SettingsContextType {
     setTimelineLayout: React.Dispatch<React.SetStateAction<TimelineLayoutMode>>;
     timelineTodoSidebarCollapsed: boolean;
     setTimelineTodoSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
-    timelineTodoSidebarWidth: number;
-    setTimelineTodoSidebarWidth: React.Dispatch<React.SetStateAction<number>>;
-    timelineQuickColorSidebarWidth: number;
-    setTimelineQuickColorSidebarWidth: React.Dispatch<React.SetStateAction<number>>;
+    timelineTodoSidebarRatio: number;
+    setTimelineTodoSidebarRatio: React.Dispatch<React.SetStateAction<number>>;
+    timelineQuickColorSidebarRatio: number;
+    setTimelineQuickColorSidebarRatio: React.Dispatch<React.SetStateAction<number>>;
 
     // 折叠字数设置
     collapseThreshold: number;
@@ -623,14 +625,16 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [timelineTodoSidebarCollapsed, setTimelineTodoSidebarCollapsed] = useState<boolean>(() => (
         localStorage.getItem(THEME_KEYS.TIMELINE_TODO_SIDEBAR_COLLAPSED) === 'true'
     ));
-    const [timelineTodoSidebarWidth, setTimelineTodoSidebarWidth] = useState<number>(() => {
-        const stored = Number(localStorage.getItem(THEME_KEYS.TIMELINE_TODO_SIDEBAR_WIDTH));
-        return Number.isFinite(stored) && stored >= 220 ? stored : 320;
-    });
-    const [timelineQuickColorSidebarWidth, setTimelineQuickColorSidebarWidth] = useState<number>(() => {
-        const stored = Number(localStorage.getItem(THEME_KEYS.TIMELINE_QUICK_COLOR_SIDEBAR_WIDTH));
-        return Number.isFinite(stored) && stored >= 220 ? stored : 280;
-    });
+    const [timelineTodoSidebarRatio, setTimelineTodoSidebarRatio] = useState<number>(() => readTimelineTodoSidebarRatio(
+        localStorage.getItem(THEME_KEYS.TIMELINE_TODO_SIDEBAR_RATIO),
+        localStorage.getItem(THEME_KEYS.TIMELINE_TODO_SIDEBAR_WIDTH),
+        typeof window === 'undefined' ? 0 : window.innerWidth
+    ));
+    const [timelineQuickColorSidebarRatio, setTimelineQuickColorSidebarRatio] = useState<number>(() => readTimelineQuickColorSidebarRatio(
+        localStorage.getItem(THEME_KEYS.TIMELINE_QUICK_COLOR_SIDEBAR_RATIO),
+        localStorage.getItem(THEME_KEYS.TIMELINE_QUICK_COLOR_SIDEBAR_WIDTH),
+        typeof window === 'undefined' ? 0 : window.innerWidth
+    ));
 
     const [emojiStyle, setEmojiStyle] = useState<EmojiStyle>(() => {
         const stored = localStorage.getItem('lumostime_emoji_style');
@@ -721,12 +725,12 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, [timelineTodoSidebarCollapsed]);
 
     useEffect(() => {
-        localStorage.setItem(THEME_KEYS.TIMELINE_TODO_SIDEBAR_WIDTH, String(timelineTodoSidebarWidth));
-    }, [timelineTodoSidebarWidth]);
+        localStorage.setItem(THEME_KEYS.TIMELINE_TODO_SIDEBAR_RATIO, String(timelineTodoSidebarRatio));
+    }, [timelineTodoSidebarRatio]);
 
     useEffect(() => {
-        localStorage.setItem(THEME_KEYS.TIMELINE_QUICK_COLOR_SIDEBAR_WIDTH, String(timelineQuickColorSidebarWidth));
-    }, [timelineQuickColorSidebarWidth]);
+        localStorage.setItem(THEME_KEYS.TIMELINE_QUICK_COLOR_SIDEBAR_RATIO, String(timelineQuickColorSidebarRatio));
+    }, [timelineQuickColorSidebarRatio]);
 
     useEffect(() => {
         localStorage.setItem('lumostime_emoji_style', emojiStyle);
@@ -842,10 +846,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setTimelineLayout,
             timelineTodoSidebarCollapsed,
             setTimelineTodoSidebarCollapsed,
-            timelineTodoSidebarWidth,
-            setTimelineTodoSidebarWidth,
-            timelineQuickColorSidebarWidth,
-            setTimelineQuickColorSidebarWidth,
+            timelineTodoSidebarRatio,
+            setTimelineTodoSidebarRatio,
+            timelineQuickColorSidebarRatio,
+            setTimelineQuickColorSidebarRatio,
             collapseThreshold,
             setCollapseThreshold,
             uiIconTheme,

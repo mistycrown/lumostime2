@@ -4,6 +4,8 @@
  * @output Updated Review Data, Generated Narrative
  * @pos View (Review System)
  * @description The interface for conducting a daily review. Supports answering template questions (Data/Guide tabs) and generating/editing an AI-assisted narrative summary.
+ * @updated 2026-07-30: Reused shared daily check template expansion so disabled template items stay excluded on reload.
+ * @updated 2026-07-30: Uses the shared auto-check change detector so auto-item refreshes ignore harmless reordering.
  * @updated 2026-05-16: Moved the daily newspaper entry under AI narrative, added one-tap AI chat generation, and added delete confirmation for newspapers.
  * @updated 2026-05-05: Clamp horizontal overflow in Daily Review so narrow Android WebViews do not get stretched by tab content.
  * @updated 2026-04-25: Let floating read-edit toggles inherit button theme colors so default UI icons remain visible on accent-theme white buttons.
@@ -31,8 +33,9 @@ import {
     getTemplateDisplayInfo
 } from '../components/ReviewView';
 import { calculateMonthlyStats } from '../utils/reviewStatsUtils';
-import { updateAutoCheckItems } from '../utils/autoCheckUtils';
+import { hasAutoCheckItemCompletionChanges, updateAutoCheckItems } from '../utils/autoCheckUtils';
 import { normalizeCheckItem } from '../utils/checkItemNormalizer';
+import { buildCheckCategorySyncMap, buildDailyCheckItems } from '../utils/dailyCheckUtils';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
 
@@ -194,18 +197,13 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                 todoCategories
             };
             const updatedItems = updateAutoCheckItems(checkItems, logs, context, date);
-            
-            // 只有当状态真的改变时才更新
-            const hasChanges = updatedItems.some((item, index) => 
-                item.isCompleted !== checkItems[index].isCompleted
-            );
-            
-            if (hasChanges) {
+
+            if (hasAutoCheckItemCompletionChanges(checkItems, updatedItems)) {
                 setCheckItems(updatedItems);
                 onUpdateReview({ ...review, checkItems: updatedItems, updatedAt: Date.now() });
             }
         }
-    }, [activeTab, logs, categories, scopes, todos, todoCategories, date]);
+    }, [activeTab, checkItems, categories, date, logs, onUpdateReview, review, scopes, todos, todoCategories]);
 
     // Check for "Today"
     const isToday = useMemo(() => {
@@ -344,36 +342,8 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         console.log('[DailyReview] 日课模板:', dailyTemplates);
 
         // 2. Map to CheckItems
-        const newItems: CheckItem[] = [];
-        const checkCategorySyncToTimeline: { [category: string]: boolean } = {};
-        dailyTemplates.forEach(template => {
-            checkCategorySyncToTimeline[template.title] = template.syncToTimeline || false;
-            template.items.forEach(item => {
-                console.log('[DailyReview] 模板项:', { content: item.content, type: item.type, autoConfig: item.autoConfig });
-                const type = item.type || 'manual';
-                const manualMode = type === 'manual'
-                    ? (item.manualMode === 'count' ? 'count' : 'binary')
-                    : undefined;
-                const targetCount = type === 'manual'
-                    ? (manualMode === 'count'
-                        ? Math.max(1, Math.floor(Number(item.targetCount) || 1))
-                        : 1)
-                    : undefined;
-                newItems.push({
-                    id: item.id || crypto.randomUUID(),
-                    category: template.title,
-                    content: item.content,
-                    icon: item.icon,
-                    uiIcon: item.uiIcon,
-                    isCompleted: false,
-                    type,
-                    manualMode,
-                    currentCount: type === 'manual' ? 0 : undefined,
-                    targetCount,
-                    autoConfig: item.autoConfig
-                });
-            });
-        });
+        const newItems: CheckItem[] = buildDailyCheckItems(checkTemplates);
+        const checkCategorySyncToTimeline = buildCheckCategorySyncMap(checkTemplates);
 
         console.log('[DailyReview] 创建的日课项:', newItems);
 

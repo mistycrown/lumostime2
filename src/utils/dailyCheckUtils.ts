@@ -4,6 +4,7 @@
  * @output daily check helpers for creating reviews, locating items, and applying manual actions
  * @pos Utils (Daily Check)
  * @description Shared daily check utilities used by SceneView and NFC flows to keep review creation, legacy item ID compatibility, and habit punch behavior consistent.
+ * @updated 2026-07-30: Skipped disabled daily check template items across generation, bindings, and manual actions.
  * @updated 2026-05-05: Hardened template item traversal so legacy or partially synced daily check templates without `items` no longer crash NFC and widget entry points.
  * @updated 2026-05-04: Added a dedicated tracking-calendar daily binding helper so 2x2 tracking widgets can target both manual and automatic daily checks.
  */
@@ -50,6 +51,10 @@ const getTemplateItems = (template: CheckTemplate): CheckTemplateItem[] => (
   Array.isArray(template.items) ? template.items : []
 );
 
+export const isCheckTemplateItemEnabled = (item: CheckTemplateItem): boolean => (
+  item.enabled !== false
+);
+
 const buildDailyCheckTemplateMeta = (
   template: CheckTemplate,
   item: CheckTemplateItem,
@@ -85,6 +90,10 @@ const getDailyCheckTemplateItems = (
 
   sortTemplatesByOrder(checkTemplates.filter(template => template.enabled && template.isDaily)).forEach(template => {
     getTemplateItems(template).forEach((item, index) => {
+      if (!isCheckTemplateItemEnabled(item)) {
+        return;
+      }
+
       const meta = buildDailyCheckTemplateMeta(template, item, index);
       if (!includeAuto && meta.type !== 'manual') {
         return;
@@ -136,6 +145,10 @@ export const buildDailyCheckItems = (checkTemplates: CheckTemplate[]): CheckItem
 
   sortTemplatesByOrder(checkTemplates.filter(template => template.enabled && template.isDaily)).forEach(template => {
     getTemplateItems(template).forEach((item, index) => {
+      if (!isCheckTemplateItemEnabled(item)) {
+        return;
+      }
+
       const type = item.type || 'manual';
       const manualMode = type === 'manual'
         ? (item.manualMode === 'count' ? 'count' : 'binary')
@@ -224,10 +237,14 @@ export const getDailyCheckTemplateMeta = (
   checkItemId: string
 ): DailyCheckTemplateMeta | null => {
   for (const template of checkTemplates) {
+    if (!template.enabled || !template.isDaily) {
+      continue;
+    }
+
     const templateItems = getTemplateItems(template);
     const itemIndex = templateItems.findIndex((entry, index) => getCheckTemplateItemKey(template, entry, index) === checkItemId);
     const item = itemIndex >= 0 ? templateItems[itemIndex] : undefined;
-    if (!item) continue;
+    if (!item || !isCheckTemplateItemEnabled(item)) continue;
 
     return buildDailyCheckTemplateMeta(template, item, itemIndex);
   }

@@ -5,13 +5,17 @@
  * @pos Component
  * @description Renders date-specific todos and daily checks without duplicating Todo view mutation controls.
  * @updated 2026-07-30: Lowered the in-flow minimum width to match the quick-color sidebar's compact limit.
- * @updated 2026-07-30: Keeps parent-row expand controls inside the narrow sidebar while using the shared one-level todo tree.
+ * @updated 2026-07-30: Removes schedule and PIN badges from the narrow todo column while retaining their data behavior.
+ * @updated 2026-07-30: Tightens the todo list gutter and uses the shared 26%-70% split ratio bounds.
+ * @updated 2026-07-30: Shares the row pointer-drag lifecycle with the quick-color sidebar through a common hook.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, ChevronRight, ClipboardCheck, ListTodo } from 'lucide-react';
+import { usePointerDrag } from '../hooks';
 import { CheckItem, Log, TodoItem } from '../types';
 import { getCheckItemCountState } from '../utils/dailyCheckUtils';
+import { TIMELINE_SIDEBAR_MAX_RATIO, TIMELINE_SIDEBAR_MIN_RATIO } from '../utils/timelineSidebarRatioUtils';
 import { buildTodoTreeItems } from '../utils/todoHierarchyUtils';
 import { buildTodoDateEntries, formatDateKey, TodoDateEntry } from '../utils/todoScheduleUtils';
 
@@ -20,7 +24,7 @@ interface TimelineTodoSidebarProps {
   logs: Log[];
   checkItems: CheckItem[];
   currentDate: Date;
-  width: number;
+  ratio: number;
   reviewSlot?: React.ReactNode;
   selectedCategoryId?: string | null;
   selectedListLabel?: string;
@@ -32,28 +36,9 @@ interface TimelineTodoSidebarProps {
   onTodoDrop: (todo: TodoItem, clientX: number, clientY: number) => boolean;
 }
 
-const SCHEDULE_LABELS: Record<Exclude<TodoDateEntry['primaryKind'], 'inProgress'>, string> = {
-  deadline: 'DUE',
-  scheduled: 'ARR',
-  recurring: 'REP',
-  maybe: 'MAY',
-  completed: 'DONE'
-};
-
-export const resolveTimelineTodoScheduleLabel = (
-  entry: SidebarTodoEntry,
-  showScheduleLabel: boolean
-): string | null => {
-  if (entry.todo.pin) return 'PIN';
-  if (!showScheduleLabel || entry.primaryKind === 'inProgress') return null;
-  return SCHEDULE_LABELS[entry.primaryKind];
-};
-
 export const TODO_DRAG_DISTANCE = 2;
 
-type TodoDragIntent = 'pending' | 'drag' | 'scroll';
-
-export const resolveTodoDragIntent = (deltaX: number, deltaY: number): Exclude<TodoDragIntent, 'pending'> => (
+export const resolveTodoDragIntent = (deltaX: number, deltaY: number): 'drag' | 'scroll' => (
   deltaX < 0 ? 'drag' : 'scroll'
 );
 
@@ -160,98 +145,34 @@ export const buildTimelineSidebarTodoTreeGroups = (
 
 const TodoRow: React.FC<{
   entry: SidebarTodoEntry;
-  showScheduleLabel: boolean;
   onSelect: () => void;
   onToggleCompletion: () => void;
   onDragMove: (clientX: number, clientY: number) => boolean;
   onDragEnd: () => void;
   onDrop: (clientX: number, clientY: number) => boolean;
-}> = ({ entry, showScheduleLabel, onSelect, onToggleCompletion, onDragMove, onDragEnd, onDrop }) => {
+}> = ({ entry, onSelect, onToggleCompletion, onDragMove, onDragEnd, onDrop }) => {
   const isCompleted = entry.primaryKind === 'completed' || entry.todo.isCompleted;
-  const scheduleLabel = resolveTimelineTodoScheduleLabel(entry, showScheduleLabel);
-  const dragRef = useRef<{
-    pointerId: number;
-    startX: number;
-    startY: number;
-    canDrag: boolean;
-    intent: TodoDragIntent;
-  } | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragFeedback, setDragFeedback] = useState<{ x: number; y: number; isTarget: boolean } | null>(null);
   const [didCreatePlan, setDidCreatePlan] = useState(false);
   const feedbackTimerRef = useRef<number | null>(null);
 
-  const clearDrag = () => {
-    const wasDragging = dragRef.current?.intent === 'drag';
-    dragRef.current = null;
-    setIsDragging(false);
-    setDragFeedback(null);
-    if (wasDragging) onDragEnd();
-  };
-
-  const showCreateFeedback = () => {
+  const showCreateFeedback = useCallback(() => {
     if (feedbackTimerRef.current !== null) window.clearTimeout(feedbackTimerRef.current);
     setDidCreatePlan(true);
     feedbackTimerRef.current = window.setTimeout(() => {
       feedbackTimerRef.current = null;
       setDidCreatePlan(false);
     }, 1200);
-  };
+  }, []);
 
-  useEffect(() => {
-    const handlePointerMove = (event: PointerEvent) => {
-      const drag = dragRef.current;
-      if (!drag || drag.pointerId !== event.pointerId) return;
-      if (drag.intent === 'drag') {
-        const isTarget = onDragMove(event.clientX, event.clientY);
-        setDragFeedback((previous) => (
-          previous && previous.x === event.clientX && previous.y === event.clientY && previous.isTarget === isTarget
-            ? previous
-            : { x: event.clientX, y: event.clientY, isTarget }
-        ));
-        event.preventDefault();
-        return;
-      }
-      if (drag.intent !== 'pending') return;
-
-      const deltaX = event.clientX - drag.startX;
-      const deltaY = event.clientY - drag.startY;
-      if (Math.hypot(deltaX, deltaY) <= TODO_DRAG_DISTANCE) return;
-
-      drag.intent = drag.canDrag ? resolveTodoDragIntent(deltaX, deltaY) : 'scroll';
-      if (drag.intent === 'drag') {
-        setIsDragging(true);
-        const isTarget = onDragMove(event.clientX, event.clientY);
-        setDragFeedback({ x: event.clientX, y: event.clientY, isTarget });
-        event.preventDefault();
-      }
-    };
-
-    const handlePointerUp = (event: PointerEvent) => {
-      const drag = dragRef.current;
-      if (!drag || drag.pointerId !== event.pointerId) return;
-
-      if (drag.intent === 'drag') {
-        if (onDrop(event.clientX, event.clientY)) showCreateFeedback();
-      } else if (drag.intent === 'pending') {
-        onSelect();
-      }
-      clearDrag();
-    };
-
-    const handlePointerCancel = (event: PointerEvent) => {
-      if (dragRef.current?.pointerId === event.pointerId) clearDrag();
-    };
-
-    document.addEventListener('pointermove', handlePointerMove, { passive: false });
-    document.addEventListener('pointerup', handlePointerUp);
-    document.addEventListener('pointercancel', handlePointerCancel);
-    return () => {
-      document.removeEventListener('pointermove', handlePointerMove);
-      document.removeEventListener('pointerup', handlePointerUp);
-    document.removeEventListener('pointercancel', handlePointerCancel);
-    };
-  }, [onDragEnd, onDragMove, onDrop, onSelect]);
+  const { beginDrag, dragFeedback, isDragging } = usePointerDrag({
+    threshold: TODO_DRAG_DISTANCE,
+    resolveIntent: resolveTodoDragIntent,
+    onSelect,
+    onDragMove,
+    onDragEnd,
+    onDrop,
+    onDropSuccess: showCreateFeedback
+  });
 
   useEffect(() => () => {
     if (feedbackTimerRef.current !== null) window.clearTimeout(feedbackTimerRef.current);
@@ -262,17 +183,7 @@ const TodoRow: React.FC<{
     <TodoCompletionMarker completed={isCompleted} onToggle={onToggleCompletion} />
     <button
       type="button"
-      onPointerDown={(event) => {
-        if (event.pointerType === 'mouse' && event.button !== 0) return;
-        event.currentTarget.setPointerCapture(event.pointerId);
-        dragRef.current = {
-          pointerId: event.pointerId,
-          startX: event.clientX,
-          startY: event.clientY,
-          canDrag: !isCompleted,
-          intent: 'pending'
-        };
-      }}
+      onPointerDown={(event) => beginDrag(event, !isCompleted)}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') onSelect();
       }}
@@ -281,7 +192,6 @@ const TodoRow: React.FC<{
       <span className={`min-w-0 flex-1 truncate text-sm font-bold leading-5 transition-colors ${isCompleted ? 'text-stone-400 line-through dark:text-stone-500' : 'text-stone-700 group-hover:text-stone-950 dark:text-stone-200 dark:group-hover:text-white'}`}>
         {entry.todo.title}
       </span>
-      {scheduleLabel && <span className="shrink-0 rounded-[3px] border border-stone-200 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-stone-400 dark:border-stone-700 dark:text-stone-500">{scheduleLabel}</span>}
     </button>
     {dragFeedback && typeof document !== 'undefined' && createPortal(
       <div
@@ -310,7 +220,7 @@ const CheckRow: React.FC<{ item: CheckItem; onClick: () => void }> = ({ item, on
       type="button"
       onClick={onClick}
       disabled={isAuto}
-      className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${isAuto ? 'cursor-default' : 'hover:bg-stone-50 dark:hover:bg-stone-800/70'}`}
+      className={`flex w-full items-center gap-2.5 px-2 py-2.5 text-left transition-colors ${isAuto ? 'cursor-default' : 'hover:bg-stone-50 dark:hover:bg-stone-800/70'}`}
     >
       <span
         className={`flex h-4 w-4 shrink-0 items-center justify-center border text-[9px] font-bold ${isSquare ? 'rounded-[3px]' : 'rounded-full'} ${isCompleted ? '' : 'border-stone-300 dark:border-stone-600'} ${shouldHideCheckMarkerContent(isCount, isCompleted) ? 'text-transparent' : ''}`}
@@ -325,7 +235,7 @@ const CheckRow: React.FC<{ item: CheckItem; onClick: () => void }> = ({ item, on
 };
 
 const GroupHeader: React.FC<{ icon: React.ReactNode; title: string; count: number }> = ({ icon, title, count }) => (
-  <div className="flex items-center justify-between px-3 pb-1 pt-3 text-[11px] font-bold uppercase tracking-wide text-stone-400 dark:text-stone-500">
+  <div className="flex items-center justify-between px-2 pb-1 pt-3 text-[11px] font-bold uppercase tracking-wide text-stone-400 dark:text-stone-500">
     <span className="flex items-center gap-1.5">{icon}{title}</span>
     <span>{count}</span>
   </div>
@@ -355,7 +265,6 @@ const TodoGroups: React.FC<{
     [selectedCategoryId, todos, visibleTodos]
   );
   const displayedTodoCount = todoTreeGroups.reduce((count, group) => count + 1 + group.childEntries.length, 0);
-  const showScheduleLabels = !selectedCategoryId;
   const [expandedParentIds, setExpandedParentIds] = useState<Record<string, boolean>>({});
   const isFutureDate = useMemo(() => {
     const selectedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate()).getTime();
@@ -365,7 +274,7 @@ const TodoGroups: React.FC<{
   }, [currentDate]);
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-64 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-64 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <section className="border-b border-stone-100 pb-3 dark:border-stone-800">
         <GroupHeader icon={<ListTodo size={12} />} title={selectedListLabel || '待办'} count={displayedTodoCount} />
         {visibleTodos.length > 0 ? (
@@ -375,16 +284,16 @@ const TodoGroups: React.FC<{
               return (
                 <div key={group.parentEntry.todo.id}>
                   <div className="flex items-center">
-                    <TodoRow entry={group.parentEntry} showScheduleLabel={showScheduleLabels} onSelect={() => onSelectTodo(group.parentEntry.todo)} onToggleCompletion={() => onToggleTodoCompletion(group.parentEntry.todo)} onDragMove={(clientX, clientY) => onTodoDragMove(group.parentEntry.todo, clientX, clientY)} onDragEnd={onTodoDragEnd} onDrop={(clientX, clientY) => onTodoDrop(group.parentEntry.todo, clientX, clientY)} />
+                    <TodoRow entry={group.parentEntry} onSelect={() => onSelectTodo(group.parentEntry.todo)} onToggleCompletion={() => onToggleTodoCompletion(group.parentEntry.todo)} onDragMove={(clientX, clientY) => onTodoDragMove(group.parentEntry.todo, clientX, clientY)} onDragEnd={onTodoDragEnd} onDrop={(clientX, clientY) => onTodoDrop(group.parentEntry.todo, clientX, clientY)} />
                     {group.childEntries.length > 0 && <button type="button" className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center text-stone-400 hover:text-stone-700 dark:hover:text-stone-200" aria-label={isExpanded ? '收起子任务' : '展开子任务'} onClick={() => setExpandedParentIds((previous) => ({ ...previous, [group.parentEntry.todo.id]: !isExpanded }))}>{isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</button>}
                   </div>
-                  {isExpanded && group.childEntries.length > 0 && <div className="ml-5 border-l border-stone-200 pl-2 dark:border-stone-700">{group.childEntries.map((entry) => <TodoRow key={entry.todo.id} entry={entry} showScheduleLabel={showScheduleLabels} onSelect={() => onSelectTodo(entry.todo)} onToggleCompletion={() => onToggleTodoCompletion(entry.todo)} onDragMove={(clientX, clientY) => onTodoDragMove(entry.todo, clientX, clientY)} onDragEnd={onTodoDragEnd} onDrop={(clientX, clientY) => onTodoDrop(entry.todo, clientX, clientY)} />)}</div>}
+                  {isExpanded && group.childEntries.length > 0 && <div className="ml-5 border-l border-stone-200 pl-2 dark:border-stone-700">{group.childEntries.map((entry) => <TodoRow key={entry.todo.id} entry={entry} onSelect={() => onSelectTodo(entry.todo)} onToggleCompletion={() => onToggleTodoCompletion(entry.todo)} onDragMove={(clientX, clientY) => onTodoDragMove(entry.todo, clientX, clientY)} onDragEnd={onTodoDragEnd} onDrop={(clientX, clientY) => onTodoDrop(entry.todo, clientX, clientY)} />)}</div>}
                 </div>
               );
             })}
           </div>
         ) : (
-          <p className="px-3 py-4 text-xs text-stone-400">暂无待办</p>
+          <p className="px-2 py-4 text-xs text-stone-400">暂无待办</p>
         )}
       </section>
       {!selectedCategoryId && !isFutureDate && <section>
@@ -394,7 +303,7 @@ const TodoGroups: React.FC<{
             {checkItems.map((item) => <CheckRow key={item.id} item={item} onClick={() => onCheckItemClick(item)} />)}
           </div>
         ) : (
-          <p className="px-3 py-4 text-xs text-stone-400">暂无日课</p>
+          <p className="px-2 py-4 text-xs text-stone-400">暂无日课</p>
         )}
       </section>}
     </div>
@@ -406,7 +315,7 @@ export const TimelineTodoSidebar: React.FC<TimelineTodoSidebarProps> = ({
   logs,
   checkItems,
   currentDate,
-  width,
+  ratio,
   reviewSlot,
   selectedCategoryId,
   selectedListLabel,
@@ -418,8 +327,8 @@ export const TimelineTodoSidebar: React.FC<TimelineTodoSidebarProps> = ({
   onTodoDrop
 }) => (
   <aside
-    className="flex h-full min-w-[220px] shrink-0 flex-col bg-[#fdfbf7]/95 shadow-[-10px_0_30px_rgba(28,25,23,0.04)] backdrop-blur-md dark:bg-stone-900/95"
-    style={{ width: `${width}px`, maxWidth: '50%' }}
+      className="flex h-full min-w-0 shrink-0 flex-col bg-[#fdfbf7]/95 shadow-[-10px_0_30px_rgba(28,25,23,0.04)] backdrop-blur-md dark:bg-stone-900/95"
+      style={{ width: `${ratio * 100}%`, minWidth: `${TIMELINE_SIDEBAR_MIN_RATIO * 100}%`, maxWidth: `${TIMELINE_SIDEBAR_MAX_RATIO * 100}%` }}
     aria-label="待办与日课"
   >
     {reviewSlot}

@@ -9,17 +9,21 @@
  * @updated 2026-07-30: Makes activity drags easier to start by waiting for a clearer horizontal leftward gesture before locking the intent.
  * @updated 2026-07-30: Removed per-label UI icons so quick coloring is represented by color swatches only.
  * @updated 2026-07-30: Added quick-color activity selection and direct timeline drag support.
+ * @updated 2026-07-30: Uses the shared responsive 26%-70% split ratio instead of a fixed pixel width.
+ * @updated 2026-07-30: Shares the row pointer-drag lifecycle with the todo sidebar through a common hook.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, GripVertical, Paintbrush } from 'lucide-react';
+import { usePointerDrag } from '../hooks';
 import { Category } from '../types';
 import { toCssColor } from '../utils/colorUtils';
+import { TIMELINE_SIDEBAR_MAX_RATIO, TIMELINE_SIDEBAR_MIN_RATIO } from '../utils/timelineSidebarRatioUtils';
 import type { TimelineQuickColorActivity } from './TimelineScheduleCanvas';
 
 interface TimelineQuickColorSidebarProps {
   categories: Category[];
-  width: number;
+  ratio: number;
   selectedTarget: TimelineQuickColorActivity | null;
   continuousMode: boolean;
   onSelectTarget: (target: TimelineQuickColorActivity) => void;
@@ -89,79 +93,15 @@ const ActivityRow: React.FC<{
   onDragEnd: () => void;
   onDrop: (clientX: number, clientY: number) => boolean;
 }> = ({ target, selected, onSelect, onDragMove, onDragEnd, onDrop }) => {
-  const dragRef = useRef<{
-    pointerId: number;
-    startX: number;
-    startY: number;
-    intent: ActivityDragIntent;
-  } | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragFeedback, setDragFeedback] = useState<{ x: number; y: number; isTarget: boolean } | null>(null);
   const color = toCssColor(target.color || '#a8a29e', 'fill');
-
-  const clearDrag = () => {
-    const wasDragging = dragRef.current?.intent === 'drag';
-    dragRef.current = null;
-    setIsDragging(false);
-    setDragFeedback(null);
-    if (wasDragging) onDragEnd();
-  };
-
-  useEffect(() => {
-    const handlePointerMove = (event: PointerEvent) => {
-      const drag = dragRef.current;
-      if (!drag || drag.pointerId !== event.pointerId) return;
-
-      if (drag.intent === 'drag') {
-        const isTarget = onDragMove(event.clientX, event.clientY);
-        setDragFeedback((previous) => (
-          previous && previous.x === event.clientX && previous.y === event.clientY && previous.isTarget === isTarget
-            ? previous
-            : { x: event.clientX, y: event.clientY, isTarget }
-        ));
-        event.preventDefault();
-        return;
-      }
-
-      if (drag.intent !== 'pending') return;
-      const deltaX = event.clientX - drag.startX;
-      const deltaY = event.clientY - drag.startY;
-      drag.intent = resolveActivityDragIntent(deltaX, deltaY);
-      if (drag.intent === 'drag') {
-        setIsDragging(true);
-        const isTarget = onDragMove(event.clientX, event.clientY);
-        setDragFeedback({ x: event.clientX, y: event.clientY, isTarget });
-        event.preventDefault();
-      } else if (drag.intent === 'scroll') {
-        clearDrag();
-      }
-    };
-
-    const handlePointerUp = (event: PointerEvent) => {
-      const drag = dragRef.current;
-      if (!drag || drag.pointerId !== event.pointerId) return;
-
-      if (drag.intent === 'drag') {
-        onDrop(event.clientX, event.clientY);
-      } else if (drag.intent === 'pending') {
-        onSelect();
-      }
-      clearDrag();
-    };
-
-    const handlePointerCancel = (event: PointerEvent) => {
-      if (dragRef.current?.pointerId === event.pointerId) clearDrag();
-    };
-
-    document.addEventListener('pointermove', handlePointerMove, { passive: false });
-    document.addEventListener('pointerup', handlePointerUp);
-    document.addEventListener('pointercancel', handlePointerCancel);
-    return () => {
-      document.removeEventListener('pointermove', handlePointerMove);
-      document.removeEventListener('pointerup', handlePointerUp);
-      document.removeEventListener('pointercancel', handlePointerCancel);
-    };
-  }, [onDragEnd, onDragMove, onDrop, onSelect]);
+  const { beginDrag, dragFeedback, isDragging } = usePointerDrag({
+    threshold: ACTIVITY_DRAG_DISTANCE,
+    resolveIntent: resolveActivityDragIntent,
+    onSelect,
+    onDragMove,
+    onDragEnd,
+    onDrop
+  });
 
   return (
     <div className={`group flex w-full items-center gap-2 px-2 transition-opacity ${isDragging ? 'opacity-45' : ''}`}>
@@ -172,16 +112,7 @@ const ActivityRow: React.FC<{
       />
       <button
         type="button"
-        onPointerDown={(event) => {
-          if (event.pointerType === 'mouse' && event.button !== 0) return;
-          event.currentTarget.setPointerCapture(event.pointerId);
-          dragRef.current = {
-            pointerId: event.pointerId,
-            startX: event.clientX,
-            startY: event.clientY,
-            intent: 'pending'
-          };
-        }}
+        onPointerDown={(event) => beginDrag(event)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') onSelect();
         }}
@@ -210,7 +141,7 @@ const ActivityRow: React.FC<{
 
 export const TimelineQuickColorSidebar: React.FC<TimelineQuickColorSidebarProps> = ({
   categories,
-  width,
+  ratio,
   selectedTarget,
   continuousMode,
   onSelectTarget,
@@ -223,8 +154,8 @@ export const TimelineQuickColorSidebar: React.FC<TimelineQuickColorSidebarProps>
 
   return (
     <aside
-      className="flex h-full min-w-[220px] shrink-0 flex-col bg-[#fdfbf7]/95 shadow-[-10px_0_30px_rgba(28,25,23,0.04)] backdrop-blur-md dark:bg-stone-900/95"
-      style={{ width: `${width}px`, maxWidth: '50%' }}
+      className="flex h-full min-w-0 shrink-0 flex-col bg-[#fdfbf7]/95 shadow-[-10px_0_30px_rgba(28,25,23,0.04)] backdrop-blur-md dark:bg-stone-900/95"
+      style={{ width: `${ratio * 100}%`, minWidth: `${TIMELINE_SIDEBAR_MIN_RATIO * 100}%`, maxWidth: `${TIMELINE_SIDEBAR_MAX_RATIO * 100}%` }}
       aria-label="快速着色"
     >
       <div className="flex shrink-0 items-center justify-between border-b border-stone-100 px-4 py-3 dark:border-stone-800">

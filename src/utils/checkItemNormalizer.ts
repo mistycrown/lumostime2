@@ -1,6 +1,7 @@
 /**
  * @file checkItemNormalizer.ts
  * @description 日课数据归一化工具 - 兼容旧版布尔数据与新版次数数据
+ * @updated 2026-07-30: Defaulted per-item daily check template enabled flags during normalization.
  * @updated 2026-06-13: Preserved Daily Newspaper local comment threads during Daily Review normalization.
  */
 import {
@@ -37,6 +38,7 @@ const normalizeTemplateItem = (item: Partial<CheckTemplateItem>): CheckTemplateI
     ...item,
     id: item.id || crypto.randomUUID(),
     content: item.content || '',
+    enabled: item.enabled !== false,
     type
   };
 

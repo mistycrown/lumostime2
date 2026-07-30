@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Category, CheckItem, Log } from '../types';
-import { evaluateAutoCheck, formatTimeValue } from './autoCheckUtils';
+import { evaluateAutoCheck, formatTimeValue, hasAutoCheckItemCompletionChanges } from './autoCheckUtils';
 import type { FilterContext } from './filterUtils';
 
 const context: FilterContext = {
@@ -94,5 +94,34 @@ describe('autoCheckUtils nightLatestStart', () => {
 
   it('formats extended night times as next-day values', () => {
     expect(formatTimeValue(24 * 60 + 30)).toBe('次日 00:30');
+  });
+});
+
+describe('hasAutoCheckItemCompletionChanges', () => {
+  const autoItem: CheckItem = {
+    id: 'auto-check',
+    content: 'auto',
+    isCompleted: false,
+    type: 'auto'
+  };
+  const manualItem: CheckItem = {
+    id: 'manual-check',
+    content: 'manual',
+    isCompleted: false,
+    type: 'manual'
+  };
+
+  it('ignores manual check changes and reordered items', () => {
+    expect(hasAutoCheckItemCompletionChanges(
+      [autoItem, manualItem],
+      [{ ...manualItem, isCompleted: true }, { ...autoItem }]
+    )).toBe(false);
+  });
+
+  it('detects automatic check completion changes', () => {
+    expect(hasAutoCheckItemCompletionChanges(
+      [autoItem, manualItem],
+      [{ ...manualItem }, { ...autoItem, isCompleted: true }]
+    )).toBe(true);
   });
 });
