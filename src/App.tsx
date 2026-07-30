@@ -5,6 +5,7 @@
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
  * @updated 2026-06-21: Centralized active-session stop persistence so floating-ball stops and app-awareness finishes always submit logs through the same path.
+ * @updated 2026-07-30: Mounted recurring auto-Plan creation so Repeat todo plan blocks are replenished once per day and after planning config edits.
  * @updated 2026-07-06: Included self-belief library data in user backup/export payloads and reset clearing so AI-created self-beliefs participate in cloud sync.
  * @updated 2026-06-15: Added a sync conflict confirmation modal so timestamp-vs-size contradictions during cloud sync now pause before a smaller JSON can overwrite a larger one.
  * @updated 2026-05-21: Localized the todo deletion confirmation modal into Chinese so the warning copy and action labels match the rest of the app.
@@ -73,6 +74,7 @@ import { useHardwareBackButton } from './hooks/useHardwareBackButton';
 import { useAppLifecycle } from './hooks/useAppLifecycle';
 import { useWidgetBridgeSync } from './hooks/useWidgetBridgeSync';
 import { useFloatingWindowSync } from './hooks/useFloatingWindowSync';
+import { useRecurringPlanAutoCreation } from './hooks/useRecurringPlanAutoCreation';
 import { assistantBackupService } from './services/assistantBackupService';
 import { customColorGroupService } from './services/customColorGroupService';
 import { getDesktopWidgetType, loadEnabledDesktopWidgetTypes } from './services/desktopWidgetService';
@@ -406,6 +408,7 @@ const AppContent: React.FC = () => {
 
   // Use Custom Hooks
   useAppInitialization();
+  useRecurringPlanAutoCreation();
   const logManager = useLogManager();
   const todoManager = useTodoManager();
   const goalManager = useGoalManager();

@@ -4,13 +4,15 @@
  * @output A resizable, in-flow todo-and-daily-check column for the Chronicle split workspace
  * @pos Component
  * @description Renders date-specific todos and daily checks without duplicating Todo view mutation controls.
- * @updated 2026-07-30: Adds switchable category lists and expandable one-level subtask rendering.
+ * @updated 2026-07-30: Lowered the in-flow minimum width to match the quick-color sidebar's compact limit.
+ * @updated 2026-07-30: Keeps parent-row expand controls inside the narrow sidebar while using the shared one-level todo tree.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, ChevronRight, ClipboardCheck, ListTodo } from 'lucide-react';
 import { CheckItem, Log, TodoItem } from '../types';
 import { getCheckItemCountState } from '../utils/dailyCheckUtils';
+import { buildTodoTreeItems } from '../utils/todoHierarchyUtils';
 import { buildTodoDateEntries, formatDateKey, TodoDateEntry } from '../utils/todoScheduleUtils';
 
 interface TimelineTodoSidebarProps {
@@ -36,6 +38,15 @@ const SCHEDULE_LABELS: Record<Exclude<TodoDateEntry['primaryKind'], 'inProgress'
   recurring: 'REP',
   maybe: 'MAY',
   completed: 'DONE'
+};
+
+export const resolveTimelineTodoScheduleLabel = (
+  entry: SidebarTodoEntry,
+  showScheduleLabel: boolean
+): string | null => {
+  if (entry.todo.pin) return 'PIN';
+  if (!showScheduleLabel || entry.primaryKind === 'inProgress') return null;
+  return SCHEDULE_LABELS[entry.primaryKind];
 };
 
 export const TODO_DRAG_DISTANCE = 2;
@@ -102,58 +113,62 @@ export const buildTimelineSidebarTodoEntries = (todos: TodoItem[], logs: Log[], 
 
 export const buildTimelineSidebarCategoryTodoEntries = (todos: TodoItem[], categoryId: string): SidebarTodoEntry[] => (
   todos
-    .filter((todo) => todo.categoryId === categoryId)
+    .filter((todo) => todo.categoryId === categoryId && !todo.isCompleted)
     .map(createCategoryTodoEntry)
-    .sort((left, right) => Number(left.todo.isCompleted) - Number(right.todo.isCompleted) || left.todo.title.localeCompare(right.todo.title, 'zh-CN'))
+    .sort((left, right) => left.todo.title.localeCompare(right.todo.title, 'zh-CN'))
 );
 
 export const buildTimelineSidebarTodoTreeGroups = (
   entries: SidebarTodoEntry[],
-  allTodos: TodoItem[]
+  allTodos: TodoItem[],
+  includeUnscheduledChildren = false
 ): TimelineSidebarTodoTreeGroup[] => {
   const entryById = new Map(entries.map((entry) => [entry.todo.id, entry]));
-  const rootIds = new Set<string>();
+  const groupedEntryIds = new Set<string>();
+  const groups: TimelineSidebarTodoTreeGroup[] = [];
 
-  entries.forEach((entry) => {
-    const parentId = entry.todo.parentTodoId;
-    if (!parentId) {
-      rootIds.add(entry.todo.id);
+  buildTodoTreeItems(allTodos).forEach(({ todo: parentTodo, children }) => {
+    const parentEntry = entryById.get(parentTodo.id);
+
+    if (parentEntry) {
+      const childEntries = children
+        .filter((childTodo) => includeUnscheduledChildren || entryById.has(childTodo.id))
+        .map((childTodo) => entryById.get(childTodo.id) || createCategoryTodoEntry(childTodo));
+      groups.push({ parentEntry, childEntries });
+      groupedEntryIds.add(parentTodo.id);
+      childEntries.forEach((childEntry) => groupedEntryIds.add(childEntry.todo.id));
       return;
     }
 
-    const parentTodo = allTodos.find((todo) => todo.id === parentId);
-    if (parentTodo) {
-      if (!entryById.has(parentTodo.id)) entryById.set(parentTodo.id, createCategoryTodoEntry(parentTodo));
-      rootIds.add(parentTodo.id);
-    } else {
-      rootIds.add(entry.todo.id);
+    children.forEach((childTodo) => {
+      const childEntry = entryById.get(childTodo.id);
+      if (!childEntry) return;
+      groups.push({ parentEntry: childEntry, childEntries: [] });
+      groupedEntryIds.add(childTodo.id);
+    });
+  });
+
+  entries.forEach((entry) => {
+    if (!groupedEntryIds.has(entry.todo.id)) {
+      groups.push({ parentEntry: entry, childEntries: [] });
     }
   });
 
-  return Array.from(rootIds)
-    .map((rootId) => {
-      const parentEntry = entryById.get(rootId);
-      if (!parentEntry) return null;
-      const childEntries = allTodos
-        .filter((todo) => todo.parentTodoId === rootId)
-        .map((todo) => entryById.get(todo.id) || createCategoryTodoEntry(todo))
-        .sort((left, right) => (left.todo.childOrder ?? Number.MAX_SAFE_INTEGER) - (right.todo.childOrder ?? Number.MAX_SAFE_INTEGER) || left.todo.title.localeCompare(right.todo.title, 'zh-CN'));
-      return { parentEntry, childEntries };
-    })
-    .filter((group): group is TimelineSidebarTodoTreeGroup => group !== null)
+  return groups
     .sort((left, right) => Number(right.parentEntry.todo.pin) - Number(left.parentEntry.todo.pin) || left.parentEntry.todo.title.localeCompare(right.parentEntry.todo.title, 'zh-CN'));
 };
 
 const TodoRow: React.FC<{
   entry: SidebarTodoEntry;
+  showScheduleLabel: boolean;
   onSelect: () => void;
   onToggleCompletion: () => void;
   onDragMove: (clientX: number, clientY: number) => boolean;
   onDragEnd: () => void;
   onDrop: (clientX: number, clientY: number) => boolean;
-}> = ({ entry, onSelect, onToggleCompletion, onDragMove, onDragEnd, onDrop }) => {
+}> = ({ entry, showScheduleLabel, onSelect, onToggleCompletion, onDragMove, onDragEnd, onDrop }) => {
   const isCompleted = entry.primaryKind === 'completed' || entry.todo.isCompleted;
-  const scheduleLabel = entry.todo.pin ? 'PIN' : (entry.primaryKind === 'inProgress' ? null : SCHEDULE_LABELS[entry.primaryKind]);
+  const scheduleLabel = resolveTimelineTodoScheduleLabel(entry, showScheduleLabel);
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
@@ -243,7 +258,7 @@ const TodoRow: React.FC<{
   }, []);
 
   return (
-  <div className={`group flex w-full items-center gap-1.5 px-1.5 ${isDragging ? 'opacity-45' : ''}`}>
+  <div className={`group flex min-w-0 flex-1 items-center gap-1.5 px-1.5 ${isDragging ? 'opacity-45' : ''}`}>
     <TodoCompletionMarker completed={isCompleted} onToggle={onToggleCompletion} />
     <button
       type="button"
@@ -335,8 +350,12 @@ const TodoGroups: React.FC<{
       ? buildTimelineSidebarCategoryTodoEntries(todos, selectedCategoryId)
       : buildTimelineSidebarTodoEntries(todos, logs, formatDateKey(currentDate))
   ), [currentDate, logs, selectedCategoryId, todos]);
-  const todoTreeGroups = useMemo(() => buildTimelineSidebarTodoTreeGroups(visibleTodos, todos), [todos, visibleTodos]);
+  const todoTreeGroups = useMemo(
+    () => buildTimelineSidebarTodoTreeGroups(visibleTodos, todos, !selectedCategoryId),
+    [selectedCategoryId, todos, visibleTodos]
+  );
   const displayedTodoCount = todoTreeGroups.reduce((count, group) => count + 1 + group.childEntries.length, 0);
+  const showScheduleLabels = !selectedCategoryId;
   const [expandedParentIds, setExpandedParentIds] = useState<Record<string, boolean>>({});
   const isFutureDate = useMemo(() => {
     const selectedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate()).getTime();
@@ -352,14 +371,14 @@ const TodoGroups: React.FC<{
         {visibleTodos.length > 0 ? (
           <div className="overflow-hidden rounded-lg">
             {todoTreeGroups.map((group) => {
-              const isExpanded = expandedParentIds[group.parentEntry.todo.id] ?? true;
+              const isExpanded = expandedParentIds[group.parentEntry.todo.id] ?? false;
               return (
                 <div key={group.parentEntry.todo.id}>
                   <div className="flex items-center">
-                    <TodoRow entry={group.parentEntry} onSelect={() => onSelectTodo(group.parentEntry.todo)} onToggleCompletion={() => onToggleTodoCompletion(group.parentEntry.todo)} onDragMove={(clientX, clientY) => onTodoDragMove(group.parentEntry.todo, clientX, clientY)} onDragEnd={onTodoDragEnd} onDrop={(clientX, clientY) => onTodoDrop(group.parentEntry.todo, clientX, clientY)} />
+                    <TodoRow entry={group.parentEntry} showScheduleLabel={showScheduleLabels} onSelect={() => onSelectTodo(group.parentEntry.todo)} onToggleCompletion={() => onToggleTodoCompletion(group.parentEntry.todo)} onDragMove={(clientX, clientY) => onTodoDragMove(group.parentEntry.todo, clientX, clientY)} onDragEnd={onTodoDragEnd} onDrop={(clientX, clientY) => onTodoDrop(group.parentEntry.todo, clientX, clientY)} />
                     {group.childEntries.length > 0 && <button type="button" className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center text-stone-400 hover:text-stone-700 dark:hover:text-stone-200" aria-label={isExpanded ? '收起子任务' : '展开子任务'} onClick={() => setExpandedParentIds((previous) => ({ ...previous, [group.parentEntry.todo.id]: !isExpanded }))}>{isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</button>}
                   </div>
-                  {isExpanded && group.childEntries.length > 0 && <div className="ml-5 border-l border-stone-200 pl-2 dark:border-stone-700">{group.childEntries.map((entry) => <TodoRow key={entry.todo.id} entry={entry} onSelect={() => onSelectTodo(entry.todo)} onToggleCompletion={() => onToggleTodoCompletion(entry.todo)} onDragMove={(clientX, clientY) => onTodoDragMove(entry.todo, clientX, clientY)} onDragEnd={onTodoDragEnd} onDrop={(clientX, clientY) => onTodoDrop(entry.todo, clientX, clientY)} />)}</div>}
+                  {isExpanded && group.childEntries.length > 0 && <div className="ml-5 border-l border-stone-200 pl-2 dark:border-stone-700">{group.childEntries.map((entry) => <TodoRow key={entry.todo.id} entry={entry} showScheduleLabel={showScheduleLabels} onSelect={() => onSelectTodo(entry.todo)} onToggleCompletion={() => onToggleTodoCompletion(entry.todo)} onDragMove={(clientX, clientY) => onTodoDragMove(entry.todo, clientX, clientY)} onDragEnd={onTodoDragEnd} onDrop={(clientX, clientY) => onTodoDrop(entry.todo, clientX, clientY)} />)}</div>}
                 </div>
               );
             })}
@@ -399,7 +418,7 @@ export const TimelineTodoSidebar: React.FC<TimelineTodoSidebarProps> = ({
   onTodoDrop
 }) => (
   <aside
-    className="flex h-full min-w-[15rem] shrink-0 flex-col bg-[#fdfbf7]/95 shadow-[-10px_0_30px_rgba(28,25,23,0.04)] backdrop-blur-md dark:bg-stone-900/95"
+    className="flex h-full min-w-[220px] shrink-0 flex-col bg-[#fdfbf7]/95 shadow-[-10px_0_30px_rgba(28,25,23,0.04)] backdrop-blur-md dark:bg-stone-900/95"
     style={{ width: `${width}px`, maxWidth: '50%' }}
     aria-label="待办与日课"
   >

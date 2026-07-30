@@ -19,6 +19,8 @@ import type { AIChatPersona, AIChatSession } from './ai-chat/AIBackfillChatShare
 import { TodoQuickActionsModal } from './TodoQuickActionsModal';
 import { isQuickTodo } from '../utils/todoKindUtils';
 import { getRealTodoCategories } from '../utils/todoQuickCategoryUtils';
+import { isAutoRecurringPlanDeleteLocked } from '../utils/todoRecurringPlanUtils';
+import type { TimelineQuickColorActivity } from './TimelineScheduleCanvas';
 
 // Views
 import { DailyReviewView } from '../views/DailyReviewView';
@@ -217,6 +219,19 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         return plannedLog;
     };
 
+    const handleCreateQuickColorLog = (target: TimelineQuickColorActivity, startTime: number, endTime: number): Log => {
+        const quickColorLog: Log = {
+            id: crypto.randomUUID(),
+            categoryId: target.categoryId,
+            activityId: target.activityId,
+            startTime,
+            endTime,
+            duration: Math.max(0, Math.round((endTime - startTime) / 1000))
+        };
+        setLogs((previous) => [...previous, quickColorLog]);
+        return quickColorLog;
+    };
+
     const handleToggleTimelineTodoCompletion = (todo: TodoItem) => {
         handleSaveTodo({
             ...todo,
@@ -227,6 +242,13 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
 
     const handleDeleteTimelinePlannedLog = (log: Log) => {
         if (!log.isPlanned) return;
+        const linkedTodo = log.linkedTodoId
+            ? todos.find((todo) => todo.id === log.linkedTodoId)
+            : null;
+        if (isAutoRecurringPlanDeleteLocked(log, linkedTodo)) {
+            addToast('info', '该循环计划已锁定，取消自动生成后可删除。');
+            return;
+        }
         setLogs((previous) => previous.filter((entry) => entry.id !== log.id));
     };
 
@@ -523,6 +545,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     onEditLog={openEditModal}
                     onUpdateLog={handleUpdateLog}
                     onCreatePlannedLog={handleCreatePlannedLog}
+                    onCreateQuickColorLog={handleCreateQuickColorLog}
                     onStartTodoFocus={handleStartTodoFocus}
                     onDeletePlannedLog={handleDeleteTimelinePlannedLog}
                     currentDate={currentDate}

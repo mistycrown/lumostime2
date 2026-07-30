@@ -1,16 +1,21 @@
 /**
  * @file TimelineScheduleCanvas.tsx
- * @input Selected date, logs, categories, scopes, todos, and record mutation callbacks
- * @output A full-day scrollable schedule canvas with plan drops, editable time bounds, and touch pinch zoom
+ * @input Selected date, logs, categories, scopes, todos, quick-color selection, and record mutation callbacks
+ * @output A full-day scrollable schedule canvas with plan drops, quick-color record creation, editable time bounds, and touch pinch zoom
  * @pos Component
  * @description Positions real records and virtual planning blocks on a 00:00-24:00 time grid for the Chronicle split layout.
- * @updated 2026-07-30: Defers normal record-detail opening until the initiating pointer sequence has completed.
+ * @updated 2026-07-30: Keeps quick-color creations out of edit mode so resizing only starts from a later long press.
+ * @updated 2026-07-30: Locks recurring auto-Plan deletion while the source Repeat todo still has auto generation enabled.
+ * @updated 2026-07-30: Added quick-color range dragging plus direct 30-minute activity drops for formal record creation.
+ * @updated 2026-07-30: Hardens mobile record taps with a click fallback while preserving long-press resizing.
+ * @updated 2026-07-30: Lets edited schedule blocks drag their middle body to move the whole range while keeping edge handles independent.
  */
 import React, { useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Minus, Play, Plus, Trash2, X } from 'lucide-react';
+import { Lock, Minus, Play, Plus, Trash2, X } from 'lucide-react';
 import { Category, Log, Scope, TodoItem } from '../types';
 import { toCssColor } from '../utils/colorUtils';
+import { isAutoRecurringPlanDeleteLocked } from '../utils/todoRecurringPlanUtils';
 
 const MIN_HOUR_HEIGHT = 52;
 const MAX_HOUR_HEIGHT = 180;
@@ -30,14 +35,31 @@ interface TimelineScheduleCanvasProps {
   onEditLog: (log: Log) => void;
   onUpdateLog: (log: Log) => void;
   onCreatePlannedLog: (todo: TodoItem, startTime: number, endTime: number) => Log;
+  quickColorSelection?: TimelineQuickColorActivity | null;
+  onCreateQuickColorLog: (target: TimelineQuickColorActivity, startTime: number, endTime: number) => Log;
   onStartPlannedTodo: (todo: TodoItem) => void;
   onDeletePlannedLog: (log: Log) => void;
+}
+
+export interface TimelineQuickColorActivity {
+  categoryId: string;
+  activityId: string;
+  categoryName: string;
+  activityName: string;
+  categoryIcon: string;
+  categoryUiIcon?: string;
+  activityIcon: string;
+  activityUiIcon?: string;
+  color: string;
 }
 
 export interface TimelineScheduleCanvasHandle {
   previewTodoDropAtClientPoint: (todo: TodoItem, clientX: number, clientY: number) => boolean;
   clearTodoDropPreview: () => void;
   dropTodoAtClientPoint: (todo: TodoItem, clientX: number, clientY: number) => boolean;
+  previewQuickColorDropAtClientPoint: (target: TimelineQuickColorActivity, clientX: number, clientY: number) => boolean;
+  clearQuickColorDropPreview: () => void;
+  dropQuickColorAtClientPoint: (target: TimelineQuickColorActivity, clientX: number, clientY: number) => boolean;
 }
 
 interface ScheduleBlockLayout {
@@ -58,6 +80,21 @@ interface TodoDropPreview {
   endMinutes: number;
 }
 
+interface QuickColorPreview {
+  target: TimelineQuickColorActivity;
+  startMinutes: number;
+  endMinutes: number;
+}
+
+interface QuickColorRangeSession {
+  pointerId: number;
+  target: TimelineQuickColorActivity;
+  anchorMinutes: number;
+  startX: number;
+  startY: number;
+  hasMoved: boolean;
+}
+
 const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max);
 
 const getTouchDistance = (first: Touch, second: Touch): number => Math.hypot(
@@ -76,6 +113,47 @@ const snapMinute = (minute: number): number => clamp(
 export const getPlannedTimeRange = (minute: number): { startMinutes: number; endMinutes: number } => {
   const startMinutes = clamp(snapMinute(minute), 0, DAY_MINUTES - 30);
   return { startMinutes, endMinutes: startMinutes + 30 };
+};
+
+export const shiftTimeRangeWithinDay = (
+  startTime: number,
+  endTime: number,
+  deltaMinutes: number,
+  dayStartTime: number
+): { startTime: number; endTime: number } => {
+  const durationMs = Math.max(0, endTime - startTime);
+  if (durationMs === 0) {
+    return { startTime, endTime };
+  }
+
+  const durationMinutes = durationMs / 60000;
+  const baseStartMinutes = (startTime - dayStartTime) / 60000;
+  const maxStartMinutes = Math.max(0, DAY_MINUTES - durationMinutes);
+  const nextStartMinutes = clamp(snapMinute(baseStartMinutes + deltaMinutes), 0, maxStartMinutes);
+  const nextStartTime = dayStartTime + nextStartMinutes * 60000;
+
+  return {
+    startTime: nextStartTime,
+    endTime: nextStartTime + durationMs
+  };
+};
+
+export const getMinimumTimelineRange = (anchorMinutes: number, currentMinutes: number): { startMinutes: number; endMinutes: number } => {
+  let startMinutes = Math.min(anchorMinutes, currentMinutes);
+  let endMinutes = Math.max(anchorMinutes, currentMinutes);
+
+  if (endMinutes - startMinutes >= TIME_SNAP_MINUTES) {
+    return { startMinutes, endMinutes };
+  }
+
+  if (startMinutes >= DAY_MINUTES - TIME_SNAP_MINUTES) {
+    startMinutes = DAY_MINUTES - TIME_SNAP_MINUTES;
+    endMinutes = DAY_MINUTES;
+  } else {
+    endMinutes = startMinutes + TIME_SNAP_MINUTES;
+  }
+
+  return { startMinutes, endMinutes };
 };
 
 export const getScheduleBlockHeight = (durationMinutes: number, hourHeight: number): number => Math.max(
@@ -129,6 +207,8 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   onEditLog,
   onUpdateLog,
   onCreatePlannedLog,
+  quickColorSelection,
+  onCreateQuickColorLog,
   onStartPlannedTodo,
   onDeletePlannedLog,
   isDarkMode
@@ -138,16 +218,27 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   const initializedDateRef = useRef<string>('');
   const longPressRef = useRef<{ logId: string; startX: number; startY: number; timerId: number | null; active: boolean } | null>(null);
   const resizeRef = useRef<{ log: Log; edge: 'start' | 'end' } | null>(null);
+  const moveRef = useRef<{
+    log: Log;
+    pointerId: number;
+    anchorMinute: number;
+    baseRange: TimeOverride;
+    hadExistingOverride: boolean;
+  } | null>(null);
+  const quickColorRangeRef = useRef<QuickColorRangeSession | null>(null);
   const timeOverridesRef = useRef<Record<string, TimeOverride>>({});
   const [hourHeight, setHourHeight] = useState(DEFAULT_HOUR_HEIGHT);
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [planActionLogId, setPlanActionLogId] = useState<string | null>(null);
   const [todoDropPreview, setTodoDropPreview] = useState<TodoDropPreview | null>(null);
+  const [quickColorDropPreview, setQuickColorDropPreview] = useState<QuickColorPreview | null>(null);
+  const [quickColorRangePreview, setQuickColorRangePreview] = useState<QuickColorPreview | null>(null);
   const [createdPlanLogId, setCreatedPlanLogId] = useState<string | null>(null);
   const [timeOverrides, setTimeOverrides] = useState<Record<string, TimeOverride>>({});
   const createdPlanTimerRef = useRef<number | null>(null);
   const recordDetailOpenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recordTapGuardRef = useRef<{ logId: string; timerId: ReturnType<typeof setTimeout> } | null>(null);
 
   const dateKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}`;
   const dayStart = useMemo(() => {
@@ -218,16 +309,31 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   const activePlanTodo = useMemo(() => (
     activePlanLog?.linkedTodoId ? todos.find((todo) => todo.id === activePlanLog.linkedTodoId) || null : null
   ), [activePlanLog, todos]);
+  const isActivePlanDeleteLocked = useMemo(() => (
+    activePlanLog ? isAutoRecurringPlanDeleteLocked(activePlanLog, activePlanTodo) : false
+  ), [activePlanLog, activePlanTodo]);
   const todoDropPreviewColor = useMemo(() => {
     if (!todoDropPreview) return '#a8a29e';
     const category = categories.find((item) => item.id === todoDropPreview.todo.linkedCategoryId);
     const activity = category?.activities.find((item) => item.id === todoDropPreview.todo.linkedActivityId);
     return toCssColor(activity?.color || '#a8a29e', 'fill');
   }, [categories, todoDropPreview]);
+  const activeQuickColorPreview = quickColorRangePreview || quickColorDropPreview;
+  const activeQuickColorPreviewColor = useMemo(() => (
+    activeQuickColorPreview
+      ? toCssColor(activeQuickColorPreview.target.color || '#a8a29e', 'fill')
+      : '#a8a29e'
+  ), [activeQuickColorPreview]);
 
   useEffect(() => {
     if (planActionLogId && !activePlanLog) setPlanActionLogId(null);
   }, [activePlanLog, planActionLogId]);
+
+  useEffect(() => {
+    quickColorRangeRef.current = null;
+    setQuickColorRangePreview(null);
+    setQuickColorDropPreview(null);
+  }, [dateKey, quickColorSelection?.activityId, quickColorSelection?.categoryId]);
 
   useEffect(() => {
     if (!scrollRef.current || initializedDateRef.current === dateKey) return;
@@ -242,6 +348,8 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   useEffect(() => () => {
     if (createdPlanTimerRef.current !== null) window.clearTimeout(createdPlanTimerRef.current);
     if (recordDetailOpenTimerRef.current !== null) clearTimeout(recordDetailOpenTimerRef.current);
+    if (recordTapGuardRef.current !== null) clearTimeout(recordTapGuardRef.current.timerId);
+    moveRef.current = null;
   }, []);
 
   const setCanvasScale = (nextHourHeight: number) => {
@@ -281,6 +389,23 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
     });
   };
 
+  const updateMoveDraft = (clientY: number) => {
+    const move = moveRef.current;
+    const minute = getMinuteAtClientY(clientY);
+    if (!move || minute === null) return;
+
+    const deltaMinutes = minute - move.anchorMinute;
+    const nextRange = shiftTimeRangeWithinDay(move.baseRange.startTime, move.baseRange.endTime, deltaMinutes, dayStart.getTime());
+    const currentRange = timeOverridesRef.current[move.log.id];
+    if (currentRange?.startTime === nextRange.startTime && currentRange?.endTime === nextRange.endTime) return;
+
+    setTimeOverrides((previous) => {
+      const next = { ...previous, [move.log.id]: nextRange };
+      timeOverridesRef.current = next;
+      return next;
+    });
+  };
+
   const commitResize = () => {
     const resize = resizeRef.current;
     if (!resize) return;
@@ -300,6 +425,62 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
     });
   };
 
+  const startMove = (log: Log, event: React.PointerEvent<HTMLDivElement>) => {
+    const minute = getMinuteAtClientY(event.clientY);
+    if (minute === null) return;
+
+    const currentRange = timeOverridesRef.current[log.id] || { startTime: log.startTime, endTime: log.endTime };
+    clearLongPress();
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    moveRef.current = {
+      log,
+      pointerId: event.pointerId,
+      anchorMinute: minute,
+      baseRange: currentRange,
+      hadExistingOverride: Boolean(timeOverridesRef.current[log.id])
+    };
+  };
+
+  const commitMove = () => {
+    const move = moveRef.current;
+    if (!move) return;
+
+    const override = timeOverridesRef.current[move.log.id];
+    if (override && (override.startTime !== move.baseRange.startTime || override.endTime !== move.baseRange.endTime)) {
+      onUpdateLog({
+        ...move.log,
+        ...override,
+        duration: Math.max(0, Math.round((override.endTime - override.startTime) / 1000))
+      });
+    }
+
+    moveRef.current = null;
+    setTimeOverrides((previous) => {
+      const { [move.log.id]: _, ...rest } = previous;
+      timeOverridesRef.current = rest;
+      return rest;
+    });
+  };
+
+  const cancelMove = () => {
+    const move = moveRef.current;
+    if (!move) return;
+
+    moveRef.current = null;
+    setTimeOverrides((previous) => {
+      const next = { ...previous };
+      if (move.hadExistingOverride) {
+        next[move.log.id] = move.baseRange;
+      } else {
+        delete next[move.log.id];
+      }
+      timeOverridesRef.current = next;
+      return next;
+    });
+  };
+
   const clearLongPress = () => {
     const press = longPressRef.current;
     if (press?.timerId !== null && press?.timerId !== undefined) {
@@ -309,7 +490,10 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   };
 
   const handleBlockPointerDown = (log: Log, event: React.PointerEvent<HTMLDivElement>) => {
-    if (editingLogId === log.id) return;
+    if (editingLogId === log.id) {
+      startMove(log, event);
+      return;
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
     const press = { logId: log.id, startX: event.clientX, startY: event.clientY, timerId: null as number | null, active: false };
     longPressRef.current = press;
@@ -321,29 +505,80 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
     }, 350);
   };
 
-  const handleBlockPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+  const handleBlockPointerMove = (log: Log, event: React.PointerEvent<HTMLDivElement>) => {
+    const move = moveRef.current;
+    if (move?.log.id === log.id && move.pointerId === event.pointerId) {
+      event.preventDefault();
+      updateMoveDraft(event.clientY);
+      return;
+    }
+
     const press = longPressRef.current;
-    if (!press || press.active) return;
+    if (!press || press.logId !== log.id) return;
+    if (press.active && !moveRef.current) {
+      startMove(log, event);
+      updateMoveDraft(event.clientY);
+      return;
+    }
+    if (press.active) return;
     if (Math.hypot(event.clientX - press.startX, event.clientY - press.startY) > 6) {
       clearLongPress();
     }
   };
 
-  const handleBlockPointerUp = (log: Log) => {
-    if (editingLogId === log.id) return;
+  const scheduleRecordDetailOpen = (log: Log) => {
+    if (recordTapGuardRef.current?.logId === log.id) return;
+    if (recordDetailOpenTimerRef.current !== null) clearTimeout(recordDetailOpenTimerRef.current);
+    recordDetailOpenTimerRef.current = scheduleTimelineRecordDetailOpen(() => {
+      recordDetailOpenTimerRef.current = null;
+      onEditLog(log);
+    });
+    if (recordTapGuardRef.current !== null) clearTimeout(recordTapGuardRef.current.timerId);
+    recordTapGuardRef.current = {
+      logId: log.id,
+      timerId: setTimeout(() => {
+        recordTapGuardRef.current = null;
+      }, 400)
+    };
+  };
+
+  const handleBlockPointerUp = (log: Log, event: React.PointerEvent<HTMLDivElement>) => {
+    const move = moveRef.current;
+    if (move?.log.id === log.id && move.pointerId === event.pointerId) {
+      event.preventDefault();
+      event.stopPropagation();
+      commitMove();
+      return;
+    }
+
+    if (editingLogId === log.id) {
+      clearLongPress();
+      return;
+    }
     const wasLongPress = longPressRef.current?.logId === log.id && longPressRef.current.active;
     clearLongPress();
     if (!wasLongPress) {
       if (log.isPlanned) {
         setPlanActionLogId(log.id);
       } else {
-        if (recordDetailOpenTimerRef.current !== null) clearTimeout(recordDetailOpenTimerRef.current);
-        recordDetailOpenTimerRef.current = scheduleTimelineRecordDetailOpen(() => {
-          recordDetailOpenTimerRef.current = null;
-          onEditLog(log);
-        });
+        scheduleRecordDetailOpen(log);
       }
     }
+  };
+
+  const handleBlockPointerCancel = (log: Log, event: React.PointerEvent<HTMLDivElement>) => {
+    const move = moveRef.current;
+    if (move?.log.id === log.id && move.pointerId === event.pointerId) {
+      cancelMove();
+      return;
+    }
+
+    clearLongPress();
+  };
+
+  const handleBlockClick = (log: Log) => {
+    if (log.isPlanned || editingLogId === log.id) return;
+    scheduleRecordDetailOpen(log);
   };
 
   const handleResizePointerDown = (log: Log, edge: 'start' | 'end', event: React.PointerEvent<HTMLButtonElement>) => {
@@ -385,6 +620,76 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   const handleTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
     event.stopPropagation();
     if (event.touches.length < 2) pinchRef.current = null;
+  };
+
+  const showCreatedLogFeedback = (log: Log, enterEditMode = true) => {
+    setEditingLogId(enterEditMode ? log.id : null);
+    if (createdPlanTimerRef.current !== null) window.clearTimeout(createdPlanTimerRef.current);
+    setCreatedPlanLogId(log.id);
+    createdPlanTimerRef.current = window.setTimeout(() => {
+      createdPlanTimerRef.current = null;
+      setCreatedPlanLogId(null);
+    }, 1200);
+  };
+
+  const clearQuickColorRange = () => {
+    quickColorRangeRef.current = null;
+    setQuickColorRangePreview(null);
+  };
+
+  const handleQuickColorCanvasPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!quickColorSelection) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    const minute = getMinuteAtClientY(event.clientY);
+    if (minute === null) return;
+
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    quickColorRangeRef.current = {
+      pointerId: event.pointerId,
+      target: quickColorSelection,
+      anchorMinutes: minute,
+      startX: event.clientX,
+      startY: event.clientY,
+      hasMoved: false
+    };
+    setQuickColorDropPreview(null);
+    setQuickColorRangePreview({ target: quickColorSelection, ...getMinimumTimelineRange(minute, minute) });
+  };
+
+  const handleQuickColorCanvasPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const session = quickColorRangeRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    const minute = getMinuteAtClientY(event.clientY);
+    if (minute === null) return;
+
+    if (!session.hasMoved && Math.hypot(event.clientX - session.startX, event.clientY - session.startY) > 4) {
+      session.hasMoved = true;
+    }
+    event.preventDefault();
+    setQuickColorRangePreview({ target: session.target, ...getMinimumTimelineRange(session.anchorMinutes, minute) });
+  };
+
+  const handleQuickColorCanvasPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const session = quickColorRangeRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    const minute = getMinuteAtClientY(event.clientY);
+    const range = minute === null ? null : getMinimumTimelineRange(session.anchorMinutes, minute);
+    const shouldCreate = Boolean(range && session.hasMoved);
+    clearQuickColorRange();
+
+    if (!shouldCreate || !range) return;
+    const log = onCreateQuickColorLog(
+      session.target,
+      dayStart.getTime() + range.startMinutes * 60 * 1000,
+      dayStart.getTime() + range.endMinutes * 60 * 1000
+    );
+    showCreatedLogFeedback(log, false);
+  };
+
+  const handleQuickColorCanvasPointerCancel = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (quickColorRangeRef.current?.pointerId === event.pointerId) clearQuickColorRange();
   };
 
   useImperativeHandle(ref, () => ({
@@ -430,22 +735,63 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
         dayStart.getTime() + range.endMinutes * 60 * 1000
       );
       setTodoDropPreview(null);
-      setEditingLogId(plannedLog.id);
-      if (createdPlanTimerRef.current !== null) window.clearTimeout(createdPlanTimerRef.current);
-      setCreatedPlanLogId(plannedLog.id);
-      createdPlanTimerRef.current = window.setTimeout(() => {
-        createdPlanTimerRef.current = null;
-        setCreatedPlanLogId(null);
-      }, 1200);
+      showCreatedLogFeedback(plannedLog);
+      return true;
+    },
+    previewQuickColorDropAtClientPoint: (target, clientX, clientY) => {
+      const scrollContainer = scrollRef.current;
+      if (!scrollContainer) return false;
+      const bounds = scrollContainer.getBoundingClientRect();
+      if (clientX < bounds.left || clientX > bounds.right || clientY < bounds.top || clientY > bounds.bottom) {
+        setQuickColorDropPreview(null);
+        return false;
+      }
+      const minute = getMinuteAtClientY(clientY);
+      if (minute === null) {
+        setQuickColorDropPreview(null);
+        return false;
+      }
+      const range = getPlannedTimeRange(minute);
+      setQuickColorDropPreview((previous) => (
+        previous?.target.activityId === target.activityId
+          && previous?.target.categoryId === target.categoryId
+          && previous.startMinutes === range.startMinutes
+          ? previous
+          : { target, ...range }
+      ));
+      return true;
+    },
+    clearQuickColorDropPreview: () => setQuickColorDropPreview(null),
+    dropQuickColorAtClientPoint: (target, clientX, clientY) => {
+      const scrollContainer = scrollRef.current;
+      if (!scrollContainer) return false;
+      const bounds = scrollContainer.getBoundingClientRect();
+      if (clientX < bounds.left || clientX > bounds.right || clientY < bounds.top || clientY > bounds.bottom) {
+        setQuickColorDropPreview(null);
+        return false;
+      }
+      const minute = getMinuteAtClientY(clientY);
+      if (minute === null) {
+        setQuickColorDropPreview(null);
+        return false;
+      }
+      const range = getPlannedTimeRange(minute);
+      const log = onCreateQuickColorLog(
+        target,
+        dayStart.getTime() + range.startMinutes * 60 * 1000,
+        dayStart.getTime() + range.endMinutes * 60 * 1000
+      );
+      setQuickColorDropPreview(null);
+      showCreatedLogFeedback(log, false);
       return true;
     }
-  }), [dayStart, hourHeight, onCreatePlannedLog]);
+  }), [dayStart, hourHeight, onCreatePlannedLog, onCreateQuickColorLog]);
 
   return (
     <section className={`relative min-h-0 min-w-0 flex-1 overflow-hidden border-t ${surfaceClassName}`} aria-label="全天时间轴">
       <div
         ref={scrollRef}
-        className="h-full overflow-y-auto overscroll-contain pb-28 touch-pan-y [scrollbar-color:#d6d3d1_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300"
+        className={`h-full overflow-y-auto overscroll-contain pb-28 [scrollbar-color:#d6d3d1_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 ${quickColorSelection ? 'touch-none' : 'touch-pan-y'}`}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -455,8 +801,14 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
           className="relative min-w-0"
           style={{ height: `${canvasHeight}px` }}
           onPointerDown={(event) => {
-            if (!(event.target as HTMLElement).closest('[data-schedule-block]')) setEditingLogId(null);
+            if (!(event.target as HTMLElement).closest('[data-schedule-block]')) {
+              setEditingLogId(null);
+              handleQuickColorCanvasPointerDown(event);
+            }
           }}
+          onPointerMove={handleQuickColorCanvasPointerMove}
+          onPointerUp={handleQuickColorCanvasPointerUp}
+          onPointerCancel={handleQuickColorCanvasPointerCancel}
         >
           {Array.from({ length: 25 }, (_, hour) => {
             const top = TIMELINE_TOP_PADDING + hour * hourHeight;
@@ -489,6 +841,26 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
                 </span>
               </div>
             )}
+            {activeQuickColorPreview && (
+              <div
+                className="pointer-events-none absolute z-10 rounded-[4px] border-l-[3px] px-3 py-2 opacity-90 shadow-[0_1px_8px_rgba(28,25,23,0.08)]"
+                style={{
+                  top: `${TIMELINE_TOP_PADDING + (activeQuickColorPreview.startMinutes / 60) * hourHeight}px`,
+                  height: `${getScheduleBlockHeight(activeQuickColorPreview.endMinutes - activeQuickColorPreview.startMinutes, hourHeight)}px`,
+                  left: '0',
+                  width: '100%',
+                  borderColor: activeQuickColorPreviewColor,
+                  backgroundColor: toCssColor(activeQuickColorPreviewColor, 'background', 0.12)
+                }}
+              >
+                <span className="block truncate text-[10px] font-bold tabular-nums text-stone-500 dark:text-stone-400">
+                  {String(Math.floor(activeQuickColorPreview.startMinutes / 60)).padStart(2, '0')}:{String(activeQuickColorPreview.startMinutes % 60).padStart(2, '0')} - {String(Math.floor(activeQuickColorPreview.endMinutes / 60)).padStart(2, '0')}:{String(activeQuickColorPreview.endMinutes % 60).padStart(2, '0')}
+                </span>
+                <span className="mt-0.5 block truncate text-[11px] font-medium text-stone-700 dark:text-stone-200">
+                  #{activeQuickColorPreview.target.activityName}
+                </span>
+              </div>
+            )}
             {scheduledLogs.map(({ log, top, height, color, background, startLabel, endLabel, activityLabel, linkedTodoLabel, linkedScopeNames, isPlanned, column, columnCount }) => {
               const isEditing = editingLogId === log.id;
               const isNewlyCreated = createdPlanLogId === log.id;
@@ -502,9 +874,10 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
                   role="button"
                   tabIndex={0}
                   onPointerDown={(event) => handleBlockPointerDown(log, event)}
-                  onPointerMove={handleBlockPointerMove}
-                  onPointerUp={() => handleBlockPointerUp(log)}
-                  onPointerCancel={clearLongPress}
+                  onPointerMove={(event) => handleBlockPointerMove(log, event)}
+                  onPointerUp={(event) => handleBlockPointerUp(log, event)}
+                  onPointerCancel={(event) => handleBlockPointerCancel(log, event)}
+                  onClick={() => handleBlockClick(log)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       if (log.isPlanned) {
@@ -514,7 +887,7 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
                       }
                     }
                   }}
-                  className={`absolute rounded-[4px] text-left shadow-[0_1px_2px_rgba(28,25,23,0.06)] transition-shadow hover:shadow-[0_5px_16px_rgba(28,25,23,0.14)] ${isEditing ? 'overflow-visible ring-1 ring-stone-300/80 dark:ring-stone-600' : 'overflow-hidden'} ${isCompact ? 'px-1.5 py-0.5' : 'px-3 py-2'} ${isPlanned ? 'border border-dashed bg-stone-50/70 dark:bg-stone-900/50' : 'border-l-[3px]'}`}
+                  className={`absolute rounded-[4px] text-left shadow-[0_1px_2px_rgba(28,25,23,0.06)] transition-shadow hover:shadow-[0_5px_16px_rgba(28,25,23,0.14)] ${isEditing ? 'overflow-visible ring-1 ring-stone-300/80 dark:ring-stone-600 cursor-grab select-none touch-none active:cursor-grabbing' : 'overflow-hidden'} ${isCompact ? 'px-1.5 py-0.5' : 'px-3 py-2'} ${isPlanned ? 'border border-dashed bg-stone-50/70 dark:bg-stone-900/50' : 'border-l-[3px]'}`}
                   style={{
                     top: `${top}px`,
                     height: `${height}px`,
@@ -604,14 +977,18 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
               </button>
               <button
                 type="button"
+                disabled={isActivePlanDeleteLocked}
                 onClick={() => {
+                  if (isActivePlanDeleteLocked) return;
                   onDeletePlannedLog(activePlanLog);
                   setPlanActionLogId(null);
                 }}
-                className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-stone-700 dark:bg-stone-800/80 dark:text-stone-200 dark:hover:border-red-900/70 dark:hover:bg-red-950/30 dark:hover:text-red-300"
+                className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:bg-white/50 disabled:text-stone-400 disabled:hover:border-stone-200 disabled:hover:bg-white/50 dark:border-stone-700 dark:bg-stone-800/80 dark:text-stone-200 dark:hover:border-red-900/70 dark:hover:bg-red-950/30 dark:hover:text-red-300 dark:disabled:bg-stone-800/50 dark:disabled:text-stone-500 dark:disabled:hover:border-stone-700 dark:disabled:hover:bg-stone-800/50"
               >
-                <Trash2 size={16} className="text-stone-400" />
-                删除计划
+                {isActivePlanDeleteLocked
+                  ? <Lock size={16} className="text-stone-400" />
+                  : <Trash2 size={16} className="text-stone-400" />}
+                {isActivePlanDeleteLocked ? '自动循环计划已锁定' : '删除计划'}
               </button>
             </div>
           </section>

@@ -1,5 +1,7 @@
 # Custom Hooks
 
+> `useRecurringPlanAutoCreation.ts` now materializes enabled Repeat todo auto-Plan windows once per local day and immediately after relevant todo planning config edits.
+
 > `useReviewManager.ts` now upserts a Daily Review when a first-time sidebar check-in returns a newly created review, so the check-in and generated review are persisted together.
 
 > `useFloatingWindowSync.ts` now stops the Android floating-window service when the global floating-ball switch is off, and no longer sends an idle update that could restart the overlay during app launch.

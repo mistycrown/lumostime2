@@ -1,12 +1,14 @@
 /**
  * @file TimelineScheduleCanvas.test.ts
  * @input Sample time intervals including overlap boundaries
- * @output Regression coverage for parallel schedule block columns and planning time ranges
+ * @output Regression coverage for parallel schedule block columns, planning time ranges, and quick-color ranges
  * @pos Test
+ * @updated 2026-07-30: Covers whole-block drag shifting while preserving duration and daily bounds.
+ * @updated 2026-07-30: Covers quick-color range minimums for click-to-drag formal record creation.
  * @updated 2026-07-30: Covers alpha backgrounds for Tailwind and hexadecimal timeline activity colors.
  */
 import { describe, expect, test, vi } from 'vitest';
-import { getPlannedTimeRange, getScheduleBlockHeight, getTimelineBlockBackground, layoutParallelScheduleBlocks, MIN_SCHEDULE_BLOCK_HEIGHT, scheduleTimelineRecordDetailOpen, TIMELINE_TOP_PADDING } from './TimelineScheduleCanvas';
+import { getMinimumTimelineRange, getPlannedTimeRange, getScheduleBlockHeight, getTimelineBlockBackground, layoutParallelScheduleBlocks, MIN_SCHEDULE_BLOCK_HEIGHT, scheduleTimelineRecordDetailOpen, shiftTimeRangeWithinDay, TIMELINE_TOP_PADDING } from './TimelineScheduleCanvas';
 
 describe('layoutParallelScheduleBlocks', () => {
   test('places overlapping records in separate equal-width columns', () => {
@@ -42,6 +44,23 @@ describe('layoutParallelScheduleBlocks', () => {
   test('creates 30-minute plans snapped to five-minute boundaries within the day', () => {
     expect(getPlannedTimeRange(62)).toEqual({ startMinutes: 60, endMinutes: 90 });
     expect(getPlannedTimeRange(1438)).toEqual({ startMinutes: 1410, endMinutes: 1440 });
+  });
+
+  test('keeps quick-color drag ranges at least five minutes within the day', () => {
+    expect(getMinimumTimelineRange(60, 60)).toEqual({ startMinutes: 60, endMinutes: 65 });
+    expect(getMinimumTimelineRange(1440, 1440)).toEqual({ startMinutes: 1435, endMinutes: 1440 });
+    expect(getMinimumTimelineRange(180, 120)).toEqual({ startMinutes: 120, endMinutes: 180 });
+  });
+
+  test('shifts a time range by snapped minutes while keeping its duration and day bounds', () => {
+    expect(shiftTimeRangeWithinDay(9 * 60 * 60 * 1000, 10 * 60 * 60 * 1000, 15, 0)).toEqual({
+      startTime: 9 * 60 * 60 * 1000 + 15 * 60 * 1000,
+      endTime: 10 * 60 * 60 * 1000 + 15 * 60 * 1000
+    });
+    expect(shiftTimeRangeWithinDay(23 * 60 * 60 * 1000 + 30 * 60 * 1000, 24 * 60 * 60 * 1000, 30, 0)).toEqual({
+      startTime: 23 * 60 * 60 * 1000 + 30 * 60 * 1000,
+      endTime: 24 * 60 * 60 * 1000
+    });
   });
 
   test('keeps short records close to their true duration instead of expanding them into long blocks', () => {

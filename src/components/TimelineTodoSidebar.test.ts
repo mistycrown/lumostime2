@@ -1,13 +1,13 @@
 /**
  * @file TimelineTodoSidebar.test.ts
- * @input Todo drag movement vectors
- * @output Regression coverage for sidebar-to-timeline drag gesture intent and check-marker visibility
+ * @input Todo drag movement vectors, scheduled entries, and one-level task hierarchy fixtures
+ * @output Regression coverage for sidebar drag intent, marker visibility, and schedule-aware parent-child grouping
  * @pos Test
- * @updated 2026-07-30: Covers the lower direct-drag threshold used by mobile cross-panel scheduling.
+ * @updated 2026-07-30: Covers category completion filtering, context-aware schedule labels, and shared hierarchy rendering.
  */
 import { describe, expect, test } from 'vitest';
 import { TodoItem } from '../types';
-import { buildTimelineSidebarCategoryTodoEntries, buildTimelineSidebarTodoEntries, buildTimelineSidebarTodoTreeGroups, resolveTodoDragIntent, shouldHideCheckMarkerContent, TODO_DRAG_DISTANCE } from './TimelineTodoSidebar';
+import { buildTimelineSidebarCategoryTodoEntries, buildTimelineSidebarTodoEntries, buildTimelineSidebarTodoTreeGroups, resolveTimelineTodoScheduleLabel, resolveTodoDragIntent, shouldHideCheckMarkerContent, TODO_DRAG_DISTANCE } from './TimelineTodoSidebar';
 
 describe('resolveTodoDragIntent', () => {
   test('uses a two-pixel threshold before recognizing a direct mobile drag', () => {
@@ -51,6 +51,25 @@ describe('buildTimelineSidebarTodoEntries', () => {
   });
 });
 
+describe('resolveTimelineTodoScheduleLabel', () => {
+  const scheduled = buildTimelineSidebarTodoEntries([
+    { id: 'scheduled', categoryId: 'cat', title: 'Scheduled', isCompleted: false, scheduledDate: '2026-07-30' }
+  ], [], '2026-07-30')[0];
+  const pinned = buildTimelineSidebarTodoEntries([
+    { id: 'pinned', categoryId: 'cat', title: 'Pinned', isCompleted: false, pin: true, scheduledDate: '2026-07-30' }
+  ], [], '2026-07-30')[0];
+
+  test('shows schedule labels only in Today', () => {
+    expect(resolveTimelineTodoScheduleLabel(scheduled, true)).toBe('ARR');
+    expect(resolveTimelineTodoScheduleLabel(scheduled, false)).toBeNull();
+  });
+
+  test('keeps PIN visible in both Today and category lists', () => {
+    expect(resolveTimelineTodoScheduleLabel(pinned, true)).toBe('PIN');
+    expect(resolveTimelineTodoScheduleLabel(pinned, false)).toBe('PIN');
+  });
+});
+
 describe('timeline sidebar list and hierarchy', () => {
   const parent: TodoItem = { id: 'parent', categoryId: 'cat-a', title: '父任务', isCompleted: false, scheduledDate: '2026-07-30' };
   const child: TodoItem = { id: 'child', categoryId: 'cat-a', title: '子任务', isCompleted: false, parentTodoId: 'parent', childOrder: 1 };
@@ -59,13 +78,38 @@ describe('timeline sidebar list and hierarchy', () => {
   test('filters a selected list by category while retaining its subtasks', () => {
     const entries = buildTimelineSidebarCategoryTodoEntries([parent, child, otherCategory], 'cat-a');
     expect(entries.map((entry) => entry.todo.id)).toEqual(['parent', 'child']);
+
+    const groups = buildTimelineSidebarTodoTreeGroups(entries, [parent, child, otherCategory]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].parentEntry.todo.id).toBe('parent');
+    expect(groups[0].childEntries.map((entry) => entry.todo.id)).toEqual(['child']);
+  });
+
+  test('hides completed todos in a specific task list while Today retains same-day completions', () => {
+    const completed = { id: 'completed', categoryId: 'cat-a', title: 'Completed', isCompleted: true, completedAt: '2026-07-30T08:00:00' };
+    const categoryEntries = buildTimelineSidebarCategoryTodoEntries([parent, child, completed], 'cat-a');
+    const todayEntries = buildTimelineSidebarTodoEntries([completed], [], '2026-07-30');
+
+    expect(categoryEntries.map((entry) => entry.todo.id)).toEqual(['parent', 'child']);
+    expect(todayEntries.map((entry) => entry.todo.id)).toEqual(['completed']);
   });
 
   test('adds a scheduled parent’s subtasks to the same expandable tree', () => {
     const scheduledEntries = buildTimelineSidebarTodoEntries([parent, child, otherCategory], [], '2026-07-30');
-    const groups = buildTimelineSidebarTodoTreeGroups(scheduledEntries, [parent, child, otherCategory]);
+    const groups = buildTimelineSidebarTodoTreeGroups(scheduledEntries, [parent, child, otherCategory], true);
     expect(groups).toHaveLength(1);
     expect(groups[0].parentEntry.todo.id).toBe('parent');
     expect(groups[0].childEntries.map((entry) => entry.todo.id)).toEqual(['child']);
+  });
+
+  test('keeps a child-only schedule entry independent without adding its parent', () => {
+    const childOnlyEntries = buildTimelineSidebarTodoEntries([
+      { ...parent, scheduledDate: undefined },
+      { ...child, scheduledDate: '2026-07-30' }
+    ], [], '2026-07-30');
+    const groups = buildTimelineSidebarTodoTreeGroups(childOnlyEntries, [parent, child], true);
+
+    expect(groups.map((group) => group.parentEntry.todo.id)).toEqual(['child']);
+    expect(groups[0].childEntries).toEqual([]);
   });
 });

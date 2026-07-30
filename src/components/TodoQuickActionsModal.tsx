@@ -5,6 +5,7 @@
  * @pos Component
  * @description A reusable bottom sheet that exposes lightweight todo planning and completion actions without opening the full todo detail editor first.
  * @updated 2026-06-16: Switched the mobile compact-edit guard from a width-only media query to real mobile detection so desktop windows keep the full sheet while phones collapse to the title editor.
+ * @updated 2026-07-30: Added extra mobile bottom padding to keep the delete action above the fixed bottom navigation area.
  * @updated 2026-06-15: Added a mobile-only compact title-edit mode that hides the lower quick-action body while typing so the editor can sit close to the soft keyboard.
  * @updated 2026-06-14: Added a `创建副本` quick action that reuses the same duplicate-modal flow as the row swipe gesture.
  * @updated 2026-06-14: Softened the mobile keyboard offset with a bottom breathing margin and added a title-row confirm action that replaces the global header actions while editing.
@@ -458,7 +459,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
         </div>
 
         {!isMobileTitleEditMode && (
-          <div className="px-4 py-4">
+          <div className="px-4 py-4 pb-12 md:pb-4">
           <div className="space-y-2">
             <div className={isRecurringTodo ? 'hidden' : 'grid grid-cols-2 gap-2'}>
               <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white/80">

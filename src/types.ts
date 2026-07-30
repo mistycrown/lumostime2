@@ -18,6 +18,7 @@
  * @updated 2026-04-21: Added one-level todo hierarchy support via optional `parentTodoId` and `childOrder` fields.
  * @updated 2026-04-21: Added an optional boolean `pin` flag for prioritizing todos in the today schedule list.
  * @updated 2026-04-20: Added configurable todo duplication options for quick-copy editing.
+ * @updated 2026-07-30: Added recurring auto-plan metadata so Repeat todos can materialize locked timeline Plan blocks over a finite future window.
  * @updated 2026-04-20: Added todo schedule and recurrence rule types for week-view planning.
  * @updated 2026-04-19: Added reusable note template definitions for detail-page editing and inline note recommendations.
  * @updated 2026-04-18: Added custom sticker set and sticker record types for synced mood sticker uploads.
@@ -199,6 +200,8 @@ export interface Log {
   note?: string; // Optional description
   linkedTodoId?: string; // New: Link to a specific todo task
   isPlanned?: boolean; // A virtual planning block created from the Chronicle todo sidebar
+  planSource?: 'recurrence-auto'; // Marks Plan blocks generated from a Repeat todo rule
+  plannedOccurrenceDate?: string; // YYYY-MM-DD occurrence date used for recurring Plan dedupe and locks
   scopeIds?: string[]; // NEW: Link to multiple Scopes (棰嗗煙) - changed from scopeId
   progressIncrement?: number; // New: Units of progress contributed by this session
   focusScore?: number; // 1-5
@@ -379,6 +382,13 @@ export interface TodoRecurrenceRule {
   fallbackToMonthEnd?: boolean; // monthly only: when the target day does not exist, use that month's last day
 }
 
+export interface TodoRecurringPlanConfig {
+  enabled: boolean;
+  startMinutes: number; // Minutes after local 00:00
+  endMinutes: number; // Minutes after local 00:00, same-day only
+  horizonCount: number; // Number of recurrence occurrences to keep materialized
+}
+
 export interface TodoDuplicateOptions {
   title: string;
   clearDates?: boolean;
@@ -421,6 +431,7 @@ export interface TodoItem {
   scheduledDate?: string; // YYYY-MM-DD
   deadlineDate?: string; // YYYY-MM-DD
   recurrenceRule?: TodoRecurrenceRule;
+  recurringPlan?: TodoRecurringPlanConfig;
   maybeDates?: string[]; // YYYY-MM-DD candidate dates kept only for future possibilities
 }
 

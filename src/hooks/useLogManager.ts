@@ -6,6 +6,7 @@
  * @description 日志数据管理 Hook - 处理日志的增删改查、快速打点、批量添加、图片管理等操作，并统一维护 NFC 快速打点的文案与时间补记逻辑。时间戳由 DataContext 自动管理。
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-07-30: Blocks deletion of recurring auto-Plan logs while their Repeat todo auto-Plan switch remains enabled.
  * @updated 2026-06-06: Added hard-field duplicate protection for new log insertions so floating-window stop races cannot append identical timeline records twice.
  * @updated 2026-05-16: Dispatches a shared assistant log-submission event only for brand-new logs so post-save AI triggers can ignore edits.
  * @updated 2026-05-10: Let callers override the date used for backfill defaults so widget supplement-log launches can force today even when the timeline was left on an older day.
@@ -27,9 +28,10 @@ import {
     hasHardDuplicateLog,
     prependLogsWithDedupe
 } from '../utils/logInsertionUtils';
+import { isAutoRecurringPlanDeleteLocked } from '../utils/todoRecurringPlanUtils';
 
 export const useLogManager = () => {
-    const { logs, setLogs, setTodos } = useData();
+    const { logs, todos, setLogs, setTodos } = useData();
     const {
         setIsAddModalOpen,
         setEditingLog,
@@ -114,6 +116,15 @@ export const useLogManager = () => {
 
     const handleDeleteLog = (id: string, shouldCloseModal = true) => {
         const logToDelete = logs.find(l => l.id === id);
+        const linkedTodo = logToDelete?.linkedTodoId
+            ? todos.find((todo) => todo.id === logToDelete.linkedTodoId)
+            : null;
+
+        if (logToDelete && isAutoRecurringPlanDeleteLocked(logToDelete, linkedTodo)) {
+            addToast('info', '该循环计划已锁定，取消自动生成后可删除。');
+            if (shouldCloseModal) closeModal();
+            return;
+        }
 
         if (logToDelete?.linkedTodoId && logToDelete.progressIncrement) {
             setTodos(prevTodos => prevTodos.map(t => {

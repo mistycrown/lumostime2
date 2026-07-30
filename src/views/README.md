@@ -3,6 +3,11 @@
 The `views/` directory contains all the React components that represent the distinct screens or pages of the LumosTime application. This layer is responsible for the presentation logic and user interaction.
 
 - Update 2026-07-30: `TimelineView.tsx` passes the selected timeline date and logs into the split-workspace todo sidebar so it shares the schedule page's date-specific entries, including same-day completions and excluding Trace; future dates omit the daily-check list.
+- Update 2026-07-30: `TimelineView.tsx` adds long-press resizing to the quick-color divider and unifies the todo and quick-color right sidebar minimum widths at 220px.
+- Update 2026-07-30: `TimelineView.tsx` adds quick-color continuous-create state: the default one-shot mode clears the selected activity after one record, while checked continuous mode preserves it for repeated range creation.
+- Update 2026-07-30: `TimelineView.tsx` scopes the right-edge split buttons by active panel: collapsed mode shows Plan Todo and Quick Color entries, Plan Todo shows Collapse plus Switch List, and Quick Color shows only Collapse.
+- Update 2026-07-30: `TimelineView.tsx` makes the todo-plan and quick-color side panels mutually exclusive and groups their collapsed entry buttons into a tight right-edge control stack.
+- Update 2026-07-30: `TimelineView.tsx` adds a second quick-color split panel with activity icon/collapse controls, click-to-range hints, and direct activity drag forwarding into the schedule canvas.
 - Update 2026-07-30: `TimelineView.tsx` now forwards todo drops into the schedule canvas for virtual planning-block creation and hardens the long-press sidebar-resize cleanup path when a pointer session has already ended.
 - Update 2026-07-30: `TimelineView.tsx` disables root swipe-date navigation only in the timeline-and-todo layout, preventing todo drag gestures from being claimed before they reach the schedule canvas.
 - Update 2026-07-30: `TimelineView.tsx` forwards sidebar completion-circle clicks through the shared todo save flow, while todo bodies remain dedicated to quick editing and plan dragging.
