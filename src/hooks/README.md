@@ -1,5 +1,7 @@
 # Custom Hooks
 
+> `useReviewManager.ts` now upserts a Daily Review when a first-time sidebar check-in returns a newly created review, so the check-in and generated review are persisted together.
+
 > `useFloatingWindowSync.ts` now stops the Android floating-window service when the global floating-ball switch is off, and no longer sends an idle update that could restart the overlay during app launch.
 > `useSyncManager.ts` now includes the self-belief library in unified backup/sync payloads and restores it to local storage, so AI-created identity descriptions travel with the main user data.
 > `useSyncManager.ts` now forces a read of the canonical cloud main backup before making direction decisions, preferring the JSON payload timestamp over remote file metadata so stale `LastModified` values cannot drive old restores.

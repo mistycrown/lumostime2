@@ -4,6 +4,7 @@
  * @output Review CRUD Operations (handleOpenDailyReview, handleUpdateReview, handleDeleteReview, handleOpenWeeklyReview, handleUpdateWeeklyReview, handleDeleteWeeklyReview, handleOpenMonthlyReview, handleUpdateMonthlyReview, handleDeleteMonthlyReview), Narrative Generation (handleGenerateNarrative, handleGenerateWeeklyNarrative, handleGenerateMonthlyNarrative), Modal Control (handleCloseWeeklyReview, handleCloseMonthlyReview)
  * @pos Hook (Data Manager)
  * @description Review data manager hook. Handles create/update/delete flows for daily, weekly, and monthly reviews, plus AI narrative generation.
+ * @updated 2026-07-30: Made Daily Review updates insert missing reviews so first sidebar check-ins persist their generated review.
  */
 import { DailyReview, WeeklyReview, MonthlyReview } from '../types';
 import { useReview } from '../contexts/ReviewContext';
@@ -81,7 +82,12 @@ export const useReviewManager = () => {
     };
 
     const handleUpdateReview = (updatedReview: DailyReview) => {
-        setDailyReviews(prev => prev.map(r => r.id === updatedReview.id ? updatedReview : r));
+        setDailyReviews(prev => {
+            const exists = prev.some(review => review.id === updatedReview.id);
+            return exists
+                ? prev.map(review => review.id === updatedReview.id ? updatedReview : review)
+                : [...prev, updatedReview];
+        });
     };
 
     const handleDeleteReview = () => {

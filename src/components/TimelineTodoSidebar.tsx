@@ -4,10 +4,11 @@
  * @output A resizable, in-flow todo-and-daily-check column for the Chronicle split workspace
  * @pos Component
  * @description Renders date-specific todos and daily checks without duplicating Todo view mutation controls.
- * @updated 2026-07-30: Matched todo rows to schedule entries, added compact typed check markers, and hid checks for future dates.
+ * @updated 2026-07-30: Adds switchable category lists and expandable one-level subtask rendering.
  */
-import React, { useMemo } from 'react';
-import { Check, ClipboardCheck, ListTodo } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Check, ChevronDown, ChevronRight, ClipboardCheck, ListTodo } from 'lucide-react';
 import { CheckItem, Log, TodoItem } from '../types';
 import { getCheckItemCountState } from '../utils/dailyCheckUtils';
 import { buildTodoDateEntries, formatDateKey, TodoDateEntry } from '../utils/todoScheduleUtils';
@@ -19,8 +20,14 @@ interface TimelineTodoSidebarProps {
   currentDate: Date;
   width: number;
   reviewSlot?: React.ReactNode;
+  selectedCategoryId?: string | null;
+  selectedListLabel?: string;
   onSelectTodo: (todo: TodoItem) => void;
+  onToggleTodoCompletion: (todo: TodoItem) => void;
   onCheckItemClick: (item: CheckItem) => void;
+  onTodoDragMove: (todo: TodoItem, clientX: number, clientY: number) => boolean;
+  onTodoDragEnd: () => void;
+  onTodoDrop: (todo: TodoItem, clientX: number, clientY: number) => boolean;
 }
 
 const SCHEDULE_LABELS: Record<Exclude<TodoDateEntry['primaryKind'], 'inProgress'>, string> = {
@@ -31,31 +38,248 @@ const SCHEDULE_LABELS: Record<Exclude<TodoDateEntry['primaryKind'], 'inProgress'
   completed: 'DONE'
 };
 
-const TodoCompletionMarker: React.FC<{ completed: boolean }> = ({ completed }) => (
-  <span
-    className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-stone-300 dark:border-stone-600"
+export const TODO_DRAG_DISTANCE = 2;
+
+type TodoDragIntent = 'pending' | 'drag' | 'scroll';
+
+export const resolveTodoDragIntent = (deltaX: number, deltaY: number): Exclude<TodoDragIntent, 'pending'> => (
+  deltaX < 0 ? 'drag' : 'scroll'
+);
+
+export const shouldHideCheckMarkerContent = (isCount: boolean, isCompleted: boolean): boolean => (
+  !isCount && !isCompleted
+);
+
+const TodoCompletionMarker: React.FC<{ completed: boolean; onToggle: () => void }> = ({ completed, onToggle }) => (
+  <button
+    type="button"
+    aria-label={completed ? '标记为未完成' : '标记为已完成'}
+    onPointerDown={(event) => event.stopPropagation()}
+    onClick={(event) => {
+      event.stopPropagation();
+      onToggle();
+    }}
+    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-stone-500 transition-colors hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800"
+  >
+    <span
+      className="flex h-4 w-4 items-center justify-center rounded-full border border-stone-300 dark:border-stone-600"
     style={completed ? { color: 'var(--accent-color, #1c1917)', borderColor: 'var(--accent-color, #1c1917)' } : undefined}
   >
     {completed && <Check size={11} strokeWidth={2.5} />}
-  </span>
+    </span>
+  </button>
 );
 
-const TodoRow: React.FC<{ entry: TodoDateEntry; onSelect: () => void }> = ({ entry, onSelect }) => {
+type SidebarTodoEntry = TodoDateEntry & { isPinnedOnly?: boolean };
+
+export interface TimelineSidebarTodoTreeGroup {
+  parentEntry: SidebarTodoEntry;
+  childEntries: SidebarTodoEntry[];
+}
+
+const createCategoryTodoEntry = (todo: TodoItem): SidebarTodoEntry => ({
+  todo,
+  badges: { scheduled: false, deadline: false, recurring: false, maybe: false, completed: todo.isCompleted, inProgress: false },
+  primaryKind: todo.isCompleted ? 'completed' : 'scheduled'
+});
+
+export const buildTimelineSidebarTodoEntries = (todos: TodoItem[], logs: Log[], dateKey: string): SidebarTodoEntry[] => {
+  const dateEntries = buildTodoDateEntries(todos, logs, dateKey)
+    .filter((entry) => entry.primaryKind !== 'inProgress');
+  const existingIds = new Set(dateEntries.map((entry) => entry.todo.id));
+  const pinnedEntries = todos
+    .filter((todo) => Boolean(todo.pin) && !todo.isCompleted && !existingIds.has(todo.id))
+    .map((todo): SidebarTodoEntry => ({
+      todo,
+      badges: { scheduled: false, deadline: false, recurring: false, maybe: false, completed: false, inProgress: false },
+      primaryKind: 'scheduled',
+      isPinnedOnly: true
+    }));
+
+  return [...dateEntries, ...pinnedEntries]
+    .sort((left, right) => Number(Boolean(right.todo.pin)) - Number(Boolean(left.todo.pin)) || left.todo.title.localeCompare(right.todo.title, 'zh-CN'));
+};
+
+export const buildTimelineSidebarCategoryTodoEntries = (todos: TodoItem[], categoryId: string): SidebarTodoEntry[] => (
+  todos
+    .filter((todo) => todo.categoryId === categoryId)
+    .map(createCategoryTodoEntry)
+    .sort((left, right) => Number(left.todo.isCompleted) - Number(right.todo.isCompleted) || left.todo.title.localeCompare(right.todo.title, 'zh-CN'))
+);
+
+export const buildTimelineSidebarTodoTreeGroups = (
+  entries: SidebarTodoEntry[],
+  allTodos: TodoItem[]
+): TimelineSidebarTodoTreeGroup[] => {
+  const entryById = new Map(entries.map((entry) => [entry.todo.id, entry]));
+  const rootIds = new Set<string>();
+
+  entries.forEach((entry) => {
+    const parentId = entry.todo.parentTodoId;
+    if (!parentId) {
+      rootIds.add(entry.todo.id);
+      return;
+    }
+
+    const parentTodo = allTodos.find((todo) => todo.id === parentId);
+    if (parentTodo) {
+      if (!entryById.has(parentTodo.id)) entryById.set(parentTodo.id, createCategoryTodoEntry(parentTodo));
+      rootIds.add(parentTodo.id);
+    } else {
+      rootIds.add(entry.todo.id);
+    }
+  });
+
+  return Array.from(rootIds)
+    .map((rootId) => {
+      const parentEntry = entryById.get(rootId);
+      if (!parentEntry) return null;
+      const childEntries = allTodos
+        .filter((todo) => todo.parentTodoId === rootId)
+        .map((todo) => entryById.get(todo.id) || createCategoryTodoEntry(todo))
+        .sort((left, right) => (left.todo.childOrder ?? Number.MAX_SAFE_INTEGER) - (right.todo.childOrder ?? Number.MAX_SAFE_INTEGER) || left.todo.title.localeCompare(right.todo.title, 'zh-CN'));
+      return { parentEntry, childEntries };
+    })
+    .filter((group): group is TimelineSidebarTodoTreeGroup => group !== null)
+    .sort((left, right) => Number(right.parentEntry.todo.pin) - Number(left.parentEntry.todo.pin) || left.parentEntry.todo.title.localeCompare(right.parentEntry.todo.title, 'zh-CN'));
+};
+
+const TodoRow: React.FC<{
+  entry: SidebarTodoEntry;
+  onSelect: () => void;
+  onToggleCompletion: () => void;
+  onDragMove: (clientX: number, clientY: number) => boolean;
+  onDragEnd: () => void;
+  onDrop: (clientX: number, clientY: number) => boolean;
+}> = ({ entry, onSelect, onToggleCompletion, onDragMove, onDragEnd, onDrop }) => {
   const isCompleted = entry.primaryKind === 'completed' || entry.todo.isCompleted;
-  const scheduleLabel = entry.primaryKind === 'inProgress' ? null : SCHEDULE_LABELS[entry.primaryKind];
+  const scheduleLabel = entry.todo.pin ? 'PIN' : (entry.primaryKind === 'inProgress' ? null : SCHEDULE_LABELS[entry.primaryKind]);
+  const dragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    canDrag: boolean;
+    intent: TodoDragIntent;
+  } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragFeedback, setDragFeedback] = useState<{ x: number; y: number; isTarget: boolean } | null>(null);
+  const [didCreatePlan, setDidCreatePlan] = useState(false);
+  const feedbackTimerRef = useRef<number | null>(null);
+
+  const clearDrag = () => {
+    const wasDragging = dragRef.current?.intent === 'drag';
+    dragRef.current = null;
+    setIsDragging(false);
+    setDragFeedback(null);
+    if (wasDragging) onDragEnd();
+  };
+
+  const showCreateFeedback = () => {
+    if (feedbackTimerRef.current !== null) window.clearTimeout(feedbackTimerRef.current);
+    setDidCreatePlan(true);
+    feedbackTimerRef.current = window.setTimeout(() => {
+      feedbackTimerRef.current = null;
+      setDidCreatePlan(false);
+    }, 1200);
+  };
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      if (drag.intent === 'drag') {
+        const isTarget = onDragMove(event.clientX, event.clientY);
+        setDragFeedback((previous) => (
+          previous && previous.x === event.clientX && previous.y === event.clientY && previous.isTarget === isTarget
+            ? previous
+            : { x: event.clientX, y: event.clientY, isTarget }
+        ));
+        event.preventDefault();
+        return;
+      }
+      if (drag.intent !== 'pending') return;
+
+      const deltaX = event.clientX - drag.startX;
+      const deltaY = event.clientY - drag.startY;
+      if (Math.hypot(deltaX, deltaY) <= TODO_DRAG_DISTANCE) return;
+
+      drag.intent = drag.canDrag ? resolveTodoDragIntent(deltaX, deltaY) : 'scroll';
+      if (drag.intent === 'drag') {
+        setIsDragging(true);
+        const isTarget = onDragMove(event.clientX, event.clientY);
+        setDragFeedback({ x: event.clientX, y: event.clientY, isTarget });
+        event.preventDefault();
+      }
+    };
+
+    const handlePointerUp = (event: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+
+      if (drag.intent === 'drag') {
+        if (onDrop(event.clientX, event.clientY)) showCreateFeedback();
+      } else if (drag.intent === 'pending') {
+        onSelect();
+      }
+      clearDrag();
+    };
+
+    const handlePointerCancel = (event: PointerEvent) => {
+      if (dragRef.current?.pointerId === event.pointerId) clearDrag();
+    };
+
+    document.addEventListener('pointermove', handlePointerMove, { passive: false });
+    document.addEventListener('pointerup', handlePointerUp);
+    document.addEventListener('pointercancel', handlePointerCancel);
+    return () => {
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('pointerup', handlePointerUp);
+    document.removeEventListener('pointercancel', handlePointerCancel);
+    };
+  }, [onDragEnd, onDragMove, onDrop, onSelect]);
+
+  useEffect(() => () => {
+    if (feedbackTimerRef.current !== null) window.clearTimeout(feedbackTimerRef.current);
+  }, []);
 
   return (
-  <button
-    type="button"
-    onClick={onSelect}
-    className="group flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-stone-50 dark:hover:bg-stone-800/70"
-  >
-    <TodoCompletionMarker completed={isCompleted} />
-    <span className={`min-w-0 flex-1 truncate text-sm font-bold leading-5 transition-colors ${isCompleted ? 'text-stone-400 line-through dark:text-stone-500' : 'text-stone-700 group-hover:text-stone-950 dark:text-stone-200 dark:group-hover:text-white'}`}>
-      {entry.todo.title}
-    </span>
-    {scheduleLabel && <span className="shrink-0 rounded-[3px] border border-stone-200 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-stone-400 dark:border-stone-700 dark:text-stone-500">{scheduleLabel}</span>}
-  </button>
+  <div className={`group flex w-full items-center gap-1.5 px-1.5 ${isDragging ? 'opacity-45' : ''}`}>
+    <TodoCompletionMarker completed={isCompleted} onToggle={onToggleCompletion} />
+    <button
+      type="button"
+      onPointerDown={(event) => {
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        dragRef.current = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          canDrag: !isCompleted,
+          intent: 'pending'
+        };
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') onSelect();
+      }}
+      className="flex min-w-0 flex-1 touch-pan-y items-center gap-2 py-2.5 pr-1 text-left transition-colors hover:bg-stone-50 dark:hover:bg-stone-800/70"
+    >
+      <span className={`min-w-0 flex-1 truncate text-sm font-bold leading-5 transition-colors ${isCompleted ? 'text-stone-400 line-through dark:text-stone-500' : 'text-stone-700 group-hover:text-stone-950 dark:text-stone-200 dark:group-hover:text-white'}`}>
+        {entry.todo.title}
+      </span>
+      {scheduleLabel && <span className="shrink-0 rounded-[3px] border border-stone-200 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-stone-400 dark:border-stone-700 dark:text-stone-500">{scheduleLabel}</span>}
+    </button>
+    {dragFeedback && typeof document !== 'undefined' && createPortal(
+      <div
+        className={`pointer-events-none fixed z-[80] flex max-w-[min(17rem,calc(100vw-2rem))] -translate-y-1/2 items-center gap-2 rounded-md border px-3 py-2 text-xs font-bold shadow-[0_10px_26px_rgba(28,25,23,0.16)] backdrop-blur-sm transition-colors ${dragFeedback.isTarget ? 'border-stone-400 bg-[#fdfbf7]/95 text-stone-800 dark:border-stone-500 dark:bg-stone-900/95 dark:text-stone-100' : 'border-stone-200 bg-[#fdfbf7]/90 text-stone-500 dark:border-stone-700 dark:bg-stone-900/90 dark:text-stone-300'}`}
+        style={{ left: `${dragFeedback.x + 16}px`, top: `${dragFeedback.y - 12}px` }}
+      >
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: dragFeedback.isTarget ? 'var(--accent-color, #1c1917)' : '#a8a29e' }} />
+        <span className="truncate">{entry.todo.title}</span>
+      </div>,
+      document.body
+    )}
+    {didCreatePlan && <span className="sr-only" role="status">Plan created</span>}
+  </div>
   );
 };
 
@@ -63,7 +287,7 @@ const CheckRow: React.FC<{ item: CheckItem; onClick: () => void }> = ({ item, on
   const isCount = item.manualMode === 'count';
   const { current, target, isCompleted } = getCheckItemCountState(item);
   const isAuto = item.type === 'auto';
-  const isSquare = isAuto || isCount;
+  const isSquare = isAuto;
   const markerLabel = isCount ? String(current) : null;
 
   return (
@@ -74,10 +298,10 @@ const CheckRow: React.FC<{ item: CheckItem; onClick: () => void }> = ({ item, on
       className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${isAuto ? 'cursor-default' : 'hover:bg-stone-50 dark:hover:bg-stone-800/70'}`}
     >
       <span
-        className={`flex h-4 w-4 shrink-0 items-center justify-center border text-[9px] font-bold ${isSquare ? 'rounded-[3px]' : 'rounded-full'} ${isCompleted ? '' : 'border-stone-300 text-transparent dark:border-stone-600'}`}
+        className={`flex h-4 w-4 shrink-0 items-center justify-center border text-[9px] font-bold ${isSquare ? 'rounded-[3px]' : 'rounded-full'} ${isCompleted ? '' : 'border-stone-300 dark:border-stone-600'} ${shouldHideCheckMarkerContent(isCount, isCompleted) ? 'text-transparent' : ''}`}
         style={isCompleted ? { color: 'var(--accent-color, #1c1917)', borderColor: 'var(--accent-color, #1c1917)' } : undefined}
       >
-        {markerLabel || (isCompleted && <Check size={11} strokeWidth={2.5} />)}
+        {markerLabel !== null ? markerLabel : (isCompleted && <Check size={11} strokeWidth={2.5} />)}
       </span>
       <span className={`min-w-0 flex-1 truncate text-sm font-bold leading-5 ${isCompleted ? 'text-stone-400 line-through dark:text-stone-500' : 'text-stone-700 dark:text-stone-200'}`}>{item.content}</span>
       {isCount && <span className="shrink-0 text-[10px] font-medium text-stone-400">/{target}</span>}
@@ -97,13 +321,23 @@ const TodoGroups: React.FC<{
   logs: Log[];
   checkItems: CheckItem[];
   currentDate: Date;
+  selectedCategoryId?: string | null;
+  selectedListLabel?: string;
   onSelectTodo: (todo: TodoItem) => void;
+  onToggleTodoCompletion: (todo: TodoItem) => void;
   onCheckItemClick: (item: CheckItem) => void;
-}> = ({ todos, logs, checkItems, currentDate, onSelectTodo, onCheckItemClick }) => {
+  onTodoDragMove: (todo: TodoItem, clientX: number, clientY: number) => boolean;
+  onTodoDragEnd: () => void;
+  onTodoDrop: (todo: TodoItem, clientX: number, clientY: number) => boolean;
+}> = ({ todos, logs, checkItems, currentDate, selectedCategoryId, selectedListLabel, onSelectTodo, onToggleTodoCompletion, onCheckItemClick, onTodoDragMove, onTodoDragEnd, onTodoDrop }) => {
   const visibleTodos = useMemo(() => (
-    buildTodoDateEntries(todos, logs, formatDateKey(currentDate))
-      .filter((entry) => entry.primaryKind !== 'inProgress')
-  ), [currentDate, logs, todos]);
+    selectedCategoryId
+      ? buildTimelineSidebarCategoryTodoEntries(todos, selectedCategoryId)
+      : buildTimelineSidebarTodoEntries(todos, logs, formatDateKey(currentDate))
+  ), [currentDate, logs, selectedCategoryId, todos]);
+  const todoTreeGroups = useMemo(() => buildTimelineSidebarTodoTreeGroups(visibleTodos, todos), [todos, visibleTodos]);
+  const displayedTodoCount = todoTreeGroups.reduce((count, group) => count + 1 + group.childEntries.length, 0);
+  const [expandedParentIds, setExpandedParentIds] = useState<Record<string, boolean>>({});
   const isFutureDate = useMemo(() => {
     const selectedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate()).getTime();
     const today = new Date();
@@ -114,16 +348,27 @@ const TodoGroups: React.FC<{
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-64 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <section className="border-b border-stone-100 pb-3 dark:border-stone-800">
-        <GroupHeader icon={<ListTodo size={12} />} title="待办" count={visibleTodos.length} />
+        <GroupHeader icon={<ListTodo size={12} />} title={selectedListLabel || '待办'} count={displayedTodoCount} />
         {visibleTodos.length > 0 ? (
           <div className="overflow-hidden rounded-lg">
-            {visibleTodos.map((entry) => <TodoRow key={`${entry.todo.id}-${entry.primaryKind}`} entry={entry} onSelect={() => onSelectTodo(entry.todo)} />)}
+            {todoTreeGroups.map((group) => {
+              const isExpanded = expandedParentIds[group.parentEntry.todo.id] ?? true;
+              return (
+                <div key={group.parentEntry.todo.id}>
+                  <div className="flex items-center">
+                    <TodoRow entry={group.parentEntry} onSelect={() => onSelectTodo(group.parentEntry.todo)} onToggleCompletion={() => onToggleTodoCompletion(group.parentEntry.todo)} onDragMove={(clientX, clientY) => onTodoDragMove(group.parentEntry.todo, clientX, clientY)} onDragEnd={onTodoDragEnd} onDrop={(clientX, clientY) => onTodoDrop(group.parentEntry.todo, clientX, clientY)} />
+                    {group.childEntries.length > 0 && <button type="button" className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center text-stone-400 hover:text-stone-700 dark:hover:text-stone-200" aria-label={isExpanded ? '收起子任务' : '展开子任务'} onClick={() => setExpandedParentIds((previous) => ({ ...previous, [group.parentEntry.todo.id]: !isExpanded }))}>{isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</button>}
+                  </div>
+                  {isExpanded && group.childEntries.length > 0 && <div className="ml-5 border-l border-stone-200 pl-2 dark:border-stone-700">{group.childEntries.map((entry) => <TodoRow key={entry.todo.id} entry={entry} onSelect={() => onSelectTodo(entry.todo)} onToggleCompletion={() => onToggleTodoCompletion(entry.todo)} onDragMove={(clientX, clientY) => onTodoDragMove(entry.todo, clientX, clientY)} onDragEnd={onTodoDragEnd} onDrop={(clientX, clientY) => onTodoDrop(entry.todo, clientX, clientY)} />)}</div>}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <p className="px-3 py-4 text-xs text-stone-400">暂无待办</p>
         )}
       </section>
-      {!isFutureDate && <section>
+      {!selectedCategoryId && !isFutureDate && <section>
         <GroupHeader icon={<ClipboardCheck size={12} />} title="日课" count={checkItems.length} />
         {checkItems.length > 0 ? (
           <div className="overflow-hidden rounded-lg">
@@ -144,8 +389,14 @@ export const TimelineTodoSidebar: React.FC<TimelineTodoSidebarProps> = ({
   currentDate,
   width,
   reviewSlot,
+  selectedCategoryId,
+  selectedListLabel,
   onSelectTodo,
-  onCheckItemClick
+  onToggleTodoCompletion,
+  onCheckItemClick,
+  onTodoDragMove,
+  onTodoDragEnd,
+  onTodoDrop
 }) => (
   <aside
     className="flex h-full min-w-[15rem] shrink-0 flex-col bg-[#fdfbf7]/95 shadow-[-10px_0_30px_rgba(28,25,23,0.04)] backdrop-blur-md dark:bg-stone-900/95"
@@ -153,6 +404,6 @@ export const TimelineTodoSidebar: React.FC<TimelineTodoSidebarProps> = ({
     aria-label="待办与日课"
   >
     {reviewSlot}
-    <TodoGroups todos={todos} logs={logs} checkItems={checkItems} currentDate={currentDate} onSelectTodo={onSelectTodo} onCheckItemClick={onCheckItemClick} />
+    <TodoGroups todos={todos} logs={logs} checkItems={checkItems} currentDate={currentDate} selectedCategoryId={selectedCategoryId} selectedListLabel={selectedListLabel} onSelectTodo={onSelectTodo} onToggleTodoCompletion={onToggleTodoCompletion} onCheckItemClick={onCheckItemClick} onTodoDragMove={onTodoDragMove} onTodoDragEnd={onTodoDragEnd} onTodoDrop={onTodoDrop} />
   </aside>
 );

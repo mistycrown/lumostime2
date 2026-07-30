@@ -12,7 +12,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test, vi } from 'vitest';
-import { resolvePersistedTodoForDetail, TodoDetailModal } from './TodoDetailModal';
+import { replaceCompletedAtDate, resolvePersistedTodoForDetail, TodoDetailModal } from './TodoDetailModal';
 
 let detailTimelineCardProps: any = null;
 
@@ -81,6 +81,53 @@ const activityCategories = [
 ] as any;
 
 describe('TodoDetailModal parent navigation regression', () => {
+  test('only renders the completion date field for completed todos', () => {
+    const commonProps = {
+      currentCategory: todoCategories[0],
+      displayMode: 'page' as const,
+      onClose: () => {},
+      onSave: () => {},
+      logs: [],
+      todoCategories,
+      categories: activityCategories,
+      scopes: []
+    };
+
+    const incompleteHtml = renderToStaticMarkup(
+      <TodoDetailModal
+        {...commonProps}
+        initialDraft={{ categoryId: 'cat-1', title: 'Incomplete task', isCompleted: false }}
+      />
+    );
+    const completedHtml = renderToStaticMarkup(
+      <TodoDetailModal
+        {...commonProps}
+        initialDraft={{
+          categoryId: 'cat-1',
+          title: 'Completed task',
+          isCompleted: true,
+          completedAt: '2026-07-30T10:20:30.000+08:00'
+        }}
+      />
+    );
+
+    expect(incompleteHtml).not.toContain('完成日期');
+    expect(completedHtml).toContain('完成日期');
+  });
+
+  test('replaces only the completion date while retaining the local completion time', () => {
+    const original = new Date('2026-07-30T10:20:30.123+08:00');
+    const updated = new Date(replaceCompletedAtDate(original.toISOString(), '2026-08-05'));
+
+    expect(updated.getFullYear()).toBe(2026);
+    expect(updated.getMonth()).toBe(7);
+    expect(updated.getDate()).toBe(5);
+    expect(updated.getHours()).toBe(original.getHours());
+    expect(updated.getMinutes()).toBe(original.getMinutes());
+    expect(updated.getSeconds()).toBe(original.getSeconds());
+    expect(updated.getMilliseconds()).toBe(original.getMilliseconds());
+  });
+
   test('prefers the live saved todo for draft-created detail sessions', () => {
     const savedTodo = {
       id: 'draft-1',

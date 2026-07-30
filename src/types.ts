@@ -198,6 +198,7 @@ export interface Log {
   title?: string;
   note?: string; // Optional description
   linkedTodoId?: string; // New: Link to a specific todo task
+  isPlanned?: boolean; // A virtual planning block created from the Chronicle todo sidebar
   scopeIds?: string[]; // NEW: Link to multiple Scopes (棰嗗煙) - changed from scopeId
   progressIncrement?: number; // New: Units of progress contributed by this session
   focusScore?: number; // 1-5

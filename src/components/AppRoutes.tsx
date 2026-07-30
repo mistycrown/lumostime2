@@ -201,6 +201,35 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         setLogs(prev => prev.map(l => l.id === updatedLog.id ? updatedLog : l));
     };
 
+    const handleCreatePlannedLog = (todo: TodoItem, startTime: number, endTime: number): Log => {
+        const plannedLog: Log = {
+            id: crypto.randomUUID(),
+            categoryId: '__timeline_plan__',
+            activityId: '__timeline_plan__',
+            startTime,
+            endTime,
+            duration: Math.max(0, Math.round((endTime - startTime) / 1000)),
+            title: `计划 · ${todo.title}`,
+            linkedTodoId: todo.id,
+            isPlanned: true
+        };
+        setLogs((previous) => [...previous, plannedLog]);
+        return plannedLog;
+    };
+
+    const handleToggleTimelineTodoCompletion = (todo: TodoItem) => {
+        handleSaveTodo({
+            ...todo,
+            isCompleted: !todo.isCompleted,
+            completedAt: todo.isCompleted ? undefined : Date.now()
+        });
+    };
+
+    const handleDeleteTimelinePlannedLog = (log: Log) => {
+        if (!log.isPlanned) return;
+        setLogs((previous) => previous.filter((entry) => entry.id !== log.id));
+    };
+
     // Helper to get local YYYY-MM-DD string (now imported from utils)
     // const getLocalDateStr = (d: Date) => { ... } // Removed - using utils version
 
@@ -493,6 +522,9 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     onAddLog={openAddModal}
                     onEditLog={openEditModal}
                     onUpdateLog={handleUpdateLog}
+                    onCreatePlannedLog={handleCreatePlannedLog}
+                    onStartTodoFocus={handleStartTodoFocus}
+                    onDeletePlannedLog={handleDeleteTimelinePlannedLog}
                     currentDate={currentDate}
                     onDateChange={setCurrentDate}
                     onShowStats={() => setCurrentView(AppView.STATS)}
@@ -510,6 +542,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                         // Reuse the Todo page quick-actions sheet from the Chronicle sidebar.
                         openQuickActions(todo);
                     }}
+                    onToggleTodoCompletion={handleToggleTimelineTodoCompletion}
                     onNavigateToGoal={(goal) => {
                         // 直接打开目标编辑器
                         handleEditGoal(goal);
