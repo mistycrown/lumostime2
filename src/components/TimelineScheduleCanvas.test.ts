@@ -3,12 +3,26 @@
  * @input Sample time intervals including overlap boundaries
  * @output Regression coverage for parallel schedule block columns, planning time ranges, and quick-color ranges
  * @pos Test
+ * @updated 2026-07-31: Covers locked recurring auto-Plan blocks staying out of time-edit mode.
  * @updated 2026-07-30: Covers whole-block drag shifting while preserving duration and daily bounds.
  * @updated 2026-07-30: Covers quick-color range minimums for click-to-drag formal record creation.
  * @updated 2026-07-30: Covers compact two-digit hour-only grid labels and alpha backgrounds for timeline activity colors.
  */
 import { describe, expect, test, vi } from 'vitest';
-import { formatTimelineHourLabel, getMinimumTimelineRange, getPlannedTimeRange, getScheduleBlockHeight, getTimelineBlockBackground, layoutParallelScheduleBlocks, MIN_SCHEDULE_BLOCK_HEIGHT, scheduleTimelineRecordDetailOpen, shiftTimeRangeWithinDay, TIMELINE_TOP_PADDING } from './TimelineScheduleCanvas';
+import { Log, TodoItem } from '../types';
+import {
+  formatTimelineHourLabel,
+  getMinimumTimelineRange,
+  getPlannedTimeRange,
+  getScheduleBlockHeight,
+  getTimelineBlockBackground,
+  isTimelinePlanTimeEditingLocked,
+  layoutParallelScheduleBlocks,
+  MIN_SCHEDULE_BLOCK_HEIGHT,
+  scheduleTimelineRecordDetailOpen,
+  shiftTimeRangeWithinDay,
+  TIMELINE_TOP_PADDING
+} from './TimelineScheduleCanvas';
 
 describe('layoutParallelScheduleBlocks', () => {
   test('places overlapping records in separate equal-width columns', () => {
@@ -51,6 +65,43 @@ describe('layoutParallelScheduleBlocks', () => {
   test('creates 30-minute plans snapped to five-minute boundaries within the day', () => {
     expect(getPlannedTimeRange(62)).toEqual({ startMinutes: 60, endMinutes: 90 });
     expect(getPlannedTimeRange(1438)).toEqual({ startMinutes: 1410, endMinutes: 1440 });
+  });
+
+  test('keeps locked recurring auto-Plan blocks out of time editing', () => {
+    const todo: TodoItem = {
+      id: 'repeat-todo',
+      categoryId: 'cat',
+      title: 'Repeat',
+      isCompleted: false,
+      recurrenceRule: {
+        frequency: 'daily',
+        startDate: '2026-07-31'
+      },
+      recurringPlan: {
+        enabled: true,
+        startMinutes: 9 * 60,
+        endMinutes: 10 * 60,
+        horizonCount: 3
+      }
+    };
+    const autoPlanLog: Log = {
+      id: 'plan-log',
+      categoryId: '__timeline_plan__',
+      activityId: '__timeline_plan__',
+      startTime: new Date('2026-07-31T09:00:00').getTime(),
+      endTime: new Date('2026-07-31T10:00:00').getTime(),
+      duration: 3600,
+      linkedTodoId: 'repeat-todo',
+      isPlanned: true,
+      planSource: 'recurrence-auto',
+      plannedOccurrenceDate: '2026-07-31'
+    };
+
+    expect(isTimelinePlanTimeEditingLocked(autoPlanLog, [todo])).toBe(true);
+    expect(isTimelinePlanTimeEditingLocked(autoPlanLog, [{
+      ...todo,
+      recurringPlan: { ...todo.recurringPlan!, enabled: false }
+    }])).toBe(false);
   });
 
   test('keeps quick-color drag ranges at least five minutes within the day', () => {

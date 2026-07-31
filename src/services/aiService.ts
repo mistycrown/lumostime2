@@ -3,6 +3,7 @@
  * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
  * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
  * @pos Service (AI Integration Layer)
+ * @updated 2026-07-31: Added normalization for foreground `create_planned_log` tool calls so AI can create todo-linked timeline Plan blocks.
  * @updated 2026-07-21: Corrected Android native AI request timeout to 120 seconds; the HTTP plugin timeout unit is seconds.
  * @updated 2026-07-06: Added principle-library and self-belief create tool-call payloads for foreground assistant writeback.
  * @updated 2026-05-18: `create_todo` unified-turn tool calls can now carry nested `subtasks`, letting one assistant action create a parent todo together with its direct children in one pass.
@@ -109,6 +110,19 @@ export interface AIBackfillCreateLogArgs {
 export interface AIBackfillToolCall {
     toolName: 'create_log';
     args: AIBackfillCreateLogArgs;
+}
+
+export interface AIPlannedLogCreateArgs {
+    todoId: string;
+    date: string; // YYYY-MM-DD
+    startTime: string; // HH:mm
+    endTime: string; // HH:mm
+    note?: string;
+}
+
+export interface AIPlannedLogToolCall {
+    toolName: 'create_planned_log';
+    args: AIPlannedLogCreateArgs;
 }
 
 export interface AITodoNestedSubtaskArgs {
@@ -1347,6 +1361,33 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
                 && normalized.args.endTime
                 && normalized.args.categoryId
                 && normalized.args.activityId
+            )
+                ? [normalized]
+                : [];
+        }
+
+        if (toolName === 'create_planned_log') {
+            const todoId = typeof args.todoId === 'string' && args.todoId.trim()
+                ? args.todoId.trim()
+                : typeof args.linkedTodoId === 'string' && args.linkedTodoId.trim()
+                    ? args.linkedTodoId.trim()
+                    : '';
+            const normalized = {
+                toolName: 'create_planned_log' as const,
+                args: {
+                    todoId,
+                    date: normalizeOptionalDateString(args.date) || '',
+                    startTime: typeof args.startTime === 'string' ? args.startTime.trim() : '',
+                    endTime: typeof args.endTime === 'string' ? args.endTime.trim() : '',
+                    ...(typeof args.note === 'string' && args.note.trim() ? { note: args.note.trim() } : {})
+                }
+            };
+
+            return (
+                normalized.args.todoId
+                && normalized.args.date
+                && normalized.args.startTime
+                && normalized.args.endTime
             )
                 ? [normalized]
                 : [];

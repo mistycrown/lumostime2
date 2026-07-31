@@ -5,6 +5,7 @@
  * @pos Type Definitions (Assistant Agent)
  * @description Defines the structured contracts used by the Android-first assistant agent layer so background triggers, memory updates, reminder queues, and AI system-turn decisions can stay typed and stable across services and plugins.
  *
+ * @updated 2026-07-31: Added the foreground `create_planned_log` tool-call contract for AI-created todo-linked timeline Plan blocks.
  * @updated 2026-07-04: Added assistant-letter trigger, config, and persisted letter record types for scheduled AI letters with backup-safe local storage.
  * @updated 2026-05-16: Added log-submission trigger typing plus persisted assistant config fields for selected post-log AI reactions.
  * @updated 2026-05-18: Added optional nested `subtasks` typing under foreground `create_todo` tool calls so one assistant action can describe a parent todo plus its direct children.
@@ -477,6 +478,17 @@ export interface AssistantCreateLogToolCall {
   };
 }
 
+export interface AssistantCreatePlannedLogToolCall {
+  toolName: 'create_planned_log';
+  args: {
+    todoId: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    note?: string;
+  };
+}
+
 export interface AssistantCreateTodoSubtaskArgs {
   title: string;
   note?: string;
@@ -578,6 +590,7 @@ export interface AssistantCreateSelfBeliefToolCall {
 
 export type AssistantToolCall =
   | AssistantCreateLogToolCall
+  | AssistantCreatePlannedLogToolCall
   | AssistantCreateTodoToolCall
   | AssistantUpdateTodoToolCall
   | AssistantCreateSubtaskToolCall

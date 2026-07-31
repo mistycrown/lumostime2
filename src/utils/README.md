@@ -3,6 +3,7 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- Update 2026-07-31: `todoRecurringPlanUtils.ts` now exposes the shared manual timeline Plan log builder and virtual Plan ids used by both drag-created and AI-created Plan blocks.
 - Update 2026-07-30: `autoCheckUtils.ts` now exposes a shared id-keyed change detector for auto-check completion refreshes, so views can ignore harmless array reordering before persisting review data.
 - Update 2026-07-30: `todoRecurringPlanUtils.ts` centralizes finite Repeat auto-Plan occurrence windows, generated Plan log metadata, same-day time normalization, and delete-lock checks.
 - Update 2026-07-11: `achievementUtils.ts` now rebuilds achievement redemption records for full recomputation, merging archived fragments and refreshing costs for rewards or collection bottles that still exist.

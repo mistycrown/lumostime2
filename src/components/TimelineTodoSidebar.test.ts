@@ -58,7 +58,7 @@ describe('timeline sidebar list and hierarchy', () => {
 
   test('filters a selected list by category while retaining its subtasks', () => {
     const entries = buildTimelineSidebarCategoryTodoEntries([parent, child, otherCategory], 'cat-a');
-    expect(entries.map((entry) => entry.todo.id)).toEqual(['parent', 'child']);
+    expect(entries.map((entry) => entry.todo.id)).toEqual(['child', 'parent']);
 
     const groups = buildTimelineSidebarTodoTreeGroups(entries, [parent, child, otherCategory]);
     expect(groups).toHaveLength(1);
@@ -71,11 +71,11 @@ describe('timeline sidebar list and hierarchy', () => {
     const categoryEntries = buildTimelineSidebarCategoryTodoEntries([parent, child, completed], 'cat-a');
     const todayEntries = buildTimelineSidebarTodoEntries([completed], [], '2026-07-30');
 
-    expect(categoryEntries.map((entry) => entry.todo.id)).toEqual(['parent', 'child']);
+    expect(categoryEntries.map((entry) => entry.todo.id)).toEqual(['child', 'parent']);
     expect(todayEntries.map((entry) => entry.todo.id)).toEqual(['completed']);
   });
 
-  test('adds a scheduled parent\\'s subtasks to the same expandable tree', () => {
+  test("adds a scheduled parent's subtasks to the same expandable tree", () => {
     const scheduledEntries = buildTimelineSidebarTodoEntries([parent, child, otherCategory], [], '2026-07-30');
     const groups = buildTimelineSidebarTodoTreeGroups(scheduledEntries, [parent, child, otherCategory], true);
     expect(groups).toHaveLength(1);

@@ -5,6 +5,7 @@
  * @pos Service (Assistant Action Executor)
  * @description Executes AI-planned log/todo/subtask/edit/principle/self-belief tool calls against local app data using shared helpers so the UI can reuse one execution layer instead of keeping tool application logic inside a modal component.
  *
+ * @updated 2026-07-31: Added `create_planned_log` execution for AI-created todo-linked timeline Plan blocks.
  * @updated 2026-07-06: Added create_principle and create_self_belief tool-call execution with localStorage writeback and undo snapshots.
  * @updated 2026-05-18: `create_todo` actions can now create nested direct subtasks in the same pass, and the applied snapshot records those child ids so the UI can undo the whole bundle cleanly.
  * @updated 2026-05-13: Added explicit todo kind handling so assistant-created quick reminders can skip activity linkage while still resolving into the reserved 小事 category.
@@ -22,6 +23,7 @@ import type {
 } from '../types';
 import type {
   AIBackfillToolCall,
+  AIPlannedLogToolCall,
   AICreateSubtaskToolCall,
   AICreatePrincipleToolCall,
   AICreateSelfBeliefToolCall,
@@ -30,7 +32,7 @@ import type {
   AITodoToolCall,
   AITodoUpdateToolCall
 } from './aiService';
-import { formatDateKey, normalizeAIBackfillToolCalls, parseTimeOnDateKey } from '../utils/aiBackfillUtils';
+import { formatDateKey, normalizeAIBackfillToolCalls, normalizeBackfillDate, parseTimeOnDateKey } from '../utils/aiBackfillUtils';
 import { getTodoProgressTrackingMode, syncSubtaskProgressToParentTodos } from '../utils/todoProgressUtils';
 import { getNextChildOrder, normalizeTodoHierarchy, syncDirectChildTodosWithParent } from '../utils/todoHierarchyUtils';
 import { getTodoKind, isQuickTodo } from '../utils/todoKindUtils';
@@ -40,6 +42,7 @@ import {
   QUICK_TODO_CATEGORY_ID
 } from '../utils/todoQuickCategoryUtils';
 import { updateLocalDataTimestamp } from '../utils/localDataTimestamp';
+import { buildTimelinePlannedLog } from '../utils/todoRecurringPlanUtils';
 
 export type AppliedActionStatus = 'applied' | 'undone' | 'failed';
 
@@ -64,6 +67,23 @@ export interface AppliedCreateLogAction {
   kind: 'create_log';
   status: AppliedActionStatus;
   snapshot: AppliedCreateLogSnapshot;
+  errorMessage?: string;
+}
+
+export interface AppliedCreatePlannedLogSnapshot {
+  logId?: string;
+  todoId: string;
+  todoTitle: string;
+  startTime: number;
+  endTime: number;
+  note?: string;
+}
+
+export interface AppliedCreatePlannedLogAction {
+  actionId: string;
+  kind: 'create_planned_log';
+  status: AppliedActionStatus;
+  snapshot: AppliedCreatePlannedLogSnapshot;
   errorMessage?: string;
 }
 
@@ -180,6 +200,7 @@ export interface AppliedCreateSelfBeliefAction {
 
 export type AppliedChatAction =
   | AppliedCreateLogAction
+  | AppliedCreatePlannedLogAction
   | AppliedCreateTodoAction
   | AppliedUpdateTodoAction
   | AppliedCreateSubtaskAction
@@ -993,6 +1014,83 @@ export const assistantActionExecutor = {
           scopeNames: getScopeNames(context, scopeIds),
           ...(linkedTodo ? { linkedTodoId: linkedTodo.id, linkedTodoTitle: linkedTodo.title } : {}),
           ...(progressIncrement ? { progressIncrement } : {})
+        }
+      });
+    });
+
+    return {
+      actions,
+      nextLogs,
+      nextTodos
+    };
+  },
+
+  applyPlannedLogToolCalls(
+    context: AssistantActionExecutionContext,
+    toolCalls: AIPlannedLogToolCall[]
+  ): AssistantActionExecutionResult {
+    const actions: AppliedChatAction[] = [];
+    let nextLogs = [...context.logs];
+    let nextTodos = [...context.todos];
+
+    toolCalls.forEach((toolCall) => {
+      const { args } = toolCall;
+      const actionDate = normalizeBackfillDate(args.date, context.defaultDateKey);
+      const startTime = parseTimeOnDateKey(actionDate, args.startTime);
+      const endTime = parseTimeOnDateKey(actionDate, args.endTime);
+      const linkedTodo = nextTodos.find((todo) => todo.id === args.todoId);
+
+      if (!startTime || !endTime || endTime <= startTime || !linkedTodo) {
+        actions.push({
+          actionId: buildActionId(),
+          kind: 'create_planned_log',
+          status: 'failed',
+          errorMessage: '这条计划的时间或待办信息不完整，我先没有自动应用。',
+          snapshot: {
+            todoId: args.todoId,
+            todoTitle: linkedTodo?.title || '未知待办',
+            startTime: startTime || Date.now(),
+            endTime: endTime || Date.now(),
+            ...(args.note ? { note: args.note } : {})
+          }
+        });
+        return;
+      }
+
+      const plannedLog = buildTimelinePlannedLog(linkedTodo, startTime, endTime, {
+        note: args.note
+      });
+      if (!plannedLog) {
+        actions.push({
+          actionId: buildActionId(),
+          kind: 'create_planned_log',
+          status: 'failed',
+          errorMessage: '这条计划的时间范围无效，我先没有自动应用。',
+          snapshot: {
+            todoId: linkedTodo.id,
+            todoTitle: linkedTodo.title,
+            startTime,
+            endTime,
+            ...(args.note ? { note: args.note } : {})
+          }
+        });
+        return;
+      }
+
+      const saveResult = applyLogSave(nextLogs, nextTodos, plannedLog);
+      nextLogs = saveResult.logs;
+      nextTodos = saveResult.todos;
+      actions.push({
+        actionId: buildActionId(),
+        kind: 'create_planned_log',
+        status: 'applied',
+        snapshot: {
+          logId: plannedLog.id,
+          todoId: linkedTodo.id,
+          todoTitle: linkedTodo.title,
+          startTime,
+          endTime,
+          ...(args.note ? { note: args.note } : {})
         }
       });
     });

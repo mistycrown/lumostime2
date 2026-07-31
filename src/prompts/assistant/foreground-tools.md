@@ -73,12 +73,13 @@
 允许的 `toolCalls`：
 
 1. `create_log`
-2. `edit_log`
-3. `create_todo`
-4. `update_todo`
-5. `create_subtask`
-6. `create_principle`
-7. `create_self_belief`
+2. `create_planned_log`
+3. `edit_log`
+4. `create_todo`
+5. `update_todo`
+6. `create_subtask`
+7. `create_principle`
+8. `create_self_belief`
 
 总规则：
 
@@ -95,6 +96,9 @@
 - `create_log`
   如果事实已经足够：返回 `create_log`。
   如果时间 / category / activity 仍然不清楚：`clarify`。
+- `create_planned_log`
+  如果用户明确要把已有 todo 安排到时间轴上的某天某段时间：返回 `create_planned_log`。
+  如果 todo 或时间段不明确：`clarify`。
 - `edit_log`
   如果存在清晰的目标 log candidate：返回 `edit_log`。
   如果没有清晰目标，或这条记录看起来超出了当前提供的目标日 log candidates：`clarify`。
@@ -107,7 +111,7 @@
 - `create_subtask`
   只有当 `parentTodoId` 能从已提供 candidates 中明确匹配，且 parent 是顶层、非 recurring todo 时才创建。
 - `daily_planning`
-  如果足够具体：可以返回 `create_todo` / `update_todo`。
+  如果足够具体：可以返回 `create_todo` / `update_todo` / `create_planned_log`。
   如果仍然模糊：`clarify`。
 - `clarify_missing_information`
   保持 `toolCalls` 为空。
@@ -157,7 +161,16 @@
 - 如果配对不清晰，或推断出的时间范围会和已有记录重叠，就保持 `toolCalls` 为空，并问一个短追问，而不是直接创建 log。
 - 跨天的记录，需要分成两段 log。
 
-### 2. edit_log
+### 2. create_planned_log
+
+- `create_planned_log` 用来创建时间轴上的“计划块”，表示未来准备在某个时间段做某个 todo，不表示已经完成或已经发生。
+- 当用户说“把 X 安排到 15:00-16:00”“今天下午给论文初稿留一个时间块”“把这个待办排到时间轴”时，优先使用 `create_planned_log`，不要使用 `create_log`。
+- `todoId` 必须来自已提供的 todo candidates。不要编造 todo id，也不要用 todo 标题代替 id。
+- 必须提供 `date`、`startTime`、`endTime`，且同一天内 `endTime` 大于 `startTime`。
+- 如果用户同时想创建一个新 todo 并安排时间，首版优先先创建 todo；除非上下文里已经有明确可复用的现有 todo，否则不要猜一个 `todoId` 来创建计划块。
+- `note` 可选，只写用户明确给出的计划备注；不要把解释性回复塞进 `note`。
+
+### 3. edit_log
 
 - 当返回 `edit_log` 时，`logId` 只能从已提供的 log candidates 中选择。不要编造 log id。
 - 如果用户说类似“我刚才那条记录时间写错了”，优先 `edit_log`，而不是 `create_log`。
@@ -219,6 +232,16 @@
         "scopeIds": ["scope id"],
         "linkedTodoId": "todo id",
         "progressIncrement": 1
+      }
+    },
+    {
+      "toolName": "create_planned_log",
+      "args": {
+        "todoId": "existing todo id",
+        "date": "YYYY-MM-DD",
+        "startTime": "HH:mm",
+        "endTime": "HH:mm",
+        "note": "string"
       }
     },
     {
@@ -336,6 +359,25 @@
 ```
 
 ## 示例
+
+### 时间轴计划块示例
+
+```json
+{
+  "toolCalls": [
+    {
+      "toolName": "create_planned_log",
+      "args": {
+        "todoId": "todo-paper-draft",
+        "date": "2026-07-31",
+        "startTime": "15:00",
+        "endTime": "16:30",
+        "note": "先处理引言部分"
+      }
+    }
+  ]
+}
+```
 
 ### 小事 / 未来分类调用示例
 

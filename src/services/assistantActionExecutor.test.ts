@@ -5,7 +5,7 @@ import {
   removeStoredSelfBeliefById,
   type AssistantActionExecutionContext
 } from './assistantActionExecutor';
-import type { AICreatePrincipleToolCall, AICreateSelfBeliefToolCall, AITodoToolCall } from './aiService';
+import type { AICreatePrincipleToolCall, AICreateSelfBeliefToolCall, AIPlannedLogToolCall, AITodoToolCall } from './aiService';
 
 const installLocalStorageMock = () => {
   const store = new Map<string, string>();
@@ -163,6 +163,73 @@ describe('assistantActionExecutor applyTodoToolCalls', () => {
     expect(citationTodo?.deadlineDate).toBeUndefined();
     expect(citationTodo?.note).toBe('Check Zotero tags');
     expect(action.snapshot.createdSubtaskIds).toHaveLength(2);
+  });
+});
+
+describe('assistantActionExecutor applyPlannedLogToolCalls', () => {
+  beforeEach(() => {
+    installLocalStorageMock();
+  });
+
+  it('creates todo-linked timeline Plan logs without requiring activity metadata', () => {
+    const context: AssistantActionExecutionContext = {
+      ...buildBaseContext(),
+      todos: [{
+        id: 'todo-paper',
+        categoryId: 'project-general',
+        title: '写论文初稿',
+        isCompleted: false,
+        linkedCategoryId: 'study',
+        linkedActivityId: 'writing'
+      }]
+    };
+    const toolCalls: AIPlannedLogToolCall[] = [{
+      toolName: 'create_planned_log',
+      args: {
+        todoId: 'todo-paper',
+        date: '2026-05-15',
+        startTime: '14:00',
+        endTime: '15:30',
+        note: '先处理引言'
+      }
+    }];
+
+    const result = assistantActionExecutor.applyPlannedLogToolCalls(context, toolCalls);
+    const action = result.actions[0];
+    const createdLog = result.nextLogs[0];
+
+    expect(action.kind).toBe('create_planned_log');
+    expect(action.status).toBe('applied');
+    expect(createdLog).toMatchObject({
+      categoryId: '__timeline_plan__',
+      activityId: '__timeline_plan__',
+      linkedTodoId: 'todo-paper',
+      title: '计划 · 写论文初稿',
+      isPlanned: true,
+      note: '先处理引言'
+    });
+    expect(new Date(createdLog.startTime).getHours()).toBe(14);
+    expect(new Date(createdLog.endTime).getHours()).toBe(15);
+    expect(result.nextTodos).toEqual(context.todos);
+  });
+
+  it('returns a failed action when the target todo cannot be resolved', () => {
+    const toolCalls: AIPlannedLogToolCall[] = [{
+      toolName: 'create_planned_log',
+      args: {
+        todoId: 'missing-todo',
+        date: '2026-05-15',
+        startTime: '14:00',
+        endTime: '15:30'
+      }
+    }];
+
+    const result = assistantActionExecutor.applyPlannedLogToolCalls(buildBaseContext(), toolCalls);
+    const action = result.actions[0];
+
+    expect(action.kind).toBe('create_planned_log');
+    expect(action.status).toBe('failed');
+    expect(result.nextLogs).toEqual([]);
   });
 });
 
