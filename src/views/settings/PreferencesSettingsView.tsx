@@ -6,6 +6,7 @@
  * @updated 2026-04-25: Added timeline quick-action customization controls under display preferences.
  * @updated 2026-07-29: Keeps the Chronicle layout selector after removing the obsolete schedule-canvas start selection.
  * @updated 2026-07-29: Moved display mode into the general settings group.
+ * @updated 2026-07-31: Renamed the Chronicle layout selector to default Chronicle layout because in-page nav taps now handle temporary layout switching.
  */
 import React, { useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus, X } from 'lucide-react';
@@ -532,7 +533,7 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                     <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
                         <div className="flex items-center justify-between gap-3 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
                             <div className="min-w-0 flex-1">
-                                <h4 className="font-bold text-stone-700">脉络布局</h4>
+                                <h4 className="font-bold text-stone-700">默认脉络布局</h4>
                             </div>
                             <div className="relative shrink-0">
                                 <button

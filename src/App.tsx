@@ -24,10 +24,11 @@
  * @updated 2026-04-22: Mounted the shared AI chat window at the app level so it can keep running in the background after the modal UI is closed.
  * @updated 2026-04-25: Added AI assistant widget shortcut handling so Android widget shortcut slots can open the shared AI chat window.
  * @updated 2026-04-26: Added Android assistant notification navigation consumption so tapping a background AI alert reopens the shared chat at the exact target message.
+ * @updated 2026-07-31: Added a temporary active Chronicle layout state so tapping the active Timeline nav item toggles layouts without changing the settings default.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Buffer } from 'buffer';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -125,6 +126,7 @@ import {
 } from './constants';
 import { DEFAULT_PRINCIPLE_PRESETS } from './constants/principlePresets';
 import { DEFAULT_SCENE_PRESETS } from './constants/scenePresets';
+import type { TimelineLayoutMode } from './services/timelineLayoutService';
 
 const OverlayFallback: React.FC<{ label: string }> = ({ label }) => (
   <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#fdfbf7]">
@@ -155,12 +157,14 @@ const AppContent: React.FC = () => {
     timelineGalleryMode, setTimelineGalleryMode,
     timelineSortOrder, setTimelineSortOrder,
     timelineQuickActions, setTimelineQuickActions,
+    timelineLayout: defaultTimelineLayout,
     collapseThreshold, setCollapseThreshold,
     manualSyncMode, setManualSyncMode
   } = useSettings();
 
   const { addToast } = useToast();
   const { openAIChat } = useAIChatWindow();
+  const [activeTimelineLayout, setActiveTimelineLayout] = useState<TimelineLayoutMode>(defaultTimelineLayout);
   const lastStorageErrorToastRef = useRef<{ signature: string; timestamp: number } | null>(null);
   const hasRestoredDesktopWidgetsRef = useRef(false);
   const desktopWindowType = getDesktopWidgetType();
@@ -288,6 +292,27 @@ const AppContent: React.FC = () => {
     setIsSearchOpenedFromSettings,
     setIsGalleryViewOpen
   } = useNavigation();
+  const previousMainViewRef = useRef<AppView>(currentView);
+
+  useEffect(() => {
+    if (currentView === AppView.TIMELINE && previousMainViewRef.current !== AppView.TIMELINE) {
+      setActiveTimelineLayout(defaultTimelineLayout);
+    }
+    previousMainViewRef.current = currentView;
+  }, [currentView, defaultTimelineLayout]);
+
+  const handlePrimaryViewChange = useCallback((view: AppView) => {
+    if (view === AppView.TIMELINE) {
+      if (currentView === AppView.TIMELINE) {
+        setActiveTimelineLayout((layout) => layout === 'timeline' ? 'timeline-todo' : 'timeline');
+        return;
+      }
+      setActiveTimelineLayout(defaultTimelineLayout);
+    }
+
+    setCurrentView(view);
+  }, [currentView, defaultTimelineLayout, setCurrentView]);
+
   const { categories, scopes, goals, majorGoals, setCategories, setScopes, setGoals, setMajorGoals } = useCategoryScope();
   const { buildBackupPayload: buildAchievementBackupPayload } = useAchievement();
   const { startActivity, stopActivity, cancelSession, activeSessions, setActiveSessions } = useSession();
@@ -839,6 +864,7 @@ const AppContent: React.FC = () => {
         }}
 
         // Misc
+        activeTimelineLayout={activeTimelineLayout}
         refreshKey={syncManager.refreshKey}
         isSyncing={syncManager.isSyncing}
         handleQuickSync={syncManager.handleQuickSync}
@@ -848,7 +874,7 @@ const AppContent: React.FC = () => {
       {showTodoDetailPage && todoDetailModalNode}
       <BottomNavigation
         currentView={currentView}
-        onViewChange={setCurrentView}
+        onViewChange={handlePrimaryViewChange}
         isVisible={
           !focusDetailSessionId &&
           !isTodoModalOpen &&

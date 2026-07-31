@@ -21,6 +21,7 @@ import { isQuickTodo } from '../utils/todoKindUtils';
 import { getRealTodoCategories } from '../utils/todoQuickCategoryUtils';
 import { buildTimelinePlannedLog, isAutoRecurringPlanDeleteLocked } from '../utils/todoRecurringPlanUtils';
 import type { TimelineQuickColorActivity } from './TimelineScheduleCanvas';
+import type { TimelineLayoutMode } from '../services/timelineLayoutService';
 
 // Views
 import { DailyReviewView } from '../views/DailyReviewView';
@@ -81,6 +82,7 @@ const resolveNewspaperAssistantName = (): string => {
 // Props Interface to receive all handlers
 // Minimized Props Interface
 interface AppRoutesProps {
+    activeTimelineLayout: TimelineLayoutMode;
     refreshKey: number;
     isSyncing: boolean;
     handleQuickSync: (e: any) => void;
@@ -119,6 +121,7 @@ interface AppRoutesProps {
 }
 
 export const AppRoutes: React.FC<AppRoutesProps> = ({
+    activeTimelineLayout,
     handleStartActivity,
     openAddModal, openEditModal, handleBatchAddLogs, handleQuickPunch,
     openEditTodoModal, openAddTodoModal, handleToggleTodo, handleStartTodoFocus, handleBatchAddTodos, handleDuplicateTodo, handleSaveTodo, handleDeleteTodo, handleUpdateTodoData,
@@ -529,6 +532,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 <>
                 <TimelineView
                     key={`timeline-${refreshKey}`}
+                    timelineLayoutMode={activeTimelineLayout}
                     refreshKey={refreshKey}
                     logs={logs}
                     todos={todos}

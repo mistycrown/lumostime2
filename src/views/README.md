@@ -3,7 +3,8 @@
 The `views/` directory contains all the React components that represent the distinct screens or pages of the LumosTime application. This layer is responsible for the presentation logic and user interaction.
 
 - Update 2026-07-30: `TimelineView.tsx` and `DailyReviewView.tsx` now use the shared auto-check change detector so reorder-only refreshes do not trigger redundant review writes.
-- Update 2026-07-31: `TimelineView.tsx` adds right-edge shortcut buttons for switching between the persisted `timeline` layout and the `timeline-todo` workspace layout, matching the settings dropdown state.
+- Update 2026-07-31: `TimelineView.tsx` now receives the active Chronicle layout from the app shell, while the settings selector acts as the default layout for fresh Timeline entries.
+- Update 2026-07-31: `TimelineView.tsx` keeps planned logs out of the pure timeline stream so idle gaps, exports, gallery data, and historical same-day links only reflect entity records.
 - Update 2026-07-30: `TimelineView.tsx` now resizes both the todo and quick-color split sidebars by the same persisted 26%-70% workspace ratio.
 - Update 2026-07-30: `TimelineView.tsx` passes the selected timeline date and logs into the split-workspace todo sidebar so it shares the schedule page's date-specific entries, including same-day completions and excluding Trace; future dates omit the daily-check list.
 - Update 2026-07-30: `TimelineView.tsx` adds long-press resizing to the quick-color divider and unifies the todo and quick-color right sidebar minimum widths.
