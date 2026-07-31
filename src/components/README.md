@@ -3,6 +3,8 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-07-31: `AIBackfillChatModal.tsx` now clears the active request id by pending message id when a foreground turn completes, so the composer returns from Stop to Send after AI tool-call replies finish.
+- Update 2026-07-31: `AppRoutes.tsx` now passes the app-shell active Chronicle layout into `TimelineView.tsx`, allowing the bottom Timeline nav item to toggle layouts without changing the settings default.
 - Update 2026-07-31: `AIBackfillChatModal.tsx` and `ai-chat/AIBackfillChatAppliedActionRenderer.tsx` now render and undo AI-created timeline Plan blocks through a dedicated `create_planned_log` action path.
 - Update 2026-07-31: `TimelineScheduleCanvas.tsx` now treats locked recurring auto-Plan blocks as read-only for long-press editing, drag moves, and resize handles while leaving the existing delete lock intact.
 - Update 2026-07-30: `TimelineTodoSidebar.tsx` and `TimelineQuickColorSidebar.tsx` now share a common pointer-drag hook, trimming the duplicate document listener and drag ghost code from both row renderers.

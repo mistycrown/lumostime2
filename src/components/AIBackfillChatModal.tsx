@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-07-31: Added a pending-message-id fallback cleanup so completed foreground turns always restore the composer send button.
  * @updated 2026-07-31: Wired foreground `create_planned_log` tool calls into local timeline Plan creation, rendering, and undo.
  * @updated 2026-07-21: Kept the composer Stop state tied to the active foreground request so ordinary requests remain cancellable even if a loading branch resets early.
  * @updated 2026-07-06: Added assistant-created principle and self-belief tool-call writeback with in-chat undo support.
@@ -6430,9 +6431,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     } finally {
       if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
         activeRequestRef.current = null;
-        setActiveRequestId(null);
-        setIsLoading(false);
       }
+      setActiveRequestId((currentRequestId) => (
+        currentRequestId === pendingMessageId ? null : currentRequestId
+      ));
+      setIsLoading(false);
     }
   };
 
