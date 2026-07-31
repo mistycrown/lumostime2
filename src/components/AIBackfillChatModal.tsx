@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-07-31: Wired foreground `create_planned_log` tool calls into local timeline Plan creation, rendering, and undo.
  * @updated 2026-07-21: Kept the composer Stop state tied to the active foreground request so ordinary requests remain cancellable even if a loading branch resets early.
  * @updated 2026-07-06: Added assistant-created principle and self-belief tool-call writeback with in-chat undo support.
  * @updated 2026-07-05: Connected ordinary foreground assistant local-query turns to the real category/review datasets and fed local-query history back into follow-up unified turns.
@@ -40,6 +41,7 @@ import {
   aiService,
   type AIDebugExchange,
   type AIBackfillToolCall,
+  type AIPlannedLogToolCall,
   type AIConversationTurn,
   type AITodoToolCall,
   type AITodoUpdateToolCall,
@@ -128,6 +130,7 @@ import {
   updateStoredSelfBelief,
   type AppliedChatAction,
   type AppliedCreateLogAction,
+  type AppliedCreatePlannedLogAction,
   type AppliedCreatePrincipleAction,
   type AppliedCreateSelfBeliefAction,
   type AppliedCreateSubtaskAction,
@@ -4847,6 +4850,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
     return result.actions;
   };
+  const applyPlannedTimelineLogToolCalls = (toolCalls: AIPlannedLogToolCall[]): AppliedChatAction[] => {
+    const result = assistantActionExecutor.applyPlannedLogToolCalls(buildAssistantActionContext(), toolCalls);
+    if (result.actions.some((action) => action.kind === 'create_planned_log' && action.status === 'applied')) {
+      setLogs(result.nextLogs);
+      setTodos(result.nextTodos);
+    }
+    return result.actions;
+  };
   const applyPlannedTodoToolCalls = (toolCalls: AITodoToolCall[], sourceText: string): AppliedChatAction[] => {
     const result = assistantActionExecutor.applyTodoToolCalls(buildAssistantActionContext(), toolCalls, sourceText);
     if (result.actions.some((action) => action.kind === 'create_todo' && action.status === 'applied')) {
@@ -4915,6 +4926,25 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
     updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
     addToast('success', '已撤销这条 AI 补记');
+  };
+
+  const handleUndoPlannedLogAction = (messageId: string, action: AppliedCreatePlannedLogAction) => {
+    if (action.status !== 'applied' || !activeSession || !action.snapshot.logId) {
+      return;
+    }
+
+    const liveLog = logs.find((log) => log.id === action.snapshot.logId);
+    if (!liveLog) {
+      updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
+      return;
+    }
+
+    const deleteResult = applyLogDelete(logs, todos, liveLog.id);
+    setLogs(deleteResult.logs);
+    setTodos(deleteResult.todos);
+
+    updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
+    addToast('success', '已撤销这条 AI 计划');
   };
 
   const handleUndoTodoAction = (messageId: string, action: AppliedCreateTodoAction) => {
@@ -5177,6 +5207,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     localQueryHistory?: AssistantLocalQueryResult[]
   ): AppliedChatAction[] => {
     const logCalls = toolCalls.filter((toolCall): toolCall is AIBackfillToolCall => toolCall.toolName === 'create_log');
+    const plannedLogCalls = toolCalls.filter((toolCall): toolCall is AIPlannedLogToolCall => toolCall.toolName === 'create_planned_log');
     const todoCalls = toolCalls.filter((toolCall): toolCall is AITodoToolCall => toolCall.toolName === 'create_todo');
     const todoUpdateCalls = toolCalls.filter((toolCall): toolCall is AITodoUpdateToolCall => toolCall.toolName === 'update_todo');
     const subtaskCalls = toolCalls.filter((toolCall): toolCall is AICreateSubtaskToolCall => toolCall.toolName === 'create_subtask');
@@ -5186,6 +5217,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
     return [
       ...applyPlannedLogToolCalls(logCalls),
+      ...applyPlannedTimelineLogToolCalls(plannedLogCalls),
       ...applyPlannedTodoToolCalls(todoCalls, sourceText),
       ...applyPlannedTodoUpdateToolCalls(todoUpdateCalls),
       ...applyPlannedCreateSubtaskToolCalls(subtaskCalls, sourceText),
@@ -6559,6 +6591,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       onUndoCreateSubtaskAction: handleUndoCreateSubtaskAction,
       onUndoEditLogAction: handleUndoEditLogAction,
       onUndoLogAction: handleUndoLogAction,
+      onUndoPlannedLogAction: handleUndoPlannedLogAction,
       onUndoPrincipleAction: handleUndoPrincipleAction,
       onUndoSelfBeliefAction: handleUndoSelfBeliefAction,
       onUndoTodoAction: handleUndoTodoAction,

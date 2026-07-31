@@ -4,6 +4,7 @@
  * @output A full-day scrollable schedule canvas with plan drops, quick-color record creation, editable time bounds, and touch pinch zoom
  * @pos Component
  * @description Positions real records and virtual planning blocks on a 00:00-24:00 time grid for the Chronicle split layout.
+ * @updated 2026-07-31: Prevents locked recurring auto-Plan blocks from entering long-press time editing or drag/resize adjustment.
  * @updated 2026-07-30: Displays compact two-digit hour-only grid labels while preserving full block start/end times.
  * @updated 2026-07-30: Locks recurring auto-Plan deletion while the source Repeat todo still has auto generation enabled.
  * @updated 2026-07-30: Added quick-color range dragging plus direct 30-minute activity drops for formal record creation.
@@ -185,6 +186,14 @@ export const scheduleTimelineRecordDetailOpen = (callback: () => void): ReturnTy
   setTimeout(callback, 0)
 );
 
+export const isTimelinePlanTimeEditingLocked = (log: Log, todos: TodoItem[]): boolean => {
+  const linkedTodo = log.linkedTodoId
+    ? todos.find((todo) => todo.id === log.linkedTodoId) || null
+    : null;
+
+  return isAutoRecurringPlanDeleteLocked(log, linkedTodo);
+};
+
 export const layoutParallelScheduleBlocks = <T extends { startMinutes: number; endMinutes: number },>(blocks: T[]): Array<T & ScheduleBlockLayout> => {
   const sorted = [...blocks].sort((left, right) => left.startMinutes - right.startMinutes || left.endMinutes - right.endMinutes);
   const laidOut: Array<T & ScheduleBlockLayout> = [];
@@ -332,8 +341,9 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
     activePlanLog?.linkedTodoId ? todos.find((todo) => todo.id === activePlanLog.linkedTodoId) || null : null
   ), [activePlanLog, todos]);
   const isActivePlanDeleteLocked = useMemo(() => (
-    activePlanLog ? isAutoRecurringPlanDeleteLocked(activePlanLog, activePlanTodo) : false
-  ), [activePlanLog, activePlanTodo]);
+    activePlanLog ? isTimelinePlanTimeEditingLocked(activePlanLog, todos) : false
+  ), [activePlanLog, todos]);
+  const isLogTimeEditingLocked = (log: Log): boolean => isTimelinePlanTimeEditingLocked(log, todos);
   const todoDropPreviewColor = useMemo(() => {
     if (!todoDropPreview) return '#a8a29e';
     const category = categories.find((item) => item.id === todoDropPreview.todo.linkedCategoryId);
@@ -516,6 +526,11 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   };
 
   const startMove = (log: Log, event: React.PointerEvent<HTMLDivElement>) => {
+    if (isLogTimeEditingLocked(log)) {
+      setEditingMode(null);
+      return;
+    }
+
     const minute = getMinuteAtClientY(event.clientY);
     if (minute === null) return;
 
@@ -579,15 +594,31 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
     longPressRef.current = null;
   };
 
+  useEffect(() => {
+    if (!editingLogId) return;
+    const editingLog = logs.find((log) => log.id === editingLogId);
+    if (!editingLog || !isTimelinePlanTimeEditingLocked(editingLog, todos)) return;
+
+    clearLongPress();
+    cancelMove();
+    setEditingMode(null);
+  }, [editingLogId, logs, todos]);
+
   const handleBlockPointerDown = (log: Log, event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'touch' && (pinchRef.current !== null || Date.now() < pinchBlockTapSuppressionUntilRef.current)) {
       event.preventDefault();
       event.stopPropagation();
       return;
     }
+    const isTimeEditingLocked = isLogTimeEditingLocked(log);
+    if (isTimeEditingLocked && editingLogIdRef.current === log.id) {
+      clearLongPress();
+      cancelMove();
+      setEditingMode(null);
+    }
     if (editingLogIdRef.current && editingLogIdRef.current !== log.id) return;
     event.currentTarget.setPointerCapture(event.pointerId);
-    const pressMode: BlockPressMode = editingLogIdRef.current === log.id ? 'edit' : 'detail';
+    const pressMode: BlockPressMode = editingLogIdRef.current === log.id && !isTimeEditingLocked ? 'edit' : 'detail';
     const press = {
       logId: log.id,
       pointerId: event.pointerId,
@@ -598,7 +629,7 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
       mode: pressMode
     };
     longPressRef.current = press;
-    if (pressMode === 'detail') {
+    if (pressMode === 'detail' && !isTimeEditingLocked) {
       press.timerId = window.setTimeout(() => {
         if (longPressRef.current === press) {
           press.active = true;
@@ -609,6 +640,13 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   };
 
   const handleBlockPointerMove = (log: Log, event: React.PointerEvent<HTMLDivElement>) => {
+    if (isLogTimeEditingLocked(log)) {
+      if (moveRef.current?.log.id === log.id) cancelMove();
+      const press = longPressRef.current;
+      if (press?.logId === log.id && press.pointerId === event.pointerId) clearLongPress();
+      return;
+    }
+
     const move = moveRef.current;
     if (move?.log.id === log.id && move.pointerId === event.pointerId) {
       event.preventDefault();
@@ -709,6 +747,12 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   const handleResizePointerDown = (log: Log, edge: 'start' | 'end', event: React.PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
+    if (isLogTimeEditingLocked(log)) {
+      clearLongPress();
+      cancelMove();
+      setEditingMode(null);
+      return;
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
     resizeRef.current = { log, edge };
   };
@@ -990,7 +1034,8 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
               </div>
             )}
             {scheduledLogs.map(({ log, top, height, color, background, startLabel, endLabel, activityLabel, linkedTodoLabel, linkedScopeNames, isPlanned, column, columnCount }) => {
-              const isEditing = editingLogId === log.id;
+              const isTimeEditingLocked = isLogTimeEditingLocked(log);
+              const isEditing = editingLogId === log.id && !isTimeEditingLocked;
               const isNewlyCreated = createdPlanLogId === log.id;
               const isCompact = height < 30;
               const showMetadata = height >= 34;

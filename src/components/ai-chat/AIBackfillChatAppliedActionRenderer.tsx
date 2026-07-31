@@ -4,15 +4,17 @@
  * @output Reusable renderer for in-chat applied-action result cards
  * @pos Component Support (AI Integration)
  * @description Extracts the bulky applied-action JSX branches out of AIBackfillChatModal while keeping the same live-data lookups, undo affordances, and visual treatment.
+ * @updated 2026-07-31: Added rendering for AI-created timeline Plan blocks as todo-linked planned actions.
  * @updated 2026-07-06: Added rendering for AI-created principles and self-beliefs with undo affordances.
  * @updated 2026-05-15: Extracted create-log, create-todo, update-todo, and edit-log action rendering from AIBackfillChatModal.
  */
 import React from 'react';
-import { Pencil, Undo2 } from 'lucide-react';
+import { ListTodo, Pencil, Undo2 } from 'lucide-react';
 import type { Category, Log, TodoCategory, TodoItem } from '../../types';
 import type {
   AppliedChatAction,
   AppliedCreateLogAction,
+  AppliedCreatePlannedLogAction,
   AppliedCreatePrincipleAction,
   AppliedCreateSelfBeliefAction,
   AppliedCreateSubtaskAction,
@@ -62,6 +64,7 @@ interface AIBackfillChatAppliedActionRendererProps {
   onUndoCreateSubtaskAction: (messageId: string, action: AppliedCreateSubtaskAction) => void;
   onUndoEditLogAction: (messageId: string, action: AppliedEditLogAction) => void;
   onUndoLogAction: (messageId: string, action: AppliedCreateLogAction) => void;
+  onUndoPlannedLogAction: (messageId: string, action: AppliedCreatePlannedLogAction) => void;
   onUndoPrincipleAction: (messageId: string, action: AppliedCreatePrincipleAction) => void;
   onUndoSelfBeliefAction: (messageId: string, action: AppliedCreateSelfBeliefAction) => void;
   onUndoTodoAction: (messageId: string, action: AppliedCreateTodoAction) => void;
@@ -237,6 +240,105 @@ const RenderLogAction: React.FC<AIBackfillChatAppliedActionRendererProps & {
         </button>
         <button
           onClick={() => onUndoLogAction(messageId, action)}
+          disabled={action.status !== 'applied'}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+          style={{
+            borderColor: theme.chipBorder,
+            backgroundColor: theme.inputBg,
+            color: theme.textSecondary
+          }}
+          title="撤销"
+        >
+          <Undo2 size={13} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const RenderPlannedLogAction: React.FC<AIBackfillChatAppliedActionRendererProps & {
+  action: AppliedCreatePlannedLogAction;
+}> = ({
+  action,
+  formatActionDate,
+  formatTimeRange,
+  logs,
+  messageId,
+  onOpenTodoDetail,
+  onUndoPlannedLogAction,
+  theme,
+  todos
+}) => {
+  const liveLog = action.snapshot.logId
+    ? logs.find((log) => log.id === action.snapshot.logId)
+    : undefined;
+  const todoId = liveLog?.linkedTodoId || action.snapshot.todoId;
+  const liveTodo = todos.find((todo) => todo.id === todoId);
+  const todoTitle = liveTodo?.title || action.snapshot.todoTitle;
+  const note = liveLog?.note || action.snapshot.note;
+
+  return (
+    <div
+      key={action.actionId}
+      className={`border-l-2 pl-3 pr-1 py-1 ${action.status === 'undone' ? 'opacity-70' : ''}`}
+      style={{ borderColor: getStatusBorderColor(action.status, theme) }}
+    >
+      <div className="min-w-0">
+        <div className="flex items-start justify-between gap-3">
+          <span className="pt-0.5 text-[11px]" style={{ color: theme.textMuted }}>
+            {formatActionDate(action.snapshot.startTime)}
+          </span>
+          <span
+            className="inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px]"
+            style={{
+              color: theme.textSecondary,
+              borderColor: theme.chipBorder,
+              backgroundColor: theme.chipBg
+            }}
+          >
+            {formatTimeRange(action.snapshot.startTime, action.snapshot.endTime)}
+          </span>
+        </div>
+        <div className="min-w-0">
+          <p className="mt-1 font-serif text-[1rem] leading-6" style={{ color: theme.textPrimary }}>
+            计划 · {todoTitle}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: theme.textMuted }}>
+        <span className="inline-flex items-center gap-1">
+          <span className="font-bold">@</span>
+          <span>{todoTitle}</span>
+        </span>
+        {note && (
+          <span className="inline-flex items-center gap-1">
+            <span className="font-bold">note</span>
+            <span>{note}</span>
+          </span>
+        )}
+      </div>
+
+      {action.errorMessage && (
+        <p className="mt-2 text-xs" style={{ color: theme.dangerText }}>{action.errorMessage}</p>
+      )}
+
+      <div className="mt-2.5 flex justify-end gap-2">
+        <button
+          onClick={() => onOpenTodoDetail(todoId)}
+          disabled={!todoId || action.status !== 'applied'}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+          style={{
+            borderColor: theme.chipBorder,
+            backgroundColor: theme.inputBg,
+            color: theme.textSecondary
+          }}
+          title="打开待办"
+        >
+          <ListTodo size={13} />
+        </button>
+        <button
+          onClick={() => onUndoPlannedLogAction(messageId, action)}
           disabled={action.status !== 'applied'}
           className="inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40"
           style={{
@@ -804,6 +906,10 @@ export const renderAppliedChatAction = ({
   action,
   ...props
 }: AIBackfillChatAppliedActionRendererProps): React.ReactNode => {
+  if (action.kind === 'create_planned_log') {
+    return <RenderPlannedLogAction {...props} action={action} />;
+  }
+
   if (action.kind === 'create_log') {
     return <RenderLogAction {...props} action={action} />;
   }

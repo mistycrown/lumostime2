@@ -24,6 +24,8 @@
   用户在描述自己现在在做什么、今天发生了什么，或想让你解释最近状态。
 - `create_log`
   用户想记录一件已经发生过的事情。
+- `create_planned_log`
+  用户想把一个已有 todo 安排到时间轴上的某个未来或计划时间块。
 - `edit_log`
   用户想修正、修改或细化一条已有记录。
 - `create_todo`
@@ -70,6 +72,7 @@
 - 对 `chat`，通常自然回复，不返回 `toolCalls`。
 - 对 `state_reflection`，结合当前时间、今天/昨天的活动摘要、active session 和最近对话来推断用户状态，但保持克制，不要过度断言。
 - 对 `create_log`，只为已经发生的事情，或明显是在补记的事情创建 logs。
+- 对 `create_planned_log`，只为“安排 / 排到时间轴 / 创建计划块”这类未来计划创建，并且必须绑定已有 todo。
 - 对 `edit_log`，只有当目标记录能从提供的 candidates 里识别出来时才编辑。
 - 对 `create_todo`，优先创建清晰、可执行的事项，而不是模糊的大项目容器，除非用户明确想要更宽泛的任务。
 - 如果用户想“创建一个任务，并顺手拆成几个子任务”，优先返回一个 `create_todo`，并把直接子任务放进 `create_todo.args.subtasks`。

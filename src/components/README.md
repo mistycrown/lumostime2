@@ -3,6 +3,8 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-07-31: `AIBackfillChatModal.tsx` and `ai-chat/AIBackfillChatAppliedActionRenderer.tsx` now render and undo AI-created timeline Plan blocks through a dedicated `create_planned_log` action path.
+- Update 2026-07-31: `TimelineScheduleCanvas.tsx` now treats locked recurring auto-Plan blocks as read-only for long-press editing, drag moves, and resize handles while leaving the existing delete lock intact.
 - Update 2026-07-30: `TimelineTodoSidebar.tsx` and `TimelineQuickColorSidebar.tsx` now share a common pointer-drag hook, trimming the duplicate document listener and drag ghost code from both row renderers.
 - Update 2026-07-30: `TimelineTodoSidebar.tsx` removes the dead schedule-label export and keeps only the row/grouping helpers that the sidebar and tests actually use.
 - Update 2026-07-30: `TimelineScheduleCanvas.tsx` suppresses the synthetic click following real-record taps so the detail modal stays open on still mobile taps.

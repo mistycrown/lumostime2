@@ -177,6 +177,50 @@ describe('aiService unified turn normalization', () => {
     }]);
   });
 
+  it('keeps create_planned_log tool calls and normalizes linkedTodoId aliases', async () => {
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockResolvedValue(createJsonTextResponse({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              outcome: 'reply',
+              assistantReply: 'ok',
+              memoryAction: 'no_update',
+              toolCalls: [{
+                toolName: 'create_planned_log',
+                args: {
+                  linkedTodoId: 'todo-paper',
+                  date: '2026-05-15',
+                  startTime: '14:00',
+                  endTime: '15:30',
+                  note: '先处理引言'
+                }
+              }]
+            })
+          }
+        }]
+      })),
+      configurable: true
+    });
+
+    const result = await aiService.requestAssistantUnifiedTurnWithDebug({
+      mode: 'foreground',
+      systemPrompt: 'system',
+      userPrompt: 'user'
+    });
+
+    expect(result.output.toolCalls).toEqual([{
+      toolName: 'create_planned_log',
+      args: {
+        todoId: 'todo-paper',
+        date: '2026-05-15',
+        startTime: '14:00',
+        endTime: '15:30',
+        note: '先处理引言'
+      }
+    }]);
+  });
+
   it('keeps nested create_todo subtasks inside the same normalized tool call', async () => {
     Object.defineProperty(globalThis, 'fetch', {
       value: vi.fn().mockResolvedValue(createJsonTextResponse({

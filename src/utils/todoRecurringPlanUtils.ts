@@ -4,11 +4,14 @@
  * @output Normalized recurring Plan configs, occurrence windows, generated Plan logs, and deletion-lock checks
  * @pos Utility (Todo planning)
  * @description Centralizes the Repeat todo auto-Plan rules so details, startup checks, and timeline actions share one behavior.
+ * @updated 2026-07-31: Added a shared manual timeline Plan log builder so drag-created and AI-created Plan blocks use the same persisted shape.
  * @updated 2026-07-30: Added the first recurring auto-Plan helper set for finite occurrence materialization and lock-aware deletion.
  */
 import { Log, TodoItem, TodoRecurringPlanConfig } from '../types';
 import { formatDateKey, matchesRecurrenceRule, parseDateKey } from './todoScheduleUtils';
 
+export const TIMELINE_PLAN_CATEGORY_ID = '__timeline_plan__';
+export const TIMELINE_PLAN_ACTIVITY_ID = '__timeline_plan__';
 export const RECURRING_PLAN_SOURCE = 'recurrence-auto' as const;
 export const DEFAULT_RECURRING_PLAN_START_MINUTES = 9 * 60;
 export const DEFAULT_RECURRING_PLAN_END_MINUTES = 10 * 60;
@@ -89,6 +92,42 @@ export const parseClockMinutes = (value: string): number | null => {
   }
 
   return hours * 60 + minutes;
+};
+
+interface BuildTimelinePlannedLogOptions {
+  idFactory?: () => string;
+  title?: string;
+  note?: string;
+  planSource?: Log['planSource'];
+  plannedOccurrenceDate?: string;
+}
+
+export const buildTimelinePlannedLog = (
+  todo: TodoItem,
+  startTime: number,
+  endTime: number,
+  options: BuildTimelinePlannedLogOptions = {}
+): Log | null => {
+  if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || endTime <= startTime) {
+    return null;
+  }
+
+  const note = options.note?.trim();
+
+  return {
+    id: (options.idFactory || (() => crypto.randomUUID()))(),
+    categoryId: TIMELINE_PLAN_CATEGORY_ID,
+    activityId: TIMELINE_PLAN_ACTIVITY_ID,
+    startTime,
+    endTime,
+    duration: Math.max(0, Math.round((endTime - startTime) / 1000)),
+    title: options.title || `计划 · ${todo.title}`,
+    linkedTodoId: todo.id,
+    isPlanned: true,
+    ...(note ? { note } : {}),
+    ...(options.planSource ? { planSource: options.planSource } : {}),
+    ...(options.plannedOccurrenceDate ? { plannedOccurrenceDate: options.plannedOccurrenceDate } : {})
+  };
 };
 
 const buildTimestampOnDate = (dateKey: string, minutes: number): number | null => {
@@ -194,19 +233,12 @@ export const buildRecurringPlanLog = (
     return null;
   }
 
-  return {
-    id: idFactory(),
-    categoryId: '__timeline_plan__',
-    activityId: '__timeline_plan__',
-    startTime,
-    endTime,
-    duration: Math.max(0, Math.round((endTime - startTime) / 1000)),
+  return buildTimelinePlannedLog(todo, startTime, endTime, {
+    idFactory,
     title: `Plan · ${todo.title}`,
-    linkedTodoId: todo.id,
-    isPlanned: true,
     planSource: RECURRING_PLAN_SOURCE,
     plannedOccurrenceDate: dateKey
-  };
+  });
 };
 
 export const buildRecurringPlanInsertions = (

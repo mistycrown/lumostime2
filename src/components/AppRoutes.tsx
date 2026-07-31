@@ -19,7 +19,7 @@ import type { AIChatPersona, AIChatSession } from './ai-chat/AIBackfillChatShare
 import { TodoQuickActionsModal } from './TodoQuickActionsModal';
 import { isQuickTodo } from '../utils/todoKindUtils';
 import { getRealTodoCategories } from '../utils/todoQuickCategoryUtils';
-import { isAutoRecurringPlanDeleteLocked } from '../utils/todoRecurringPlanUtils';
+import { buildTimelinePlannedLog, isAutoRecurringPlanDeleteLocked } from '../utils/todoRecurringPlanUtils';
 import type { TimelineQuickColorActivity } from './TimelineScheduleCanvas';
 
 // Views
@@ -204,17 +204,10 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     };
 
     const handleCreatePlannedLog = (todo: TodoItem, startTime: number, endTime: number): Log => {
-        const plannedLog: Log = {
-            id: crypto.randomUUID(),
-            categoryId: '__timeline_plan__',
-            activityId: '__timeline_plan__',
-            startTime,
-            endTime,
-            duration: Math.max(0, Math.round((endTime - startTime) / 1000)),
-            title: `计划 · ${todo.title}`,
-            linkedTodoId: todo.id,
-            isPlanned: true
-        };
+        const plannedLog = buildTimelinePlannedLog(todo, startTime, endTime);
+        if (!plannedLog) {
+            throw new Error('Invalid planned log time range.');
+        }
         setLogs((previous) => [...previous, plannedLog]);
         return plannedLog;
     };

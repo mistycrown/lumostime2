@@ -4,14 +4,18 @@
  * @output Regression coverage for recurring auto-Plan materialization and deletion locks
  * @pos Test (todo planning automation)
  * @description Verifies finite Repeat auto-Plan windows, existing-plan dedupe, skip/end-date handling, and lock-state rules.
+ * @updated 2026-07-31: Added coverage for the shared manual timeline Plan log builder used by drag and AI creation paths.
  * @updated 2026-07-30: Added first regression tests for recurring auto-Plan helpers.
  */
 import { describe, expect, test } from 'vitest';
 import { Log, TodoItem } from '../types';
 import {
   RECURRING_PLAN_SOURCE,
+  TIMELINE_PLAN_ACTIVITY_ID,
+  TIMELINE_PLAN_CATEGORY_ID,
   buildRecurringPlanInsertions,
   buildRecurringPlanLog,
+  buildTimelinePlannedLog,
   getRecurringPlanOccurrenceDateKeys,
   isAutoRecurringPlanDeleteLocked,
   normalizeTodoRecurringPlanConfig
@@ -159,6 +163,33 @@ describe('todo recurring auto-Plan helpers', () => {
     });
     expect(new Date(log!.startTime).getHours()).toBe(9);
     expect(new Date(log!.endTime).getHours()).toBe(10);
+  });
+
+  test('builds manual timeline Plan logs with shared virtual metadata', () => {
+    const startTime = new Date('2026-04-20T14:00:00').getTime();
+    const endTime = new Date('2026-04-20T15:30:00').getTime();
+    const log = buildTimelinePlannedLog(
+      buildTodo({ title: '写论文' }),
+      startTime,
+      endTime,
+      {
+        idFactory: () => 'manual-plan',
+        note: '先写引言'
+      }
+    );
+
+    expect(log).toMatchObject({
+      id: 'manual-plan',
+      categoryId: TIMELINE_PLAN_CATEGORY_ID,
+      activityId: TIMELINE_PLAN_ACTIVITY_ID,
+      startTime,
+      endTime,
+      duration: 90 * 60,
+      title: '计划 · 写论文',
+      linkedTodoId: 'repeat-todo',
+      isPlanned: true,
+      note: '先写引言'
+    });
   });
 
   test('locks auto-Plan deletion only while the source todo switch is enabled', () => {

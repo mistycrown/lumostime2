@@ -20,13 +20,14 @@
  * @updated 2026-07-30: Uses a persistent workspace ratio for the timeline todo sidebar across screen sizes.
  * @updated 2026-07-30: Applies the same compact 26%-70% ratio resizing to quick-color and todo split sidebars.
  * @updated 2026-07-30: Uses the shared auto-check change detector so daily review persistence ignores harmless item reordering.
+ * @updated 2026-07-31: Added right-edge shortcut buttons that switch between the pure timeline layout and the timeline-plus-plan workspace through the persisted settings state.
  */
 import React, { useMemo, useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule, Goal, CheckItem, CheckTemplate } from '../types';
 import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
-import { Plus, MoreHorizontal, BarChart2, BookOpen, FlaskConical, RefreshCw, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon, Star, ChevronLeft, ChevronRight, ListFilter, ListTodo, X, Paintbrush, PanelRightClose } from 'lucide-react';
+import { Plus, MoreHorizontal, BarChart2, BookOpen, FlaskConical, RefreshCw, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon, Star, ChevronLeft, ChevronRight, ListFilter, ListTodo, X, Paintbrush, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { ParsedTimeEntry } from '../services/aiService';
 import { ToastType } from '../components/Toast';
@@ -262,6 +263,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
         timelineSortOrder,
         timelineQuickActions,
         timelineLayout,
+        setTimelineLayout,
         timelineTodoSidebarCollapsed,
         setTimelineTodoSidebarCollapsed,
         timelineTodoSidebarRatio,
@@ -301,6 +303,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
 
     const isTimelineTodoSidebarOpen = !timelineTodoSidebarCollapsed && isQuickColorSidebarCollapsed;
     const isQuickColorSidebarOpen = !isQuickColorSidebarCollapsed;
+    const timelineRightEdgeButtonClass = 'rounded-l-lg border border-r-0 border-stone-200 bg-[#fdfbf7]/95 p-2 text-stone-500 shadow-[-3px_2px_12px_rgba(28,25,23,0.08)] backdrop-blur-md transition-colors hover:bg-white hover:text-stone-800 dark:border-stone-700 dark:bg-stone-900/95 dark:hover:bg-stone-800 dark:hover:text-stone-100';
 
     const sidebarCheckItems = useMemo(() => {
         const sourceItems = activeSidebarDailyReview?.checkItems || buildDailyCheckItems(checkTemplates);
@@ -366,6 +369,21 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
         setIsSidebarTodoListPickerOpen(false);
         setTimelineTodoSidebarCollapsed(true);
         setIsQuickColorSidebarCollapsed(false);
+    };
+
+    const handleSwitchToPureTimelineLayout = () => {
+        setTimelineLayout('timeline');
+        setIsSidebarTodoListPickerOpen(false);
+        setTimelineTodoSidebarCollapsed(true);
+        setIsQuickColorSidebarCollapsed(true);
+        setSelectedQuickColorTarget(null);
+    };
+
+    const handleSwitchToTimelineTodoLayout = () => {
+        setTimelineLayout('timeline-todo');
+        setIsSidebarTodoListPickerOpen(false);
+        setIsQuickColorSidebarCollapsed(true);
+        setTimelineTodoSidebarCollapsed(false);
     };
 
     const timelineWorkspaceRef = useRef<HTMLDivElement>(null);
@@ -2304,23 +2322,28 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ logs, todos, scopes,
                 </div>
             )}
 
-            {timelineLayout === 'timeline-todo' && (
-                <div className="absolute right-0 top-1/2 z-30 flex -translate-y-1/2 flex-col items-end gap-1">
-                    {isQuickColorSidebarOpen ? (
-                        <button type="button" onClick={handleToggleQuickColorSidebar} className="rounded-l-lg border border-r-0 border-stone-200 bg-[#fdfbf7]/95 p-2 text-stone-500 shadow-[-3px_2px_12px_rgba(28,25,23,0.08)] backdrop-blur-md transition-colors hover:bg-white hover:text-stone-800 dark:border-stone-700 dark:bg-stone-900/95 dark:hover:bg-stone-800 dark:hover:text-stone-100" title="收起快速着色" aria-label="收起快速着色"><PanelRightClose size={18} /></button>
-                    ) : isTimelineTodoSidebarOpen ? (
-                        <>
-                            <button type="button" onClick={handleToggleTimelineTodoSidebar} className="rounded-l-lg border border-r-0 border-stone-200 bg-[#fdfbf7]/95 p-2 text-stone-500 shadow-[-3px_2px_12px_rgba(28,25,23,0.08)] backdrop-blur-md transition-colors hover:bg-white hover:text-stone-800 dark:border-stone-700 dark:bg-stone-900/95 dark:hover:bg-stone-800 dark:hover:text-stone-100" title="收起待办" aria-label="收起待办"><PanelRightClose size={18} /></button>
-                            <button type="button" onClick={() => setIsSidebarTodoListPickerOpen(true)} className="rounded-l-lg border border-r-0 border-stone-200 bg-[#fdfbf7]/95 p-2 text-stone-500 shadow-[-3px_2px_12px_rgba(28,25,23,0.08)] backdrop-blur-md transition-colors hover:bg-white hover:text-stone-800 dark:border-stone-700 dark:bg-stone-900/95 dark:hover:bg-stone-800 dark:hover:text-stone-100" title="切换待办列表" aria-label="切换待办列表"><ListFilter size={18} /></button>
-                        </>
-                    ) : (
-                        <>
-                            <button type="button" onClick={handleToggleTimelineTodoSidebar} className="rounded-l-lg border border-r-0 border-stone-200 bg-[#fdfbf7]/95 p-2 text-stone-500 shadow-[-3px_2px_12px_rgba(28,25,23,0.08)] backdrop-blur-md transition-colors hover:bg-white hover:text-stone-800 dark:border-stone-700 dark:bg-stone-900/95 dark:hover:bg-stone-800 dark:hover:text-stone-100" title="展开待办" aria-label="展开待办"><ListTodo size={18} /></button>
-                            <button type="button" onClick={handleToggleQuickColorSidebar} className="rounded-l-lg border border-r-0 border-stone-200 bg-[#fdfbf7]/95 p-2 text-stone-500 shadow-[-3px_2px_12px_rgba(28,25,23,0.08)] backdrop-blur-md transition-colors hover:bg-white hover:text-stone-800 dark:border-stone-700 dark:bg-stone-900/95 dark:hover:bg-stone-800 dark:hover:text-stone-100" title="展开快速着色" aria-label="展开快速着色"><Paintbrush size={18} /></button>
-                        </>
-                    )}
-                </div>
-            )}
+            <div className="absolute right-0 top-1/2 z-30 flex -translate-y-1/2 flex-col items-end gap-1">
+                {timelineLayout === 'timeline-todo' ? (
+                    <>
+                        {isQuickColorSidebarOpen ? (
+                            <button type="button" onClick={handleToggleQuickColorSidebar} className={timelineRightEdgeButtonClass} title="收起快速着色" aria-label="收起快速着色"><PanelRightClose size={18} /></button>
+                        ) : isTimelineTodoSidebarOpen ? (
+                            <>
+                                <button type="button" onClick={handleToggleTimelineTodoSidebar} className={timelineRightEdgeButtonClass} title="收起待办" aria-label="收起待办"><PanelRightClose size={18} /></button>
+                                <button type="button" onClick={() => setIsSidebarTodoListPickerOpen(true)} className={timelineRightEdgeButtonClass} title="切换待办列表" aria-label="切换待办列表"><ListFilter size={18} /></button>
+                            </>
+                        ) : (
+                            <>
+                                <button type="button" onClick={handleToggleTimelineTodoSidebar} className={timelineRightEdgeButtonClass} title="打开待办栏" aria-label="打开待办栏"><ListTodo size={18} /></button>
+                                <button type="button" onClick={handleToggleQuickColorSidebar} className={timelineRightEdgeButtonClass} title="打开快速着色栏" aria-label="打开快速着色栏"><Paintbrush size={18} /></button>
+                            </>
+                        )}
+                        <button type="button" onClick={handleSwitchToPureTimelineLayout} className={timelineRightEdgeButtonClass} title="切换到纯时间轴页面" aria-label="切换到纯时间轴页面"><Clock size={18} /></button>
+                    </>
+                ) : (
+                    <button type="button" onClick={handleSwitchToTimelineTodoLayout} className={timelineRightEdgeButtonClass} title="切换到时间轴+计划左右边栏" aria-label="切换到时间轴+计划左右边栏"><PanelRightOpen size={18} /></button>
+                )}
+            </div>
 
             {isSidebarTodoListPickerOpen && <div className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-stone-950/20 px-4 py-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" role="presentation" onMouseDown={() => setIsSidebarTodoListPickerOpen(false)}><div role="dialog" aria-modal="true" aria-label="切换待办列表" className="my-auto flex max-h-[min(82vh,42rem)] w-full max-w-sm flex-col overflow-hidden rounded-2xl border border-stone-200 bg-[#fdfbf7] shadow-xl dark:border-stone-700 dark:bg-stone-900" onMouseDown={(event) => event.stopPropagation()}><div className="flex shrink-0 items-center justify-between border-b border-stone-200 px-4 py-3 dark:border-stone-700"><h2 className="text-sm font-bold text-stone-800 dark:text-stone-100">切换待办列表</h2><button type="button" onClick={() => setIsSidebarTodoListPickerOpen(false)} className="flex h-8 w-8 items-center justify-center text-stone-400 hover:text-stone-700 dark:hover:text-stone-200" aria-label="关闭"><X size={18} /></button></div><div className="min-h-0 flex-1 overflow-y-auto p-2"><button type="button" onClick={() => { setSidebarTodoCategoryId(null); setIsSidebarTodoListPickerOpen(false); }} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm transition-colors ${!sidebarTodoCategoryId ? 'bg-stone-200/70 font-bold text-stone-900 dark:bg-stone-800 dark:text-stone-50' : 'text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800'}`}><ListTodo size={17} />今日</button>{sidebarTodoListOptions.map((category) => <button key={category.id} type="button" onClick={() => { setSidebarTodoCategoryId(category.id); setIsSidebarTodoListPickerOpen(false); }} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm transition-colors ${sidebarTodoCategoryId === category.id ? 'bg-stone-200/70 font-bold text-stone-900 dark:bg-stone-800 dark:text-stone-50' : 'text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800'}`}><IconRenderer icon={category.icon} uiIcon={category.uiIcon} size={17} /><span className="truncate">{category.name}</span></button>)}</div></div></div>}
 

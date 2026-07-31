@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-07-31: `aiService.ts` and `assistantActionExecutor.ts` now support foreground `create_planned_log` tool calls, letting AI create todo-linked timeline Plan blocks without treating them as completed activity logs.
+
 Update 2026-07-29: `timelineLayoutService.ts` centralizes supported Chronicle layout modes while the schedule canvas now positions itself from the current time instead of a saved start hour.
 
 Update 2026-07-06: `updateService.ts` now reports shipped app version `1.6.3` for the 1.6.3 release line.
