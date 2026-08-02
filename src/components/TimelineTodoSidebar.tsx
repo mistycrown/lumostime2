@@ -4,6 +4,7 @@
  * @output A resizable, in-flow todo-and-daily-check column for the Chronicle split workspace
  * @pos Component
  * @description Renders date-specific todos and daily checks without duplicating Todo view mutation controls.
+ * @updated 2026-08-02: Replaces recurring todo completion toggles in the Chronicle sidebar with a read-only repeat marker.
  * @updated 2026-07-30: Lowered the in-flow minimum width to match the quick-color sidebar's compact limit.
  * @updated 2026-07-30: Removes schedule and PIN badges from the narrow todo column while retaining their data behavior.
  * @updated 2026-07-30: Tightens the todo list gutter and uses the shared 26%-70% split ratio bounds.
@@ -11,7 +12,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, ChevronRight, ClipboardCheck, ListTodo } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, ClipboardCheck, ListTodo, Repeat2 } from 'lucide-react';
 import { usePointerDrag } from '../hooks';
 import { CheckItem, Log, TodoItem } from '../types';
 import { getCheckItemCountState } from '../utils/dailyCheckUtils';
@@ -46,7 +47,19 @@ export const shouldHideCheckMarkerContent = (isCount: boolean, isCompleted: bool
   !isCount && !isCompleted
 );
 
-const TodoCompletionMarker: React.FC<{ completed: boolean; onToggle: () => void }> = ({ completed, onToggle }) => (
+export const isTimelineSidebarTodoCompletionLocked = (todo: TodoItem): boolean => Boolean(todo.recurrenceRule);
+
+const TodoCompletionMarker: React.FC<{ completed: boolean; isLocked: boolean; onToggle: () => void }> = ({ completed, isLocked, onToggle }) => isLocked ? (
+  <span
+    aria-label="循环任务"
+    title="循环任务"
+    className="flex h-8 w-8 shrink-0 cursor-default items-center justify-center rounded-full text-stone-400 dark:text-stone-500"
+    onPointerDown={(event) => event.stopPropagation()}
+    onClick={(event) => event.stopPropagation()}
+  >
+    <Repeat2 size={14} strokeWidth={2.2} />
+  </span>
+) : (
   <button
     type="button"
     aria-label={completed ? '标记为未完成' : '标记为已完成'}
@@ -152,6 +165,7 @@ const TodoRow: React.FC<{
   onDrop: (clientX: number, clientY: number) => boolean;
 }> = ({ entry, onSelect, onToggleCompletion, onDragMove, onDragEnd, onDrop }) => {
   const isCompleted = entry.primaryKind === 'completed' || entry.todo.isCompleted;
+  const isCompletionLocked = isTimelineSidebarTodoCompletionLocked(entry.todo);
   const [didCreatePlan, setDidCreatePlan] = useState(false);
   const feedbackTimerRef = useRef<number | null>(null);
 
@@ -180,7 +194,7 @@ const TodoRow: React.FC<{
 
   return (
   <div className={`group flex min-w-0 flex-1 items-center gap-1.5 px-1.5 ${isDragging ? 'opacity-45' : ''}`}>
-    <TodoCompletionMarker completed={isCompleted} onToggle={onToggleCompletion} />
+    <TodoCompletionMarker completed={isCompleted} isLocked={isCompletionLocked} onToggle={onToggleCompletion} />
     <button
       type="button"
       onPointerDown={(event) => beginDrag(event, !isCompleted)}

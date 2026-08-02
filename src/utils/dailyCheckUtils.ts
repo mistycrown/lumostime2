@@ -4,6 +4,7 @@
  * @output daily check helpers for creating reviews, locating items, and applying manual actions
  * @pos Utils (Daily Check)
  * @description Shared daily check utilities used by SceneView and NFC flows to keep review creation, legacy item ID compatibility, and habit punch behavior consistent.
+ * @updated 2026-07-31: Added a template-enabled filter for displaying stored daily check snapshots.
  * @updated 2026-07-30: Skipped disabled daily check template items across generation, bindings, and manual actions.
  * @updated 2026-05-05: Hardened template item traversal so legacy or partially synced daily check templates without `items` no longer crash NFC and widget entry points.
  * @updated 2026-05-04: Added a dedicated tracking-calendar daily binding helper so 2x2 tracking widgets can target both manual and automatic daily checks.
@@ -176,6 +177,30 @@ export const buildDailyCheckItems = (checkTemplates: CheckTemplate[]): CheckItem
   });
 
   return checkItems;
+};
+
+export const filterDailyCheckItemsByEnabledTemplates = (
+  checkItems: CheckItem[],
+  checkTemplates: CheckTemplate[]
+): CheckItem[] => {
+  if (checkTemplates.length === 0) {
+    return checkItems;
+  }
+
+  const enabledTemplateItems = getDailyCheckTemplateItems(checkTemplates, { includeAuto: true });
+  if (enabledTemplateItems.length === 0) {
+    return [];
+  }
+
+  const enabledIds = new Set(enabledTemplateItems.map(item => item.checkItemId));
+  const enabledCategoryContent = new Set(enabledTemplateItems.map(item => `${item.category}\u0000${item.content}`));
+  const enabledContent = new Set(enabledTemplateItems.map(item => item.content));
+
+  return checkItems.filter(item => (
+    enabledIds.has(item.id)
+    || Boolean(item.category && enabledCategoryContent.has(`${item.category}\u0000${item.content}`))
+    || Boolean(!item.category && enabledContent.has(item.content))
+  ));
 };
 
 export const createDailyReviewFromTemplates = (

@@ -3,11 +3,12 @@
  * @input Todo drag movement vectors, scheduled entries, and one-level task hierarchy fixtures
  * @output Regression coverage for sidebar drag intent, marker visibility, and schedule-aware parent-child grouping
  * @pos Test
+ * @updated 2026-08-02: Covers recurring todos using a locked completion marker in the Chronicle sidebar.
  * @updated 2026-07-30: Covers category completion filtering and shared hierarchy rendering.
  */
 import { describe, expect, test } from 'vitest';
 import { TodoItem } from '../types';
-import { buildTimelineSidebarCategoryTodoEntries, buildTimelineSidebarTodoEntries, buildTimelineSidebarTodoTreeGroups, resolveTodoDragIntent, shouldHideCheckMarkerContent, TODO_DRAG_DISTANCE } from './TimelineTodoSidebar';
+import { buildTimelineSidebarCategoryTodoEntries, buildTimelineSidebarTodoEntries, buildTimelineSidebarTodoTreeGroups, isTimelineSidebarTodoCompletionLocked, resolveTodoDragIntent, shouldHideCheckMarkerContent, TODO_DRAG_DISTANCE } from './TimelineTodoSidebar';
 
 describe('resolveTodoDragIntent', () => {
   test('uses a two-pixel threshold before recognizing a direct mobile drag', () => {
@@ -33,6 +34,28 @@ describe('shouldHideCheckMarkerContent', () => {
   test('hides only an empty, incomplete binary marker', () => {
     expect(shouldHideCheckMarkerContent(false, false)).toBe(true);
     expect(shouldHideCheckMarkerContent(false, true)).toBe(false);
+  });
+});
+
+describe('isTimelineSidebarTodoCompletionLocked', () => {
+  test('locks recurring todos while leaving ordinary todos completable', () => {
+    expect(isTimelineSidebarTodoCompletionLocked({
+      id: 'repeat',
+      categoryId: 'cat',
+      title: 'Repeat task',
+      isCompleted: false,
+      recurrenceRule: {
+        frequency: 'daily',
+        startDate: '2026-08-02'
+      }
+    })).toBe(true);
+
+    expect(isTimelineSidebarTodoCompletionLocked({
+      id: 'ordinary',
+      categoryId: 'cat',
+      title: 'Ordinary task',
+      isCompleted: false
+    })).toBe(false);
   });
 });
 

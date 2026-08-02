@@ -1,5 +1,6 @@
 /**
  * @file TodoAssociation.tsx
+ * @updated 2026-08-02: Reused the adaptive association option grid for associated-todo category filters so narrow log modals switch to three readable columns.
  * @updated 2026-07-21: Updated record-detail category chips to use outline-only selection.
  * @input todos, categories, linked ID, optional hierarchy toggle
  * @output Todo Selection UI
@@ -32,7 +33,7 @@ import {
   isTodoInAssociationTodayCategory,
   TODO_ASSOCIATION_TODAY_CATEGORY_ID
 } from '../utils/todoScheduleUtils';
-import { IconRenderer } from './IconRenderer';
+import { AssociationOptionGrid } from './AssociationOptionGrid';
 
 interface TodoAssociationProps {
   todos: TodoItem[];
@@ -185,24 +186,17 @@ export const TodoAssociation: React.FC<TodoAssociationProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-2 mb-2">
-        {categoryOptions.map((category) => (
-          <button
-            key={category.id}
-            onClick={() => setSelectedCatId(selectedCatId === category.id ? TODO_ASSOCIATION_TODAY_CATEGORY_ID : category.id)}
-            className={`
-              px-2 py-2 rounded-lg text-[10px] font-medium text-center transition-colors flex items-center justify-center gap-1.5 truncate
-              ${selectedCatId === category.id
-                ? 'record-association-selected border border-stone-700 text-stone-800'
-                : 'bg-transparent text-stone-500 hover:bg-stone-100'
-              }
-            `}
-          >
-            <IconRenderer icon={category.icon} uiIcon={category.uiIcon} className="text-xs" />
-            <span className="truncate">{category.name}</span>
-          </button>
-        ))}
-      </div>
+      <AssociationOptionGrid
+        className="mb-2"
+        items={categoryOptions}
+        isSelected={(category) => selectedCatId === category.id}
+        onSelect={(category) => setSelectedCatId(
+          selectedCatId === category.id ? TODO_ASSOCIATION_TODAY_CATEGORY_ID : category.id
+        )}
+        selectedClassName="record-association-selected border-stone-700 text-stone-800"
+        unselectedClassName="bg-transparent text-stone-500 hover:bg-stone-100"
+        iconClassName="text-xs"
+      />
 
       <div className="space-y-0">
         {todoRows.map((row) => (

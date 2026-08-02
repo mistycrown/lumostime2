@@ -4,6 +4,7 @@
  * @output Modal Interaction (Edit Todo, View History)
  * @pos Component (Modal)
  * @description Displays detailed information for a specific Todo item, including its progress, planning fields, associated history logs, and focus stats.
+ * @updated 2026-08-02: Reused the adaptive association option grid for the todo category picker without changing its original text size.
  * @updated 2026-07-30: Added Repeat auto-Plan settings for fixed timeline blocks with finite future occurrence generation.
  * @updated 2026-07-30: Completed todos now expose an editable completion-date field that reuses the planning date picker while preserving the stored local completion time.
  * @updated 2026-07-06: Raised the overlay detail layer above collection and schedule popovers so collection-launched todo timeline entries remain visible.
@@ -39,6 +40,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { TodoItem, TodoCategory, Log, Category, Scope, TodoProgressTrackingMode, TodoRecurrenceFrequency, TodoRecurrenceRule, TodoRecurringPlanConfig } from '../types';
 import { ScopeAssociation } from './ScopeAssociation';
 import { TagAssociation } from './TagAssociation';
+import { AssociationOptionGrid } from './AssociationOptionGrid';
 import { Trash2, Check, CheckCircle2, TrendingUp, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Pin, RotateCcw, CalendarDays, Flag, Repeat2, Plus, X } from 'lucide-react';
 import { DetailTimelineCard } from './DetailTimelineCard';
 import { TimelineImage } from './TimelineImage';
@@ -1187,23 +1189,14 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
               ) : (
                 <div>
                   <label className="text-xs text-stone-400 font-medium mb-1.5 block">分类</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {realTodoCategories.map(cat => (
-                      <button
-                        key={cat.id}
-                        onClick={() => setSelectedCategoryId(cat.id)}
-                        className={`
-                              px-2 py-2 rounded-lg text-[10px] font-medium text-center border transition-colors truncate flex items-center justify-center gap-1.5
-                              ${selectedCategoryId === cat.id
-                            ? 'btn-template-filled border-transparent'
-                            : 'bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100'}
-                          `}
-                      >
-                        <IconRenderer icon={cat.icon} uiIcon={cat.uiIcon} className="text-xs" />
-                        <span className="truncate">{cat.name}</span>
-                      </button>
-                    ))}
-                  </div>
+                  <AssociationOptionGrid
+                    items={realTodoCategories}
+                    isSelected={(cat) => selectedCategoryId === cat.id}
+                    onSelect={(cat) => setSelectedCategoryId(cat.id)}
+                    selectedClassName="btn-template-filled border-transparent"
+                    unselectedClassName="bg-stone-50 text-stone-500 border-stone-100 hover:bg-stone-100"
+                    iconClassName="text-xs"
+                  />
                 </div>
               )}
               <div>
