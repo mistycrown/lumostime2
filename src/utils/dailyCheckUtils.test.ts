@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { CheckTemplate, DailyReview, ReviewTemplate } from '../types';
+import type { CheckItem, CheckTemplate, DailyReview, ReviewTemplate } from '../types';
 import {
   applyDailyCheckActionForDate,
   buildDailyCheckItems,
+  filterDailyCheckItemsByEnabledTemplates,
   getDailyCheckTemplateMeta,
   getEligibleNfcDailyCheckItems,
   getEligibleTrackingCalendarDailyCheckItems
@@ -255,5 +256,43 @@ describe('dailyCheckUtils', () => {
 
     expect(result.status).toBe('not_found');
     expect(result.createdReview).toBe(false);
+  });
+
+  it('filters disabled template items from stored review snapshots used by sidebars', () => {
+    const templatesWithDisabledItems: CheckTemplate[] = [
+      {
+        ...checkTemplates[0],
+        items: [
+          ...checkTemplates[0].items,
+          {
+            id: 'check-disabled',
+            content: 'disabled',
+            enabled: false,
+            type: 'manual',
+            manualMode: 'binary'
+          }
+        ]
+      }
+    ];
+    const storedItems: CheckItem[] = [
+      {
+        id: 'check-binary',
+        content: 'binary',
+        isCompleted: false,
+        type: 'manual',
+        manualMode: 'binary'
+      },
+      {
+        id: 'check-disabled',
+        content: 'disabled',
+        isCompleted: true,
+        type: 'manual',
+        manualMode: 'binary'
+      }
+    ];
+
+    expect(filterDailyCheckItemsByEnabledTemplates(storedItems, templatesWithDisabledItems).map(item => item.id)).toEqual([
+      'check-binary'
+    ]);
   });
 });

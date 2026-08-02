@@ -22,6 +22,7 @@
  * @updated 2026-07-30: Uses the shared auto-check change detector so daily review persistence ignores harmless item reordering.
  * @updated 2026-07-31: Reads the active Chronicle layout from the app shell so repeated Timeline nav taps can switch layouts without overwriting the settings default.
  * @updated 2026-07-31: Keeps planned blocks out of the pure timeline record stream so idle gaps and export/gallery actions only use entity logs.
+ * @updated 2026-07-31: Filters the todo sidebar daily checks against disabled template items before display and auto refresh.
  */
 import React, { useMemo, useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -62,7 +63,7 @@ import { TimelineQuickColorSidebar } from '../components/TimelineQuickColorSideb
 import { TimelineReviewStack } from '../components/TimelineReviewStack';
 import { getLocalDateStr } from '../utils/dateUtils';
 import { hasAutoCheckItemCompletionChanges, updateAutoCheckItems } from '../utils/autoCheckUtils';
-import { applyDailyCheckActionForDate, buildDailyCheckItems } from '../utils/dailyCheckUtils';
+import { applyDailyCheckActionForDate, buildDailyCheckItems, filterDailyCheckItemsByEnabledTemplates } from '../utils/dailyCheckUtils';
 import { ensureQuickTodoCategory, isFutureTodoCategoryId } from '../utils/todoQuickCategoryUtils';
 import { clampTimelineSidebarRatio } from '../utils/timelineSidebarRatioUtils';
 import type { TimelineLayoutMode } from '../services/timelineLayoutService';
@@ -311,17 +312,21 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
 
     const sidebarCheckItems = useMemo(() => {
         const sourceItems = activeSidebarDailyReview?.checkItems || buildDailyCheckItems(checkTemplates);
-        return updateAutoCheckItems(sourceItems, logs, { categories, scopes, todos, todoCategories }, currentDate);
+        const visibleItems = filterDailyCheckItemsByEnabledTemplates(sourceItems, checkTemplates);
+        return updateAutoCheckItems(visibleItems, logs, { categories, scopes, todos, todoCategories }, currentDate);
     }, [activeSidebarDailyReview, categories, checkTemplates, currentDate, logs, scopes, todoCategories, todos]);
 
     React.useEffect(() => {
         if (timelineLayout !== 'timeline-todo' || !activeSidebarDailyReview || !onUpdateDailyReview) return;
         const previousItems = activeSidebarDailyReview.checkItems || [];
-        const refreshedItems = updateAutoCheckItems(previousItems, logs, { categories, scopes, todos, todoCategories }, currentDate);
-        if (hasAutoCheckItemCompletionChanges(previousItems, refreshedItems)) {
-            onUpdateDailyReview({ ...activeSidebarDailyReview, checkItems: refreshedItems, updatedAt: Date.now() });
+        const visiblePreviousItems = filterDailyCheckItemsByEnabledTemplates(previousItems, checkTemplates);
+        const refreshedVisibleItems = updateAutoCheckItems(visiblePreviousItems, logs, { categories, scopes, todos, todoCategories }, currentDate);
+        if (hasAutoCheckItemCompletionChanges(visiblePreviousItems, refreshedVisibleItems)) {
+            const refreshedItemsById = new Map(refreshedVisibleItems.map((item) => [item.id, item]));
+            const mergedItems = previousItems.map((item) => refreshedItemsById.get(item.id) || item);
+            onUpdateDailyReview({ ...activeSidebarDailyReview, checkItems: mergedItems, updatedAt: Date.now() });
         }
-    }, [activeSidebarDailyReview, categories, currentDate, logs, onUpdateDailyReview, scopes, timelineLayout, todoCategories, todos]);
+    }, [activeSidebarDailyReview, categories, checkTemplates, currentDate, logs, onUpdateDailyReview, scopes, timelineLayout, todoCategories, todos]);
 
     const handleSidebarCheckItemClick = (item: CheckItem) => {
         if (item.type === 'auto' || !onUpdateDailyReview) return;
