@@ -1,5 +1,6 @@
 /**
  * @file TagsView.tsx
+ * @updated 2026-08-06: Added archived tag index section and active-tag filtering.
  * @input Categories, Logs
  * @output Selection Events, Category Updates
  * @pos View (Main Tab)
@@ -9,9 +10,10 @@
  */
 import React, { useState, useMemo } from 'react';
 import { Log, Category } from '../types';
-import { ChevronDown, ChevronRight, Settings2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Settings2, Archive } from 'lucide-react';
 import { BatchManageView } from './BatchManageView';
 import { IconRenderer } from '../components/IconRenderer';
+import { isActivityArchived } from '../utils/archiveUtils';
 
 
 interface TagsViewProps {
@@ -26,6 +28,7 @@ interface TagsViewProps {
 
 export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectCategory, categories, onUpdateCategories, isManaging, onStopManaging }) => {
    const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+   const [isArchivedExpanded, setIsArchivedExpanded] = useState(false);
 
    const toggleCategory = (id: string) => {
       const newSet = new Set(expandedCategories);
@@ -45,6 +48,17 @@ export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectC
       });
       return { catCounts, actCounts };
    }, [logs]);
+
+   const activeCategories = useMemo(
+      () => categories.map(category => ({ ...category, activities: category.activities.filter(activity => !isActivityArchived(activity)) })),
+      [categories]
+   );
+   const archivedCategories = useMemo(
+      () => categories
+         .map(category => ({ ...category, activities: category.activities.filter(isActivityArchived) }))
+         .filter(category => category.activities.length > 0),
+      [categories]
+   );
 
    if (isManaging) {
       return (
@@ -89,12 +103,12 @@ export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectC
                      <Settings2 size={16} className="rotate-90" />
                   )}
                </button>
-               <span>{categories.length}</span>
+               <span>{activeCategories.reduce((count, category) => count + category.activities.length, 0)}</span>
             </div>
          </div>
 
          <div className="space-y-1">
-            {categories.map(category => {
+            {activeCategories.map(category => {
                const isExpanded = expandedCategories.has(category.id);
                const totalCount = counts.catCounts.get(category.id) || 0;
 
@@ -158,6 +172,61 @@ export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectC
                );
             })}
          </div>
+
+         {archivedCategories.length > 0 && (
+            <div className="mt-8 pt-5 border-t border-stone-200">
+               <button
+                  type="button"
+                  onClick={() => setIsArchivedExpanded(prev => !prev)}
+                  className="w-full flex items-center gap-2 px-2 mb-3 text-[10px] text-stone-400 font-bold uppercase tracking-widest text-left"
+               >
+                  {isArchivedExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                  <Archive size={13} />
+                  <span>已归档</span>
+                  <span className="ml-auto">{archivedCategories.reduce((count, category) => count + category.activities.length, 0)}</span>
+               </button>
+               {isArchivedExpanded && <div className="space-y-1">
+                  {archivedCategories.map(category => {
+                     const archiveKey = `archived:${category.id}`;
+                     const isExpanded = expandedCategories.has(archiveKey);
+                     return (
+                        <div key={category.id} className="flex flex-col">
+                           <div
+                              onClick={() => toggleCategory(archiveKey)}
+                              className="flex items-center justify-between py-2 px-3 cursor-pointer rounded-lg transition-colors group"
+                           >
+                              <div className="flex items-center gap-3">
+                                 <span className="text-stone-300 font-bold">#</span>
+                                 <IconRenderer icon={category.icon} uiIcon={category.uiIcon} size={16} />
+                                 <span className="font-bold text-stone-500">{category.name}</span>
+                                 <span className="text-xs text-stone-400 font-mono ml-1">({category.activities.length})</span>
+                              </div>
+                              {isExpanded ? <ChevronDown size={18} className="text-stone-300" /> : <ChevronRight size={18} className="text-stone-300" />}
+                           </div>
+                           {isExpanded && (
+                              <div className="pl-9 flex flex-col gap-2 mt-1 mb-2">
+                                 {category.activities.map(act => (
+                                    <div
+                                       key={act.id}
+                                       onClick={() => onSelectTag(act.id)}
+                                       className="flex items-center justify-between bg-stone-50 border border-stone-100 rounded-lg px-4 py-3 cursor-pointer transition-all opacity-70"
+                                    >
+                                       <div className="flex items-center gap-3">
+                                          <span className="text-stone-300 font-light text-sm">#</span>
+                                          {act.icon && <IconRenderer icon={act.icon} uiIcon={act.uiIcon} className="opacity-70" />}
+                                          <span className="text-stone-500 font-medium text-sm">{act.name}</span>
+                                       </div>
+                                       <span className="text-xs text-stone-400 font-mono">{counts.actCounts.get(act.id) || 0}</span>
+                                    </div>
+                                 ))}
+                              </div>
+                           )}
+                        </div>
+                     );
+                  })}
+               </div>}
+            </div>
+         )}
       </div>
    );
 };

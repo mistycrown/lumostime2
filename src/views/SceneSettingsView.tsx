@@ -1,5 +1,6 @@
 /**
  * @file SceneSettingsView.tsx
+ * @updated 2026-08-06: Made scene time-slot previews explicitly prefer configured UI icons over stored emoji fallbacks.
  * @description 场景设置页面 - 管理场景组、时间段和快捷方式
  *
  * @updated 2026-07-21: Replaced shadow-only scene-mode selection with a dark-mode outline state.
@@ -927,6 +928,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
                       <IconRenderer 
                         icon={slot.icon || '⏰'}
                         uiIcon={slot.uiIcon}
+                        preferUiIcon
                         size={18}
                       />
                     </div>
@@ -1634,6 +1636,7 @@ const SlotEditModal: React.FC<{
                     <IconRenderer 
                       icon={slot.icon || '⏰'} 
                       uiIcon={slot.uiIcon}
+                      preferUiIcon
                       size={16}
                     />
                   ) : (

@@ -16,6 +16,7 @@ import { ActiveSession, TodoItem, Category, Activity, TodoCategory, Scope, AutoL
 import { X, Check, ChevronDown, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2, Maximize2 } from 'lucide-react';
 import { TodoAssociation } from '../components/TodoAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
+import { getActiveActivities } from '../utils/archiveUtils';
 import { FocusScoreSelector } from '../components/FocusScoreSelector';
 import { MoodScoreSelector } from '../components/MoodScoreSelector';
 import { ImmersiveTimer } from '../components/ImmersiveTimer';
@@ -475,7 +476,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                     {isActivitySelectorOpen && (
                         <div className="mt-4 bg-white border border-stone-100 rounded-2xl shadow-xl p-4 animate-in fade-in zoom-in-95 duration-200">
                             <div className="grid grid-cols-4 gap-3">
-                                {categories.flatMap(cat => cat.activities.map(act => (
+                                {categories.flatMap(cat => getActiveActivities(cat).map(act => (
                                     <button
                                         key={act.id}
                                         onClick={() => handleActivitySelect(act, cat.id)}

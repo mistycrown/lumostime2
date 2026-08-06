@@ -18,6 +18,7 @@ import { Check, GripVertical, Paintbrush } from 'lucide-react';
 import { usePointerDrag } from '../hooks';
 import { Category } from '../types';
 import { toCssColor } from '../utils/colorUtils';
+import { getActiveActivities } from '../utils/archiveUtils';
 import { TIMELINE_SIDEBAR_MAX_RATIO, TIMELINE_SIDEBAR_MIN_RATIO } from '../utils/timelineSidebarRatioUtils';
 import type { TimelineQuickColorActivity } from './TimelineScheduleCanvas';
 
@@ -70,7 +71,7 @@ const buildQuickColorTargets = (categories: Category[]): Array<{
   categories
     .map((category) => ({
       category,
-      targets: category.activities.map((activity) => ({
+      targets: getActiveActivities(category).map((activity) => ({
         categoryId: category.id,
         activityId: activity.id,
         categoryName: category.name,

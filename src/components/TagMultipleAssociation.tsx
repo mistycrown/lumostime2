@@ -1,5 +1,6 @@
 /**
  * @file TagMultipleAssociation.tsx
+ * @updated 2026-08-06: Hide archived activities from multi-selection options.
  * @input categories, selected activity IDs
  * @output Multiple Tag Selection UI
  * @pos Component (Input)
@@ -13,6 +14,7 @@ import React, { useState } from 'react';
 import { Category } from '../types';
 import { IconRenderer } from './IconRenderer';
 import { getTagCirclePresentation } from '../utils/colorAdapterUtils';
+import { getActiveActivities } from '../utils/archiveUtils';
 
 interface TagMultipleAssociationProps {
     categories: Category[];
@@ -33,6 +35,9 @@ export const TagMultipleAssociation: React.FC<TagMultipleAssociationProps> = ({
     description = '仅统计选中标签的时间记录',
     accentColor
 }) => {
+    const activeCategories = categories
+        .map(category => ({ ...category, activities: getActiveActivities(category) }))
+        .filter(category => category.activities.length > 0);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
     const [isEnabled, setIsEnabled] = useState<boolean>(selectedActivityIds.length > 0);
 
@@ -111,7 +116,7 @@ export const TagMultipleAssociation: React.FC<TagMultipleAssociationProps> = ({
                 <>
                     {/* Category Grid */}
                     <div className="grid grid-cols-4 gap-2">
-                        {categories.map(cat => {
+                        {activeCategories.map(cat => {
                             const isSelected = selectedCategoryId === cat.id;
                             return (
                                 <button
@@ -135,7 +140,7 @@ export const TagMultipleAssociation: React.FC<TagMultipleAssociationProps> = ({
                     {/* Activity Grid - Multi-select */}
                     {selectedCategoryId && (
                         <div className="grid grid-cols-4 gap-3 pt-2 animate-in slide-in-from-top-2">
-                            {categories
+                            {activeCategories
                                 .find(c => c.id === selectedCategoryId)
                                 ?.activities.map(act => {
                                     const isActive = selectedActivityIds.includes(act.id);

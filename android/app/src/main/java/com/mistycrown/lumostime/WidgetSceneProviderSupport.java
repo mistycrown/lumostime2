@@ -20,6 +20,7 @@ import java.util.Objects;
 
 /**
  * Shared rendering and tap handling for the dedicated 4x3 scene widget.
+ * Updated 2026-08-06: Passes scene time-slot UI icon asset paths to native tab rendering.
  */
 public final class WidgetSceneProviderSupport {
     public static final String ACTION_SELECT_SCENE_TAB =
@@ -300,7 +301,13 @@ public final class WidgetSceneProviderSupport {
             views.setViewVisibility(rootId, View.VISIBLE);
             views.setImageViewBitmap(
                     bitmapId,
-                    WidgetSceneTabBitmapRenderer.INSTANCE.render(context, slot.getIcon(), isSelected)
+                    WidgetSceneTabBitmapRenderer.INSTANCE.render(
+                            context,
+                            slot.getIcon(),
+                            slot.getUiIconAssetPath(),
+                            slot.getUiIconFallbackAssetPath(),
+                            isSelected
+                    )
             );
             views.setOnClickPendingIntent(
                     rootId,

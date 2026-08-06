@@ -15,6 +15,7 @@ import { AchievementDialog } from './AchievementDialog';
 import { TagMultipleAssociation } from '../TagMultipleAssociation';
 import { IconRenderer } from '../IconRenderer';
 import { formatAchievementSignedStars, formatAchievementStars } from '../../utils/achievementUtils';
+import { getActiveActivities } from '../../utils/archiveUtils';
 
 interface AchievementRulesTabProps {
   categories: Category[];
@@ -150,7 +151,7 @@ const getRuleNamePlaceholder = (targetType: AchievementRule['targetType']) => {
 };
 
 const collectActivityOptions = (categories: Category[]) => categories.flatMap((category) => (
-  category.activities.map((activity) => ({
+  getActiveActivities(category).map((activity) => ({
     categoryId: category.id,
     categoryName: category.name,
     activityId: activity.id,

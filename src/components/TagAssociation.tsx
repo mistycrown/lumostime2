@@ -1,5 +1,6 @@
 /**
  * @file TagAssociation.tsx
+ * @updated 2026-08-06: Hide archived activities and scopes from association options.
  * @updated 2026-08-02: Reused the shared adaptive association option grid so tag categories stay readable in narrow panels.
  * @updated 2026-07-21: Replaced record-detail selection shadows with outline-based dark-mode states.
  * @input categories, activities, selected IDs
@@ -15,6 +16,7 @@ import { Category } from '../types';
 import { AssociationOptionGrid } from './AssociationOptionGrid';
 import { IconRenderer } from './IconRenderer';
 import { getTagCirclePresentation } from '../utils/colorAdapterUtils';
+import { getActiveActivities } from '../utils/archiveUtils';
 
 interface TagAssociationProps {
   categories: Category[];
@@ -31,13 +33,16 @@ export const TagAssociation: React.FC<TagAssociationProps> = ({
   onCategorySelect,
   onActivitySelect
 }) => {
-  const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
+  const activeCategories = categories
+    .map(category => ({ ...category, activities: getActiveActivities(category) }))
+    .filter(category => category.activities.length > 0);
+  const selectedCategory = activeCategories.find(c => c.id === selectedCategoryId) || activeCategories[0];
 
   return (
     <div className="w-full space-y-4">
       {/* Category Grid */}
       <AssociationOptionGrid
-        items={categories}
+        items={activeCategories}
         isSelected={(cat) => selectedCategoryId === cat.id}
         onSelect={(cat) => {
           onCategorySelect(cat.id);
@@ -50,7 +55,7 @@ export const TagAssociation: React.FC<TagAssociationProps> = ({
 
       {/* Activity Grid */}
       <div className="grid grid-cols-4 gap-3">
-        {selectedCategory.activities.map(act => {
+        {selectedCategory?.activities.map(act => {
           const isActive = selectedActivityId === act.id;
           const colorPresentation = getTagCirclePresentation(act.color || '', 0.2);
           return (

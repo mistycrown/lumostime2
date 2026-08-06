@@ -51,6 +51,7 @@ import { summarizeAppAwarenessTemplate } from '../services/appAwarenessService';
 import AppUsage from '../plugins/AppUsagePlugin';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
 import { CustomSelect } from '../components/CustomSelect';
+import { getActiveActivities } from '../utils/archiveUtils';
 
 interface Props {
   onBack: () => void;
@@ -67,7 +68,7 @@ type PageMode = 'home' | 'templates' | 'template-editor' | 'bindings';
 
 const flattenActivityOptions = (categories: Category[]): AppAwarenessActivityOption[] =>
   categories.flatMap((category) =>
-    category.activities.map((activity) => ({
+    getActiveActivities(category).map((activity) => ({
       id: `${category.id}:${activity.id}`,
       categoryId: category.id,
       activityId: activity.id,

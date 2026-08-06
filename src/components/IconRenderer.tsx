@@ -1,6 +1,7 @@
 /**
  * @file IconRenderer.tsx
  * @description 通用图标渲染组件 - 支持双图标系统（emoji + uiIcon）
+ * @updated 2026-08-06: Added an explicit UI-icon precedence option for scene time-slot rendering while preserving emoji fallback data.
  * 
  * 新的双图标系统：
  * - icon: 始终保存 emoji（用于默认主题）
@@ -19,6 +20,7 @@ import { imageService } from '../services/imageService';
 interface IconRendererProps {
     icon: string;                    // Emoji 图标（用于默认主题）
     uiIcon?: string;                 // UI 图标 ID（用于自定义主题，格式：ui:iconType）
+    preferUiIcon?: boolean;          // 在当前自定义主题下显式优先使用 UI 图标
     className?: string;              // 额外的 CSS 类名
     size?: number | string;          // 图标大小（像素或 CSS 值）
     alt?: string;                    // 图片的 alt 文本
@@ -44,6 +46,7 @@ interface IconRendererProps {
 export const IconRenderer: React.FC<IconRendererProps> = ({
     icon,
     uiIcon,
+    preferUiIcon = false,
     className = '',
     size,
     alt,
@@ -59,7 +62,9 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     const currentTheme = uiIconService.getCurrentTheme();
     
     // 使用工具函数获取应该显示的图标
-    const displayIcon = getDisplayIcon(icon, uiIcon, currentTheme);
+    const displayIcon = preferUiIcon && uiIcon && currentTheme !== 'default'
+        ? uiIcon
+        : getDisplayIcon(icon, uiIcon, currentTheme);
     
     // 当图标变化时，重置错误状态
     React.useEffect(() => {

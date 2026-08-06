@@ -11,6 +11,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Check, ShieldAlert, Smartphone, ChevronRight, X, Search, Trash2 } from 'lucide-react';
 import AppUsage from '../plugins/AppUsagePlugin';
 import { Category } from '../types';
+import { getActiveActivities } from '../utils/archiveUtils';
 
 interface Props {
   onBack: () => void;
@@ -254,7 +255,7 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
                   <span className="font-bold text-stone-700">{category.name}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  {category.activities.map((activity) => {
+                  {getActiveActivities(category).map((activity) => {
                     const isSelected = currentRuleId === activity.id;
                     return (
                       <button

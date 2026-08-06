@@ -1,5 +1,6 @@
 /**
  * @file BatchManageView.tsx
+ * @updated 2026-08-06: Added archive and restore actions for activities.
  * @input Categories, Activities
  * @output Updated Category Structure
  * @pos View (Settings Sub-page)
@@ -9,7 +10,7 @@
  */
 import React, { useState } from 'react';
 import { Category, Activity } from '../types';
-import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check } from 'lucide-react';
+import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check, Archive, ArchiveRestore } from 'lucide-react';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
 import { IconRenderer } from '../components/IconRenderer';
 import { uiIconService } from '../services/uiIconService';
@@ -117,6 +118,13 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
             }
             return c;
         }));
+    };
+
+    const handleToggleActivityArchive = (catId: string, actId: string) => {
+        setCategories(prev => prev.map(c => c.id === catId
+            ? { ...c, activities: c.activities.map(a => a.id === actId ? { ...a, isArchived: a.isArchived !== true } : a) }
+            : c
+        ));
     };
 
     const handleNameChange = (catId: string, actId: string | null, newName: string) => {
@@ -397,7 +405,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                         <div
                                             draggable
                                             onDragStart={(e) => handleDragStart(e, activity, category.id)}
-                                            className="flex items-center gap-3 p-2 bg-white border border-stone-100 rounded-xl hover:border-stone-300 group cursor-move active:shadow-lg active:scale-[1.02] transition-all"
+                                            className={`flex items-center gap-3 p-2 bg-white border border-stone-100 rounded-xl hover:border-stone-300 group cursor-move active:shadow-lg active:scale-[1.02] transition-all ${activity.isArchived === true ? 'opacity-55' : ''}`}
                                         >
                                             <GripVertical size={14} className="text-stone-300 shrink-0" />
 
@@ -455,6 +463,13 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                                         )}
                                                     </button>
                                                 )}
+                                                <button
+                                                    onClick={() => handleToggleActivityArchive(category.id, activity.id)}
+                                                    className="p-1 text-stone-300 hover:text-amber-500"
+                                                    title={activity.isArchived === true ? '恢复' : '归档'}
+                                                >
+                                                    {activity.isArchived === true ? <ArchiveRestore size={14} /> : <Archive size={14} />}
+                                                </button>
                                                 <button onClick={() => moveActivity(catIndex, actIndex, 'up')} disabled={actIndex === 0} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
                                                     <ArrowUp size={14} />
                                                 </button>

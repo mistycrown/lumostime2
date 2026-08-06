@@ -17,6 +17,7 @@ import { CustomSelect } from '../../components/CustomSelect';
 import { IconRenderer } from '../../components/IconRenderer';
 import { getEligibleNfcDailyCheckItems } from '../../utils/dailyCheckUtils';
 import { parseLumosTimeUrl } from '../../utils/lumosTimeUrlParser';
+import { getActiveActivities } from '../../utils/archiveUtils';
 
 interface NFCSettingsViewProps {
   onBack: () => void;
@@ -162,7 +163,7 @@ export const NFCSettingsView: React.FC<NFCSettingsViewProps> = ({
   const safeCategories = useMemo(() => {
     return (Array.isArray(categories) ? categories : []).map((category) => ({
       ...category,
-      activities: Array.isArray(category.activities) ? category.activities : []
+      activities: getActiveActivities(category)
     }));
   }, [categories]);
 

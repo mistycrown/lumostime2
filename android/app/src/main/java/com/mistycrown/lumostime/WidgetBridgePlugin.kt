@@ -18,6 +18,7 @@ import org.json.JSONObject
  * Updated 2026-05-05: Expanded TODAY + PIN sync parsing to persist mirrored source todos/categories for native-side refresh rebuilding.
  * Updated 2026-05-05: Added log-tail synchronization so native quick-punch shortcuts can compute gap fills without opening the app.
  * Updated 2026-05-20: Wrapped non-Exception sync failures before forwarding them to Capacitor's PluginCall.reject overloads.
+ * Updated 2026-08-06: Added UI icon asset paths to scene time-slot parsing for native scene-tab rendering.
  */
 @CapacitorPlugin(name = "WidgetBridge")
 class WidgetBridgePlugin : Plugin() {
@@ -861,6 +862,8 @@ class WidgetBridgePlugin : Plugin() {
                     id = id,
                     name = parseNullableString(item.optString("name")) ?: id,
                     icon = parseNullableString(item.optString("icon")) ?: "\u2022",
+                    uiIconAssetPath = parseNullableString(item.optString("uiIconAssetPath")),
+                    uiIconFallbackAssetPath = parseNullableString(item.optString("uiIconFallbackAssetPath")),
                     startTime = startTime,
                     endTime = endTime,
                     disableAutoSwitch = item.optBoolean("disableAutoSwitch", false),
