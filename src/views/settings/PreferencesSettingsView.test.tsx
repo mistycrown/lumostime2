@@ -2,10 +2,23 @@
  * @file PreferencesSettingsView.test.tsx
  * @description Verifies the selected timer auto-jump label shown in preferences.
  * @updated 2026-05-10: Added coverage for the new three-option post-start jump selector.
+ * @updated 2026-08-06: Added coverage for the shared association-selector layout preference.
  */
 import React from 'react';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+
+vi.mock('../../contexts/SettingsContext', () => ({
+  useSettings: () => ({
+    themeMode: 'light',
+    setThemeMode: vi.fn(),
+    timelineLayout: 'timeline',
+    setTimelineLayout: vi.fn(),
+    associationSelectorColumns: 3,
+    setAssociationSelectorColumns: vi.fn()
+  })
+}));
+
 import { PreferencesSettingsView } from './PreferencesSettingsView';
 
 describe('PreferencesSettingsView timer auto-jump selector', () => {
@@ -24,5 +37,20 @@ describe('PreferencesSettingsView timer auto-jump selector', () => {
 
     expect(html).toContain('开始计时后自动跳转');
     expect(html).toContain(label);
+  });
+});
+
+describe('PreferencesSettingsView association selector layout', () => {
+  test('shows the shared selector layout options', () => {
+    const html = renderToStaticMarkup(
+      <PreferencesSettingsView
+        onBack={() => {}}
+        onToast={() => {}}
+      />
+    );
+
+    expect(html).toContain('分类选择器布局');
+    expect(html).toContain('三列');
+    expect(html).toContain('四列');
   });
 });

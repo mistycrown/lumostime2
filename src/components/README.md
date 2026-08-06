@@ -3,6 +3,7 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-08-06: `TimelineScheduleCanvas.tsx` now expands note text inside sufficiently tall time blocks while keeping shorter blocks to one truncated line.
 - Update 2026-08-02: `AssociationOptionGrid.tsx`, `TagAssociation.tsx`, `ScopeAssociation.tsx`, `TodoAssociation.tsx`, and `TodoDetailModal.tsx` now share an adaptive option grid that keeps todo category, associated-todo filter, tag category, and scope chips readable by switching narrow panels to three columns without changing the original chip text size.
 - Update 2026-08-02: `TimelineTodoSidebar.tsx` now shows recurring todos with a read-only repeat marker instead of a completable checkbox in the Chronicle split sidebar.
 - Update 2026-07-31: `AIBackfillChatModal.tsx` now clears the active request id by pending message id when a foreground turn completes, so the composer returns from Stop to Send after AI tool-call replies finish.

@@ -1,6 +1,7 @@
 /**
  * @file ReviewContext.tsx
  * @description Manages review system state, using async repository hydration for heavy review entries and localStorage for light review settings.
+ * @updated 2026-08-06: Preserved item-level daily check template enabled flags during localStorage startup migration.
  */
 import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { DEFAULT_CHECK_TEMPLATES, DEFAULT_REVIEW_TEMPLATES, INITIAL_DAILY_REVIEWS } from '../constants';
@@ -64,11 +65,13 @@ export const useReview = () => {
   return context;
 };
 
-const buildInitialCheckTemplates = (): CheckTemplate[] => {
-  const stored = storage.getJSON<any[]>(REVIEW_KEYS.CHECK_TEMPLATES);
+export const migrateStoredCheckTemplatesForInitialLoad = (
+  stored: unknown,
+  defaultTemplates: CheckTemplate[] = DEFAULT_CHECK_TEMPLATES
+): CheckTemplate[] => {
   const defaultIconMap: Record<string, string> = {};
 
-  DEFAULT_CHECK_TEMPLATES.forEach((template) => {
+  defaultTemplates.forEach((template) => {
     template.items.forEach((item) => {
       if (item.content && item.icon) {
         defaultIconMap[item.content] = item.icon;
@@ -76,8 +79,8 @@ const buildInitialCheckTemplates = (): CheckTemplate[] => {
     });
   });
 
-  if (!stored) {
-    return normalizeCheckTemplates(DEFAULT_CHECK_TEMPLATES);
+  if (!Array.isArray(stored)) {
+    return normalizeCheckTemplates(defaultTemplates);
   }
 
   try {
@@ -104,6 +107,7 @@ const buildInitialCheckTemplates = (): CheckTemplate[] => {
           content,
           icon,
           uiIcon: item.uiIcon,
+          enabled: typeof item === 'string' ? undefined : item.enabled,
           type: item.type || 'manual',
           manualMode: item.manualMode,
           targetCount: item.targetCount,
@@ -115,9 +119,13 @@ const buildInitialCheckTemplates = (): CheckTemplate[] => {
     return normalizeCheckTemplates(migrated);
   } catch (error) {
     console.error('Failed to parse checkTemplates, falling back to default', error);
-    return normalizeCheckTemplates(DEFAULT_CHECK_TEMPLATES);
+    return normalizeCheckTemplates(defaultTemplates);
   }
 };
+
+const buildInitialCheckTemplates = (): CheckTemplate[] => (
+  migrateStoredCheckTemplatesForInitialLoad(storage.getJSON<any[]>(REVIEW_KEYS.CHECK_TEMPLATES))
+);
 
 export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isReady, setIsReady] = useState(false);

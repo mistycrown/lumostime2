@@ -7,6 +7,7 @@
  * @updated 2026-07-29: Added persistent Chronicle layout, todo-column collapse state, and width preferences.
  * @updated 2026-07-30: Migrates the Chronicle todo split sidebar from a pixel width to a responsive persisted ratio.
  * @updated 2026-07-30: Migrates the Chronicle quick-color split sidebar to the same responsive ratio model.
+ * @updated 2026-08-06: Added a persistent association selector column preference for shared category, scope, tag, and todo pickers.
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
@@ -83,6 +84,10 @@ import {
     type ThemeMode
 } from '../utils/displayMode';
 import { readTimelineQuickColorSidebarRatio, readTimelineTodoSidebarRatio } from '../utils/timelineSidebarRatioUtils';
+import {
+    normalizeAssociationSelectorColumns,
+    type AssociationSelectorColumns
+} from '../services/associationSelectorLayoutService';
 
 export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
 export type DefaultIndexView = 'TAGS' | 'SCOPE';
@@ -150,6 +155,8 @@ interface SettingsContextType {
     setTimelineTodoSidebarRatio: React.Dispatch<React.SetStateAction<number>>;
     timelineQuickColorSidebarRatio: number;
     setTimelineQuickColorSidebarRatio: React.Dispatch<React.SetStateAction<number>>;
+    associationSelectorColumns: AssociationSelectorColumns;
+    setAssociationSelectorColumns: React.Dispatch<React.SetStateAction<AssociationSelectorColumns>>;
 
     // 折叠字数设置
     collapseThreshold: number;
@@ -277,6 +284,8 @@ export const useSettings = () => {
     }
     return context;
 };
+
+export const useOptionalSettings = () => useContext(SettingsContext);
 
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const hasInitializedSyncRelevantTimestampRef = useRef(false);
@@ -635,6 +644,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         localStorage.getItem(THEME_KEYS.TIMELINE_QUICK_COLOR_SIDEBAR_WIDTH),
         typeof window === 'undefined' ? 0 : window.innerWidth
     ));
+    const [associationSelectorColumns, setAssociationSelectorColumns] = useState<AssociationSelectorColumns>(() => {
+        return normalizeAssociationSelectorColumns(localStorage.getItem(THEME_KEYS.ASSOCIATION_SELECTOR_COLUMNS));
+    });
 
     const [emojiStyle, setEmojiStyle] = useState<EmojiStyle>(() => {
         const stored = localStorage.getItem('lumostime_emoji_style');
@@ -731,6 +743,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem(THEME_KEYS.TIMELINE_QUICK_COLOR_SIDEBAR_RATIO, String(timelineQuickColorSidebarRatio));
     }, [timelineQuickColorSidebarRatio]);
+
+    useEffect(() => {
+        localStorage.setItem(THEME_KEYS.ASSOCIATION_SELECTOR_COLUMNS, String(associationSelectorColumns));
+    }, [associationSelectorColumns]);
 
     useEffect(() => {
         localStorage.setItem('lumostime_emoji_style', emojiStyle);
@@ -850,6 +866,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setTimelineTodoSidebarRatio,
             timelineQuickColorSidebarRatio,
             setTimelineQuickColorSidebarRatio,
+            associationSelectorColumns,
+            setAssociationSelectorColumns,
             collapseThreshold,
             setCollapseThreshold,
             uiIconTheme,

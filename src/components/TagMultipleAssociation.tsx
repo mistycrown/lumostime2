@@ -1,6 +1,7 @@
 /**
  * @file TagMultipleAssociation.tsx
  * @updated 2026-08-06: Hide archived activities from multi-selection options.
+ * @updated 2026-08-06: Reused the shared association selector grid for the category picker so the new layout preference applies everywhere.
  * @input categories, selected activity IDs
  * @output Multiple Tag Selection UI
  * @pos Component (Input)
@@ -12,6 +13,7 @@
  */
 import React, { useState } from 'react';
 import { Category } from '../types';
+import { AssociationOptionGrid } from './AssociationOptionGrid';
 import { IconRenderer } from './IconRenderer';
 import { getTagCirclePresentation } from '../utils/colorAdapterUtils';
 import { getActiveActivities } from '../utils/archiveUtils';
@@ -115,27 +117,14 @@ export const TagMultipleAssociation: React.FC<TagMultipleAssociationProps> = ({
             {(showToggle ? isEnabled : true) && (
                 <>
                     {/* Category Grid */}
-                    <div className="grid grid-cols-4 gap-2">
-                        {activeCategories.map(cat => {
-                            const isSelected = selectedCategoryId === cat.id;
-                            return (
-                                <button
-                                    key={cat.id}
-                                    type="button"
-                                    onClick={() => setSelectedCategoryId(isSelected ? '' : cat.id)}
-                                    className={`
-                                        px-2 py-2 rounded-lg text-[10px] font-medium text-center transition-colors flex items-center justify-center gap-1.5 truncate
-                                        ${isSelected
-                                            ? 'btn-template-filled'
-                                            : 'bg-stone-50 text-stone-500 border border-stone-100 hover:bg-stone-100'}
-                                    `}
-                                >
-                                    <IconRenderer icon={cat.icon} uiIcon={cat.uiIcon} className="text-xs" />
-                                    <span className="truncate">{cat.name}</span>
-                                </button>
-                            );
-                        })}
-                    </div>
+                    <AssociationOptionGrid
+                        items={activeCategories}
+                        isSelected={(cat) => selectedCategoryId === cat.id}
+                        onSelect={(cat) => setSelectedCategoryId(selectedCategoryId === cat.id ? '' : cat.id)}
+                        selectedClassName="btn-template-filled"
+                        unselectedClassName="bg-stone-50 text-stone-500 border border-stone-100 hover:bg-stone-100"
+                        iconClassName="text-xs"
+                    />
 
                     {/* Activity Grid - Multi-select */}
                     {selectedCategoryId && (

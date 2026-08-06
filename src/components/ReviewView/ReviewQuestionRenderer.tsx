@@ -1,6 +1,9 @@
 /**
  * @file ReviewQuestionRenderer.tsx
+ * @input Review question definitions, saved answers, reading/editing mode, answer update callback
+ * @output Question UI for Review guide tabs
  * @description Shared component for rendering review questions in both edit and reading modes
+ * @updated 2026-08-06: Added per-text-question expand/collapse controls so long guide answers have more room while editing.
  */
 import React from 'react';
 import { ReviewQuestion, ReviewAnswer } from '../../types';
@@ -32,15 +35,35 @@ const EditModeQuestion: React.FC<{
     answer?: ReviewAnswer;
     onUpdateAnswer: (questionId: string, question: string, answer: string) => void;
 }> = ({ question: q, answer, onUpdateAnswer }) => {
+    const [isTextAnswerExpanded, setIsTextAnswerExpanded] = React.useState(false);
+    const textareaId = React.useId();
+
     if (q.type === 'text') {
         return (
             <div key={q.id} className="space-y-3">
-                <label className="text-sm text-stone-700">{q.question}</label>
+                <div className="flex items-start justify-between gap-3">
+                    <label htmlFor={textareaId} className="text-sm leading-relaxed text-stone-700">
+                        {q.question}
+                    </label>
+                    <button
+                        type="button"
+                        onClick={() => setIsTextAnswerExpanded((current) => !current)}
+                        className="shrink-0 rounded-md p-1 text-stone-400 transition-all duration-200 hover:bg-stone-100 hover:text-stone-600"
+                        title={isTextAnswerExpanded ? '收缩输入框' : '扩展输入框'}
+                        aria-label={isTextAnswerExpanded ? '收缩输入框' : '扩展输入框'}
+                    >
+                        {isTextAnswerExpanded
+                            ? <LucideIcons.Minimize2 size={16} />
+                            : <LucideIcons.Minimize2 size={16} className="rotate-180" />}
+                    </button>
+                </div>
                 <textarea
+                    id={textareaId}
                     value={answer?.answer || ''}
                     onChange={(e) => onUpdateAnswer(q.id, q.question, e.target.value)}
-                    className="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-800 outline-none text-[15px] leading-relaxed shadow-sm focus:border-stone-400 transition-colors resize-none"
-                    rows={3}
+                    className={`w-full resize-none rounded-xl border border-stone-200 bg-white px-4 py-3 text-[15px] leading-relaxed text-stone-800 shadow-sm outline-none transition-[height,border-color] duration-150 ease-out placeholder:text-stone-300 focus:border-stone-400 ${
+                        isTextAnswerExpanded ? 'h-[320px]' : 'h-[112px]'
+                    }`}
                     placeholder="输入你的回答..."
                 />
             </div>

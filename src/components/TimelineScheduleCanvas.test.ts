@@ -3,6 +3,7 @@
  * @input Sample time intervals including overlap boundaries
  * @output Regression coverage for parallel schedule block columns, planning time ranges, and quick-color ranges
  * @pos Test
+ * @updated 2026-08-06: Covers multiline note expansion for sufficiently tall timeline blocks.
  * @updated 2026-07-31: Covers locked recurring auto-Plan blocks staying out of time-edit mode.
  * @updated 2026-07-30: Covers whole-block drag shifting while preserving duration and daily bounds.
  * @updated 2026-07-30: Covers quick-color range minimums for click-to-drag formal record creation.
@@ -17,6 +18,7 @@ import {
   getScheduleBlockHeight,
   getTimelineBlockBackground,
   isTimelinePlanTimeEditingLocked,
+  isTimelineLogNoteExpanded,
   layoutParallelScheduleBlocks,
   MIN_SCHEDULE_BLOCK_HEIGHT,
   scheduleTimelineRecordDetailOpen,
@@ -65,6 +67,11 @@ describe('layoutParallelScheduleBlocks', () => {
   test('creates 30-minute plans snapped to five-minute boundaries within the day', () => {
     expect(getPlannedTimeRange(62)).toEqual({ startMinutes: 60, endMinutes: 90 });
     expect(getPlannedTimeRange(1438)).toEqual({ startMinutes: 1410, endMinutes: 1440 });
+  });
+
+  test('expands notes only on sufficiently tall timeline blocks', () => {
+    expect(isTimelineLogNoteExpanded(87)).toBe(false);
+    expect(isTimelineLogNoteExpanded(88)).toBe(true);
   });
 
   test('keeps locked recurring auto-Plan blocks out of time editing', () => {

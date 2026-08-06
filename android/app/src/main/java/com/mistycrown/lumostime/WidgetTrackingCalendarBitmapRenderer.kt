@@ -16,6 +16,7 @@ import kotlin.math.min
 
 /**
  * Renders the dedicated 2x2 tracking-calendar widget as a single bitmap.
+ * @updated 2026-08-06: Wraps sparse sixth-week dates into the first row while keeping the original six-row spacing.
  */
 object WidgetTrackingCalendarBitmapRenderer {
     private const val FALLBACK_WIDGET_SIZE_DP = 220f
@@ -141,14 +142,17 @@ object WidgetTrackingCalendarBitmapRenderer {
         val rawDayOfWeek = monthStart.get(Calendar.DAY_OF_WEEK)
         val startOffset = if (rawDayOfWeek == Calendar.SUNDAY) 6 else rawDayOfWeek - Calendar.MONDAY
         val dayCount = monthStart.getActualMaximum(Calendar.DAY_OF_MONTH)
+        val monthRowCount = ((startOffset + dayCount + 6) / 7).coerceAtLeast(1)
+        val wrapsSixthRowToFirst = monthRowCount > 5
         val circleRadius = cellSize * 0.475f
 
         for (day in 1..dayCount) {
             val cellIndex = startOffset + day - 1
             val row = cellIndex / 7
             val column = cellIndex % 7
+            val displayRow = if (wrapsSixthRowToFirst && row == 5) 0 else row
             val centerX = centeredGridLeft + column * (cellSize + cellGapX) + cellSize / 2f
-            val centerY = centeredGridTop + row * (cellSize + cellGapY) + cellSize / 2f
+            val centerY = centeredGridTop + displayRow * (cellSize + cellGapY) + cellSize / 2f
             val value = dayValueMap[day] ?: 0
             val isActive = value > 0
 
