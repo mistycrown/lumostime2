@@ -13,6 +13,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { CustomSelect } from '../components/CustomSelect'; // Assuming this exists or using native select if not suitable
 import { sortScopesForSelection } from '../utils/scopeSortUtils';
+import { getActiveActivities } from '../utils/archiveUtils';
 
 interface MemoirSettingsViewProps {
     onBack: () => void;
@@ -206,7 +207,7 @@ export const MemoirSettingsView: React.FC<MemoirSettingsViewProps> = ({ onBack }
 
                     <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto pr-1">
                         {categories.map(cat => (
-                            cat.activities.map(act => {
+                            getActiveActivities(cat).map(act => {
                                 const isSelected = config.relatedTagIds.includes(act.id);
                                 return (
                                     <button

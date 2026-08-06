@@ -17,6 +17,7 @@ import android.util.LruCache
  * Updated 2026-04-25: Prefer packaged UI icon assets for widget slots and
  * cache decoded bitmaps so unlocked icon rendering does not add visible lag.
  * Updated 2026-05-05: Reused the daily completion checkmark for successful quick-punch shortcut taps.
+ * Updated 2026-08-06: Exposed packaged UI icon loading for scene time-slot tab rendering.
  */
 object WidgetSlotBitmapRenderer {
     private const val SLOT_SIZE_DP = 72f
@@ -294,10 +295,24 @@ object WidgetSlotBitmapRenderer {
         slot: WidgetSnapshotSlot,
         iconSizePx: Int
     ): Bitmap? {
-        val primaryPath = slot.uiIconAssetPath?.takeIf { it.isNotBlank() } ?: return null
-        val fallbackPath = slot.uiIconFallbackAssetPath?.takeIf { it.isNotBlank() }
-        return decodePackagedBitmap(context, primaryPath, iconSizePx)
-            ?: fallbackPath?.let { decodePackagedBitmap(context, it, iconSizePx) }
+        return loadUiIconBitmap(
+            context,
+            slot.uiIconAssetPath,
+            slot.uiIconFallbackAssetPath,
+            iconSizePx
+        )
+    }
+
+    fun loadUiIconBitmap(
+        context: Context,
+        primaryPath: String?,
+        fallbackPath: String?,
+        iconSizePx: Int
+    ): Bitmap? {
+        val primaryPathValue = primaryPath?.takeIf { it.isNotBlank() } ?: return null
+        val fallbackPathValue = fallbackPath?.takeIf { it.isNotBlank() }
+        return decodePackagedBitmap(context, primaryPathValue, iconSizePx)
+            ?: fallbackPathValue?.let { decodePackagedBitmap(context, it, iconSizePx) }
     }
 
     private fun decodePackagedBitmap(

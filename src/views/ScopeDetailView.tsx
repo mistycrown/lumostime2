@@ -1,5 +1,6 @@
 /**
  * @file ScopeDetailView.tsx
+ * @updated 2026-08-06: Added archive and restore control for domains.
  * @input Scope Data, Logs, Associated Todos/Goals/MajorGoals
  * @output Updated Scope, Managed Goals/MajorGoals/Keywords
  * @pos View (Detail Page)
@@ -13,7 +14,7 @@ import { Scope, Log, Category, TodoItem, Goal, MajorGoal } from '../types';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { MatrixAnalysisChart } from '../components/MatrixAnalysisChart';
 import { DateRangeFilter, RangeType } from '../components/DateRangeFilter';
-import { ArrowUpDown, Check, Save, Zap, Clock, BarChart2, Archive, Plus, X, ChevronDown } from 'lucide-react';
+import { ArrowUpDown, Check, Save, Zap, Clock, BarChart2, Archive, ArchiveRestore, Plus, X, ChevronDown } from 'lucide-react';
 import { COLOR_OPTIONS } from '../constants';
 import { GoalCard } from '../components/GoalCard';
 import { MajorGoalCard } from '../components/MajorGoalCard';
@@ -106,6 +107,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                 scope.themeColor !== initialScope.themeColor ||
                 scope.enableFocusScore !== initialScope.enableFocusScore ||
                 scope.enableMoodScore !== initialScope.enableMoodScore ||
+                scope.isArchived !== initialScope.isArchived ||
                 JSON.stringify(scope.keywords) !== JSON.stringify(initialScope.keywords) ||
                 JSON.stringify(scope.noteTemplates || []) !== JSON.stringify(initialScope.noteTemplates || []);
             
@@ -170,6 +172,10 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     // 处理归档目标
     const handleArchiveGoal = (goalId: string) => {
         onArchiveGoal?.(goalId);
+    };
+
+    const handleToggleArchive = () => {
+        setScope(prev => ({ ...prev, isArchived: prev.isArchived !== true }));
     };
 
     // 关键字颜色系统（用于Details tab中的关键字显示）
@@ -301,6 +307,17 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                     <div className="space-y-6 max-w-2xl">
                         {/* Basic Info */}
                         <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
+                            <div className="flex items-center justify-between mb-4 pb-4 border-b border-stone-100">
+                                <span className="text-sm font-medium text-stone-600">归档状态</span>
+                                <button
+                                    onClick={handleToggleArchive}
+                                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-stone-500 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                                    title={scope.isArchived ? '恢复领域' : '归档领域'}
+                                >
+                                    {scope.isArchived ? <ArchiveRestore size={15} /> : <Archive size={15} />}
+                                    {scope.isArchived ? '恢复领域' : '归档领域'}
+                                </button>
+                            </div>
                             <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">基本信息</h3>
 
                             <div className="space-y-4">
@@ -881,6 +898,13 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                         className="text-2xl" 
                     />}
                     {scope.name}
+                    <button
+                        onClick={handleToggleArchive}
+                        className="hidden"
+                        title={scope.isArchived ? '恢复' : '归档'}
+                    >
+                        {scope.isArchived ? <ArchiveRestore size={18} /> : <Archive size={18} />}
+                    </button>
                 </h1>
                 {scope.description && (
                     <span className="text-stone-400 text-sm font-medium ml-1 mt-1 block">

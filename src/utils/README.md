@@ -3,6 +3,7 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- Update 2026-08-06: `archiveUtils.ts` centralizes active/archive predicates for labels and domains so indexes and selectors apply the same visibility rules while legacy activities without `isArchived` remain active.
 - Update 2026-07-31: `todoRecurringPlanUtils.ts` now exposes the shared manual timeline Plan log builder and virtual Plan ids used by both drag-created and AI-created Plan blocks.
 - Update 2026-07-30: `autoCheckUtils.ts` now exposes a shared id-keyed change detector for auto-check completion refreshes, so views can ignore harmless array reordering before persisting review data.
 - Update 2026-07-30: `todoRecurringPlanUtils.ts` centralizes finite Repeat auto-Plan occurrence windows, generated Plan log metadata, same-day time normalization, and delete-lock checks.

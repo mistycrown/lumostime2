@@ -15,12 +15,13 @@
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState, useEffect, type CSSProperties } from 'react';
+import React, { useState, useEffect, useMemo, type CSSProperties } from 'react';
 import { Category, Activity } from '../types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { IconRenderer } from '../components/IconRenderer';
 import { getColorHexForCharts, getSoftColorCircleStyle } from '../utils/colorAdapterUtils';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
+import { getActiveActivities } from '../utils/archiveUtils';
 
 
 interface RecordViewProps {
@@ -40,19 +41,22 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
     ? Math.max(0.18, panelOverlayOpacity - 0.08)
     : panelOverlayOpacity;
   const panelSurfaceColor = `rgba(250, 249, 246, ${panelLayerOpacity})`;
+  const activeCategories = useMemo(() => categories
+    .map(category => ({ ...category, activities: getActiveActivities(category) }))
+    .filter(category => category.activities.length > 0), [categories]);
 
   // 初始化时从 localStorage 恢复用户上次选择的分组
   useEffect(() => {
     const savedCategoryId = localStorage.getItem('lastSelectedCategoryId');
     
-    if (savedCategoryId && categories.some(c => c.id === savedCategoryId)) {
+    if (savedCategoryId && activeCategories.some(c => c.id === savedCategoryId)) {
       // 如果保存的分组 ID 仍然存在，则使用它
       setSelectedCategoryId(savedCategoryId);
-    } else if (categories.length > 0) {
+    } else if (activeCategories.length > 0) {
       // 否则使用第一个分组
-      setSelectedCategoryId(categories[0].id);
+      setSelectedCategoryId(activeCategories[0].id);
     }
-  }, [categories]);
+  }, [activeCategories]);
 
   // 保存用户选择的分组到 localStorage
   useEffect(() => {
@@ -64,7 +68,7 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
   // Fallback to first category if selected one is not found (e.g. was deleted)
   // Or if 'recent' is not implemented yet, just default to first.
   // Note: 'recent' logic was not fully implemented in previous code, it just defaulted to CATEGORIES[0] if not found.
-  const selectedCategory = categories.find(c => c.id === selectedCategoryId) || categories[0];
+  const selectedCategory = activeCategories.find(c => c.id === selectedCategoryId) || activeCategories[0];
 
   const getActivityButtonStyle = (activity: Activity): CSSProperties => {
     return {
@@ -102,7 +106,7 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
         className={`flex-shrink-0 flex flex-col overflow-y-auto pt-6 pb-20 pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative ${isSidebarOpen ? 'w-auto md:min-w-[12rem]' : 'w-16 items-center'}`}
       >
         <div className="relative z-10 flex-1 w-full">
-          {categories.map((category) => {
+          {activeCategories.map((category) => {
             const isSelected = selectedCategoryId === category.id;
             return (
               <button

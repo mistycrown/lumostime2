@@ -1,5 +1,6 @@
 /**
  * @file TagDetailView.tsx
+ * @updated 2026-08-06: Added archive and restore control for tags.
  * @input Activity ID, Logs, Associated Todos, Categories
  * @output Activity Updates (Name, Color), Todo Toggles
  * @pos View (Detail Page)
@@ -12,7 +13,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Log, Category, Activity, TodoItem } from '../types';
 import { COLOR_OPTIONS } from '../constants';
 import { CalendarWidget } from '../components/CalendarWidget';
-import { ArrowLeft, Clock, Calendar as CalendarIcon, MoreHorizontal, ChevronDown, Check, X, Zap, Save, CheckCircle2, Circle, Plus } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar as CalendarIcon, MoreHorizontal, ChevronDown, Check, X, Zap, Save, CheckCircle2, Circle, Plus, Archive, ArchiveRestore } from 'lucide-react';
 import { DateRangeFilter } from '../components/DateRangeFilter';
 import { MatrixAnalysisChart } from '../components/MatrixAnalysisChart';
 import { Scope } from '../types';
@@ -86,6 +87,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
             activity.heatmapMax !== initialActivity.heatmapMax ||
             activity.enableFocusScore !== initialActivity.enableFocusScore ||
             activity.enableMoodScore !== initialActivity.enableMoodScore ||
+            activity.isArchived !== initialActivity.isArchived ||
             JSON.stringify(activity.keywords) !== JSON.stringify(initialActivity.keywords) ||
             JSON.stringify(activity.noteTemplates || []) !== JSON.stringify(initialActivity.noteTemplates || []);
          
@@ -250,6 +252,10 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
       setActivity({ ...activity, color });
    };
 
+   const handleToggleArchive = () => {
+      if (activity) setActivity({ ...activity, isArchived: activity.isArchived !== true });
+   };
+
    // 关键字颜色系统（用于Details tab中的关键字显示）
    const KEYWORD_COLORS = [
       'bg-red-100 text-red-600 border-red-200 hover:bg-red-200',
@@ -311,9 +317,31 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
          case 'Details':
             return (
                <div className="space-y-6">
+                  <div className="hidden">
+                     <span className="text-sm font-medium text-stone-600">归档状态</span>
+                     <button
+                        onClick={handleToggleArchive}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-stone-500 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                        title={activity.isArchived === true ? '恢复标签' : '归档标签'}
+                     >
+                        {activity.isArchived === true ? <ArchiveRestore size={15} /> : <Archive size={15} />}
+                        {activity.isArchived === true ? '恢复标签' : '归档标签'}
+                     </button>
+                  </div>
                   <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
                      <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">基本信息</h3>
                      <div className="space-y-4">
+                        <div className="flex items-center justify-between pb-4 border-b border-stone-100">
+                           <span className="text-sm font-medium text-stone-600">归档状态</span>
+                           <button
+                              onClick={handleToggleArchive}
+                              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-stone-500 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                              title={activity.isArchived === true ? '恢复标签' : '归档标签'}
+                           >
+                              {activity.isArchived === true ? <ArchiveRestore size={15} /> : <Archive size={15} />}
+                              {activity.isArchived === true ? '恢复标签' : '归档标签'}
+                           </button>
+                        </div>
                         <div>
                            <label className="text-xs text-stone-400 font-medium mb-1.5 block">名称（首字符作为图标）</label>
                            <input
@@ -719,6 +747,13 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   className="text-2xl" 
                />}
                {activity.name}
+               <button
+                  onClick={handleToggleArchive}
+                  className="hidden"
+                  title={activity.isArchived === true ? '恢复' : '归档'}
+               >
+                  {activity.isArchived === true ? <ArchiveRestore size={18} /> : <Archive size={18} />}
+               </button>
             </h1>
             <span className="text-stone-400 text-sm font-medium ml-1 mt-1 flex items-center gap-2">
                <IconRenderer 

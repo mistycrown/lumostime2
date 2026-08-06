@@ -8,6 +8,7 @@ package com.mistycrown.lumostime
  * Updated 2026-05-05: Added mirrored TODAY + PIN source todo/category models so native widgets can rebuild today's list on refresh without waiting for a new web payload.
  * Updated 2026-05-05: Added optional scene item app-launch metadata so scene widgets can mirror in-app third-party app launching.
  * Updated 2026-05-05: Added optional scene runtime source metadata so app-side scene flips can stay scoped to the tapped scene slot.
+ * Updated 2026-08-06: Added packaged UI icon asset paths to scene time slots for native tab rendering.
  */
 object WidgetTypes {
     const val TIMER = "timer"
@@ -453,6 +454,8 @@ data class WidgetSceneTimeSlot(
     val id: String,
     val name: String,
     val icon: String,
+    val uiIconAssetPath: String? = null,
+    val uiIconFallbackAssetPath: String? = null,
     val startTime: String,
     val endTime: String,
     val disableAutoSwitch: Boolean = false,

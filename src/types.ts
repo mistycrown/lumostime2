@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-08-06: Added backward-compatible archive state to activities.
  * @input None
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
@@ -49,6 +50,7 @@ export interface Activity {
   enableMoodScore?: boolean; // Override parent setting for mood tracking
   keywords?: string[]; // (NEW) Keywords for finer classification
   noteTemplates?: NoteTemplate[];
+  isArchived?: boolean;
 }
 
 export interface Category {

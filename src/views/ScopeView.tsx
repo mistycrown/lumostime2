@@ -1,5 +1,6 @@
 /**
  * @file ScopeView.tsx
+ * @updated 2026-08-06: Added archived domain index section.
  * @input Scope List, Log Statistics
  * @output Navigation to Scope Detail
  * @pos View (Main Tab)
@@ -11,7 +12,7 @@ import React, { useMemo, useState } from 'react';
 import { Scope, Goal, Log, TodoItem, MajorGoal } from '../types';
 import { GoalCard } from '../components/GoalCard';
 import { GoalStatusAlert } from '../components/GoalStatusAlert';
-import { Settings2 } from 'lucide-react';
+import { Settings2, Archive, ChevronDown, ChevronRight } from 'lucide-react';
 import { IconRenderer } from '../components/IconRenderer';
 import { useGoalStatus } from '../hooks/useGoalStatus';
 import { getNormalizedScopeIds } from '../utils/scopeStatsUtils';
@@ -46,6 +47,7 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
 }) => {
     // 用于管理已关闭的提示
     const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
+    const [showArchivedScopes, setShowArchivedScopes] = useState(false);
     // 用于跟踪刚刚归档的目标（显示第二步）
     const [recentlyArchivedGoals, setRecentlyArchivedGoals] = useState<Set<string>>(new Set());
 
@@ -80,6 +82,10 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
     // Filter active scopes and sort by order
     const activeScopes = useMemo(() =>
         scopes.filter(s => !s.isArchived).sort((a, b) => a.order - b.order),
+        [scopes]
+    );
+    const archivedScopes = useMemo(() =>
+        scopes.filter(s => s.isArchived).sort((a, b) => a.order - b.order),
         [scopes]
     );
 
@@ -259,6 +265,33 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
                             </div>
                         );
                     })
+                )}
+
+                {archivedScopes.length > 0 && (
+                    <div className="mt-8 pt-5 border-t border-stone-200">
+                        <button
+                            type="button"
+                            onClick={() => setShowArchivedScopes(prev => !prev)}
+                            className="w-full flex items-center gap-2 mb-3 text-xs font-bold text-stone-400 uppercase tracking-widest text-left"
+                        >
+                            {showArchivedScopes ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                            <Archive size={14} />
+                            <span>已归档</span>
+                            <span className="ml-auto font-mono">{archivedScopes.length}</span>
+                        </button>
+                        {showArchivedScopes && <div className="space-y-2">
+                            {archivedScopes.map(scope => (
+                                <button
+                                    key={scope.id}
+                                    onClick={() => onScopeClick(scope.id)}
+                                    className="w-full flex items-center gap-3 p-3 text-left bg-stone-50 border border-stone-200 rounded-xl opacity-70 hover:opacity-100 transition-opacity"
+                                >
+                                    <IconRenderer icon={scope.icon} uiIcon={scope.uiIcon} size={18} />
+                                    <span className="font-medium text-stone-600">{scope.name}</span>
+                                </button>
+                            ))}
+                        </div>}
+                    </div>
                 )}
             </div>
         </div>

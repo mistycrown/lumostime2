@@ -15,6 +15,7 @@ import { AutoLinkRule, Category, Scope, Activity } from '../types';
 import { getSoftColorCircleStyle } from '../utils/colorAdapterUtils';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { sortActiveScopesByOrder } from '../utils/scopeSortUtils';
+import { getActiveActivities } from '../utils/archiveUtils';
 
 interface AutoLinkViewProps {
     onClose: () => void;
@@ -79,7 +80,7 @@ export const AutoLinkView: React.FC<AutoLinkViewProps> = ({
     // 获取选中分类下的活动
     const getActivitiesForCategory = (categoryId: string): Activity[] => {
         const category = categories.find(c => c.id === categoryId);
-        return category?.activities || [];
+        return category ? getActiveActivities(category) : [];
     };
 
     return (
@@ -162,7 +163,7 @@ export const AutoLinkView: React.FC<AutoLinkViewProps> = ({
                                 </label>
                                 {/* Category Grid */}
                                 <div className="grid grid-cols-4 gap-2">
-                                    {categories.map(cat => (
+                                    {categories.filter(cat => getActiveActivities(cat).length > 0).map(cat => (
                                         <button
                                             key={cat.id}
                                             onClick={() => {

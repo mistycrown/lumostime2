@@ -19,6 +19,7 @@ import { parseFilterExpression, matchesFilter, FilterContext } from '../utils/fi
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { toCssColor } from '../utils/colorUtils';
 import { sortActiveScopesByOrder } from '../utils/scopeSortUtils';
+import { getActiveActivities } from '../utils/archiveUtils';
 import { appendTemplateToNote } from '../utils/noteTemplateUtils';
 
 interface BatchFocusRecordManageViewProps {
@@ -974,7 +975,7 @@ const ActivitySelector: React.FC<ActivitySelectorProps> = ({
     }> = [];
 
     categories.forEach(category => {
-        category.activities.forEach(activity => {
+        getActiveActivities(category).forEach(activity => {
             activityOptions.push({
                 value: activity.id,
                 label: `${category.name} / ${activity.name}`,

@@ -9,13 +9,21 @@ import android.text.TextPaint
 
 /**
  * Renders the compact icon-only scene tabs used by the dedicated 4x3 scene widget.
+ * Updated 2026-08-06: Added packaged UI icon rendering with emoji fallback.
  */
 object WidgetSceneTabBitmapRenderer {
     private const val TAB_SIZE_DP = 34f
     private const val TAB_RADIUS_DP = 12f
     private const val TAB_TEXT_SIZE_DP = 18f
+    private const val TAB_UI_ICON_SIZE_DP = 20f
 
-    fun render(context: Context, icon: String, isSelected: Boolean): Bitmap {
+    fun render(
+        context: Context,
+        icon: String,
+        uiIconAssetPath: String?,
+        uiIconFallbackAssetPath: String?,
+        isSelected: Boolean
+    ): Bitmap {
         val sizePx = dpToPx(context, TAB_SIZE_DP)
         val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -35,6 +43,22 @@ object WidgetSceneTabBitmapRenderer {
                 radiusPx,
                 backgroundPaint
             )
+        }
+
+        val uiIcon = WidgetSlotBitmapRenderer.loadUiIconBitmap(
+            context,
+            uiIconAssetPath,
+            uiIconFallbackAssetPath,
+            dpToPx(context, TAB_UI_ICON_SIZE_DP)
+        )
+        if (uiIcon != null) {
+            canvas.drawBitmap(
+                uiIcon,
+                (sizePx - uiIcon.width) / 2f,
+                (sizePx - uiIcon.height) / 2f,
+                null
+            )
+            return bitmap
         }
 
         val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {

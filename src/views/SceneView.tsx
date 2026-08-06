@@ -1,5 +1,6 @@
 /**
  * @file SceneView.tsx
+ * @updated 2026-08-06: Made the scene time-slot sidebar explicitly prefer configured UI icons over stored emoji fallbacks.
  * @input Scene groups, cards, categories, todos, reviews, active sessions, and background settings
  * @output Interactive scene dashboard with quick actions, card status, and review navigation
  * @pos View (Scene)
@@ -1067,6 +1068,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
                   <IconRenderer 
                     icon={slot.icon || 'clock'}
                     uiIcon={slot.uiIcon}
+                    preferUiIcon
                     size={20}
                   />
                 </div>

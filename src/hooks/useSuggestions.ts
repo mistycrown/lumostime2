@@ -1,10 +1,12 @@
 /**
  * @file useSuggestions.ts
+ * @updated 2026-08-06: Exclude archived activities and scopes from suggestions.
  * @description Custom hook for activity and scope suggestions
  */
 
 import { useMemo } from 'react';
 import { Category, TodoItem, Scope, AutoLinkRule } from '../types';
+import { isActivityArchived, isScopeArchived } from '../utils/archiveUtils';
 
 interface Suggestion {
   activity?: {
@@ -44,7 +46,7 @@ export const useSuggestions = (
       if (linkedTodo.linkedActivityId !== selectedActivityId) {
         const cat = categories.find(c => c.id === linkedTodo.linkedCategoryId);
         const act = cat?.activities.find(a => a.id === linkedTodo.linkedActivityId);
-        if (cat && act) {
+        if (cat && act && !isActivityArchived(act)) {
           suggestions.activity = {
             id: act.id,
             categoryId: cat.id,
@@ -60,6 +62,7 @@ export const useSuggestions = (
     if (!suggestions.activity && note) {
       for (const cat of categories) {
         for (const act of cat.activities) {
+          if (isActivityArchived(act)) continue;
           if (act.id === selectedActivityId) continue;
 
           for (const kw of (act.keywords || [])) {
@@ -90,7 +93,7 @@ export const useSuggestions = (
         if (scopeIds?.includes(sId)) continue;
 
         const s = scopes.find(scope => scope.id === sId);
-        if (s) {
+        if (s && !isScopeArchived(s)) {
           candidateScopes.set(sId, { id: s.id, name: s.name, icon: s.icon, reason: '关联待办' });
         }
       }
@@ -102,7 +105,7 @@ export const useSuggestions = (
       if (scopeIds?.includes(rule.scopeId)) continue;
 
       const s = scopes.find(scope => scope.id === rule.scopeId);
-      if (s && !candidateScopes.has(rule.scopeId)) {
+      if (s && !isScopeArchived(s) && !candidateScopes.has(rule.scopeId)) {
         candidateScopes.set(rule.scopeId, { id: s.id, name: s.name, icon: s.icon, reason: '自动规则' });
       }
     }
@@ -110,7 +113,7 @@ export const useSuggestions = (
     // 从关键词匹配获取领域建议
     if (note) {
       for (const scope of scopes) {
-        if (scopeIds?.includes(scope.id)) continue;
+        if (scopeIds?.includes(scope.id) || isScopeArchived(scope)) continue;
         if (candidateScopes.has(scope.id)) continue;
 
         for (const kw of (scope.keywords || [])) {

@@ -309,6 +309,8 @@ export interface WidgetBridgeSceneTimeSlot {
   id: string;
   name: string;
   icon: string;
+  uiIconAssetPath?: string | null;
+  uiIconFallbackAssetPath?: string | null;
   startTime: string;
   endTime: string;
   disableAutoSwitch?: boolean;

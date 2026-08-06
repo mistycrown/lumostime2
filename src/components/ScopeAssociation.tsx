@@ -1,5 +1,6 @@
 /**
  * @file ScopeAssociation.tsx
+ * @updated 2026-08-06: Hide archived scopes from association options.
  * @updated 2026-08-02: Reused the shared adaptive association option grid so scope chips stay readable in narrow panels.
  * @updated 2026-07-21: Updated record-detail scope chips to use outline-only selection.
  * @input scopes list, selected IDs
@@ -14,6 +15,7 @@ import React, { useMemo } from 'react';
 import { Scope } from '../types';
 import { AssociationOptionGrid } from './AssociationOptionGrid';
 import { sortScopesForSelection } from '../utils/scopeSortUtils';
+import { getActiveScopes } from '../utils/archiveUtils';
 
 interface ScopeAssociationProps {
   scopes: Scope[];
@@ -22,7 +24,7 @@ interface ScopeAssociationProps {
 }
 
 export const ScopeAssociation: React.FC<ScopeAssociationProps> = ({ scopes, selectedScopeIds = [], onSelect }) => {
-  const sortedScopes = useMemo(() => sortScopesForSelection(scopes), [scopes]);
+  const sortedScopes = useMemo(() => sortScopesForSelection(getActiveScopes(scopes)), [scopes]);
 
   const handleToggle = (scopeId: string) => {
     const currentIds = selectedScopeIds || [];

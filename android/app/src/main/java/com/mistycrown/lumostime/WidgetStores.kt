@@ -13,6 +13,7 @@ import org.json.JSONObject
  * Updated 2026-05-02: Added scene widget payload storage plus per-instance selected-tab persistence.
  * Updated 2026-05-05: Added scene-widget morning refresh date tracking so the first morning unlock only refreshes once per day.
  * Updated 2026-05-05: Expanded TODAY + PIN payload storage to retain mirrored source todos/categories for native-side list rebuilding.
+ * Updated 2026-08-06: Persists scene time-slot UI icon asset paths when reloading native payloads.
  */
 object WidgetStores {
     private const val PREFS_NAME = "lumostime_widget_timer"
@@ -1839,6 +1840,8 @@ object WidgetStores {
                         id = id,
                         name = name,
                         icon = parseNullableString(item.optString("icon")) ?: "\u2022",
+                        uiIconAssetPath = parseNullableString(item.optString("uiIconAssetPath")),
+                        uiIconFallbackAssetPath = parseNullableString(item.optString("uiIconFallbackAssetPath")),
                         startTime = startTime,
                         endTime = endTime,
                         disableAutoSwitch = item.optBoolean("disableAutoSwitch", false),
@@ -1929,6 +1932,8 @@ object WidgetStores {
                 put("id", slot.id)
                 put("name", slot.name)
                 put("icon", slot.icon)
+                put("uiIconAssetPath", slot.uiIconAssetPath ?: JSONObject.NULL)
+                put("uiIconFallbackAssetPath", slot.uiIconFallbackAssetPath ?: JSONObject.NULL)
                 put("startTime", slot.startTime)
                 put("endTime", slot.endTime)
                 put("disableAutoSwitch", slot.disableAutoSwitch)

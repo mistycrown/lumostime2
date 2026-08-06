@@ -6,6 +6,7 @@
  * @description Resolves scene-group time slots into native-friendly timer, todo, and checklist widget items so Android can render and refresh the dedicated scene widget without reimplementing React-side business lookups.
  * @updated 2026-05-02: Added full scene widget payload builders that mirror scene groups, slot timing, and actionable card metadata for the dedicated 4x3 scene widget.
  * @updated 2026-05-05: Mirrored scene card third-party app launch metadata into native payloads so the Android scene widget can match in-app launch behavior.
+ * @updated 2026-08-06: Added packaged UI icon asset paths to scene time-slot payloads for native tab rendering.
  */
 import type {
   Activity,
@@ -343,7 +344,7 @@ const buildSceneTimeSlotPayload = (
 ): WidgetBridgeSceneTimeSlot => ({
   id: timeSlot.id,
   name: timeSlot.name,
-  icon: normalizeSceneIcon(timeSlot.icon, timeSlot.uiIcon, FALLBACK_SCENE_WIDGET_ICON),
+  ...resolveSceneIcon(timeSlot.icon, timeSlot.uiIcon, FALLBACK_SCENE_WIDGET_ICON),
   startTime: timeSlot.startTime,
   endTime: timeSlot.endTime,
   disableAutoSwitch: Boolean(timeSlot.disableAutoSwitch),
