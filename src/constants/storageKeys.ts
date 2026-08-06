@@ -4,6 +4,7 @@
  * @updated 2026-07-29: Added persistent Chronicle layout, todo-column state, and width preferences.
  * @updated 2026-07-30: Added persistent quick-color sidebar width alongside the existing timeline todo width.
  * @updated 2026-07-30: Added persistent quick-color sidebar ratio while keeping the legacy width key for migration.
+ * @updated 2026-08-06: Added the association selector column-count preference key.
  * 
  * 集中管理所有 localStorage 键名，避免硬编码字符串分散在各处
  * 便于维护和重构
@@ -51,6 +52,7 @@ export const THEME_KEYS = {
     TIMELINE_TODO_SIDEBAR_RATIO: 'lumostime_timeline_todo_sidebar_ratio',
     TIMELINE_QUICK_COLOR_SIDEBAR_WIDTH: 'lumostime_timeline_quick_color_sidebar_width',
     TIMELINE_QUICK_COLOR_SIDEBAR_RATIO: 'lumostime_timeline_quick_color_sidebar_ratio',
+    ASSOCIATION_SELECTOR_COLUMNS: 'lumostime_association_selector_columns',
     ACHIEVEMENT_BOTTLE_STYLE: 'lumostime_achievement_bottle_style',
     ACHIEVEMENT_BOTTLE_ICON_PACK: 'lumostime_achievement_bottle_icon_pack',
     /** 自定义色组 */

@@ -7,6 +7,7 @@
  * @updated 2026-07-29: Keeps the Chronicle layout selector after removing the obsolete schedule-canvas start selection.
  * @updated 2026-07-29: Moved display mode into the general settings group.
  * @updated 2026-07-31: Renamed the Chronicle layout selector to default Chronicle layout because in-page nav taps now handle temporary layout switching.
+ * @updated 2026-08-06: Added a shared association-selector layout preference for the category, scope, tag, and todo pickers.
  */
 import React, { useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus, X } from 'lucide-react';
@@ -19,6 +20,7 @@ import {
     getAutoStartTimerJumpModeLabel
 } from '../../utils/autoStartTimerJumpMode';
 import { TIMELINE_LAYOUT_OPTIONS } from '../../services/timelineLayoutService';
+import { ASSOCIATION_SELECTOR_COLUMN_OPTIONS } from '../../services/associationSelectorLayoutService';
 
 interface PreferencesSettingsViewProps {
     onBack: () => void;
@@ -121,7 +123,14 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     sceneCardTimerMode = 'realtime',
     onSetSceneCardTimerMode
 }) => {
-    const { themeMode, setThemeMode, timelineLayout, setTimelineLayout } = useSettings();
+    const {
+        themeMode,
+        setThemeMode,
+        timelineLayout,
+        setTimelineLayout,
+        associationSelectorColumns,
+        setAssociationSelectorColumns
+    } = useSettings();
     const [isThemeModeDropdownOpen, setIsThemeModeDropdownOpen] = useState(false);
     const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
     const [isAutoStartTimerJumpModeDropdownOpen, setIsAutoStartTimerJumpModeDropdownOpen] = useState(false);
@@ -569,6 +578,29 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                         </div>
                                     </>
                                 )}
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-3 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                            <div className="min-w-0 flex-1">
+                                <h4 className="font-bold text-stone-700">分类选择器布局</h4>
+                                <p className="text-xs text-stone-400 mt-1">用于分类、领域、标签、待办的通用选择器</p>
+                            </div>
+                            <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-lg">
+                                {ASSOCIATION_SELECTOR_COLUMN_OPTIONS.map((option) => (
+                                    <button
+                                        key={option.value}
+                                        type="button"
+                                        onClick={() => setAssociationSelectorColumns(option.value)}
+                                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                                            associationSelectorColumns === option.value
+                                                ? 'bg-white text-stone-800 shadow-sm'
+                                                : 'text-stone-400 hover:text-stone-600'
+                                        }`}
+                                        aria-pressed={associationSelectorColumns === option.value}
+                                    >
+                                        {option.label}
+                                    </button>
+                                ))}
                             </div>
                         </div>
                         <div className="flex items-center justify-between p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">

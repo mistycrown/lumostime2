@@ -4,6 +4,7 @@
  * @output A full-day scrollable schedule canvas with plan drops, quick-color record creation, editable time bounds, and touch pinch zoom
  * @pos Component
  * @description Positions real records and virtual planning blocks on a 00:00-24:00 time grid for the Chronicle split layout.
+ * @updated 2026-08-06: Lets larger blocks show full multiline notes while keeping shorter blocks on a single truncated line.
  * @updated 2026-07-31: Prevents locked recurring auto-Plan blocks from entering long-press time editing or drag/resize adjustment.
  * @updated 2026-07-30: Displays compact two-digit hour-only grid labels while preserving full block start/end times.
  * @updated 2026-07-30: Locks recurring auto-Plan deletion while the source Repeat todo still has auto generation enabled.
@@ -29,6 +30,7 @@ const DAY_MINUTES = 24 * 60;
 const TIME_SNAP_MINUTES = 5;
 export const TIMELINE_TOP_PADDING = 12;
 export const MIN_SCHEDULE_BLOCK_HEIGHT = 12;
+const MIN_EXPANDED_TIMELINE_NOTE_HEIGHT = 88;
 const BLOCK_GESTURE_THRESHOLD = 6;
 const LONG_PRESS_EDIT_DELAY = 500;
 const PINCH_BLOCK_TAP_SUPPRESSION_MS = 300;
@@ -185,6 +187,8 @@ export const getTimelineBlockBackground = (colorSource: string, alpha: number): 
 export const scheduleTimelineRecordDetailOpen = (callback: () => void): ReturnType<typeof setTimeout> => (
   setTimeout(callback, 0)
 );
+
+export const isTimelineLogNoteExpanded = (height: number): boolean => height >= MIN_EXPANDED_TIMELINE_NOTE_HEIGHT;
 
 export const isTimelinePlanTimeEditingLocked = (log: Log, todos: TodoItem[]): boolean => {
   const linkedTodo = log.linkedTodoId
@@ -1040,6 +1044,8 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
               const isCompact = height < 30;
               const showMetadata = height >= 34;
               const showNote = height >= 52;
+              const isExpandedNote = isTimelineLogNoteExpanded(height);
+              const noteText = log.note?.trim() || '';
               return (
                 <div
                   key={log.id}
@@ -1091,7 +1097,15 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
                       {activityLabel && `#${activityLabel}`}{linkedTodoLabel && `${activityLabel ? ' ' : ''}@${linkedTodoLabel}`}{linkedScopeNames.map((scopeName) => ` %${scopeName}`).join('')}
                     </span>
                   )}
-                  {showNote && log.note && <span className="mt-0.5 block truncate text-[11px] leading-4 text-stone-500">{log.note.replace(/\s+/g, ' ')}</span>}
+                  {showNote && noteText && (
+                    <span
+                      className={`mt-0.5 block text-[11px] leading-4 text-stone-500 ${
+                        isExpandedNote ? 'whitespace-pre-wrap break-words' : 'truncate'
+                      }`}
+                    >
+                      {isExpandedNote ? noteText : noteText.replace(/\s+/g, ' ')}
+                    </span>
+                  )}
                 </div>
               );
             })}
