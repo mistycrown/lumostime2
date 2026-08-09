@@ -5,6 +5,7 @@
  * @pos View (Review System)
  * @description Renders a read-only archive page for the same month-day across years, with timeline, schedule, review, and persistent notes, while keeping the default timeline rail aligned with the main timeline/detail views.
  * @updated 2026-04-12: Switched historical review answers to a quote-style layout and preserved multiline formatting for review and note content.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from On This Day duration and count summaries.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -22,6 +23,7 @@ import { useToast } from '../contexts/ToastContext';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { getLocalDateStr } from '../utils/dateUtils';
 import { parseNarrative } from '../utils/narrativeUtils';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 type TabType = 'timeline' | 'schedule' | 'review' | 'notes';
 
@@ -323,7 +325,8 @@ export const OnThisDayView: React.FC<OnThisDayViewProps> = ({
     return (
       <div className="space-y-8 pb-16">
         {yearBuckets.map((bucket) => {
-          const totalDuration = bucket.logs.reduce((sum, log) => sum + log.duration, 0);
+          const countableLogs = filterCountableLogs(bucket.logs);
+          const totalDuration = countableLogs.reduce((sum, log) => sum + log.duration, 0);
           const sortedLogs = [...bucket.logs].sort((first, second) => second.startTime - first.startTime);
 
           return (
@@ -341,7 +344,7 @@ export const OnThisDayView: React.FC<OnThisDayViewProps> = ({
               <div className="flex items-end justify-between border-b border-stone-200 pb-2">
                 <h2 className="text-xl font-bold text-stone-900">{bucket.year}</h2>
                 <div className="text-right text-xs text-stone-400">
-                  <div>{bucket.logs.length} 条记录</div>
+                  <div>{countableLogs.length} 条记录</div>
                   <div>{Math.round(totalDuration / 60)} 分钟</div>
                 </div>
               </div>

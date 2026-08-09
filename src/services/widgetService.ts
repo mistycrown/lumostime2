@@ -19,7 +19,8 @@
  * @updated 2026-05-05: Preserved scene-widget runtime source metadata when converting between native runtime state and app sessions.
  * @updated 2026-08-09: Planned timeline blocks are excluded from widget statistics and tracking payloads.
  * @updated 2026-08-09: Added principle-card widget payload building from the local principle library with default preset fallback.
-*/
+ * @updated 2026-08-09: Uses deterministic fallback ids for principle cards without stored ids so native shuffle state stays stable.
+ */
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, CheckTemplate, DailyReview, Log, TodoItem } from '../types';
 import type {
@@ -133,6 +134,15 @@ const normalizePositiveInt = (value?: number | null, fallback: number = 1): numb
   return Math.max(1, Math.floor(value));
 };
 
+const createFallbackPrincipleCardId = (title: string, frontText: string, backText: string): string => {
+  const source = `${title}\n${frontText}\n${backText}`;
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) {
+    hash = Math.imul(hash ^ source.charCodeAt(index), 16777619) >>> 0;
+  }
+  return `principle-${hash.toString(36)}`;
+};
+
 const normalizePrincipleCard = (value: unknown): WidgetBridgePrincipleCard | null => {
   if (!value || typeof value !== 'object') {
     return null;
@@ -149,7 +159,7 @@ const normalizePrincipleCard = (value: unknown): WidgetBridgePrincipleCard | nul
   return {
     id: typeof candidate.id === 'string' && candidate.id.trim()
       ? candidate.id.trim()
-      : `principle-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      : createFallbackPrincipleCardId(title, frontText, backText),
     title,
     frontText,
     backText

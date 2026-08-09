@@ -5,6 +5,7 @@
  * @pos Service (Weekly Review Template)
  * @description Centralizes the weekly-review template workflow, including strict week-range parsing, method selection metadata, Weekly Review lookup/creation helpers, compact per-week data packaging, and prompt composition for both weekly-review chat and weekly-review narrative writeback.
  *
+ * @updated 2026-08-09: Excluded planned timeline blocks from the per-day duration digest while preserving the timeline context.
  * @updated 2026-05-13: Moved weekly-review prompt copy into a typed TS constant so the template flow no longer depends on a markdown asset or runtime fetch/parse path.
  */
 
@@ -21,6 +22,7 @@ import type {
 import { WEEKLY_REVIEW_TEMPLATE_PROMPTS } from '../constants/weeklyReviewTemplatePrompts';
 import { calculateMonthlyStats, formatDuration, generateCheckItemStatsText } from '../utils/reviewStatsUtils';
 import { getLocalDateStr, getLocalTimeStr, getWeekRange } from '../utils/dateUtils';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 const STRICT_JSON_OUTPUT_RULES = [
   '=== Structured Output Contract ===',
@@ -212,12 +214,13 @@ const buildTimelineDigest = (weekLogs: Log[], categories: Category[], todos: Tod
 };
 
 const buildDailyDurationDigest = (weekLogs: Log[]): string => {
-  if (weekLogs.length === 0) {
+  const countableWeekLogs = filterCountableLogs(weekLogs);
+  if (countableWeekLogs.length === 0) {
     return '本周没有按天可汇总的日志。';
   }
 
   const totals = new Map<string, number>();
-  weekLogs.forEach((log) => {
+  countableWeekLogs.forEach((log) => {
     const dayKey = toDayKey(log.startTime);
     const nextDuration = (totals.get(dayKey) || 0) + ((log.endTime - log.startTime) / 1000);
     totals.set(dayKey, nextDuration);

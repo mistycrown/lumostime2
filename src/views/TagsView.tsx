@@ -5,6 +5,7 @@
  * @output Selection Events, Category Updates
  * @pos View (Main Tab)
  * @description The main "Library" view displaying all Categories and Activities in a hierarchical list. Supports expanding/collapsing categories, switching to a Batch Management mode, and clearer activity card icon sizing.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from tag and category log counts.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -14,6 +15,7 @@ import { ChevronDown, ChevronRight, Settings2, Archive } from 'lucide-react';
 import { BatchManageView } from './BatchManageView';
 import { IconRenderer } from '../components/IconRenderer';
 import { isActivityArchived } from '../utils/archiveUtils';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 
 interface TagsViewProps {
@@ -42,7 +44,7 @@ export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectC
       const catCounts = new Map<string, number>();
       const actCounts = new Map<string, number>();
 
-      logs.forEach(log => {
+       filterCountableLogs(logs).forEach(log => {
          catCounts.set(log.categoryId, (catCounts.get(log.categoryId) || 0) + 1);
          actCounts.set(log.activityId, (actCounts.get(log.activityId) || 0) + 1);
       });

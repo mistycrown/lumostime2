@@ -4,6 +4,7 @@
  * @output Parsed monthly-review template targets, structured monthly context digests, and dedicated monthly-review AI prompt text
  * @pos Service (Monthly Review Template)
  * @description Centralizes the monthly-review template workflow, including strict month-range parsing, method selection metadata, Monthly Review lookup/creation helpers, compact per-month data packaging, and prompt composition for both monthly-review chat and monthly-review narrative writeback.
+ * @updated 2026-08-09: Excluded planned timeline blocks from the per-day duration digest while preserving the timeline context.
  * @updated 2026-05-13: Added the first monthly-review template service by mirroring the weekly-review template flow with month-based range selection and writeback.
  */
 
@@ -21,6 +22,7 @@ import type {
 import { MONTHLY_REVIEW_TEMPLATE_PROMPTS } from '../constants/monthlyReviewTemplatePrompts';
 import { calculateMonthlyStats, formatDuration, generateCheckItemStatsText } from '../utils/reviewStatsUtils';
 import { getLocalDateStr, getLocalTimeStr } from '../utils/dateUtils';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 const STRICT_JSON_OUTPUT_RULES = [
   '=== Structured Output Contract ===',
@@ -217,12 +219,13 @@ const buildTimelineDigest = (monthLogs: Log[], categories: Category[], todos: To
 };
 
 const buildDailyDurationDigest = (monthLogs: Log[]): string => {
-  if (monthLogs.length === 0) {
+  const countableMonthLogs = filterCountableLogs(monthLogs);
+  if (countableMonthLogs.length === 0) {
     return '本月没有按天可汇总的日志。';
   }
 
   const totals = new Map<string, number>();
-  monthLogs.forEach((log) => {
+  countableMonthLogs.forEach((log) => {
     const dayKey = toDayKey(log.startTime);
     const nextDuration = (totals.get(dayKey) || 0) + ((log.endTime - log.startTime) / 1000);
     totals.set(dayKey, nextDuration);

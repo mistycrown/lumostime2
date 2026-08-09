@@ -381,11 +381,12 @@ class ObsidianExportService {
         }
 
         // 2. 统计数据
-        const totalDuration = dayLogs.reduce((acc, l) => acc + l.duration, 0);
+        const countableDayLogs = filterCountableLogs(dayLogs);
+        const totalDuration = countableDayLogs.reduce((acc, l) => acc + l.duration, 0);
         const totalH = Math.floor(totalDuration / 3600);
         const totalM = Math.floor((totalDuration % 3600) / 60);
 
-        const focusLogs = dayLogs.filter(l => l.focusScore !== undefined);
+        const focusLogs = countableDayLogs.filter(l => l.focusScore !== undefined);
         const avgFocus = focusLogs.length > 0
             ? (focusLogs.reduce((acc, l) => acc + (l.focusScore || 0), 0) / focusLogs.length).toFixed(1)
             : 'N/A';
