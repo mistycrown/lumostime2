@@ -6,10 +6,12 @@
  * @description 筛选器详情页,展示匹配筛选器的记录的时间线和热力图
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from filter detail statistics while remaining visible in the timeline.
  */
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Filter, Log, Category, Scope, TodoItem, TodoCategory } from '../types';
 import { getFilteredLogs } from '../utils/filterUtils';
+import { filterCountableLogs } from '../utils/statLogUtils';
 import { DetailTimelineCard } from '../components/DetailTimelineCard';
 import { Clock, ChevronLeft } from 'lucide-react';
 import { IconRenderer } from '../components/IconRenderer';
@@ -58,9 +60,10 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
             todoCategories
         });
     }, [logs, filter, categories, scopes, todos, todoCategories]);
+    const countableLogs = useMemo(() => filterCountableLogs(filteredLogs), [filteredLogs]);
 
     // 总计统计
-    const totalSeconds = filteredLogs.reduce((acc, curr) => acc + curr.duration, 0);
+    const totalSeconds = countableLogs.reduce((acc, curr) => acc + curr.duration, 0);
     const totalHours = Math.floor(totalSeconds / 3600);
     const totalMins = Math.floor((totalSeconds % 3600) / 60);
 
@@ -70,7 +73,7 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
 
     const heatmapData = useMemo(() => {
         const map = new Map<number, number>();
-        filteredLogs.forEach(log => {
+        countableLogs.forEach(log => {
             const d = new Date(log.startTime);
             if (d.getMonth() === displayMonth && d.getFullYear() === displayYear) {
                 const day = d.getDate();
@@ -78,12 +81,12 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
             }
         });
         return map;
-    }, [filteredLogs, displayMonth, displayYear]);
+    }, [countableLogs, displayMonth, displayYear]);
 
-    const monthLogs = useMemo(() => filteredLogs.filter(log => {
+    const monthLogs = useMemo(() => countableLogs.filter(log => {
         const d = new Date(log.startTime);
         return d.getMonth() === displayMonth && d.getFullYear() === displayYear;
-    }), [filteredLogs, displayMonth, displayYear]);
+    }), [countableLogs, displayMonth, displayYear]);
 
     const monthSeconds = monthLogs.reduce((acc, curr) => acc + curr.duration, 0);
     const monthHours = Math.floor(monthSeconds / 3600);
@@ -128,7 +131,7 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
             weeks.set(key, 0);
         }
 
-        filteredLogs.forEach(log => {
+        countableLogs.forEach(log => {
             const d = new Date(log.startTime);
             const weekNum = Math.ceil((((d.getTime() - new Date(d.getFullYear(), 0, 1).getTime()) / 86400000) + new Date(d.getFullYear(), 0, 1).getDay() + 1) / 7);
             const k = `${d.getFullYear()}-W${weekNum}`;
@@ -140,7 +143,7 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
         return Array.from(weeks.entries())
             .sort((a, b) => a[0].localeCompare(b[0]))
             .slice(-12);
-    }, [filteredLogs]);
+    }, [countableLogs]);
 
     // Trend View Data Preparation - Monthly (New)
     const monthlyTrend = useMemo(() => {
@@ -152,7 +155,7 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
             months.set(key, 0);
         }
 
-        filteredLogs.forEach(log => {
+        countableLogs.forEach(log => {
             const d = new Date(log.startTime);
             const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
             if (months.has(key)) {
@@ -161,7 +164,7 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
         });
 
         return Array.from(months.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-    }, [filteredLogs]);
+    }, [countableLogs]);
 
     // Trend View Data Preparation - Contribution Graph (New)
     const contributionData = useMemo(() => {
@@ -171,7 +174,7 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
         startDate.setDate(today.getDate() - 364); // Last ~1 year (52 weeks * 7 + 1)
 
         const dayMap = new Map<string, number>();
-        filteredLogs.forEach(log => {
+        countableLogs.forEach(log => {
             const d = new Date(log.startTime);
             const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
             dayMap.set(key, (dayMap.get(key) || 0) + log.duration);
@@ -204,14 +207,14 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
         if (currentWeek.length > 0) weeks.push(currentWeek); // partial week
 
         return { weeks, maxVal };
-    }, [filteredLogs]);
+    }, [countableLogs]);
 
     // Rhythm View Data Preparation (Moved to top level)
     const rhythmStats = useMemo(() => {
         const hourDistribution = new Array(24).fill(0);
         const weekDistribution = new Array(7).fill(0);
 
-        filteredLogs.forEach(log => {
+        countableLogs.forEach(log => {
             // Distribute duration across hours for 24h distribution
             const start = new Date(log.startTime);
             const end = new Date(log.startTime + (log.duration * 1000));
@@ -237,11 +240,11 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
         });
 
         return { hourDistribution, weekDistribution };
-    }, [filteredLogs]);
+    }, [countableLogs]);
 
     // Focus View Data Preparation (Updated)
     const focusStats = useMemo(() => {
-        const focusedLogs = filteredLogs.filter(l => l.focusScore && l.focusScore > 0);
+        const focusedLogs = countableLogs.filter(l => l.focusScore && l.focusScore > 0);
         const focusCount = focusedLogs.length;
         const totalFocusScore = focusedLogs.reduce((acc, curr) => acc + (curr.focusScore || 0), 0);
         const avgFocus = focusCount > 0 ? (totalFocusScore / focusCount).toFixed(1) : '0.0';
@@ -286,21 +289,21 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
             }
         });
 
-        const minTime = Math.min(...filteredLogs.map(l => l.startTime));
-        const maxTime = Math.max(...filteredLogs.map(l => l.startTime));
+        const minTime = Math.min(...countableLogs.map(l => l.startTime));
+        const maxTime = Math.max(...countableLogs.map(l => l.startTime));
         const timeSpan = maxTime - minTime || 1;
-        const maxDur = Math.max(...filteredLogs.map(l => l.duration), 1);
+        const maxDur = Math.max(...countableLogs.map(l => l.duration), 1);
 
         return {
             focusedLogs, focusCount, avgFocus, scoreDist,
             minTime, timeSpan, maxDur,
             hourDist, weekDist, monthDist
         };
-    }, [filteredLogs]);
+    }, [countableLogs]);
 
     // Mood View Data Preparation
     const moodStats = useMemo(() => {
-        const moodLogs = filteredLogs.filter(l => l.moodScore && l.moodScore > 0);
+        const moodLogs = countableLogs.filter(l => l.moodScore && l.moodScore > 0);
         const moodCount = moodLogs.length;
         const totalMoodScore = moodLogs.reduce((acc, curr) => acc + (curr.moodScore || 0), 0);
         const avgMood = moodCount > 0 ? (totalMoodScore / moodCount).toFixed(1) : '0.0';
@@ -345,17 +348,17 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
             }
         });
 
-        const minTime = Math.min(...filteredLogs.map(l => l.startTime));
-        const maxTime = Math.max(...filteredLogs.map(l => l.startTime));
+        const minTime = Math.min(...countableLogs.map(l => l.startTime));
+        const maxTime = Math.max(...countableLogs.map(l => l.startTime));
         const timeSpan = maxTime - minTime || 1;
-        const maxDur = Math.max(...filteredLogs.map(l => l.duration), 1);
+        const maxDur = Math.max(...countableLogs.map(l => l.duration), 1);
 
         return {
             moodLogs, moodCount, avgMood, scoreDist,
             minTime, timeSpan, maxDur,
             hourDist, weekDist, monthDist
         };
-    }, [filteredLogs]);
+    }, [countableLogs]);
 
 
     // Helper: Generate consistent color from string
@@ -693,7 +696,7 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
                                 <span className="text-xs font-bold text-stone-900 tracking-wider">专注记录</span>
                                 <div className="flex flex-col items-center">
                                     <span className="text-4xl font-black font-mono tracking-tight text-stone-800">{focusCount}</span>
-                                    <span className="text-xs text-stone-300 font-bold mt-1">占比 {filteredLogs.length > 0 ? Math.round((focusCount / filteredLogs.length) * 100) : 0}%</span>
+                                    <span className="text-xs text-stone-300 font-bold mt-1">占比 {countableLogs.length > 0 ? Math.round((focusCount / countableLogs.length) * 100) : 0}%</span>
                                 </div>
                             </div>
                         </div>
@@ -883,7 +886,7 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
                                 <span className="text-xs font-bold text-stone-900 tracking-wider">情绪记录</span>
                                 <div className="flex flex-col items-center">
                                     <span className="text-4xl font-black font-mono tracking-tight text-stone-800">{moodCount}</span>
-                                    <span className="text-xs text-stone-300 font-bold mt-1">占比 {filteredLogs.length > 0 ? Math.round((moodCount / filteredLogs.length) * 100) : 0}%</span>
+                                    <span className="text-xs text-stone-300 font-bold mt-1">占比 {countableLogs.length > 0 ? Math.round((moodCount / countableLogs.length) * 100) : 0}%</span>
                                 </div>
                             </div>
                         </div>

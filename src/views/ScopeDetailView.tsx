@@ -6,6 +6,7 @@
  * @pos View (Detail Page)
  * @description A comprehensive detail view for a specific Scope (Domain). Features a heatmap, keyword analysis, note template management, matrix chart (Tags vs Time), and management of associated Goals, Major Goals, and Todos. The Goals tab displays both major goals (with their phase goals) and independent goals.
  * @updated 2026-06-13: Reused the shared hierarchical associated-todo list so subtasks render under parent todos in the association tab.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from scope detail statistics.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -33,6 +34,7 @@ import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 import { getNormalizedScopeIds } from '../utils/scopeStatsUtils';
 import { NoteTemplateManager } from '../components/NoteTemplateManager';
 import { AssociatedTodoList } from '../components/AssociatedTodoList';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 interface ScopeDetailViewProps {
     scope: Scope;
@@ -122,6 +124,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
         () => logs.filter((log) => getNormalizedScopeIds(log.scopeIds).includes(scope.id)),
         [logs, scope.id]
     );
+    const countableScopeLogs = useMemo(() => filterCountableLogs(scopeLogs), [scopeLogs]);
 
     // Filter todos linked to this scope
     const scopeTodos = useMemo(() => todos
@@ -130,7 +133,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
         [todos, scope.id]);
 
     // Calculate total stats (All time)
-    const totalSeconds = scopeLogs.reduce((acc, curr) => acc + curr.duration, 0);
+    const totalSeconds = countableScopeLogs.reduce((acc, curr) => acc + curr.duration, 0);
     const totalHours = Math.floor(totalSeconds / 3600);
     const totalMins = Math.floor((totalSeconds % 3600) / 60);
 
@@ -140,7 +143,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
 
     const heatmapData = useMemo(() => {
         const map = new Map<number, number>();
-        scopeLogs.forEach(log => {
+        countableScopeLogs.forEach(log => {
             const d = new Date(log.startTime);
             if (d.getMonth() === displayMonth && d.getFullYear() === displayYear) {
                 const day = d.getDate();
@@ -148,13 +151,13 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
             }
         });
         return map;
-    }, [scopeLogs, displayMonth, displayYear]);
+    }, [countableScopeLogs, displayMonth, displayYear]);
 
     // Month stats
-    const monthLogs = useMemo(() => scopeLogs.filter(log => {
+    const monthLogs = useMemo(() => countableScopeLogs.filter(log => {
         const d = new Date(log.startTime);
         return d.getMonth() === displayMonth && d.getFullYear() === displayYear;
-    }), [scopeLogs, displayMonth, displayYear]);
+    }), [countableScopeLogs, displayMonth, displayYear]);
 
     const monthSeconds = monthLogs.reduce((acc, curr) => acc + curr.duration, 0);
     const monthHours = Math.floor(monthSeconds / 3600);
@@ -218,7 +221,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     // Matrix Stats
     const matrixStats = useMemo(() => {
         // Filter logs based on analysisRange
-        const filteredLogs = scopeLogs.filter(log => {
+        const filteredLogs = countableScopeLogs.filter(log => {
             if (analysisRange === 'All') return true;
             const d = new Date(log.startTime);
             const target = analysisDate;
@@ -266,7 +269,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                 icon: act?.icon
             };
         });
-    }, [scopeLogs, categories, analysisRange, analysisDate]);
+    }, [countableScopeLogs, categories, analysisRange, analysisDate]);
 
     // Calculate total duration for the filtered range
     const analysisTotalDuration = useMemo(() => {

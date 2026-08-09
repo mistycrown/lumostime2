@@ -4,16 +4,19 @@
  * @output Full-screen achievement bottle experience with a bottle-first collapsed state and a ledger-first expanded state
  * @pos View (Achievement Overlay)
  * @description Achievement bottle full-screen page opened from Timeline. The collapsed state emphasizes the bottle, while the expanded state turns the screen into a full ledger workspace.
+ * @updated 2026-08-09: Added the fixed-height character profile mode and attribute management entry point.
  *
  * @updated 2026-07-11: Wired the records tab to the full achievement recomputation action.
  * @updated 2026-07-07: Shows split current/history bottle balances and feeds sealing with the shared achievement account summary.
  * @updated 2026-04-06: Collections tab now drives fixed-range sealing, archived bottle browsing, and shatter actions.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Archive, ChevronDown, Gift, ScrollText, SlidersHorizontal } from 'lucide-react';
+import { Archive, ChevronDown, FlaskConical, Gift, ScrollText, SlidersHorizontal, UserRound } from 'lucide-react';
 import { useAchievement } from '../contexts/AchievementContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { AchievementBottle } from '../components/achievement/AchievementBottle';
+import { AchievementCharacterProfile } from '../components/achievement/AchievementCharacterProfile';
+import { AchievementAttributeSettingsDialog } from '../components/achievement/AchievementAttributeSettingsDialog';
 import { AchievementCollectionsTab } from '../components/achievement/AchievementCollectionsTab';
 import { AchievementRecordsTab } from '../components/achievement/AchievementRecordsTab';
 import { AchievementRulesTab } from '../components/achievement/AchievementRulesTab';
@@ -42,6 +45,12 @@ export const AchievementView: React.FC = () => {
     rewards,
     collections,
     dailySnapshots,
+    attributes,
+    attributeExperience,
+    attributeLevels,
+    totalExperience,
+    totalLevelProgress,
+    growthDailySnapshots,
     redemptionRecords,
     archivedBottles,
     sealPreview,
@@ -53,6 +62,10 @@ export const AchievementView: React.FC = () => {
     createRule,
     updateRule,
     deleteRule,
+    createAttribute,
+    updateAttribute,
+    deleteAttribute,
+    reorderAttributes,
     createReward,
     updateReward,
     deleteReward,
@@ -70,6 +83,8 @@ export const AchievementView: React.FC = () => {
   const [pendingTab, setPendingTab] = useState<AchievementTab | null>(null);
   const [isDetailContentVisible, setIsDetailContentVisible] = useState(false);
   const [hasEnsuredSnapshots, setHasEnsuredSnapshots] = useState(false);
+  const [topPanelMode, setTopPanelMode] = useState<'bottle' | 'character'>('bottle');
+  const [isAttributeSettingsOpen, setIsAttributeSettingsOpen] = useState(false);
   const renderedBottleStars = getAchievementRenderableStarCount(availableStars);
 
   useEffect(() => {
@@ -121,9 +136,11 @@ export const AchievementView: React.FC = () => {
   const tabContent = useMemo(() => {
     if (activeTab === 'records') {
       return (
-        <AchievementRecordsTab
-          snapshots={dailySnapshots}
-          redemptionRecords={redemptionRecords}
+          <AchievementRecordsTab
+            snapshots={dailySnapshots}
+            growthSnapshots={growthDailySnapshots}
+            attributes={attributes}
+            redemptionRecords={redemptionRecords}
           onDeleteRedemptionRecord={deleteRedemptionRecord}
           onRecomputeSnapshot={recomputeSnapshotForDate}
           onRecomputeAllData={recomputeAllAchievementData}
@@ -139,6 +156,7 @@ export const AchievementView: React.FC = () => {
           todoCategories={todoCategories}
           checkTemplates={checkTemplates}
           rules={rules}
+          attributes={attributes}
           onCreateRule={createRule}
           onUpdateRule={updateRule}
           onDeleteRule={deleteRule}
@@ -180,6 +198,8 @@ export const AchievementView: React.FC = () => {
     createReward,
     createRule,
     dailySnapshots,
+    growthDailySnapshots,
+    attributes,
     deleteRedemptionRecord,
     deleteReward,
     deleteRule,
@@ -201,7 +221,7 @@ export const AchievementView: React.FC = () => {
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[#faf9f6] text-stone-900">
       <section
-        className={`pointer-events-none absolute inset-x-0 top-0 px-4 pb-3 pt-4 transition-all ${
+        className={`${topPanelMode === 'character' ? 'pointer-events-auto' : 'pointer-events-none'} absolute inset-x-0 top-0 px-4 pb-3 pt-4 transition-all ${
           isDetailExpanded ? 'translate-y-2 opacity-0' : 'translate-y-0 opacity-100'
         }`}
         style={{
@@ -210,15 +230,37 @@ export const AchievementView: React.FC = () => {
         }}
         aria-hidden={isDetailExpanded}
       >
-        <AchievementBottle
-          starCount={availableStars}
-          currentStarCount={accountSummary.currentStars}
-          historyStarCount={accountSummary.historyStars}
-          rebuildToken={renderedBottleStars}
-          compact={false}
-          styleVariant={achievementBottleStyle}
-          iconPack={achievementBottleIconPack}
-        />
+        <div className={`absolute right-4 top-3 z-30 ${isDetailExpanded ? 'pointer-events-none' : 'pointer-events-auto'}`}>
+          <button
+            type="button"
+            onClick={() => setTopPanelMode((previous) => (previous === 'bottle' ? 'character' : 'bottle'))}
+            title={topPanelMode === 'bottle' ? '切换到人物属性' : '切换到光点瓶'}
+            aria-label={topPanelMode === 'bottle' ? '切换到人物属性' : '切换到光点瓶'}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 bg-white/85 text-stone-500 shadow-sm backdrop-blur-sm transition-colors hover:bg-white hover:text-stone-900"
+          >
+            {topPanelMode === 'bottle' ? <UserRound size={15} /> : <FlaskConical size={15} />}
+          </button>
+        </div>
+        {topPanelMode === 'bottle' ? (
+          <AchievementBottle
+            starCount={availableStars}
+            currentStarCount={accountSummary.currentStars}
+            historyStarCount={accountSummary.historyStars}
+            rebuildToken={renderedBottleStars}
+            compact={false}
+            styleVariant={achievementBottleStyle}
+            iconPack={achievementBottleIconPack}
+          />
+        ) : (
+          <AchievementCharacterProfile
+            attributes={attributes}
+            attributeExperience={attributeExperience}
+            attributeLevels={attributeLevels}
+            totalExperience={totalExperience}
+            totalLevelProgress={totalLevelProgress}
+            onManageAttributes={() => setIsAttributeSettingsOpen(true)}
+          />
+        )}
       </section>
 
       <section
@@ -294,6 +336,16 @@ export const AchievementView: React.FC = () => {
           )}
         </div>
       </section>
+
+      <AchievementAttributeSettingsDialog
+        isOpen={isAttributeSettingsOpen}
+        attributes={attributes}
+        onClose={() => setIsAttributeSettingsOpen(false)}
+        onCreate={createAttribute}
+        onUpdate={updateAttribute}
+        onDelete={deleteAttribute}
+        onReorder={reorderAttributes}
+      />
     </div>
   );
 };

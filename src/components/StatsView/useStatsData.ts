@@ -1,12 +1,14 @@
 /**
  * @file useStatsData.ts
  * @description Custom hook for calculating statistics data
+ * @updated 2026-08-09: Planned timeline blocks are excluded from legacy stats hooks.
  */
 
 import { useMemo } from 'react';
 import { Log, Category, Activity, TodoItem, TodoCategory, Scope, DailyReview } from '../../types';
 import { getColorHexForCharts } from '../../utils/colorAdapterUtils';
 import { getLogDurationSeconds, getNormalizedScopeIds, summarizeScopeDurations } from '../../utils/scopeStatsUtils';
+import { filterCountableLogs } from '../../utils/statLogUtils';
 
 interface ActivityStat extends Activity {
   duration: number;
@@ -28,12 +30,13 @@ export const useStatsData = (
   categories: Category[]
 ): StatsData => {
   return useMemo(() => {
-    const totalDuration = filteredLogs.reduce((acc, log) => 
+    const countableLogs = filterCountableLogs(filteredLogs);
+    const totalDuration = countableLogs.reduce((acc, log) => 
       acc + Math.max(0, (log.endTime - log.startTime) / 1000), 0
     );
     
     const categoryStats: CategoryStat[] = categories.map(cat => {
-      const catLogs = filteredLogs.filter(l => l.categoryId === cat.id);
+      const catLogs = countableLogs.filter(l => l.categoryId === cat.id);
       const catDuration = catLogs.reduce((acc, l) => 
         acc + Math.max(0, (l.endTime - l.startTime) / 1000), 0
       );
@@ -64,7 +67,7 @@ export const useTodoStats = (
   todoCategories: TodoCategory[]
 ) => {
   return useMemo(() => {
-    const logsWithTodos = filteredLogs.filter(l => l.linkedTodoId);
+    const logsWithTodos = filterCountableLogs(filteredLogs).filter(l => l.linkedTodoId);
     const totalDuration = logsWithTodos.reduce((acc, log) => 
       acc + Math.max(0, (log.endTime - log.startTime) / 1000), 0
     );
@@ -111,7 +114,7 @@ export const useScopeStats = (
   categories: Category[]
 ) => {
   return useMemo(() => {
-    const logsWithScopes = filteredLogs.filter(l => getNormalizedScopeIds(l.scopeIds).length > 0);
+    const logsWithScopes = filterCountableLogs(filteredLogs).filter(l => getNormalizedScopeIds(l.scopeIds).length > 0);
     const { totalAttributedDuration, scopeDurations } = summarizeScopeDurations(logsWithScopes);
     const scopeActivityBreakdown: Record<string, Record<string, number>> = {};
 
@@ -161,7 +164,7 @@ export const usePreviousStats = (
   categories: Category[]
 ) => {
   const previousFilteredLogs = useMemo(() => {
-    return logs.filter(log =>
+    return filterCountableLogs(logs).filter(log =>
       log.startTime >= previousRange.start.getTime() &&
       log.endTime <= previousRange.end.getTime() &&
       !excludedCategoryIds.includes(log.categoryId)

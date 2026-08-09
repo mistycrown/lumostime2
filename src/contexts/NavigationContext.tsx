@@ -1,6 +1,7 @@
 /**
  * @file NavigationContext.tsx
  * @updated 2026-05-12: Added nested todo-detail history state so detail-to-detail navigation can unwind back to the previous task page instead of closing straight to the root view.
+ * @updated 2026-08-09: Added daily-check overview/detail navigation state.
  * @description 统一管理应用的所有导航和模态状态（含设置子页层级）
  */
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
@@ -196,6 +197,10 @@ interface NavigationContextType {
     currentDate: Date;
     setCurrentDate: (date: Date) => void;
 
+    // Daily Check Detail
+    dailyCheckDetailId: string | null;
+    setDailyCheckDetailId: (id: string | null) => void;
+
     // Navigation History
     previousView: AppView | null;
     setPreviousView: (view: AppView | null) => void;
@@ -338,6 +343,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [isGalleryViewOpen, setIsGalleryViewOpen] = useState(false);
     const [isExportViewOpen, setIsExportViewOpen] = useState(false);
     const [currentDate, setCurrentDate] = useState<Date>(new Date());
+    const [dailyCheckDetailId, setDailyCheckDetailId] = useState<string | null>(null);
     const [previousView, setPreviousView] = useState<AppView | null>(null);
 
     useEffect(() => {
@@ -505,6 +511,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setIsExportViewOpen,
             currentDate,
             setCurrentDate,
+            dailyCheckDetailId,
+            setDailyCheckDetailId,
             previousView,
             setPreviousView
         }}>

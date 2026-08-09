@@ -594,6 +594,8 @@ export const VIEW_TITLES: Record<AppView, string> = {
   [AppView.RECORD]: 'LumosTime',
   [AppView.TIMELINE]: '时间轴',
   [AppView.STATS]: '数据统计',
+  [AppView.DAILY_CHECKS]: '日课总览',
+  [AppView.DAILY_CHECK_DETAIL]: '日课详情',
   [AppView.TAGS]: '标签管理',
   [AppView.SCOPE]: '领域',
   [AppView.TODO]: 'TODO',

@@ -1,6 +1,7 @@
 /**
  * @file types.ts
  * @updated 2026-08-06: Added backward-compatible archive state to activities.
+ * @updated 2026-08-09: Added character attributes, experience ledgers, and optional fixed-rule attribute experience effects.
  * @input None
  * @output TypeScript Interfaces & Types
  * @pos Type Definitions (Shared contract)
@@ -452,6 +453,11 @@ export interface ParsedTimeEntry {
 
 export type AchievementRuleTargetType = 'activity' | 'scope' | 'todoCategory' | 'checkCategory' | 'filterDuration';
 
+export interface AchievementRuleAttributeEffect {
+  attributeId: string;
+  expPerUnit: number;
+}
+
 export interface AchievementRule {
   id: string;
   name: string;
@@ -465,6 +471,7 @@ export interface AchievementRule {
   unitAmount: number;
   deltaPerUnit: number;
   roundingMode: 'floor';
+  attributeEffect?: AchievementRuleAttributeEffect;
   note?: string;
   createdAt: number;
   updatedAt: number;
@@ -492,6 +499,54 @@ export interface AchievementDailySnapshot {
   netDelta: number;
   ruleBreakdown: AchievementDailyRuleBreakdown[];
   computedAt: number;
+}
+
+export interface AchievementAttribute {
+  id: string;
+  name: string;
+  subtitle: string;
+  icon: string;
+  color: string;
+  enabled: boolean;
+  sortOrder: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AchievementGrowthRuleBreakdown {
+  ruleId: string;
+  ruleName: string;
+  targetType: AchievementRuleTargetType;
+  attributeId: string;
+  attributeName: string;
+  matchedValue: number;
+  unitAmount: number;
+  appliedUnits: number;
+  expPerUnit: number;
+  deltaExp: number;
+  targetIds: string[];
+}
+
+export interface AchievementGrowthAttributeChange {
+  attributeId: string;
+  attributeName: string;
+  deltaExp: number;
+  ruleBreakdown: AchievementGrowthRuleBreakdown[];
+}
+
+export interface AchievementGrowthDailySnapshot {
+  id: string;
+  date: string;
+  attributeChanges: AchievementGrowthAttributeChange[];
+  computedAt: number;
+}
+
+export interface AchievementLevelProgress {
+  level: number;
+  currentExperience: number;
+  nextLevelExperience: number;
+  levelExperienceRange: number;
+  progress: number;
 }
 
 export interface AchievementReward {
@@ -594,6 +649,7 @@ export interface AchievementAccountSummary {
 
 export interface AchievementMeta {
   achievementStartDate: string | null;
+  growthStartDate?: string | null;
   activeBottleCarryoverStars: number;
   checkStreakConfig?: CheckStreakConfig;
 }
@@ -602,6 +658,8 @@ export enum AppView {
   RECORD = 'RECORD',
   TIMELINE = 'TIMELINE',
   STATS = 'STATS',
+  DAILY_CHECKS = 'DAILY_CHECKS',
+  DAILY_CHECK_DETAIL = 'DAILY_CHECK_DETAIL',
   TAGS = 'TAGS',
   SCOPE = 'SCOPE', // NEW
   REVIEW = 'REVIEW', // NEW: Review Hub

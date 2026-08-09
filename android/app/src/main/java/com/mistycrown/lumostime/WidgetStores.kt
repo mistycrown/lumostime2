@@ -14,6 +14,7 @@ import org.json.JSONObject
  * Updated 2026-05-05: Added scene-widget morning refresh date tracking so the first morning unlock only refreshes once per day.
  * Updated 2026-05-05: Expanded TODAY + PIN payload storage to retain mirrored source todos/categories for native-side list rebuilding.
  * Updated 2026-08-06: Persists scene time-slot UI icon asset paths when reloading native payloads.
+ * Updated 2026-08-09: Persists principle-card widget payloads and per-instance shuffle state.
  */
 object WidgetStores {
     private const val PREFS_NAME = "lumostime_widget_timer"
@@ -27,6 +28,8 @@ object WidgetStores {
     private const val KEY_DAILY_RUNTIME_SYNC = "daily_runtime_sync_v1"
     private const val KEY_TODO_PIN_SYNC = "todo_pin_sync_v1"
     private const val KEY_TRACKING_CALENDAR_SYNC = "tracking_calendar_sync_v1"
+    private const val KEY_PRINCIPLE_CARD_SYNC = "principle_card_sync_v1"
+    private const val KEY_PRINCIPLE_CARD_STATES = "principle_card_states_v1"
     private const val KEY_SCENE_SYNC = "scene_sync_v1"
     private const val KEY_SCENE_SELECTIONS = "scene_selections_v1"
     private const val KEY_SCENE_MORNING_REFRESH_DATE = "scene_morning_refresh_date_v1"
@@ -696,6 +699,35 @@ object WidgetStores {
             put("syncedAt", payload.syncedAt)
         }
         editor.putString(KEY_TRACKING_CALENDAR_SYNC, json.toString()).commit()
+    }
+
+    fun loadPrincipleCardPayload(context: Context): WidgetPrincipleCardPayload? {
+        val raw = prefs(context).getString(KEY_PRINCIPLE_CARD_SYNC, null)
+        if (raw.isNullOrBlank()) {
+            return null
+        }
+
+        return runCatching {
+            val json = JSONObject(raw)
+            WidgetPrincipleCardPayload(
+                principles = json.optJSONArray("principles").toPrincipleCardList(),
+                syncedAt = json.optLong("syncedAt", System.currentTimeMillis())
+            )
+        }.getOrNull()
+    }
+
+    fun savePrincipleCardPayload(context: Context, payload: WidgetPrincipleCardPayload?) {
+        val editor = prefs(context).edit()
+        if (payload == null) {
+            editor.remove(KEY_PRINCIPLE_CARD_SYNC).commit()
+            return
+        }
+
+        val json = JSONObject().apply {
+            put("principles", payload.principles.toPrincipleCardJsonArray())
+            put("syncedAt", payload.syncedAt)
+        }
+        editor.putString(KEY_PRINCIPLE_CARD_SYNC, json.toString()).commit()
     }
 
     fun loadScenePayload(context: Context): WidgetScenePayload? {

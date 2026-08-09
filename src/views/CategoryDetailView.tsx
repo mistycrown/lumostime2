@@ -5,6 +5,7 @@
  * @pos View (Detail Page)
  * @description Displays comprehensive analytics for a specific category, including a heatmap, history log, focus trends, cross-analysis with scopes, and inline-managed note templates.
  * @updated 2026-06-13: Reused the shared hierarchical associated-todo list so subtasks render under parent todos in the association tab.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from category statistics.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -26,6 +27,7 @@ import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 import { getNormalizedScopeIds } from '../utils/scopeStatsUtils';
 import { NoteTemplateManager } from '../components/NoteTemplateManager';
 import { AssociatedTodoList } from '../components/AssociatedTodoList';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 interface CategoryDetailViewProps {
     categoryId: string;
@@ -78,6 +80,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
 
     // Filter logs for this category (All time)
     const catLogs = useMemo(() => logs.filter(l => l.categoryId === categoryId), [logs, categoryId]);
+    const countableCatLogs = useMemo(() => filterCountableLogs(catLogs), [catLogs]);
 
     // Associated Todos
     const catTodos = useMemo(() =>
@@ -88,7 +91,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
     // Matrix Stats (Scope Distribution)
     const matrixStats = useMemo(() => {
         // Filter logs based on analysisRange
-        const filteredLogs = catLogs.filter(log => {
+        const filteredLogs = countableCatLogs.filter(log => {
             if (analysisRange === 'All') return true;
             const d = new Date(log.startTime);
             const target = analysisDate;
@@ -133,7 +136,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                 icon: scope?.icon
             };
         });
-    }, [catLogs, scopes, analysisRange, analysisDate]);
+    }, [countableCatLogs, scopes, analysisRange, analysisDate]);
 
     // Calculate total duration for the filtered range
     const analysisTotalDuration = useMemo(() => {
@@ -141,7 +144,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
     }, [matrixStats]);
 
     // Total Stats
-    const totalSeconds = catLogs.reduce((acc, curr) => acc + curr.duration, 0);
+    const totalSeconds = countableCatLogs.reduce((acc, curr) => acc + curr.duration, 0);
     const totalHours = Math.floor(totalSeconds / 3600);
     const totalMins = Math.floor((totalSeconds % 3600) / 60);
 
@@ -149,10 +152,10 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
     const displayMonth = displayDate.getMonth();
     const displayYear = displayDate.getFullYear();
 
-    const monthLogs = useMemo(() => catLogs.filter(log => {
+    const monthLogs = useMemo(() => countableCatLogs.filter(log => {
         const d = new Date(log.startTime);
         return d.getMonth() === displayMonth && d.getFullYear() === displayYear;
-    }), [catLogs, displayMonth, displayYear]);
+    }), [countableCatLogs, displayMonth, displayYear]);
 
     const monthSeconds = monthLogs.reduce((acc, curr) => acc + curr.duration, 0);
     const monthHours = Math.floor(monthSeconds / 3600);
@@ -160,7 +163,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
 
     const heatmapData = useMemo(() => {
         const map = new Map<number, number>();
-        catLogs.forEach(log => {
+        countableCatLogs.forEach(log => {
             const d = new Date(log.startTime);
             if (d.getMonth() === displayMonth && d.getFullYear() === displayYear) {
                 const day = d.getDate();
@@ -168,7 +171,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
             }
         });
         return map;
-    }, [catLogs, displayMonth, displayYear]);
+    }, [countableCatLogs, displayMonth, displayYear]);
 
     const handleMonthChange = (offset: number) => {
         const newDate = new Date(displayDate);

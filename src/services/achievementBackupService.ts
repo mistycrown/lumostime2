@@ -4,6 +4,7 @@
  * @output Unified achievement backup payloads plus restore parsing helpers for export/import/cloud sync
  * @pos Service (Achievement Backup)
  * @description Centralizes the achievement bottle backup block so the full achievement state can travel inside the app's main backup JSON and cloud sync payload.
+ * @updated 2026-08-09: Added character attributes and independent growth snapshots to unified achievement backups.
  * @updated 2026-07-07: Reconstructs missing carryover meta from shattered archived bottles when importing older achievement backups.
  * @updated 2026-05-18: Added unified achievement backup export/restore helpers covering bottle meta, rules, rewards, collections, snapshots, records, and archived bottles.
  */
@@ -64,6 +65,10 @@ export const achievementBackupService = {
       rewards: snapshot.rewards,
       collections: snapshot.collections,
       dailySnapshots: snapshot.dailySnapshots,
+      ...(snapshot.attributes !== undefined ? { attributes: snapshot.attributes } : {}),
+      ...(snapshot.growthDailySnapshots !== undefined
+        ? { growthDailySnapshots: snapshot.growthDailySnapshots }
+        : {}),
       redemptionRecords: snapshot.redemptionRecords,
       collectionRecords: snapshot.collectionRecords,
       archivedBottles: snapshot.archivedBottles,
@@ -82,6 +87,8 @@ export const achievementBackupService = {
       'rewards',
       'collections',
       'dailySnapshots',
+      'attributes',
+      'growthDailySnapshots',
       'redemptionRecords',
       'collectionRecords',
       'archivedBottles',
@@ -114,6 +121,12 @@ export const achievementBackupService = {
       rewards: readArray(value.rewards),
       collections: readArray(value.collections),
       dailySnapshots: readArray(value.dailySnapshots),
+      ...(hasOwnProperty(value, 'attributes')
+        ? { attributes: readArray(value.attributes) }
+        : {}),
+      ...(hasOwnProperty(value, 'growthDailySnapshots')
+        ? { growthDailySnapshots: readArray(value.growthDailySnapshots) }
+        : {}),
       redemptionRecords,
       collectionRecords,
       archivedBottles,

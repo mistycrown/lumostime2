@@ -4,12 +4,14 @@
  * @output Focus Statistics & Stacked Bar Chart
  * @pos Component (Visualization)
  * @description Visualizes focus trends over time using a calendar heatmap and a stacked bar chart showing focus score distribution.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from focus chart statistics.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useMemo, useState } from 'react';
 import { Log } from '../types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 interface FocusChartsProps {
     logs: Log[];
@@ -26,6 +28,8 @@ const SCORE_COLORS = {
 };
 
 export const FocusCharts: React.FC<FocusChartsProps> = ({ logs, currentDate, onDateChange }) => {
+    const countableLogs = useMemo(() => filterCountableLogs(logs), [logs]);
+
     // Calculate Month Range for the Chart
     const range = useMemo(() => {
         const start = new Date(currentDate);
@@ -49,7 +53,7 @@ export const FocusCharts: React.FC<FocusChartsProps> = ({ logs, currentDate, onD
         }
 
         return days.map(day => {
-            const dayLogs = logs.filter(l => {
+            const dayLogs = countableLogs.filter(l => {
                 const d = new Date(l.startTime);
                 return d.getDate() === day.getDate() &&
                     d.getMonth() === day.getMonth() &&
@@ -79,7 +83,7 @@ export const FocusCharts: React.FC<FocusChartsProps> = ({ logs, currentDate, onD
                 totalHours // For bar height
             };
         });
-    }, [logs, range]);
+    }, [countableLogs, range]);
 
     // Stacked Bar Utils
     const maxBarHours = Math.max(...chartData.map(d => d.totalHours), 1);
@@ -126,7 +130,7 @@ export const FocusCharts: React.FC<FocusChartsProps> = ({ logs, currentDate, onD
     const getFocusColor = (date: Date | null) => {
         if (!date) return 'transparent';
         
-        const dayLogs = logs.filter(l => {
+        const dayLogs = countableLogs.filter(l => {
             const d = new Date(l.startTime);
             return d.getDate() === date.getDate() &&
                 d.getMonth() === date.getMonth() &&
@@ -239,13 +243,13 @@ export const FocusCharts: React.FC<FocusChartsProps> = ({ logs, currentDate, onD
                         <div className="text-2xl font-bold text-stone-900 font-mono">
                             {(() => {
                                 // All time
-                                const allFocusLogs = logs.filter(l => l.focusScore);
+                                const allFocusLogs = countableLogs.filter(l => l.focusScore);
                                 const allSeconds = allFocusLogs.reduce((acc, l) => acc + l.duration, 0);
                                 const allH = Math.floor(allSeconds / 3600);
                                 const allM = Math.floor((allSeconds % 3600) / 60);
 
                                 // Current month
-                                const monthFocusLogs = logs.filter(l => {
+                                const monthFocusLogs = countableLogs.filter(l => {
                                     const d = new Date(l.startTime);
                                     return d.getMonth() === currentDate.getMonth() &&
                                         d.getFullYear() === currentDate.getFullYear() &&
@@ -268,8 +272,8 @@ export const FocusCharts: React.FC<FocusChartsProps> = ({ logs, currentDate, onD
                         </div>
                         <div className="text-[10px] text-stone-500 bg-stone-100 inline-block px-2 py-1 rounded mt-2 font-bold">
                             {(() => {
-                                const allCount = logs.filter(l => l.focusScore).length;
-                                const monthCount = logs.filter(l => {
+                                const allCount = countableLogs.filter(l => l.focusScore).length;
+                                const monthCount = countableLogs.filter(l => {
                                     const d = new Date(l.startTime);
                                     return d.getMonth() === currentDate.getMonth() &&
                                         d.getFullYear() === currentDate.getFullYear() &&
@@ -284,7 +288,7 @@ export const FocusCharts: React.FC<FocusChartsProps> = ({ logs, currentDate, onD
                         <div className="text-xl font-bold text-stone-700 font-mono">
                             {(() => {
                                 // All time average
-                                const allFocusLogs = logs.filter(l => l.focusScore);
+                                const allFocusLogs = countableLogs.filter(l => l.focusScore);
                                 let allTotalWeighted = 0;
                                 let allTotalDuration = 0;
                                 allFocusLogs.forEach(l => {
@@ -296,7 +300,7 @@ export const FocusCharts: React.FC<FocusChartsProps> = ({ logs, currentDate, onD
                                 const allAvg = allTotalDuration > 0 ? (allTotalWeighted / allTotalDuration).toFixed(1) : '0.0';
 
                                 // Current month average
-                                const monthLogs = logs.filter(l => {
+                                const monthLogs = countableLogs.filter(l => {
                                     const d = new Date(l.startTime);
                                     return d.getMonth() === currentDate.getMonth() &&
                                         d.getFullYear() === currentDate.getFullYear() &&

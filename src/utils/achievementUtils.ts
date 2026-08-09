@@ -6,21 +6,28 @@
  * @description 成就系统计算工具 - 负责每日快照计算、日期枚举和账本汇总。
  *
  * @updated 2026-07-11: Added full-ledger redemption rebuild helpers for achievement all-data recomputation.
+ * @updated 2026-08-09: Added fixed-rule character growth snapshots, experience totals, and level progress helpers.
  * @updated 2026-07-11: Added todo-category subtask inclusion handling so achievement rules can count parent tasks only unless explicitly configured otherwise.
  * @updated 2026-06-30: Added shared seal validation so bottles cannot be sealed while the current active balance is negative.
  * @updated 2026-07-07: Added explicit current/history account summaries and made seal previews use the current-bottle account balance.
  * @updated 2026-04-25: Added check-category streak weighting so daily check rules can sum per-item multiplier contributions.
  * @updated 2026-04-17: Added filter-expression duration rules that reuse the shared custom-filter matching logic.
  * @updated 2026-04-07: Separates live-period spending from remaining carryover so archived carryover-funded redemptions do not inflate the active balance.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from achievement snapshot statistics.
  */
 import {
   AchievementArchivedBottle,
+  AchievementAttribute,
   AchievementBottleActionRecord,
   AchievementCollectionRecord,
   AchievementDailySnapshot,
   AchievementDailyRuleBreakdown,
   AchievementAccountSummary,
   AchievementCollection,
+  AchievementGrowthAttributeChange,
+  AchievementGrowthDailySnapshot,
+  AchievementGrowthRuleBreakdown,
+  AchievementLevelProgress,
   CheckStreakConfig,
   CheckTemplate,
   AchievementRedemptionRecord,
@@ -34,6 +41,7 @@ import {
 import { getLocalDateStr } from './dateUtils';
 import { getCheckCategoryWeightedCompletionValue } from './checkStreakUtils';
 import { FilterContext, matchesFilter, parseFilterExpression } from './filterUtils';
+import { filterCountableLogs } from './statLogUtils';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ACHIEVEMENT_STAR_DECIMALS = 1;
@@ -89,7 +97,8 @@ const isAchievementDateInRange = (date: string, startDate: string, endDate: stri
 };
 
 const normalizeUnitAmount = (rule: AchievementRule | (AchievementRule & { unitMinutes?: number })): number => {
-  return Math.max(1, Math.floor(rule.unitAmount ?? rule.unitMinutes ?? 1));
+  const legacyRule = rule as AchievementRule & { unitMinutes?: number };
+  return Math.max(1, Math.floor(legacyRule.unitAmount ?? legacyRule.unitMinutes ?? 1));
 };
 
 const getDurationMinutesFromLogs = (logs: Log[]): number => {
@@ -154,8 +163,41 @@ export const normalizeAchievementRule = (
   filterExpression: rule.filterExpression?.trim() || undefined,
   unitAmount: normalizeUnitAmount(rule),
   deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(rule.deltaPerUnit || 1)),
-  targetIds: Array.isArray(rule.targetIds) ? rule.targetIds : []
+  targetIds: Array.isArray(rule.targetIds) ? rule.targetIds : [],
+  attributeEffect: rule.attributeEffect
+    && typeof rule.attributeEffect.attributeId === 'string'
+    && rule.attributeEffect.attributeId.trim()
+    && Number.isFinite(rule.attributeEffect.expPerUnit)
+    && rule.attributeEffect.expPerUnit > 0
+    ? {
+      attributeId: rule.attributeEffect.attributeId.trim(),
+      expPerUnit: Math.max(1, Math.floor(rule.attributeEffect.expPerUnit))
+    }
+    : undefined
 });
+
+export const normalizeAchievementAttribute = (
+  attribute: AchievementAttribute,
+  fallbackSortOrder = 0
+): AchievementAttribute => ({
+  ...attribute,
+  name: attribute.name?.trim() || '未命名属性',
+  subtitle: attribute.subtitle?.trim() || 'CUSTOM',
+  icon: attribute.icon?.trim() || 'Sparkles',
+  color: /^#[0-9a-f]{6}$/i.test(attribute.color || '') ? attribute.color : '#7D9687',
+  enabled: attribute.enabled !== false,
+  sortOrder: Number.isFinite(attribute.sortOrder) ? attribute.sortOrder : fallbackSortOrder,
+  createdAt: Number.isFinite(attribute.createdAt) ? attribute.createdAt : Date.now(),
+  updatedAt: Number.isFinite(attribute.updatedAt) ? attribute.updatedAt : Date.now()
+});
+
+export const sortAchievementAttributes = (
+  attributes: AchievementAttribute[]
+): AchievementAttribute[] => (
+  [...attributes]
+    .map((attribute, index) => normalizeAchievementAttribute(attribute, index))
+    .sort((first, second) => first.sortOrder - second.sortOrder || first.createdAt - second.createdAt)
+);
 
 export const normalizeAchievementSnapshot = (
   snapshot: AchievementDailySnapshot | (AchievementDailySnapshot & {
@@ -176,8 +218,22 @@ export const normalizeAchievementSnapshot = (
       ? item.includeSubtasks !== false
       : false,
     filterExpression: item.filterExpression?.trim() || undefined,
-    matchedValue: Math.max(0, normalizeAchievementStarValue(item.matchedValue ?? item.matchedMinutes ?? 0)),
-    unitAmount: Math.max(1, Math.floor(item.unitAmount ?? item.unitMinutes ?? 1)),
+    matchedValue: Math.max(
+      0,
+      normalizeAchievementStarValue(
+        item.matchedValue
+          ?? (item as AchievementDailyRuleBreakdown & { matchedMinutes?: number }).matchedMinutes
+          ?? 0
+      )
+    ),
+    unitAmount: Math.max(
+      1,
+      Math.floor(
+        item.unitAmount
+          ?? (item as AchievementDailyRuleBreakdown & { unitMinutes?: number }).unitMinutes
+          ?? 1
+      )
+    ),
     deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(item.deltaPerUnit || 1)),
     delta: normalizeAchievementStarValue(item.delta || 0),
     targetIds: Array.isArray(item.targetIds) ? item.targetIds : []
@@ -192,6 +248,14 @@ interface AchievementComputationContext extends FilterContext {
 export const getAchievementYesterday = (baseDate: Date = new Date()): string => {
   const yesterday = new Date(baseDate.getTime() - DAY_MS);
   return getLocalDateStr(yesterday);
+};
+
+export const getAchievementRecentGrowthStartDate = (
+  baseDate: Date = new Date(),
+  windowDays = 7
+): string => {
+  const safeWindowDays = Math.max(1, Math.floor(windowDays));
+  return shiftAchievementDate(getLocalDateStr(baseDate), -(safeWindowDays - 1));
 };
 
 export const enumerateAchievementDates = (startDate: string, endDate: string): string[] => {
@@ -239,7 +303,7 @@ export const computeAchievementDailySnapshot = (
         || rule.targetIds.length > 0
       )
     ));
-  const dayLogs = logs.filter((log) => getLocalDateStr(new Date(log.startTime)) === date);
+  const dayLogs = filterCountableLogs(logs).filter((log) => getLocalDateStr(new Date(log.startTime)) === date);
   const completedTodos = todos.filter((todo) => (
     todo.isCompleted
     && todo.completedAt
@@ -324,6 +388,177 @@ export const computeAchievementDailySnapshot = (
     computedAt: Date.now()
   };
 };
+
+export const normalizeAchievementGrowthSnapshot = (
+  snapshot: AchievementGrowthDailySnapshot
+): AchievementGrowthDailySnapshot => ({
+  ...snapshot,
+  attributeChanges: (snapshot.attributeChanges || []).map((change) => ({
+    ...change,
+    attributeId: change.attributeId || '',
+    attributeName: change.attributeName || '未命名属性',
+    deltaExp: Math.max(0, Math.floor(change.deltaExp || 0)),
+    ruleBreakdown: (change.ruleBreakdown || []).map((item) => ({
+      ...item,
+      attributeId: item.attributeId || change.attributeId || '',
+      attributeName: item.attributeName || change.attributeName || '未命名属性',
+      matchedValue: Math.max(0, item.matchedValue || 0),
+      unitAmount: Math.max(1, Math.floor(item.unitAmount || 1)),
+      appliedUnits: Math.max(0, Math.floor(item.appliedUnits || 0)),
+      expPerUnit: Math.max(1, Math.floor(item.expPerUnit || 1)),
+      deltaExp: Math.max(0, Math.floor(item.deltaExp || 0)),
+      targetIds: Array.isArray(item.targetIds) ? item.targetIds : []
+    }))
+  }))
+});
+
+export const sortAchievementGrowthSnapshots = (
+  snapshots: AchievementGrowthDailySnapshot[]
+): AchievementGrowthDailySnapshot[] => (
+  [...snapshots]
+    .map(normalizeAchievementGrowthSnapshot)
+    .sort((first, second) => first.date.localeCompare(second.date))
+);
+
+export const computeAchievementGrowthDailySnapshot = (
+  date: string,
+  logs: Log[],
+  todos: TodoItem[],
+  dailyReviews: DailyReview[],
+  rules: AchievementRule[],
+  attributes: AchievementAttribute[],
+  filterContext?: AchievementComputationContext
+): AchievementGrowthDailySnapshot => {
+  const activeAttributeMap = new Map(
+    attributes
+      .filter((attribute) => attribute.enabled !== false)
+      .map((attribute) => [attribute.id, normalizeAchievementAttribute(attribute)])
+  );
+  const starSnapshot = computeAchievementDailySnapshot(
+    date,
+    logs,
+    todos,
+    dailyReviews,
+    rules,
+    filterContext
+  );
+  const breakdownByRuleId = new Map(
+    starSnapshot.ruleBreakdown.map((breakdown) => [breakdown.ruleId, breakdown])
+  );
+  const changesByAttributeId = new Map<string, AchievementGrowthAttributeChange>();
+
+  rules
+    .map(normalizeAchievementRule)
+    .filter((rule) => Boolean(rule.attributeEffect))
+    .forEach((rule) => {
+      const attributeEffect = rule.attributeEffect;
+      if (!attributeEffect) {
+        return;
+      }
+
+      const attribute = activeAttributeMap.get(attributeEffect.attributeId);
+      const matchedRule = breakdownByRuleId.get(rule.id);
+      if (!attribute || !matchedRule) {
+        return;
+      }
+
+      const appliedUnits = Math.floor(
+        Math.max(0, matchedRule.matchedValue) / Math.max(1, rule.unitAmount)
+      );
+      const deltaExp = appliedUnits * attributeEffect.expPerUnit;
+      if (appliedUnits <= 0 || deltaExp <= 0) {
+        return;
+      }
+
+      const ruleBreakdown: AchievementGrowthRuleBreakdown = {
+        ruleId: rule.id,
+        ruleName: rule.name,
+        targetType: rule.targetType,
+        attributeId: attribute.id,
+        attributeName: attribute.name,
+        matchedValue: matchedRule.matchedValue,
+        unitAmount: rule.unitAmount,
+        appliedUnits,
+        expPerUnit: attributeEffect.expPerUnit,
+        deltaExp,
+        targetIds: [...rule.targetIds]
+      };
+      const previous = changesByAttributeId.get(attribute.id);
+      if (previous) {
+        previous.deltaExp += deltaExp;
+        previous.ruleBreakdown.push(ruleBreakdown);
+        return;
+      }
+
+      changesByAttributeId.set(attribute.id, {
+        attributeId: attribute.id,
+        attributeName: attribute.name,
+        deltaExp,
+        ruleBreakdown: [ruleBreakdown]
+      });
+    });
+
+  return {
+    id: crypto.randomUUID(),
+    date,
+    attributeChanges: Array.from(changesByAttributeId.values()),
+    computedAt: Date.now()
+  };
+};
+
+export const calculateAchievementAttributeExperience = (
+  snapshots: AchievementGrowthDailySnapshot[],
+  attributes: AchievementAttribute[] = []
+): Record<string, number> => {
+  const experience = Object.fromEntries(attributes.map((attribute) => [attribute.id, 0])) as Record<string, number>;
+  snapshots.forEach((snapshot) => {
+    snapshot.attributeChanges.forEach((change) => {
+      experience[change.attributeId] = (experience[change.attributeId] || 0) + Math.max(0, change.deltaExp || 0);
+    });
+  });
+  return Object.fromEntries(
+    Object.entries(experience).map(([attributeId, value]) => [attributeId, Math.floor(value)])
+  );
+};
+
+export const calculateAchievementTotalExperience = (
+  snapshots: AchievementGrowthDailySnapshot[]
+): number => (
+  Math.floor(
+    snapshots.reduce((sum, snapshot) => (
+      sum + snapshot.attributeChanges.reduce((changeSum, change) => changeSum + Math.max(0, change.deltaExp || 0), 0)
+    ), 0)
+  )
+);
+
+export const getAchievementExperienceRequiredForLevel = (level: number): number => {
+  const safeLevel = Math.max(1, Math.floor(level));
+  return 50 * safeLevel * (safeLevel - 1);
+};
+
+export const getAchievementLevelProgress = (experience: number): AchievementLevelProgress => {
+  const safeExperience = Math.max(0, Math.floor(experience || 0));
+  let level = 1;
+  while (safeExperience >= getAchievementExperienceRequiredForLevel(level + 1)) {
+    level += 1;
+  }
+
+  const currentLevelStart = getAchievementExperienceRequiredForLevel(level);
+  const nextLevelExperience = getAchievementExperienceRequiredForLevel(level + 1);
+  const levelExperienceRange = Math.max(1, nextLevelExperience - currentLevelStart);
+
+  return {
+    level,
+    currentExperience: safeExperience - currentLevelStart,
+    nextLevelExperience,
+    levelExperienceRange,
+    progress: Math.min(1, Math.max(0, (safeExperience - currentLevelStart) / levelExperienceRange))
+  };
+};
+
+export const formatAchievementExperience = (value: number): string => (
+  Math.max(0, Math.floor(value || 0)).toLocaleString('en-US')
+);
 
 export const sortAchievementSnapshots = (snapshots: AchievementDailySnapshot[]): AchievementDailySnapshot[] => {
   return [...snapshots].sort((first, second) => first.date.localeCompare(second.date));

@@ -23,10 +23,11 @@
  * @updated 2026-07-31: Reads the active Chronicle layout from the app shell so repeated Timeline nav taps can switch layouts without overwriting the settings default.
  * @updated 2026-07-31: Keeps planned blocks out of the pure timeline record stream so idle gaps and export/gallery actions only use entity logs.
  * @updated 2026-07-31: Filters the todo sidebar daily checks against disabled template items before display and auto refresh.
+ * @updated 2026-08-09: Added the configurable shortcut to the daily-check overview page.
  */
 import React, { useMemo, useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule, Goal, CheckItem, CheckTemplate } from '../types';
+import { AppView, Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule, Goal, CheckItem, CheckTemplate } from '../types';
 import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
 import { Plus, MoreHorizontal, BarChart2, BookOpen, FlaskConical, RefreshCw, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon, Star, ChevronLeft, ChevronRight, ListFilter, ListTodo, X, Paintbrush, PanelRightClose } from 'lucide-react';
@@ -259,7 +260,10 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
         setIsAchievementOpen,
         setIsSettingsOpen,
         setSettingsSubmenu,
-        setSettingsSubmenuBackCloses
+        setSettingsSubmenuBackCloses,
+        setCurrentView,
+        setPreviousView,
+        setDailyCheckDetailId
     } = useNavigation();
     const {
         timelineStyleTheme,
@@ -507,6 +511,16 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
             title: '成就瓶',
             icon: <FlaskConical size={20} />,
             onClick: () => setIsAchievementOpen(true)
+        },
+        daily_checks: {
+            label: '日课总览',
+            title: '日课总览',
+            icon: <ListTodo size={20} />,
+            onClick: () => {
+                setPreviousView(AppView.TIMELINE);
+                setDailyCheckDetailId(null);
+                setCurrentView(AppView.DAILY_CHECKS);
+            }
         },
         collections: {
             label: 'Collections',

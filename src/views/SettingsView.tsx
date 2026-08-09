@@ -11,6 +11,7 @@
 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-07-21: Delegated cloud backup cleanup confirmation to the data-management in-app modal.
+ * @updated 2026-08-09: Added the daily-check overview entry under Content.
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -86,7 +87,7 @@ import { getActiveSceneGroup, loadSceneGroupStateFromStorage } from '../utils/sc
 import { getLocalDataTimestamp, setLocalDataTimestampValue } from '../utils/localDataTimestamp';
 
 import { ConfirmModal } from '../components/ConfirmModal';
-import { ReviewTemplate, NarrativeTemplate, Log, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyReview, TodoCategory, Filter, Category, CheckTemplate } from '../types';
+import { AppView, ReviewTemplate, NarrativeTemplate, Log, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyReview, TodoCategory, Filter, Category, CheckTemplate } from '../types';
 import { DefaultArchiveView, DefaultIndexView, DefaultRecordView, TimelineQuickActionKey, TimelineSortOrder, useSettings } from '../contexts/SettingsContext';
 import { useData } from '../contexts/DataContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
@@ -232,7 +233,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         settingsSubmenu: activeSubmenu,
         setSettingsSubmenu: setActiveSubmenu,
         settingsSubmenuBackCloses,
-        setSettingsSubmenuBackCloses
+        setSettingsSubmenuBackCloses,
+        currentView,
+        setCurrentView,
+        setPreviousView,
+        setDailyCheckDetailId
     } = useNavigation();
     const mainListScrollRef = useRef<HTMLDivElement>(null);
     const mainListScrollTopRef = useRef(0);
@@ -275,6 +280,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     const handleBackFromShortcutSubview = () => {
         setSettingsSubmenuBackCloses(false);
         onClose();
+    };
+
+    const handleOpenDailyChecks = () => {
+        setPreviousView(currentView);
+        setDailyCheckDetailId(null);
+        onClose();
+        setCurrentView(AppView.DAILY_CHECKS);
     };
 
     useEffect(() => {
@@ -1434,6 +1446,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             onClick={() => {
                                 onOpenSearch?.();
                             }}
+                        />
+                        <MenuItem
+                            icon={<CheckCircle2 size={18} className="text-emerald-600" />}
+                            label="日课总览"
+                            onClick={handleOpenDailyChecks}
                         />
                         <MenuItem
                             icon={<Hash size={18} className="text-amber-500" />}

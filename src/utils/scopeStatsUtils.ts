@@ -3,9 +3,11 @@
  * @input Logs with scopeIds and duration fields
  * @output Shared helpers for scope duration aggregation
  * @description Centralizes scope duration rules so all views count full duration for every linked scope.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from scope duration aggregation.
  */
 
 import { Log } from '../types';
+import { filterCountableLogs } from './statLogUtils';
 
 type ScopeLogLike = Pick<Log, 'duration' | 'startTime' | 'endTime' | 'scopeIds'>;
 
@@ -34,7 +36,7 @@ export function summarizeScopeDurations(logs: ScopeLogLike[]): ScopeDurationSumm
   const scopeDurations = new Map<string, number>();
   let totalAttributedDuration = 0;
 
-  logs.forEach((log) => {
+  filterCountableLogs(logs).forEach((log) => {
     const scopeIds = getNormalizedScopeIds(log.scopeIds);
     if (scopeIds.length === 0) {
       return;

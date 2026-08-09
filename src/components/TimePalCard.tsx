@@ -7,6 +7,7 @@
  * @input activeSessions?: ActiveSession[] - 正在进行中的会话
  * @output 顶部时光小友卡片
  * @updated 2026-07-22: Added dark mode colors for the Time Pal card surface and content.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from Time Pal focus totals.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Log, Category, ActiveSession } from '../types';
@@ -21,6 +22,7 @@ import {
     calculateTimePalStageLevel,
     readStoredTimePalStageThresholds
 } from '../utils/timePalStageThresholds';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 const TIMEPAL_CLICK_SWITCH_CHANGED_EVENT = 'timepal-click-switch-changed';
 
@@ -196,7 +198,8 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         const endOfDay = new Date(currentDate);
         endOfDay.setHours(23, 59, 59, 999);
 
-        const dayLogs = logs.filter(log => {
+        const countableLogs = filterCountableLogs(logs);
+        const dayLogs = countableLogs.filter(log => {
             return log.startTime >= startOfDay.getTime() && log.startTime <= endOfDay.getTime();
         });
 

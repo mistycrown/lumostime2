@@ -10,11 +10,13 @@
  * - StatsView (Line Chart View - Todos Trend)
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from todo statistics.
  */
 
 import { useMemo } from 'react';
 import { Log, TodoItem, TodoCategory } from '../types';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 export interface TodoItemStat {
   id: string;
@@ -90,7 +92,7 @@ export const useTodoStats = ({
   // 计算当前周期待办统计
   const todoStats = useMemo(() => {
     // 过滤有待办关联的日志
-    const logsWithTodos = logs.filter(
+    const logsWithTodos = filterCountableLogs(logs).filter(
       l => l.linkedTodoId &&
       l.startTime >= dateRange.start.getTime() &&
       l.endTime <= dateRange.end.getTime()
@@ -152,7 +154,7 @@ export const useTodoStats = ({
     const previousStart = new Date(dateRange.start.getTime() - duration);
     const previousEnd = new Date(dateRange.end.getTime() - duration);
 
-    const logsWithTodos = logs.filter(
+    const logsWithTodos = filterCountableLogs(logs).filter(
       l => l.linkedTodoId &&
       l.startTime >= previousStart.getTime() &&
       l.endTime <= previousEnd.getTime()

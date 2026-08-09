@@ -1,6 +1,7 @@
 ﻿/**
  * @file AchievementRecordsTab.tsx
  * @description Minimal ledger-style daily snapshot list with modal-based detail view and one-decimal achievement star values, including decimal-weighted check-category contributions.
+ * @updated 2026-08-09: Added merged daily character growth details alongside the existing star ledger.
  * @updated 2026-07-11: Shows todo-completion rule subtask counting scope in daily rule details.
  * @updated 2026-07-11: Added a low-key full recomputation entry with confirmation for restoring archived achievement data into the active ledger.
  * @updated 2026-07-05: Added a stats entry button beside Daily Records and a bottom-sheet chart modal for active daily star trends.
@@ -12,18 +13,35 @@
 import React, { useMemo, useState } from 'react';
 import { AlertTriangle, BarChart3, ChevronRight, RotateCcw, Trash2 } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
-import { AchievementDailySnapshot, AchievementRedemptionRecord } from '../../types';
+import {
+  AchievementAttribute,
+  AchievementDailySnapshot,
+  AchievementGrowthDailySnapshot,
+  AchievementRedemptionRecord
+} from '../../types';
 import { formatRelativeTime, getLocalDateTimeStr } from '../../utils/dateUtils';
 import { AchievementDialog } from './AchievementDialog';
-import { formatAchievementSignedStars, formatAchievementStars } from '../../utils/achievementUtils';
+import {
+  formatAchievementExperience,
+  formatAchievementSignedStars,
+  formatAchievementStars
+} from '../../utils/achievementUtils';
 import { AchievementStatsLineChartModal } from './AchievementStatsLineChartModal';
 
 interface AchievementRecordsTabProps {
   snapshots: AchievementDailySnapshot[];
+  growthSnapshots: AchievementGrowthDailySnapshot[];
+  attributes: AchievementAttribute[];
   redemptionRecords: AchievementRedemptionRecord[];
   onDeleteRedemptionRecord: (recordId: string) => void;
   onRecomputeSnapshot: (date: string) => { ok: boolean; message?: string };
-  onRecomputeAllData: () => { ok: boolean; message?: string; snapshotCount?: number; redemptionCount?: number };
+  onRecomputeAllData: () => {
+    ok: boolean;
+    message?: string;
+    snapshotCount?: number;
+    growthSnapshotCount?: number;
+    redemptionCount?: number;
+  };
 }
 
 const PAGE_SIZE = 10;
@@ -39,6 +57,8 @@ function usePagedList<T>(items: T[]) {
 
 export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
   snapshots,
+  growthSnapshots,
+  attributes,
   redemptionRecords,
   onDeleteRedemptionRecord,
   onRecomputeSnapshot,
@@ -58,6 +78,14 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
   }, [redemptionRecords]);
 
   const selectedSnapshot = orderedSnapshots.find((snapshot) => snapshot.id === selectedSnapshotId) || null;
+  const growthSnapshotByDate = useMemo(
+    () => new Map(growthSnapshots.map((snapshot) => [snapshot.date, snapshot] as const)),
+    [growthSnapshots]
+  );
+  const attributeNameMap = useMemo(
+    () => new Map(attributes.map((attribute) => [attribute.id, attribute.name] as const)),
+    [attributes]
+  );
 
   const snapshotsPaged = usePagedList(orderedSnapshots);
   const rewardsPaged = usePagedList(orderedRewardRecords);
@@ -83,7 +111,10 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
       return;
     }
 
-    addToast('success', `已重算 ${result.snapshotCount || 0} 天记录，恢复 ${result.redemptionCount || 0} 条兑换`);
+    addToast(
+      'success',
+      `已重算 ${result.snapshotCount || 0} 天光点记录和 ${result.growthSnapshotCount || 0} 天成长记录，恢复 ${result.redemptionCount || 0} 条兑换`
+    );
     setIsRecomputeAllDialogOpen(false);
   };
 
@@ -121,7 +152,11 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
                   <div className="min-w-0 flex-1">
                     <div className="text-[16px] leading-none text-stone-900">{snapshot.date}</div>
                     <div className="mt-[6px] text-[13px] leading-6 text-stone-500">
-                      命中 {snapshot.ruleBreakdown.length} 条规则，更新于 {formatRelativeTime(snapshot.computedAt)}
+                      命中 {snapshot.ruleBreakdown.length} 条规则
+                      {growthSnapshotByDate.get(snapshot.date)?.attributeChanges.length
+                        ? ` · 成长 ${growthSnapshotByDate.get(snapshot.date)!.attributeChanges.length} 项`
+                        : ''}
+                      ，更新于 {formatRelativeTime(snapshot.computedAt)}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -204,7 +239,6 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
       <AchievementDialog
         isOpen={!!selectedSnapshot}
         title={selectedSnapshot?.date || '记录详情'}
-        subtitle={selectedSnapshot ? `净变化 ${formatAchievementSignedStars(selectedSnapshot.netDelta)}` : undefined}
         onClose={() => setSelectedSnapshotId(null)}
         footer={selectedSnapshot ? (
           <div className="flex items-center justify-between gap-3">
@@ -259,6 +293,32 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
             这一天没有命中任何规则，净变化为 0。
           </div>
         )}
+        {selectedSnapshot && growthSnapshotByDate.get(selectedSnapshot.date)?.attributeChanges.length ? (
+          <div className="mt-5 border-t border-stone-200 pt-5">
+            <div className="text-[11px] uppercase tracking-[0.16em] text-stone-400">Character Growth</div>
+            <div className="mt-3 divide-y divide-stone-200">
+              {growthSnapshotByDate.get(selectedSnapshot.date)!.attributeChanges.map((change) => (
+                <div key={`${selectedSnapshot.id}-${change.attributeId}`} className="py-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="text-sm font-medium text-stone-900">
+                      {attributeNameMap.get(change.attributeId) || change.attributeName}
+                    </div>
+                    <div className="text-sm font-medium text-stone-900">
+                      +{formatAchievementExperience(change.deltaExp)} EXP
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs leading-6 text-stone-500">
+                    {change.ruleBreakdown.map((rule) => (
+                      <div key={rule.ruleId}>
+                        {rule.ruleName} · {rule.appliedUnits} × {rule.expPerUnit} EXP
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </AchievementDialog>
 
       <AchievementStatsLineChartModal
@@ -270,7 +330,7 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
       <AchievementDialog
         isOpen={isRecomputeAllDialogOpen}
         title="全部重算"
-        subtitle="这会清空收藏瓶，并把历史封存内容还原到当前账本后重新计算。"
+        subtitle="这会清空收藏瓶，并把历史封存内容还原到当前账本后重新计算光点和人物成长。"
         onClose={() => setIsRecomputeAllDialogOpen(false)}
         footer={(
           <div className="flex items-center justify-between gap-3">
@@ -296,11 +356,12 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
           <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-amber-800">
             <AlertTriangle size={17} className="mt-1 shrink-0" />
             <div>
-              重算后，已封存和已砸碎的历史瓶会被清空；原来瓶中的每日记录会按当前规则重新生成。
+              重算后，已封存和已砸碎的历史瓶会被清空；原来瓶中的每日记录会按当前规则重新生成，人物成长经验也会独立重算。
             </div>
           </div>
           <div className="grid gap-3 border-t border-stone-200 pt-4">
             <div>Daily Records：从成就开始日期到今天全部重算，包括历史已封存记录。</div>
+            <div>Character Growth：从人物成长启用日期到今天全部重算，不受封屏影响。</div>
             <div>兑换记录：当前、已收藏、已封存的兑换会统一回到兑换记录中。</div>
             <div>Reward 成本：仍存在的奖品按当前成本计算；已删除的奖品保留历史实际点数。</div>
           </div>

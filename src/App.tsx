@@ -887,6 +887,8 @@ const AppContent: React.FC = () => {
           !selectedCategoryId &&
           !selectedScopeId &&
           currentView !== 'STATS' &&
+          currentView !== AppView.DAILY_CHECKS &&
+          currentView !== AppView.DAILY_CHECK_DETAIL &&
           !isTodoManaging &&
           !isTagsManaging &&
           !isScopeManaging &&

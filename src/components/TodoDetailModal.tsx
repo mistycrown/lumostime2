@@ -5,6 +5,7 @@
  * @pos Component (Modal)
  * @description Displays detailed information for a specific Todo item, including its progress, planning fields, associated history logs, and focus stats.
  * @updated 2026-08-02: Reused the adaptive association option grid for the todo category picker without changing its original text size.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from todo detail statistics while remaining visible in history.
  * @updated 2026-07-30: Added Repeat auto-Plan settings for fixed timeline blocks with finite future occurrence generation.
  * @updated 2026-07-30: Completed todos now expose an editable completion-date field that reuses the planning date picker while preserving the stored local completion time.
  * @updated 2026-07-06: Raised the overlay detail layer above collection and schedule popovers so collection-launched todo timeline entries remain visible.
@@ -70,6 +71,7 @@ import {
   normalizeTodoRecurringPlanConfig,
   parseClockMinutes
 } from '../utils/todoRecurringPlanUtils';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 interface TodoDetailModalProps {
   initialTodo?: TodoItem | null;
@@ -1010,7 +1012,10 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     : '未关联领域';
 
   // Linked Logs
-  const ownLinkedLogs = useMemo(() => logs.filter((log) => log.linkedTodoId === todoId), [logs, todoId]);
+  const ownLinkedLogs = useMemo(
+    () => filterCountableLogs(logs).filter((log) => log.linkedTodoId === todoId),
+    [logs, todoId]
+  );
   const timelineLinkedTodoIds = useMemo(
     () => (isSubtask ? [todoId] : [todoId, ...childTodos.map((todo) => todo.id)]),
     [childTodos, isSubtask, todoId]
@@ -1019,6 +1024,10 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     const linkedTodoIdSet = new Set(timelineLinkedTodoIds);
     return logs.filter((log) => log.linkedTodoId && linkedTodoIdSet.has(log.linkedTodoId));
   }, [logs, timelineLinkedTodoIds]);
+  const countableTimelineLinkedLogs = useMemo(
+    () => filterCountableLogs(timelineLinkedLogs),
+    [timelineLinkedLogs]
+  );
   const timelineTodos = isSubtask ? [buildTodoPayload()] : [buildTodoPayload(), ...childTodos];
 
   const handleOpenLinkedTodo = (todo?: TodoItem | null) => {
@@ -1037,7 +1046,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   };
 
   // Stats
-  const totalSeconds = timelineLinkedLogs.reduce((acc, curr) => acc + curr.duration, 0);
+  const totalSeconds = countableTimelineLinkedLogs.reduce((acc, curr) => acc + curr.duration, 0);
   const totalHours = Math.floor(totalSeconds / 3600);
   const totalMins = Math.floor((totalSeconds % 3600) / 60);
 
@@ -1049,13 +1058,13 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   // 1. 首先检查日志中是否有专注打分数据（最直接的判断）
   // 2. 如果有关联活动，也检查活动的设置
   // 3. 如果日志中有任何一个活动启用了专注打分，就显示
-  const hasLogFocusData = timelineLinkedLogs.some(log => log.focusScore !== undefined && log.focusScore > 0);
+  const hasLogFocusData = countableTimelineLinkedLogs.some(log => log.focusScore !== undefined && log.focusScore > 0);
   const linkedActivityFocusEnabled = linkedActivity 
     ? (linkedActivity.enableFocusScore ?? linkedActivityCategory?.enableFocusScore ?? false)
     : false;
   
   // 检查日志所属的活动是否有启用专注打分的
-  const logActivitiesFocusEnabled = timelineLinkedLogs.some(log => {
+  const logActivitiesFocusEnabled = countableTimelineLinkedLogs.some(log => {
     const logCategory = categories?.find(c => c.id === log.categoryId);
     const logActivity = logCategory?.activities.find(a => a.id === log.activityId);
     return logActivity && (logActivity.enableFocusScore ?? logCategory?.enableFocusScore ?? false);
@@ -1064,12 +1073,12 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const enableFocusScore = hasLogFocusData || linkedActivityFocusEnabled || logActivitiesFocusEnabled;
 
   // 检查是否应该显示情绪评分
-  const hasLogMoodData = timelineLinkedLogs.some(log => log.moodScore !== undefined && log.moodScore > 0);
+  const hasLogMoodData = countableTimelineLinkedLogs.some(log => log.moodScore !== undefined && log.moodScore > 0);
   const linkedActivityMoodEnabled = linkedActivity 
     ? (linkedActivity.enableMoodScore ?? linkedActivityCategory?.enableMoodScore ?? false)
     : false;
   
-  const logActivitiesMoodEnabled = timelineLinkedLogs.some(log => {
+  const logActivitiesMoodEnabled = countableTimelineLinkedLogs.some(log => {
     const logCategory = categories?.find(c => c.id === log.categoryId);
     const logActivity = logCategory?.activities.find(a => a.id === log.activityId);
     return logActivity && (logActivity.enableMoodScore ?? logCategory?.enableMoodScore ?? false);

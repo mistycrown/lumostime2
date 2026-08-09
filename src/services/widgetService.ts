@@ -17,6 +17,8 @@
  * @updated 2026-05-05: Expanded TODAY + PIN payload builders to include native-refresh source snapshots so Android can rebuild today's list from mirrored app todos.
  * @updated 2026-05-05: Added log-tail bridge helpers so native quick-punch shortcuts can fill today's gap without foregrounding the app.
  * @updated 2026-05-05: Preserved scene-widget runtime source metadata when converting between native runtime state and app sessions.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from widget statistics and tracking payloads.
+ * @updated 2026-08-09: Added principle-card widget payload building from the local principle library with default preset fallback.
 */
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, CheckTemplate, DailyReview, Log, TodoItem } from '../types';
@@ -32,6 +34,8 @@ import type {
   WidgetBridgeInstanceBinding,
   WidgetBridgePendingAction,
   WidgetBridgeLogTailState,
+  WidgetBridgePrincipleCard,
+  WidgetBridgePrincipleCardPayload,
   WidgetBridgeRuntimeState,
   WidgetBridgeSlot,
   WidgetBridgeTemplate,
@@ -47,6 +51,7 @@ import type {
   WidgetBridgeTodoPinPayload,
   WidgetType
 } from '../plugins/WidgetBridgePlugin';
+import { DEFAULT_PRINCIPLE_PRESETS } from '../constants/principlePresets';
 import {
   ShortcutWidgetAction,
   getShortcutWidgetActionColor,
@@ -54,6 +59,7 @@ import {
   getShortcutWidgetActionLabel,
   normalizeShortcutWidgetAction
 } from './widgetShortcutService';
+import { filterCountableLogs } from '../utils/statLogUtils';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 import {
   DailyCheckTemplateMeta,
@@ -69,6 +75,7 @@ import { getTodoAssociationTodayTodos } from '../utils/todoScheduleUtils';
 
 const LEGACY_WIDGET_TIMER_STORAGE_KEY = 'lumostime_widget_timer_slots_v1';
 const WIDGET_TEMPLATE_STORAGE_KEY = 'lumostime_widget_templates_v1';
+export const PRINCIPLE_LIBRARY_STORAGE_KEY = 'lumostime_principles';
 const FALLBACK_WIDGET_ICON = '\u2022';
 
 export const DEFAULT_WIDGET_TYPE: WidgetType = 'timer';
@@ -125,6 +132,80 @@ const normalizePositiveInt = (value?: number | null, fallback: number = 1): numb
 
   return Math.max(1, Math.floor(value));
 };
+
+const normalizePrincipleCard = (value: unknown): WidgetBridgePrincipleCard | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const candidate = value as Partial<WidgetBridgePrincipleCard>;
+  const title = typeof candidate.title === 'string' ? candidate.title.trim() : '';
+  const frontText = typeof candidate.frontText === 'string' ? candidate.frontText.trim() : '';
+  const backText = typeof candidate.backText === 'string' ? candidate.backText.trim() : '';
+  if (!title || !frontText) {
+    return null;
+  }
+
+  return {
+    id: typeof candidate.id === 'string' && candidate.id.trim()
+      ? candidate.id.trim()
+      : `principle-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    title,
+    frontText,
+    backText
+  };
+};
+
+const readPrincipleCardsFromStorage = (): unknown[] => {
+  if (typeof localStorage === 'undefined') {
+    return [];
+  }
+
+  const stored = localStorage.getItem(PRINCIPLE_LIBRARY_STORAGE_KEY);
+  if (!stored) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error('[widgetService] Failed to parse principle library for widget sync', error);
+    return [];
+  }
+};
+
+const getDefaultPrincipleCards = (): WidgetBridgePrincipleCard[] => (
+  DEFAULT_PRINCIPLE_PRESETS.flatMap((preset): WidgetBridgePrincipleCard[] => {
+    const normalized = normalizePrincipleCard(preset);
+    return normalized ? [normalized] : [];
+  })
+);
+
+export const buildPrincipleCardWidgetPayload = (
+  value: {
+    principles?: unknown[] | null;
+    now?: number;
+  } = {}
+): WidgetBridgePrincipleCardPayload => {
+  const normalizedPrinciples = (value.principles || [])
+    .flatMap((item): WidgetBridgePrincipleCard[] => {
+      const normalized = normalizePrincipleCard(item);
+      return normalized ? [normalized] : [];
+    });
+
+  return {
+    principles: normalizedPrinciples.length > 0 ? normalizedPrinciples : getDefaultPrincipleCards(),
+    syncedAt: value.now ?? Date.now()
+  };
+};
+
+export const loadPrincipleCardWidgetPayloadFromStorage = (
+  now: number = Date.now()
+): WidgetBridgePrincipleCardPayload => buildPrincipleCardWidgetPayload({
+  principles: readPrincipleCardsFromStorage(),
+  now
+});
 
 const createWidgetTemplateId = () =>
   `widget-template-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -1136,6 +1217,7 @@ const buildDailyRuntimeViewData = ({
   const { dayStartMs, dayEndMs } = getDailyRuntimeDayBounds(date);
   const segmentBuckets = Array.from({ length: DAILY_RUNTIME_SEGMENT_COUNT }, () => new Map<string, number>());
   const legendBuckets = new Map<string, DailyRuntimeAccumulator>();
+  const countableLogs = filterCountableLogs(logs);
 
   const accumulateRange = (itemId: string, startMs: number, endMs: number) => {
     const safeStart = clampRange(startMs, dayStartMs, dayEndMs);
@@ -1175,7 +1257,7 @@ const buildDailyRuntimeViewData = ({
     }
   };
 
-  logs.forEach((log) => {
+  countableLogs.forEach((log) => {
     const itemId = resolveEntityId(log);
     if (!itemId) {
       return;
@@ -1458,6 +1540,7 @@ const getExpandedLogsForTracking = (
   activeSessions: ActiveSession[],
   now: number
 ): Log[] => {
+  const countableLogs = filterCountableLogs(logs);
   const sessionLogs: Log[] = activeSessions
     .filter((session) => now > session.startTime)
     .map((session) => ({
@@ -1471,7 +1554,7 @@ const getExpandedLogsForTracking = (
       scopeIds: session.scopeIds
     }));
 
-  return [...logs, ...sessionLogs].flatMap((log) => {
+  return [...countableLogs, ...sessionLogs].flatMap((log) => {
     if (log.endTime <= log.startTime) {
       return [];
     }
