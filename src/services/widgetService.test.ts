@@ -1,7 +1,7 @@
 /**
  * @file widgetService.test.ts
- * @input TODAY + PIN payload builders plus native provider source text
- * @output Regression coverage for pinned/recurring TODAY + PIN widget payload items and native refresh bindings
+ * @input TODAY + PIN and principle-card payload builders plus native provider source text
+ * @output Regression coverage for pinned/recurring TODAY + PIN widget payload items, principle-card sync, and native refresh bindings
  * @pos Test (widget service)
  * @description Verifies pinned and recurring-today todos can populate the TODAY + PIN widget payload, preserves mirrored source snapshots for native rebuilds, and guards the dedicated refresh-button wiring.
  * @updated 2026-07-22: Covers completed TODAY + PIN todos remaining visible after unfinished rows with completion state included in the native payload.
@@ -14,11 +14,14 @@
  * @updated 2026-05-03: Added regression coverage for targeted native widget refresh routing in the Capacitor bridge.
  * @updated 2026-05-05: Added scene widget launch-app regression coverage so native scene cards can mirror in-app third-party app launches.
  * @updated 2026-05-10: Added native scene-card title layout regression coverage so widget launchers keep mixed-language labels centered and use ASCII ellipsis truncation.
+ * @updated 2026-08-09: Added principle-card widget payload, PNG/WebP background scanning, and native provider wiring regression coverage.
  */
 
 import { describe, expect, it, vi } from 'vitest';
 import type { ActiveSession, Category, CheckTemplate, DailyReview, Log, SceneGroupState, Scope, TodoItem } from '../types';
+import { DEFAULT_PRINCIPLE_PRESETS } from '../constants/principlePresets';
 import {
+  buildPrincipleCardWidgetPayload,
   buildShortcutWidgetSlotConfig,
   buildTodoPinWidgetPayload,
   buildTrackingCalendarDailyConfig,
@@ -28,15 +31,21 @@ import {
   createWidgetTemplate,
   sanitizeWidgetTemplatesForUiIconSupport
 } from './widgetService';
+import androidManifestSource from '../../android/app/src/main/AndroidManifest.xml?raw';
+import quickLogWidgetPrincipleCard4x2Source from '../../android/app/src/main/java/com/mistycrown/lumostime/QuickLogWidgetPrincipleCard4x2.java?raw';
 import widgetBridgePluginSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetBridgePlugin.kt?raw';
+import widgetPrincipleCardBitmapRendererSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetPrincipleCardBitmapRenderer.kt?raw';
+import widgetPrincipleCardProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetPrincipleCardProviderSupport.kt?raw';
 import widgetRefreshCoordinatorSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetRefreshCoordinator.kt?raw';
 import widgetSceneCardsRemoteViewsServiceSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetSceneCardsRemoteViewsService.java?raw';
 import widgetSceneProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetSceneProviderSupport.java?raw';
 import widgetStoresSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetStores.kt?raw';
 import widgetTimerControllerSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetTimerController.kt?raw';
 import widgetTodoPinProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetTodoPinProviderSupport.java?raw';
+import widgetPrincipleCardLayoutSource from '../../android/app/src/main/res/layout/widget_layout_principle_card_4x2.xml?raw';
 import widgetSceneCardItemLayoutSource from '../../android/app/src/main/res/layout/widget_scene_card_item.xml?raw';
 import widgetSceneLayoutSource from '../../android/app/src/main/res/layout/widget_layout_scene_4x3.xml?raw';
+import widgetPrincipleCardInfoSource from '../../android/app/src/main/res/xml/widget_info_principle_card_4x2.xml?raw';
 
 const REFERENCE_DATE = new Date('2026-04-26T09:30:00+08:00');
 
@@ -237,6 +246,70 @@ describe('buildTodoPinWidgetPayload', () => {
         ]
       })
     ]);
+  });
+});
+
+describe('buildPrincipleCardWidgetPayload', () => {
+  it('normalizes valid principle cards and skips incomplete entries', () => {
+    const payload = buildPrincipleCardWidgetPayload({
+      principles: [
+        {
+          id: ' principle-1 ',
+          title: ' 在行动中确立主体 ',
+          frontText: ' 先做一个可见动作 ',
+          backText: ' 把判断留给行动之后 '
+        },
+        {
+          id: 'missing-front',
+          title: 'Invalid',
+          frontText: ''
+        },
+        null
+      ],
+      now: 123456789
+    });
+
+    expect(payload).toEqual({
+      principles: [
+        {
+          id: 'principle-1',
+          title: '在行动中确立主体',
+          frontText: '先做一个可见动作',
+          backText: '把判断留给行动之后'
+        }
+      ],
+      syncedAt: 123456789
+    });
+  });
+
+  it('falls back to the default principle presets when the library has no valid cards', () => {
+    const payload = buildPrincipleCardWidgetPayload({
+      principles: [],
+      now: 987654321
+    });
+
+    expect(payload.syncedAt).toBe(987654321);
+    expect(payload.principles).toHaveLength(DEFAULT_PRINCIPLE_PRESETS.length);
+    expect(payload.principles[0]).toMatchObject({
+      id: DEFAULT_PRINCIPLE_PRESETS[0].id,
+      title: DEFAULT_PRINCIPLE_PRESETS[0].title,
+      frontText: DEFAULT_PRINCIPLE_PRESETS[0].frontText,
+      backText: DEFAULT_PRINCIPLE_PRESETS[0].backText
+    });
+  });
+
+  it('uses stable fallback ids when a principle card has no stored id', () => {
+    const principle = {
+      title: '稳定行动',
+      frontText: '先把下一步写清楚',
+      backText: '让系统记住同一张卡'
+    };
+
+    const firstPayload = buildPrincipleCardWidgetPayload({ principles: [principle], now: 1 });
+    const secondPayload = buildPrincipleCardWidgetPayload({ principles: [principle], now: 2 });
+
+    expect(firstPayload.principles[0].id).toMatch(/^principle-[0-9a-z]+$/);
+    expect(secondPayload.principles[0].id).toBe(firstPayload.principles[0].id);
   });
 });
 
@@ -584,6 +657,40 @@ describe('WidgetTodoPinProviderSupport', () => {
   });
 });
 
+describe('WidgetPrincipleCardProviderSupport', () => {
+  it('wires card-face toggling, top-right refresh, and per-instance shuffle state', () => {
+    expect(widgetPrincipleCardProviderSupportSource).toContain('ACTION_TOGGLE_PRINCIPLE_CARD_FACE');
+    expect(widgetPrincipleCardProviderSupportSource).toContain('ACTION_REFRESH_PRINCIPLE_CARD');
+    expect(widgetPrincipleCardProviderSupportSource).toContain('advanceSelection = true');
+    expect(widgetPrincipleCardProviderSupportSource).toContain('forceFrontFace = true');
+    expect(widgetPrincipleCardProviderSupportSource).toContain('savePrincipleCardState');
+    expect(widgetPrincipleCardProviderSupportSource).toContain('distinctBy { it.id }');
+    expect(widgetPrincipleCardLayoutSource).toContain('widget_principle_card_refresh_root');
+    expect(widgetPrincipleCardLayoutSource).toContain('widget_principle_card_bitmap');
+    expect(quickLogWidgetPrincipleCard4x2Source).toContain('WidgetPrincipleCardProviderSupport.INSTANCE.handleCommonReceive');
+    expect(quickLogWidgetPrincipleCard4x2Source).toContain('refreshAllAsync(context)');
+  });
+
+  it('scans PNG and WebP card backgrounds from the Capacitor public assets directory', () => {
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('BACKGROUND_ASSET_DIR = "public/card"');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('SUPPORTED_EXTENSIONS = setOf("png", "webp")');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('it.endsWith(".webp", ignoreCase = true)');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('it.endsWith(".png", ignoreCase = true)');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('widthPx * 0.75f');
+  });
+
+  it('registers a dedicated 4x2 launcher widget with principle-card bridge storage and refresh routing', () => {
+    expect(androidManifestSource).toContain('android:name=".QuickLogWidgetPrincipleCard4x2"');
+    expect(androidManifestSource).toContain('@xml/widget_info_principle_card_4x2');
+    expect(widgetPrincipleCardInfoSource).toContain('android:targetCellWidth="4"');
+    expect(widgetPrincipleCardInfoSource).toContain('android:targetCellHeight="2"');
+    expect(widgetBridgePluginSource).toContain('fun syncPrincipleCardWidgetData(call: PluginCall)');
+    expect(widgetBridgePluginSource).toContain('WidgetRefreshCoordinator.refreshPrincipleCardWidgets(context)');
+    expect(widgetStoresSource).toContain('KEY_PRINCIPLE_CARD_SYNC');
+    expect(widgetStoresSource).toContain('KEY_PRINCIPLE_CARD_STATES');
+  });
+});
+
 describe('WidgetSceneCardsRemoteViewsService', () => {
   it('uses code-point-safe truncation for scene card titles', () => {
     expect(widgetSceneCardsRemoteViewsServiceSource).toContain('codePointCount');
@@ -630,12 +737,14 @@ describe('WidgetBridgePlugin refresh routing', () => {
     expect(widgetRefreshCoordinatorSource).toContain('fun refreshTrackingCalendarWidgets(context: Context)');
     expect(widgetRefreshCoordinatorSource).toContain('fun refreshDailyRuntimeWidgets(context: Context)');
     expect(widgetRefreshCoordinatorSource).toContain('fun refreshTodoPinWidgets(context: Context)');
+    expect(widgetRefreshCoordinatorSource).toContain('fun refreshPrincipleCardWidgets(context: Context)');
     expect(widgetRefreshCoordinatorSource).toContain('fun refreshSceneWidgets(context: Context)');
 
     expect(widgetBridgePluginSource).toContain('WidgetRefreshCoordinator.refreshTimerWidgets(context)');
     expect(widgetBridgePluginSource).toContain('WidgetRefreshCoordinator.refreshTrackingCalendarWidgets(context)');
     expect(widgetBridgePluginSource).toContain('WidgetRefreshCoordinator.refreshDailyRuntimeWidgets(context)');
     expect(widgetBridgePluginSource).toContain('WidgetRefreshCoordinator.refreshTodoPinWidgets(context)');
+    expect(widgetBridgePluginSource).toContain('WidgetRefreshCoordinator.refreshPrincipleCardWidgets(context)');
     expect(widgetBridgePluginSource).toContain('WidgetRefreshCoordinator.refreshSceneWidgets(context)');
     expect(widgetBridgePluginSource).toContain('sourceTodos = it.optJSONArray("sourceTodos").toTodoPinSourceTodoList()');
     expect(widgetBridgePluginSource).toContain('sourceCategories = it.optJSONArray("sourceCategories").toTodoPinSourceCategoryList()');

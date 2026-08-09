@@ -5,6 +5,7 @@
  * @pos View (Review Modal)
  * @description The interface for conducting Weekly Reviews. Integrates statistics visualization, guided reflection templates, and AI-assisted narrative generation.
  * @updated 2026-06-07: Added weekly AI newspaper entry, one-tap chat generation, dedicated newspaper opening, and guarded delete flow inside the narrative tab.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from weekly review statistics.
  * @updated 2026-05-11: Added optional initial-tab support so external jumps can open Weekly Review directly on the `叙事` tab after AI writeback.
  * @updated 2026-04-25: Let floating read-edit toggles inherit button theme colors so default UI icons remain visible on accent-theme white buttons.
  * 
@@ -35,6 +36,7 @@ import {
 } from '../utils/reviewStatsUtils';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 interface WeeklyReviewViewProps {
     review: WeeklyReview;
@@ -155,11 +157,12 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
             log.endTime <= end.getTime()
         );
     }, [logs, weekStartDate, weekEndDate]);
+    const countableWeekLogs = useMemo(() => filterCountableLogs(weekLogs), [weekLogs]);
 
     // 统计本周数据（用于AI叙事生成）
     const stats = useMemo(() => 
-        calculateMonthlyStats(weekLogs, categories, todos, todoCategories, scopes),
-        [weekLogs, categories, todos, todoCategories, scopes]
+        calculateMonthlyStats(countableWeekLogs, categories, todos, todoCategories, scopes),
+        [countableWeekLogs, categories, todos, todoCategories, scopes]
     );
 
     // 获取用于显示的模板列表 (用于渲染模板卡片)
@@ -315,7 +318,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
                     const dayStart = currentDay.getTime();
                     const dayEnd = dayStart + 86400000 - 1;
 
-                    const dayLogs = weekLogs.filter(log =>
+                    const dayLogs = countableWeekLogs.filter(log =>
                         log.startTime >= dayStart && log.endTime <= dayEnd
                     );
 

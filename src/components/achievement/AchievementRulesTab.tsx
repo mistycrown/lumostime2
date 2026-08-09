@@ -352,7 +352,7 @@ const AttributeExperiencePicker: React.FC<{
                   }}
                   className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${
                     isSelected
-                      ? 'bg-stone-900 text-white'
+                      ? 'text-stone-900'
                       : 'text-stone-700 hover:bg-stone-100'
                   }`}
                 >
@@ -364,9 +364,7 @@ const AttributeExperiencePicker: React.FC<{
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm">{attribute.name}</span>
-                    <span className={`block truncate text-[10px] uppercase tracking-[0.12em] ${
-                      isSelected ? 'text-stone-300' : 'text-stone-400'
-                    }`}>
+                    <span className="block truncate text-[10px] uppercase tracking-[0.12em] text-stone-400">
                       {attribute.subtitle}
                     </span>
                   </span>

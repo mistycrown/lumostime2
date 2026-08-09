@@ -7,11 +7,13 @@
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-07-22: Added semantic hooks for dark-mode month schedule grids, labels, and legends.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from month heatmap statistics.
  */
 import React, { useMemo } from 'react';
 import { Log, Category } from '../types';
 import { IconRenderer } from './IconRenderer';
 import { getHeatmapFillColor } from '../utils/colorAdapterUtils';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 interface MonthHeatmapProps {
     logs: Log[];
@@ -23,6 +25,7 @@ const ROW_HEIGHT = 16;
 const HOUR_LABEL_INTERVAL = 3;
 
 export const MonthHeatmap: React.FC<MonthHeatmapProps> = ({ logs, categories, month }) => {
+    const countableLogs = useMemo(() => filterCountableLogs(logs), [logs]);
     const year = month.getFullYear();
     const monthIndex = month.getMonth();
     const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
@@ -32,7 +35,7 @@ export const MonthHeatmap: React.FC<MonthHeatmapProps> = ({ logs, categories, mo
     const logsByDate = useMemo(() => {
         const dateMap = new Map<number, Log[]>();
 
-        logs.forEach(log => {
+        countableLogs.forEach(log => {
             const logDate = new Date(log.startTime);
 
             if (logDate.getMonth() !== monthIndex || logDate.getFullYear() !== year) {
@@ -47,7 +50,7 @@ export const MonthHeatmap: React.FC<MonthHeatmapProps> = ({ logs, categories, mo
         });
 
         return dateMap;
-    }, [logs, year, monthIndex]);
+    }, [countableLogs, year, monthIndex]);
 
     const activityLegend = useMemo(() => {
         const activityMap = new Map<string, {
@@ -60,7 +63,7 @@ export const MonthHeatmap: React.FC<MonthHeatmapProps> = ({ logs, categories, mo
             activityId: string;
         }>();
 
-        logs.forEach(log => {
+        countableLogs.forEach(log => {
             const logDate = new Date(log.startTime);
             if (logDate.getMonth() !== monthIndex || logDate.getFullYear() !== year) {
                 return;
@@ -101,7 +104,7 @@ export const MonthHeatmap: React.FC<MonthHeatmapProps> = ({ logs, categories, mo
         });
 
         return activities;
-    }, [logs, categories, year, monthIndex]);
+    }, [countableLogs, categories, year, monthIndex]);
 
     return (
         <div className="stats-month-heatmap w-full flex flex-col">

@@ -9,6 +9,7 @@
  * @updated 2026-07-22: Added the shared dark-mode background layering used by the main tab pages.
  * @updated 2026-05-11: Manual scene-group quick switching now follows the saved group order from SceneSettingsView.
  * @updated 2026-05-10: Timer and todo scene cards now auto-flip only when the current slot has a matching timeline record, and that forced back side disables swipe-to-front until the record condition clears.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from scene duration statistics.
  * @updated 2026-05-05: Reworked the custom-background surface stack so the whole scene page gets one shared base scrim and the right content panel adds a second warm overlay, matching TodoView and RecordView without a center seam.
  * @updated 2026-05-05: Fixed SceneView widget-session matching by reading active sessions from SessionContext instead of DataContext, preventing undefined access crashes in scene cards.
  * @updated 2026-05-05: Scoped scene-widget-triggered card flips to the tapped scene group and time slot so identical cards in other slots stay untouched.
@@ -34,6 +35,7 @@ import { findAutoSwitchTargetGroup, getActiveSceneGroup, loadSceneGroupStateFrom
 import { updateLocalDataTimestamp } from '../utils/localDataTimestamp';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 import { doesSceneCardMatchCurrentSlotTimeline, getCurrentSceneSlotWindow } from '../utils/sceneTimelineMatchUtils';
+import { filterCountableLogs } from '../utils/statLogUtils';
 import { isCheckTemplateItemEnabled } from '../utils/dailyCheckUtils';
 
 interface SceneViewProps {
@@ -416,7 +418,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
     const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
     const currentTime = Date.now();
 
-    const dayLogs = logs.filter(log => {
+    const dayLogs = filterCountableLogs(logs).filter(log => {
       return log.startTime >= startOfDay.getTime() && log.startTime <= endOfDay.getTime();
     });
 

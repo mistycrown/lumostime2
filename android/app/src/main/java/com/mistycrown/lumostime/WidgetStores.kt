@@ -807,6 +807,77 @@ object WidgetStores {
         prefs(context).edit().putString(KEY_SCENE_SELECTIONS, root.toString()).commit()
     }
 
+    fun loadPrincipleCardState(context: Context, appWidgetId: Int): WidgetPrincipleCardState? {
+        if (appWidgetId <= 0) {
+            return null
+        }
+
+        val raw = prefs(context).getString(KEY_PRINCIPLE_CARD_STATES, null)
+        if (raw.isNullOrBlank()) {
+            return null
+        }
+
+        return runCatching {
+            val root = JSONObject(raw)
+            val item = root.optJSONObject(appWidgetId.toString()) ?: return@runCatching null
+            WidgetPrincipleCardState(
+                appWidgetId = appWidgetId,
+                currentPrincipleId = parseNullableString(item.optString("currentPrincipleId")),
+                currentBackgroundKey = parseNullableString(item.optString("currentBackgroundKey")),
+                principleOrder = item.optJSONArray("principleOrder").toStringList(),
+                backgroundOrder = item.optJSONArray("backgroundOrder").toStringList(),
+                principleCursor = item.optInt("principleCursor", 0).coerceAtLeast(0),
+                backgroundCursor = item.optInt("backgroundCursor", 0).coerceAtLeast(0),
+                isBackSideVisible = item.optBoolean("isBackSideVisible", false),
+                updatedAt = item.optLong("updatedAt", System.currentTimeMillis())
+            )
+        }.getOrNull()
+    }
+
+    fun savePrincipleCardState(context: Context, state: WidgetPrincipleCardState) {
+        if (state.appWidgetId <= 0) {
+            return
+        }
+
+        val root = runCatching {
+            JSONObject(prefs(context).getString(KEY_PRINCIPLE_CARD_STATES, null) ?: "{}")
+        }.getOrElse {
+            JSONObject()
+        }
+
+        root.put(state.appWidgetId.toString(), JSONObject().apply {
+            put("currentPrincipleId", state.currentPrincipleId ?: JSONObject.NULL)
+            put("currentBackgroundKey", state.currentBackgroundKey ?: JSONObject.NULL)
+            put("principleOrder", state.principleOrder.toJsonArray())
+            put("backgroundOrder", state.backgroundOrder.toJsonArray())
+            put("principleCursor", state.principleCursor.coerceAtLeast(0))
+            put("backgroundCursor", state.backgroundCursor.coerceAtLeast(0))
+            put("isBackSideVisible", state.isBackSideVisible)
+            put("updatedAt", state.updatedAt)
+        })
+
+        prefs(context).edit().putString(KEY_PRINCIPLE_CARD_STATES, root.toString()).commit()
+    }
+
+    fun removePrincipleCardStates(context: Context, appWidgetIds: IntArray) {
+        if (appWidgetIds.isEmpty()) {
+            return
+        }
+
+        val raw = prefs(context).getString(KEY_PRINCIPLE_CARD_STATES, null)
+        if (raw.isNullOrBlank()) {
+            return
+        }
+
+        val root = runCatching { JSONObject(raw) }.getOrElse { JSONObject() }
+        appWidgetIds.forEach { appWidgetId ->
+            if (appWidgetId > 0) {
+                root.remove(appWidgetId.toString())
+            }
+        }
+        prefs(context).edit().putString(KEY_PRINCIPLE_CARD_STATES, root.toString()).commit()
+    }
+
     fun removeSceneSelectionStates(context: Context, appWidgetIds: IntArray) {
         if (appWidgetIds.isEmpty()) {
             return
@@ -1349,6 +1420,46 @@ object WidgetStores {
             if (value.isNotBlank()) {
                 array.put(value)
             }
+        }
+        return array
+    }
+
+    private fun JSONArray?.toPrincipleCardList(): List<WidgetPrincipleCard> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        return buildList {
+            for (index in 0 until length()) {
+                val item = optJSONObject(index) ?: continue
+                val id = parseNullableString(item.optString("id")) ?: continue
+                val title = parseNullableString(item.optString("title")) ?: continue
+                val frontText = parseNullableString(item.optString("frontText")) ?: continue
+                add(
+                    WidgetPrincipleCard(
+                        id = id,
+                        title = title,
+                        frontText = frontText,
+                        backText = parseNullableString(item.optString("backText")) ?: ""
+                    )
+                )
+            }
+        }
+    }
+
+    private fun List<WidgetPrincipleCard>.toPrincipleCardJsonArray(): JSONArray {
+        val array = JSONArray()
+        forEach { item ->
+            if (item.id.isBlank() || item.title.isBlank() || item.frontText.isBlank()) {
+                return@forEach
+            }
+
+            array.put(JSONObject().apply {
+                put("id", item.id)
+                put("title", item.title)
+                put("frontText", item.frontText)
+                put("backText", item.backText)
+            })
         }
         return array
     }

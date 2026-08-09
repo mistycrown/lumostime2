@@ -5,6 +5,7 @@
  * @output Navigation to Scope Detail
  * @pos View (Main Tab)
  * @description The main landing page for the "Scopes" (Domains) feature. Displays a card list of all active scopes with summary statistics (Total Time, Monthly Time).
+ * @updated 2026-08-09: Planned timeline blocks are excluded from scope overview statistics.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -16,6 +17,7 @@ import { Settings2, Archive, ChevronDown, ChevronRight } from 'lucide-react';
 import { IconRenderer } from '../components/IconRenderer';
 import { useGoalStatus } from '../hooks/useGoalStatus';
 import { getNormalizedScopeIds } from '../utils/scopeStatsUtils';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 
 interface ScopeViewProps {
@@ -59,7 +61,7 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
 
-        logs.forEach(log => {
+        filterCountableLogs(logs).forEach(log => {
             const scopeIds = getNormalizedScopeIds(log.scopeIds);
             if (scopeIds.length === 0) return;
 

@@ -19,6 +19,7 @@ import org.json.JSONObject
  * Updated 2026-05-05: Added log-tail synchronization so native quick-punch shortcuts can compute gap fills without opening the app.
  * Updated 2026-05-20: Wrapped non-Exception sync failures before forwarding them to Capacitor's PluginCall.reject overloads.
  * Updated 2026-08-06: Added UI icon asset paths to scene time-slot parsing for native scene-tab rendering.
+ * Updated 2026-08-09: Added principle-card widget payload synchronization for the dedicated Android 4x2 card widget.
  */
 @CapacitorPlugin(name = "WidgetBridge")
 class WidgetBridgePlugin : Plugin() {
@@ -263,6 +264,21 @@ class WidgetBridgePlugin : Plugin() {
 
         WidgetStores.saveTrackingCalendarPayload(context, payload)
         WidgetRefreshCoordinator.refreshTrackingCalendarWidgets(context)
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun syncPrincipleCardWidgetData(call: PluginCall) {
+        val payloadJson = call.getObject("payload")
+        val payload = payloadJson?.let {
+            WidgetPrincipleCardPayload(
+                principles = it.optJSONArray("principles").toPrincipleCardList(),
+                syncedAt = it.optLong("syncedAt", System.currentTimeMillis())
+            )
+        }
+
+        WidgetStores.savePrincipleCardPayload(context, payload)
+        WidgetRefreshCoordinator.refreshPrincipleCardWidgets(context)
         call.resolve()
     }
 
@@ -779,6 +795,29 @@ class WidgetBridgePlugin : Plugin() {
                     name = name,
                     icon = parseNullableString(item.optString("icon")),
                     color = parseNullableString(item.optString("color"))
+                )
+            )
+        }
+        return values
+    }
+
+    private fun JSONArray?.toPrincipleCardList(): List<WidgetPrincipleCard> {
+        if (this == null) {
+            return emptyList()
+        }
+
+        val values = mutableListOf<WidgetPrincipleCard>()
+        for (index in 0 until length()) {
+            val item = optJSONObject(index) ?: continue
+            val id = parseNullableString(item.optString("id")) ?: continue
+            val title = parseNullableString(item.optString("title")) ?: continue
+            val frontText = parseNullableString(item.optString("frontText")) ?: continue
+            values.add(
+                WidgetPrincipleCard(
+                    id = id,
+                    title = title,
+                    frontText = frontText,
+                    backText = parseNullableString(item.optString("backText")) ?: ""
                 )
             )
         }

@@ -7,6 +7,7 @@
  * @created 2026-08-09
  * @updated 2026-08-09: Added initial daily-check overview statistics.
  * @updated 2026-08-09: Preserved automatic time metrics and nullable missing values for detail views.
+ * @updated 2026-08-09: Made daily-review snapshots authoritative and exposed review existence on history points.
  */
 import { CheckItem, CheckTemplate, DailyReview, Log } from '../types';
 import { getLocalDateStr } from './dateUtils';
@@ -17,7 +18,7 @@ import {
 } from './dailyCheckUtils';
 import { normalizeCheckItem } from './checkItemNormalizer';
 import { FilterContext } from './filterUtils';
-import { getAutoCheckMetricForDate, updateAutoCheckItems } from './autoCheckUtils';
+import { getAutoCheckMetricForDate } from './autoCheckUtils';
 
 export type DailyCheckDisplayType = 'binary' | 'count' | 'duration' | 'time';
 
@@ -26,6 +27,7 @@ export interface DailyCheckHistoryPoint {
   dateLabel: string;
   value: number | null;
   isCompleted: boolean;
+  hasReview: boolean;
 }
 
 export interface DailyCheckCalendarPoint extends DailyCheckHistoryPoint {
@@ -77,7 +79,7 @@ export const getDailyCheckDisplayType = (item: CheckItem): DailyCheckDisplayType
     return 'binary';
   }
 
-  if (item.type !== 'auto' && item.manualMode === 'count') {
+  if (item.manualMode === 'count') {
     return 'count';
   }
 
@@ -103,6 +105,11 @@ const getTemplateItem = (checkTemplates: CheckTemplate[], itemId: string): Check
   return item ? normalizeCheckItem(item) : null;
 };
 
+export const getDailyCheckTemplateItem = (
+  checkTemplates: CheckTemplate[],
+  itemId: string
+): CheckItem | null => getTemplateItem(checkTemplates, itemId);
+
 export const getDailyCheckItemForDate = ({
   itemId,
   date,
@@ -124,6 +131,10 @@ export const getDailyCheckItemForDate = ({
   }
 
   const review = dailyReviews.find((entry) => entry.date === getLocalDateStr(date));
+  if (!review) {
+    return null;
+  }
+
   let item = templateItem;
 
   if (review) {
@@ -131,10 +142,6 @@ export const getDailyCheckItemForDate = ({
     if (index >= 0 && review.checkItems?.[index]) {
       item = normalizeCheckItem(review.checkItems[index]);
     }
-  }
-
-  if (item.type === 'auto') {
-    return updateAutoCheckItems([item], logs, filterContext, date)[0];
   }
 
   return item;
@@ -220,7 +227,8 @@ export const getDailyCheckHistory = ({
       value: item
         ? getDailyCheckValue({ item, date, logs, filterContext })
         : null,
-      isCompleted: item ? isDailyCheckComplete(item) : false
+      isCompleted: item ? isDailyCheckComplete(item) : false,
+      hasReview: Boolean(dailyReviews.find((entry) => entry.date === getLocalDateStr(date)))
     };
   });
 };
@@ -291,6 +299,7 @@ export const getDailyCheckMonthHistory = ({
       dateLabel: `${date.getMonth() + 1}/${date.getDate()}`,
       value: item ? getDailyCheckValue({ item, date, logs, filterContext }) : null,
       isCompleted: item ? isDailyCheckComplete(item) : false,
+      hasReview: Boolean(dailyReviews.find((entry) => entry.date === getLocalDateStr(date))),
       inMonth: date.getMonth() === anchorDate.getMonth()
         && date.getFullYear() === anchorDate.getFullYear()
     };

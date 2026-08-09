@@ -11,7 +11,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Filter, Log, Category, Scope, TodoItem, TodoCategory } from '../types';
 import { getFilteredLogs } from '../utils/filterUtils';
-import { filterCountableLogs } from '../utils/statLogUtils';
+import { filterCountableLogs, isCountableLog } from '../utils/statLogUtils';
 import { DetailTimelineCard } from '../components/DetailTimelineCard';
 import { Clock, ChevronLeft } from 'lucide-react';
 import { IconRenderer } from '../components/IconRenderer';
@@ -113,7 +113,9 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
             }
             const group = dateMap.get(dateKey)!;
             group.logs.push(log);
-            group.duration += log.duration;
+            if (isCountableLog(log)) {
+                group.duration += log.duration;
+            }
         });
 
         return groups.sort((a, b) => b.date.getTime() - a.date.getTime());

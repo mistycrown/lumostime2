@@ -16,6 +16,7 @@
  * @updated 2026-05-14: Added a dual-tab Add modal to collection detail so users can search and multi-select logs or todos for batch membership insertion without leaving the page.
  * @updated 2026-05-13: Made mixed collection timeline entries clickable so linked logs/todos can open their shared detail overlays while leaving the collection page underneath for return navigation.
  * @updated 2026-05-12: Rebuilt Collection detail items as a standalone UI, tightened the create-row controls, compressed the header summary into a single line, switched entry media to a wrapped right-aligned preview layout, and aligned todo metadata with memoir/task tag rendering.
+ * @updated 2026-08-09: Excluded planned timeline blocks from collection investment statistics while preserving them in the collection timeline.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronLeft, ChevronRight, PencilLine, Plus, Save, Search, Settings2, X } from 'lucide-react';
@@ -34,6 +35,7 @@ import { registerHardwareBackHandler } from '../../utils/hardwareBackHandlerStac
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { CollectionManageView } from '../CollectionManageView';
 import { useNavigation } from '../../contexts/NavigationContext';
+import { filterCountableLogs } from '../../utils/statLogUtils';
 
 interface CollectionSettingsViewProps {
   onBack: () => void;
@@ -868,7 +870,7 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
     });
   };
 
-  const investedSecondsByTodoId = useMemo(() => logs.reduce((accumulator, log) => {
+  const investedSecondsByTodoId = useMemo(() => filterCountableLogs(logs).reduce((accumulator, log) => {
     if (!log.linkedTodoId) {
       return accumulator;
     }
@@ -1070,7 +1072,7 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
         const linkedActivity = item.todo.linkedActivityId
           ? linkedCategory?.activities.find((candidate) => candidate.id === item.todo.linkedActivityId)
           : undefined;
-        const investedSeconds = logs
+        const investedSeconds = filterCountableLogs(logs)
           .filter((log) => log.linkedTodoId === item.todo.id)
           .reduce((total, log) => total + (Number.isFinite(log.duration) ? log.duration : Math.max(0, (log.endTime - log.startTime) / 1000)), 0);
         const tagString = buildTagString(

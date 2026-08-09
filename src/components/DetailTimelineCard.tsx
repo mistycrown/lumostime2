@@ -351,16 +351,23 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
             const d = new Date(log.startTime);
             const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 
-            map.set(startOfDay, (map.get(startOfDay) || 0) + log.duration);
-
+            if (!map.has(startOfDay)) {
+                map.set(startOfDay, 0);
+            }
             if (!logsMap.has(startOfDay)) {
                 logsMap.set(startOfDay, []);
             }
             logsMap.get(startOfDay)!.push(log);
         });
 
+        countableLogs.forEach(log => {
+            const d = new Date(log.startTime);
+            const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+            map.set(startOfDay, (map.get(startOfDay) || 0) + log.duration);
+        });
+
         return { durationMap: map, logsMap };
-    }, [logsToDisplay]);
+    }, [countableLogs, logsToDisplay]);
     
     // 滚动监听：显示日期悬浮条并更新活跃日期
     React.useEffect(() => {

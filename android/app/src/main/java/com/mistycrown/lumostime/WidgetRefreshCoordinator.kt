@@ -12,6 +12,7 @@ import android.os.Looper
  * Updated 2026-05-03: Added widget-family refresh helpers so bridge sync calls can refresh only the providers that depend on each payload.
  * Updated 2026-05-05: Extended tap-feedback refresh frames so shortcut success states can animate back after one second.
  * Updated 2026-07-22: Registered the quick-todo 4x3 provider in global and targeted refresh routing.
+ * Updated 2026-08-09: Added refresh routing for the dedicated principle-card 4x2 widget.
  */
 object WidgetRefreshCoordinator {
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -65,6 +66,10 @@ object WidgetRefreshCoordinator {
         QuickLogWidgetTrackingCalendar2x2.refreshAllAsync(context)
     }
 
+    fun refreshPrincipleCardWidgets(context: Context) {
+        QuickLogWidgetPrincipleCard4x2.refreshAllAsync(context)
+    }
+
     fun refreshDailyRuntimeWidgets(context: Context) {
         QuickLogWidgetDailyRuntime4x2.refreshAllAsync(context)
         QuickLogWidgetDailyRuntime4x4.refreshAllAsync(context)
@@ -84,6 +89,7 @@ object WidgetRefreshCoordinator {
     fun refreshAll(context: Context) {
         refreshTimerWidgets(context)
         refreshTrackingCalendarWidgets(context)
+        refreshPrincipleCardWidgets(context)
         refreshDailyRuntimeWidgets(context)
         refreshTodoPinWidgets(context)
         refreshSceneWidgets(context)
@@ -109,6 +115,8 @@ object WidgetRefreshCoordinator {
                 QuickLogWidget4x2.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidgetTrackingCalendar2x2::class.java).className ->
                 QuickLogWidgetTrackingCalendar2x2.refreshWidget(context, appWidgetId)
+            ComponentName(context, QuickLogWidgetPrincipleCard4x2::class.java).className ->
+                QuickLogWidgetPrincipleCard4x2.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidgetDailyRuntime4x2::class.java).className ->
                 QuickLogWidgetDailyRuntime4x2.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidgetTodoPin4x2::class.java).className ->
