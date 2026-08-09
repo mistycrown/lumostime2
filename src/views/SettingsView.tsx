@@ -12,6 +12,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-07-21: Delegated cloud backup cleanup confirmation to the data-management in-app modal.
  * @updated 2026-08-09: Added the daily-check overview entry under Content.
+ * @updated 2026-08-09: Added the Review Overview settings subpage under Content.
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -120,6 +121,7 @@ import {
     ObsidianExportViewLazy as ObsidianExportView,
     PreferencesSettingsViewLazy as PreferencesSettingsView,
     PrincipleLibraryViewLazy as PrincipleLibraryView,
+    ReviewOverviewViewLazy as ReviewOverviewView,
     ReviewTemplateManageViewLazy as ReviewTemplateManageView,
     S3SyncSettingsViewLazy as S3SyncSettingsView,
     SponsorshipViewLazy as SponsorshipView,
@@ -1039,6 +1041,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         );
     }
 
+    if (activeSubmenu === 'review_overview') {
+        return renderLazySettingsSubview(
+            <ReviewOverviewView
+                onBack={handleBackToMain}
+                dailyReviews={dailyReviews}
+                weeklyReviews={weeklyReviews}
+                monthlyReviews={monthlyReviews}
+                reviewTemplates={reviewTemplates}
+            />,
+            '正在加载回顾总览...'
+        );
+    }
+
     if (activeSubmenu === 'check_templates') {
         return renderLazySettingsSubview(
             <CheckTemplateManageView
@@ -1451,6 +1466,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             icon={<CheckCircle2 size={18} className="text-emerald-600" />}
                             label="日课总览"
                             onClick={handleOpenDailyChecks}
+                        />
+                        <MenuItem
+                            icon={<FileText size={18} className="text-indigo-600" />}
+                            label="回顾总览"
+                            onClick={() => openSettingsSubmenu('review_overview')}
                         />
                         <MenuItem
                             icon={<Hash size={18} className="text-amber-500" />}

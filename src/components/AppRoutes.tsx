@@ -22,6 +22,8 @@ import { useTodoQuickActions } from '../hooks/useTodoQuickActions';
 import { aiService } from '../services/aiService';
 import { dailyNewspaperService } from '../services/dailyNewspaperService';
 import { getLocalDateStr } from '../utils/dateUtils';
+import { hasAutoCheckItemCompletionChanges, updateAutoCheckItems } from '../utils/autoCheckUtils';
+import { ensureDailyReviewForDate, upsertDailyReview } from '../utils/dailyCheckUtils';
 import { ACTIVE_SESSION_KEY, CHAT_PERSONAS_KEY, CHAT_SESSIONS_KEY, DEFAULT_AI_PERSONAS } from './ai-chat/AIBackfillChatInitialization';
 import type { AIChatPersona, AIChatSession } from './ai-chat/AIBackfillChatShared';
 import { TodoQuickActionsModal } from './TodoQuickActionsModal';
@@ -195,6 +197,56 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         setCurrentView(previousView || AppView.TIMELINE);
         setPreviousView(null);
     };
+
+    const dailyCheckRefreshKeyRef = React.useRef<string | null>(null);
+    React.useEffect(() => {
+        if (currentView !== AppView.DAILY_CHECKS) {
+            dailyCheckRefreshKeyRef.current = null;
+            return;
+        }
+
+        const dateStr = getLocalDateStr(currentDate);
+        const templateKey = checkTemplates
+            .filter((template) => template.enabled && template.isDaily)
+            .sort((a, b) => a.order - b.order)
+            .flatMap((template) => template.items || [])
+            .filter((item) => item.enabled !== false)
+            .map((item) => `${item.id}:${item.type || 'manual'}:${item.manualMode || 'binary'}`)
+            .join('|');
+        const refreshKey = `${dateStr}:${templateKey}`;
+
+        if (dailyCheckRefreshKeyRef.current === refreshKey) {
+            return;
+        }
+        dailyCheckRefreshKeyRef.current = refreshKey;
+
+        const ensured = ensureDailyReviewForDate({
+            dateStr,
+            dailyReviews,
+            checkTemplates,
+            reviewTemplates
+        });
+        const existingItems = ensured.review.checkItems || [];
+        const nextItems = updateAutoCheckItems(existingItems, logs, {
+            categories,
+            scopes,
+            todos,
+            todoCategories
+        }, currentDate);
+        const shouldPersist = Boolean(ensured.updatedReviews)
+            || hasAutoCheckItemCompletionChanges(existingItems, nextItems);
+
+        if (!shouldPersist) {
+            return;
+        }
+
+        setDailyReviews((previousReviews) => upsertDailyReview(previousReviews, {
+            ...ensured.review,
+            checkItems: nextItems,
+            updatedAt: Date.now()
+        }));
+    }, [categories, checkTemplates, currentDate, currentView, dailyReviews, logs, reviewTemplates, scopes, todoCategories, todos, setDailyReviews]);
+
     const {
         quickActionTodo,
         quickActionOpenedAt,
@@ -663,14 +715,12 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 <DailyCheckOverviewView
                     checkTemplates={checkTemplates}
                     dailyReviews={dailyReviews}
-                    reviewTemplates={reviewTemplates}
                     logs={logs}
                     categories={categories}
                     scopes={scopes}
                     todos={todos}
                     todoCategories={todoCategories}
                     currentDate={currentDate}
-                    onUpdateDailyReview={handleUpdateReview}
                     onOpenDetail={(itemId) => {
                         setDailyCheckDetailId(itemId);
                         setCurrentView(AppView.DAILY_CHECK_DETAIL);
@@ -683,6 +733,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 <DailyCheckDetailView
                     itemId={dailyCheckDetailId}
                     checkTemplates={checkTemplates}
+                    reviewTemplates={reviewTemplates}
                     dailyReviews={dailyReviews}
                     logs={logs}
                     categories={categories}
@@ -690,6 +741,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     todos={todos}
                     todoCategories={todoCategories}
                     currentDate={currentDate}
+                    onUpdateDailyReview={handleUpdateReview}
                     onBack={() => {
                         setDailyCheckDetailId(null);
                         setCurrentView(AppView.DAILY_CHECKS);

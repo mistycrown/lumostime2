@@ -4,6 +4,7 @@
 
 ## Updates
 
+- 2026-08-09: `ReviewOverviewView.tsx` adds a `回顾总览` settings subpage that groups Daily/Weekly/Monthly review answers by template group and question, with newest-first answer detail.
 - 2026-07-29: `PreferencesSettingsView.tsx` keeps the Display-section Chronicle layout selector; the schedule canvas now starts from the current time and no longer exposes a default-hour selector.
 - 2026-07-31: `PreferencesSettingsView.tsx` renames the Chronicle layout selector to `默认脉络布局`, clarifying that navigation taps can temporarily switch the active Timeline layout without changing this default.
 - 2026-06-06: `FiltersSettingsView.tsx` now labels `@` syntax as `待办/分类`, aligning the settings help text with the shared custom-filter behavior for linked-log todo matches.
@@ -44,6 +45,11 @@
 - Image cleanup and consistency tools
 - Cloud backup cleanup
 - Reset and clear data actions
+
+### `ReviewOverviewView.tsx`
+- Browse Daily, Weekly, and Monthly review answers from Settings > Content
+- Uses historical `templateSnapshot` groups before falling back to current review templates
+- Opens per-question answer detail sorted newest first
 
 ## Integration Notes
 

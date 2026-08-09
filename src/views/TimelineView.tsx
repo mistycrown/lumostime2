@@ -24,6 +24,7 @@
  * @updated 2026-07-31: Keeps planned blocks out of the pure timeline record stream so idle gaps and export/gallery actions only use entity logs.
  * @updated 2026-07-31: Filters the todo sidebar daily checks against disabled template items before display and auto refresh.
  * @updated 2026-08-09: Added the configurable shortcut to the daily-check overview page.
+ * @updated 2026-08-09: Passes actionable real-record idle gaps into the split timeline canvas while excluding plan blocks from gap detection.
  */
 import React, { useMemo, useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -2241,6 +2242,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                         scopes={scopes}
                         todos={todos}
                         isDarkMode={isDarkMode}
+                        minIdleTimeThreshold={minIdleTimeThreshold}
+                        onAddLog={onAddLog}
                         onEditLog={onEditLog}
                         onUpdateLog={onUpdateLog}
                         onCreatePlannedLog={onCreatePlannedLog}

@@ -4,7 +4,7 @@
  * @output Version Information, Update Availability
  * @pos Service (App Maintenance)
  * @description Checks for application updates by fetching version metadata from remote repositories, with robust fallback mechanisms.
- * @updated 2026-07-06: Bumped the shipped app version to 1.6.3 for the 1.6.3 release line.
+ * @updated 2026-08-09: Bumped the shipped app version to 1.6.4 for the 1.6.4 release line.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -27,7 +27,7 @@ export class UpdateService {
     private static GITHUB_UPDATE_URL = 'https://raw.githubusercontent.com/mistycrown/lumostime2/master/version.json';
 
     // 当前应用版本（从 package.json 读取）
-    private static CURRENT_VERSION = '1.6.3';
+    private static CURRENT_VERSION = '1.6.4';
 
     // 更新检查间隔（24小时）
     private static UPDATE_CHECK_INTERVAL = 24 * 60 * 60 * 1000;

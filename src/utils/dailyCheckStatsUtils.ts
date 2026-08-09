@@ -135,14 +135,12 @@ export const getDailyCheckItemForDate = ({
     return null;
   }
 
-  let item = templateItem;
-
-  if (review) {
-    const index = findCheckItemIndexInReview(review, checkTemplates, itemId);
-    if (index >= 0 && review.checkItems?.[index]) {
-      item = normalizeCheckItem(review.checkItems[index]);
-    }
+  const index = findCheckItemIndexInReview(review, checkTemplates, itemId);
+  if (index < 0 || !review.checkItems?.[index]) {
+    return null;
   }
+
+  const item = normalizeCheckItem(review.checkItems[index]);
 
   return item;
 };

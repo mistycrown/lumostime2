@@ -5,6 +5,8 @@ import {
   getCompletionRate,
   getCurrentStreak,
   getDailyCheckDisplayType,
+  getDailyCheckHistory,
+  getDailyCheckItemForDate,
   getDailyCheckTypeLabel
 } from './dailyCheckStatsUtils';
 
@@ -66,14 +68,52 @@ describe('dailyCheckStatsUtils', () => {
 
   it('calculates completion rate and the trailing streak', () => {
     const history = [
-      { date: new Date('2026-08-03T12:00:00'), dateLabel: '8/3', value: 1, isCompleted: true },
-      { date: new Date('2026-08-04T12:00:00'), dateLabel: '8/4', value: 0, isCompleted: false },
-      { date: new Date('2026-08-05T12:00:00'), dateLabel: '8/5', value: 1, isCompleted: true },
-      { date: new Date('2026-08-06T12:00:00'), dateLabel: '8/6', value: 1, isCompleted: true },
-      { date: new Date('2026-08-07T12:00:00'), dateLabel: '8/7', value: 1, isCompleted: true }
+      { date: new Date('2026-08-03T12:00:00'), dateLabel: '8/3', value: 1, isCompleted: true, hasReview: true },
+      { date: new Date('2026-08-04T12:00:00'), dateLabel: '8/4', value: 0, isCompleted: false, hasReview: true },
+      { date: new Date('2026-08-05T12:00:00'), dateLabel: '8/5', value: 1, isCompleted: true, hasReview: true },
+      { date: new Date('2026-08-06T12:00:00'), dateLabel: '8/6', value: 1, isCompleted: true, hasReview: true },
+      { date: new Date('2026-08-07T12:00:00'), dateLabel: '8/7', value: 1, isCompleted: true, hasReview: true }
     ];
 
     expect(getCompletionRate(history)).toBe(80);
     expect(getCurrentStreak(history)).toBe(3);
+  });
+
+  it('does not fall back to template data when a daily review is missing', () => {
+    const checkTemplates = [{
+      id: 'template',
+      title: '日常',
+      items: [{
+        id: 'binary',
+        content: '阅读',
+        enabled: true,
+        type: 'manual' as const,
+        manualMode: 'binary' as const
+      }],
+      enabled: true,
+      order: 0,
+      isDaily: true
+    }];
+    const filterContext = { categories: [], scopes: [], todos: [], todoCategories: [] };
+    const date = new Date('2026-08-09T12:00:00');
+
+    expect(getDailyCheckItemForDate({
+      itemId: 'binary',
+      date,
+      dailyReviews: [],
+      checkTemplates,
+      logs: [],
+      filterContext
+    })).toBeNull();
+
+    expect(getDailyCheckHistory({
+      itemId: 'binary',
+      anchorDate: date,
+      days: 1,
+      dailyReviews: [],
+      checkTemplates,
+      logs: [],
+      filterContext
+    })[0]).toMatchObject({ value: null, isCompleted: false, hasReview: false });
   });
 });

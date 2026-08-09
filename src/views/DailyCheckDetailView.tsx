@@ -3,23 +3,27 @@
  * @input Daily-check item id, templates, daily reviews, logs, and filter context
  * @output Type-specific daily-check statistics detail page with monthly heatmap
  * @pos View (Daily Check)
- * @description Shows one daily check's current progress, rolling metrics, monthly heatmap, and recent records without secondary statistic tabs.
+ * @description Shows one daily check's current progress, editable manual state, monthly heatmap, and trend chart without secondary statistic tabs.
  * @created 2026-08-09
  * @updated 2026-08-09: Added binary, count, duration, and automatic-time detail presentations.
  * @updated 2026-08-09: Removed nested cards and restored the monthly heatmap section.
+ * @updated 2026-08-09: Added daily-review-only unknown states, manual editing, month switching, and trends.
  */
-import React, { useMemo } from 'react';
-import { ArrowLeft, Target } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ArrowLeft, Check, Target } from 'lucide-react';
 import {
   Category,
   CheckItem,
   CheckTemplate,
   DailyReview,
   Log,
+  ReviewTemplate,
   Scope,
   TodoCategory,
   TodoItem
 } from '../types';
+import { CountInputModal } from '../components/CountInputModal';
+import { HeatmapCalendar } from '../components/HeatmapCalendar';
 import {
   formatDurationMinutes,
   getAverageValue,
@@ -28,18 +32,36 @@ import {
   getDailyCheckDisplayType,
   getDailyCheckItemForDate,
   getDailyCheckMonthHistory,
+  getDailyCheckTemplateItem,
   getDailyCheckTarget,
   getDailyCheckTypeLabel,
   getDailyCheckHistory,
   isDailyCheckComplete
 } from '../utils/dailyCheckStatsUtils';
+import {
+  applyDailyCheckActionForDate,
+  getCheckItemCountState
+} from '../utils/dailyCheckUtils';
 import { getDailyCheckIconTone } from '../components/DailyCheckIcon';
 import { formatTimeValue } from '../utils/autoCheckUtils';
 import { FilterContext } from '../utils/filterUtils';
+import { getLocalDateStr } from '../utils/dateUtils';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from 'recharts';
 
 interface DailyCheckDetailViewProps {
   itemId: string | null;
   checkTemplates: CheckTemplate[];
+  reviewTemplates: ReviewTemplate[];
   dailyReviews: DailyReview[];
   logs: Log[];
   categories: Category[];
@@ -47,6 +69,7 @@ interface DailyCheckDetailViewProps {
   todos: TodoItem[];
   todoCategories: TodoCategory[];
   currentDate: Date;
+  onUpdateDailyReview: (review: DailyReview) => void;
   onBack: () => void;
 }
 
@@ -56,7 +79,7 @@ const formatCount = (value: number): string => (
 
 const formatMetricValue = (type: ReturnType<typeof getDailyCheckDisplayType>, value: number | null): string => {
   if (value === null) {
-    return '未记录';
+    return '?';
   }
 
   if (type === 'duration') {
@@ -90,16 +113,10 @@ const formatTargetValue = (type: ReturnType<typeof getDailyCheckDisplayType>, ta
   return '每日完成一次';
 };
 
-const HEATMAP_COLORS = {
-  binary: ['bg-stone-100', 'bg-emerald-500'],
-  count: ['bg-sky-100', 'bg-sky-500'],
-  duration: ['bg-violet-100', 'bg-violet-500'],
-  time: ['bg-amber-100', 'bg-amber-500']
-} as const;
-
 export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
   itemId,
   checkTemplates,
+  reviewTemplates,
   dailyReviews,
   logs,
   categories,
@@ -107,8 +124,11 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
   todos,
   todoCategories,
   currentDate,
+  onUpdateDailyReview,
   onBack
 }) => {
+  const [heatmapMonth, setHeatmapMonth] = useState(() => new Date(currentDate));
+  const [isCountInputOpen, setIsCountInputOpen] = useState(false);
   const filterContext = useMemo<FilterContext>(() => ({
     categories,
     scopes,
@@ -116,7 +136,13 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
     todoCategories
   }), [categories, scopes, todoCategories, todos]);
 
-  const item = useMemo(() => (
+  const templateItem = useMemo(() => (
+    itemId
+      ? getDailyCheckTemplateItem(checkTemplates, itemId)
+      : null
+  ), [checkTemplates, itemId]);
+
+  const currentItem = useMemo(() => (
     itemId
       ? getDailyCheckItemForDate({
         itemId,
@@ -147,7 +173,21 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
     itemId
       ? getDailyCheckMonthHistory({
         itemId,
+        anchorDate: heatmapMonth,
+        dailyReviews,
+        checkTemplates,
+        logs,
+        filterContext
+      })
+      : []
+  ), [checkTemplates, dailyReviews, filterContext, heatmapMonth, itemId, logs]);
+
+  const trendHistory = useMemo(() => (
+    itemId
+      ? getDailyCheckHistory({
+        itemId,
         anchorDate: currentDate,
+        days: 30,
         dailyReviews,
         checkTemplates,
         logs,
@@ -156,7 +196,7 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
       : []
   ), [checkTemplates, currentDate, dailyReviews, filterContext, itemId, logs]);
 
-  if (!item || !itemId) {
+  if (!templateItem || !itemId) {
     return (
       <div className="flex h-full min-h-0 flex-col bg-[#faf9f6] text-stone-900">
         <header className="flex shrink-0 items-center border-b border-stone-200/80 px-4 py-4 sm:px-6">
@@ -180,6 +220,7 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
     );
   }
 
+  const item = templateItem;
   const type = getDailyCheckDisplayType(item);
   const tone = getDailyCheckIconTone(type);
   const currentValue = history[history.length - 1]?.value ?? null;
@@ -187,39 +228,108 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
   const completionRate = getCompletionRate(history);
   const currentStreak = getCurrentStreak(history);
   const averageValue = getAverageValue(history);
+  const isManual = item.type !== 'auto';
+  const currentIsCompleted = currentItem ? isDailyCheckComplete(currentItem) : false;
   const progress = type === 'binary' || type === 'time'
-    ? (isDailyCheckComplete(item) ? 100 : 0)
+    ? (currentIsCompleted ? 100 : 0)
     : target > 0 && currentValue !== null ? Math.min(100, (currentValue / target) * 100) : 0;
   const numericValues = history.flatMap((point) => point.value === null ? [] : [point.value]);
-  const heatmapValues = monthHistory.flatMap((point) => (
-    point.inMonth && point.value !== null ? [point.value] : []
-  ));
-  const maxHeatmapValue = Math.max(target, ...heatmapValues, 1);
   const totalValue = numericValues.reduce((sum, value) => sum + value, 0);
   const completedDays = history.filter((point) => point.isCompleted).length;
-  const heatmapColor = HEATMAP_COLORS[type];
-
-  const getHeatmapCellClass = (point: typeof monthHistory[number]): string => {
+  const heatmapData = new Map<number, number>();
+  const unknownDays = new Set<number>();
+  monthHistory.forEach((point) => {
     if (!point.inMonth) {
-      return 'bg-transparent text-transparent';
+      return;
     }
-    if (point.value === null) {
-      return 'bg-stone-100 text-stone-300';
+    if (!point.hasReview || point.value === null) {
+      unknownDays.add(point.date.getDate());
+      return;
     }
-    if (type === 'binary' || type === 'time') {
-      return point.isCompleted ? `${heatmapColor[1]} text-white` : `${heatmapColor[0]} text-stone-500`;
+    heatmapData.set(
+      point.date.getDate(),
+      type === 'duration'
+        ? point.value * 60
+        : type === 'binary' || type === 'time'
+          ? (point.isCompleted ? 1 : 0)
+          : point.value
+    );
+  });
+  const heatmapMode = type === 'duration' ? 'duration' : type === 'count' ? 'count' : 'binary';
+  const heatmapAccent = type === 'duration'
+    ? '#7c3aed'
+    : type === 'count'
+      ? '#0284c7'
+      : type === 'time'
+        ? '#d97706'
+        : '#059669';
+  const trendData = trendHistory.map((point) => ({
+    label: point.dateLabel,
+    value: point.value === null
+      ? null
+      : type === 'binary'
+        ? (point.isCompleted ? 1 : 0)
+        : point.value
+  }));
+
+  const handleManualToggle = () => {
+    if (!isManual || type !== 'binary') {
+      return;
     }
-    const ratio = maxHeatmapValue > 0 ? point.value / maxHeatmapValue : 0;
-    if (ratio === 0) return 'bg-stone-100 text-stone-400';
-    if (ratio < 0.25) return `${heatmapColor[0]} text-stone-600`;
-    if (ratio < 0.5) return 'bg-opacity-60 text-stone-700 ' + heatmapColor[1];
-    if (ratio < 0.75) return 'bg-opacity-80 text-white ' + heatmapColor[1];
-    return `${heatmapColor[1]} text-white`;
+    const result = applyDailyCheckActionForDate({
+      dateStr: getLocalDateStr(currentDate),
+      dailyReviews,
+      checkTemplates,
+      reviewTemplates,
+      checkItemId: item.id,
+      actionMode: 'toggle'
+    });
+    if (result.updatedReview) {
+      onUpdateDailyReview(result.updatedReview);
+    }
+  };
+
+  const handleCountConfirm = (count: number) => {
+    const current = currentItem ? getCheckItemCountState(currentItem).current : 0;
+    let workingReviews = dailyReviews;
+    let latestReview: DailyReview | undefined;
+
+    if (count < current) {
+      const resetResult = applyDailyCheckActionForDate({
+        dateStr: getLocalDateStr(currentDate),
+        dailyReviews: workingReviews,
+        checkTemplates,
+        reviewTemplates,
+        checkItemId: item.id,
+        actionMode: 'reset'
+      });
+      workingReviews = resetResult.updatedReviews || workingReviews;
+      latestReview = resetResult.updatedReview;
+    }
+
+    const startCount = count < current ? 0 : current;
+    for (let index = startCount; index < count; index += 1) {
+      const incrementResult = applyDailyCheckActionForDate({
+        dateStr: getLocalDateStr(currentDate),
+        dailyReviews: workingReviews,
+        checkTemplates,
+        reviewTemplates,
+        checkItemId: item.id,
+        actionMode: 'increment'
+      });
+      workingReviews = incrementResult.updatedReviews || workingReviews;
+      latestReview = incrementResult.updatedReview || latestReview;
+    }
+
+    if (latestReview) {
+      onUpdateDailyReview(latestReview);
+    }
+    setIsCountInputOpen(false);
   };
 
   const stats = type === 'binary'
     ? [
-      { label: '完成天数', value: `${completedDays}/7` },
+        { label: '完成天数', value: `${completedDays}/7` },
       { label: '当前连续', value: `${currentStreak} 天` },
       { label: '完成率', value: `${completionRate}%` }
     ]
@@ -262,12 +372,35 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
             <div className="min-w-0">
               <div className="text-sm text-stone-500">今日记录</div>
               <div className="mt-3 truncate text-3xl font-semibold tracking-tight text-stone-900">
-                {formatMetricValue(type, currentValue)}
+                {currentValue === null ? '?' : formatMetricValue(type, currentValue)}
               </div>
               <div className="mt-2 flex items-center gap-2 text-sm text-stone-500">
                 <Target size={15} />
                 <span>{formatTargetValue(type, target)}</span>
               </div>
+              {isManual && type === 'binary' && (
+                <button
+                  type="button"
+                  onClick={handleManualToggle}
+                  className={`mt-4 inline-flex items-center gap-2 border-b pb-1 text-sm transition-colors ${
+                    currentIsCompleted ? 'border-emerald-500 text-emerald-700' : 'border-stone-300 text-stone-500 hover:border-stone-700 hover:text-stone-900'
+                  }`}
+                  title="切换今日完成状态"
+                >
+                  {currentIsCompleted && <Check size={14} />}
+                  {currentItem ? (currentIsCompleted ? '已完成' : '待完成') : '?'}
+                </button>
+              )}
+              {isManual && type === 'count' && (
+                <button
+                  type="button"
+                  onClick={() => setIsCountInputOpen(true)}
+                  className="mt-4 border-b border-stone-300 pb-1 text-sm text-stone-500 transition-colors hover:border-stone-700 hover:text-stone-900"
+                  title="修改今日次数"
+                >
+                  修改今日次数
+                </button>
+              )}
             </div>
 
             <div
@@ -302,54 +435,66 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
           </section>
 
           <section className="border-b border-stone-200 py-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-stone-800">{currentDate.getFullYear()} 年 {currentDate.getMonth() + 1} 月</h2>
-              <span className="text-xs text-stone-400">月度热力图</span>
-            </div>
-
-            <div className="mt-5 grid grid-cols-7 gap-1 text-center text-[10px] text-stone-400">
-              {['一', '二', '三', '四', '五', '六', '日'].map((weekday) => (
-                <span key={weekday}>{weekday}</span>
-              ))}
-              {monthHistory.map((point) => (
-                <div
-                  key={`${point.dateLabel}-${point.date.getTime()}`}
-                  className={`flex aspect-square items-center justify-center rounded-sm text-[11px] tabular-nums ${getHeatmapCellClass(point)}`}
-                  title={point.inMonth ? `${point.dateLabel} ${formatMetricValue(type, point.value)}` : undefined}
-                >
-                  {point.inMonth ? point.date.getDate() : ''}
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] text-stone-400">
-              <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-stone-100" />未记录</span>
-              <span className="flex items-center gap-1"><span className={`h-2.5 w-2.5 rounded-sm ${heatmapColor[0]}`} />有记录</span>
-              <span className="flex items-center gap-1"><span className={`h-2.5 w-2.5 rounded-sm ${heatmapColor[1]}`} />达标</span>
-            </div>
+            <HeatmapCalendar
+              year={heatmapMonth.getFullYear()}
+              month={heatmapMonth.getMonth()}
+              data={heatmapData}
+              mode={heatmapMode}
+              target={target}
+              unknownDays={unknownDays}
+              accentColor={heatmapAccent}
+              onMonthChange={(offset) => {
+                setHeatmapMonth((previous) => {
+                  const next = new Date(previous);
+                  next.setMonth(next.getMonth() + offset);
+                  return next;
+                });
+              }}
+              getDayTitle={(day, value) => {
+                if (value === null) return `${heatmapMonth.getMonth() + 1}/${day} ?`;
+                return `${heatmapMonth.getMonth() + 1}/${day} ${formatMetricValue(type, type === 'duration' ? value / 60 : value)}`;
+              }}
+            />
           </section>
 
           <section className="py-6">
             <div className="flex items-center justify-between border-b border-stone-200 pb-3">
-              <h2 className="text-sm font-semibold text-stone-800">近 7 天记录</h2>
-              <span className="text-xs text-stone-400">{getDailyCheckTypeLabel(item)}</span>
+              <h2 className="text-sm font-semibold text-stone-800">趋势</h2>
+              <span className="text-xs text-stone-400">近 30 天 · {getDailyCheckTypeLabel(item)}</span>
             </div>
-
-            <div className="divide-y divide-stone-100">
-              {history.map((point) => (
-                <div key={`${point.dateLabel}-detail`} className="flex items-center justify-between py-3 text-sm">
-                  <span className="tabular-nums text-stone-500">{point.dateLabel}</span>
-                  <span className={point.isCompleted ? 'font-medium text-stone-800' : 'text-stone-400'}>
-                    {type === 'binary'
-                      ? point.isCompleted ? '已完成' : '未完成'
-                      : formatMetricValue(type, point.value)}
-                  </span>
-                </div>
-              ))}
+            <div className="mt-5 h-52 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                {type === 'binary' ? (
+                  <LineChart data={trendData} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
+                    <CartesianGrid stroke="#e7e5e4" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#a8a29e' }} interval={4} axisLine={false} tickLine={false} />
+                    <YAxis domain={[0, 1]} ticks={[0, 1]} tickFormatter={(value) => value === 1 ? '完成' : '未完成'} tick={{ fontSize: 10, fill: '#a8a29e' }} axisLine={false} tickLine={false} />
+                    <Tooltip formatter={(value) => [value === 1 ? '已完成' : value === 0 ? '未完成' : '?', '状态']} />
+                    <Line type="monotone" dataKey="value" connectNulls={false} stroke="#059669" strokeWidth={2} dot={{ r: 3, fill: '#059669' }} />
+                  </LineChart>
+                ) : (
+                  <BarChart data={trendData} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
+                    <CartesianGrid stroke="#e7e5e4" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#a8a29e' }} interval={4} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(value) => type === 'time' ? formatTimeValue(value) : String(value)} tick={{ fontSize: 10, fill: '#a8a29e' }} axisLine={false} tickLine={false} />
+                    <Tooltip formatter={(value) => [formatMetricValue(type, typeof value === 'number' ? value : null), '记录']} />
+                    <Bar dataKey="value" fill={heatmapAccent} radius={[4, 4, 0, 0]} maxBarSize={14} />
+                  </BarChart>
+                )}
+              </ResponsiveContainer>
             </div>
           </section>
         </div>
       </main>
+
+      <CountInputModal
+        isOpen={isCountInputOpen}
+        currentCount={currentItem ? getCheckItemCountState(currentItem).current : 0}
+        targetCount={getCheckItemCountState(item).target}
+        itemContent={item.content}
+        onClose={() => setIsCountInputOpen(false)}
+        onConfirm={handleCountConfirm}
+      />
     </div>
   );
 };

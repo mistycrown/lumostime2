@@ -7,10 +7,12 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.widget.RemoteViews
+import kotlin.jvm.JvmOverloads
 
 /**
  * Shared rendering and tap handling for the dedicated 4x2 principle-card widget.
  * @updated 2026-08-09: Keeps one shuffle-bag per widget instance so face flips stay local while refresh advances both the card and background.
+ * @updated 2026-08-09: Allows unlock-triggered refreshes to advance the same per-widget principle/background shuffle state.
  */
 object WidgetPrincipleCardProviderSupport {
     const val ACTION_TOGGLE_PRINCIPLE_CARD_FACE =
@@ -60,16 +62,20 @@ object WidgetPrincipleCardProviderSupport {
                     AppWidgetManager.INVALID_APPWIDGET_ID
                 )
                 if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                    val resolved = resolveState(
+                    refreshSingleWidget(
                         context = context,
                         appWidgetId = appWidgetId,
+                        providerClass = providerClass,
                         advanceSelection = true,
                         forceFrontFace = true
                     )
-                    WidgetStores.savePrincipleCardState(context, resolved.state)
-                    refreshSingleWidget(context, appWidgetId, providerClass)
                 } else {
-                    refreshAllWidgets(context, providerClass)
+                    refreshAllWidgets(
+                        context = context,
+                        providerClass = providerClass,
+                        advanceSelection = true,
+                        forceFrontFace = true
+                    )
                 }
                 return true
             }
@@ -78,6 +84,7 @@ object WidgetPrincipleCardProviderSupport {
         return Intent.ACTION_DATE_CHANGED.equals(intent.action)
             || Intent.ACTION_TIME_CHANGED.equals(intent.action)
             || Intent.ACTION_TIMEZONE_CHANGED.equals(intent.action)
+            || Intent.ACTION_USER_PRESENT.equals(intent.action)
     }
 
     @JvmStatic
@@ -86,18 +93,26 @@ object WidgetPrincipleCardProviderSupport {
     }
 
     @JvmStatic
+    @JvmOverloads
     fun updateWidgets(
         context: Context,
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray,
-        providerClass: Class<out AppWidgetProvider>
+        providerClass: Class<out AppWidgetProvider>,
+        advanceSelection: Boolean = false,
+        forceFrontFace: Boolean? = null
     ) {
         if (appWidgetIds.isEmpty()) {
             return
         }
 
         appWidgetIds.forEach { appWidgetId ->
-            val resolved = resolveState(context, appWidgetId)
+            val resolved = resolveState(
+                context = context,
+                appWidgetId = appWidgetId,
+                advanceSelection = advanceSelection,
+                forceFrontFace = forceFrontFace
+            )
             WidgetStores.savePrincipleCardState(context, resolved.state)
             val views = RemoteViews(context.packageName, R.layout.widget_layout_principle_card_4x2)
             views.setImageViewBitmap(
@@ -218,23 +233,41 @@ object WidgetPrincipleCardProviderSupport {
     private fun refreshSingleWidget(
         context: Context,
         appWidgetId: Int,
-        providerClass: Class<out AppWidgetProvider>
+        providerClass: Class<out AppWidgetProvider>,
+        advanceSelection: Boolean = false,
+        forceFrontFace: Boolean? = null
     ) {
         if (appWidgetId <= 0) {
             return
         }
 
         val appWidgetManager = AppWidgetManager.getInstance(context)
-        updateWidgets(context, appWidgetManager, intArrayOf(appWidgetId), providerClass)
+        updateWidgets(
+            context = context,
+            appWidgetManager = appWidgetManager,
+            appWidgetIds = intArrayOf(appWidgetId),
+            providerClass = providerClass,
+            advanceSelection = advanceSelection,
+            forceFrontFace = forceFrontFace
+        )
     }
 
     private fun refreshAllWidgets(
         context: Context,
-        providerClass: Class<out AppWidgetProvider>
+        providerClass: Class<out AppWidgetProvider>,
+        advanceSelection: Boolean = false,
+        forceFrontFace: Boolean? = null
     ) {
         val appWidgetManager = AppWidgetManager.getInstance(context)
         val appWidgetIds = appWidgetManager.getAppWidgetIds(android.content.ComponentName(context, providerClass))
-        updateWidgets(context, appWidgetManager, appWidgetIds, providerClass)
+        updateWidgets(
+            context = context,
+            appWidgetManager = appWidgetManager,
+            appWidgetIds = appWidgetIds,
+            providerClass = providerClass,
+            advanceSelection = advanceSelection,
+            forceFrontFace = forceFrontFace
+        )
     }
 
     private fun buildTogglePendingIntent(

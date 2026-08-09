@@ -1,10 +1,11 @@
 
 /**
  * @file HeatmapCalendar.tsx
- * @input year, month, data map
+ * @input year, month, data map, optional display mode and unknown-day metadata
  * @output Minimalist Month Heatmap
  * @pos Component (Visualization)
- * @description A simple, grid-based heatmap for visualizing daily activity intensity within a specific month.
+ * @description A simple, grid-based heatmap for visualizing daily activity intensity within a specific month. Supports duration, count, and completion-oriented daily-check cells.
+ * @updated 2026-08-09: Added count, binary, unknown-day, and caller accent modes for daily-check heatmaps.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -16,9 +17,24 @@ interface HeatmapCalendarProps {
   month: number; // 0-11
   data: Map<number, number>; // day -> seconds
   onMonthChange: (offset: number) => void;
+  mode?: 'duration' | 'count' | 'binary';
+  target?: number;
+  unknownDays?: Set<number>;
+  accentColor?: string;
+  getDayTitle?: (day: number, value: number | null) => string;
 }
 
-export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({ year, month, data, onMonthChange }) => {
+export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({
+  year,
+  month,
+  data,
+  onMonthChange,
+  mode = 'duration',
+  target = 0,
+  unknownDays,
+  accentColor,
+  getDayTitle
+}) => {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 = Sun
 
@@ -33,16 +49,35 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({ year, month, d
   }
 
   // Helper to determine color intensity using theme colors
-  const getColor = (seconds: number) => {
-    if (seconds === 0) return { bg: 'bg-stone-100', textColor: 'text-stone-300', useTheme: false };
-    const hours = seconds / 3600;
-    
-    // 使用主题色的不同透明度
-    if (hours < 0.5) return { bg: '', textColor: 'text-stone-700', useTheme: true, opacity: 0.15 }; // 15%
-    if (hours < 1) return { bg: '', textColor: 'text-stone-700', useTheme: true, opacity: 0.3 };   // 30%
-    if (hours < 2) return { bg: '', textColor: 'text-stone-700', useTheme: true, opacity: 0.5 };   // 50%
-    if (hours < 4) return { bg: '', textColor: 'text-white', useTheme: true, opacity: 0.7 };       // 70%
-    return { bg: '', textColor: 'text-white', useTheme: true, opacity: 1 };                        // 100%
+  const getColor = (value: number) => {
+    if (mode === 'binary') {
+      return value > 0
+        ? { bg: '', textColor: 'text-white', useTheme: true, opacity: 1 }
+        : { bg: 'bg-stone-100', textColor: 'text-stone-400', useTheme: false };
+    }
+
+    if (mode === 'duration' && target === 0) {
+      const hours = value / 3600;
+      if (hours === 0) return { bg: 'bg-stone-100', textColor: 'text-stone-300', useTheme: false };
+      if (hours < 0.5) return { bg: '', textColor: 'text-stone-700', useTheme: true, opacity: 0.15 };
+      if (hours < 1) return { bg: '', textColor: 'text-stone-700', useTheme: true, opacity: 0.3 };
+      if (hours < 2) return { bg: '', textColor: 'text-stone-700', useTheme: true, opacity: 0.5 };
+      if (hours < 4) return { bg: '', textColor: 'text-white', useTheme: true, opacity: 0.7 };
+      return { bg: '', textColor: 'text-white', useTheme: true, opacity: 1 };
+    }
+
+    const normalizedValue = mode === 'duration' ? value / 3600 : value;
+    const normalizedTarget = mode === 'duration' ? target / 60 : target;
+    const ratio = normalizedTarget > 0
+      ? Math.min(1, normalizedValue / normalizedTarget)
+      : normalizedValue > 0 ? 1 : 0;
+
+    if (ratio === 0) return { bg: 'bg-stone-100', textColor: 'text-stone-400', useTheme: false };
+    if (ratio < 0.25) return { bg: '', textColor: 'text-stone-700', useTheme: true, opacity: 0.15 };
+    if (ratio < 0.5) return { bg: '', textColor: 'text-stone-700', useTheme: true, opacity: 0.3 };
+    if (ratio < 0.75) return { bg: '', textColor: 'text-stone-700', useTheme: true, opacity: 0.5 };
+    if (ratio < 1) return { bg: '', textColor: 'text-white', useTheme: true, opacity: 0.7 };
+    return { bg: '', textColor: 'text-white', useTheme: true, opacity: 1 };
   };
 
   const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
@@ -80,8 +115,9 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({ year, month, d
 
         {days.map((day, idx) => {
           if (day === null) return <div key={`pad-${idx}`} />;
-          const duration = data.get(day) || 0;
-          const colorInfo = getColor(duration);
+          const value = data.get(day) ?? 0;
+          const isUnknown = unknownDays?.has(day) || false;
+          const colorInfo = getColor(value);
 
           return (
             <div
@@ -91,11 +127,12 @@ export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({ year, month, d
                     ${colorInfo.useTheme ? '' : colorInfo.bg}
                  `}
               style={colorInfo.useTheme ? {
-                backgroundColor: `color-mix(in srgb, var(--progress-bar-fill) ${colorInfo.opacity * 100}%, transparent)`
+                backgroundColor: `color-mix(in srgb, ${accentColor || 'var(--progress-bar-fill)'} ${colorInfo.opacity * 100}%, transparent)`
               } : undefined}
+              title={getDayTitle?.(day, isUnknown ? null : value)}
             >
               <span className={`text-[10px] font-medium ${colorInfo.textColor}`}>
-                {day}
+                {isUnknown ? '?' : day}
               </span>
             </div>
           );

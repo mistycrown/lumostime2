@@ -1,13 +1,14 @@
 /**
  * @file TimelineScheduleCanvas.test.ts
  * @input Sample time intervals including overlap boundaries
- * @output Regression coverage for parallel schedule block columns, planning time ranges, and quick-color ranges
+ * @output Regression coverage for parallel schedule block columns, actionable idle-time gaps, planning time ranges, and quick-color ranges
  * @pos Test
  * @updated 2026-08-06: Covers multiline note expansion for sufficiently tall timeline blocks.
  * @updated 2026-07-31: Covers locked recurring auto-Plan blocks staying out of time-edit mode.
  * @updated 2026-07-30: Covers whole-block drag shifting while preserving duration and daily bounds.
  * @updated 2026-07-30: Covers quick-color range minimums for click-to-drag formal record creation.
  * @updated 2026-07-30: Covers compact two-digit hour-only grid labels and alpha backgrounds for timeline activity colors.
+ * @updated 2026-08-09: Covers all-day idle-gap calculation, planned-block exclusion, threshold filtering, and the current-time trailing boundary.
  */
 import { describe, expect, test, vi } from 'vitest';
 import { Log, TodoItem } from '../types';
@@ -16,6 +17,7 @@ import {
   getMinimumTimelineRange,
   getPlannedTimeRange,
   getScheduleBlockHeight,
+  getTimelineIdleGaps,
   getTimelineBlockBackground,
   isTimelinePlanTimeEditingLocked,
   isTimelineLogNoteExpanded,
@@ -27,6 +29,39 @@ import {
 } from './TimelineScheduleCanvas';
 
 describe('layoutParallelScheduleBlocks', () => {
+  test('finds start, intermediate, and trailing idle time while ignoring planned blocks', () => {
+    const minute = 60 * 1000;
+    expect(getTimelineIdleGaps([
+      { id: 'first', startTime: 100 * minute, endTime: 200 * minute, isPlanned: false },
+      { id: 'plan', startTime: 300 * minute, endTime: 400 * minute, isPlanned: true },
+      { id: 'last', startTime: 500 * minute, endTime: 600 * minute, isPlanned: false }
+    ], 0, 24 * 60 * minute, 1)).toEqual([
+      { id: 'idle-0-6000000', startTime: 0, endTime: 100 * minute },
+      { id: 'idle-12000000-30000000', startTime: 200 * minute, endTime: 500 * minute },
+      { id: 'idle-36000000-86400000', startTime: 600 * minute, endTime: 24 * 60 * minute }
+    ]);
+  });
+
+  test('merges overlapping real records and stops the trailing idle time at the supplied current-time boundary', () => {
+    const minute = 60 * 1000;
+    expect(getTimelineIdleGaps([
+      { id: 'first', startTime: 100 * minute, endTime: 300 * minute, isPlanned: false },
+      { id: 'overlap', startTime: 200 * minute, endTime: 400 * minute, isPlanned: false }
+    ], 0, 500 * minute, 1)).toEqual([
+      { id: 'idle-0-6000000', startTime: 0, endTime: 100 * minute },
+      { id: 'idle-24000000-30000000', startTime: 400 * minute, endTime: 500 * minute }
+    ]);
+  });
+
+  test('uses the whole available day for an empty day and filters gaps below the configured threshold', () => {
+    const minute = 60 * 1000;
+    expect(getTimelineIdleGaps([], 0, 60 * minute, 60)).toEqual([
+      { id: 'idle-0-3600000', startTime: 0, endTime: 60 * minute }
+    ]);
+    expect(getTimelineIdleGaps([], 0, 59 * minute, 60)).toEqual([]);
+    expect(getTimelineIdleGaps([], 100 * minute, 90 * minute, 1)).toEqual([]);
+  });
+
   test('places overlapping records in separate equal-width columns', () => {
     const blocks = layoutParallelScheduleBlocks([
       { id: 'first', startMinutes: 60, endMinutes: 180 },

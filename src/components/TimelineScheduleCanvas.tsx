@@ -1,7 +1,7 @@
 /**
  * @file TimelineScheduleCanvas.tsx
  * @input Selected date, logs, categories, scopes, todos, quick-color selection, and record mutation callbacks
- * @output A full-day scrollable schedule canvas with plan drops, quick-color record creation, editable time bounds, and touch pinch zoom
+ * @output A full-day scrollable schedule canvas with actionable idle-time gaps, plan drops, quick-color record creation, editable time bounds, and touch pinch zoom
  * @pos Component
  * @description Positions real records and virtual planning blocks on a 00:00-24:00 time grid for the Chronicle split layout.
  * @updated 2026-08-06: Lets larger blocks show full multiline notes while keeping shorter blocks on a single truncated line.
@@ -15,6 +15,7 @@
  * @updated 2026-07-30: Restores a guarded click fallback so still taps open block detail without requiring pointer movement.
  * @updated 2026-07-30: Tightens the schedule gutters and hides the in-panel scrollbar for a denser split workspace.
  * @updated 2026-07-30: Suppresses the synthetic click after real-record taps so the detail modal is not immediately backdrop-closed.
+ * @updated 2026-08-09: Renders clickable idle-time gaps from real records only; planned blocks do not split gaps and today's trailing gap ends at the current time.
  */
 import React, { useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -44,6 +45,8 @@ interface TimelineScheduleCanvasProps {
   scopes: Scope[];
   todos: TodoItem[];
   isDarkMode: boolean;
+  minIdleTimeThreshold: number;
+  onAddLog: (startTime: number, endTime: number) => void;
   onEditLog: (log: Log) => void;
   onUpdateLog: (log: Log) => void;
   onCreatePlannedLog: (todo: TodoItem, startTime: number, endTime: number) => Log;
@@ -82,6 +85,12 @@ interface ScheduleBlockLayout {
 }
 
 interface TimeOverride {
+  startTime: number;
+  endTime: number;
+}
+
+export interface TimelineIdleGap {
+  id: string;
   startTime: number;
   endTime: number;
 }
@@ -174,6 +183,40 @@ export const getMinimumTimelineRange = (anchorMinutes: number, currentMinutes: n
   return { startMinutes, endMinutes };
 };
 
+export const getTimelineIdleGaps = (
+  logs: Array<Pick<Log, 'id' | 'startTime' | 'endTime' | 'isPlanned'>>,
+  dayStartTime: number,
+  availableEndTime: number,
+  minimumDurationMinutes: number
+): TimelineIdleGap[] => {
+  if (availableEndTime <= dayStartTime) return [];
+
+  const realRanges = logs
+    .filter((log) => !log.isPlanned && log.startTime < availableEndTime && log.endTime > dayStartTime)
+    .map((log) => ({
+      startTime: Math.max(log.startTime, dayStartTime),
+      endTime: Math.min(log.endTime, availableEndTime)
+    }))
+    .filter((range) => range.endTime > range.startTime)
+    .sort((left, right) => left.startTime - right.startTime || left.endTime - right.endTime);
+  const minimumDurationMs = Math.max(0, minimumDurationMinutes) * 60 * 1000;
+  const gaps: TimelineIdleGap[] = [];
+  let cursor = dayStartTime;
+
+  const addGap = (startTime: number, endTime: number) => {
+    if (endTime <= startTime || endTime - startTime < minimumDurationMs) return;
+    gaps.push({ id: `idle-${startTime}-${endTime}`, startTime, endTime });
+  };
+
+  realRanges.forEach((range) => {
+    addGap(cursor, range.startTime);
+    cursor = Math.max(cursor, range.endTime);
+  });
+  addGap(cursor, availableEndTime);
+
+  return gaps;
+};
+
 export const getScheduleBlockHeight = (durationMinutes: number, hourHeight: number): number => Math.max(
   MIN_SCHEDULE_BLOCK_HEIGHT,
   (durationMinutes / 60) * hourHeight
@@ -232,6 +275,8 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   categories,
   scopes,
   todos,
+  minIdleTimeThreshold,
+  onAddLog,
   onEditLog,
   onUpdateLog,
   onCreatePlannedLog,
@@ -290,6 +335,12 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   const halfHourLineClassName = isDarkMode ? 'border-stone-800' : 'border-stone-100';
   const timeLabelClassName = isDarkMode ? 'text-stone-300' : 'text-stone-400';
   const zoomControlClassName = isDarkMode ? 'border-stone-700 bg-stone-900/95 text-stone-300 hover:bg-stone-800 hover:text-white' : 'border-stone-200 bg-white/95 text-stone-400 hover:bg-stone-50 hover:text-stone-700';
+  const idleGaps = useMemo(() => getTimelineIdleGaps(
+    logs,
+    dayStart.getTime(),
+    isToday ? Math.min(dayEnd, currentTime.getTime()) : dayStart.getTime() > currentTime.getTime() ? dayStart.getTime() : dayEnd,
+    minIdleTimeThreshold
+  ), [logs, dayStart, dayEnd, isToday, currentTime, minIdleTimeThreshold]);
 
   const scheduledLogs = useMemo(() => layoutParallelScheduleBlocks(logs
     .map((log) => ({ log, ...timeOverrides[log.id] }))
@@ -1000,6 +1051,38 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
           })}
 
           <div className="absolute inset-y-0 left-10 right-1">
+            {idleGaps.map((gap) => {
+              const startMinutes = (gap.startTime - dayStart.getTime()) / 60000;
+              const endMinutes = (gap.endTime - dayStart.getTime()) / 60000;
+              const durationMinutes = endMinutes - startMinutes;
+              return (
+                <button
+                  key={gap.id}
+                  type="button"
+                  data-idle-time
+                  disabled={Boolean(quickColorSelection)}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onAddLog(gap.startTime, gap.endTime);
+                  }}
+                  className="absolute z-0 w-full overflow-hidden rounded-[4px] border border-dashed border-stone-300/70 bg-stone-100/20 px-3 py-2 text-left transition-colors hover:border-stone-400 hover:bg-stone-100/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400/50 disabled:pointer-events-none dark:border-stone-700/80 dark:bg-stone-900/15 dark:hover:border-stone-500 dark:hover:bg-stone-800/35"
+                  style={{
+                    top: `${TIMELINE_TOP_PADDING + (startMinutes / 60) * hourHeight}px`,
+                    height: `${getScheduleBlockHeight(endMinutes - startMinutes, hourHeight)}px`,
+                    left: '0'
+                  }}
+                  aria-label={`添加空闲时段活动 ${formatTime(new Date(gap.startTime))} 至 ${formatTime(new Date(gap.endTime))}`}
+                >
+                  {durationMinutes >= 20 && <>
+                    <span className="block truncate text-[10px] font-bold tabular-nums text-stone-400 dark:text-stone-500">
+                      {formatTime(new Date(gap.startTime))} - {formatTime(new Date(gap.endTime))}
+                    </span>
+                    <span className="mt-0.5 block truncate text-[11px] font-medium text-stone-400 dark:text-stone-500">Idle Time</span>
+                  </>}
+                </button>
+              );
+            })}
             {todoDropPreview && (
               <div
                 className="pointer-events-none absolute z-10 rounded-[4px] border border-dashed px-3 py-2 opacity-90"
