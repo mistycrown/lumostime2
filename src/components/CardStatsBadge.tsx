@@ -1,11 +1,13 @@
 /**
  * @file CardStatsBadge.tsx
  * @description 场景卡片统计徽章组件 - 显示不同类型卡片的统计信息
+ * @updated 2026-08-09: Planned timeline blocks are excluded from badge duration statistics.
  */
 import React from 'react';
 import { Clock, ListTodo, Trophy } from 'lucide-react';
 import { DailyReview, Log, TodoItem } from '../types';
 import { calculateCheckItemStreak } from '../utils/reviewStatsUtils';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 interface CardStatsBadgeProps {
     type: 'timer' | 'todo' | 'checklist';
@@ -45,7 +47,7 @@ const calculateActivityDuration = (activityId: string, categoryId: string, logs:
     const todayStart = today.getTime();
     const todayEnd = todayStart + 24 * 60 * 60 * 1000;
 
-    const todayLogs = logs.filter(log => 
+    const todayLogs = filterCountableLogs(logs).filter(log => 
         log.activityId === activityId &&
         log.categoryId === categoryId &&
         log.startTime >= todayStart &&
@@ -68,7 +70,7 @@ const calculateTodoDuration = (todoId: string, logs: Log[]): number => {
     const todayStart = today.getTime();
     const todayEnd = todayStart + 24 * 60 * 60 * 1000;
 
-    const todayLogs = logs.filter(log => 
+    const todayLogs = filterCountableLogs(logs).filter(log => 
         log.linkedTodoId === todoId &&
         log.startTime >= todayStart &&
         log.startTime < todayEnd

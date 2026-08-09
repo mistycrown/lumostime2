@@ -2,11 +2,13 @@
  * @file lineChartUtils.ts
  * @description Utilities for preparing line chart series data.
  * @updated 2026-03-16 Scope trend series now count full duration for every linked scope.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from line chart series.
  */
 
 import { Log, Category, TodoItem, Scope } from '../types';
 import { CHART_STROKE_COLORS, getChartStrokeColor } from './colorAdapterUtils';
 import { getLogDurationSeconds, getNormalizedScopeIds, summarizeScopeDurations } from './scopeStatsUtils';
+import { filterCountableLogs } from './statLogUtils';
 
 export const CHART_LINE_COLORS: Record<string, string> = {
   ...CHART_STROKE_COLORS,
@@ -65,8 +67,9 @@ export function prepareActivitySeries(
   daysOfRange: Date[]
 ): { series: number[][]; meta: SeriesMeta[] } {
   const allActivitiesMap = new Map<string, SeriesMeta & { total: number; categoryId: string }>();
+  const countableLogs = filterCountableLogs(filteredLogs);
 
-  filteredLogs.forEach((log) => {
+  countableLogs.forEach((log) => {
     const category = categories.find((item) => item.id === log.categoryId);
     const activity = category?.activities.find((item) => item.id === log.activityId);
     if (!activity || !category) {
@@ -104,7 +107,7 @@ export function prepareActivitySeries(
       const dayEnd = new Date(day);
       dayEnd.setHours(23, 59, 59, 999);
 
-      const dailyTotal = filteredLogs
+      const dailyTotal = countableLogs
         .filter(
           (log) =>
             log.activityId === activity.id &&
@@ -127,7 +130,7 @@ export function prepareTodoSeries(
   rangeEnd: Date,
   daysOfRange: Date[]
 ): { series: number[][]; meta: SeriesMeta[] } {
-  const unfilteredLogs = logs.filter(
+  const unfilteredLogs = filterCountableLogs(logs).filter(
     (log) => log.startTime >= rangeStart.getTime() && log.endTime <= rangeEnd.getTime()
   );
 
@@ -192,7 +195,7 @@ export function prepareScopeSeries(
   rangeEnd: Date,
   daysOfRange: Date[]
 ): { series: number[][]; meta: SeriesMeta[] } {
-  const unfilteredLogs = logs.filter(
+  const unfilteredLogs = filterCountableLogs(logs).filter(
     (log) => log.startTime >= rangeStart.getTime() && log.endTime <= rangeEnd.getTime()
   );
 

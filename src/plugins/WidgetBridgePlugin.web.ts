@@ -9,6 +9,7 @@
  * @updated 2026-05-01: Added no-op tracking-calendar payload sync for the dedicated 2x2 tracking calendar widget.
  * @updated 2026-05-02: Added no-op scene widget payload sync for the dedicated 4x3 scene widget.
  * @updated 2026-05-05: Added no-op log-tail sync for native quick-punch shortcut gap fills.
+ * @updated 2026-08-09: Added no-op principle-card payload sync for the dedicated Android 4x2 card widget.
  */
 import { WebPlugin } from '@capacitor/core';
 import type {
@@ -18,6 +19,7 @@ import type {
   WidgetBridgePendingAction,
   WidgetBridgePendingDailyAction,
   WidgetBridgePendingTodoPinAction,
+  WidgetBridgePrincipleCardPayload,
   WidgetBridgePlugin,
   WidgetBridgeScenePayload,
   WidgetBridgeRuntimeState,
@@ -73,6 +75,10 @@ export class WidgetBridgeWeb extends WebPlugin implements WidgetBridgePlugin {
 
   async syncTrackingCalendarWidgetData(
     _options?: { payload: WidgetBridgeTrackingCalendarPayload | null }
+  ): Promise<void> {}
+
+  async syncPrincipleCardWidgetData(
+    _options?: { payload: WidgetBridgePrincipleCardPayload | null }
   ): Promise<void> {}
 
   async syncSceneWidgetData(

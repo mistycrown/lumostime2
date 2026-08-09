@@ -9,6 +9,7 @@ package com.mistycrown.lumostime
  * Updated 2026-05-05: Added optional scene item app-launch metadata so scene widgets can mirror in-app third-party app launching.
  * Updated 2026-05-05: Added optional scene runtime source metadata so app-side scene flips can stay scoped to the tapped scene slot.
  * Updated 2026-08-06: Added packaged UI icon asset paths to scene time slots for native tab rendering.
+ * Updated 2026-08-09: Added principle-card widget payload and per-instance shuffle/flip state models.
  */
 object WidgetTypes {
     const val TIMER = "timer"
@@ -420,6 +421,30 @@ data class WidgetTrackingCalendarTemplatePayload(
 data class WidgetTrackingCalendarPayload(
     val templates: List<WidgetTrackingCalendarTemplatePayload> = emptyList(),
     val syncedAt: Long
+)
+
+data class WidgetPrincipleCard(
+    val id: String,
+    val title: String,
+    val frontText: String,
+    val backText: String
+)
+
+data class WidgetPrincipleCardPayload(
+    val principles: List<WidgetPrincipleCard> = emptyList(),
+    val syncedAt: Long
+)
+
+data class WidgetPrincipleCardState(
+    val appWidgetId: Int,
+    val currentPrincipleId: String? = null,
+    val currentBackgroundKey: String? = null,
+    val principleOrder: List<String> = emptyList(),
+    val backgroundOrder: List<String> = emptyList(),
+    val principleCursor: Int = 0,
+    val backgroundCursor: Int = 0,
+    val isBackSideVisible: Boolean = false,
+    val updatedAt: Long
 )
 
 data class WidgetSceneGroupAutoSwitchConfig(

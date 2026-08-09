@@ -3,6 +3,7 @@
  * @input children, navigation state, handlers
  * @output Main Application Layout
  * @updated 2026-06-07: Added weekly/monthly newspaper overlays to the shared header title and back-navigation handling alongside the existing daily newspaper path.
+ * @updated 2026-08-09: Let the daily-check overview and detail views own their compact headers.
  * @updated 2026-04-25: Let floating switch-button fallback icons inherit the button theme color so default UI icons stay visible on accent-theme white buttons.
  * @updated 2026-04-25: Added a `min-h-0` guard on the main content shell so nested scene lists can keep scrolling on mobile WebViews.
  * @pos Component (Layout)
@@ -141,7 +142,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         <div className={`h-screen w-screen flex flex-col text-stone-800 overflow-hidden select-none font-serif relative pb-[env(safe-area-inset-bottom)]`}>
 
             {/* Top Header Bar */}
-            {!isSettingsOpen && (currentView !== AppView.TIMELINE || isDailyReviewOpen || isDailyNewspaperOpen || isWeeklyNewspaperOpen || isMonthlyNewspaperOpen || isOnThisDayOpen || isWeeklyReviewOpen || isMonthlyReviewOpen || isAchievementOpen) && !isStatsFullScreen &&
+            {!isSettingsOpen && currentView !== AppView.DAILY_CHECKS && currentView !== AppView.DAILY_CHECK_DETAIL && (currentView !== AppView.TIMELINE || isDailyReviewOpen || isDailyNewspaperOpen || isWeeklyNewspaperOpen || isMonthlyNewspaperOpen || isOnThisDayOpen || isWeeklyReviewOpen || isMonthlyReviewOpen || isAchievementOpen) && !isStatsFullScreen &&
                 !isTodoModalOpen &&
                 !(currentView === AppView.TODO && isTodoManaging) &&
                 !(currentView === AppView.TODO && isTodoScheduleMode) &&

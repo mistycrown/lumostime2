@@ -8,6 +8,7 @@
  * @updated 2026-06-13: Added collapsed-by-default parent rows with a compact expand/collapse button for subtasks.
  * @updated 2026-06-13: Removed the child-row branch line so subtasks use indentation only.
  * @updated 2026-06-13: Added shared hierarchical associated-todo list for detail pages.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from associated todo duration totals.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -16,6 +17,7 @@ import React, { useMemo, useState } from 'react';
 import { Check, ChevronRight } from 'lucide-react';
 import { Log, TodoItem } from '../types';
 import { buildTodoTreeItems } from '../utils/todoHierarchyUtils';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 interface AssociatedTodoListProps {
   todos: TodoItem[];
@@ -64,7 +66,7 @@ export const AssociatedTodoList: React.FC<AssociatedTodoListProps> = ({
   const durationByTodoId = useMemo(() => {
     const durationMap = new Map<string, number>();
 
-    logs.forEach((log) => {
+    filterCountableLogs(logs).forEach((log) => {
       if (!log.linkedTodoId) {
         return;
       }

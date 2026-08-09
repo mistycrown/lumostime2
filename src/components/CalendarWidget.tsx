@@ -4,14 +4,16 @@
  * @output Interactive Calendar / Heatmap with animated expand/collapse
  * @pos Component (Core UI)
  * @description A versatile calendar component supporting animated expand/collapse, Week/Month modes, and Heatmap visualization (Duration or Focus).
+ * @updated 2026-08-09: Planned timeline blocks are excluded from calendar heatmap statistics.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Log } from '../types';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 interface CalendarWidgetProps {
     currentDate: Date;
@@ -35,6 +37,7 @@ interface CalendarWidgetProps {
 
 export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [], onDayClick }) => {
     const [viewMode, setViewMode] = useState<'calendar' | 'month_year'>('calendar');
+    const countableLogs = useMemo(() => filterCountableLogs(logs), [logs]);
     const calendarAreaTransition = {
         duration: 0.18,
         ease: [0.22, 1, 0.36, 1] as const
@@ -118,7 +121,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
         const end = new Date(date);
         end.setHours(23, 59, 59, 999);
 
-        return logs.some(log => log.startTime >= start.getTime() && log.startTime <= end.getTime());
+        return countableLogs.some(log => log.startTime >= start.getTime() && log.startTime <= end.getTime());
     };
 
     return (
@@ -286,7 +289,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                         const today = isToday(day);
 
                                         // Heatmap Logic
-                                        const dayLogs = logs.filter(l => {
+                                        const dayLogs = countableLogs.filter(l => {
                                             const logDate = new Date(l.startTime);
                                             return logDate.getDate() === day.getDate() &&
                                                 logDate.getMonth() === day.getMonth() &&

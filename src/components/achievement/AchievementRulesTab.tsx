@@ -3,18 +3,24 @@
  * @input Achievement rules plus category, scope, todo, and daily-check metadata for editing targets
  * @output Rule list rows and a modal editor that can safely edit temporary empty numeric input states
  * @description Achievement rule list and modal editor, reusing the shared selectors plus inline filter expressions for duration-based custom matching.
+ * @updated 2026-08-09: Added optional fixed attribute experience effects to achievement rules.
  * @updated 2026-07-11: Added a custom styled todo subtask inclusion checkbox for todo-completion achievement rules.
  * @updated 2026-06-06: Clarified custom-filter help text so `@` expressions cover todo titles and todo category names.
  * @updated 2026-04-25: Added a fixed per-rule streak toggle for check-category rules without exposing custom streak-tier editing in the UI.
  * @updated 2026-04-17: Added filter-duration rules backed by inline custom filter expressions.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronRight, Plus } from 'lucide-react';
-import { AchievementRule, Category, CheckTemplate, Scope, TodoCategory } from '../../types';
+import { Check, ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import { AchievementAttribute, AchievementRule, Category, CheckTemplate, Scope, TodoCategory } from '../../types';
 import { AchievementDialog } from './AchievementDialog';
 import { TagMultipleAssociation } from '../TagMultipleAssociation';
 import { IconRenderer } from '../IconRenderer';
-import { formatAchievementSignedStars, formatAchievementStars } from '../../utils/achievementUtils';
+import { getAchievementAttributeIcon } from '../../constants/achievementAttributeIcons';
+import {
+  formatAchievementExperience,
+  formatAchievementSignedStars,
+  formatAchievementStars
+} from '../../utils/achievementUtils';
 import { getActiveActivities } from '../../utils/archiveUtils';
 
 interface AchievementRulesTabProps {
@@ -23,6 +29,7 @@ interface AchievementRulesTabProps {
   todoCategories: TodoCategory[];
   checkTemplates: CheckTemplate[];
   rules: AchievementRule[];
+  attributes: AchievementAttribute[];
   onCreateRule: (input: {
     name: string;
     effectType: 'earn' | 'spend';
@@ -33,6 +40,10 @@ interface AchievementRulesTabProps {
     filterExpression?: string;
     unitAmount: number;
     deltaPerUnit: number;
+    attributeEffect?: {
+      attributeId: string;
+      expPerUnit: number;
+    };
     note?: string;
   }) => void;
   onUpdateRule: (rule: AchievementRule) => void;
@@ -49,6 +60,10 @@ interface RuleDraft {
   filterExpression: string;
   unitAmount: number;
   deltaPerUnit: number;
+  attributeExperienceEnabled: boolean;
+  attributeId: string;
+  attributeExpPerUnit: number;
+  attributeExpPerUnitInput: string;
   note: string;
 }
 
@@ -77,6 +92,10 @@ const createEmptyDraft = (): RuleDraft => ({
   filterExpression: '',
   unitAmount: 30,
   deltaPerUnit: 1,
+  attributeExperienceEnabled: false,
+  attributeId: '',
+  attributeExpPerUnit: 10,
+  attributeExpPerUnitInput: '10',
   note: ''
 });
 
@@ -114,6 +133,10 @@ const isSameRuleDraft = (left: RuleDraft, right: RuleDraft) => (
   left.targetType === right.targetType &&
   left.unitAmount === right.unitAmount &&
   left.deltaPerUnit === right.deltaPerUnit &&
+  left.attributeExperienceEnabled === right.attributeExperienceEnabled &&
+  left.attributeId === right.attributeId &&
+  left.attributeExpPerUnit === right.attributeExpPerUnit &&
+  left.attributeExpPerUnitInput === right.attributeExpPerUnitInput &&
   left.useCheckStreakMultiplier === right.useCheckStreakMultiplier &&
   left.includeSubtasks === right.includeSubtasks &&
   left.filterExpression === right.filterExpression &&
@@ -251,12 +274,120 @@ const TodoSubtaskInclusionToggle: React.FC<{
   </button>
 );
 
+const AttributeExperiencePicker: React.FC<{
+  attributes: AchievementAttribute[];
+  selectedId: string;
+  onChange: (attributeId: string) => void;
+}> = ({ attributes, selectedId, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedAttribute = attributes.find((attribute) => attribute.id === selectedId);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
+  return (
+    <div className="relative mt-2">
+      <button
+        type="button"
+        role="combobox"
+        aria-expanded={isOpen}
+        aria-label="选择属性"
+        onClick={() => setIsOpen((previous) => !previous)}
+        className={`flex w-full items-center justify-between gap-3 border-b py-2 text-left transition-colors ${
+          isOpen ? 'border-stone-900' : 'border-stone-300 hover:border-stone-500'
+        }`}
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          {selectedAttribute ? (
+            <>
+              <span
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white"
+                style={{ backgroundColor: selectedAttribute.color }}
+              >
+                {React.createElement(getAchievementAttributeIcon(selectedAttribute.icon), { size: 13 })}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm text-stone-900">{selectedAttribute.name}</span>
+                <span className="block truncate text-[10px] uppercase tracking-[0.12em] text-stone-400">
+                  {selectedAttribute.subtitle}
+                </span>
+              </span>
+            </>
+          ) : (
+            <span className="text-sm text-stone-400">选择属性</span>
+          )}
+        </span>
+        <ChevronDown
+          size={15}
+          className={`shrink-0 text-stone-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {isOpen && (
+        <div className="absolute inset-x-0 top-full z-30 mt-2 max-h-56 overflow-y-auto rounded-xl border border-stone-200 bg-[#fdfbf7] p-1.5 shadow-[0_16px_36px_rgba(28,25,23,0.14)] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {attributes.length === 0 ? (
+            <div className="px-3 py-3 text-sm text-stone-400">暂无可用属性</div>
+          ) : (
+            attributes.map((attribute) => {
+              const Icon = getAchievementAttributeIcon(attribute.icon);
+              const isSelected = attribute.id === selectedId;
+              return (
+                <button
+                  key={attribute.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(attribute.id);
+                    setIsOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${
+                    isSelected
+                      ? 'bg-stone-900 text-white'
+                      : 'text-stone-700 hover:bg-stone-100'
+                  }`}
+                >
+                  <span
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white"
+                    style={{ backgroundColor: attribute.color }}
+                  >
+                    <Icon size={14} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm">{attribute.name}</span>
+                    <span className={`block truncate text-[10px] uppercase tracking-[0.12em] ${
+                      isSelected ? 'text-stone-300' : 'text-stone-400'
+                    }`}>
+                      {attribute.subtitle}
+                    </span>
+                  </span>
+                  {isSelected && <Check size={15} className="shrink-0" />}
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
   categories,
   scopes,
   todoCategories,
   checkTemplates,
   rules,
+  attributes,
   onCreateRule,
   onUpdateRule,
   onDeleteRule
@@ -272,6 +403,9 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
   const isDraftSavable = Boolean(
     (draft.targetType === 'filterDuration' && draft.filterExpression.trim())
     || (draft.targetType !== 'filterDuration' && draft.targetIds.length > 0)
+  ) && (
+    !draft.attributeExperienceEnabled
+    || (Boolean(draft.attributeId) && Number.isFinite(draft.attributeExpPerUnit) && draft.attributeExpPerUnit > 0)
   );
 
   useEffect(() => {
@@ -288,6 +422,10 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
         filterExpression: selectedRule.filterExpression || '',
         unitAmount: selectedRule.unitAmount,
         deltaPerUnit: selectedRule.deltaPerUnit,
+        attributeExperienceEnabled: Boolean(selectedRule.attributeEffect),
+        attributeId: selectedRule.attributeEffect?.attributeId || '',
+        attributeExpPerUnit: selectedRule.attributeEffect?.expPerUnit || 10,
+        attributeExpPerUnitInput: String(selectedRule.attributeEffect?.expPerUnit || 10),
         note: selectedRule.note || ''
       };
       setUnitAmountInput(formatRuleNumberInput(nextDraft.unitAmount));
@@ -313,6 +451,13 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
     () => new Map(todoCategories.map((category) => [category.id, category.name] as const)),
     [todoCategories]
   );
+  const attributeNameMap = useMemo(
+    () => new Map(attributes.map((attribute) => [attribute.id, attribute.name] as const)),
+    [attributes]
+  );
+  const attributeOptions = useMemo(() => (
+    attributes.filter((attribute) => attribute.enabled || attribute.id === draft.attributeId)
+  ), [attributes, draft.attributeId]);
   const scopeNameMap = useMemo(
     () => new Map(scopes.map((scope) => [scope.id, scope.name] as const)),
     [scopes]
@@ -355,7 +500,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
     const existingIds = new Set(baseOptions.map((option) => option.id));
     draft.targetIds.forEach((targetId) => {
       if (!existingIds.has(targetId)) {
-        baseOptions.push({ id: targetId, name: targetId });
+        baseOptions.push({ id: targetId, name: targetId, icon: '', uiIcon: '' });
       }
     });
 
@@ -410,6 +555,12 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
     const normalizedDeltaPerUnit = commitDeltaPerUnitInput();
     const normalizedTargetIds = draft.targetType === 'filterDuration' ? [] : draft.targetIds;
     const normalizedFilterExpression = draft.filterExpression.trim() || undefined;
+    const normalizedAttributeEffect = draft.attributeExperienceEnabled && draft.attributeId
+      ? {
+        attributeId: draft.attributeId,
+        expPerUnit: Math.max(1, Math.floor(draft.attributeExpPerUnit))
+      }
+      : undefined;
 
     if (dialogMode === 'create') {
       onCreateRule({
@@ -422,6 +573,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
         filterExpression: normalizedFilterExpression,
         unitAmount: normalizedUnitAmount,
         deltaPerUnit: normalizedDeltaPerUnit,
+        attributeEffect: normalizedAttributeEffect,
         note: draft.note.trim() || undefined
       });
       closeDialog();
@@ -440,6 +592,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
         filterExpression: normalizedFilterExpression,
         unitAmount: normalizedUnitAmount,
         deltaPerUnit: normalizedDeltaPerUnit,
+        attributeEffect: normalizedAttributeEffect,
         note: draft.note.trim() || undefined
       });
       closeDialog();
@@ -491,6 +644,9 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
               }
               return `每完成 ${rule.unitAmount} 项 ${formatAchievementSignedStars(rule.effectType === 'earn' ? rule.deltaPerUnit : -rule.deltaPerUnit)} 光点`;
             })();
+            const attributeSummary = rule.attributeEffect
+              ? ` · ${attributeNameMap.get(rule.attributeEffect.attributeId) || '属性'} +${formatAchievementExperience(rule.attributeEffect.expPerUnit)} EXP`
+              : '';
 
             return (
               <button
@@ -506,6 +662,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
                   <div className="text-[16px] leading-none text-stone-900">{rule.name}</div>
                   <div className="mt-[6px] text-[13px] leading-6 text-stone-500">
                     {summaryText}
+                    {attributeSummary}
                     {rule.targetType === 'todoCategory'
                       ? ` · ${rule.includeSubtasks !== false ? '含子任务' : '仅父任务'}`
                       : ''}
@@ -663,6 +820,82 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
               />
               <div className="mt-2 text-xs text-stone-400">Current: {formatAchievementStars(draft.deltaPerUnit)} 光点</div>
             </label>
+          </div>
+
+          <div className="border-t border-stone-200 pt-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.14em] text-stone-400">人物成长</div>
+                <div className="mt-2 text-xs leading-6 text-stone-500">
+                  每完成一组规则单位，同时增加指定属性的经验值。
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDraft((previous) => ({
+                  ...previous,
+                  attributeExperienceEnabled: !previous.attributeExperienceEnabled
+                }))}
+                aria-pressed={draft.attributeExperienceEnabled}
+                title="是否增加属性经验"
+                className="inline-flex items-center bg-transparent px-0 py-0"
+              >
+                <span
+                  className={`relative h-7 w-12 rounded-full transition-colors ${
+                    draft.attributeExperienceEnabled ? 'bg-stone-900' : 'bg-stone-200'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-all ${
+                      draft.attributeExperienceEnabled ? 'left-6' : 'left-1'
+                    }`}
+                  />
+                </span>
+              </button>
+            </div>
+
+            {draft.attributeExperienceEnabled && (
+              <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem]">
+                <label className="block">
+                  <span className="text-xs text-stone-500">增加属性</span>
+                  <AttributeExperiencePicker
+                    attributes={attributeOptions}
+                    selectedId={draft.attributeId}
+                    onChange={(attributeId) => setDraft((previous) => ({ ...previous, attributeId }))}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs text-stone-500">每单位经验</span>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={draft.attributeExpPerUnitInput}
+                    onBlur={() => {
+                      const parsed = Number(draft.attributeExpPerUnitInput);
+                      const normalized = Number.isFinite(parsed) ? Math.max(1, Math.floor(parsed)) : 1;
+                      setDraft((previous) => ({
+                        ...previous,
+                        attributeExpPerUnit: normalized,
+                        attributeExpPerUnitInput: String(normalized)
+                      }));
+                    }}
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      const parsed = Number(nextValue);
+                      setDraft((previous) => ({
+                        ...previous,
+                        attributeExpPerUnitInput: nextValue,
+                        ...(Number.isFinite(parsed) && parsed > 0
+                          ? { attributeExpPerUnit: Math.max(1, Math.floor(parsed)) }
+                          : {})
+                      }));
+                    }}
+                    className="mt-2 w-full border-b border-stone-300 bg-transparent px-0 py-2 text-sm text-stone-900 outline-none focus:border-stone-900"
+                  />
+                </label>
+              </div>
+            )}
           </div>
 
           {draft.targetType === 'checkCategory' && (

@@ -5,11 +5,13 @@
  * @pos Utility (MajorGoal Logic)
  * @description Pure functions for managing major goals, including progress calculation, time range management, and validation.
  * @updated 2026-07-21: Use explicit local calendar-day boundaries for inclusive goal ranges.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from major goal progress calculations.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { MajorGoal, Goal, Log, TodoItem } from '../types';
 import { calculateGoalProgress, getGoalDateRange } from './goalUtils';
+import { filterCountableLogs } from './statLogUtils';
 
 /**
  * 计算大目标的总进度
@@ -73,7 +75,7 @@ export const calculateMajorGoalProgress = (
     totalCurrent = filteredTodos.length;
   } else {
     // 日志相关指标：先执行基础过滤（时间、领域、标签）
-    const baseFilteredLogs = logs.filter(log => {
+    const baseFilteredLogs = filterCountableLogs(logs).filter(log => {
       if (log.startTime < start || log.startTime > end) return false;
       if (!log.scopeIds?.includes(majorGoal.scopeId)) return false;
       if (majorGoal.filterActivityIds && majorGoal.filterActivityIds.length > 0) {

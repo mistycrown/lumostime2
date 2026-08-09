@@ -48,6 +48,8 @@ export const useHardwareBackButton = () => {
         isGalleryViewOpen, setIsGalleryViewOpen,
         isExportViewOpen, setIsExportViewOpen,
         currentView, setCurrentView,
+        dailyCheckDetailId, setDailyCheckDetailId,
+        previousView, setPreviousView,
         selectedTagId, setSelectedTagId,
         selectedCategoryId, setSelectedCategoryId,
         selectedScopeId, setSelectedScopeId,
@@ -230,6 +232,17 @@ export const useHardwareBackButton = () => {
                 setCurrentView(AppView.TIMELINE);
                 return;
             }
+            if (currentView === AppView.DAILY_CHECK_DETAIL) {
+                setDailyCheckDetailId(null);
+                setCurrentView(AppView.DAILY_CHECKS);
+                return;
+            }
+            if (currentView === AppView.DAILY_CHECKS) {
+                setDailyCheckDetailId(null);
+                setCurrentView(previousView || AppView.TIMELINE);
+                setPreviousView(null);
+                return;
+            }
             if (currentView === AppView.TAGS && (selectedTagId || selectedCategoryId)) {
                 handleBackFromTag();
                 return;
@@ -253,6 +266,7 @@ export const useHardwareBackButton = () => {
         isSettingsOpen, isAutoLinkOpen, isSearchOpen, isFiltersOpen, isExportViewOpen, isGalleryViewOpen, isShareViewOpen, focusDetailSessionId, isAddModalOpen, isTodoModalOpen,
         isDailyNewspaperOpen, isWeeklyNewspaperOpen, isMonthlyNewspaperOpen, isDailyReviewOpen, isOnThisDayOpen, isWeeklyReviewOpen, isMonthlyReviewOpen, isAchievementOpen,
         isStatsFullScreen, isTodoManaging, isTagsManaging, isScopeManaging,
-        currentView, selectedTagId, selectedCategoryId, selectedScopeId, settingsSubmenu, settingsSubmenuBackCloses, isSearchOpenedFromSettings, activeFilterId
+        currentView, selectedTagId, selectedCategoryId, selectedScopeId, settingsSubmenu, settingsSubmenuBackCloses, isSearchOpenedFromSettings, activeFilterId,
+        dailyCheckDetailId, previousView
     ]);
 };

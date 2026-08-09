@@ -7,6 +7,7 @@
  *
  * @updated 2026-06-07: Normalized weekly and monthly review payloads during repository hydration so periodic AI newspaper fields survive reloads with the same guarantees as daily reviews.
  * @updated 2026-07-07: Reconstructs missing achievement carryover meta from shattered archived bottles for older achievement ledgers.
+ * @updated 2026-08-09: Added persistence for character attributes and independent growth snapshots.
  * @updated 2026-05-18: Parallelized snapshot hydration reads and added startup timing logs so Electron boot can diagnose slow IndexedDB-backed loads faster.
  * @updated 2026-05-18: Repaired default achievement bottle image paths by id, preset name, and stale bottle asset URLs so desktop updates keep bottle artwork visible.
  * @updated 2026-05-12: Added repository-backed `DataCollection` and `DataCollectionEntry` persistence to the core data snapshot.
@@ -23,10 +24,12 @@ import { CATEGORIES, INITIAL_DAILY_REVIEWS, INITIAL_GOALS, INITIAL_LOGS, INITIAL
 import { REVIEW_KEYS, StorageKey, USER_DATA_KEYS, storage } from '../constants/storageKeys';
 import {
   AchievementArchivedBottle,
+  AchievementAttribute,
   AchievementBottleActionRecord,
   AchievementCollection,
   AchievementCollectionRecord,
   AchievementDailySnapshot,
+  AchievementGrowthDailySnapshot,
   AchievementMeta,
   AchievementRedemptionRecord,
   AchievementReward,
@@ -76,6 +79,8 @@ export const REPOSITORY_KEYS = {
   ACHIEVEMENT_REWARDS: 'achievementRewards',
   ACHIEVEMENT_COLLECTIONS: 'achievementCollections',
   ACHIEVEMENT_DAILY_SNAPSHOTS: 'achievementDailySnapshots',
+  ACHIEVEMENT_ATTRIBUTES: 'achievementAttributes',
+  ACHIEVEMENT_GROWTH_DAILY_SNAPSHOTS: 'achievementGrowthDailySnapshots',
   ACHIEVEMENT_REDEMPTION_RECORDS: 'achievementRedemptionRecords',
   ACHIEVEMENT_COLLECTION_RECORDS: 'achievementCollectionRecords',
   ACHIEVEMENT_ARCHIVED_BOTTLES: 'achievementArchivedBottles',
@@ -136,6 +141,8 @@ export interface AchievementSnapshot {
   rewards: AchievementReward[];
   collections: AchievementCollection[];
   dailySnapshots: AchievementDailySnapshot[];
+  attributes?: AchievementAttribute[];
+  growthDailySnapshots?: AchievementGrowthDailySnapshot[];
   redemptionRecords: AchievementRedemptionRecord[];
   collectionRecords: AchievementCollectionRecord[];
   archivedBottles: AchievementArchivedBottle[];
@@ -388,6 +395,8 @@ export class DataRepository {
       rewards,
       collections,
       dailySnapshots,
+      attributes,
+      growthDailySnapshots,
       redemptionRecords,
       collectionRecords,
       archivedBottles,
@@ -398,6 +407,10 @@ export class DataRepository {
       this.repository.getData<AchievementReward[]>(REPOSITORY_KEYS.ACHIEVEMENT_REWARDS),
       this.repository.getData<AchievementCollection[]>(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTIONS),
       this.repository.getData<AchievementDailySnapshot[]>(REPOSITORY_KEYS.ACHIEVEMENT_DAILY_SNAPSHOTS),
+      this.repository.getData<AchievementAttribute[]>(REPOSITORY_KEYS.ACHIEVEMENT_ATTRIBUTES),
+      this.repository.getData<AchievementGrowthDailySnapshot[]>(
+        REPOSITORY_KEYS.ACHIEVEMENT_GROWTH_DAILY_SNAPSHOTS
+      ),
       this.repository.getData<AchievementRedemptionRecord[]>(REPOSITORY_KEYS.ACHIEVEMENT_REDEMPTION_RECORDS),
       this.repository.getData<AchievementCollectionRecord[]>(REPOSITORY_KEYS.ACHIEVEMENT_COLLECTION_RECORDS),
       this.repository.getData<AchievementArchivedBottle[]>(REPOSITORY_KEYS.ACHIEVEMENT_ARCHIVED_BOTTLES),
@@ -429,15 +442,22 @@ export class DataRepository {
       `[DataRepository] loadAchievementSnapshot resolved in ${(getTimingNow() - startedAt).toFixed(1)}ms`
     );
 
+    const normalizedMeta: AchievementMeta = {
+      achievementStartDate: meta.achievementStartDate ?? null,
+      activeBottleCarryoverStars,
+      ...(meta.growthStartDate !== undefined
+        ? { growthStartDate: meta.growthStartDate ?? null }
+        : {})
+    };
+
     return {
-      meta: {
-        achievementStartDate: meta.achievementStartDate ?? null,
-        activeBottleCarryoverStars
-      },
+      meta: normalizedMeta,
       rules: safeRules,
       rewards: safeRewards,
       collections: migratedCollections,
       dailySnapshots: safeDailySnapshots,
+      attributes: attributes === null ? undefined : (attributes ?? []),
+      growthDailySnapshots: growthDailySnapshots ?? [],
       redemptionRecords: safeRedemptionRecords,
       collectionRecords: safeCollectionRecords,
       archivedBottles: safeArchivedBottles,
@@ -548,6 +568,21 @@ export class DataRepository {
   async saveAchievementDailySnapshots(dailySnapshots: AchievementDailySnapshot[]): Promise<void> {
     await this.initialize();
     await this.repository.setData(REPOSITORY_KEYS.ACHIEVEMENT_DAILY_SNAPSHOTS, dailySnapshots);
+  }
+
+  async saveAchievementAttributes(attributes: AchievementAttribute[]): Promise<void> {
+    await this.initialize();
+    await this.repository.setData(REPOSITORY_KEYS.ACHIEVEMENT_ATTRIBUTES, attributes);
+  }
+
+  async saveAchievementGrowthDailySnapshots(
+    growthDailySnapshots: AchievementGrowthDailySnapshot[]
+  ): Promise<void> {
+    await this.initialize();
+    await this.repository.setData(
+      REPOSITORY_KEYS.ACHIEVEMENT_GROWTH_DAILY_SNAPSHOTS,
+      growthDailySnapshots
+    );
   }
 
   async saveAchievementRedemptionRecords(redemptionRecords: AchievementRedemptionRecord[]): Promise<void> {

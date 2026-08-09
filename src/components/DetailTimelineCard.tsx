@@ -11,6 +11,7 @@
  * @updated 2026-04-15: 每日时间线总和超过 60 分钟时改为显示“X小时Y分钟”，整小时仅显示“X小时”
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from detail-page statistics while remaining visible in timelines.
  */
 import React, { useMemo } from 'react';
 import { Log, Category } from '../types';
@@ -21,6 +22,7 @@ import { useData } from '../contexts/DataContext';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { TimelineStyleRail } from './TimelineStyleRail';
+import { filterCountableLogs } from '../utils/statLogUtils';
 type ScoreBarColor = {
     bg: string;
     bgStyle?: React.CSSProperties;
@@ -264,10 +266,15 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     };
 
     // 当月日志
+    const countableLogs = useMemo(() => filterCountableLogs(filteredLogs), [filteredLogs]);
     const monthLogs = useMemo(() => filteredLogs.filter(log => {
         const d = new Date(log.startTime);
         return d.getMonth() === displayMonth && d.getFullYear() === displayYear;
     }), [filteredLogs, displayMonth, displayYear]);
+    const countableMonthLogs = useMemo(() => countableLogs.filter(log => {
+        const d = new Date(log.startTime);
+        return d.getMonth() === displayMonth && d.getFullYear() === displayYear;
+    }), [countableLogs, displayMonth, displayYear]);
 
     // 智能判断初始视图：检测当月是否有足够的图片
     React.useEffect(() => {
@@ -276,7 +283,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
         
         let imageCount = 0;
         
-        monthLogs.forEach(log => {
+        countableMonthLogs.forEach(log => {
             // 统计记录本身的图片
             if (log.images && log.images.length > 0) {
                 imageCount += log.images.length;
@@ -316,18 +323,18 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     }, [logsToDisplay]);
 
     // 总计统计
-    const totalSeconds = filteredLogs.reduce((acc, curr) => acc + curr.duration, 0);
+    const totalSeconds = countableLogs.reduce((acc, curr) => acc + curr.duration, 0);
     const totalHours = Math.floor(totalSeconds / 3600);
     const totalMins = Math.floor((totalSeconds % 3600) / 60);
 
     // 当月统计
-    const monthSeconds = monthLogs.reduce((acc, curr) => acc + curr.duration, 0);
+    const monthSeconds = countableMonthLogs.reduce((acc, curr) => acc + curr.duration, 0);
     const monthHours = Math.floor(monthSeconds / 3600);
     const monthMins = Math.floor((monthSeconds % 3600) / 60);
 
     // 平均时长 (All View)
-    const avgDurationMins = filteredLogs.length > 0
-        ? Math.round(totalSeconds / filteredLogs.length / 60)
+    const avgDurationMins = countableLogs.length > 0
+        ? Math.round(totalSeconds / countableLogs.length / 60)
         : 0;
     const avgDurationH = Math.floor(avgDurationMins / 60);
     const avgDurationM = avgDurationMins % 60;
@@ -428,7 +435,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
         }
         
         // 填充数据
-        monthLogs.forEach(log => {
+        countableMonthLogs.forEach(log => {
             const d = new Date(log.startTime);
             const day = d.getDate();
             const current = map.get(day)!;
@@ -461,7 +468,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
         });
         
         return map;
-    }, [monthLogs, displayDate, todos]);
+    }, [countableMonthLogs, displayDate, todos]);
 
     const handleMonthChange = (offset: number) => {
         const newDate = new Date(displayDate);
@@ -600,7 +607,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                     if (calendarViewMode === 'keywords') {
                                         // 关键字视图
                                         const dayDate = new Date(year, month, day);
-                                        const dayLogs = monthLogs.filter(l => {
+                                        const dayLogs = countableMonthLogs.filter(l => {
                                             const d = new Date(l.startTime);
                                             return d.getDate() === day;
                                         });
@@ -737,9 +744,9 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                             <div className="flex-1 border-b border-dotted border-stone-200" />
                             <span className="text-xs font-medium text-stone-400">
                                 {(() => {
-                                    const totalDays = new Set(filteredLogs.map(l => new Date(l.startTime).toDateString())).size;
+                                    const totalDays = new Set(countableLogs.map(l => new Date(l.startTime).toDateString())).size;
                                     const avgTotal = totalDays > 0 ? Math.round(totalSeconds / 60 / totalDays) : 0;
-                                    const monthDays = new Set(monthLogs.map(l => new Date(l.startTime).toDateString())).size;
+                                    const monthDays = new Set(countableMonthLogs.map(l => new Date(l.startTime).toDateString())).size;
                                     const avgMonth = monthDays > 0 ? Math.round(monthSeconds / 60 / monthDays) : 0;
                                     return `${avgTotal}m / ${avgMonth}m`;
                                 })()}
@@ -752,7 +759,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                             const focusDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
                             let totalFocusTime = 0;
                             
-                            monthLogs.forEach(log => {
+                            countableMonthLogs.forEach(log => {
                                 if (log.focusScore && log.focusScore >= 1 && log.focusScore <= 5) {
                                     focusDistribution[log.focusScore as 1 | 2 | 3 | 4 | 5] += log.duration;
                                     totalFocusTime += log.duration;
@@ -858,7 +865,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                             const moodDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
                             let totalMoodTime = 0;
                             
-                            monthLogs.forEach(log => {
+                            countableMonthLogs.forEach(log => {
                                 if (log.moodScore && log.moodScore >= 1 && log.moodScore <= 5) {
                                     moodDistribution[log.moodScore as 1 | 2 | 3 | 4 | 5] += log.duration;
                                     totalMoodTime += log.duration;
@@ -1002,7 +1009,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                     <div className="flex flex-col items-center gap-2">
                         <span className="text-xs font-bold text-stone-900 tracking-wider">累计次数</span>
                         <div className="flex items-baseline text-stone-800">
-                            <span className="text-3xl font-black font-mono tracking-tight">{filteredLogs.length}</span>
+                            <span className="text-3xl font-black font-mono tracking-tight">{countableLogs.length}</span>
                         </div>
                     </div>
 

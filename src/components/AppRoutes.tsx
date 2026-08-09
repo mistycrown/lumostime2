@@ -1,3 +1,11 @@
+/**
+ * @file AppRoutes.tsx
+ * @input Application view state, shared data contexts, and route-level handlers
+ * @output Active page view rendering for the main application shell
+ * @pos Component (Routing)
+ * @description Resolves top-level views and modal-like screens from navigation state.
+ * @updated 2026-08-09: Added daily-check overview and detail routes.
+ */
 import React from 'react';
 import { AppView, Category, DailyReview, WeeklyReview, MonthlyReview, Log, TodoItem, TodoCategory, TodoDuplicateOptions } from '../types';
 import { useNavigation } from '../contexts/NavigationContext';
@@ -44,6 +52,8 @@ import { TodoView } from '../views/TodoView';
 import { ScopeDetailView } from '../views/ScopeDetailView';
 import { ScopeManageView } from '../views/ScopeManageView';
 import { ScopeView } from '../views/ScopeView';
+import { DailyCheckOverviewView } from '../views/DailyCheckOverviewView';
+import { DailyCheckDetailView } from '../views/DailyCheckDetailView';
 import { StatsViewLazy as StatsView } from '../utils/lazyViews';
 
 const RouteFallback: React.FC<{ label: string }> = ({ label }) => (
@@ -144,7 +154,9 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         selectedTagId, selectedCategoryId, selectedScopeId, setSelectedScopeId,
         isJournalMode,
         currentDate, setCurrentDate,
-        statsRange, setStatsRange
+        statsRange, setStatsRange,
+        dailyCheckDetailId, setDailyCheckDetailId,
+        previousView, setPreviousView
     } = useNavigation();
 
 
@@ -178,6 +190,11 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
 
     const { setSelectedTagId, setSelectedCategoryId } = useNavigation();
     const handleSelectTag = (id: string) => setSelectedTagId(id);
+    const handleCloseDailyChecks = () => {
+        setDailyCheckDetailId(null);
+        setCurrentView(previousView || AppView.TIMELINE);
+        setPreviousView(null);
+    };
     const {
         quickActionTodo,
         quickActionOpenedAt,
@@ -640,6 +657,44 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                         forcedRange={statsRange || undefined}
                     />
                 </React.Suspense>
+            );
+        case AppView.DAILY_CHECKS:
+            return (
+                <DailyCheckOverviewView
+                    checkTemplates={checkTemplates}
+                    dailyReviews={dailyReviews}
+                    reviewTemplates={reviewTemplates}
+                    logs={logs}
+                    categories={categories}
+                    scopes={scopes}
+                    todos={todos}
+                    todoCategories={todoCategories}
+                    currentDate={currentDate}
+                    onUpdateDailyReview={handleUpdateReview}
+                    onOpenDetail={(itemId) => {
+                        setDailyCheckDetailId(itemId);
+                        setCurrentView(AppView.DAILY_CHECK_DETAIL);
+                    }}
+                    onBack={handleCloseDailyChecks}
+                />
+            );
+        case AppView.DAILY_CHECK_DETAIL:
+            return (
+                <DailyCheckDetailView
+                    itemId={dailyCheckDetailId}
+                    checkTemplates={checkTemplates}
+                    dailyReviews={dailyReviews}
+                    logs={logs}
+                    categories={categories}
+                    scopes={scopes}
+                    todos={todos}
+                    todoCategories={todoCategories}
+                    currentDate={currentDate}
+                    onBack={() => {
+                        setDailyCheckDetailId(null);
+                        setCurrentView(AppView.DAILY_CHECKS);
+                    }}
+                />
             );
         case AppView.REVIEW:
             return isJournalMode ? (

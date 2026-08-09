@@ -1,9 +1,11 @@
 /**
  * @file userStatsService.ts
  * @description User data statistics service that reads heavy log data through the async data repository instead of directly from localStorage.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from user statistics.
  */
 import { Log } from '../types';
 import { dataRepository } from '../repositories/dataRepository';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 export interface UserStats {
   totalTimeSeconds: number;
@@ -17,11 +19,12 @@ export interface UserStats {
 class UserStatsService {
   async getUserStats(): Promise<UserStats> {
     const logs = await this.getLogs();
-    const totalTimeSeconds = this.getTotalTimeRecorded(logs);
-    const totalWords = this.getTotalWords(logs);
-    const totalImages = this.getTotalImages(logs);
-    const daysUsed = this.getDaysUsed(logs);
-    const firstUseDate = this.getFirstUseDate(logs);
+    const countableLogs = filterCountableLogs(logs);
+    const totalTimeSeconds = this.getTotalTimeRecorded(countableLogs);
+    const totalWords = this.getTotalWords(countableLogs);
+    const totalImages = this.getTotalImages(countableLogs);
+    const daysUsed = this.getDaysUsed(countableLogs);
+    const firstUseDate = this.getFirstUseDate(countableLogs);
 
     return {
       totalTimeSeconds,

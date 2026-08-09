@@ -16,6 +16,7 @@
  * @updated 2026-05-05: Includes mirrored TODAY + PIN source todos/categories in the native sync payload so Android refresh actions can rebuild today's list without waiting for a new web-state change.
  * @updated 2026-05-05: Clears native widget runtime after app-side stop/cancel transitions while still preserving widget-started sessions during initial hydration.
  * @updated 2026-05-05: Mirrors the latest app log end time to native storage so widget quick-punch shortcuts can append gaps directly on the home screen.
+ * @updated 2026-08-09: Mirrors the principle library into the native principle-card widget payload so the Android 4x2 card can randomize from the latest library state.
  */
 import { App as CapacitorApp } from '@capacitor/app';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -37,6 +38,8 @@ import {
   buildTodoPinWidgetPayload,
   buildWidgetRuntimeStateFromSession,
   buildWidgetSessionFromRuntimeState,
+  loadPrincipleCardWidgetPayloadFromStorage,
+  PRINCIPLE_LIBRARY_STORAGE_KEY,
   isNativeAndroidWidgetSupported,
   loadWidgetTemplatesFromStorage,
   normalizeWidgetTemplates,
@@ -68,6 +71,7 @@ export const useWidgetBridgeSync = () => {
   const [hasHydratedNativeState, setHasHydratedNativeState] = useState(!isNativeAndroidWidgetSupported());
   const [widgetTemplateRevision, setWidgetTemplateRevision] = useState(0);
   const [sceneWidgetRevision, setSceneWidgetRevision] = useState(0);
+  const [principleLibraryRevision, setPrincipleLibraryRevision] = useState(0);
 
   const latestSession = useMemo(
     () => (activeSessions.length > 0 ? activeSessions[activeSessions.length - 1] : null),
@@ -100,6 +104,30 @@ export const useWidgetBridgeSync = () => {
 
     window.addEventListener(WIDGET_TEMPLATES_UPDATED_EVENT, handleTemplatesUpdated);
     return () => window.removeEventListener(WIDGET_TEMPLATES_UPDATED_EVENT, handleTemplatesUpdated);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const bumpPrincipleRevision = () => {
+      setPrincipleLibraryRevision((previous) => previous + 1);
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === PRINCIPLE_LIBRARY_STORAGE_KEY) {
+        bumpPrincipleRevision();
+      }
+    };
+
+    window.addEventListener('principleLibraryChanged', bumpPrincipleRevision);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('principleLibraryChanged', bumpPrincipleRevision);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   useEffect(() => {
@@ -491,6 +519,19 @@ export const useWidgetBridgeSync = () => {
     scopes,
     widgetTemplateRevision
   ]);
+
+  useEffect(() => {
+    if (!isNativeAndroidWidgetSupported() || !hasHydratedNativeState) {
+      return;
+    }
+
+    const payload = loadPrincipleCardWidgetPayloadFromStorage();
+
+    fireAndForgetWidgetBridgeCall(
+      'Failed to sync principle-card widget data to native widget',
+      () => WidgetBridge.syncPrincipleCardWidgetData({ payload })
+    );
+  }, [hasHydratedNativeState, principleLibraryRevision]);
 
   useEffect(() => {
     if (!isNativeAndroidWidgetSupported() || !hasHydratedNativeState) {

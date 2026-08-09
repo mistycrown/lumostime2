@@ -4,13 +4,15 @@
  * @output Markdown文件路径和内容
  * @pos Service (导出服务)
  * @description 处理导出数据到 Obsidian 笔记的逻辑,包括路径生成、Markdown内容生成和文件写入
- * @updated 2026-04-09: PC ???????????????????????????????????????, ??????????????????????
+ * @updated 2026-04-09: PC ???????????????????????????????????????, ??????????????????????
+ * @updated 2026-08-09: Planned timeline blocks are excluded from exported statistics sections.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 import { Log, Category, TodoItem, Scope, DailyReview } from '../types';
-import { imageService } from './imageService';
+import { imageService } from './imageService';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 /**
  * 导出选项
@@ -115,11 +117,13 @@ class ObsidianExportService {
     ): string {
         // 直接使用传入的logs,不再进行日期筛选
         // 因为调用者(日报/周报/月报生成函数)已经负责筛选了正确时间范围内的数据
-        if (logs.length === 0) {
+        const countableLogs = filterCountableLogs(logs);
+
+        if (countableLogs.length === 0) {
             return `## 📊 数据统计\n\n暂无数据\n`;
         }
 
-        const totalDuration = logs.reduce((acc, l) => acc + l.duration, 0);
+        const totalDuration = countableLogs.reduce((acc, l) => acc + l.duration, 0);
         const formatDuration = (seconds: number) => {
             const h = Math.floor(seconds / 3600);
             const m = Math.floor((seconds % 3600) / 60);
@@ -137,7 +141,7 @@ class ObsidianExportService {
             activities: Map<string, { activityName: string; duration: number }>;
         }>();
 
-        logs.forEach(log => {
+        countableLogs.forEach(log => {
             const cat = categories.find(c => c.id === log.categoryId);
             const act = cat?.activities.find(a => a.id === log.activityId);
             if (cat && act) {
@@ -197,7 +201,7 @@ class ObsidianExportService {
             todos: Map<string, { todoTitle: string; duration: number }>;
         }>();
 
-        logs.forEach(log => {
+        countableLogs.forEach(log => {
             if (log.linkedTodoId) {
                 const todo = todos.find(t => t.id === log.linkedTodoId);
                 if (todo) {
@@ -253,7 +257,7 @@ class ObsidianExportService {
 
         // 按领域统计
         const scopeStats = new Map<string, number>();
-        logs.forEach(log => {
+        countableLogs.forEach(log => {
             if (log.scopeIds && log.scopeIds.length > 0) {
                 log.scopeIds.forEach(scopeId => {
                     const scope = scopes.find(s => s.id === scopeId);

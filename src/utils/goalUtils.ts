@@ -7,8 +7,10 @@
  * @updated 2026-07-21: Use explicit local calendar-day boundaries for inclusive goal ranges.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from goal progress calculations.
  */
 import { Goal, Log, TodoItem } from '../types';
+import { filterCountableLogs } from './statLogUtils';
 
 export const getGoalDateRange = (startDate: string, endDate: string): { start: number; end: number } => {
     const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
@@ -34,7 +36,7 @@ export const calculateGoalProgress = (
     const { start, end } = getGoalDateRange(startDate, endDate);
 
     // 过滤符合条件的logs
-    let relevantLogs = logs.filter(log => {
+    let relevantLogs = filterCountableLogs(logs).filter(log => {
         // 必须在时间范围内
         if (log.startTime < start || log.startTime > end) return false;
 

@@ -1,6 +1,7 @@
 ﻿/**
  * @file AchievementContext.tsx
  * @description Manages achievement bottle data, live snapshots, archived bottles, and reward redemption records with repository hydration and selective recent-day recomputation.
+ * @updated 2026-08-09: Added fixed-rule character attributes, independent growth snapshots, and cumulative experience progress.
  * @updated 2026-07-11: Persists per-rule todo subtask inclusion settings for todo-category achievement rules.
  * @updated 2026-07-11: Added full achievement recomputation that clears archived bottles, restores historical ledgers, and rebuilds all daily snapshots.
  * @updated 2026-07-04: Auto-resyncs active achievement snapshots whenever source logs, todos, reviews, or filter context data change so balances stay fresh outside the achievement page.
@@ -12,14 +13,18 @@
  * @updated 2026-04-07: Separates live and carryover redemption funding so sealing only archives live-period spending.
  */
 import React, { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
+import { buildDefaultAchievementAttributes } from '../constants/achievementAttributes';
 import { AchievementSnapshot, dataRepository } from '../repositories/dataRepository';
 import {
   AchievementArchivedBottle,
+  AchievementAttribute,
   AchievementAccountSummary,
   AchievementBottleActionRecord,
   AchievementCollection,
   AchievementCollectionRecord,
   AchievementDailySnapshot,
+  AchievementGrowthDailySnapshot,
+  AchievementLevelProgress,
   CheckStreakConfig,
   AchievementMeta,
   AchievementRedemptionRecord,
@@ -30,17 +35,24 @@ import {
 import {
   calculateAchievementAvailableStars,
   calculateAchievementAccountSummary,
+  calculateAchievementAttributeExperience,
+  calculateAchievementTotalExperience,
   calculateAchievementTotalEarned,
   calculateAchievementTotalRedeemed,
   computeAchievementDailySnapshot,
+  computeAchievementGrowthDailySnapshot,
   enumerateAchievementDates,
   getAchievementActiveStartDate,
+  getAchievementLevelProgress,
+  getAchievementRecentGrowthStartDate,
   getAchievementSealBlockedReason,
   getAchievementSealPreview,
   getAchievementYesterday,
   normalizeAchievementRedemptionRecordFunding,
+  normalizeAchievementAttribute,
   normalizeAchievementStarValue,
   normalizeAchievementRule,
+  normalizeAchievementGrowthSnapshot,
   normalizeAchievementSnapshot,
   partitionAchievementCollectionRecordsForSeal,
   partitionAchievementRedemptionsForSeal,
@@ -68,7 +80,18 @@ interface CreateAchievementRuleInput {
   filterExpression?: string;
   unitAmount: number;
   deltaPerUnit: number;
+  attributeEffect?: {
+    attributeId: string;
+    expPerUnit: number;
+  };
   note?: string;
+}
+
+interface CreateAchievementAttributeInput {
+  name: string;
+  subtitle: string;
+  icon: string;
+  color: string;
 }
 
 interface CreateAchievementRewardInput {
@@ -81,12 +104,19 @@ interface CreateAchievementRewardInput {
 interface AchievementContextType {
   isReady: boolean;
   achievementStartDate: string | null;
+  growthStartDate: string | null;
   activeBottleCarryoverStars: number;
   checkStreakConfig: CheckStreakConfig;
   rules: AchievementRule[];
   rewards: AchievementReward[];
   collections: AchievementCollection[];
   dailySnapshots: AchievementDailySnapshot[];
+  attributes: AchievementAttribute[];
+  growthDailySnapshots: AchievementGrowthDailySnapshot[];
+  attributeExperience: Record<string, number>;
+  totalExperience: number;
+  attributeLevels: Record<string, AchievementLevelProgress>;
+  totalLevelProgress: AchievementLevelProgress;
   redemptionRecords: AchievementRedemptionRecord[];
   collectionRecords: AchievementCollectionRecord[];
   archivedBottles: AchievementArchivedBottle[];
@@ -100,11 +130,21 @@ interface AchievementContextType {
   applyBackupPayload: (value: unknown) => boolean;
   ensureRecentSnapshots: () => Promise<void>;
   recomputeSnapshotForDate: (date: string) => { ok: boolean; message?: string };
-  recomputeAllAchievementData: () => { ok: boolean; message?: string; snapshotCount?: number; redemptionCount?: number };
+  recomputeAllAchievementData: () => {
+    ok: boolean;
+    message?: string;
+    snapshotCount?: number;
+    growthSnapshotCount?: number;
+    redemptionCount?: number;
+  };
   updateCheckStreakConfig: (config: CheckStreakConfig) => void;
   createRule: (input: CreateAchievementRuleInput) => void;
   updateRule: (rule: AchievementRule) => void;
   deleteRule: (ruleId: string) => void;
+  createAttribute: (input: CreateAchievementAttributeInput) => void;
+  updateAttribute: (attribute: AchievementAttribute) => void;
+  deleteAttribute: (attributeId: string) => void;
+  reorderAttributes: (attributeIds: string[]) => void;
   createReward: (input: CreateAchievementRewardInput) => void;
   updateReward: (reward: AchievementReward) => void;
   deleteReward: (rewardId: string) => void;
@@ -163,6 +203,7 @@ const normalizeCollectionRecord = (record: AchievementCollectionRecord): Achieve
 
 const normalizeAchievementMeta = (meta: AchievementMeta): AchievementMeta => ({
   achievementStartDate: meta.achievementStartDate ?? null,
+  growthStartDate: meta.growthStartDate ?? null,
   activeBottleCarryoverStars: Math.max(0, normalizeAchievementStarValue(meta.activeBottleCarryoverStars || 0)),
   checkStreakConfig: normalizeCheckStreakConfig(meta.checkStreakConfig)
 });
@@ -188,6 +229,11 @@ const normalizeAchievementSnapshotState = (snapshot: AchievementSnapshot): Achie
   rewards: snapshot.rewards.map(normalizeReward),
   collections: snapshot.collections.map(normalizeCollection),
   dailySnapshots: sortAchievementSnapshots(snapshot.dailySnapshots.map(normalizeAchievementSnapshot)),
+  attributes: snapshot.attributes === undefined
+    ? buildDefaultAchievementAttributes()
+    : snapshot.attributes.map((attribute, index) => normalizeAchievementAttribute(attribute, index)),
+  growthDailySnapshots: (snapshot.growthDailySnapshots || []).map(normalizeAchievementGrowthSnapshot)
+    .sort((first, second) => first.date.localeCompare(second.date)),
   redemptionRecords: snapshot.redemptionRecords.map(normalizeRedemptionRecord),
   collectionRecords: snapshot.collectionRecords.map(normalizeCollectionRecord),
   archivedBottles: snapshot.archivedBottles.map(normalizeArchivedBottle),
@@ -212,6 +258,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   const [meta, setMeta] = useState<AchievementMeta>({
     achievementStartDate: null,
+    growthStartDate: null,
     activeBottleCarryoverStars: 0,
     checkStreakConfig: getDefaultCheckStreakConfig()
   });
@@ -219,6 +266,8 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [rewards, setRewards] = useState<AchievementReward[]>([]);
   const [collections, setCollections] = useState<AchievementCollection[]>([]);
   const [dailySnapshots, setDailySnapshots] = useState<AchievementDailySnapshot[]>([]);
+  const [attributes, setAttributes] = useState<AchievementAttribute[]>(buildDefaultAchievementAttributes());
+  const [growthDailySnapshots, setGrowthDailySnapshots] = useState<AchievementGrowthDailySnapshot[]>([]);
   const [redemptionRecords, setRedemptionRecords] = useState<AchievementRedemptionRecord[]>([]);
   const [collectionRecords, setCollectionRecords] = useState<AchievementCollectionRecord[]>([]);
   const [archivedBottles, setArchivedBottles] = useState<AchievementArchivedBottle[]>([]);
@@ -242,6 +291,17 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         setRewards(snapshot.rewards.map(normalizeReward));
         setCollections(snapshot.collections.map(normalizeCollection));
         setDailySnapshots(sortAchievementSnapshots(snapshot.dailySnapshots.map(normalizeAchievementSnapshot)));
+        setAttributes(
+          (snapshot.attributes === undefined
+            ? buildDefaultAchievementAttributes()
+            : snapshot.attributes
+          ).map((attribute, index) => normalizeAchievementAttribute(attribute, index))
+        );
+        setGrowthDailySnapshots(
+          (snapshot.growthDailySnapshots || [])
+            .map(normalizeAchievementGrowthSnapshot)
+            .sort((first, second) => first.date.localeCompare(second.date))
+        );
         setRedemptionRecords(snapshot.redemptionRecords.map(normalizeRedemptionRecord));
         setCollectionRecords(snapshot.collectionRecords.map(normalizeCollectionRecord));
         setArchivedBottles(snapshot.archivedBottles.map(normalizeArchivedBottle));
@@ -305,22 +365,88 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     return sortAchievementSnapshots(nextSnapshots);
   };
 
+  const reconcileGrowthSnapshots = (
+    startDate: string,
+    baseSnapshots: AchievementGrowthDailySnapshot[],
+    rulesSource: AchievementRule[],
+    attributesSource: AchievementAttribute[],
+    forceRecomputeAllDates = false
+  ): AchievementGrowthDailySnapshot[] => {
+    const today = getLocalDateStr(new Date());
+    const recentStartDate = getAchievementRecentGrowthStartDate();
+    const snapshotMap = new Map(
+      baseSnapshots.map((item) => [item.date, normalizeAchievementGrowthSnapshot(item)])
+    );
+    const dates = enumerateAchievementDates(startDate, today);
+
+    const nextSnapshots = dates.map((date) => {
+      const existing = snapshotMap.get(date);
+      const shouldRecompute = forceRecomputeAllDates
+        || !existing
+        || date >= recentStartDate;
+
+      if (!shouldRecompute && existing) {
+        return existing;
+      }
+
+      const computed = computeAchievementGrowthDailySnapshot(
+        date,
+        logs,
+        todos,
+        dailyReviews,
+        rulesSource,
+        attributesSource,
+        {
+          categories,
+          scopes,
+          todos,
+          todoCategories,
+          checkTemplates,
+          checkStreakConfig: meta.checkStreakConfig
+        }
+      );
+      if (existing) {
+        computed.id = existing.id;
+        const disabledAttributeIds = new Set(
+          attributesSource
+            .filter((attribute) => !attribute.enabled)
+            .map((attribute) => attribute.id)
+        );
+        const preservedChanges = existing.attributeChanges.filter((change) => (
+          disabledAttributeIds.has(change.attributeId)
+        ));
+        if (preservedChanges.length > 0) {
+          computed.attributeChanges = [...preservedChanges, ...computed.attributeChanges];
+        }
+      }
+      return computed;
+    });
+
+    return nextSnapshots.sort((first, second) => first.date.localeCompare(second.date));
+  };
+
   const syncActiveSnapshots = ({
     forceRecomputeAllDates = false,
     rulesSource = rules,
-    checkStreakConfigSource = normalizeCheckStreakConfig(meta.checkStreakConfig)
+    checkStreakConfigSource = normalizeCheckStreakConfig(meta.checkStreakConfig),
+    attributesSource = attributes,
+    forceRecomputeGrowthAllDates = false
   }: {
     forceRecomputeAllDates?: boolean;
     rulesSource?: AchievementRule[];
     checkStreakConfigSource?: CheckStreakConfig;
+    attributesSource?: AchievementAttribute[];
+    forceRecomputeGrowthAllDates?: boolean;
   } = {}) => {
     const today = getLocalDateStr(new Date());
     const startDate = getAchievementActiveStartDate(meta.achievementStartDate, archivedBottles) || today;
+    const growthStartDate = meta.growthStartDate || today;
 
-    if (!meta.achievementStartDate) {
+    if (!meta.achievementStartDate || !meta.growthStartDate) {
       setMeta((previous) => ({
         ...previous,
-        achievementStartDate: startDate
+        achievementStartDate: previous.achievementStartDate || startDate,
+        growthStartDate: previous.growthStartDate || growthStartDate
       }));
     }
 
@@ -331,6 +457,15 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         rulesSource,
         forceRecomputeAllDates,
         checkStreakConfigSource
+      )
+    ));
+    setGrowthDailySnapshots((previous) => (
+      reconcileGrowthSnapshots(
+        growthStartDate,
+        previous,
+        rulesSource,
+        attributesSource,
+        forceRecomputeGrowthAllDates
       )
     ));
   };
@@ -409,6 +544,46 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
 
       return sortAchievementSnapshots(nextSnapshots);
     });
+    setGrowthDailySnapshots((previous) => {
+      const existingSnapshot = previous.find((item) => item.date === normalizedDate);
+      const recomputedSnapshot = computeAchievementGrowthDailySnapshot(
+        normalizedDate,
+        logs,
+        todos,
+        dailyReviews,
+        rules,
+        attributes,
+        {
+          categories,
+          scopes,
+          todos,
+          todoCategories,
+          checkTemplates,
+          checkStreakConfig: meta.checkStreakConfig
+        }
+      );
+
+      if (existingSnapshot) {
+        recomputedSnapshot.id = existingSnapshot.id;
+        const disabledAttributeIds = new Set(
+          attributes
+            .filter((attribute) => !attribute.enabled)
+            .map((attribute) => attribute.id)
+        );
+        const preservedChanges = existingSnapshot.attributeChanges.filter((change) => (
+          disabledAttributeIds.has(change.attributeId)
+        ));
+        if (preservedChanges.length > 0) {
+          recomputedSnapshot.attributeChanges = [...preservedChanges, ...recomputedSnapshot.attributeChanges];
+        }
+      }
+
+      const nextSnapshots = existingSnapshot
+        ? previous.map((item) => (item.date === normalizedDate ? recomputedSnapshot : item))
+        : [...previous, recomputedSnapshot];
+
+      return nextSnapshots.sort((first, second) => first.date.localeCompare(second.date));
+    });
 
     return { ok: true };
   };
@@ -433,12 +608,20 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       || allKnownSnapshotDates.sort((first, second) => first.localeCompare(second))[0]
       || today;
     const normalizedCheckStreakConfig = normalizeCheckStreakConfig(meta.checkStreakConfig);
+    const growthStartDate = meta.growthStartDate || today;
     const recomputedSnapshots = reconcileSnapshots(
       startDate,
       [],
       rules,
       true,
       normalizedCheckStreakConfig
+    );
+    const recomputedGrowthSnapshots = reconcileGrowthSnapshots(
+      growthStartDate,
+      growthDailySnapshots,
+      rules,
+      attributes,
+      true
     );
     const recomputedRedemptionRecords = rebuildAchievementRedemptionRecordsForFullRecompute({
       redemptionRecords,
@@ -451,10 +634,12 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     setMeta((previous) => ({
       ...previous,
       achievementStartDate: startDate,
+      growthStartDate,
       activeBottleCarryoverStars: 0,
       checkStreakConfig: normalizedCheckStreakConfig
     }));
     setDailySnapshots(recomputedSnapshots);
+    setGrowthDailySnapshots(recomputedGrowthSnapshots);
     setRedemptionRecords(recomputedRedemptionRecords);
     setCollectionRecords([]);
     setArchivedBottles([]);
@@ -463,6 +648,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     return {
       ok: true,
       snapshotCount: recomputedSnapshots.length,
+      growthSnapshotCount: recomputedGrowthSnapshots.length,
       redemptionCount: recomputedRedemptionRecords.length
     };
   };
@@ -491,6 +677,12 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       unitAmount: Math.max(1, Math.floor(input.unitAmount)),
       deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(input.deltaPerUnit || 0.1)),
       roundingMode: 'floor',
+      attributeEffect: input.attributeEffect
+        ? {
+          attributeId: input.attributeEffect.attributeId.trim(),
+          expPerUnit: Math.max(1, Math.floor(input.attributeEffect.expPerUnit))
+        }
+        : undefined,
       note: input.note?.trim() || undefined,
       createdAt: now,
       updatedAt: now
@@ -513,6 +705,12 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
           filterExpression: rule.filterExpression?.trim() || undefined,
           unitAmount: Math.max(1, Math.floor(rule.unitAmount)),
           deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(rule.deltaPerUnit || 0.1)),
+          attributeEffect: rule.attributeEffect
+            ? {
+              attributeId: rule.attributeEffect.attributeId.trim(),
+              expPerUnit: Math.max(1, Math.floor(rule.attributeEffect.expPerUnit))
+            }
+            : undefined,
           updatedAt: Date.now()
         }
         : item
@@ -526,6 +724,75 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     const nextRules = rules.filter((item) => item.id !== ruleId);
     setRules(nextRules);
     syncActiveSnapshots({ forceRecomputeAllDates: true, rulesSource: nextRules });
+  };
+
+  const createAttribute = (input: CreateAchievementAttributeInput) => {
+    const now = Date.now();
+    const nextAttribute = normalizeAchievementAttribute({
+      id: crypto.randomUUID(),
+      name: input.name,
+      subtitle: input.subtitle,
+      icon: input.icon,
+      color: input.color,
+      enabled: true,
+      sortOrder: attributes.length,
+      createdAt: now,
+      updatedAt: now
+    });
+    const nextAttributes = [...attributes, nextAttribute];
+    setAttributes(nextAttributes);
+    syncActiveSnapshots({ attributesSource: nextAttributes });
+  };
+
+  const updateAttribute = (attribute: AchievementAttribute) => {
+    const nextAttribute = normalizeAchievementAttribute({
+      ...attribute,
+      updatedAt: Date.now()
+    });
+    const nextAttributes = attributes
+      .map((item) => (item.id === nextAttribute.id ? nextAttribute : item))
+      .sort((first, second) => first.sortOrder - second.sortOrder);
+    const nextRules = nextAttribute.enabled
+      ? rules
+      : rules.map((rule) => (
+        rule.attributeEffect?.attributeId === nextAttribute.id
+          ? { ...rule, enabled: false, updatedAt: Date.now() }
+          : rule
+      ));
+
+    setAttributes(nextAttributes);
+    if (nextRules !== rules) {
+      setRules(nextRules);
+    }
+    syncActiveSnapshots({
+      rulesSource: nextRules,
+      attributesSource: nextAttributes
+    });
+  };
+
+  const deleteAttribute = (attributeId: string) => {
+    const targetAttribute = attributes.find((attribute) => attribute.id === attributeId);
+    if (!targetAttribute) {
+      return;
+    }
+
+    updateAttribute({
+      ...targetAttribute,
+      enabled: false
+    });
+  };
+
+  const reorderAttributes = (attributeIds: string[]) => {
+    const orderMap = new Map(attributeIds.map((attributeId, index) => [attributeId, index]));
+    const nextAttributes = attributes
+      .map((attribute) => ({
+        ...attribute,
+        sortOrder: orderMap.get(attribute.id) ?? attribute.sortOrder,
+        updatedAt: orderMap.has(attribute.id) ? Date.now() : attribute.updatedAt
+      }))
+      .sort((first, second) => first.sortOrder - second.sortOrder);
+    setAttributes(nextAttributes);
+    syncActiveSnapshots({ attributesSource: nextAttributes });
   };
 
   const createReward = (input: CreateAchievementRewardInput) => {
@@ -768,6 +1035,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     achievementBackupService.buildBackupPayload({
       meta: {
         achievementStartDate: meta.achievementStartDate,
+        growthStartDate: meta.growthStartDate ?? null,
         activeBottleCarryoverStars: meta.activeBottleCarryoverStars,
         checkStreakConfig: normalizeCheckStreakConfig(meta.checkStreakConfig)
       },
@@ -775,6 +1043,8 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       rewards,
       collections,
       dailySnapshots,
+      attributes,
+      growthDailySnapshots,
       redemptionRecords,
       collectionRecords,
       archivedBottles,
@@ -795,6 +1065,8 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     setRewards(normalizedSnapshot.rewards);
     setCollections(normalizedSnapshot.collections);
     setDailySnapshots(normalizedSnapshot.dailySnapshots);
+    setAttributes(normalizedSnapshot.attributes || buildDefaultAchievementAttributes());
+    setGrowthDailySnapshots(normalizedSnapshot.growthDailySnapshots || []);
     setRedemptionRecords(normalizedSnapshot.redemptionRecords);
     setCollectionRecords(normalizedSnapshot.collectionRecords);
     setArchivedBottles(normalizedSnapshot.archivedBottles);
@@ -815,6 +1087,12 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
   const availableStars = accountSummary.totalStars;
   const totalEarnedStars = calculateAchievementTotalEarned(dailySnapshots);
   const totalRedeemedStars = calculateAchievementTotalRedeemed(spendRecords);
+  const attributeExperience = calculateAchievementAttributeExperience(growthDailySnapshots, attributes);
+  const totalExperience = calculateAchievementTotalExperience(growthDailySnapshots);
+  const attributeLevels = Object.fromEntries(
+    attributes.map((attribute) => [attribute.id, getAchievementLevelProgress(attributeExperience[attribute.id] || 0)])
+  ) as Record<string, AchievementLevelProgress>;
+  const totalLevelProgress = getAchievementLevelProgress(totalExperience);
 
   useEffect(() => {
     if (!isReady || !canPersist) {
@@ -871,6 +1149,26 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       return;
     }
 
+    void dataRepository.saveAchievementAttributes(attributes).catch((error) => {
+      console.error('[AchievementContext] Failed to persist achievement attributes', error);
+    });
+  }, [attributes, canPersist, isReady]);
+
+  useEffect(() => {
+    if (!isReady || !canPersist) {
+      return;
+    }
+
+    void dataRepository.saveAchievementGrowthDailySnapshots(growthDailySnapshots).catch((error) => {
+      console.error('[AchievementContext] Failed to persist achievement growth snapshots', error);
+    });
+  }, [canPersist, growthDailySnapshots, isReady]);
+
+  useEffect(() => {
+    if (!isReady || !canPersist) {
+      return;
+    }
+
     void dataRepository.saveAchievementRedemptionRecords(redemptionRecords).catch((error) => {
       console.error('[AchievementContext] Failed to persist achievement redemption records', error);
     });
@@ -916,19 +1214,40 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
 
     updateLocalDataTimestamp();
-  }, [archivedBottles, bottleActionRecords, canPersist, collectionRecords, collections, dailySnapshots, isReady, meta, redemptionRecords, rewards, rules]);
+  }, [
+    archivedBottles,
+    attributes,
+    bottleActionRecords,
+    canPersist,
+    collectionRecords,
+    collections,
+    dailySnapshots,
+    growthDailySnapshots,
+    isReady,
+    meta,
+    redemptionRecords,
+    rewards,
+    rules
+  ]);
 
   return (
     <AchievementContext.Provider
       value={{
         isReady,
         achievementStartDate: meta.achievementStartDate,
+        growthStartDate: meta.growthStartDate ?? null,
         activeBottleCarryoverStars: meta.activeBottleCarryoverStars,
         checkStreakConfig: normalizeCheckStreakConfig(meta.checkStreakConfig),
         rules,
         rewards,
         collections,
         dailySnapshots,
+        attributes,
+        growthDailySnapshots,
+        attributeExperience,
+        totalExperience,
+        attributeLevels,
+        totalLevelProgress,
         redemptionRecords,
         collectionRecords,
         archivedBottles,
@@ -947,6 +1266,10 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         createRule,
         updateRule,
         deleteRule,
+        createAttribute,
+        updateAttribute,
+        deleteAttribute,
+        reorderAttributes,
         createReward,
         updateReward,
         deleteReward,

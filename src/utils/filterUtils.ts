@@ -5,11 +5,13 @@
  * @pos Utils (筛选逻辑)
  * @description 自定义筛选器的核心逻辑,包括表达式解析、记录匹配、统计计算和排序规整
  * @updated 2026-06-06: Unified `@` matching so linked-log todo filters can match both todo titles and todo category names.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from filter statistics.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 import { Log, Filter, ParsedFilterCondition, Category, Scope, TodoItem, TodoCategory } from '../types';
+import { filterCountableLogs } from './statLogUtils';
 
 export function normalizeFiltersOrder(filters: Filter[]): Filter[] {
     return [...filters]
@@ -368,11 +370,12 @@ export function getFilterStats(
     context: FilterContext
 ): { count: number; totalDuration: number } {
     const condition = parseFilterExpression(filter.filterExpression);
+    const countableLogs = filterCountableLogs(logs);
 
     let count = 0;
     let totalDuration = 0;
 
-    for (const log of logs) {
+    for (const log of countableLogs) {
         if (matchesFilter(log, condition, context)) {
             count++;
             totalDuration += log.duration;

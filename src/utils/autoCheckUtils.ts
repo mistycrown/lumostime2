@@ -6,12 +6,15 @@
  * @description 自动日课判断逻辑 - 根据筛选条件和统计规则自动判断日课完成状态
  * @updated 2026-07-30: Added reorder-safe auto-check completion change detection for Daily Review refreshes.
  * @updated 2026-04-15: Added nightLatestStart support for cross-midnight sleep auto checks.
+ * @updated 2026-08-09: Exposed the evaluated metric for daily-check statistics.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from auto-check statistics.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 import { CheckItem, Log, AutoCheckConfig } from '../types';
 import { parseFilterExpression, matchesFilter, FilterContext } from './filterUtils';
+import { filterCountableLogs } from './statLogUtils';
 
 /**
  * 计算匹配记录的统计信息
@@ -75,7 +78,9 @@ function calculateLogStats(
   nightWindowEnd.setDate(nightWindowEnd.getDate() + 1);
   nightWindowEnd.setHours(4, 0, 0, 0);
 
-  const filteredLogs = logs.filter(log => {
+  const countableLogs = filterCountableLogs(logs);
+
+  const filteredLogs = countableLogs.filter(log => {
     const logStartTime = log.startTime;
     const isInDateRange = logStartTime >= dayStart.getTime() && logStartTime <= dayEnd.getTime();
     const matchesCondition = matchesFilter(log, condition, context);
@@ -83,7 +88,7 @@ function calculateLogStats(
     return isInDateRange && matchesCondition;
   });
 
-  const nightFilteredLogs = logs.filter(log => {
+  const nightFilteredLogs = countableLogs.filter(log => {
     const logStartTime = log.startTime;
     const isInNightWindow = logStartTime >= nightWindowStart.getTime() && logStartTime < nightWindowEnd.getTime();
     const matchesCondition = matchesFilter(log, condition, context);
@@ -129,6 +134,42 @@ function calculateLogStats(
 }
 
 /**
+ * 获取自动日课在指定日期的实际指标值。
+ */
+export function getAutoCheckMetricForDate(
+  checkItem: CheckItem,
+  logs: Log[],
+  context: FilterContext,
+  targetDate: Date
+): number | null {
+  if (checkItem.type !== 'auto' || !checkItem.autoConfig) {
+    return null;
+  }
+
+  const config = checkItem.autoConfig;
+  const stats = calculateLogStats(logs, config.filterExpression, context, targetDate);
+
+  switch (config.comparisonType) {
+    case 'duration':
+      return stats.totalDuration;
+    case 'earliestStart':
+      return stats.earliestStart;
+    case 'latestStart':
+      return stats.latestStart;
+    case 'nightLatestStart':
+      return stats.nightLatestStart;
+    case 'earliestEnd':
+      return stats.earliestEnd;
+    case 'latestEnd':
+      return stats.latestEnd;
+    case 'count':
+      return stats.count;
+    default:
+      return null;
+  }
+}
+
+/**
  * 判断自动日课是否完成
  */
 export function evaluateAutoCheck(
@@ -142,34 +183,7 @@ export function evaluateAutoCheck(
   }
 
   const config = checkItem.autoConfig;
-  const stats = calculateLogStats(logs, config.filterExpression, context, targetDate);
-
-  // 根据判断类型获取实际值
-  let actualValue: number | null = null;
-  
-  switch (config.comparisonType) {
-    case 'duration':
-      actualValue = stats.totalDuration;
-      break;
-    case 'earliestStart':
-      actualValue = stats.earliestStart;
-      break;
-    case 'latestStart':
-      actualValue = stats.latestStart;
-      break;
-    case 'nightLatestStart':
-      actualValue = stats.nightLatestStart;
-      break;
-    case 'earliestEnd':
-      actualValue = stats.earliestEnd;
-      break;
-    case 'latestEnd':
-      actualValue = stats.latestEnd;
-      break;
-    case 'count':
-      actualValue = stats.count;
-      break;
-  }
+  const actualValue = getAutoCheckMetricForDate(checkItem, logs, context, targetDate);
 
   // 如果没有匹配的记录，返回 false
   if (actualValue === null) {

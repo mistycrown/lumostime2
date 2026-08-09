@@ -6,6 +6,7 @@
  * @pos View (Detail Page)
  * @description Detailed analytics and settings for a specific Activity (Tag). Features an activity heatmap, history timeline, keyword management, note template editing, and associated To-Do tracking.
  * @updated 2026-06-13: Reused the shared hierarchical associated-todo list so subtasks render under parent todos in the association tab.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from tag statistics.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -28,6 +29,7 @@ import { getColorHexForCharts } from '../utils/colorAdapterUtils';
 import { getNormalizedScopeIds } from '../utils/scopeStatsUtils';
 import { NoteTemplateManager } from '../components/NoteTemplateManager';
 import { AssociatedTodoList } from '../components/AssociatedTodoList';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 
 interface TagDetailViewProps {
@@ -130,9 +132,10 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
    // Filter logs for this tag (All time)
    const tagLogs = useMemo(() => logs.filter(l => l.activityId === tagId), [logs, tagId]);
+   const countableTagLogs = useMemo(() => filterCountableLogs(tagLogs), [tagLogs]);
 
    // Total Stats (All time)
-   const totalSeconds = tagLogs.reduce((acc, curr) => acc + curr.duration, 0);
+   const totalSeconds = countableTagLogs.reduce((acc, curr) => acc + curr.duration, 0);
    const totalHours = Math.floor(totalSeconds / 3600);
    const totalMins = Math.floor((totalSeconds % 3600) / 60);
 
@@ -142,7 +145,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
    const heatmapData = useMemo(() => {
       const map = new Map<number, number>();
-      tagLogs.forEach(log => {
+      countableTagLogs.forEach(log => {
          const d = new Date(log.startTime);
          if (d.getMonth() === displayMonth && d.getFullYear() === displayYear) {
             const day = d.getDate();
@@ -150,13 +153,13 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
          }
       });
       return map;
-   }, [tagLogs, displayMonth, displayYear]);
+   }, [countableTagLogs, displayMonth, displayYear]);
 
    // Month Stats (Current month only)
-   const monthLogs = useMemo(() => tagLogs.filter(log => {
+   const monthLogs = useMemo(() => countableTagLogs.filter(log => {
       const d = new Date(log.startTime);
       return d.getMonth() === displayMonth && d.getFullYear() === displayYear;
-   }), [tagLogs, displayMonth, displayYear]);
+   }), [countableTagLogs, displayMonth, displayYear]);
 
    const monthSeconds = monthLogs.reduce((acc, curr) => acc + curr.duration, 0);
    const monthHours = Math.floor(monthSeconds / 3600);
@@ -179,7 +182,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    // Matrix Stats (Scope Distribution)
    const matrixStats = useMemo(() => {
       // Filter logs based on analysisRange
-      const filteredLogs = tagLogs.filter(log => {
+       const filteredLogs = countableTagLogs.filter(log => {
          if (analysisRange === 'All') return true;
          const d = new Date(log.startTime);
          const target = analysisDate;
@@ -232,7 +235,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
             icon: scope?.icon
          };
       });
-   }, [tagLogs, scopes, analysisRange, analysisDate]);
+   }, [countableTagLogs, scopes, analysisRange, analysisDate]);
 
    // Calculate total duration for the filtered range
    const analysisTotalDuration = useMemo(() => {

@@ -5,11 +5,13 @@
  * 提供统一的统计文本生成逻辑，消除 DailyReviewView、WeeklyReviewView 和 MonthlyReviewView 之间的重复代码
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from all review statistics.
  */
 
 import { Log, Category, Scope, TodoItem, TodoCategory, DailyReview } from '../types';
 import { getLocalDateStr } from './dateUtils';
 import { summarizeScopeDurations } from './scopeStatsUtils';
+import { filterCountableLogs } from './statLogUtils';
 
 /**
  * 格式化时长（秒 → 小时分钟）
@@ -91,7 +93,7 @@ export function calculateCategoryStats(
 ): CategoryStat[] {
     const catDurations = new Map<string, number>();
     
-    logs.forEach(log => {
+    filterCountableLogs(logs).forEach(log => {
         const catName = categories.find(c => c.id === log.categoryId)?.name || '未知';
         const duration = (log.endTime - log.startTime) / 1000;
         catDurations.set(catName, (catDurations.get(catName) || 0) + duration);
@@ -113,7 +115,7 @@ export function calculateScopeStats(
     logs: Log[],
     scopes: Scope[]
 ): CategoryStat[] {
-    const { scopeDurations } = summarizeScopeDurations(logs);
+    const { scopeDurations } = summarizeScopeDurations(filterCountableLogs(logs));
 
     return scopes
         .map((scope) => ({ name: scope.name, duration: scopeDurations.get(scope.id) || 0 }))
@@ -128,7 +130,7 @@ export function calculateScopeStats(
  * @returns 待办总时长（秒）
  */
 export function calculateTodoTotalDuration(logs: Log[]): number {
-    const todoLogs = logs.filter(l => l.linkedTodoId);
+    const todoLogs = filterCountableLogs(logs).filter(l => l.linkedTodoId);
     return todoLogs.reduce((acc, l) => acc + (l.endTime - l.startTime) / 1000, 0);
 }
 
@@ -152,9 +154,10 @@ export function generateWeeklyStatsText(
     let text = '每周详细统计：\n';
     
     const weeks = getWeeksInRange(startDate, endDate);
+    const countableLogs = filterCountableLogs(logs);
 
     weeks.forEach((week, index) => {
-        const weekLogs = logs.filter(l =>
+        const weekLogs = countableLogs.filter(l =>
             l.startTime >= week.start.getTime() &&
             l.endTime <= week.end.getTime()
         );
@@ -349,11 +352,12 @@ export function calculateMonthlyStats(
     todoCategories: TodoCategory[],
     scopes: Scope[]
 ): MonthlyStatsOverview {
-    const totalDuration = logs.reduce((acc, log) => acc + (log.duration || 0), 0);
+    const countableLogs = filterCountableLogs(logs);
+    const totalDuration = countableLogs.reduce((acc, log) => acc + (log.duration || 0), 0);
 
     // 分类统计
     const categoryStats = categories.map(cat => {
-        const catLogs = logs.filter(l => l.categoryId === cat.id);
+        const catLogs = countableLogs.filter(l => l.categoryId === cat.id);
         const duration = catLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
         const percentage = totalDuration > 0 ? (duration / totalDuration) * 100 : 0;
         return { name: cat.name, duration, percentage };
@@ -362,7 +366,7 @@ export function calculateMonthlyStats(
     // 待办统计
     const todoStats = todoCategories.map(cat => {
         const catTodos = todos.filter(t => t.categoryId === cat.id);
-        const linkedLogs = logs.filter(l =>
+        const linkedLogs = countableLogs.filter(l =>
             l.linkedTodoId && catTodos.some(t => t.id === l.linkedTodoId)
         );
         const duration = linkedLogs.reduce((acc, l) => acc + (l.duration || 0), 0);
@@ -371,7 +375,7 @@ export function calculateMonthlyStats(
     }).filter(c => c.duration > 0);
 
     // 领域统计
-    const { totalAttributedDuration, scopeDurations } = summarizeScopeDurations(logs);
+    const { totalAttributedDuration, scopeDurations } = summarizeScopeDurations(countableLogs);
     const scopeStats = scopes.map(scope => {
         const duration = scopeDurations.get(scope.id) || 0;
         const percentage = totalAttributedDuration > 0 ? (duration / totalAttributedDuration) * 100 : 0;

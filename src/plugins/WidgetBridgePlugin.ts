@@ -13,6 +13,7 @@
  * @updated 2026-05-05: Expanded TODAY + PIN payload sync to include native-refresh source snapshots so the widget can rebuild today's list from mirrored app todos.
  * @updated 2026-05-05: Added optional scene widget third-party app launch metadata so scene widget cards can mirror in-app launch behavior.
  * @updated 2026-05-05: Added optional scene-widget runtime source metadata so scene card flips can stay scoped to one scene slot.
+ * @updated 2026-08-09: Added principle-card widget payload sync types for the dedicated Android 4x2 card widget.
  */
 import { registerPlugin } from '@capacitor/core';
 import { ShortcutWidgetAction } from '../services/widgetShortcutService';
@@ -277,6 +278,18 @@ export interface WidgetBridgeTrackingCalendarPayload {
   syncedAt: number;
 }
 
+export interface WidgetBridgePrincipleCard {
+  id: string;
+  title: string;
+  frontText: string;
+  backText: string;
+}
+
+export interface WidgetBridgePrincipleCardPayload {
+  principles: WidgetBridgePrincipleCard[];
+  syncedAt: number;
+}
+
 export interface WidgetBridgeSceneGroupAutoSwitchConfig {
   mode: WidgetSceneGroupAutoSwitchMode;
   startDate?: string | null;
@@ -347,6 +360,7 @@ export interface WidgetBridgePlugin {
   syncDailyRuntimeWidgetData(options: { payload: WidgetBridgeDailyRuntimePayload | null }): Promise<void>;
   syncTodoPinWidgetData(options: { payload: WidgetBridgeTodoPinPayload | null }): Promise<void>;
   syncTrackingCalendarWidgetData(options: { payload: WidgetBridgeTrackingCalendarPayload | null }): Promise<void>;
+  syncPrincipleCardWidgetData(options: { payload: WidgetBridgePrincipleCardPayload | null }): Promise<void>;
   syncSceneWidgetData(options: { payload: WidgetBridgeScenePayload | null }): Promise<void>;
   refreshWidget(options?: { appWidgetId?: number; templateId?: string }): Promise<void>;
   syncLogTailState(options: { logTailState: WidgetBridgeLogTailState | null }): Promise<void>;

@@ -11,10 +11,12 @@
  * - 其他需要活动统计的地方
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-08-09: Planned timeline blocks are excluded from hook-level statistics.
  */
 
 import { useMemo } from 'react';
 import { Log, Category, Activity } from '../types';
+import { filterCountableLogs } from '../utils/statLogUtils';
 
 export interface ActivityStat extends Activity {
   duration: number;
@@ -82,7 +84,7 @@ export const useStatsCalculation = ({
   
   // 过滤当前周期的日志
   const filteredLogs = useMemo(() => {
-    return logs.filter(log =>
+    return filterCountableLogs(logs).filter(log =>
       log.startTime >= dateRange.start.getTime() &&
       log.endTime <= dateRange.end.getTime() &&
       !excludedCategoryIds.includes(log.categoryId)
@@ -138,7 +140,7 @@ export const useStatsCalculation = ({
     const previousStart = new Date(dateRange.start.getTime() - duration);
     const previousEnd = new Date(dateRange.end.getTime() - duration);
 
-    const previousFilteredLogs = logs.filter(log =>
+    const previousFilteredLogs = filterCountableLogs(logs).filter(log =>
       log.startTime >= previousStart.getTime() &&
       log.endTime <= previousEnd.getTime() &&
       !excludedCategoryIds.includes(log.categoryId)
