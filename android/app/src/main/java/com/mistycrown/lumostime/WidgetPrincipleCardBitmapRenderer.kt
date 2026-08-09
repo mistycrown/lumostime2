@@ -6,10 +6,9 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
-import android.graphics.Shader
 import android.graphics.Typeface
 import android.text.Layout
 import android.text.StaticLayout
@@ -22,19 +21,20 @@ import kotlin.math.max
 /**
  * Renders the dedicated 4x2 principle-card widget as a single bitmap.
  * @updated 2026-08-09: Supports packaged PNG/WebP card backgrounds with a left-anchored principle text block and face-aware content.
+ * @updated 2026-08-09: Clips the rendered bitmap to rounded corners, removes the left mask, and uses sans-serif dynamic text sizing.
  */
 object WidgetPrincipleCardBitmapRenderer {
     private const val BACKGROUND_ASSET_DIR = "public/card"
     private const val FALLBACK_WIDGET_WIDTH_DP = 360f
     private const val FALLBACK_WIDGET_HEIGHT_DP = 180f
-    private const val READABILITY_TINT_START = 0.88f
-    private const val READABILITY_TINT_MIDDLE = 0.62f
-    private const val READABILITY_TINT_END = 0.06f
-    private const val MIN_BODY_TEXT_SP = 12f
-    private const val MAX_BODY_TEXT_SP = 21f
-    private const val TITLE_TEXT_SP = 11f
-    private const val BODY_LINE_SPACING_MULTIPLIER = 1.08f
-    private const val BODY_LINE_SPACING_EXTRA_DP = 1.5f
+    private const val CARD_CORNER_RADIUS_DP = 18f
+    private const val MIN_BODY_TEXT_SP = 11.5f
+    private const val MAX_BODY_TEXT_SP = 18.5f
+    private const val TITLE_TEXT_SP = 9.5f
+    private const val BODY_LINE_SPACING_MULTIPLIER = 1.18f
+    private const val BODY_LINE_SPACING_EXTRA_DP = 2.2f
+    private const val TEXT_SHADOW_RADIUS_DP = 1.8f
+    private const val TEXT_SHADOW_OFFSET_Y_DP = 0.8f
     private val SUPPORTED_EXTENSIONS = setOf("png", "webp")
     private val backgroundBitmapCache = object : LruCache<String, Bitmap>(12) {}
 
@@ -98,9 +98,18 @@ object WidgetPrincipleCardBitmapRenderer {
         )
         val bitmap = Bitmap.createBitmap(widgetWidthPx, widgetHeightPx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
+        val clipPath = Path().apply {
+            addRoundRect(
+                RectF(0f, 0f, widgetWidthPx.toFloat(), widgetHeightPx.toFloat()),
+                CARD_CORNER_RADIUS_DP * density,
+                CARD_CORNER_RADIUS_DP * density,
+                Path.Direction.CW
+            )
+        }
 
+        canvas.save()
+        canvas.clipPath(clipPath)
         drawBackground(canvas, context, widgetWidthPx, widgetHeightPx, backgroundAssetPath)
-        drawReadabilityOverlay(canvas, widgetWidthPx, widgetHeightPx)
         drawPrincipleText(
             canvas = canvas,
             principle = principle,
@@ -110,6 +119,7 @@ object WidgetPrincipleCardBitmapRenderer {
             density = density,
             scaledDensity = scaledDensity
         )
+        canvas.restore()
 
         return bitmap
     }
@@ -143,30 +153,6 @@ object WidgetPrincipleCardBitmapRenderer {
         canvas.drawColor(Color.parseColor("#F7F3EC"))
     }
 
-    private fun drawReadabilityOverlay(
-        canvas: Canvas,
-        widgetWidthPx: Int,
-        widgetHeightPx: Int
-    ) {
-        val overlayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(
-                0f,
-                0f,
-                widgetWidthPx * 0.78f,
-                0f,
-                intArrayOf(
-                    Color.argb((255 * READABILITY_TINT_START).toInt(), 255, 255, 255),
-                    Color.argb((255 * READABILITY_TINT_MIDDLE).toInt(), 255, 255, 255),
-                    Color.argb((255 * READABILITY_TINT_END).toInt(), 255, 255, 255)
-                ),
-                floatArrayOf(0f, 0.68f, 1f),
-                Shader.TileMode.CLAMP
-            )
-        }
-
-        canvas.drawRect(0f, 0f, widgetWidthPx.toFloat(), widgetHeightPx.toFloat(), overlayPaint)
-    }
-
     private fun drawPrincipleText(
         canvas: Canvas,
         principle: WidgetPrincipleCard?,
@@ -176,9 +162,9 @@ object WidgetPrincipleCardBitmapRenderer {
         density: Float,
         scaledDensity: Float
     ) {
-        val leftPadding = 18f * density
-        val topPadding = 16f * density
-        val textRightBound = widthPx * 0.75f
+        val leftPadding = 16f * density
+        val topPadding = 14f * density
+        val textRightBound = widthPx * 0.74f
         val textWidth = (textRightBound - leftPadding).toInt().coerceAtLeast((120f * density).toInt())
         val title = principle?.title.orEmpty()
         val titleText = when {
@@ -187,14 +173,26 @@ object WidgetPrincipleCardBitmapRenderer {
             else -> "原则卡"
         }
         val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#85796B")
+            color = Color.parseColor("#2B2622")
             textSize = TITLE_TEXT_SP * scaledDensity
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            setShadowLayer(
+                TEXT_SHADOW_RADIUS_DP * density,
+                0f,
+                TEXT_SHADOW_OFFSET_Y_DP * density,
+                Color.argb(90, 0, 0, 0)
+            )
         }
         val bodyPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#1C1917")
-            textSize = MAX_BODY_TEXT_SP * scaledDensity
-            typeface = Typeface.create("serif", Typeface.NORMAL)
+            color = Color.parseColor("#161311")
+            textSize = resolveInitialBodyTextSizeSp(resolveBodyText(principle, isBackSideVisible)) * scaledDensity
+            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+            setShadowLayer(
+                TEXT_SHADOW_RADIUS_DP * density,
+                0f,
+                TEXT_SHADOW_OFFSET_Y_DP * density,
+                Color.argb(72, 0, 0, 0)
+            )
         }
 
         val titleLayout = buildTextLayout(
@@ -208,9 +206,9 @@ object WidgetPrincipleCardBitmapRenderer {
         titleLayout.draw(canvas)
         canvas.restore()
 
-        val bodyTop = topPadding + titleLayout.height + (8f * density)
         val bodyText = resolveBodyText(principle, isBackSideVisible)
-        val maxBodyHeight = (heightPx - bodyTop - (18f * density)).toInt().coerceAtLeast((44f * density).toInt())
+        val bodyTop = topPadding + titleLayout.height + (10f * density)
+        val maxBodyHeight = (heightPx - bodyTop - (16f * density)).toInt().coerceAtLeast((40f * density).toInt())
         val bodyLayout = buildBodyLayout(
             text = bodyText,
             paint = bodyPaint,
@@ -241,6 +239,19 @@ object WidgetPrincipleCardBitmapRenderer {
             .orEmpty()
     }
 
+    private fun resolveInitialBodyTextSizeSp(text: String): Float {
+        val normalizedLength = text.replace(Regex("\\s+"), "").length
+        return when {
+            normalizedLength <= 18 -> 18.5f
+            normalizedLength <= 36 -> 17.4f
+            normalizedLength <= 54 -> 16.4f
+            normalizedLength <= 78 -> 15.4f
+            normalizedLength <= 108 -> 14.4f
+            normalizedLength <= 144 -> 13.4f
+            else -> MIN_BODY_TEXT_SP
+        }
+    }
+
     private fun buildBodyLayout(
         text: String,
         paint: TextPaint,
@@ -251,7 +262,7 @@ object WidgetPrincipleCardBitmapRenderer {
         val minTextSize = MIN_BODY_TEXT_SP * scaledDensity
         val maxTextSize = MAX_BODY_TEXT_SP * scaledDensity
         val lineSpacingExtraPx = BODY_LINE_SPACING_EXTRA_DP * scaledDensity
-        paint.textSize = maxTextSize
+        paint.textSize = paint.textSize.coerceIn(minTextSize, maxTextSize)
 
         var layout = buildTextLayout(
             text = text,

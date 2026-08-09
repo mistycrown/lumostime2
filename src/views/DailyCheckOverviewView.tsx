@@ -3,10 +3,11 @@
  * @input Daily-check templates, daily reviews, logs, and filter context
  * @output Grouped daily-check overview with continuous records and detail navigation
  * @pos View (Daily Check)
- * @description Presents the three daily-check types in a compact editorial list while preserving the existing review data flow.
+ * @description Presents daily-check templates in a compact editorial list while preserving daily-review-only state.
  * @created 2026-08-09
  * @updated 2026-08-09: Added the first daily-check overview page.
  * @updated 2026-08-09: Moved continuous records to the row's right side and removed semantic icon replacement.
+ * @updated 2026-08-09: Shows five history cells only for manual checks and keeps missing reviews unknown.
  */
 import React, { useMemo } from 'react';
 import { ArrowLeft, Check, ChevronRight } from 'lucide-react';
@@ -16,7 +17,6 @@ import {
   CheckTemplate,
   DailyReview,
   Log,
-  ReviewTemplate,
   Scope,
   TodoCategory,
   TodoItem
@@ -27,22 +27,22 @@ import {
   getDailyCheckDisplayType,
   getDailyCheckHistory,
   getDailyCheckItemForDate,
+  getDailyCheckTemplateItem,
   getDailyCheckTypeLabel,
   isDailyCheckComplete
 } from '../utils/dailyCheckStatsUtils';
 import { formatTimeValue } from '../utils/autoCheckUtils';
+import { getLocalDateStr } from '../utils/dateUtils';
 
 interface DailyCheckOverviewViewProps {
   checkTemplates: CheckTemplate[];
   dailyReviews: DailyReview[];
-  reviewTemplates: ReviewTemplate[];
   logs: Log[];
   categories: Category[];
   scopes: Scope[];
   todos: TodoItem[];
   todoCategories: TodoCategory[];
   currentDate: Date;
-  onUpdateDailyReview: (review: DailyReview) => void;
   onOpenDetail: (itemId: string) => void;
   onBack: () => void;
 }
@@ -55,14 +55,12 @@ interface DailyCheckGroup {
 export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
   checkTemplates,
   dailyReviews,
-  reviewTemplates,
   logs,
   categories,
   scopes,
   todos,
   todoCategories,
   currentDate,
-  onUpdateDailyReview,
   onOpenDetail,
   onBack
 }) => {
@@ -81,24 +79,13 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
         template,
         items: template.items
           .filter((item) => item.enabled !== false)
-          .map((item) => getDailyCheckItemForDate({
-            itemId: item.id,
-            date: currentDate,
-            dailyReviews,
-            checkTemplates,
-            logs,
-            filterContext
-          }))
+          .map((item) => getDailyCheckTemplateItem(checkTemplates, item.id))
           .filter((item): item is CheckItem => Boolean(item))
       }))
       .filter((group) => group.items.length > 0)
-  ), [checkTemplates, currentDate, dailyReviews, filterContext, logs]);
+  ), [checkTemplates]);
 
-  const totalItems = groups.reduce((sum, group) => sum + group.items.length, 0);
-  const completedItems = groups.reduce(
-    (sum, group) => sum + group.items.filter(isDailyCheckComplete).length,
-    0
-  );
+  const hasCurrentReview = dailyReviews.some((review) => review.date === getLocalDateStr(currentDate));
 
   const formatCount = (value: number): string => (
     Number.isInteger(value) ? String(value) : value.toFixed(1)
@@ -108,8 +95,11 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
     type: ReturnType<typeof getDailyCheckDisplayType>,
     value: number | null
   ): string | null => {
-    if (value === null || type === 'binary') {
+    if (type === 'binary') {
       return null;
+    }
+    if (value === null) {
+      return '?';
     }
     if (type === 'duration') {
       return formatDurationMinutes(value);
@@ -134,9 +124,6 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
         </button>
         <div className="text-center">
           <div className="text-lg font-semibold tracking-wide">日课总览</div>
-          <div className="mt-0.5 text-[10px] uppercase tracking-[0.24em] text-stone-400">
-            {completedItems}/{totalItems || 0} 完成
-          </div>
         </div>
         <div className="w-9 text-right text-xs tabular-nums text-stone-400">
           {currentDate.getMonth() + 1}/{currentDate.getDate()}
@@ -156,7 +143,17 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
           ) : (
             <div className="space-y-8">
               {groups.map((group) => {
-                const completed = group.items.filter(isDailyCheckComplete).length;
+                const completed = group.items.filter((item) => {
+                  const currentItem = getDailyCheckItemForDate({
+                    itemId: item.id,
+                    date: currentDate,
+                    dailyReviews,
+                    checkTemplates,
+                    logs,
+                    filterContext
+                  });
+                  return currentItem ? isDailyCheckComplete(currentItem) : false;
+                }).length;
                 return (
                   <section key={group.template.id}>
                     <div className="mb-3 flex items-end justify-between border-b border-stone-300 pb-2">
@@ -164,7 +161,7 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
                         {group.template.title}
                       </h2>
                       <span className="text-xs tabular-nums text-stone-500">
-                        {completed}/{group.items.length} 完成
+                        {hasCurrentReview ? `${completed}/${group.items.length} 完成` : `?/${group.items.length} 完成`}
                       </span>
                     </div>
 
@@ -175,13 +172,17 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
                         const history = getDailyCheckHistory({
                           itemId: item.id,
                           anchorDate: currentDate,
+                          days: 5,
                           dailyReviews,
                           checkTemplates,
                           logs,
                           filterContext
                         });
                         const value = history[history.length - 1]?.value ?? null;
-                        const displayValue = formatOverviewValue(type, value);
+                        const isManual = item.type !== 'auto';
+                        const displayValue = isManual && type === 'count'
+                          ? null
+                          : formatOverviewValue(type, value);
 
                         return (
                           <div
@@ -214,26 +215,42 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
                             </button>
 
                             <div className="flex shrink-0 items-center gap-2">
-                              <div className="flex items-center gap-0.5" aria-label="近 7 天记录">
-                                {history.map((point) => {
-                                  const hasValue = point.value !== null && point.value > 0;
-                                  return (
-                                    <span
-                                      key={point.dateLabel}
-                                      className={`flex h-5 w-5 items-center justify-center rounded-full border ${
-                                        point.isCompleted
-                                          ? `${tone.surface} ${tone.text} border-transparent`
-                                          : hasValue
-                                            ? `${tone.surface} ${tone.text} border-transparent opacity-60`
-                                            : 'border-stone-300 bg-transparent text-transparent'
-                                      }`}
-                                      title={`${point.dateLabel}${point.isCompleted ? ' 已完成' : hasValue ? ' 有记录' : ' 未记录'}`}
-                                    >
-                                      {point.isCompleted && <Check size={10} strokeWidth={2.5} />}
-                                    </span>
-                                  );
-                                })}
-                              </div>
+                              {isManual && (
+                                <div className="flex items-center gap-0.5" aria-label="近 5 天记录">
+                                  {history.map((point) => {
+                                    const hasValue = point.value !== null && point.value > 0;
+                                    const isCount = type === 'count';
+                                    const circleContent = !point.hasReview
+                                      ? '?'
+                                      : point.isCompleted
+                                        ? <Check size={10} strokeWidth={2.5} />
+                                        : isCount
+                                          ? String(point.value ?? 0)
+                                          : null;
+                                    return (
+                                      <span
+                                        key={point.dateLabel}
+                                        className={`flex h-5 w-5 items-center justify-center rounded-full border text-[10px] font-semibold ${
+                                          !point.hasReview
+                                            ? 'border-stone-300 bg-transparent text-stone-400'
+                                            : point.isCompleted
+                                              ? `${tone.surface} ${tone.text} border-transparent`
+                                              : isCount
+                                                ? hasValue
+                                                  ? `${tone.surface} ${tone.text} border-transparent opacity-60`
+                                                  : 'border-stone-300 bg-transparent text-stone-500'
+                                              : hasValue
+                                                ? `${tone.surface} ${tone.text} border-transparent opacity-60`
+                                                : 'border-stone-300 bg-transparent text-transparent'
+                                        }`}
+                                        title={`${point.dateLabel}${!point.hasReview ? ' ?' : point.isCompleted ? ' 已完成' : isCount ? ` ${point.value ?? 0} 次` : hasValue ? ' 有记录' : ' 未完成'}`}
+                                      >
+                                        {circleContent}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              )}
 
                               {displayValue && (
                                 <span className="min-w-16 text-right text-xl font-semibold tabular-nums text-stone-800">

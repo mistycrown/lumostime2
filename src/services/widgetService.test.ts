@@ -15,6 +15,7 @@
  * @updated 2026-05-05: Added scene widget launch-app regression coverage so native scene cards can mirror in-app third-party app launches.
  * @updated 2026-05-10: Added native scene-card title layout regression coverage so widget launchers keep mixed-language labels centered and use ASCII ellipsis truncation.
  * @updated 2026-08-09: Added principle-card widget payload, PNG/WebP background scanning, and native provider wiring regression coverage.
+ * @updated 2026-08-09: Added principle-card visual refresh regression coverage for rounded clipping, no mask, sans-serif text, and unlock refresh.
  */
 
 import { describe, expect, it, vi } from 'vitest';
@@ -663,12 +664,15 @@ describe('WidgetPrincipleCardProviderSupport', () => {
     expect(widgetPrincipleCardProviderSupportSource).toContain('ACTION_REFRESH_PRINCIPLE_CARD');
     expect(widgetPrincipleCardProviderSupportSource).toContain('advanceSelection = true');
     expect(widgetPrincipleCardProviderSupportSource).toContain('forceFrontFace = true');
+    expect(widgetPrincipleCardProviderSupportSource).toContain('Intent.ACTION_USER_PRESENT');
+    expect(widgetPrincipleCardProviderSupportSource).toContain('@JvmOverloads');
     expect(widgetPrincipleCardProviderSupportSource).toContain('savePrincipleCardState');
     expect(widgetPrincipleCardProviderSupportSource).toContain('distinctBy { it.id }');
     expect(widgetPrincipleCardLayoutSource).toContain('widget_principle_card_refresh_root');
     expect(widgetPrincipleCardLayoutSource).toContain('widget_principle_card_bitmap');
     expect(quickLogWidgetPrincipleCard4x2Source).toContain('WidgetPrincipleCardProviderSupport.INSTANCE.handleCommonReceive');
     expect(quickLogWidgetPrincipleCard4x2Source).toContain('refreshAllAsync(context)');
+    expect(quickLogWidgetPrincipleCard4x2Source).toContain('refreshAllAsync(context, true, true)');
   });
 
   it('scans PNG and WebP card backgrounds from the Capacitor public assets directory', () => {
@@ -676,12 +680,30 @@ describe('WidgetPrincipleCardProviderSupport', () => {
     expect(widgetPrincipleCardBitmapRendererSource).toContain('SUPPORTED_EXTENSIONS = setOf("png", "webp")');
     expect(widgetPrincipleCardBitmapRendererSource).toContain('it.endsWith(".webp", ignoreCase = true)');
     expect(widgetPrincipleCardBitmapRendererSource).toContain('it.endsWith(".png", ignoreCase = true)');
-    expect(widgetPrincipleCardBitmapRendererSource).toContain('widthPx * 0.75f');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('widthPx * 0.74f');
+  });
+
+  it('clips the card bitmap corners, removes the text mask, and uses sans-serif dynamic text sizing', () => {
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('CARD_CORNER_RADIUS_DP');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('canvas.clipPath(clipPath)');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('addRoundRect(');
+    expect(widgetPrincipleCardBitmapRendererSource).not.toContain('LinearGradient');
+    expect(widgetPrincipleCardBitmapRendererSource).not.toContain('drawReadabilityOverlay');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('Typeface.create("sans-serif"');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('setShadowLayer(');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('resolveInitialBodyTextSizeSp');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('BODY_LINE_SPACING_MULTIPLIER = 1.18f');
   });
 
   it('registers a dedicated 4x2 launcher widget with principle-card bridge storage and refresh routing', () => {
+    const principleCardManifestBlock = androidManifestSource.slice(
+      androidManifestSource.indexOf('android:name=".QuickLogWidgetPrincipleCard4x2"'),
+      androidManifestSource.indexOf('android:name=".QuickLogWidgetTrackingCalendar2x2"')
+    );
+
     expect(androidManifestSource).toContain('android:name=".QuickLogWidgetPrincipleCard4x2"');
     expect(androidManifestSource).toContain('@xml/widget_info_principle_card_4x2');
+    expect(principleCardManifestBlock).toContain('android.intent.action.USER_PRESENT');
     expect(widgetPrincipleCardInfoSource).toContain('android:targetCellWidth="4"');
     expect(widgetPrincipleCardInfoSource).toContain('android:targetCellHeight="2"');
     expect(widgetBridgePluginSource).toContain('fun syncPrincipleCardWidgetData(call: PluginCall)');

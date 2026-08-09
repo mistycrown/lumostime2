@@ -4,7 +4,7 @@ Update 2026-07-31: `aiService.ts` and `assistantActionExecutor.ts` now support f
 
 Update 2026-07-29: `timelineLayoutService.ts` centralizes supported Chronicle layout modes while the schedule canvas now positions itself from the current time instead of a saved start hour.
 
-Update 2026-07-06: `updateService.ts` now reports shipped app version `1.6.3` for the 1.6.3 release line.
+Update 2026-08-09: `updateService.ts` now reports shipped app version `1.6.4` for the 1.6.4 release line.
 Update 2026-07-05: `assistantLocalSearchService.ts`, `assistantTurnService.ts`, and the foreground AI chat runner now support model-requested local retrieval rounds, reusing shared search/filter logic, surfacing pending progress text, and feeding accumulated local-query digests back into follow-up unified turns.
 Update 2026-06-21: `webdavService.ts`, `s3Service.ts`, and `compatibleS3Service.ts` now harden canonical JSON backup reads with cache-busting / no-cache behavior so sync verification reads the current `lumostime_backup.json` instead of stale responses.
 

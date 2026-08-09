@@ -2,6 +2,7 @@
  * @file NavigationContext.tsx
  * @updated 2026-05-12: Added nested todo-detail history state so detail-to-detail navigation can unwind back to the previous task page instead of closing straight to the root view.
  * @updated 2026-08-09: Added daily-check overview/detail navigation state.
+ * @updated 2026-08-09: Added the review-overview settings submenu.
  * @description 统一管理应用的所有导航和模态状态（含设置子页层级）
  */
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
@@ -33,6 +34,7 @@ export type SettingsSubmenu =
     | 'scene'
     | 'emoji'
     | 'principle'
+    | 'review_overview'
     | 'widget'
     | 'desktop_widget';
 
