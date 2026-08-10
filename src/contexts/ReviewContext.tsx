@@ -2,6 +2,7 @@
  * @file ReviewContext.tsx
  * @description Manages review system state, using async repository hydration for heavy review entries and localStorage for light review settings.
  * @updated 2026-08-06: Preserved item-level daily check template enabled flags during localStorage startup migration.
+ * @updated 2026-08-09: Preserved item-level daily check colors during localStorage startup migration.
  */
 import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { DEFAULT_CHECK_TEMPLATES, DEFAULT_REVIEW_TEMPLATES, INITIAL_DAILY_REVIEWS } from '../constants';
@@ -107,6 +108,7 @@ export const migrateStoredCheckTemplatesForInitialLoad = (
           content,
           icon,
           uiIcon: item.uiIcon,
+          color: typeof item === 'string' ? undefined : item.color,
           enabled: typeof item === 'string' ? undefined : item.enabled,
           type: item.type || 'manual',
           manualMode: item.manualMode,

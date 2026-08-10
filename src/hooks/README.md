@@ -1,5 +1,7 @@
 # Custom Hooks
 
+> `useHardwareBackButton.ts` now closes review overlays before unwinding Settings, keeping the 回顾总览 date-jump path aligned with the visible layer order on Android.
+
 > `usePointerDrag.ts` now centralizes the shared pointer capture, document listener, and drag ghost lifecycle used by the timeline todo and quick-color sidebars.
 
 > `useRecurringPlanAutoCreation.ts` now materializes enabled Repeat todo auto-Plan windows once per local day and immediately after relevant todo planning config edits.

@@ -15,7 +15,7 @@
  * @updated 2026-05-05: Added scene widget launch-app regression coverage so native scene cards can mirror in-app third-party app launches.
  * @updated 2026-05-10: Added native scene-card title layout regression coverage so widget launchers keep mixed-language labels centered and use ASCII ellipsis truncation.
  * @updated 2026-08-09: Added principle-card widget payload, PNG/WebP background scanning, and native provider wiring regression coverage.
- * @updated 2026-08-09: Added principle-card visual refresh regression coverage for rounded clipping, no mask, sans-serif text, and unlock refresh.
+ * @updated 2026-08-09: Added principle-card visual refresh regression coverage for rounded clipping, no mask, serif justified body text, and unlock refresh.
  */
 
 import { describe, expect, it, vi } from 'vitest';
@@ -681,17 +681,23 @@ describe('WidgetPrincipleCardProviderSupport', () => {
     expect(widgetPrincipleCardBitmapRendererSource).toContain('it.endsWith(".webp", ignoreCase = true)');
     expect(widgetPrincipleCardBitmapRendererSource).toContain('it.endsWith(".png", ignoreCase = true)');
     expect(widgetPrincipleCardBitmapRendererSource).toContain('widthPx * 0.74f');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('BACKGROUND_OVERSCAN_SCALE = 1.03f');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain(') * BACKGROUND_OVERSCAN_SCALE');
   });
 
-  it('clips the card bitmap corners, removes the text mask, and uses sans-serif dynamic text sizing', () => {
-    expect(widgetPrincipleCardBitmapRendererSource).toContain('CARD_CORNER_RADIUS_DP');
+  it('clips the card bitmap corners, removes the text mask, and uses smaller serif justified body text', () => {
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('CARD_CORNER_RADIUS_DP = 24f');
     expect(widgetPrincipleCardBitmapRendererSource).toContain('canvas.clipPath(clipPath)');
     expect(widgetPrincipleCardBitmapRendererSource).toContain('addRoundRect(');
     expect(widgetPrincipleCardBitmapRendererSource).not.toContain('LinearGradient');
     expect(widgetPrincipleCardBitmapRendererSource).not.toContain('drawReadabilityOverlay');
-    expect(widgetPrincipleCardBitmapRendererSource).toContain('Typeface.create("sans-serif"');
-    expect(widgetPrincipleCardBitmapRendererSource).toContain('setShadowLayer(');
+    expect(widgetPrincipleCardBitmapRendererSource).not.toContain('setShadowLayer(');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('Typeface.create("serif"');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('MIN_BODY_TEXT_SP = 10f');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('MAX_BODY_TEXT_SP = 16f');
     expect(widgetPrincipleCardBitmapRendererSource).toContain('resolveInitialBodyTextSizeSp');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('setJustificationMode(');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('Layout.JUSTIFICATION_MODE_INTER_WORD');
     expect(widgetPrincipleCardBitmapRendererSource).toContain('BODY_LINE_SPACING_MULTIPLIER = 1.18f');
   });
 
@@ -706,6 +712,8 @@ describe('WidgetPrincipleCardProviderSupport', () => {
     expect(principleCardManifestBlock).toContain('android.intent.action.USER_PRESENT');
     expect(widgetPrincipleCardInfoSource).toContain('android:targetCellWidth="4"');
     expect(widgetPrincipleCardInfoSource).toContain('android:targetCellHeight="2"');
+    expect(widgetPrincipleCardInfoSource).toContain('android:previewImage="@drawable/widget_preview_principle_card_4x2"');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('PRINCIPLE_TEXT_COLOR = "#2F2F2F"');
     expect(widgetBridgePluginSource).toContain('fun syncPrincipleCardWidgetData(call: PluginCall)');
     expect(widgetBridgePluginSource).toContain('WidgetRefreshCoordinator.refreshPrincipleCardWidgets(context)');
     expect(widgetStoresSource).toContain('KEY_PRINCIPLE_CARD_SYNC');

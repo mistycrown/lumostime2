@@ -13,6 +13,7 @@ import android.os.Looper
  * Updated 2026-05-05: Extended tap-feedback refresh frames so shortcut success states can animate back after one second.
  * Updated 2026-07-22: Registered the quick-todo 4x3 provider in global and targeted refresh routing.
  * Updated 2026-08-09: Added refresh routing for the dedicated principle-card 4x2 widget.
+ * Updated 2026-08-09: Added refresh routing for the dedicated 4x4 daily-check weekly widget.
  */
 object WidgetRefreshCoordinator {
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -75,6 +76,10 @@ object WidgetRefreshCoordinator {
         QuickLogWidgetDailyRuntime4x4.refreshAllAsync(context)
     }
 
+    fun refreshDailyCheckWeekWidgets(context: Context) {
+        QuickLogWidgetDailyCheckWeek4x4.refreshAllAsync(context)
+    }
+
     fun refreshTodoPinWidgets(context: Context) {
         QuickLogWidgetTodoPin4x2.refreshAllAsync(context)
         QuickLogWidgetTodoPin4x3.refreshAllAsync(context)
@@ -91,6 +96,7 @@ object WidgetRefreshCoordinator {
         refreshTrackingCalendarWidgets(context)
         refreshPrincipleCardWidgets(context)
         refreshDailyRuntimeWidgets(context)
+        refreshDailyCheckWeekWidgets(context)
         refreshTodoPinWidgets(context)
         refreshSceneWidgets(context)
     }
@@ -131,6 +137,8 @@ object WidgetRefreshCoordinator {
                 QuickLogWidgetScene4x3.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidgetDailyRuntime4x4::class.java).className ->
                 QuickLogWidgetDailyRuntime4x4.refreshWidget(context, appWidgetId)
+            ComponentName(context, QuickLogWidgetDailyCheckWeek4x4::class.java).className ->
+                QuickLogWidgetDailyCheckWeek4x4.refreshWidget(context, appWidgetId)
             else -> refreshAll(context)
         }
     }

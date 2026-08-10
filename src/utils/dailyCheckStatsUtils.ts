@@ -8,6 +8,7 @@
  * @updated 2026-08-09: Added initial daily-check overview statistics.
  * @updated 2026-08-09: Preserved automatic time metrics and nullable missing values for detail views.
  * @updated 2026-08-09: Made daily-review snapshots authoritative and exposed review existence on history points.
+ * @updated 2026-08-09: Added all-history effective-record metrics and calendar-aware completion streaks.
  */
 import { CheckItem, CheckTemplate, DailyReview, Log } from '../types';
 import { getLocalDateStr } from './dateUtils';
@@ -28,6 +29,7 @@ export interface DailyCheckHistoryPoint {
   value: number | null;
   isCompleted: boolean;
   hasReview: boolean;
+  hasRecord: boolean;
 }
 
 export interface DailyCheckCalendarPoint extends DailyCheckHistoryPoint {
@@ -219,6 +221,8 @@ export const getDailyCheckHistory = ({
       filterContext
     });
 
+    const hasReview = Boolean(dailyReviews.find((entry) => entry.date === getLocalDateStr(date)));
+
     return {
       date,
       dateLabel: `${date.getMonth() + 1}/${date.getDate()}`,
@@ -226,39 +230,111 @@ export const getDailyCheckHistory = ({
         ? getDailyCheckValue({ item, date, logs, filterContext })
         : null,
       isCompleted: item ? isDailyCheckComplete(item) : false,
-      hasReview: Boolean(dailyReviews.find((entry) => entry.date === getLocalDateStr(date)))
+      hasReview,
+      hasRecord: Boolean(item)
     };
   });
 };
 
+export const getDailyCheckRecordedHistory = ({
+  itemId,
+  anchorDate,
+  dailyReviews,
+  checkTemplates,
+  logs,
+  filterContext
+}: {
+  itemId: string;
+  anchorDate: Date;
+  dailyReviews: DailyReview[];
+  checkTemplates: CheckTemplate[];
+  logs: Log[];
+  filterContext: FilterContext;
+}): DailyCheckHistoryPoint[] => {
+  const anchorDateStr = getLocalDateStr(anchorDate);
+  const reviewsByDate = new Map<string, DailyReview>();
+
+  dailyReviews.forEach((review) => {
+    if (review.date <= anchorDateStr) {
+      reviewsByDate.set(review.date, review);
+    }
+  });
+
+  return Array.from(reviewsByDate.values())
+    .sort((first, second) => first.date.localeCompare(second.date))
+    .flatMap((review) => {
+      const date = new Date(`${review.date}T12:00:00`);
+      const item = getDailyCheckItemForDate({
+        itemId,
+        date,
+        dailyReviews,
+        checkTemplates,
+        logs,
+        filterContext
+      });
+
+      if (!item) {
+        return [];
+      }
+
+      return [{
+        date,
+        dateLabel: `${date.getMonth() + 1}/${date.getDate()}`,
+        value: getDailyCheckValue({ item, date, logs, filterContext }),
+        isCompleted: isDailyCheckComplete(item),
+        hasReview: true,
+        hasRecord: true
+      }];
+    });
+};
+
 export const getCompletionRate = (history: DailyCheckHistoryPoint[]): number => {
-  if (history.length === 0) {
+  const recordedHistory = history.filter((point) => point.hasRecord);
+  if (recordedHistory.length === 0) {
     return 0;
   }
 
-  return Math.round((history.filter((point) => point.isCompleted).length / history.length) * 100);
+  return Math.round((recordedHistory.filter((point) => point.isCompleted).length / recordedHistory.length) * 100);
 };
 
-export const getCurrentStreak = (history: DailyCheckHistoryPoint[]): number => {
-  let streak = 0;
+export const getCurrentStreak = (history: DailyCheckHistoryPoint[], anchorDate?: Date): number => {
+  const recordedHistory = history
+    .filter((point) => point.hasRecord)
+    .sort((first, second) => first.date.getTime() - second.date.getTime());
+  const expectedEndDate = anchorDate ? getLocalDateStr(anchorDate) : null;
+  const lastPoint = recordedHistory[recordedHistory.length - 1];
 
-  for (let index = history.length - 1; index >= 0; index -= 1) {
-    if (!history[index].isCompleted) {
+  if (!lastPoint || (expectedEndDate && getLocalDateStr(lastPoint.date) !== expectedEndDate)) {
+    return 0;
+  }
+
+  let streak = 0;
+  let laterDate: Date | null = null;
+
+  for (let index = recordedHistory.length - 1; index >= 0; index -= 1) {
+    const point = recordedHistory[index];
+    if (!point.isCompleted) {
       break;
     }
+
+    if (laterDate && Math.round((laterDate.getTime() - point.date.getTime()) / 86400000) !== 1) {
+      break;
+    }
+
     streak += 1;
+    laterDate = point.date;
   }
 
   return streak;
 };
 
 export const getAverageValue = (history: DailyCheckHistoryPoint[]): number => {
-  const values = history.flatMap((point) => point.value === null ? [] : [point.value]);
-  if (values.length === 0) {
+  const recordedHistory = history.filter((point) => point.hasRecord);
+  if (recordedHistory.length === 0) {
     return 0;
   }
 
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
+  return recordedHistory.reduce((sum, point) => sum + (point.value || 0), 0) / recordedHistory.length;
 };
 
 export const getDailyCheckMonthHistory = ({
@@ -292,12 +368,15 @@ export const getDailyCheckMonthHistory = ({
       filterContext
     });
 
+    const hasReview = Boolean(dailyReviews.find((entry) => entry.date === getLocalDateStr(date)));
+
     return {
       date,
       dateLabel: `${date.getMonth() + 1}/${date.getDate()}`,
       value: item ? getDailyCheckValue({ item, date, logs, filterContext }) : null,
       isCompleted: item ? isDailyCheckComplete(item) : false,
-      hasReview: Boolean(dailyReviews.find((entry) => entry.date === getLocalDateStr(date))),
+      hasReview,
+      hasRecord: Boolean(item),
       inMonth: date.getMonth() === anchorDate.getMonth()
         && date.getFullYear() === anchorDate.getFullYear()
     };

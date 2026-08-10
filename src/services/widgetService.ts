@@ -68,7 +68,8 @@ import {
   getCheckItemCountState,
   getDailyCheckProgressForDate,
   getDailyCheckTemplateMeta,
-  getEligibleNfcDailyCheckItems
+  getEligibleNfcDailyCheckItems,
+  getEligibleTrackingCalendarDailyCheckItems
 } from '../utils/dailyCheckUtils';
 import { getLocalDateStr } from '../utils/dateUtils';
 import { splitLogByDays } from '../utils/logUtils';
@@ -1107,20 +1108,29 @@ export const buildDailyWidgetSyncPayload = ({
   date?: Date;
 }): WidgetBridgeDailySyncPayload => {
   const dateStr = getLocalDateStr(date);
-  const items: WidgetBridgeDailyCheckMeta[] = getEligibleNfcDailyCheckItems(checkTemplates).map((item) => ({
+  const weekStart = new Date(date);
+  const dayOfWeek = weekStart.getDay();
+  weekStart.setDate(weekStart.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+  const weekDates = Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(weekStart);
+    day.setDate(weekStart.getDate() + index);
+    return getLocalDateStr(day);
+  });
+  const items: WidgetBridgeDailyCheckMeta[] = getEligibleTrackingCalendarDailyCheckItems(checkTemplates).map((item) => ({
     checkTemplateId: item.checkTemplateId,
     checkItemId: item.checkItemId,
     content: item.content,
     category: item.category,
     manualMode: item.manualMode,
     targetCount: item.targetCount,
+    color: item.color ?? null,
     icon: item.icon ?? null,
     uiIcon: item.uiIcon ?? null
   }));
 
-  const progress: WidgetBridgeDailyProgress[] = items.map((item) => {
+  const progress: WidgetBridgeDailyProgress[] = weekDates.flatMap((progressDate) => items.map((item) => {
     const state = getDailyCheckProgressForDate({
-      dateStr,
+      dateStr: progressDate,
       dailyReviews,
       checkTemplates,
       checkItemId: item.checkItemId
@@ -1128,17 +1138,19 @@ export const buildDailyWidgetSyncPayload = ({
 
     return {
       checkItemId: item.checkItemId,
-      date: dateStr,
+      date: progressDate,
       manualMode: state.manualMode,
       currentCount: state.currentCount,
       targetCount: state.targetCount,
       isCompleted: state.isCompleted,
       updatedAt: Date.now()
     };
-  });
+  }));
 
   return {
     date: dateStr,
+    weekStartDate: weekDates[0],
+    weekEndDate: weekDates[6],
     items,
     progress,
     syncedAt: Date.now()

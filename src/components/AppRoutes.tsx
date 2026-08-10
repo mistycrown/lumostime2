@@ -5,8 +5,10 @@
  * @pos Component (Routing)
  * @description Resolves top-level views and modal-like screens from navigation state.
  * @updated 2026-08-09: Added daily-check overview and detail routes.
+ * @updated 2026-08-09: Lets settings-launched review pages render above Settings with their own detail back layer.
  */
 import React from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { AppView, Category, DailyReview, WeeklyReview, MonthlyReview, Log, TodoItem, TodoCategory, TodoDuplicateOptions } from '../types';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useData } from '../contexts/DataContext';
@@ -144,10 +146,27 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     const {
         currentView, setCurrentView,
         isSettingsOpen,
-        isDailyReviewOpen, isDailyNewspaperOpen, isWeeklyNewspaperOpen, isMonthlyNewspaperOpen, isOnThisDayOpen, setIsOnThisDayOpen, currentReviewDate, currentDailyNewspaperDate, currentWeeklyNewspaperStart, currentWeeklyNewspaperEnd, currentDailyReviewInitialTab, currentOnThisDayDate, setCurrentOnThisDayDate,
-        isWeeklyReviewOpen, currentWeeklyReviewStart, currentWeeklyReviewEnd, currentWeeklyReviewInitialTab,
-        currentMonthlyReviewInitialTab,
-        isMonthlyReviewOpen, currentMonthlyReviewStart, currentMonthlyReviewEnd, currentMonthlyNewspaperStart, currentMonthlyNewspaperEnd,
+        isDailyReviewOpen, setIsDailyReviewOpen,
+        isDailyNewspaperOpen, setIsDailyNewspaperOpen,
+        isWeeklyNewspaperOpen, setIsWeeklyNewspaperOpen,
+        isMonthlyNewspaperOpen, setIsMonthlyNewspaperOpen,
+        isOnThisDayOpen, setIsOnThisDayOpen,
+        currentReviewDate, setCurrentReviewDate,
+        currentDailyNewspaperDate, setCurrentDailyNewspaperDate,
+        currentWeeklyNewspaperStart, setCurrentWeeklyNewspaperStart,
+        currentWeeklyNewspaperEnd, setCurrentWeeklyNewspaperEnd,
+        currentDailyReviewInitialTab, setCurrentDailyReviewInitialTab,
+        currentOnThisDayDate, setCurrentOnThisDayDate,
+        isWeeklyReviewOpen, setIsWeeklyReviewOpen,
+        currentWeeklyReviewStart, setCurrentWeeklyReviewStart,
+        currentWeeklyReviewEnd, setCurrentWeeklyReviewEnd,
+        currentWeeklyReviewInitialTab, setCurrentWeeklyReviewInitialTab,
+        currentMonthlyReviewInitialTab, setCurrentMonthlyReviewInitialTab,
+        isMonthlyReviewOpen, setIsMonthlyReviewOpen,
+        currentMonthlyReviewStart, setCurrentMonthlyReviewStart,
+        currentMonthlyReviewEnd, setCurrentMonthlyReviewEnd,
+        currentMonthlyNewspaperStart, setCurrentMonthlyNewspaperStart,
+        currentMonthlyNewspaperEnd, setCurrentMonthlyNewspaperEnd,
         isAchievementOpen,
         isStatsFullScreen, setIsStatsFullScreen,
         isTodoManaging, setIsTodoManaging,
@@ -317,10 +336,81 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         setLogs((previous) => previous.filter((entry) => entry.id !== log.id));
     };
 
+    const closeDailyReview = () => {
+        setIsDailyReviewOpen(false);
+        setCurrentReviewDate(null);
+        setCurrentDailyReviewInitialTab(null);
+    };
+
+    const closeDailyNewspaper = () => {
+        setIsDailyNewspaperOpen(false);
+        setCurrentDailyNewspaperDate(null);
+    };
+
+    const closeWeeklyNewspaper = () => {
+        setIsWeeklyNewspaperOpen(false);
+        setCurrentWeeklyNewspaperStart(null);
+        setCurrentWeeklyNewspaperEnd(null);
+    };
+
+    const closeMonthlyNewspaper = () => {
+        setIsMonthlyNewspaperOpen(false);
+        setCurrentMonthlyNewspaperStart(null);
+        setCurrentMonthlyNewspaperEnd(null);
+    };
+
+    const closeWeeklyReview = () => {
+        setIsWeeklyReviewOpen(false);
+        setCurrentWeeklyReviewStart(null);
+        setCurrentWeeklyReviewEnd(null);
+        setCurrentWeeklyReviewInitialTab(null);
+    };
+
+    const closeMonthlyReview = () => {
+        setIsMonthlyReviewOpen(false);
+        setCurrentMonthlyReviewStart(null);
+        setCurrentMonthlyReviewEnd(null);
+        setCurrentMonthlyReviewInitialTab(null);
+    };
+
+    const renderSettingsLaunchedReview = (content: React.ReactNode, onBack: () => void) => {
+        if (!isSettingsOpen) {
+            return content;
+        }
+
+        return (
+            <div className="fixed inset-0 z-[90] flex flex-col bg-[#faf9f6] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] font-serif text-stone-900 animate-in slide-in-from-right duration-300">
+                <header className="sticky top-0 z-20 grid h-14 shrink-0 grid-cols-[1.5rem_1fr_1.5rem] items-center border-b border-stone-100 bg-[#faf9f6]/92 px-4 backdrop-blur-md">
+                    <button
+                        type="button"
+                        onClick={onBack}
+                        className="p-1 text-stone-400 transition-colors hover:text-stone-700"
+                        title="返回回答详情"
+                        aria-label="返回回答详情"
+                    >
+                        <ChevronLeft size={24} />
+                    </button>
+                    <span className="text-center text-lg font-bold text-stone-800">详情</span>
+                    <span aria-hidden="true" />
+                </header>
+                <div className="min-h-0 flex-1 overflow-hidden">
+                    {content}
+                </div>
+            </div>
+        );
+    };
+
     // Helper to get local YYYY-MM-DD string (now imported from utils)
     // const getLocalDateStr = (d: Date) => { ... } // Removed - using utils version
 
-    if (isSettingsOpen) return null;
+    const isSettingsLaunchedReviewOpen = isDailyNewspaperOpen
+        || isWeeklyNewspaperOpen
+        || isMonthlyNewspaperOpen
+        || isDailyReviewOpen
+        || isWeeklyReviewOpen
+        || isMonthlyReviewOpen;
+
+    if (isSettingsOpen && !isSettingsLaunchedReviewOpen) return null;
 
     if (isDailyNewspaperOpen && currentDailyNewspaperDate) {
         const dateStr = getLocalDateStr(currentDailyNewspaperDate);
@@ -383,7 +473,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
             }
         };
 
-        return (
+        const view = (
             <DailyNewspaperView
                 review={review}
                 date={currentDailyNewspaperDate}
@@ -395,6 +485,8 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 onSubmitAnnotationReply={handleSubmitDailyNewspaperReply}
             />
         );
+
+        return renderSettingsLaunchedReview(view, closeDailyNewspaper);
     }
 
     if (isWeeklyNewspaperOpen && currentWeeklyNewspaperStart && currentWeeklyNewspaperEnd) {
@@ -403,13 +495,15 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         const review = weeklyReviews.find(r => r.weekStartDate === weekStartStr && r.weekEndDate === weekEndStr);
         if (!review) return null;
 
-        return (
+        const view = (
             <WeeklyNewspaperView
                 review={review}
                 weekStartDate={currentWeeklyNewspaperStart}
                 weekEndDate={currentWeeklyNewspaperEnd}
             />
         );
+
+        return renderSettingsLaunchedReview(view, closeWeeklyNewspaper);
     }
 
     if (isMonthlyNewspaperOpen && currentMonthlyNewspaperStart && currentMonthlyNewspaperEnd) {
@@ -418,13 +512,15 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         const review = monthlyReviews.find(r => r.monthStartDate === monthStartStr && r.monthEndDate === monthEndStr);
         if (!review) return null;
 
-        return (
+        const view = (
             <MonthlyNewspaperView
                 review={review}
                 monthStartDate={currentMonthlyNewspaperStart}
                 monthEndDate={currentMonthlyNewspaperEnd}
             />
         );
+
+        return renderSettingsLaunchedReview(view, closeMonthlyNewspaper);
     }
 
     // Daily Review has priority
@@ -435,7 +531,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         // If undefined, return null or spinner
         if (!review) return null;
 
-        return (
+        const view = (
             <DailyReviewView
                 review={review}
                 date={currentReviewDate}
@@ -458,6 +554,8 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 }}
             />
         );
+
+        return renderSettingsLaunchedReview(view, closeDailyReview);
     }
 
     if (isOnThisDayOpen && currentOnThisDayDate) {
@@ -509,7 +607,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
             };
         }
 
-        return (
+        const view = (
             <WeeklyReviewView
                 review={review}
                 weekStartDate={currentWeeklyReviewStart}
@@ -530,6 +628,8 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 addToast={addToast}
             />
         );
+
+        return renderSettingsLaunchedReview(view, closeWeeklyReview);
     }
 
     // Monthly Review
@@ -562,7 +662,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
             };
         }
 
-        return (
+        const view = (
             <MonthlyReviewView
                 review={review}
                 monthStartDate={currentMonthlyReviewStart}
@@ -583,7 +683,11 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 onClose={handleCloseMonthlyReview}
             />
         );
+
+        return renderSettingsLaunchedReview(view, closeMonthlyReview);
     }
+
+    if (isSettingsOpen) return null;
 
     switch (currentView) {
         case AppView.RECORD:

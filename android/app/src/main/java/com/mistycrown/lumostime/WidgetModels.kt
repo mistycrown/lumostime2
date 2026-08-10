@@ -10,6 +10,7 @@ package com.mistycrown.lumostime
  * Updated 2026-05-05: Added optional scene runtime source metadata so app-side scene flips can stay scoped to the tapped scene slot.
  * Updated 2026-08-06: Added packaged UI icon asset paths to scene time slots for native tab rendering.
  * Updated 2026-08-09: Added principle-card widget payload and per-instance shuffle/flip state models.
+ * Updated 2026-08-09: Added weekly range and per-item color fields to daily-check widget payloads.
  */
 object WidgetTypes {
     const val TIMER = "timer"
@@ -284,6 +285,7 @@ data class WidgetDailyCheckMeta(
     val category: String,
     val manualMode: String = WidgetDailyModes.DEFAULT,
     val targetCount: Int = 1,
+    val color: String? = null,
     val icon: String? = null,
     val uiIcon: String? = null
 )
@@ -300,6 +302,8 @@ data class WidgetDailyProgress(
 
 data class WidgetDailySyncPayload(
     val date: String,
+    val weekStartDate: String = date,
+    val weekEndDate: String = date,
     val items: List<WidgetDailyCheckMeta>,
     val progress: List<WidgetDailyProgress>,
     val syncedAt: Long

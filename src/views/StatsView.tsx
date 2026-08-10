@@ -12,6 +12,7 @@
  * - 2026-04-03: 复用共享周范围计算，修复矩阵视图跨月时被错误扩展为超过 7 天的问题。
  * - 2026-04-25: 为矩阵视图新增日范围切换和 editorial 时间格子图，使用活动标签颜色与本地书法字体。
  * - 2026-04-25: check 统计视图仅统计仍存在于启用日课模板中的条目，隐藏停用或已删除模板项。
+ * - 2026-08-09: 日课统计优先使用日课模板条目颜色，旧模板继续使用名称颜色兜底。
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -615,14 +616,15 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       activeTemplates.flatMap(template => template.items.map(item => `${template.title}|${item.content}`))
     );
     const shouldFilterByTemplates = Array.isArray(checkTemplates);
-    const templateIconMap: Record<string, { icon: string; uiIcon?: string }> = {};
+    const templateIconMap: Record<string, { icon: string; uiIcon?: string; color?: string }> = {};
 
     activeTemplates.forEach((template) => {
       template.items.forEach((item) => {
         const key = `${template.title}|${item.content}`;
         templateIconMap[key] = {
           icon: item.icon || '🔵',
-          uiIcon: item.uiIcon
+          uiIcon: item.uiIcon,
+          color: item.color
         };
       });
     });
@@ -682,7 +684,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
     });
 
     // Prefer current active template icons so stats stay in sync with the latest template UI icon selection.
-    const habitIcons: Record<string, { icon: string, uiIcon?: string }> = { ...templateIconMap };
+    const habitIcons: Record<string, { icon: string, uiIcon?: string, color?: string }> = { ...templateIconMap };
 
     dailyReviews.forEach(review => {
       if (days.includes(review.date) && review.checkItems) {
@@ -709,6 +711,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
           name: hab,
           icon: iconData.icon,
           uiIcon: iconData.uiIcon,
+          color: iconData.color,
           days: habits[cat][hab], // Map of DateStr -> Boolean
           dayDetails: habitDayDetails[key],
           stats

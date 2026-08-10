@@ -151,4 +151,105 @@ describe('reviewOverviewUtils', () => {
     ]);
     expect(sections[1].groups[0].questions[0].latestAnswer?.periodLabel).toBe('2026-08-10 ~ 2026-08-16');
   });
+
+  it('sorts groups and questions by newest answer first', () => {
+    const sortingTemplates: ReviewTemplate[] = [
+      {
+        id: 'early-template',
+        title: '旧顺序分组',
+        questions: [
+          { id: 'old-question', question: '旧问题', type: 'text' },
+          { id: 'newer-question', question: '较新的问题', type: 'text' }
+        ],
+        isSystem: false,
+        order: 0,
+        isDailyTemplate: true,
+        syncToTimeline: false
+      },
+      {
+        id: 'late-template',
+        title: '最新分组',
+        questions: [
+          { id: 'newest-group-question', question: '最新分组的问题', type: 'text' }
+        ],
+        isSystem: false,
+        order: 1,
+        isDailyTemplate: true,
+        syncToTimeline: false
+      }
+    ];
+
+    const sections = getReviewOverviewSections({
+      dailyReviews: [
+        createDailyReview({
+          id: 'daily-older',
+          date: '2026-08-01',
+          answers: [
+            { questionId: 'old-question', question: '旧问题', answer: '旧问题回答' }
+          ]
+        }),
+        createDailyReview({
+          id: 'daily-newer',
+          date: '2026-08-08',
+          answers: [
+            { questionId: 'newer-question', question: '较新的问题', answer: '较新问题回答' }
+          ]
+        }),
+        createDailyReview({
+          id: 'daily-newest',
+          date: '2026-08-09',
+          answers: [
+            { questionId: 'newest-group-question', question: '最新分组的问题', answer: '最新分组回答' }
+          ]
+        })
+      ],
+      weeklyReviews: [],
+      monthlyReviews: [],
+      reviewTemplates: sortingTemplates
+    });
+
+    expect(sections[0].groups.map((group) => group.title)).toEqual(['最新分组', '旧顺序分组']);
+    expect(sections[0].groups[1].questions.map((question) => question.question)).toEqual(['较新的问题', '旧问题']);
+  });
+
+  it('preserves choice and rating display metadata', () => {
+    const typedTemplates: ReviewTemplate[] = [
+      {
+        id: 'typed-template',
+        title: '状态',
+        questions: [
+          { id: 'choice-question', question: '今天的状态？', type: 'choice', choices: ['轻盈', '普通'] },
+          { id: 'rating-question', question: '今天打几分？', type: 'rating', icon: 'Heart', colorId: 'rose' }
+        ],
+        isSystem: false,
+        order: 0,
+        isDailyTemplate: true,
+        syncToTimeline: false
+      }
+    ];
+
+    const sections = getReviewOverviewSections({
+      dailyReviews: [
+        createDailyReview({
+          answers: [
+            { questionId: 'choice-question', question: '今天的状态？', answer: '轻盈' },
+            { questionId: 'rating-question', question: '今天打几分？', answer: '4' }
+          ]
+        })
+      ],
+      weeklyReviews: [],
+      monthlyReviews: [],
+      reviewTemplates: typedTemplates
+    });
+
+    expect(sections[0].groups[0].questions[0]).toMatchObject({
+      type: 'choice',
+      choices: ['轻盈', '普通']
+    });
+    expect(sections[0].groups[0].questions[1]).toMatchObject({
+      type: 'rating',
+      icon: 'Heart',
+      colorId: 'rose'
+    });
+  });
 });

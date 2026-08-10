@@ -6,12 +6,15 @@
  * @description Builds the settings Review Overview hierarchy from persisted review answers while preserving historical template snapshots.
  * @created 2026-08-09
  * @updated 2026-08-09: Added review overview grouping utilities.
+ * @updated 2026-08-09: Carries review question display metadata and sorts questions/groups by latest answer.
  */
 
 import type {
   DailyReview,
   MonthlyReview,
+  QuestionType,
   ReviewAnswer,
+  ReviewQuestion,
   ReviewTemplate,
   ReviewTemplateSnapshot,
   WeeklyReview
@@ -34,6 +37,10 @@ export interface ReviewOverviewAnswer {
 export interface ReviewOverviewQuestion {
   id: string;
   question: string;
+  type: QuestionType;
+  choices?: string[];
+  icon?: string;
+  colorId?: string;
   groupTitle: string;
   order: number;
   answers: ReviewOverviewAnswer[];
@@ -47,6 +54,7 @@ export interface ReviewOverviewTemplateGroup {
   order: number;
   questions: ReviewOverviewQuestion[];
   answerCount: number;
+  latestAnswer?: ReviewOverviewAnswer;
 }
 
 export interface ReviewOverviewSection {
@@ -72,10 +80,21 @@ interface ReviewDescriptor {
   reviews: ReviewRecord[];
 }
 
+interface QuestionDisplayMetadata {
+  groupTitle: string;
+  question: string;
+  groupOrder: number;
+  questionOrder: number;
+  type: QuestionType;
+  choices?: string[];
+  icon?: string;
+  colorId?: string;
+}
+
 interface TemplateLookup {
   templates: ReviewTemplateSnapshot[];
-  byQuestionId: Map<string, { groupTitle: string; question: string; groupOrder: number; questionOrder: number }>;
-  byQuestionText: Map<string, { groupTitle: string; question: string; groupOrder: number; questionOrder: number }>;
+  byQuestionId: Map<string, QuestionDisplayMetadata>;
+  byQuestionText: Map<string, QuestionDisplayMetadata>;
 }
 
 const UNGROUPED_TITLE = '未分组';
@@ -153,8 +172,8 @@ const buildTemplateLookup = (
   reviewTemplates: ReviewTemplate[]
 ): TemplateLookup => {
   const templates = getReviewTemplates(kind, review, reviewTemplates);
-  const byQuestionId = new Map<string, { groupTitle: string; question: string; groupOrder: number; questionOrder: number }>();
-  const byQuestionText = new Map<string, { groupTitle: string; question: string; groupOrder: number; questionOrder: number }>();
+  const byQuestionId = new Map<string, QuestionDisplayMetadata>();
+  const byQuestionText = new Map<string, QuestionDisplayMetadata>();
 
   templates.forEach((template, templateIndex) => {
     template.questions.forEach((question, questionIndex) => {
@@ -162,7 +181,8 @@ const buildTemplateLookup = (
         groupTitle: template.title || UNGROUPED_TITLE,
         question: question.question,
         groupOrder: templateIndex,
-        questionOrder: questionIndex
+        questionOrder: questionIndex,
+        ...getQuestionDisplayMetadata(question)
       };
 
       byQuestionId.set(question.id, value);
@@ -220,6 +240,32 @@ const compareOverviewAnswersNewestFirst = (
   }
 
   return b.updatedAt - a.updatedAt;
+};
+
+const getQuestionDisplayMetadata = (question: ReviewQuestion): Pick<QuestionDisplayMetadata, 'type' | 'choices' | 'icon' | 'colorId'> => ({
+  type: question.type || 'text',
+  choices: question.choices,
+  icon: question.icon,
+  colorId: question.colorId
+});
+
+const compareOptionalAnswersNewestFirst = (
+  a?: ReviewOverviewAnswer,
+  b?: ReviewOverviewAnswer
+): number => {
+  if (a && b) {
+    return compareOverviewAnswersNewestFirst(a, b);
+  }
+
+  if (a) {
+    return -1;
+  }
+
+  if (b) {
+    return 1;
+  }
+
+  return 0;
 };
 
 export const getReviewOverviewSections = ({
@@ -282,6 +328,10 @@ export const getReviewOverviewSections = ({
           question = {
             id: questionKey,
             question: questionText,
+            type: matchedQuestion?.type || 'text',
+            choices: matchedQuestion?.choices,
+            icon: matchedQuestion?.icon,
+            colorId: matchedQuestion?.colorId,
             groupTitle,
             order: matchedQuestion?.questionOrder ?? Number.POSITIVE_INFINITY,
             answers: [],
@@ -324,16 +374,36 @@ export const getReviewOverviewSections = ({
             };
           })
           .filter((question) => question.answerCount > 0)
-          .sort((a, b) => a.order - b.order || a.question.localeCompare(b.question, 'zh-Hans-CN'));
+          .sort((a, b) => (
+            compareOptionalAnswersNewestFirst(a.latestAnswer, b.latestAnswer)
+            || a.order - b.order
+            || a.question.localeCompare(b.question, 'zh-Hans-CN')
+          ));
+        const latestAnswer = questions.reduce<ReviewOverviewAnswer | undefined>((currentLatest, question) => {
+          if (!question.latestAnswer) {
+            return currentLatest;
+          }
+
+          if (!currentLatest || compareOverviewAnswersNewestFirst(question.latestAnswer, currentLatest) < 0) {
+            return question.latestAnswer;
+          }
+
+          return currentLatest;
+        }, undefined);
 
         return {
           ...group,
           questions,
-          answerCount: questions.reduce((sum, question) => sum + question.answerCount, 0)
+          answerCount: questions.reduce((sum, question) => sum + question.answerCount, 0),
+          latestAnswer
         };
       })
       .filter((group) => group.questions.length > 0)
       .sort((a, b) => {
+        const latestCompare = compareOptionalAnswersNewestFirst(a.latestAnswer, b.latestAnswer);
+        if (latestCompare !== 0) {
+          return latestCompare;
+        }
         if (a.title === UNGROUPED_TITLE) {
           return 1;
         }

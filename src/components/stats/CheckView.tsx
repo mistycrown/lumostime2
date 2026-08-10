@@ -9,12 +9,14 @@
  * - 2026-03-03: 数字类型（manual count）日课改为展示完成次数，而不是仅展示是否完成。
  * - 2026-03-03: 月视图中数字类型日课的完成天数改为按“达标天数（value >= target）”计算并渲染。
  * - 2026-07-22: Added semantic hooks for dark-mode weekly, monthly, and yearly habit-stat grids.
+ * - 2026-08-09: Applied custom daily-check template colors across week, month, and year views.
  */
 
 import React from 'react';
 import { CheckCircle2, ListChecks, Target } from 'lucide-react';
 import { getWeekColorStyle, getMonthYearColorStyle } from '../../utils/checkViewUtils';
 import { IconRenderer } from '../IconRenderer';
+import { getDailyCheckColorValues } from '../../utils/dailyCheckColorUtils';
 
 export interface CheckStats {
   categories: {
@@ -23,6 +25,7 @@ export interface CheckStats {
       name: string;
       icon: string;
       uiIcon?: string;
+      color?: string;
       days: Record<string, boolean>;
       dayDetails?: Record<string, { value: number; target: number }>;
       stats: {
@@ -75,6 +78,7 @@ export const CheckView: React.FC<CheckViewProps> = ({
               <div className="space-y-2">
                 {cat.items.map(habit => {
                   const style = getWeekColorStyle(habit.name);
+                  const customColor = getDailyCheckColorValues(habit.color);
                   const isCountMode = Boolean(habit.stats.isCountMode);
 
                   return (
@@ -104,11 +108,14 @@ export const CheckView: React.FC<CheckViewProps> = ({
                                   ? `${date.toLocaleDateString()} ${countValue}次`
                                   : `${date.toLocaleDateString()} ${isChecked ? '已完成' : '未完成'}${detail ? ` (${detail.value}/${detail.target}次)` : ''}`
                                 }
-                                className={`daily-check-week-cell ${isChecked ? 'daily-check-cell-complete' : ''} w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all ${
-                                  isChecked
-                                    ? `${style.fill} ${style.text}`
-                                    : 'bg-white border border-stone-200'
-                                }`}
+                                  className={`daily-check-week-cell ${isChecked ? 'daily-check-cell-complete' : ''} w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all ${
+                                    isChecked
+                                      ? customColor ? '' : `${style.fill} ${style.text}`
+                                      : 'bg-white border border-stone-200'
+                                  }`}
+                                style={customColor && isChecked
+                                  ? { backgroundColor: customColor.surface, color: customColor.primary }
+                                  : undefined}
                               >
                                 {isCountMode && countValue > 0 ? (
                                   <span className="text-[10px] sm:text-xs font-bold leading-none">{countValue}</span>
@@ -130,11 +137,12 @@ export const CheckView: React.FC<CheckViewProps> = ({
       )}
 
       {/* Month View */}
-      {pieRange === 'month' && (
-        <div className="grid grid-cols-2 gap-3">
-          {checkStats.categories.flatMap(cat => cat.items.map(habit => {
-            const style = getMonthYearColorStyle(habit.name);
-            const isCountMode = Boolean(habit.stats.isCountMode);
+          {pieRange === 'month' && (
+            <div className="grid grid-cols-2 gap-3">
+              {checkStats.categories.flatMap(cat => cat.items.map(habit => {
+                const style = getMonthYearColorStyle(habit.name);
+                const customColor = getDailyCheckColorValues(habit.color);
+                const isCountMode = Boolean(habit.stats.isCountMode);
             const completedDisplay = isCountMode
               ? checkStats.allDays.reduce((sum, dayStr) => {
                   const detail = habit.dayDetails?.[dayStr];
@@ -185,9 +193,10 @@ export const CheckView: React.FC<CheckViewProps> = ({
                               title={isCountMode
                                 ? `${dayStr} ${countValue}/${targetValue}次${isChecked ? '（达标）' : '（未达标）'}`
                                 : (detail ? `${dayStr} ${detail.value}/${detail.target}次` : dayStr)}
-                              className={`daily-check-month-cell ${isChecked ? 'daily-check-cell-complete' : ''} aspect-square rounded-md flex items-center justify-center text-[10px] font-medium transition-colors ${
-                                isChecked ? `${style.fill} text-white` : 'bg-stone-50 text-stone-300'
+                                className={`daily-check-month-cell ${isChecked ? 'daily-check-cell-complete' : ''} aspect-square rounded-md flex items-center justify-center text-[10px] font-medium transition-colors ${
+                                isChecked ? customColor ? 'text-white' : `${style.fill} text-white` : 'bg-stone-50 text-stone-300'
                               }`}
+                              style={customColor && isChecked ? { backgroundColor: customColor.primary } : undefined}
                             >
                               {isCountMode && countValue > 0 ? countValue : ''}
                             </div>
@@ -200,17 +209,29 @@ export const CheckView: React.FC<CheckViewProps> = ({
 
                 <div className="flex items-center justify-between mt-3 pt-2 border-t border-stone-50">
                   <div className="flex items-center gap-1.5 text-xs text-stone-500">
-                    <CheckCircle2 size={14} className={style.text} />
+                    <CheckCircle2
+                      size={14}
+                      className={customColor ? '' : style.text}
+                      style={customColor ? { color: customColor.primary } : undefined}
+                    />
                     <span className="font-bold">{completedDisplay}</span>
                     {isCountMode && typeof habit.stats.countTotal === 'number' && (
                       <>
-                        <ListChecks size={14} className={style.text} />
+                        <ListChecks
+                          size={14}
+                          className={customColor ? '' : style.text}
+                          style={customColor ? { color: customColor.primary } : undefined}
+                        />
                         <span className="font-bold">{habit.stats.countTotal}</span>
                       </>
                     )}
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-stone-500">
-                    <Target size={14} className={style.text} />
+                    <Target
+                      size={14}
+                      className={customColor ? '' : style.text}
+                      style={customColor ? { color: customColor.primary } : undefined}
+                    />
                     <span className="font-bold">
                       {completionPercent}%
                     </span>
@@ -223,11 +244,12 @@ export const CheckView: React.FC<CheckViewProps> = ({
       )}
 
       {/* Year View */}
-      {pieRange === 'year' && (
-        <div className="space-y-4">
-          {checkStats.categories.flatMap(cat => cat.items.map(habit => {
-            const style = getMonthYearColorStyle(habit.name);
-            const isCountMode = Boolean(habit.stats.isCountMode);
+          {pieRange === 'year' && (
+            <div className="space-y-4">
+              {checkStats.categories.flatMap(cat => cat.items.map(habit => {
+                const style = getMonthYearColorStyle(habit.name);
+                const customColor = getDailyCheckColorValues(habit.color);
+                const isCountMode = Boolean(habit.stats.isCountMode);
             const completedDisplay = isCountMode
               ? (habit.stats.countTotal || 0)
               : habit.stats.checked;
@@ -285,9 +307,10 @@ export const CheckView: React.FC<CheckViewProps> = ({
                                   }
                                   className={`daily-check-year-cell ${isChecked ? 'daily-check-cell-complete' : ''} w-3 h-3 rounded-[2px] transition-colors flex items-center justify-center ${
                                     isChecked
-                                      ? style.fill
+                                      ? customColor ? '' : style.fill
                                       : 'bg-stone-100'
                                   }`}
+                                  style={customColor && isChecked ? { backgroundColor: customColor.primary } : undefined}
                                 >
                                   {isCountMode && countValue > 0 && (
                                     <span className="text-[6px] leading-none text-white font-bold tracking-[-0.2px]">

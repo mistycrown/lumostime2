@@ -12,6 +12,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-08-09: Planned timeline blocks are excluded from detail-page statistics while remaining visible in timelines.
+ * @updated 2026-08-09: Month-view groups now use only countable dates from the selected month, removing cross-month and planned-only headings.
  */
 import React, { useMemo } from 'react';
 import { Log, Category } from '../types';
@@ -23,6 +24,10 @@ import { usePrivacy } from '../contexts/PrivacyContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { TimelineStyleRail } from './TimelineStyleRail';
 import { filterCountableLogs } from '../utils/statLogUtils';
+import {
+    buildDetailTimelineGroupedData,
+    DetailTimelineViewMode,
+} from '../utils/detailTimelineGrouping';
 type ScoreBarColor = {
     bg: string;
     bgStyle?: React.CSSProperties;
@@ -163,7 +168,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     const { isPrivacyMode } = usePrivacy();
     const { timelineStyleTheme, timelineStyleConfigs } = useSettings();
     const activeConfig = timelineStyleConfigs[timelineStyleTheme];
-    const [viewMode, setViewMode] = React.useState<'month' | 'all'>(defaultViewMode);
+    const [viewMode, setViewMode] = React.useState<DetailTimelineViewMode>(defaultViewMode);
     const [calendarViewMode, setCalendarViewMode] = React.useState<'heatmap' | 'gallery' | 'keywords'>('heatmap');
     
     // 用于存储日期对应的 DOM 元素引用
@@ -306,6 +311,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
 
     // 显示日志：根据模式选择
     const logsToDisplay = viewMode === 'month' ? monthLogs : filteredLogs;
+    const countableLogsToDisplay = viewMode === 'month' ? countableMonthLogs : countableLogs;
 
     const styledLogIndexMap = useMemo(() => {
         return [...logsToDisplay]
@@ -340,34 +346,10 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     const avgDurationM = avgDurationMins % 60;
 
     // 热图/分组数据
-    const groupedData = useMemo(() => {
-        // 使用 logsToDisplay 进行分组
-        // 这里的 key 需要包含完整日期信息以便排序 (timestamp or YYYY-MM-DD)
-        // 为了复用现有逻辑（按日分组），我们使用 timestamp (Start of day) 作为 key
-        const map = new Map<number, number>(); // Key: timestamp of start of day
-        const logsMap = new Map<number, Log[]>();
-
-        logsToDisplay.forEach(log => {
-            const d = new Date(log.startTime);
-            const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-
-            if (!map.has(startOfDay)) {
-                map.set(startOfDay, 0);
-            }
-            if (!logsMap.has(startOfDay)) {
-                logsMap.set(startOfDay, []);
-            }
-            logsMap.get(startOfDay)!.push(log);
-        });
-
-        countableLogs.forEach(log => {
-            const d = new Date(log.startTime);
-            const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-            map.set(startOfDay, (map.get(startOfDay) || 0) + log.duration);
-        });
-
-        return { durationMap: map, logsMap };
-    }, [countableLogs, logsToDisplay]);
+    const groupedData = useMemo(
+        () => buildDetailTimelineGroupedData(logsToDisplay, countableLogsToDisplay, viewMode),
+        [countableLogsToDisplay, logsToDisplay, viewMode]
+    );
     
     // 滚动监听：显示日期悬浮条并更新活跃日期
     React.useEffect(() => {
@@ -1176,7 +1158,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                     </div>
                 </div>
 
-                {logsToDisplay.length === 0 ? (
+                {groupedData.durationMap.size === 0 ? (
                     <div className="text-center py-10 text-stone-400 text-sm italic border border-dashed border-stone-200 rounded-2xl">
                         {viewMode === 'month' ? 'No activity recorded in this month.' : 'No activity recorded.'}
                     </div>

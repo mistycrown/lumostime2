@@ -15,6 +15,7 @@ import org.json.JSONObject
  * Updated 2026-05-05: Expanded TODAY + PIN payload storage to retain mirrored source todos/categories for native-side list rebuilding.
  * Updated 2026-08-06: Persists scene time-slot UI icon asset paths when reloading native payloads.
  * Updated 2026-08-09: Persists principle-card widget payloads and per-instance shuffle state.
+ * Updated 2026-08-09: Persists weekly daily-check ranges and per-item colors for the 4x4 statistics widget.
  */
 object WidgetStores {
     private const val PREFS_NAME = "lumostime_widget_timer"
@@ -569,6 +570,8 @@ object WidgetStores {
             val json = JSONObject(raw)
             WidgetDailySyncPayload(
                 date = json.optString("date"),
+                weekStartDate = json.optString("weekStartDate").ifBlank { json.optString("date") },
+                weekEndDate = json.optString("weekEndDate").ifBlank { json.optString("date") },
                 items = json.optJSONArray("items").toDailyMetaList(),
                 progress = json.optJSONArray("progress").toDailyProgressList(),
                 syncedAt = json.optLong("syncedAt", System.currentTimeMillis())
@@ -585,6 +588,8 @@ object WidgetStores {
 
         val json = JSONObject().apply {
             put("date", payload.date)
+            put("weekStartDate", payload.weekStartDate)
+            put("weekEndDate", payload.weekEndDate)
             put("items", payload.items.toDailyMetaJsonArray())
             put("progress", payload.progress.toDailyProgressJsonArray())
             put("syncedAt", payload.syncedAt)
@@ -1116,19 +1121,19 @@ object WidgetStores {
     fun upsertDailyProgress(context: Context, progress: WidgetDailyProgress) {
         val existing = loadDailySyncPayload(context)
         val baseItems = existing?.items ?: emptyList()
-        val nextProgress = if (existing == null || existing.date != progress.date) {
-            listOf(progress)
-        } else {
-            existing.progress
-                .filterNot { it.checkItemId == progress.checkItemId }
-                .toMutableList()
-                .apply { add(progress) }
-        }
+        val nextProgress = existing?.progress.orEmpty()
+            .filterNot {
+                it.checkItemId == progress.checkItemId && it.date == progress.date
+            }
+            .toMutableList()
+            .apply { add(progress) }
 
         saveDailySyncPayload(
             context,
             WidgetDailySyncPayload(
                 date = progress.date,
+                weekStartDate = existing?.weekStartDate ?: progress.date,
+                weekEndDate = existing?.weekEndDate ?: progress.date,
                 items = baseItems,
                 progress = nextProgress.sortedBy { it.checkItemId },
                 syncedAt = System.currentTimeMillis()
@@ -1484,6 +1489,7 @@ object WidgetStores {
                         targetCount = normalizePositiveInt(
                             if (item.has("targetCount")) item.optInt("targetCount") else 1
                         ),
+                        color = parseNullableString(item.optString("color")),
                         icon = parseNullableString(item.optString("icon")),
                         uiIcon = parseNullableString(item.optString("uiIcon"))
                     )
@@ -1528,6 +1534,7 @@ object WidgetStores {
                 put("category", item.category)
                 put("manualMode", WidgetDailyModes.normalize(item.manualMode))
                 put("targetCount", normalizePositiveInt(item.targetCount))
+                put("color", item.color ?: JSONObject.NULL)
                 put("icon", item.icon ?: JSONObject.NULL)
                 put("uiIcon", item.uiIcon ?: JSONObject.NULL)
             })

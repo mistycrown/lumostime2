@@ -20,6 +20,7 @@ import org.json.JSONObject
  * Updated 2026-05-20: Wrapped non-Exception sync failures before forwarding them to Capacitor's PluginCall.reject overloads.
  * Updated 2026-08-06: Added UI icon asset paths to scene time-slot parsing for native scene-tab rendering.
  * Updated 2026-08-09: Added principle-card widget payload synchronization for the dedicated Android 4x2 card widget.
+ * Updated 2026-08-09: Accepts weekly daily-check progress and refreshes the dedicated 4x4 weekly widget.
  */
 @CapacitorPlugin(name = "WidgetBridge")
 class WidgetBridgePlugin : Plugin() {
@@ -197,6 +198,8 @@ class WidgetBridgePlugin : Plugin() {
         val payload = payloadJson?.let {
             WidgetDailySyncPayload(
                 date = it.optString("date"),
+                weekStartDate = it.optString("weekStartDate").ifBlank { it.optString("date") },
+                weekEndDate = it.optString("weekEndDate").ifBlank { it.optString("date") },
                 items = it.optJSONArray("items").toDailyMetaList(),
                 progress = it.optJSONArray("progress").toDailyProgressList(),
                 syncedAt = it.optLong("syncedAt", System.currentTimeMillis())
@@ -205,6 +208,7 @@ class WidgetBridgePlugin : Plugin() {
 
         WidgetStores.saveDailySyncPayload(context, payload)
         WidgetRefreshCoordinator.refreshTimerWidgets(context)
+        WidgetRefreshCoordinator.refreshDailyCheckWeekWidgets(context)
         WidgetRefreshCoordinator.refreshSceneWidgets(context)
         call.resolve()
     }
@@ -547,6 +551,7 @@ class WidgetBridgePlugin : Plugin() {
                     category = item.optString("category"),
                     manualMode = WidgetDailyModes.normalize(item.optString("manualMode")),
                     targetCount = item.optInt("targetCount", 1).coerceAtLeast(1),
+                    color = parseNullableString(item.optString("color")),
                     icon = parseNullableString(item.optString("icon")),
                     uiIcon = parseNullableString(item.optString("uiIcon"))
                 )
