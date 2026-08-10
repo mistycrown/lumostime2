@@ -7,8 +7,8 @@
  * @updated 2026-04-26: Captures assistant-notification navigation intents so the Web layer can reopen the shared AI chat at the targeted background reply after resume or cold start.
  * @updated 2026-07-22: Registers the native status-bar appearance bridge for display-mode synchronization.
  * @updated 2026-07-22: Draws an explicit top inset backdrop beneath Android 15's transparent status bar.
- * @updated 2026-08-10: Adds temporary immersive overlay and configuration diagnostics for logcat investigation.
  * @updated 2026-08-10: Restores post-WebView edge-to-edge setup and reapplies it after orientation changes so immersive mode does not expose the launch splash surface.
+ * @updated 2026-08-10: Adds temporary immersive overlay and configuration diagnostics for logcat investigation.
  */
 package com.mistycrown.lumostime;
 

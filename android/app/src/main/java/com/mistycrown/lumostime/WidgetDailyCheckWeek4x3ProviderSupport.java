@@ -15,12 +15,13 @@ import java.util.Locale;
 /**
  * Provider wiring for the compact scrollable daily-check weekly widget.
  * Updated 2026-08-10: Unified date, refresh, weekday header, and scrollable matrix styling.
+ * Updated 2026-08-10: Moved the weekday header into the collection to guarantee one rendered row.
  */
 public final class WidgetDailyCheckWeek4x3ProviderSupport {
     public static final String ACTION_REFRESH =
             "com.mistycrown.lumostime.action.REFRESH_DAILY_CHECK_WEEK_4X3";
     private static final String EXTRA_APPWIDGET_ID = "daily_check_week_4x3_app_widget_id";
-    private static final String REMOTE_VIEWS_VERSION = "v3";
+    private static final String REMOTE_VIEWS_VERSION = "v4";
 
     private WidgetDailyCheckWeek4x3ProviderSupport() {}
 
@@ -72,10 +73,6 @@ public final class WidgetDailyCheckWeek4x3ProviderSupport {
             views.setTextViewText(
                     R.id.widget_daily_check_week_4x3_date,
                     formatWeekRange(payload)
-            );
-            views.setImageViewBitmap(
-                    R.id.widget_daily_check_week_4x3_weekdays,
-                    WidgetDailyCheckWeek4x3RowBitmapRenderer.INSTANCE.renderWeekdays(context, appWidgetId)
             );
             views.setOnClickPendingIntent(
                     R.id.widget_daily_check_week_4x3_refresh,

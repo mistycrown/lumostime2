@@ -11,6 +11,7 @@
  * @updated 2026-05-04: Realigned the immersive top control bar so both portrait and landscape modes avoid inheriting the managed status-bar fallback and drifting downward.
  * @updated 2026-05-03: Switched Android EdgeToEdge access to the plugin's ESM entry so Capacitor WebView builds no longer execute browser-undefined `require()` calls.
  * @updated 2026-08-10: Adds temporary immersive transition diagnostics for Android logcat investigation.
+ * @updated 2026-08-10: Waits for Android's requested-orientation animation to settle before hiding system bars, preventing the fixed-rotation transition from obscuring the WebView with the launch surface.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, Image as ImageIcon, MonitorSmartphone, Volume2, VolumeX, X } from 'lucide-react';
@@ -100,6 +101,24 @@ interface ImmersiveTimerProps {
   onSubmit: () => void;
 }
 
+const waitForAndroidOrientationStability = async () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  // ScreenOrientation.lock() resolves after setRequestedOrientation(), before Android's
+  // fixed-rotation animation and the WebView's surface resize have completed.
+  await new Promise<void>((resolve) => {
+    window.setTimeout(resolve, 700);
+  });
+
+  await new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(resolve);
+    });
+  });
+};
+
 export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit, onSubmit }) => {
   const { immersiveTimerDefaultOrientation } = useSettings();
   const [showControls, setShowControls] = useState(false);
@@ -159,6 +178,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
   );
   const timerRef = useRef<HTMLDivElement>(null);
   const exitTransitionPromiseRef = useRef<Promise<void> | null>(null);
+  const orientationTransitionPromiseRef = useRef<Promise<void> | null>(null);
   const hasRestoredShellRef = useRef(false);
   const effectiveOrientation = resolveImmersiveTimerOrientation(
     immersiveTimerDefaultOrientation,
@@ -256,6 +276,12 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
         console.error('[ImmersiveDebug] Requesting orientation lock', { effectiveOrientation, preferredLock });
         await ScreenOrientation.lock({ type });
         console.error('[ImmersiveDebug] Orientation lock completed', { effectiveOrientation, preferredLock });
+
+        if (platform === 'android') {
+          console.error('[ImmersiveDebug] Waiting for Android orientation stability before hiding system bars');
+          await waitForAndroidOrientationStability();
+          console.error('[ImmersiveDebug] Android orientation stability wait completed');
+        }
       } catch (error) {
         console.error('[ImmersiveDebug] Orientation lock failed', { effectiveOrientation, error });
         if (!isCancelled && !shouldSilenceImmersiveOrientationError(error)) {
@@ -264,10 +290,14 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
       }
     };
 
-    void applyEffectiveOrientation();
+    const orientationTransition = applyEffectiveOrientation();
+    orientationTransitionPromiseRef.current = orientationTransition;
 
     return () => {
       isCancelled = true;
+      if (orientationTransitionPromiseRef.current === orientationTransition) {
+        orientationTransitionPromiseRef.current = null;
+      }
       console.error('[ImmersiveDebug] Requesting orientation unlock');
       ScreenOrientation.unlock().catch((error) => {
         console.error('[ImmersiveDebug] Orientation unlock failed', error);
@@ -284,6 +314,11 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
     const applyEnterTransition = async () => {
       const enterTransition = getImmersiveStatusBarTransition(platform, 'enter');
       console.error('[ImmersiveDebug] Starting immersive enter transition', { platform, enterTransition });
+
+      if (platform === 'android' && orientationTransitionPromiseRef.current) {
+        console.error('[ImmersiveDebug] Waiting for orientation transition before Android immersive entry');
+        await orientationTransitionPromiseRef.current;
+      }
 
       if (platform === 'ios') {
         await StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});

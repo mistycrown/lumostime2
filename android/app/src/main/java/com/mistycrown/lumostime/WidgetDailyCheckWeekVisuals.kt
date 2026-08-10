@@ -12,6 +12,7 @@ import kotlin.math.min
  * Updated 2026-08-10: Unified both widget sizes with the reference square-cell style.
  * Updated 2026-08-10: Moved the grid left and reduced the right inset for denser layouts.
  * Updated 2026-08-10: Moved the grid closer to daily-check labels to match the reference layout.
+ * Updated 2026-08-10: Allowed full-widget renderers to use the same effective content inset as list rows.
  */
 object WidgetDailyCheckWeekVisuals {
     private const val DEFAULT_ACCENT_COLOR = "#34D399"
@@ -23,9 +24,11 @@ object WidgetDailyCheckWeekVisuals {
     data class Grid(val left: Float, val right: Float, val step: Float)
 
     @JvmStatic
-    fun grid(width: Int, density: Float): Grid {
-        val left = max(width * GRID_LEFT_RATIO, GRID_LEFT_MIN_DP * density)
-        val right = width - GRID_RIGHT_INSET_DP * density
+    fun grid(width: Int, density: Float, outerInsetDp: Float = 0f): Grid {
+        val outerInset = outerInsetDp * density
+        val contentWidth = (width - outerInset * 2f).coerceAtLeast(1f)
+        val left = outerInset + max(contentWidth * GRID_LEFT_RATIO, GRID_LEFT_MIN_DP * density)
+        val right = width - outerInset - GRID_RIGHT_INSET_DP * density
         return Grid(left, right, ((right - left) / 6f).coerceAtLeast(0f))
     }
 

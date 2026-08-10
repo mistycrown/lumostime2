@@ -9,6 +9,7 @@
  * @updated 2026-08-10: Added shared reference-style visual wiring coverage.
  * @updated 2026-08-10: Added dense-row and unscaled compact-content coverage.
  * @updated 2026-08-10: Added reference-gap and RemoteViews cache-busting coverage.
+ * @updated 2026-08-10: Added single-header collection and shared-size coverage.
  */
 import { describe, expect, it } from 'vitest';
 import type { CheckTemplate, DailyReview } from '../types';
@@ -24,6 +25,7 @@ import widgetInfoSource from '../../android/app/src/main/res/xml/widget_info_dai
 import compactWidgetInfoSource from '../../android/app/src/main/res/xml/widget_info_daily_check_week_4x3.xml?raw';
 import widgetLayoutSource from '../../android/app/src/main/res/layout/widget_layout_daily_check_week_4x4.xml?raw';
 import compactWidgetLayoutSource from '../../android/app/src/main/res/layout/widget_layout_daily_check_week_4x3.xml?raw';
+import compactWeekdayItemSource from '../../android/app/src/main/res/layout/widget_daily_check_week_4x3_weekday_item.xml?raw';
 import widgetPreviewSource from '../../android/app/src/main/res/drawable/widget_preview_daily_check_week_4x4.xml?raw';
 import compactWidgetPreviewSource from '../../android/app/src/main/res/drawable/widget_preview_daily_check_week_4x3.xml?raw';
 
@@ -97,7 +99,8 @@ describe('daily-check weekly Android widget wiring', () => {
     expect(rendererSource).toContain('resolveWeekDates');
     expect(rendererSource).toContain('weekStartDate');
     expect(rendererSource).toContain('WidgetDailyCheckWeekVisuals.drawStateCell');
-    expect(rendererSource).toContain('min(24f * density');
+    expect(rendererSource).toContain('min(31f * density');
+    expect(rendererSource).toContain('grid(width, density, 16f)');
     expect(widgetLayoutSource).toContain('widget_daily_check_week_date');
     expect(widgetPreviewSource).toContain('android:width="250dp"');
     expect(widgetPreviewSource).toContain('@drawable/ic_widget_refresh');
@@ -110,15 +113,19 @@ describe('daily-check weekly Android widget wiring', () => {
     expect(compactWidgetInfoSource).toContain('android:targetCellHeight="3"');
     expect(compactProviderSource).toContain('setRemoteAdapter');
     expect(compactProviderSource).toContain('ACTION_REFRESH');
-    expect(compactProviderSource).toContain('REMOTE_VIEWS_VERSION = "v3"');
+    expect(compactProviderSource).toContain('REMOTE_VIEWS_VERSION = "v4"');
     expect(compactServiceSource).toContain('WidgetDailyCheckWeek4x3RowBitmapRenderer');
+    expect(compactServiceSource).toContain('items.size() + 1');
+    expect(compactServiceSource).toContain('getViewTypeCount()');
+    expect(compactServiceSource).toContain('return 2;');
     expect(compactRendererSource).toContain('renderWeekdays');
     expect(compactRendererSource).toContain('WidgetDailyCheckWeekVisuals.drawStateCell');
     expect(compactRendererSource).toContain('CONTENT_HORIZONTAL_INSET_DP');
     expect(sharedVisualsSource).toContain('pastelAccentColor');
     expect(sharedVisualsSource).toContain('GRID_LEFT_RATIO = 0.43f');
     expect(compactWidgetLayoutSource).toContain('android:scrollbars="none"');
-    expect(compactWidgetLayoutSource).toContain('widget_daily_check_week_4x3_weekdays');
+    expect(compactWidgetLayoutSource).not.toContain('widget_daily_check_week_4x3_weekdays');
+    expect(compactWeekdayItemSource).toContain('widget_daily_check_week_4x3_weekday_bitmap');
     expect(compactWidgetLayoutSource).toContain('widget_daily_check_week_4x3_refresh');
     expect(compactWidgetPreviewSource).toContain('android:width="220dp"');
   });

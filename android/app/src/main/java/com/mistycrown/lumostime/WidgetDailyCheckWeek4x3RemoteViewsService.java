@@ -10,7 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Supplies compact daily-check rows to the scrollable 4x3 widget.
+ * Supplies one weekday header followed by compact daily-check rows to the 4x3 widget.
+ * Updated 2026-08-10: Made the weekday header a collection item to avoid duplicate RemoteViews layers.
  */
 public class WidgetDailyCheckWeek4x3RemoteViewsService extends RemoteViewsService {
     @Override
@@ -51,13 +52,25 @@ public class WidgetDailyCheckWeek4x3RemoteViewsService extends RemoteViewsServic
 
         @Override
         public int getCount() {
-            return items.size();
+            return items.isEmpty() ? 0 : items.size() + 1;
         }
 
         @Override
         public RemoteViews getViewAt(int position) {
-            if (position < 0 || position >= items.size()) {
+            if (position < 0 || position >= getCount()) {
                 return null;
+            }
+
+            if (position == 0) {
+                RemoteViews header = new RemoteViews(
+                        context.getPackageName(),
+                        R.layout.widget_daily_check_week_4x3_weekday_item
+                );
+                header.setImageViewBitmap(
+                        R.id.widget_daily_check_week_4x3_weekday_bitmap,
+                        WidgetDailyCheckWeek4x3RowBitmapRenderer.INSTANCE.renderWeekdays(context, appWidgetId)
+                );
+                return header;
             }
 
             RemoteViews views = new RemoteViews(
@@ -68,7 +81,7 @@ public class WidgetDailyCheckWeek4x3RemoteViewsService extends RemoteViewsServic
                     context,
                     appWidgetId,
                     payload,
-                    items.get(position)
+                    items.get(position - 1)
             );
             views.setImageViewBitmap(R.id.widget_daily_check_week_4x3_row_bitmap, bitmap);
             return views;
@@ -81,14 +94,17 @@ public class WidgetDailyCheckWeek4x3RemoteViewsService extends RemoteViewsServic
 
         @Override
         public int getViewTypeCount() {
-            return 1;
+            return 2;
         }
 
         @Override
         public long getItemId(int position) {
-            return position < 0 || position >= items.size()
+            if (position == 0) {
+                return Long.MIN_VALUE;
+            }
+            return position < 0 || position >= getCount()
                     ? position
-                    : items.get(position).getCheckItemId().hashCode();
+                    : items.get(position - 1).getCheckItemId().hashCode();
         }
 
         @Override
