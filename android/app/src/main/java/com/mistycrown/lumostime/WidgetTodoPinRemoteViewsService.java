@@ -12,6 +12,7 @@ import java.util.List;
 
 /**
  * RemoteViews collection service backing the scrollable TODAY + PIN widget list.
+ * Updated 2026-08-10: Uses a repeat icon and omits completion intents for recurring rows.
  */
 public class WidgetTodoPinRemoteViewsService extends RemoteViewsService {
     @Override
@@ -76,7 +77,11 @@ public class WidgetTodoPinRemoteViewsService extends RemoteViewsService {
             views.setTextViewText(R.id.widget_todo_pin_title, item.getTitle());
             views.setImageViewResource(
                     R.id.widget_todo_pin_checkbox,
-                    item.isCompleted() ? R.drawable.widget_todo_pin_checkbox_checked : R.drawable.widget_todo_pin_checkbox_unchecked
+                    item.isRecurring()
+                            ? R.drawable.widget_todo_pin_repeat_icon
+                            : item.isCompleted()
+                            ? R.drawable.widget_todo_pin_checkbox_checked
+                            : R.drawable.widget_todo_pin_checkbox_unchecked
             );
             views.setViewVisibility(
                     R.id.widget_todo_pin_button_start,
@@ -100,12 +105,14 @@ public class WidgetTodoPinRemoteViewsService extends RemoteViewsService {
             fillInIntent.putExtra(WidgetTodoPinProviderSupport.EXTRA_TODO_ID, item.getTodoId());
             views.setOnClickFillInIntent(R.id.widget_todo_pin_row, fillInIntent);
             views.setOnClickFillInIntent(R.id.widget_todo_pin_action_button, fillInIntent);
-            Intent completionFillInIntent = new Intent(fillInIntent);
-            completionFillInIntent.putExtra(
-                    WidgetTodoPinProviderSupport.EXTRA_TODO_PIN_ACTION,
-                    WidgetTodoPinProviderSupport.TODO_PIN_ACTION_COMPLETE
-            );
-            views.setOnClickFillInIntent(R.id.widget_todo_pin_checkbox, completionFillInIntent);
+            if (!item.isRecurring()) {
+                Intent completionFillInIntent = new Intent(fillInIntent);
+                completionFillInIntent.putExtra(
+                        WidgetTodoPinProviderSupport.EXTRA_TODO_PIN_ACTION,
+                        WidgetTodoPinProviderSupport.TODO_PIN_ACTION_COMPLETE
+                );
+                views.setOnClickFillInIntent(R.id.widget_todo_pin_checkbox, completionFillInIntent);
+            }
             return views;
         }
 

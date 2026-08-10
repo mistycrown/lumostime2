@@ -213,6 +213,7 @@ describe('buildTodoPinWidgetPayload', () => {
     expect(payload.items).toHaveLength(1);
     expect(payload.items[0]).toMatchObject({
       todoId: 'recurring-todo',
+      isRecurring: true,
       badgeLabel: 'TODAY',
       categoryId: 'focus-category',
       activityId: 'writing-activity',

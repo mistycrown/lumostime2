@@ -341,6 +341,7 @@ data class WidgetTodoPinItem(
     val todoId: String,
     val title: String,
     val isCompleted: Boolean = false,
+    val isRecurring: Boolean = false,
     val badgeLabel: String,
     val categoryId: String? = null,
     val activityId: String? = null,

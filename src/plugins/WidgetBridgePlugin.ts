@@ -5,6 +5,7 @@
  * @pos Plugin
  * @description Exposes the Android widget template, instance binding state, and runtime bridge to the React application.
  * @updated 2026-05-21: Expanded TODAY + PIN mirrored todo contracts with `maybeDates` plus recurrence `skipDates` so native rebuilds can match the app's current-day schedule visibility.
+ * @updated 2026-08-10: Added recurring state to TODAY + PIN item contracts for non-completable native rows.
  * @updated 2026-05-13: Expanded mirrored todo recurrence contracts with optional month-end fallback metadata for monthly schedules.
  * @updated 2026-04-25: Added dedicated DAILY_RUNTIME category/activity dual-view payload sync types for native heatmap widgets.
  * @updated 2026-04-26: Added TODAY + PIN widget payload sync types for the dedicated scrollable 4x2 todo widget.
@@ -200,6 +201,7 @@ export interface WidgetBridgeTodoPinItem {
   todoId: string;
   title: string;
   isCompleted: boolean;
+  isRecurring: boolean;
   badgeLabel: 'TODAY' | 'PIN';
   categoryId: string | null;
   activityId: string | null;
