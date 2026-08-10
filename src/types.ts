@@ -950,6 +950,7 @@ export interface CheckTemplateItem {
   content: string;
   icon?: string; // Preset icon (emoji or Lucide name)
   uiIcon?: string; // UI icon ID, formatted as ui:iconType
+  color?: string; // Stored daily-check color (Tailwind token or HEX)
   enabled?: boolean; // Whether this template item should be used; missing values default to true.
   type?: 'manual' | 'auto'; // Manual or automatic check; defaults to manual
   manualMode?: 'binary' | 'count'; // Binary toggle or count mode for manual checks

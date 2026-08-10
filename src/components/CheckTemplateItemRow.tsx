@@ -9,6 +9,7 @@
  * @updated 2026-07-21: Added semantic dark-mode surfaces for daily-check item inputs and auto-rule controls.
  * @updated 2026-05-03: Rewrote the row in UTF-8 and added supporter-gated UI icon selection support.
  * @updated 2026-04-15: Added nightLatestStart summary rendering for auto rules.
+ * @updated 2026-08-09: Added per-item color selection beside the daily-check type control.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -17,6 +18,9 @@ import { CheckTemplateItem } from '../types';
 import { AutoCheckItemEditor } from './AutoCheckItemEditor';
 import { UIIconSelectorCompact } from './UIIconSelector';
 import { IconRenderer } from './IconRenderer';
+import { COLOR_OPTIONS } from '../constants';
+import { useCustomColors } from '../hooks/useCustomColors';
+import { getColorPreviewValue, isStoredColorSelected } from '../utils/colorUtils';
 
 interface CheckTemplateItemRowProps {
   item: CheckTemplateItem;
@@ -41,6 +45,8 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
 }) => {
   const [showAutoEditor, setShowAutoEditor] = useState(false);
   const [showIconSelector, setShowIconSelector] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const customColors = useCustomColors();
 
   const getCurrentMode = (): 'manual-binary' | 'manual-count' | 'auto' => {
     if (item.type === 'auto') return 'auto';
@@ -115,6 +121,11 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
 
   const handleToggleEnabled = () => {
     onUpdate(index, { ...item, enabled: !isItemEnabled });
+  };
+
+  const handleColorSelect = (color: string) => {
+    onUpdate(index, { ...item, color });
+    setShowColorPicker(false);
   };
 
   const [targetCountText, setTargetCountText] = useState<string>(
@@ -261,6 +272,26 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
             {!sortingMode && (
               <button
                 type="button"
+                onClick={() => setShowColorPicker((previous) => !previous)}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all ${
+                  showColorPicker
+                    ? 'bg-[var(--accent-color)]/10'
+                    : 'border border-stone-200 bg-white hover:border-stone-300'
+                }`}
+                style={showColorPicker ? { border: '0.5px solid var(--accent-color)' } : undefined}
+                title="选择颜色"
+                aria-label="选择日课颜色"
+              >
+                <span
+                  className="h-4 w-4 rounded-full border border-stone-300"
+                  style={{ backgroundColor: getColorPreviewValue(item.color || 'bg-stone-100 text-stone-600', 'activity') }}
+                />
+              </button>
+            )}
+
+            {!sortingMode && (
+              <button
+                type="button"
                 onClick={handleCycleMode}
                 className={`daily-check-mode-button ${isAuto ? 'daily-check-mode-button-auto' : ''} flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
                   isAuto
@@ -323,6 +354,45 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
             )}
           </div>
         </div>
+
+        {!sortingMode && showColorPicker && (
+          <div className="ml-6 rounded-xl border border-stone-100 bg-stone-50/50 p-3">
+            <div className="flex flex-wrap gap-2">
+              {COLOR_OPTIONS.map((option) => {
+                const value = `${option.bg} ${option.text}`;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => handleColorSelect(value)}
+                    title={option.label}
+                    aria-label={option.label}
+                    className={`h-8 w-8 rounded-full ${option.bg} transition-all hover:scale-110 ${
+                      isStoredColorSelected(item.color, value)
+                        ? `ring-2 ${option.ring} ring-offset-2`
+                        : ''
+                    }`}
+                  />
+                );
+              })}
+              {customColors.map((customColor) => (
+                <button
+                  key={customColor.id}
+                  type="button"
+                  onClick={() => handleColorSelect(customColor.color)}
+                  title={customColor.color}
+                  aria-label={customColor.color}
+                  className={`h-8 w-8 rounded-full border border-stone-300 transition-all hover:scale-110 ${
+                    isStoredColorSelected(item.color, customColor.color)
+                      ? 'ring-2 ring-stone-400 ring-offset-2'
+                      : ''
+                  }`}
+                  style={{ backgroundColor: customColor.color }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {canUseUiIcon && showIconSelector && !sortingMode && (
           <div className="ml-6 rounded-xl border border-stone-100 bg-stone-50/60 p-3">

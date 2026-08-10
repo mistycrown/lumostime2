@@ -3,6 +3,8 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- Update 2026-08-09: `dailyCheckStatsUtils.ts` now derives daily-check aggregates from all dated review snapshots that contain the selected check; `dailyCheckUtils.ts` adds the detail-page count-cycle action used only by temporary backfill mode.
+- Update 2026-08-09: `reviewOverviewUtils.ts` now carries choice/rating display metadata and sorts review overview groups plus questions by their latest answers.
 - Update 2026-08-06: `archiveUtils.ts` centralizes active/archive predicates for labels and domains so indexes and selectors apply the same visibility rules while legacy activities without `isArchived` remain active.
 - Update 2026-07-31: `todoRecurringPlanUtils.ts` now exposes the shared manual timeline Plan log builder and virtual Plan ids used by both drag-created and AI-created Plan blocks.
 - Update 2026-07-30: `autoCheckUtils.ts` now exposes a shared id-keyed change detector for auto-check completion refreshes, so views can ignore harmless array reordering before persisting review data.
@@ -77,3 +79,4 @@ Contains pure utility functions for data processing and business logic calculati
 
 > Once the folder I belong to changes, please update me.
 Update 2026-07-30: `timelineSidebarRatioUtils.ts` centralizes Chronicle todo-sidebar ratio bounds, defaults, and migration from the former pixel-width preference.
+Update 2026-08-09: `detailTimelineGrouping.ts` centralizes detail timeline date grouping so month views exclude cross-month and planned-only headings while all-record views retain existing timeline records.

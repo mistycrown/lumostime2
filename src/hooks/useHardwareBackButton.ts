@@ -16,6 +16,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-05-04: Added a shared overlay back-handler stack so transient sheets can consume Android hardware back before app-level navigation or exit runs.
  * @updated 2026-04-30: Routed Android hardware back presses through the shared AI chat back handler so AI subpages unwind before app-level exit logic runs.
+ * @updated 2026-08-09: Prioritizes review overlays above Settings so Review Overview date jumps unwind in the visible order.
  */
 import { useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -35,10 +36,10 @@ export const useHardwareBackButton = () => {
         focusDetailSessionId, setFocusDetailSessionId,
         isAddModalOpen, setIsAddModalOpen,
         isTodoModalOpen, closeTodoDetail,
-        isDailyReviewOpen, isDailyNewspaperOpen, isWeeklyNewspaperOpen, isMonthlyNewspaperOpen, setIsDailyReviewOpen, setCurrentReviewDate, setIsDailyNewspaperOpen, setCurrentDailyNewspaperDate, setIsWeeklyNewspaperOpen, setCurrentWeeklyNewspaperStart, setCurrentWeeklyNewspaperEnd, setIsMonthlyNewspaperOpen, setCurrentMonthlyNewspaperStart, setCurrentMonthlyNewspaperEnd,
+        isDailyReviewOpen, isDailyNewspaperOpen, isWeeklyNewspaperOpen, isMonthlyNewspaperOpen, setIsDailyReviewOpen, setCurrentReviewDate, setCurrentDailyReviewInitialTab, setIsDailyNewspaperOpen, setCurrentDailyNewspaperDate, setIsWeeklyNewspaperOpen, setCurrentWeeklyNewspaperStart, setCurrentWeeklyNewspaperEnd, setIsMonthlyNewspaperOpen, setCurrentMonthlyNewspaperStart, setCurrentMonthlyNewspaperEnd,
         isOnThisDayOpen, setIsOnThisDayOpen, setCurrentOnThisDayDate,
-        isWeeklyReviewOpen, setIsWeeklyReviewOpen,
-        isMonthlyReviewOpen, setIsMonthlyReviewOpen,
+        isWeeklyReviewOpen, setIsWeeklyReviewOpen, setCurrentWeeklyReviewInitialTab,
+        isMonthlyReviewOpen, setIsMonthlyReviewOpen, setCurrentMonthlyReviewInitialTab,
         isAchievementOpen, setIsAchievementOpen,
         isStatsFullScreen, setIsStatsFullScreen,
         isTodoManaging, setIsTodoManaging,
@@ -125,6 +126,55 @@ export const useHardwareBackButton = () => {
                 closeTodoDetail();
                 return;
             }
+
+            // Review overlays may be launched above Settings, so they must unwind before the settings stack.
+            if (isDailyNewspaperOpen) {
+                setIsDailyNewspaperOpen(false);
+                setCurrentDailyNewspaperDate(null);
+                return;
+            }
+            if (isWeeklyNewspaperOpen) {
+                setIsWeeklyNewspaperOpen(false);
+                setCurrentWeeklyNewspaperStart(null);
+                setCurrentWeeklyNewspaperEnd(null);
+                return;
+            }
+            if (isMonthlyNewspaperOpen) {
+                setIsMonthlyNewspaperOpen(false);
+                setCurrentMonthlyNewspaperStart(null);
+                setCurrentMonthlyNewspaperEnd(null);
+                return;
+            }
+            if (isDailyReviewOpen) {
+                setIsDailyReviewOpen(false);
+                setCurrentReviewDate(null);
+                setCurrentDailyReviewInitialTab(null);
+                return;
+            }
+            if (isOnThisDayOpen) {
+                setIsOnThisDayOpen(false);
+                setCurrentOnThisDayDate(null);
+                return;
+            }
+            if (isWeeklyReviewOpen) {
+                setIsWeeklyReviewOpen(false);
+                setCurrentWeeklyReviewStart(null);
+                setCurrentWeeklyReviewEnd(null);
+                setCurrentWeeklyReviewInitialTab(null);
+                return;
+            }
+            if (isMonthlyReviewOpen) {
+                setIsMonthlyReviewOpen(false);
+                setCurrentMonthlyReviewStart(null);
+                setCurrentMonthlyReviewEnd(null);
+                setCurrentMonthlyReviewInitialTab(null);
+                return;
+            }
+            if (isAchievementOpen) {
+                setIsAchievementOpen(false);
+                return;
+            }
+
             if (isSettingsOpen) {
                 if (settingsSubmenu !== 'main') {
                     if (settingsSubmenuBackCloses) {
@@ -161,51 +211,6 @@ export const useHardwareBackButton = () => {
             }
             if (isShareViewOpen) {
                 setIsShareViewOpen(false);
-                return;
-            }
-
-            // 1.5. Daily/Weekly/Monthly Review
-            if (isDailyNewspaperOpen) {
-                setIsDailyNewspaperOpen(false);
-                setCurrentDailyNewspaperDate(null);
-                return;
-            }
-            if (isWeeklyNewspaperOpen) {
-                setIsWeeklyNewspaperOpen(false);
-                setCurrentWeeklyNewspaperStart(null);
-                setCurrentWeeklyNewspaperEnd(null);
-                return;
-            }
-            if (isMonthlyNewspaperOpen) {
-                setIsMonthlyNewspaperOpen(false);
-                setCurrentMonthlyNewspaperStart(null);
-                setCurrentMonthlyNewspaperEnd(null);
-                return;
-            }
-            if (isDailyReviewOpen) {
-                setIsDailyReviewOpen(false);
-                setCurrentReviewDate(null);
-                return;
-            }
-            if (isOnThisDayOpen) {
-                setIsOnThisDayOpen(false);
-                setCurrentOnThisDayDate(null);
-                return;
-            }
-            if (isWeeklyReviewOpen) {
-                setIsWeeklyReviewOpen(false);
-                setCurrentWeeklyReviewStart(null);
-                setCurrentWeeklyReviewEnd(null);
-                return;
-            }
-            if (isMonthlyReviewOpen) {
-                setIsMonthlyReviewOpen(false);
-                setCurrentMonthlyReviewStart(null);
-                setCurrentMonthlyReviewEnd(null);
-                return;
-            }
-            if (isAchievementOpen) {
-                setIsAchievementOpen(false);
                 return;
             }
 

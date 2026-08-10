@@ -14,6 +14,7 @@
  * @updated 2026-05-05: Added optional scene widget third-party app launch metadata so scene widget cards can mirror in-app launch behavior.
  * @updated 2026-05-05: Added optional scene-widget runtime source metadata so scene card flips can stay scoped to one scene slot.
  * @updated 2026-08-09: Added principle-card widget payload sync types for the dedicated Android 4x2 card widget.
+ * @updated 2026-08-09: Added weekly daily-check progress and per-item color fields for the Android 4x4 widget.
  */
 import { registerPlugin } from '@capacitor/core';
 import { ShortcutWidgetAction } from '../services/widgetShortcutService';
@@ -131,6 +132,7 @@ export interface WidgetBridgeDailyCheckMeta {
   category: string;
   manualMode: DailyWidgetManualMode;
   targetCount: number;
+  color?: string | null;
   icon?: string | null;
   uiIcon?: string | null;
 }
@@ -147,6 +149,8 @@ export interface WidgetBridgeDailyProgress {
 
 export interface WidgetBridgeDailySyncPayload {
   date: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
   items: WidgetBridgeDailyCheckMeta[];
   progress: WidgetBridgeDailyProgress[];
   syncedAt: number;

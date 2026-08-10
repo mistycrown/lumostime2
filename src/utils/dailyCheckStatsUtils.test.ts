@@ -7,6 +7,7 @@ import {
   getDailyCheckDisplayType,
   getDailyCheckHistory,
   getDailyCheckItemForDate,
+  getDailyCheckRecordedHistory,
   getDailyCheckTypeLabel
 } from './dailyCheckStatsUtils';
 
@@ -68,11 +69,11 @@ describe('dailyCheckStatsUtils', () => {
 
   it('calculates completion rate and the trailing streak', () => {
     const history = [
-      { date: new Date('2026-08-03T12:00:00'), dateLabel: '8/3', value: 1, isCompleted: true, hasReview: true },
-      { date: new Date('2026-08-04T12:00:00'), dateLabel: '8/4', value: 0, isCompleted: false, hasReview: true },
-      { date: new Date('2026-08-05T12:00:00'), dateLabel: '8/5', value: 1, isCompleted: true, hasReview: true },
-      { date: new Date('2026-08-06T12:00:00'), dateLabel: '8/6', value: 1, isCompleted: true, hasReview: true },
-      { date: new Date('2026-08-07T12:00:00'), dateLabel: '8/7', value: 1, isCompleted: true, hasReview: true }
+      { date: new Date('2026-08-03T12:00:00'), dateLabel: '8/3', value: 1, isCompleted: true, hasReview: true, hasRecord: true },
+      { date: new Date('2026-08-04T12:00:00'), dateLabel: '8/4', value: 0, isCompleted: false, hasReview: true, hasRecord: true },
+      { date: new Date('2026-08-05T12:00:00'), dateLabel: '8/5', value: 1, isCompleted: true, hasReview: true, hasRecord: true },
+      { date: new Date('2026-08-06T12:00:00'), dateLabel: '8/6', value: 1, isCompleted: true, hasReview: true, hasRecord: true },
+      { date: new Date('2026-08-07T12:00:00'), dateLabel: '8/7', value: 1, isCompleted: true, hasReview: true, hasRecord: true }
     ];
 
     expect(getCompletionRate(history)).toBe(80);
@@ -114,6 +115,53 @@ describe('dailyCheckStatsUtils', () => {
       checkTemplates,
       logs: [],
       filterContext
-    })[0]).toMatchObject({ value: null, isCompleted: false, hasReview: false });
+    })[0]).toMatchObject({ value: null, isCompleted: false, hasReview: false, hasRecord: false });
+  });
+
+  it('counts only daily reviews containing the requested check as effective history', () => {
+    const checkTemplates = [{
+      id: 'template',
+      title: '日常',
+      items: [{ id: 'binary', content: '阅读', enabled: true, type: 'manual' as const }],
+      enabled: true,
+      order: 0,
+      isDaily: true
+    }];
+    const filterContext = { categories: [], scopes: [], todos: [], todoCategories: [] };
+    const dailyReviews = [
+      {
+        id: 'with-item', date: '2026-08-07', createdAt: 1, updatedAt: 1, answers: [],
+        checkItems: [{ id: 'binary', content: '阅读', isCompleted: true, type: 'manual' as const }]
+      },
+      {
+        id: 'without-item', date: '2026-08-08', createdAt: 1, updatedAt: 1, answers: [], checkItems: []
+      },
+      {
+        id: 'unfinished', date: '2026-08-09', createdAt: 1, updatedAt: 1, answers: [],
+        checkItems: [{ id: 'binary', content: '阅读', isCompleted: false, type: 'manual' as const }]
+      }
+    ];
+
+    const history = getDailyCheckRecordedHistory({
+      itemId: 'binary',
+      anchorDate: new Date('2026-08-09T12:00:00'),
+      dailyReviews,
+      checkTemplates,
+      logs: [],
+      filterContext
+    });
+
+    expect(history).toHaveLength(2);
+    expect(getCompletionRate(history)).toBe(50);
+    expect(getCurrentStreak(history, new Date('2026-08-09T12:00:00'))).toBe(0);
+  });
+
+  it('breaks the current streak across dates without an effective record', () => {
+    const history = [
+      { date: new Date('2026-08-07T12:00:00'), dateLabel: '8/7', value: 1, isCompleted: true, hasReview: true, hasRecord: true },
+      { date: new Date('2026-08-09T12:00:00'), dateLabel: '8/9', value: 1, isCompleted: true, hasReview: true, hasRecord: true }
+    ];
+
+    expect(getCurrentStreak(history, new Date('2026-08-09T12:00:00'))).toBe(1);
   });
 });

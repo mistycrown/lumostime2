@@ -1,140 +1,149 @@
-
 /**
  * @file HeatmapCalendar.tsx
- * @input year, month, data map, optional display mode and unknown-day metadata
- * @output Minimalist Month Heatmap
+ * @input Month, daily-check records, display mode, and optional temporary backfill controls
+ * @output Month heatmap with record-aware daily-check cells
  * @pos Component (Visualization)
- * @description A simple, grid-based heatmap for visualizing daily activity intensity within a specific month. Supports duration, count, and completion-oriented daily-check cells.
- * @updated 2026-08-09: Added count, binary, unknown-day, and caller accent modes for daily-check heatmaps.
- * 
+ * @description Renders a Monday-first month grid whose empty dates remain visible without a background, while recorded checks expose completion, measured values, and temporary manual backfill actions.
+ * @updated 2026-08-09: Matched detail timeline month navigation, restored empty date numerals, and added record-aware captions plus backfill mode.
+ *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
+export interface HeatmapCalendarDayData {
+  value: number | null;
+  hasRecord: boolean;
+  isCompleted: boolean;
+}
+
 interface HeatmapCalendarProps {
   year: number;
-  month: number; // 0-11
-  data: Map<number, number>; // day -> seconds
+  month: number;
+  data: Map<number, HeatmapCalendarDayData>;
   onMonthChange: (offset: number) => void;
-  mode?: 'duration' | 'count' | 'binary';
-  target?: number;
-  unknownDays?: Set<number>;
   accentColor?: string;
-  getDayTitle?: (day: number, value: number | null) => string;
+  getDayCaption?: (day: number, data: HeatmapCalendarDayData) => string | null;
+  getDayTitle?: (day: number, data: HeatmapCalendarDayData) => string;
+  isBackfillMode?: boolean;
+  onBackfillModeChange?: (enabled: boolean) => void;
+  onDayClick?: (day: number) => void;
 }
+
+const WEEK_DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
 export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({
   year,
   month,
   data,
   onMonthChange,
-  mode = 'duration',
-  target = 0,
-  unknownDays,
   accentColor,
-  getDayTitle
+  getDayCaption,
+  getDayTitle,
+  isBackfillMode = false,
+  onBackfillModeChange,
+  onDayClick
 }) => {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 = Sun
+  const firstDayOffset = (new Date(year, month, 1).getDay() + 6) % 7;
+  const days: Array<number | null> = Array.from({ length: firstDayOffset }, () => null);
 
-  const days = [];
-  // Pad empty start days
-  for (let i = 0; i < firstDayOfWeek; i++) {
-    days.push(null);
-  }
-  // Fill actual days
-  for (let i = 1; i <= daysInMonth; i++) {
-    days.push(i);
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    days.push(day);
   }
 
-  // Helper to determine color intensity using theme colors
-  const getColor = (value: number) => {
-    if (mode === 'binary') {
-      return value > 0
-        ? { bg: '', textColor: 'text-white', useTheme: true, opacity: 1 }
-        : { bg: 'bg-stone-100', textColor: 'text-stone-400', useTheme: false };
+  const getColor = (dayData: HeatmapCalendarDayData) => {
+    if (!dayData.hasRecord) {
+      return { className: 'bg-transparent text-stone-400', style: undefined };
     }
 
-    if (mode === 'duration' && target === 0) {
-      const hours = value / 3600;
-      if (hours === 0) return { bg: 'bg-stone-100', textColor: 'text-stone-300', useTheme: false };
-      if (hours < 0.5) return { bg: '', textColor: 'text-stone-700', useTheme: true, opacity: 0.15 };
-      if (hours < 1) return { bg: '', textColor: 'text-stone-700', useTheme: true, opacity: 0.3 };
-      if (hours < 2) return { bg: '', textColor: 'text-stone-700', useTheme: true, opacity: 0.5 };
-      if (hours < 4) return { bg: '', textColor: 'text-white', useTheme: true, opacity: 0.7 };
-      return { bg: '', textColor: 'text-white', useTheme: true, opacity: 1 };
+    if (!dayData.isCompleted) {
+      return { className: 'bg-stone-100 text-stone-500', style: undefined };
     }
 
-    const normalizedValue = mode === 'duration' ? value / 3600 : value;
-    const normalizedTarget = mode === 'duration' ? target / 60 : target;
-    const ratio = normalizedTarget > 0
-      ? Math.min(1, normalizedValue / normalizedTarget)
-      : normalizedValue > 0 ? 1 : 0;
-
-    if (ratio === 0) return { bg: 'bg-stone-100', textColor: 'text-stone-400', useTheme: false };
-    if (ratio < 0.25) return { bg: '', textColor: 'text-stone-700', useTheme: true, opacity: 0.15 };
-    if (ratio < 0.5) return { bg: '', textColor: 'text-stone-700', useTheme: true, opacity: 0.3 };
-    if (ratio < 0.75) return { bg: '', textColor: 'text-stone-700', useTheme: true, opacity: 0.5 };
-    if (ratio < 1) return { bg: '', textColor: 'text-white', useTheme: true, opacity: 0.7 };
-    return { bg: '', textColor: 'text-white', useTheme: true, opacity: 1 };
+    return {
+      className: 'text-white',
+      style: { backgroundColor: accentColor || 'var(--progress-bar-fill)' }
+    };
   };
-
-  const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between mb-6 px-1">
-        <span className="text-xl font-bold text-stone-900 font-mono tracking-tight">
-          {year} <span className="text-stone-500 font-serif ml-1">{month + 1}月</span>
-        </span>
-        <div className="flex gap-1 text-stone-400">
+      <div className="mb-4 flex min-h-8 flex-wrap items-center justify-center gap-2 px-1 sm:relative">
+        <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => onMonthChange(-1)}
-            className="p-1 hover:bg-stone-100 hover:text-stone-900 rounded-full transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-stone-600 transition-colors hover:bg-stone-100/70"
+            title="上个月"
+            aria-label="上个月"
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={18} />
           </button>
+          <span className="min-w-[92px] text-center font-mono text-lg font-bold tabular-nums text-stone-800">
+            {year}.{String(month + 1).padStart(2, '0')}
+          </span>
           <button
+            type="button"
             onClick={() => onMonthChange(1)}
-            className="p-1 hover:bg-stone-100 hover:text-stone-900 rounded-full transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-stone-600 transition-colors hover:bg-stone-100/70"
+            title="下个月"
+            aria-label="下个月"
           >
-            <ChevronRight size={20} />
+            <ChevronRight size={18} />
           </button>
         </div>
+
+        {onBackfillModeChange && (
+          <label className="flex items-center gap-1.5 text-xs text-stone-500 sm:absolute sm:right-0">
+            <input
+              type="checkbox"
+              checked={isBackfillMode}
+              onChange={(event) => onBackfillModeChange(event.target.checked)}
+              className="h-3.5 w-3.5 accent-stone-700"
+            />
+            补打卡模式
+          </label>
+        )}
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-7 gap-2 md:gap-3">
-        {/* Headers */}
-        {weekDays.map(d => (
-          <div key={d} className="text-center text-[10px] text-stone-400 mb-2 font-medium">
-            {d}
+      <div className="grid grid-cols-7 gap-2 px-2">
+        {WEEK_DAYS.map((day) => (
+          <div key={day} className="mb-0.5 text-center text-[10px] font-medium text-stone-400">
+            {day}
           </div>
         ))}
 
-        {days.map((day, idx) => {
-          if (day === null) return <div key={`pad-${idx}`} />;
-          const value = data.get(day) ?? 0;
-          const isUnknown = unknownDays?.has(day) || false;
-          const colorInfo = getColor(value);
+        {days.map((day, index) => {
+          if (day === null) {
+            return <div key={`pad-${index}`} aria-hidden="true" />;
+          }
+
+          const dayData = data.get(day) || { value: null, hasRecord: false, isCompleted: false };
+          const color = getColor(dayData);
+          const caption = getDayCaption?.(day, dayData);
+          const isClickable = Boolean(onDayClick && isBackfillMode);
 
           return (
-            <div
+            <button
               key={day}
-              className={`
-                    aspect-square rounded-lg flex flex-col items-center justify-center relative group cursor-pointer transition-colors duration-300
-                    ${colorInfo.useTheme ? '' : colorInfo.bg}
-                 `}
-              style={colorInfo.useTheme ? {
-                backgroundColor: `color-mix(in srgb, ${accentColor || 'var(--progress-bar-fill)'} ${colorInfo.opacity * 100}%, transparent)`
-              } : undefined}
-              title={getDayTitle?.(day, isUnknown ? null : value)}
+              type="button"
+              onClick={() => onDayClick?.(day)}
+              disabled={!isClickable}
+              className={`aspect-square rounded-lg ${isClickable ? 'cursor-pointer active:scale-95' : 'cursor-default'} flex flex-col items-center justify-center transition-all ${color.className}`}
+              style={color.style}
+              title={getDayTitle?.(day, dayData)}
+              aria-label={getDayTitle?.(day, dayData)}
             >
-              <span className={`text-[10px] font-medium ${colorInfo.textColor}`}>
-                {isUnknown ? '?' : day}
+              <span className={`font-medium leading-none ${caption ? 'text-[13px]' : 'text-sm'}`}>
+                {day}
               </span>
-            </div>
+              {caption && (
+                <span className="mt-1 max-w-full truncate px-0.5 text-[8px] font-semibold leading-none">
+                  {caption}
+                </span>
+              )}
+            </button>
           );
         })}
       </div>

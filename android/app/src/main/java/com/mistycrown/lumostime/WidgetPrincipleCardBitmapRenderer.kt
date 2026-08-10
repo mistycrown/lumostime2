@@ -10,6 +10,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.os.Build
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
@@ -21,20 +22,22 @@ import kotlin.math.max
 /**
  * Renders the dedicated 4x2 principle-card widget as a single bitmap.
  * @updated 2026-08-09: Supports packaged PNG/WebP card backgrounds with a left-anchored principle text block and face-aware content.
- * @updated 2026-08-09: Clips the rendered bitmap to rounded corners, removes the left mask, and uses sans-serif dynamic text sizing.
+ * @updated 2026-08-09: Clips the rendered bitmap to larger rounded corners, removes the left mask, and keeps the body text serif, justified, and smaller.
+ * @updated 2026-08-09: Slightly overscans card backgrounds after cover-scaling so source-image rounded corners cannot expose white edges.
+ * @updated 2026-08-09: Uses a shared dark-gray text color instead of pure black for a softer card treatment.
  */
 object WidgetPrincipleCardBitmapRenderer {
     private const val BACKGROUND_ASSET_DIR = "public/card"
     private const val FALLBACK_WIDGET_WIDTH_DP = 360f
     private const val FALLBACK_WIDGET_HEIGHT_DP = 180f
-    private const val CARD_CORNER_RADIUS_DP = 18f
-    private const val MIN_BODY_TEXT_SP = 11.5f
-    private const val MAX_BODY_TEXT_SP = 18.5f
+    private const val CARD_CORNER_RADIUS_DP = 24f
+    private const val MIN_BODY_TEXT_SP = 10f
+    private const val MAX_BODY_TEXT_SP = 16f
     private const val TITLE_TEXT_SP = 9.5f
     private const val BODY_LINE_SPACING_MULTIPLIER = 1.18f
     private const val BODY_LINE_SPACING_EXTRA_DP = 2.2f
-    private const val TEXT_SHADOW_RADIUS_DP = 1.8f
-    private const val TEXT_SHADOW_OFFSET_Y_DP = 0.8f
+    private const val BACKGROUND_OVERSCAN_SCALE = 1.03f
+    private const val PRINCIPLE_TEXT_COLOR = "#2F2F2F"
     private val SUPPORTED_EXTENSIONS = setOf("png", "webp")
     private val backgroundBitmapCache = object : LruCache<String, Bitmap>(12) {}
 
@@ -136,7 +139,7 @@ object WidgetPrincipleCardBitmapRenderer {
             val scale = max(
                 widgetWidthPx.toFloat() / backgroundBitmap.width.toFloat(),
                 widgetHeightPx.toFloat() / backgroundBitmap.height.toFloat()
-            )
+            ) * BACKGROUND_OVERSCAN_SCALE
             val scaledWidth = backgroundBitmap.width * scale
             val scaledHeight = backgroundBitmap.height * scale
             val left = (widgetWidthPx - scaledWidth) / 2f
@@ -173,26 +176,14 @@ object WidgetPrincipleCardBitmapRenderer {
             else -> "原则卡"
         }
         val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#2B2622")
+            color = Color.parseColor(PRINCIPLE_TEXT_COLOR)
             textSize = TITLE_TEXT_SP * scaledDensity
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            setShadowLayer(
-                TEXT_SHADOW_RADIUS_DP * density,
-                0f,
-                TEXT_SHADOW_OFFSET_Y_DP * density,
-                Color.argb(90, 0, 0, 0)
-            )
         }
         val bodyPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#161311")
+            color = Color.parseColor(PRINCIPLE_TEXT_COLOR)
             textSize = resolveInitialBodyTextSizeSp(resolveBodyText(principle, isBackSideVisible)) * scaledDensity
-            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-            setShadowLayer(
-                TEXT_SHADOW_RADIUS_DP * density,
-                0f,
-                TEXT_SHADOW_OFFSET_Y_DP * density,
-                Color.argb(72, 0, 0, 0)
-            )
+            typeface = Typeface.create("serif", Typeface.NORMAL)
         }
 
         val titleLayout = buildTextLayout(
@@ -242,12 +233,12 @@ object WidgetPrincipleCardBitmapRenderer {
     private fun resolveInitialBodyTextSizeSp(text: String): Float {
         val normalizedLength = text.replace(Regex("\\s+"), "").length
         return when {
-            normalizedLength <= 18 -> 18.5f
-            normalizedLength <= 36 -> 17.4f
-            normalizedLength <= 54 -> 16.4f
-            normalizedLength <= 78 -> 15.4f
-            normalizedLength <= 108 -> 14.4f
-            normalizedLength <= 144 -> 13.4f
+            normalizedLength <= 18 -> 16f
+            normalizedLength <= 36 -> 15f
+            normalizedLength <= 54 -> 14f
+            normalizedLength <= 78 -> 13f
+            normalizedLength <= 108 -> 12f
+            normalizedLength <= 144 -> 11f
             else -> MIN_BODY_TEXT_SP
         }
     }
@@ -269,7 +260,8 @@ object WidgetPrincipleCardBitmapRenderer {
             paint = paint,
             widthPx = widthPx,
             maxLines = null,
-            lineSpacingExtraPx = lineSpacingExtraPx
+            lineSpacingExtraPx = lineSpacingExtraPx,
+            justify = true
         )
 
         while (layout.height > maxHeightPx && paint.textSize > minTextSize) {
@@ -279,7 +271,8 @@ object WidgetPrincipleCardBitmapRenderer {
                 paint = paint,
                 widthPx = widthPx,
                 maxLines = null,
-                lineSpacingExtraPx = lineSpacingExtraPx
+                lineSpacingExtraPx = lineSpacingExtraPx,
+                justify = true
             )
         }
 
@@ -291,7 +284,8 @@ object WidgetPrincipleCardBitmapRenderer {
                 paint = paint,
                 widthPx = widthPx,
                 maxLines = maxLines,
-                lineSpacingExtraPx = lineSpacingExtraPx
+                lineSpacingExtraPx = lineSpacingExtraPx,
+                justify = true
             )
         }
 
@@ -303,13 +297,18 @@ object WidgetPrincipleCardBitmapRenderer {
         paint: TextPaint,
         widthPx: Int,
         maxLines: Int?,
-        lineSpacingExtraPx: Float = 0f
+        lineSpacingExtraPx: Float = 0f,
+        justify: Boolean = false
     ): StaticLayout {
         val builder = StaticLayout.Builder
             .obtain(text, 0, text.length, paint, widthPx)
             .setAlignment(Layout.Alignment.ALIGN_NORMAL)
             .setIncludePad(false)
             .setLineSpacing(lineSpacingExtraPx, BODY_LINE_SPACING_MULTIPLIER)
+
+        if (justify && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            builder.setJustificationMode(Layout.JUSTIFICATION_MODE_INTER_WORD)
+        }
 
         if (maxLines != null) {
             builder

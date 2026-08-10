@@ -8,11 +8,13 @@
  * @updated 2026-07-30: Skipped disabled daily check template items across generation, bindings, and manual actions.
  * @updated 2026-05-05: Hardened template item traversal so legacy or partially synced daily check templates without `items` no longer crash NFC and widget entry points.
  * @updated 2026-05-04: Added a dedicated tracking-calendar daily binding helper so 2x2 tracking widgets can target both manual and automatic daily checks.
+ * @updated 2026-08-09: Includes per-item colors in daily-check template metadata for native weekly-widget rendering.
+ * @updated 2026-08-09: Added a detail-page-only count cycle action for temporary backfill mode.
  */
 import { CheckItem, CheckTemplate, CheckTemplateItem, DailyReview, ReviewTemplate, ReviewTemplateSnapshot } from '../types';
 import { normalizeCheckItem } from './checkItemNormalizer';
 
-export type DailyCheckActionMode = 'toggle' | 'increment' | 'reset' | 'complete_once';
+export type DailyCheckActionMode = 'toggle' | 'increment' | 'reset' | 'complete_once' | 'cycle';
 
 export type DailyCheckActionStatus =
   | 'completed'
@@ -32,6 +34,7 @@ export interface DailyCheckTemplateMeta {
   type: 'manual' | 'auto';
   manualMode: 'binary' | 'count';
   targetCount: number;
+  color?: string;
   icon?: string;
   uiIcon?: string;
 }
@@ -77,6 +80,7 @@ const buildDailyCheckTemplateMeta = (
     type,
     manualMode,
     targetCount,
+    color: item.color,
     icon: item.icon,
     uiIcon: item.uiIcon
   };
@@ -431,6 +435,9 @@ export const applyDailyCheckActionForDate = ({
     if (actionMode === 'reset') {
       nextCurrent = 0;
       status = 'reset';
+    } else if (actionMode === 'cycle') {
+      nextCurrent = current >= target ? 0 : current + 1;
+      status = nextCurrent >= target ? 'completed' : 'toggled';
     } else if (actionMode === 'toggle') {
       nextCurrent = isCompleted ? Math.max(0, current - 1) : Math.min(target, current + 1);
       status = nextCurrent >= target ? 'completed' : 'toggled';

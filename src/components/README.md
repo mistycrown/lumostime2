@@ -3,6 +3,8 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-08-09: `HeatmapCalendar.tsx` now follows the detail timeline's compact `YYYY.MM` month navigator, leaves dates without a Daily Review snapshot transparent while retaining their numerals, renders recorded check values below dates, and exposes a temporary manual-check backfill control.
+- Update 2026-08-09: `AppRoutes.tsx` now lets reviews opened from Settings > 回顾总览 render above the settings overlay with a compact `详情` back layer, so software back returns to answer detail first.
 - Update 2026-08-06: `TimelineScheduleCanvas.tsx` now expands note text inside sufficiently tall time blocks while keeping shorter blocks to one truncated line.
 - Update 2026-08-02: `AssociationOptionGrid.tsx`, `TagAssociation.tsx`, `ScopeAssociation.tsx`, `TodoAssociation.tsx`, and `TodoDetailModal.tsx` now share an adaptive option grid that keeps todo category, associated-todo filter, tag category, and scope chips readable by switching narrow panels to three columns without changing the original chip text size.
 - Update 2026-08-02: `TimelineTodoSidebar.tsx` now shows recurring todos with a read-only repeat marker instead of a completable checkbox in the Chronicle split sidebar.
@@ -340,3 +342,5 @@ Components for theme and appearance customization.
 - `TodoAssociation.tsx`: Added a first-position virtual `今天` category so shared todo pickers can surface pinned tasks plus todos arranged for today without switching into each source category.
 - `TodoAssociation.tsx`: Updated progress display logic in associated parent modals/views (`AddLogModal`, `FocusDetailView`) to reflect active progress increments in real time with a distinct color.
 - `NavigationDecorationSelector.tsx`: Added support for uploading and managing custom navigation decorations using Capacitor Filesystem.
+- `DetailTimelineCard.tsx`: Month-view date headings now come only from countable logs in the selected month; planned-only dates are hidden while same-day planned records remain attached to real activity dates.
+- `DetailTimelineCard.test.ts`: Added regression coverage for cross-month, planned-only, same-day planned, and all-record timeline grouping.

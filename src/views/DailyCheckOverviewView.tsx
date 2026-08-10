@@ -8,6 +8,7 @@
  * @updated 2026-08-09: Added the first daily-check overview page.
  * @updated 2026-08-09: Moved continuous records to the row's right side and removed semantic icon replacement.
  * @updated 2026-08-09: Shows five history cells only for manual checks and keeps missing reviews unknown.
+ * @updated 2026-08-09: Unified the header height and applied per-item template colors.
  */
 import React, { useMemo } from 'react';
 import { ArrowLeft, Check, ChevronRight } from 'lucide-react';
@@ -33,6 +34,8 @@ import {
 } from '../utils/dailyCheckStatsUtils';
 import { formatTimeValue } from '../utils/autoCheckUtils';
 import { getLocalDateStr } from '../utils/dateUtils';
+import { getDailyCheckColorValues } from '../utils/dailyCheckColorUtils';
+import { getCheckTemplateItemKey } from '../utils/dailyCheckUtils';
 
 interface DailyCheckOverviewViewProps {
   checkTemplates: CheckTemplate[];
@@ -85,6 +88,16 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
       .filter((group) => group.items.length > 0)
   ), [checkTemplates]);
 
+  const templateItemColors = useMemo(() => {
+    const colors = new Map<string, string | undefined>();
+    checkTemplates.forEach((template) => {
+      template.items.forEach((item, index) => {
+        colors.set(getCheckTemplateItemKey(template, item, index), item.color);
+      });
+    });
+    return colors;
+  }, [checkTemplates]);
+
   const hasCurrentReview = dailyReviews.some((review) => review.date === getLocalDateStr(currentDate));
 
   const formatCount = (value: number): string => (
@@ -112,7 +125,7 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#faf9f6] text-stone-900">
-      <header className="flex shrink-0 items-center justify-between border-b border-stone-200/80 px-4 py-4 sm:px-6">
+      <header className="grid h-14 shrink-0 grid-cols-[1.5rem_1fr_1.5rem] items-center border-b border-stone-200/80 px-4 sm:px-6">
         <button
           type="button"
           onClick={onBack}
@@ -125,9 +138,7 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
         <div className="text-center">
           <div className="text-lg font-semibold tracking-wide">日课总览</div>
         </div>
-        <div className="w-9 text-right text-xs tabular-nums text-stone-400">
-          {currentDate.getMonth() + 1}/{currentDate.getDate()}
-        </div>
+        <span aria-hidden="true" />
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-12 pt-5 sm:px-6">
@@ -180,6 +191,7 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
                         });
                         const value = history[history.length - 1]?.value ?? null;
                         const isManual = item.type !== 'auto';
+                        const customColor = getDailyCheckColorValues(templateItemColors.get(item.id));
                         const displayValue = isManual && type === 'count'
                           ? null
                           : formatOverviewValue(type, value);
@@ -195,7 +207,10 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
                               className="flex min-w-0 flex-1 items-center gap-3 text-left"
                               aria-label={`查看${item.content}详情`}
                             >
-                              <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${tone.surface} ${tone.icon}`}>
+                              <div
+                                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${customColor ? '' : `${tone.surface} ${tone.icon}`}`}
+                                style={customColor ? { backgroundColor: customColor.surface, color: customColor.primary } : undefined}
+                              >
                                 <DailyCheckIcon
                                   content={item.content}
                                   icon={item.icon}
@@ -234,15 +249,18 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
                                           !point.hasReview
                                             ? 'border-stone-300 bg-transparent text-stone-400'
                                             : point.isCompleted
-                                              ? `${tone.surface} ${tone.text} border-transparent`
+                                              ? `${customColor ? '' : `${tone.surface} ${tone.text}`} border-transparent`
                                               : isCount
                                                 ? hasValue
-                                                  ? `${tone.surface} ${tone.text} border-transparent opacity-60`
+                                                  ? `${customColor ? '' : `${tone.surface} ${tone.text}`} border-transparent opacity-60`
                                                   : 'border-stone-300 bg-transparent text-stone-500'
                                               : hasValue
-                                                ? `${tone.surface} ${tone.text} border-transparent opacity-60`
+                                                ? `${customColor ? '' : `${tone.surface} ${tone.text}`} border-transparent opacity-60`
                                                 : 'border-stone-300 bg-transparent text-transparent'
                                         }`}
+                                        style={customColor && point.hasReview && (point.isCompleted || hasValue)
+                                          ? { backgroundColor: customColor.surface, color: customColor.primary }
+                                          : undefined}
                                         title={`${point.dateLabel}${!point.hasReview ? ' ?' : point.isCompleted ? ' 已完成' : isCount ? ` ${point.value ?? 0} 次` : hasValue ? ' 有记录' : ' 未完成'}`}
                                       >
                                         {circleContent}
