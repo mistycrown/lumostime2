@@ -18,6 +18,7 @@ import kotlin.math.min
  * Updated 2026-08-10: Replaced circles with the shared reference square-cell style.
  * Updated 2026-08-10: Limited row height so sparse daily checks remain compact.
  * Updated 2026-08-10: Tightened row spacing to better match the reference table density.
+ * Updated 2026-08-10: Matched the compact widget's content inset, row height, and state-cell scale.
  */
 object WidgetDailyCheckWeekBitmapRenderer {
     private const val FALLBACK_WIDTH_DP = 250f
@@ -76,7 +77,7 @@ object WidgetDailyCheckWeekBitmapRenderer {
         }
 
         val left = 16f * density
-        val visualGrid = WidgetDailyCheckWeekVisuals.grid(width, density)
+        val visualGrid = WidgetDailyCheckWeekVisuals.grid(width, density, 16f)
         val weekDates = resolveWeekDates(payload)
         val weekdayBaseline = 48f * density
         listOf("一", "二", "三", "四", "五", "六", "日").forEachIndexed { index, label ->
@@ -103,7 +104,7 @@ object WidgetDailyCheckWeekBitmapRenderer {
         val progressByKey = payload?.progress.orEmpty().associateBy { "${it.checkItemId}|${it.date}" }
         val contentTop = 59f * density
         val contentBottom = height - 10f * density
-        val rowHeight = min(24f * density, (contentBottom - contentTop) / items.size)
+        val rowHeight = min(31f * density, (contentBottom - contentTop) / items.size)
             .coerceAtLeast(19f * density)
         val iconCenterX = left + 7.5f * density
         val labelX = left + 22f * density

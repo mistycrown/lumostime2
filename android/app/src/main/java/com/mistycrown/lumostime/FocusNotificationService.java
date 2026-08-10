@@ -5,18 +5,20 @@
  * @pos Native Service
  * @description Keeps the shared LumosTime runtime notification alive when active focus timers exist without the floating window or assistant agent foreground services, and refreshes timer durations once per second.
  * @updated 2026-05-09: Added a dedicated focus-only foreground service so active timers can keep the shared persistent notification visible and ticking even when no other native foreground service is active.
+ * @updated 2026-08-10: Starts from the foreground app with a regular service call and ignores background-start rejection to avoid Android 16 foreground-service timeout process kills.
  */
 package com.mistycrown.lumostime;
 
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.util.Log;
 
 public class FocusNotificationService extends Service {
+    private static final String TAG = "FocusNotificationService";
     private static final long REFRESH_INTERVAL_MS = 1000L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -40,10 +42,15 @@ public class FocusNotificationService extends Service {
 
         Intent intent = new Intent(context, FocusNotificationService.class);
         if (UnifiedServiceNotificationManager.shouldRunDedicatedFocusService(context)) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent);
-            } else {
+            try {
+                // syncActiveSessions is normally invoked while the WebView is visible. Starting
+                // as a regular service lets onCreate call startForeground synchronously without
+                // Android's startForegroundService timeout killing the application process.
                 context.startService(intent);
+            } catch (RuntimeException error) {
+                // A later background reconciliation may be rejected by Android; the notification
+                // update remains best-effort and must not crash the host activity.
+                Log.w(TAG, "Focus notification service start skipped", error);
             }
             return;
         }
@@ -54,7 +61,14 @@ public class FocusNotificationService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        UnifiedServiceNotificationManager.startForeground(this);
+        try {
+            UnifiedServiceNotificationManager.startForeground(this);
+        } catch (RuntimeException error) {
+            // A notification/FGS policy failure must not terminate the host WebView process.
+            Log.e(TAG, "Unable to promote focus notification service", error);
+            stopSelf();
+            return;
+        }
         scheduleRefresh();
     }
 

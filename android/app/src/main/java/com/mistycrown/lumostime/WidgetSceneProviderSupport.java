@@ -82,7 +82,7 @@ public final class WidgetSceneProviderSupport {
                         context,
                         new WidgetSceneSelectionState(appWidgetId, slotId, state.currentAutoSlotId)
                 );
-                refreshSingleWidgetAfterTabSelection(context, appWidgetId);
+                refreshSingleWidget(context, appWidgetId, providerClass);
             }
             return true;
         }
@@ -98,10 +98,6 @@ public final class WidgetSceneProviderSupport {
                     && !TextUtils.isEmpty(slotId)
                     && !TextUtils.isEmpty(itemId)) {
                 ResolvedSceneState state = resolveState(context, appWidgetId);
-                if (!Objects.equals(slotId, state.selectedSlotId)) {
-                    refreshSingleWidgetAfterTabSelection(context, appWidgetId);
-                    return true;
-                }
                 WidgetSceneItem item = findSceneItem(state.displayedGroup, slotId, itemId);
                 int itemIndex = findSceneItemIndex(state.displayedGroup, slotId, itemId);
                 if (item != null
@@ -187,7 +183,7 @@ public final class WidgetSceneProviderSupport {
 
             Intent tabsIntent = new Intent(context, WidgetSceneTabsRemoteViewsService.class);
             tabsIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
-            tabsIntent.setData(Uri.parse(tabsIntent.toUri(Intent.URI_INTENT_SCHEME)));
+            tabsIntent.setData(Uri.parse("lumostime://scene-tabs/" + appWidgetId));
             views.setRemoteAdapter(R.id.widget_scene_tabs, tabsIntent);
             views.setPendingIntentTemplate(
                     R.id.widget_scene_tabs,
@@ -205,9 +201,8 @@ public final class WidgetSceneProviderSupport {
                     buildCardTemplatePendingIntent(context, appWidgetId, providerClass)
             );
             appWidgetManager.notifyAppWidgetViewDataChanged(new int[] { appWidgetId }, R.id.widget_scene_cards);
-            appWidgetManager.notifyAppWidgetViewDataChanged(new int[] { appWidgetId }, R.id.widget_scene_tabs);
-
             appWidgetManager.updateAppWidget(appWidgetId, views);
+            appWidgetManager.notifyAppWidgetViewDataChanged(new int[] { appWidgetId }, R.id.widget_scene_tabs);
         }
     }
 
@@ -276,31 +271,6 @@ public final class WidgetSceneProviderSupport {
     ) {
         AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
         updateWidgets(context, appWidgetManager, new int[] { appWidgetId }, providerClass);
-    }
-
-    private static void refreshSingleWidgetAfterTabSelection(
-            Context context,
-            int appWidgetId
-    ) {
-        AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
-        ResolvedSceneState state = resolveState(context, appWidgetId);
-        RemoteViews partialViews = new RemoteViews(
-                context.getPackageName(),
-                R.layout.widget_layout_scene_4x3
-        );
-        partialViews.setTextViewText(
-                R.id.widget_scene_slot_label,
-                formatSlotLabel(state.selectedSlot)
-        );
-        appWidgetManager.partiallyUpdateAppWidget(appWidgetId, partialViews);
-        appWidgetManager.notifyAppWidgetViewDataChanged(
-                new int[] { appWidgetId },
-                R.id.widget_scene_cards
-        );
-        appWidgetManager.notifyAppWidgetViewDataChanged(
-                new int[] { appWidgetId },
-                R.id.widget_scene_tabs
-        );
     }
 
     private static void refreshAllWidgets(
@@ -500,7 +470,7 @@ public final class WidgetSceneProviderSupport {
         intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
         return PendingIntent.getBroadcast(
                 context,
-                appWidgetId * 1000 + 8700,
+                appWidgetId + 8700,
                 intent,
                 pendingIntentFlags()
         );
@@ -558,7 +528,7 @@ public final class WidgetSceneProviderSupport {
         intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
         return PendingIntent.getBroadcast(
                 context,
-                appWidgetId * 1000 + 8600,
+                appWidgetId + 8600,
                 intent,
                 pendingIntentTemplateFlags()
         );
