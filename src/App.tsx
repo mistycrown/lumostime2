@@ -5,6 +5,8 @@
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
  * @updated 2026-06-21: Centralized active-session stop persistence so floating-ball stops and app-awareness finishes always submit logs through the same path.
+ * @updated 2026-08-10: Excluded timeline Plan blocks from default backfill time inference.
+ * @updated 2026-08-10: Adds temporary focus-detail ownership diagnostics for Android immersive-mode investigation.
  * @updated 2026-07-30: Mounted recurring auto-Plan creation so Repeat todo plan blocks are replenished once per day and after planning config edits.
  * @updated 2026-07-06: Included self-belief library data in user backup/export payloads and reset clearing so AI-created self-beliefs participate in cloud sync.
  * @updated 2026-06-15: Added a sync conflict confirmation modal so timestamp-vs-size contradictions during cloud sync now pause before a smaller JSON can overwrite a larger one.
@@ -81,6 +83,7 @@ import { customColorGroupService } from './services/customColorGroupService';
 import { getDesktopWidgetType, loadEnabledDesktopWidgetTypes } from './services/desktopWidgetService';
 import { ShortcutWidgetAction } from './services/widgetShortcutService';
 import { splitLogByDays } from './utils/logUtils';
+import { getLatestActualLogEndTime } from './utils/statLogUtils';
 import { buildSceneGroupStateFromLegacySlots, getActiveSceneGroup, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from './utils/sceneGroupStorage';
 import { getLocalDataTimestamp, setLocalDataTimestampValue } from './utils/localDataTimestamp';
 import { validateAndFixData } from './utils/dataValidation';
@@ -490,9 +493,21 @@ const AppContent: React.FC = () => {
       return;
     }
 
+    console.error('[ImmersiveDebug] Clearing focus detail because its session is no longer active', {
+      focusDetailSessionId,
+      activeSessionIds: activeSessions.map((session) => session.id),
+    });
     setFocusDetailSessionId(null);
     setShouldAutoEnterImmersive(false);
   }, [activeSessions, focusDetailSessionId, setFocusDetailSessionId]);
+
+  React.useEffect(() => {
+    console.error('[ImmersiveDebug] Focus detail owner state changed', {
+      focusDetailSessionId,
+      activeSessionIds: activeSessions.map((session) => session.id),
+      shouldAutoEnterImmersive,
+    });
+  }, [activeSessions, focusDetailSessionId, shouldAutoEnterImmersive]);
   
   // Wrappers for Session Actions to match original signature (injecting autoLinkRules)
   const handleStartActivityWrapper = (
@@ -750,9 +765,7 @@ const AppContent: React.FC = () => {
 
   // Calculate lastLogEndTime for AddLogModal
   const lastLogEndTime = React.useMemo(() => {
-    if (!logs.length) return undefined;
-    const sortedLogs = [...logs].sort((a, b) => b.endTime - a.endTime);
-    return sortedLogs[0].endTime;
+    return getLatestActualLogEndTime(logs);
   }, [logs]);
   const showTodoDetailPage = currentView === AppView.TODO && isTodoModalOpen;
   const resetPrinciplesToDefaults = () => {
@@ -1001,11 +1014,15 @@ const AppContent: React.FC = () => {
               autoApplyTodoLink={autoApplyTodoLink}
               autoEnterImmersive={shouldAutoEnterImmersive}
               onClose={() => {
+                console.error('[ImmersiveDebug] FocusDetail onClose cleared its owner', {
+                  focusDetailSessionId,
+                });
                 setFocusDetailSessionId(null);
                 setShouldAutoEnterImmersive(false);
               }}
               onCancel={cancelSession}
               onComplete={(finalSession) => {
+                console.error('[ImmersiveDebug] FocusDetail completed session', { sessionId: finalSession.id });
                 handleStopActivityWrapper(finalSession.id, finalSession);
                 setFocusDetailSessionId(null);
                 setShouldAutoEnterImmersive(false);

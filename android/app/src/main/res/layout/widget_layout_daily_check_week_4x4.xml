@@ -11,19 +11,33 @@
         android:contentDescription="@null"
         android:scaleType="fitXY" />
 
-    <FrameLayout
-        android:id="@+id/widget_daily_check_week_refresh_root"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:layout_gravity="top|end"
-        android:layout_marginTop="21dp"
-        android:layout_marginEnd="6dp"
-        android:contentDescription="@string/widget_refresh">
+    <LinearLayout
+        android:id="@+id/widget_daily_check_week_header"
+        android:layout_width="wrap_content"
+        android:layout_height="28dp"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/widget_daily_check_week_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif"
+            android:text="08/10 - 08/16"
+            android:textColor="#78716C"
+            android:textSize="11sp" />
 
         <ImageView
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:padding="8dp"
-            android:src="@drawable/ic_widget_refresh" />
-    </FrameLayout>
+            android:id="@+id/widget_daily_check_week_refresh_root"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="3dp"
+            android:contentDescription="@string/widget_refresh"
+            android:padding="4dp"
+            android:src="@drawable/ic_widget_refresh"
+            android:tint="#A8A29E" />
+    </LinearLayout>
 </FrameLayout>

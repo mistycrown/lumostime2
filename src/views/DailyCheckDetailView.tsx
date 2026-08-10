@@ -9,6 +9,8 @@
  * @updated 2026-08-09: Removed nested cards and restored the monthly heatmap section.
  * @updated 2026-08-09: Added daily-review-only unknown states, manual editing, month switching, and trends.
  * @updated 2026-08-09: Uses all effective historical records for aggregate statistics and supports temporary manual backfill from the month grid.
+ * @updated 2026-08-10: Replaces missing daily-check value placeholders with a compact slash.
+ * @updated 2026-08-10: Reads nightEarliestStart current metrics from the completed previous night.
  */
 import React, { useMemo, useState } from 'react';
 import { ArrowLeft, Check, Target } from 'lucide-react';
@@ -31,6 +33,7 @@ import {
   getCompletionRate,
   getCurrentStreak,
   getDailyCheckDisplayType,
+  getDailyCheckOverviewAnchorDate,
   getDailyCheckItemForDate,
   getDailyCheckMonthHistory,
   getDailyCheckRecordedHistory,
@@ -57,7 +60,6 @@ import {
   Line,
   LineChart,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis
 } from 'recharts';
@@ -83,7 +85,7 @@ const formatCount = (value: number): string => (
 
 const formatMetricValue = (type: ReturnType<typeof getDailyCheckDisplayType>, value: number | null): string => {
   if (value === null) {
-    return '?';
+    return '/';
   }
 
   if (type === 'duration') {
@@ -147,24 +149,28 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
       : null
   ), [checkTemplates, itemId]);
 
+  const displayDate = useMemo(() => (
+    templateItem ? getDailyCheckOverviewAnchorDate(templateItem, currentDate) : currentDate
+  ), [currentDate, templateItem]);
+
   const currentItem = useMemo(() => (
     itemId
       ? getDailyCheckItemForDate({
         itemId,
-        date: currentDate,
+        date: displayDate,
         dailyReviews,
         checkTemplates,
         logs,
         filterContext
       })
       : null
-  ), [checkTemplates, currentDate, dailyReviews, filterContext, itemId, logs]);
+  ), [checkTemplates, dailyReviews, displayDate, filterContext, itemId, logs]);
 
   const history = useMemo(() => (
     itemId
       ? getDailyCheckHistory({
         itemId,
-        anchorDate: currentDate,
+        anchorDate: displayDate,
         days: 7,
         dailyReviews,
         checkTemplates,
@@ -172,7 +178,7 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
         filterContext
       })
       : []
-  ), [checkTemplates, currentDate, dailyReviews, filterContext, itemId, logs]);
+  ), [checkTemplates, dailyReviews, displayDate, filterContext, itemId, logs]);
 
   const monthHistory = useMemo(() => (
     itemId
@@ -191,7 +197,7 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
     itemId
       ? getDailyCheckHistory({
         itemId,
-        anchorDate: currentDate,
+        anchorDate: displayDate,
         days: 30,
         dailyReviews,
         checkTemplates,
@@ -199,20 +205,20 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
         filterContext
       })
       : []
-  ), [checkTemplates, currentDate, dailyReviews, filterContext, itemId, logs]);
+  ), [checkTemplates, dailyReviews, displayDate, filterContext, itemId, logs]);
 
   const recordedHistory = useMemo(() => (
     itemId
       ? getDailyCheckRecordedHistory({
         itemId,
-        anchorDate: currentDate,
+        anchorDate: displayDate,
         dailyReviews,
         checkTemplates,
         logs,
         filterContext
       })
       : []
-  ), [checkTemplates, currentDate, dailyReviews, filterContext, itemId, logs]);
+  ), [checkTemplates, dailyReviews, displayDate, filterContext, itemId, logs]);
 
   if (!templateItem || !itemId) {
     return (
@@ -244,10 +250,10 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
   const currentValue = history[history.length - 1]?.value ?? null;
   const target = getDailyCheckTarget(item);
   const completionRate = getCompletionRate(recordedHistory);
-  const currentStreak = getCurrentStreak(recordedHistory, currentDate);
+  const currentStreak = getCurrentStreak(recordedHistory, displayDate);
   const averageValue = getAverageValue(recordedHistory);
   const isManual = item.type !== 'auto';
-  const currentIsCompleted = currentItem ? isDailyCheckComplete(currentItem) : false;
+  const currentIsCompleted = history[history.length - 1]?.isCompleted ?? false;
   const progress = type === 'binary' || type === 'time'
     ? (currentIsCompleted ? 100 : 0)
     : target > 0 && currentValue !== null ? Math.min(100, (currentValue / target) * 100) : 0;
@@ -415,7 +421,7 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
             <div className="min-w-0">
               <div className="text-sm text-stone-500">今日记录</div>
               <div className="mt-3 truncate text-3xl font-semibold tracking-tight text-stone-900">
-                {currentValue === null ? '?' : formatMetricValue(type, currentValue)}
+                {currentValue === null ? '/' : formatMetricValue(type, currentValue)}
               </div>
               <div className="mt-2 flex items-center gap-2 text-sm text-stone-500">
                 <Target size={15} />
@@ -431,7 +437,7 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
                   title="切换今日完成状态"
                 >
                   {currentIsCompleted && <Check size={14} />}
-                  {currentItem ? (currentIsCompleted ? '已完成' : '待完成') : '?'}
+                  {currentItem ? (currentIsCompleted ? '已完成' : '待完成') : '/'}
                 </button>
               )}
               {isManual && type === 'count' && (
@@ -518,22 +524,20 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
               <h2 className="text-sm font-semibold text-stone-800">趋势</h2>
               <span className="text-xs text-stone-400">近 30 天 · {getDailyCheckTypeLabel(item)}</span>
             </div>
-            <div className="mt-5 h-52 w-full">
+            <div className="mt-5 h-52 w-full select-none pointer-events-none">
               <ResponsiveContainer width="100%" height="100%">
                 {type === 'binary' ? (
-                  <LineChart data={trendData} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
+                  <LineChart data={trendData} margin={{ top: 8, right: 8, left: -24, bottom: 0 }} accessibilityLayer={false}>
                     <CartesianGrid stroke="#e7e5e4" strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#a8a29e' }} interval={4} axisLine={false} tickLine={false} />
                     <YAxis domain={[0, 1]} ticks={[0, 1]} tickFormatter={(value) => value === 1 ? '完成' : '未完成'} tick={{ fontSize: 10, fill: '#a8a29e' }} axisLine={false} tickLine={false} />
-                    <Tooltip formatter={(value) => [value === 1 ? '已完成' : value === 0 ? '未完成' : '?', '状态']} />
                     <Line type="monotone" dataKey="value" connectNulls={false} stroke="#059669" strokeWidth={2} dot={{ r: 3, fill: '#059669' }} />
                   </LineChart>
                 ) : (
-                  <BarChart data={trendData} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
+                  <BarChart data={trendData} margin={{ top: 8, right: 8, left: -24, bottom: 0 }} accessibilityLayer={false}>
                     <CartesianGrid stroke="#e7e5e4" strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#a8a29e' }} interval={4} axisLine={false} tickLine={false} />
                     <YAxis tickFormatter={(value) => type === 'time' ? formatTimeValue(value) : String(value)} tick={{ fontSize: 10, fill: '#a8a29e' }} axisLine={false} tickLine={false} />
-                    <Tooltip formatter={(value) => [formatMetricValue(type, typeof value === 'number' ? value : null), '记录']} />
                     <Bar dataKey="value" fill={heatmapAccent} radius={[4, 4, 0, 0]} maxBarSize={14} />
                   </BarChart>
                 )}

@@ -3,6 +3,9 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- Update 2026-08-10: `autoCheckUtils.ts` now evaluates split overnight sleep from the first night segment through `nightEarliestStart`; `checkItemNormalizer.ts` migrates legacy `nightLatestStart` template and Daily Review snapshots during hydration.
+- Update 2026-08-10: `dailyCheckStatsUtils.ts` resolves a selected template item once per history range, avoiding repeated template traversal while the daily-check overview prepares its rows.
+- Update 2026-08-10: `statLogUtils.ts` now exposes actual-log filters and latest-end-time inference so backfill defaults and the previous-record shortcut ignore timeline Plan blocks.
 - Update 2026-08-09: `dailyCheckStatsUtils.ts` now derives daily-check aggregates from all dated review snapshots that contain the selected check; `dailyCheckUtils.ts` adds the detail-page count-cycle action used only by temporary backfill mode.
 - Update 2026-08-09: `reviewOverviewUtils.ts` now carries choice/rating display metadata and sorts review overview groups plus questions by their latest answers.
 - Update 2026-08-06: `archiveUtils.ts` centralizes active/archive predicates for labels and domains so indexes and selectors apply the same visibility rules while legacy activities without `isArchived` remain active.

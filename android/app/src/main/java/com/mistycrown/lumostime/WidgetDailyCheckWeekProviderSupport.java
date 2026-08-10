@@ -7,9 +7,13 @@ import android.content.Intent;
 import android.os.Build;
 import android.widget.RemoteViews;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
 /**
  * Renders and refreshes the read-only daily-check weekly widget.
- * Updated 2026-08-09: Added refresh-button handling for the 4x4 weekly widget.
+ * Updated 2026-08-10: Unified date, refresh, weekday header, and square-cell styling.
  */
 public final class WidgetDailyCheckWeekProviderSupport {
     public static final String ACTION_REFRESH =
@@ -57,12 +61,25 @@ public final class WidgetDailyCheckWeekProviderSupport {
                     R.id.widget_daily_check_week_bitmap,
                     WidgetDailyCheckWeekBitmapRenderer.INSTANCE.render(context, appWidgetId, payload)
             );
+            views.setTextViewText(
+                    R.id.widget_daily_check_week_date,
+                    formatWeekRange(payload)
+            );
             views.setOnClickPendingIntent(
                     R.id.widget_daily_check_week_refresh_root,
                     buildRefreshPendingIntent(context, appWidgetId)
             );
             manager.updateAppWidget(appWidgetId, views);
         }
+    }
+
+    private static String formatWeekRange(WidgetDailySyncPayload payload) {
+        String start = payload == null ? null : payload.getWeekStartDate();
+        String end = payload == null ? null : payload.getWeekEndDate();
+        if (start != null && end != null && start.length() >= 10 && end.length() >= 10) {
+            return start.substring(5).replace('-', '/') + " - " + end.substring(5).replace('-', '/');
+        }
+        return new SimpleDateFormat("MM/dd", Locale.getDefault()).format(new Date());
     }
 
     private static PendingIntent buildRefreshPendingIntent(Context context, int appWidgetId) {

@@ -8,7 +8,7 @@
  * @updated 2026-05-14: Keep index and input on one line, move action buttons to a right-aligned second row on small screens.
  * @updated 2026-07-21: Added semantic dark-mode surfaces for daily-check item inputs and auto-rule controls.
  * @updated 2026-05-03: Rewrote the row in UTF-8 and added supporter-gated UI icon selection support.
- * @updated 2026-04-15: Added nightLatestStart summary rendering for auto rules.
+ * @updated 2026-08-10: Renders the nightEarliestStart summary for split sleep records.
  * @updated 2026-08-09: Added per-item color selection beside the daily-check type control.
  */
 
@@ -153,7 +153,7 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
       if (comparisonType === 'duration') return '时长';
       if (comparisonType === 'earliestStart') return '最早开始';
       if (comparisonType === 'latestStart') return '最晚开始';
-      if (comparisonType === 'nightLatestStart') return '夜间最晚开始';
+      if (comparisonType === 'nightEarliestStart') return '夜间最早开始';
       if (comparisonType === 'earliestEnd') return '最早结束';
       if (comparisonType === 'latestEnd') return '最晚结束';
       if (comparisonType === 'count') return '次数';
@@ -163,10 +163,10 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
     const formattedTarget = (() => {
       if (comparisonType === 'duration') return `${targetValue}分钟`;
       if (comparisonType === 'count') return `${targetValue}次`;
-      const rawMinutes = comparisonType === 'nightLatestStart' && targetValue >= 24 * 60
+      const rawMinutes = comparisonType === 'nightEarliestStart' && targetValue >= 24 * 60
         ? targetValue - 24 * 60
         : targetValue;
-      const prefix = comparisonType === 'nightLatestStart' && targetValue >= 24 * 60 ? '次日 ' : '';
+      const prefix = comparisonType === 'nightEarliestStart' && targetValue >= 24 * 60 ? '次日 ' : '';
       const hour = Math.floor(rawMinutes / 60).toString().padStart(2, '0');
       const minute = (rawMinutes % 60).toString().padStart(2, '0');
       return `${prefix}${hour}:${minute}`;

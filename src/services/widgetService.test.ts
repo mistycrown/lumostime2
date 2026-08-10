@@ -670,6 +670,8 @@ describe('WidgetPrincipleCardProviderSupport', () => {
     expect(widgetPrincipleCardProviderSupportSource).toContain('distinctBy { it.id }');
     expect(widgetPrincipleCardLayoutSource).toContain('widget_principle_card_refresh_root');
     expect(widgetPrincipleCardLayoutSource).toContain('widget_principle_card_bitmap');
+    expect(widgetPrincipleCardLayoutSource).toContain('android:background="@android:color/transparent"');
+    expect(widgetPrincipleCardLayoutSource).not.toContain('android:background="@drawable/widget_background"');
     expect(quickLogWidgetPrincipleCard4x2Source).toContain('WidgetPrincipleCardProviderSupport.INSTANCE.handleCommonReceive');
     expect(quickLogWidgetPrincipleCard4x2Source).toContain('refreshAllAsync(context)');
     expect(quickLogWidgetPrincipleCard4x2Source).toContain('refreshAllAsync(context, true, true)');

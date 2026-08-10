@@ -5,7 +5,7 @@
  * @pos Component (Auto Check Editor)
  * @description 自动日课配置编辑器 - 用于配置自动判断规则
  * @updated 2026-07-21: Added semantic dark-mode styles for automatic daily-check configuration surfaces.
- * @updated 2026-04-15: Added nightLatestStart configuration support for sleep rules.
+ * @updated 2026-08-10: Uses nightEarliestStart configuration for split cross-midnight sleep records.
  */
 
 import React, { useState } from 'react';
@@ -38,10 +38,10 @@ export const AutoCheckItemEditor: React.FC<AutoCheckItemEditorProps> = ({
     if (item.autoConfig && item.autoConfig.targetValue > 0 && 
         (item.autoConfig.comparisonType === 'earliestStart' || 
          item.autoConfig.comparisonType === 'latestStart' || 
-         item.autoConfig.comparisonType === 'nightLatestStart' || 
+         item.autoConfig.comparisonType === 'nightEarliestStart' ||
          item.autoConfig.comparisonType === 'earliestEnd' || 
          item.autoConfig.comparisonType === 'latestEnd')) {
-      const displayValue = item.autoConfig.comparisonType === 'nightLatestStart' && item.autoConfig.targetValue >= 24 * 60
+      const displayValue = item.autoConfig.comparisonType === 'nightEarliestStart' && item.autoConfig.targetValue >= 24 * 60
         ? item.autoConfig.targetValue - 24 * 60
         : item.autoConfig.targetValue;
       const hours = Math.floor(displayValue / 60);
@@ -64,7 +64,7 @@ export const AutoCheckItemEditor: React.FC<AutoCheckItemEditorProps> = ({
     { value: 'duration', label: '总时长' },
     { value: 'earliestStart', label: '最早开始时间' },
     { value: 'latestStart', label: '最晚开始时间' },
-    { value: 'nightLatestStart', label: '夜间最晚开始时间' },
+    { value: 'nightEarliestStart', label: '夜间最早开始时间' },
     { value: 'earliestEnd', label: '最早结束时间' },
     { value: 'latestEnd', label: '最晚结束时间' },
     { value: 'count', label: '次数' }
@@ -101,12 +101,12 @@ export const AutoCheckItemEditor: React.FC<AutoCheckItemEditorProps> = ({
       return `${value}次`;
     } else {
       // 时刻类型
-      const displayValue = config.comparisonType === 'nightLatestStart' && value >= 24 * 60
+      const displayValue = config.comparisonType === 'nightEarliestStart' && value >= 24 * 60
         ? value - 24 * 60
         : value;
       const hours = Math.floor(displayValue / 60);
       const mins = displayValue % 60;
-      const prefix = config.comparisonType === 'nightLatestStart' && value >= 24 * 60 ? '次日 ' : '';
+      const prefix = config.comparisonType === 'nightEarliestStart' && value >= 24 * 60 ? '次日 ' : '';
       return `${prefix}${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
     }
   };
@@ -118,7 +118,7 @@ export const AutoCheckItemEditor: React.FC<AutoCheckItemEditorProps> = ({
     
     const hours = parseInt(cleaned.slice(0, 2), 10);
     const mins = parseInt(cleaned.slice(2, 4), 10);
-    if (config.comparisonType === 'nightLatestStart') {
+    if (config.comparisonType === 'nightEarliestStart') {
       if (mins < 0 || mins >= 60) return 0;
       if (hours >= 18 && hours < 24) {
         return hours * 60 + mins;
@@ -142,7 +142,7 @@ export const AutoCheckItemEditor: React.FC<AutoCheckItemEditorProps> = ({
       return '输入分钟数（如：240）';
     } else if (config.comparisonType === 'count') {
       return '输入次数（如：3）';
-    } else if (config.comparisonType === 'nightLatestStart') {
+    } else if (config.comparisonType === 'nightEarliestStart') {
       return '输入 2300 或 0030（夜间 18:00-次日03:59）';
     } else {
       return '输入4位数字（如：0800）';
@@ -268,10 +268,10 @@ export const AutoCheckItemEditor: React.FC<AutoCheckItemEditorProps> = ({
               {config.comparisonType === 'count' && '输入具体次数'}
               {(config.comparisonType === 'earliestStart' || 
                 config.comparisonType === 'latestStart' || 
-                config.comparisonType === 'nightLatestStart' || 
+                config.comparisonType === 'nightEarliestStart' ||
                 config.comparisonType === 'earliestEnd' || 
                 config.comparisonType === 'latestEnd') && '格式：0800 表示 8:00'}
-              {config.comparisonType === 'nightLatestStart' && '；支持 1800-2359 与 0000-0359，凌晨会按次日时刻比较'}
+              {config.comparisonType === 'nightEarliestStart' && '；支持 1800-2359 与 0000-0359，凌晨会按次日时刻比较'}
             </p>
           </div>
 
@@ -283,7 +283,7 @@ export const AutoCheckItemEditor: React.FC<AutoCheckItemEditorProps> = ({
               {config.comparisonType === 'duration' && '总时长'}
               {config.comparisonType === 'earliestStart' && '最早开始时间'}
               {config.comparisonType === 'latestStart' && '最晚开始时间'}
-              {config.comparisonType === 'nightLatestStart' && '夜间最晚开始时间'}
+              {config.comparisonType === 'nightEarliestStart' && '夜间最早开始时间'}
               {config.comparisonType === 'earliestEnd' && '最早结束时间'}
               {config.comparisonType === 'latestEnd' && '最晚结束时间'}
               {config.comparisonType === 'count' && '次数'}

@@ -5,16 +5,27 @@
  * @pos Test (widget service)
  * @description Verifies that the native weekly widget receives Monday-to-Sunday progress and item colors.
  * @created 2026-08-09
+ * @updated 2026-08-10: Added compact 4x3 scrollable widget wiring coverage.
+ * @updated 2026-08-10: Added shared reference-style visual wiring coverage.
+ * @updated 2026-08-10: Added dense-row and unscaled compact-content coverage.
+ * @updated 2026-08-10: Added reference-gap and RemoteViews cache-busting coverage.
  */
 import { describe, expect, it } from 'vitest';
 import type { CheckTemplate, DailyReview } from '../types';
 import { buildDailyWidgetSyncPayload } from './widgetService';
 import androidManifestSource from '../../android/app/src/main/AndroidManifest.xml?raw';
 import rendererSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetDailyCheckWeekBitmapRenderer.kt?raw';
+import compactRendererSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetDailyCheckWeek4x3RowBitmapRenderer.kt?raw';
+import sharedVisualsSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetDailyCheckWeekVisuals.kt?raw';
 import providerSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetDailyCheckWeekProviderSupport.java?raw';
+import compactProviderSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetDailyCheckWeek4x3ProviderSupport.java?raw';
+import compactServiceSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetDailyCheckWeek4x3RemoteViewsService.java?raw';
 import widgetInfoSource from '../../android/app/src/main/res/xml/widget_info_daily_check_week_4x4.xml?raw';
+import compactWidgetInfoSource from '../../android/app/src/main/res/xml/widget_info_daily_check_week_4x3.xml?raw';
 import widgetLayoutSource from '../../android/app/src/main/res/layout/widget_layout_daily_check_week_4x4.xml?raw';
+import compactWidgetLayoutSource from '../../android/app/src/main/res/layout/widget_layout_daily_check_week_4x3.xml?raw';
 import widgetPreviewSource from '../../android/app/src/main/res/drawable/widget_preview_daily_check_week_4x4.xml?raw';
+import compactWidgetPreviewSource from '../../android/app/src/main/res/drawable/widget_preview_daily_check_week_4x3.xml?raw';
 
 const checkTemplates: CheckTemplate[] = [{
   id: 'daily-template',
@@ -85,7 +96,30 @@ describe('daily-check weekly Android widget wiring', () => {
     expect(widgetLayoutSource).toContain('widget_daily_check_week_refresh_root');
     expect(rendererSource).toContain('resolveWeekDates');
     expect(rendererSource).toContain('weekStartDate');
+    expect(rendererSource).toContain('WidgetDailyCheckWeekVisuals.drawStateCell');
+    expect(rendererSource).toContain('min(24f * density');
+    expect(widgetLayoutSource).toContain('widget_daily_check_week_date');
     expect(widgetPreviewSource).toContain('android:width="250dp"');
     expect(widgetPreviewSource).toContain('@drawable/ic_widget_refresh');
+  });
+
+  it('wires a separate scrollable 4x3 variant without row actions or scrollbars', () => {
+    expect(androidManifestSource).toContain('android:name=".QuickLogWidgetDailyCheckWeek4x3"');
+    expect(androidManifestSource).toContain('android:name=".WidgetDailyCheckWeek4x3RemoteViewsService"');
+    expect(compactWidgetInfoSource).toContain('android:targetCellWidth="4"');
+    expect(compactWidgetInfoSource).toContain('android:targetCellHeight="3"');
+    expect(compactProviderSource).toContain('setRemoteAdapter');
+    expect(compactProviderSource).toContain('ACTION_REFRESH');
+    expect(compactProviderSource).toContain('REMOTE_VIEWS_VERSION = "v3"');
+    expect(compactServiceSource).toContain('WidgetDailyCheckWeek4x3RowBitmapRenderer');
+    expect(compactRendererSource).toContain('renderWeekdays');
+    expect(compactRendererSource).toContain('WidgetDailyCheckWeekVisuals.drawStateCell');
+    expect(compactRendererSource).toContain('CONTENT_HORIZONTAL_INSET_DP');
+    expect(sharedVisualsSource).toContain('pastelAccentColor');
+    expect(sharedVisualsSource).toContain('GRID_LEFT_RATIO = 0.43f');
+    expect(compactWidgetLayoutSource).toContain('android:scrollbars="none"');
+    expect(compactWidgetLayoutSource).toContain('widget_daily_check_week_4x3_weekdays');
+    expect(compactWidgetLayoutSource).toContain('widget_daily_check_week_4x3_refresh');
+    expect(compactWidgetPreviewSource).toContain('android:width="220dp"');
   });
 });

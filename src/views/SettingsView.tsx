@@ -13,6 +13,7 @@
  * @updated 2026-07-21: Delegated cloud backup cleanup confirmation to the data-management in-app modal.
  * @updated 2026-08-09: Added the daily-check overview entry under Content.
  * @updated 2026-08-09: Added the Review Overview settings subpage under Content.
+ * @updated 2026-08-10: Records Settings as the return target when opening daily-check overview.
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -239,7 +240,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         currentView,
         setCurrentView,
         setPreviousView,
-        setDailyCheckDetailId
+        setDailyCheckDetailId,
+        setDailyChecksReturnTarget
     } = useNavigation();
     const mainListScrollRef = useRef<HTMLDivElement>(null);
     const mainListScrollTopRef = useRef(0);
@@ -285,6 +287,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     };
 
     const handleOpenDailyChecks = () => {
+        setDailyChecksReturnTarget('settings');
         setPreviousView(currentView);
         setDailyCheckDetailId(null);
         onClose();

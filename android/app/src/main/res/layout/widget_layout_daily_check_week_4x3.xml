@@ -1,0 +1,74 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="vertical"
+    android:paddingStart="16dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="9dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="24dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/widget_daily_check_week_4x3_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif"
+            android:text="08/10 - 08/16"
+            android:textColor="#78716C"
+            android:textSize="11sp" />
+
+        <ImageView
+            android:id="@+id/widget_daily_check_week_4x3_refresh"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="3dp"
+            android:contentDescription="@string/widget_refresh"
+            android:padding="4dp"
+            android:src="@drawable/ic_widget_refresh"
+            android:tint="#A8A29E" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/widget_daily_check_week_4x3_weekdays"
+        android:layout_width="match_parent"
+        android:layout_height="18dp"
+        android:adjustViewBounds="false"
+        android:contentDescription="@null"
+        android:scaleType="fitXY" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="1dp"
+        android:layout_weight="1">
+
+        <ListView
+            android:id="@+id/widget_daily_check_week_4x3_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:cacheColorHint="@android:color/transparent"
+            android:clipToPadding="false"
+            android:divider="@android:color/transparent"
+            android:dividerHeight="0dp"
+            android:fadingEdge="none"
+            android:listSelector="@android:color/transparent"
+            android:overScrollMode="never"
+            android:scrollbars="none" />
+
+        <TextView
+            android:id="@+id/widget_daily_check_week_4x3_empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="@string/widget_daily_check_empty"
+            android:textColor="#A8A29E"
+            android:textSize="11sp"
+            android:visibility="gone" />
+    </FrameLayout>
+</LinearLayout>

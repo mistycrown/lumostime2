@@ -9,6 +9,8 @@
  * @updated 2026-08-09: Preserved automatic time metrics and nullable missing values for detail views.
  * @updated 2026-08-09: Made daily-review snapshots authoritative and exposed review existence on history points.
  * @updated 2026-08-09: Added all-history effective-record metrics and calendar-aware completion streaks.
+ * @updated 2026-08-10: Reuses resolved template items while building a history range to avoid repeated template scans.
+ * @updated 2026-08-10: Re-evaluates automatic completion from live logs and anchors night-earliest checks to the previous night.
  */
 import { CheckItem, CheckTemplate, DailyReview, Log } from '../types';
 import { getLocalDateStr } from './dateUtils';
@@ -19,7 +21,7 @@ import {
 } from './dailyCheckUtils';
 import { normalizeCheckItem } from './checkItemNormalizer';
 import { FilterContext } from './filterUtils';
-import { getAutoCheckMetricForDate } from './autoCheckUtils';
+import { evaluateAutoCheck, getAutoCheckMetricForDate } from './autoCheckUtils';
 
 export type DailyCheckDisplayType = 'binary' | 'count' | 'duration' | 'time';
 
@@ -61,7 +63,7 @@ export const formatDurationMinutes = (minutes: number): string => {
 const TIME_COMPARISON_TYPES = new Set([
   'earliestStart',
   'latestStart',
-  'nightLatestStart',
+  'nightEarliestStart',
   'earliestEnd',
   'latestEnd'
 ]);
@@ -102,6 +104,14 @@ export const getDailyCheckTypeLabel = (item: CheckItem): string => {
   }
 };
 
+export const isNightEarliestStartCheck = (item: CheckItem): boolean => (
+  item.type === 'auto' && item.autoConfig?.comparisonType === 'nightEarliestStart'
+);
+
+export const getDailyCheckOverviewAnchorDate = (item: CheckItem, currentDate: Date): Date => (
+  isNightEarliestStartCheck(item) ? addDays(currentDate, -1) : currentDate
+);
+
 const getTemplateItem = (checkTemplates: CheckTemplate[], itemId: string): CheckItem | null => {
   const item = buildDailyCheckItems(checkTemplates).find((entry) => entry.id === itemId);
   return item ? normalizeCheckItem(item) : null;
@@ -118,7 +128,8 @@ export const getDailyCheckItemForDate = ({
   dailyReviews,
   checkTemplates,
   logs,
-  filterContext
+  filterContext,
+  templateItem
 }: {
   itemId: string;
   date: Date;
@@ -126,9 +137,10 @@ export const getDailyCheckItemForDate = ({
   checkTemplates: CheckTemplate[];
   logs: Log[];
   filterContext: FilterContext;
+  templateItem?: CheckItem | null;
 }): CheckItem | null => {
-  const templateItem = getTemplateItem(checkTemplates, itemId);
-  if (!templateItem) {
+  const resolvedTemplateItem = templateItem || getTemplateItem(checkTemplates, itemId);
+  if (!resolvedTemplateItem) {
     return null;
   }
 
@@ -209,6 +221,7 @@ export const getDailyCheckHistory = ({
   filterContext: FilterContext;
 }): DailyCheckHistoryPoint[] => {
   const firstDate = addDays(anchorDate, -(days - 1));
+  const templateItem = getTemplateItem(checkTemplates, itemId);
 
   return Array.from({ length: days }, (_, index) => {
     const date = addDays(firstDate, index);
@@ -218,7 +231,8 @@ export const getDailyCheckHistory = ({
       dailyReviews,
       checkTemplates,
       logs,
-      filterContext
+      filterContext,
+      templateItem
     });
 
     const hasReview = Boolean(dailyReviews.find((entry) => entry.date === getLocalDateStr(date)));
@@ -229,7 +243,11 @@ export const getDailyCheckHistory = ({
       value: item
         ? getDailyCheckValue({ item, date, logs, filterContext })
         : null,
-      isCompleted: item ? isDailyCheckComplete(item) : false,
+      isCompleted: item
+        ? (item.type === 'auto'
+          ? evaluateAutoCheck(item, logs, filterContext, date)
+          : isDailyCheckComplete(item))
+        : false,
       hasReview,
       hasRecord: Boolean(item)
     };
@@ -253,6 +271,11 @@ export const getDailyCheckRecordedHistory = ({
 }): DailyCheckHistoryPoint[] => {
   const anchorDateStr = getLocalDateStr(anchorDate);
   const reviewsByDate = new Map<string, DailyReview>();
+  const templateItem = getTemplateItem(checkTemplates, itemId);
+
+  if (!templateItem) {
+    return [];
+  }
 
   dailyReviews.forEach((review) => {
     if (review.date <= anchorDateStr) {
@@ -270,7 +293,8 @@ export const getDailyCheckRecordedHistory = ({
         dailyReviews,
         checkTemplates,
         logs,
-        filterContext
+        filterContext,
+        templateItem
       });
 
       if (!item) {
@@ -281,7 +305,9 @@ export const getDailyCheckRecordedHistory = ({
         date,
         dateLabel: `${date.getMonth() + 1}/${date.getDate()}`,
         value: getDailyCheckValue({ item, date, logs, filterContext }),
-        isCompleted: isDailyCheckComplete(item),
+        isCompleted: item.type === 'auto'
+          ? evaluateAutoCheck(item, logs, filterContext, date)
+          : isDailyCheckComplete(item),
         hasReview: true,
         hasRecord: true
       }];
@@ -356,6 +382,7 @@ export const getDailyCheckMonthHistory = ({
   const monthEnd = new Date(anchorDate.getFullYear(), anchorDate.getMonth() + 1, 0);
   const mondayOffset = monthStart.getDay() === 0 ? 6 : monthStart.getDay() - 1;
   const totalCells = Math.ceil((mondayOffset + monthEnd.getDate()) / 7) * 7;
+  const templateItem = getTemplateItem(checkTemplates, itemId);
 
   return Array.from({ length: totalCells }, (_, index) => {
     const date = addDays(monthStart, index - mondayOffset);
@@ -365,7 +392,8 @@ export const getDailyCheckMonthHistory = ({
       dailyReviews,
       checkTemplates,
       logs,
-      filterContext
+      filterContext,
+      templateItem
     });
 
     const hasReview = Boolean(dailyReviews.find((entry) => entry.date === getLocalDateStr(date)));
@@ -374,7 +402,11 @@ export const getDailyCheckMonthHistory = ({
       date,
       dateLabel: `${date.getMonth() + 1}/${date.getDate()}`,
       value: item ? getDailyCheckValue({ item, date, logs, filterContext }) : null,
-      isCompleted: item ? isDailyCheckComplete(item) : false,
+      isCompleted: item
+        ? (item.type === 'auto'
+          ? evaluateAutoCheck(item, logs, filterContext, date)
+          : isDailyCheckComplete(item))
+        : false,
       hasReview,
       hasRecord: Boolean(item),
       inMonth: date.getMonth() === anchorDate.getMonth()

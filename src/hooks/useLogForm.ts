@@ -1,10 +1,12 @@
 /**
  * @file useLogForm.ts
  * @description Custom hook for managing log form state
+ * @updated 2026-08-10: Excluded timeline Plan blocks from backfill previous-record inference.
  */
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Log, Category, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment } from '../types';
+import { filterActualLogs } from '../utils/statLogUtils';
 
 interface UseLogFormProps {
   initialLog?: Log | null;
@@ -187,14 +189,15 @@ export const useLogForm = ({
 
   // 计算上一条记录的结束时间
   const previousLogEndTime = useMemo(() => {
-    if (!allLogs || allLogs.length === 0) return lastLogEndTime;
+    const actualLogs = filterActualLogs(allLogs);
+    if (actualLogs.length === 0) return lastLogEndTime;
     
     const referenceTime = formState.currentStartTime || formState.trackStartTime || Date.now();
     const referenceDate = new Date(referenceTime);
     referenceDate.setHours(0, 0, 0, 0);
     const dayStartTime = referenceDate.getTime();
     
-    const previousLogs = allLogs.filter(log => {
+    const previousLogs = actualLogs.filter(log => {
       if (initialLog && log.id === initialLog.id) return false;
       return log.endTime <= referenceTime;
     });

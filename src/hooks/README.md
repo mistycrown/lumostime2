@@ -1,5 +1,7 @@
 # Custom Hooks
 
+> `useLogManager.ts` now excludes timeline Plan blocks from smart backfill defaults and quick-punch start inference; `useLogForm.ts` applies the same rule to the previous-record shortcut.
+
 > `useHardwareBackButton.ts` now closes review overlays before unwinding Settings, keeping the 回顾总览 date-jump path aligned with the visible layer order on Android.
 
 > `usePointerDrag.ts` now centralizes the shared pointer capture, document listener, and drag ghost lifecycle used by the timeline todo and quick-color sidebars.

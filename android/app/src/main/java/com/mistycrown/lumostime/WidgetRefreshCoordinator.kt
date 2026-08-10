@@ -14,6 +14,7 @@ import android.os.Looper
  * Updated 2026-07-22: Registered the quick-todo 4x3 provider in global and targeted refresh routing.
  * Updated 2026-08-09: Added refresh routing for the dedicated principle-card 4x2 widget.
  * Updated 2026-08-09: Added refresh routing for the dedicated 4x4 daily-check weekly widget.
+ * Updated 2026-08-10: Added the scrollable compact 4x3 daily-check weekly widget to refresh routing.
  */
 object WidgetRefreshCoordinator {
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -78,6 +79,7 @@ object WidgetRefreshCoordinator {
 
     fun refreshDailyCheckWeekWidgets(context: Context) {
         QuickLogWidgetDailyCheckWeek4x4.refreshAllAsync(context)
+        QuickLogWidgetDailyCheckWeek4x3.refreshAllAsync(context)
     }
 
     fun refreshTodoPinWidgets(context: Context) {
@@ -139,6 +141,8 @@ object WidgetRefreshCoordinator {
                 QuickLogWidgetDailyRuntime4x4.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidgetDailyCheckWeek4x4::class.java).className ->
                 QuickLogWidgetDailyCheckWeek4x4.refreshWidget(context, appWidgetId)
+            ComponentName(context, QuickLogWidgetDailyCheckWeek4x3::class.java).className ->
+                QuickLogWidgetDailyCheckWeek4x3.refreshWidget(context, appWidgetId)
             else -> refreshAll(context)
         }
     }
