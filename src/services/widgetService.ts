@@ -20,6 +20,7 @@
  * @updated 2026-08-09: Planned timeline blocks are excluded from widget statistics and tracking payloads.
  * @updated 2026-08-09: Added principle-card widget payload building from the local principle library with default preset fallback.
  * @updated 2026-08-09: Uses deterministic fallback ids for principle cards without stored ids so native shuffle state stays stable.
+ * @updated 2026-08-10: Marks recurring TODAY + PIN items so native rows can disable completion controls.
  */
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, CheckTemplate, DailyReview, Log, TodoItem } from '../types';
@@ -1522,6 +1523,7 @@ export const buildTodoPinWidgetPayload = ({
         todoId: todo.id,
         title: formatTodoPinTitle(todo, todos),
         isCompleted: todo.isCompleted,
+        isRecurring: Boolean(todo.recurrenceRule),
         badgeLabel: todo.pin ? TODO_PIN_BADGE_PIN : TODO_PIN_BADGE_TODAY,
         categoryId: linkedTarget.categoryId,
         activityId: linkedTarget.activityId,

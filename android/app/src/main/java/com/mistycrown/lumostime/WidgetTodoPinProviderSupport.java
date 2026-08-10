@@ -26,6 +26,7 @@ import java.util.Set;
 /**
  * Shared rendering and tap handling for the dedicated TODAY + PIN widgets.
  * Updated 2026-07-22: Appends a subtask's parent title when rebuilding TODAY + PIN widget rows from mirrored sources.
+ * Updated 2026-08-10: Propagates recurrence state so recurring widget rows cannot be completed.
  * Updated 2026-05-21: Matched native TODAY + PIN rebuild visibility to the app's today schedule helper, including `maybeDates` and recurrence `skipDates` suppression.
  */
 public final class WidgetTodoPinProviderSupport {
@@ -331,6 +332,7 @@ public final class WidgetTodoPinProviderSupport {
                     todo.getId(),
                     formatTodoPinTitle(todo, todoById),
                     todo.isCompleted(),
+                    todo.getRecurrenceRule() != null,
                     todo.getPin() ? "PIN" : "TODAY",
                     linkedTarget.categoryId,
                     linkedTarget.activityId,
@@ -355,6 +357,7 @@ public final class WidgetTodoPinProviderSupport {
             }
         }
         if (target == null) return false;
+        if (target.getRecurrenceRule() != null) return false;
 
         boolean isCompleted = !target.isCompleted();
         List<WidgetTodoPinSourceTodo> updatedSourceTodos = new ArrayList<>();

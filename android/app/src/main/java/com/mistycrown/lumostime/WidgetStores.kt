@@ -9,6 +9,7 @@ import org.json.JSONObject
  * SharedPreferences-backed storage for widget templates, instance bindings, runtime state,
  * pending imports, and the daily widget's mirrored review snapshot.
  * Updated 2026-07-22: Persists queued TODAY + PIN checkbox changes until the app writes them back to todo storage.
+ * Updated 2026-08-10: Persists the recurring flag on TODAY + PIN items across native cache reloads.
  * Updated 2026-05-21: Expanded TODAY + PIN payload storage to persist mirrored todo `maybeDates` and recurrence `skipDates`, keeping native rebuild visibility aligned with the app's today schedule.
  * Updated 2026-05-02: Added scene widget payload storage plus per-instance selected-tab persistence.
  * Updated 2026-05-05: Added scene-widget morning refresh date tracking so the first morning unlock only refreshes once per day.
@@ -1664,6 +1665,7 @@ object WidgetStores {
                         todoId = todoId,
                         title = title,
                         isCompleted = item.optBoolean("isCompleted", false),
+                        isRecurring = item.optBoolean("isRecurring", false),
                         badgeLabel = parseNullableString(item.optString("badgeLabel")) ?: "TODAY",
                         categoryId = parseNullableString(item.optString("categoryId")),
                         activityId = parseNullableString(item.optString("activityId")),
@@ -1684,6 +1686,7 @@ object WidgetStores {
                 put("todoId", item.todoId)
                 put("title", item.title)
                 put("isCompleted", item.isCompleted)
+                put("isRecurring", item.isRecurring)
                 put("badgeLabel", item.badgeLabel)
                 put("categoryId", item.categoryId ?: JSONObject.NULL)
                 put("activityId", item.activityId ?: JSONObject.NULL)

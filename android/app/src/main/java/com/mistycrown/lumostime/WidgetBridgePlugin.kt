@@ -12,6 +12,7 @@ import org.json.JSONObject
 /**
  * Capacitor bridge for widget templates, instance binding state, runtime synchronization, and pending action import.
  * Updated 2026-07-22: Exposes queued TODAY + PIN checkbox changes so the app can persist widget-side todo completion updates.
+ * Updated 2026-08-10: Parses recurring item state for non-completable TODAY + PIN rows.
  * Updated 2026-05-21: Expanded TODAY + PIN sync parsing to accept mirrored todo `maybeDates` and recurrence `skipDates`, matching app-side today visibility during native rebuilds.
  * Updated 2026-05-02: Added dedicated scene widget payload sync support for the Android 4x3 scene widget.
  * Updated 2026-05-03: Routed widget sync calls to targeted widget-family refresh helpers instead of always refreshing every widget provider.
@@ -704,6 +705,7 @@ class WidgetBridgePlugin : Plugin() {
                     todoId = todoId,
                     title = title,
                     isCompleted = item.optBoolean("isCompleted", false),
+                    isRecurring = item.optBoolean("isRecurring", false),
                     badgeLabel = parseNullableString(item.optString("badgeLabel")) ?: "TODAY",
                     categoryId = parseNullableString(item.optString("categoryId")),
                     activityId = parseNullableString(item.optString("activityId")),
