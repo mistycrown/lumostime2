@@ -125,7 +125,6 @@ export const AchievementAttributeSettingsDialog: React.FC<AchievementAttributeSe
     <AchievementDialog
       isOpen={isOpen}
       title="人物属性"
-      subtitle="管理属性名称、图标、颜色和显示顺序。删除属性会保留历史经验，但停用关联规则。"
       onClose={onClose}
       footer={(
         <div className="flex items-center justify-between gap-3">

@@ -5,6 +5,7 @@
  * @pos Utility (Assistant Native Debug)
  * @description Reconstructs the same prompt/request/response debug structure used by foreground AI calls so native Android background diagnostics can be inspected with the shared debug viewer.
  *
+ * @updated 2026-08-10: Marks reconstructed native diagnostic exchanges as Android Native HTTP so the shared debug viewer reports the correct request channel.
  * @updated 2026-05-13: Added native diagnostic debug-exchange reconstruction so background Android runs can surface their actual assembled prompts and raw payloads in the shared Web debug UI.
  */
 
@@ -112,6 +113,7 @@ export const buildNativeDiagnosticDebugExchange = (
 
   return {
     provider,
+    transport: 'native-http',
     requestedAt,
     completedAt,
     request: {

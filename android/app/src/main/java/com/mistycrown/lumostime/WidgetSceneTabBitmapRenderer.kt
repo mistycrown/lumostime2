@@ -9,14 +9,21 @@ import android.text.TextPaint
 
 /**
  * Renders the compact icon-only scene tabs used by the dedicated 4x3 scene widget.
- * Updated 2026-08-10: Restored the 1.6.3 compact time-slot visual baseline.
+ * Updated 2026-08-10: Uses packaged UI icons before emoji fallback and keeps six rows visible.
  */
 object WidgetSceneTabBitmapRenderer {
-    private const val TAB_SIZE_DP = 34f
+    private const val TAB_SIZE_DP = 44f
     private const val TAB_RADIUS_DP = 12f
-    private const val TAB_TEXT_SIZE_DP = 18f
+    private const val TAB_TEXT_SIZE_DP = 22f
+    private const val TAB_UI_ICON_SIZE_DP = 26f
 
-    fun render(context: Context, icon: String, isSelected: Boolean): Bitmap {
+    fun render(
+        context: Context,
+        icon: String,
+        uiIconAssetPath: String?,
+        uiIconFallbackAssetPath: String?,
+        isSelected: Boolean
+    ): Bitmap {
         val sizePx = dpToPx(context, TAB_SIZE_DP)
         val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -36,6 +43,22 @@ object WidgetSceneTabBitmapRenderer {
                 radiusPx,
                 backgroundPaint
             )
+        }
+
+        val uiIcon = WidgetSlotBitmapRenderer.loadUiIconBitmap(
+            context,
+            uiIconAssetPath,
+            uiIconFallbackAssetPath,
+            dpToPx(context, TAB_UI_ICON_SIZE_DP)
+        )
+        if (uiIcon != null) {
+            canvas.drawBitmap(
+                uiIcon,
+                (sizePx - uiIcon.width) / 2f,
+                (sizePx - uiIcon.height) / 2f,
+                null
+            )
+            return bitmap
         }
 
         val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {

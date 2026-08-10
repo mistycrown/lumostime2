@@ -4,6 +4,8 @@ The `views/` directory contains all the React components that represent the dist
 
 - Update 2026-08-10: `DailyCheckOverviewView.tsx` caches each row's current value and manual history before rendering, renders one full-width detail button per row, and uses `/` for a missing daily-check snapshot.
 - Update 2026-08-10: `DailyCheckOverviewView.tsx` and `DailyCheckDetailView.tsx` show `nightEarliestStart` checks against the completed previous night during the daytime.
+- Update 2026-08-10: `DailyCheckDetailView.tsx` presents an immediate loading screen, renders the current-month data first, and defers all-history statistics plus the 30-day trend until after first paint.
+- Update 2026-08-10: `DailyCheckDetailView.tsx` uses the selected daily-check theme color consistently for its progress ring, heatmap, and trend.
 - Update 2026-08-10: `DailyCheckDetailView.tsx` now presents its 30-day trend as a static chart without hover tooltips, pointer interaction, or Recharts focus outlines.
 - Update 2026-07-30: `TimelineView.tsx` and `DailyReviewView.tsx` now use the shared auto-check change detector so reorder-only refreshes do not trigger redundant review writes.
 - Update 2026-07-31: `TimelineView.tsx` now receives the active Chronicle layout from the app shell, while the settings selector acts as the default layout for fresh Timeline entries.

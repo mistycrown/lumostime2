@@ -5,7 +5,7 @@
  * @pos Utility (Auto Check)
  * @description 自动日课判断逻辑 - 根据筛选条件和统计规则自动判断日课完成状态
  * @updated 2026-07-30: Added reorder-safe auto-check completion change detection for Daily Review refreshes.
- * @updated 2026-08-10: Uses nightEarliestStart for cross-midnight sleep checks so split records retain their bedtime.
+ * @updated 2026-08-10: Caches per-date matching-log statistics so daily-check calendars and aggregate views do not rescan every log per day.
  * @updated 2026-08-09: Exposed the evaluated metric for daily-check statistics.
  * @updated 2026-08-09: Planned timeline blocks are excluded from auto-check statistics.
  *
@@ -29,6 +29,33 @@ interface LogStats {
   count: number; // 匹配记录的次数
 }
 
+interface CachedLogStats {
+  dayStats: Map<string, LogStats>;
+  nightEarliestStarts: Map<string, number>;
+}
+
+const logStatsCache = new WeakMap<Log[], WeakMap<FilterContext, Map<string, CachedLogStats>>>();
+
+const createEmptyStats = (): LogStats => ({
+  totalDuration: 0,
+  earliestStart: null,
+  latestStart: null,
+  nightEarliestStart: null,
+  earliestEnd: null,
+  latestEnd: null,
+  count: 0
+});
+
+const getLocalDateKey = (date: Date): string => (
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+);
+
+const getPreviousLocalDateKey = (timestamp: number): string => {
+  const date = new Date(timestamp);
+  date.setDate(date.getDate() - 1);
+  return getLocalDateKey(date);
+};
+
 /**
  * 将时间戳转换为分钟数（从 0:00 开始）
  */
@@ -42,72 +69,51 @@ function timestampToNightMinutes(timestamp: number): number {
   return minutes < 4 * 60 ? minutes + 24 * 60 : minutes;
 }
 
-/**
- * 计算匹配筛选条件的记录统计
- */
-function calculateLogStats(
+const getCachedLogStats = (
   logs: Log[],
   filterExpression: string,
-  context: FilterContext,
-  targetDate: Date
-): LogStats {
-  const stats: LogStats = {
-    totalDuration: 0,
-    earliestStart: null,
-    latestStart: null,
-    nightEarliestStart: null,
-    earliestEnd: null,
-    latestEnd: null,
-    count: 0
-  };
+  context: FilterContext
+): CachedLogStats => {
+  let contextCache = logStatsCache.get(logs);
+  if (!contextCache) {
+    contextCache = new WeakMap<FilterContext, Map<string, CachedLogStats>>();
+    logStatsCache.set(logs, contextCache);
+  }
 
-  if (!filterExpression.trim()) {
-    return stats;
+  let expressionCache = contextCache.get(context);
+  if (!expressionCache) {
+    expressionCache = new Map<string, CachedLogStats>();
+    contextCache.set(context, expressionCache);
+  }
+
+  const existing = expressionCache.get(filterExpression);
+  if (existing) {
+    return existing;
   }
 
   const condition = parseFilterExpression(filterExpression);
-  
-  // 筛选当天的记录
-  const dayStart = new Date(targetDate);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(targetDate);
-  dayEnd.setHours(23, 59, 59, 999);
-  const nightWindowStart = new Date(targetDate);
-  nightWindowStart.setHours(18, 0, 0, 0);
-  const nightWindowEnd = new Date(targetDate);
-  nightWindowEnd.setDate(nightWindowEnd.getDate() + 1);
-  nightWindowEnd.setHours(4, 0, 0, 0);
+  const cached: CachedLogStats = {
+    dayStats: new Map<string, LogStats>(),
+    nightEarliestStarts: new Map<string, number>()
+  };
 
-  const countableLogs = filterCountableLogs(logs);
+  filterCountableLogs(logs).forEach((log) => {
+    if (!matchesFilter(log, condition, context)) {
+      return;
+    }
 
-  const filteredLogs = countableLogs.filter(log => {
-    const logStartTime = log.startTime;
-    const isInDateRange = logStartTime >= dayStart.getTime() && logStartTime <= dayEnd.getTime();
-    const matchesCondition = matchesFilter(log, condition, context);
-    
-    return isInDateRange && matchesCondition;
-  });
+    const dayKey = getLocalDateKey(new Date(log.startTime));
+    let stats = cached.dayStats.get(dayKey);
+    if (!stats) {
+      stats = createEmptyStats();
+      cached.dayStats.set(dayKey, stats);
+    }
 
-  const nightFilteredLogs = countableLogs.filter(log => {
-    const logStartTime = log.startTime;
-    const isInNightWindow = logStartTime >= nightWindowStart.getTime() && logStartTime < nightWindowEnd.getTime();
-    const matchesCondition = matchesFilter(log, condition, context);
-
-    return isInNightWindow && matchesCondition;
-  });
-
-  // 计算统计信息
-  filteredLogs.forEach(log => {
-    // 时长（duration 是秒，转换为分钟）
     stats.totalDuration += Math.round(log.duration / 60);
-    
-    // 次数
-    stats.count++;
+    stats.count += 1;
 
-    // 时间点（从时间戳转换为当天的分钟数）
     const startMinutes = timestampToMinutes(log.startTime);
     const endMinutes = timestampToMinutes(log.endTime);
-
     if (stats.earliestStart === null || startMinutes < stats.earliestStart) {
       stats.earliestStart = startMinutes;
     }
@@ -120,17 +126,47 @@ function calculateLogStats(
     if (stats.latestEnd === null || endMinutes > stats.latestEnd) {
       stats.latestEnd = endMinutes;
     }
-  });
 
-  nightFilteredLogs.forEach(log => {
-    const startMinutes = timestampToNightMinutes(log.startTime);
+    const isNightStart = startMinutes >= 18 * 60 || startMinutes < 4 * 60;
+    if (!isNightStart) {
+      return;
+    }
 
-    if (stats.nightEarliestStart === null || startMinutes < stats.nightEarliestStart) {
-      stats.nightEarliestStart = startMinutes;
+    const nightDateKey = startMinutes < 4 * 60
+      ? getPreviousLocalDateKey(log.startTime)
+      : dayKey;
+    const nightStart = timestampToNightMinutes(log.startTime);
+    const existingNightStart = cached.nightEarliestStarts.get(nightDateKey);
+    if (existingNightStart === undefined || nightStart < existingNightStart) {
+      cached.nightEarliestStarts.set(nightDateKey, nightStart);
     }
   });
 
-  return stats;
+  expressionCache.set(filterExpression, cached);
+  return cached;
+};
+
+/**
+ * 计算匹配筛选条件的记录统计
+ */
+function calculateLogStats(
+  logs: Log[],
+  filterExpression: string,
+  context: FilterContext,
+  targetDate: Date
+): LogStats {
+  if (!filterExpression.trim()) {
+    return createEmptyStats();
+  }
+
+  const cached = getCachedLogStats(logs, filterExpression, context);
+  const targetDateKey = getLocalDateKey(targetDate);
+  const stats = cached.dayStats.get(targetDateKey) || createEmptyStats();
+
+  return {
+    ...stats,
+    nightEarliestStart: cached.nightEarliestStarts.get(targetDateKey) ?? null
+  };
 }
 
 /**

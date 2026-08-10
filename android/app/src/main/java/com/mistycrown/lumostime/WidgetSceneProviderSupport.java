@@ -316,7 +316,13 @@ public final class WidgetSceneProviderSupport {
             views.setViewVisibility(rootId, View.VISIBLE);
             views.setImageViewBitmap(
                     bitmapId,
-                    WidgetSceneTabBitmapRenderer.INSTANCE.render(context, slot.getIcon(), isSelected)
+                    WidgetSceneTabBitmapRenderer.INSTANCE.render(
+                            context,
+                            slot.getIcon(),
+                            slot.getUiIconAssetPath(),
+                            slot.getUiIconFallbackAssetPath(),
+                            isSelected
+                    )
             );
             views.setOnClickPendingIntent(
                     rootId,
@@ -342,6 +348,8 @@ public final class WidgetSceneProviderSupport {
                     WidgetSceneTabBitmapRenderer.INSTANCE.render(
                             context,
                             slot.getIcon(),
+                            slot.getUiIconAssetPath(),
+                            slot.getUiIconFallbackAssetPath(),
                             Objects.equals(slot.getId(), state.selectedSlotId)
                     )
             );
