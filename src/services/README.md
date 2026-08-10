@@ -6,6 +6,7 @@ Update 2026-07-29: `timelineLayoutService.ts` centralizes supported Chronicle la
 
 Update 2026-08-09: `updateService.ts` now reports shipped app version `1.6.4` for the 1.6.4 release line.
 Update 2026-08-10: `appearanceBackupService.ts` centralizes export/cloud restore for theme, TimePal, and visual-style preferences; custom TimePal, background, and navigation assets now participate in the canonical image manifest and cleanup protection.
+Update 2026-08-10: `aiService.ts` now preserves Android native HTTP error response bodies through a Fetch-compatible `text()` adapter and records whether each AI debug exchange used Android Native HTTP or Web Fetch, preventing `text is not a function` from hiding the provider's actual failure.
 Update 2026-07-05: `assistantLocalSearchService.ts`, `assistantTurnService.ts`, and the foreground AI chat runner now support model-requested local retrieval rounds, reusing shared search/filter logic, surfacing pending progress text, and feeding accumulated local-query digests back into follow-up unified turns.
 Update 2026-06-21: `webdavService.ts`, `s3Service.ts`, and `compatibleS3Service.ts` now harden canonical JSON backup reads with cache-busting / no-cache behavior so sync verification reads the current `lumostime_backup.json` instead of stale responses.
 

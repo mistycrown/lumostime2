@@ -4,6 +4,7 @@
  * @output Reusable formatter/debug/helper functions for AIBackfillChatModal
  * @pos Component Support (AI Integration)
  * @description Moves pure formatting, debug rendering, and retry/error helpers out of AIBackfillChatModal so the modal can focus on state transitions and user actions.
+ * @updated 2026-08-10: Shows the concrete AI request transport in request metadata so Android native and Web Fetch failures can be distinguished.
  * @updated 2026-05-16: Preserved pre-section prompt text in debug rendering so unlabeled instructions remain visible above structured prompt sections.
  * @updated 2026-05-16: Limited persona custom prompt block serialization to enabled blocks only.
  * @updated 2026-05-16: Extended persona prompt assembly so labeled custom prompt blocks are appended into the AI request alongside the base persona prompt.
@@ -233,6 +234,7 @@ export const buildDebugBlocks = (exchange: AIDebugExchange): DebugTextBlock[] =>
     label: '请求元信息',
     content: [
       `provider: ${exchange.provider}`,
+      `transport: ${exchange.transport === 'native-http' ? 'Android Native HTTP' : 'Web Fetch'}`,
       `requestedAt: ${exchange.requestedAt}`,
       `completedAt: ${exchange.completedAt}`,
       `url: ${exchange.request.url}`,
@@ -258,6 +260,16 @@ export const buildDebugBlocks = (exchange: AIDebugExchange): DebugTextBlock[] =>
       content: cacheLines.join('\n')
     });
   }
+
+  blocks.push({
+    label: '请求头',
+    content: toPrettyJson(exchange.request.headers)
+  });
+
+  blocks.push({
+    label: '完整请求体',
+    content: toPrettyJson(exchange.request.body)
+  });
 
   const modelValue = typeof requestBody?.model === 'string'
     ? requestBody.model
@@ -438,6 +450,7 @@ export const buildBackgroundSummaryDebugExchange = (
 
   return {
     provider: 'openai',
+    transport: 'native-http',
     requestedAt: entry.requestedAt,
     completedAt: entry.completedAt || entry.requestedAt,
     request: {

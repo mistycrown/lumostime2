@@ -3,6 +3,7 @@
  * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
  * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
  * @pos Service (AI Integration Layer)
+ * @updated 2026-08-10: Restored native HTTP error bodies and exposed the request transport in AI debug exchanges so Android failures retain their real status and response text.
  * @updated 2026-07-31: Added normalization for foreground `create_planned_log` tool calls so AI can create todo-linked timeline Plan blocks.
  * @updated 2026-07-21: Corrected Android native AI request timeout to 120 seconds; the HTTP plugin timeout unit is seconds.
  * @updated 2026-07-06: Added principle-library and self-belief create tool-call payloads for foreground assistant writeback.
@@ -62,6 +63,7 @@ interface AIRawTimeEntry {
 
 export interface AIDebugExchange {
     provider: 'openai' | 'gemini';
+    transport?: 'native-http' | 'web-fetch';
     requestedAt: string;
     completedAt: string;
     request: {
@@ -514,7 +516,23 @@ const createAbortError = (): Error => {
     return error;
 };
 
-const normalizeNativeFetchError = (error: any) => {
+const stringifyNativeResponseData = (data: unknown): string => {
+    if (typeof data === 'string') {
+        return data;
+    }
+
+    if (data === undefined || data === null) {
+        return '';
+    }
+
+    try {
+        return JSON.stringify(data);
+    } catch (_error) {
+        return String(data);
+    }
+};
+
+export const normalizeNativeFetchError = (error: any) => {
     console.error('Native AI Request Error', error);
 
     let errMsg = error?.error || error?.message || JSON.stringify(error);
@@ -531,10 +549,11 @@ const normalizeNativeFetchError = (error: any) => {
     if (typeof window !== 'undefined') window.webdavLastError = `NativeAI: ${error?.status || 'Err'} - ${errMsg}`;
 
     if (error?.status) {
-        let errorBody = {};
-        if (error.error) {
+        const errorBodyText = stringifyNativeResponseData(error.error);
+        let errorBody: unknown = {};
+        if (errorBodyText) {
             try {
-                errorBody = JSON.parse(error.error);
+                errorBody = JSON.parse(errorBodyText);
             } catch (_parseError) {
                 errorBody = { error: error.error };
             }
@@ -543,6 +562,7 @@ const normalizeNativeFetchError = (error: any) => {
         return {
             ok: false,
             status: error.status,
+            text: async () => errorBodyText,
             json: async () => errorBody
         };
     }
@@ -613,11 +633,12 @@ const nativeFetch = async (url: string, options: any) => {
                     url,
                     requestOptions,
                     (response) => {
+                        const responseText = stringifyNativeResponseData(response.data);
                         resolveOnce({
                             ok: response.status >= 200 && response.status < 300,
                             status: response.status,
-                            text: async () => response.data,
-                            json: async () => JSON.parse(response.data)
+                            text: async () => responseText,
+                            json: async () => JSON.parse(responseText)
                         });
                     },
                     (error) => {
@@ -636,12 +657,13 @@ const nativeFetch = async (url: string, options: any) => {
         }
 
         const response = await HTTP.sendRequest(url, requestOptions);
+        const responseText = stringifyNativeResponseData(response.data);
 
         return {
             ok: response.status >= 200 && response.status < 300,
             status: response.status,
-            text: async () => response.data,
-            json: async () => JSON.parse(response.data)
+            text: async () => responseText,
+            json: async () => JSON.parse(responseText)
         };
     } catch (error: any) {
         if (signal?.aborted) {
@@ -1753,6 +1775,8 @@ const requestJsonObjectWithDebug = async <T>(
         options?: AIRequestOptions;
     }
 ): Promise<{ result: T; debug: AIDebugExchange }> => {
+    const transport: AIDebugExchange['transport'] = fetchFn === nativeFetch ? 'native-http' : 'web-fetch';
+
     if (config.provider === 'openai') {
         const url = `${config.baseUrl}/chat/completions`;
         const promptCacheConfig = buildOpenAICompatiblePromptCacheConfig(config, params.cacheHint);
@@ -1794,6 +1818,7 @@ const requestJsonObjectWithDebug = async <T>(
 
             const debug: AIDebugExchange = {
                 provider: 'openai',
+                transport,
                 requestedAt,
                 completedAt: new Date().toISOString(),
                 request: {
@@ -1833,6 +1858,7 @@ const requestJsonObjectWithDebug = async <T>(
         } catch (error) {
             const debug: AIDebugExchange = {
                 provider: 'openai',
+                transport,
                 requestedAt,
                 completedAt: new Date().toISOString(),
                 request: {
@@ -1897,6 +1923,7 @@ const requestJsonObjectWithDebug = async <T>(
 
             const debug: AIDebugExchange = {
                 provider: 'gemini',
+                transport,
                 requestedAt,
                 completedAt: new Date().toISOString(),
                 request: {
@@ -1929,6 +1956,7 @@ const requestJsonObjectWithDebug = async <T>(
         } catch (error) {
             const debug: AIDebugExchange = {
                 provider: 'gemini',
+                transport,
                 requestedAt,
                 completedAt: new Date().toISOString(),
                 request: {

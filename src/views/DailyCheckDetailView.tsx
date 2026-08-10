@@ -10,10 +10,11 @@
  * @updated 2026-08-09: Added daily-review-only unknown states, manual editing, month switching, and trends.
  * @updated 2026-08-09: Uses all effective historical records for aggregate statistics and supports temporary manual backfill from the month grid.
  * @updated 2026-08-10: Replaces missing daily-check value placeholders with a compact slash.
- * @updated 2026-08-10: Reads nightEarliestStart current metrics from the completed previous night.
+ * @updated 2026-08-10: Defers aggregate statistics until the current-month view has painted and renders operator-aware automatic targets.
+ * @updated 2026-08-10: Reuses each daily check's theme color for its progress ring, heatmap, and trend.
  */
-import React, { useMemo, useState } from 'react';
-import { ArrowLeft, Check, Target } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, Check, LoaderCircle, Target } from 'lucide-react';
 import {
   Category,
   CheckItem,
@@ -103,9 +104,12 @@ const formatMetricValue = (type: ReturnType<typeof getDailyCheckDisplayType>, va
   return value > 0 ? '已完成' : '待完成';
 };
 
-const formatTargetValue = (type: ReturnType<typeof getDailyCheckDisplayType>, target: number): string => {
+const formatTargetValue = (item: CheckItem, type: ReturnType<typeof getDailyCheckDisplayType>, target: number): string => {
+  const operator = item.type === 'auto' ? item.autoConfig?.operator : undefined;
+  const operatorLabel = operator ? `${operator} ` : '';
+
   if (type === 'duration') {
-    return `目标 ${formatDurationMinutes(target)}`;
+    return `目标 ${operatorLabel}${formatDurationMinutes(target)}`;
   }
 
   if (type === 'count') {
@@ -113,13 +117,13 @@ const formatTargetValue = (type: ReturnType<typeof getDailyCheckDisplayType>, ta
   }
 
   if (type === 'time') {
-    return `目标 ${formatTimeValue(target)}`;
+    return `目标 ${operatorLabel}${formatTimeValue(target)}`;
   }
 
   return '每日完成一次';
 };
 
-export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
+const DailyCheckDetailContent: React.FC<DailyCheckDetailViewProps> = ({
   itemId,
   checkTemplates,
   reviewTemplates,
@@ -136,6 +140,7 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
   const [heatmapMonth, setHeatmapMonth] = useState(() => new Date(currentDate));
   const [isCountInputOpen, setIsCountInputOpen] = useState(false);
   const [isBackfillMode, setIsBackfillMode] = useState(false);
+  const [isAggregateReady, setIsAggregateReady] = useState(false);
   const filterContext = useMemo<FilterContext>(() => ({
     categories,
     scopes,
@@ -152,6 +157,23 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
   const displayDate = useMemo(() => (
     templateItem ? getDailyCheckOverviewAnchorDate(templateItem, currentDate) : currentDate
   ), [currentDate, templateItem]);
+
+  useEffect(() => {
+    setIsAggregateReady(false);
+    let secondFrame: number | null = null;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        setIsAggregateReady(true);
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame !== null) {
+        window.cancelAnimationFrame(secondFrame);
+      }
+    };
+  }, [itemId]);
 
   const currentItem = useMemo(() => (
     itemId
@@ -194,7 +216,7 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
   ), [checkTemplates, dailyReviews, filterContext, heatmapMonth, itemId, logs]);
 
   const trendHistory = useMemo(() => (
-    itemId
+    itemId && isAggregateReady
       ? getDailyCheckHistory({
         itemId,
         anchorDate: displayDate,
@@ -205,10 +227,10 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
         filterContext
       })
       : []
-  ), [checkTemplates, dailyReviews, displayDate, filterContext, itemId, logs]);
+  ), [checkTemplates, dailyReviews, displayDate, filterContext, isAggregateReady, itemId, logs]);
 
   const recordedHistory = useMemo(() => (
-    itemId
+    itemId && isAggregateReady
       ? getDailyCheckRecordedHistory({
         itemId,
         anchorDate: displayDate,
@@ -218,7 +240,7 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
         filterContext
       })
       : []
-  ), [checkTemplates, dailyReviews, displayDate, filterContext, itemId, logs]);
+  ), [checkTemplates, dailyReviews, displayDate, filterContext, isAggregateReady, itemId, logs]);
 
   if (!templateItem || !itemId) {
     return (
@@ -249,18 +271,18 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
   const tone = getDailyCheckIconTone(type);
   const currentValue = history[history.length - 1]?.value ?? null;
   const target = getDailyCheckTarget(item);
-  const completionRate = getCompletionRate(recordedHistory);
-  const currentStreak = getCurrentStreak(recordedHistory, displayDate);
-  const averageValue = getAverageValue(recordedHistory);
+  const completionRate = isAggregateReady ? getCompletionRate(recordedHistory) : null;
+  const currentStreak = isAggregateReady ? getCurrentStreak(recordedHistory, displayDate) : null;
+  const averageValue = isAggregateReady ? getAverageValue(recordedHistory) : null;
   const isManual = item.type !== 'auto';
   const currentIsCompleted = history[history.length - 1]?.isCompleted ?? false;
   const progress = type === 'binary' || type === 'time'
     ? (currentIsCompleted ? 100 : 0)
     : target > 0 && currentValue !== null ? Math.min(100, (currentValue / target) * 100) : 0;
   const numericValues = recordedHistory.flatMap((point) => point.value === null ? [] : [point.value]);
-  const totalValue = numericValues.reduce((sum, value) => sum + value, 0);
-  const recordedDays = recordedHistory.length;
-  const completedDays = recordedHistory.filter((point) => point.isCompleted).length;
+  const totalValue = isAggregateReady ? numericValues.reduce((sum, value) => sum + value, 0) : null;
+  const recordedDays = isAggregateReady ? recordedHistory.length : null;
+  const completedDays = isAggregateReady ? recordedHistory.filter((point) => point.isCompleted).length : null;
   const heatmapData = new Map<number, {
     value: number | null;
     hasRecord: boolean;
@@ -378,26 +400,26 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
 
   const stats = type === 'binary'
     ? [
-        { label: '完成天数', value: `${completedDays}/${recordedDays}` },
-      { label: '当前连续', value: `${currentStreak} 天` },
-      { label: '完成率', value: `${completionRate}%` }
+        { label: '完成天数', value: completedDays === null || recordedDays === null ? '—' : `${completedDays}/${recordedDays}` },
+      { label: '当前连续', value: currentStreak === null ? '—' : `${currentStreak} 天` },
+      { label: '完成率', value: completionRate === null ? '—' : `${completionRate}%` }
     ]
     : type === 'time'
       ? [
-        { label: '记录天数', value: String(recordedDays) },
-        { label: '达标天数', value: `${completedDays}/${recordedDays}` },
-        { label: '完成率', value: `${completionRate}%` }
+        { label: '记录天数', value: recordedDays === null ? '—' : String(recordedDays) },
+        { label: '达标天数', value: completedDays === null || recordedDays === null ? '—' : `${completedDays}/${recordedDays}` },
+        { label: '完成率', value: completionRate === null ? '—' : `${completionRate}%` }
       ]
     : type === 'count'
       ? [
-        { label: '总完成次数', value: formatCount(totalValue) },
-        { label: '日均完成次数', value: formatCount(averageValue) },
-        { label: '达标天数', value: `${completedDays}/${recordedDays}` }
+        { label: '总完成次数', value: totalValue === null ? '—' : formatCount(totalValue) },
+        { label: '日均完成次数', value: averageValue === null ? '—' : formatCount(averageValue) },
+        { label: '达标天数', value: completedDays === null || recordedDays === null ? '—' : `${completedDays}/${recordedDays}` }
       ]
       : [
-        { label: '总时长', value: formatDurationMinutes(totalValue) },
-        { label: '日均时长', value: formatDurationMinutes(averageValue) },
-        { label: '达标天数', value: `${completedDays}/${recordedDays}` }
+        { label: '总时长', value: totalValue === null ? '—' : formatDurationMinutes(totalValue) },
+        { label: '日均时长', value: averageValue === null ? '—' : formatDurationMinutes(averageValue) },
+        { label: '达标天数', value: completedDays === null || recordedDays === null ? '—' : `${completedDays}/${recordedDays}` }
       ];
 
   return (
@@ -425,7 +447,7 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
               </div>
               <div className="mt-2 flex items-center gap-2 text-sm text-stone-500">
                 <Target size={15} />
-                <span>{formatTargetValue(type, target)}</span>
+                <span>{formatTargetValue(item, type, target)}</span>
               </div>
               {isManual && type === 'binary' && (
                 <button
@@ -456,13 +478,7 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
               className={`relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full ${tone.surface}`}
               style={{
                 background: `conic-gradient(currentColor ${progress}%, #eeeae4 ${progress}% 100%)`,
-                color: type === 'count'
-                  ? '#0369a1'
-                  : type === 'duration'
-                    ? '#6d28d9'
-                    : type === 'time'
-                      ? '#b45309'
-                      : '#047857'
+                color: heatmapAccent
               }}
               aria-label={`今日完成度 ${Math.round(progress)}%`}
             >
@@ -525,23 +541,27 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
               <span className="text-xs text-stone-400">近 30 天 · {getDailyCheckTypeLabel(item)}</span>
             </div>
             <div className="mt-5 h-52 w-full select-none pointer-events-none">
-              <ResponsiveContainer width="100%" height="100%">
-                {type === 'binary' ? (
+              {isAggregateReady ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  {type === 'binary' ? (
                   <LineChart data={trendData} margin={{ top: 8, right: 8, left: -24, bottom: 0 }} accessibilityLayer={false}>
                     <CartesianGrid stroke="#e7e5e4" strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#a8a29e' }} interval={4} axisLine={false} tickLine={false} />
                     <YAxis domain={[0, 1]} ticks={[0, 1]} tickFormatter={(value) => value === 1 ? '完成' : '未完成'} tick={{ fontSize: 10, fill: '#a8a29e' }} axisLine={false} tickLine={false} />
                     <Line type="monotone" dataKey="value" connectNulls={false} stroke="#059669" strokeWidth={2} dot={{ r: 3, fill: '#059669' }} />
                   </LineChart>
-                ) : (
+                  ) : (
                   <BarChart data={trendData} margin={{ top: 8, right: 8, left: -24, bottom: 0 }} accessibilityLayer={false}>
                     <CartesianGrid stroke="#e7e5e4" strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#a8a29e' }} interval={4} axisLine={false} tickLine={false} />
                     <YAxis tickFormatter={(value) => type === 'time' ? formatTimeValue(value) : String(value)} tick={{ fontSize: 10, fill: '#a8a29e' }} axisLine={false} tickLine={false} />
                     <Bar dataKey="value" fill={heatmapAccent} radius={[4, 4, 0, 0]} maxBarSize={14} />
                   </BarChart>
-                )}
-              </ResponsiveContainer>
+                  )}
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full border-y border-stone-100 bg-white/40" aria-label="正在计算趋势" />
+              )}
             </div>
           </section>
         </div>
@@ -557,4 +577,30 @@ export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = ({
       />
     </div>
   );
+};
+
+const DailyCheckDetailLoading: React.FC = () => (
+  <div className="flex h-full min-h-0 flex-col items-center justify-center gap-3 bg-[#faf9f6] text-stone-500">
+    <LoaderCircle size={24} className="animate-spin" aria-hidden="true" />
+    <div className="text-sm font-medium">正在读取日课数据</div>
+  </div>
+);
+
+export const DailyCheckDetailView: React.FC<DailyCheckDetailViewProps> = (props) => {
+  const [isContentReady, setIsContentReady] = useState(false);
+
+  useEffect(() => {
+    setIsContentReady(false);
+    const frame = window.requestAnimationFrame(() => {
+      setIsContentReady(true);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [props.itemId]);
+
+  return isContentReady
+    ? <DailyCheckDetailContent {...props} />
+    : <DailyCheckDetailLoading />;
 };

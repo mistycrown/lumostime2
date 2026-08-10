@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { aiService } from './aiService';
+import { aiService, normalizeNativeFetchError } from './aiService';
 
 type LocalStorageMock = {
   getItem: (key: string) => string | null;
@@ -59,6 +59,26 @@ describe('aiService unified turn normalization', () => {
     vi.restoreAllMocks();
   });
 
+  it('preserves native HTTP error text through the Fetch-compatible adapter', async () => {
+    const response = normalizeNativeFetchError({
+      status: 401,
+      error: JSON.stringify({
+        error: {
+          message: 'Invalid API key'
+        }
+      })
+    });
+
+    expect(response.ok).toBe(false);
+    expect(response.status).toBe(401);
+    expect(await response.text()).toContain('Invalid API key');
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        message: 'Invalid API key'
+      }
+    });
+  });
+
   it('drops create_todo tool calls that omit linkedActivityId', async () => {
     Object.defineProperty(globalThis, 'fetch', {
       value: vi.fn().mockResolvedValue(createJsonTextResponse({
@@ -88,6 +108,7 @@ describe('aiService unified turn normalization', () => {
       userPrompt: 'user'
     });
 
+    expect(result.debug.transport).toBe('web-fetch');
     expect(result.output.toolCalls).toBeUndefined();
   });
 
