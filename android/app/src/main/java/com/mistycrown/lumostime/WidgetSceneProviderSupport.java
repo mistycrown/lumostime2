@@ -19,7 +19,7 @@ import java.util.Objects;
 
 /**
  * Shared rendering and tap handling for the dedicated 4x3 scene widget.
- * Updated 2026-08-10: Uses a scrollable RemoteViews time-slot list while preserving native tab rendering.
+ * Updated 2026-08-10: Isolates the scrollable time-slot rail from timer-card RemoteViews caches.
  */
 public final class WidgetSceneProviderSupport {
     public static final String ACTION_SELECT_SCENE_TAB =
@@ -181,9 +181,9 @@ public final class WidgetSceneProviderSupport {
             ResolvedSceneState state = resolveState(context, appWidgetId, payload);
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_layout_scene_4x3);
 
-            Intent tabsIntent = new Intent(context, WidgetSceneTabsRemoteViewsService.class);
+            Intent tabsIntent = new Intent(context, WidgetSceneTimeSlotRemoteViewsService.class);
             tabsIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
-            tabsIntent.setData(Uri.parse("lumostime://scene-tabs/" + appWidgetId));
+            tabsIntent.setData(buildTimeSlotAdapterUri(appWidgetId, state));
             views.setRemoteAdapter(R.id.widget_scene_tabs, tabsIntent);
             views.setPendingIntentTemplate(
                     R.id.widget_scene_tabs,
@@ -458,6 +458,22 @@ public final class WidgetSceneProviderSupport {
         } catch (NumberFormatException ignored) {
             return 0;
         }
+    }
+
+    private static Uri buildTimeSlotAdapterUri(int appWidgetId, ResolvedSceneState state) {
+        String groupId = state.displayedGroup != null ? state.displayedGroup.getId() : "none";
+        String selectedSlotId = state.selectedSlotId != null ? state.selectedSlotId : "none";
+        long syncedAt = state.payload != null ? state.payload.getSyncedAt() : 0L;
+        return Uri.parse(
+                "lumostime://scene-time-slots/v2/"
+                        + appWidgetId
+                        + "/"
+                        + syncedAt
+                        + "/"
+                        + Uri.encode(groupId)
+                        + "/"
+                        + Uri.encode(selectedSlotId)
+        );
     }
 
     private static PendingIntent buildRefreshPendingIntent(

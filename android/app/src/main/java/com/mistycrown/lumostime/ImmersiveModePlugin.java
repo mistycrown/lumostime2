@@ -4,11 +4,10 @@
  * @output Android system bar visibility changes
  * @pos Native Plugin
  * @description Provides Android immersive mode controls for fullscreen experiences, hiding and restoring system bars while keeping edge-to-edge enabled.
- * @updated 2026-08-10: Adds temporary native immersive transition diagnostics for logcat investigation.
+ * @updated 2026-08-10: Delegates immersive state restoration across Android orientation and focus transitions to MainActivity.
  */
 package com.mistycrown.lumostime;
 
-import android.util.Log;
 import android.view.View;
 import android.view.Window;
 
@@ -23,13 +22,9 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 @CapacitorPlugin(name = "ImmersiveMode")
 public class ImmersiveModePlugin extends Plugin {
-    private static final String TAG = "ImmersiveDebug";
-
     @PluginMethod
     public void enter(PluginCall call) {
-        Log.i(TAG, "Native immersive enter requested");
         if (getActivity() == null) {
-            Log.e(TAG, "Native immersive enter rejected: Activity unavailable");
             call.reject("Activity unavailable");
             return;
         }
@@ -40,23 +35,20 @@ public class ImmersiveModePlugin extends Plugin {
                 View decorView = window.getDecorView();
                 WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, decorView);
                 if (controller == null) {
-                    Log.e(TAG, "Native immersive enter rejected: WindowInsetsController unavailable");
                     call.reject("WindowInsetsController unavailable");
                     return;
                 }
 
                 if (getActivity() instanceof MainActivity) {
-                    ((MainActivity) getActivity()).setImmersiveProtectionVisible(true);
+                    ((MainActivity) getActivity()).setImmersiveModeActive(true);
+                } else {
+                    controller.setSystemBarsBehavior(
+                        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    );
+                    controller.hide(WindowInsetsCompat.Type.systemBars());
                 }
-
-                controller.setSystemBarsBehavior(
-                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                );
-                controller.hide(WindowInsetsCompat.Type.systemBars());
-                Log.i(TAG, "Native immersive enter applied: system bars hidden");
                 call.resolve();
             } catch (Exception exception) {
-                Log.e(TAG, "Native immersive enter failed", exception);
                 call.reject(exception.getMessage());
             }
         });
@@ -64,9 +56,7 @@ public class ImmersiveModePlugin extends Plugin {
 
     @PluginMethod
     public void exit(PluginCall call) {
-        Log.i(TAG, "Native immersive exit requested");
         if (getActivity() == null) {
-            Log.e(TAG, "Native immersive exit rejected: Activity unavailable");
             call.reject("Activity unavailable");
             return;
         }
@@ -77,19 +67,16 @@ public class ImmersiveModePlugin extends Plugin {
                 View decorView = window.getDecorView();
                 WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, decorView);
                 if (controller == null) {
-                    Log.e(TAG, "Native immersive exit rejected: WindowInsetsController unavailable");
                     call.reject("WindowInsetsController unavailable");
                     return;
                 }
 
                 controller.show(WindowInsetsCompat.Type.systemBars());
                 if (getActivity() instanceof MainActivity) {
-                    ((MainActivity) getActivity()).setImmersiveProtectionVisible(false);
+                    ((MainActivity) getActivity()).setImmersiveModeActive(false);
                 }
-                Log.i(TAG, "Native immersive exit applied: system bars shown");
                 call.resolve();
             } catch (Exception exception) {
-                Log.e(TAG, "Native immersive exit failed", exception);
                 call.reject(exception.getMessage());
             }
         });

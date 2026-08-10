@@ -8,7 +8,6 @@
  * @updated 2026-05-11: Added a one-shot completion-mode toggle beside the associated todo picker so finishing a focus session can also complete the linked unfinished task after the log is saved.
  * @updated 2026-05-05: Registered immersive focus mode with the shared Android back-handler stack so system back exits fullscreen before dismissing the focus detail overlay.
  * @updated 2026-04-22: Enabled hierarchical todo selection so focus-session todo pickers can expand subtasks beneath collapsed parent tasks.
- * @updated 2026-08-10: Adds temporary immersive-mode lifecycle diagnostics for Android logcat investigation.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -101,29 +100,10 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
         }
 
         return registerHardwareBackHandler(() => {
-            console.error('[ImmersiveDebug] FocusDetail hardware back exits immersive mode', { sessionId: session.id });
             setIsImmersiveMode(false);
             return true;
         });
-    }, [isImmersiveMode, session.id]);
-
-    useEffect(() => {
-        console.error('[ImmersiveDebug] FocusDetail mounted', {
-            sessionId: session.id,
-            autoEnterImmersive,
-        });
-
-        return () => {
-            console.error('[ImmersiveDebug] FocusDetail unmounted', { sessionId: session.id });
-        };
-    }, [autoEnterImmersive, session.id]);
-
-    useEffect(() => {
-        console.error('[ImmersiveDebug] FocusDetail immersive state changed', {
-            sessionId: session.id,
-            isImmersiveMode,
-        });
-    }, [isImmersiveMode, session.id]);
+    }, [isImmersiveMode]);
 
     // Auto-focus note input
     useEffect(() => {
@@ -422,10 +402,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
             {isImmersiveMode && (
                 <ImmersiveTimer 
                     elapsed={elapsed} 
-                    onExit={() => {
-                        console.error('[ImmersiveDebug] ImmersiveTimer requested exit', { sessionId: session.id });
-                        setIsImmersiveMode(false);
-                    }}
+                    onExit={() => setIsImmersiveMode(false)}
                     onSubmit={handleComplete}
                 />
             )}
@@ -441,10 +418,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                     
                     {/* Immersive Mode Button */}
                     <button
-                        onClick={() => {
-                            console.error('[ImmersiveDebug] User requested immersive mode', { sessionId: session.id });
-                            setIsImmersiveMode(true);
-                        }}
+                        onClick={() => setIsImmersiveMode(true)}
                         className="p-2 rounded-full hover:bg-stone-100 transition-colors text-stone-400 hover:text-stone-600"
                         title="沉浸式计时"
                     >

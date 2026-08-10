@@ -7,8 +7,7 @@
  * @updated 2026-04-26: Captures assistant-notification navigation intents so the Web layer can reopen the shared AI chat at the targeted background reply after resume or cold start.
  * @updated 2026-07-22: Registers the native status-bar appearance bridge for display-mode synchronization.
  * @updated 2026-07-22: Draws an explicit top inset backdrop beneath Android 15's transparent status bar.
- * @updated 2026-08-10: Restores post-WebView edge-to-edge setup and reapplies it after orientation changes so immersive mode does not expose the launch splash surface.
- * @updated 2026-08-10: Adds temporary immersive overlay and configuration diagnostics for logcat investigation.
+ * @updated 2026-08-10: Reapplies immersive system-bar hiding after Android orientation and focus transitions.
  */
 package com.mistycrown.lumostime;
 
@@ -18,28 +17,22 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 
-import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.getcapacitor.BridgeActivity;
 import com.lumostime.app.AppLauncherPlugin;
 
 public class MainActivity extends BridgeActivity {
-    private static final String TAG = "ImmersiveDebug";
-    private FrameLayout immersiveProtectionOverlay;
-    private View immersiveProtectionTopView;
-    private View immersiveProtectionBottomView;
-    private View immersiveProtectionLeftView;
-    private View immersiveProtectionRightView;
     private View statusBarBackdropView;
+    private boolean immersiveModeActive;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -52,14 +45,12 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ImmersiveModePlugin.class);
         registerPlugin(NativeStatusBarAppearancePlugin.class);
         registerPlugin(WidgetBridgePlugin.class);
+        configureWindowForEdgeToEdge();
         super.onCreate(savedInstanceState);
 
-        // BridgeActivity switches away from the launch theme and creates the WebView here.
-        // Applying edge-to-edge afterwards prevents orientation changes from exposing splash content.
         configureWindowForEdgeToEdge();
         AssistantNotificationNavigationStore.captureFromIntent(this, getIntent());
         ensureStatusBarBackdrop();
-        ensureImmersiveProtectionOverlay();
         initializeIconState();
     }
 
@@ -77,10 +68,17 @@ public class MainActivity extends BridgeActivity {
         if (statusBarBackdropView != null) {
             ViewCompat.requestApplyInsets(statusBarBackdropView);
         }
-        if (immersiveProtectionOverlay != null) {
-            ViewCompat.requestApplyInsets(immersiveProtectionOverlay);
+        if (immersiveModeActive) {
+            getWindow().getDecorView().post(this::applyImmersiveWindowState);
         }
-        Log.i(TAG, "Configuration changed and edge-to-edge reapplied: orientation=" + newConfig.orientation);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus && immersiveModeActive) {
+            getWindow().getDecorView().post(this::applyImmersiveWindowState);
+        }
     }
 
     private void configureWindowForEdgeToEdge() {
@@ -101,19 +99,10 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    public void setImmersiveProtectionVisible(boolean visible) {
-        Log.i(TAG, "Immersive protection overlay visibility requested: " + visible);
-        ensureImmersiveProtectionOverlay();
-        if (immersiveProtectionOverlay == null) {
-            Log.e(TAG, "Immersive protection overlay unavailable");
-            return;
-        }
-
-        immersiveProtectionOverlay.setVisibility(visible ? View.VISIBLE : View.GONE);
-        Log.i(TAG, "Immersive protection overlay visibility applied: " + visible);
-        if (visible) {
-            immersiveProtectionOverlay.bringToFront();
-            ViewCompat.requestApplyInsets(immersiveProtectionOverlay);
+    public void setImmersiveModeActive(boolean active) {
+        immersiveModeActive = active;
+        if (active) {
+            applyImmersiveWindowState();
         }
     }
 
@@ -165,113 +154,22 @@ public class MainActivity extends BridgeActivity {
         ViewCompat.requestApplyInsets(statusBarBackdropView);
     }
 
-    private void ensureImmersiveProtectionOverlay() {
-        if (immersiveProtectionOverlay != null) {
-            return;
-        }
-
+    private void applyImmersiveWindowState() {
+        View decorView = getWindow().getDecorView();
+        decorView.setBackgroundColor(Color.BLACK);
         FrameLayout contentView = getWindow().findViewById(android.R.id.content);
-        if (contentView == null) {
+        if (contentView != null) {
+            contentView.setBackgroundColor(Color.BLACK);
+        }
+        setStatusBarBackdropColor(Color.BLACK);
+
+        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), decorView);
+        if (controller == null) {
             return;
         }
 
-        immersiveProtectionOverlay = new FrameLayout(this);
-        immersiveProtectionOverlay.setClickable(false);
-        immersiveProtectionOverlay.setFocusable(false);
-        immersiveProtectionOverlay.setFitsSystemWindows(false);
-        immersiveProtectionOverlay.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
-
-        FrameLayout.LayoutParams overlayParams = new FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        );
-        contentView.addView(immersiveProtectionOverlay, overlayParams);
-
-        immersiveProtectionTopView = createProtectionView();
-        immersiveProtectionBottomView = createProtectionView();
-        immersiveProtectionLeftView = createProtectionView();
-        immersiveProtectionRightView = createProtectionView();
-
-        immersiveProtectionOverlay.addView(
-            immersiveProtectionTopView,
-            new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                0,
-                Gravity.TOP
-            )
-        );
-        immersiveProtectionOverlay.addView(
-            immersiveProtectionBottomView,
-            new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                0,
-                Gravity.BOTTOM
-            )
-        );
-        immersiveProtectionOverlay.addView(
-            immersiveProtectionLeftView,
-            new FrameLayout.LayoutParams(
-                0,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                Gravity.START
-            )
-        );
-        immersiveProtectionOverlay.addView(
-            immersiveProtectionRightView,
-            new FrameLayout.LayoutParams(
-                0,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                Gravity.END
-            )
-        );
-
-        immersiveProtectionOverlay.setVisibility(View.GONE);
-
-        ViewCompat.setOnApplyWindowInsetsListener(immersiveProtectionOverlay, (view, insets) -> {
-            updateImmersiveProtectionInsets(insets);
-            return insets;
-        });
-        ViewCompat.requestApplyInsets(immersiveProtectionOverlay);
-    }
-
-    private View createProtectionView() {
-        View view = new View(this);
-        view.setBackgroundColor(Color.BLACK);
-        view.setClickable(false);
-        view.setFocusable(false);
-        return view;
-    }
-
-    private void updateImmersiveProtectionInsets(WindowInsetsCompat windowInsets) {
-        if (immersiveProtectionOverlay == null) {
-            return;
-        }
-
-        Insets systemBarInsets = windowInsets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars());
-        Insets displayCutoutInsets = windowInsets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.displayCutout());
-        boolean isLandscape = getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
-        ImmersiveProtectionInsets protectionInsets = ImmersiveProtectionInsets.resolve(
-            systemBarInsets,
-            displayCutoutInsets,
-            isLandscape
-        );
-
-        updateProtectionEdgeLayout(immersiveProtectionTopView, FrameLayout.LayoutParams.MATCH_PARENT, protectionInsets.top, Gravity.TOP);
-        updateProtectionEdgeLayout(immersiveProtectionBottomView, FrameLayout.LayoutParams.MATCH_PARENT, protectionInsets.bottom, Gravity.BOTTOM);
-        updateProtectionEdgeLayout(immersiveProtectionLeftView, protectionInsets.left, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.START);
-        updateProtectionEdgeLayout(immersiveProtectionRightView, protectionInsets.right, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.END);
-    }
-
-    private void updateProtectionEdgeLayout(View view, int width, int height, int gravity) {
-        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) view.getLayoutParams();
-        if (params.width == width && params.height == height && params.gravity == gravity) {
-            return;
-        }
-
-        params.width = width;
-        params.height = height;
-        params.gravity = gravity;
-        view.setLayoutParams(params);
+        controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        controller.hide(WindowInsetsCompat.Type.systemBars());
     }
 
     private void initializeIconState() {

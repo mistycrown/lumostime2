@@ -107,15 +107,8 @@ export const useHardwareBackButton = () => {
     };
 
     useEffect(() => {
-        const handleBackButton = ({ canGoBack }: { canGoBack: boolean }) => {
-            console.error('[ImmersiveDebug] Android backButton event received', {
-                canGoBack,
-                focusDetailSessionId,
-            });
+        const handleBackButton = () => {
             const handledByRegisteredHandler = runRegisteredHardwareBackHandler();
-            console.error('[ImmersiveDebug] Registered hardware back handler result', {
-                handledByRegisteredHandler,
-            });
             if (handledByRegisteredHandler) {
                 return;
             }

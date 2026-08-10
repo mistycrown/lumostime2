@@ -21,9 +21,10 @@
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
         <item name="windowSplashScreenBackground">#000000</item>
+        <!-- Do not reattach the legacy full-screen splash preview during Android fixed rotation. -->
+        <item name="android:windowDisablePreview">true</item>
     </style>
 
     <style name="AppTheme.QuickTodoOverlay" parent="Theme.AppCompat.Light.NoActionBar">
