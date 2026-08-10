@@ -10,8 +10,6 @@
  * @updated 2026-05-05: Restored Android immersive system bars before unmounting the fullscreen timer so exiting immersive mode no longer leaves the app header shifted downward.
  * @updated 2026-05-04: Realigned the immersive top control bar so both portrait and landscape modes avoid inheriting the managed status-bar fallback and drifting downward.
  * @updated 2026-05-03: Switched Android EdgeToEdge access to the plugin's ESM entry so Capacitor WebView builds no longer execute browser-undefined `require()` calls.
- * @updated 2026-08-10: Adds temporary immersive transition diagnostics for Android logcat investigation.
- * @updated 2026-08-10: Waits for Android's requested-orientation animation to settle before hiding system bars, preventing the fixed-rotation transition from obscuring the WebView with the launch surface.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, Image as ImageIcon, MonitorSmartphone, Volume2, VolumeX, X } from 'lucide-react';
@@ -101,24 +99,6 @@ interface ImmersiveTimerProps {
   onSubmit: () => void;
 }
 
-const waitForAndroidOrientationStability = async () => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  // ScreenOrientation.lock() resolves after setRequestedOrientation(), before Android's
-  // fixed-rotation animation and the WebView's surface resize have completed.
-  await new Promise<void>((resolve) => {
-    window.setTimeout(resolve, 700);
-  });
-
-  await new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(resolve);
-    });
-  });
-};
-
 export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit, onSubmit }) => {
   const { immersiveTimerDefaultOrientation } = useSettings();
   const [showControls, setShowControls] = useState(false);
@@ -178,7 +158,6 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
   );
   const timerRef = useRef<HTMLDivElement>(null);
   const exitTransitionPromiseRef = useRef<Promise<void> | null>(null);
-  const orientationTransitionPromiseRef = useRef<Promise<void> | null>(null);
   const hasRestoredShellRef = useRef(false);
   const effectiveOrientation = resolveImmersiveTimerOrientation(
     immersiveTimerDefaultOrientation,
@@ -202,40 +181,23 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
   const leftControlsInset = 'calc(1rem + env(safe-area-inset-left, 0px))';
   const rightControlsInset = 'calc(1rem + env(safe-area-inset-right, 0px))';
 
-  useEffect(() => {
-    console.error('[ImmersiveDebug] ImmersiveTimer mounted', {
-      elapsed,
-      effectiveOrientation,
-      platform: Capacitor.getPlatform(),
-    });
-
-    return () => {
-      console.error('[ImmersiveDebug] ImmersiveTimer unmounted');
-    };
-  }, []);
-
   const restorePlatformShell = async () => {
     if (exitTransitionPromiseRef.current) {
-      console.error('[ImmersiveDebug] Awaiting existing immersive exit transition');
       await exitTransitionPromiseRef.current;
       return;
     }
 
     if (hasRestoredShellRef.current) {
-      console.error('[ImmersiveDebug] Skipping duplicate immersive shell restore');
       return;
     }
 
     hasRestoredShellRef.current = true;
     const platform = Capacitor.getPlatform();
     const exitTransition = getImmersiveStatusBarTransition(platform, 'exit');
-    console.error('[ImmersiveDebug] Starting immersive shell restore', { platform, exitTransition });
 
     exitTransitionPromiseRef.current = (async () => {
       if (platform === 'android' && exitTransition.restoreSystemBars) {
-        await ImmersiveMode.exit().catch((error) => {
-          console.error('[ImmersiveDebug] Native immersive exit failed', error);
-        });
+        await ImmersiveMode.exit().catch(() => {});
       }
 
       if (exitTransition.show) {
@@ -251,7 +213,6 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
 
     try {
       await exitTransitionPromiseRef.current;
-      console.error('[ImmersiveDebug] Immersive shell restore completed');
     } finally {
       exitTransitionPromiseRef.current = null;
     }
@@ -273,34 +234,19 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
           ? OrientationType.PORTRAIT_PRIMARY
           : OrientationType.LANDSCAPE_PRIMARY;
 
-        console.error('[ImmersiveDebug] Requesting orientation lock', { effectiveOrientation, preferredLock });
         await ScreenOrientation.lock({ type });
-        console.error('[ImmersiveDebug] Orientation lock completed', { effectiveOrientation, preferredLock });
-
-        if (platform === 'android') {
-          console.error('[ImmersiveDebug] Waiting for Android orientation stability before hiding system bars');
-          await waitForAndroidOrientationStability();
-          console.error('[ImmersiveDebug] Android orientation stability wait completed');
-        }
       } catch (error) {
-        console.error('[ImmersiveDebug] Orientation lock failed', { effectiveOrientation, error });
         if (!isCancelled && !shouldSilenceImmersiveOrientationError(error)) {
           console.error('Failed to lock immersive timer orientation:', error);
         }
       }
     };
 
-    const orientationTransition = applyEffectiveOrientation();
-    orientationTransitionPromiseRef.current = orientationTransition;
+    void applyEffectiveOrientation();
 
     return () => {
       isCancelled = true;
-      if (orientationTransitionPromiseRef.current === orientationTransition) {
-        orientationTransitionPromiseRef.current = null;
-      }
-      console.error('[ImmersiveDebug] Requesting orientation unlock');
       ScreenOrientation.unlock().catch((error) => {
-        console.error('[ImmersiveDebug] Orientation unlock failed', error);
         if (!shouldSilenceImmersiveOrientationError(error)) {
           console.error('Failed to unlock immersive timer orientation:', error);
         }
@@ -313,12 +259,6 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
 
     const applyEnterTransition = async () => {
       const enterTransition = getImmersiveStatusBarTransition(platform, 'enter');
-      console.error('[ImmersiveDebug] Starting immersive enter transition', { platform, enterTransition });
-
-      if (platform === 'android' && orientationTransitionPromiseRef.current) {
-        console.error('[ImmersiveDebug] Waiting for orientation transition before Android immersive entry');
-        await orientationTransitionPromiseRef.current;
-      }
 
       if (platform === 'ios') {
         await StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
@@ -339,13 +279,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
       await StatusBar.setStyle({ style: Style.Light }).catch(() => {});
 
       if (platform === 'android' && enterTransition.hideSystemBars) {
-        await ImmersiveMode.enter()
-          .then(() => {
-            console.error('[ImmersiveDebug] Native immersive enter completed');
-          })
-          .catch((error) => {
-            console.error('[ImmersiveDebug] Native immersive enter failed', error);
-          });
+        await ImmersiveMode.enter().catch(() => {});
       }
     };
 
@@ -657,11 +591,9 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
 
   const handleExit = async () => {
     if (isRestoringShell) {
-      console.error('[ImmersiveDebug] Ignored duplicate immersive exit request');
       return;
     }
 
-    console.error('[ImmersiveDebug] ImmersiveTimer exit requested by user');
     setIsRestoringShell(true);
     stopWhiteNoise();
     await restorePlatformShell();
@@ -670,11 +602,9 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
 
   const handleSubmit = async () => {
     if (isRestoringShell) {
-      console.error('[ImmersiveDebug] Ignored immersive submit while shell restores');
       return;
     }
 
-    console.error('[ImmersiveDebug] ImmersiveTimer submit requested');
     setIsRestoringShell(true);
     stopWhiteNoise();
     await restorePlatformShell();

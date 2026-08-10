@@ -493,21 +493,9 @@ const AppContent: React.FC = () => {
       return;
     }
 
-    console.error('[ImmersiveDebug] Clearing focus detail because its session is no longer active', {
-      focusDetailSessionId,
-      activeSessionIds: activeSessions.map((session) => session.id),
-    });
     setFocusDetailSessionId(null);
     setShouldAutoEnterImmersive(false);
   }, [activeSessions, focusDetailSessionId, setFocusDetailSessionId]);
-
-  React.useEffect(() => {
-    console.error('[ImmersiveDebug] Focus detail owner state changed', {
-      focusDetailSessionId,
-      activeSessionIds: activeSessions.map((session) => session.id),
-      shouldAutoEnterImmersive,
-    });
-  }, [activeSessions, focusDetailSessionId, shouldAutoEnterImmersive]);
   
   // Wrappers for Session Actions to match original signature (injecting autoLinkRules)
   const handleStartActivityWrapper = (
@@ -1014,15 +1002,11 @@ const AppContent: React.FC = () => {
               autoApplyTodoLink={autoApplyTodoLink}
               autoEnterImmersive={shouldAutoEnterImmersive}
               onClose={() => {
-                console.error('[ImmersiveDebug] FocusDetail onClose cleared its owner', {
-                  focusDetailSessionId,
-                });
                 setFocusDetailSessionId(null);
                 setShouldAutoEnterImmersive(false);
               }}
               onCancel={cancelSession}
               onComplete={(finalSession) => {
-                console.error('[ImmersiveDebug] FocusDetail completed session', { sessionId: finalSession.id });
                 handleStopActivityWrapper(finalSession.id, finalSession);
                 setFocusDetailSessionId(null);
                 setShouldAutoEnterImmersive(false);
