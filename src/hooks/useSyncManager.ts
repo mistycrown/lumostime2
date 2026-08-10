@@ -12,6 +12,8 @@
  * @updated 2026-05-18: Extended the unified backup/sync payload to include the achievement bottle backup block, and now restore that state alongside the main app data during imports and cloud downloads.
  * @updated 2026-05-17: Extended the unified backup/sync payload to include the shared AI backup block, and now restore that AI state alongside the main app data during imports and cloud downloads.
  * @updated 2026-05-18: Included the persisted custom color group in backup/sync payloads and now auto-sync palette-only edits as part of user data.
+ * @updated 2026-08-10: Included Android widget templates in backup/sync payloads, restores them through widgetService, and auto-syncs template-only changes.
+ * @updated 2026-08-10: Included unified appearance and TimePal settings in backup/sync payloads and restores their runtime state after image download.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -29,6 +31,12 @@ import { webdavService } from '../services/webdavService';
 import { s3Service } from '../services/s3Service';
 import { compatibleS3Service } from '../services/compatibleS3Service';
 import { assistantBackupService } from '../services/assistantBackupService';
+import { appearanceBackupService } from '../services/appearanceBackupService';
+import {
+    loadWidgetTemplatesFromStorage,
+    saveWidgetTemplatesToStorage,
+    WIDGET_TEMPLATES_UPDATED_EVENT
+} from '../services/widgetService';
 import {
     CUSTOM_COLOR_GROUP_UPDATED_EVENT,
     customColorGroupService
@@ -201,6 +209,14 @@ export const useSyncManager = () => {
                 await assistantBackupService.applyBackupPayload(data.aiData);
             }
 
+            if (hasField('widgetTemplates')) {
+                saveWidgetTemplatesToStorage(data.widgetTemplates);
+            }
+
+            if (hasField('appearanceData')) {
+                appearanceBackupService.applyBackupPayload(data.appearanceData);
+            }
+
             await new Promise(resolve => setTimeout(resolve, 10));
             console.log('[Sync] handleSyncDataUpdate applied restore payload');
 
@@ -227,6 +243,7 @@ export const useSyncManager = () => {
         const principles = principlesStr ? JSON.parse(principlesStr) : [];
         const selfBeliefsStr = localStorage.getItem('lumostime_self_beliefs');
         const selfBeliefs = selfBeliefsStr ? JSON.parse(selfBeliefsStr) : [];
+        const widgetTemplates = loadWidgetTemplatesFromStorage();
         
         const customColorGroup = customColorGroupService.getGroup();
 
@@ -237,6 +254,8 @@ export const useSyncManager = () => {
             customColorGroup,
             achievementData: buildAchievementBackupPayload(),
             aiData: assistantBackupService.buildBackupPayload(),
+            appearanceData: appearanceBackupService.buildBackupPayload(),
+            widgetTemplates,
             sceneTimeSlots,
             sceneGroupState,
             principles, // 添加原则库
@@ -1258,6 +1277,43 @@ export const useSyncManager = () => {
 
         return () => {
             window.removeEventListener(CUSTOM_COLOR_GROUP_UPDATED_EVENT, handleCustomColorGroupChanged as EventListener);
+            if (timer) clearTimeout(timer);
+        };
+    }, [manualSyncMode]);
+
+    // 2e. Android widget template Auto Sync
+    useEffect(() => {
+        let timer: NodeJS.Timeout | null = null;
+
+        const handleWidgetTemplatesUpdated = () => {
+            if (isRestoring.current) {
+                return;
+            }
+
+            setLocalDataTimestampValue(Date.now());
+
+            if (manualSyncMode) {
+                return;
+            }
+
+            if (timer) {
+                clearTimeout(timer);
+            }
+
+            pendingAutoSyncRef.current = true;
+
+            timer = setTimeout(async () => {
+                if (!isSyncingRef.current && !isRestoring.current) {
+                    await performSync('auto');
+                    pendingAutoSyncRef.current = false;
+                }
+            }, SYNC_CONFIG.AUTO_SYNC_DEBOUNCE_MS);
+        };
+
+        window.addEventListener(WIDGET_TEMPLATES_UPDATED_EVENT, handleWidgetTemplatesUpdated as EventListener);
+
+        return () => {
+            window.removeEventListener(WIDGET_TEMPLATES_UPDATED_EVENT, handleWidgetTemplatesUpdated as EventListener);
             if (timer) clearTimeout(timer);
         };
     }, [manualSyncMode]);

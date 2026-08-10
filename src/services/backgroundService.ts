@@ -13,6 +13,7 @@
  * - 闁哄秷顫夊畵渚€鎳楃仦鐐彲闁煎浜滄慨鈺冩嫬閸愨晜娈婚柣妯垮煐閳ь兛鐒﹂悥顕€寮藉畡鎵
  * 
  * 闁宠法濯寸粭?Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-08-10: Added canonical image-list storage and restore hydration for custom backgrounds.
  * @updated 2026-04-20: Added event-driven background subscriptions, image preloading, and lighter reapply scheduling to reduce mobile jank and white flashes.
  */
 
@@ -20,6 +21,7 @@ import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { statusBarService } from './statusBarService';
 import { resolveAssetPath } from '../utils/assetPath';
+import { imageService } from './imageService';
 
 export interface BackgroundOption {
     id: string;
@@ -28,6 +30,7 @@ export interface BackgroundOption {
     url: string;
     thumbnail?: string;
     filePath?: string;
+    imageFilename?: string;
 }
 
 export interface BackgroundSnapshot {
@@ -212,6 +215,7 @@ const TARGET_ELEMENTS = [
 
 class BackgroundService {
     private lastFoundElements?: string;
+    private isMigratingImageReferences = false;
     private isApplying = false; // 闂傚啫寮堕娑㈡煂瀹ュ拋妲婚幖瀛樻⒒閺?    private isMigratingLegacyBackgrounds = false;
     private reapplyTimeoutId: number | null = null;
     private preloadPromises = new Map<string, Promise<void>>();
@@ -369,6 +373,40 @@ class BackgroundService {
         }
     }
 
+    private async migrateLegacyImageReferences(): Promise<void> {
+        if (this.isMigratingImageReferences) return;
+
+        const backgrounds = this.loadStoredCustomBackgrounds();
+        if (!backgrounds.some(background => background.type === 'custom' && !background.imageFilename && background.url)) {
+            return;
+        }
+
+        this.isMigratingImageReferences = true;
+        try {
+            let changed = false;
+            const migrated = await Promise.all(backgrounds.map(async (background) => {
+                if (background.type !== 'custom' || background.imageFilename || !background.url) return background;
+
+                try {
+                    const response = await fetch(background.url);
+                    if (!response.ok) return background;
+                    changed = true;
+                    return {
+                        ...background,
+                        imageFilename: await imageService.saveImage(await response.blob())
+                    };
+                } catch (error) {
+                    console.warn('[BackgroundService] Failed to register legacy custom background:', background.id, error);
+                    return background;
+                }
+            }));
+
+            if (changed) this.saveCustomBackgrounds(migrated);
+        } finally {
+            this.isMigratingImageReferences = false;
+        }
+    }
+
     /**
      * 闁兼儳鍢茶ぐ鍥箥閳ь剟寮垫径搴″壒闁哄拋鍨堕埀顒€顦甸妴宥夋晬閸儺鏆曢悹?+ 闁煎浜滈悾鐐▕婢舵稓绀?     */
     getAllBackgrounds(): BackgroundOption[] {
@@ -393,6 +431,25 @@ class BackgroundService {
         return this.loadStoredCustomBackgrounds();
     }
 
+    async hydrateImageBackedCustomBackgrounds(): Promise<void> {
+        const backgrounds = this.loadStoredCustomBackgrounds();
+        let changed = false;
+        const hydrated = await Promise.all(backgrounds.map(async (background) => {
+            if (background.type !== 'custom' || !background.imageFilename) return background;
+
+            const url = await imageService.getImageUrl(background.imageFilename);
+            if (!url || background.url === url) return background;
+            changed = true;
+            return { ...background, url, thumbnail: url };
+        }));
+
+        if (changed) {
+            this.saveCustomBackgrounds(hydrated);
+            this.emitBackgroundChange();
+            this.applyBackgroundToElements();
+        }
+    }
+
     /**
      * 婵烇綀顕ф慨鐐烘嚊椤忓嫮鏆板☉鏂款槼閸庢寮?     */
     async addCustomBackground(file: File): Promise<BackgroundOption> {
@@ -406,6 +463,8 @@ class BackgroundService {
             url: dataUrl,
             thumbnail: dataUrl,
         };
+
+        customBackground.imageFilename = await imageService.saveImage(file);
 
         if (Capacitor.isNativePlatform()) {
             const persisted = await this.persistNativeBackgroundFile(dataUrl, backgroundId, file.name);
@@ -435,6 +494,9 @@ class BackgroundService {
 
                 if (backgroundToDelete?.filePath) {
                     void this.deleteNativeBackgroundFile(backgroundToDelete.filePath);
+                }
+                if (backgroundToDelete?.imageFilename) {
+                    void imageService.deleteImage(backgroundToDelete.imageFilename).catch(() => undefined);
                 }
 
                 // 濠碘€冲€归悘澶愬礆閻樼粯鐝熼柣銊ュ濡叉瓕銇愰幘鍐差枀闁煎啿鏈▍娆撴晬瀹€鍕缂傚喚鍠曠拹鐔割渶濡鍚?                const currentBackground = this.getCurrentBackground();
@@ -761,6 +823,8 @@ class BackgroundService {
     init(): void {
         const currentBackground = this.getCurrentBackgroundOption();
         void this.migrateLegacyCustomBackgrounds();
+        void this.migrateLegacyImageReferences();
+        void this.hydrateImageBackedCustomBackgrounds();
         if (currentBackground?.url) {
             void this.preloadBackground(currentBackground.url).catch(() => undefined);
         }

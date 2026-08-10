@@ -4,6 +4,7 @@
  * @input categories: Category[] - 活动分类列表
  * @output 时光小友设置界面，包含选择、筛选、自定义名言和点击切换开关
  * @pos Component
+ * @updated 2026-08-10: Reloads all TimePal controls after cloud or export settings restore.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Plus, X } from 'lucide-react';
@@ -13,6 +14,7 @@ import { TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 import { TagMultipleAssociation } from './TagMultipleAssociation';
 import { ToastType } from './Toast';
 import { imageService } from '../services/imageService';
+import { APPEARANCE_RESTORED_EVENT } from '../services/appearanceBackupService';
 import { CustomTimePalItem, timePalCustomService, TIMEPAL_CUSTOM_CHANGED_EVENT } from '../services/timePalCustomService';
 import { CustomTimePalModal } from './CustomTimePalModal';
 import { ConfirmModal } from './ConfirmModal';
@@ -163,6 +165,24 @@ export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories, on
     }, []);
 
     useEffect(() => {
+        const restoreTimePalSettings = () => {
+            const restoredType = storage.get(TIMEPAL_KEYS.TYPE);
+            setSelectedType(restoredType && restoredType !== 'none' ? restoredType : 'none');
+            setFilterActivityIds(storage.getJSON<string[]>(TIMEPAL_KEYS.FILTER_ACTIVITIES, []));
+            setCustomQuotesEnabled(storage.getBoolean(TIMEPAL_KEYS.CUSTOM_QUOTES_ENABLED, false));
+            setCustomQuotes(storage.getJSON<string[]>(TIMEPAL_KEYS.CUSTOM_QUOTES, []).join('\n'));
+            setClickSwitchEnabled(storage.getBoolean(TIMEPAL_KEYS.CLICK_SWITCH_ENABLED, true));
+            const restoredThresholds = readStoredTimePalStageThresholds();
+            setSavedStageThresholds(restoredThresholds);
+            setStageThresholdInputs(buildStageThresholdInputs(restoredThresholds));
+            void loadCustomItems();
+        };
+
+        window.addEventListener(APPEARANCE_RESTORED_EVENT, restoreTimePalSettings);
+        return () => window.removeEventListener(APPEARANCE_RESTORED_EVENT, restoreTimePalSettings);
+    }, []);
+
+    useEffect(() => {
         if (!isCustomItemsLoaded) {
             return;
         }
@@ -233,7 +253,7 @@ export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories, on
         const selectionValue = timePalCustomService.getSelectionValue(item.id);
         handleSelectType(selectionValue);
         loadCustomItems();
-        onToast?.('info', '自定义的时间小友不参加云同步');
+        onToast?.('success', '自定义时间小友已保存，会随数据同步');
     };
 
     const handleDeleteCustomItem = (item: CustomTimePalItem, event: React.MouseEvent) => {
@@ -399,7 +419,7 @@ export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories, on
             </div>
 
             <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                自定义的时间小友不参加云同步
+                自定义时间小友及其图片会随云同步和数据导出保存
             </div>
 
             <div className="pt-4 border-t border-stone-200 bg-white rounded-lg p-4 shadow-sm">

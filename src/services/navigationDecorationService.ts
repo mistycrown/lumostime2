@@ -13,11 +13,13 @@
  * 
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-08-10: Added canonical image-list storage and restore hydration for custom navigation decorations.
  */
 
 import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { resolveAssetPath } from '../utils/assetPath';
+import { imageService } from './imageService';
 
 export interface NavigationDecorationOption {
     id: string;
@@ -26,6 +28,7 @@ export interface NavigationDecorationOption {
     url: string;
     thumbnail?: string;
     filePath?: string;
+    imageFilename?: string;
     offsetY?: string; // 垂直偏移值，如 '0px', '-10px', '50%' 等
     offsetX?: string; // 水平位置（像素），如 '0px', '-20px', '50px' 等
     scale?: number;   // 缩放比例，默认 1 (100%)
@@ -45,6 +48,7 @@ interface NavigationDecorationSettings {
 }
 
 class NavigationDecorationService {
+    private isMigratingImageReferences = false;
     private decorations: NavigationDecorationOption[] = [
         { id: 'default', name: '默认', url: '', offsetY: 'bottom', offsetX: '0px', scale: 1, opacity: 0.6 },
         { id: 'bird', name: '飞鸟', url: '/dchh/bird.webp', offsetY: '56px', offsetX: '0px', scale: 1, opacity: 0.6 },
@@ -85,6 +89,11 @@ class NavigationDecorationService {
         { id: 'sun', name: '太阳', type: 'preset', url: '/dchh/sun.webp', offsetY: '61px', offsetX: '80px', scale: 1.35, opacity: 0.75 },
         { id: 'ya', name: '芽', type: 'preset', url: '/dchh/ya.webp', offsetY: '21px', offsetX: '23px', scale: 1.95, opacity: 0.6 },
     ].map(d => ({ ...d, type: d.type || 'preset' })) as NavigationDecorationOption[];
+
+    constructor() {
+        void this.migrateLegacyImageReferences();
+        void this.hydrateImageBackedCustomDecorations();
+    }
 
     private loadStoredCustomDecorations(): NavigationDecorationOption[] {
         try {
@@ -187,6 +196,60 @@ class NavigationDecorationService {
         return this.loadStoredCustomDecorations();
     }
 
+    private async migrateLegacyImageReferences(): Promise<void> {
+        if (this.isMigratingImageReferences) return;
+
+        const decorations = this.loadStoredCustomDecorations();
+        if (!decorations.some(decoration => decoration.type === 'custom' && !decoration.imageFilename && decoration.url)) {
+            return;
+        }
+
+        this.isMigratingImageReferences = true;
+        try {
+            let changed = false;
+            const migrated = await Promise.all(decorations.map(async (decoration) => {
+                if (decoration.type !== 'custom' || decoration.imageFilename || !decoration.url) return decoration;
+
+                try {
+                    const response = await fetch(decoration.url);
+                    if (!response.ok) return decoration;
+                    changed = true;
+                    return {
+                        ...decoration,
+                        imageFilename: await imageService.saveImage(await response.blob())
+                    };
+                } catch (error) {
+                    console.warn('[NavigationDecorationService] Failed to register legacy custom decoration:', decoration.id, error);
+                    return decoration;
+                }
+            }));
+
+            if (changed) this.saveCustomDecorations(migrated);
+        } finally {
+            this.isMigratingImageReferences = false;
+        }
+    }
+
+    async hydrateImageBackedCustomDecorations(): Promise<void> {
+        const decorations = this.loadStoredCustomDecorations();
+        let changed = false;
+        const hydrated = await Promise.all(decorations.map(async (decoration) => {
+            if (decoration.type !== 'custom' || !decoration.imageFilename) return decoration;
+
+            const url = await imageService.getImageUrl(decoration.imageFilename);
+            if (!url || decoration.url === url) return decoration;
+            changed = true;
+            return { ...decoration, url, thumbnail: url };
+        }));
+
+        if (changed) {
+            this.saveCustomDecorations(hydrated);
+            window.dispatchEvent(new CustomEvent('navigationDecorationChange', {
+                detail: { decorationId: this.getCurrentDecoration() }
+            }));
+        }
+    }
+
     getAllDecorations(): NavigationDecorationOption[] {
         return [
             ...this.decorations.map(decoration => ({
@@ -214,6 +277,8 @@ class NavigationDecorationService {
             opacity: 1
         };
 
+        customDecoration.imageFilename = await imageService.saveImage(file);
+
         if (Capacitor.isNativePlatform()) {
             const persisted = await this.persistNativeDecorationFile(dataUrl, decorationId, file.name);
             customDecoration = {
@@ -240,6 +305,9 @@ class NavigationDecorationService {
 
                 if (decorationToDelete?.filePath) {
                     void this.deleteNativeDecorationFile(decorationToDelete.filePath);
+                }
+                if (decorationToDelete?.imageFilename) {
+                    void imageService.deleteImage(decorationToDelete.imageFilename).catch(() => undefined);
                 }
 
                 // 如果删除的是当前装饰，重置为默认

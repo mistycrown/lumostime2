@@ -8,6 +8,7 @@
  * @updated 2026-07-30: Migrates the Chronicle todo split sidebar from a pixel width to a responsive persisted ratio.
  * @updated 2026-07-30: Migrates the Chronicle quick-color split sidebar to the same responsive ratio model.
  * @updated 2026-08-06: Added a persistent association selector column preference for shared category, scope, tag, and todo pickers.
+ * @updated 2026-08-10: Rehydrates appearance state after cloud or export restores so mounted settings do not overwrite restored choices.
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
@@ -88,6 +89,7 @@ import {
     normalizeAssociationSelectorColumns,
     type AssociationSelectorColumns
 } from '../services/associationSelectorLayoutService';
+import { APPEARANCE_RESTORED_EVENT } from '../services/appearanceBackupService';
 
 export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
 export type DefaultIndexView = 'TAGS' | 'SCOPE';
@@ -659,6 +661,61 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
         return (stored as EmojiStyle) || 'native';
     });
+
+    useEffect(() => {
+        const restoreAppearanceState = () => {
+            const storedScheduleStyle = localStorage.getItem(THEME_KEYS.SCHEDULE_STYLE);
+            const storedTimelineConfigs = localStorage.getItem(THEME_KEYS.TIMELINE_STYLE_CONFIGS);
+
+            setUiIconTheme(localStorage.getItem(THEME_KEYS.UI_ICON_THEME) || 'default');
+            setColorScheme(localStorage.getItem(THEME_KEYS.COLOR_SCHEME) || 'default');
+            setThemeMode(readStoredThemeMode(localStorage));
+            setFontFamily(localStorage.getItem('lumostime_font_family') || 'default');
+            setScheduleStyle(
+                storedScheduleStyle === 'outline' ? 'minimal' :
+                    (storedScheduleStyle === 'classic' || storedScheduleStyle === 'minimal' || storedScheduleStyle === 'solid' || storedScheduleStyle === 'default'
+                        ? storedScheduleStyle
+                        : 'default')
+            );
+
+            const storedCalendarNumberStyle = localStorage.getItem(THEME_KEYS.CALENDAR_NUMBER_STYLE);
+            setCalendarNumberStyle(isCalendarNumberStyle(storedCalendarNumberStyle)
+                ? storedCalendarNumberStyle
+                : DEFAULT_CALENDAR_NUMBER_STYLE);
+            setCalendarLunarDisplay(localStorage.getItem(THEME_KEYS.CALENDAR_LUNAR_DISPLAY) === 'true');
+
+            const storedBottleStyle = localStorage.getItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_STYLE);
+            setAchievementBottleStyle(isAchievementBottleStyle(storedBottleStyle)
+                ? storedBottleStyle
+                : DEFAULT_ACHIEVEMENT_BOTTLE_STYLE);
+            const storedBottleIconPack = localStorage.getItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_ICON_PACK);
+            setAchievementBottleIconPack(isAchievementBottleIconPack(storedBottleIconPack)
+                ? storedBottleIconPack
+                : DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK);
+
+            const storedTimelineStyle = localStorage.getItem(THEME_KEYS.TIMELINE_STYLE_THEME);
+            setTimelineStyleTheme(isTimelineStyleTheme(storedTimelineStyle)
+                ? storedTimelineStyle
+                : DEFAULT_TIMELINE_STYLE_THEME);
+            try {
+                setTimelineStyleConfigs(storedTimelineConfigs
+                    ? normalizeTimelineStyleConfigs(JSON.parse(storedTimelineConfigs))
+                    : getDefaultTimelineStyleConfigs());
+            } catch {
+                setTimelineStyleConfigs(getDefaultTimelineStyleConfigs());
+            }
+
+            const storedTimelineLayout = localStorage.getItem(THEME_KEYS.TIMELINE_LAYOUT);
+            setTimelineLayout(isTimelineLayoutMode(storedTimelineLayout)
+                ? storedTimelineLayout
+                : DEFAULT_TIMELINE_LAYOUT_MODE);
+            const storedEmojiStyle = localStorage.getItem('lumostime_emoji_style');
+            setEmojiStyle(storedEmojiStyle === 'twemoji' || storedEmojiStyle === 'openmoji' ? storedEmojiStyle : 'native');
+        };
+
+        window.addEventListener(APPEARANCE_RESTORED_EVENT, restoreAppearanceState);
+        return () => window.removeEventListener(APPEARANCE_RESTORED_EVENT, restoreAppearanceState);
+    }, []);
 
     const [defaultSelectorPage, setDefaultSelectorPage] = useState<DefaultSelectorPage>(() => {
         const stored = localStorage.getItem('lumostime_default_selector_page');

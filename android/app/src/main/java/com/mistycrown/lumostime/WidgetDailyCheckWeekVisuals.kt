@@ -13,6 +13,7 @@ import kotlin.math.min
  * Updated 2026-08-10: Moved the grid left and reduced the right inset for denser layouts.
  * Updated 2026-08-10: Moved the grid closer to daily-check labels to match the reference layout.
  * Updated 2026-08-10: Allowed full-widget renderers to use the same effective content inset as list rows.
+ * Updated 2026-08-10: Made completion marks and counts use darker shades of their item colors.
  */
 object WidgetDailyCheckWeekVisuals {
     private const val DEFAULT_ACCENT_COLOR = "#34D399"
@@ -70,7 +71,7 @@ object WidgetDailyCheckWeekVisuals {
             && progress.currentCount > 0
             && !progress.isCompleted
         ) {
-            textPaint.color = Color.rgb(41, 37, 36)
+            textPaint.color = foregroundAccentColor(item.color)
             textPaint.textSize = radius * 0.95f
             textPaint.textAlign = Paint.Align.CENTER
             val baseline = centerY - ((textPaint.descent() + textPaint.ascent()) / 2f)
@@ -78,7 +79,7 @@ object WidgetDailyCheckWeekVisuals {
             return
         }
 
-        checkPaint.color = Color.rgb(41, 37, 36)
+        checkPaint.color = foregroundAccentColor(item.color)
         checkPaint.strokeWidth = max(1.65f * density, radius * 0.18f)
         canvas.drawLine(centerX - radius * 0.46f, centerY, centerX - radius * 0.12f, centerY + radius * 0.34f, checkPaint)
         canvas.drawLine(centerX - radius * 0.12f, centerY + radius * 0.34f, centerX + radius * 0.50f, centerY - radius * 0.38f, checkPaint)
@@ -91,6 +92,15 @@ object WidgetDailyCheckWeekVisuals {
         val green = (Color.green(accent) + 255 * 3) / 4
         val blue = (Color.blue(accent) + 255 * 3) / 4
         return Color.rgb(red, green, blue)
+    }
+
+    @JvmStatic
+    fun foregroundAccentColor(color: String?): Int {
+        val hsv = FloatArray(3)
+        Color.colorToHSV(accentColor(color), hsv)
+        hsv[1] = max(hsv[1], 0.55f)
+        hsv[2] = min(hsv[2] * 0.62f, 0.62f)
+        return Color.HSVToColor(hsv)
     }
 
     @JvmStatic

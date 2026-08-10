@@ -23,7 +23,7 @@ import kotlin.math.max
  * Renders the dedicated 4x2 principle-card widget as a single bitmap.
  * @updated 2026-08-09: Supports packaged PNG/WebP card backgrounds with a left-anchored principle text block and face-aware content.
  * @updated 2026-08-09: Clips the rendered bitmap to larger rounded corners, removes the left mask, and keeps the body text serif, justified, and smaller.
- * @updated 2026-08-09: Slightly overscans card backgrounds after cover-scaling so source-image rounded corners cannot expose white edges.
+ * @updated 2026-08-10: Keeps cover-scaled backgrounds anchored to the bottom-right so cropping only removes the left/top empty area.
  * @updated 2026-08-09: Uses a shared dark-gray text color instead of pure black for a softer card treatment.
  */
 object WidgetPrincipleCardBitmapRenderer {
@@ -36,7 +36,6 @@ object WidgetPrincipleCardBitmapRenderer {
     private const val TITLE_TEXT_SP = 9.5f
     private const val BODY_LINE_SPACING_MULTIPLIER = 1.18f
     private const val BODY_LINE_SPACING_EXTRA_DP = 2.2f
-    private const val BACKGROUND_OVERSCAN_SCALE = 1.03f
     private const val PRINCIPLE_TEXT_COLOR = "#2F2F2F"
     private val SUPPORTED_EXTENSIONS = setOf("png", "webp")
     private val backgroundBitmapCache = object : LruCache<String, Bitmap>(12) {}
@@ -139,11 +138,11 @@ object WidgetPrincipleCardBitmapRenderer {
             val scale = max(
                 widgetWidthPx.toFloat() / backgroundBitmap.width.toFloat(),
                 widgetHeightPx.toFloat() / backgroundBitmap.height.toFloat()
-            ) * BACKGROUND_OVERSCAN_SCALE
+            )
             val scaledWidth = backgroundBitmap.width * scale
             val scaledHeight = backgroundBitmap.height * scale
-            val left = (widgetWidthPx - scaledWidth) / 2f
-            val top = (widgetHeightPx - scaledHeight) / 2f
+            val left = widgetWidthPx - scaledWidth
+            val top = widgetHeightPx - scaledHeight
             canvas.drawBitmap(
                 backgroundBitmap,
                 null,

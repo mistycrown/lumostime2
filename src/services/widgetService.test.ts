@@ -16,6 +16,7 @@
  * @updated 2026-05-10: Added native scene-card title layout regression coverage so widget launchers keep mixed-language labels centered and use ASCII ellipsis truncation.
  * @updated 2026-08-09: Added principle-card widget payload, PNG/WebP background scanning, and native provider wiring regression coverage.
  * @updated 2026-08-09: Added principle-card visual refresh regression coverage for rounded clipping, no mask, serif justified body text, and unlock refresh.
+ * @updated 2026-08-10: Added widget template storage regression coverage for backup and restore payload persistence.
  */
 
 import { describe, expect, it, vi } from 'vitest';
@@ -30,6 +31,8 @@ import {
   buildTrackingCalendarTagConfig,
   buildTrackingCalendarWidgetPayload,
   createWidgetTemplate,
+  loadWidgetTemplatesFromStorage,
+  saveWidgetTemplatesToStorage,
   sanitizeWidgetTemplatesForUiIconSupport
 } from './widgetService';
 import androidManifestSource from '../../android/app/src/main/AndroidManifest.xml?raw';
@@ -101,6 +104,25 @@ const checkTemplates: CheckTemplate[] = [
 const buildTrackingTemplate = (name: string) => createWidgetTemplate(name, '2x2', 'trackingCalendar');
 
 const emptySessions: ActiveSession[] = [];
+
+describe('widget template storage', () => {
+  it('round-trips templates through the backup storage representation', () => {
+    const storage = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value)
+    });
+
+    try {
+      const template = createWidgetTemplate('Backup template');
+      saveWidgetTemplatesToStorage([template]);
+
+      expect(loadWidgetTemplatesFromStorage()).toEqual([template]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
 
 const buildTodo = (overrides: Partial<TodoItem>): TodoItem => ({
   id: 'todo-1',
@@ -683,8 +705,9 @@ describe('WidgetPrincipleCardProviderSupport', () => {
     expect(widgetPrincipleCardBitmapRendererSource).toContain('it.endsWith(".webp", ignoreCase = true)');
     expect(widgetPrincipleCardBitmapRendererSource).toContain('it.endsWith(".png", ignoreCase = true)');
     expect(widgetPrincipleCardBitmapRendererSource).toContain('widthPx * 0.74f');
-    expect(widgetPrincipleCardBitmapRendererSource).toContain('BACKGROUND_OVERSCAN_SCALE = 1.03f');
-    expect(widgetPrincipleCardBitmapRendererSource).toContain(') * BACKGROUND_OVERSCAN_SCALE');
+    expect(widgetPrincipleCardBitmapRendererSource).not.toContain('BACKGROUND_OVERSCAN_SCALE');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('val left = widgetWidthPx - scaledWidth');
+    expect(widgetPrincipleCardBitmapRendererSource).toContain('val top = widgetHeightPx - scaledHeight');
   });
 
   it('clips the card bitmap corners, removes the text mask, and uses smaller serif justified body text', () => {

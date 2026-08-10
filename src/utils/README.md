@@ -3,6 +3,7 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- Update 2026-08-10: `dataValidation.ts` now accepts optional `widgetTemplates` arrays in backup and cloud sync payloads, while older backups that omit the field remain valid.
 - Update 2026-08-10: `autoCheckUtils.ts` now evaluates split overnight sleep from the first night segment through `nightEarliestStart`; `checkItemNormalizer.ts` migrates legacy `nightLatestStart` template and Daily Review snapshots during hydration.
 - Update 2026-08-10: `dailyCheckStatsUtils.ts` resolves a selected template item once per history range, avoiding repeated template traversal while the daily-check overview prepares its rows.
 - Update 2026-08-10: `statLogUtils.ts` now exposes actual-log filters and latest-end-time inference so backfill defaults and the previous-record shortcut ignore timeline Plan blocks.

@@ -6,6 +6,8 @@
  * @updated 2026-05-18: Added validation support for the nested `achievementData` backup block so achievement bottle progress can travel with user-data exports and sync restores.
  * @updated 2026-05-18: Added validation support for the nested `customColorGroup` backup block so custom palette swatches can travel with user-data exports and sync restores.
  * @updated 2026-05-17: Added unified-backup validation support for the nested `aiData` object so AI chat, prompt, and assistant-state payloads can travel with the main app JSON without tripping import guards.
+ * @updated 2026-08-10: Added optional Android widget template array validation while preserving compatibility with backups created before widget templates were exported.
+ * @updated 2026-08-10: Added optional appearance backup validation for theme and TimePal restore data.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -62,7 +64,8 @@ export function validateLocalData(data: any): ValidationResult {
     'customNarrativeTemplates',
     'filters',
     'principles',
-    'selfBeliefs'
+    'selfBeliefs',
+    'widgetTemplates'
   ];
 
   for (const field of arrayFields) {
@@ -85,6 +88,14 @@ export function validateLocalData(data: any): ValidationResult {
 
   if (data.aiData !== undefined && data.aiData !== null && typeof data.aiData !== 'object') {
     errors.push('Field aiData must be an object');
+  }
+
+  if (data.appearanceData !== undefined && data.appearanceData !== null && typeof data.appearanceData !== 'object') {
+    errors.push('Field appearanceData must be an object');
+  }
+
+  if (data.appearanceData?.storage !== undefined && data.appearanceData.storage !== null && typeof data.appearanceData.storage !== 'object') {
+    errors.push('Field appearanceData.storage must be an object');
   }
 
   if (!data.version) {

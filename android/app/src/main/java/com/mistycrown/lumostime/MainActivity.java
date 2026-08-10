@@ -7,7 +7,7 @@
  * @updated 2026-04-26: Captures assistant-notification navigation intents so the Web layer can reopen the shared AI chat at the targeted background reply after resume or cold start.
  * @updated 2026-07-22: Registers the native status-bar appearance bridge for display-mode synchronization.
  * @updated 2026-07-22: Draws an explicit top inset backdrop beneath Android 15's transparent status bar.
- * @updated 2026-08-10: Reapplies immersive system-bar hiding after Android orientation and focus transitions.
+ * @updated 2026-08-10: Reapplies immersive system-bar hiding after Android orientation and focus transitions, while keeping web controls above the native status-bar backdrop.
  */
 package com.mistycrown.lumostime;
 
@@ -22,6 +22,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 
+import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -103,6 +104,8 @@ public class MainActivity extends BridgeActivity {
         immersiveModeActive = active;
         if (active) {
             applyImmersiveWindowState();
+        } else {
+            moveStatusBarBackdropToFront();
         }
     }
 
@@ -113,8 +116,36 @@ public class MainActivity extends BridgeActivity {
         }
 
         statusBarBackdropView.setBackgroundColor(color);
-        statusBarBackdropView.bringToFront();
+        if (immersiveModeActive) {
+            moveStatusBarBackdropBehindWebContent();
+        } else {
+            moveStatusBarBackdropToFront();
+        }
         ViewCompat.requestApplyInsets(statusBarBackdropView);
+    }
+
+    private void moveStatusBarBackdropBehindWebContent() {
+        moveStatusBarBackdropToIndex(0);
+    }
+
+    private void moveStatusBarBackdropToFront() {
+        if (statusBarBackdropView != null) {
+            statusBarBackdropView.bringToFront();
+        }
+    }
+
+    private void moveStatusBarBackdropToIndex(int index) {
+        if (statusBarBackdropView == null) {
+            return;
+        }
+
+        FrameLayout contentView = getWindow().findViewById(android.R.id.content);
+        if (contentView == null || contentView.indexOfChild(statusBarBackdropView) == index) {
+            return;
+        }
+
+        contentView.removeView(statusBarBackdropView);
+        contentView.addView(statusBarBackdropView, index);
     }
 
     private void ensureStatusBarBackdrop() {

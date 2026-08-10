@@ -20,6 +20,7 @@
  * @updated 2026-05-18: Included the full achievement bottle backup block in JSON export payloads so synced exports now carry achievement progress too.
  * @updated 2026-05-18: Included the persisted custom color group in JSON export payloads so user-defined palette swatches travel with backup data.
  * @updated 2026-05-17: Added unified AI backup payload export so chat sessions, prompts, assistant memory, Dream state, and sanitized AI presets now travel inside the main JSON backup together with the rest of the app data.
+ * @updated 2026-08-10: Included Android widget templates plus unified appearance and TimePal settings in JSON export payloads so configured widgets and visual preferences can be restored after reinstalling the app.
  * @updated 2026-05-10: Upgraded the post-start timer auto-jump flow to support none, focus-detail, and immersive entry modes while preserving scene-card immersive overrides.
  * @updated 2026-05-10: Made the widget supplement-log shortcut snap the timeline date back to today before opening the backfill modal.
  * @updated 2026-04-27: Passed todo delete callbacks into the shared quick-actions sheet path so list and week todo action bars can trigger task removal.
@@ -79,9 +80,11 @@ import { useWidgetBridgeSync } from './hooks/useWidgetBridgeSync';
 import { useFloatingWindowSync } from './hooks/useFloatingWindowSync';
 import { useRecurringPlanAutoCreation } from './hooks/useRecurringPlanAutoCreation';
 import { assistantBackupService } from './services/assistantBackupService';
+import { appearanceBackupService } from './services/appearanceBackupService';
 import { customColorGroupService } from './services/customColorGroupService';
 import { getDesktopWidgetType, loadEnabledDesktopWidgetTypes } from './services/desktopWidgetService';
 import { ShortcutWidgetAction } from './services/widgetShortcutService';
+import { loadWidgetTemplatesFromStorage } from './services/widgetService';
 import { splitLogByDays } from './utils/logUtils';
 import { getLatestActualLogEndTime } from './utils/statLogUtils';
 import { buildSceneGroupStateFromLegacySlots, getActiveSceneGroup, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from './utils/sceneGroupStorage';
@@ -353,6 +356,7 @@ const AppContent: React.FC = () => {
     const principles = principlesStr ? JSON.parse(principlesStr) : [];
     const selfBeliefsStr = localStorage.getItem('lumostime_self_beliefs');
     const selfBeliefs = selfBeliefsStr ? JSON.parse(selfBeliefsStr) : [];
+    const widgetTemplates = loadWidgetTemplatesFromStorage();
     const customColorGroup = customColorGroupService.getGroup();
     
     const data = {
@@ -362,6 +366,8 @@ const AppContent: React.FC = () => {
       customColorGroup,
       achievementData: buildAchievementBackupPayload(),
       aiData: assistantBackupService.buildBackupPayload(),
+      appearanceData: appearanceBackupService.buildBackupPayload(),
+      widgetTemplates,
       sceneGroupState, // 新版：场景组状态
       sceneTimeSlots, // 添加场景设置
       principles, // 添加原则库
@@ -1175,6 +1181,8 @@ const AppContent: React.FC = () => {
               customColorGroup: customColorGroupService.getGroup(),
               achievementData: buildAchievementBackupPayload(),
               aiData: assistantBackupService.buildBackupPayload(),
+              appearanceData: appearanceBackupService.buildBackupPayload(),
+              widgetTemplates: loadWidgetTemplatesFromStorage(),
               selfBeliefs: JSON.parse(localStorage.getItem('lumostime_self_beliefs') || '[]')
             }}
             onEditTodo={todoManager.openEditTodoModal}
