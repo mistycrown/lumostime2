@@ -8,121 +8,19 @@
     android:paddingEnd="6dp"
     android:paddingBottom="6dp">
 
-    <LinearLayout
+    <ListView
+        android:id="@+id/widget_scene_tabs"
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="0.15"
-        android:orientation="vertical"
-        android:paddingEnd="3dp">
-
-        <FrameLayout
-            android:id="@+id/widget_scene_tab_0_root"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="false">
-
-            <ImageView
-                android:id="@+id/widget_scene_tab_0_bitmap"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:adjustViewBounds="false"
-                android:contentDescription="@null"
-                android:padding="2dp"
-                android:scaleType="centerInside" />
-        </FrameLayout>
-
-        <FrameLayout
-            android:id="@+id/widget_scene_tab_1_root"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="false">
-
-            <ImageView
-                android:id="@+id/widget_scene_tab_1_bitmap"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:adjustViewBounds="false"
-                android:contentDescription="@null"
-                android:padding="2dp"
-                android:scaleType="centerInside" />
-        </FrameLayout>
-
-        <FrameLayout
-            android:id="@+id/widget_scene_tab_2_root"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="false">
-
-            <ImageView
-                android:id="@+id/widget_scene_tab_2_bitmap"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:adjustViewBounds="false"
-                android:contentDescription="@null"
-                android:padding="2dp"
-                android:scaleType="centerInside" />
-        </FrameLayout>
-
-        <FrameLayout
-            android:id="@+id/widget_scene_tab_3_root"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="false">
-
-            <ImageView
-                android:id="@+id/widget_scene_tab_3_bitmap"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:adjustViewBounds="false"
-                android:contentDescription="@null"
-                android:padding="2dp"
-                android:scaleType="centerInside" />
-        </FrameLayout>
-
-        <FrameLayout
-            android:id="@+id/widget_scene_tab_4_root"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="false">
-
-            <ImageView
-                android:id="@+id/widget_scene_tab_4_bitmap"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:adjustViewBounds="false"
-                android:contentDescription="@null"
-                android:padding="2dp"
-                android:scaleType="centerInside" />
-        </FrameLayout>
-
-        <FrameLayout
-            android:id="@+id/widget_scene_tab_5_root"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="false">
-
-            <ImageView
-                android:id="@+id/widget_scene_tab_5_bitmap"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:adjustViewBounds="false"
-                android:contentDescription="@null"
-                android:padding="2dp"
-                android:scaleType="centerInside" />
-        </FrameLayout>
-    </LinearLayout>
+        android:clipToPadding="false"
+        android:divider="@null"
+        android:dividerHeight="0dp"
+        android:overScrollMode="never"
+        android:paddingEnd="3dp"
+        android:scrollbars="none"
+        android:scrollingCache="false"
+        android:stackFromBottom="false" />
 
     <LinearLayout
         android:layout_width="1dp"
@@ -185,7 +83,7 @@
             android:cacheColorHint="@android:color/transparent"
             android:clipToPadding="false"
             android:columnWidth="50dp"
-            android:gravity="center"
+            android:gravity="top|center_horizontal"
             android:horizontalSpacing="2dp"
             android:listSelector="@android:color/transparent"
             android:numColumns="4"

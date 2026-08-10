@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Category, CheckItem, Log } from '../types';
 import { evaluateAutoCheck, formatTimeValue, hasAutoCheckItemCompletionChanges } from './autoCheckUtils';
+import { normalizeCheckItem, normalizeCheckTemplates } from './checkItemNormalizer';
 import type { FilterContext } from './filterUtils';
 
 const context: FilterContext = {
@@ -47,15 +48,15 @@ function createNightSleepCheck(targetValue = 23 * 60): CheckItem {
     type: 'auto',
     autoConfig: {
       filterExpression: '#睡觉',
-      comparisonType: 'nightLatestStart',
+      comparisonType: 'nightEarliestStart',
       operator: '<',
       targetValue
     }
   };
 }
 
-describe('autoCheckUtils nightLatestStart', () => {
-  it('passes when the latest night sleep start is before the target', () => {
+describe('autoCheckUtils nightEarliestStart', () => {
+  it('passes when the earliest night sleep start is before the target', () => {
     const checkItem = createNightSleepCheck();
     const logs = [
       createSleepLog('2026-04-15T22:40:00+08:00', '2026-04-16T06:40:00+08:00')
@@ -73,7 +74,7 @@ describe('autoCheckUtils nightLatestStart', () => {
     expect(evaluateAutoCheck(checkItem, logs, context, new Date('2026-04-15T12:00:00+08:00'))).toBe(false);
   });
 
-  it('uses the latest start across both pre-midnight and post-midnight sleep segments', () => {
+  it('uses the earliest start across both pre-midnight and post-midnight sleep segments', () => {
     const checkItem = createNightSleepCheck();
     const logs = [
       createSleepLog('2026-04-15T23:20:00+08:00', '2026-04-16T00:20:00+08:00'),
@@ -81,6 +82,16 @@ describe('autoCheckUtils nightLatestStart', () => {
     ];
 
     expect(evaluateAutoCheck(checkItem, logs, context, new Date('2026-04-15T12:00:00+08:00'))).toBe(false);
+  });
+
+  it('passes split sleep records when the bedtime segment begins before the target', () => {
+    const checkItem = createNightSleepCheck();
+    const logs = [
+      createSleepLog('2026-04-15T22:49:00+08:00', '2026-04-16T00:00:00+08:00'),
+      createSleepLog('2026-04-16T00:00:00+08:00', '2026-04-16T07:00:00+08:00')
+    ];
+
+    expect(evaluateAutoCheck(checkItem, logs, context, new Date('2026-04-15T12:00:00+08:00'))).toBe(true);
   });
 
   it('excludes logs that start at 04:00 sharp from the night window', () => {
@@ -94,6 +105,36 @@ describe('autoCheckUtils nightLatestStart', () => {
 
   it('formats extended night times as next-day values', () => {
     expect(formatTimeValue(24 * 60 + 30)).toBe('次日 00:30');
+  });
+});
+
+describe('legacy night sleep configuration migration', () => {
+  const legacyAutoConfig = {
+    filterExpression: '#睡觉',
+    comparisonType: 'nightLatestStart',
+    operator: '<' as const,
+    targetValue: 23 * 60
+  };
+
+  it('migrates template and daily-review snapshots to nightEarliestStart', () => {
+    const normalizedTemplate = normalizeCheckTemplates([{
+      id: 'template',
+      title: '日常',
+      enabled: true,
+      order: 0,
+      isDaily: true,
+      items: [{ id: 'sleep', content: '早睡', type: 'auto', autoConfig: legacyAutoConfig }]
+    }]);
+    const normalizedItem = normalizeCheckItem({
+      id: 'sleep',
+      content: '早睡',
+      type: 'auto',
+      isCompleted: false,
+      autoConfig: legacyAutoConfig as unknown as CheckItem['autoConfig']
+    });
+
+    expect(normalizedTemplate[0].items[0].autoConfig?.comparisonType).toBe('nightEarliestStart');
+    expect(normalizedItem.autoConfig?.comparisonType).toBe('nightEarliestStart');
   });
 });
 

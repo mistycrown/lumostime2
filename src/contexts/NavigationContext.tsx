@@ -2,6 +2,7 @@
  * @file NavigationContext.tsx
  * @updated 2026-05-12: Added nested todo-detail history state so detail-to-detail navigation can unwind back to the previous task page instead of closing straight to the root view.
  * @updated 2026-08-09: Added daily-check overview/detail navigation state.
+ * @updated 2026-08-10: Added an explicit return target for daily-check overview launches from Settings or Timeline.
  * @updated 2026-08-09: Added the review-overview settings submenu.
  * @description 统一管理应用的所有导航和模态状态（含设置子页层级）
  */
@@ -37,6 +38,8 @@ export type SettingsSubmenu =
     | 'review_overview'
     | 'widget'
     | 'desktop_widget';
+
+export type DailyChecksReturnTarget = 'settings' | 'timeline';
 
 interface NavigationContextType {
     // 主视图
@@ -202,6 +205,8 @@ interface NavigationContextType {
     // Daily Check Detail
     dailyCheckDetailId: string | null;
     setDailyCheckDetailId: (id: string | null) => void;
+    dailyChecksReturnTarget: DailyChecksReturnTarget;
+    setDailyChecksReturnTarget: (target: DailyChecksReturnTarget) => void;
 
     // Navigation History
     previousView: AppView | null;
@@ -346,6 +351,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     const [isExportViewOpen, setIsExportViewOpen] = useState(false);
     const [currentDate, setCurrentDate] = useState<Date>(new Date());
     const [dailyCheckDetailId, setDailyCheckDetailId] = useState<string | null>(null);
+    const [dailyChecksReturnTarget, setDailyChecksReturnTarget] = useState<DailyChecksReturnTarget>('timeline');
     const [previousView, setPreviousView] = useState<AppView | null>(null);
 
     useEffect(() => {
@@ -515,6 +521,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
             setCurrentDate,
             dailyCheckDetailId,
             setDailyCheckDetailId,
+            dailyChecksReturnTarget,
+            setDailyChecksReturnTarget,
             previousView,
             setPreviousView
         }}>

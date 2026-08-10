@@ -17,6 +17,8 @@
  * @updated 2026-05-04: Added a shared overlay back-handler stack so transient sheets can consume Android hardware back before app-level navigation or exit runs.
  * @updated 2026-04-30: Routed Android hardware back presses through the shared AI chat back handler so AI subpages unwind before app-level exit logic runs.
  * @updated 2026-08-09: Prioritizes review overlays above Settings so Review Overview date jumps unwind in the visible order.
+ * @updated 2026-08-10: Routes daily-check overview hardware back to its explicit Settings or Timeline launch source.
+ * @updated 2026-08-10: Adds temporary Android back-event diagnostics for immersive-mode investigation.
  */
 import { useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -51,6 +53,7 @@ export const useHardwareBackButton = () => {
         currentView, setCurrentView,
         dailyCheckDetailId, setDailyCheckDetailId,
         previousView, setPreviousView,
+        dailyChecksReturnTarget, setDailyChecksReturnTarget,
         selectedTagId, setSelectedTagId,
         selectedCategoryId, setSelectedCategoryId,
         selectedScopeId, setSelectedScopeId,
@@ -105,7 +108,15 @@ export const useHardwareBackButton = () => {
 
     useEffect(() => {
         const handleBackButton = ({ canGoBack }: { canGoBack: boolean }) => {
-            if (runRegisteredHardwareBackHandler()) {
+            console.error('[ImmersiveDebug] Android backButton event received', {
+                canGoBack,
+                focusDetailSessionId,
+            });
+            const handledByRegisteredHandler = runRegisteredHardwareBackHandler();
+            console.error('[ImmersiveDebug] Registered hardware back handler result', {
+                handledByRegisteredHandler,
+            });
+            if (handledByRegisteredHandler) {
                 return;
             }
 
@@ -244,7 +255,13 @@ export const useHardwareBackButton = () => {
             }
             if (currentView === AppView.DAILY_CHECKS) {
                 setDailyCheckDetailId(null);
-                setCurrentView(previousView || AppView.TIMELINE);
+                if (dailyChecksReturnTarget === 'settings') {
+                    setCurrentView(previousView || AppView.TIMELINE);
+                    setIsSettingsOpen(true);
+                } else {
+                    setCurrentView(AppView.TIMELINE);
+                }
+                setDailyChecksReturnTarget('timeline');
                 setPreviousView(null);
                 return;
             }
@@ -272,6 +289,6 @@ export const useHardwareBackButton = () => {
         isDailyNewspaperOpen, isWeeklyNewspaperOpen, isMonthlyNewspaperOpen, isDailyReviewOpen, isOnThisDayOpen, isWeeklyReviewOpen, isMonthlyReviewOpen, isAchievementOpen,
         isStatsFullScreen, isTodoManaging, isTagsManaging, isScopeManaging,
         currentView, selectedTagId, selectedCategoryId, selectedScopeId, settingsSubmenu, settingsSubmenuBackCloses, isSearchOpenedFromSettings, activeFilterId,
-        dailyCheckDetailId, previousView
+        dailyCheckDetailId, previousView, dailyChecksReturnTarget
     ]);
 };

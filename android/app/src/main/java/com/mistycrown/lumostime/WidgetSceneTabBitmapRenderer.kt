@@ -9,13 +9,13 @@ import android.text.TextPaint
 
 /**
  * Renders the compact icon-only scene tabs used by the dedicated 4x3 scene widget.
- * Updated 2026-08-06: Added packaged UI icon rendering with emoji fallback.
+ * Updated 2026-08-10: Increased the scrollable tab hit target and icon canvas size.
  */
 object WidgetSceneTabBitmapRenderer {
-    private const val TAB_SIZE_DP = 34f
+    private const val TAB_SIZE_DP = 44f
     private const val TAB_RADIUS_DP = 12f
-    private const val TAB_TEXT_SIZE_DP = 18f
-    private const val TAB_UI_ICON_SIZE_DP = 20f
+    private const val TAB_TEXT_SIZE_DP = 22f
+    private const val TAB_UI_ICON_SIZE_DP = 26f
 
     fun render(
         context: Context,

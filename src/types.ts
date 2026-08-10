@@ -28,7 +28,7 @@
  * @updated 2026-04-18: Added custom sticker set and sticker record types for synced mood sticker uploads.
  * @updated 2026-04-17: Added achievement filter-duration rules with inline filter expressions.
  * @updated 2026-04-18: Expanded widget session metadata to match the slot-based widget model, including shortcut slots.
- * @updated 2026-04-15: Added nightLatestStart auto-check comparison type for cross-midnight sleep rules.
+ * @updated 2026-08-10: Replaced the cross-midnight sleep rule with nightEarliestStart so split sleep records use the bedtime segment.
  *
  * Note: update this header comment and the folder README when changing this file.
  */
@@ -961,7 +961,7 @@ export interface CheckTemplateItem {
 // Automatic daily check config
 export interface AutoCheckConfig {
   filterExpression: string; // Filter expression, for example "#study %deep-work"
-  comparisonType: 'duration' | 'earliestStart' | 'latestStart' | 'nightLatestStart' | 'earliestEnd' | 'latestEnd' | 'count'; // Metric to evaluate
+  comparisonType: 'duration' | 'earliestStart' | 'latestStart' | 'nightEarliestStart' | 'earliestEnd' | 'latestEnd' | 'count'; // Metric to evaluate
   operator: '>=' | '<=' | '>' | '<' | '='; // Comparison operator
   targetValue: number; // Target value in minutes, clock minutes, or count
 }

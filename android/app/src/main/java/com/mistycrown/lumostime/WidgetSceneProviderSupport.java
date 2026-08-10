@@ -8,7 +8,6 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.text.TextUtils;
-import android.view.View;
 import android.widget.RemoteViews;
 
 import java.text.SimpleDateFormat;
@@ -20,7 +19,7 @@ import java.util.Objects;
 
 /**
  * Shared rendering and tap handling for the dedicated 4x3 scene widget.
- * Updated 2026-08-06: Passes scene time-slot UI icon asset paths to native tab rendering.
+ * Updated 2026-08-10: Uses a scrollable RemoteViews time-slot list while preserving native tab rendering.
  */
 public final class WidgetSceneProviderSupport {
     public static final String ACTION_SELECT_SCENE_TAB =
@@ -33,24 +32,6 @@ public final class WidgetSceneProviderSupport {
     public static final String EXTRA_ITEM_ID = "scene_item_id";
     private static final int MORNING_REFRESH_START_HOUR = 4;
     private static final long SCENE_REFRESH_ANIMATION_DURATION_MS = 420L;
-
-    private static final int[] TAB_ROOT_IDS = new int[] {
-            R.id.widget_scene_tab_0_root,
-            R.id.widget_scene_tab_1_root,
-            R.id.widget_scene_tab_2_root,
-            R.id.widget_scene_tab_3_root,
-            R.id.widget_scene_tab_4_root,
-            R.id.widget_scene_tab_5_root
-    };
-
-    private static final int[] TAB_BITMAP_IDS = new int[] {
-            R.id.widget_scene_tab_0_bitmap,
-            R.id.widget_scene_tab_1_bitmap,
-            R.id.widget_scene_tab_2_bitmap,
-            R.id.widget_scene_tab_3_bitmap,
-            R.id.widget_scene_tab_4_bitmap,
-            R.id.widget_scene_tab_5_bitmap
-    };
 
     private WidgetSceneProviderSupport() {}
 
@@ -101,7 +82,7 @@ public final class WidgetSceneProviderSupport {
                         context,
                         new WidgetSceneSelectionState(appWidgetId, slotId, state.currentAutoSlotId)
                 );
-                refreshSingleWidget(context, appWidgetId, providerClass);
+                refreshSingleWidgetAfterTabSelection(context, appWidgetId);
             }
             return true;
         }
@@ -117,6 +98,10 @@ public final class WidgetSceneProviderSupport {
                     && !TextUtils.isEmpty(slotId)
                     && !TextUtils.isEmpty(itemId)) {
                 ResolvedSceneState state = resolveState(context, appWidgetId);
+                if (!Objects.equals(slotId, state.selectedSlotId)) {
+                    refreshSingleWidgetAfterTabSelection(context, appWidgetId);
+                    return true;
+                }
                 WidgetSceneItem item = findSceneItem(state.displayedGroup, slotId, itemId);
                 int itemIndex = findSceneItemIndex(state.displayedGroup, slotId, itemId);
                 if (item != null
@@ -200,7 +185,14 @@ public final class WidgetSceneProviderSupport {
             ResolvedSceneState state = resolveState(context, appWidgetId, payload);
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_layout_scene_4x3);
 
-            bindSceneTabs(context, views, state, appWidgetId, providerClass);
+            Intent tabsIntent = new Intent(context, WidgetSceneTabsRemoteViewsService.class);
+            tabsIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+            tabsIntent.setData(Uri.parse(tabsIntent.toUri(Intent.URI_INTENT_SCHEME)));
+            views.setRemoteAdapter(R.id.widget_scene_tabs, tabsIntent);
+            views.setPendingIntentTemplate(
+                    R.id.widget_scene_tabs,
+                    buildTabTemplatePendingIntent(context, appWidgetId, providerClass)
+            );
             views.setTextViewText(R.id.widget_scene_slot_label, formatSlotLabel(state.selectedSlot));
             bindRefreshButton(context, views, appWidgetId, providerClass);
 
@@ -213,6 +205,7 @@ public final class WidgetSceneProviderSupport {
                     buildCardTemplatePendingIntent(context, appWidgetId, providerClass)
             );
             appWidgetManager.notifyAppWidgetViewDataChanged(new int[] { appWidgetId }, R.id.widget_scene_cards);
+            appWidgetManager.notifyAppWidgetViewDataChanged(new int[] { appWidgetId }, R.id.widget_scene_tabs);
 
             appWidgetManager.updateAppWidget(appWidgetId, views);
         }
@@ -276,46 +269,6 @@ public final class WidgetSceneProviderSupport {
         );
     }
 
-    private static void bindSceneTabs(
-            Context context,
-            RemoteViews views,
-            ResolvedSceneState state,
-            int appWidgetId,
-            Class<? extends AppWidgetProvider> providerClass
-    ) {
-        List<WidgetSceneTimeSlot> slots = state.displayedGroup != null
-                ? state.displayedGroup.getTimeSlots()
-                : java.util.Collections.emptyList();
-
-        for (int index = 0; index < TAB_ROOT_IDS.length; index += 1) {
-            int rootId = TAB_ROOT_IDS[index];
-            int bitmapId = TAB_BITMAP_IDS[index];
-
-            if (index >= slots.size()) {
-                views.setViewVisibility(rootId, View.INVISIBLE);
-                continue;
-            }
-
-            WidgetSceneTimeSlot slot = slots.get(index);
-            boolean isSelected = slot.getId() != null && slot.getId().equals(state.selectedSlotId);
-            views.setViewVisibility(rootId, View.VISIBLE);
-            views.setImageViewBitmap(
-                    bitmapId,
-                    WidgetSceneTabBitmapRenderer.INSTANCE.render(
-                            context,
-                            slot.getIcon(),
-                            slot.getUiIconAssetPath(),
-                            slot.getUiIconFallbackAssetPath(),
-                            isSelected
-                    )
-            );
-            views.setOnClickPendingIntent(
-                    rootId,
-                    buildTabPendingIntent(context, appWidgetId, providerClass, slot.getId(), index)
-            );
-        }
-    }
-
     private static void refreshSingleWidget(
             Context context,
             int appWidgetId,
@@ -323,6 +276,31 @@ public final class WidgetSceneProviderSupport {
     ) {
         AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
         updateWidgets(context, appWidgetManager, new int[] { appWidgetId }, providerClass);
+    }
+
+    private static void refreshSingleWidgetAfterTabSelection(
+            Context context,
+            int appWidgetId
+    ) {
+        AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
+        ResolvedSceneState state = resolveState(context, appWidgetId);
+        RemoteViews partialViews = new RemoteViews(
+                context.getPackageName(),
+                R.layout.widget_layout_scene_4x3
+        );
+        partialViews.setTextViewText(
+                R.id.widget_scene_slot_label,
+                formatSlotLabel(state.selectedSlot)
+        );
+        appWidgetManager.partiallyUpdateAppWidget(appWidgetId, partialViews);
+        appWidgetManager.notifyAppWidgetViewDataChanged(
+                new int[] { appWidgetId },
+                R.id.widget_scene_cards
+        );
+        appWidgetManager.notifyAppWidgetViewDataChanged(
+                new int[] { appWidgetId },
+                R.id.widget_scene_tabs
+        );
     }
 
     private static void refreshAllWidgets(
@@ -512,25 +490,6 @@ public final class WidgetSceneProviderSupport {
         }
     }
 
-    private static PendingIntent buildTabPendingIntent(
-            Context context,
-            int appWidgetId,
-            Class<? extends AppWidgetProvider> providerClass,
-            String slotId,
-            int position
-    ) {
-        Intent intent = new Intent(context, providerClass);
-        intent.setAction(ACTION_SELECT_SCENE_TAB);
-        intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
-        intent.putExtra(EXTRA_SLOT_ID, slotId);
-        return PendingIntent.getBroadcast(
-                context,
-                appWidgetId * 100 + position + 8500,
-                intent,
-                pendingIntentFlags()
-        );
-    }
-
     private static PendingIntent buildRefreshPendingIntent(
             Context context,
             int appWidgetId,
@@ -541,9 +500,25 @@ public final class WidgetSceneProviderSupport {
         intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
         return PendingIntent.getBroadcast(
                 context,
-                appWidgetId + 8700,
+                appWidgetId * 1000 + 8700,
                 intent,
                 pendingIntentFlags()
+        );
+    }
+
+    private static PendingIntent buildTabTemplatePendingIntent(
+            Context context,
+            int appWidgetId,
+            Class<? extends AppWidgetProvider> providerClass
+    ) {
+        Intent intent = new Intent(context, providerClass);
+        intent.setAction(ACTION_SELECT_SCENE_TAB);
+        intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+        return PendingIntent.getBroadcast(
+                context,
+                appWidgetId * 1000 + 8500,
+                intent,
+                pendingIntentTemplateFlags()
         );
     }
 
@@ -583,7 +558,7 @@ public final class WidgetSceneProviderSupport {
         intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
         return PendingIntent.getBroadcast(
                 context,
-                appWidgetId + 8600,
+                appWidgetId * 1000 + 8600,
                 intent,
                 pendingIntentTemplateFlags()
         );

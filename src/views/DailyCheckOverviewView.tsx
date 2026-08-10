@@ -7,8 +7,9 @@
  * @created 2026-08-09
  * @updated 2026-08-09: Added the first daily-check overview page.
  * @updated 2026-08-09: Moved continuous records to the row's right side and removed semantic icon replacement.
- * @updated 2026-08-09: Shows five history cells only for manual checks and keeps missing reviews unknown.
+ * @updated 2026-08-09: Shows five history cells only for manual checks and keeps missing reviews distinct.
  * @updated 2026-08-09: Unified the header height and applied per-item template colors.
+ * @updated 2026-08-10: Reads nightEarliestStart rows from the previous night's review while retaining today for other checks.
  */
 import React, { useMemo } from 'react';
 import { ArrowLeft, Check, ChevronRight } from 'lucide-react';
@@ -25,15 +26,13 @@ import {
 import { DailyCheckIcon, getDailyCheckIconTone } from '../components/DailyCheckIcon';
 import {
   formatDurationMinutes,
+  getDailyCheckOverviewAnchorDate,
   getDailyCheckDisplayType,
   getDailyCheckHistory,
-  getDailyCheckItemForDate,
   getDailyCheckTemplateItem,
-  getDailyCheckTypeLabel,
-  isDailyCheckComplete
+  getDailyCheckTypeLabel
 } from '../utils/dailyCheckStatsUtils';
 import { formatTimeValue } from '../utils/autoCheckUtils';
-import { getLocalDateStr } from '../utils/dateUtils';
 import { getDailyCheckColorValues } from '../utils/dailyCheckColorUtils';
 import { getCheckTemplateItemKey } from '../utils/dailyCheckUtils';
 
@@ -53,6 +52,14 @@ interface DailyCheckOverviewViewProps {
 interface DailyCheckGroup {
   template: CheckTemplate;
   items: CheckItem[];
+}
+
+interface DailyCheckOverviewRow {
+  item: CheckItem;
+  type: ReturnType<typeof getDailyCheckDisplayType>;
+  history: ReturnType<typeof getDailyCheckHistory>;
+  displayValue: string | null;
+  customColor: ReturnType<typeof getDailyCheckColorValues>;
 }
 
 export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
@@ -98,8 +105,6 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
     return colors;
   }, [checkTemplates]);
 
-  const hasCurrentReview = dailyReviews.some((review) => review.date === getLocalDateStr(currentDate));
-
   const formatCount = (value: number): string => (
     Number.isInteger(value) ? String(value) : value.toFixed(1)
   );
@@ -112,7 +117,7 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
       return null;
     }
     if (value === null) {
-      return '?';
+      return '/';
     }
     if (type === 'duration') {
       return formatDurationMinutes(value);
@@ -122,6 +127,40 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
     }
     return formatCount(value);
   };
+
+  const groupRows = useMemo(() => {
+    const rowsByTemplateId = new Map<string, DailyCheckOverviewRow[]>();
+
+    groups.forEach((group) => {
+      rowsByTemplateId.set(group.template.id, group.items.map((item) => {
+        const type = getDailyCheckDisplayType(item);
+        const anchorDate = getDailyCheckOverviewAnchorDate(item, currentDate);
+        const history = getDailyCheckHistory({
+          itemId: item.id,
+          anchorDate,
+          days: item.type === 'auto' ? 1 : 5,
+          dailyReviews,
+          checkTemplates,
+          logs,
+          filterContext
+        });
+        const value = history[history.length - 1]?.value ?? null;
+        const displayValue = item.type !== 'auto' && type === 'count'
+          ? null
+          : formatOverviewValue(type, value);
+
+        return {
+          item,
+          type,
+          history,
+          displayValue,
+          customColor: getDailyCheckColorValues(templateItemColors.get(item.id))
+        };
+      }));
+    });
+
+    return rowsByTemplateId;
+  }, [checkTemplates, currentDate, dailyReviews, filterContext, groups, logs, templateItemColors]);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#faf9f6] text-stone-900">
@@ -154,17 +193,9 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
           ) : (
             <div className="space-y-8">
               {groups.map((group) => {
-                const completed = group.items.filter((item) => {
-                  const currentItem = getDailyCheckItemForDate({
-                    itemId: item.id,
-                    date: currentDate,
-                    dailyReviews,
-                    checkTemplates,
-                    logs,
-                    filterContext
-                  });
-                  return currentItem ? isDailyCheckComplete(currentItem) : false;
-                }).length;
+                const rows = groupRows.get(group.template.id) || [];
+                const completed = rows.filter((row) => row.history[row.history.length - 1]?.isCompleted).length;
+                const hasOverviewRecord = rows.some((row) => row.history[row.history.length - 1]?.hasRecord);
                 return (
                   <section key={group.template.id}>
                     <div className="mb-3 flex items-end justify-between border-b border-stone-300 pb-2">
@@ -172,41 +203,24 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
                         {group.template.title}
                       </h2>
                       <span className="text-xs tabular-nums text-stone-500">
-                        {hasCurrentReview ? `${completed}/${group.items.length} 完成` : `?/${group.items.length} 完成`}
+                        {hasOverviewRecord ? `${completed}/${group.items.length} 完成` : `/${group.items.length} 完成`}
                       </span>
                     </div>
 
                     <div className="divide-y divide-stone-200/80 border-b border-stone-200/80">
-                      {group.items.map((item) => {
-                        const type = getDailyCheckDisplayType(item);
+                      {rows.map(({ item, type, history, displayValue, customColor }) => {
                         const tone = getDailyCheckIconTone(type);
-                        const history = getDailyCheckHistory({
-                          itemId: item.id,
-                          anchorDate: currentDate,
-                          days: 5,
-                          dailyReviews,
-                          checkTemplates,
-                          logs,
-                          filterContext
-                        });
-                        const value = history[history.length - 1]?.value ?? null;
                         const isManual = item.type !== 'auto';
-                        const customColor = getDailyCheckColorValues(templateItemColors.get(item.id));
-                        const displayValue = isManual && type === 'count'
-                          ? null
-                          : formatOverviewValue(type, value);
 
                         return (
-                          <div
+                          <button
                             key={item.id}
-                            className="group flex w-full items-center gap-3 py-4 text-left transition-colors hover:bg-white/60"
+                            type="button"
+                            onClick={() => onOpenDetail(item.id)}
+                            className="group flex w-full items-center gap-3 py-4 text-left transition-colors hover:bg-white/60 active:bg-stone-100/70"
+                            aria-label={`查看${item.content}详情`}
                           >
-                            <button
-                              type="button"
-                              onClick={() => onOpenDetail(item.id)}
-                              className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                              aria-label={`查看${item.content}详情`}
-                            >
+                            <div className="flex min-w-0 flex-1 items-center gap-3">
                               <div
                                 className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${customColor ? '' : `${tone.surface} ${tone.icon}`}`}
                                 style={customColor ? { backgroundColor: customColor.surface, color: customColor.primary } : undefined}
@@ -227,7 +241,7 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
                                   <span>{getDailyCheckTypeLabel(item)}</span>
                                 </div>
                               </div>
-                            </button>
+                            </div>
 
                             <div className="flex shrink-0 items-center gap-2">
                               {isManual && (
@@ -235,8 +249,8 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
                                   {history.map((point) => {
                                     const hasValue = point.value !== null && point.value > 0;
                                     const isCount = type === 'count';
-                                    const circleContent = !point.hasReview
-                                      ? '?'
+                                    const circleContent = !point.hasRecord
+                                      ? '/'
                                       : point.isCompleted
                                         ? <Check size={10} strokeWidth={2.5} />
                                         : isCount
@@ -246,7 +260,7 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
                                       <span
                                         key={point.dateLabel}
                                         className={`flex h-5 w-5 items-center justify-center rounded-full border text-[10px] font-semibold ${
-                                          !point.hasReview
+                                          !point.hasRecord
                                             ? 'border-stone-300 bg-transparent text-stone-400'
                                             : point.isCompleted
                                               ? `${customColor ? '' : `${tone.surface} ${tone.text}`} border-transparent`
@@ -258,10 +272,10 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
                                                 ? `${customColor ? '' : `${tone.surface} ${tone.text}`} border-transparent opacity-60`
                                                 : 'border-stone-300 bg-transparent text-transparent'
                                         }`}
-                                        style={customColor && point.hasReview && (point.isCompleted || hasValue)
+                                        style={customColor && point.hasRecord && (point.isCompleted || hasValue)
                                           ? { backgroundColor: customColor.surface, color: customColor.primary }
                                           : undefined}
-                                        title={`${point.dateLabel}${!point.hasReview ? ' ?' : point.isCompleted ? ' 已完成' : isCount ? ` ${point.value ?? 0} 次` : hasValue ? ' 有记录' : ' 未完成'}`}
+                                        title={`${point.dateLabel}${!point.hasRecord ? ' /' : point.isCompleted ? ' 已完成' : isCount ? ` ${point.value ?? 0} 次` : hasValue ? ' 有记录' : ' 未完成'}`}
                                       >
                                         {circleContent}
                                       </span>
@@ -276,17 +290,14 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
                                 </span>
                               )}
 
-                              <button
-                                type="button"
-                                onClick={() => onOpenDetail(item.id)}
-                                className="flex h-8 w-8 items-center justify-center rounded-full text-stone-300 transition-colors hover:bg-white hover:text-stone-700"
-                                title="查看详情"
-                                aria-label={`查看${item.content}详情`}
+                              <span
+                                className="flex h-8 w-8 items-center justify-center rounded-full text-stone-300 transition-colors group-hover:bg-white group-hover:text-stone-700"
+                                aria-hidden="true"
                               >
                                 <ChevronRight size={17} />
-                              </button>
+                              </span>
                             </div>
-                          </div>
+                          </button>
                         );
                       })}
                     </div>

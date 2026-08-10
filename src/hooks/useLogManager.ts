@@ -7,6 +7,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-07-30: Blocks deletion of recurring auto-Plan logs while their Repeat todo auto-Plan switch remains enabled.
+ * @updated 2026-08-10: Excluded timeline Plan blocks from smart backfill defaults and quick-punch start inference.
  * @updated 2026-06-06: Added hard-field duplicate protection for new log insertions so floating-window stop races cannot append identical timeline records twice.
  * @updated 2026-05-16: Dispatches a shared assistant log-submission event only for brand-new logs so post-save AI triggers can ignore edits.
  * @updated 2026-05-10: Let callers override the date used for backfill defaults so widget supplement-log launches can force today even when the timeline was left on an older day.
@@ -29,6 +30,7 @@ import {
     prependLogsWithDedupe
 } from '../utils/logInsertionUtils';
 import { isAutoRecurringPlanDeleteLocked } from '../utils/todoRecurringPlanUtils';
+import { filterActualLogs, getLatestActualLogEndTimeInRange } from '../utils/statLogUtils';
 
 export const useLogManager = () => {
     const { logs, todos, setLogs, setTodos } = useData();
@@ -168,8 +170,7 @@ export const useLogManager = () => {
         todayStart.setHours(0, 0, 0, 0);
         const todayStartTimestamp = todayStart.getTime();
 
-        const allLogs = [...logs].sort((a, b) => b.endTime - a.endTime);
-        const lastLog = allLogs[0];
+        const lastLog = filterActualLogs(logs).sort((a, b) => b.endTime - a.endTime)[0];
 
         let startTimestamp: number;
 
@@ -284,16 +285,17 @@ export const useLogManager = () => {
             }
 
             // Find the last log on the current day
-            const logsOnDay = logs.filter(log =>
-                log.endTime >= dayStart.getTime() &&
-                log.endTime <= dayEnd.getTime()
+            const latestActualLogEndTime = getLatestActualLogEndTimeInRange(
+                logs,
+                dayStart.getTime(),
+                dayEnd.getTime()
             );
 
             let newStart = dayStart.getTime();
 
-            if (logsOnDay.length > 0) {
-                // Use the end time of the last log on this day
-                newStart = logsOnDay.reduce((max, log) => Math.max(max, log.endTime), dayStart.getTime());
+            if (latestActualLogEndTime !== undefined) {
+                // Use the end time of the latest actual log on this day.
+                newStart = latestActualLogEndTime;
             }
 
             setInitialLogTimes({ start: newStart, end: dayEnd.getTime(), prefilledData });

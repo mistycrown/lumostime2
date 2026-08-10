@@ -3,6 +3,8 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-08-10: `AppRoutes.tsx` now gives daily-check overview and detail a stable current-day value whenever the route changes, independent of the selected date in other workspaces.
+- Update 2026-08-10: `HeatmapCalendar.tsx` continues to render missing daily-check dates without a question-mark placeholder; no visual change was needed for the compact slash used by overview and detail value surfaces.
 - Update 2026-08-09: `HeatmapCalendar.tsx` now follows the detail timeline's compact `YYYY.MM` month navigator, leaves dates without a Daily Review snapshot transparent while retaining their numerals, renders recorded check values below dates, and exposes a temporary manual-check backfill control.
 - Update 2026-08-09: `AppRoutes.tsx` now lets reviews opened from Settings > 回顾总览 render above the settings overlay with a compact `详情` back layer, so software back returns to answer detail first.
 - Update 2026-08-06: `TimelineScheduleCanvas.tsx` now expands note text inside sufficiently tall time blocks while keeping shorter blocks to one truncated line.
@@ -203,6 +205,8 @@ Components that form the structural or global UI elements.
 - Update 2026-04-27: `AIBackfillChatModal.tsx` now skips foreground reminder-summary injection when background polling is off, omits long-term-memory prompt sections when memory is disabled, and blocks foreground memory writes while long-term memory is off.
 - Update 2026-04-27: `AIBackfillChatModal.tsx` now uses plus-only icon buttons for adding long-term-memory notes and reminders, replacing the repeated `新增一条` labels in that management view.
 Overlay components for complex interactions.
+
+- Update 2026-08-10: `AutoCheckItemEditor.tsx` and `CheckTemplateItemRow.tsx` expose the cross-midnight sleep metric as `夜间最早开始时间`.
 
 - `AIBackfillChatModal.tsx`: Shared AI workspace for generic chat plus the first weekly-review template conversation flow, now supporting one-step `普通对话 / 模板对话：周复盘` session creation, week-bound template sessions with direct range buttons and method selection, template-specific weekly data/context injection sourced from the shared TS weekly-review prompt constants, a composer-side `写入 AI 叙事` quick-fill path that still goes through local overwrite/merge gating before Weekly Review narrative writeback, and background assistant routing that only follows the latest user-active ordinary conversation instead of any template or assistant-only thread.
 - `AIBackfillChatModal.tsx`: The same shared AI workspace now also exposes a separate Dream system where users manage concern topics, Dream entries live under per-topic tabs, the explicit `dream` command now enters a conversational month-selection step before refreshing one chosen month of data, and ordinary foreground/background assistant turns consume Dream as read-only continuity context.

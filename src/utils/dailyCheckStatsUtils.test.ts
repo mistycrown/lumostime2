@@ -7,6 +7,7 @@ import {
   getDailyCheckDisplayType,
   getDailyCheckHistory,
   getDailyCheckItemForDate,
+  getDailyCheckOverviewAnchorDate,
   getDailyCheckRecordedHistory,
   getDailyCheckTypeLabel
 } from './dailyCheckStatsUtils';
@@ -163,5 +164,55 @@ describe('dailyCheckStatsUtils', () => {
     ];
 
     expect(getCurrentStreak(history, new Date('2026-08-09T12:00:00'))).toBe(1);
+  });
+
+  it('uses the previous night and live completion status for split early-sleep records', () => {
+    const earlySleep: CheckItem = {
+      id: 'sleep',
+      content: '早睡',
+      isCompleted: false,
+      type: 'auto',
+      autoConfig: {
+        filterExpression: '#睡觉',
+        comparisonType: 'nightEarliestStart',
+        operator: '<',
+        targetValue: 23 * 60
+      }
+    };
+    const checkTemplates = [{
+      id: 'template',
+      title: '日常',
+      items: [{ ...earlySleep, enabled: true }],
+      enabled: true,
+      order: 0,
+      isDaily: true
+    }];
+    const dailyReviews = [{
+      id: 'review', date: '2026-08-09', createdAt: 1, updatedAt: 1, answers: [],
+      checkItems: [earlySleep]
+    }];
+    const filterContext = {
+      categories: [{
+        id: 'sleep-category', name: '睡眠', color: '', activities: [{ id: 'sleep', name: '睡觉', icon: '', color: '' }]
+      }],
+      scopes: [], todos: [], todoCategories: []
+    };
+    const logs = [
+      { id: 'first', categoryId: 'sleep-category', activityId: 'sleep', startTime: new Date('2026-08-09T22:49:00').getTime(), endTime: new Date('2026-08-10T00:00:00').getTime(), duration: 42660 },
+      { id: 'second', categoryId: 'sleep-category', activityId: 'sleep', startTime: new Date('2026-08-10T00:00:00').getTime(), endTime: new Date('2026-08-10T07:00:00').getTime(), duration: 25200 }
+    ];
+    const overviewDate = new Date('2026-08-10T12:00:00');
+    const history = getDailyCheckHistory({
+      itemId: 'sleep',
+      anchorDate: getDailyCheckOverviewAnchorDate(earlySleep, overviewDate),
+      days: 1,
+      dailyReviews,
+      checkTemplates,
+      logs,
+      filterContext
+    });
+
+    expect(getDailyCheckOverviewAnchorDate(earlySleep, overviewDate).getDate()).toBe(9);
+    expect(history[0]).toMatchObject({ value: 22 * 60 + 49, isCompleted: true, hasRecord: true });
   });
 });

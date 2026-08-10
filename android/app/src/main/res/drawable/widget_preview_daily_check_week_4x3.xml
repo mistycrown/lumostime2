@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <size android:width="220dp" android:height="165dp" />
+            <solid android:color="#FFFFFF" />
+            <corners android:radius="14dp" />
+        </shape>
+    </item>
+    <item android:left="16dp" android:top="15dp" android:right="135dp" android:bottom="150dp">
+        <shape android:shape="rectangle"><solid android:color="#A8A29E" /><corners android:radius="3dp" /></shape>
+    </item>
+    <item android:left="103dp" android:top="13dp" android:right="99dp" android:bottom="149dp" android:drawable="@drawable/ic_widget_refresh" />
+    <item android:left="111dp" android:top="37dp" android:right="14dp" android:bottom="143dp">
+        <shape android:shape="rectangle"><solid android:color="#E7E5E4" /><corners android:radius="2dp" /></shape>
+    </item>
+    <item android:left="16dp" android:top="49dp" android:right="112dp" android:bottom="137dp"><shape android:shape="rectangle"><solid android:color="#57534E" /><corners android:radius="2dp" /></shape></item>
+    <item android:left="16dp" android:top="71dp" android:right="118dp" android:bottom="115dp"><shape android:shape="rectangle"><solid android:color="#78716C" /><corners android:radius="2dp" /></shape></item>
+    <item android:left="16dp" android:top="93dp" android:right="110dp" android:bottom="93dp"><shape android:shape="rectangle"><solid android:color="#57534E" /><corners android:radius="2dp" /></shape></item>
+    <item android:left="16dp" android:top="115dp" android:right="122dp" android:bottom="71dp"><shape android:shape="rectangle"><solid android:color="#78716C" /><corners android:radius="2dp" /></shape></item>
+    <item android:left="113dp" android:top="47dp" android:right="94dp" android:bottom="130dp"><shape android:shape="rectangle"><solid android:color="#BAE6FD" /><corners android:radius="4dp" /></shape></item>
+    <item android:left="130dp" android:top="47dp" android:right="77dp" android:bottom="130dp"><shape android:shape="rectangle"><solid android:color="#F5F5F4" /><corners android:radius="4dp" /></shape></item>
+    <item android:left="147dp" android:top="47dp" android:right="60dp" android:bottom="130dp"><shape android:shape="rectangle"><solid android:color="#F5F5F4" /><corners android:radius="4dp" /></shape></item>
+    <item android:left="164dp" android:top="47dp" android:right="43dp" android:bottom="130dp"><shape android:shape="rectangle"><solid android:color="#D9F99D" /><corners android:radius="4dp" /></shape></item>
+    <item android:left="181dp" android:top="47dp" android:right="26dp" android:bottom="130dp"><shape android:shape="rectangle"><solid android:color="#F5F5F4" /><corners android:radius="4dp" /></shape></item>
+</layer-list>

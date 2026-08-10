@@ -24,6 +24,7 @@
  * @updated 2026-07-31: Keeps planned blocks out of the pure timeline record stream so idle gaps and export/gallery actions only use entity logs.
  * @updated 2026-07-31: Filters the todo sidebar daily checks against disabled template items before display and auto refresh.
  * @updated 2026-08-09: Added the configurable shortcut to the daily-check overview page.
+ * @updated 2026-08-10: Records Timeline as the return target when opening daily-check overview.
  * @updated 2026-08-09: Passes actionable real-record idle gaps into the split timeline canvas while excluding plan blocks from gap detection.
  */
 import React, { useMemo, useState, useRef } from 'react';
@@ -263,8 +264,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
         setSettingsSubmenu,
         setSettingsSubmenuBackCloses,
         setCurrentView,
-        setPreviousView,
-        setDailyCheckDetailId
+        setDailyCheckDetailId,
+        setDailyChecksReturnTarget
     } = useNavigation();
     const {
         timelineStyleTheme,
@@ -518,7 +519,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
             title: '日课总览',
             icon: <ListTodo size={20} />,
             onClick: () => {
-                setPreviousView(AppView.TIMELINE);
+                setDailyChecksReturnTarget('timeline');
                 setDailyCheckDetailId(null);
                 setCurrentView(AppView.DAILY_CHECKS);
             }

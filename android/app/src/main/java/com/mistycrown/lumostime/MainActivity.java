@@ -7,7 +7,8 @@
  * @updated 2026-04-26: Captures assistant-notification navigation intents so the Web layer can reopen the shared AI chat at the targeted background reply after resume or cold start.
  * @updated 2026-07-22: Registers the native status-bar appearance bridge for display-mode synchronization.
  * @updated 2026-07-22: Draws an explicit top inset backdrop beneath Android 15's transparent status bar.
- * @updated 2026-07-22: Configures edge-to-edge before Capacitor creates the WebView so the status-bar backdrop is visible.
+ * @updated 2026-08-10: Adds temporary immersive overlay and configuration diagnostics for logcat investigation.
+ * @updated 2026-08-10: Restores post-WebView edge-to-edge setup and reapplies it after orientation changes so immersive mode does not expose the launch splash surface.
  */
 package com.mistycrown.lumostime;
 
@@ -17,6 +18,7 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
@@ -31,6 +33,7 @@ import com.getcapacitor.BridgeActivity;
 import com.lumostime.app.AppLauncherPlugin;
 
 public class MainActivity extends BridgeActivity {
+    private static final String TAG = "ImmersiveDebug";
     private FrameLayout immersiveProtectionOverlay;
     private View immersiveProtectionTopView;
     private View immersiveProtectionBottomView;
@@ -49,12 +52,10 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ImmersiveModePlugin.class);
         registerPlugin(NativeStatusBarAppearancePlugin.class);
         registerPlugin(WidgetBridgePlugin.class);
-        // BridgeActivity creates the WebView during super.onCreate(). Configure this first so
-        // its content is laid out behind the transparent Android 15 status bar.
-        configureWindowForEdgeToEdge();
         super.onCreate(savedInstanceState);
 
-        // Reapply after Capacitor's own window setup in case a plugin updates these flags.
+        // BridgeActivity switches away from the launch theme and creates the WebView here.
+        // Applying edge-to-edge afterwards prevents orientation changes from exposing splash content.
         configureWindowForEdgeToEdge();
         AssistantNotificationNavigationStore.captureFromIntent(this, getIntent());
         ensureStatusBarBackdrop();
@@ -67,6 +68,19 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         AssistantNotificationNavigationStore.captureFromIntent(this, intent);
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        configureWindowForEdgeToEdge();
+        if (statusBarBackdropView != null) {
+            ViewCompat.requestApplyInsets(statusBarBackdropView);
+        }
+        if (immersiveProtectionOverlay != null) {
+            ViewCompat.requestApplyInsets(immersiveProtectionOverlay);
+        }
+        Log.i(TAG, "Configuration changed and edge-to-edge reapplied: orientation=" + newConfig.orientation);
     }
 
     private void configureWindowForEdgeToEdge() {
@@ -88,12 +102,15 @@ public class MainActivity extends BridgeActivity {
     }
 
     public void setImmersiveProtectionVisible(boolean visible) {
+        Log.i(TAG, "Immersive protection overlay visibility requested: " + visible);
         ensureImmersiveProtectionOverlay();
         if (immersiveProtectionOverlay == null) {
+            Log.e(TAG, "Immersive protection overlay unavailable");
             return;
         }
 
         immersiveProtectionOverlay.setVisibility(visible ? View.VISIBLE : View.GONE);
+        Log.i(TAG, "Immersive protection overlay visibility applied: " + visible);
         if (visible) {
             immersiveProtectionOverlay.bringToFront();
             ViewCompat.requestApplyInsets(immersiveProtectionOverlay);

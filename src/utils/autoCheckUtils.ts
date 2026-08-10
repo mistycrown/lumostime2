@@ -5,7 +5,7 @@
  * @pos Utility (Auto Check)
  * @description 自动日课判断逻辑 - 根据筛选条件和统计规则自动判断日课完成状态
  * @updated 2026-07-30: Added reorder-safe auto-check completion change detection for Daily Review refreshes.
- * @updated 2026-04-15: Added nightLatestStart support for cross-midnight sleep auto checks.
+ * @updated 2026-08-10: Uses nightEarliestStart for cross-midnight sleep checks so split records retain their bedtime.
  * @updated 2026-08-09: Exposed the evaluated metric for daily-check statistics.
  * @updated 2026-08-09: Planned timeline blocks are excluded from auto-check statistics.
  *
@@ -23,7 +23,7 @@ interface LogStats {
   totalDuration: number; // 总时长（分钟）
   earliestStart: number | null; // 最早开始时间（分钟，从 0:00 开始）
   latestStart: number | null; // 最晚开始时间（分钟）
-  nightLatestStart: number | null; // 夜间最晚开始时间（18:00-次日04:00，跨零点按延长时刻比较）
+  nightEarliestStart: number | null; // 夜间最早开始时间（18:00-次日04:00，跨零点按延长时刻比较）
   earliestEnd: number | null; // 最早结束时间（分钟）
   latestEnd: number | null; // 最晚结束时间（分钟）
   count: number; // 匹配记录的次数
@@ -55,7 +55,7 @@ function calculateLogStats(
     totalDuration: 0,
     earliestStart: null,
     latestStart: null,
-    nightLatestStart: null,
+    nightEarliestStart: null,
     earliestEnd: null,
     latestEnd: null,
     count: 0
@@ -125,8 +125,8 @@ function calculateLogStats(
   nightFilteredLogs.forEach(log => {
     const startMinutes = timestampToNightMinutes(log.startTime);
 
-    if (stats.nightLatestStart === null || startMinutes > stats.nightLatestStart) {
-      stats.nightLatestStart = startMinutes;
+    if (stats.nightEarliestStart === null || startMinutes < stats.nightEarliestStart) {
+      stats.nightEarliestStart = startMinutes;
     }
   });
 
@@ -156,8 +156,8 @@ export function getAutoCheckMetricForDate(
       return stats.earliestStart;
     case 'latestStart':
       return stats.latestStart;
-    case 'nightLatestStart':
-      return stats.nightLatestStart;
+    case 'nightEarliestStart':
+      return stats.nightEarliestStart;
     case 'earliestEnd':
       return stats.earliestEnd;
     case 'latestEnd':

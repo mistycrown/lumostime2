@@ -1,7 +1,7 @@
 /**
  * @file checkItemNormalizer.ts
  * @description 日课数据归一化工具 - 兼容旧版布尔数据与新版次数数据
- * @updated 2026-07-30: Defaulted per-item daily check template enabled flags during normalization.
+ * @updated 2026-08-10: Migrates persisted nightLatestStart sleep rules to nightEarliestStart during template and review hydration.
  * @updated 2026-06-13: Preserved Daily Newspaper local comment threads during Daily Review normalization.
  */
 import {
@@ -15,6 +15,10 @@ import {
   WeeklyNewspaper,
   WeeklyReview
 } from '../types';
+
+type PersistedAutoCheckConfig = Omit<NonNullable<CheckItem['autoConfig']>, 'comparisonType'> & {
+  comparisonType?: string;
+};
 
 type ManualMode = 'binary' | 'count';
 
@@ -32,6 +36,19 @@ const resolveManualMode = (item: Partial<CheckItem | CheckTemplateItem>): Manual
   return item.manualMode === 'count' ? 'count' : 'binary';
 };
 
+const normalizeAutoCheckConfig = (
+  config: CheckItem['autoConfig'] | CheckTemplateItem['autoConfig'] | undefined
+) => {
+  if (!config) {
+    return undefined;
+  }
+
+  const persistedConfig = config as PersistedAutoCheckConfig;
+  return persistedConfig.comparisonType === 'nightLatestStart'
+    ? { ...persistedConfig, comparisonType: 'nightEarliestStart' as const }
+    : persistedConfig as NonNullable<CheckItem['autoConfig']>;
+};
+
 const normalizeTemplateItem = (item: Partial<CheckTemplateItem>): CheckTemplateItem => {
   const type: 'manual' | 'auto' = item.type === 'auto' ? 'auto' : 'manual';
   const normalizedBase: CheckTemplateItem = {
@@ -45,6 +62,7 @@ const normalizeTemplateItem = (item: Partial<CheckTemplateItem>): CheckTemplateI
   if (type === 'auto') {
     return {
       ...normalizedBase,
+      autoConfig: normalizeAutoCheckConfig(item.autoConfig),
       manualMode: undefined,
       targetCount: undefined
     };
@@ -79,6 +97,7 @@ export const normalizeCheckItem = (item: Partial<CheckItem>): CheckItem => {
   if (type === 'auto') {
     return {
       ...normalizedBase,
+      autoConfig: normalizeAutoCheckConfig(item.autoConfig),
       manualMode: undefined,
       currentCount: undefined,
       targetCount: undefined

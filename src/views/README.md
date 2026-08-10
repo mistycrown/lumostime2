@@ -2,6 +2,9 @@
 
 The `views/` directory contains all the React components that represent the distinct screens or pages of the LumosTime application. This layer is responsible for the presentation logic and user interaction.
 
+- Update 2026-08-10: `DailyCheckOverviewView.tsx` caches each row's current value and manual history before rendering, renders one full-width detail button per row, and uses `/` for a missing daily-check snapshot.
+- Update 2026-08-10: `DailyCheckOverviewView.tsx` and `DailyCheckDetailView.tsx` show `nightEarliestStart` checks against the completed previous night during the daytime.
+- Update 2026-08-10: `DailyCheckDetailView.tsx` now presents its 30-day trend as a static chart without hover tooltips, pointer interaction, or Recharts focus outlines.
 - Update 2026-07-30: `TimelineView.tsx` and `DailyReviewView.tsx` now use the shared auto-check change detector so reorder-only refreshes do not trigger redundant review writes.
 - Update 2026-07-31: `TimelineView.tsx` now receives the active Chronicle layout from the app shell, while the settings selector acts as the default layout for fresh Timeline entries.
 - Update 2026-07-31: `TimelineView.tsx` keeps planned logs out of the pure timeline stream so idle gaps, exports, gallery data, and historical same-day links only reflect entity records.
