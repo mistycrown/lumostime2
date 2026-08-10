@@ -1,9 +1,10 @@
 /**
  * @file timePalCustomService.ts
- * @description 自定义时光小友服务 - 负责本地校验、保存、读取和删除（不参加云同步）
+ * @description 自定义时光小友服务 - 负责本地校验、保存、读取和删除，并通过图片引用清单参与云同步。
  * @input 用户上传的 5 张图片（建议 1:1 PNG）、名称
  * @output 自定义时光小友元数据（localStorage）和本地图片文件（imageService）
  * @pos Service (TimePal Customization)
+ * @updated 2026-08-10: Registers TimePal stage images in the canonical image list for export, sync, and cleanup protection.
  */
 import { TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 import { CUSTOM_TIMEPAL_PREFIX, extractCustomTimePalId } from '../constants/timePalConfig';
@@ -126,6 +127,7 @@ class TimePalCustomService {
         const items = this.getAllItems();
         items.push(newItem);
         this.saveItems(items);
+        stageFilenames.forEach(filename => imageService.addToReferencedList(filename, false));
         this.emitChanged();
 
         return newItem;
@@ -146,6 +148,7 @@ class TimePalCustomService {
                 imageService.deleteImageLocalOnly(filename).catch(() => undefined)
             )
         );
+        target.stageFilenames.forEach(filename => imageService.removeFromReferencedList(filename));
 
         const filtered = items.filter(item => item.id !== id);
         this.saveItems(filtered);

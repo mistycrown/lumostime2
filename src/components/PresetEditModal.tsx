@@ -4,6 +4,7 @@
  * @input preset data
  * @output Updated preset or delete action
  * @pos Component (Modal)
+ * @updated 2026-08-10: Updated TimePal persistence guidance to match cloud sync and export behavior.
  */
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, Trash2 } from 'lucide-react';
@@ -393,7 +394,7 @@ export const PresetEditModal: React.FC<PresetEditModalProps> = ({
                             })}
                         </div>
                         <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2">
-                            自定义的时间小友不参加云同步
+                            自定义时间小友及其图片会随云同步和数据导出保存
                         </div>
                     </div>
                 </div>

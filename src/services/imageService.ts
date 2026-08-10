@@ -6,6 +6,7 @@
  * @description Handles saving, retrieving, and deleting images.
  * Uses Capacitor Filesystem for Native/Electron, and IndexedDB for Web fallback.
  * @updated 2026-05-05: Reused settings-level protected image references during manifest rebuild so AI assistant avatars participate in cleanup protection and sync.
+ * @updated 2026-08-10: Supports original-only image-list registration for TimePal stage images that have no thumbnail files.
  * @updated 2026-05-04: Preserve uploaded PNG/WebP transparency by keeping source-compatible filenames and thumbnail encodings instead of forcing JPEG output.
  * @updated 2026-03-30: Added native camera-path save flow and normalized Base64 payload handling for Capacitor Filesystem writes.
  * @updated 2026-03-23: Added pure referenced-image list helpers for cloud sync restore/upload flows, and rebuild image manifests using only references that still exist locally.
@@ -829,7 +830,7 @@ class ImageService {
     /**
      * 添加图片到引用列表
      */
-    addToReferencedList(filename: string): void {
+    addToReferencedList(filename: string, includeThumbnail = true): void {
         try {
             const list = this.getReferencedImagesList();
             let updated = false;
@@ -840,10 +841,12 @@ class ImageService {
             }
 
             // 同时添加缩略图
-            const thumbName = `thumb_${filename}`;
-            if (!list.includes(thumbName)) {
-                list.push(thumbName);
-                updated = true;
+            if (includeThumbnail) {
+                const thumbName = `thumb_${filename}`;
+                if (!list.includes(thumbName)) {
+                    list.push(thumbName);
+                    updated = true;
+                }
             }
 
             if (updated) {

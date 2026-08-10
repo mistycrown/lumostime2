@@ -630,16 +630,6 @@
             </intent-filter>
         </service>
 
-        <service
-            android:name=".WidgetSceneTimeSlotRemoteViewsService"
-            android:enabled="true"
-            android:exported="false"
-            android:permission="android.permission.BIND_REMOTEVIEWS">
-            <intent-filter>
-                <action android:name="android.widget.RemoteViewsService" />
-            </intent-filter>
-        </service>
-
         <!-- 无障碍服务 - 用于即时检测应用切换 -->
         <service
             android:name=".AppAccessibilityService"

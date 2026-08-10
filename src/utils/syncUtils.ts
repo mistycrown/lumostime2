@@ -3,12 +3,14 @@
  * @description Unified cloud sync helpers for WebDAV, COS, and compatible S3.
  * @updated 2026-06-21: Added write-after-read verification for main backup uploads so stale cloud reads or failed overwrites cannot be reported as a successful sync.
  * @updated 2026-04-20: Cleaned user-facing messages and kept compatible S3 fully aligned with the shared upload/restore flow.
+ * @updated 2026-08-10: Includes appearance and TimePal theme image assets in cloud image manifests.
  */
 
 import { webdavService } from '../services/webdavService';
 import { s3Service } from '../services/s3Service';
 import { compatibleS3Service } from '../services/compatibleS3Service';
 import { imageService } from '../services/imageService';
+import { appearanceBackupService } from '../services/appearanceBackupService';
 import { syncService } from '../services/syncService';
 import { validateAndFixData, validateLocalData } from './dataValidation';
 import { buildSyncPayloadMetadata, isSameSyncPayload } from './syncPayloadMetadata';
@@ -47,13 +49,16 @@ function getServiceDisplayName(service: CloudService): string {
 }
 
 function buildReferencedImageList(data: any): string[] {
-  return imageService.buildReferencedImagesList(
+  return [...new Set([
+    ...imageService.buildReferencedImagesList(
     data?.logs || [],
     data?.todos || [],
     data?.dailyReviews || [],
     data?.customStickerSets || [],
     data?.customStickers || []
-  );
+    ),
+    ...appearanceBackupService.getReferencedImageFilenames(data?.appearanceData)
+  ])];
 }
 
 async function listCloudImageFiles(service: CloudService): Promise<string[] | null> {

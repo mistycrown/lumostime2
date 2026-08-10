@@ -8,19 +8,140 @@
     android:paddingEnd="6dp"
     android:paddingBottom="6dp">
 
-    <ListView
-        android:id="@+id/widget_scene_tabs"
+    <FrameLayout
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="0.15"
-        android:clipToPadding="false"
-        android:divider="@null"
-        android:dividerHeight="0dp"
-        android:overScrollMode="never"
-        android:paddingEnd="3dp"
-        android:scrollbars="none"
-        android:scrollingCache="false"
-        android:stackFromBottom="false" />
+        android:paddingEnd="3dp">
+
+        <LinearLayout
+            android:id="@+id/widget_scene_static_tabs"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <FrameLayout
+                android:id="@+id/widget_scene_tab_0_root"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="false">
+
+                <ImageView
+                    android:id="@+id/widget_scene_tab_0_bitmap"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:adjustViewBounds="false"
+                    android:contentDescription="@null"
+                    android:padding="2dp"
+                    android:scaleType="centerInside" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/widget_scene_tab_1_root"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="false">
+
+                <ImageView
+                    android:id="@+id/widget_scene_tab_1_bitmap"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:adjustViewBounds="false"
+                    android:contentDescription="@null"
+                    android:padding="2dp"
+                    android:scaleType="centerInside" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/widget_scene_tab_2_root"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="false">
+
+                <ImageView
+                    android:id="@+id/widget_scene_tab_2_bitmap"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:adjustViewBounds="false"
+                    android:contentDescription="@null"
+                    android:padding="2dp"
+                    android:scaleType="centerInside" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/widget_scene_tab_3_root"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="false">
+
+                <ImageView
+                    android:id="@+id/widget_scene_tab_3_bitmap"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:adjustViewBounds="false"
+                    android:contentDescription="@null"
+                    android:padding="2dp"
+                    android:scaleType="centerInside" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/widget_scene_tab_4_root"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="false">
+
+                <ImageView
+                    android:id="@+id/widget_scene_tab_4_bitmap"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:adjustViewBounds="false"
+                    android:contentDescription="@null"
+                    android:padding="2dp"
+                    android:scaleType="centerInside" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/widget_scene_tab_5_root"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="false">
+
+                <ImageView
+                    android:id="@+id/widget_scene_tab_5_bitmap"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:adjustViewBounds="false"
+                    android:contentDescription="@null"
+                    android:padding="2dp"
+                    android:scaleType="centerInside" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <ListView
+            android:id="@+id/widget_scene_tabs"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:divider="@null"
+            android:dividerHeight="0dp"
+            android:overScrollMode="never"
+            android:scrollbars="none"
+            android:scrollingCache="false"
+            android:stackFromBottom="false"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <LinearLayout
         android:layout_width="1dp"

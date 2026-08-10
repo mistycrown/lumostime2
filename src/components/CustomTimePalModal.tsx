@@ -4,6 +4,7 @@
  * @input 名称、5 张阶段图片（建议 PNG 1:1）
  * @output 创建成功后的自定义时光小友
  * @pos Component (Modal)
+ * @updated 2026-08-10: Updated persistence guidance because custom TimePal assets now participate in cloud sync and export.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -195,13 +196,13 @@ export const CustomTimePalModal: React.FC<CustomTimePalModalProps> = ({
 
                     <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
                         <p className="text-xs text-amber-800">
-                            自定义的时间小友不参加云同步
+                            自定义时间小友及其图片会随云同步和数据导出保存
                         </p>
                         <p className="text-[11px] text-amber-700 mt-1">
                             建议上传 1:1 的 PNG 图片，否则效果会有所影响
                         </p>
                         <p className="text-[11px] text-amber-700 mt-1">
-                            支持 JPG / PNG / WebP 等常见图片格式，仅保存在当前设备本地
+                            支持 JPG / PNG / WebP 等常见图片格式
                         </p>
                     </div>
                 </div>

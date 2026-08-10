@@ -9,6 +9,48 @@ const createValidPayload = () => ({
 });
 
 describe('dataValidation achievementData support', () => {
+  it('accepts optional Android widget templates and keeps old backups compatible', () => {
+    const widgetTemplateResult = validateLocalData({
+      ...createValidPayload(),
+      widgetTemplates: []
+    });
+    const legacyBackupResult = validateLocalData(createValidPayload());
+
+    expect(widgetTemplateResult.isValid).toBe(true);
+    expect(legacyBackupResult.isValid).toBe(true);
+  });
+
+  it('rejects malformed Android widget templates', () => {
+    const result = validateLocalData({
+      ...createValidPayload(),
+      widgetTemplates: {}
+    });
+
+    expect(result.isValid).toBe(false);
+    expect(result.errors.some((error) => error.includes('widgetTemplates'))).toBe(true);
+  });
+
+  it('accepts an optional appearance backup block and rejects malformed values', () => {
+    const validResult = validateLocalData({
+      ...createValidPayload(),
+      appearanceData: {
+        version: 1,
+        storage: {
+          lumostime_color_scheme: 'forest',
+          lumostime_timepal_type: 'cat'
+        }
+      }
+    });
+    const invalidResult = validateLocalData({
+      ...createValidPayload(),
+      appearanceData: 'not-a-backup'
+    });
+
+    expect(validResult.isValid).toBe(true);
+    expect(invalidResult.isValid).toBe(false);
+    expect(invalidResult.errors.some((error) => error.includes('appearanceData'))).toBe(true);
+  });
+
   it('accepts data collections and collection entries in backup payloads', () => {
     const result = validateLocalData({
       ...createValidPayload(),

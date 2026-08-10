@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.text.TextUtils;
+import android.view.View;
 import android.widget.RemoteViews;
 
 import java.text.SimpleDateFormat;
@@ -19,7 +20,8 @@ import java.util.Objects;
 
 /**
  * Shared rendering and tap handling for the dedicated 4x3 scene widget.
- * Updated 2026-08-10: Isolates the scrollable time-slot rail from timer-card RemoteViews caches.
+ * Updated 2026-08-10: Restores the 1.6.3 direct time-slot rendering path and uses in-process
+ * RemoteCollectionItems for the optional scrollable rail on Android 12 and newer.
  */
 public final class WidgetSceneProviderSupport {
     public static final String ACTION_SELECT_SCENE_TAB =
@@ -32,6 +34,24 @@ public final class WidgetSceneProviderSupport {
     public static final String EXTRA_ITEM_ID = "scene_item_id";
     private static final int MORNING_REFRESH_START_HOUR = 4;
     private static final long SCENE_REFRESH_ANIMATION_DURATION_MS = 420L;
+
+    private static final int[] TAB_ROOT_IDS = new int[] {
+            R.id.widget_scene_tab_0_root,
+            R.id.widget_scene_tab_1_root,
+            R.id.widget_scene_tab_2_root,
+            R.id.widget_scene_tab_3_root,
+            R.id.widget_scene_tab_4_root,
+            R.id.widget_scene_tab_5_root
+    };
+
+    private static final int[] TAB_BITMAP_IDS = new int[] {
+            R.id.widget_scene_tab_0_bitmap,
+            R.id.widget_scene_tab_1_bitmap,
+            R.id.widget_scene_tab_2_bitmap,
+            R.id.widget_scene_tab_3_bitmap,
+            R.id.widget_scene_tab_4_bitmap,
+            R.id.widget_scene_tab_5_bitmap
+    };
 
     private WidgetSceneProviderSupport() {}
 
@@ -181,14 +201,7 @@ public final class WidgetSceneProviderSupport {
             ResolvedSceneState state = resolveState(context, appWidgetId, payload);
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_layout_scene_4x3);
 
-            Intent tabsIntent = new Intent(context, WidgetSceneTimeSlotRemoteViewsService.class);
-            tabsIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
-            tabsIntent.setData(buildTimeSlotAdapterUri(appWidgetId, state));
-            views.setRemoteAdapter(R.id.widget_scene_tabs, tabsIntent);
-            views.setPendingIntentTemplate(
-                    R.id.widget_scene_tabs,
-                    buildTabTemplatePendingIntent(context, appWidgetId, providerClass)
-            );
+            bindSceneTabs(context, views, state, appWidgetId, providerClass);
             views.setTextViewText(R.id.widget_scene_slot_label, formatSlotLabel(state.selectedSlot));
             bindRefreshButton(context, views, appWidgetId, providerClass);
 
@@ -202,7 +215,6 @@ public final class WidgetSceneProviderSupport {
             );
             appWidgetManager.notifyAppWidgetViewDataChanged(new int[] { appWidgetId }, R.id.widget_scene_cards);
             appWidgetManager.updateAppWidget(appWidgetId, views);
-            appWidgetManager.notifyAppWidgetViewDataChanged(new int[] { appWidgetId }, R.id.widget_scene_tabs);
         }
     }
 
@@ -262,6 +274,95 @@ public final class WidgetSceneProviderSupport {
                 currentAutoSlotId,
                 selectedSlotId
         );
+    }
+
+    private static void bindSceneTabs(
+            Context context,
+            RemoteViews views,
+            ResolvedSceneState state,
+            int appWidgetId,
+            Class<? extends AppWidgetProvider> providerClass
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            views.setViewVisibility(R.id.widget_scene_static_tabs, View.GONE);
+            views.setViewVisibility(R.id.widget_scene_tabs, View.VISIBLE);
+            bindScrollableSceneTabs(context, views, state, appWidgetId, providerClass);
+            return;
+        }
+
+        views.setViewVisibility(R.id.widget_scene_tabs, View.GONE);
+        views.setViewVisibility(R.id.widget_scene_static_tabs, View.VISIBLE);
+        bindStaticSceneTabs(context, views, state, appWidgetId, providerClass);
+    }
+
+    private static void bindStaticSceneTabs(
+            Context context,
+            RemoteViews views,
+            ResolvedSceneState state,
+            int appWidgetId,
+            Class<? extends AppWidgetProvider> providerClass
+    ) {
+        List<WidgetSceneTimeSlot> slots = getSceneTimeSlots(state);
+        for (int index = 0; index < TAB_ROOT_IDS.length; index += 1) {
+            int rootId = TAB_ROOT_IDS[index];
+            int bitmapId = TAB_BITMAP_IDS[index];
+            if (index >= slots.size()) {
+                views.setViewVisibility(rootId, View.INVISIBLE);
+                continue;
+            }
+
+            WidgetSceneTimeSlot slot = slots.get(index);
+            boolean isSelected = Objects.equals(slot.getId(), state.selectedSlotId);
+            views.setViewVisibility(rootId, View.VISIBLE);
+            views.setImageViewBitmap(
+                    bitmapId,
+                    WidgetSceneTabBitmapRenderer.INSTANCE.render(context, slot.getIcon(), isSelected)
+            );
+            views.setOnClickPendingIntent(
+                    rootId,
+                    buildTabPendingIntent(context, appWidgetId, providerClass, slot.getId(), index)
+            );
+        }
+    }
+
+    private static void bindScrollableSceneTabs(
+            Context context,
+            RemoteViews views,
+            ResolvedSceneState state,
+            int appWidgetId,
+            Class<? extends AppWidgetProvider> providerClass
+    ) {
+        List<WidgetSceneTimeSlot> slots = getSceneTimeSlots(state);
+        RemoteViews.RemoteCollectionItems.Builder items = new RemoteViews.RemoteCollectionItems.Builder();
+        for (int index = 0; index < slots.size(); index += 1) {
+            WidgetSceneTimeSlot slot = slots.get(index);
+            RemoteViews row = new RemoteViews(context.getPackageName(), R.layout.widget_scene_tab_item);
+            row.setImageViewBitmap(
+                    R.id.widget_scene_tab_bitmap,
+                    WidgetSceneTabBitmapRenderer.INSTANCE.render(
+                            context,
+                            slot.getIcon(),
+                            Objects.equals(slot.getId(), state.selectedSlotId)
+                    )
+            );
+            Intent fillInIntent = new Intent();
+            fillInIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+            fillInIntent.putExtra(EXTRA_SLOT_ID, slot.getId());
+            row.setOnClickFillInIntent(R.id.widget_scene_tab_root, fillInIntent);
+            row.setOnClickFillInIntent(R.id.widget_scene_tab_bitmap, fillInIntent);
+            items.addItem(index, row);
+        }
+        views.setRemoteAdapter(R.id.widget_scene_tabs, items.build());
+        views.setPendingIntentTemplate(
+                R.id.widget_scene_tabs,
+                buildTabTemplatePendingIntent(context, appWidgetId, providerClass)
+        );
+    }
+
+    private static List<WidgetSceneTimeSlot> getSceneTimeSlots(ResolvedSceneState state) {
+        return state.displayedGroup != null
+                ? state.displayedGroup.getTimeSlots()
+                : java.util.Collections.emptyList();
     }
 
     private static void refreshSingleWidget(
@@ -460,19 +561,22 @@ public final class WidgetSceneProviderSupport {
         }
     }
 
-    private static Uri buildTimeSlotAdapterUri(int appWidgetId, ResolvedSceneState state) {
-        String groupId = state.displayedGroup != null ? state.displayedGroup.getId() : "none";
-        String selectedSlotId = state.selectedSlotId != null ? state.selectedSlotId : "none";
-        long syncedAt = state.payload != null ? state.payload.getSyncedAt() : 0L;
-        return Uri.parse(
-                "lumostime://scene-time-slots/v2/"
-                        + appWidgetId
-                        + "/"
-                        + syncedAt
-                        + "/"
-                        + Uri.encode(groupId)
-                        + "/"
-                        + Uri.encode(selectedSlotId)
+    private static PendingIntent buildTabPendingIntent(
+            Context context,
+            int appWidgetId,
+            Class<? extends AppWidgetProvider> providerClass,
+            String slotId,
+            int position
+    ) {
+        Intent intent = new Intent(context, providerClass);
+        intent.setAction(ACTION_SELECT_SCENE_TAB);
+        intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+        intent.putExtra(EXTRA_SLOT_ID, slotId);
+        return PendingIntent.getBroadcast(
+                context,
+                appWidgetId * 100 + position + 8500,
+                intent,
+                pendingIntentFlags()
         );
     }
 

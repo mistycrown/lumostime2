@@ -11,6 +11,7 @@
 > `useReviewManager.ts` now upserts a Daily Review when a first-time sidebar check-in returns a newly created review, so the check-in and generated review are persisted together.
 
 > `useFloatingWindowSync.ts` now stops the Android floating-window service when the global floating-ball switch is off, and no longer sends an idle update that could restart the overlay during app launch.
+> `useSyncManager.ts` now includes Android widget templates in unified cloud backup payloads, restores them through the shared widget storage service, and treats template-only edits as timestamped auto-sync changes.
 > `useSyncManager.ts` now includes the self-belief library in unified backup/sync payloads and restores it to local storage, so AI-created identity descriptions travel with the main user data.
 > `useSyncManager.ts` now forces a read of the canonical cloud main backup before making direction decisions, preferring the JSON payload timestamp over remote file metadata so stale `LastModified` values cannot drive old restores.
 > `useSyncManager.ts` now treats confirmed pending local auto-sync edits as upload-worthy even when the local/cloud timestamps are still within the equal-tolerance window, so creating a new todo right after a sync no longer gets skipped.
@@ -65,7 +66,7 @@
 ## 文件说明
 
 ### `useSyncManager.ts`
-同步恢复时会规整自定义筛选器的 `order`，确保云端/本地恢复后的筛选器顺序稳定。
+同步恢复时会规整自定义筛选器的 `order`，确保云端/本地恢复后的筛选器顺序稳定；同时备份、恢复并自动同步 Android 小组件模板。
 
 ### `useLogForm.ts`
 表单状态管理 Hook，将 20+ 个独立状态合并为单个对象。

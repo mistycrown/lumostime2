@@ -11,6 +11,8 @@ type LocalStorageMock = {
 
 const AI_CHAT_PERSONAS_KEY = 'lumostime_ai_chat_personas_v1';
 const AI_CHAT_USER_PROFILE_KEY = 'lumostime_ai_chat_user_profile_v1';
+const CUSTOM_BACKGROUND_KEY = 'lumos_custom_backgrounds';
+const CUSTOM_NAVIGATION_KEY = 'navigation_decoration_custom_list';
 
 const createLocalStorageMock = (): LocalStorageMock => {
   const store = new Map<string, string>();
@@ -58,6 +60,22 @@ describe('getSettingsReferencedImages', () => {
       'timepal-stage-1.png',
       'timepal-stage-2.png',
       'user-avatar.png'
+    ]);
+  });
+
+  it('keeps custom background and navigation theme images from being cleaned up', () => {
+    localStorage.setItem(CUSTOM_BACKGROUND_KEY, JSON.stringify([
+      { imageFilename: 'custom-background.png' }
+    ]));
+    localStorage.setItem(CUSTOM_NAVIGATION_KEY, JSON.stringify([
+      { imageFilename: 'custom-navigation.png' }
+    ]));
+
+    expect(Array.from(getSettingsReferencedImages()).sort()).toEqual([
+      'custom-background.png',
+      'custom-navigation.png',
+      'thumb_custom-background.png',
+      'thumb_custom-navigation.png'
     ]);
   });
 });

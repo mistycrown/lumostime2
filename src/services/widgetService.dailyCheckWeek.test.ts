@@ -122,6 +122,7 @@ describe('daily-check weekly Android widget wiring', () => {
     expect(compactRendererSource).toContain('WidgetDailyCheckWeekVisuals.drawStateCell');
     expect(compactRendererSource).toContain('CONTENT_HORIZONTAL_INSET_DP');
     expect(sharedVisualsSource).toContain('pastelAccentColor');
+    expect(sharedVisualsSource).toContain('foregroundAccentColor');
     expect(sharedVisualsSource).toContain('GRID_LEFT_RATIO = 0.43f');
     expect(compactWidgetLayoutSource).toContain('android:scrollbars="none"');
     expect(compactWidgetLayoutSource).not.toContain('widget_daily_check_week_4x3_weekdays');
