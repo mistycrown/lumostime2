@@ -30,7 +30,7 @@ When both signals give the same non-equal direction, sync proceeds automatically
 
 ## Coverage
 
-The implementation keeps Context-based timestamp updates for main data, categories, reviews, achievements, and sync-relevant settings. It also routes widget-template and custom-color localStorage events through the same user-change timestamp helper. Appearance-specific mutation events remain a separate follow-up because the current appearance backup service only exposes a restore event, not a change event.
+The implementation keeps Context-based timestamp updates for main data, categories, reviews, achievements, and sync-relevant settings. It routes widget-template, custom-color, appearance, and TimePal localStorage events through the same user-change timestamp helper. Restore events remain ignored by the restore lock.
 
 ## Verification
 

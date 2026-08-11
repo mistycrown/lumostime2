@@ -3,9 +3,9 @@
  * @input Local/cloud timestamps, sync tolerance, and serialized JSON sizes
  * @output Pure sync-direction classifiers for timestamp-based and size-aware cloud decisions
  * @pos Utility (Sync Metadata)
- * @description Keeps sync direction decisions side-effect free so timestamp tolerance, pending local edits, and JSON-size conflict protection can be regression tested without pulling in the full app shell.
+ * @description Keeps sync direction decisions side-effect free so timestamp tolerance and JSON-size conflict protection can be regression tested without pulling in the full app shell.
+ * @updated 2026-08-11: Keeps timestamp and JSON-size paths independent, with sync metadata excluded from the JSON-size fallback.
  * @updated 2026-06-15: Added JSON-size-aware sync direction resolution so larger backup payloads can block contradictory overwrite directions and break timestamp ties.
- * @updated 2026-06-14: Added a pending-local-change auto-sync override so freshly queued local edits are uploaded even when timestamp tolerance would otherwise classify them as equal.
  * @updated 2026-05-18: Added shared timestamp direction classification so narrow sync-tolerance fixes can be tested independently from the React hook.
  */
 
@@ -63,6 +63,15 @@ export const getJsonByteSize = (data: unknown): number => {
   return serialized.length;
 };
 
+export const getComparableSyncJsonByteSize = (data: unknown): number => {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return getJsonByteSize(data);
+  }
+
+  const { timestamp: _timestamp, cloudUploadedAt: _cloudUploadedAt, ...userData } = data as Record<string, unknown>;
+  return getJsonByteSize(userData);
+};
+
 interface ResolveSyncTimestampDirectionOptions {
   localTimestamp: number;
   cloudTimestamp: number;
@@ -74,20 +83,9 @@ interface ResolveSyncTimestampDirectionOptions {
 export const resolveSyncTimestampDirection = ({
   localTimestamp,
   cloudTimestamp,
-  toleranceMs,
-  mode,
-  hadPendingAutoSync
+  toleranceMs
 }: ResolveSyncTimestampDirectionOptions): SyncTimestampDirection => {
   const baseDirection = classifySyncTimestampDirection(localTimestamp, cloudTimestamp, toleranceMs);
-
-  if (
-    mode === 'auto' &&
-    hadPendingAutoSync &&
-    baseDirection === 'equal' &&
-    localTimestamp > cloudTimestamp
-  ) {
-    return 'upload';
-  }
 
   return baseDirection;
 };

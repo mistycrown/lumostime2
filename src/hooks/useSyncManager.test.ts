@@ -3,9 +3,9 @@
  * @input Sync timestamp and JSON-size direction helpers
  * @output Regression coverage for local/cloud timestamp classification and size-aware conflict detection
  * @pos Test
- * @description Ensures sync direction classification still uploads fresh local edits shortly after the previous sync, keeps sub-second timestamp jitter treated as equal, and blocks contradictory overwrite directions when the larger backup JSON would otherwise be replaced by a smaller one.
+ * @description Ensures timestamp and JSON-size directions remain independent, use neutral equality inside tolerance, and block contradictory overwrite directions.
  * @updated 2026-06-15: Added JSON-size direction, tie-break, and conflict coverage for cloud sync overwrite protection.
- * @updated 2026-06-14: Added pending-auto-sync coverage so freshly created local todos still upload when the timestamp delta is inside the equal-tolerance window.
+ * @updated 2026-08-11: Covers neutral pending-auto-sync timestamps and JSON-size comparison that excludes sync metadata.
  * @updated 2026-05-18: Added regression coverage for the narrowed sync tolerance so recent desktop edits are no longer swallowed as equal.
  */
 
@@ -14,6 +14,7 @@ import {
   classifySyncJsonSizeDirection,
   classifySyncTimestampDirection,
   detectForcedSyncConflict,
+  getComparableSyncJsonByteSize,
   getJsonByteSize,
   resolveSyncDirectionDecision,
   resolveSyncTimestampDirection
@@ -33,14 +34,14 @@ describe('classifySyncTimestampDirection', () => {
     expect(classifySyncTimestampDirection(10_000, 11_500, 1_000)).toBe('restore');
   });
 
-  test('prefers upload for pending auto-sync edits even inside tolerance', () => {
+  test('keeps an in-tolerance timestamp neutral even with pending auto-sync', () => {
     expect(resolveSyncTimestampDirection({
       localTimestamp: 10_400,
       cloudTimestamp: 10_000,
       toleranceMs: 1_000,
       mode: 'auto',
       hadPendingAutoSync: true
-    })).toBe('upload');
+    })).toBe('equal');
   });
 
   test('keeps equal classification inside tolerance when no local auto-sync is pending', () => {
@@ -153,5 +154,14 @@ describe('detectForcedSyncConflict', () => {
 describe('getJsonByteSize', () => {
   test('returns utf-8 byte length instead of plain character count', () => {
     expect(getJsonByteSize({ text: '中' })).toBeGreaterThan(JSON.stringify({ text: '中' }).length);
+  });
+});
+
+describe('getComparableSyncJsonByteSize', () => {
+  test('excludes top-level sync timestamps from the JSON-size fallback', () => {
+    const localSize = getComparableSyncJsonByteSize({ logs: ['same'], timestamp: 1 });
+    const cloudSize = getComparableSyncJsonByteSize({ logs: ['same'], timestamp: 9999999999999, cloudUploadedAt: 9999999999999 });
+
+    expect(localSize).toBe(cloudSize);
   });
 });
