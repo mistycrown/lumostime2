@@ -8,6 +8,7 @@
  * @updated 2026-05-17: Added unified-backup validation support for the nested `aiData` object so AI chat, prompt, and assistant-state payloads can travel with the main app JSON without tripping import guards.
  * @updated 2026-08-10: Added optional Android widget template array validation while preserving compatibility with backups created before widget templates were exported.
  * @updated 2026-08-10: Added optional appearance backup validation for theme and TimePal restore data.
+ * @updated 2026-08-11: Keeps missing or invalid legacy timestamps neutral instead of manufacturing a current timestamp during import or restore.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -102,9 +103,13 @@ export function validateLocalData(data: any): ValidationResult {
     warnings.push('Missing version information');
   }
 
-  if (!data.timestamp) {
+  if (data.timestamp === undefined || data.timestamp === null) {
     warnings.push('Missing timestamp');
-  } else if (typeof data.timestamp !== 'number') {
+  } else if (
+    typeof data.timestamp !== 'number'
+    || !Number.isFinite(data.timestamp)
+    || data.timestamp < 0
+  ) {
     warnings.push('Timestamp must be a number');
   }
 
@@ -162,7 +167,13 @@ export function validateAndFixData(data: any): { data: any; result: ValidationRe
     if (!fixedData.selfBeliefs) fixedData.selfBeliefs = [];
 
     if (!fixedData.version) fixedData.version = '1.0.0';
-    if (!fixedData.timestamp) fixedData.timestamp = Date.now();
+    if (
+      typeof fixedData.timestamp !== 'number'
+      || !Number.isFinite(fixedData.timestamp)
+      || fixedData.timestamp < 0
+    ) {
+      fixedData.timestamp = 0;
+    }
 
     return { data: fixedData, result: validateLocalData(fixedData) };
   }

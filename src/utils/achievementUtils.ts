@@ -6,7 +6,7 @@
  * @description 成就系统计算工具 - 负责每日快照计算、日期枚举和账本汇总。
  *
  * @updated 2026-07-11: Added full-ledger redemption rebuild helpers for achievement all-data recomputation.
- * @updated 2026-08-09: Added fixed-rule character growth snapshots, experience totals, and level progress helpers.
+ * @updated 2026-08-11: Calculates daily attribute experience proportionally and excludes deleted attributes from aggregate experience.
  * @updated 2026-07-11: Added todo-category subtask inclusion handling so achievement rules can count parent tasks only unless explicitly configured otherwise.
  * @updated 2026-06-30: Added shared seal validation so bottles cannot be sealed while the current active balance is negative.
  * @updated 2026-07-07: Added explicit current/history account summaries and made seal previews use the current-bottle account balance.
@@ -404,13 +404,20 @@ export const normalizeAchievementGrowthSnapshot = (
       attributeName: item.attributeName || change.attributeName || '未命名属性',
       matchedValue: Math.max(0, item.matchedValue || 0),
       unitAmount: Math.max(1, Math.floor(item.unitAmount || 1)),
-      appliedUnits: Math.max(0, Math.floor(item.appliedUnits || 0)),
+      appliedUnits: Math.max(0, normalizeAchievementStarValue(item.appliedUnits || 0)),
       expPerUnit: Math.max(1, Math.floor(item.expPerUnit || 1)),
       deltaExp: Math.max(0, Math.floor(item.deltaExp || 0)),
       targetIds: Array.isArray(item.targetIds) ? item.targetIds : []
     }))
   }))
 });
+
+export const getAchievementAttributeReferencingRules = (
+  rules: AchievementRule[],
+  attributeId: string
+): AchievementRule[] => (
+  rules.filter((rule) => rule.attributeEffect?.attributeId === attributeId)
+);
 
 export const sortAchievementGrowthSnapshots = (
   snapshots: AchievementGrowthDailySnapshot[]
@@ -462,11 +469,9 @@ export const computeAchievementGrowthDailySnapshot = (
         return;
       }
 
-      const appliedUnits = Math.floor(
-        Math.max(0, matchedRule.matchedValue) / Math.max(1, rule.unitAmount)
-      );
-      const deltaExp = appliedUnits * attributeEffect.expPerUnit;
-      if (appliedUnits <= 0 || deltaExp <= 0) {
+      const appliedUnits = Math.max(0, matchedRule.matchedValue) / Math.max(1, rule.unitAmount);
+      const deltaExp = Math.floor(appliedUnits * attributeEffect.expPerUnit);
+      if (deltaExp <= 0) {
         return;
       }
 
@@ -513,7 +518,9 @@ export const calculateAchievementAttributeExperience = (
   const experience = Object.fromEntries(attributes.map((attribute) => [attribute.id, 0])) as Record<string, number>;
   snapshots.forEach((snapshot) => {
     snapshot.attributeChanges.forEach((change) => {
-      experience[change.attributeId] = (experience[change.attributeId] || 0) + Math.max(0, change.deltaExp || 0);
+      if (Object.prototype.hasOwnProperty.call(experience, change.attributeId)) {
+        experience[change.attributeId] += Math.max(0, change.deltaExp || 0);
+      }
     });
   });
   return Object.fromEntries(
@@ -522,14 +529,23 @@ export const calculateAchievementAttributeExperience = (
 };
 
 export const calculateAchievementTotalExperience = (
-  snapshots: AchievementGrowthDailySnapshot[]
-): number => (
-  Math.floor(
+  snapshots: AchievementGrowthDailySnapshot[],
+  attributes?: AchievementAttribute[]
+): number => {
+  const activeAttributeIds = attributes
+    ? new Set(attributes.map((attribute) => attribute.id))
+    : null;
+
+  return Math.floor(
     snapshots.reduce((sum, snapshot) => (
-      sum + snapshot.attributeChanges.reduce((changeSum, change) => changeSum + Math.max(0, change.deltaExp || 0), 0)
+      sum + snapshot.attributeChanges.reduce((changeSum, change) => (
+        !activeAttributeIds || activeAttributeIds.has(change.attributeId)
+          ? changeSum + Math.max(0, change.deltaExp || 0)
+          : changeSum
+      ), 0)
     ), 0)
-  )
-);
+  );
+};
 
 export const getAchievementExperienceRequiredForLevel = (level: number): number => {
   const safeLevel = Math.max(1, Math.floor(level));

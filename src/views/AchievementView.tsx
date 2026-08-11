@@ -4,7 +4,8 @@
  * @output Full-screen achievement bottle experience with a bottle-first collapsed state and a ledger-first expanded state
  * @pos View (Achievement Overlay)
  * @description Achievement bottle full-screen page opened from Timeline. The collapsed state emphasizes the bottle, while the expanded state turns the screen into a full ledger workspace.
- * @updated 2026-08-09: Added the fixed-height character profile mode and attribute management entry point.
+ * @updated 2026-08-11: Marks the active ledger tab so its pale selection remains readable in dark mode.
+ * @updated 2026-08-11: Passes achievement rules to attribute settings so deletion can report active references.
  *
  * @updated 2026-07-11: Wired the records tab to the full achievement recomputation action.
  * @updated 2026-07-07: Shows split current/history bottle balances and feeds sealing with the shared achievement account summary.
@@ -307,7 +308,7 @@ export const AchievementView: React.FC = () => {
                   onClick={() => openDetailPanel(tab.id)}
                   className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-[1.1rem] px-2 py-2.5 text-[13px] font-medium leading-none transition-all min-[360px]:gap-1.5 min-[360px]:px-2.5 min-[360px]:text-[13px] min-[390px]:gap-2 min-[390px]:px-3 min-[390px]:text-[14px] ${
                     activeTab === tab.id
-                      ? 'text-stone-900'
+                      ? 'achievement-ledger-tab-active text-stone-900'
                       : 'text-stone-900 hover:text-stone-900'
                   }`}
                   style={activeTab === tab.id ? {
@@ -340,6 +341,7 @@ export const AchievementView: React.FC = () => {
       <AchievementAttributeSettingsDialog
         isOpen={isAttributeSettingsOpen}
         attributes={attributes}
+        rules={rules}
         onClose={() => setIsAttributeSettingsOpen(false)}
         onCreate={createAttribute}
         onUpdate={updateAttribute}

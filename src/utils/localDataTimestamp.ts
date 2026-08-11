@@ -7,6 +7,7 @@
  * @updated 2026-08-11: Treats missing local timestamps as neutral and stores cloud acknowledgements separately from user edits.
  * @updated 2026-08-11: Rejects background startup writes until a real user interaction occurs, preventing initialization tasks from becoming local edits.
  * @updated 2026-08-11: Records pending user edits separately so automatic sync can ignore stale timestamps left by earlier startup writes.
+ * @updated 2026-08-11: Provides an explicit local-edit marker for import and programmatic user actions that do not originate from a DOM event.
  */
 import { SYNC_KEYS, USER_DATA_KEYS, storage } from '../constants/storageKeys';
 
@@ -54,14 +55,22 @@ export const setLocalDataTimestampValue = (timestamp: number): number => {
   return timestamp;
 };
 
-export const updateLocalDataTimestamp = (): number => {
-  if (isTimestampUpdateLocked || !wasRecentlyChangedByUser()) {
+export const markLocalDataEdited = (): number => {
+  if (isTimestampUpdateLocked) {
     return getLocalDataTimestamp();
   }
 
   const timestamp = setLocalDataTimestampValue(Date.now());
   storage.set(SYNC_KEYS.HAS_PENDING_LOCAL_EDIT, 'true');
   return timestamp;
+};
+
+export const updateLocalDataTimestamp = (): number => {
+  if (isTimestampUpdateLocked || !wasRecentlyChangedByUser()) {
+    return getLocalDataTimestamp();
+  }
+
+  return markLocalDataEdited();
 };
 
 export const hasPendingLocalDataEdit = (): boolean => (

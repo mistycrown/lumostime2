@@ -5,6 +5,7 @@
  * @pos Utility (Sync Metadata)
  * @description Keeps sync direction decisions side-effect free so timestamp tolerance and JSON-size conflict protection can be regression tested without pulling in the full app shell.
  * @updated 2026-08-11: Keeps timestamp and JSON-size paths independent, with sync metadata excluded from the JSON-size fallback.
+ * @updated 2026-08-11: Keeps unseen cloud versions on the restore path even when their payload byte size matches local data.
  * @updated 2026-06-15: Added JSON-size-aware sync direction resolution so larger backup payloads can block contradictory overwrite directions and break timestamp ties.
  * @updated 2026-05-18: Added shared timestamp direction classification so narrow sync-tolerance fixes can be tested independently from the React hook.
  */
@@ -21,6 +22,46 @@ export interface SyncDirectionDecision {
   cloudJsonSize: number;
   conflictSource?: 'timestamp-vs-size' | 'forced-direction-vs-size';
 }
+
+interface ResolveSyncComparisonTimestampOptions {
+  localTimestamp: number;
+  cloudTimestamp: number;
+  lastSeenCloudUploadedAt: number;
+  hasPendingLocalEdit: boolean;
+  mode: 'startup' | 'resume' | 'manual' | 'auto';
+}
+
+export const resolveSyncComparisonTimestamp = ({
+  localTimestamp,
+  cloudTimestamp,
+  lastSeenCloudUploadedAt,
+  hasPendingLocalEdit,
+  mode
+}: ResolveSyncComparisonTimestampOptions): {
+  comparisonLocalTimestamp: number;
+  cloudAlreadyApplied: boolean;
+  shouldRestoreUnseenCloud: boolean;
+} => {
+  const cloudAlreadyApplied = mode !== 'manual'
+    && !hasPendingLocalEdit
+    && cloudTimestamp > 0
+    && cloudTimestamp <= lastSeenCloudUploadedAt;
+  const shouldRestoreUnseenCloud = mode !== 'manual'
+    && !hasPendingLocalEdit
+    && cloudTimestamp > 0
+    && !cloudAlreadyApplied;
+
+  return {
+    // A device with no local edit must not let a stale legacy timestamp mask an unseen cloud update.
+    comparisonLocalTimestamp: cloudAlreadyApplied
+      ? cloudTimestamp
+      : shouldRestoreUnseenCloud
+        ? 0
+        : localTimestamp,
+    cloudAlreadyApplied,
+    shouldRestoreUnseenCloud
+  };
+};
 
 export const classifySyncTimestampDirection = (
   localTimestamp: number,

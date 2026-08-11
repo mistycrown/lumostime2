@@ -11,6 +11,7 @@ Keep cloud sync simple for sequential multi-device use while retaining JSON-size
 - Missing or invalid timestamps resolve to `0`; reading a missing value must never manufacture `Date.now()`.
 - Restores, successful uploads, and manual sync operations must not overwrite `localModifiedAt`.
 - A local `lastSeenCloudUploadedAt` acknowledgement prevents a device from repeatedly restoring the cloud version it has already applied.
+- If no local edit is pending and the cloud version is newer than the acknowledgement, timestamp direction is explicitly `restore`; equal JSON byte size never means equal content.
 
 ## Direction Rules
 
@@ -26,7 +27,7 @@ When both signals give the same non-equal direction, sync proceeds automatically
 - Older cloud backups without new metadata continue to use provider modification time, then their legacy payload timestamp.
 - Existing local timestamp values are retained as the migration source. A missing value is neutral rather than "now".
 - Imported JSON is an explicit local user change and updates the local timestamp.
-- Before every restore, the existing local safety backup remains in place.
+- Before every restore, the existing local safety backup is written and read back for verification before local data can be overwritten.
 
 ## Coverage
 

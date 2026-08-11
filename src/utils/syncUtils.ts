@@ -5,6 +5,7 @@
  * @updated 2026-04-20: Cleaned user-facing messages and kept compatible S3 fully aligned with the shared upload/restore flow.
  * @updated 2026-08-10: Includes appearance and TimePal theme image assets in cloud image manifests.
  * @updated 2026-08-11: Stops restore when the local safety backup fails, explains missing WebDAV backup directories, and adds report IDs to critical sync failures.
+ * @updated 2026-08-11: Verifies each local safety backup by reading it back before allowing a cloud restore.
  */
 
 import { webdavService } from '../services/webdavService';
@@ -213,6 +214,30 @@ async function verifyMainBackupUpload(
     success: true,
     verifiedData
   };
+}
+
+async function verifyLocalSafetyBackupUpload(
+  service: CloudService,
+  expectedData: any,
+  backupFilename: string,
+  displayName: string
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    const verifiedData = await service.downloadData(backupFilename);
+    if (isSameSyncPayload(expectedData, verifiedData)) {
+      return { success: true };
+    }
+
+    return {
+      success: false,
+      message: `本地安全备份写入 ${displayName} 后校验失败，已停止从云端恢复。`
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      message: `本地安全备份写入 ${displayName} 后无法读回校验：${error?.message || '未知错误'}。已停止从云端恢复。`
+    };
+  }
 }
 
 export async function uploadDataToCloud(
@@ -435,6 +460,20 @@ export async function backupLocalDataToCloud(
     onProgress?.(`正在备份本地数据到 ${backupFilename}...`);
 
     await service.uploadData(localData, backupFilename);
+
+    onProgress?.('正在校验本地安全备份...');
+    const verifyResult = await verifyLocalSafetyBackupUpload(
+      service,
+      localData,
+      backupFilename,
+      displayName
+    );
+    if (!verifyResult.success) {
+      return {
+        success: false,
+        message: verifyResult.message || '本地安全备份校验失败，已停止从云端恢复。'
+      };
+    }
 
     return {
       success: true,
