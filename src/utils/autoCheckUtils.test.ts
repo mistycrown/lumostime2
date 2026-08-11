@@ -103,8 +103,8 @@ describe('autoCheckUtils nightEarliestStart', () => {
     expect(evaluateAutoCheck(checkItem, logs, context, new Date('2026-04-15T12:00:00+08:00'))).toBe(false);
   });
 
-  it('formats extended night times as next-day values', () => {
-    expect(formatTimeValue(24 * 60 + 30)).toBe('次日 00:30');
+  it('formats extended night times with the clock value before the next-day marker', () => {
+    expect(formatTimeValue(24 * 60 + 30)).toBe('00:30 次日');
   });
 });
 

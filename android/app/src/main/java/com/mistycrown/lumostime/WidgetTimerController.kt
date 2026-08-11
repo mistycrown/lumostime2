@@ -19,6 +19,7 @@ import java.util.UUID
  * Updated 2026-05-05: Executes quick-punch shortcuts natively with a daily-style success checkmark instead of foregrounding the app.
  * Updated 2026-05-05: Lets scene widget timer/todo cards try opening configured third-party apps without blocking their normal Lumo runtime actions.
  * Updated 2026-05-05: Preserves scene group/slot/item source metadata when a scene widget starts runtime so app-side flips can stay scoped to the tapped slot.
+ * Updated 2026-08-11: Cycles binary and count daily checks locally and queues the matching replay action for the web layer.
  */
 object WidgetTimerController {
     private const val TAP_FEEDBACK_DURATION_MS = 260L
@@ -463,30 +464,29 @@ object WidgetTimerController {
         val isCompleted = currentProgress?.isCompleted ?: false
         val occurredAt = System.currentTimeMillis()
 
+        val actionMode: String
         val animationMode = if (manualMode == WidgetDailyModes.BINARY) {
-            if (isCompleted) {
-                return null
-            }
-
+            val nextCompleted = !isCompleted
             WidgetStores.upsertDailyProgress(
                 context,
                 WidgetDailyProgress(
                     checkItemId = checkItemId,
                     date = todayDate,
                     manualMode = WidgetDailyModes.BINARY,
-                    currentCount = 1,
+                    currentCount = if (nextCompleted) 1 else 0,
                     targetCount = 1,
-                    isCompleted = true,
+                    isCompleted = nextCompleted,
                     updatedAt = occurredAt
                 )
             )
-            WidgetTapAnimationModes.DAILY_COMPLETE
-        } else {
-            if (currentCount >= targetCount) {
-                return null
+            actionMode = "toggle"
+            if (nextCompleted) {
+                WidgetTapAnimationModes.DAILY_COMPLETE
+            } else {
+                WidgetTapAnimationModes.DAILY_COUNT
             }
-
-            val nextCount = (currentCount + 1).coerceAtMost(targetCount)
+        } else {
+            val nextCount = if (currentCount >= targetCount) 0 else currentCount + 1
             WidgetStores.upsertDailyProgress(
                 context,
                 WidgetDailyProgress(
@@ -499,11 +499,14 @@ object WidgetTimerController {
                     updatedAt = occurredAt
                 )
             )
+            actionMode = "cycle"
 
-            if (nextCount < targetCount) {
+            if (nextCount in 1 until targetCount) {
                 WidgetTapAnimationModes.DAILY_COUNT
-            } else {
+            } else if (nextCount == targetCount) {
                 WidgetTapAnimationModes.DAILY_COMPLETE
+            } else {
+                WidgetTapAnimationModes.DAILY_COUNT
             }
         }
 
@@ -515,7 +518,7 @@ object WidgetTimerController {
                 date = todayDate,
                 checkTemplateId = checkTemplateId,
                 checkItemId = checkItemId,
-                actionMode = "complete_once",
+                actionMode = actionMode,
                 createdAt = occurredAt,
                 appWidgetId = appWidgetId,
                 slotIndex = pendingSlotIndex

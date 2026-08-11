@@ -106,8 +106,8 @@ export const AutoCheckItemEditor: React.FC<AutoCheckItemEditorProps> = ({
         : value;
       const hours = Math.floor(displayValue / 60);
       const mins = displayValue % 60;
-      const prefix = config.comparisonType === 'nightEarliestStart' && value >= 24 * 60 ? '次日 ' : '';
-      return `${prefix}${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+      const suffix = config.comparisonType === 'nightEarliestStart' && value >= 24 * 60 ? ' 次日' : '';
+      return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}${suffix}`;
     }
   };
 

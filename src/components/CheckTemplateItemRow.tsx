@@ -166,10 +166,10 @@ export const CheckTemplateItemRow: React.FC<CheckTemplateItemRowProps> = ({
       const rawMinutes = comparisonType === 'nightEarliestStart' && targetValue >= 24 * 60
         ? targetValue - 24 * 60
         : targetValue;
-      const prefix = comparisonType === 'nightEarliestStart' && targetValue >= 24 * 60 ? '次日 ' : '';
       const hour = Math.floor(rawMinutes / 60).toString().padStart(2, '0');
       const minute = (rawMinutes % 60).toString().padStart(2, '0');
-      return `${prefix}${hour}:${minute}`;
+      const suffix = comparisonType === 'nightEarliestStart' && targetValue >= 24 * 60 ? ' 次日' : '';
+      return `${hour}:${minute}${suffix}`;
     })();
 
     return (

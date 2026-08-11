@@ -220,6 +220,58 @@ describe('dailyCheckUtils', () => {
     expect(result.item?.isCompleted).toBe(false);
   });
 
+  it('cycles a count manual check through every value before resetting for widget replay', () => {
+    let reviews: DailyReview[] = [];
+    const counts: number[] = [];
+
+    for (let index = 0; index < 4; index += 1) {
+      const result = applyDailyCheckActionForDate({
+        dateStr: '2026-03-14',
+        dailyReviews: reviews,
+        checkTemplates,
+        reviewTemplates,
+        checkItemId: 'check-count',
+        actionMode: 'cycle'
+      });
+      reviews = result.updatedReviews || reviews;
+      counts.push(result.item?.currentCount || 0);
+    }
+
+    expect(counts).toEqual([1, 2, 3, 0]);
+  });
+
+  it('toggles a binary manual check back to incomplete for widget replay', () => {
+    const completedReview: DailyReview = {
+      id: 'review-5',
+      date: '2026-03-14',
+      createdAt: 1,
+      updatedAt: 1,
+      answers: [],
+      checkItems: [{
+        id: 'check-binary',
+        category: '晨间',
+        content: '喝水',
+        isCompleted: true,
+        type: 'manual',
+        manualMode: 'binary',
+        currentCount: 1,
+        targetCount: 1
+      }]
+    };
+
+    const result = applyDailyCheckActionForDate({
+      dateStr: '2026-03-14',
+      dailyReviews: [completedReview],
+      checkTemplates,
+      reviewTemplates,
+      checkItemId: 'check-binary',
+      actionMode: 'toggle'
+    });
+
+    expect(result.item?.currentCount).toBe(0);
+    expect(result.item?.isCompleted).toBe(false);
+  });
+
   it('exposes only enabled manual daily checks for NFC selection', () => {
     const eligible = getEligibleNfcDailyCheckItems(checkTemplates);
 

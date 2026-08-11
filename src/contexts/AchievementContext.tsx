@@ -10,11 +10,12 @@
  * @updated 2026-05-18: Added unified achievement backup export/restore helpers so bottle data can travel through app export/import and cloud sync.
  * @updated 2026-04-25: Added global check streak config plus active-period recomputation for streak-weighted check-category rules.
  * @updated 2026-04-17: Added filter-duration achievement rules that reuse the shared custom filter expression logic.
- * @updated 2026-04-07: Separates live and carryover redemption funding so sealing only archives live-period spending.
+ * @updated 2026-08-11: Reports failed achievement-data hydration through the bootstrap recovery screen.
  */
 import React, { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { buildDefaultAchievementAttributes } from '../constants/achievementAttributes';
 import { AchievementSnapshot, dataRepository } from '../repositories/dataRepository';
+import { reportCriticalDataError } from '../services/errorReporting';
 import {
   AchievementArchivedBottle,
   AchievementAttribute,
@@ -308,6 +309,11 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         setBottleActionRecords(snapshot.bottleActionRecords.map(normalizeBottleActionRecord));
       } catch (error) {
         console.error('[AchievementContext] Failed to hydrate achievement data', error);
+        if (!cancelled) {
+          reportCriticalDataError(error, '读取本地成就数据失败，请重试。', {
+            dataArea: 'achievements'
+          });
+        }
       } finally {
         if (!cancelled) {
           setCanPersist(hydratedSuccessfully);

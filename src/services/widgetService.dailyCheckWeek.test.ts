@@ -92,6 +92,7 @@ describe('daily-check weekly Android widget wiring', () => {
     expect(widgetInfoSource).toContain('android:targetCellWidth="4"');
     expect(widgetInfoSource).toContain('android:targetCellHeight="4"');
     expect(widgetInfoSource).toContain('@drawable/widget_preview_daily_check_week_4x4');
+    expect(widgetInfoSource).not.toContain('android:previewLayout');
     expect(providerSupportSource).toContain('ACTION_REFRESH');
     expect(providerSupportSource).toContain('R.id.widget_daily_check_week_refresh_root');
     expect(providerSupportSource).not.toContain('getLaunchIntentForPackage');
@@ -111,6 +112,7 @@ describe('daily-check weekly Android widget wiring', () => {
     expect(androidManifestSource).toContain('android:name=".WidgetDailyCheckWeek4x3RemoteViewsService"');
     expect(compactWidgetInfoSource).toContain('android:targetCellWidth="4"');
     expect(compactWidgetInfoSource).toContain('android:targetCellHeight="3"');
+    expect(compactWidgetInfoSource).not.toContain('android:previewLayout');
     expect(compactProviderSource).toContain('setRemoteAdapter');
     expect(compactProviderSource).toContain('ACTION_REFRESH');
     expect(compactProviderSource).toContain('REMOTE_VIEWS_VERSION = "v4"');

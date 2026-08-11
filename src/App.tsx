@@ -28,6 +28,7 @@
  * @updated 2026-04-25: Added AI assistant widget shortcut handling so Android widget shortcut slots can open the shared AI chat window.
  * @updated 2026-04-26: Added Android assistant notification navigation consumption so tapping a background AI alert reopens the shared chat at the exact target message.
  * @updated 2026-07-31: Added a temporary active Chronicle layout state so tapping the active Timeline nav item toggles layouts without changing the settings default.
+ * @updated 2026-08-11: Shows shareable Sentry error IDs for startup, local-data hydration, and imported-file failures.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -78,6 +79,19 @@ import { useHardwareBackButton } from './hooks/useHardwareBackButton';
 import { useAppLifecycle } from './hooks/useAppLifecycle';
 import { useWidgetBridgeSync } from './hooks/useWidgetBridgeSync';
 import { useFloatingWindowSync } from './hooks/useFloatingWindowSync';
+import {
+  completeStartupDiagnostics,
+  markStartupStage,
+  STARTUP_TIMEOUT_EVENT,
+  type StartupTimeoutDetail
+} from './services/startupDiagnostics';
+import {
+  CRITICAL_DATA_ERROR_EVENT,
+  getLatestCriticalDataError,
+  reportException,
+  type CriticalDataErrorDetail,
+  withErrorReference
+} from './services/errorReporting';
 import { useRecurringPlanAutoCreation } from './hooks/useRecurringPlanAutoCreation';
 import { assistantBackupService } from './services/assistantBackupService';
 import { appearanceBackupService } from './services/appearanceBackupService';
@@ -434,7 +448,11 @@ const AppContent: React.FC = () => {
       } catch (error) {
         console.error('Import failed', error);
         const message = error instanceof Error ? error.message : 'Invalid JSON';
-        addToast('error', `Import failed: ${message}`);
+        const sentryEventId = reportException(error, {
+          feature: 'data_import',
+          operation: 'import_json_backup'
+        });
+        addToast('error', withErrorReference(`Import failed: ${message}`, sentryEventId));
       }
     };
     reader.readAsText(file);
@@ -1351,9 +1369,42 @@ const AppBootstrapGate: React.FC<{ children: React.ReactNode }> = ({ children })
   const { isReady: isReviewReady } = useReview();
   const { isReady: isCategoryScopeReady } = useCategoryScope();
   const { isReady: isAchievementReady } = useAchievement();
-  const isAppReady = isDataReady && isReviewReady && isCategoryScopeReady && isAchievementReady;
+  const isStartupTimeoutSimulation = import.meta.env.DEV &&
+    new URLSearchParams(window.location.search).has('simulate-startup-timeout');
+  const isAppReady = isDataReady &&
+    isReviewReady &&
+    isCategoryScopeReady &&
+    isAchievementReady &&
+    !isStartupTimeoutSimulation;
   const bootstrapStartedAtRef = useRef(getBootstrapTimingNow());
   const lastLoggedStateRef = useRef<string | null>(null);
+  const [startupTimeoutEventId, setStartupTimeoutEventId] = useState<string | null | undefined>(undefined);
+  const [criticalDataError, setCriticalDataError] = useState<CriticalDataErrorDetail | null>(
+    getLatestCriticalDataError
+  );
+
+  useEffect(() => {
+    const handleStartupTimeout = (event: Event) => {
+      const detail = (event as CustomEvent<StartupTimeoutDetail>).detail;
+      setStartupTimeoutEventId(detail?.sentryEventId ?? null);
+    };
+    window.addEventListener(STARTUP_TIMEOUT_EVENT, handleStartupTimeout);
+    return () => window.removeEventListener(STARTUP_TIMEOUT_EVENT, handleStartupTimeout);
+  }, []);
+
+  useEffect(() => {
+    const handleCriticalDataError = (event: Event) => {
+      const detail = (event as CustomEvent<CriticalDataErrorDetail>).detail;
+      if (!detail) {
+        return;
+      }
+
+      setCriticalDataError((current) => current || detail);
+    };
+
+    window.addEventListener(CRITICAL_DATA_ERROR_EVENT, handleCriticalDataError);
+    return () => window.removeEventListener(CRITICAL_DATA_ERROR_EVENT, handleCriticalDataError);
+  }, []);
 
   useEffect(() => {
     const readinessState = JSON.stringify({
@@ -1369,7 +1420,11 @@ const AppBootstrapGate: React.FC<{ children: React.ReactNode }> = ({ children })
 
     lastLoggedStateRef.current = readinessState;
     console.info('[AppBootstrapGate] readiness changed', JSON.parse(readinessState));
-  }, [isAchievementReady, isCategoryScopeReady, isDataReady, isReviewReady]);
+    markStartupStage(
+      isStartupTimeoutSimulation ? 'startup_timeout_simulation' : 'provider_hydration',
+      JSON.parse(readinessState)
+    );
+  }, [isAchievementReady, isCategoryScopeReady, isDataReady, isReviewReady, isStartupTimeoutSimulation]);
 
   useEffect(() => {
     if (!isAppReady) {
@@ -1379,10 +1434,45 @@ const AppBootstrapGate: React.FC<{ children: React.ReactNode }> = ({ children })
     console.info(
       `[AppBootstrapGate] app ready after ${(getBootstrapTimingNow() - bootstrapStartedAtRef.current).toFixed(1)}ms`
     );
+    completeStartupDiagnostics();
     window.dispatchEvent(new Event(APP_READY_EVENT));
   }, [isAppReady]);
 
-  if (!isAppReady) {
+  if (criticalDataError || !isAppReady) {
+    const errorMessage = criticalDataError?.message || '加载本地数据超时';
+    const sentryEventId = criticalDataError?.sentryEventId ?? startupTimeoutEventId;
+
+    if (criticalDataError || startupTimeoutEventId !== undefined) {
+      return (
+        <div className="min-h-screen bg-[#fafaf9] flex flex-col items-center justify-center gap-5 px-6 text-center font-serif">
+          <div className="text-base text-stone-700">{errorMessage}</div>
+          {sentryEventId ? (
+            <div className="flex max-w-full flex-col items-center gap-2 text-xs text-stone-500">
+              <code className="max-w-full break-all border border-stone-200 bg-white px-3 py-2 text-stone-700">
+                错误编号：{sentryEventId}
+              </code>
+              <button
+                type="button"
+                className="text-sm text-stone-700 underline"
+                onClick={() => void navigator.clipboard?.writeText(sentryEventId)}
+              >
+                复制错误编号
+              </button>
+            </div>
+          ) : (
+            <div className="text-xs text-stone-500">诊断上报未启用</div>
+          )}
+          <button
+            type="button"
+            className="border border-stone-300 px-4 py-2 text-sm text-stone-700"
+            onClick={() => window.location.reload()}
+          >
+            重试
+          </button>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-[#fafaf9] flex items-center justify-center text-sm text-stone-500 font-serif">
         正在加载本地数据...

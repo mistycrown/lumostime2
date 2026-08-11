@@ -569,8 +569,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             const result = await downloadWithBackup(
                 webdavService,
                 localData,
-                (message) => onToast('info', message),
-                async (message) => window.confirm(message)
+                (message) => onToast('info', message)
             );
 
             if (result.success && result.data) {
@@ -728,8 +727,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             const result = await downloadWithBackup(
                 s3Service,
                 localData,
-                (message) => onToast('info', message),
-                async (message) => window.confirm(message)
+                (message) => onToast('info', message)
             );
 
             if (result.success && result.data) {
@@ -763,8 +761,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             const result = await downloadWithBackup(
                 compatibleS3Service,
                 localData,
-                (message) => onToast('info', message),
-                async (message) => window.confirm(message)
+                (message) => onToast('info', message)
             );
 
             if (result.success && result.data) {

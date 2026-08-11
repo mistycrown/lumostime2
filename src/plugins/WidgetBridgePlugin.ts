@@ -16,8 +16,10 @@
  * @updated 2026-05-05: Added optional scene-widget runtime source metadata so scene card flips can stay scoped to one scene slot.
  * @updated 2026-08-09: Added principle-card widget payload sync types for the dedicated Android 4x2 card widget.
  * @updated 2026-08-09: Added weekly daily-check progress and per-item color fields for the Android 4x4 widget.
+ * @updated 2026-08-11: Preserves native daily toggle and count-cycle actions when replaying widget taps in the web layer.
  */
 import { registerPlugin } from '@capacitor/core';
+import type { DailyCheckActionMode } from '../utils/dailyCheckUtils';
 import { ShortcutWidgetAction } from '../services/widgetShortcutService';
 
 export type WidgetType = 'timer' | 'daily' | 'shortcut';
@@ -163,7 +165,7 @@ export interface WidgetBridgePendingDailyAction {
   date: string;
   checkTemplateId?: string | null;
   checkItemId: string;
-  actionMode: 'complete_once';
+  actionMode: DailyCheckActionMode;
   createdAt: number;
   appWidgetId?: number | null;
   slotIndex?: number | null;

@@ -4,6 +4,7 @@
  * @updated 2026-06-21: Added write-after-read verification for main backup uploads so stale cloud reads or failed overwrites cannot be reported as a successful sync.
  * @updated 2026-04-20: Cleaned user-facing messages and kept compatible S3 fully aligned with the shared upload/restore flow.
  * @updated 2026-08-10: Includes appearance and TimePal theme image assets in cloud image manifests.
+ * @updated 2026-08-11: Stops restore when the local safety backup fails, explains missing WebDAV backup directories, and adds report IDs to critical sync failures.
  */
 
 import { webdavService } from '../services/webdavService';
@@ -14,6 +15,7 @@ import { appearanceBackupService } from '../services/appearanceBackupService';
 import { syncService } from '../services/syncService';
 import { validateAndFixData, validateLocalData } from './dataValidation';
 import { buildSyncPayloadMetadata, isSameSyncPayload } from './syncPayloadMetadata';
+import { reportDiagnostic, reportException, withErrorReference } from '../services/errorReporting';
 
 export type CloudService = typeof webdavService | typeof s3Service | typeof compatibleS3Service;
 export type CloudServiceName = 'webdav' | 's3' | 'compatible-s3';
@@ -46,6 +48,20 @@ function getServiceDisplayName(service: CloudService): string {
   }
 
   return '云端';
+}
+
+function getErrorStatus(error: any): number | undefined {
+  return error?.status ?? error?.response?.status;
+}
+
+function buildBackupFailureMessage(service: CloudService, error: any): string {
+  const status = getErrorStatus(error);
+  if (service === webdavService && (status === 404 || status === 409)) {
+    return '云端备份失败：WebDAV 根目录下未找到 backups 文件夹，请先手动创建 backups 文件夹后重试。';
+  }
+
+  const detail = error?.message || error?.error || `HTTP ${status || '未知'}`;
+  return `云端备份失败：${detail}`;
 }
 
 function buildReferencedImageList(data: any): string[] {
@@ -150,9 +166,17 @@ async function verifyMainBackupUpload(
     verifiedData = await service.downloadData(MAIN_BACKUP_FILENAME);
   } catch (error: any) {
     console.error('[syncUtils] Failed to verify uploaded main backup:', error);
+    const sentryEventId = reportException(error, {
+      feature: 'cloud_sync',
+      operation: 'verify_main_backup',
+      service: getServiceName(service)
+    });
     return {
       success: false,
-      message: `Upload to ${displayName} finished, but reading the main backup back failed: ${error?.message || 'unknown error'}`
+      message: withErrorReference(
+        `Upload to ${displayName} finished, but reading the main backup back failed: ${error?.message || 'unknown error'}`,
+        sentryEventId
+      )
     };
   }
 
@@ -166,9 +190,22 @@ async function verifyMainBackupUpload(
       actualJsonSize: actualMeta.jsonSize
     });
 
+    const sentryEventId = reportDiagnostic('cloud_main_backup_verification_mismatch', {
+      feature: 'cloud_sync',
+      operation: 'verify_main_backup',
+      service: getServiceName(service),
+      expectedTimestamp: expectedMeta.timestamp,
+      actualTimestamp: actualMeta.timestamp,
+      expectedJsonSize: expectedMeta.jsonSize,
+      actualJsonSize: actualMeta.jsonSize
+    });
+
     return {
       success: false,
-      message: `Upload to ${displayName} did not verify: the main backup read back from cloud is not the data that was just written.`
+      message: withErrorReference(
+        `Upload to ${displayName} did not verify: the main backup read back from cloud is not the data that was just written.`,
+        sentryEventId
+      )
     };
   }
 
@@ -188,9 +225,14 @@ export async function uploadDataToCloud(
   try {
     if (!isValidSyncPayload(localData)) {
       console.error('[syncUtils] Invalid upload payload:', localData);
+      const sentryEventId = reportDiagnostic('cloud_upload_invalid_local_payload', {
+        feature: 'cloud_sync',
+        operation: 'validate_upload_payload',
+        service: getServiceName(service)
+      });
       return {
         success: false,
-        message: '本地数据不完整，已取消上传'
+        message: withErrorReference('本地数据不完整，已取消上传', sentryEventId)
       };
     }
 
@@ -249,9 +291,17 @@ export async function uploadDataToCloud(
     };
   } catch (error: any) {
     console.error(`[syncUtils] ${displayName} upload error:`, error);
+    const sentryEventId = reportException(error, {
+      feature: 'cloud_sync',
+      operation: 'upload_main_backup',
+      service: getServiceName(service)
+    });
     return {
       success: false,
-      message: `上传到${displayName}失败: ${error?.message || '未知错误'}`
+      message: withErrorReference(
+        `上传到${displayName}失败: ${error?.message || '未知错误'}`,
+        sentryEventId
+      )
     };
   }
 }
@@ -274,9 +324,14 @@ export async function downloadDataFromCloud(
     });
 
     if (!rawData) {
+      const sentryEventId = reportDiagnostic('cloud_download_returned_empty_data', {
+        feature: 'cloud_sync',
+        operation: 'download_main_backup',
+        service: getServiceName(service)
+      });
       return {
         success: false,
-        message: `从${displayName}下载数据失败：未获取到数据`
+        message: withErrorReference(`从${displayName}下载数据失败：未获取到数据`, sentryEventId)
       };
     }
 
@@ -293,9 +348,18 @@ export async function downloadDataFromCloud(
 
     if (!result.isValid) {
       console.error('[syncUtils] Invalid restore payload:', result.errors, rawData);
+      const sentryEventId = reportDiagnostic('cloud_download_invalid_payload', {
+        feature: 'cloud_sync',
+        operation: 'validate_downloaded_backup',
+        service: getServiceName(service),
+        validationErrorCount: result.errors.length
+      });
       return {
         success: false,
-        message: `从${displayName}下载的数据格式无效：${result.errors.join('；')}`
+        message: withErrorReference(
+          `从${displayName}下载的数据格式无效：${result.errors.join('；')}`,
+          sentryEventId
+        )
       };
     }
 
@@ -335,9 +399,17 @@ export async function downloadDataFromCloud(
     };
   } catch (error: any) {
     console.error(`[syncUtils] ${displayName} download error:`, error);
+    const sentryEventId = reportException(error, {
+      feature: 'cloud_sync',
+      operation: 'download_main_backup',
+      service: getServiceName(service)
+    });
     return {
       success: false,
-      message: `从${displayName}下载数据失败: ${error?.message || '未知错误'}`
+      message: withErrorReference(
+        `从${displayName}下载数据失败: ${error?.message || '未知错误'}`,
+        sentryEventId
+      )
     };
   }
 }
@@ -370,9 +442,14 @@ export async function backupLocalDataToCloud(
     };
   } catch (error: any) {
     console.error(`[syncUtils] ${displayName} backup error:`, error);
+    const sentryEventId = reportException(error, {
+      feature: 'cloud_sync',
+      operation: 'backup_local_data',
+      service: getServiceName(service)
+    });
     return {
       success: false,
-      message: `云端备份失败: ${error?.message || '未知错误'}`
+      message: withErrorReference(buildBackupFailureMessage(service, error), sentryEventId)
     };
   }
 }
@@ -380,25 +457,17 @@ export async function backupLocalDataToCloud(
 export async function downloadWithBackup(
   service: CloudService,
   localData: any,
-  onProgress?: ProgressCallback,
-  onConfirm?: (message: string) => Promise<boolean>
+  onProgress?: ProgressCallback
 ): Promise<SyncResult> {
   const backupResult = await backupLocalDataToCloud(service, localData, onProgress);
 
   if (!backupResult.success) {
-    const shouldContinue = await onConfirm?.(
-      `${backupResult.message}。是否继续恢复？继续后会用云端数据覆盖当前本地数据。`
-    );
-
-    if (!shouldContinue) {
-      return {
-        success: false,
-        message: '用户取消操作'
-      };
-    }
-  } else {
-    onProgress?.(backupResult.message);
+    return {
+      success: false,
+      message: `${backupResult.message}。为保护本地数据，已停止恢复。`
+    };
   }
 
+  onProgress?.(backupResult.message);
   return downloadDataFromCloud(service, onProgress);
 }

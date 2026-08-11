@@ -1,11 +1,18 @@
 import path from 'path';
+import { readFileSync } from 'node:fs';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import electron from 'vite-plugin-electron/simple';
 import renderer from 'vite-plugin-electron-renderer';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   const isProduction = mode === 'production';
+  const appVersion = JSON.parse(readFileSync(path.resolve(__dirname, 'version.json'), 'utf8')).version as string;
+  const sentryRelease = `lumostime@${appVersion}`;
+  const shouldUploadSentrySourceMaps = Boolean(
+    env.SENTRY_AUTH_TOKEN && env.SENTRY_ORG && env.SENTRY_PROJECT
+  );
   
   return {
     server: {
@@ -21,6 +28,18 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
+      ...(shouldUploadSentrySourceMaps ? [sentryVitePlugin({
+        authToken: env.SENTRY_AUTH_TOKEN,
+        org: env.SENTRY_ORG,
+        project: env.SENTRY_PROJECT,
+        release: {
+          name: sentryRelease
+        },
+        sourcemaps: {
+          assets: './dist/**',
+          filesToDeleteAfterUpload: ['./dist/**/*.map']
+        }
+      })] : []),
       electron({
         main: {
           // Shortcut of `build.lib.entry`
@@ -38,7 +57,8 @@ export default defineConfig(({ mode }) => {
     ],
     define: {
       'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'import.meta.env.VITE_APP_VERSION': JSON.stringify(sentryRelease)
     },
     resolve: {
       alias: {
@@ -47,6 +67,7 @@ export default defineConfig(({ mode }) => {
       }
     },
     build: {
+      sourcemap: shouldUploadSentrySourceMaps ? 'hidden' : false,
       // 使用 esbuild 进行压缩（比 terser 更快，内存占用更少）
       minify: isProduction ? 'esbuild' : false,
       // esbuild 压缩选项

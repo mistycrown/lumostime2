@@ -34,6 +34,8 @@
     "@capawesome/capacitor-screen-orientation": "^7.1.0",
     "@emotion/is-prop-valid": "^1.4.0",
     "@google/genai": "^1.31.0",
+    "@sentry/react": "^10.70.0",
+    "@sentry/vite-plugin": "^5.4.0",
     "@supabase/supabase-js": "^2.86.2",
     "@tailwindcss/typography": "^0.5.19",
     "@types/canvas-confetti": "^1.9.0",

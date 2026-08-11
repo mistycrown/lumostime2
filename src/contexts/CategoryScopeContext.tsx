@@ -1,6 +1,7 @@
 /**
  * @file CategoryScopeContext.tsx
  * @description Manages categories, scopes, goals, and major goals with async repository hydration and persistence.
+ * @updated 2026-08-11: Reports failed category and goal hydration through the bootstrap recovery screen.
  */
 import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { CATEGORIES, INITIAL_GOALS, SCOPES } from '../constants';
@@ -11,6 +12,7 @@ import {
   isLocalDataTimestampUpdateLocked,
   updateLocalDataTimestamp
 } from '../utils/localDataTimestamp';
+import { reportCriticalDataError } from '../services/errorReporting';
 
 interface CategoryScopeContextType {
   isReady: boolean;
@@ -86,6 +88,11 @@ export const CategoryScopeProvider: React.FC<CategoryScopeProviderProps> = ({
         setMajorGoals(snapshot.majorGoals);
       } catch (error) {
         console.error('[CategoryScopeContext] Failed to hydrate category/scope data from repository', error);
+        if (!cancelled) {
+          reportCriticalDataError(error, '读取本地分类和目标数据失败，请重试。', {
+            dataArea: 'categories_and_goals'
+          });
+        }
       } finally {
         if (!cancelled) {
           setCanPersist(hydratedSuccessfully);

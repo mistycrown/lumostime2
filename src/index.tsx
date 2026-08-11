@@ -9,6 +9,7 @@
  * @updated 2026-05-17: 扩展了桌面小组件的分流路由逻辑，新增对 DesktopQuickWidgetView（小事清单小组件）的渲染路由分发。
  * @updated 2026-05-17: Added a dedicated transparent desktop quick-editor window route to the widget boot switch.
  * @updated 2026-05-17: Added a dedicated desktop-widget boot path so Electron can render a lightweight today-tasks window or month planning calendar window without mounting the full app shell.
+ * @updated 2026-08-11: Starts optional error reporting and records normal-app startup attempts for timeout diagnosis.
  */
 import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -22,6 +23,8 @@ import { DesktopMonthWidgetView } from './views/desktop/DesktopMonthWidgetView';
 import { DesktopQuickWidgetView } from './views/desktop/DesktopQuickWidgetView';
 import { DesktopTimerWidgetView } from './views/desktop/DesktopTimerWidgetView';
 import { DesktopTodoQuickEditorWindowView } from './views/desktop/DesktopTodoQuickEditorWindowView';
+import { initializeErrorReporting } from './services/errorReporting';
+import { startStartupDiagnostics } from './services/startupDiagnostics';
 
 const APP_READY_EVENT = 'lumostime:app-ready';
 const getRendererBootTimingNow = (): number => (
@@ -30,6 +33,8 @@ const getRendererBootTimingNow = (): number => (
     : Date.now()
 );
 const rendererBootStartedAt = getRendererBootTimingNow();
+
+initializeErrorReporting();
 
 // @ts-ignore
 window.Buffer = window.Buffer || Buffer;
@@ -62,6 +67,10 @@ console.info(
   `[RendererBoot] React root created at ${(getRendererBootTimingNow() - rendererBootStartedAt).toFixed(1)}ms after index evaluation`
 );
 const isDesktopWidgetRenderer = isDesktopWidgetWindow();
+
+if (!isDesktopWidgetRenderer) {
+  startStartupDiagnostics();
+}
 
 if (isDesktopWidgetRenderer) {
   const disableGlobalThemeMode = () => document.documentElement.removeAttribute('data-theme-mode');

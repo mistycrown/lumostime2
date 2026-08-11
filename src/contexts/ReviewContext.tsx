@@ -2,7 +2,7 @@
  * @file ReviewContext.tsx
  * @description Manages review system state, using async repository hydration for heavy review entries and localStorage for light review settings.
  * @updated 2026-08-06: Preserved item-level daily check template enabled flags during localStorage startup migration.
- * @updated 2026-08-09: Preserved item-level daily check colors during localStorage startup migration.
+ * @updated 2026-08-11: Reports failed review-data hydration through the bootstrap recovery screen.
  */
 import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { DEFAULT_CHECK_TEMPLATES, DEFAULT_REVIEW_TEMPLATES, INITIAL_DAILY_REVIEWS } from '../constants';
@@ -15,6 +15,7 @@ import {
   isLocalDataTimestampUpdateLocked,
   updateLocalDataTimestamp
 } from '../utils/localDataTimestamp';
+import { reportCriticalDataError } from '../services/errorReporting';
 
 interface ReviewContextType {
   isReady: boolean;
@@ -188,6 +189,11 @@ export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setOnThisDayEntries(snapshot.onThisDayEntries);
       } catch (error) {
         console.error('[ReviewContext] Failed to hydrate review entries from repository', error);
+        if (!cancelled) {
+          reportCriticalDataError(error, '读取本地回顾数据失败，请重试。', {
+            dataArea: 'reviews'
+          });
+        }
       } finally {
         if (!cancelled) {
           setCanPersist(hydratedSuccessfully);
