@@ -2,7 +2,6 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:initialLayout="@layout/widget_layout_daily_check_week_4x3"
     android:previewImage="@drawable/widget_preview_daily_check_week_4x3"
-    android:previewLayout="@layout/widget_layout_daily_check_week_4x3"
     android:minWidth="220dp"
     android:minHeight="165dp"
     android:resizeMode="none"

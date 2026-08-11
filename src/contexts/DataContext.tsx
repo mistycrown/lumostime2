@@ -3,7 +3,7 @@
  * @description Manages core application data state (logs, todos, todoCategories, and data collections) with async repository hydration and persistence.
  * @updated 2026-07-30: Normalizes hydrated recurring auto-Plan settings alongside Maybe dates.
  * @updated 2026-05-23: Broadcasts desktop todo sync events after persisted todo writes and rehydrates todos from external desktop-window edits so Electron widgets and the main app stay aligned.
- * @updated 2026-05-14: Normalizes hydrated todo `maybeDates` on load so stale past `Maybe Date` entries are cleaned automatically when the app opens on a later day.
+ * @updated 2026-08-11: Reports core local-data hydration failures and stops the bootstrap gate with a shareable error ID.
  */
 import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES } from '../constants';
@@ -22,6 +22,7 @@ import {
   LocalDataTimestampUpdatedDetail,
   updateLocalDataTimestamp
 } from '../utils/localDataTimestamp';
+import { reportCriticalDataError } from '../services/errorReporting';
 
 interface DataContextType {
   isReady: boolean;
@@ -116,6 +117,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUsesFallbackSeedData(snapshot.usesFallbackSeedData);
       } catch (error) {
         console.error('[DataContext] Failed to hydrate core data from repository', error);
+        if (!cancelled) {
+          reportCriticalDataError(error, '读取本地数据失败，请重试。', {
+            dataArea: 'core'
+          });
+        }
         setUsesFallbackSeedData(true);
       } finally {
         if (!cancelled) {

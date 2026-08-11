@@ -5,7 +5,7 @@
  * @pos Utility (Auto Check)
  * @description 自动日课判断逻辑 - 根据筛选条件和统计规则自动判断日课完成状态
  * @updated 2026-07-30: Added reorder-safe auto-check completion change detection for Daily Review refreshes.
- * @updated 2026-08-10: Caches per-date matching-log statistics so daily-check calendars and aggregate views do not rescan every log per day.
+ * @updated 2026-08-11: Formats cross-midnight times as `HH:MM 次日` so narrow screens retain the actual time first.
  * @updated 2026-08-09: Exposed the evaluated metric for daily-check statistics.
  * @updated 2026-08-09: Planned timeline blocks are excluded from auto-check statistics.
  *
@@ -288,7 +288,7 @@ export function formatTimeValue(minutes: number): string {
     const adjustedMinutes = minutes - 24 * 60;
     const hours = Math.floor(adjustedMinutes / 60);
     const mins = adjustedMinutes % 60;
-    return `次日 ${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')} 次日`;
   }
 
   const hours = Math.floor(minutes / 60);

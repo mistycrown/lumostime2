@@ -17,6 +17,7 @@
  * @updated 2026-05-05: Clears native widget runtime after app-side stop/cancel transitions while still preserving widget-started sessions during initial hydration.
  * @updated 2026-05-05: Mirrors the latest app log end time to native storage so widget quick-punch shortcuts can append gaps directly on the home screen.
  * @updated 2026-08-09: Mirrors the principle library into the native principle-card widget payload so the Android 4x2 card can randomize from the latest library state.
+ * @updated 2026-08-11: Replays the native daily action mode so widget taps can toggle binary checks and cycle count checks.
  */
 import { App as CapacitorApp } from '@capacitor/app';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -249,7 +250,7 @@ export const useWidgetBridgeSync = () => {
               checkTemplates: currentState.checkTemplates,
               reviewTemplates: currentState.reviewTemplates,
               checkItemId: action.checkItemId,
-              actionMode: 'complete_once'
+              actionMode: action.actionMode
             });
 
             if (result.updatedReviews) {

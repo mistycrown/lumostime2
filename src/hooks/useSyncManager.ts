@@ -13,7 +13,7 @@
  * @updated 2026-05-17: Extended the unified backup/sync payload to include the shared AI backup block, and now restore that AI state alongside the main app data during imports and cloud downloads.
  * @updated 2026-05-18: Included the persisted custom color group in backup/sync payloads and now auto-sync palette-only edits as part of user data.
  * @updated 2026-08-10: Included Android widget templates in backup/sync payloads, restores them through widgetService, and auto-syncs template-only changes.
- * @updated 2026-08-10: Included unified appearance and TimePal settings in backup/sync payloads and restores their runtime state after image download.
+ * @updated 2026-08-11: Adds shareable error IDs to user-visible manual cloud sync failures.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -43,7 +43,8 @@ import {
 } from '../services/customColorGroupService';
 import { imageService } from '../services/imageService';
 import { syncService } from '../services/syncService';
-import { uploadDataToCloud, downloadWithBackup, CloudService } from '../utils/syncUtils';
+import { downloadWithBackup, getServiceName, uploadDataToCloud, CloudService } from '../utils/syncUtils';
+import { reportDiagnostic, reportException, withErrorReference } from '../services/errorReporting';
 import { AppView } from '../types';
 import { SYNC_CONFIG } from '../config/syncConfig';
 import { normalizeCheckTemplates, normalizeDailyReviews } from '../utils/checkItemNormalizer';
@@ -117,6 +118,23 @@ export const useSyncManager = () => {
     } = useAchievement();
     const { currentView, setIsSettingsOpen } = useNavigation();
     const { addToast } = useToast();
+
+    const addSyncErrorToast = (
+        message: string,
+        operation: string,
+        service?: CloudService,
+        error?: unknown
+    ) => {
+        const context = {
+            feature: 'cloud_sync',
+            operation,
+            ...(service ? { service: getServiceName(service) } : {})
+        };
+        const sentryEventId = error
+            ? reportException(error, context)
+            : reportDiagnostic('cloud_sync_user_visible_failure', context, 'warning');
+        addToast('error', withErrorReference(message, sentryEventId));
+    };
 
     // Removed local isSyncing state to use global state
     const [refreshKey, setRefreshKey] = useState(0);
@@ -466,13 +484,7 @@ export const useSyncManager = () => {
         const result = await downloadWithBackup(
             activeService,
             localData,
-            undefined,
-            async (message) => {
-                if (mode === 'manual') {
-                    return window.confirm(message);
-                }
-                return true;
-            }
+            undefined
         );
 
         if (!result.success || !result.data) {
@@ -572,7 +584,7 @@ export const useSyncManager = () => {
 
                         if (mode === 'manual') {
                             const msg = (typeof result === 'object' && result.message) ? result.message : '连接测试失败，请检查网络或配置';
-                            addToast('error', msg);
+                            addSyncErrorToast(msg, 'check_connection', activeService);
                         } else {
                             // For auto/startup/resume, fail silently or log
                             // console.log(`[Sync] Skipped ${mode}: Connection unestablished`);
@@ -582,7 +594,7 @@ export const useSyncManager = () => {
                     // console.log(`[Sync] Connection verified.`);
                 } catch (err) {
                     console.error(`[Sync] Connection check exception:`, err);
-                    if (mode === 'manual') addToast('error', '连接检查出错');
+                    if (mode === 'manual') addSyncErrorToast('连接检查出错', 'check_connection', activeService, err);
                     return;
                 }
             }
@@ -809,7 +821,7 @@ export const useSyncManager = () => {
 
         } catch (error) {
             console.error("Sync failed", error);
-            if (mode === 'manual') addToast('error', '同步失败，请检查网络或配置');
+            if (mode === 'manual') addSyncErrorToast('同步失败，请检查网络或配置', 'perform_sync', undefined, error);
         } finally {
             setIsSyncing(false);
             syncLock.current = false;
@@ -904,7 +916,7 @@ export const useSyncManager = () => {
             }
         } catch (error) {
             console.error('Resolve sync conflict failed', error);
-            addToast('error', '同步失败，请检查网络或配置');
+            addSyncErrorToast('同步失败，请检查网络或配置', 'resolve_sync_conflict', activeService, error);
         } finally {
             setIsSyncing(false);
             syncLock.current = false;
@@ -951,7 +963,7 @@ export const useSyncManager = () => {
                 const isConnected = (typeof result === 'object' && 'success' in result) ? result.success : !!result;
                 if (!isConnected) {
                     const msg = (typeof result === 'object' && result.message) ? result.message : '连接测试失败，请检查网络或配置';
-                    addToast('error', msg);
+                    addSyncErrorToast(msg, 'manual_upload_check_connection', activeService);
                     return;
                 }
             }
@@ -1010,7 +1022,7 @@ export const useSyncManager = () => {
 
         } catch (error) {
             console.error("Manual upload failed", error);
-            addToast('error', '上传失败，请检查网络或配置');
+            addSyncErrorToast('上传失败，请检查网络或配置', 'manual_upload', undefined, error);
         } finally {
             setIsSyncing(false);
             syncLock.current = false;
@@ -1049,7 +1061,7 @@ export const useSyncManager = () => {
                 const isConnected = (typeof result === 'object' && 'success' in result) ? result.success : !!result;
                 if (!isConnected) {
                     const msg = (typeof result === 'object' && result.message) ? result.message : '连接测试失败，请检查网络或配置';
-                    addToast('error', msg);
+                    addSyncErrorToast(msg, 'manual_download_check_connection', activeService);
                     return;
                 }
             }
@@ -1107,7 +1119,7 @@ export const useSyncManager = () => {
 
         } catch (error) {
             console.error("Manual download failed", error);
-            addToast('error', '下载失败，请检查网络或配置');
+            addSyncErrorToast('下载失败，请检查网络或配置', 'manual_download', undefined, error);
         } finally {
             setIsSyncing(false);
             syncLock.current = false;

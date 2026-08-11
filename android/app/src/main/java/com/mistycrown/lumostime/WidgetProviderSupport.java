@@ -11,10 +11,12 @@ import android.widget.RemoteViews;
 
 /**
  * Shared provider-side rendering and tap handling for all widget sizes.
+ * Updated 2026-08-11: Lets unoccupied grid-widget background taps refresh only the current widget instance.
  */
 public final class WidgetProviderSupport {
     public static final String ACTION_TOGGLE_SLOT = "com.mistycrown.lumostime.action.TOGGLE_WIDGET_SLOT";
     public static final String ACTION_CYCLE_TEMPLATE = "com.mistycrown.lumostime.action.CYCLE_WIDGET_TEMPLATE";
+    public static final String ACTION_REFRESH_WIDGET = "com.mistycrown.lumostime.action.REFRESH_WIDGET";
     public static final String EXTRA_SLOT_INDEX = "slot_index";
     private static final int MAX_SLOT_LABEL_CODE_POINTS = 4;
 
@@ -165,6 +167,25 @@ public final class WidgetProviderSupport {
             return;
         }
 
+        if (ACTION_REFRESH_WIDGET.equals(intent.getAction())) {
+            int appWidgetId = intent.getIntExtra(
+                    AppWidgetManager.EXTRA_APPWIDGET_ID,
+                    AppWidgetManager.INVALID_APPWIDGET_ID
+            );
+            if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                refreshWidget(
+                        context,
+                        appWidgetId,
+                        providerClass,
+                        widgetSize,
+                        layoutResId,
+                        slotViewIds,
+                        slotLabelViewIds
+                );
+            }
+            return;
+        }
+
         if (ACTION_CYCLE_TEMPLATE.equals(intent.getAction())) {
             int appWidgetId = intent.getIntExtra(
                     AppWidgetManager.EXTRA_APPWIDGET_ID,
@@ -219,7 +240,9 @@ public final class WidgetProviderSupport {
                     WidgetTemplateTypes.GRID
             );
             PendingIntent cycleTemplateIntent = buildCycleTemplatePendingIntent(context, providerClass, appWidgetId);
+            PendingIntent refreshIntent = buildRefreshPendingIntent(context, providerClass, appWidgetId);
             views.setTextViewText(R.id.widget_title, snapshot.getTemplateName());
+            views.setOnClickPendingIntent(R.id.widget_root, refreshIntent);
             views.setOnClickPendingIntent(R.id.widget_title, cycleTemplateIntent);
             bindSlots(context, views, snapshot, appWidgetId, providerClass, slotViewIds, slotLabelViewIds);
             appWidgetManager.updateAppWidget(appWidgetId, views);
@@ -305,6 +328,23 @@ public final class WidgetProviderSupport {
         intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
 
         int requestCode = appWidgetId * 100 + 99;
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            flags |= PendingIntent.FLAG_IMMUTABLE;
+        }
+        return PendingIntent.getBroadcast(context, requestCode, intent, flags);
+    }
+
+    private static PendingIntent buildRefreshPendingIntent(
+            Context context,
+            Class<? extends AppWidgetProvider> providerClass,
+            int appWidgetId
+    ) {
+        Intent intent = new Intent(context, providerClass);
+        intent.setAction(ACTION_REFRESH_WIDGET);
+        intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+
+        int requestCode = appWidgetId * 100 + 98;
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
             flags |= PendingIntent.FLAG_IMMUTABLE;

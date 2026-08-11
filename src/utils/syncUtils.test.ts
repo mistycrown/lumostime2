@@ -8,21 +8,30 @@
  */
 
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { uploadDataToCloud } from './syncUtils';
 
-const storage = new Map<string, string>();
-
-vi.stubGlobal('localStorage', {
-  getItem: (key: string) => storage.get(key) ?? null,
-  setItem: (key: string, value: string) => storage.set(key, value),
-  removeItem: (key: string) => storage.delete(key),
-  clear: () => storage.clear()
+const { storage } = vi.hoisted(() => {
+  const storage = new Map<string, string>();
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => storage.set(key, value),
+    removeItem: (key: string) => storage.delete(key),
+    clear: () => storage.clear()
+  });
+  return { storage };
 });
+
+import { downloadWithBackup, uploadDataToCloud } from './syncUtils';
 
 vi.mock('../services/imageService', () => ({
   imageService: {
     buildReferencedImagesList: vi.fn(() => []),
     updateReferencedImagesList: vi.fn()
+  }
+}));
+
+vi.mock('../services/appearanceBackupService', () => ({
+  appearanceBackupService: {
+    getReferencedImageFilenames: vi.fn(() => [])
   }
 }));
 
@@ -92,5 +101,18 @@ describe('uploadDataToCloud', () => {
     expect(result.success).toBe(true);
     expect(cloud.uploadData).toHaveBeenCalledWith(expect.objectContaining({ timestamp: 10 }), 'lumostime_backup.json');
     expect(cloud.downloadData).toHaveBeenCalledWith('lumostime_backup.json');
+  });
+});
+
+describe('downloadWithBackup', () => {
+  test('does not restore from cloud when the local safety backup fails', async () => {
+    const cloud = createMockCloudService(vi.fn(async () => buildValidPayload(20)));
+    cloud.uploadData.mockRejectedValueOnce(new Error('backup write failed'));
+
+    const result = await downloadWithBackup(cloud as any, buildValidPayload(10));
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('已停止恢复');
+    expect(cloud.downloadData).not.toHaveBeenCalled();
   });
 });

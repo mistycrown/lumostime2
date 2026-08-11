@@ -4,6 +4,7 @@
  * @output Remote Storage Operations (Upload/Download)
  * @pos Service (Data Synchronization)
  * @description Manages WebDAV connections and file operations, handling platform-specific networking (Cordova HTTP for native, Proxy for web).
+ * @updated 2026-08-11: Keeps nested-directory failures explicit for manual WebDAV folder setup and generates safe native download paths.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -32,6 +33,34 @@ export interface WebDAVConfig {
 export class WebDAVService {
     private client: WebDAVClient | null = null;
     private config: WebDAVConfig | null = null;
+
+    private buildNativeTempPath(filename: string): string {
+        const safeFilename = filename.split('/').pop()?.replace(/[^a-zA-Z0-9._-]/g, '_') || 'download.json';
+        return `temp/lumostime-${Date.now()}-${safeFilename}`;
+    }
+
+    private buildNativeError(operation: string, url: string, error: any): Error {
+        const status = error?.status ?? error?.response?.status;
+        const rawDetail = error?.error ?? error?.response?.data ?? error?.message;
+        let detail = typeof rawDetail === 'string' ? rawDetail : '';
+
+        if (detail.startsWith('{')) {
+            try {
+                const parsed = JSON.parse(detail);
+                detail = parsed?.message || parsed?.error || detail;
+            } catch {
+                // Keep the original response when it is not JSON.
+            }
+        }
+
+        const statusText = status ? `HTTP ${status}` : '无 HTTP 状态码';
+        const message = detail || '服务器未返回具体错误信息';
+        const enriched = new Error(`${operation}失败（${statusText}）：${message}`);
+        (enriched as any).status = status;
+        (enriched as any).url = url;
+        (enriched as any).responseError = rawDetail;
+        return enriched;
+    }
 
     constructor() {
         this.loadConfig();
@@ -433,15 +462,14 @@ export class WebDAVService {
                 });
 
                 console.log(`[WebDAV] Upload Success: status ${response.status}`);
-                return response.status === 200 || response.status === 201 || response.status === 204;
+                if (![200, 201, 204].includes(response.status)) {
+                    throw this.buildNativeError(`上传 ${filename}`, url, response);
+                }
+                return true;
             } catch (error: any) {
                 console.error('[WebDAV] Native Upload Error:', error);
-                console.error('[WebDAV] Error status:', error?.status);
-                console.error('[WebDAV] Error message:', error?.message);
-                console.error('[WebDAV] Error error:', error?.error);
-                console.error('[WebDAV] Error url:', error?.url);
-                console.error('[WebDAV] Full error JSON:', JSON.stringify(error, null, 2));
-                throw error;
+                const baseUrl = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
+                throw this.buildNativeError(`上传 ${filename}`, baseUrl, error);
             }
         }
 
@@ -462,9 +490,10 @@ export class WebDAVService {
         // NATIVE: Use Filesystem.downloadFile for better performance
         // This avoids passing large JSON through WebView bridge
         if (Capacitor.isNativePlatform() && this.config) {
+            const url = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
             try {
-                const url = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
                 const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
+                const tempPath = this.buildNativeTempPath(filename);
                 
                 console.log(`[WebDAV] 移动端下载数据（原生方式）: ${filename}`);
                 
@@ -502,7 +531,7 @@ export class WebDAVService {
                 
             } catch (error: any) {
                 console.error('WebDAV Download Error (Native):', error);
-                throw error;
+                throw this.buildNativeError(`下载 ${filename}`, url, error);
             }
         }
 
@@ -738,6 +767,7 @@ export class WebDAVService {
             if (Capacitor.isNativePlatform() && this.config) {
                 const url = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
                 const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
+                const tempPath = this.buildNativeTempPath(filename);
                 
                 // Download directly to filesystem
                 await Filesystem.downloadFile({
