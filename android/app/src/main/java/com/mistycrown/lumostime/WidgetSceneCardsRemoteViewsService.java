@@ -17,6 +17,7 @@ import java.util.Objects;
  * RemoteViews collection service backing the scrollable 5-column scene card grid.
  * Updated 2026-05-03: Switched title truncation to a code-point-safe implementation so emoji and surrogate pairs are not split mid-character.
  * Updated 2026-05-10: Stabilized mixed-language card-title centering by using a plain ASCII ellipsis fallback that launcher TextViews measure more consistently.
+ * Updated 2026-08-11: Selects scene checklist progress for today from the weekly daily payload.
  */
 public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
     private static final int MAX_CARD_TITLE_CODE_POINTS = 4;
@@ -182,7 +183,8 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
                         targetCount,
                         isCompleted,
                         tapAnimationMode,
-                        tapAnimationProgress
+                        tapAnimationProgress,
+                        item.getCheckTemplateId()
                 );
             }
 
@@ -203,7 +205,8 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
                     1,
                     false,
                     tapAnimationMode,
-                    tapAnimationProgress
+                    tapAnimationProgress,
+                    null
             );
         }
 
@@ -227,7 +230,8 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
                 return null;
             }
             for (WidgetDailyProgress item : dailyPayload.getProgress()) {
-                if (Objects.equals(item.getCheckItemId(), checkItemId)) {
+                if (Objects.equals(item.getCheckItemId(), checkItemId)
+                        && Objects.equals(item.getDate(), dailyPayload.getDate())) {
                     return item;
                 }
             }

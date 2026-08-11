@@ -10,6 +10,7 @@
  * @updated 2026-08-10: Added dense-row and unscaled compact-content coverage.
  * @updated 2026-08-10: Added reference-gap and RemoteViews cache-busting coverage.
  * @updated 2026-08-10: Added single-header collection and shared-size coverage.
+ * @updated 2026-08-11: Covers shared geometric picker previews.
  */
 import { describe, expect, it } from 'vitest';
 import type { CheckTemplate, DailyReview } from '../types';
@@ -92,7 +93,7 @@ describe('daily-check weekly Android widget wiring', () => {
     expect(widgetInfoSource).toContain('android:targetCellWidth="4"');
     expect(widgetInfoSource).toContain('android:targetCellHeight="4"');
     expect(widgetInfoSource).toContain('@drawable/widget_preview_daily_check_week_4x4');
-    expect(widgetInfoSource).not.toContain('android:previewLayout');
+    expect(widgetInfoSource).toContain('@layout/widget_layout_daily_check_week_4x4');
     expect(providerSupportSource).toContain('ACTION_REFRESH');
     expect(providerSupportSource).toContain('R.id.widget_daily_check_week_refresh_root');
     expect(providerSupportSource).not.toContain('getLaunchIntentForPackage');
@@ -103,8 +104,8 @@ describe('daily-check weekly Android widget wiring', () => {
     expect(rendererSource).toContain('min(31f * density');
     expect(rendererSource).toContain('grid(width, density, 16f)');
     expect(widgetLayoutSource).toContain('widget_daily_check_week_date');
-    expect(widgetPreviewSource).toContain('android:width="250dp"');
-    expect(widgetPreviewSource).toContain('@drawable/ic_widget_refresh');
+    expect(widgetPreviewSource).toContain('android:width="440dp"');
+    expect(widgetPreviewSource).toContain('android:left="232dp"');
   });
 
   it('wires a separate scrollable 4x3 variant without row actions or scrollbars', () => {
@@ -112,7 +113,7 @@ describe('daily-check weekly Android widget wiring', () => {
     expect(androidManifestSource).toContain('android:name=".WidgetDailyCheckWeek4x3RemoteViewsService"');
     expect(compactWidgetInfoSource).toContain('android:targetCellWidth="4"');
     expect(compactWidgetInfoSource).toContain('android:targetCellHeight="3"');
-    expect(compactWidgetInfoSource).not.toContain('android:previewLayout');
+    expect(compactWidgetInfoSource).toContain('@layout/widget_layout_daily_check_week_4x3');
     expect(compactProviderSource).toContain('setRemoteAdapter');
     expect(compactProviderSource).toContain('ACTION_REFRESH');
     expect(compactProviderSource).toContain('REMOTE_VIEWS_VERSION = "v4"');
@@ -130,6 +131,7 @@ describe('daily-check weekly Android widget wiring', () => {
     expect(compactWidgetLayoutSource).not.toContain('widget_daily_check_week_4x3_weekdays');
     expect(compactWeekdayItemSource).toContain('widget_daily_check_week_4x3_weekday_bitmap');
     expect(compactWidgetLayoutSource).toContain('widget_daily_check_week_4x3_refresh');
-    expect(compactWidgetPreviewSource).toContain('android:width="220dp"');
+    expect(compactWidgetPreviewSource).toContain('android:width="440dp"');
+    expect(compactWidgetPreviewSource).toContain('android:left="232dp"');
   });
 });

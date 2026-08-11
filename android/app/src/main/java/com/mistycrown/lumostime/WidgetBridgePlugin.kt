@@ -22,9 +22,38 @@ import org.json.JSONObject
  * Updated 2026-08-06: Added UI icon asset paths to scene time-slot parsing for native scene-tab rendering.
  * Updated 2026-08-09: Added principle-card widget payload synchronization for the dedicated Android 4x2 card widget.
  * Updated 2026-08-09: Accepts weekly daily-check progress and refreshes the dedicated 4x4 weekly widget.
+ * Updated 2026-08-11: Preserves native daily progress while its widget actions are still awaiting web replay.
+ * Updated 2026-08-11: Notifies an active WebView as soon as a widget daily action is queued.
  */
 @CapacitorPlugin(name = "WidgetBridge")
 class WidgetBridgePlugin : Plugin() {
+    companion object {
+        @Volatile
+        private var instance: WidgetBridgePlugin? = null
+
+        @JvmStatic
+        fun notifyDailyActionPending() {
+            val plugin = instance
+            if (plugin?.bridge == null) {
+                return
+            }
+
+            plugin.notifyListeners("dailyWidgetActionPending", JSObject(), true)
+        }
+    }
+
+    override fun load() {
+        super.load()
+        instance = this
+    }
+
+    override fun handleOnDestroy() {
+        if (instance === this) {
+            instance = null
+        }
+        super.handleOnDestroy()
+    }
+
     private fun parseNullableString(value: String?): String? {
         val trimmed = value?.trim() ?: return null
         return if (trimmed.isEmpty() || trimmed.equals("null", ignoreCase = true)) null else trimmed
@@ -207,11 +236,40 @@ class WidgetBridgePlugin : Plugin() {
             )
         }
 
-        WidgetStores.saveDailySyncPayload(context, payload)
+        val mergedPayload = mergePendingDailyProgress(payload)
+        WidgetStores.saveDailySyncPayload(context, mergedPayload)
         WidgetRefreshCoordinator.refreshTimerWidgets(context)
         WidgetRefreshCoordinator.refreshDailyCheckWeekWidgets(context)
         WidgetRefreshCoordinator.refreshSceneWidgets(context)
         call.resolve()
+    }
+
+    private fun mergePendingDailyProgress(payload: WidgetDailySyncPayload?): WidgetDailySyncPayload? {
+        if (payload == null) {
+            return null
+        }
+
+        val pendingKeys = WidgetStores.loadPendingDailyActions(context)
+            .map { it.checkItemId to it.date }
+            .toSet()
+        if (pendingKeys.isEmpty()) {
+            return payload
+        }
+
+        val nativeProgressByKey = WidgetStores.loadDailySyncPayload(context)
+            ?.progress
+            ?.associateBy { it.checkItemId to it.date }
+            .orEmpty()
+        val incomingKeys = payload.progress.map { it.checkItemId to it.date }.toSet()
+        val mergedProgress = payload.progress.map { incoming ->
+            nativeProgressByKey[incoming.checkItemId to incoming.date]
+                ?.takeIf { pendingKeys.contains(incoming.checkItemId to incoming.date) }
+                ?: incoming
+        } + nativeProgressByKey
+            .filterKeys { pendingKeys.contains(it) && !incomingKeys.contains(it) }
+            .values
+
+        return payload.copy(progress = mergedProgress.sortedWith(compareBy({ it.date }, { it.checkItemId })))
     }
 
     @PluginMethod
