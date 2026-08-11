@@ -13,6 +13,7 @@
  * @updated 2026-07-21: Delegated cloud backup cleanup confirmation to the data-management in-app modal.
  * @updated 2026-08-09: Added the daily-check overview entry under Content.
  * @updated 2026-08-09: Added the Review Overview settings subpage under Content.
+ * @updated 2026-08-11: Keeps manual cloud sync acknowledgements separate from the local user-edit timestamp.
  * @updated 2026-08-10: Records Settings as the return target when opening daily-check overview.
  */
 import React, { useState, useRef, useEffect } from 'react';
@@ -86,7 +87,7 @@ import { ToastType } from '../components/Toast';
 import { uploadDataToCloud, downloadWithBackup, CloudService } from '../utils/syncUtils';
 import { validateLocalData, canSafelyUpload } from '../utils/dataValidation';
 import { getActiveSceneGroup, loadSceneGroupStateFromStorage } from '../utils/sceneGroupStorage';
-import { getLocalDataTimestamp, setLocalDataTimestampValue } from '../utils/localDataTimestamp';
+import { getLocalDataTimestamp, setLastSeenCloudUploadedAt } from '../utils/localDataTimestamp';
 
 import { ConfirmModal } from '../components/ConfirmModal';
 import { AppView, ReviewTemplate, NarrativeTemplate, Log, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyReview, TodoCategory, Filter, Category, CheckTemplate } from '../types';
@@ -516,6 +517,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     }, []);
 
 
+    const resolveCloudUploadedAt = async (service: CloudService, fallback: number): Promise<number> => {
+        try {
+            const remoteDate = await service.statFile?.();
+            if (remoteDate) {
+                return remoteDate.getTime();
+            }
+        } catch (error) {
+            console.warn('[Settings] Failed to read cloud upload time', error);
+        }
+
+        return fallback;
+    };
+
     const handleSyncUpload = async () => {
         if (!webdavConfig) return;
         setIsSyncing(true);
@@ -539,10 +553,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             );
 
             if (result.success) {
-                // 上传成功后，使用当前时间更新本地时间戳
-                const syncedTimestamp = result.data?.timestamp || getLocalDataTimestamp();
-                setLocalDataTimestampValue(syncedTimestamp);
-                console.log(`[Settings] WebDAV upload timestamp updated: ${syncedTimestamp}`);
+                const syncedTimestamp = await resolveCloudUploadedAt(webdavService, result.data?.timestamp || 0);
+                setLastSeenCloudUploadedAt(syncedTimestamp);
+                console.log(`[Settings] WebDAV cloud upload acknowledged: ${syncedTimestamp}`);
 
                 onToast('success', result.message);
             } else {
@@ -574,7 +587,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
             if (result.success && result.data) {
                 await onSyncUpdate(result.data);
-                setLocalDataTimestampValue(result.data?.timestamp || getLocalDataTimestamp());
+                setLastSeenCloudUploadedAt(await resolveCloudUploadedAt(webdavService, result.data?.timestamp || 0));
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
 
                 // 同步完成后关闭设置页面，自动刷新到脉络页面
@@ -616,10 +629,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             );
 
             if (result.success) {
-                // 上传成功后，使用当前时间更新本地时间戳
-                const syncedTimestamp = result.data?.timestamp || getLocalDataTimestamp();
-                setLocalDataTimestampValue(syncedTimestamp);
-                console.log(`[Settings] S3 upload timestamp updated: ${syncedTimestamp}`);
+                const syncedTimestamp = await resolveCloudUploadedAt(s3Service, result.data?.timestamp || 0);
+                setLastSeenCloudUploadedAt(syncedTimestamp);
+                console.log(`[Settings] S3 cloud upload acknowledged: ${syncedTimestamp}`);
 
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
             } else {
@@ -653,7 +665,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             );
 
             if (result.success) {
-                setLocalDataTimestampValue(result.data?.timestamp || getLocalDataTimestamp());
+                setLastSeenCloudUploadedAt(await resolveCloudUploadedAt(compatibleS3Service, result.data?.timestamp || 0));
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
             } else {
                 onToast('error', result.message);
@@ -732,7 +744,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
             if (result.success && result.data) {
                 await onSyncUpdate(result.data);
-                setLocalDataTimestampValue(result.data?.timestamp || getLocalDataTimestamp());
+                setLastSeenCloudUploadedAt(await resolveCloudUploadedAt(s3Service, result.data?.timestamp || 0));
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
 
                 // 同步完成后关闭设置页面
@@ -766,7 +778,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
             if (result.success && result.data) {
                 await onSyncUpdate(result.data);
-                setLocalDataTimestampValue(result.data?.timestamp || getLocalDataTimestamp());
+                setLastSeenCloudUploadedAt(await resolveCloudUploadedAt(compatibleS3Service, result.data?.timestamp || 0));
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
 
                 setTimeout(() => {

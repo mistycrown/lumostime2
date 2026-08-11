@@ -5,6 +5,7 @@
  * @pos Hook (System Integration)
  * @description 同步管理 Hook - 处理数据和图片的云端同步，支持启动同步、恢复同步、手动同步、自动同步等多种模式，并在恢复筛选器时保持顺序稳定，同时保证空值恢复与 majorGoals 载荷一致。
  * @updated 2026-07-06: Included the self-belief library in backup/sync payloads and restore handling so identity descriptions travel with user data.
+ * @updated 2026-08-11: Separates local user-edit time from cloud upload time, preserves JSON-size conflict protection, and records acknowledged cloud uploads without rewriting local edit time.
  * @updated 2026-06-15: Added JSON-size conflict protection so timestamp-based cloud decisions now pause before any larger backup payload would be overwritten by a smaller one, letting the user choose upload vs restore explicitly.
  * @updated 2026-06-14: Prefer uploading confirmed pending local edits during auto-sync even when the local/cloud timestamps still fall inside the equal-tolerance window, so newly created todos are not skipped.
  * @updated 2026-05-18: Reduced timestamp comparison tolerance handling by routing sync direction through a shared helper, so fresh desktop edits are no longer swallowed as "equal" for several seconds after the previous sync.
@@ -52,15 +53,17 @@ import { AI_BACKUP_CHANGED_EVENT } from '../utils/aiBackupChange';
 import { normalizeFiltersOrder } from '../utils/filterUtils';
 import {
     detectForcedSyncConflict,
-    getJsonByteSize,
+    getComparableSyncJsonByteSize,
     resolveSyncDirectionDecision,
     SyncDirectionDecision
 } from '../utils/syncTimestampDirection';
 import { getSyncPayloadTimestamp } from '../utils/syncPayloadMetadata';
 import {
     getLocalDataTimestamp,
+    getLastSeenCloudUploadedAt,
+    setLastSeenCloudUploadedAt,
     setLocalDataTimestampUpdateLocked,
-    setLocalDataTimestampValue
+    updateLocalDataTimestamp
 } from '../utils/localDataTimestamp';
 import {
     buildSceneGroupStateFromLegacySlots,
@@ -600,7 +603,7 @@ export const useSyncManager = () => {
             }
 
             const localData = getFullLocalData();
-            const localJsonSize = getJsonByteSize(localData);
+            const localJsonSize = getComparableSyncJsonByteSize(localData);
 
             // Track status
             let dataSyncStatus: 'restored' | 'uploaded' | 'equal' | 'error' = 'equal';
@@ -653,27 +656,32 @@ export const useSyncManager = () => {
                 const canonicalCloudTimestamp = getSyncPayloadTimestamp(canonicalCloudData, 0);
                 cloudData = canonicalCloudData;
 
-                if (canonicalCloudTimestamp > 0) {
+                if (canonicalCloudTimestamp > 0 && !usedFileModTime) {
                     cloudTimestamp = canonicalCloudTimestamp;
-                    usedFileModTime = false;
                 }
 
                 console.log('[Sync][Step 2c] Canonical cloud main backup loaded:', {
                     cloudTimestamp,
                     cloudTimestampSource: canonicalCloudTimestamp > 0 ? 'payload' : 'metadata-fallback',
-                    cloudJsonSize: getJsonByteSize(cloudData)
+                    cloudJsonSize: getComparableSyncJsonByteSize(cloudData)
                 });
             } catch (error) {
                 console.warn('[Sync] Failed to load canonical cloud main backup; keeping metadata fallback.', error);
             }
 
-            const timeDiff = localTimestamp - cloudTimestamp;
+            const lastSeenCloudUploadedAt = getLastSeenCloudUploadedAt();
+            const cloudAlreadyApplied = cloudTimestamp > 0
+                && cloudTimestamp <= lastSeenCloudUploadedAt
+                && localTimestamp <= cloudTimestamp;
+            const comparisonLocalTimestamp = cloudAlreadyApplied ? cloudTimestamp : localTimestamp;
+            const timeDiff = comparisonLocalTimestamp - cloudTimestamp;
             console.log(`[Sync][Step 3] 时间戳比较:`);
             console.log(`[Sync][Step 3]   - 本地时间: ${localTimestamp} (${new Date(localTimestamp).toLocaleString()})`);
             console.log(`[Sync][Step 3]   - 云端时间: ${cloudTimestamp} (${cloudTimestamp > 0 ? new Date(cloudTimestamp).toLocaleString() : '无数据'})`);
             console.log(`[Sync][Step 3]   - 时间差: ${timeDiff}ms (${(timeDiff / 1000).toFixed(1)}秒)`);
             console.log(`[Sync][Step 3]   - 容错阈值: ±${SYNC_TOLERANCE_MS}ms (±${SYNC_TOLERANCE_MS / 1000}秒)`);
             console.log(`[Sync][Step 3]   - 时间来源: ${usedFileModTime ? '文件修改时间' : '文件内部时间戳'}`);
+            console.log(`[Sync][Step 3]   - 已见云端上传时间: ${lastSeenCloudUploadedAt || '无'}`);
 
             // 4. 执行操作（使用容错阈值判断）
             if (!cloudData && cloudTimestamp > 0) {
@@ -684,9 +692,9 @@ export const useSyncManager = () => {
                 }
             }
 
-            const cloudJsonSize = cloudData ? getJsonByteSize(cloudData) : 0;
+            const cloudJsonSize = cloudData ? getComparableSyncJsonByteSize(cloudData) : 0;
             const decision = resolveSyncDirectionDecision({
-                localTimestamp,
+                localTimestamp: comparisonLocalTimestamp,
                 cloudTimestamp,
                 toleranceMs: SYNC_TOLERANCE_MS,
                 mode,
@@ -801,17 +809,10 @@ export const useSyncManager = () => {
                 // Auto mode: Silent, no toast
             }
 
-            // 6. 统一更新时间戳（在所有同步工作完成后）
-            if (dataSyncStatus === 'uploaded') {
-                // 上传成功后，使用当前时间作为本地时间戳
-                const now = typeof syncedTimestamp === 'number' ? syncedTimestamp : Date.now();
-                setLocalDataTimestampValue(now);
-                console.log(`[Sync] 上传完成，本地时间戳已更新: ${now} (${new Date(now).toLocaleString()})`);
-            } else if (dataSyncStatus === 'restored') {
-                // 下载成功后，时间戳已经在 handleSyncDataUpdate 后立即更新了
-                // 这里只需要更新 React state（确保 UI 同步）
-                const storedTimestamp = getLocalDataTimestamp();
-                console.log(`[Sync] 下载完成，同步 React state 时间戳: ${storedTimestamp}`);
+            // Sync completion acknowledges the cloud version but never changes the user-edit timestamp.
+            if ((dataSyncStatus === 'uploaded' || dataSyncStatus === 'restored') && typeof syncedTimestamp === 'number') {
+                setLastSeenCloudUploadedAt(syncedTimestamp);
+                console.log(`[Sync] 已确认云端上传时间: ${syncedTimestamp} (${new Date(syncedTimestamp).toLocaleString()})`);
             }
 
             if ((currentView === AppView.TIMELINE) || (mode === 'startup' && dataSyncStatus === 'restored')) {
@@ -885,7 +886,7 @@ export const useSyncManager = () => {
                 }
 
                 if (typeof result.syncedTimestamp === 'number') {
-                    setLocalDataTimestampValue(result.syncedTimestamp);
+                    setLastSeenCloudUploadedAt(result.syncedTimestamp);
                 }
 
                 addToast(result.hasImageWarnings ? 'warning' : 'success', result.message);
@@ -904,7 +905,7 @@ export const useSyncManager = () => {
                 }
 
                 if (typeof result.syncedTimestamp === 'number') {
-                    setLocalDataTimestampValue(result.syncedTimestamp);
+                    setLastSeenCloudUploadedAt(result.syncedTimestamp);
                 }
 
                 addToast(result.hasImageWarnings ? 'warning' : 'success', result.message);
@@ -976,11 +977,15 @@ export const useSyncManager = () => {
             } catch (error) {
                 console.warn('[Sync] Failed to download cloud data before manual upload size check.', error);
             }
+            const cloudTimestamp = await resolveCanonicalSyncedTimestamp(
+                activeService,
+                getSyncPayloadTimestamp(cloudData, 0)
+            );
 
             const conflictDecision = detectForcedSyncConflict(
                 'upload',
-                getJsonByteSize(localData),
-                cloudData ? getJsonByteSize(cloudData) : 0
+                getComparableSyncJsonByteSize(localData),
+                cloudData ? getComparableSyncJsonByteSize(cloudData) : 0
             );
 
             if (conflictDecision.direction === 'conflict') {
@@ -990,7 +995,7 @@ export const useSyncManager = () => {
                     localData,
                     cloudData,
                     localData.timestamp || getLocalDataTimestamp(),
-                    cloudData?.timestamp || 0,
+                    cloudTimestamp,
                     conflictDecision
                 );
                 return;
@@ -1009,8 +1014,8 @@ export const useSyncManager = () => {
             }
 
             if (typeof result.syncedTimestamp === 'number') {
-                setLocalDataTimestampValue(result.syncedTimestamp);
-                console.log(`[Sync] 手动上传完成，本地时间戳已更新: ${result.syncedTimestamp}`);
+                setLastSeenCloudUploadedAt(result.syncedTimestamp);
+                console.log(`[Sync] 手动上传完成，已确认云端上传时间: ${result.syncedTimestamp}`);
             }
 
             addToast(result.hasImageWarnings ? 'warning' : 'success', result.message);
@@ -1074,11 +1079,15 @@ export const useSyncManager = () => {
             } catch (error) {
                 console.warn('[Sync] Failed to download cloud data before manual download size check.', error);
             }
+            const cloudTimestamp = await resolveCanonicalSyncedTimestamp(
+                activeService,
+                getSyncPayloadTimestamp(cloudData, 0)
+            );
 
             const conflictDecision = detectForcedSyncConflict(
                 'restore',
-                getJsonByteSize(localData),
-                cloudData ? getJsonByteSize(cloudData) : 0
+                getComparableSyncJsonByteSize(localData),
+                cloudData ? getComparableSyncJsonByteSize(cloudData) : 0
             );
 
             if (conflictDecision.direction === 'conflict') {
@@ -1088,7 +1097,7 @@ export const useSyncManager = () => {
                     localData,
                     cloudData,
                     localData.timestamp || getLocalDataTimestamp(),
-                    cloudData?.timestamp || 0,
+                    cloudTimestamp,
                     conflictDecision
                 );
                 return;
@@ -1098,7 +1107,7 @@ export const useSyncManager = () => {
                 activeService,
                 localData,
                 cloudData,
-                cloudData?.timestamp || 0,
+                cloudTimestamp,
                 'manual'
             );
 
@@ -1108,8 +1117,8 @@ export const useSyncManager = () => {
             }
 
             if (typeof result.syncedTimestamp === 'number') {
-                setLocalDataTimestampValue(result.syncedTimestamp);
-                console.log(`[Sync] 手动下载完成，立即更新 localStorage 时间戳: ${result.syncedTimestamp}`);
+                setLastSeenCloudUploadedAt(result.syncedTimestamp);
+                console.log(`[Sync] 手动下载完成，已确认云端上传时间: ${result.syncedTimestamp}`);
             }
 
             addToast(result.hasImageWarnings ? 'warning' : 'success', result.message);
@@ -1267,7 +1276,13 @@ export const useSyncManager = () => {
         let timer: NodeJS.Timeout | null = null;
 
         const handleCustomColorGroupChanged = () => {
-            if (manualSyncMode || isRestoring.current) {
+            if (isRestoring.current) {
+                return;
+            }
+
+            updateLocalDataTimestamp();
+
+            if (manualSyncMode) {
                 return;
             }
 
@@ -1293,7 +1308,59 @@ export const useSyncManager = () => {
         };
     }, [manualSyncMode]);
 
-    // 2e. Android widget template Auto Sync
+    // 2e. Appearance and TimePal Auto Sync
+    useEffect(() => {
+        let timer: NodeJS.Timeout | null = null;
+        const appearanceEvents = [
+            'color-scheme-changed',
+            'ui-icon-theme-changed',
+            'lumostime:background-changed',
+            'navigationDecorationChange',
+            'timepal-type-changed',
+            'timepal-click-switch-changed',
+            'timepal-stage-thresholds-changed',
+            'timepal-custom-changed'
+        ];
+
+        const handleAppearanceDataChanged = () => {
+            if (isRestoring.current) {
+                return;
+            }
+
+            updateLocalDataTimestamp();
+
+            if (manualSyncMode) {
+                return;
+            }
+
+            if (timer) {
+                clearTimeout(timer);
+            }
+
+            pendingAutoSyncRef.current = true;
+            timer = setTimeout(async () => {
+                if (!isSyncingRef.current && !isRestoring.current) {
+                    await performSync('auto');
+                    pendingAutoSyncRef.current = false;
+                }
+            }, SYNC_CONFIG.AUTO_SYNC_DEBOUNCE_MS);
+        };
+
+        appearanceEvents.forEach((eventName) => {
+            window.addEventListener(eventName, handleAppearanceDataChanged);
+        });
+
+        return () => {
+            appearanceEvents.forEach((eventName) => {
+                window.removeEventListener(eventName, handleAppearanceDataChanged);
+            });
+            if (timer) {
+                clearTimeout(timer);
+            }
+        };
+    }, [manualSyncMode]);
+
+    // 2f. Android widget template Auto Sync
     useEffect(() => {
         let timer: NodeJS.Timeout | null = null;
 
@@ -1302,7 +1369,7 @@ export const useSyncManager = () => {
                 return;
             }
 
-            setLocalDataTimestampValue(Date.now());
+            updateLocalDataTimestamp();
 
             if (manualSyncMode) {
                 return;

@@ -5,6 +5,7 @@
  * @updated 2026-07-30: Added persistent quick-color sidebar width alongside the existing timeline todo width.
  * @updated 2026-07-30: Added persistent quick-color sidebar ratio while keeping the legacy width key for migration.
  * @updated 2026-08-06: Added the association selector column-count preference key.
+ * @updated 2026-08-11: Added the last-seen cloud upload timestamp for dual-path sync decisions.
  * 
  * 集中管理所有 localStorage 键名，避免硬编码字符串分散在各处
  * 便于维护和重构
@@ -153,6 +154,8 @@ export const SYNC_KEYS = {
     LAST_SYNC_TIME: 'lumostime_last_sync_time',
     /** 同步状态 */
     SYNC_STATUS: 'lumostime_sync_status',
+    /** 本机已处理过的最新云端上传时间 */
+    LAST_SEEN_CLOUD_UPLOADED_AT: 'lumostime_last_seen_cloud_uploaded_at',
 } as const;
 
 /**
