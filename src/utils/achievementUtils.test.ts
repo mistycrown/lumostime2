@@ -779,6 +779,45 @@ describe('achievementUtils decimal stars', () => {
     })).toBe('当前光点为负，暂时不能封瓶');
   });
 
+  it('blocks sealing when a same-day redemption has consumed the proposed historical balance', () => {
+    const sealPreview = getAchievementSealPreview({
+      achievementStartDate: '2026-04-01',
+      archivedBottles: [],
+      dailySnapshots: [
+        {
+          id: 'snapshot-yesterday',
+          date: '2026-04-01',
+          netDelta: 80,
+          ruleBreakdown: [],
+          computedAt: 1
+        },
+        {
+          id: 'snapshot-today',
+          date: '2026-04-02',
+          netDelta: 20,
+          ruleBreakdown: [],
+          computedAt: 2
+        }
+      ],
+      redemptionRecords: [
+        {
+          id: 'redeem-today',
+          rewardId: 'reward-1',
+          rewardName: 'Tea',
+          cost: 100,
+          redeemedAt: new Date('2026-04-02T12:00:00+08:00').getTime()
+        }
+      ],
+      today: new Date('2026-04-02T22:00:00+08:00')
+    });
+
+    expect(sealPreview?.sealableStars).toBe(80);
+    expect(getAchievementSealBlockedReason({
+      sealPreview,
+      availableStars: 0
+    })).toBe('当前瓶余额不足，暂时不能封存这段历史光点');
+  });
+
   it('moves the live snapshot start date to the day after the latest archived bottle', () => {
     expect(getAchievementActiveStartDate(
       '2026-04-01',

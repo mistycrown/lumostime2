@@ -10,6 +10,7 @@
  * @updated 2026-07-11: Added todo-category subtask inclusion handling so achievement rules can count parent tasks only unless explicitly configured otherwise.
  * @updated 2026-06-30: Added shared seal validation so bottles cannot be sealed while the current active balance is negative.
  * @updated 2026-07-07: Added explicit current/history account summaries and made seal previews use the current-bottle account balance.
+ * @updated 2026-08-11: Blocks sealing when today's spending has already consumed part of the proposed historical balance.
  * @updated 2026-04-25: Added check-category streak weighting so daily check rules can sum per-item multiplier contributions.
  * @updated 2026-04-17: Added filter-expression duration rules that reuse the shared custom-filter matching logic.
  * @updated 2026-04-07: Separates live-period spending from remaining carryover so archived carryover-funded redemptions do not inflate the active balance.
@@ -745,6 +746,10 @@ export const getAchievementSealBlockedReason = ({
 
   if (normalizeAchievementStarValue(availableStars) < 0) {
     return '当前光点为负，暂时不能封瓶';
+  }
+
+  if (normalizeAchievementStarValue(availableStars) < sealPreview.sealableStars) {
+    return '当前瓶余额不足，暂时不能封存这段历史光点';
   }
 
   if (sealPreview.sealableStars <= 0) {
