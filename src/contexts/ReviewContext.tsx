@@ -134,6 +134,7 @@ export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [isReady, setIsReady] = useState(false);
   const [canPersist, setCanPersist] = useState(false);
   const isHydratingRef = useRef(true);
+  const isTimestampTrackingReadyRef = useRef(false);
 
   const [reviewTemplates, setReviewTemplates] = useState<ReviewTemplate[]>(() => {
     return storage.getJSON<ReviewTemplate[]>(REVIEW_KEYS.REVIEW_TEMPLATES, DEFAULT_REVIEW_TEMPLATES) || DEFAULT_REVIEW_TEMPLATES;
@@ -201,6 +202,7 @@ export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           window.setTimeout(() => {
             if (!cancelled) {
               isHydratingRef.current = false;
+              isTimestampTrackingReadyRef.current = true;
             }
           }, 0);
         }
@@ -287,7 +289,7 @@ export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [canPersist, isReady, onThisDayEntries]);
 
   useEffect(() => {
-    if (!isReady || !canPersist || isHydratingRef.current) {
+    if (!isReady || !canPersist || isHydratingRef.current || !isTimestampTrackingReadyRef.current) {
       return;
     }
 

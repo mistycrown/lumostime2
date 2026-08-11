@@ -6,6 +6,8 @@
  * @description 同步管理 Hook - 处理数据和图片的云端同步，支持启动同步、恢复同步、手动同步、自动同步等多种模式，并在恢复筛选器时保持顺序稳定，同时保证空值恢复与 majorGoals 载荷一致。
  * @updated 2026-07-06: Included the self-belief library in backup/sync payloads and restore handling so identity descriptions travel with user data.
  * @updated 2026-08-11: Separates local user-edit time from cloud upload time, preserves JSON-size conflict protection, and records acknowledged cloud uploads without rewriting local edit time.
+ * @updated 2026-08-11: Ignores startup hydration and no-op appearance events so initialization cannot be recorded as a local user edit.
+ * @updated 2026-08-11: Uses a pending-user-edit acknowledgement to prevent legacy startup timestamps from overriding newer cloud data.
  * @updated 2026-06-15: Added JSON-size conflict protection so timestamp-based cloud decisions now pause before any larger backup payload would be overwritten by a smaller one, letting the user choose upload vs restore explicitly.
  * @updated 2026-06-14: Prefer uploading confirmed pending local edits during auto-sync even when the local/cloud timestamps still fall inside the equal-tolerance window, so newly created todos are not skipped.
  * @updated 2026-05-18: Reduced timestamp comparison tolerance handling by routing sync direction through a shared helper, so fresh desktop edits are no longer swallowed as "equal" for several seconds after the previous sync.
@@ -59,8 +61,10 @@ import {
 } from '../utils/syncTimestampDirection';
 import { getSyncPayloadTimestamp } from '../utils/syncPayloadMetadata';
 import {
+    clearPendingLocalDataEdit,
     getLocalDataTimestamp,
     getLastSeenCloudUploadedAt,
+    hasPendingLocalDataEdit,
     setLastSeenCloudUploadedAt,
     setLocalDataTimestampUpdateLocked,
     updateLocalDataTimestamp
@@ -670,10 +674,12 @@ export const useSyncManager = () => {
             }
 
             const lastSeenCloudUploadedAt = getLastSeenCloudUploadedAt();
+            const hasPendingLocalEdit = hasPendingLocalDataEdit();
             const cloudAlreadyApplied = cloudTimestamp > 0
                 && cloudTimestamp <= lastSeenCloudUploadedAt
                 && localTimestamp <= cloudTimestamp;
-            const comparisonLocalTimestamp = cloudAlreadyApplied ? cloudTimestamp : localTimestamp;
+            const shouldPreferCloud = mode !== 'manual' && cloudTimestamp > 0 && !hasPendingLocalEdit;
+            const comparisonLocalTimestamp = cloudAlreadyApplied || shouldPreferCloud ? cloudTimestamp : localTimestamp;
             const timeDiff = comparisonLocalTimestamp - cloudTimestamp;
             console.log(`[Sync][Step 3] 时间戳比较:`);
             console.log(`[Sync][Step 3]   - 本地时间: ${localTimestamp} (${new Date(localTimestamp).toLocaleString()})`);
@@ -682,6 +688,7 @@ export const useSyncManager = () => {
             console.log(`[Sync][Step 3]   - 容错阈值: ±${SYNC_TOLERANCE_MS}ms (±${SYNC_TOLERANCE_MS / 1000}秒)`);
             console.log(`[Sync][Step 3]   - 时间来源: ${usedFileModTime ? '文件修改时间' : '文件内部时间戳'}`);
             console.log(`[Sync][Step 3]   - 已见云端上传时间: ${lastSeenCloudUploadedAt || '无'}`);
+            console.log(`[Sync][Step 3]   - 待上传本地编辑: ${hasPendingLocalEdit ? '有' : '无'}`);
 
             // 4. 执行操作（使用容错阈值判断）
             if (!cloudData && cloudTimestamp > 0) {
@@ -812,6 +819,7 @@ export const useSyncManager = () => {
             // Sync completion acknowledges the cloud version but never changes the user-edit timestamp.
             if ((dataSyncStatus === 'uploaded' || dataSyncStatus === 'restored') && typeof syncedTimestamp === 'number') {
                 setLastSeenCloudUploadedAt(syncedTimestamp);
+                clearPendingLocalDataEdit();
                 console.log(`[Sync] 已确认云端上传时间: ${syncedTimestamp} (${new Date(syncedTimestamp).toLocaleString()})`);
             }
 
@@ -887,6 +895,7 @@ export const useSyncManager = () => {
 
                 if (typeof result.syncedTimestamp === 'number') {
                     setLastSeenCloudUploadedAt(result.syncedTimestamp);
+                    clearPendingLocalDataEdit();
                 }
 
                 addToast(result.hasImageWarnings ? 'warning' : 'success', result.message);
@@ -906,6 +915,7 @@ export const useSyncManager = () => {
 
                 if (typeof result.syncedTimestamp === 'number') {
                     setLastSeenCloudUploadedAt(result.syncedTimestamp);
+                    clearPendingLocalDataEdit();
                 }
 
                 addToast(result.hasImageWarnings ? 'warning' : 'success', result.message);
@@ -1015,6 +1025,7 @@ export const useSyncManager = () => {
 
             if (typeof result.syncedTimestamp === 'number') {
                 setLastSeenCloudUploadedAt(result.syncedTimestamp);
+                clearPendingLocalDataEdit();
                 console.log(`[Sync] 手动上传完成，已确认云端上传时间: ${result.syncedTimestamp}`);
             }
 
@@ -1118,6 +1129,7 @@ export const useSyncManager = () => {
 
             if (typeof result.syncedTimestamp === 'number') {
                 setLastSeenCloudUploadedAt(result.syncedTimestamp);
+                clearPendingLocalDataEdit();
                 console.log(`[Sync] 手动下载完成，已确认云端上传时间: ${result.syncedTimestamp}`);
             }
 
@@ -1274,11 +1286,18 @@ export const useSyncManager = () => {
     // 2d. Custom color group Auto Sync
     useEffect(() => {
         let timer: NodeJS.Timeout | null = null;
+        let serializedColorGroup = JSON.stringify(customColorGroupService.getGroup());
 
         const handleCustomColorGroupChanged = () => {
             if (isRestoring.current) {
                 return;
             }
+
+            const nextSerializedColorGroup = JSON.stringify(customColorGroupService.getGroup());
+            if (nextSerializedColorGroup === serializedColorGroup) {
+                return;
+            }
+            serializedColorGroup = nextSerializedColorGroup;
 
             updateLocalDataTimestamp();
 
@@ -1311,6 +1330,7 @@ export const useSyncManager = () => {
     // 2e. Appearance and TimePal Auto Sync
     useEffect(() => {
         let timer: NodeJS.Timeout | null = null;
+        let serializedAppearanceData = JSON.stringify(appearanceBackupService.buildBackupPayload());
         const appearanceEvents = [
             'color-scheme-changed',
             'ui-icon-theme-changed',
@@ -1326,6 +1346,12 @@ export const useSyncManager = () => {
             if (isRestoring.current) {
                 return;
             }
+
+            const nextSerializedAppearanceData = JSON.stringify(appearanceBackupService.buildBackupPayload());
+            if (nextSerializedAppearanceData === serializedAppearanceData) {
+                return;
+            }
+            serializedAppearanceData = nextSerializedAppearanceData;
 
             updateLocalDataTimestamp();
 
@@ -1363,11 +1389,18 @@ export const useSyncManager = () => {
     // 2f. Android widget template Auto Sync
     useEffect(() => {
         let timer: NodeJS.Timeout | null = null;
+        let serializedWidgetTemplates = JSON.stringify(loadWidgetTemplatesFromStorage());
 
         const handleWidgetTemplatesUpdated = () => {
             if (isRestoring.current) {
                 return;
             }
+
+            const nextSerializedWidgetTemplates = JSON.stringify(loadWidgetTemplatesFromStorage());
+            if (nextSerializedWidgetTemplates === serializedWidgetTemplates) {
+                return;
+            }
+            serializedWidgetTemplates = nextSerializedWidgetTemplates;
 
             updateLocalDataTimestamp();
 
