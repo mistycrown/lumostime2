@@ -69,6 +69,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [localDataTimestamp, setLocalDataTimestamp] = useState<number>(() => getLocalDataTimestamp());
 
   const isHydratingRef = useRef(true);
+  const isTimestampTrackingReadyRef = useRef(false);
   const latestTodosRef = useRef<TodoItem[]>(INITIAL_TODOS);
 
   useEffect(() => {
@@ -130,6 +131,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           window.setTimeout(() => {
             if (!cancelled) {
               isHydratingRef.current = false;
+              isTimestampTrackingReadyRef.current = true;
             }
           }, 0);
         }
@@ -235,7 +237,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [canPersist, collectionEntries, isReady]);
 
   useEffect(() => {
-    if (!isReady || !canPersist || isHydratingRef.current) {
+    if (!isReady || !canPersist || isHydratingRef.current || !isTimestampTrackingReadyRef.current) {
       return;
     }
 

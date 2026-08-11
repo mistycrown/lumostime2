@@ -68,6 +68,7 @@ export const CategoryScopeProvider: React.FC<CategoryScopeProviderProps> = ({
   const [goals, setGoals] = useState<Goal[]>(INITIAL_GOALS);
   const [majorGoals, setMajorGoals] = useState<MajorGoal[]>([]);
   const isHydratingRef = useRef(true);
+  const isTimestampTrackingReadyRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,6 +101,7 @@ export const CategoryScopeProvider: React.FC<CategoryScopeProviderProps> = ({
           window.setTimeout(() => {
             if (!cancelled) {
               isHydratingRef.current = false;
+              isTimestampTrackingReadyRef.current = true;
             }
           }, 0);
         }
@@ -154,7 +156,7 @@ export const CategoryScopeProvider: React.FC<CategoryScopeProviderProps> = ({
   }, [canPersist, isReady, majorGoals]);
 
   useEffect(() => {
-    if (!isReady || !canPersist || isHydratingRef.current) {
+    if (!isReady || !canPersist || isHydratingRef.current || !isTimestampTrackingReadyRef.current) {
       return;
     }
 

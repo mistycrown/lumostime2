@@ -156,6 +156,8 @@ export const SYNC_KEYS = {
     SYNC_STATUS: 'lumostime_sync_status',
     /** 本机已处理过的最新云端上传时间 */
     LAST_SEEN_CLOUD_UPLOADED_AT: 'lumostime_last_seen_cloud_uploaded_at',
+    /** 已由真实用户操作产生、尚未完成云端确认的本地编辑 */
+    HAS_PENDING_LOCAL_EDIT: 'lumostime_has_pending_local_edit',
 } as const;
 
 /**

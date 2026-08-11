@@ -256,6 +256,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [isReady, setIsReady] = useState(false);
   const [canPersist, setCanPersist] = useState(false);
   const isHydratingRef = useRef(true);
+  const isTimestampTrackingReadyRef = useRef(false);
 
   const [meta, setMeta] = useState<AchievementMeta>({
     achievementStartDate: null,
@@ -321,6 +322,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
           window.setTimeout(() => {
             if (!cancelled) {
               isHydratingRef.current = false;
+              isTimestampTrackingReadyRef.current = true;
             }
           }, 0);
         }
@@ -1211,7 +1213,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
   }, [bottleActionRecords, canPersist, isReady]);
 
   useEffect(() => {
-    if (!isReady || !canPersist || isHydratingRef.current) {
+    if (!isReady || !canPersist || isHydratingRef.current || !isTimestampTrackingReadyRef.current) {
       return;
     }
 

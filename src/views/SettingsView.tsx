@@ -87,7 +87,7 @@ import { ToastType } from '../components/Toast';
 import { uploadDataToCloud, downloadWithBackup, CloudService } from '../utils/syncUtils';
 import { validateLocalData, canSafelyUpload } from '../utils/dataValidation';
 import { getActiveSceneGroup, loadSceneGroupStateFromStorage } from '../utils/sceneGroupStorage';
-import { getLocalDataTimestamp, setLastSeenCloudUploadedAt } from '../utils/localDataTimestamp';
+import { clearPendingLocalDataEdit, getLocalDataTimestamp, setLastSeenCloudUploadedAt } from '../utils/localDataTimestamp';
 
 import { ConfirmModal } from '../components/ConfirmModal';
 import { AppView, ReviewTemplate, NarrativeTemplate, Log, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyReview, TodoCategory, Filter, Category, CheckTemplate } from '../types';
@@ -555,6 +555,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             if (result.success) {
                 const syncedTimestamp = await resolveCloudUploadedAt(webdavService, result.data?.timestamp || 0);
                 setLastSeenCloudUploadedAt(syncedTimestamp);
+                clearPendingLocalDataEdit();
                 console.log(`[Settings] WebDAV cloud upload acknowledged: ${syncedTimestamp}`);
 
                 onToast('success', result.message);
@@ -588,6 +589,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             if (result.success && result.data) {
                 await onSyncUpdate(result.data);
                 setLastSeenCloudUploadedAt(await resolveCloudUploadedAt(webdavService, result.data?.timestamp || 0));
+                clearPendingLocalDataEdit();
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
 
                 // 同步完成后关闭设置页面，自动刷新到脉络页面
@@ -631,6 +633,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             if (result.success) {
                 const syncedTimestamp = await resolveCloudUploadedAt(s3Service, result.data?.timestamp || 0);
                 setLastSeenCloudUploadedAt(syncedTimestamp);
+                clearPendingLocalDataEdit();
                 console.log(`[Settings] S3 cloud upload acknowledged: ${syncedTimestamp}`);
 
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
@@ -666,6 +669,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
             if (result.success) {
                 setLastSeenCloudUploadedAt(await resolveCloudUploadedAt(compatibleS3Service, result.data?.timestamp || 0));
+                clearPendingLocalDataEdit();
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
             } else {
                 onToast('error', result.message);
@@ -745,6 +749,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             if (result.success && result.data) {
                 await onSyncUpdate(result.data);
                 setLastSeenCloudUploadedAt(await resolveCloudUploadedAt(s3Service, result.data?.timestamp || 0));
+                clearPendingLocalDataEdit();
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
 
                 // 同步完成后关闭设置页面
@@ -779,6 +784,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             if (result.success && result.data) {
                 await onSyncUpdate(result.data);
                 setLastSeenCloudUploadedAt(await resolveCloudUploadedAt(compatibleS3Service, result.data?.timestamp || 0));
+                clearPendingLocalDataEdit();
                 onToast(result.imageStats?.errors.length ? 'warning' : 'success', result.message);
 
                 setTimeout(() => {

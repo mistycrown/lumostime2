@@ -5,6 +5,8 @@
  * @pos Utility (Sync Metadata)
  * @description Centralizes the local-data timestamp so all sync-relevant state changes can update one consistent clock without fighting restore flows.
  * @updated 2026-08-11: Treats missing local timestamps as neutral and stores cloud acknowledgements separately from user edits.
+ * @updated 2026-08-11: Rejects background startup writes until a real user interaction occurs, preventing initialization tasks from becoming local edits.
+ * @updated 2026-08-11: Records pending user edits separately so automatic sync can ignore stale timestamps left by earlier startup writes.
  */
 import { SYNC_KEYS, USER_DATA_KEYS, storage } from '../constants/storageKeys';
 
@@ -15,6 +17,24 @@ export interface LocalDataTimestampUpdatedDetail {
 }
 
 let isTimestampUpdateLocked = false;
+let lastUserInteractionAt = 0;
+
+const USER_INTERACTION_WINDOW_MS = 15_000;
+
+export const recordLocalDataUserInteraction = (): void => {
+  lastUserInteractionAt = Date.now();
+};
+
+const wasRecentlyChangedByUser = (): boolean => (
+  lastUserInteractionAt > 0 && Date.now() - lastUserInteractionAt <= USER_INTERACTION_WINDOW_MS
+);
+
+if (typeof window !== 'undefined') {
+  const recordInteraction = () => recordLocalDataUserInteraction();
+  ['pointerdown', 'keydown', 'input', 'change'].forEach((eventName) => {
+    window.addEventListener(eventName, recordInteraction, { capture: true, passive: true });
+  });
+}
 
 export const getLocalDataTimestamp = (): number => {
   const stored = storage.get(USER_DATA_KEYS.LOCAL_TIMESTAMP);
@@ -35,11 +55,21 @@ export const setLocalDataTimestampValue = (timestamp: number): number => {
 };
 
 export const updateLocalDataTimestamp = (): number => {
-  if (isTimestampUpdateLocked) {
+  if (isTimestampUpdateLocked || !wasRecentlyChangedByUser()) {
     return getLocalDataTimestamp();
   }
 
-  return setLocalDataTimestampValue(Date.now());
+  const timestamp = setLocalDataTimestampValue(Date.now());
+  storage.set(SYNC_KEYS.HAS_PENDING_LOCAL_EDIT, 'true');
+  return timestamp;
+};
+
+export const hasPendingLocalDataEdit = (): boolean => (
+  storage.get(SYNC_KEYS.HAS_PENDING_LOCAL_EDIT) === 'true'
+);
+
+export const clearPendingLocalDataEdit = (): void => {
+  storage.remove(SYNC_KEYS.HAS_PENDING_LOCAL_EDIT);
 };
 
 export const getLastSeenCloudUploadedAt = (): number => {

@@ -4,7 +4,7 @@
  * @output Regression coverage for neutral missing local timestamps and cloud acknowledgement persistence
  * @pos Test
  * @description Prevents a missing local timestamp from being interpreted as the current time during sync direction checks.
- * @updated 2026-08-11: Added dual-path sync timestamp storage coverage.
+ * @updated 2026-08-11: Added dual-path sync timestamp storage coverage, user-interaction write protection, and pending-edit acknowledgement tests.
  */
 
 import { beforeEach, describe, expect, test, vi } from 'vitest';
@@ -21,8 +21,11 @@ const { storage } = vi.hoisted(() => {
 });
 
 import {
+  clearPendingLocalDataEdit,
   getLastSeenCloudUploadedAt,
   getLocalDataTimestamp,
+  hasPendingLocalDataEdit,
+  recordLocalDataUserInteraction,
   setLastSeenCloudUploadedAt,
   setLocalDataTimestampUpdateLocked,
   updateLocalDataTimestamp
@@ -43,11 +46,22 @@ describe('localDataTimestamp', () => {
     expect(getLocalDataTimestamp()).toBe(0);
   });
 
-  test('updates the local timestamp only through an explicit local data change', () => {
+  test('does not treat startup work as a local user change', () => {
     vi.spyOn(Date, 'now').mockReturnValue(123456);
 
+    expect(updateLocalDataTimestamp()).toBe(0);
+    expect(getLocalDataTimestamp()).toBe(0);
+  });
+
+  test('updates the local timestamp only after an explicit user interaction', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(123456);
+
+    recordLocalDataUserInteraction();
     expect(updateLocalDataTimestamp()).toBe(123456);
     expect(getLocalDataTimestamp()).toBe(123456);
+    expect(hasPendingLocalDataEdit()).toBe(true);
+    clearPendingLocalDataEdit();
+    expect(hasPendingLocalDataEdit()).toBe(false);
   });
 
   test('persists the latest acknowledged cloud upload independently', () => {
