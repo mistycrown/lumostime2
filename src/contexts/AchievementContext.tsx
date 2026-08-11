@@ -1,7 +1,7 @@
 ﻿/**
  * @file AchievementContext.tsx
  * @description Manages achievement bottle data, live snapshots, archived bottles, and reward redemption records with repository hydration and selective recent-day recomputation.
- * @updated 2026-08-09: Added fixed-rule character attributes, independent growth snapshots, and cumulative experience progress.
+ * @updated 2026-08-11: Separates attribute deletion from hiding and rejects deletion while achievement rules still reference the attribute.
  * @updated 2026-07-11: Persists per-rule todo subtask inclusion settings for todo-category achievement rules.
  * @updated 2026-07-11: Added full achievement recomputation that clears archived bottles, restores historical ledgers, and rebuilds all daily snapshots.
  * @updated 2026-07-04: Auto-resyncs active achievement snapshots whenever source logs, todos, reviews, or filter context data change so balances stay fresh outside the achievement page.
@@ -44,6 +44,7 @@ import {
   computeAchievementGrowthDailySnapshot,
   enumerateAchievementDates,
   getAchievementActiveStartDate,
+  getAchievementAttributeReferencingRules,
   getAchievementLevelProgress,
   getAchievementRecentGrowthStartDate,
   getAchievementSealBlockedReason,
@@ -95,6 +96,11 @@ interface CreateAchievementAttributeInput {
   color: string;
 }
 
+interface DeleteAchievementAttributeResult {
+  ok: boolean;
+  message?: string;
+}
+
 interface CreateAchievementRewardInput {
   name: string;
   cost: number;
@@ -144,7 +150,7 @@ interface AchievementContextType {
   deleteRule: (ruleId: string) => void;
   createAttribute: (input: CreateAchievementAttributeInput) => void;
   updateAttribute: (attribute: AchievementAttribute) => void;
-  deleteAttribute: (attributeId: string) => void;
+  deleteAttribute: (attributeId: string) => DeleteAchievementAttributeResult;
   reorderAttributes: (attributeIds: string[]) => void;
   createReward: (input: CreateAchievementRewardInput) => void;
   updateReward: (reward: AchievementReward) => void;
@@ -415,13 +421,13 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       );
       if (existing) {
         computed.id = existing.id;
-        const disabledAttributeIds = new Set(
+        const activeAttributeIds = new Set(
           attributesSource
-            .filter((attribute) => !attribute.enabled)
+            .filter((attribute) => attribute.enabled !== false)
             .map((attribute) => attribute.id)
         );
         const preservedChanges = existing.attributeChanges.filter((change) => (
-          disabledAttributeIds.has(change.attributeId)
+          !activeAttributeIds.has(change.attributeId)
         ));
         if (preservedChanges.length > 0) {
           computed.attributeChanges = [...preservedChanges, ...computed.attributeChanges];
@@ -573,13 +579,13 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
 
       if (existingSnapshot) {
         recomputedSnapshot.id = existingSnapshot.id;
-        const disabledAttributeIds = new Set(
+        const activeAttributeIds = new Set(
           attributes
-            .filter((attribute) => !attribute.enabled)
+            .filter((attribute) => attribute.enabled !== false)
             .map((attribute) => attribute.id)
         );
         const preservedChanges = existingSnapshot.attributeChanges.filter((change) => (
-          disabledAttributeIds.has(change.attributeId)
+          !activeAttributeIds.has(change.attributeId)
         ));
         if (preservedChanges.length > 0) {
           recomputedSnapshot.attributeChanges = [...preservedChanges, ...recomputedSnapshot.attributeChanges];
@@ -760,34 +766,32 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     const nextAttributes = attributes
       .map((item) => (item.id === nextAttribute.id ? nextAttribute : item))
       .sort((first, second) => first.sortOrder - second.sortOrder);
-    const nextRules = nextAttribute.enabled
-      ? rules
-      : rules.map((rule) => (
-        rule.attributeEffect?.attributeId === nextAttribute.id
-          ? { ...rule, enabled: false, updatedAt: Date.now() }
-          : rule
-      ));
-
     setAttributes(nextAttributes);
-    if (nextRules !== rules) {
-      setRules(nextRules);
-    }
     syncActiveSnapshots({
-      rulesSource: nextRules,
       attributesSource: nextAttributes
     });
   };
 
-  const deleteAttribute = (attributeId: string) => {
+  const deleteAttribute = (attributeId: string): DeleteAchievementAttributeResult => {
     const targetAttribute = attributes.find((attribute) => attribute.id === attributeId);
     if (!targetAttribute) {
-      return;
+      return { ok: false, message: '找不到此属性。' };
     }
 
-    updateAttribute({
-      ...targetAttribute,
-      enabled: false
+    const referencingRules = getAchievementAttributeReferencingRules(rules, attributeId);
+    if (referencingRules.length > 0) {
+      return {
+        ok: false,
+        message: `仍有 ${referencingRules.length} 条规则引用“${targetAttribute.name}”，无法删除。`
+      };
+    }
+
+    const nextAttributes = attributes.filter((attribute) => attribute.id !== attributeId);
+    setAttributes(nextAttributes);
+    syncActiveSnapshots({
+      attributesSource: nextAttributes
     });
+    return { ok: true };
   };
 
   const reorderAttributes = (attributeIds: string[]) => {
@@ -1096,7 +1100,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
   const totalEarnedStars = calculateAchievementTotalEarned(dailySnapshots);
   const totalRedeemedStars = calculateAchievementTotalRedeemed(spendRecords);
   const attributeExperience = calculateAchievementAttributeExperience(growthDailySnapshots, attributes);
-  const totalExperience = calculateAchievementTotalExperience(growthDailySnapshots);
+  const totalExperience = calculateAchievementTotalExperience(growthDailySnapshots, attributes);
   const attributeLevels = Object.fromEntries(
     attributes.map((attribute) => [attribute.id, getAchievementLevelProgress(attributeExperience[attribute.id] || 0)])
   ) as Record<string, AchievementLevelProgress>;

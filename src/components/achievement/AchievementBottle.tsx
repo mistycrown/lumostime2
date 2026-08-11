@@ -2,6 +2,7 @@
  * @file AchievementBottle.tsx
  * @description Physics-driven achievement bottle visualization with switchable bottle skins for the achievement page and sponsorship previews.
  *
+ * @updated 2026-08-11: Moves bottle skin layers to semantic CSS variables so dark-mode fallbacks preserve every light-mode bottle shape and palette.
  * @updated 2026-07-07: Displays split current/history bottle balances beside the total star count.
  * @updated 2026-04-07: Clamp live-mode spawn points so low-count bottle items always start inside the visible chamber.
  */
@@ -921,26 +922,26 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
 
   return (
     <div
-      className="relative h-full w-full overflow-hidden border transition-all"
+      className="achievement-bottle-shell relative h-full w-full overflow-hidden border transition-all"
       style={{
-        borderColor: compact ? 'rgba(231,229,228,1)' : palette.outerBorderColor,
-        background: compact ? '#fdfbf7' : palette.outerBackground,
-        boxShadow: compact ? 'none' : palette.outerShadow,
-        borderRadius: compact ? '1.6rem' : palette.outerRadius
-      }}
+        '--achievement-bottle-outer-border': compact ? 'rgba(231,229,228,1)' : palette.outerBorderColor,
+        '--achievement-bottle-outer-background': compact ? '#fdfbf7' : palette.outerBackground,
+        '--achievement-bottle-outer-shadow': compact ? 'none' : palette.outerShadow,
+        '--achievement-bottle-outer-radius': compact ? '1.6rem' : palette.outerRadius
+      } as React.CSSProperties}
     >
       {!compact && (
         <>
           <div
-            className="pointer-events-none absolute left-1/2 top-2 z-0 h-16 w-40 -translate-x-1/2 rounded-full blur-2xl"
-            style={{ background: palette.haloBackground }}
+            className="achievement-bottle-halo pointer-events-none absolute left-1/2 top-2 z-0 h-16 w-40 -translate-x-1/2 rounded-full blur-2xl"
+            style={{ '--achievement-bottle-halo-background': palette.haloBackground } as React.CSSProperties}
           />
           <div
-            className="pointer-events-none absolute left-1/2 top-3 z-10 h-2 w-16 -translate-x-1/2 rounded-full opacity-55"
+            className="achievement-bottle-neck pointer-events-none absolute left-1/2 top-3 z-10 h-2 w-16 -translate-x-1/2 rounded-full opacity-55"
             style={{
-              background: palette.neckBackground,
+              '--achievement-bottle-neck-background': palette.neckBackground,
               boxShadow: '0 2px 8px rgba(255,255,255,0.1)'
-            }}
+            } as React.CSSProperties}
           />
         </>
       )}
@@ -1001,27 +1002,27 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
       {!compact && (
         <>
           <div
-            className="pointer-events-none absolute inset-x-0 top-0 h-24"
-            style={{ background: palette.topMist }}
+            className="achievement-bottle-top-mist pointer-events-none absolute inset-x-0 top-0 h-24"
+            style={{ '--achievement-bottle-top-mist-background': palette.topMist } as React.CSSProperties}
           />
           <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-24"
-            style={{ background: palette.bottomGlow }}
+            className="achievement-bottle-bottom-glow pointer-events-none absolute inset-x-0 bottom-0 h-24"
+            style={{ '--achievement-bottle-bottom-glow-background': palette.bottomGlow } as React.CSSProperties}
           />
 
           <div
             ref={containerRef}
-            className="absolute inset-x-5 bottom-12 top-20 overflow-hidden border backdrop-blur-[2px]"
+            className="achievement-bottle-chamber absolute inset-x-5 bottom-12 top-20 overflow-hidden border backdrop-blur-[2px]"
             style={{
-              borderColor: palette.chamberBorderColor,
-              background: palette.chamberBackground,
-              boxShadow: palette.chamberShadow,
-              borderRadius: palette.chamberRadius
-            }}
+              '--achievement-bottle-chamber-border': palette.chamberBorderColor,
+              '--achievement-bottle-chamber-background': palette.chamberBackground,
+              '--achievement-bottle-chamber-shadow': palette.chamberShadow,
+              '--achievement-bottle-chamber-radius': palette.chamberRadius
+            } as React.CSSProperties}
           >
             <div
-              className="pointer-events-none absolute inset-y-4 left-3 w-8 rounded-full blur-md"
-              style={{ background: palette.sideHighlight }}
+              className="achievement-bottle-side-highlight pointer-events-none absolute inset-y-4 left-3 w-8 rounded-full blur-md"
+              style={{ '--achievement-bottle-side-highlight-background': palette.sideHighlight } as React.CSSProperties}
             />
 
             {visibleCount === 0 && (
@@ -1123,11 +1124,11 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
 
             {overflowCount > 0 && (
               <div
-                className="pointer-events-none absolute bottom-4 right-4 rounded-full px-3 py-1 text-xs font-semibold shadow-sm"
+                className="achievement-bottle-overflow pointer-events-none absolute bottom-4 right-4 rounded-full px-3 py-1 text-xs font-semibold shadow-sm"
                 style={{
-                  background: palette.overflowBackground,
+                  '--achievement-bottle-overflow-background': palette.overflowBackground,
                   color: palette.overflowColor
-                }}
+                } as React.CSSProperties}
               >
                 +{overflowCount}
               </div>

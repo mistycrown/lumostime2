@@ -16,6 +16,7 @@ import {
   detectForcedSyncConflict,
   getComparableSyncJsonByteSize,
   getJsonByteSize,
+  resolveSyncComparisonTimestamp,
   resolveSyncDirectionDecision,
   resolveSyncTimestampDirection
 } from '../utils/syncTimestampDirection';
@@ -70,6 +71,45 @@ describe('classifySyncJsonSizeDirection', () => {
 });
 
 describe('resolveSyncDirectionDecision', () => {
+  test('restores an unseen cloud version even when both JSON payloads have the same size', () => {
+    const comparison = resolveSyncComparisonTimestamp({
+      localTimestamp: 15_000,
+      cloudTimestamp: 20_000,
+      lastSeenCloudUploadedAt: 10_000,
+      hasPendingLocalEdit: false,
+      mode: 'resume'
+    });
+
+    expect(comparison).toMatchObject({
+      comparisonLocalTimestamp: 0,
+      cloudAlreadyApplied: false,
+      shouldRestoreUnseenCloud: true
+    });
+    expect(resolveSyncDirectionDecision({
+      localTimestamp: comparison.comparisonLocalTimestamp,
+      cloudTimestamp: 20_000,
+      toleranceMs: 1_000,
+      mode: 'resume',
+      hadPendingAutoSync: false,
+      localJsonSize: 300,
+      cloudJsonSize: 300
+    }).direction).toBe('restore');
+  });
+
+  test('keeps an already acknowledged cloud version neutral when no local edit is pending', () => {
+    expect(resolveSyncComparisonTimestamp({
+      localTimestamp: 15_000,
+      cloudTimestamp: 20_000,
+      lastSeenCloudUploadedAt: 20_000,
+      hasPendingLocalEdit: false,
+      mode: 'startup'
+    })).toMatchObject({
+      comparisonLocalTimestamp: 20_000,
+      cloudAlreadyApplied: true,
+      shouldRestoreUnseenCloud: false
+    });
+  });
+
   test('returns conflict when timestamp says restore but local json is larger', () => {
     expect(resolveSyncDirectionDecision({
       localTimestamp: 10_000,

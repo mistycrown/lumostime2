@@ -3327,3 +3327,96 @@ html[data-theme-mode=dark] .scene-group-menu > div > button:not(.scene-group-men
 html[data-theme-mode=dark] .scene-group-menu > div > button:not(.scene-group-menu-selected):hover {
   background-color: #44403c !important;
 }
+
+/* Achievement bottle skins keep their light-mode glass construction in dark mode. */
+.achievement-bottle-shell {
+  border-color: var(--achievement-bottle-outer-border);
+  background: var(--achievement-bottle-outer-background);
+  box-shadow: var(--achievement-bottle-outer-shadow);
+  border-radius: var(--achievement-bottle-outer-radius);
+}
+
+.achievement-bottle-halo {
+  background: var(--achievement-bottle-halo-background);
+}
+
+.achievement-bottle-neck {
+  background: var(--achievement-bottle-neck-background);
+}
+
+.achievement-bottle-top-mist {
+  background: var(--achievement-bottle-top-mist-background);
+}
+
+.achievement-bottle-bottom-glow {
+  background: var(--achievement-bottle-bottom-glow-background);
+}
+
+.achievement-bottle-chamber {
+  border-color: var(--achievement-bottle-chamber-border);
+  background: var(--achievement-bottle-chamber-background);
+  box-shadow: var(--achievement-bottle-chamber-shadow);
+  border-radius: var(--achievement-bottle-chamber-radius);
+}
+
+.achievement-bottle-side-highlight {
+  background: var(--achievement-bottle-side-highlight-background);
+}
+
+.achievement-bottle-overflow {
+  background: var(--achievement-bottle-overflow-background);
+}
+
+html[data-theme-mode=dark] .achievement-bottle-shell {
+  border-color: var(--achievement-bottle-outer-border) !important;
+  background: var(--achievement-bottle-outer-background) !important;
+  box-shadow: var(--achievement-bottle-outer-shadow) !important;
+}
+
+html[data-theme-mode=dark] .achievement-bottle-halo {
+  background: var(--achievement-bottle-halo-background) !important;
+}
+
+html[data-theme-mode=dark] .achievement-bottle-neck {
+  background: var(--achievement-bottle-neck-background) !important;
+}
+
+html[data-theme-mode=dark] .achievement-bottle-top-mist {
+  background: var(--achievement-bottle-top-mist-background) !important;
+}
+
+html[data-theme-mode=dark] .achievement-bottle-bottom-glow {
+  background: var(--achievement-bottle-bottom-glow-background) !important;
+}
+
+html[data-theme-mode=dark] .achievement-bottle-chamber {
+  border-color: var(--achievement-bottle-chamber-border) !important;
+  background: var(--achievement-bottle-chamber-background) !important;
+  box-shadow: var(--achievement-bottle-chamber-shadow) !important;
+}
+
+html[data-theme-mode=dark] .achievement-bottle-side-highlight {
+  background: var(--achievement-bottle-side-highlight-background) !important;
+}
+
+html[data-theme-mode=dark] .achievement-bottle-overflow {
+  background: var(--achievement-bottle-overflow-background) !important;
+}
+
+html[data-theme-mode=dark] .achievement-ledger-tab-active {
+  background-color: #f5f5f4 !important;
+  color: #292524 !important;
+}
+
+html[data-theme-mode=dark] .achievement-ledger-tab-active svg,
+html[data-theme-mode=dark] .achievement-ledger-tab-active span {
+  color: inherit !important;
+}
+
+html[data-theme-mode=dark] .review-overview-list-row,
+html[data-theme-mode=dark] .review-overview-list-row:hover,
+html[data-theme-mode=dark] .daily-check-overview-list-row,
+html[data-theme-mode=dark] .daily-check-overview-list-row:hover,
+html[data-theme-mode=dark] .daily-check-overview-list-row:active {
+  background-color: transparent !important;
+}

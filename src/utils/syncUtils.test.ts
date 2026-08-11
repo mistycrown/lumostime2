@@ -115,4 +115,15 @@ describe('downloadWithBackup', () => {
     expect(result.message).toContain('已停止恢复');
     expect(cloud.downloadData).not.toHaveBeenCalled();
   });
+
+  test('does not restore from cloud when the local safety backup cannot be read back', async () => {
+    const cloud = createMockCloudService(vi.fn(async () => buildValidPayload(20)));
+
+    const result = await downloadWithBackup(cloud as any, buildValidPayload(10));
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('校验失败');
+    expect(cloud.downloadData).toHaveBeenCalledTimes(1);
+    expect(cloud.downloadData).toHaveBeenCalledWith(expect.stringMatching(/^backups\/local_backup_/));
+  });
 });

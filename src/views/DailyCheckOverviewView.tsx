@@ -10,6 +10,7 @@
  * @updated 2026-08-09: Shows five history cells only for manual checks and keeps missing reviews distinct.
  * @updated 2026-08-09: Unified the header height and applied per-item template colors.
  * @updated 2026-08-10: Reads nightEarliestStart rows from the previous night's review while retaining today for other checks.
+ * @updated 2026-08-11: Keeps overview rows transparent in dark mode so the list reads as one continuous surface.
  */
 import React, { useMemo } from 'react';
 import { ArrowLeft, Check, ChevronRight } from 'lucide-react';
@@ -217,7 +218,7 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
                             key={item.id}
                             type="button"
                             onClick={() => onOpenDetail(item.id)}
-                            className="group flex w-full items-center gap-3 py-4 text-left transition-colors hover:bg-white/60 active:bg-stone-100/70"
+                            className="daily-check-overview-list-row group flex w-full items-center gap-3 py-4 text-left transition-colors hover:bg-white/60 active:bg-stone-100/70"
                             aria-label={`查看${item.content}详情`}
                           >
                             <div className="flex min-w-0 flex-1 items-center gap-3">

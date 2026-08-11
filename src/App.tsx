@@ -21,6 +21,7 @@
  * @updated 2026-05-18: Included the persisted custom color group in JSON export payloads so user-defined palette swatches travel with backup data.
  * @updated 2026-05-17: Added unified AI backup payload export so chat sessions, prompts, assistant memory, Dream state, and sanitized AI presets now travel inside the main JSON backup together with the rest of the app data.
  * @updated 2026-08-10: Included Android widget templates plus unified appearance and TimePal settings in JSON export payloads so configured widgets and visual preferences can be restored after reinstalling the app.
+ * @updated 2026-08-11: Routes imported JSON through the explicit local-edit path so it is retained for the next cloud upload.
  * @updated 2026-05-10: Upgraded the post-start timer auto-jump flow to support none, focus-detail, and immersive entry modes while preserving scene-card immersive overrides.
  * @updated 2026-05-10: Made the widget supplement-log shortcut snap the timeline date back to today before opening the backfill modal.
  * @updated 2026-04-27: Passed todo delete callbacks into the shared quick-actions sheet path so list and week todo action bars can trigger task removal.
@@ -102,7 +103,7 @@ import { loadWidgetTemplatesFromStorage } from './services/widgetService';
 import { splitLogByDays } from './utils/logUtils';
 import { getLatestActualLogEndTime } from './utils/statLogUtils';
 import { buildSceneGroupStateFromLegacySlots, getActiveSceneGroup, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from './utils/sceneGroupStorage';
-import { getLocalDataTimestamp, setLocalDataTimestampValue } from './utils/localDataTimestamp';
+import { getLocalDataTimestamp } from './utils/localDataTimestamp';
 import { validateAndFixData } from './utils/dataValidation';
 import { ensureQuickTodoCategory } from './utils/todoQuickCategoryUtils';
 import { STORAGE_WRITE_ERROR_EVENT, StorageWriteErrorDetail } from './constants/storageKeys';
@@ -442,8 +443,7 @@ const AppContent: React.FC = () => {
           throw new Error(result.errors.join('; '));
         }
 
-        await syncManager.handleSyncDataUpdate(data);
-        setLocalDataTimestampValue(Date.now());
+        await syncManager.handleLocalDataUpdate(data);
         addToast('success', 'Data imported successfully');
       } catch (error) {
         console.error('Import failed', error);
@@ -1163,6 +1163,7 @@ const AppContent: React.FC = () => {
             onImport={handleImportData}
             onToast={addToast}
             onSyncUpdate={syncManager.handleSyncDataUpdate}
+            onLocalDataUpdate={syncManager.handleLocalDataUpdate}
 
             // Data Props
             logs={logs}

@@ -3,23 +3,25 @@
  * @input Achievement attributes and attribute mutation callbacks
  * @output Attribute management dialog for the character profile
  * @pos Component (Achievement)
- * @description Lets users add, edit, reorder, hide, and restore character attributes while preserving archived experience history.
- * @updated 2026-08-09: Added character attribute management for the fixed-rule growth system.
+ * @description Lets users add, edit, reorder, hide, restore, and safely delete character attributes while preserving archived experience history.
+ * @updated 2026-08-11: Split attribute hiding from deletion and report rules that block deletion.
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
-import type { AchievementAttribute } from '../../types';
+import { ArrowDown, ArrowUp, Eye, EyeOff, Pencil, Plus, Trash2 } from 'lucide-react';
+import type { AchievementAttribute, AchievementRule } from '../../types';
 import { ACHIEVEMENT_ATTRIBUTE_ICON_OPTIONS, getAchievementAttributeIcon } from '../../constants/achievementAttributeIcons';
+import { getAchievementAttributeReferencingRules } from '../../utils/achievementUtils';
 import { AchievementDialog } from './AchievementDialog';
 
 interface AchievementAttributeSettingsDialogProps {
   isOpen: boolean;
   attributes: AchievementAttribute[];
+  rules: AchievementRule[];
   onClose: () => void;
   onCreate: (input: { name: string; subtitle: string; icon: string; color: string }) => void;
   onUpdate: (attribute: AchievementAttribute) => void;
-  onDelete: (attributeId: string) => void;
+  onDelete: (attributeId: string) => { ok: boolean; message?: string };
   onReorder: (attributeIds: string[]) => void;
 }
 
@@ -42,6 +44,7 @@ const createEmptyDraft = (): AttributeDraft => ({
 export const AchievementAttributeSettingsDialog: React.FC<AchievementAttributeSettingsDialogProps> = ({
   isOpen,
   attributes,
+  rules,
   onClose,
   onCreate,
   onUpdate,
@@ -50,6 +53,7 @@ export const AchievementAttributeSettingsDialog: React.FC<AchievementAttributeSe
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<AttributeDraft>(createEmptyDraft);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const orderedAttributes = useMemo(
     () => [...attributes].sort((first, second) => first.sortOrder - second.sortOrder),
@@ -63,6 +67,7 @@ export const AchievementAttributeSettingsDialog: React.FC<AchievementAttributeSe
     if (!isOpen) {
       setEditingId(null);
       setDraft(createEmptyDraft());
+      setDeleteError(null);
     }
   }, [isOpen]);
 
@@ -121,6 +126,26 @@ export const AchievementAttributeSettingsDialog: React.FC<AchievementAttributeSe
     onReorder(nextOrder);
   };
 
+  const toggleAttributeVisibility = (attribute: AchievementAttribute) => {
+    setDeleteError(null);
+    onUpdate({ ...attribute, enabled: !attribute.enabled, updatedAt: Date.now() });
+  };
+
+  const deleteAttribute = (attribute: AchievementAttribute) => {
+    const referencingRules = getAchievementAttributeReferencingRules(rules, attribute.id);
+    if (referencingRules.length > 0) {
+      setDeleteError(`仍有 ${referencingRules.length} 条规则引用“${attribute.name}”，无法删除。`);
+      return;
+    }
+
+    if (!window.confirm(`删除“${attribute.name}”？历史成长记录会保留，但不再计入人物经验。`)) {
+      return;
+    }
+
+    const result = onDelete(attribute.id);
+    setDeleteError(result.ok ? null : result.message || '无法删除此属性。');
+  };
+
   return (
     <AchievementDialog
       isOpen={isOpen}
@@ -140,6 +165,11 @@ export const AchievementAttributeSettingsDialog: React.FC<AchievementAttributeSe
       )}
     >
       <div className="space-y-6">
+        {deleteError && (
+          <div role="alert" className="border-l-2 border-red-400 bg-red-50 px-3 py-2 text-xs text-red-700">
+            {deleteError}
+          </div>
+        )}
         <div className="divide-y divide-stone-200 border-y border-stone-200">
           {orderedAttributes.map((attribute, index) => {
             const Icon = getAchievementAttributeIcon(attribute.icon);
@@ -193,18 +223,21 @@ export const AchievementAttributeSettingsDialog: React.FC<AchievementAttributeSe
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (attribute.enabled) {
-                        onDelete(attribute.id);
-                      } else {
-                        onUpdate({ ...attribute, enabled: true, updatedAt: Date.now() });
-                      }
-                    }}
+                    onClick={() => toggleAttributeVisibility(attribute)}
                     title={attribute.enabled ? '隐藏属性' : '恢复属性'}
                     aria-label={attribute.enabled ? `隐藏${attribute.name}` : `恢复${attribute.name}`}
                     className="inline-flex h-7 w-7 items-center justify-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-800"
                   >
-                    {attribute.enabled ? <Trash2 size={14} /> : <RotateCcw size={14} />}
+                    {attribute.enabled ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteAttribute(attribute)}
+                    title="删除属性"
+                    aria-label={`删除${attribute.name}`}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full text-stone-400 transition-colors hover:bg-red-50 hover:text-red-700"
+                  >
+                    <Trash2 size={14} />
                   </button>
                 </div>
               </div>

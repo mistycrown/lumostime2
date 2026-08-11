@@ -8,6 +8,7 @@
  * @updated 2026-08-09: Added the first Review Overview settings subpage.
  * @updated 2026-08-09: Linked answer dates to source review pages and aligned nested back navigation.
  * @updated 2026-08-09: Matched detail-page spacing, hid scrollbars, and added typed answer rendering.
+ * @updated 2026-08-11: Keeps overview question rows transparent instead of inheriting dark gray entry backgrounds.
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -369,7 +370,7 @@ export const ReviewOverviewView: React.FC<ReviewOverviewViewProps> = ({
                               key={question.id}
                               type="button"
                               onClick={() => setSelectedQuestionId(question.id)}
-                              className="group flex w-full items-center gap-4 py-4 text-left transition-colors hover:bg-white/60"
+                              className="review-overview-list-row group flex w-full items-center gap-4 py-4 text-left transition-colors hover:bg-white/60"
                             >
                               <div className="min-w-0 flex-1">
                                 <div className="break-words text-[15px] font-medium leading-6 text-stone-800">

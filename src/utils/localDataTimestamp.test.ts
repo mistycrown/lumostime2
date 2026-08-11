@@ -25,6 +25,7 @@ import {
   getLastSeenCloudUploadedAt,
   getLocalDataTimestamp,
   hasPendingLocalDataEdit,
+  markLocalDataEdited,
   recordLocalDataUserInteraction,
   setLastSeenCloudUploadedAt,
   setLocalDataTimestampUpdateLocked,
@@ -62,6 +63,14 @@ describe('localDataTimestamp', () => {
     expect(hasPendingLocalDataEdit()).toBe(true);
     clearPendingLocalDataEdit();
     expect(hasPendingLocalDataEdit()).toBe(false);
+  });
+
+  test('marks programmatic user actions as pending without relying on a DOM event', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(654321);
+
+    expect(markLocalDataEdited()).toBe(654321);
+    expect(getLocalDataTimestamp()).toBe(654321);
+    expect(hasPendingLocalDataEdit()).toBe(true);
   });
 
   test('persists the latest acknowledged cloud upload independently', () => {

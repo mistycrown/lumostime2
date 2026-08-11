@@ -3,8 +3,8 @@
  * @input Fixed achievement rules, logs, and character attributes
  * @output Regression coverage for character growth experience and level calculations
  * @pos Test (Achievement)
- * @description Covers fixed-rule attribute experience accumulation and the cumulative level curve.
- * @updated 2026-08-09: Added initial character growth calculation tests.
+ * @description Covers proportional fixed-rule attribute experience, deleted-attribute aggregation, and the cumulative level curve.
+ * @updated 2026-08-11: Added proportional daily experience and attribute deletion reference regression coverage.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -13,6 +13,7 @@ import {
   calculateAchievementAttributeExperience,
   calculateAchievementTotalExperience,
   computeAchievementGrowthDailySnapshot,
+  getAchievementAttributeReferencingRules,
   getAchievementExperienceRequiredForLevel,
   getAchievementLevelProgress
 } from './achievementUtils';
@@ -70,13 +71,13 @@ describe('achievement character growth', () => {
     expect(snapshot.attributeChanges).toHaveLength(1);
     expect(snapshot.attributeChanges[0]).toMatchObject({
       attributeId: attribute.id,
-      deltaExp: 20
+      deltaExp: 25
     });
     expect(snapshot.attributeChanges[0]?.ruleBreakdown[0]).toMatchObject({
       matchedValue: 75,
-      appliedUnits: 2,
+      appliedUnits: 2.5,
       expPerUnit: 10,
-      deltaExp: 20
+      deltaExp: 25
     });
   });
 
@@ -96,9 +97,56 @@ describe('achievement character growth', () => {
     };
 
     expect(calculateAchievementAttributeExperience([first, second], [attribute])).toEqual({
-      [attribute.id]: 40
+      [attribute.id]: 50
     });
-    expect(calculateAchievementTotalExperience([first, second])).toBe(40);
+    expect(calculateAchievementTotalExperience([first, second])).toBe(50);
+  });
+
+  it('floors proportional experience once for each daily rule', () => {
+    const halfUnitRule: AchievementRule = {
+      ...rule,
+      unitAmount: 60
+    };
+    const halfUnitLog: Log = {
+      ...log,
+      duration: 30 * 60
+    };
+
+    const snapshot = computeAchievementGrowthDailySnapshot(
+      '2026-08-09',
+      [halfUnitLog],
+      [],
+      [],
+      [halfUnitRule],
+      [attribute]
+    );
+
+    expect(snapshot.attributeChanges[0]).toMatchObject({ deltaExp: 5 });
+    expect(snapshot.attributeChanges[0]?.ruleBreakdown[0]).toMatchObject({
+      appliedUnits: 0.5,
+      deltaExp: 5
+    });
+  });
+
+  it('treats deleted attributes as unowned historical experience', () => {
+    const snapshot = computeAchievementGrowthDailySnapshot(
+      '2026-08-09',
+      [log],
+      [],
+      [],
+      [rule],
+      [attribute]
+    );
+
+    expect(calculateAchievementAttributeExperience([snapshot], [])).toEqual({});
+    expect(calculateAchievementTotalExperience([snapshot], [])).toBe(0);
+  });
+
+  it('finds disabled and enabled rules that still reference an attribute', () => {
+    expect(getAchievementAttributeReferencingRules([
+      rule,
+      { ...rule, id: 'rule-disabled', enabled: false }
+    ], attribute.id)).toHaveLength(2);
   });
 
   it('uses a cumulative quadratic level curve without a maximum level', () => {

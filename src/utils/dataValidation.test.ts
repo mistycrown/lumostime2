@@ -98,6 +98,13 @@ describe('dataValidation achievementData support', () => {
     expect(data.collectionEntries).toBeUndefined();
   });
 
+  it('keeps a missing legacy timestamp neutral during fix-up', () => {
+    const { data, result } = validateAndFixData(createValidPayload());
+
+    expect(result.isValid).toBe(true);
+    expect(data.timestamp).toBe(0);
+  });
+
   it('accepts a nested achievementData object in backup payloads', () => {
     const result = validateLocalData({
       ...createValidPayload(),
