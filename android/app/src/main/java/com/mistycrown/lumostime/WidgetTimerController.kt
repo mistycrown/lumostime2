@@ -20,6 +20,8 @@ import java.util.UUID
  * Updated 2026-05-05: Lets scene widget timer/todo cards try opening configured third-party apps without blocking their normal Lumo runtime actions.
  * Updated 2026-05-05: Preserves scene group/slot/item source metadata when a scene widget starts runtime so app-side flips can stay scoped to the tapped slot.
  * Updated 2026-08-11: Cycles binary and count daily checks locally and queues the matching replay action for the web layer.
+ * Updated 2026-08-11: Resolves daily progress by today's date within the weekly widget payload.
+ * Updated 2026-08-11: Notifies the WebView immediately after a daily widget action is queued.
  */
 object WidgetTimerController {
     private const val TAP_FEEDBACK_DURATION_MS = 260L
@@ -202,7 +204,6 @@ object WidgetTimerController {
         appWidgetId: Int,
         slot: WidgetSlotConfig
     ): Boolean {
-        val normalizedWidgetType = WidgetTypes.normalize(slot.slotType)
         val checkItemId = slot.checkItemId ?: return false
         val mutation = applyDailyCheckTap(
             context = context,
@@ -217,7 +218,7 @@ object WidgetTimerController {
         saveTapAnimation(
             context,
             appWidgetId = appWidgetId,
-            widgetType = normalizedWidgetType,
+            widgetType = WidgetTypes.normalize(slot.slotType),
             slotIndex = slot.slotIndex,
             animationMode = mutation.animationMode,
             startedAt = mutation.occurredAt
@@ -456,7 +457,13 @@ object WidgetTimerController {
         val todayDate = getCurrentDateString()
         val meta = payload?.items?.firstOrNull { it.checkItemId == checkItemId }
         val currentProgress =
-            if (payload?.date == todayDate) payload.progress.firstOrNull { it.checkItemId == checkItemId } else null
+            if (payload?.date == todayDate) {
+                payload.progress.firstOrNull {
+                    it.checkItemId == checkItemId && it.date == todayDate
+                }
+            } else {
+                null
+            }
 
         val manualMode = WidgetDailyModes.normalize(meta?.manualMode ?: fallbackManualMode)
         val targetCount = (meta?.targetCount ?: fallbackTargetCount ?: 1).coerceAtLeast(1)
@@ -524,6 +531,7 @@ object WidgetTimerController {
                 slotIndex = pendingSlotIndex
             )
         )
+        WidgetBridgePlugin.notifyDailyActionPending()
 
         return DailyTapMutationResult(
             animationMode = animationMode,

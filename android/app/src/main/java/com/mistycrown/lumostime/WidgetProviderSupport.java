@@ -11,7 +11,8 @@ import android.widget.RemoteViews;
 
 /**
  * Shared provider-side rendering and tap handling for all widget sizes.
- * Updated 2026-08-11: Lets unoccupied grid-widget background taps refresh only the current widget instance.
+ * Updated 2026-08-11: Keeps slot actions isolated from the title-row refresh button.
+ * Updated 2026-08-11: Uses the dedicated refresh icon as the only refresh click target.
  */
 public final class WidgetProviderSupport {
     public static final String ACTION_TOGGLE_SLOT = "com.mistycrown.lumostime.action.TOGGLE_WIDGET_SLOT";
@@ -242,8 +243,9 @@ public final class WidgetProviderSupport {
             PendingIntent cycleTemplateIntent = buildCycleTemplatePendingIntent(context, providerClass, appWidgetId);
             PendingIntent refreshIntent = buildRefreshPendingIntent(context, providerClass, appWidgetId);
             views.setTextViewText(R.id.widget_title, snapshot.getTemplateName());
-            views.setOnClickPendingIntent(R.id.widget_root, refreshIntent);
+            views.setImageViewResource(R.id.widget_refresh_icon, R.drawable.widget_todo_pin_refresh_icon);
             views.setOnClickPendingIntent(R.id.widget_title, cycleTemplateIntent);
+            views.setOnClickPendingIntent(R.id.widget_refresh_icon, refreshIntent);
             bindSlots(context, views, snapshot, appWidgetId, providerClass, slotViewIds, slotLabelViewIds);
             appWidgetManager.updateAppWidget(appWidgetId, views);
         }

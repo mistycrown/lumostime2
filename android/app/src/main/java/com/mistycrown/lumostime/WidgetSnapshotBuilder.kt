@@ -7,6 +7,7 @@ import java.util.Locale
 /**
  * Builds the lightweight widget UI snapshot from template bindings, runtime state,
  * and the daily widget's mirrored review progress.
+ * Updated 2026-08-11: Selects daily progress by both item ID and date because the payload includes a full week.
  */
 object WidgetSnapshotBuilder {
     fun build(
@@ -25,7 +26,10 @@ object WidgetSnapshotBuilder {
         val dailyMetaMap = dailyPayload?.items?.associateBy { it.checkItemId } ?: emptyMap()
         val dailyProgressMap =
             if (dailyPayload?.date == todayDate) {
-                dailyPayload.progress.associateBy { it.checkItemId }
+                dailyPayload.progress
+                    .asSequence()
+                    .filter { it.date == todayDate }
+                    .associateBy { it.checkItemId }
             } else {
                 emptyMap()
             }

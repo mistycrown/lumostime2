@@ -17,8 +17,10 @@
  * @updated 2026-08-09: Added principle-card widget payload sync types for the dedicated Android 4x2 card widget.
  * @updated 2026-08-09: Added weekly daily-check progress and per-item color fields for the Android 4x4 widget.
  * @updated 2026-08-11: Preserves native daily toggle and count-cycle actions when replaying widget taps in the web layer.
+ * @updated 2026-08-11: Exposes immediate native daily-action notifications for active WebView reconciliation.
  */
 import { registerPlugin } from '@capacitor/core';
+import type { PluginListenerHandle } from '@capacitor/core';
 import type { DailyCheckActionMode } from '../utils/dailyCheckUtils';
 import { ShortcutWidgetAction } from '../services/widgetShortcutService';
 
@@ -372,6 +374,11 @@ export interface WidgetBridgePlugin {
   syncSceneWidgetData(options: { payload: WidgetBridgeScenePayload | null }): Promise<void>;
   refreshWidget(options?: { appWidgetId?: number; templateId?: string }): Promise<void>;
   syncLogTailState(options: { logTailState: WidgetBridgeLogTailState | null }): Promise<void>;
+  addListener(
+    eventName: 'dailyWidgetActionPending',
+    listenerFunc: () => void
+  ): Promise<PluginListenerHandle> & PluginListenerHandle;
+  removeAllListeners(): Promise<void>;
 }
 
 const WidgetBridge = registerPlugin<WidgetBridgePlugin>('WidgetBridge', {

@@ -11,6 +11,7 @@ package com.mistycrown.lumostime
  * Updated 2026-08-06: Added packaged UI icon asset paths to scene time slots for native tab rendering.
  * Updated 2026-08-09: Added principle-card widget payload and per-instance shuffle/flip state models.
  * Updated 2026-08-09: Added weekly range and per-item color fields to daily-check widget payloads.
+ * Updated 2026-08-11: Keeps optional daily template IDs in rendered slots for scene-card compatibility.
  */
 object WidgetTypes {
     const val TIMER = "timer"
@@ -563,8 +564,49 @@ data class WidgetSnapshotSlot(
     val targetCount: Int = 1,
     val isCompleted: Boolean = false,
     val tapAnimationMode: String? = null,
-    val tapAnimationProgress: Float? = null
-)
+    val tapAnimationProgress: Float? = null,
+    val checkTemplateId: String? = null
+) {
+    /** Keeps Java callers compiled before checkTemplateId was added source-compatible. */
+    constructor(
+        slotIndex: Int,
+        slotType: String?,
+        activityId: String?,
+        categoryId: String?,
+        checkItemId: String?,
+        icon: String,
+        uiIconAssetPath: String?,
+        uiIconFallbackAssetPath: String?,
+        label: String,
+        color: String,
+        isActive: Boolean,
+        manualMode: String?,
+        currentCount: Int,
+        targetCount: Int,
+        isCompleted: Boolean,
+        tapAnimationMode: String?,
+        tapAnimationProgress: Float?
+    ) : this(
+        slotIndex,
+        slotType,
+        activityId,
+        categoryId,
+        checkItemId,
+        icon,
+        uiIconAssetPath,
+        uiIconFallbackAssetPath,
+        label,
+        color,
+        isActive,
+        manualMode,
+        currentCount,
+        targetCount,
+        isCompleted,
+        tapAnimationMode,
+        tapAnimationProgress,
+        null
+    )
+}
 
 data class WidgetSnapshot(
     val appWidgetId: Int,

@@ -18,6 +18,9 @@
  * @updated 2026-05-05: Mirrors the latest app log end time to native storage so widget quick-punch shortcuts can append gaps directly on the home screen.
  * @updated 2026-08-09: Mirrors the principle library into the native principle-card widget payload so the Android 4x2 card can randomize from the latest library state.
  * @updated 2026-08-11: Replays the native daily action mode so widget taps can toggle binary checks and cycle count checks.
+ * @updated 2026-08-11: Mirrors grid templates after startup and storage-driven updates so native shortcut slots never rely on the settings screen being opened.
+ * @updated 2026-08-11: Clears native daily actions only after their updated state has been sent back to the widget.
+ * @updated 2026-08-11: Serializes native daily-action replay and responds immediately while the WebView is active.
  */
 import { App as CapacitorApp } from '@capacitor/app';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -208,8 +211,18 @@ export const useWidgetBridgeSync = () => {
     }
 
     let cancelled = false;
+    let isReconciling = false;
+    let reconciliationRequested = false;
 
     const reconcileFromNative = async () => {
+      if (cancelled) {
+        return;
+      }
+      if (isReconciling) {
+        reconciliationRequested = true;
+        return;
+      }
+      isReconciling = true;
       try {
         let reconciledDailyState = latestDailyStateRef.current;
         const [{ actions }, { runtimeState }, { actions: dailyActions }, { actions: todoPinActions }] = await Promise.all([
@@ -269,7 +282,6 @@ export const useWidgetBridgeSync = () => {
             reconciledDailyState = currentState;
           }
 
-          await WidgetBridge.clearPendingDailyActions({ ids: dailyActions.map((action) => action.id) });
         }
 
         if (todoPinActions.length > 0) {
@@ -312,6 +324,10 @@ export const useWidgetBridgeSync = () => {
         });
         await WidgetBridge.syncDailyWidgetData({ payload });
 
+        if (dailyActions.length > 0) {
+          await WidgetBridge.clearPendingDailyActions({ ids: dailyActions.map((action) => action.id) });
+        }
+
         setActiveSessions((prevSessions) => {
           const completedActionIds = new Set(actions.map((action) => action.id));
           const withoutCompletedSessions = prevSessions.filter(
@@ -351,12 +367,27 @@ export const useWidgetBridgeSync = () => {
       } catch (error) {
         console.error('[useWidgetBridgeSync] Failed to reconcile widget native state', error);
         setHasHydratedNativeState(true);
+      } finally {
+        isReconciling = false;
+        if (reconciliationRequested && !cancelled) {
+          reconciliationRequested = false;
+          void reconcileFromNative();
+        }
       }
     };
 
     void reconcileFromNative();
 
     let appStateHandle: { remove: () => Promise<void> } | null = null;
+    let dailyActionListener: { remove: () => Promise<void> } | null = null;
+
+    void WidgetBridge.addListener('dailyWidgetActionPending', () => {
+      void reconcileFromNative();
+    }).then((listener) => {
+      dailyActionListener = listener;
+    }).catch((error) => {
+      console.error('[useWidgetBridgeSync] Failed to register native daily-action listener', error);
+    });
 
     void CapacitorApp.addListener('appStateChange', ({ isActive }) => {
       if (isActive) {
@@ -379,6 +410,7 @@ export const useWidgetBridgeSync = () => {
     return () => {
       cancelled = true;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      void dailyActionListener?.remove();
       void appStateHandle?.remove();
     };
   }, [categories, setActiveSessions, setDailyReviews, setLogs, setTodos]);
@@ -441,6 +473,22 @@ export const useWidgetBridgeSync = () => {
 
     void syncRuntimeState();
   }, [categories, hasHydratedNativeState, latestSession]);
+
+  useEffect(() => {
+    if (!isNativeAndroidWidgetSupported() || !hasHydratedNativeState) {
+      return;
+    }
+
+    const templates = normalizeWidgetTemplates(loadWidgetTemplatesFromStorage());
+    if (templates.length === 0) {
+      return;
+    }
+
+    fireAndForgetWidgetBridgeCall(
+      'Failed to sync widget templates to native widget',
+      () => WidgetBridge.saveTemplates({ templates })
+    );
+  }, [hasHydratedNativeState, widgetTemplateRevision]);
 
   useEffect(() => {
     if (!isNativeAndroidWidgetSupported() || !hasHydratedNativeState) {
