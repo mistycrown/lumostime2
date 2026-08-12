@@ -242,6 +242,62 @@ describe('aiService unified turn normalization', () => {
     }]);
   });
 
+  it('keeps matching clientRef and todoRef values for a same-turn todo and Plan block', async () => {
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockResolvedValue(createJsonTextResponse({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              outcome: 'reply',
+              assistantReply: 'ok',
+              memoryAction: 'no_update',
+              toolCalls: [
+                {
+                  toolName: 'create_todo',
+                  args: {
+                    title: 'Hospital visit',
+                    categoryId: 'project-general',
+                    kind: 'project',
+                    linkedCategoryId: 'study',
+                    linkedActivityId: 'writing',
+                    clientRef: 'hospital-visit'
+                  }
+                },
+                {
+                  toolName: 'create_planned_log',
+                  args: {
+                    todoRef: 'hospital-visit',
+                    date: '2026-10-10',
+                    startTime: '07:30',
+                    endTime: '09:30'
+                  }
+                }
+              ]
+            })
+          }
+        }]
+      })),
+      configurable: true
+    });
+
+    const result = await aiService.requestAssistantUnifiedTurnWithDebug({
+      mode: 'foreground',
+      systemPrompt: 'system',
+      userPrompt: 'user'
+    });
+
+    expect(result.output.toolCalls).toEqual([
+      {
+        toolName: 'create_todo',
+        args: expect.objectContaining({ clientRef: 'hospital-visit' })
+      },
+      {
+        toolName: 'create_planned_log',
+        args: expect.objectContaining({ todoRef: 'hospital-visit' })
+      }
+    ]);
+  });
+
   it('keeps nested create_todo subtasks inside the same normalized tool call', async () => {
     Object.defineProperty(globalThis, 'fetch', {
       value: vi.fn().mockResolvedValue(createJsonTextResponse({

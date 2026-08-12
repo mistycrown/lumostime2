@@ -165,9 +165,10 @@
 
 - `create_planned_log` 用来创建时间轴上的“计划块”，表示未来准备在某个时间段做某个 todo，不表示已经完成或已经发生。
 - 当用户说“把 X 安排到 15:00-16:00”“今天下午给论文初稿留一个时间块”“把这个待办排到时间轴”时，优先使用 `create_planned_log`，不要使用 `create_log`。
-- `todoId` 必须来自已提供的 todo candidates。不要编造 todo id，也不要用 todo 标题代替 id。
+- 已有 todo 使用 `todoId`，必须来自已提供的 todo candidates。不要编造 todo id，也不要用 todo 标题代替 id。
+- 若同一轮既要创建新 todo 又要创建计划块：先返回带唯一 `clientRef` 的 `create_todo`，再返回带相同 `todoRef` 的 `create_planned_log`。这两个字段只在本轮 toolCalls 内引用，不能当作真实 todo id 使用。
 - 必须提供 `date`、`startTime`、`endTime`，且同一天内 `endTime` 大于 `startTime`。
-- 如果用户同时想创建一个新 todo 并安排时间，首版优先先创建 todo；除非上下文里已经有明确可复用的现有 todo，否则不要猜一个 `todoId` 来创建计划块。
+- 如果用户同时想创建一个新 todo 并安排时间，使用上述 `clientRef` / `todoRef` 成对返回两个 toolCalls；不要猜一个真实 `todoId`。
 - `note` 可选，只写用户明确给出的计划备注；不要把解释性回复塞进 `note`。
 
 ### 3. edit_log
@@ -238,6 +239,7 @@
       "toolName": "create_planned_log",
       "args": {
         "todoId": "existing todo id",
+        "todoRef": "same-turn create_todo clientRef",
         "date": "YYYY-MM-DD",
         "startTime": "HH:mm",
         "endTime": "HH:mm",
@@ -287,7 +289,8 @@
             "scheduledDate": "YYYY-MM-DD",
             "deadlineDate": "YYYY-MM-DD"
           }
-        ]
+        ],
+        "clientRef": "same-turn unique reference"
       }
     },
     {

@@ -6,6 +6,7 @@
  * @description A no-op web implementation of the FocusNotification plugin to prevent errors when running in a browser environment.
  * @updated 2026-05-09: Added web no-op support for pending floating-stop recovery and session-id sync payloads.
  * @updated 2026-05-09: Added no-op active-session syncing for the shared Android timer notification title path.
+ * @updated 2026-08-12: Added a no-op side-bubble visibility control for browser builds.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -47,6 +48,10 @@ export class FocusNotificationWeb extends WebPlugin implements FocusNotification
 
     async stopFloatingWindow(): Promise<void> {
         console.log('FocusNotification.stopFloatingWindow (Web - No-op)');
+    }
+
+    async setSideBubbleEnabled(options: { enabled: boolean }): Promise<void> {
+        console.log('FocusNotification.setSideBubbleEnabled (Web - No-op)', options);
     }
 
     async syncActiveSessions(options: { sessions: { id: string; label: string; startTime: number }[] }): Promise<void> {

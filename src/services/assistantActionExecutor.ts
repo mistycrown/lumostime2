@@ -5,6 +5,7 @@
  * @pos Service (Assistant Action Executor)
  * @description Executes AI-planned log/todo/subtask/edit/principle/self-belief tool calls against local app data using shared helpers so the UI can reuse one execution layer instead of keeping tool application logic inside a modal component.
  *
+ * @updated 2026-08-12: Added ordered todo-and-plan execution that resolves one-turn temporary todo references into persisted ids.
  * @updated 2026-07-31: Added `create_planned_log` execution for AI-created todo-linked timeline Plan blocks.
  * @updated 2026-07-06: Added create_principle and create_self_belief tool-call execution with localStorage writeback and undo snapshots.
  * @updated 2026-05-18: `create_todo` actions can now create nested direct subtasks in the same pass, and the applied snapshot records those child ids so the UI can undo the whole bundle cleanly.
@@ -1047,7 +1048,7 @@ export const assistantActionExecutor = {
           status: 'failed',
           errorMessage: '这条计划的时间或待办信息不完整，我先没有自动应用。',
           snapshot: {
-            todoId: args.todoId,
+            todoId: args.todoId || args.todoRef || '',
             todoTitle: linkedTodo?.title || '未知待办',
             startTime: startTime || Date.now(),
             endTime: endTime || Date.now(),
@@ -1100,6 +1101,58 @@ export const assistantActionExecutor = {
       nextLogs,
       nextTodos
     };
+  },
+
+  applyTodoAndPlannedLogToolCalls(
+    context: AssistantActionExecutionContext,
+    toolCalls: Array<AITodoToolCall | AIPlannedLogToolCall>,
+    sourceText: string = ''
+  ): AssistantActionExecutionResult {
+    const actions: AppliedChatAction[] = [];
+    const todoIdsByClientRef = new Map<string, string>();
+    let nextLogs = [...context.logs];
+    let nextTodos = [...context.todos];
+
+    toolCalls.forEach((toolCall) => {
+      const currentContext = {
+        ...context,
+        logs: nextLogs,
+        todos: nextTodos
+      };
+
+      if (toolCall.toolName === 'create_todo') {
+        const result = this.applyTodoToolCalls(currentContext, [toolCall], sourceText);
+        nextLogs = result.nextLogs;
+        nextTodos = result.nextTodos;
+        actions.push(...result.actions);
+
+        const createdTodoId = result.actions[0]?.kind === 'create_todo'
+          && result.actions[0].status === 'applied'
+          ? result.actions[0].snapshot.todoId
+          : undefined;
+        const clientRef = toolCall.args.clientRef?.trim();
+        if (clientRef && createdTodoId) {
+          todoIdsByClientRef.set(clientRef, createdTodoId);
+        }
+        return;
+      }
+
+      const resolvedTodoId = toolCall.args.todoId || (toolCall.args.todoRef
+        ? todoIdsByClientRef.get(toolCall.args.todoRef)
+        : undefined);
+      const result = this.applyPlannedLogToolCalls(currentContext, [{
+        ...toolCall,
+        args: {
+          ...toolCall.args,
+          ...(resolvedTodoId ? { todoId: resolvedTodoId } : {})
+        }
+      }]);
+      nextLogs = result.nextLogs;
+      nextTodos = result.nextTodos;
+      actions.push(...result.actions);
+    });
+
+    return { actions, nextLogs, nextTodos };
   },
 
   applyTodoToolCalls(

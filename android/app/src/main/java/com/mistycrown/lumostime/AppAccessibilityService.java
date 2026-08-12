@@ -4,7 +4,7 @@
  * @output Foreground App Change Events
  * @pos Native Service
  * @description Accessibility service detecting foreground app changes and filtering ignored apps before updating the floating window and prompt logic.
- * @updated 2026-06-13: Special-case the host app (LumosTime) to update floating window icon when switching back, while avoiding showing prompt alerts.
+ * @updated 2026-08-12: Added AppAwareness decision logs so foreground detection can be traced through native workflow dispatch.
  */
 package com.mistycrown.lumostime;
 
@@ -19,7 +19,7 @@ import android.view.accessibility.AccessibilityEvent;
 import java.util.List;
 
 public class AppAccessibilityService extends AccessibilityService {
-    private static final String TAG = "AppAccessibilityService";
+    private static final String TAG = "AppAwareness";
 
     private String lastPackageName = "";
 
@@ -46,6 +46,7 @@ public class AppAccessibilityService extends AccessibilityService {
         String currentPackage = event.getPackageName().toString();
         boolean isAppAwarenessOverlayShowing = FloatingWindowService.isAppAwarenessOverlayShowing();
         if (currentPackage.equals(lastPackageName)) {
+            Log.v(TAG, "Detection skipped: package unchanged=" + currentPackage);
             return;
         }
 
@@ -96,7 +97,8 @@ public class AppAccessibilityService extends AccessibilityService {
             return;
         }
 
-        Log.i(TAG, "APP SWITCHED: " + lastPackageName + " -> " + currentPackage);
+        Log.i(TAG, "Detection accepted: " + lastPackageName + " -> " + currentPackage
+                + " (label=" + appLabel + ", overlayShowing=" + isAppAwarenessOverlayShowing + ")");
         lastPackageName = currentPackage;
 
         FloatingWindowService.updateCurrentApp(currentPackage, appLabel);

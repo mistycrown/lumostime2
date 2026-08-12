@@ -3,8 +3,8 @@
  * @input SessionContext activeSessions, app-awareness runtime state, and local floating-window setting
  * @output Android floating window runtime synchronization
  * @pos Hook (System Integration)
- * @description Keeps the Android floating window aligned with the latest active session, while allowing app-awareness timers to force status syncing even when the general floating-ball toggle is off.
- * @updated 2026-07-11: Stop the Android floating-window service when the global floating-ball switch is off instead of sending an idle update that can restart the service.
+ * @description Keeps the Android floating window aligned with the latest active session, while allowing app-awareness timers to force status syncing even when the regular side-bubble switch is off.
+ * @updated 2026-08-12: Hides only the regular side bubble when disabled, preserving the shared Android service for app-awareness overlays.
  * @updated 2026-06-21: Re-sync the floating ball when app-awareness timer state changes so overtime prompts and extensions do not drop the positive timer display.
  * @updated 2026-06-21: Let app-awareness sessions keep floating-window timer/status sync alive independently from the global floating-ball switch.
  */
@@ -49,9 +49,9 @@ export const useFloatingWindowSync = () => {
 
     lastSyncedSignatureRef.current = signature;
 
-    if (action === 'stop') {
-      FocusNotification.stopFloatingWindow().catch((error) => {
-        console.error('[useFloatingWindowSync] Failed to stop disabled floating window', error);
+    if (action === 'hide') {
+      FocusNotification.setSideBubbleEnabled({ enabled: false }).catch((error) => {
+        console.error('[useFloatingWindowSync] Failed to hide disabled side bubble', error);
       });
       return;
     }

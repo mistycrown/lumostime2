@@ -4,7 +4,7 @@
  * @output Native Usage Stats and App Rule State
  * @pos Native Plugin
  * @description Capacitor plugin exposing Android foreground-app access, app association rules, and per-app ignore state to the React application.
- * @updated 2026-07-06: Added ack-based pending app-awareness reconciliation, overlay-permission guarded native workflows, and native required-text validation.
+ * @updated 2026-08-12: Added AppAwareness decision logs and a native-overlay visibility watchdog that falls back to the Web workflow after failed rendering.
  */
 package com.mistycrown.lumostime;
 
@@ -44,7 +44,7 @@ import java.util.UUID;
 
 @CapacitorPlugin(name = "AppUsage")
 public class AppUsagePlugin extends Plugin {
-    private static final String TAG = "AppUsagePlugin";
+    private static final String TAG = "AppAwareness";
     private static final String PREFS_NAME = "AppUsageRules";
     private static final String RULE_NAME_SUFFIX = "_name";
     private static final String IGNORE_SUFFIX = "_ignore";
@@ -57,6 +57,7 @@ public class AppUsagePlugin extends Plugin {
             new android.os.Handler(android.os.Looper.getMainLooper());
     private static NativeAppAwarenessRuntime nativeAppAwarenessRuntime = null;
     private static Runnable nativeAppAwarenessCooldownRunnable = null;
+    private static Runnable nativeAppAwarenessStartWatchdogRunnable = null;
     private static NativeAppAwarenessTimerRuntime nativeAppAwarenessTimerRuntime = null;
     private static Runnable nativeAppAwarenessTimerRunnable = null;
 
@@ -179,16 +180,23 @@ public class AppUsagePlugin extends Plugin {
 
     private void checkAndHandleDetectedApp(String packageName, String appLabel) {
         try {
+            Log.i(TAG, "Workflow dispatch requested: package=" + packageName + ", label=" + appLabel);
             if (nativeAppAwarenessTimerRuntime != null
                     && packageName.equals(nativeAppAwarenessTimerRuntime.packageName)) {
-                Log.d(TAG, "App-awareness timer already active for package, skip duplicate trigger: " + packageName);
+                Log.i(TAG, "Workflow skipped: native timer already active for package=" + packageName);
                 return;
             }
 
             if (nativeAppAwarenessRuntime != null
                     && packageName.equals(nativeAppAwarenessRuntime.packageName)) {
-                Log.d(TAG, "App-awareness workflow already active for package, skip duplicate trigger: " + packageName);
-                return;
+                if (FloatingWindowService.isAppAwarenessOverlayVisible()) {
+                    Log.i(TAG, "Workflow skipped: visible native runtime already active for package=" + packageName);
+                    return;
+                }
+
+                Log.w(TAG, "Stale native runtime found without a visible overlay; restarting package=" + packageName
+                        + ", state=" + FloatingWindowService.getAppAwarenessOverlayState());
+                clearNativeAppAwarenessRuntime(false);
             }
 
             if (nativeAppAwarenessRuntime != null
@@ -197,18 +205,22 @@ public class AppUsagePlugin extends Plugin {
             }
 
             if (shouldIgnoreApp(getContext(), packageName, appLabel)) {
-                Log.d(TAG, "Ignoring prompt for app: " + packageName + " / " + appLabel);
+                Log.i(TAG, "Workflow skipped: app is ignored, package=" + packageName);
                 return;
             }
 
             SharedPreferences prefs = getPrefs(getContext());
             String workflowTemplateId = prefs.getString(packageName + APP_AWARENESS_SUFFIX, null);
             if (workflowTemplateId != null && !workflowTemplateId.isEmpty()) {
+                Log.i(TAG, "Workflow binding found: package=" + packageName + ", template=" + workflowTemplateId);
                 if (!ensureFloatingWindowServiceRunning()) {
-                    Log.w(TAG, "Skipping app-awareness workflow because floating overlay service is unavailable");
+                    Log.w(TAG, "Workflow skipped: floating overlay service is unavailable");
                     return;
                 }
-                if (!startNativeAppAwarenessWorkflow(packageName, appLabel, workflowTemplateId)) {
+                if (startNativeAppAwarenessWorkflow(packageName, appLabel, workflowTemplateId)) {
+                    scheduleNativeAppAwarenessStartWatchdog(nativeAppAwarenessRuntime, workflowTemplateId);
+                } else {
+                    Log.w(TAG, "Native workflow unavailable; falling back to Web workflow, template=" + workflowTemplateId);
                     triggerAppAwarenessDetected(packageName, appLabel, workflowTemplateId);
                 }
                 return;
@@ -218,7 +230,7 @@ public class AppUsagePlugin extends Plugin {
             String activityName = prefs.getString(packageName + RULE_NAME_SUFFIX, null);
 
             if (activityId == null || activityId.isEmpty()) {
-                Log.d(TAG, "No linked activity for app: " + appLabel);
+                Log.i(TAG, "Workflow skipped: no app-awareness binding or legacy activity rule for package=" + packageName);
                 return;
             }
 
@@ -251,6 +263,7 @@ public class AppUsagePlugin extends Plugin {
             } else {
                 context.startService(serviceIntent);
             }
+            Log.d(TAG, "Floating overlay service start requested");
             return true;
         } catch (Exception e) {
             Log.e(TAG, "Failed to ensure FloatingWindowService is running", e);
@@ -268,6 +281,7 @@ public class AppUsagePlugin extends Plugin {
         payload.put("packageName", packageName);
         payload.put("appLabel", appLabel);
         payload.put("workflowTemplateId", workflowTemplateId);
+        Log.i(TAG, "Dispatching Web workflow fallback: package=" + packageName + ", template=" + workflowTemplateId);
         notifyListeners("appAwarenessDetected", payload, true);
         getBridge().triggerWindowJSEvent("appAwarenessDetected", payload.toString());
     }
@@ -631,8 +645,9 @@ public class AppUsagePlugin extends Plugin {
 
         clearNativeAppAwarenessRuntime(false);
         nativeAppAwarenessRuntime = new NativeAppAwarenessRuntime(packageName, appLabel, template);
+        Log.i(TAG, "Starting native workflow: package=" + packageName + ", template=" + workflowTemplateId);
         renderNativeAppAwarenessStep(nativeAppAwarenessRuntime);
-        return true;
+        return nativeAppAwarenessRuntime != null;
     }
 
     private org.json.JSONObject getStoredAppAwarenessTemplate(String workflowTemplateId) {
@@ -658,6 +673,7 @@ public class AppUsagePlugin extends Plugin {
 
     private void clearNativeAppAwarenessRuntime(boolean hideOverlay) {
         cancelNativeAppAwarenessCooldown();
+        cancelNativeAppAwarenessStartWatchdog();
         nativeAppAwarenessRuntime = null;
         if (hideOverlay) {
             FloatingWindowService.hideAppAwarenessOverlay();
@@ -668,6 +684,43 @@ public class AppUsagePlugin extends Plugin {
         if (nativeAppAwarenessCooldownRunnable != null) {
             APP_AWARENESS_HANDLER.removeCallbacks(nativeAppAwarenessCooldownRunnable);
             nativeAppAwarenessCooldownRunnable = null;
+        }
+    }
+
+    private void scheduleNativeAppAwarenessStartWatchdog(
+            final NativeAppAwarenessRuntime runtime,
+            final String workflowTemplateId) {
+        cancelNativeAppAwarenessStartWatchdog();
+        if (runtime == null) {
+            return;
+        }
+
+        nativeAppAwarenessStartWatchdogRunnable = new Runnable() {
+            @Override
+            public void run() {
+                nativeAppAwarenessStartWatchdogRunnable = null;
+                if (nativeAppAwarenessRuntime != runtime) {
+                    return;
+                }
+
+                String overlayState = FloatingWindowService.getAppAwarenessOverlayState();
+                if (FloatingWindowService.isAppAwarenessOverlayVisible()) {
+                    Log.i(TAG, "Native workflow visibility verified: " + overlayState);
+                    return;
+                }
+
+                Log.w(TAG, "Native workflow rendered no visible overlay; falling back to Web workflow: " + overlayState);
+                clearNativeAppAwarenessRuntime(true);
+                triggerAppAwarenessDetected(runtime.packageName, runtime.appLabel, workflowTemplateId);
+            }
+        };
+        APP_AWARENESS_HANDLER.postDelayed(nativeAppAwarenessStartWatchdogRunnable, 750L);
+    }
+
+    private void cancelNativeAppAwarenessStartWatchdog() {
+        if (nativeAppAwarenessStartWatchdogRunnable != null) {
+            APP_AWARENESS_HANDLER.removeCallbacks(nativeAppAwarenessStartWatchdogRunnable);
+            nativeAppAwarenessStartWatchdogRunnable = null;
         }
     }
 
@@ -1062,6 +1115,8 @@ public class AppUsagePlugin extends Plugin {
         }
 
         String stepType = step.optString("type", "");
+        Log.i(TAG, "Rendering native workflow step: package=" + runtime.packageName
+                + ", index=" + runtime.currentStepIndex + ", type=" + stepType);
         if ("cooldown_wait".equals(stepType)) {
             long endsAt = System.currentTimeMillis() + Math.max(1, step.optInt("durationSeconds", 30)) * 1000L;
             scheduleNativeCooldown(runtime, step, steps.length(), endsAt);

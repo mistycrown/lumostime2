@@ -3,15 +3,15 @@
  * @input Floating-window sync decision inputs
  * @output Regression coverage for disabled floating-ball startup prevention
  * @pos Test
- * @description Ensures the Android floating-window sync hook stops the native service when the global switch is off instead of sending an idle update that can restart it.
- * @updated 2026-07-11: Added disabled-switch regression coverage for floating-window sync actions.
+ * @description Ensures the Android floating-window sync hook hides the regular side bubble without stopping app-awareness overlays when the global switch is off.
+ * @updated 2026-08-12: Updated disabled-switch regression coverage for shared-service app-awareness overlays.
  */
 
 import { describe, expect, test } from 'vitest';
 import { resolveFloatingWindowSyncAction } from '../utils/floatingWindowSyncDecision';
 
 describe('resolveFloatingWindowSyncAction', () => {
-  test('stops the floating window when the global switch is off', () => {
+  test('hides the regular side bubble when the global switch is off', () => {
     expect(resolveFloatingWindowSyncAction({
       floatingWindowEnabled: false,
       shouldForceFloatingWindow: false,
@@ -19,12 +19,12 @@ describe('resolveFloatingWindowSyncAction', () => {
       lastSyncedSignature: null,
       nextSignature: 'idle:none',
     })).toEqual({
-      action: 'stop',
+      action: 'hide',
       signature: 'hidden',
     });
   });
 
-  test('does not repeat stop calls once the disabled state is hidden', () => {
+  test('does not repeat hide calls once the disabled state is hidden', () => {
     expect(resolveFloatingWindowSyncAction({
       floatingWindowEnabled: false,
       shouldForceFloatingWindow: false,

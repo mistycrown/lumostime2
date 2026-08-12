@@ -17,6 +17,7 @@
  * @updated 2026-08-09: Added principle-card widget payload, PNG/WebP background scanning, and native provider wiring regression coverage.
  * @updated 2026-08-09: Added principle-card visual refresh regression coverage for rounded clipping, no mask, serif justified body text, and unlock refresh.
  * @updated 2026-08-10: Added widget template storage regression coverage for backup and restore payload persistence.
+ * @updated 2026-08-12: Covers Android 12+ in-process scene-card collection rendering with the legacy service fallback retained for older launchers.
  */
 
 import { describe, expect, it, vi } from 'vitest';
@@ -41,6 +42,7 @@ import widgetBridgePluginSource from '../../android/app/src/main/java/com/mistyc
 import widgetPrincipleCardBitmapRendererSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetPrincipleCardBitmapRenderer.kt?raw';
 import widgetPrincipleCardProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetPrincipleCardProviderSupport.kt?raw';
 import widgetRefreshCoordinatorSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetRefreshCoordinator.kt?raw';
+import widgetSceneCardRendererSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetSceneCardRenderer.java?raw';
 import widgetSceneCardsRemoteViewsServiceSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetSceneCardsRemoteViewsService.java?raw';
 import widgetSceneProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetSceneProviderSupport.java?raw';
 import widgetStoresSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetStores.kt?raw';
@@ -749,10 +751,11 @@ describe('WidgetPrincipleCardProviderSupport', () => {
 
 describe('WidgetSceneCardsRemoteViewsService', () => {
   it('uses code-point-safe truncation for scene card titles', () => {
-    expect(widgetSceneCardsRemoteViewsServiceSource).toContain('codePointCount');
-    expect(widgetSceneCardsRemoteViewsServiceSource).toContain('offsetByCodePoints');
-    expect(widgetSceneCardsRemoteViewsServiceSource).not.toContain('substring(0, maxChars)');
-    expect(widgetSceneCardsRemoteViewsServiceSource).toContain('CARD_TITLE_ELLIPSIS = "..."');
+    expect(widgetSceneCardRendererSource).toContain('codePointCount');
+    expect(widgetSceneCardRendererSource).toContain('offsetByCodePoints');
+    expect(widgetSceneCardRendererSource).not.toContain('substring(0, maxChars)');
+    expect(widgetSceneCardRendererSource).toContain('CARD_TITLE_ELLIPSIS = "..."');
+    expect(widgetSceneCardsRemoteViewsServiceSource).toContain('WidgetSceneCardRenderer.render');
   });
 
   it('pins scene card titles to a centered single-line layout for launcher consistency', () => {
@@ -764,6 +767,15 @@ describe('WidgetSceneCardsRemoteViewsService', () => {
 });
 
 describe('WidgetSceneProviderSupport', () => {
+  it('uses in-process card collections on Android 12+ and retains the service adapter for older systems', () => {
+    expect(widgetSceneProviderSupportSource).toContain('private static void bindSceneCards');
+    expect(widgetSceneProviderSupportSource).toContain('Build.VERSION.SDK_INT >= Build.VERSION_CODES.S');
+    expect(widgetSceneProviderSupportSource).toContain('RemoteViews.RemoteCollectionItems.Builder items');
+    expect(widgetSceneProviderSupportSource).toContain('WidgetSceneCardRenderer.render');
+    expect(widgetSceneProviderSupportSource).toContain('new Intent(context, WidgetSceneCardsRemoteViewsService.class)');
+    expect(widgetSceneProviderSupportSource).toContain('Build.VERSION.SDK_INT < Build.VERSION_CODES.S');
+  });
+
   it('binds a manual refresh action, animates the refresh icon, and tracks morning unlock refreshes for the scene widget', () => {
     expect(widgetSceneProviderSupportSource).toContain('ACTION_REFRESH_SCENE_WIDGET');
     expect(widgetSceneProviderSupportSource).toContain('Intent.ACTION_USER_PRESENT');
