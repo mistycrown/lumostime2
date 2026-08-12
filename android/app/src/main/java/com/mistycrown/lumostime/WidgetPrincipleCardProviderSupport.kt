@@ -13,6 +13,7 @@ import kotlin.jvm.JvmOverloads
  * Shared rendering and tap handling for the dedicated 4x2 principle-card widget.
  * @updated 2026-08-09: Keeps one shuffle-bag per widget instance so face flips stay local while refresh advances both the card and background.
  * @updated 2026-08-09: Allows unlock-triggered refreshes to advance the same per-widget principle/background shuffle state.
+ * @updated 2026-08-12: Animates the manual refresh control while advancing the card.
  */
 object WidgetPrincipleCardProviderSupport {
     const val ACTION_TOGGLE_PRINCIPLE_CARD_FACE =
@@ -62,6 +63,11 @@ object WidgetPrincipleCardProviderSupport {
                     AppWidgetManager.INVALID_APPWIDGET_ID
                 )
                 if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                    val startedAt = System.currentTimeMillis()
+                    WidgetStores.saveRefreshAnimationState(
+                        context,
+                        WidgetRefreshAnimationState(appWidgetId, startedAt, startedAt + 420L)
+                    )
                     refreshSingleWidget(
                         context = context,
                         appWidgetId = appWidgetId,
@@ -69,6 +75,7 @@ object WidgetPrincipleCardProviderSupport {
                         advanceSelection = true,
                         forceFrontFace = true
                     )
+                    WidgetRefreshCoordinator.refreshWidgetWithRefreshFeedback(context, appWidgetId)
                 } else {
                     refreshAllWidgets(
                         context = context,
@@ -127,7 +134,7 @@ object WidgetPrincipleCardProviderSupport {
             )
             views.setImageViewResource(
                 R.id.widget_principle_card_refresh_icon,
-                R.drawable.widget_todo_pin_refresh_icon
+                WidgetRefreshIconResolver.resolve(context, appWidgetId)
             )
 
             val toggleIntent = buildTogglePendingIntent(context, appWidgetId, providerClass)
