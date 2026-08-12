@@ -16,6 +16,7 @@ import java.util.Locale;
  * Provider wiring for the compact scrollable daily-check weekly widget.
  * Updated 2026-08-10: Unified date, refresh, weekday header, and scrollable matrix styling.
  * Updated 2026-08-10: Moved the weekday header into the collection to guarantee one rendered row.
+ * Updated 2026-08-12: Animates the manual refresh icon during compact widget redraws.
  */
 public final class WidgetDailyCheckWeek4x3ProviderSupport {
     public static final String ACTION_REFRESH =
@@ -34,7 +35,7 @@ public final class WidgetDailyCheckWeek4x3ProviderSupport {
         if (ACTION_REFRESH.equals(action)) {
             int appWidgetId = intent.getIntExtra(EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID);
             if (appWidgetId > 0) {
-                QuickLogWidgetDailyCheckWeek4x3.refreshWidget(context, appWidgetId);
+                WidgetRefreshCoordinator.INSTANCE.refreshWidgetWithRefreshFeedback(context, appWidgetId);
             } else {
                 QuickLogWidgetDailyCheckWeek4x3.refreshAllAsync(context);
             }
@@ -73,6 +74,10 @@ public final class WidgetDailyCheckWeek4x3ProviderSupport {
             views.setTextViewText(
                     R.id.widget_daily_check_week_4x3_date,
                     formatWeekRange(payload)
+            );
+            views.setImageViewResource(
+                    R.id.widget_daily_check_week_4x3_refresh,
+                    WidgetRefreshIconResolver.resolve(context, appWidgetId)
             );
             views.setOnClickPendingIntent(
                     R.id.widget_daily_check_week_4x3_refresh,

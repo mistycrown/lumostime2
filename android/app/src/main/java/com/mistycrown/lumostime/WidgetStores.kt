@@ -17,6 +17,7 @@ import org.json.JSONObject
  * Updated 2026-08-06: Persists scene time-slot UI icon asset paths when reloading native payloads.
  * Updated 2026-08-09: Persists principle-card widget payloads and per-instance shuffle state.
  * Updated 2026-08-09: Persists weekly daily-check ranges and per-item colors for the 4x4 statistics widget.
+ * Updated 2026-08-12: Stores independent manual refresh animation windows for every widget instance.
  */
 object WidgetStores {
     private const val PREFS_NAME = "lumostime_widget_timer"
@@ -39,6 +40,7 @@ object WidgetStores {
     private const val KEY_DAILY_RUNTIME_VIEW_MODES = "daily_runtime_view_modes_v1"
     private const val KEY_TAP_ANIMATION = "tap_animation_v1"
     private const val KEY_TODO_PIN_REFRESH_ANIMATION = "todo_pin_refresh_animation_v1"
+    private const val KEY_REFRESH_ANIMATIONS = "refresh_animations_v1"
     private const val KEY_LAST_WIDGET_STOP_AT = "last_widget_stop_at_v1"
     private const val KEY_LOG_TAIL_STATE = "log_tail_state_v1"
     private const val KEY_LEGACY_CONFIG = "shared_slots_v1"
@@ -1117,6 +1119,37 @@ object WidgetStores {
 
     fun clearTodoPinRefreshAnimationState(context: Context) {
         prefs(context).edit().remove(KEY_TODO_PIN_REFRESH_ANIMATION).commit()
+    }
+
+    fun loadRefreshAnimationState(context: Context, appWidgetId: Int): WidgetRefreshAnimationState? {
+        if (appWidgetId <= 0) return null
+        val root = runCatching {
+            JSONObject(prefs(context).getString(KEY_REFRESH_ANIMATIONS, null) ?: "{}")
+        }.getOrElse { JSONObject() }
+        val json = root.optJSONObject(appWidgetId.toString()) ?: return null
+        val state = WidgetRefreshAnimationState(
+            appWidgetId = appWidgetId,
+            startedAt = json.optLong("startedAt", 0L),
+            expiresAt = json.optLong("expiresAt", 0L)
+        )
+        if (state.expiresAt <= System.currentTimeMillis()) {
+            root.remove(appWidgetId.toString())
+            prefs(context).edit().putString(KEY_REFRESH_ANIMATIONS, root.toString()).commit()
+            return null
+        }
+        return state
+    }
+
+    fun saveRefreshAnimationState(context: Context, state: WidgetRefreshAnimationState?) {
+        if (state == null || state.appWidgetId <= 0) return
+        val root = runCatching {
+            JSONObject(prefs(context).getString(KEY_REFRESH_ANIMATIONS, null) ?: "{}")
+        }.getOrElse { JSONObject() }
+        root.put(state.appWidgetId.toString(), JSONObject().apply {
+            put("startedAt", state.startedAt)
+            put("expiresAt", state.expiresAt)
+        })
+        prefs(context).edit().putString(KEY_REFRESH_ANIMATIONS, root.toString()).commit()
     }
 
     fun upsertDailyProgress(context: Context, progress: WidgetDailyProgress) {

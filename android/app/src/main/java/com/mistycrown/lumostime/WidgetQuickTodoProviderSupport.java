@@ -8,7 +8,10 @@ import android.net.Uri;
 import android.os.Build;
 import android.widget.RemoteViews;
 
-/** Rendering and actions for the dedicated quick-todo widget. */
+/**
+ * Rendering and actions for the dedicated quick-todo widget.
+ * Updated 2026-08-12: Animates the manual refresh control while the widget redraws.
+ */
 public final class WidgetQuickTodoProviderSupport {
     public static final String ACTION_COMPLETE = "com.mistycrown.lumostime.action.COMPLETE_QUICK_TODO";
     public static final String ACTION_REFRESH = "com.mistycrown.lumostime.action.REFRESH_QUICK_TODO";
@@ -20,7 +23,16 @@ public final class WidgetQuickTodoProviderSupport {
     public static boolean handleReceive(Context context, Intent intent) {
         if (intent == null) return false;
         String action = intent.getAction();
-        if (ACTION_REFRESH.equals(action)) return true;
+        if (ACTION_REFRESH.equals(action)) {
+            int appWidgetId = intent.getIntExtra(
+                    AppWidgetManager.EXTRA_APPWIDGET_ID,
+                    AppWidgetManager.INVALID_APPWIDGET_ID
+            );
+            if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                WidgetRefreshCoordinator.INSTANCE.refreshWidgetWithRefreshFeedback(context, appWidgetId);
+            }
+            return true;
+        }
         if (ACTION_OPEN_ADD_DIALOG.equals(action)) {
             Intent addIntent = new Intent(context, QuickTodoAddActivity.class);
             addIntent.addFlags(
@@ -83,6 +95,10 @@ public final class WidgetQuickTodoProviderSupport {
             serviceIntent.setData(Uri.parse(serviceIntent.toUri(Intent.URI_INTENT_SCHEME)));
             views.setRemoteAdapter(R.id.widget_quick_todo_list, serviceIntent);
             views.setEmptyView(R.id.widget_quick_todo_list, R.id.widget_quick_todo_empty);
+            views.setImageViewResource(
+                    R.id.widget_quick_todo_refresh_button,
+                    WidgetRefreshIconResolver.resolve(context, appWidgetId)
+            );
             views.setOnClickPendingIntent(R.id.widget_quick_todo_refresh_button, refreshIntent(context, appWidgetId, providerClass));
             views.setOnClickPendingIntent(
                     R.id.widget_quick_todo_add_button,

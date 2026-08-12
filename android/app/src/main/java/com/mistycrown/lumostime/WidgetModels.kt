@@ -540,6 +540,12 @@ data class WidgetTodoPinRefreshAnimationState(
     val expiresAt: Long
 )
 
+data class WidgetRefreshAnimationState(
+    val appWidgetId: Int,
+    val startedAt: Long,
+    val expiresAt: Long
+)
+
 data class WidgetSceneRefreshAnimationState(
     val appWidgetId: Int,
     val animationMode: String = WidgetSceneRefreshAnimationModes.REFRESH,

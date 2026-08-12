@@ -13,6 +13,7 @@ import android.widget.RemoteViews;
  * Shared provider-side rendering and tap handling for all widget sizes.
  * Updated 2026-08-11: Keeps slot actions isolated from the title-row refresh button.
  * Updated 2026-08-11: Uses the dedicated refresh icon as the only refresh click target.
+ * Updated 2026-08-12: Animates the manual refresh icon for each grid widget instance.
  */
 public final class WidgetProviderSupport {
     public static final String ACTION_TOGGLE_SLOT = "com.mistycrown.lumostime.action.TOGGLE_WIDGET_SLOT";
@@ -174,15 +175,7 @@ public final class WidgetProviderSupport {
                     AppWidgetManager.INVALID_APPWIDGET_ID
             );
             if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                refreshWidget(
-                        context,
-                        appWidgetId,
-                        providerClass,
-                        widgetSize,
-                        layoutResId,
-                        slotViewIds,
-                        slotLabelViewIds
-                );
+                WidgetRefreshCoordinator.INSTANCE.refreshWidgetWithRefreshFeedback(context, appWidgetId);
             }
             return;
         }
@@ -243,7 +236,10 @@ public final class WidgetProviderSupport {
             PendingIntent cycleTemplateIntent = buildCycleTemplatePendingIntent(context, providerClass, appWidgetId);
             PendingIntent refreshIntent = buildRefreshPendingIntent(context, providerClass, appWidgetId);
             views.setTextViewText(R.id.widget_title, snapshot.getTemplateName());
-            views.setImageViewResource(R.id.widget_refresh_icon, R.drawable.widget_todo_pin_refresh_icon);
+            views.setImageViewResource(
+                    R.id.widget_refresh_icon,
+                    WidgetRefreshIconResolver.resolve(context, appWidgetId)
+            );
             views.setOnClickPendingIntent(R.id.widget_title, cycleTemplateIntent);
             views.setOnClickPendingIntent(R.id.widget_refresh_icon, refreshIntent);
             bindSlots(context, views, snapshot, appWidgetId, providerClass, slotViewIds, slotLabelViewIds);

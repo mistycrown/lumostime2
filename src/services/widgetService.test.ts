@@ -18,6 +18,7 @@
  * @updated 2026-08-09: Added principle-card visual refresh regression coverage for rounded clipping, no mask, serif justified body text, and unlock refresh.
  * @updated 2026-08-10: Added widget template storage regression coverage for backup and restore payload persistence.
  * @updated 2026-08-12: Covers Android 12+ in-process scene-card collection rendering with the legacy service fallback retained for older launchers.
+ * @updated 2026-08-12: Covers shared manual refresh-icon animation wiring across every widget family with a refresh control.
  */
 
 import { describe, expect, it, vi } from 'vitest';
@@ -41,6 +42,10 @@ import quickLogWidgetPrincipleCard4x2Source from '../../android/app/src/main/jav
 import widgetBridgePluginSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetBridgePlugin.kt?raw';
 import widgetPrincipleCardBitmapRendererSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetPrincipleCardBitmapRenderer.kt?raw';
 import widgetPrincipleCardProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetPrincipleCardProviderSupport.kt?raw';
+import widgetProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetProviderSupport.java?raw';
+import quickTodoProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetQuickTodoProviderSupport.java?raw';
+import dailyCheckWeekProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetDailyCheckWeekProviderSupport.java?raw';
+import dailyCheckWeek4x3ProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetDailyCheckWeek4x3ProviderSupport.java?raw';
 import widgetRefreshCoordinatorSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetRefreshCoordinator.kt?raw';
 import widgetSceneCardRendererSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetSceneCardRenderer.java?raw';
 import widgetSceneCardsRemoteViewsServiceSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetSceneCardsRemoteViewsService.java?raw';
@@ -787,6 +792,17 @@ describe('WidgetSceneProviderSupport', () => {
     expect(widgetRefreshCoordinatorSource).toContain('fun refreshSceneWidgetWithFeedback(context: Context, appWidgetId: Int)');
     expect(widgetSceneLayoutSource).toContain('widget_scene_refresh_root');
     expect(widgetSceneLayoutSource).toContain('widget_scene_refresh_icon');
+  });
+
+  it('animates every other manual widget refresh control with the shared instance feedback', () => {
+    expect(widgetRefreshCoordinatorSource).toContain('fun refreshWidgetWithRefreshFeedback(context: Context, appWidgetId: Int)');
+    expect(widgetProviderSupportSource).toContain('WidgetRefreshCoordinator.INSTANCE.refreshWidgetWithRefreshFeedback(context, appWidgetId)');
+    expect(widgetProviderSupportSource).toContain('WidgetRefreshIconResolver.resolve(context, appWidgetId)');
+    expect(quickTodoProviderSupportSource).toContain('WidgetRefreshCoordinator.INSTANCE.refreshWidgetWithRefreshFeedback(context, appWidgetId)');
+    expect(quickTodoProviderSupportSource).toContain('WidgetRefreshIconResolver.resolve(context, appWidgetId)');
+    expect(dailyCheckWeekProviderSupportSource).toContain('WidgetRefreshCoordinator.INSTANCE.refreshWidgetWithRefreshFeedback(context, appWidgetId)');
+    expect(dailyCheckWeek4x3ProviderSupportSource).toContain('WidgetRefreshCoordinator.INSTANCE.refreshWidgetWithRefreshFeedback(context, appWidgetId)');
+    expect(widgetPrincipleCardProviderSupportSource).toContain('WidgetRefreshIconResolver.resolve(context, appWidgetId)');
   });
 
   it('keeps third-party app launch metadata wired through the native scene widget stack', () => {

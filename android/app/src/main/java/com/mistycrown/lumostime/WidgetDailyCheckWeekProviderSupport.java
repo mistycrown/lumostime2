@@ -14,6 +14,7 @@ import java.util.Locale;
 /**
  * Renders and refreshes the read-only daily-check weekly widget.
  * Updated 2026-08-10: Unified date, refresh, weekday header, and square-cell styling.
+ * Updated 2026-08-12: Animates the manual refresh icon during 4x4 widget redraws.
  */
 public final class WidgetDailyCheckWeekProviderSupport {
     public static final String ACTION_REFRESH =
@@ -31,7 +32,7 @@ public final class WidgetDailyCheckWeekProviderSupport {
         if (ACTION_REFRESH.equals(action)) {
             int appWidgetId = intent.getIntExtra(EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID);
             if (appWidgetId > 0) {
-                QuickLogWidgetDailyCheckWeek4x4.refreshWidget(context, appWidgetId);
+                WidgetRefreshCoordinator.INSTANCE.refreshWidgetWithRefreshFeedback(context, appWidgetId);
             } else {
                 QuickLogWidgetDailyCheckWeek4x4.refreshAllAsync(context);
             }
@@ -64,6 +65,10 @@ public final class WidgetDailyCheckWeekProviderSupport {
             views.setTextViewText(
                     R.id.widget_daily_check_week_date,
                     formatWeekRange(payload)
+            );
+            views.setImageViewResource(
+                    R.id.widget_daily_check_week_refresh_root,
+                    WidgetRefreshIconResolver.resolve(context, appWidgetId)
             );
             views.setOnClickPendingIntent(
                     R.id.widget_daily_check_week_refresh_root,

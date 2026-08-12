@@ -15,12 +15,14 @@ import android.os.Looper
  * Updated 2026-08-09: Added refresh routing for the dedicated principle-card 4x2 widget.
  * Updated 2026-08-09: Added refresh routing for the dedicated 4x4 daily-check weekly widget.
  * Updated 2026-08-10: Added the scrollable compact 4x3 daily-check weekly widget to refresh routing.
+ * Updated 2026-08-12: Added a shared instance-scoped refresh-icon animation for widget families with manual refresh buttons.
  */
 object WidgetRefreshCoordinator {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val tapFeedbackFrameDelays = longArrayOf(0L, 48L, 108L, 176L, 244L, 520L, 1000L)
     private val sceneRefreshFrameDelays = longArrayOf(0L, 70L, 140L, 210L, 280L, 350L, 420L)
     private val todoPinRefreshFrameDelays = longArrayOf(0L, 72L, 144L, 216L, 288L, 360L)
+    private const val refreshAnimationDurationMs = 420L
 
     fun refreshAllAsync(context: Context) {
         refreshAll(context)
@@ -53,6 +55,19 @@ object WidgetRefreshCoordinator {
                 { refreshWidget(appContext, appWidgetId) },
                 delayMs
             )
+        }
+    }
+
+    fun refreshWidgetWithRefreshFeedback(context: Context, appWidgetId: Int) {
+        if (appWidgetId <= 0) return
+        val appContext = context.applicationContext
+        val startedAt = System.currentTimeMillis()
+        WidgetStores.saveRefreshAnimationState(
+            appContext,
+            WidgetRefreshAnimationState(appWidgetId, startedAt, startedAt + refreshAnimationDurationMs)
+        )
+        sceneRefreshFrameDelays.forEach { delayMs ->
+            mainHandler.postDelayed({ refreshWidget(appContext, appWidgetId) }, delayMs)
         }
     }
 
