@@ -2,6 +2,8 @@
  * @file AchievementContext.tsx
  * @description Manages achievement bottle data, live snapshots, archived bottles, and reward redemption records with repository hydration and selective recent-day recomputation.
  * @updated 2026-08-11: Persists multiple independent attribute effects and continues hidden-attribute growth settlement.
+ * @updated 2026-08-12: Computes total level progress with the fixed five-attribute threshold curve.
+ * @updated 2026-08-12: Recomputes character growth for the active bottle period whenever a rule changes.
  * @updated 2026-08-11: Separates attribute deletion from hiding and rejects deletion while achievement rules still reference the attribute.
  * @updated 2026-07-11: Persists per-rule todo subtask inclusion settings for todo-category achievement rules.
  * @updated 2026-07-11: Added full achievement recomputation that clears archived bottles, restores historical ledgers, and rebuilds all daily snapshots.
@@ -47,6 +49,7 @@ import {
   getAchievementActiveStartDate,
   getAchievementAttributeReferencingRules,
   getAchievementLevelProgress,
+  getAchievementTotalLevelProgress,
   getAchievementRecentGrowthStartDate,
   getAchievementSealBlockedReason,
   getAchievementSealPreview,
@@ -83,7 +86,7 @@ interface CreateAchievementRuleInput {
   filterExpression?: string;
   unitAmount: number;
   deltaPerUnit: number;
-  attributeEffects?: Array<{ attributeId: string; expPerUnit: number }>;
+  attributeEffects?: Array<{ attributeId: string; expPerUnit: number; direction?: 'gain' | 'loss' }>;
   note?: string;
 }
 
@@ -382,7 +385,8 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     baseSnapshots: AchievementGrowthDailySnapshot[],
     rulesSource: AchievementRule[],
     attributesSource: AchievementAttribute[],
-    forceRecomputeAllDates = false
+    forceRecomputeAllDates = false,
+    recomputeStartDate = startDate
   ): AchievementGrowthDailySnapshot[] => {
     const today = getLocalDateStr(new Date());
     const recentStartDate = getAchievementRecentGrowthStartDate();
@@ -394,7 +398,8 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     const nextSnapshots = dates.map((date) => {
       const existing = snapshotMap.get(date);
       const shouldRecompute = forceRecomputeAllDates
-        || !existing
+        ? date >= recomputeStartDate
+        : !existing
         || date >= recentStartDate;
 
       if (!shouldRecompute && existing) {
@@ -473,7 +478,8 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         previous,
         rulesSource,
         attributesSource,
-        forceRecomputeGrowthAllDates
+        forceRecomputeGrowthAllDates,
+        startDate
       )
     ));
   };
@@ -683,7 +689,8 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       roundingMode: 'floor',
       attributeEffects: input.attributeEffects?.map((effect) => ({
         attributeId: effect.attributeId.trim(),
-        expPerUnit: Math.max(1, Math.floor(effect.expPerUnit))
+        expPerUnit: Math.max(1, Math.floor(effect.expPerUnit)),
+        direction: effect.direction === 'loss' ? 'loss' : 'gain'
       })).filter((effect) => effect.attributeId) || undefined,
       note: input.note?.trim() || undefined,
       createdAt: now,
@@ -692,7 +699,11 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
 
     const nextRules = [...rules, nextRule];
     setRules(nextRules);
-    syncActiveSnapshots({ forceRecomputeAllDates: true, rulesSource: nextRules });
+    syncActiveSnapshots({
+      forceRecomputeAllDates: true,
+      forceRecomputeGrowthAllDates: true,
+      rulesSource: nextRules
+    });
   };
 
   const updateRule = (rule: AchievementRule) => {
@@ -709,7 +720,8 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
           deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(rule.deltaPerUnit || 0.1)),
           attributeEffects: rule.attributeEffects?.map((effect) => ({
             attributeId: effect.attributeId.trim(),
-            expPerUnit: Math.max(1, Math.floor(effect.expPerUnit))
+            expPerUnit: Math.max(1, Math.floor(effect.expPerUnit)),
+            direction: effect.direction === 'loss' ? 'loss' : 'gain'
           })).filter((effect) => effect.attributeId) || undefined,
           updatedAt: Date.now()
         }
@@ -717,13 +729,21 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     ));
 
     setRules(nextRules);
-    syncActiveSnapshots({ forceRecomputeAllDates: true, rulesSource: nextRules });
+    syncActiveSnapshots({
+      forceRecomputeAllDates: true,
+      forceRecomputeGrowthAllDates: true,
+      rulesSource: nextRules
+    });
   };
 
   const deleteRule = (ruleId: string) => {
     const nextRules = rules.filter((item) => item.id !== ruleId);
     setRules(nextRules);
-    syncActiveSnapshots({ forceRecomputeAllDates: true, rulesSource: nextRules });
+    syncActiveSnapshots({
+      forceRecomputeAllDates: true,
+      forceRecomputeGrowthAllDates: true,
+      rulesSource: nextRules
+    });
   };
 
   const createAttribute = (input: CreateAchievementAttributeInput) => {
@@ -1090,7 +1110,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
   const attributeLevels = Object.fromEntries(
     attributes.map((attribute) => [attribute.id, getAchievementLevelProgress(attributeExperience[attribute.id] || 0)])
   ) as Record<string, AchievementLevelProgress>;
-  const totalLevelProgress = getAchievementLevelProgress(totalExperience);
+  const totalLevelProgress = getAchievementTotalLevelProgress(totalExperience);
 
   useEffect(() => {
     if (!isReady || !canPersist) {

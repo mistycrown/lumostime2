@@ -4,6 +4,7 @@
  * @output Regression coverage for character growth experience and level calculations
  * @pos Test (Achievement)
  * @description Covers proportional fixed-rule attribute experience, deleted-attribute aggregation, and the cumulative level curve.
+ * @updated 2026-08-12: Added negative attribute experience and zero-clamped visual level regression coverage.
  * @updated 2026-08-11: Added proportional daily experience, multi-attribute effects, and attribute deletion reference regression coverage.
  */
 
@@ -15,7 +16,9 @@ import {
   computeAchievementGrowthDailySnapshot,
   getAchievementAttributeReferencingRules,
   getAchievementExperienceRequiredForLevel,
-  getAchievementLevelProgress
+  getAchievementLevelProgress,
+  getAchievementTotalExperienceRequiredForLevel,
+  getAchievementTotalLevelProgress
 } from './achievementUtils';
 
 const attribute: AchievementAttribute = {
@@ -163,6 +166,27 @@ describe('achievement character growth', () => {
     expect(calculateAchievementTotalExperience([snapshot], [attribute, hiddenAttribute])).toBe(35);
   });
 
+  it('keeps negative attribute experience for future recovery while clamping the displayed level to zero', () => {
+    const lossRule: AchievementRule = {
+      ...rule,
+      attributeEffects: [{ attributeId: attribute.id, expPerUnit: 10, direction: 'loss' }],
+      attributeEffect: undefined
+    };
+    const snapshot = computeAchievementGrowthDailySnapshot(
+      '2026-08-09',
+      [log],
+      [],
+      [],
+      [lossRule],
+      [attribute]
+    );
+
+    expect(snapshot.attributeChanges[0]).toMatchObject({ deltaExp: -25 });
+    expect(calculateAchievementAttributeExperience([snapshot], [attribute])).toEqual({ [attribute.id]: -25 });
+    expect(calculateAchievementTotalExperience([snapshot], [attribute])).toBe(-25);
+    expect(getAchievementLevelProgress(-25)).toMatchObject({ level: 1, currentExperience: 0, progress: 0 });
+  });
+
   it('treats deleted attributes as unowned historical experience', () => {
     const snapshot = computeAchievementGrowthDailySnapshot(
       '2026-08-09',
@@ -199,5 +223,12 @@ describe('achievement character growth', () => {
       currentExperience: 50,
       nextLevelExperience: 600
     });
+  });
+
+  it('uses a fixed five-attribute threshold for the total character level', () => {
+    expect(getAchievementTotalExperienceRequiredForLevel(2)).toBe(500);
+    expect(getAchievementTotalExperienceRequiredForLevel(3)).toBe(1500);
+    expect(getAchievementTotalLevelProgress(499)).toMatchObject({ level: 1, nextLevelExperience: 500 });
+    expect(getAchievementTotalLevelProgress(500)).toMatchObject({ level: 2, currentExperience: 0, nextLevelExperience: 1500 });
   });
 });

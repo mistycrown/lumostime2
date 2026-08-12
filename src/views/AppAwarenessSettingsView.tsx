@@ -10,6 +10,7 @@
  * @updated 2026-06-21: Rebuilt the settings UX with UTF-8-safe copy, top-level permission gating, cleaner toggle controls, and refined workflow node editors.
  * @updated 2026-07-21: Added dark-mode semantic states for notices, toggles, and selected workflow activities.
  * @updated 2026-07-22: Preserve native line breaks while editing single-choice option lists.
+ * @updated 2026-08-12: Unified software and Android hardware back handling so nested workflow pages return to their immediate parent before Settings.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -52,6 +53,7 @@ import AppUsage from '../plugins/AppUsagePlugin';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
 import { CustomSelect } from '../components/CustomSelect';
 import { getActiveActivities } from '../utils/archiveUtils';
+import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
 
 interface Props {
   onBack: () => void;
@@ -387,6 +389,40 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
     setMode('templates');
   };
 
+  const handleInternalBack = (): boolean => {
+    if (selectedBindingApp) {
+      setSelectedBindingApp(null);
+      return true;
+    }
+
+    if (mode === 'template-editor') {
+      handleBackFromTemplateEditor();
+      return true;
+    }
+
+    if (mode === 'templates') {
+      setEditingTemplateId(null);
+      setMode('home');
+      return true;
+    }
+
+    if (mode === 'bindings') {
+      setSearchQuery('');
+      setMode('home');
+      return true;
+    }
+
+    return false;
+  };
+
+  useEffect(() => {
+    if (mode === 'home' && !selectedBindingApp) {
+      return;
+    }
+
+    return registerHardwareBackHandler(handleInternalBack);
+  }, [mode, selectedBindingApp, handleInternalBack]);
+
   const syncBindingsSnapshot = async (bindings: AppAwarenessAppBinding[]) => {
     if (Capacitor.getPlatform() !== 'android' || typeof AppUsage.syncAppAwarenessBindings !== 'function') {
       return;
@@ -611,10 +647,7 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
     <>
       {renderHeader(
         '工作流模板',
-        () => {
-          setEditingTemplateId(null);
-          setMode('home');
-        },
+        handleInternalBack,
         <button type="button" onClick={handleCreateTemplate} className="p-2 text-stone-500 hover:text-stone-700">
           <Plus size={18} />
         </button>
@@ -704,7 +737,7 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
       <>
         {renderHeader(
           '编辑工作流',
-          handleBackFromTemplateEditor
+          handleInternalBack
         )}
         <div className="flex-1 overflow-y-auto p-4 space-y-5">
           <div className="space-y-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
@@ -1106,11 +1139,7 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
     <>
       {renderHeader(
         '启动应用设置',
-        () => {
-          setSelectedBindingApp(null);
-          setSearchQuery('');
-          setMode('home');
-        }
+        handleInternalBack
       )}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <div className="relative">
@@ -1177,7 +1206,7 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
         <div className="fixed inset-0 z-[70] flex flex-col bg-[#fdfbf7]">
           {renderHeader(
             selectedBindingApp.label,
-            () => setSelectedBindingApp(null),
+            handleInternalBack,
             <button type="button" onClick={() => setSelectedBindingApp(null)} className="p-2 text-stone-500 hover:text-stone-700">
               <X size={18} />
             </button>

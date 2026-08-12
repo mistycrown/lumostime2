@@ -35,7 +35,7 @@ interface GoalEditorProps {
 const metricOptions: { value: Goal['metric']; label: string; hint: string }[] = [
     { value: 'duration_raw', label: '投入时长', hint: '累计投入时间（小时）' },
     { value: 'task_count', label: '完成任务', hint: '完成待办数量（个）' },
-    { value: 'duration_weighted', label: '有效时长', hint: '加权有效时长（小时）' },
+    { value: 'duration_weighted', label: '有效时长', hint: '专注度加权有效时长（小时）' },
     { value: 'frequency_days', label: '活跃天数', hint: '有活动的天数（天）' },
     { value: 'duration_limit', label: '时长上限', hint: '不超过时长（小时）' },
     { value: 'record_count', label: '记录条数', hint: '限定标签中的记录有多少条' }
