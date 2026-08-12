@@ -1,6 +1,7 @@
 ﻿/**
  * @file AchievementContext.tsx
  * @description Manages achievement bottle data, live snapshots, archived bottles, and reward redemption records with repository hydration and selective recent-day recomputation.
+ * @updated 2026-08-11: Persists multiple independent attribute effects and continues hidden-attribute growth settlement.
  * @updated 2026-08-11: Separates attribute deletion from hiding and rejects deletion while achievement rules still reference the attribute.
  * @updated 2026-07-11: Persists per-rule todo subtask inclusion settings for todo-category achievement rules.
  * @updated 2026-07-11: Added full achievement recomputation that clears archived bottles, restores historical ledgers, and rebuilds all daily snapshots.
@@ -82,10 +83,7 @@ interface CreateAchievementRuleInput {
   filterExpression?: string;
   unitAmount: number;
   deltaPerUnit: number;
-  attributeEffect?: {
-    attributeId: string;
-    expPerUnit: number;
-  };
+  attributeEffects?: Array<{ attributeId: string; expPerUnit: number }>;
   note?: string;
 }
 
@@ -421,13 +419,9 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       );
       if (existing) {
         computed.id = existing.id;
-        const activeAttributeIds = new Set(
-          attributesSource
-            .filter((attribute) => attribute.enabled !== false)
-            .map((attribute) => attribute.id)
-        );
+        const knownAttributeIds = new Set(attributesSource.map((attribute) => attribute.id));
         const preservedChanges = existing.attributeChanges.filter((change) => (
-          !activeAttributeIds.has(change.attributeId)
+          !knownAttributeIds.has(change.attributeId)
         ));
         if (preservedChanges.length > 0) {
           computed.attributeChanges = [...preservedChanges, ...computed.attributeChanges];
@@ -579,13 +573,9 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
 
       if (existingSnapshot) {
         recomputedSnapshot.id = existingSnapshot.id;
-        const activeAttributeIds = new Set(
-          attributes
-            .filter((attribute) => attribute.enabled !== false)
-            .map((attribute) => attribute.id)
-        );
+        const knownAttributeIds = new Set(attributes.map((attribute) => attribute.id));
         const preservedChanges = existingSnapshot.attributeChanges.filter((change) => (
-          !activeAttributeIds.has(change.attributeId)
+          !knownAttributeIds.has(change.attributeId)
         ));
         if (preservedChanges.length > 0) {
           recomputedSnapshot.attributeChanges = [...preservedChanges, ...recomputedSnapshot.attributeChanges];
@@ -691,12 +681,10 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
       unitAmount: Math.max(1, Math.floor(input.unitAmount)),
       deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(input.deltaPerUnit || 0.1)),
       roundingMode: 'floor',
-      attributeEffect: input.attributeEffect
-        ? {
-          attributeId: input.attributeEffect.attributeId.trim(),
-          expPerUnit: Math.max(1, Math.floor(input.attributeEffect.expPerUnit))
-        }
-        : undefined,
+      attributeEffects: input.attributeEffects?.map((effect) => ({
+        attributeId: effect.attributeId.trim(),
+        expPerUnit: Math.max(1, Math.floor(effect.expPerUnit))
+      })).filter((effect) => effect.attributeId) || undefined,
       note: input.note?.trim() || undefined,
       createdAt: now,
       updatedAt: now
@@ -719,12 +707,10 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
           filterExpression: rule.filterExpression?.trim() || undefined,
           unitAmount: Math.max(1, Math.floor(rule.unitAmount)),
           deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(rule.deltaPerUnit || 0.1)),
-          attributeEffect: rule.attributeEffect
-            ? {
-              attributeId: rule.attributeEffect.attributeId.trim(),
-              expPerUnit: Math.max(1, Math.floor(rule.attributeEffect.expPerUnit))
-            }
-            : undefined,
+          attributeEffects: rule.attributeEffects?.map((effect) => ({
+            attributeId: effect.attributeId.trim(),
+            expPerUnit: Math.max(1, Math.floor(effect.expPerUnit))
+          })).filter((effect) => effect.attributeId) || undefined,
           updatedAt: Date.now()
         }
         : item

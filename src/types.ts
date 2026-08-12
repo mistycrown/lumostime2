@@ -471,6 +471,9 @@ export interface AchievementRule {
   unitAmount: number;
   deltaPerUnit: number;
   roundingMode: 'floor';
+  /** Current multi-attribute format. */
+  attributeEffects?: AchievementRuleAttributeEffect[];
+  /** Legacy single-attribute format retained for backup compatibility. */
   attributeEffect?: AchievementRuleAttributeEffect;
   note?: string;
   createdAt: number;

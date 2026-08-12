@@ -7,6 +7,7 @@
  *
  * @updated 2026-07-11: Added full-ledger redemption rebuild helpers for achievement all-data recomputation.
  * @updated 2026-08-11: Calculates daily attribute experience proportionally and excludes deleted attributes from aggregate experience.
+ * @updated 2026-08-11: Normalizes legacy single-attribute rules into independent multi-attribute effects.
  * @updated 2026-07-11: Added todo-category subtask inclusion handling so achievement rules can count parent tasks only unless explicitly configured otherwise.
  * @updated 2026-06-30: Added shared seal validation so bottles cannot be sealed while the current active balance is negative.
  * @updated 2026-07-07: Added explicit current/history account summaries and made seal previews use the current-bottle account balance.
@@ -154,7 +155,32 @@ export const getAchievementRenderableStarCount = (value: number): number => {
 
 export const normalizeAchievementRule = (
   rule: AchievementRule | (AchievementRule & { unitMinutes?: number; targetType?: AchievementRule['targetType'] })
-): AchievementRule => ({
+): AchievementRule => {
+  const legacyEffects = rule.attributeEffect
+    && typeof rule.attributeEffect.attributeId === 'string'
+    && rule.attributeEffect.attributeId.trim()
+    && Number.isFinite(rule.attributeEffect.expPerUnit)
+    && rule.attributeEffect.expPerUnit > 0
+    ? [{
+      attributeId: rule.attributeEffect.attributeId.trim(),
+      expPerUnit: Math.max(1, Math.floor(rule.attributeEffect.expPerUnit))
+    }]
+    : [];
+  const normalizedEffects = (Array.isArray(rule.attributeEffects) ? rule.attributeEffects : legacyEffects)
+    .filter((effect) => (
+      effect
+      && typeof effect.attributeId === 'string'
+      && effect.attributeId.trim()
+      && Number.isFinite(effect.expPerUnit)
+      && effect.expPerUnit > 0
+    ))
+    .map((effect) => ({
+      attributeId: effect.attributeId.trim(),
+      expPerUnit: Math.max(1, Math.floor(effect.expPerUnit))
+    }))
+    .filter((effect, index, effects) => effects.findIndex((item) => item.attributeId === effect.attributeId) === index);
+
+  return {
   ...rule,
   targetType: rule.targetType ?? 'activity',
   useCheckStreakMultiplier: rule.useCheckStreakMultiplier === true,
@@ -165,17 +191,10 @@ export const normalizeAchievementRule = (
   unitAmount: normalizeUnitAmount(rule),
   deltaPerUnit: Math.max(0.1, normalizeAchievementStarValue(rule.deltaPerUnit || 1)),
   targetIds: Array.isArray(rule.targetIds) ? rule.targetIds : [],
-  attributeEffect: rule.attributeEffect
-    && typeof rule.attributeEffect.attributeId === 'string'
-    && rule.attributeEffect.attributeId.trim()
-    && Number.isFinite(rule.attributeEffect.expPerUnit)
-    && rule.attributeEffect.expPerUnit > 0
-    ? {
-      attributeId: rule.attributeEffect.attributeId.trim(),
-      expPerUnit: Math.max(1, Math.floor(rule.attributeEffect.expPerUnit))
-    }
-    : undefined
-});
+  attributeEffects: normalizedEffects.length > 0 ? normalizedEffects : undefined,
+  attributeEffect: undefined
+  };
+};
 
 export const normalizeAchievementAttribute = (
   attribute: AchievementAttribute,
@@ -417,7 +436,7 @@ export const getAchievementAttributeReferencingRules = (
   rules: AchievementRule[],
   attributeId: string
 ): AchievementRule[] => (
-  rules.filter((rule) => rule.attributeEffect?.attributeId === attributeId)
+  rules.filter((rule) => normalizeAchievementRule(rule).attributeEffects?.some((effect) => effect.attributeId === attributeId))
 );
 
 export const sortAchievementGrowthSnapshots = (
@@ -437,10 +456,8 @@ export const computeAchievementGrowthDailySnapshot = (
   attributes: AchievementAttribute[],
   filterContext?: AchievementComputationContext
 ): AchievementGrowthDailySnapshot => {
-  const activeAttributeMap = new Map(
-    attributes
-      .filter((attribute) => attribute.enabled !== false)
-      .map((attribute) => [attribute.id, normalizeAchievementAttribute(attribute)])
+  const attributeMap = new Map(
+    attributes.map((attribute) => [attribute.id, normalizeAchievementAttribute(attribute)])
   );
   const starSnapshot = computeAchievementDailySnapshot(
     date,
@@ -457,50 +474,50 @@ export const computeAchievementGrowthDailySnapshot = (
 
   rules
     .map(normalizeAchievementRule)
-    .filter((rule) => Boolean(rule.attributeEffect))
+    .filter((rule) => (rule.attributeEffects || []).length > 0)
     .forEach((rule) => {
-      const attributeEffect = rule.attributeEffect;
-      if (!attributeEffect) {
-        return;
-      }
-
-      const attribute = activeAttributeMap.get(attributeEffect.attributeId);
       const matchedRule = breakdownByRuleId.get(rule.id);
-      if (!attribute || !matchedRule) {
+      if (!matchedRule) {
         return;
       }
 
-      const appliedUnits = Math.max(0, matchedRule.matchedValue) / Math.max(1, rule.unitAmount);
-      const deltaExp = Math.floor(appliedUnits * attributeEffect.expPerUnit);
-      if (deltaExp <= 0) {
-        return;
-      }
+      (rule.attributeEffects || []).forEach((attributeEffect) => {
+        const attribute = attributeMap.get(attributeEffect.attributeId);
+        if (!attribute) {
+          return;
+        }
+        const appliedUnits = Math.max(0, matchedRule.matchedValue) / Math.max(1, rule.unitAmount);
+        const deltaExp = Math.floor(appliedUnits * attributeEffect.expPerUnit);
+        if (deltaExp <= 0) {
+          return;
+        }
 
-      const ruleBreakdown: AchievementGrowthRuleBreakdown = {
-        ruleId: rule.id,
-        ruleName: rule.name,
-        targetType: rule.targetType,
-        attributeId: attribute.id,
-        attributeName: attribute.name,
-        matchedValue: matchedRule.matchedValue,
-        unitAmount: rule.unitAmount,
-        appliedUnits,
-        expPerUnit: attributeEffect.expPerUnit,
-        deltaExp,
-        targetIds: [...rule.targetIds]
-      };
-      const previous = changesByAttributeId.get(attribute.id);
-      if (previous) {
-        previous.deltaExp += deltaExp;
-        previous.ruleBreakdown.push(ruleBreakdown);
-        return;
-      }
+        const ruleBreakdown: AchievementGrowthRuleBreakdown = {
+          ruleId: rule.id,
+          ruleName: rule.name,
+          targetType: rule.targetType,
+          attributeId: attribute.id,
+          attributeName: attribute.name,
+          matchedValue: matchedRule.matchedValue,
+          unitAmount: rule.unitAmount,
+          appliedUnits,
+          expPerUnit: attributeEffect.expPerUnit,
+          deltaExp,
+          targetIds: [...rule.targetIds]
+        };
+        const previous = changesByAttributeId.get(attribute.id);
+        if (previous) {
+          previous.deltaExp += deltaExp;
+          previous.ruleBreakdown.push(ruleBreakdown);
+          return;
+        }
 
-      changesByAttributeId.set(attribute.id, {
-        attributeId: attribute.id,
-        attributeName: attribute.name,
-        deltaExp,
-        ruleBreakdown: [ruleBreakdown]
+        changesByAttributeId.set(attribute.id, {
+          attributeId: attribute.id,
+          attributeName: attribute.name,
+          deltaExp,
+          ruleBreakdown: [ruleBreakdown]
+        });
       });
     });
 
