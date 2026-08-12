@@ -4,6 +4,7 @@
  * @output Reusable formatter/debug/helper functions for AIBackfillChatModal
  * @pos Component Support (AI Integration)
  * @description Moves pure formatting, debug rendering, and retry/error helpers out of AIBackfillChatModal so the modal can focus on state transitions and user actions.
+ * @updated 2026-08-11: Added a debug-mode fallback section for AI exceptions that do not carry a captured request exchange, so Dream and other failed turns retain an inspectable error record.
  * @updated 2026-08-10: Shows the concrete AI request transport in request metadata so Android native and Web Fetch failures can be distinguished.
  * @updated 2026-05-16: Preserved pre-section prompt text in debug rendering so unlabeled instructions remain visible above structured prompt sections.
  * @updated 2026-05-16: Limited persona custom prompt block serialization to enabled blocks only.
@@ -689,15 +690,39 @@ export const getErrorDebugSections = (
   label: string,
   enabled: boolean
 ): AIChatDebugSection[] | undefined => {
-  if (!enabled || typeof error !== 'object' || error === null || !('debug' in error)) {
+  if (!enabled) {
     return undefined;
   }
 
-  const exchange = (error as { debug?: AIDebugExchange }).debug;
+  const exchange = (
+    typeof error === 'object'
+    && error !== null
+    && 'debug' in error
+  )
+    ? (error as { debug?: AIDebugExchange }).debug
+    : undefined;
   return exchange
     ? [{
       label,
       exchange
     }]
-    : undefined;
+    : [{
+      label,
+      blocks: [
+        {
+          label: '异常信息',
+          content: error instanceof Error
+            ? [
+              `名称：${error.name || 'Error'}`,
+              `消息：${error.message || '无错误消息'}`,
+              ...(error.stack ? [`堆栈：\n${error.stack}`] : [])
+            ].join('\n\n')
+            : String(error || '未知错误')
+        },
+        {
+          label: '请求快照状态',
+          content: '该异常未携带 AI 服务层捕获的请求/响应快照。请结合异常信息检查 Dream 工作流或上游服务日志。'
+        }
+      ]
+    }];
 };

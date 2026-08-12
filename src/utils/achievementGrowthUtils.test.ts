@@ -4,7 +4,7 @@
  * @output Regression coverage for character growth experience and level calculations
  * @pos Test (Achievement)
  * @description Covers proportional fixed-rule attribute experience, deleted-attribute aggregation, and the cumulative level curve.
- * @updated 2026-08-11: Added proportional daily experience and attribute deletion reference regression coverage.
+ * @updated 2026-08-11: Added proportional daily experience, multi-attribute effects, and attribute deletion reference regression coverage.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -28,6 +28,14 @@ const attribute: AchievementAttribute = {
   sortOrder: 0,
   createdAt: 0,
   updatedAt: 0
+};
+
+const hiddenAttribute: AchievementAttribute = {
+  ...attribute,
+  id: 'attribute-willpower',
+  name: '意志',
+  enabled: false,
+  sortOrder: 1
 };
 
 const rule: AchievementRule = {
@@ -126,6 +134,33 @@ describe('achievement character growth', () => {
       appliedUnits: 0.5,
       deltaExp: 5
     });
+  });
+
+  it('applies independent experience values to multiple attributes, including hidden attributes', () => {
+    const multiAttributeRule: AchievementRule = {
+      ...rule,
+      attributeEffects: [
+        { attributeId: attribute.id, expPerUnit: 10 },
+        { attributeId: hiddenAttribute.id, expPerUnit: 4 }
+      ],
+      attributeEffect: undefined
+    };
+
+    const snapshot = computeAchievementGrowthDailySnapshot(
+      '2026-08-09',
+      [log],
+      [],
+      [],
+      [multiAttributeRule],
+      [attribute, hiddenAttribute]
+    );
+
+    expect(snapshot.attributeChanges).toHaveLength(2);
+    expect(snapshot.attributeChanges).toEqual(expect.arrayContaining([
+      expect.objectContaining({ attributeId: attribute.id, deltaExp: 25 }),
+      expect.objectContaining({ attributeId: hiddenAttribute.id, deltaExp: 10 })
+    ]));
+    expect(calculateAchievementTotalExperience([snapshot], [attribute, hiddenAttribute])).toBe(35);
   });
 
   it('treats deleted attributes as unowned historical experience', () => {

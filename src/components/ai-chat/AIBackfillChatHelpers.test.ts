@@ -4,11 +4,12 @@
  * @output Regression coverage for persona prompt assembly
  * @pos Component Support Tests (AI Integration)
  * @description Verifies that persona prompt serialization keeps the base persona text and appends custom prompt blocks in order.
+ * @updated 2026-08-11: Added debug fallback coverage for failures that bypass the AI service exchange capture.
  * @updated 2026-05-16: Added debug-block coverage so prompt text before the first labeled section remains visible in the debug viewer.
  * @updated 2026-05-16: Added coverage for labeled custom prompt blocks and fallback block labels.
  */
 import { describe, expect, it } from 'vitest';
-import { buildDebugBlocks, buildPersonaPrompt } from './AIBackfillChatHelpers';
+import { buildDebugBlocks, buildPersonaPrompt, getErrorDebugSections } from './AIBackfillChatHelpers';
 
 describe('buildPersonaPrompt', () => {
   it('appends labeled custom prompt blocks after the base persona prompt', () => {
@@ -119,5 +120,35 @@ describe('buildDebugBlocks', () => {
         content: expect.stringContaining('date: 2026-05-16')
       })
     ]));
+  });
+});
+
+describe('getErrorDebugSections', () => {
+  it('keeps an inspectable fallback when debug mode is enabled without an AI exchange', () => {
+    const sections = getErrorDebugSections(
+      new ReferenceError('assistantReply is not defined'),
+      'Dream 整理',
+      true
+    );
+
+    expect(sections).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        label: 'Dream 整理',
+        blocks: expect.arrayContaining([
+          expect.objectContaining({
+            label: '异常信息',
+            content: expect.stringContaining('assistantReply is not defined')
+          }),
+          expect.objectContaining({
+            label: '请求快照状态',
+            content: expect.stringContaining('未携带 AI 服务层捕获')
+          })
+        ])
+      })
+    ]));
+  });
+
+  it('does not create a fallback while debug mode is disabled', () => {
+    expect(getErrorDebugSections(new Error('failed'), 'Dream 整理', false)).toBeUndefined();
   });
 });
