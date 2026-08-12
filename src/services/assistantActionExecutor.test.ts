@@ -233,6 +233,51 @@ describe('assistantActionExecutor applyPlannedLogToolCalls', () => {
   });
 });
 
+describe('assistantActionExecutor applyTodoAndPlannedLogToolCalls', () => {
+  beforeEach(() => {
+    installLocalStorageMock();
+  });
+
+  it('creates a todo then resolves its one-turn client reference when creating a Plan block', () => {
+    const result = assistantActionExecutor.applyTodoAndPlannedLogToolCalls(buildBaseContext(), [
+      {
+        toolName: 'create_todo',
+        args: {
+          title: 'Hospital visit',
+          categoryId: 'project-general',
+          kind: 'project',
+          linkedCategoryId: 'study',
+          linkedActivityId: 'writing',
+          clientRef: 'hospital-visit'
+        }
+      },
+      {
+        toolName: 'create_planned_log',
+        args: {
+          todoRef: 'hospital-visit',
+          date: '2026-10-10',
+          startTime: '07:30',
+          endTime: '09:30'
+        }
+      }
+    ]);
+
+    expect(result.actions.map((action) => [action.kind, action.status])).toEqual([
+      ['create_todo', 'applied'],
+      ['create_planned_log', 'applied']
+    ]);
+    expect(result.nextTodos).toHaveLength(1);
+    expect(result.nextLogs).toHaveLength(1);
+    expect(result.nextLogs[0]).toMatchObject({
+      linkedTodoId: result.nextTodos[0].id,
+      isPlanned: true,
+      categoryId: '__timeline_plan__'
+    });
+    expect(new Date(result.nextLogs[0].startTime).getHours()).toBe(7);
+    expect(new Date(result.nextLogs[0].endTime).getHours()).toBe(9);
+  });
+});
+
 describe('assistantActionExecutor principle-library tool calls', () => {
   beforeEach(() => {
     installLocalStorageMock();

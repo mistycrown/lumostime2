@@ -9,6 +9,7 @@
  * @updated 2026-04-15: Switched floating-window launches to foreground-service startup on Android 8+.
  * @updated 2026-07-11: Prevent idle updateFloatingWindow calls from starting the floating-window service when it is not already running.
  * @updated 2026-06-13: Prefer direct memory state update in updateFloatingWindow to avoid Android 12+ background startForegroundService limitations.
+ * @updated 2026-08-12: Separates the regular side-bubble visibility setting from the shared service used by app-awareness overlays.
   */
 package com.mistycrown.lumostime;
 
@@ -230,6 +231,13 @@ public class FocusNotificationPlugin extends Plugin {
         Intent intent = new Intent(context, FloatingWindowService.class);
         context.stopService(intent);
         Log.d(TAG, "✅ Stopped floating window service");
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void setSideBubbleEnabled(PluginCall call) {
+        boolean enabled = call.getBoolean("enabled", false);
+        FloatingWindowService.setSideBubbleEnabled(getContext(), enabled);
         call.resolve();
     }
 

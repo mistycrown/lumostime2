@@ -4851,21 +4851,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
     return result.actions;
   };
-  const applyPlannedTimelineLogToolCalls = (toolCalls: AIPlannedLogToolCall[]): AppliedChatAction[] => {
-    const result = assistantActionExecutor.applyPlannedLogToolCalls(buildAssistantActionContext(), toolCalls);
-    if (result.actions.some((action) => action.kind === 'create_planned_log' && action.status === 'applied')) {
-      setLogs(result.nextLogs);
-      setTodos(result.nextTodos);
-    }
-    return result.actions;
-  };
-  const applyPlannedTodoToolCalls = (toolCalls: AITodoToolCall[], sourceText: string): AppliedChatAction[] => {
-    const result = assistantActionExecutor.applyTodoToolCalls(buildAssistantActionContext(), toolCalls, sourceText);
-    if (result.actions.some((action) => action.kind === 'create_todo' && action.status === 'applied')) {
-      setTodos(result.nextTodos);
-    }
-    return result.actions;
-  };
   const applyPlannedTodoUpdateToolCalls = (toolCalls: AITodoUpdateToolCall[]): AppliedChatAction[] => {
     const result = assistantActionExecutor.applyTodoUpdateToolCalls(buildAssistantActionContext(), toolCalls);
     if (result.actions.some((action) => action.kind === 'update_todo' && action.status === 'applied')) {
@@ -4886,6 +4871,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const applyPlannedEditLogToolCalls = (toolCalls: AIEditLogToolCall[]): AppliedChatAction[] => {
     const result = assistantActionExecutor.applyEditLogToolCalls(buildAssistantActionContext(), toolCalls);
     if (result.actions.some((action) => action.kind === 'edit_log' && action.status === 'applied')) {
+      setLogs(result.nextLogs);
+      setTodos(result.nextTodos);
+    }
+    return result.actions;
+  };
+  const applyTodoAndPlannedTimelineLogToolCalls = (
+    toolCalls: Array<AITodoToolCall | AIPlannedLogToolCall>,
+    sourceText: string
+  ): AppliedChatAction[] => {
+    const result = assistantActionExecutor.applyTodoAndPlannedLogToolCalls(buildAssistantActionContext(), toolCalls, sourceText);
+    if (result.actions.some((action) => action.status === 'applied')) {
       setLogs(result.nextLogs);
       setTodos(result.nextTodos);
     }
@@ -5208,8 +5204,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     localQueryHistory?: AssistantLocalQueryResult[]
   ): AppliedChatAction[] => {
     const logCalls = toolCalls.filter((toolCall): toolCall is AIBackfillToolCall => toolCall.toolName === 'create_log');
-    const plannedLogCalls = toolCalls.filter((toolCall): toolCall is AIPlannedLogToolCall => toolCall.toolName === 'create_planned_log');
-    const todoCalls = toolCalls.filter((toolCall): toolCall is AITodoToolCall => toolCall.toolName === 'create_todo');
+    const todoAndPlannedLogCalls = toolCalls.filter((toolCall): toolCall is AITodoToolCall | AIPlannedLogToolCall => (
+      toolCall.toolName === 'create_todo' || toolCall.toolName === 'create_planned_log'
+    ));
     const todoUpdateCalls = toolCalls.filter((toolCall): toolCall is AITodoUpdateToolCall => toolCall.toolName === 'update_todo');
     const subtaskCalls = toolCalls.filter((toolCall): toolCall is AICreateSubtaskToolCall => toolCall.toolName === 'create_subtask');
     const editLogCalls = toolCalls.filter((toolCall): toolCall is AIEditLogToolCall => toolCall.toolName === 'edit_log');
@@ -5218,8 +5215,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
     return [
       ...applyPlannedLogToolCalls(logCalls),
-      ...applyPlannedTimelineLogToolCalls(plannedLogCalls),
-      ...applyPlannedTodoToolCalls(todoCalls, sourceText),
+      ...applyTodoAndPlannedTimelineLogToolCalls(todoAndPlannedLogCalls, sourceText),
       ...applyPlannedTodoUpdateToolCalls(todoUpdateCalls),
       ...applyPlannedCreateSubtaskToolCalls(subtaskCalls, sourceText),
       ...applyPlannedEditLogToolCalls(editLogCalls),

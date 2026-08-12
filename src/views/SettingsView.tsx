@@ -336,14 +336,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     useEffect(() => {
         const checkFloatingStatus = async () => {
             if (Capacitor.isNativePlatform()) {
-                const savedState = localStorage.getItem('floating_window_enabled');
-                if (savedState === 'true') {
-                    setFloatingWindowEnabled(true);
-                    // Optionally sync actual state if needed, but for now trust localStorage or plugin
-                }
+                const enabled = localStorage.getItem('floating_window_enabled') === 'true';
+                setFloatingWindowEnabled(enabled);
+                await FocusNotification.setSideBubbleEnabled({ enabled });
             }
         };
-        checkFloatingStatus();
+        checkFloatingStatus().catch((error) => {
+            console.error('Sync native side-bubble setting failed:', error);
+        });
     }, []);
 
     const handleFloatingWindowStartFeedback = (
@@ -426,6 +426,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         localStorage.setItem('floating_window_enabled', String(newState));
 
         try {
+            await FocusNotification.setSideBubbleEnabled({ enabled: newState });
+
             if (newState) {
                 const result = await startFloatingWindowWithGuards({
                     requestFloatingPermission: true,
@@ -439,7 +441,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                 return;
             } else {
                 pendingFloatingWindowResumeCheckRef.current = false;
-                await FocusNotification.stopFloatingWindow();
                 onToast('success', '悬浮球已关闭');
             }
         } catch (error) {

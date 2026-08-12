@@ -6,6 +6,7 @@
  * @description Defines the interface for the FocusNotification capacitor plugin, managing the persistent notification bar and floating window overlay on Android.
  * @updated 2026-05-09: Added pending floating-stop recovery hooks and session-id sync so Android background stops can reconcile after resume without duplicate logs.
  * @updated 2026-05-09: Added active focus-session syncing so Android can surface timer labels in the shared persistent notification title.
+ * @updated 2026-08-12: Added native side-bubble visibility control so app-awareness overlays can keep their shared service without restoring the regular floating ball.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -49,6 +50,8 @@ export interface FocusNotificationPlugin {
      * 停止悬浮窗服务
      */
     stopFloatingWindow(): Promise<void>;
+
+    setSideBubbleEnabled(options: { enabled: boolean }): Promise<void>;
 
     syncActiveSessions(options: { sessions: FocusNotificationActiveSession[] }): Promise<void>;
 

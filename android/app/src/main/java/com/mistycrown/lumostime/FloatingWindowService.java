@@ -9,6 +9,8 @@
  * @updated 2026-05-04: Routed floating-window foreground startup through the shared runtime notification manager so Android 8+ no longer depends on the removed legacy notification channel.
  * @updated 2026-04-26: Switched the floating-window foreground notification onto the shared runtime-status manager so Android only shows one persistent LumosTime service notification.
  * @updated 2026-06-13: Added updateFocusStateIfRunning to allow direct memory focus state updates, bypassing background startForegroundService limitations on Android 12+.
+ * @updated 2026-08-12: Exposes a strict app-awareness overlay visibility check for workflow startup recovery and Logcat diagnostics.
+ * @updated 2026-08-12: Keeps the regular side bubble independently disabled when app-awareness starts the shared foreground service.
  */
 package com.mistycrown.lumostime;
 
@@ -43,6 +45,8 @@ public class FloatingWindowService extends Service {
     private static final String TAG = "FloatingWindowService";
     private static final String CHANNEL_ID = "floating_window_channel";
     private static final int NOTIFICATION_ID = 2101;
+    private static final String SIDE_BUBBLE_PREFS = "floating_window_settings";
+    private static final String KEY_SIDE_BUBBLE_ENABLED = "side_bubble_enabled";
     private static FloatingWindowService instance = null;
     private static String pendingAppAwarenessPayloadJson = null;
 
@@ -275,7 +279,9 @@ public class FloatingWindowService extends Service {
         UnifiedServiceNotificationManager.reconcileNotificationState(this);
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        initBubbleView();
+        if (isSideBubbleEnabled()) {
+            initBubbleView();
+        }
         initAppAwarenessWindow();
         initAppAwarenessTimerWindow();
         registerAppChangeReceiver();
@@ -348,6 +354,26 @@ public class FloatingWindowService extends Service {
         return instance != null && instance.isAppAwarenessMode;
     }
 
+    public static boolean isAppAwarenessOverlayVisible() {
+        return instance != null
+                && instance.isAppAwarenessMode
+                && instance.isAppAwarenessWindowAttached
+                && instance.appAwarenessScrollView != null
+                && instance.appAwarenessScrollView.getVisibility() == View.VISIBLE;
+    }
+
+    public static String getAppAwarenessOverlayState() {
+        if (instance == null) {
+            return "service=missing";
+        }
+
+        return "service=ready, mode=" + instance.isAppAwarenessMode
+                + ", attached=" + instance.isAppAwarenessWindowAttached
+                + ", panel=" + (instance.appAwarenessScrollView != null)
+                + ", visible=" + (instance.appAwarenessScrollView != null
+                    && instance.appAwarenessScrollView.getVisibility() == View.VISIBLE);
+    }
+
     public static void showAppAwarenessTimerBar(String payloadJson) {
         if (instance == null) {
             return;
@@ -396,6 +422,23 @@ public class FloatingWindowService extends Service {
             instance.updateContent(icon, focusing, startTime, sessionId);
         });
         return true;
+    }
+
+    public static void setSideBubbleEnabled(Context context, boolean enabled) {
+        context.getSharedPreferences(SIDE_BUBBLE_PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_SIDE_BUBBLE_ENABLED, enabled)
+                .apply();
+
+        if (instance != null) {
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                if (enabled) {
+                    instance.initBubbleView();
+                } else {
+                    instance.removeSideBubbleView();
+                }
+            });
+        }
     }
 
     private void showTempTextInternal(String text) {
@@ -514,6 +557,7 @@ public class FloatingWindowService extends Service {
         try {
             windowManager.addView(appAwarenessFloatingView, appAwarenessParams);
             isAppAwarenessWindowAttached = true;
+            Log.i(TAG, "App-awareness overlay attached");
         } catch (Exception e) {
             Log.w(TAG, "Failed to attach app-awareness window", e);
         }
@@ -562,6 +606,7 @@ public class FloatingWindowService extends Service {
 
     private void showAppAwarenessOverlayInternal(String payloadJson) {
         if (appAwarenessScrollView == null || appAwarenessPanel == null) {
+            Log.e(TAG, "Cannot show app-awareness overlay: panel has not been initialized");
             return;
         }
 
@@ -573,6 +618,7 @@ public class FloatingWindowService extends Service {
             isAppAwarenessMode = true;
             ensureAppAwarenessWindowAttached();
             appAwarenessScrollView.setVisibility(View.VISIBLE);
+            Log.i(TAG, "Showing app-awareness overlay: " + getAppAwarenessOverlayState());
 
             String progressText = payload.optString("progressText", "");
             boolean allowClose = payload.optBoolean("allowClose", true);
@@ -853,6 +899,9 @@ public class FloatingWindowService extends Service {
     }
 
     private void initBubbleView() {
+        if (floatingView != null || windowManager == null) {
+            return;
+        }
         // 容器
         containerView = new android.widget.FrameLayout(this);
         android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
@@ -930,6 +979,33 @@ public class FloatingWindowService extends Service {
         } catch (Exception e) {
             Log.e(TAG, "Add view failed", e);
         }
+    }
+
+    private boolean isSideBubbleEnabled() {
+        return getSharedPreferences(SIDE_BUBBLE_PREFS, MODE_PRIVATE)
+                .getBoolean(KEY_SIDE_BUBBLE_ENABLED, false);
+    }
+
+    private void removeSideBubbleView() {
+        handler.removeCallbacks(updateRunnable);
+        isFocusing = false;
+        currentSessionId = null;
+
+        if (floatingView == null || windowManager == null) {
+            return;
+        }
+
+        try {
+            windowManager.removeView(floatingView);
+        } catch (Exception e) {
+            Log.e(TAG, "Remove side bubble failed", e);
+        }
+        floatingView = null;
+        containerView = null;
+        emojiView = null;
+        timeView = null;
+        iconView = null;
+        params = null;
     }
 
     private void initAppAwarenessWindow() {

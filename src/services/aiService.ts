@@ -4,6 +4,7 @@
  * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
  * @pos Service (AI Integration Layer)
  * @updated 2026-08-10: Restored native HTTP error bodies and exposed the request transport in AI debug exchanges so Android failures retain their real status and response text.
+ * @updated 2026-08-12: Preserved one-turn todo `clientRef` / planned-log `todoRef` links for create-and-schedule requests.
  * @updated 2026-07-31: Added normalization for foreground `create_planned_log` tool calls so AI can create todo-linked timeline Plan blocks.
  * @updated 2026-07-21: Corrected Android native AI request timeout to 120 seconds; the HTTP plugin timeout unit is seconds.
  * @updated 2026-07-06: Added principle-library and self-belief create tool-call payloads for foreground assistant writeback.
@@ -115,7 +116,8 @@ export interface AIBackfillToolCall {
 }
 
 export interface AIPlannedLogCreateArgs {
-    todoId: string;
+    todoId?: string;
+    todoRef?: string;
     date: string; // YYYY-MM-DD
     startTime: string; // HH:mm
     endTime: string; // HH:mm
@@ -146,6 +148,7 @@ export interface AITodoCreateArgs {
     deadlineDate?: string;
     recurrenceRule?: TodoRecurrenceRule;
     subtasks?: AITodoNestedSubtaskArgs[];
+    clientRef?: string;
 }
 
 export interface AITodoToolCall {
@@ -1398,6 +1401,7 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
                 toolName: 'create_planned_log' as const,
                 args: {
                     todoId,
+                    ...(typeof args.todoRef === 'string' && args.todoRef.trim() ? { todoRef: args.todoRef.trim() } : {}),
                     date: normalizeOptionalDateString(args.date) || '',
                     startTime: typeof args.startTime === 'string' ? args.startTime.trim() : '',
                     endTime: typeof args.endTime === 'string' ? args.endTime.trim() : '',
@@ -1406,7 +1410,7 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
             };
 
             return (
-                normalized.args.todoId
+                (normalized.args.todoId || normalized.args.todoRef)
                 && normalized.args.date
                 && normalized.args.startTime
                 && normalized.args.endTime
@@ -1451,7 +1455,8 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
                     ...(!normalizedRecurrenceRule && normalizeOptionalDateString(args.scheduledDate) ? { scheduledDate: normalizeOptionalDateString(args.scheduledDate)! } : {}),
                     ...(!normalizedRecurrenceRule && normalizeOptionalDateString(args.deadlineDate) ? { deadlineDate: normalizeOptionalDateString(args.deadlineDate)! } : {}),
                     ...(normalizedRecurrenceRule ? { recurrenceRule: normalizedRecurrenceRule } : {}),
-                    ...(normalizedSubtasks.length > 0 ? { subtasks: normalizedSubtasks } : {})
+                    ...(normalizedSubtasks.length > 0 ? { subtasks: normalizedSubtasks } : {}),
+                    ...(typeof args.clientRef === 'string' && args.clientRef.trim() ? { clientRef: args.clientRef.trim() } : {})
                 }
             };
             const isValid = normalized.args.title

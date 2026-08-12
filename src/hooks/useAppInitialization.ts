@@ -6,6 +6,7 @@
  * @description 应用初始化 Hook - 处理应用启动时的数据修复、迁移、规则加载、更新检查等初始化任务
  * @updated 2026-05-03: Replaced CommonJS EdgeToEdge loading with the plugin's ESM entry so Android production bundles stop calling browser-undefined `require()`.
  * @updated 2026-04-15: Unified Android floating-window startup so the overlay can still recover when notifications are disabled.
+ * @updated 2026-08-12: Mirrors the persisted side-bubble switch into native storage before app-awareness workflows can start the shared overlay service.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -25,6 +26,7 @@ import { dualIconMigrationService } from '../services/dualIconMigrationService';
 import { initResetDataTool } from '../utils/resetDataTool';
 import { DEFAULT_PRINCIPLE_PRESETS } from '../constants/principlePresets';
 import { startFloatingWindowWithGuards } from '../utils/floatingWindowStartup';
+import FocusNotification from '../plugins/FocusNotificationPlugin';
 
 // Edge-to-Edge 支持（仅在 Android 上可用）
 export const useAppInitialization = () => {
@@ -221,6 +223,7 @@ export const useAppInitialization = () => {
 
             try {
                 const floatingWindowEnabled = localStorage.getItem('floating_window_enabled') === 'true';
+                await FocusNotification.setSideBubbleEnabled({ enabled: floatingWindowEnabled });
                 
                 if (floatingWindowEnabled) {
                     console.log('🎈 检测到悬浮球已启用，尝试启动...');

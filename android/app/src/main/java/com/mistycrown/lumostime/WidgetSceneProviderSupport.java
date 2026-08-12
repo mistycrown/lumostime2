@@ -22,6 +22,8 @@ import java.util.Objects;
  * Shared rendering and tap handling for the dedicated 4x3 scene widget.
  * Updated 2026-08-10: Restores the 1.6.3 direct time-slot rendering path and uses in-process
  * RemoteCollectionItems for the optional scrollable rail on Android 12 and newer.
+ * Updated 2026-08-12: Renders scene cards with in-process RemoteCollectionItems on Android 12+
+ * so launchers do not need to bind the legacy card RemoteViewsService.
  */
 public final class WidgetSceneProviderSupport {
     public static final String ACTION_SELECT_SCENE_TAB =
@@ -205,15 +207,14 @@ public final class WidgetSceneProviderSupport {
             views.setTextViewText(R.id.widget_scene_slot_label, formatSlotLabel(state.selectedSlot));
             bindRefreshButton(context, views, appWidgetId, providerClass);
 
-            Intent cardsIntent = new Intent(context, WidgetSceneCardsRemoteViewsService.class);
-            cardsIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
-            cardsIntent.setData(Uri.parse(cardsIntent.toUri(Intent.URI_INTENT_SCHEME)));
-            views.setRemoteAdapter(R.id.widget_scene_cards, cardsIntent);
+            bindSceneCards(context, views, state, appWidgetId);
             views.setPendingIntentTemplate(
                     R.id.widget_scene_cards,
                     buildCardTemplatePendingIntent(context, appWidgetId, providerClass)
             );
-            appWidgetManager.notifyAppWidgetViewDataChanged(new int[] { appWidgetId }, R.id.widget_scene_cards);
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                appWidgetManager.notifyAppWidgetViewDataChanged(new int[] { appWidgetId }, R.id.widget_scene_cards);
+            }
             appWidgetManager.updateAppWidget(appWidgetId, views);
         }
     }
@@ -365,6 +366,42 @@ public final class WidgetSceneProviderSupport {
                 R.id.widget_scene_tabs,
                 buildTabTemplatePendingIntent(context, appWidgetId, providerClass)
         );
+    }
+
+    private static void bindSceneCards(
+            Context context,
+            RemoteViews views,
+            ResolvedSceneState state,
+            int appWidgetId
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            WidgetDailySyncPayload dailyPayload = WidgetStores.INSTANCE.loadDailySyncPayload(context);
+            WidgetRuntimeState runtimeState = WidgetStores.INSTANCE.loadRuntimeState(context);
+            WidgetTapAnimationState tapAnimationState = WidgetStores.INSTANCE.loadTapAnimationState(context);
+            RemoteViews.RemoteCollectionItems.Builder items = new RemoteViews.RemoteCollectionItems.Builder();
+            List<WidgetSceneItem> sceneItems = state.selectedSlot != null
+                    ? state.selectedSlot.getItems()
+                    : java.util.Collections.emptyList();
+            for (int index = 0; index < sceneItems.size(); index += 1) {
+                items.addItem(index, WidgetSceneCardRenderer.render(
+                        context,
+                        appWidgetId,
+                        state.selectedSlotId,
+                        sceneItems.get(index),
+                        index,
+                        dailyPayload,
+                        runtimeState,
+                        tapAnimationState
+                ));
+            }
+            views.setRemoteAdapter(R.id.widget_scene_cards, items.build());
+            return;
+        }
+
+        Intent cardsIntent = new Intent(context, WidgetSceneCardsRemoteViewsService.class);
+        cardsIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+        cardsIntent.setData(Uri.parse(cardsIntent.toUri(Intent.URI_INTENT_SCHEME)));
+        views.setRemoteAdapter(R.id.widget_scene_cards, cardsIntent);
     }
 
     private static List<WidgetSceneTimeSlot> getSceneTimeSlots(ResolvedSceneState state) {
