@@ -9,6 +9,7 @@
  * @updated 2026-07-30: Covers quick-color range minimums for click-to-drag formal record creation.
  * @updated 2026-07-30: Covers compact two-digit hour-only grid labels and alpha backgrounds for timeline activity colors.
  * @updated 2026-08-09: Covers all-day idle-gap calculation, planned-block exclusion, threshold filtering, and the current-time trailing boundary.
+ * @updated 2026-08-12: Covers contiguous schedule blocks staying on one visual track.
  */
 import { describe, expect, test, vi } from 'vitest';
 import { Log, TodoItem } from '../types';
@@ -86,6 +87,30 @@ describe('layoutParallelScheduleBlocks', () => {
 
     expect(blocks.find((block) => block.id === 'third')).toMatchObject({ column: 0, columnCount: 2 });
     expect(blocks.find((block) => block.id === 'later')).toMatchObject({ column: 0, columnCount: 1 });
+  });
+
+  test('keeps directly contiguous records in the same visual track', () => {
+    const blocks = layoutParallelScheduleBlocks([
+      { id: 'first', startMinutes: 40, endMinutes: 43 },
+      { id: 'second', startMinutes: 43, endMinutes: 48 }
+    ]);
+
+    expect(blocks.map(({ id, column, columnCount }) => ({ id, column, columnCount }))).toEqual([
+      { id: 'first', column: 0, columnCount: 1 },
+      { id: 'second', column: 0, columnCount: 1 }
+    ]);
+  });
+
+  test('treats second-level boundaries shown in the same minute as contiguous', () => {
+    const blocks = layoutParallelScheduleBlocks([
+      { id: 'first', startMinutes: 40, endMinutes: 43.9 },
+      { id: 'second', startMinutes: 43.1, endMinutes: 48 }
+    ]);
+
+    expect(blocks.map(({ id, column, columnCount }) => ({ id, column, columnCount }))).toEqual([
+      { id: 'first', column: 0, columnCount: 1 },
+      { id: 'second', column: 0, columnCount: 1 }
+    ]);
   });
 
   test('keeps a small breathing space before the 00:00 line', () => {
