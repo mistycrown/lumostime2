@@ -456,6 +456,7 @@ export type AchievementRuleTargetType = 'activity' | 'scope' | 'todoCategory' | 
 export interface AchievementRuleAttributeEffect {
   attributeId: string;
   expPerUnit: number;
+  direction?: 'gain' | 'loss';
 }
 
 export interface AchievementRule {

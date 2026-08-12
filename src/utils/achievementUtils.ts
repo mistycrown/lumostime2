@@ -8,6 +8,7 @@
  * @updated 2026-07-11: Added full-ledger redemption rebuild helpers for achievement all-data recomputation.
  * @updated 2026-08-11: Calculates daily attribute experience proportionally and excludes deleted attributes from aggregate experience.
  * @updated 2026-08-11: Normalizes legacy single-attribute rules into independent multi-attribute effects.
+ * @updated 2026-08-12: Uses a fixed five-attribute threshold curve for total character level progress.
  * @updated 2026-07-11: Added todo-category subtask inclusion handling so achievement rules can count parent tasks only unless explicitly configured otherwise.
  * @updated 2026-06-30: Added shared seal validation so bottles cannot be sealed while the current active balance is negative.
  * @updated 2026-07-07: Added explicit current/history account summaries and made seal previews use the current-bottle account balance.
@@ -48,6 +49,7 @@ import { filterCountableLogs } from './statLogUtils';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ACHIEVEMENT_STAR_DECIMALS = 1;
 const ACHIEVEMENT_STAR_FACTOR = 10 ** ACHIEVEMENT_STAR_DECIMALS;
+const ACHIEVEMENT_TOTAL_LEVEL_ATTRIBUTE_COUNT = 5;
 
 interface AchievementSpendRecordLike {
   id?: string;
@@ -176,7 +178,8 @@ export const normalizeAchievementRule = (
     ))
     .map((effect) => ({
       attributeId: effect.attributeId.trim(),
-      expPerUnit: Math.max(1, Math.floor(effect.expPerUnit))
+      expPerUnit: Math.max(1, Math.floor(effect.expPerUnit)),
+      direction: effect.direction === 'loss' ? 'loss' : 'gain'
     }))
     .filter((effect, index, effects) => effects.findIndex((item) => item.attributeId === effect.attributeId) === index);
 
@@ -417,7 +420,7 @@ export const normalizeAchievementGrowthSnapshot = (
     ...change,
     attributeId: change.attributeId || '',
     attributeName: change.attributeName || '未命名属性',
-    deltaExp: Math.max(0, Math.floor(change.deltaExp || 0)),
+    deltaExp: Math.floor(change.deltaExp || 0),
     ruleBreakdown: (change.ruleBreakdown || []).map((item) => ({
       ...item,
       attributeId: item.attributeId || change.attributeId || '',
@@ -426,7 +429,7 @@ export const normalizeAchievementGrowthSnapshot = (
       unitAmount: Math.max(1, Math.floor(item.unitAmount || 1)),
       appliedUnits: Math.max(0, normalizeAchievementStarValue(item.appliedUnits || 0)),
       expPerUnit: Math.max(1, Math.floor(item.expPerUnit || 1)),
-      deltaExp: Math.max(0, Math.floor(item.deltaExp || 0)),
+      deltaExp: Math.floor(item.deltaExp || 0),
       targetIds: Array.isArray(item.targetIds) ? item.targetIds : []
     }))
   }))
@@ -487,10 +490,11 @@ export const computeAchievementGrowthDailySnapshot = (
           return;
         }
         const appliedUnits = Math.max(0, matchedRule.matchedValue) / Math.max(1, rule.unitAmount);
-        const deltaExp = Math.floor(appliedUnits * attributeEffect.expPerUnit);
-        if (deltaExp <= 0) {
+        const absoluteDeltaExp = Math.floor(appliedUnits * attributeEffect.expPerUnit);
+        if (absoluteDeltaExp <= 0) {
           return;
         }
+        const deltaExp = attributeEffect.direction === 'loss' ? -absoluteDeltaExp : absoluteDeltaExp;
 
         const ruleBreakdown: AchievementGrowthRuleBreakdown = {
           ruleId: rule.id,
@@ -537,7 +541,7 @@ export const calculateAchievementAttributeExperience = (
   snapshots.forEach((snapshot) => {
     snapshot.attributeChanges.forEach((change) => {
       if (Object.prototype.hasOwnProperty.call(experience, change.attributeId)) {
-        experience[change.attributeId] += Math.max(0, change.deltaExp || 0);
+        experience[change.attributeId] += Math.floor(change.deltaExp || 0);
       }
     });
   });
@@ -558,7 +562,7 @@ export const calculateAchievementTotalExperience = (
     snapshots.reduce((sum, snapshot) => (
       sum + snapshot.attributeChanges.reduce((changeSum, change) => (
         !activeAttributeIds || activeAttributeIds.has(change.attributeId)
-          ? changeSum + Math.max(0, change.deltaExp || 0)
+          ? changeSum + Math.floor(change.deltaExp || 0)
           : changeSum
       ), 0)
     ), 0)
@@ -570,15 +574,30 @@ export const getAchievementExperienceRequiredForLevel = (level: number): number 
   return 50 * safeLevel * (safeLevel - 1);
 };
 
+export const getAchievementTotalExperienceRequiredForLevel = (level: number): number => (
+  getAchievementExperienceRequiredForLevel(level) * ACHIEVEMENT_TOTAL_LEVEL_ATTRIBUTE_COUNT
+);
+
 export const getAchievementLevelProgress = (experience: number): AchievementLevelProgress => {
+  return getAchievementLevelProgressWithThreshold(experience, getAchievementExperienceRequiredForLevel);
+};
+
+export const getAchievementTotalLevelProgress = (experience: number): AchievementLevelProgress => {
+  return getAchievementLevelProgressWithThreshold(experience, getAchievementTotalExperienceRequiredForLevel);
+};
+
+const getAchievementLevelProgressWithThreshold = (
+  experience: number,
+  getRequiredExperience: (level: number) => number
+): AchievementLevelProgress => {
   const safeExperience = Math.max(0, Math.floor(experience || 0));
   let level = 1;
-  while (safeExperience >= getAchievementExperienceRequiredForLevel(level + 1)) {
+  while (safeExperience >= getRequiredExperience(level + 1)) {
     level += 1;
   }
 
-  const currentLevelStart = getAchievementExperienceRequiredForLevel(level);
-  const nextLevelExperience = getAchievementExperienceRequiredForLevel(level + 1);
+  const currentLevelStart = getRequiredExperience(level);
+  const nextLevelExperience = getRequiredExperience(level + 1);
   const levelExperienceRange = Math.max(1, nextLevelExperience - currentLevelStart);
 
   return {

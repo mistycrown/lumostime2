@@ -1,9 +1,11 @@
 /**
  * @file AchievementStatsLineChartModal.tsx
- * @input Active achievement daily snapshots
- * @output Bottom-sheet achievement stats drawer with a horizontally draggable positive/negative line chart
+ * @input Active achievement daily snapshots plus visible character attributes and growth snapshots
+ * @output Bottom-sheet achievement stats drawer with a horizontally draggable multi-series positive/negative line chart
  * @pos Component (Achievement Stats)
- * @description Renders an editorial print-inspired statistics drawer for the active achievement ledger with one draggable daily net-delta line chart.
+ * @description Renders an editorial print-inspired statistics drawer for the active achievement ledger with draggable daily point and attribute-change lines.
+ * @updated 2026-08-12: Uses stable indexed keys when historical snapshots contain duplicate dates.
+ * @updated 2026-08-12: Added toggleable lines for every attribute currently visible on the character panel.
  * @updated 2026-07-24: Anchored the opening scroll position to the latest daily point instead of a fixed viewport guess.
  * @updated 2026-07-06: Removed the y-axis title words and added a trailing empty day slot so the last-point label has breathing room.
  * @updated 2026-07-06: Restored fixed horizontal spacing by preventing the scrollable plot from shrinking on mobile.
@@ -15,13 +17,23 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
-import { AchievementDailySnapshot } from '../../types';
+import { AchievementAttribute, AchievementDailySnapshot, AchievementGrowthDailySnapshot } from '../../types';
 import { formatAchievementSignedStars } from '../../utils/achievementUtils';
 
 interface AchievementStatsLineChartModalProps {
   isOpen: boolean;
   snapshots: AchievementDailySnapshot[];
+  growthSnapshots: AchievementGrowthDailySnapshot[];
+  attributes: AchievementAttribute[];
   onClose: () => void;
+}
+
+interface ChartSeries {
+  id: string;
+  name: string;
+  color: string;
+  unit: 'points' | 'experience';
+  values: number[];
 }
 
 const CHART_HEIGHT = 320;
@@ -67,22 +79,62 @@ const buildChartPath = (points: Array<{ x: number; y: number }>): string => {
   return path;
 };
 
+const formatChartValue = (value: number, unit: ChartSeries['unit']): string => (
+  unit === 'points'
+    ? formatAchievementSignedStars(value)
+    : `${value >= 0 ? '+' : '-'}${Math.abs(Math.floor(value || 0)).toLocaleString('en-US')} EXP`
+);
+
 export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartModalProps> = ({
   isOpen,
   snapshots,
+  growthSnapshots,
+  attributes,
   onClose
 }) => {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<{ pointerId: number; startX: number; startScrollLeft: number } | null>(null);
   const [activePointIndex, setActivePointIndex] = useState<number | null>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
+  const [hiddenSeriesIds, setHiddenSeriesIds] = useState<Set<string>>(() => new Set());
 
   const orderedSnapshots = useMemo(() => (
     [...snapshots].sort((first, second) => first.date.localeCompare(second.date))
   ), [snapshots]);
 
+  const chartSeries = useMemo<ChartSeries[]>(() => {
+    const growthByDate = new Map(growthSnapshots.map((snapshot) => [snapshot.date, snapshot] as const));
+    const visibleAttributes = attributes
+      .filter((attribute) => attribute.enabled)
+      .sort((first, second) => first.sortOrder - second.sortOrder);
+
+    return [
+      {
+        id: 'points',
+        name: '光点',
+        color: '#231f1b',
+        unit: 'points',
+        values: orderedSnapshots.map((snapshot) => snapshot.netDelta)
+      },
+      ...visibleAttributes.map((attribute) => ({
+        id: attribute.id,
+        name: attribute.name,
+        color: attribute.color,
+        unit: 'experience' as const,
+        values: orderedSnapshots.map((snapshot) => (
+          growthByDate.get(snapshot.date)?.attributeChanges
+            .find((change) => change.attributeId === attribute.id)?.deltaExp || 0
+        ))
+      }))
+    ];
+  }, [attributes, growthSnapshots, orderedSnapshots]);
+
+  const visibleSeries = useMemo(() => (
+    chartSeries.filter((series) => !hiddenSeriesIds.has(series.id))
+  ), [chartSeries, hiddenSeriesIds]);
+
   const chartData = useMemo(() => {
-    const values = orderedSnapshots.map((snapshot) => snapshot.netDelta);
+    const values = visibleSeries.flatMap((series) => series.values);
     const count = orderedSnapshots.length;
     const maxAbs = values.reduce((max, value) => Math.max(max, Math.abs(value)), 0);
     const domain = Math.max(5, Math.ceil(maxAbs / 2) * 2);
@@ -107,26 +159,31 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
       ? Math.max((innerWidth - axisOccupiedWidth) / 2, 0)
       : 0;
 
-    const points = orderedSnapshots.map((snapshot, index) => {
+    const xCoordinates = orderedSnapshots.map((_, index) => {
       const x = count === 1
         ? padding.left + innerWidth / 2
         : padding.left + plotOffset + index * pointGap;
-      const normalized = (snapshot.netDelta - minValue) / (maxValue - minValue || 1);
-      const y = CHART_HEIGHT - padding.bottom - normalized * innerHeight;
-
-      return {
-        x,
-        y,
-        date: snapshot.date,
-        value: snapshot.netDelta,
-        shortDate: snapshot.date.slice(5)
-      };
+      return x;
     });
+    const series = chartSeries.map((item) => ({
+      ...item,
+      points: orderedSnapshots.map((snapshot, index) => {
+        const value = item.values[index] || 0;
+        const normalized = (value - minValue) / (maxValue - minValue || 1);
+        return {
+          x: xCoordinates[index],
+          y: CHART_HEIGHT - padding.bottom - normalized * innerHeight,
+          date: snapshot.date,
+          value
+        };
+      })
+    }));
 
     const zeroY = CHART_HEIGHT - padding.bottom - ((0 - minValue) / (maxValue - minValue || 1)) * innerHeight;
 
     return {
-      points,
+      xCoordinates,
+      series,
       zeroY,
       padding,
       minValue,
@@ -138,7 +195,7 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
       isEmpty: values.length === 0,
       yTicks: [maxValue, maxValue / 2, 0, minValue / 2, minValue]
     };
-  }, [orderedSnapshots, viewportWidth]);
+  }, [chartSeries, orderedSnapshots, viewportWidth, visibleSeries]);
 
   useEffect(() => {
     if (!isOpen || !scrollerRef.current) {
@@ -177,12 +234,12 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
 
     window.setTimeout(() => {
       const scroller = scrollerRef.current;
-      const latestPoint = chartData.points[latestIndex];
+      const latestPointX = chartData.xCoordinates[latestIndex];
 
-      if (!chartData.isSparse && scroller && latestPoint) {
+      if (!chartData.isSparse && scroller && latestPointX !== undefined) {
         const maxScrollLeft = Math.max(chartData.svgWidth - scroller.clientWidth, 0);
         const rightInset = Math.min(LATEST_POINT_RIGHT_INSET, Math.max(scroller.clientWidth * 0.25, 0));
-        const targetScrollLeft = Math.max(latestPoint.x - scroller.clientWidth + rightInset, 0);
+        const targetScrollLeft = Math.max(latestPointX - scroller.clientWidth + rightInset, 0);
 
         scroller.scrollTo({
           left: Math.min(targetScrollLeft, maxScrollLeft),
@@ -190,15 +247,26 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
         });
       }
     }, 0);
-  }, [chartData.isSparse, chartData.points, chartData.svgWidth, isOpen, orderedSnapshots.length]);
+  }, [chartData.isSparse, chartData.svgWidth, chartData.xCoordinates, isOpen, orderedSnapshots.length]);
 
   if (!isOpen) {
     return null;
   }
 
-  const pathD = buildChartPath(chartData.points);
+  const activePointX = activePointIndex !== null ? chartData.xCoordinates[activePointIndex] : null;
+  const activeDate = activePointIndex !== null ? orderedSnapshots[activePointIndex]?.date : null;
 
-  const activePoint = activePointIndex !== null ? chartData.points[activePointIndex] : null;
+  const toggleSeries = (seriesId: string) => {
+    setHiddenSeriesIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(seriesId)) {
+        next.delete(seriesId);
+      } else if (previous.size < chartSeries.length - 1) {
+        next.add(seriesId);
+      }
+      return next;
+    });
+  };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!scrollerRef.current) {
@@ -266,8 +334,33 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
               <div className="flex h-full flex-col">
                 <div className="mb-3 flex items-end justify-between gap-4 px-1">
                   <div className="shrink-0 text-xs text-stone-400">{orderedSnapshots[0]?.date}</div>
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">Daily Net Delta</div>
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">Daily Change</div>
                   <div className="shrink-0 text-right text-xs text-stone-400">{orderedSnapshots[orderedSnapshots.length - 1]?.date}</div>
+                </div>
+
+                <div className="mb-3 flex flex-wrap gap-1.5 px-1">
+                  {chartSeries.map((series) => {
+                    const isVisible = !hiddenSeriesIds.has(series.id);
+                    return (
+                      <button
+                        key={series.id}
+                        type="button"
+                        onClick={() => toggleSeries(series.id)}
+                        aria-pressed={isVisible}
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
+                          isVisible
+                            ? 'border-stone-300 bg-white text-stone-800'
+                            : 'border-stone-200 bg-transparent text-stone-400'
+                        }`}
+                      >
+                        <span
+                          className="h-2 w-2 rounded-full"
+                          style={{ backgroundColor: series.color, opacity: isVisible ? 1 : 0.35 }}
+                        />
+                        {series.name}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <div
@@ -356,11 +449,11 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
                           );
                         })}
 
-                        {activePoint && (
+                        {activePointX !== null && (
                           <line
-                            x1={activePoint.x}
+                            x1={activePointX}
                             y1={chartData.padding.top}
-                            x2={activePoint.x}
+                            x2={activePointX}
                             y2={CHART_HEIGHT - chartData.padding.bottom}
                             stroke="#b8b1a8"
                             strokeWidth="1"
@@ -368,32 +461,54 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
                           />
                         )}
 
-                        <path
-                          d={pathD}
-                          fill="none"
-                          stroke="#c9c1b7"
-                          strokeWidth="5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          opacity="0.32"
-                        />
-                        <path
-                          d={pathD}
-                          fill="none"
-                          stroke="#231f1b"
-                          strokeWidth="1.9"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
+                        {visibleSeries.map((series) => {
+                          const points = chartData.series.find((item) => item.id === series.id)?.points || [];
+                          const pathD = buildChartPath(points);
+                          const isPointsSeries = series.id === 'points';
+                          return (
+                            <g key={series.id}>
+                              {isPointsSeries && (
+                                <path
+                                  d={pathD}
+                                  fill="none"
+                                  stroke="#c9c1b7"
+                                  strokeWidth="5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  opacity="0.32"
+                                />
+                              )}
+                              <path
+                                d={pathD}
+                                fill="none"
+                                stroke={series.color}
+                                strokeWidth={isPointsSeries ? '1.9' : '1.6'}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                opacity={isPointsSeries ? 1 : 0.88}
+                              />
+                              {points.map((point, index) => (
+                                <circle
+                                  key={`${series.id}-${point.date}-${index}`}
+                                  cx={point.x}
+                                  cy={point.y}
+                                  r={index === activePointIndex ? '3.6' : '1.8'}
+                                  fill={series.color}
+                                  opacity={index === activePointIndex ? 1 : 0.72}
+                                />
+                              ))}
+                            </g>
+                          );
+                        })}
 
                         {chartData.axisLabels.map((label, index) => {
-                          const labelX = chartData.points.length === 1 && index === 0
-                            ? chartData.points[0].x
+                          const labelX = chartData.xCoordinates.length === 1 && index === 0
+                            ? chartData.xCoordinates[0]
                             : chartData.padding.left + (chartData.isSparse ? Math.max((chartData.innerWidth - Math.max(0, (chartData.axisLabels.length - 1) * (chartData.isSparse ? SPARSE_POINT_GAP : REGULAR_POINT_GAP))) / 2, 0) : 0) + index * (chartData.isSparse ? SPARSE_POINT_GAP : REGULAR_POINT_GAP);
 
                           return (
                             <text
-                              key={label}
+                              key={`${label}-${index}`}
                               x={labelX}
                               y={CHART_HEIGHT - 16}
                               textAnchor="middle"
@@ -405,17 +520,17 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
                           );
                         })}
 
-                        {chartData.points.map((point, index) => {
+                        {chartData.xCoordinates.map((x, index) => {
                           const isActive = index === activePointIndex;
 
                           return (
                             <g
-                              key={`${point.date}-${index}`}
+                              key={`${orderedSnapshots[index]?.date}-${index}`}
                               onMouseEnter={() => setActivePointIndex(index)}
                             >
                               <circle
-                                cx={point.x}
-                                cy={point.y}
+                                cx={x}
+                                cy={CHART_HEIGHT / 2}
                                 r="18"
                                 fill="transparent"
                                 className="cursor-pointer"
@@ -425,35 +540,6 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
                                 }}
                                 onPointerDown={(event) => event.stopPropagation()}
                               />
-                              <circle
-                                cx={point.x}
-                                cy={point.y}
-                                r={isActive ? '4.5' : '2.2'}
-                                fill={isActive ? '#231f1b' : '#6b6258'}
-                                opacity={isActive ? 1 : 0.55}
-                              />
-                              {isActive && (
-                                <>
-                                  <rect
-                                    x={point.x - 34}
-                                    y={point.y - 32}
-                                    width="68"
-                                    height="18"
-                                    rx="9"
-                                    fill="#f4efe7"
-                                  />
-                                  <text
-                                    x={point.x}
-                                    y={point.y - 19}
-                                    textAnchor="middle"
-                                    fill="#231f1b"
-                                    fontSize="10"
-                                    fontWeight="600"
-                                  >
-                                    {formatAchievementSignedStars(point.value)}
-                                  </text>
-                                </>
-                              )}
                             </g>
                           );
                         })}
@@ -462,10 +548,17 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
                   </div>
                 </div>
 
-                {activePoint && (
-                  <div className="flex items-center justify-between border-t border-stone-100 px-1 pt-4 text-sm text-stone-500">
-                    <span>{activePoint.date}</span>
-                    <span className="text-stone-900">{formatAchievementSignedStars(activePoint.value)}</span>
+                {activeDate && activePointIndex !== null && (
+                  <div className="border-t border-stone-100 px-1 pt-4">
+                    <div className="text-sm text-stone-500">{activeDate}</div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+                      {visibleSeries.map((series) => (
+                        <span key={series.id} className="inline-flex items-center gap-1.5 text-xs text-stone-600">
+                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: series.color }} />
+                          {series.name} {formatChartValue(series.values[activePointIndex] || 0, series.unit)}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

@@ -6,12 +6,14 @@
  * @description Allows users to grant accessibility permissions, configure app-to-activity associations, and mark apps to be ignored by floating-window detection.
  * @updated 2026-07-11: Stopped list ignore toggle clicks from bubbling into app detail navigation.
  * @updated 2026-07-21: Added semantic surfaces for dark-mode app-association notices and list states.
+ * @updated 2026-08-12: Let Android hardware back close the app-rule editor before returning to Settings.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Check, ShieldAlert, Smartphone, ChevronRight, X, Search, Trash2 } from 'lucide-react';
 import AppUsage from '../plugins/AppUsagePlugin';
 import { Category } from '../types';
 import { getActiveActivities } from '../utils/archiveUtils';
+import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
 
 interface Props {
   onBack: () => void;
@@ -100,6 +102,22 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
     setIsModalOpen(true);
   };
 
+  const closeRuleEditor = () => {
+    setIsModalOpen(false);
+    setSelectedApp(null);
+  };
+
+  useEffect(() => {
+    if (!isModalOpen) {
+      return;
+    }
+
+    return registerHardwareBackHandler(() => {
+      closeRuleEditor();
+      return true;
+    });
+  }, [isModalOpen]);
+
   const handleSaveRule = async (activityId: string) => {
     if (!selectedApp) {
       return;
@@ -113,8 +131,7 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
         activityName: activity?.name
       });
       setRules((prev) => ({ ...prev, [selectedApp.packageName]: activityId }));
-      setIsModalOpen(false);
-      setSelectedApp(null);
+      closeRuleEditor();
     } catch (error) {
       console.error(error);
     }
@@ -144,8 +161,7 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
         delete next[selectedApp.packageName];
         return next;
       });
-      setIsModalOpen(false);
-      setSelectedApp(null);
+      closeRuleEditor();
     } catch (error) {
       console.error(error);
     }
@@ -213,7 +229,7 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
             paddingTop: 'env(safe-area-inset-top)'
           }}
         >
-          <button onClick={() => setIsModalOpen(false)} className="p-2 -ml-2 text-stone-400 hover:text-stone-600">
+          <button onClick={closeRuleEditor} className="p-2 -ml-2 text-stone-400 hover:text-stone-600">
             <X size={24} />
           </button>
           <div className="flex items-center gap-2 font-bold text-stone-800">

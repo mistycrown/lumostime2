@@ -3,6 +3,7 @@
  * @input Achievement rules plus category, scope, todo, and daily-check metadata for editing targets
  * @output Rule list rows and a modal editor that can safely edit temporary empty numeric input states
  * @description Achievement rule list and modal editor, reusing the shared selectors plus inline filter expressions for duration-based custom matching.
+ * @updated 2026-08-12: Supports independent gain and loss directions for each attribute experience effect.
  * @updated 2026-08-11: Supports multiple independent attribute experience effects per rule with additive editor rows.
  * @updated 2026-08-09: Added optional fixed attribute experience effects to achievement rules.
  * @updated 2026-07-11: Added a custom styled todo subtask inclusion checkbox for todo-completion achievement rules.
@@ -42,7 +43,7 @@ interface AchievementRulesTabProps {
     filterExpression?: string;
     unitAmount: number;
     deltaPerUnit: number;
-    attributeEffects?: Array<{ attributeId: string; expPerUnit: number }>;
+    attributeEffects?: Array<{ attributeId: string; expPerUnit: number; direction?: 'gain' | 'loss' }>;
     note?: string;
   }) => void;
   onUpdateRule: (rule: AchievementRule) => void;
@@ -53,6 +54,7 @@ interface RuleDraftAttributeEffect {
   attributeId: string;
   expPerUnit: number;
   expPerUnitInput: string;
+  direction: 'gain' | 'loss';
 }
 
 interface RuleDraft {
@@ -96,7 +98,7 @@ const createEmptyDraft = (): RuleDraft => ({
   unitAmount: 30,
   deltaPerUnit: 1,
   attributeExperienceEnabled: false,
-  attributeEffects: [{ attributeId: '', expPerUnit: 10, expPerUnitInput: '10' }],
+  attributeEffects: [{ attributeId: '', expPerUnit: 10, expPerUnitInput: '10', direction: 'gain' }],
   note: ''
 });
 
@@ -140,6 +142,7 @@ const isSameRuleDraft = (left: RuleDraft, right: RuleDraft) => (
     effect.attributeId === right.attributeEffects[index].attributeId
     && effect.expPerUnit === right.attributeEffects[index].expPerUnit
     && effect.expPerUnitInput === right.attributeEffects[index].expPerUnitInput
+    && effect.direction === right.attributeEffects[index].direction
   )) &&
   left.useCheckStreakMultiplier === right.useCheckStreakMultiplier &&
   left.includeSubtasks === right.includeSubtasks &&
@@ -430,7 +433,8 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
         attributeExperienceEnabled: Boolean(normalizeAchievementRule(selectedRule).attributeEffects?.length),
         attributeEffects: (normalizeAchievementRule(selectedRule).attributeEffects || []).map((effect) => ({
           ...effect,
-          expPerUnitInput: String(effect.expPerUnit)
+          expPerUnitInput: String(effect.expPerUnit),
+          direction: effect.direction === 'loss' ? 'loss' : 'gain'
         })),
         note: selectedRule.note || ''
       };
@@ -566,7 +570,8 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
         .filter((effect) => effect.attributeId)
         .map((effect) => ({
           attributeId: effect.attributeId,
-          expPerUnit: Math.max(1, Math.floor(effect.expPerUnit))
+          expPerUnit: Math.max(1, Math.floor(effect.expPerUnit)),
+          direction: effect.direction
         }))
       : undefined;
 
@@ -653,7 +658,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
               return `每完成 ${rule.unitAmount} 项 ${formatAchievementSignedStars(rule.effectType === 'earn' ? rule.deltaPerUnit : -rule.deltaPerUnit)} 光点`;
             })();
             const attributeSummary = (normalizeAchievementRule(rule).attributeEffects || [])
-              .map((effect) => ` · ${attributeNameMap.get(effect.attributeId) || '属性'} +${formatAchievementExperience(effect.expPerUnit)} EXP`)
+              .map((effect) => ` · ${attributeNameMap.get(effect.attributeId) || '属性'} ${effect.direction === 'loss' ? '-' : '+'}${formatAchievementExperience(effect.expPerUnit)} EXP`)
               .join(' · ');
 
             return (
@@ -845,7 +850,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
                   attributeExperienceEnabled: !previous.attributeExperienceEnabled,
                   attributeEffects: previous.attributeExperienceEnabled || previous.attributeEffects.length > 0
                     ? previous.attributeEffects
-                    : [{ attributeId: '', expPerUnit: 10, expPerUnitInput: '10' }]
+                    : [{ attributeId: '', expPerUnit: 10, expPerUnitInput: '10', direction: 'gain' }]
                 }))}
                 aria-pressed={draft.attributeExperienceEnabled}
                 title="是否增加属性经验"
@@ -873,58 +878,99 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
                     attribute.id === effect.attributeId || !selectedIds.has(attribute.id)
                   ));
                   return (
-                    <div key={`${index}-${effect.attributeId}`} className="grid items-end gap-3 rounded-2xl border border-stone-200 bg-white/70 p-3 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">
-                      <label className="block min-w-0">
-                        <span className="text-xs text-stone-500">属性 {index + 1}</span>
-                        <AttributeExperiencePicker
-                          attributes={rowOptions}
-                          selectedId={effect.attributeId}
-                          onChange={(attributeId) => setDraft((previous) => ({
-                            ...previous,
-                            attributeEffects: previous.attributeEffects.map((item, itemIndex) => (
-                              itemIndex === index ? { ...item, attributeId } : item
-                            ))
-                          }))}
-                        />
-                      </label>
-                      <label className="block">
-                        <span className="text-xs text-stone-500">每单位经验</span>
-                        <input
-                          type="number"
-                          min={1}
-                          step={1}
-                          value={effect.expPerUnitInput}
-                          onBlur={() => setDraft((previous) => ({
-                            ...previous,
-                            attributeEffects: previous.attributeEffects.map((item, itemIndex) => {
-                              if (itemIndex !== index) return item;
-                              const parsed = Number(item.expPerUnitInput);
-                              const normalized = Number.isFinite(parsed) ? Math.max(1, Math.floor(parsed)) : 1;
-                              return { ...item, expPerUnit: normalized, expPerUnitInput: String(normalized) };
-                            })
-                          }))}
-                          onChange={(event) => {
-                            const nextValue = event.target.value;
-                            const parsed = Number(nextValue);
-                            setDraft((previous) => ({
+                    <div key={`${index}-${effect.attributeId}`} className="rounded-2xl border border-stone-200 bg-white/70 p-3">
+                      <div className="flex min-w-0 items-end gap-3">
+                        <label className="block min-w-0 flex-1">
+                          <span className="text-xs text-stone-500">属性 {index + 1}</span>
+                          <AttributeExperiencePicker
+                            attributes={rowOptions}
+                            selectedId={effect.attributeId}
+                            onChange={(attributeId) => setDraft((previous) => ({
                               ...previous,
                               attributeEffects: previous.attributeEffects.map((item, itemIndex) => (
-                                itemIndex === index
-                                  ? {
-                                    ...item,
-                                    expPerUnitInput: nextValue,
-                                    ...(Number.isFinite(parsed) && parsed > 0
-                                      ? { expPerUnit: Math.max(1, Math.floor(parsed)) }
-                                      : {})
-                                  }
-                                  : item
+                                itemIndex === index ? { ...item, attributeId } : item
                               ))
-                            }));
-                          }}
-                          className="mt-2 w-full border-b border-stone-300 bg-transparent px-0 py-2 text-sm text-stone-900 outline-none focus:border-stone-900"
-                        />
-                      </label>
-                      <div className="flex items-center justify-end gap-1 pb-1">
+                            }))}
+                          />
+                        </label>
+                        <div className="mb-0.5 shrink-0">
+                          <div className="inline-flex h-9 overflow-hidden rounded-lg border border-stone-300 bg-stone-50 p-0.5">
+                          <button
+                            type="button"
+                            aria-pressed={effect.direction === 'gain'}
+                            onClick={() => setDraft((previous) => ({
+                              ...previous,
+                              attributeEffects: previous.attributeEffects.map((item, itemIndex) => (
+                                itemIndex === index ? { ...item, direction: 'gain' } : item
+                              ))
+                            }))}
+                            className={`min-w-[3.25rem] rounded-md px-2 text-xs font-medium transition-colors ${
+                              effect.direction === 'gain'
+                                ? 'bg-white text-stone-900 shadow-sm'
+                                : 'text-stone-400 hover:text-stone-700'
+                            }`}
+                          >
+                            增加
+                          </button>
+                          <button
+                            type="button"
+                            aria-pressed={effect.direction === 'loss'}
+                            onClick={() => setDraft((previous) => ({
+                              ...previous,
+                              attributeEffects: previous.attributeEffects.map((item, itemIndex) => (
+                                itemIndex === index ? { ...item, direction: 'loss' } : item
+                              ))
+                            }))}
+                            className={`min-w-[3.25rem] rounded-md px-2 text-xs font-medium transition-colors ${
+                              effect.direction === 'loss'
+                                ? 'bg-[#fdf1ef] text-[#9f3e37] shadow-sm'
+                                : 'text-stone-400 hover:text-stone-700'
+                            }`}
+                          >
+                            减少
+                          </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-end gap-3">
+                        <label className="block w-full max-w-[9rem]">
+                          <span className="text-xs text-stone-500">每单位经验</span>
+                          <input
+                            type="number"
+                            min={1}
+                            step={1}
+                            value={effect.expPerUnitInput}
+                            onBlur={() => setDraft((previous) => ({
+                              ...previous,
+                              attributeEffects: previous.attributeEffects.map((item, itemIndex) => {
+                                if (itemIndex !== index) return item;
+                                const parsed = Number(item.expPerUnitInput);
+                                const normalized = Number.isFinite(parsed) ? Math.max(1, Math.floor(parsed)) : 1;
+                                return { ...item, expPerUnit: normalized, expPerUnitInput: String(normalized) };
+                              })
+                            }))}
+                            onChange={(event) => {
+                              const nextValue = event.target.value;
+                              const parsed = Number(nextValue);
+                              setDraft((previous) => ({
+                                ...previous,
+                                attributeEffects: previous.attributeEffects.map((item, itemIndex) => (
+                                  itemIndex === index
+                                    ? {
+                                      ...item,
+                                      expPerUnitInput: nextValue,
+                                      ...(Number.isFinite(parsed) && parsed > 0
+                                        ? { expPerUnit: Math.max(1, Math.floor(parsed)) }
+                                        : {})
+                                    }
+                                    : item
+                                ))
+                              }));
+                            }}
+                            className="mt-2 w-full border-b border-stone-300 bg-transparent px-0 py-2 text-sm text-stone-900 outline-none focus:border-stone-900"
+                          />
+                        </label>
+                        <div className="ml-auto flex items-center justify-end gap-1 pb-1">
                         {index === draft.attributeEffects.length - 1 && rowOptions.length > 0 && (
                           <button
                             type="button"
@@ -932,7 +978,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
                             title="增加属性"
                             onClick={() => setDraft((previous) => ({
                               ...previous,
-                              attributeEffects: [...previous.attributeEffects, { attributeId: '', expPerUnit: 10, expPerUnitInput: '10' }]
+                              attributeEffects: [...previous.attributeEffects, { attributeId: '', expPerUnit: 10, expPerUnitInput: '10', direction: 'gain' }]
                             }))}
                             className="flex h-8 w-8 items-center justify-center rounded-full border border-stone-300 text-stone-700 transition-colors hover:border-stone-900 hover:bg-stone-900 hover:text-white"
                           >
@@ -953,6 +999,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
                             <X size={15} />
                           </button>
                         )}
+                        </div>
                       </div>
                     </div>
                   );
