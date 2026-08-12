@@ -16,6 +16,7 @@
  * @updated 2026-07-30: Tightens the schedule gutters and hides the in-panel scrollbar for a denser split workspace.
  * @updated 2026-07-30: Suppresses the synthetic click after real-record taps so the detail modal is not immediately backdrop-closed.
  * @updated 2026-08-09: Renders clickable idle-time gaps from real records only; planned blocks do not split gaps and today's trailing gap ends at the current time.
+ * @updated 2026-08-12: Keeps exactly adjacent schedule blocks in the same visual layout group so contiguous records do not appear staggered.
  */
 import React, { useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -29,6 +30,7 @@ const MAX_HOUR_HEIGHT = 180;
 const DEFAULT_HOUR_HEIGHT = 88;
 const DAY_MINUTES = 24 * 60;
 const TIME_SNAP_MINUTES = 5;
+const SCHEDULE_ADJACENCY_TOLERANCE_MINUTES = 1;
 export const TIMELINE_TOP_PADDING = 12;
 export const MIN_SCHEDULE_BLOCK_HEIGHT = 12;
 const MIN_EXPANDED_TIMELINE_NOTE_HEIGHT = 88;
@@ -254,8 +256,12 @@ export const layoutParallelScheduleBlocks = <T extends { startMinutes: number; e
   };
 
   sorted.forEach((block) => {
-    active = active.filter((entry) => entry.endMinutes > block.startMinutes);
-    if (active.length === 0 && group.length > 0) finalizeGroup();
+    active = active.filter((entry) => entry.endMinutes > block.startMinutes + SCHEDULE_ADJACENCY_TOLERANCE_MINUTES);
+    if (active.length === 0 && group.length > 0) {
+      const groupEndMinutes = Math.max(...group.map((entry) => entry.endMinutes));
+      // Keep a zero-gap successor in the same group so it reuses the released track.
+      if (block.startMinutes - groupEndMinutes > SCHEDULE_ADJACENCY_TOLERANCE_MINUTES) finalizeGroup();
+    }
     const usedColumns = new Set(active.map((entry) => entry.column));
     let column = 0;
     while (usedColumns.has(column)) column += 1;
