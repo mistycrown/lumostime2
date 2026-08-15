@@ -6,7 +6,7 @@ On some Android ROMs, including affected Xiaomi devices, the app can launch thro
 
 ## Decision
 
-Make the application-level fallback theme action-bar-free and retain the splash theme's post-splash transition to the same action-bar-free theme. Add a `MainActivity` runtime safeguard that hides a native support action bar if a device or ROM still creates one.
+Make the application-level fallback theme action-bar-free and explicitly call AndroidX `installSplashScreen()` before Activity creation so the configured post-splash transition is applied on Android 12+. Add a `MainActivity` runtime safeguard that hides a native support action bar if a device or ROM still creates one.
 
 ## Scope
 
