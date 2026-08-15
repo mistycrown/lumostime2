@@ -11,6 +11,8 @@
  * @updated 2026-06-13: Added updateFocusStateIfRunning to allow direct memory focus state updates, bypassing background startForegroundService limitations on Android 12+.
  * @updated 2026-08-12: Exposes a strict app-awareness overlay visibility check for workflow startup recovery and Logcat diagnostics.
  * @updated 2026-08-12: Keeps the regular side bubble independently disabled when app-awareness starts the shared foreground service.
+ * @updated 2026-08-13: Ignores ordinary side-bubble icon updates when that view is disabled so accessibility events cannot crash the shared service.
+ * @updated 2026-08-15: Reports side-bubble visibility separately from the shared app-awareness foreground service in Android notifications.
  */
 package com.mistycrown.lumostime;
 
@@ -273,13 +275,14 @@ public class FloatingWindowService extends Service {
         instance = this;
         Log.d(TAG, "🟢 悬浮窗服务 onCreate");
 
-        createNotificationChannel();
-        UnifiedServiceNotificationManager.setFloatingWindowState(this, true, false);
-        startForeground(NOTIFICATION_ID, createNotification("悬浮球已开启，点击可返回 LumosTime"));
+        boolean sideBubbleEnabled = isSideBubbleEnabled();
+        UnifiedServiceNotificationManager.setFloatingWindowServiceState(this, true);
+        UnifiedServiceNotificationManager.setFloatingWindowState(this, sideBubbleEnabled, false);
+        UnifiedServiceNotificationManager.startForeground(this);
         UnifiedServiceNotificationManager.reconcileNotificationState(this);
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        if (isSideBubbleEnabled()) {
+        if (sideBubbleEnabled) {
             initBubbleView();
         }
         initAppAwarenessWindow();
@@ -437,6 +440,11 @@ public class FloatingWindowService extends Service {
                 } else {
                     instance.removeSideBubbleView();
                 }
+                UnifiedServiceNotificationManager.setFloatingWindowState(
+                        instance,
+                        enabled && instance.floatingView != null,
+                        enabled && instance.floatingView != null && instance.isFocusing);
+                UnifiedServiceNotificationManager.reconcileNotificationState(instance);
             });
         }
     }
@@ -853,6 +861,11 @@ public class FloatingWindowService extends Service {
     }
 
     private void updateAppIconInternal(String packageName, String appLabel) {
+        if (iconView == null) {
+            Log.d(TAG, "Skipping app icon update because the side bubble is disabled");
+            return;
+        }
+
         if (packageName.equals(currentAppPackage)) {
             return; // No change
         }
@@ -1300,7 +1313,11 @@ public class FloatingWindowService extends Service {
     }
 
     private void updateNotification(String contentText) {
-        UnifiedServiceNotificationManager.setFloatingWindowState(this, true, this.isFocusing);
+        boolean sideBubbleActive = floatingView != null && isSideBubbleEnabled();
+        UnifiedServiceNotificationManager.setFloatingWindowState(
+                this,
+                sideBubbleActive,
+                sideBubbleActive && this.isFocusing);
         UnifiedServiceNotificationManager.reconcileNotificationState(this);
     }
 
