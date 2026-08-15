@@ -8,6 +8,7 @@
  * @updated 2026-07-22: Registers the native status-bar appearance bridge for display-mode synchronization.
  * @updated 2026-07-22: Draws an explicit top inset backdrop beneath Android 15's transparent status bar.
  * @updated 2026-08-10: Reapplies immersive system-bar hiding after Android orientation and focus transitions, while keeping web controls above the native status-bar backdrop.
+ * @updated 2026-08-15: Hides a native ActionBar restored by certain Android activity-alias theme fallbacks so it cannot cover the WebView header.
  */
 package com.mistycrown.lumostime;
 
@@ -22,6 +23,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 
+import androidx.appcompat.app.ActionBar;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -49,6 +51,7 @@ public class MainActivity extends BridgeActivity {
         configureWindowForEdgeToEdge();
         super.onCreate(savedInstanceState);
 
+        hideUnexpectedNativeActionBar();
         configureWindowForEdgeToEdge();
         AssistantNotificationNavigationStore.captureFromIntent(this, getIntent());
         ensureStatusBarBackdrop();
@@ -65,6 +68,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
+        hideUnexpectedNativeActionBar();
         configureWindowForEdgeToEdge();
         if (statusBarBackdropView != null) {
             ViewCompat.requestApplyInsets(statusBarBackdropView);
@@ -106,6 +110,13 @@ public class MainActivity extends BridgeActivity {
             applyImmersiveWindowState();
         } else {
             moveStatusBarBackdropToFront();
+        }
+    }
+
+    private void hideUnexpectedNativeActionBar() {
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.hide();
         }
     }
 
