@@ -96,7 +96,7 @@ export const AIBackfillChatMemoryOverlay: React.FC<AIBackfillChatMemoryOverlayPr
     <div
       className="flex h-full flex-col bg-[#f3f4f6]"
       style={{
-        paddingTop: 'env(safe-area-inset-top)',
+        paddingTop: 'var(--app-safe-area-top)',
         paddingBottom: 'env(safe-area-inset-bottom)'
       }}
     >

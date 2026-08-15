@@ -519,8 +519,8 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
     <div
       className="flex items-center justify-between px-4 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md shrink-0"
       style={{
-        height: 'calc(3.5rem + env(safe-area-inset-top))',
-        paddingTop: 'env(safe-area-inset-top)'
+        height: 'calc(3.5rem + var(--app-safe-area-top))',
+        paddingTop: 'var(--app-safe-area-top)'
       }}
     >
       <button onClick={onLeftClick} className="p-2 -ml-2 text-stone-500 hover:text-stone-700">

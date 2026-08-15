@@ -213,7 +213,7 @@ export const ChronoPrintView: React.FC<ChronoPrintViewProps> = ({ inputText, onB
         }
       `}</style>
 
-      <div className="flex-shrink-0 pt-[env(safe-area-inset-top)]">
+      <div className="flex-shrink-0 pt-[var(--app-safe-area-top)]">
         <div className="flex items-center justify-between gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0 z-10">
           <button
             onClick={onBack}

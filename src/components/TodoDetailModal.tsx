@@ -1090,8 +1090,8 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const totalSquares = Math.ceil(totalAmount / unitAmount);
   const renderSquares = totalSquares > 3000 ? 3000 : totalSquares;
   const containerClassName = displayMode === 'page'
-    ? 'h-full bg-[#faf9f6] flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]'
-    : `fixed inset-0 z-[180] bg-[#faf9f6] flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] ${isEntering ? 'animate-in slide-in-from-right duration-300' : ''}`;
+    ? 'h-full bg-[#faf9f6] flex flex-col pt-[var(--app-safe-area-top)] pb-[env(safe-area-inset-bottom)]'
+    : `fixed inset-0 z-[180] bg-[#faf9f6] flex flex-col pt-[var(--app-safe-area-top)] pb-[env(safe-area-inset-bottom)] ${isEntering ? 'animate-in slide-in-from-right duration-300' : ''}`;
 
   return (
     <div

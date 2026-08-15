@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file AIBackfillChatModal.tsx
  * @input Unified AI chat sessions, local logs/todos/categories/scopes, and user natural-language messages
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
@@ -6656,7 +6656,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         style={{
           backgroundColor: AI_CHAT_THEME.shellLayerBg,
           borderColor: isDesktopWidgetMode ? AI_CHAT_THEME.panelBorder : undefined,
-          paddingTop: 'env(safe-area-inset-top)',
+          paddingTop: 'var(--app-safe-area-top)',
           paddingBottom: `calc(env(safe-area-inset-bottom) + ${keyboardBottomInset}px)`,
           transition: isDesktopWidgetMode
             ? 'padding-bottom 180ms ease-out, opacity 150ms ease-out, transform 160ms cubic-bezier(0.22, 1, 0.36, 1)'

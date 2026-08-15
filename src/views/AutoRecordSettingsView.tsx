@@ -225,8 +225,8 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
         <div
           className="box-border flex items-center justify-between border-b border-stone-100 bg-[#fdfbf7]/80 px-4 backdrop-blur-md shrink-0"
           style={{
-            height: 'calc(3.5rem + env(safe-area-inset-top))',
-            paddingTop: 'env(safe-area-inset-top)'
+            height: 'calc(3.5rem + var(--app-safe-area-top))',
+            paddingTop: 'var(--app-safe-area-top)'
           }}
         >
           <button onClick={closeRuleEditor} className="p-2 -ml-2 text-stone-400 hover:text-stone-600">
@@ -312,8 +312,8 @@ export const AutoRecordSettingsView: React.FC<Props> = ({ onBack, categories }) 
       <div
         className="sticky top-0 z-10 box-border flex items-center gap-3 border-b border-stone-100 bg-[#fdfbf7]/80 px-4 backdrop-blur-md shrink-0"
         style={{
-          height: 'calc(3.5rem + env(safe-area-inset-top))',
-          paddingTop: 'env(safe-area-inset-top)'
+          height: 'calc(3.5rem + var(--app-safe-area-top))',
+          paddingTop: 'var(--app-safe-area-top)'
         }}
       >
         <button

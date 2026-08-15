@@ -802,7 +802,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
   const selectedSlot = timeSlots.find(s => s.id === selectedSlotId);
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#faf9f6] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+    <div className="fixed inset-0 z-50 bg-[#faf9f6] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[var(--app-safe-area-top)] pb-[env(safe-area-inset-bottom)]">
       {/* 顶部导航 */}
       <div className="h-14 flex items-center justify-between px-5 bg-[#fdfbf7] border-b border-stone-100 sticky top-0 z-20">
         <button

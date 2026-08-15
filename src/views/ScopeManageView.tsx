@@ -127,7 +127,7 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
     };
 
     return (
-        <div className="h-full bg-[#faf9f6] flex flex-col pt-[env(safe-area-inset-top)]">
+        <div className="h-full bg-[#faf9f6] flex flex-col pt-[var(--app-safe-area-top)]">
             {/* Header */}
             <div className="h-14 flex items-center justify-between px-5 bg-[#fdfbf7] border-b border-stone-100 sticky top-0 z-20">
                 <button

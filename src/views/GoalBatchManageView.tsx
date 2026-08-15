@@ -271,7 +271,7 @@ export const GoalBatchManageView: React.FC<GoalBatchManageViewProps> = ({
     };
 
     return (
-        <div className="h-full bg-[#faf9f6] flex flex-col pt-[env(safe-area-inset-top)]">
+        <div className="h-full bg-[#faf9f6] flex flex-col pt-[var(--app-safe-area-top)]">
             <div className="h-14 flex items-center justify-between px-5 bg-[#fdfbf7] border-b border-stone-100 sticky top-0 z-20">
                 <button onClick={onBack} className="p-2 -ml-2 text-stone-400 hover:text-stone-600 transition-colors">
                     <X size={24} />

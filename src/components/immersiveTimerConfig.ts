@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file immersiveTimerConfig.ts
  * @input None
  * @output Shared black-and-white immersive timer presentation constants
@@ -11,7 +11,7 @@ export const IMMERSIVE_TIMER_CONTROL_IDS = ['back', 'submit', 'orientation', 'fo
 export const IMMERSIVE_TIMER_FONT_FAMILY = '"Kode Mono", "Noto Sans Mono CJK SC", "Microsoft YaHei", monospace';
 export const IMMERSIVE_TIMER_FONT_WEIGHT = 700;
 export const IMMERSIVE_TIMER_LETTER_SPACING = '0.01em';
-export const IMMERSIVE_TIMER_TOP_INSET = 'max(env(safe-area-inset-top, 0px), var(--status-bar-height, 0px))';
+export const IMMERSIVE_TIMER_TOP_INSET = 'max(var(--app-safe-area-top), var(--status-bar-height, 0px))';
 export const IMMERSIVE_TIMER_DIGIT_SLOT_WIDTH = '2.45ch';
 export const IMMERSIVE_TIMER_DIGIT_SLOT_WIDTH_PER_CHARACTER = 1.12;
 export const IMMERSIVE_TIMER_SEPARATOR_SLOT_WIDTH = '0';

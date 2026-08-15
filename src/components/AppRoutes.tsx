@@ -389,7 +389,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         }
 
         return (
-            <div className="fixed inset-0 z-[90] flex flex-col bg-[#faf9f6] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] font-serif text-stone-900 animate-in slide-in-from-right duration-300">
+            <div className="fixed inset-0 z-[90] flex flex-col bg-[#faf9f6] pb-[env(safe-area-inset-bottom)] pt-[var(--app-safe-area-top)] font-serif text-stone-900 animate-in slide-in-from-right duration-300">
                 <header className="sticky top-0 z-20 grid h-14 shrink-0 grid-cols-[1.5rem_1fr_1.5rem] items-center border-b border-stone-100 bg-[#faf9f6]/92 px-4 backdrop-blur-md">
                     <button
                         type="button"

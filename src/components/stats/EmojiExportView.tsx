@@ -430,7 +430,7 @@ export const EmojiExportView: React.FC<EmojiExportViewProps> = ({
       `}</style>
 
       {/* Header */}
-      <div className="flex-shrink-0 pt-[env(safe-area-inset-top)] bg-white">
+      <div className="flex-shrink-0 pt-[var(--app-safe-area-top)] bg-white">
         <div className="flex items-center justify-between gap-3 px-4 h-14 border-b border-stone-100 bg-white">
           <button onClick={onBack} className="text-stone-400 hover:text-stone-600 p-1">
             <ChevronLeft size={24} />

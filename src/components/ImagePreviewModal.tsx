@@ -120,7 +120,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
             {({ zoomIn, zoomOut }) => (
               <>
                 <div className="absolute inset-0 pointer-events-none z-[60]">
-                  <div className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-50 pointer-events-auto">
+                  <div className="absolute top-[calc(1rem+var(--app-safe-area-top))] right-4 z-50 pointer-events-auto">
                     <ImagePreviewControls
                       onZoomIn={zoomIn}
                       onZoomOut={zoomOut}

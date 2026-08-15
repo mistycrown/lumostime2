@@ -1430,7 +1430,7 @@ export const CollectionSettingsView: React.FC<CollectionSettingsViewProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-[#faf9f6] animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-[#faf9f6] animate-in slide-in-from-right duration-300 pt-[var(--app-safe-area-top)] pb-[env(safe-area-inset-bottom)]">
       {!isManagingCollections ? (
         <div className="sticky top-0 z-10 border-b border-stone-200 bg-[#faf9f6]/96 backdrop-blur-sm">
         <div className="relative mx-auto flex h-14 max-w-5xl items-center px-5">
