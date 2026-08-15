@@ -1,6 +1,6 @@
 # 数据同步与导出
 
-[查看数据同步详细教程](https://my.feishu.cn/wiki/B11xw9HLzi4dkok9V29c5mygnbf?from=from_copylink)
+[点击此处查看数据同步云服务配置详细教程](https://my.feishu.cn/wiki/B11xw9HLzi4dkok9V29c5mygnbf?from=from_copylink)
 
 LumosTime 坚持 **本地优先** 策略，数据默认保存在本地。
 

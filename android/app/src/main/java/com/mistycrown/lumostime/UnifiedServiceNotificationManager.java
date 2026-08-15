@@ -1,12 +1,13 @@
 /**
  * @file UnifiedServiceNotificationManager.java
- * @input Floating-window runtime state, assistant-agent runtime state, app focus sessions, and widget runtime state
+ * @input Floating-window service and side-bubble state, assistant-agent runtime state, app focus sessions, and widget runtime state
  * @output A single shared Android foreground-status notification for background LumosTime services
  * @pos Native Helper
  * @description Keeps the floating window service, assistant agent service, and focus-only foreground service on one shared persistent Android notification while rendering active timer labels directly in the notification title.
  * @updated 2026-06-14: Exposed the persisted assistant enabled flag so alarm wakeups and service restarts can refuse to revive the agent after the user turns polling off.
  * @updated 2026-05-09: Added app-focus session syncing, widget-runtime title aggregation, and dedicated focus-only foreground-service handoff so active timers can keep the persistent notification visible without the floating window or assistant poller.
  * @updated 2026-04-27: Exposed assistant-runtime activity lookup so plugin-side user-turn and task-state signals only wake the service when the assistant loop is already active.
+ * @updated 2026-08-15: Separates shared overlay-service activity from side-bubble visibility so app-awareness notifications never claim the bubble is enabled.
  */
 package com.mistycrown.lumostime;
 
@@ -40,6 +41,7 @@ public final class UnifiedServiceNotificationManager {
 
     private static final String KEY_FLOATING_ACTIVE = "floating_active";
     private static final String KEY_FLOATING_FOCUSING = "floating_focusing";
+    private static final String KEY_FLOATING_SERVICE_ACTIVE = "floating_service_active";
     private static final String KEY_ASSISTANT_ACTIVE = "assistant_active";
     private static final String KEY_ASSISTANT_ENABLED = "assistant_enabled";
     private static final String KEY_ASSISTANT_RANDOM_CHECKIN = "assistant_random_checkin";
@@ -94,10 +96,17 @@ public final class UnifiedServiceNotificationManager {
             .apply();
     }
 
+    public static void setFloatingWindowServiceState(Context context, boolean active) {
+        prefs(context).edit()
+            .putBoolean(KEY_FLOATING_SERVICE_ACTIVE, active)
+            .apply();
+    }
+
     public static void clearFloatingWindowState(Context context) {
         prefs(context).edit()
             .putBoolean(KEY_FLOATING_ACTIVE, false)
             .putBoolean(KEY_FLOATING_FOCUSING, false)
+            .putBoolean(KEY_FLOATING_SERVICE_ACTIVE, false)
             .apply();
     }
 
@@ -157,6 +166,7 @@ public final class UnifiedServiceNotificationManager {
 
         SharedPreferences sharedPreferences = prefs(context);
         return !sharedPreferences.getBoolean(KEY_FLOATING_ACTIVE, false)
+            && !sharedPreferences.getBoolean(KEY_FLOATING_SERVICE_ACTIVE, false)
             && !sharedPreferences.getBoolean(KEY_ASSISTANT_ACTIVE, false)
             && hasActiveFocusSessions(context);
     }
@@ -164,6 +174,7 @@ public final class UnifiedServiceNotificationManager {
     private static boolean hasNotificationDemand(Context context) {
         SharedPreferences sharedPreferences = prefs(context);
         return sharedPreferences.getBoolean(KEY_FLOATING_ACTIVE, false)
+            || sharedPreferences.getBoolean(KEY_FLOATING_SERVICE_ACTIVE, false)
             || sharedPreferences.getBoolean(KEY_ASSISTANT_ACTIVE, false)
             || hasActiveFocusSessions(context);
     }
@@ -207,6 +218,7 @@ public final class UnifiedServiceNotificationManager {
         SharedPreferences sharedPreferences = prefs(context);
         boolean floatingActive = sharedPreferences.getBoolean(KEY_FLOATING_ACTIVE, false);
         boolean floatingFocusing = sharedPreferences.getBoolean(KEY_FLOATING_FOCUSING, false);
+        boolean floatingServiceActive = sharedPreferences.getBoolean(KEY_FLOATING_SERVICE_ACTIVE, false);
         boolean assistantActive = sharedPreferences.getBoolean(KEY_ASSISTANT_ACTIVE, false);
 
         if (floatingActive && assistantActive) {
@@ -226,6 +238,10 @@ public final class UnifiedServiceNotificationManager {
 
         if (assistantActive) {
             return buildAssistantStatusText(sharedPreferences, System.currentTimeMillis());
+        }
+
+        if (floatingServiceActive) {
+            return "\u5e94\u7528\u611f\u77e5\u670d\u52a1\u8fd0\u884c\u4e2d";
         }
 
         return "LumosTime \u6b63\u5728\u540e\u53f0\u8fd0\u884c";

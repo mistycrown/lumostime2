@@ -4,6 +4,7 @@
  * @output A full-day scrollable schedule canvas with actionable idle-time gaps, plan drops, quick-color record creation, editable time bounds, and touch pinch zoom
  * @pos Component
  * @description Positions real records and virtual planning blocks on a 00:00-24:00 time grid for the Chronicle split layout.
+ * @updated 2026-08-13: Hides notes while a time block is being edited so long text cannot extend beyond its bounds.
  * @updated 2026-08-06: Lets larger blocks show full multiline notes while keeping shorter blocks on a single truncated line.
  * @updated 2026-07-31: Prevents locked recurring auto-Plan blocks from entering long-press time editing or drag/resize adjustment.
  * @updated 2026-07-30: Displays compact two-digit hour-only grid labels while preserving full block start/end times.
@@ -1186,7 +1187,7 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
                       {activityLabel && `#${activityLabel}`}{linkedTodoLabel && `${activityLabel ? ' ' : ''}@${linkedTodoLabel}`}{linkedScopeNames.map((scopeName) => ` %${scopeName}`).join('')}
                     </span>
                   )}
-                  {showNote && noteText && (
+                  {!isEditing && showNote && noteText && (
                     <span
                       className={`mt-0.5 block text-[11px] leading-4 text-stone-500 ${
                         isExpandedNote ? 'whitespace-pre-wrap break-words' : 'truncate'
