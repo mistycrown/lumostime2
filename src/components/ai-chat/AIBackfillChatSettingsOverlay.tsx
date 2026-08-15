@@ -46,7 +46,7 @@ export const AIBackfillChatSettingsOverlay: React.FC<AIBackfillChatSettingsOverl
       <div
         className="flex h-full flex-col"
         style={{
-          paddingTop: 'env(safe-area-inset-top)',
+          paddingTop: 'var(--app-safe-area-top)',
           paddingBottom: 'env(safe-area-inset-bottom)'
         }}
       >

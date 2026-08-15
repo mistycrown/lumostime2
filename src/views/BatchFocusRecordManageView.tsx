@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file BatchFocusRecordManageView.tsx
  * @input Logs, Categories, Scopes, Todos
  * @output Batch operations on focus records
@@ -1424,7 +1424,7 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
     const endDateValid = isValidDateFormat(endDate);
 
     return (
-        <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+        <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[var(--app-safe-area-top)] pb-[env(safe-area-inset-bottom)]">
             {/* Header */}
             <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0">
                 <button

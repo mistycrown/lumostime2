@@ -76,6 +76,12 @@
 @layer base {
   :root {
     --font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Source Han Serif CN', 'Songti SC', 'STSong', 'SimSun', 'Microsoft YaHei', serif;
+    --app-safe-area-top: env(safe-area-inset-top);
+  }
+
+  html[data-native-android-top-inset] {
+    /* The native EdgeToEdge plugin already applies this inset to the WebView. */
+    --app-safe-area-top: 0px;
   }
   
   body {

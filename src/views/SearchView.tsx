@@ -115,7 +115,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
   const totalResults = countSearchAllResults(searchResults);
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col pt-[env(safe-area-inset-top)] animate-in slide-in-from-right duration-300">
+    <div className="fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col pt-[var(--app-safe-area-top)] animate-in slide-in-from-right duration-300">
       <div className="flex items-center gap-3 px-4 pt-4 pb-3 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md sticky top-0">
         <button
           onClick={onClose}

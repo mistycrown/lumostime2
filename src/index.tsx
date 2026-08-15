@@ -9,6 +9,7 @@
  * @updated 2026-05-17: 扩展了桌面小组件的分流路由逻辑，新增对 DesktopQuickWidgetView（小事清单小组件）的渲染路由分发。
  * @updated 2026-05-17: Added a dedicated transparent desktop quick-editor window route to the widget boot switch.
  * @updated 2026-05-17: Added a dedicated desktop-widget boot path so Electron can render a lightweight today-tasks window or month planning calendar window without mounting the full app shell.
+ * @updated 2026-08-15: Marks native Android documents so CSS does not reserve a duplicate top status-bar inset.
  * @updated 2026-08-11: Starts optional error reporting and records normal-app startup attempts for timeout diagnosis.
  */
 import React from 'react';
@@ -25,6 +26,8 @@ import { DesktopTimerWidgetView } from './views/desktop/DesktopTimerWidgetView';
 import { DesktopTodoQuickEditorWindowView } from './views/desktop/DesktopTodoQuickEditorWindowView';
 import { initializeErrorReporting } from './services/errorReporting';
 import { startStartupDiagnostics } from './services/startupDiagnostics';
+import { Capacitor } from '@capacitor/core';
+import { shouldUseNativeAndroidTopInset } from './utils/topSafeArea';
 
 const APP_READY_EVENT = 'lumostime:app-ready';
 const getRendererBootTimingNow = (): number => (
@@ -61,6 +64,11 @@ const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error('Could not find root element to mount to');
 }
+
+document.documentElement.toggleAttribute(
+  'data-native-android-top-inset',
+  shouldUseNativeAndroidTopInset(Capacitor.isNativePlatform(), Capacitor.getPlatform())
+);
 
 const root = ReactDOM.createRoot(rootElement);
 console.info(

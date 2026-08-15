@@ -98,7 +98,7 @@ export const AIBackfillChatDreamOverlay: React.FC<AIBackfillChatDreamOverlayProp
     <div
       className="flex h-full flex-col bg-[linear-gradient(180deg,#f7f5f1_0%,#f3f1ec_100%)]"
       style={{
-        paddingTop: 'env(safe-area-inset-top)',
+        paddingTop: 'var(--app-safe-area-top)',
         paddingBottom: 'env(safe-area-inset-bottom)'
       }}
     >

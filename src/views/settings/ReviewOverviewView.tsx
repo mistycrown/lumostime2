@@ -251,7 +251,7 @@ export const ReviewOverviewView: React.FC<ReviewOverviewViewProps> = ({
     const tone = REVIEW_TONES[section.kind];
 
     return (
-      <div className="fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] font-serif text-stone-900 animate-in slide-in-from-right duration-300">
+      <div className="fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] pb-[env(safe-area-inset-bottom)] pt-[var(--app-safe-area-top)] font-serif text-stone-900 animate-in slide-in-from-right duration-300">
         <header className="sticky top-0 z-10 grid h-14 shrink-0 grid-cols-[1.5rem_1fr_1.5rem] items-center border-b border-stone-100 bg-[#fdfbf7]/90 px-4 backdrop-blur-md">
           <button
             type="button"
@@ -310,7 +310,7 @@ export const ReviewOverviewView: React.FC<ReviewOverviewViewProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] font-serif text-stone-900 animate-in slide-in-from-right duration-300">
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] pb-[env(safe-area-inset-bottom)] pt-[var(--app-safe-area-top)] font-serif text-stone-900 animate-in slide-in-from-right duration-300">
       <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 border-b border-stone-100 bg-[#fdfbf7]/90 px-4 backdrop-blur-md">
         <button
           type="button"

@@ -2292,7 +2292,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
         <div className="page-background-overlay absolute inset-0 -z-10" style={{ backgroundColor: 'rgba(250, 249, 246, 0.92)' }}></div>
 
-        <div className={`relative z-10 flex h-full flex-col pb-[calc(3rem+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] ${isWeekScheduleView ? 'px-4 md:px-8' : ''} ${useReducedEffects ? '' : 'backdrop-blur-[2px]'}`}>
+        <div className={`relative z-10 flex h-full flex-col pb-[calc(3rem+env(safe-area-inset-bottom))] pt-[var(--app-safe-area-top)] ${isWeekScheduleView ? 'px-4 md:px-8' : ''} ${useReducedEffects ? '' : 'backdrop-blur-[2px]'}`}>
           {isWeekScheduleView ? (
             <>
               <div className="shrink-0 border-b border-stone-300/70">

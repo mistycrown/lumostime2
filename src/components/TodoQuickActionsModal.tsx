@@ -360,7 +360,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
     ? QUICK_ACTION_MOBILE_EDIT_KEYBOARD_BREATHING_ROOM
     : QUICK_ACTION_KEYBOARD_BREATHING_ROOM;
   const effectiveKeyboardBottomInset = Math.max(0, keyboardBottomInset - keyboardBreathingRoom);
-  const sheetMaxHeight = `calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - ${effectiveKeyboardBottomInset}px - 4rem)`;
+  const sheetMaxHeight = `calc(100vh - var(--app-safe-area-top) - env(safe-area-inset-bottom) - ${effectiveKeyboardBottomInset}px - 4rem)`;
 
   return (
     <div

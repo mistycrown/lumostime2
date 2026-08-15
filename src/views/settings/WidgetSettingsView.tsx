@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file WidgetSettingsView.tsx
  * @input Widget templates, categories, daily check templates, todos, scopes, Android bridge availability
  * @output A template-based widget configuration page with per-slot mixed-type editing
@@ -755,7 +755,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] font-serif animate-in slide-in-from-right duration-300">
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] pt-[var(--app-safe-area-top)] pb-[env(safe-area-inset-bottom)] font-serif animate-in slide-in-from-right duration-300">
       <div className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-stone-100 bg-[#fdfbf7]/80 px-4 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <button

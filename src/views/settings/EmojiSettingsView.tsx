@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file EmojiSettingsView.tsx
  * @updated 2026-07-21: Reworked effect notices and edit controls for dark-mode contrast.
  * @description Emoji 和 Sticker 设置页面 - 管理心情日历的 emoji 组、emoji 渲染风格和 Selector 默认页
@@ -353,7 +353,7 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-stone-50 flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+        <div className="fixed inset-0 z-50 bg-stone-50 flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[var(--app-safe-area-top)] pb-[env(safe-area-inset-bottom)]">
             {/* Header */}
             <div className="flex items-center gap-3 px-4 h-14 border-b border-stone-100 bg-white/80 backdrop-blur-md sticky top-0">
                 <button

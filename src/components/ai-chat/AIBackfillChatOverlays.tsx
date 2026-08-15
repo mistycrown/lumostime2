@@ -53,7 +53,7 @@ export const AssistantBackgroundHistoryOverlay: React.FC<AssistantBackgroundHist
     <div
       className="flex h-full flex-col bg-[#f3f4f6]"
       style={{
-        paddingTop: 'env(safe-area-inset-top)',
+        paddingTop: 'var(--app-safe-area-top)',
         paddingBottom: 'env(safe-area-inset-bottom)'
       }}
     >
@@ -173,7 +173,7 @@ export const AssistantLetterHistoryOverlay: React.FC<AssistantLetterHistoryOverl
     <div
       className="flex h-full flex-col bg-[#f3f4f6]"
       style={{
-        paddingTop: 'env(safe-area-inset-top)',
+        paddingTop: 'var(--app-safe-area-top)',
         paddingBottom: 'env(safe-area-inset-bottom)'
       }}
     >
@@ -353,7 +353,7 @@ export const AIChatDebugViewerOverlay: React.FC<AIChatDebugViewerOverlayProps> =
     <div
       className="flex h-full flex-col bg-[#f3f4f6]"
       style={{
-        paddingTop: 'env(safe-area-inset-top)',
+        paddingTop: 'var(--app-safe-area-top)',
         paddingBottom: 'env(safe-area-inset-bottom)'
       }}
     >

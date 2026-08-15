@@ -570,7 +570,7 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
     };
 
     return (
-        <div className="h-full bg-[#faf9f6] flex flex-col pt-[env(safe-area-inset-top)]">
+        <div className="h-full bg-[#faf9f6] flex flex-col pt-[var(--app-safe-area-top)]">
             {/* Header */}
             <div className="h-14 flex items-center justify-between px-5 bg-[#fdfbf7] border-b border-stone-100 sticky top-0 z-20">
                 <button onClick={onBack} className="p-2 -ml-2 text-stone-400 hover:text-stone-600 transition-colors">

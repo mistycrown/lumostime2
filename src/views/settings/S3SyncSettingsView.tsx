@@ -610,7 +610,7 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
   };
 
   return (
-    <div className="sync-settings-view fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] font-serif animate-in slide-in-from-right duration-300">
+    <div className="sync-settings-view fixed inset-0 z-50 flex flex-col bg-[#fdfbf7] pb-[env(safe-area-inset-bottom)] pt-[var(--app-safe-area-top)] font-serif animate-in slide-in-from-right duration-300">
       <div className="sticky top-0 flex h-14 items-center gap-3 border-b border-stone-100 bg-[#fdfbf7]/80 px-4 backdrop-blur-md">
         <button onClick={onBack} className="p-1 text-stone-400 hover:text-stone-600">
           <ChevronLeft size={24} />

@@ -723,9 +723,9 @@ export const JournalView: React.FC<JournalViewProps> = ({
             />
 
             {/* Sticky Header - 标题栏随滚动缩小 */}
-            <header className={`sticky top-0 z-40 transition-all duration-300 pt-[env(safe-area-inset-top)] ${isScrolled
-                ? `bg-[#faf9f6]/90 ${useReducedEffects ? '' : 'backdrop-blur-md'} shadow-sm h-[calc(3rem+env(safe-area-inset-top))]`
-                : `bg-[#faf9f6]/80 ${useReducedEffects ? '' : 'backdrop-blur-sm'} h-[calc(3.5rem+env(safe-area-inset-top))]`
+            <header className={`sticky top-0 z-40 transition-all duration-300 pt-[var(--app-safe-area-top)] ${isScrolled
+                ? `bg-[#faf9f6]/90 ${useReducedEffects ? '' : 'backdrop-blur-md'} shadow-sm h-[calc(3rem+var(--app-safe-area-top))]`
+                : `bg-[#faf9f6]/80 ${useReducedEffects ? '' : 'backdrop-blur-sm'} h-[calc(3.5rem+var(--app-safe-area-top))]`
                 }`}>
                 <div className="max-w-xl mx-auto px-6 h-full flex items-center justify-center relative">
                     <h1 className={`font-serif text-stone-800 font-bold transition-all duration-300 ${isScrolled ? 'text-[16px]' : 'text-[18px]'

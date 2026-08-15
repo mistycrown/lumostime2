@@ -277,7 +277,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 bg-[#faf9f6] z-50 flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+        <div className="fixed inset-0 bg-[#faf9f6] z-50 flex flex-col pt-[var(--app-safe-area-top)] pb-[env(safe-area-inset-bottom)]">
             {/* Sticky Header */}
             <header className={`sticky top-0 z-40 transition-all duration-300 ${isScrolled
                 ? 'bg-[#faf9f6]/90 backdrop-blur-md shadow-sm h-12'

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file ImmersiveTimer.tsx
  * @input elapsed time, onExit callback, onSubmit callback
  * @output Immersive fullscreen timer display and session submit trigger
@@ -177,7 +177,7 @@ export const ImmersiveTimer: React.FC<ImmersiveTimerProps> = ({ elapsed, onExit,
   const displaySignature = `${displaySource}-${displayFormat}-${selectedFontId}-${displayParts.map((part) => part.value).join('')}`;
   const selectedArt = getImmersiveArtOptionById(selectedArtId);
   const selectedFont = getImmersiveTimerFontOptionById(selectedFontId);
-  const topControlsInset = 'calc(0.75rem + env(safe-area-inset-top, 0px))';
+  const topControlsInset = 'calc(0.75rem + var(--app-safe-area-top))';
   const leftControlsInset = 'calc(1rem + env(safe-area-inset-left, 0px))';
   const rightControlsInset = 'calc(1rem + env(safe-area-inset-right, 0px))';
 

@@ -433,13 +433,13 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
 
 
     return (
-        <div className="obsidian-export-view fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+        <div className="obsidian-export-view fixed inset-0 z-50 bg-[#fdfbf7] flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[var(--app-safe-area-top)] pb-[env(safe-area-inset-bottom)]">
             {/* Header */}
             <div
                 className="flex items-center px-4 border-b border-stone-100 bg-[#fdfbf7]/80 backdrop-blur-md shrink-0 z-10 gap-3 sticky top-0 box-border"
                 style={{
-                    height: 'calc(3.5rem + env(safe-area-inset-top))',
-                    paddingTop: 'env(safe-area-inset-top)'
+                    height: 'calc(3.5rem + var(--app-safe-area-top))',
+                    paddingTop: 'var(--app-safe-area-top)'
                 }}
             >
                 <button

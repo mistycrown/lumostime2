@@ -259,10 +259,10 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
         style={{ backgroundColor: `rgba(250, 249, 246, ${panelOverlayOpacity})` }}
       />
       <header
-        className={`sticky top-0 z-40 transition-all duration-300 pt-[env(safe-area-inset-top)] ${
+        className={`sticky top-0 z-40 transition-all duration-300 pt-[var(--app-safe-area-top)] ${
           isScrolled
-            ? `bg-[#faf9f6]/90 ${useReducedEffects ? '' : 'backdrop-blur-md'} shadow-sm h-[calc(3rem+env(safe-area-inset-top))]`
-            : `bg-[#faf9f6]/80 ${useReducedEffects ? '' : 'backdrop-blur-sm'} h-[calc(3.5rem+env(safe-area-inset-top))]`
+            ? `bg-[#faf9f6]/90 ${useReducedEffects ? '' : 'backdrop-blur-md'} shadow-sm h-[calc(3rem+var(--app-safe-area-top))]`
+            : `bg-[#faf9f6]/80 ${useReducedEffects ? '' : 'backdrop-blur-sm'} h-[calc(3.5rem+var(--app-safe-area-top))]`
         }`}
       >
         <div className="max-w-xl mx-auto px-6 h-full flex items-center justify-center">
