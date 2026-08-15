@@ -9,6 +9,7 @@
  * @updated 2026-07-22: Draws an explicit top inset backdrop beneath Android 15's transparent status bar.
  * @updated 2026-08-10: Reapplies immersive system-bar hiding after Android orientation and focus transitions, while keeping web controls above the native status-bar backdrop.
  * @updated 2026-08-15: Hides a native ActionBar restored by certain Android activity-alias theme fallbacks so it cannot cover the WebView header.
+ * @updated 2026-08-15: Installs the AndroidX splash screen before Activity creation so MIUI applies the configured post-splash NoActionBar theme.
  */
 package com.mistycrown.lumostime;
 
@@ -25,6 +26,7 @@ import android.widget.FrameLayout;
 
 import androidx.appcompat.app.ActionBar;
 import androidx.core.graphics.Insets;
+import androidx.core.splashscreen.SplashScreen;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -39,6 +41,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        SplashScreen.installSplashScreen(this);
         registerPlugin(LumosNfcPlugin.class);
         registerPlugin(FocusNotificationPlugin.class);
         registerPlugin(AssistantAgentPlugin.class);
