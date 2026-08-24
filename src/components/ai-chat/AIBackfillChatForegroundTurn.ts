@@ -5,6 +5,7 @@
  * @pos Component Support (AI Integration)
  * @description Extracts the pre-request foreground turn setup and the ordinary unified-turn execution path out of AIBackfillChatModal so the main send handler becomes a thin dispatcher.
  * @updated 2026-07-06: Passes local-query history into foreground tool-call application so principle/self-belief writes can require a prior library lookup.
+ * @updated 2026-08-24: Captures reminder and memory snapshots on foreground replies so retry can revert every persistent side effect.
  * @updated 2026-07-06: Enforced structured log-query routing, duplicate-query rejection, and clearer local-query summaries so repeated foreground retrieval rounds must actually change the retrieval expression.
  * @updated 2026-07-05: Surfaced local-query keywords and hit summaries in pending chat feedback, and added debug sections for query request/result/retry rounds.
  * @updated 2026-07-05: Wired the foreground local-query loop back into real category/review data and fed accumulated query history into follow-up unified turns.
@@ -27,6 +28,8 @@ import type {
   AssistantLocalQueryRequest,
   AssistantLocalQueryResult,
   AssistantLocalQueryResultItem,
+  AssistantMemory,
+  AssistantReminder,
   AssistantTurnDictionaryContext,
   AssistantUnifiedTurnOutput
 } from '../../types/assistant';
@@ -69,8 +72,10 @@ interface ReplacePendingResultOptions {
   displayParts?: string[];
   localQueryResults?: AssistantLocalQueryResult[];
   memoryUpdates?: AIChatMemoryUpdateSection[];
+  memoryBefore?: AssistantMemory;
   reasoning?: AssistantUnifiedTurnOutput['reasoning'];
   reminderUpdates?: string[];
+  remindersBefore?: AssistantReminder[];
   retryInput?: string;
   retrySourceUserMessageId?: string;
   tone?: 'normal' | 'system' | 'error' | 'pending';
@@ -79,8 +84,14 @@ interface ReplacePendingResultOptions {
 interface RunOrdinaryForegroundTurnOptions {
   activePersona: AIChatPersona;
   activeRequestRef: { current: { controller: AbortController; pendingMessageId: string; sessionId: string } | null };
-  applyAssistantMemoryPatch: (patch?: AssistantUnifiedTurnOutput['memoryPatch']) => AIChatMemoryUpdateSection[];
-  applyUnifiedReminders: (output: AssistantUnifiedTurnOutput) => string[];
+  applyAssistantMemoryPatch: (patch?: AssistantUnifiedTurnOutput['memoryPatch']) => {
+    before: AssistantMemory;
+    updates: AIChatMemoryUpdateSection[];
+  } | null;
+  applyUnifiedReminders: (output: AssistantUnifiedTurnOutput) => {
+    before: AssistantReminder[];
+    updates: string[];
+  };
   applyUnifiedToolCalls: (toolCalls: any[], sourceText: string, localQueryHistory?: AssistantLocalQueryResult[]) => AppliedChatAction[];
   assistantMemoryEnabled: boolean;
   buildDictionaryContext: () => AssistantTurnDictionaryContext | undefined;
@@ -692,10 +703,12 @@ export const runOrdinaryForegroundTurn = async ({
       : [];
     const unifiedSuccessCount = unifiedAppliedActions.filter((action) => action.status === 'applied').length;
 
-    const reminderUpdates = applyUnifiedReminders(outputForReply);
-    const memoryUpdates = assistantMemoryEnabled && outputForReply.memoryAction === 'update_memory'
+    const reminderResult = applyUnifiedReminders(outputForReply);
+    const memoryResult = assistantMemoryEnabled && outputForReply.memoryAction === 'update_memory'
       ? applyAssistantMemoryPatch(outputForReply.memoryPatch)
-      : [];
+      : null;
+    const reminderUpdates = reminderResult.updates;
+    const memoryUpdates = memoryResult?.updates || [];
 
     const rawUnifiedContent = resolveAssistantReplyContent(
       outputForReply,
@@ -715,7 +728,11 @@ export const runOrdinaryForegroundTurn = async ({
       debugSections,
       ...(unifiedAppliedActions.length > 0 ? { appliedActions: unifiedAppliedActions } : {}),
       ...(memoryUpdates.length > 0 ? { memoryUpdates: memoryUpdates } : {}),
-      ...(reminderUpdates.length > 0 ? { reminderUpdates } : {})
+      ...(memoryResult ? { memoryBefore: memoryResult.before } : {}),
+      ...(reminderUpdates.length > 0 ? { reminderUpdates } : {}),
+      ...(reminderUpdates.length > 0 ? { remindersBefore: reminderResult.before } : {}),
+      retryInput: trimmedText,
+      retrySourceUserMessageId: userMessageId
     });
     if (unifiedAppliedActions.length > 0 || reminderUpdates.length > 0) {
       notifyAssistantTaskStateChanged();

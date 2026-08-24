@@ -4,7 +4,7 @@
  * @output Native Methods
  * @pos Plugin
  * @description Defines the interface for the AppUsage capacitor plugin, used for tracking foreground apps, managing app association rules, and controlling per-app ignore state on Android.
- * @updated 2026-07-06: Added explicit pending app-awareness acknowledgement methods so Web reconciliation can retry failed native events.
+ * @updated 2026-08-24: Added explicit workflow cancellation so the Android detector can clear its foreground-app deduplication cache.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -82,6 +82,7 @@ export interface AppUsagePlugin {
     acknowledgePendingAppAwarenessFinish(): Promise<void>;
     showAppAwarenessOverlay(options: { payload: AppAwarenessOverlayPayload }): Promise<void>;
     hideAppAwarenessOverlay(): Promise<void>;
+    cancelAppAwarenessWorkflow(): Promise<void>;
     stopCurrentAppAwarenessTimer(): Promise<void>;
     startMonitor(): Promise<void>;
     stopMonitor(): Promise<void>;

@@ -5,6 +5,7 @@
  * @pos Component Support (AI Integration)
  * @description Extracts the heavy conversation rendering UI out of AIBackfillChatModal so the modal can focus on orchestration while the message list, writeback cards, and per-message metadata remain behaviorally unchanged.
  * @updated 2026-07-06: Normalized assistant-letter result timestamps to local display strings with timezone so chat cards match the letter detail overlay.
+ * @updated 2026-08-24: Showed in-place retry controls for completed foreground replies as well as retryable errors.
  * @updated 2026-06-07: Added weekly/monthly newspaper result cards so periodic AI newspaper writeback can open dedicated full-screen newspaper pages from chat results.
  * @updated 2026-05-21: Treat assistant messages as standalone avatar groups so each AI reply starts with an avatar while multi-bubble displayParts still share one avatar.
  * @updated 2026-05-18: Added configurable width classes so compact desktop AI shells can reuse the conversation renderer without forcing the full-screen modal measure.
@@ -912,7 +913,7 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
               </div>
             )}
 
-            {!isUser && tone === 'error' && message.retryInput && (
+            {!isUser && message.retryInput && (tone === 'error' || !message.dreamRetryYearMonth) && (
               <div className="pl-1">
                 <button
                   onClick={() => onRetryMessage(message)}

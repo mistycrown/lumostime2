@@ -26,6 +26,7 @@
  * @updated 2026-08-09: Added the configurable shortcut to the daily-check overview page.
  * @updated 2026-08-10: Records Timeline as the return target when opening daily-check overview.
  * @updated 2026-08-09: Passes actionable real-record idle gaps into the split timeline canvas while excluding plan blocks from gap detection.
+ * @updated 2026-08-24: Added an always-leftmost More menu for timeline shortcuts that are not pinned to the header.
  */
 import React, { useMemo, useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -58,7 +59,7 @@ import { toCssColor } from '../utils/colorUtils';
 import { TimelineStyleRail } from '../components/TimelineStyleRail';
 import { TimelineStyleAdjuster } from '../components/TimelineStyleAdjuster';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
-import { type TimelineQuickActionKey } from '../constants/timelineQuickActions';
+import { TIMELINE_QUICK_ACTION_OPTIONS, type TimelineQuickActionKey } from '../constants/timelineQuickActions';
 import { formatCompletedTodoLabel } from '../utils/todoHierarchyUtils';
 import { TimelineTodoSidebar } from '../components/TimelineTodoSidebar';
 import { TimelineScheduleCanvas, TimelineScheduleCanvasHandle, type TimelineQuickColorActivity } from '../components/TimelineScheduleCanvas';
@@ -251,6 +252,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
     const [isQuickColorSidebarCollapsed, setIsQuickColorSidebarCollapsed] = useState(true);
     const [selectedQuickColorTarget, setSelectedQuickColorTarget] = useState<TimelineQuickColorActivity | null>(null);
     const [isQuickColorContinuousMode, setIsQuickColorContinuousMode] = useState(false);
+    const [isTimelineQuickActionsMenuOpen, setIsTimelineQuickActionsMenuOpen] = useState(false);
     const [showTimePalDebugger, setShowTimePalDebugger] = useState(false);
     const {
         isGalleryViewOpen,
@@ -555,6 +557,10 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
     const configuredQuickActions = timelineQuickActions
         .map((actionKey) => quickActionMap[actionKey])
         .filter(Boolean);
+    const moreQuickActions = TIMELINE_QUICK_ACTION_OPTIONS
+        .filter((option) => !timelineQuickActions.includes(option.key))
+        .map((option) => ({ option, action: quickActionMap[option.key] }))
+        .filter((item) => Boolean(item.action));
 
     const logCollectionNames = useMemo(() => {
         const collectionById = new Map(collections.map((collection) => [collection.id, collection]));
@@ -1396,6 +1402,48 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                     todos={todos}
                     extraHeaderControls={
                         <>
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsTimelineQuickActionsMenuOpen((open) => !open)}
+                                    className="rounded-full p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600"
+                                    title="更多"
+                                    aria-label="更多快捷操作"
+                                    aria-haspopup="menu"
+                                    aria-expanded={isTimelineQuickActionsMenuOpen}
+                                >
+                                    <MoreHorizontal size={20} />
+                                </button>
+                                {isTimelineQuickActionsMenuOpen && (
+                                    <>
+                                        <div
+                                            className="fixed inset-0 z-[100]"
+                                            onClick={() => setIsTimelineQuickActionsMenuOpen(false)}
+                                        />
+                                        <div
+                                            role="menu"
+                                            aria-label="更多快捷操作"
+                                            className="absolute left-0 top-full z-[110] mt-2 flex w-52 flex-col overflow-hidden rounded-xl border border-stone-100 bg-white py-1 shadow-xl animate-in fade-in zoom-in-95 duration-200 origin-top-left"
+                                        >
+                                            {moreQuickActions.map(({ option, action }) => (
+                                                <button
+                                                    key={option.key}
+                                                    type="button"
+                                                    role="menuitem"
+                                                    disabled={action.disabled}
+                                                    onClick={(event) => {
+                                                        setIsTimelineQuickActionsMenuOpen(false);
+                                                        action.onClick(event);
+                                                    }}
+                                                    className="flex w-full items-center px-3 py-2.5 text-left text-sm text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                                >
+                                                    <span className="truncate">{action.label}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                             {configuredQuickActions.map((action) => (
                                 <button
                                     key={action.label}

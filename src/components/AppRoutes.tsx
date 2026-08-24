@@ -293,7 +293,8 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         handleQuickActionMoveCategory,
         handleQuickActionUpgradeToProject,
         handleQuickActionDelete,
-        handleQuickActionUpdateTitle
+        handleQuickActionUpdateTitle,
+        handleQuickActionUpdateNote
     } = useTodoQuickActions({
         onSaveTodo: handleSaveTodo,
         onEditTodo: openEditTodoModal,
@@ -795,6 +796,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     openedAt={quickActionOpenedAt}
                     showUpgradeToProject={Boolean(quickActionTodo && isQuickTodo(quickActionTodo))}
                     onUpdateTitle={handleQuickActionUpdateTitle}
+                    onUpdateNote={handleQuickActionUpdateNote}
                 />
                 </>
             );

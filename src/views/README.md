@@ -2,6 +2,7 @@
 
 The `views/` directory contains all the React components that represent the distinct screens or pages of the LumosTime application. This layer is responsible for the presentation logic and user interaction.
 
+- Update 2026-08-24: `TagDetailView.tsx` now owns Activity custom attribute definition management and an actual-log-only attribute statistics tab; `FocusDetailView.tsx` persists the same fields into the active session.
 - Update 2026-08-10: `DailyCheckOverviewView.tsx` caches each row's current value and manual history before rendering, renders one full-width detail button per row, and uses `/` for a missing daily-check snapshot.
 - Update 2026-08-10: `DailyCheckOverviewView.tsx` and `DailyCheckDetailView.tsx` show `nightEarliestStart` checks against the completed previous night during the daytime.
 - Update 2026-08-10: `DailyCheckDetailView.tsx` presents an immediate loading screen, renders the current-month data first, and defers all-history statistics plus the 30-day trend until after first paint.
@@ -101,6 +102,7 @@ The views are designed as "dumb" or "presentational" components where possible, 
 - `TodoView.tsx`: Lowered the Todo sidebar utility trio again so its bottom expand/collapse button lands closer to the Record page's left-rail toggle position above the fixed navigation.
 - `SettingsView.tsx`, `TimelineView.tsx`: Swapped the `Collections` entry icon in both settings and the timeline quick-action bar from archive/book styling to a star for a consistent shortcut cue.
 - `TimelineView.tsx`, `timelineQuickActions.ts`: Added a `Collections` quick-action route so the timeline header can open `设置 > 内容 > Collections` through the same settings-subpage deep-link pattern already used by `原则库`.
+- `TimelineView.tsx`: Added an always-leftmost `更多` menu for timeline shortcuts that are not pinned in the configurable header slots.
 - `SettingsView.tsx`, `CollectionSettingsView.tsx`, and `DataCollectionSelector.tsx`: Moved the `Collection` feature entrance under `设置 > 内容`, then rebuilt the page around compact `◬`-led rows and a true mixed-item detail timeline that follows the app's detail-page timeline structure instead of oversized archive mock layouts.
 - `AppAwarenessSettingsView.tsx`, `AutoRecordSettingsView.tsx`: Android hardware back now closes the active app binding, workflow editor, or app-rule editor first, matching the visible back controls before returning to Settings.
 - `TodoView.tsx`, `TodoMonthView.tsx`: The Todo month planner now opens the shared quick-add schedule modal when users tap a day numeral, matching the week planner while preserving full-cell taps for expanding that day's detail rows.

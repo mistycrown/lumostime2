@@ -1,6 +1,7 @@
 /**
  * @file SessionContext.tsx
  * @description 绠＄悊娲诲姩璁℃椂浼氳瘽鐨勭姸鎬佸拰閫昏緫
+ * @updated 2026-08-24: Preserves Activity custom attribute values when an active focus session becomes logs.
  * @updated 2026-06-21: Returns started session ids so app-awareness overlay workflows can keep overtime reminders and native prompts linked to the exact active session.
  * @updated 2026-05-14: Prevents duplicate active sessions for the same category/activity pair so repeated NFC/deep-link deliveries cannot leave one timer still running after the other is stopped.
  * @updated 2026-05-09: Syncs app-origin active sessions into the native notification plugin so Android can render timer labels in the persistent status notification.
@@ -166,6 +167,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
                     linkedTodoId: session.linkedTodoId,
                     title: finalSessionData?.title || session.title,
                     note: finalSessionData?.note || session.note,
+                    attributeValues: finalSessionData?.attributeValues || session.attributeValues,
                     progressIncrement: finalSessionData?.progressIncrement,
                     focusScore: finalSessionData?.focusScore || session.focusScore,
                     moodScore: finalSessionData?.moodScore || session.moodScore,

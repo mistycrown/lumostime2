@@ -18,7 +18,8 @@ import {
   buildTimelinePlannedLog,
   getRecurringPlanOccurrenceDateKeys,
   isAutoRecurringPlanDeleteLocked,
-  normalizeTodoRecurringPlanConfig
+  normalizeTodoRecurringPlanConfig,
+  removeRecurringAutoPlanLogsFromDate
 } from './todoRecurringPlanUtils';
 
 const referenceDate = new Date(2026, 3, 20);
@@ -208,6 +209,43 @@ describe('todo recurring auto-Plan helpers', () => {
       }
     }))).toBe(false);
     expect(isAutoRecurringPlanDeleteLocked(buildPlannedLog('2026-04-20'), buildTodo())).toBe(false);
+  });
+
+  test('removes only current-day and future automatic plans for cancelled or deleted todos', () => {
+    const todayStart = new Date(2026, 3, 20, 0, 0, 0, 0);
+    const logs = [
+      buildPlannedLog('2026-04-19', {
+        id: 'past-auto-plan',
+        planSource: RECURRING_PLAN_SOURCE,
+        plannedOccurrenceDate: '2026-04-19'
+      }),
+      buildPlannedLog('2026-04-20', {
+        id: 'today-auto-plan',
+        planSource: RECURRING_PLAN_SOURCE,
+        plannedOccurrenceDate: '2026-04-20'
+      }),
+      buildPlannedLog('2026-04-21', {
+        id: 'future-auto-plan',
+        planSource: RECURRING_PLAN_SOURCE,
+        plannedOccurrenceDate: '2026-04-21'
+      }),
+      buildPlannedLog('2026-04-20', {
+        id: 'today-manual-plan',
+        planSource: undefined
+      }),
+      buildPlannedLog('2026-04-21', {
+        id: 'other-todo-auto-plan',
+        linkedTodoId: 'other-todo',
+        planSource: RECURRING_PLAN_SOURCE,
+        plannedOccurrenceDate: '2026-04-21'
+      })
+    ];
+
+    expect(removeRecurringAutoPlanLogsFromDate(logs, ['repeat-todo'], todayStart).map((log) => log.id)).toEqual([
+      'past-auto-plan',
+      'today-manual-plan',
+      'other-todo-auto-plan'
+    ]);
   });
 
   test('normalizes invalid config into bounded same-day values', () => {

@@ -48,6 +48,7 @@ const baseProps = {
   onSkipToMaybeDate: vi.fn(),
   onMoveCategory: vi.fn(),
   onUpgradeToProject: vi.fn(),
+  onUpdateNote: vi.fn(),
   onDelete: vi.fn(),
   onClose: vi.fn(),
   onForceClose: vi.fn(),
@@ -70,6 +71,7 @@ describe('TodoQuickActionsModal category move', () => {
     );
 
     expect(html).toContain('移动分类');
+    expect(html).toContain('修改备注');
   });
 
   test('hides the move-category action for subtasks', () => {

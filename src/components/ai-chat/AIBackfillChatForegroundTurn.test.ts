@@ -8,7 +8,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { normalizeLocalQueryRequestForExecution } from './AIBackfillChatForegroundTurn';
+import {
+  normalizeLocalQueryRequestForExecution,
+  prepareForegroundTurn
+} from './AIBackfillChatForegroundTurn';
 
 describe('foreground local-query normalization contract', () => {
   it('converts id-like filter-expression tokens into display names before executing log queries', () => {
@@ -142,5 +145,48 @@ describe('foreground local-query normalization contract', () => {
     expect(normalized.mode).toBe('keyword_search');
     expect(normalized.targets).toEqual(['todos', 'reviews', 'categories', 'activities', 'scopes']);
     expect(normalized.query).toBe('#writing');
+  });
+});
+
+describe('foreground retry preparation', () => {
+  it('replaces a reply without tool actions in place', () => {
+    let session: any = {
+      id: 'session-1',
+      title: 'Test',
+      personaId: 'persona-1',
+      createdAt: 1,
+      updatedAt: 1,
+      messages: [
+        { id: 'user-1', role: 'user', content: 'Question', createdAt: 1 },
+        { id: 'assistant-1', role: 'assistant', content: 'Old reply', createdAt: 2, retryInput: 'Question' }
+      ]
+    };
+
+    const result = prepareForegroundTurn({
+      activeSession: session,
+      buildRetryConversationHistory: () => [],
+      conversationHistoryCache: new Map(),
+      createSessionTitleFromUserMessage: (value) => value,
+      isMonthlyReviewTemplateSession: false,
+      isWeeklyReviewTemplateSession: false,
+      mutateSession: (_sessionId, updater) => {
+        session = updater(session);
+      },
+      notifyUserTurn: async () => undefined,
+      onNotifyUserTurnError: () => undefined,
+      replaceMessageId: 'assistant-1',
+      retrySourceUserMessageId: 'user-1',
+      setInputText: () => undefined,
+      trimmedText: 'Question'
+    });
+
+    expect(result.canRetryInPlace).toBe(true);
+    expect(result.pendingMessageId).toBe('assistant-1');
+    expect(session.messages).toHaveLength(2);
+    expect(session.messages[1]).toMatchObject({
+      id: 'assistant-1',
+      role: 'assistant',
+      tone: 'pending'
+    });
   });
 });

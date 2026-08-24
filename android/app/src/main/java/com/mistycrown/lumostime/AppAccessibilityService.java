@@ -4,7 +4,7 @@
  * @output Foreground App Change Events
  * @pos Native Service
  * @description Accessibility service detecting foreground app changes and filtering ignored apps before updating the floating window and prompt logic.
- * @updated 2026-08-12: Added AppAwareness decision logs so foreground detection can be traced through native workflow dispatch.
+ * @updated 2026-08-24: Clears foreground-app deduplication after an explicitly cancelled app-awareness workflow, so the same app can be detected on its next launch without toggling accessibility.
  */
 package com.mistycrown.lumostime;
 
@@ -20,12 +20,14 @@ import java.util.List;
 
 public class AppAccessibilityService extends AccessibilityService {
     private static final String TAG = "AppAwareness";
+    private static AppAccessibilityService instance;
 
     private String lastPackageName = "";
 
     @Override
     public void onServiceConnected() {
         super.onServiceConnected();
+        instance = this;
 
         AccessibilityServiceInfo info = new AccessibilityServiceInfo();
         info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED;
@@ -35,6 +37,15 @@ public class AppAccessibilityService extends AccessibilityService {
 
         setServiceInfo(info);
         Log.i(TAG, "AccessibilityService connected and configured");
+    }
+
+    public static void clearLastDetectedPackage() {
+        if (instance == null) {
+            return;
+        }
+
+        instance.lastPackageName = "";
+        Log.d(TAG, "Cleared foreground-app deduplication after workflow cancellation");
     }
 
     @Override
@@ -140,6 +151,7 @@ public class AppAccessibilityService extends AccessibilityService {
 
     @Override
     public void onDestroy() {
+        instance = null;
         super.onDestroy();
         Log.i(TAG, "AccessibilityService destroyed");
     }

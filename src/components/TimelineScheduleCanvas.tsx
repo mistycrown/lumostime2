@@ -18,6 +18,9 @@
  * @updated 2026-07-30: Suppresses the synthetic click after real-record taps so the detail modal is not immediately backdrop-closed.
  * @updated 2026-08-09: Renders clickable idle-time gaps from real records only; planned blocks do not split gaps and today's trailing gap ends at the current time.
  * @updated 2026-08-12: Keeps exactly adjacent schedule blocks in the same visual layout group so contiguous records do not appear staggered.
+ * @updated 2026-08-24: Uses 23:59:59.999 rather than next-day 00:00 for historical-day gaps and 24:00 timeline creations.
+ * @updated 2026-08-24: Closes the plan action panel on completed backdrop clicks so the release click cannot reach the timeline underneath.
+ * @updated 2026-08-24: Ignores the opening touch click inside plan actions and requires a second delete confirmation to prevent accidental starts and removals.
  */
 import React, { useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -25,6 +28,7 @@ import { Lock, Minus, Play, Plus, Trash2, X } from 'lucide-react';
 import { Category, Log, Scope, TodoItem } from '../types';
 import { toCssColor } from '../utils/colorUtils';
 import { isAutoRecurringPlanDeleteLocked } from '../utils/todoRecurringPlanUtils';
+import { clampEndTimeToStartDay } from '../utils/logUtils';
 
 const MIN_HOUR_HEIGHT = 52;
 const MAX_HOUR_HEIGHT = 180;
@@ -40,6 +44,12 @@ const LONG_PRESS_EDIT_DELAY = 500;
 const PINCH_BLOCK_TAP_SUPPRESSION_MS = 300;
 const BLOCK_CLICK_FALLBACK_SUPPRESSION_MS = 160;
 const RECORD_DETAIL_BACKDROP_CLICK_SUPPRESSION_MS = 320;
+export const PLAN_ACTION_INTERACTION_GUARD_MS = 280;
+
+export const isPlanActionInteractionGuardActive = (
+  openedAt: number,
+  now = Date.now()
+): boolean => openedAt > 0 && now - openedAt < PLAN_ACTION_INTERACTION_GUARD_MS;
 
 interface TimelineScheduleCanvasProps {
   currentDate: Date;
@@ -186,6 +196,11 @@ export const getMinimumTimelineRange = (anchorMinutes: number, currentMinutes: n
   return { startMinutes, endMinutes };
 };
 
+export const getTimelineTimestamp = (dayStartTime: number, minutes: number): number => clampEndTimeToStartDay(
+  dayStartTime,
+  dayStartTime + minutes * 60 * 1000
+);
+
 export const getTimelineIdleGaps = (
   logs: Array<Pick<Log, 'id' | 'startTime' | 'endTime' | 'isPlanned'>>,
   dayStartTime: number,
@@ -314,6 +329,8 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [planActionLogId, setPlanActionLogId] = useState<string | null>(null);
+  const [planActionOpenedAt, setPlanActionOpenedAt] = useState(0);
+  const [isPlanDeleteConfirming, setIsPlanDeleteConfirming] = useState(false);
   const [todoDropPreview, setTodoDropPreview] = useState<TodoDropPreview | null>(null);
   const [quickColorDropPreview, setQuickColorDropPreview] = useState<QuickColorPreview | null>(null);
   const [quickColorRangePreview, setQuickColorRangePreview] = useState<QuickColorPreview | null>(null);
@@ -345,7 +362,7 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   const idleGaps = useMemo(() => getTimelineIdleGaps(
     logs,
     dayStart.getTime(),
-    isToday ? Math.min(dayEnd, currentTime.getTime()) : dayStart.getTime() > currentTime.getTime() ? dayStart.getTime() : dayEnd,
+    isToday ? Math.min(dayEnd, currentTime.getTime()) : dayStart.getTime() > currentTime.getTime() ? dayStart.getTime() : getTimelineTimestamp(dayStart.getTime(), DAY_MINUTES),
     minIdleTimeThreshold
   ), [logs, dayStart, dayEnd, isToday, currentTime, minIdleTimeThreshold]);
 
@@ -406,6 +423,30 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
     activePlanLog ? isTimelinePlanTimeEditingLocked(activePlanLog, todos) : false
   ), [activePlanLog, todos]);
   const isLogTimeEditingLocked = (log: Log): boolean => isTimelinePlanTimeEditingLocked(log, todos);
+
+  const openPlanActions = (logId: string) => {
+    setPlanActionOpenedAt(Date.now());
+    setIsPlanDeleteConfirming(false);
+    setPlanActionLogId(logId);
+  };
+
+  const closePlanActions = () => {
+    setIsPlanDeleteConfirming(false);
+    setPlanActionLogId(null);
+  };
+
+  const withPlanActionInteractionGuard = <T extends HTMLElement>(
+    action: () => void
+  ): React.MouseEventHandler<T> => (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (event.detail !== 0 && isPlanActionInteractionGuardActive(planActionOpenedAt)) {
+      return;
+    }
+
+    action();
+  };
   const todoDropPreviewColor = useMemo(() => {
     if (!todoDropPreview) return '#a8a29e';
     const category = categories.find((item) => item.id === todoDropPreview.todo.linkedCategoryId);
@@ -540,7 +581,7 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
     if (!resize || minute === null) return;
     const current = timeOverridesRef.current[resize.log.id] || { startTime: resize.log.startTime, endTime: resize.log.endTime };
     const minimumDuration = TIME_SNAP_MINUTES * 60 * 1000;
-    const nextTime = dayStart.getTime() + minute * 60 * 1000;
+    const nextTime = getTimelineTimestamp(dayStart.getTime(), minute);
     const nextOverride = resize.edge === 'start'
       ? { startTime: Math.min(nextTime, current.endTime - minimumDuration), endTime: current.endTime }
       : { startTime: current.startTime, endTime: Math.max(nextTime, current.startTime + minimumDuration) };
@@ -772,7 +813,7 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
     if (!wasLongPress) {
       blockClickFallbackSuppressionUntilRef.current = Date.now() + BLOCK_CLICK_FALLBACK_SUPPRESSION_MS;
       if (log.isPlanned) {
-        setPlanActionLogId(log.id);
+        openPlanActions(log.id);
       } else {
         scheduleRecordDetailOpen(log);
       }
@@ -788,7 +829,7 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
     event.stopPropagation();
     clearLongPress();
     if (log.isPlanned) {
-      setPlanActionLogId(log.id);
+      openPlanActions(log.id);
     } else {
       scheduleRecordDetailOpen(log);
     }
@@ -916,8 +957,8 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
     if (!shouldCreate || !range) return;
     const log = onCreateQuickColorLog(
       session.target,
-      dayStart.getTime() + range.startMinutes * 60 * 1000,
-      dayStart.getTime() + range.endMinutes * 60 * 1000
+      getTimelineTimestamp(dayStart.getTime(), range.startMinutes),
+      getTimelineTimestamp(dayStart.getTime(), range.endMinutes)
     );
     showCreatedLogFeedback(log, false);
   };
@@ -965,8 +1006,8 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
       const range = getPlannedTimeRange(minute);
       const plannedLog = onCreatePlannedLog(
         todo,
-        dayStart.getTime() + range.startMinutes * 60 * 1000,
-        dayStart.getTime() + range.endMinutes * 60 * 1000
+        getTimelineTimestamp(dayStart.getTime(), range.startMinutes),
+        getTimelineTimestamp(dayStart.getTime(), range.endMinutes)
       );
       setTodoDropPreview(null);
       showCreatedLogFeedback(plannedLog);
@@ -1012,8 +1053,8 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
       const range = getPlannedTimeRange(minute);
       const log = onCreateQuickColorLog(
         target,
-        dayStart.getTime() + range.startMinutes * 60 * 1000,
-        dayStart.getTime() + range.endMinutes * 60 * 1000
+        getTimelineTimestamp(dayStart.getTime(), range.startMinutes),
+        getTimelineTimestamp(dayStart.getTime(), range.endMinutes)
       );
       setQuickColorDropPreview(null);
       showCreatedLogFeedback(log, false);
@@ -1151,7 +1192,7 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       if (log.isPlanned) {
-                        setPlanActionLogId(log.id);
+                        openPlanActions(log.id);
                       } else {
                         onEditLog(log);
                       }
@@ -1222,7 +1263,14 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
         <div
           className="fixed inset-0 z-[130] flex items-end justify-center bg-[rgba(15,23,42,0.12)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-12 backdrop-blur-sm md:items-center md:pb-4"
           onPointerDown={(event) => {
-            if (event.target === event.currentTarget) setPlanActionLogId(null);
+            event.stopPropagation();
+          }}
+          onClick={(event) => {
+            if (event.target !== event.currentTarget) return;
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.detail !== 0 && isPlanActionInteractionGuardActive(planActionOpenedAt)) return;
+            closePlanActions();
           }}
         >
           <section
@@ -1231,11 +1279,12 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
             aria-modal="true"
             className="w-full max-w-[26rem] overflow-hidden rounded-[2rem] border border-stone-200 bg-[#faf9f6] shadow-[0_26px_70px_rgba(15,23,42,0.14)] dark:border-stone-700 dark:bg-stone-900"
             onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
           >
             <div className="relative border-b border-stone-200 px-5 py-4 pr-14 dark:border-stone-700">
               <div className="text-[11px] uppercase tracking-[0.22em] text-stone-400">Plan</div>
               <div className="mt-1 min-w-0 truncate text-lg font-medium text-stone-800 dark:text-stone-100">{activePlanTodo?.title || activePlanLog.title || '计划'}</div>
-              <button type="button" onClick={() => setPlanActionLogId(null)} className="absolute right-4 top-4 rounded-full p-2 text-stone-400 transition-colors hover:bg-white hover:text-stone-600 dark:hover:bg-stone-800 dark:hover:text-stone-200" aria-label="关闭计划操作">
+              <button type="button" onClick={withPlanActionInteractionGuard(closePlanActions)} className="absolute right-4 top-4 rounded-full p-2 text-stone-400 transition-colors hover:bg-white hover:text-stone-600 dark:hover:bg-stone-800 dark:hover:text-stone-200" aria-label="关闭计划操作">
                 <X size={16} />
               </button>
             </div>
@@ -1243,11 +1292,11 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
               <button
                 type="button"
                 disabled={!activePlanTodo}
-                onClick={() => {
+                onClick={withPlanActionInteractionGuard(() => {
                   if (!activePlanTodo) return;
                   onStartPlannedTodo(activePlanTodo);
-                  setPlanActionLogId(null);
-                }}
+                  closePlanActions();
+                })}
                 className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-stone-700 dark:bg-stone-800/80 dark:text-stone-200 dark:hover:bg-stone-800"
               >
                 <Play size={16} className="text-stone-400" />
@@ -1256,17 +1305,25 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
               <button
                 type="button"
                 disabled={isActivePlanDeleteLocked}
-                onClick={() => {
+                onClick={withPlanActionInteractionGuard(() => {
                   if (isActivePlanDeleteLocked) return;
+                  if (!isPlanDeleteConfirming) {
+                    setIsPlanDeleteConfirming(true);
+                    return;
+                  }
                   onDeletePlannedLog(activePlanLog);
-                  setPlanActionLogId(null);
-                }}
-                className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:bg-white/50 disabled:text-stone-400 disabled:hover:border-stone-200 disabled:hover:bg-white/50 dark:border-stone-700 dark:bg-stone-800/80 dark:text-stone-200 dark:hover:border-red-900/70 dark:hover:bg-red-950/30 dark:hover:text-red-300 dark:disabled:bg-stone-800/50 dark:disabled:text-stone-500 dark:disabled:hover:border-stone-700 dark:disabled:hover:bg-stone-800/50"
+                  closePlanActions();
+                })}
+                className={`flex w-full items-center gap-2 rounded-2xl border px-4 py-3 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:bg-white/50 disabled:text-stone-400 disabled:hover:border-stone-200 disabled:hover:bg-white/50 dark:disabled:bg-stone-800/50 dark:disabled:text-stone-500 dark:disabled:hover:border-stone-700 dark:disabled:hover:bg-stone-800/50 ${
+                  isPlanDeleteConfirming
+                    ? 'border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-300'
+                    : 'border-stone-200 bg-white/80 text-stone-700 hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-stone-700 dark:bg-stone-800/80 dark:text-stone-200 dark:hover:border-red-900/70 dark:hover:bg-red-950/30 dark:hover:text-red-300'
+                }`}
               >
                 {isActivePlanDeleteLocked
                   ? <Lock size={16} className="text-stone-400" />
-                  : <Trash2 size={16} className="text-stone-400" />}
-                {isActivePlanDeleteLocked ? '自动循环计划已锁定' : '删除计划'}
+                  : <Trash2 size={16} className={isPlanDeleteConfirming ? 'text-red-500' : 'text-stone-400'} />}
+                {isActivePlanDeleteLocked ? '自动循环计划已锁定' : isPlanDeleteConfirming ? '确认删除？' : '删除计划'}
               </button>
             </div>
           </section>

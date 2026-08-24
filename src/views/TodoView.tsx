@@ -1095,7 +1095,8 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     handleQuickActionMoveCategory,
     handleQuickActionUpgradeToProject,
     handleQuickActionDelete,
-    handleQuickActionUpdateTitle
+    handleQuickActionUpdateTitle,
+    handleQuickActionUpdateNote
   } = useTodoQuickActions({ onSaveTodo, onEditTodo, onDeleteTodo });
 
   // 濞?localStorage 閻犲洩顕цぐ鍥偨閵婏箑鐓曞☉鎾筹攻椤愬ジ鏌呮径瀣仴闁汇劌瀚～瀣炊閻愵儫浣割嚕?
@@ -2212,6 +2213,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       openedAt={quickActionOpenedAt}
       showUpgradeToProject={Boolean(quickActionTodo && isQuickTodo(quickActionTodo))}
       onUpdateTitle={handleQuickActionUpdateTitle}
+      onUpdateNote={handleQuickActionUpdateNote}
     />
   );
 

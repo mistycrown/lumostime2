@@ -4,6 +4,7 @@
  * @output Session Updates (Note, Association), Completion Event
  * @pos View (Active Focus Overlay)
  * @description The main interface displayed during an active focus session. Shows the timer, allows associating the session with a Todo or Scope, editing the note, completing the session, and applying inline note templates.
+ * @updated 2026-08-24: Added inline Activity custom attribute fields persisted on active focus sessions.
  * @updated 2026-05-13: Kept the focus detail overlay on the shared topmost `z-[100]` layer so collection-launched detail flows still cover the underlying settings stack cleanly.
  * @updated 2026-05-11: Added a one-shot completion-mode toggle beside the associated todo picker so finishing a focus session can also complete the linked unfinished task after the log is saved.
  * @updated 2026-05-05: Registered immersive focus mode with the shared Android back-handler stack so system back exits fullscreen before dismissing the focus detail overlay.
@@ -23,10 +24,12 @@ import { ImmersiveTimer } from '../components/ImmersiveTimer';
 import { IconRenderer } from '../components/IconRenderer';
 import { ReactionPicker, ReactionList } from '../components/ReactionComponents';
 import { RecommendedNoteTemplates } from '../components/RecommendedNoteTemplates';
+import { ActivityAttributeFields } from '../components/ActivityAttributeFields';
 import { useToast } from '../contexts/ToastContext';
 import { appendTemplateToNote, getRecommendedNoteTemplates, RecommendedNoteTemplate } from '../utils/noteTemplateUtils';
 import { getTodoProgressSnapshot, shouldTodoUseManualProgressInput } from '../utils/todoProgressUtils';
 import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
+import { filterAttributeValuesForActivity } from '../utils/activityAttributeUtils';
 import {
     getCompletionModeTodoId,
     isTodoEligibleForCompletionMode,
@@ -54,6 +57,7 @@ interface FocusDetailViewProps {
 export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, onClose, onCancel, onComplete, onCompleteLinkedTodo, onUpdate, autoFocusNote = true, autoEnterImmersive = false }) => {
     const [elapsed, setElapsed] = useState(0);
     const [note, setNote] = useState(session.note || '');
+    const [attributeValues, setAttributeValues] = useState(session.attributeValues || []);
     const [isActivitySelectorOpen, setIsActivitySelectorOpen] = useState(false);
     const [completeLinkedTodoOnSubmit, setCompleteLinkedTodoOnSubmit] = useState(false);
     const { addToast } = useToast();
@@ -73,6 +77,13 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
         () => shouldTodoUseManualProgressInput(linkedTodo, todos),
         [linkedTodo, todos]
     );
+    const selectedActivity = useMemo(() => categories
+        .flatMap((category) => category.activities)
+        .find((activity) => activity.id === session.activityId), [categories, session.activityId]);
+
+    useEffect(() => {
+        setAttributeValues((current) => filterAttributeValuesForActivity(current, selectedActivity));
+    }, [selectedActivity, session.activityId]);
     
     // 跟踪已自动应用的规则，避免重复应用
     const autoAppliedRulesRef = useRef<Set<string>>(new Set());
@@ -252,7 +263,8 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                             activityId: act.id,
                             activityName: act.name,
                             activityIcon: act.icon,
-                            activityUiIcon: act.uiIcon
+                            activityUiIcon: act.uiIcon,
+                            attributeValues: filterAttributeValuesForActivity(session.attributeValues, act)
                         });
                         autoAppliedRulesRef.current.add(suggestionKey);
                     }
@@ -337,14 +349,25 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [note]); // 只依赖 note
 
+    useEffect(() => {
+        onUpdateRef.current({
+            ...sessionRef.current,
+            attributeValues: attributeValues.length > 0 ? attributeValues : undefined
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [attributeValues]);
+
     const handleActivitySelect = (activity: Activity, categoryId: string) => {
+        const nextAttributeValues = filterAttributeValuesForActivity(session.attributeValues, activity);
+        setAttributeValues(nextAttributeValues);
         onUpdate({
             ...session,
             activityId: activity.id,
             categoryId: categoryId,
             activityName: activity.name,
             activityIcon: activity.icon,
-            activityUiIcon: activity.uiIcon
+            activityUiIcon: activity.uiIcon,
+            attributeValues: nextAttributeValues.length > 0 ? nextAttributeValues : undefined
         });
         setIsActivitySelectorOpen(false);
     };
@@ -375,6 +398,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
         const finalSession = {
             ...session,
             note,
+            attributeValues: attributeValues.length > 0 ? attributeValues : undefined,
             progressIncrement: canUseManualProgressIncrement ? progressAmount : undefined,
             reactions: reactions.length > 0 ? reactions : undefined
         };
@@ -592,6 +616,14 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                         scopes={scopes}
                         selectedScopeIds={session.scopeIds}
                         onSelect={(scopeIds) => onUpdate({ ...session, scopeIds })}
+                    />
+                </div>
+
+                <div className="w-full px-8 mb-8">
+                    <ActivityAttributeFields
+                        activity={selectedActivity}
+                        values={attributeValues}
+                        onChange={setAttributeValues}
                     />
                 </div>
 

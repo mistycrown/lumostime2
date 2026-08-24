@@ -1,5 +1,6 @@
 /**
  * @file TagDetailView.tsx
+ * @updated 2026-08-24: Added Activity custom attribute definition management and base attribute statistics.
  * @updated 2026-08-06: Added archive and restore control for tags.
  * @input Activity ID, Logs, Associated Todos, Categories
  * @output Activity Updates (Name, Color), Todo Toggles
@@ -30,6 +31,8 @@ import { getNormalizedScopeIds } from '../utils/scopeStatsUtils';
 import { NoteTemplateManager } from '../components/NoteTemplateManager';
 import { AssociatedTodoList } from '../components/AssociatedTodoList';
 import { filterCountableLogs } from '../utils/statLogUtils';
+import { ActivityAttributeManager } from '../components/ActivityAttributeManager';
+import { ActivityAttributeStatistics } from '../components/ActivityAttributeStatistics';
 
 
 interface TagDetailViewProps {
@@ -91,7 +94,8 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
             activity.enableMoodScore !== initialActivity.enableMoodScore ||
             activity.isArchived !== initialActivity.isArchived ||
             JSON.stringify(activity.keywords) !== JSON.stringify(initialActivity.keywords) ||
-            JSON.stringify(activity.noteTemplates || []) !== JSON.stringify(initialActivity.noteTemplates || []);
+            JSON.stringify(activity.noteTemplates || []) !== JSON.stringify(initialActivity.noteTemplates || []) ||
+            JSON.stringify(activity.attributes || []) !== JSON.stringify(initialActivity.attributes || []);
          
          if (hasChanges) {
             onUpdateActivity(activity);
@@ -577,6 +581,11 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                      onChange={(noteTemplates) => setActivity({ ...activity, noteTemplates })}
                   />
 
+                  <ActivityAttributeManager
+                     attributes={activity.attributes}
+                     onChange={(attributes) => setActivity({ ...activity, attributes })}
+                  />
+
                   {/* Keywords Section */}
                   <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
                      <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">关键字</h3>
@@ -706,6 +715,9 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                />
             );
 
+         case 'Attributes':
+            return <ActivityAttributeStatistics activity={activity} logs={countableTagLogs} />;
+
          case '关联':
             return (
                <div className="space-y-6">
@@ -770,13 +782,13 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
          {/* Tabs */}
          <div className="flex gap-6 border-b border-stone-200 mb-8 overflow-x-auto no-scrollbar">
-            {['Details', 'Timeline', '关联'].map((tab) => (
+            {['Details', 'Timeline', 'Attributes', '关联'].map((tab) => (
                <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors ${activeTab === tab ? 'text-stone-900 border-b-2 border-stone-900 font-bold' : 'text-stone-400 hover:text-stone-600'}`}
                >
-                  {tab === 'Timeline' ? '時間線' : tab === 'Details' ? '细节' : tab}
+                  {tab === 'Timeline' ? '時間線' : tab === 'Details' ? '细节' : tab === 'Attributes' ? '属性统计' : tab}
                </button>
             ))}
          </div>

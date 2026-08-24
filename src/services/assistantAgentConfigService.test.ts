@@ -105,4 +105,23 @@ describe('assistantAgentConfigService', () => {
       letterWindowEnd: '2200'
     }));
   });
+
+  it('removes the cached next letter time when letters are disabled', () => {
+    assistantAgentConfigService.saveConfig({
+      letterEnabled: true,
+      letterFrequencyDays: 2,
+      letterWindowStart: '2000',
+      letterWindowEnd: '2200',
+      nextLetterAt: '2026-08-24T12:00:00.000Z'
+    });
+
+    const saved = assistantAgentConfigService.saveConfig({
+      letterEnabled: false,
+      nextLetterAt: undefined
+    });
+
+    expect(saved.letterEnabled).toBe(false);
+    expect(saved.nextLetterAt).toBeUndefined();
+    expect(assistantAgentConfigService.getConfig().nextLetterAt).toBeUndefined();
+  });
 });

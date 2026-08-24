@@ -4,6 +4,7 @@
  * @output Interactive Calendar / Heatmap with animated expand/collapse
  * @pos Component (Core UI)
  * @description A versatile calendar component supporting animated expand/collapse, Week/Month modes, and Heatmap visualization (Duration or Focus).
+ * @updated 2026-08-24: Allows timeline header menus to overflow the calendar container without clipping.
  * @updated 2026-08-09: Planned timeline blocks are excluded from calendar heatmap statistics.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -126,8 +127,8 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
 
     return (
         <div className={hideTopBar
-            ? "z-20 transition-all duration-500 ease-in-out overflow-hidden flex flex-col shrink-0"
-            : "bg-white/80 backdrop-blur-md z-20 shadow-sm transition-all duration-500 ease-in-out overflow-hidden flex flex-col shrink-0 border-b border-stone-200 pt-[var(--app-safe-area-top)]"
+            ? "z-20 transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0"
+            : "bg-white/80 backdrop-blur-md z-20 shadow-sm transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0 border-b border-stone-200 pt-[var(--app-safe-area-top)]"
         }>
 
             {/* Top Bar - 详情页面模式下隐藏 */}

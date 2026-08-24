@@ -4,10 +4,21 @@
  * @output Processed/Split logs
  * @pos Utility (Log Data Manipulation)
  * @description Helper functions for processing time logs, specifically handling logs that cross midnight boundaries.
+ * @updated 2026-08-24: Added same-day end-time clamping for new manual timeline records.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { Log } from '../types';
+
+export function getEndOfStartDay(startTime: number): number {
+    const endOfDay = new Date(startTime);
+    endOfDay.setHours(23, 59, 59, 999);
+    return endOfDay.getTime();
+}
+
+export function clampEndTimeToStartDay(startTime: number, endTime: number): number {
+    return Math.min(endTime, getEndOfStartDay(startTime));
+}
 
 /**
  * 检测一条记录是否跨天

@@ -1,7 +1,7 @@
 /**
  * @file useTodoManager.ts
  * @input DataContext (todos, setTodos, todoCategories, setTodoCategories, logs, setLogs), NavigationContext (modal states), CategoryScopeContext (categories), ToastContext (addToast), SessionContext (startActivity), SettingsContext (autoLinkRules)
- * @output Todo CRUD Operations (handleSaveTodo, handleDeleteTodo, handleToggleTodo, handleDuplicateTodo, handleBatchAddTodos), Modal Control (openAddTodoModal, openEditTodoModal, closeTodoModal), Focus Management (handleStartTodoFocus), Progress Update (updateTodoProgress)
+ * @output Todo CRUD Operations with recurring auto-Plan cleanup (handleSaveTodo, handleDeleteTodo, handleToggleTodo, handleDuplicateTodo, handleBatchAddTodos), Modal Control (openAddTodoModal, openEditTodoModal, closeTodoModal), Focus Management (handleStartTodoFocus), Progress Update (updateTodoProgress)
  * @pos Hook (Data Manager)
  * @description Todo data manager hook for CRUD, focus launch, child-task inheritance sync, cascade delete behavior, nested detail-page return state, and lightweight schedule-field normalization.
  * @updated 2026-06-06: Moved duplicate shaping into shared utilities and now clears duplicated todo cover images by default.
@@ -11,6 +11,7 @@
  * @updated 2026-05-12: Prefer live todo records when opening detail pages so auto-save comparisons do not loop on stale snapshots.
  * @updated 2026-05-12: Added todo-detail history stacking so opening a child task from a parent detail page returns back to the parent detail instead of closing to the root todo view.
  * @updated 2026-05-11: Added an idempotent complete-only helper so focus-log flows can save first and then finish the linked todo without reopening already completed tasks.
+ * @updated 2026-08-24: Removes current-day and future recurring auto-Plan blocks when auto scheduling is cancelled or a todo is deleted.
  * @updated 2026-04-21: Blocked subtask creation for recurring parent todos so recurrence and child-task management stay mutually exclusive.
  * @updated 2026-04-21: Added one-level subtask support with inherited parent fields, cascade delete, and child draft helpers.
  * @updated 2026-04-21: Reset duplicated and newly created todos to `pin: false` unless explicitly toggled later.
@@ -39,6 +40,7 @@ import { pushTodoDetailHistory } from '../utils/todoDetailNavigation';
 import { isQuickTodo } from '../utils/todoKindUtils';
 import { getRealTodoCategories } from '../utils/todoQuickCategoryUtils';
 import { buildDuplicatedTodo, normalizeTodoScheduleFields } from '../utils/todoDuplicateUtils';
+import { isTodoRecurringPlanEnabled, removeRecurringAutoPlanLogsFromDate } from '../utils/todoRecurringPlanUtils';
 
 export const useTodoManager = () => {
   const { todos, setTodos, todoCategories, setTodoCategories, logs, setLogs } = useData();
@@ -176,6 +178,10 @@ export const useTodoManager = () => {
   };
 
   const handleSaveTodo = (todo: TodoItem) => {
+    const previousTodo = todos.find((item) => item.id === todo.id);
+    const shouldRemoveFutureAutoPlans = isTodoRecurringPlanEnabled(previousTodo)
+      && !isTodoRecurringPlanEnabled(todo);
+
     setTodos((prev) => {
       const normalizedTodo = normalizeTodoHierarchy(normalizeTodoScheduleFields(todo), prev);
       const exists = prev.find((item) => item.id === normalizedTodo.id);
@@ -190,6 +196,10 @@ export const useTodoManager = () => {
       return syncSubtaskProgressToParentTodos(nextTodos);
     });
 
+    if (shouldRemoveFutureAutoPlans) {
+      setLogs((prev) => removeRecurringAutoPlanLogsFromDate(prev, [todo.id]));
+    }
+
     if (editingTodo?.id === todo.id) {
       const normalizedTodo = normalizeTodoHierarchy(normalizeTodoScheduleFields(todo), todos);
       setEditingTodo(normalizedTodo);
@@ -199,7 +209,8 @@ export const useTodoManager = () => {
 
   const handleDeleteTodo = (id: string) => {
     const deleteTargetIds = getTodoCascadeDeleteIds(todos, id);
-    const linkedLogs = logs.filter((log) => log.linkedTodoId && deleteTargetIds.includes(log.linkedTodoId));
+    const retainedLogs = removeRecurringAutoPlanLogsFromDate(logs, deleteTargetIds);
+    const linkedLogs = retainedLogs.filter((log) => log.linkedTodoId && deleteTargetIds.includes(log.linkedTodoId));
 
     if (linkedLogs.length > 0) {
       setTodoToDeleteId(id);
@@ -210,6 +221,7 @@ export const useTodoManager = () => {
     }
 
     setTodos((prev) => syncSubtaskProgressToParentTodos(prev.filter((todo) => !deleteTargetIds.includes(todo.id))));
+    setLogs((prev) => removeRecurringAutoPlanLogsFromDate(prev, deleteTargetIds));
     closeTodoModal();
   };
 
@@ -220,7 +232,7 @@ export const useTodoManager = () => {
 
     const deleteTargetIds = todoDeleteTargetIds.length > 0 ? todoDeleteTargetIds : [todoToDeleteId];
 
-    setLogs((prev) => prev.map((log) => (
+    setLogs((prev) => removeRecurringAutoPlanLogsFromDate(prev, deleteTargetIds).map((log) => (
       log.linkedTodoId && deleteTargetIds.includes(log.linkedTodoId)
         ? { ...log, linkedTodoId: undefined }
         : log

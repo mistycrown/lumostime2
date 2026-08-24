@@ -6,6 +6,7 @@
  * @description Verifies that LumosTime record and widget URIs stay recognizable across WebView parsing variants and legacy parameter aliases.
  * @updated 2026-05-14: Added execution-key coverage so equivalent NFC/deep-link URI variants dedupe to the same runtime action.
  * @updated 2026-04-22: Added compatibility coverage for legacy NFC URI variants and parameter aliases.
+ * @updated 2026-08-24: Covers the NFC activity URI used to regress after URL dispatch was misplaced.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -21,6 +22,15 @@ describe('parseLumosTimeUrl', () => {
       catId: 'life',
       actId: 'commute',
       checkItemId: null
+    });
+  });
+
+  it('parses the NFC activity URI used by the affected tag', () => {
+    expect(parseLumosTimeUrl('lumostime://record?action=start&cat_id=eros&act_id=surf')).toMatchObject({
+      type: 'record',
+      action: 'start',
+      catId: 'eros',
+      actId: 'surf'
     });
   });
 

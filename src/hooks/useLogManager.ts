@@ -8,6 +8,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-07-30: Blocks deletion of recurring auto-Plan logs while their Repeat todo auto-Plan switch remains enabled.
  * @updated 2026-08-10: Excluded timeline Plan blocks from smart backfill defaults and quick-punch start inference.
+ * @updated 2026-08-24: Clamps newly saved manual records to the selected start day so they cannot end at next-day 00:00.
  * @updated 2026-06-06: Added hard-field duplicate protection for new log insertions so floating-window stop races cannot append identical timeline records twice.
  * @updated 2026-05-16: Dispatches a shared assistant log-submission event only for brand-new logs so post-save AI triggers can ignore edits.
  * @updated 2026-05-10: Let callers override the date used for backfill defaults so widget supplement-log launches can force today even when the timeline was left on an older day.
@@ -31,6 +32,7 @@ import {
 } from '../utils/logInsertionUtils';
 import { isAutoRecurringPlanDeleteLocked } from '../utils/todoRecurringPlanUtils';
 import { filterActualLogs, getLatestActualLogEndTimeInRange } from '../utils/statLogUtils';
+import { clampEndTimeToStartDay } from '../utils/logUtils';
 
 export const useLogManager = () => {
     const { logs, todos, setLogs, setTodos } = useData();
@@ -59,10 +61,20 @@ export const useLogManager = () => {
 
     const handleSaveLog = (log: Log) => {
         const existingLog = logs.find(l => l.id === log.id);
+        const endTime = existingLog
+            ? log.endTime
+            : clampEndTimeToStartDay(log.startTime, log.endTime);
+        const savedLog = endTime === log.endTime
+            ? log
+            : {
+                ...log,
+                endTime,
+                duration: (endTime - log.startTime) / 1000
+            };
         const shouldDispatchAssistantTrigger = isNewLogInsertion(existingLog);
-        const isDuplicateInsertion = shouldDispatchAssistantTrigger && hasHardDuplicateLog(logs, log);
+        const isDuplicateInsertion = shouldDispatchAssistantTrigger && hasHardDuplicateLog(logs, savedLog);
 
-        if (log.linkedTodoId || (existingLog && existingLog.linkedTodoId)) {
+        if (savedLog.linkedTodoId || (existingLog && existingLog.linkedTodoId)) {
             setTodos(prevTodos => {
                 const newTodos = [...prevTodos];
 
@@ -80,14 +92,14 @@ export const useLogManager = () => {
                 }
 
                 // Apply New Progress (if has link)
-                if (log.linkedTodoId) {
-                    const newTodoIndex = newTodos.findIndex(t => t.id === log.linkedTodoId);
+                if (savedLog.linkedTodoId) {
+                    const newTodoIndex = newTodos.findIndex(t => t.id === savedLog.linkedTodoId);
                     if (newTodoIndex > -1 && getTodoProgressTrackingMode(newTodos[newTodoIndex], newTodos) === 'manual') {
                         newTodos[newTodoIndex] = {
                             ...newTodos[newTodoIndex],
                             isProgress: true,
                             progressTrackingMode: 'manual',
-                            completedUnits: Math.max(0, (newTodos[newTodoIndex].completedUnits || 0) + (log.progressIncrement || 0))
+                            completedUnits: Math.max(0, (newTodos[newTodoIndex].completedUnits || 0) + (savedLog.progressIncrement || 0))
                         };
                     }
                 }
@@ -96,11 +108,11 @@ export const useLogManager = () => {
         }
 
         setLogs(prev => {
-            const exists = prev.find(l => l.id === log.id);
+            const exists = prev.find(l => l.id === savedLog.id);
             if (exists) {
-                return prev.map(l => l.id === log.id ? log : l);
+                return prev.map(l => l.id === savedLog.id ? savedLog : l);
             }
-            const insertionResult = prependLogsWithDedupe(prev, [log]);
+            const insertionResult = prependLogsWithDedupe(prev, [savedLog]);
             return insertionResult.skippedLogs.length > 0 ? prev : insertionResult.logs;
         });
         // Timestamp automatically updated by DataContext
@@ -112,7 +124,7 @@ export const useLogManager = () => {
         }
 
         if (shouldDispatchAssistantTrigger) {
-            dispatchAssistantLogSubmittedEvent({ log });
+            dispatchAssistantLogSubmittedEvent({ log: savedLog });
         }
     };
 

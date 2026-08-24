@@ -5,6 +5,7 @@
  * @pos Component Support (AI Integration)
  * @description Centralizes the stable data model and low-risk helper/UI pieces used by AIBackfillChatModal so the main modal focuses on orchestration instead of carrying every type and validator inline.
  * @updated 2026-07-05: Extended chat debug sections so foreground local-query rounds can persist structured text blocks alongside AI request exchanges.
+ * @updated 2026-08-24: Persisted pre-turn reminder and memory snapshots so retry can restore every foreground side effect.
  * @updated 2026-06-07: Added weekly/monthly newspaper result and confirmation types so periodic AI newspaper writeback can travel through chat state and guarded overwrite flows.
  * @updated 2026-05-16: Added daily newspaper result card types so AI chat can open lightweight structured newspaper pages stored on Daily Review.
  * @updated 2026-05-16: Added per-block enable flags for persona-scoped custom prompt blocks so each extra prompt snippet can be toggled independently.
@@ -22,6 +23,7 @@ import type {
   AssistantEditableMemoryListKey,
   AssistantLetterResultCard,
   AssistantLocalQueryResult,
+  AssistantMemory,
   AssistantReasoningSummary,
   AssistantReminder,
   AssistantScheduledTask,
@@ -157,8 +159,10 @@ export interface AIChatMessage {
   appliedActions?: AppliedChatAction[];
   assistantLetterResult?: AssistantLetterResultCard;
   memoryUpdates?: AIChatMemoryUpdateSection[];
+  memoryBefore?: AssistantMemory;
   dreamUpdates?: AIChatDreamUpdateCard[];
   reminderUpdates?: string[];
+  remindersBefore?: AssistantReminder[];
   dailyReviewWriteback?: AIChatDailyReviewWritebackResult;
   dailyNewspaperWriteback?: AIChatDailyNewspaperWritebackResult;
   weeklyNewspaperWriteback?: AIChatWeeklyNewspaperWritebackResult;

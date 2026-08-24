@@ -4,13 +4,14 @@
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
  * @pos Component
  * @description A reusable bottom sheet that exposes lightweight todo planning and completion actions without opening the full todo detail editor first.
- * @updated 2026-06-16: Switched the mobile compact-edit guard from a width-only media query to real mobile detection so desktop windows keep the full sheet while phones collapse to the title editor.
+ * @updated 2026-08-24: Replaced inline title editing with the same standalone modal used for quick note editing to avoid mobile keyboard positioning conflicts.
  * @updated 2026-07-30: Added extra mobile bottom padding to keep the delete action above the fixed bottom navigation area.
  * @updated 2026-06-15: Added a mobile-only compact title-edit mode that hides the lower quick-action body while typing so the editor can sit close to the soft keyboard.
  * @updated 2026-06-14: Added a `创建副本` quick action that reuses the same duplicate-modal flow as the row swipe gesture.
  * @updated 2026-06-14: Softened the mobile keyboard offset with a bottom breathing margin and added a title-row confirm action that replaces the global header actions while editing.
  * @updated 2026-06-14: Added visualViewport-based mobile keyboard avoidance and scrollable sheet bounds so inline title editing stays visible above the soft keyboard.
  * @updated 2026-06-13: Added inline todo title editing inside the sheet header with auto-save on blur, styled with a print-inspired bottom border and no focus ring to prevent visual shifts.
+ * @updated 2026-08-24: Added inline note editing from the shared quick-actions sheet, with Enter/blur save and cancel support.
  * @updated 2026-05-14: Reworked the `Maybe` quick-action row into one shared outer pill that contains the main `Maybe` picker plus inline `今 / 明 / +7` shortcuts, and renamed the arrange/due `下周` shortcuts to `+7`.
  * @updated 2026-05-14: Expanded the `Maybe` summary text under the title to show every future candidate date in order instead of collapsing multiple dates into a `+n` count.
  * @updated 2026-05-14: Moved the recurring skip icon into each skip action button so the shortcut row matches the shared quick-action button structure.
@@ -32,8 +33,7 @@
  * @updated 2026-04-20: Extracted from TodoView so todo-list taps and week badges can share one quick-actions sheet implementation.
  */
 import React, { useEffect, useState, useRef } from 'react';
-import { Capacitor } from '@capacitor/core';
-import { ArrowRightLeft, CalendarDays, Check, CheckCircle2, Copy, Flag, PanelRightOpen, Pin, SkipForward, Trash2, X } from 'lucide-react';
+import { ArrowRightLeft, CalendarDays, Check, CheckCircle2, Copy, FilePenLine, Flag, PanelRightOpen, Pin, SkipForward, Trash2, X } from 'lucide-react';
 import { TodoCategory, TodoItem } from '../types';
 import { formatDateKey, formatTodoRecurrenceSummary, normalizeMaybeDates, parseDateKey } from '../utils/todoScheduleUtils';
 import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
@@ -43,10 +43,6 @@ import { IconRenderer } from './IconRenderer';
 import { TodoDatePickerModal } from './TodoDatePickerModal';
 
 type CategoryPickerMode = 'move' | 'upgrade' | null;
-
-const QUICK_ACTION_KEYBOARD_INSET_THRESHOLD = 80;
-const QUICK_ACTION_KEYBOARD_BREATHING_ROOM = 56;
-const QUICK_ACTION_MOBILE_EDIT_KEYBOARD_BREATHING_ROOM = 12;
 
 interface TodoQuickActionsModalProps {
   isOpen: boolean;
@@ -70,6 +66,7 @@ interface TodoQuickActionsModalProps {
   openedAt?: number;
   showUpgradeToProject?: boolean;
   onUpdateTitle?: (title: string) => void;
+  onUpdateNote?: (note: string) => void;
 }
 
 export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
@@ -93,7 +90,8 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   onForceClose,
   openedAt = 0,
   showUpgradeToProject = false,
-  onUpdateTitle
+  onUpdateTitle,
+  onUpdateNote
 }) => {
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
   const [categoryPickerMode, setCategoryPickerMode] = useState<CategoryPickerMode>(null);
@@ -101,11 +99,12 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   const [isSkipToPickerOpen, setIsSkipToPickerOpen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
-  const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
-  const [isMobileViewport, setIsMobileViewport] = useState(false);
-  const isEscapeRef = useRef(false);
+  const [isEditingNote, setIsEditingNote] = useState(false);
+  const [editedNote, setEditedNote] = useState('');
+  const isTitleCancelRef = useRef(false);
+  const isNoteCancelRef = useRef(false);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
-  const visualViewportBaselineRef = useRef<{ height: number; width: number }>({ height: 0, width: 0 });
+  const noteInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setIsDeleteConfirming(false);
@@ -114,7 +113,10 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
     setIsSkipToPickerOpen(false);
     setIsEditingTitle(false);
     setEditedTitle(todo?.title || '');
-    isEscapeRef.current = false;
+    setIsEditingNote(false);
+    setEditedNote(todo?.note || '');
+    isTitleCancelRef.current = false;
+    isNoteCancelRef.current = false;
   }, [isOpen, todo?.id, todo?.title]);
 
   useEffect(() => {
@@ -143,6 +145,28 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
         return true;
       }
 
+      if (isEditingTitle) {
+        isTitleCancelRef.current = true;
+        setEditedTitle(todo?.title || '');
+        if (onForceClose) {
+          onForceClose();
+        } else {
+          onClose();
+        }
+        return true;
+      }
+
+      if (isEditingNote) {
+        isNoteCancelRef.current = true;
+        setEditedNote(todo?.note || '');
+        if (onForceClose) {
+          onForceClose();
+        } else {
+          onClose();
+        }
+        return true;
+      }
+
       if (onForceClose) {
         onForceClose();
       } else {
@@ -150,104 +174,138 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
       }
       return true;
     });
-  }, [categoryPickerMode, isDeleteConfirming, isMaybePickerOpen, isOpen, isSkipToPickerOpen, onClose, onForceClose]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      visualViewportBaselineRef.current = { height: 0, width: 0 };
-      setKeyboardBottomInset(0);
-      return;
-    }
-
-    if (typeof window === 'undefined' || !window.visualViewport) {
-      setKeyboardBottomInset(0);
-      return;
-    }
-
-    const viewport = window.visualViewport;
-    let frameId: number | null = null;
-
-    const getKeyboardBottomInset = () => {
-      const currentVisibleHeight = viewport.height + viewport.offsetTop;
-      const currentViewportWidth = viewport.width;
-
-      if (currentVisibleHeight <= 0 || currentViewportWidth <= 0) {
-        return 0;
-      }
-
-      const baseline = visualViewportBaselineRef.current;
-      const widthDelta = Math.abs(currentViewportWidth - baseline.width);
-
-      if (baseline.height === 0 || widthDelta > 120 || currentVisibleHeight > baseline.height) {
-        visualViewportBaselineRef.current = { height: currentVisibleHeight, width: currentViewportWidth };
-        return 0;
-      }
-
-      const baselineInset = baseline.height - currentVisibleHeight;
-      const layoutViewportInset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
-      const inset = Math.round(Math.max(baselineInset, layoutViewportInset));
-
-      return inset > QUICK_ACTION_KEYBOARD_INSET_THRESHOLD ? inset : 0;
-    };
-
-    const syncKeyboardBottomInset = () => {
-      const nextInset = getKeyboardBottomInset();
-      setKeyboardBottomInset((current) => (current === nextInset ? current : nextInset));
-
-      if (nextInset > 0 && document.activeElement === titleInputRef.current) {
-        if (frameId !== null) {
-          window.cancelAnimationFrame(frameId);
-        }
-        frameId = window.requestAnimationFrame(() => {
-          titleInputRef.current?.scrollIntoView({ behavior: 'auto', block: 'nearest' });
-        });
-      }
-    };
-
-    syncKeyboardBottomInset();
-    viewport.addEventListener('resize', syncKeyboardBottomInset);
-    viewport.addEventListener('scroll', syncKeyboardBottomInset);
-
-    return () => {
-      viewport.removeEventListener('resize', syncKeyboardBottomInset);
-      viewport.removeEventListener('scroll', syncKeyboardBottomInset);
-      if (frameId !== null) {
-        window.cancelAnimationFrame(frameId);
-      }
-    };
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      setIsMobileViewport(false);
-      return;
-    }
-
-    const nativePlatform = Capacitor.getPlatform();
-    const isNativeMobile = Capacitor.isNativePlatform()
-      && (nativePlatform === 'android' || nativePlatform === 'ios');
-    const userAgent = window.navigator.userAgent || '';
-    const isBrowserMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent)
-      || Boolean((window.navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData?.mobile);
-
-    setIsMobileViewport(isNativeMobile || isBrowserMobile);
-  }, []);
+  }, [categoryPickerMode, isDeleteConfirming, isEditingNote, isEditingTitle, isMaybePickerOpen, isOpen, isSkipToPickerOpen, onClose, onForceClose, todo?.note, todo?.title]);
 
   if (!isOpen || !todo) return null;
 
   const handleTitleSave = () => {
     setIsEditingTitle(false);
-    if (isEscapeRef.current) {
-      isEscapeRef.current = false;
+    if (isTitleCancelRef.current) {
+      isTitleCancelRef.current = false;
       return;
     }
+
     const trimmedTitle = editedTitle.trim();
     if (trimmedTitle && trimmedTitle !== todo.title) {
       onUpdateTitle?.(trimmedTitle);
     } else {
       setEditedTitle(todo.title);
     }
+
+    if (onForceClose) {
+      onForceClose();
+    } else {
+      onClose();
+    }
   };
+
+  const handleCancelTitleEdit = () => {
+    isTitleCancelRef.current = true;
+    setEditedTitle(todo.title);
+    titleInputRef.current?.blur();
+    setIsEditingTitle(false);
+    if (onForceClose) {
+      onForceClose();
+    } else {
+      onClose();
+    }
+  };
+
+  const handleNoteSave = () => {
+    setIsEditingNote(false);
+    if (isNoteCancelRef.current) {
+      isNoteCancelRef.current = false;
+      return;
+    }
+
+    const trimmedNote = editedNote.trim();
+    if (trimmedNote !== (todo.note || '')) {
+      onUpdateNote?.(trimmedNote);
+    } else {
+      setEditedNote(todo.note || '');
+    }
+
+    if (onForceClose) {
+      onForceClose();
+    } else {
+      onClose();
+    }
+  };
+
+  const handleCancelNoteEdit = () => {
+    isNoteCancelRef.current = true;
+    setEditedNote(todo.note || '');
+    noteInputRef.current?.blur();
+    setIsEditingNote(false);
+    if (onForceClose) {
+      onForceClose();
+    } else {
+      onClose();
+    }
+  };
+
+  if (isEditingTitle || isEditingNote) {
+    const isTitleEditor = isEditingTitle;
+    const value = isTitleEditor ? editedTitle : editedNote;
+    const setValue = isTitleEditor ? setEditedTitle : setEditedNote;
+    const inputRef = isTitleEditor ? titleInputRef : noteInputRef;
+    const onSave = isTitleEditor ? handleTitleSave : handleNoteSave;
+    const onCancel = isTitleEditor ? handleCancelTitleEdit : handleCancelNoteEdit;
+
+    return (
+      <div
+        className="fixed inset-0 z-[140] flex items-center justify-center bg-[rgba(15,23,42,0.12)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-12 backdrop-blur-sm"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="w-full max-w-[26rem] rounded-[1.75rem] border border-stone-200 bg-[#faf9f6] p-4 shadow-[0_22px_60px_rgba(15,23,42,0.18)]">
+          <div className="mb-3 px-1">
+            <div className="text-[11px] uppercase tracking-[0.22em] text-stone-400">Quick Edit</div>
+            <div className="mt-1 text-base font-medium text-stone-800">{isTitleEditor ? '修改标题' : '修改备注'}</div>
+          </div>
+
+          <input
+            ref={inputRef}
+            type="text"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            onBlur={onSave}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                inputRef.current?.blur();
+              } else if (event.key === 'Escape') {
+                event.preventDefault();
+                onCancel();
+              }
+            }}
+            autoFocus
+            placeholder={isTitleEditor ? '输入标题' : '添加备注'}
+            className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-800 outline-none transition-colors placeholder:text-stone-400 focus:border-stone-400"
+          />
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={onCancel}
+              className="rounded-2xl border border-stone-200 px-4 py-3 text-sm text-stone-500 transition-colors hover:border-stone-300 hover:bg-white"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={onSave}
+              className="rounded-2xl border border-stone-300 bg-stone-800 px-4 py-3 text-sm text-white transition-colors hover:bg-stone-700"
+            >
+              确定
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const showDetailShortcut = !isQuickTodo(todo);
   const isRecurringTodo = Boolean(todo.recurrenceRule);
@@ -355,74 +413,31 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
       formatDateKey(targetDate)
     ]);
   };
-  const isMobileTitleEditMode = isEditingTitle && isMobileViewport;
-  const keyboardBreathingRoom = isMobileTitleEditMode
-    ? QUICK_ACTION_MOBILE_EDIT_KEYBOARD_BREATHING_ROOM
-    : QUICK_ACTION_KEYBOARD_BREATHING_ROOM;
-  const effectiveKeyboardBottomInset = Math.max(0, keyboardBottomInset - keyboardBreathingRoom);
-  const sheetMaxHeight = `calc(100vh - var(--app-safe-area-top) - env(safe-area-inset-bottom) - ${effectiveKeyboardBottomInset}px - 4rem)`;
-
   return (
     <div
       className="fixed inset-0 z-[130] flex items-end justify-center bg-[rgba(15,23,42,0.12)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-12 backdrop-blur-sm md:items-center md:pb-4"
-      style={{
-        paddingBottom: `calc(1rem + env(safe-area-inset-bottom) + ${effectiveKeyboardBottomInset}px)`,
-        transition: 'padding-bottom 180ms ease-out'
-      }}
       onPointerDown={handleBackdropPointerDown}
       onClick={handleBackdropClick}
     >
       <div
         className="w-full max-w-[26rem] overflow-y-auto overscroll-contain rounded-[2rem] border border-stone-200 bg-[#faf9f6] shadow-[0_26px_70px_rgba(15,23,42,0.14)]"
-        style={{
-          maxHeight: isMobileTitleEditMode ? 'none' : sheetMaxHeight,
-          overflowY: isMobileTitleEditMode ? 'hidden' : 'auto',
-          transition: 'max-height 180ms ease-out'
-        }}
+        style={{ maxHeight: 'calc(100vh - var(--app-safe-area-top) - env(safe-area-inset-bottom) - 4rem)' }}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className={`relative px-5 py-4 ${isMobileTitleEditMode ? '' : 'border-b border-stone-200 pr-24'}`}>
+        <div className="relative border-b border-stone-200 px-5 py-4 pr-24">
           <div className="text-[11px] uppercase tracking-[0.22em] text-stone-400">Quick Actions</div>
-          {isEditingTitle ? (
-            <div className="mt-1 flex items-end gap-2">
-              <input
-                ref={titleInputRef}
-                type="text"
-                className="min-w-0 flex-1 border-x-0 border-t-0 border-b border-stone-300 bg-transparent px-1 pb-0.5 text-lg font-medium text-stone-800 outline-none focus:border-stone-400 focus:ring-0 focus:outline-none"
-                value={editedTitle}
-                onChange={(e) => setEditedTitle(e.target.value)}
-                onBlur={handleTitleSave}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    (e.target as HTMLInputElement).blur();
-                  } else if (e.key === 'Escape') {
-                    isEscapeRef.current = true;
-                    setEditedTitle(todo.title);
-                    setIsEditingTitle(false);
-                  }
-                }}
-                autoFocus
-              />
-              <button
-                type="button"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => titleInputRef.current?.blur()}
-                className="shrink-0 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-stone-600 transition-colors hover:border-stone-300 hover:text-stone-800"
-                title="Confirm title"
-              >
-                OK
-              </button>
-            </div>
-          ) : (
-            <div
-              className="mt-1 text-lg font-medium text-stone-800 cursor-pointer hover:bg-stone-100/60 rounded px-1 -mx-1 transition-colors"
-              onClick={withActionGuard(() => setIsEditingTitle(true))}
-            >
-              {todo.title}
-            </div>
-          )}
-          {!isMobileTitleEditMode && visibleQuickActionDateRows.length > 0 && (
+          <div
+            className="-mx-1 mt-1 cursor-pointer rounded px-1 text-lg font-medium text-stone-800 transition-colors hover:bg-stone-100/60"
+            onClick={withActionGuard(() => {
+              setEditedTitle(todo.title);
+              isTitleCancelRef.current = false;
+              setIsEditingTitle(true);
+            })}
+          >
+            {todo.title}
+          </div>
+          {visibleQuickActionDateRows.length > 0 && (
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-stone-400">
               {visibleQuickActionDateRows.map((item) => (
                 <span key={`${item.label}-${item.value}`} className="inline-flex min-w-0 items-center gap-1.5">
@@ -432,8 +447,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
               ))}
             </div>
           )}
-          {!isEditingTitle && (
-            <div className="absolute right-5 top-4 flex items-center gap-2">
+          <div className="absolute right-5 top-4 flex items-center gap-2">
             {showDetailShortcut && (
               <button
               type="button"
@@ -454,11 +468,9 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
                 <Check size={16} />
               </button>
             )}
-            </div>
-          )}
+          </div>
         </div>
 
-        {!isMobileTitleEditMode && (
           <div className="px-4 py-4 pb-12 md:pb-4">
           <div className="space-y-2">
             <div className={isRecurringTodo ? 'hidden' : 'grid grid-cols-2 gap-2'}>
@@ -620,15 +632,33 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
               </button>
             )}
 
-            {canMoveCategory && (
-              <button
-                type="button"
-                onClick={withActionGuard(() => setCategoryPickerMode('move'))}
-                className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
-              >
-                <ArrowRightLeft size={15} className="text-stone-400" />
-                <span>移动分类</span>
-              </button>
+            {(canMoveCategory || onUpdateNote) && (
+              <div className="grid grid-cols-2 gap-2">
+                {canMoveCategory && (
+                  <button
+                    type="button"
+                    onClick={withActionGuard(() => setCategoryPickerMode('move'))}
+                    className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
+                  >
+                    <ArrowRightLeft size={15} className="text-stone-400" />
+                    <span>移动分类</span>
+                  </button>
+                )}
+
+                {onUpdateNote && (
+                  <button
+                    type="button"
+                    onClick={withActionGuard(() => {
+                      setEditedNote(todo.note || '');
+                      setIsEditingNote(true);
+                    })}
+                    className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
+                  >
+                    <FilePenLine size={15} className="text-stone-400" />
+                    <span>修改备注</span>
+                  </button>
+                )}
+              </div>
             )}
 
             {canUpgradeToProject && (
@@ -674,7 +704,6 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
             </button>
           </div>
           </div>
-        )}
       </div>
 
       <TodoDatePickerModal
@@ -755,6 +784,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
           </div>
         </div>
       )}
+
     </div>
   );
 };
