@@ -18,18 +18,30 @@ import {
   getMinimumTimelineRange,
   getPlannedTimeRange,
   getScheduleBlockHeight,
+ getTimelineTimestamp,
   getTimelineIdleGaps,
   getTimelineBlockBackground,
+  isPlanActionInteractionGuardActive,
   isTimelinePlanTimeEditingLocked,
   isTimelineLogNoteExpanded,
   layoutParallelScheduleBlocks,
   MIN_SCHEDULE_BLOCK_HEIGHT,
+  PLAN_ACTION_INTERACTION_GUARD_MS,
   scheduleTimelineRecordDetailOpen,
   shiftTimeRangeWithinDay,
   TIMELINE_TOP_PADDING
 } from './TimelineScheduleCanvas';
 
 describe('layoutParallelScheduleBlocks', () => {
+  test('blocks pointer clicks briefly after plan actions open but leaves keyboard activation available', () => {
+    const openedAt = 10_000;
+
+    expect(isPlanActionInteractionGuardActive(openedAt, openedAt)).toBe(true);
+    expect(isPlanActionInteractionGuardActive(openedAt, openedAt + PLAN_ACTION_INTERACTION_GUARD_MS - 1)).toBe(true);
+    expect(isPlanActionInteractionGuardActive(openedAt, openedAt + PLAN_ACTION_INTERACTION_GUARD_MS)).toBe(false);
+    expect(isPlanActionInteractionGuardActive(0, openedAt)).toBe(false);
+  });
+
   test('finds start, intermediate, and trailing idle time while ignoring planned blocks', () => {
     const minute = 60 * 1000;
     expect(getTimelineIdleGaps([
@@ -127,6 +139,13 @@ describe('layoutParallelScheduleBlocks', () => {
   test('creates 30-minute plans snapped to five-minute boundaries within the day', () => {
     expect(getPlannedTimeRange(62)).toEqual({ startMinutes: 60, endMinutes: 90 });
     expect(getPlannedTimeRange(1438)).toEqual({ startMinutes: 1410, endMinutes: 1440 });
+  });
+
+  test('uses the last millisecond of a selected day instead of next-day midnight', () => {
+    const dayStart = new Date('2026-08-24T00:00:00').getTime();
+    const timestamp = getTimelineTimestamp(dayStart, 24 * 60);
+
+    expect(timestamp).toBe(new Date('2026-08-24T23:59:59.999').getTime());
   });
 
   test('expands notes only on sufficiently tall timeline blocks', () => {

@@ -3,6 +3,8 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-08-24: `ActivityAttributeFields.tsx` provides shared optional text, number, single-select, and multi-select controls for records and active sessions; `ActivityAttributeManager.tsx` configures Activity definitions; `ActivityAttributeStatistics.tsx` calculates numeric summaries and choice coverage from actual logs.
+- Update 2026-08-24: `TimelineScheduleCanvas.tsx` now ends historical-day idle gaps and 24:00-boundary record creation at `23:59:59.999`, preventing new Chronicle records from being saved at next-day midnight.
 - Update 2026-08-10: `AppRoutes.tsx` now gives daily-check overview and detail a stable current-day value whenever the route changes, independent of the selected date in other workspaces.
 - Update 2026-08-10: `HeatmapCalendar.tsx` continues to render missing daily-check dates without a question-mark placeholder; no visual change was needed for the compact slash used by overview and detail value surfaces.
 - Update 2026-08-09: `HeatmapCalendar.tsx` now follows the detail timeline's compact `YYYY.MM` month navigator, leaves dates without a Daily Review snapshot transparent while retaining their numerals, renders recorded check values below dates, and exposes a temporary manual-check backfill control.

@@ -3,6 +3,8 @@
 Contains pure utility functions for data processing and business logic calculations.
 
 ## Files
+- Update 2026-08-24: `activityAttributeUtils.ts` centralizes stable ordering, lookup, and Activity-switch cleanup for ID-based custom attribute values.
+- Update 2026-08-24: `logUtils.ts` now exposes the start-day end boundary and a clamp helper so new manual logs cannot use next-day `00:00` as their end time.
 - Update 2026-08-10: `dataValidation.ts` now accepts optional `widgetTemplates` arrays in backup and cloud sync payloads, while older backups that omit the field remain valid.
 - Update 2026-08-10: `autoCheckUtils.ts` evaluates split overnight sleep from the first night segment through `nightEarliestStart` and caches matching logs by date for daily-check views; `checkItemNormalizer.ts` migrates legacy `nightLatestStart` template and Daily Review snapshots during hydration.
 - Update 2026-08-11: `autoCheckUtils.ts` formats cross-midnight times as `HH:MM 次日`, keeping the clock value visible on narrow screens.
@@ -14,6 +16,7 @@ Contains pure utility functions for data processing and business logic calculati
 - Update 2026-07-31: `todoRecurringPlanUtils.ts` now exposes the shared manual timeline Plan log builder and virtual Plan ids used by both drag-created and AI-created Plan blocks.
 - Update 2026-07-30: `autoCheckUtils.ts` now exposes a shared id-keyed change detector for auto-check completion refreshes, so views can ignore harmless array reordering before persisting review data.
 - Update 2026-07-30: `todoRecurringPlanUtils.ts` centralizes finite Repeat auto-Plan occurrence windows, generated Plan log metadata, same-day time normalization, and delete-lock checks.
+- Update 2026-08-24: `todoRecurringPlanUtils.ts` removes current-day and future recurrence-auto Plan logs when a recurring todo's auto scheduling is cancelled or the todo is deleted, while preserving past and manual Plan logs.
 - Update 2026-07-11: `achievementUtils.ts` now rebuilds achievement redemption records for full recomputation, merging archived fragments and refreshing costs for rewards or collection bottles that still exist.
 - Update 2026-07-11: `hardwareBackHandlerStack.test.ts` now covers topmost-handler priority and fallthrough, guarding the shared Android back stack used by nested collection, todo, and record overlays.
 - Update 2026-07-06: `dataValidation.ts` now accepts `selfBeliefs` arrays in backup and cloud sync payloads so the self-belief library restores alongside principles.

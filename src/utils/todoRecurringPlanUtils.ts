@@ -6,6 +6,7 @@
  * @description Centralizes the Repeat todo auto-Plan rules so details, startup checks, and timeline actions share one behavior.
  * @updated 2026-07-31: Added a shared manual timeline Plan log builder so drag-created and AI-created Plan blocks use the same persisted shape.
  * @updated 2026-07-30: Added the first recurring auto-Plan helper set for finite occurrence materialization and lock-aware deletion.
+ * @updated 2026-08-24: Added cancellation/deletion cleanup for future recurring auto-Plan logs from the local start of today.
  */
 import { Log, TodoItem, TodoRecurringPlanConfig } from '../types';
 import { formatDateKey, matchesRecurrenceRule, parseDateKey } from './todoScheduleUtils';
@@ -151,6 +152,30 @@ const getRecurringPlanLogDateKey = (log: Log): string => (
 export const isRecurringAutoPlanLog = (log: Log): boolean => (
   log.isPlanned === true && log.planSource === RECURRING_PLAN_SOURCE
 );
+
+export const getLocalStartOfDayTimestamp = (referenceDate: Date = new Date()): number => {
+  const startOfDay = new Date(referenceDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  return startOfDay.getTime();
+};
+
+export const removeRecurringAutoPlanLogsFromDate = (
+  logs: Log[],
+  todoIds: string[],
+  referenceDate: Date = new Date()
+): Log[] => {
+  const todoIdSet = new Set(todoIds);
+  if (todoIdSet.size === 0) {
+    return logs;
+  }
+
+  const startOfDayTimestamp = getLocalStartOfDayTimestamp(referenceDate);
+  return logs.filter((log) => !(
+    isRecurringAutoPlanLog(log)
+    && Boolean(log.linkedTodoId && todoIdSet.has(log.linkedTodoId))
+    && log.startTime >= startOfDayTimestamp
+  ));
+};
 
 export const hasPlanForTodoOnDate = (logs: Log[], todoId: string, dateKey: string): boolean => (
   logs.some((log) => (

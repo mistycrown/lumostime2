@@ -9,6 +9,7 @@
  * @updated 2026-05-14: Suppresses cross-source replays of the same NFC timer start so one physical scan cannot stop a running session and then immediately restart it through the app-link bridge.
  * @updated 2026-05-14: Normalized equivalent NFC/deep-link start URLs onto one execution key so appUrlOpen and nfcTagScanned can share a single dedupe path without leaving duplicate same-activity timers behind.
  * @updated 2026-05-13: Added a short same-activity restart guard so duplicate NFC deliveries after a stop do not immediately start a fresh timer.
+ * @updated 2026-08-24: Restored NFC activity execution by keeping quick-todo URL routing out of the activity start handler.
  */
 import { useEffect, useRef } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -205,11 +206,6 @@ export const useDeepLink = (
       actId: string,
       toggleExisting: boolean
     ) => {
-      if (parsedUrl.type === 'quick_todo') {
-        openQuickTodoAddRef.current?.();
-        return true;
-      }
-
       const { categories: currentCategories, activeSessions: currentActiveSessions } = latestStateRef.current;
       const category = currentCategories.find((entry) => entry.id === catId);
       const activity = category?.activities.find((entry) => entry.id === actId);
@@ -247,6 +243,11 @@ export const useDeepLink = (
       toggleExistingActivity: boolean,
       source: 'scan' | 'deeplink'
     ) => {
+      if (parsedUrl.type === 'quick_todo') {
+        openQuickTodoAddRef.current?.();
+        return true;
+      }
+
       if (parsedUrl.type === 'record' && parsedUrl.action === 'quick_punch') {
         quickPunchRef.current();
         return true;

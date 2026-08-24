@@ -317,6 +317,23 @@ export const useAppAwarenessRuntime = ({
     }
   };
 
+  const cancelWorkflow = async () => {
+    if (Capacitor.getPlatform() !== 'android') {
+      return;
+    }
+
+    try {
+      if (typeof AppUsage.cancelAppAwarenessWorkflow === 'function') {
+        await AppUsage.cancelAppAwarenessWorkflow();
+        return;
+      }
+    } catch (error) {
+      console.error('[useAppAwarenessRuntime] Failed to cancel app-awareness workflow', error);
+    }
+
+    await hideOverlay();
+  };
+
   const showOverlay = async (payload: AppAwarenessOverlayPayload) => {
     if (Capacitor.getPlatform() !== 'android' || typeof AppUsage.showAppAwarenessOverlay !== 'function') {
       return;
@@ -497,7 +514,7 @@ export const useAppAwarenessRuntime = ({
       if (run.status === 'waiting_cooldown') {
         if (detail.actionId === 'workflow-cancel') {
           setAppAwarenessActiveRun(null);
-          void hideOverlay();
+          void cancelWorkflow();
         }
         return;
       }
@@ -567,7 +584,7 @@ export const useAppAwarenessRuntime = ({
 
       if (detail.actionId === 'workflow-cancel') {
         setAppAwarenessActiveRun(null);
-        void hideOverlay();
+        void cancelWorkflow();
         return;
       }
 

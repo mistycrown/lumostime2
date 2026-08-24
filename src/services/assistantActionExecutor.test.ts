@@ -3,6 +3,7 @@ import {
   assistantActionExecutor,
   removeStoredPrincipleById,
   removeStoredSelfBeliefById,
+  rollbackAppliedChatActions,
   type AssistantActionExecutionContext
 } from './assistantActionExecutor';
 import type { AICreatePrincipleToolCall, AICreateSelfBeliefToolCall, AIPlannedLogToolCall, AITodoToolCall } from './aiService';
@@ -430,5 +431,67 @@ describe('assistantActionExecutor principle-library tool calls', () => {
 
     expect(action.snapshot.previousSelfBelief.descriptions).toHaveLength(1);
     expect(action.snapshot.nextSelfBelief?.descriptions).toHaveLength(2);
+  });
+});
+
+describe('assistantActionExecutor retry rollback', () => {
+  beforeEach(() => {
+    installLocalStorageMock();
+  });
+
+  it('reverses all applied foreground tool effects before a reply is retried', () => {
+    const context = buildBaseContext();
+    const todoAndPlanResult = assistantActionExecutor.applyTodoAndPlannedLogToolCalls(context, [
+      {
+        toolName: 'create_todo',
+        args: {
+          clientRef: 'draft-plan',
+          title: 'Write the outline',
+          categoryId: 'project-general',
+          linkedCategoryId: 'study',
+          linkedActivityId: 'writing'
+        }
+      },
+      {
+        toolName: 'create_planned_log',
+        args: {
+          todoRef: 'draft-plan',
+          date: '2026-05-15',
+          startTime: '09:00',
+          endTime: '10:00'
+        }
+      }
+    ], 'Create an outline plan.');
+    const principleAction = assistantActionExecutor.applyPrincipleToolCalls([{
+      toolName: 'create_principle',
+      args: {
+        title: 'Start small',
+        frontText: 'Begin with one concrete step.'
+      }
+    }])[0];
+    const selfBeliefAction = assistantActionExecutor.applySelfBeliefToolCalls([{
+      toolName: 'create_self_belief',
+      args: {
+        title: 'I can finish difficult work',
+        descriptions: []
+      }
+    }])[0];
+
+    if (!principleAction || !selfBeliefAction) {
+      throw new Error('Expected library tool actions to be applied.');
+    }
+
+    const actions = [...todoAndPlanResult.actions, principleAction, selfBeliefAction];
+    const rollbackResult = rollbackAppliedChatActions(
+      actions,
+      todoAndPlanResult.nextLogs,
+      todoAndPlanResult.nextTodos
+    );
+
+    expect(rollbackResult.logs).toEqual([]);
+    expect(rollbackResult.todos).toEqual([]);
+    expect(rollbackResult.undoneActionIds).toEqual(actions.map((action) => action.actionId));
+    expect(JSON.parse(localStorage.getItem('lumostime_principles') || '[]')).toEqual([]);
+    expect(JSON.parse(localStorage.getItem('lumostime_self_beliefs') || '[]')).toEqual([]);
   });
 });

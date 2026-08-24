@@ -5,6 +5,7 @@
  * @pos Component Support (AI Integration)
  * @description Moves the large persistence/bootstrap normalization layer out of AIBackfillChatModal so startup state restoration stays pure and isolated from the runtime orchestration logic.
  * @updated 2026-06-07: Added weekly/monthly newspaper writeback result normalization so periodic AI newspaper cards persist across chat reloads.
+ * @updated 2026-08-24: Persisted foreground memory/reminder rollback snapshots for in-place reply retry.
  * @updated 2026-05-16: Normalized legacy garbled background-debug labels during chat-state hydration so older persisted assistant messages render readable Chinese titles.
  * @updated 2026-05-16: Moved custom prompt blocks into a global store, with legacy persona-bound block migration during initial chat-state hydration.
  * @updated 2026-05-16: Normalized per-block enabled flags for persona custom prompt blocks and defaulted legacy blocks to enabled.
@@ -23,7 +24,12 @@ import {
   loadInitialChatStateFromStorage,
   normalizeChatSessions
 } from './AIBackfillChatSessionHelpers';
-import type { AssistantLetterResultCard, AssistantLocalQueryResult } from '../../types/assistant';
+import type {
+  AssistantLetterResultCard,
+  AssistantLocalQueryResult,
+  AssistantMemory,
+  AssistantReminder
+} from '../../types/assistant';
 import type {
   AIChatCustomPromptBlock,
   AIChatDailyNewspaperWritebackResult,
@@ -208,6 +214,18 @@ const normalizeMemoryUpdates = (value: unknown): AIChatMemoryUpdateSection[] => 
     }];
   });
 };
+
+const normalizeMemoryBefore = (value: unknown): AssistantMemory | undefined => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as AssistantMemory
+    : undefined
+);
+
+const normalizeRemindersBefore = (value: unknown): AssistantReminder[] | undefined => (
+  Array.isArray(value)
+    ? value.filter((item): item is AssistantReminder => Boolean(item && typeof item === 'object'))
+    : undefined
+);
 
 const normalizeReminderUpdates = (value: unknown): string[] => (
   Array.isArray(value)
@@ -709,8 +727,14 @@ const normalizeMessages = (value: unknown, getLocalDateStr: (date: Date) => stri
         ? { assistantLetterResult: normalizeAssistantLetterResult(candidate.assistantLetterResult) }
         : {}),
       ...(candidate.memoryUpdates ? { memoryUpdates: normalizeMemoryUpdates(candidate.memoryUpdates) } : {}),
+      ...(normalizeMemoryBefore(candidate.memoryBefore)
+        ? { memoryBefore: normalizeMemoryBefore(candidate.memoryBefore) }
+        : {}),
       ...(candidate.dreamUpdates ? { dreamUpdates: normalizeDreamUpdates(candidate.dreamUpdates) } : {}),
       ...(candidate.reminderUpdates ? { reminderUpdates: normalizeReminderUpdates(candidate.reminderUpdates) } : {}),
+      ...(normalizeRemindersBefore(candidate.remindersBefore)
+        ? { remindersBefore: normalizeRemindersBefore(candidate.remindersBefore) }
+        : {}),
       ...(normalizeDailyReviewWritebackResult(candidate.dailyReviewWriteback)
         ? { dailyReviewWriteback: normalizeDailyReviewWritebackResult(candidate.dailyReviewWriteback) }
         : {}),

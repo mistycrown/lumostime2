@@ -4,7 +4,7 @@
  * @output Native Usage Stats and App Rule State
  * @pos Native Plugin
  * @description Capacitor plugin exposing Android foreground-app access, app association rules, and per-app ignore state to the React application.
- * @updated 2026-08-12: Added AppAwareness decision logs and a native-overlay visibility watchdog that falls back to the Web workflow after failed rendering.
+ * @updated 2026-08-24: Resets foreground-app detection cache on an explicit workflow cancellation so reopening the same target app triggers app awareness again.
  */
 package com.mistycrown.lumostime;
 
@@ -616,6 +616,14 @@ public class AppUsagePlugin extends Plugin {
     }
 
     @PluginMethod
+    public void cancelAppAwarenessWorkflow(PluginCall call) {
+        clearNativeAppAwarenessRuntime(false);
+        FloatingWindowService.hideAppAwarenessOverlay();
+        AppAccessibilityService.clearLastDetectedPackage();
+        call.resolve();
+    }
+
+    @PluginMethod
     public void stopCurrentAppAwarenessTimer(PluginCall call) {
         clearNativeAppAwarenessTimerRuntime(true, true);
         call.resolve();
@@ -817,6 +825,7 @@ public class AppUsagePlugin extends Plugin {
 
         if ("workflow-cancel".equals(actionId)) {
             clearNativeAppAwarenessRuntime(true);
+            AppAccessibilityService.clearLastDetectedPackage();
             return true;
         }
 

@@ -13,15 +13,15 @@ Allow users to retry a completed foreground AI reply in place. The retried reque
 
 ## Rollback
 
-- Save and use each message's existing `appliedActions` snapshots.
+- Save and use each message's existing `appliedActions` snapshots plus pre-turn memory and reminder snapshots.
 - Roll back only actions whose status is `applied`, in reverse execution order.
-- Restore logs and todos from their snapshots as one coherent state update, and restore or remove principle and self-belief entries through their stored snapshots.
+- Restore logs and todos from their snapshots as one coherent state update, restore or remove principle and self-belief entries through their stored snapshots, and restore reminder and memory state.
 - Mark successfully reverted actions as `undone` before starting the new request.
 - If a rollback cannot be completed, keep the original reply and do not send the retry request. This prevents duplicate or partially superseded changes.
 
 ## Scope
 
-The first implementation covers ordinary foreground replies and all existing `AppliedChatAction` kinds: logs, planned logs, todos, todo updates, subtasks, log edits, principles, and self-beliefs. Read-only local-query rounds need no rollback. Dedicated review/newspaper writeback commands are excluded because they do not yet carry a writeback-before snapshot sufficient for safe reversal.
+The first implementation covers ordinary foreground replies and all existing `AppliedChatAction` kinds: logs, planned logs, todos, todo updates, subtasks, log edits, principles, and self-beliefs. It also restores reminder and long-term-memory writes made by the same foreground response. Read-only local-query rounds need no rollback. Dedicated review/newspaper writeback commands are excluded because they do not yet carry a writeback-before snapshot sufficient for safe reversal.
 
 ## Verification
 

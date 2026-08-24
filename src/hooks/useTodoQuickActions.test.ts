@@ -6,6 +6,7 @@
  * @description Ensures the quick-actions helpers keep their same-touch guard and category-move save behavior stable.
  * @updated 2026-05-13: Added quick upgrade-to-project coverage so quick reminders must carry an explicitly chosen target category.
  * @updated 2026-05-13: Added quick category-move coverage so non-subtask todos can switch todo categories while subtasks stay locked.
+ * @updated 2026-08-24: Added note-update normalization coverage for quick note editing.
  * @updated 2026-05-05: Added guard-window coverage for bottom-row quick-actions click-through.
  */
 
@@ -13,6 +14,7 @@ import { describe, expect, test } from 'vitest';
 import {
   QUICK_ACTION_INTERACTION_GUARD_MS,
   buildQuickActionCategoryMoveTodo,
+  buildQuickActionNoteUpdateTodo,
   buildQuickActionUpgradeToProjectTodo,
   isTodoQuickActionInteractionGuardActive,
 } from './useTodoQuickActions';
@@ -84,5 +86,25 @@ describe('useTodoQuickActions interaction guard', () => {
     } as any;
 
     expect(buildQuickActionUpgradeToProjectTodo(todo, 'cat-b')).toBeNull();
+  });
+
+  test('trims note updates and clears empty notes', () => {
+    const todo = {
+      id: 'todo-5',
+      categoryId: 'cat-a',
+      title: 'Task with note',
+      isCompleted: false,
+      note: 'old note'
+    } as any;
+
+    expect(buildQuickActionNoteUpdateTodo(todo, '  new note  ')).toEqual({
+      ...todo,
+      note: 'new note'
+    });
+    expect(buildQuickActionNoteUpdateTodo(todo, '   ')).toEqual({
+      ...todo,
+      note: undefined
+    });
+    expect(buildQuickActionNoteUpdateTodo(todo, 'old note')).toBeNull();
   });
 });

@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-08-24: Added Activity-level custom attribute definitions and ID-based values on logs and active sessions.
  * @updated 2026-08-06: Added backward-compatible archive state to activities.
  * @updated 2026-08-09: Added character attributes, experience ledgers, and optional fixed-rule attribute experience effects.
  * @input None
@@ -39,6 +40,31 @@ export interface NoteTemplate {
   order?: number;
 }
 
+export type ActivityAttributeType = 'text' | 'single' | 'multi' | 'number';
+
+export interface ActivityAttributeOption {
+  id: string;
+  label: string;
+  isArchived?: boolean;
+}
+
+export interface ActivityAttributeDefinition {
+  id: string;
+  name: string;
+  type: ActivityAttributeType;
+  options?: ActivityAttributeOption[];
+  order: number;
+  isArchived?: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type ActivityAttributeValue =
+  | { attributeId: string; value: string }
+  | { attributeId: string; value: number }
+  | { attributeId: string; optionId: string }
+  | { attributeId: string; optionIds: string[] };
+
 export interface Activity {
   id: string;
   name: string;
@@ -51,6 +77,7 @@ export interface Activity {
   enableMoodScore?: boolean; // Override parent setting for mood tracking
   keywords?: string[]; // (NEW) Keywords for finer classification
   noteTemplates?: NoteTemplate[];
+  attributes?: ActivityAttributeDefinition[];
   isArchived?: boolean;
 }
 
@@ -157,6 +184,7 @@ export interface ActiveSession {
   scopeIds?: string[]; // NEW: Link to multiple Scopes - changed from scopeId
   title?: string;
   note?: string;
+  attributeValues?: ActivityAttributeValue[];
   progressIncrement?: number; // New: Carry over to Log
   focusScore?: number; // 1-5
   moodScore?: number; // 1-5 mood rating
@@ -187,6 +215,7 @@ export interface Log {
   duration: number; // in seconds
   title?: string;
   note?: string; // Optional description
+  attributeValues?: ActivityAttributeValue[];
   linkedTodoId?: string; // New: Link to a specific todo task
   isPlanned?: boolean; // A virtual planning block created from the Chronicle todo sidebar
   planSource?: 'recurrence-auto'; // Marks Plan blocks generated from a Repeat todo rule

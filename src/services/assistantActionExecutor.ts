@@ -6,6 +6,7 @@
  * @description Executes AI-planned log/todo/subtask/edit/principle/self-belief tool calls against local app data using shared helpers so the UI can reuse one execution layer instead of keeping tool application logic inside a modal component.
  *
  * @updated 2026-08-12: Added ordered todo-and-plan execution that resolves one-turn temporary todo references into persisted ids.
+ * @updated 2026-08-24: Added reverse-order batch rollback for retrying foreground assistant replies without retaining their tool effects.
  * @updated 2026-07-31: Added `create_planned_log` execution for AI-created todo-linked timeline Plan blocks.
  * @updated 2026-07-06: Added create_principle and create_self_belief tool-call execution with localStorage writeback and undo snapshots.
  * @updated 2026-05-18: `create_todo` actions can now create nested direct subtasks in the same pass, and the applied snapshot records those child ids so the UI can undo the whole bundle cleanly.
@@ -461,6 +462,44 @@ export const applyLogDelete = (
   };
 };
 
+export interface AppliedChatActionRollbackResult {
+  logs: Log[];
+  todos: TodoItem[];
+  undoneActionIds: string[];
+}
+
+const assertRollbackSnapshot = (action: AppliedChatAction) => {
+  if (action.kind === 'create_log' || action.kind === 'create_planned_log') {
+    if (!action.snapshot.logId) {
+      throw new Error('AI action snapshot is missing its created item id.');
+    }
+    return;
+  }
+
+  if (action.kind === 'create_todo' || action.kind === 'create_subtask') {
+    if (!action.snapshot.todoId) {
+      throw new Error('AI action snapshot is missing its created item id.');
+    }
+    return;
+  }
+
+  if (action.kind === 'update_todo' && !action.snapshot.previousTodo) {
+    throw new Error('AI todo update snapshot is missing its previous value.');
+  }
+
+  if (action.kind === 'edit_log' && !action.snapshot.previousLog) {
+    throw new Error('AI log edit snapshot is missing its previous value.');
+  }
+
+  if (action.kind === 'create_principle' && !action.snapshot.principleId) {
+    throw new Error('AI principle snapshot is missing its id.');
+  }
+
+  if (action.kind === 'create_self_belief' && !action.snapshot.selfBeliefId) {
+    throw new Error('AI self-belief snapshot is missing its id.');
+  }
+};
+
 const buildActionId = (): string => crypto.randomUUID();
 const PRINCIPLES_STORAGE_KEY = 'lumostime_principles';
 const SELF_BELIEFS_STORAGE_KEY = 'lumostime_self_beliefs';
@@ -686,6 +725,107 @@ export const updateStoredSelfBelief = (selfBelief: StoredSelfBelief): boolean =>
     item.id === selfBelief.id ? selfBelief : item
   )));
   return true;
+};
+
+export const rollbackAppliedChatActions = (
+  actions: AppliedChatAction[],
+  logs: Log[],
+  todos: TodoItem[]
+): AppliedChatActionRollbackResult => {
+  const actionsToUndo = actions.filter((action) => action.status === 'applied');
+  actionsToUndo.forEach(assertRollbackSnapshot);
+
+  let nextLogs = [...logs];
+  let nextTodos = [...todos];
+  let nextPrinciples = loadStoredPrinciples();
+  let nextSelfBeliefs = loadStoredSelfBeliefs();
+  let principlesChanged = false;
+  let selfBeliefsChanged = false;
+
+  [...actionsToUndo].reverse().forEach((action) => {
+    switch (action.kind) {
+      case 'create_log':
+      case 'create_planned_log': {
+        const logId = action.snapshot.logId;
+        if (!logId) {
+          return;
+        }
+        const result = applyLogDelete(nextLogs, nextTodos, logId);
+        nextLogs = result.logs;
+        nextTodos = result.todos;
+        return;
+      }
+      case 'create_todo': {
+        const todoId = action.snapshot.todoId;
+        if (!todoId) {
+          return;
+        }
+        const todoIds = new Set([todoId, ...(action.snapshot.createdSubtaskIds || [])]);
+        nextTodos = nextTodos.filter((todo) => !todoIds.has(todo.id));
+        return;
+      }
+      case 'create_subtask': {
+        const todoId = action.snapshot.todoId;
+        if (!todoId) {
+          return;
+        }
+        nextTodos = nextTodos.filter((todo) => todo.id !== todoId);
+        return;
+      }
+      case 'update_todo':
+        nextTodos = applyTodoSave(nextTodos, action.snapshot.previousTodo!);
+        return;
+      case 'edit_log': {
+        const result = applyLogSave(nextLogs, nextTodos, action.snapshot.previousLog!);
+        nextLogs = result.logs;
+        nextTodos = result.todos;
+        return;
+      }
+      case 'create_principle': {
+        const principleId = action.snapshot.principleId;
+        if (!principleId) {
+          return;
+        }
+        nextPrinciples = action.snapshot.previousPrinciple
+          ? nextPrinciples.some((item) => item.id === principleId)
+            ? nextPrinciples.map((item) => (
+              item.id === principleId ? action.snapshot.previousPrinciple! : item
+            ))
+            : [action.snapshot.previousPrinciple, ...nextPrinciples]
+          : nextPrinciples.filter((item) => item.id !== principleId);
+        principlesChanged = true;
+        return;
+      }
+      case 'create_self_belief': {
+        const selfBeliefId = action.snapshot.selfBeliefId;
+        if (!selfBeliefId) {
+          return;
+        }
+        nextSelfBeliefs = action.snapshot.previousSelfBelief
+          ? nextSelfBeliefs.some((item) => item.id === selfBeliefId)
+            ? nextSelfBeliefs.map((item) => (
+              item.id === selfBeliefId ? action.snapshot.previousSelfBelief! : item
+            ))
+            : [action.snapshot.previousSelfBelief, ...nextSelfBeliefs]
+          : nextSelfBeliefs.filter((item) => item.id !== selfBeliefId);
+        selfBeliefsChanged = true;
+        return;
+      }
+    }
+  });
+
+  if (principlesChanged) {
+    saveStoredPrinciples(nextPrinciples);
+  }
+  if (selfBeliefsChanged) {
+    saveStoredSelfBeliefs(nextSelfBeliefs);
+  }
+
+  return {
+    logs: nextLogs,
+    todos: nextTodos,
+    undoneActionIds: actionsToUndo.map((action) => action.actionId)
+  };
 };
 
 export const assistantActionExecutor = {

@@ -6,6 +6,7 @@
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
  * @updated 2026-07-31: Added a pending-message-id fallback cleanup so completed foreground turns always restore the composer send button.
  * @updated 2026-07-31: Wired foreground `create_planned_log` tool calls into local timeline Plan creation, rendering, and undo.
+ * @updated 2026-08-24: Added in-place foreground reply retry that rolls back applied tool actions before regenerating the response.
  * @updated 2026-07-21: Kept the composer Stop state tied to the active foreground request so ordinary requests remain cancellable even if a loading branch resets early.
  * @updated 2026-07-06: Added assistant-created principle and self-belief tool-call writeback with in-chat undo support.
  * @updated 2026-07-05: Connected ordinary foreground assistant local-query turns to the real category/review datasets and fed local-query history back into follow-up unified turns.
@@ -127,6 +128,7 @@ import {
   removeStoredSelfBeliefById,
   restoreStoredPrinciple,
   restoreStoredSelfBelief,
+  rollbackAppliedChatActions,
   updateStoredPrinciple,
   updateStoredSelfBelief,
   type AppliedChatAction,
@@ -700,6 +702,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [editingSelfBeliefDescriptionText, setEditingSelfBeliefDescriptionText] = useState('');
   const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
   const activeRequestRef = useRef<ActiveRequestRef | null>(null);
+  const retryingMessageIdRef = useRef<string | null>(null);
   const isStopActionVisible = isLoading || activeRequestId !== null;
   const isDesktopWidgetMode = displayMode === 'desktop-widget';
   const isOpenRef = useRef(isOpen);
@@ -5228,10 +5231,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     ];
   };
 
-  const applyUnifiedReminders = (output: AssistantUnifiedTurnOutput): string[] => {
+  const applyUnifiedReminders = (output: AssistantUnifiedTurnOutput): {
+    before: AssistantReminder[];
+    updates: string[];
+  } => {
+    const before = assistantReminderQueueService.listReminders();
     const reminders = output.reminders || [];
     if (reminders.length === 0) {
-      return [];
+      return { before, updates: [] };
     }
 
     const reminderUpdates: string[] = [];
@@ -5257,7 +5264,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
     refreshAssistantReminderSnapshot();
     refreshAssistantMemorySnapshot();
-    return reminderUpdates;
+    return { before, updates: reminderUpdates };
   };
 
   const handleOpenLogEditor = (logId?: string) => {
@@ -5439,8 +5446,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       assistantLetterResult?: AssistantLetterResultCard;
       localQueryResults?: AssistantLocalQueryResult[];
       memoryUpdates?: AIChatMemoryUpdateSection[];
+      memoryBefore?: AssistantMemory;
       dreamUpdates?: AIChatDreamUpdateCard[];
       reminderUpdates?: string[];
+      remindersBefore?: AssistantReminder[];
       dailyNewspaperWriteback?: AIChatDailyNewspaperWritebackResult;
       dailyReviewWriteback?: AIChatDailyReviewWritebackResult;
       weeklyNewspaperWriteback?: AIChatWeeklyNewspaperWritebackResult;
@@ -5465,8 +5474,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       ...(options?.assistantLetterResult ? { assistantLetterResult: options.assistantLetterResult } : {}),
       ...(options?.localQueryResults && options.localQueryResults.length > 0 ? { localQueryResults: options.localQueryResults } : {}),
       ...(options?.memoryUpdates && options.memoryUpdates.length > 0 ? { memoryUpdates: options.memoryUpdates } : {}),
+      ...(options?.memoryBefore ? { memoryBefore: options.memoryBefore } : {}),
       ...(options?.dreamUpdates && options.dreamUpdates.length > 0 ? { dreamUpdates: options.dreamUpdates } : {}),
       ...(options?.reminderUpdates && options.reminderUpdates.length > 0 ? { reminderUpdates: options.reminderUpdates } : {}),
+      ...(options?.remindersBefore ? { remindersBefore: options.remindersBefore } : {}),
       ...(options?.dailyNewspaperWriteback ? { dailyNewspaperWriteback: options.dailyNewspaperWriteback } : {}),
       ...(options?.dailyReviewWriteback ? { dailyReviewWriteback: options.dailyReviewWriteback } : {}),
       ...(options?.weeklyNewspaperWriteback ? { weeklyNewspaperWriteback: options.weeklyNewspaperWriteback } : {}),
@@ -5493,15 +5504,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   const applyAssistantMemoryPatch = (
     patch?: AssistantUnifiedTurnOutput['memoryPatch'],
-  ): AIChatMemoryUpdateSection[] => {
+  ): { before: AssistantMemory; updates: AIChatMemoryUpdateSection[] } | null => {
     if (!patch) {
-      return [];
+      return null;
     }
 
     const before = assistantMemoryService.getMemory();
     const after = assistantMemoryService.applyPatch(patch);
     refreshAssistantMemorySnapshot();
-    return buildMemoryUpdateSections(before, after);
+    return {
+      before,
+      updates: buildMemoryUpdateSections(before, after)
+    };
   };
 
   const resolveAssistantDisplayParts = (
@@ -6476,33 +6490,68 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   };
 
   const handleRetryMessage = (message: AIChatMessage) => {
-    if (!message.retryInput || isLoading) {
+    if (!message.retryInput || isLoading || retryingMessageIdRef.current) {
       return;
     }
+
+    if (message.role !== 'assistant' || !activeSession) {
+      return;
+    }
+
+    retryingMessageIdRef.current = message.id;
+
+    try {
+      if (message.remindersBefore) {
+        assistantReminderQueueService.saveReminders(message.remindersBefore);
+      }
+      if (message.memoryBefore) {
+        assistantMemoryService.saveMemory(message.memoryBefore);
+      }
+      if (message.remindersBefore || message.memoryBefore) {
+        refreshAssistantReminderSnapshot();
+        refreshAssistantMemorySnapshot();
+      }
+
+      if (message.appliedActions?.some((action) => action.status === 'applied')) {
+        const rollbackResult = rollbackAppliedChatActions(message.appliedActions, logs, todos);
+        setLogs(rollbackResult.logs);
+        setTodos(rollbackResult.todos);
+        rollbackResult.undoneActionIds.forEach((actionId) => {
+          updateAppliedActionStatus(activeSession.id, message.id, actionId, 'undone');
+        });
+      }
+    } catch (error) {
+      console.error('[AIBackfillChatModal] Failed to rollback assistant actions before retry', error);
+      addToast('error', '撤销本次 AI 操作失败，未重新发送。');
+      retryingMessageIdRef.current = null;
+      return;
+    }
+
+    const retryOptions = {
+      replaceMessageId: message.id,
+      retrySourceUserMessageId: resolveRetrySourceUserMessageId(message)
+    };
 
     if (message.retryInput === 'dream' && message.dreamRetryYearMonth && activeSession) {
       const selectedMonth = parseDreamMonthSelection(message.dreamRetryYearMonth, getLocalDateStr);
       if (!selectedMonth) {
+        retryingMessageIdRef.current = null;
         addToast('info', '这次 Dream 重试缺少可用的年月。');
         return;
       }
 
-      void handleDreamCommand(
-        activeSession,
-        selectedMonth,
-        undefined,
-        {
-          replaceMessageId: message.id,
-          retrySourceUserMessageId: resolveRetrySourceUserMessageId(message)
-        }
-      );
+      window.setTimeout(() => {
+        retryingMessageIdRef.current = null;
+        void handleDreamCommand(activeSession, selectedMonth, undefined, retryOptions);
+      }, 0);
       return;
     }
 
-    void handleSend(message.retryInput, {
-      replaceMessageId: message.id,
-      retrySourceUserMessageId: resolveRetrySourceUserMessageId(message)
-    });
+    // Let the state updates above commit before the runner snapshots logs/todos.
+    window.setTimeout(() => {
+      retryingMessageIdRef.current = null;
+      void handleSend(message.retryInput, retryOptions);
+    }, 0);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {

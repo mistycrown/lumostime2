@@ -1,5 +1,6 @@
 /**
  * @file AddLogModal.tsx
+ * @updated 2026-08-24: Added shared Activity custom attribute fields for backfill and record editing.
  * @updated 2026-07-21: Added dark-mode detail outlines and high-contrast time range slider handles.
  * @input props: initialLog, time ranges, categories, todos, etc.
  * @output Modal Interaction (Save/Delete Log)
@@ -28,12 +29,14 @@ import { ReactionPicker, ReactionList } from './ReactionComponents';
 import { IconRenderer } from './IconRenderer';
 import { RecommendedNoteTemplates } from './RecommendedNoteTemplates';
 import { DataCollectionSelector } from './DataCollectionSelector';
+import { ActivityAttributeFields } from './ActivityAttributeFields';
 import { useLogForm, useTimeCalculation, useImageManager, useSuggestions, LogFormState } from '../hooks';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useToast } from '../contexts/ToastContext';
 import { imageService } from '../services/imageService';
 import { appendTemplateToNote, getRecommendedNoteTemplates, RecommendedNoteTemplate } from '../utils/noteTemplateUtils';
 import { getTodoProgressSnapshot, shouldTodoUseManualProgressInput } from '../utils/todoProgressUtils';
+import { filterAttributeValuesForActivity } from '../utils/activityAttributeUtils';
 import {
   getCompletionModeTodoId,
   isTodoEligibleForCompletionMode,
@@ -157,6 +160,9 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     () => shouldTodoUseManualProgressInput(linkedTodo, todos),
     [linkedTodo, todos]
   );
+  const selectedActivity = useMemo(() => categories
+    .flatMap((category) => category.activities)
+    .find((activity) => activity.id === formState.selectedActivityId), [categories, formState.selectedActivityId]);
 
   // UI 状态
   const [isNoteExpanded, setIsNoteExpanded] = useState(false);
@@ -476,6 +482,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       endTime: formState.currentEndTime,
       duration: duration,
       note: formState.note.trim(),
+      attributeValues: formState.attributeValues.length > 0 ? formState.attributeValues : undefined,
       linkedTodoId: formState.linkedTodoId,
       progressIncrement: canUseManualProgressIncrement && formState.progressIncrement ? formState.progressIncrement : undefined,
       focusScore: formState.focusScore,
@@ -506,6 +513,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     // 检查是否有值得保存的内容
     const hasContent = 
       formState.note.trim() ||
+      formState.attributeValues.length > 0 ||
       formState.linkedTodoId ||
       formState.progressIncrement > 0 ||
       formState.focusScore !== undefined ||
@@ -536,6 +544,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     updateFields({
       selectedCategoryId: defaultCategory?.id || '',
       selectedActivityId: '', // 不默认选中任何活动
+      attributeValues: [],
       note: '',
       linkedTodoId: undefined,
       progressIncrement: 0,
@@ -845,8 +854,27 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
             categories={categories}
             selectedCategoryId={formState.selectedCategoryId}
             selectedActivityId={formState.selectedActivityId}
-            onCategorySelect={(id) => updateField('selectedCategoryId', id)}
-            onActivitySelect={(id) => updateField('selectedActivityId', id)}
+            onCategorySelect={(id) => updateFields({
+              selectedCategoryId: id,
+              selectedActivityId: '',
+              attributeValues: []
+            })}
+            onActivitySelect={(id) => {
+              const nextCategory = categories.find((category) => category.activities.some((activity) => activity.id === id));
+              const nextActivity = nextCategory?.activities.find((activity) => activity.id === id);
+              updateFields({
+                selectedActivityId: id,
+                selectedCategoryId: nextCategory?.id || formState.selectedCategoryId,
+                attributeValues: filterAttributeValuesForActivity(formState.attributeValues, nextActivity)
+              });
+            }}
+          />
+
+          <ActivityAttributeFields
+            activity={selectedActivity}
+            values={formState.attributeValues}
+            onChange={(attributeValues) => updateField('attributeValues', attributeValues)}
+            includeReferencedArchived={Boolean(initialLog)}
           />
 
           {/* Todo Association with Embedded Progress */}

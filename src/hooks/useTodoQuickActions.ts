@@ -5,6 +5,7 @@
  * @pos Hook
  * @description Centralizes todo quick-actions sheet state so multiple entry points can open the same modal without duplicating move/complete/detail logic inside the view.
  * @updated 2026-06-13: Added handleQuickActionUpdateTitle to support updating todo title directly from the quick actions modal on blur.
+ * @updated 2026-08-24: Added inline note updates for the todo quick-actions sheet.
  * @updated 2026-05-14: Dismisses the quick-actions sheet after the recurring skip-current action succeeds so both recurrence skip shortcuts share the same success-close feedback.
  * @updated 2026-05-14: Added recurring `Skip 当前轮次 / Skip到` quick actions so recurrence shortcuts can skip the next occurrence and optionally pair that skip with one future `Maybe Date` target from the shared quick-actions flow.
  * @updated 2026-05-14: Added a shared `Maybe` quick action that writes normalized multi-date `maybeDates`, including for recurring todos, through the same save pipeline as other lightweight task actions.
@@ -54,6 +55,25 @@ export const buildQuickActionUpgradeToProjectTodo = (
     ...todo,
     kind: 'project',
     categoryId
+  };
+};
+
+export const buildQuickActionNoteUpdateTodo = (
+  todo: TodoItem | null,
+  note: string
+): TodoItem | null => {
+  if (!todo) {
+    return null;
+  }
+
+  const nextNote = note.trim() || undefined;
+  if ((todo.note || undefined) === nextNote) {
+    return null;
+  }
+
+  return {
+    ...todo,
+    note: nextNote
   };
 };
 
@@ -250,6 +270,14 @@ export const useTodoQuickActions = ({ onSaveTodo, onEditTodo, onDeleteTodo }: Us
     });
   };
 
+  const handleQuickActionUpdateNote = (note: string) => {
+    const nextTodo = buildQuickActionNoteUpdateTodo(quickActionTodo, note);
+    if (!nextTodo) return;
+
+    setQuickActionTodo(nextTodo);
+    onSaveTodo(nextTodo);
+  };
+
   return {
     quickActionTodo,
     quickActionOpenedAt: quickActionOpenedAtRef.current,
@@ -267,6 +295,7 @@ export const useTodoQuickActions = ({ onSaveTodo, onEditTodo, onDeleteTodo }: Us
     handleQuickActionMoveCategory,
     handleQuickActionUpgradeToProject,
     handleQuickActionDelete,
-    handleQuickActionUpdateTitle
+    handleQuickActionUpdateTitle,
+    handleQuickActionUpdateNote
   };
 };

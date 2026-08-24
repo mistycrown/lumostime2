@@ -1,11 +1,12 @@
 /**
  * @file useLogForm.ts
  * @description Custom hook for managing log form state
+ * @updated 2026-08-24: Added Activity custom attribute values to editable record form state.
  * @updated 2026-08-10: Excluded timeline Plan blocks from backfill previous-record inference.
  */
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Log, Category, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment } from '../types';
+import { Log, Category, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment, ActivityAttributeValue } from '../types';
 import { filterActualLogs } from '../utils/statLogUtils';
 
 interface UseLogFormProps {
@@ -24,6 +25,7 @@ interface UseLogFormProps {
 export interface LogFormState {
   selectedCategoryId: string;
   selectedActivityId: string;
+  attributeValues: ActivityAttributeValue[];
   note: string;
   linkedTodoId?: string;
   progressIncrement: number;
@@ -62,6 +64,7 @@ export const useLogForm = ({
     return {
       selectedCategoryId: defaultCategory?.id || '',
       selectedActivityId: '', // 默认不选中任何活动
+      attributeValues: [],
       note: '',
       linkedTodoId: undefined,
       progressIncrement: 0,
@@ -98,6 +101,7 @@ export const useLogForm = ({
       setFormState({
         selectedCategoryId: initialLog.categoryId,
         selectedActivityId: initialLog.activityId,
+        attributeValues: initialLog.attributeValues || [],
         note: initialLog.note || '',
         linkedTodoId: initialLog.linkedTodoId,
         progressIncrement: initialLog.progressIncrement || 0,

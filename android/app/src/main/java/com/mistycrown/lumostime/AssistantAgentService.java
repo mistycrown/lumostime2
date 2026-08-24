@@ -4,6 +4,7 @@
  * @output Persistent Android agent loop, shared runtime notification state, and bridge-triggered assistant events
  * @pos Native Service
  * @description Minimal Android foreground service scaffold for the background AI agent. Maintains a lightweight polling loop, shares one persistent Android status notification with the floating-window service, and emits assistant system-trigger events through the Capacitor plugin bridge.
+ * @updated 2026-08-24: Clears the persisted assistant-letter schedule and dispatch marker whenever AI letters are disabled, preventing stale native wakeups after the feature is turned off.
  * @updated 2026-07-07: Added native assistant-letter scheduling so Android can wake at nextLetterAt and dispatch one assistant_letter_due trigger.
  * @updated 2026-06-14: Persisted and reloaded the assistant enabled flag before non-start wakeups so stale reminder alarms or native repokes cannot restart polling after the user disables it.
  * @updated 2026-05-15: Remove a native reminder immediately after it has been persisted as a pending `reminder_due` trigger so background retries do not re-dispatch the same completed reminder every minute.
@@ -577,6 +578,14 @@ public class AssistantAgentService extends Service {
         if (!letterEnabled || nextLetterAt.isEmpty()) {
             nextLetterDispatchAtMs = 0L;
             AssistantLetterAlarmScheduler.cancel(this);
+            if (!letterEnabled) {
+                nextLetterAt = "";
+                lastLetterDispatchedFor = "";
+                prefs().edit()
+                    .remove(KEY_NEXT_LETTER_AT)
+                    .remove(KEY_LAST_LETTER_DISPATCHED_FOR)
+                    .apply();
+            }
         }
     }
 

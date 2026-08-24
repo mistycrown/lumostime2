@@ -2,11 +2,15 @@
 
 > `useLogManager.ts` now excludes timeline Plan blocks from smart backfill defaults and quick-punch start inference; `useLogForm.ts` applies the same rule to the previous-record shortcut.
 
+> Update 2026-08-24: `useLogManager.ts` clamps new manual records to their start day's final millisecond before persistence, without rewriting existing records.
+
 > `useHardwareBackButton.ts` now closes review overlays before unwinding Settings, keeping the 回顾总览 date-jump path aligned with the visible layer order on Android.
 
 > `usePointerDrag.ts` now centralizes the shared pointer capture, document listener, and drag ghost lifecycle used by the timeline todo and quick-color sidebars.
 
 > `useRecurringPlanAutoCreation.ts` now materializes enabled Repeat todo auto-Plan windows once per local day and immediately after relevant todo planning config edits.
+
+> `useTodoManager.ts` now removes current-day and future recurrence-auto Plan blocks when recurring auto scheduling is cancelled or a todo is deleted.
 
 > `useReviewManager.ts` now upserts a Daily Review when a first-time sidebar check-in returns a newly created review, so the check-in and generated review are persisted together.
 
