@@ -8,6 +8,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-07-21: Added the synchronized month-calendar number style selector to the style tab.
+ * @updated 2026-08-15: Added confirmation before clearing the saved redemption-code state.
  */
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, Fish, Check, X, Plus } from 'lucide-react';
@@ -317,6 +318,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [editingStickerSetId, setEditingStickerSetId] = useState<string | null>(null);
     const [stickerSetName, setStickerSetName] = useState('');
     const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<StickerDeleteTarget>(null);
+    const [isClearCodeConfirmOpen, setIsClearCodeConfirmOpen] = useState(false);
 
     // 用户统计数据
     const [userStats, setUserStats] = useState<UserStats | null>(null);
@@ -574,6 +576,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         setIsRedeemed(false);
         setRedemptionCode('');
         setSupporterId(undefined);
+        setIsClearCodeConfirmOpen(false);
         onToast('success', '已重置');
     };
 
@@ -1496,10 +1499,21 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                             )}
                         </div>
 
+                        <ConfirmModal
+                            isOpen={isClearCodeConfirmOpen}
+                            onClose={() => setIsClearCodeConfirmOpen(false)}
+                            onConfirm={handleClearCode}
+                            title="清除兑换码状态？"
+                            description="清除后，需要重新输入兑换码才能使用投喂功能。"
+                            confirmText="确认清除"
+                            cancelText="取消"
+                            type="danger"
+                        />
+
                         {/* 测试用重置按钮 */}
                         <div className="flex justify-center pt-4">
                             <button
-                                onClick={handleClearCode}
+                                onClick={() => setIsClearCodeConfirmOpen(true)}
                                 className="text-xs text-stone-300 hover:text-stone-500 px-4 py-2"
                             >
                                 清除兑换码状态
