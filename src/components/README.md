@@ -3,6 +3,7 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-08-25: Activity attribute fields now use compact association-style controls with collapse, horizontal option rails, usage ordering, and quick option creation; the manager uses custom type selection, move buttons, and destructive deletion cleanup.
 - Update 2026-08-24: `ActivityAttributeFields.tsx` provides shared optional text, number, single-select, and multi-select controls for records and active sessions; `ActivityAttributeManager.tsx` configures Activity definitions; `ActivityAttributeStatistics.tsx` calculates numeric summaries and choice coverage from actual logs.
 - Update 2026-08-24: `TimelineScheduleCanvas.tsx` now ends historical-day idle gaps and 24:00-boundary record creation at `23:59:59.999`, preventing new Chronicle records from being saved at next-day midnight.
 - Update 2026-08-10: `AppRoutes.tsx` now gives daily-check overview and detail a stable current-day value whenever the route changes, independent of the selected date in other workspaces.
@@ -350,4 +351,6 @@ Components for theme and appearance customization.
 - `TodoAssociation.tsx`: Updated progress display logic in associated parent modals/views (`AddLogModal`, `FocusDetailView`) to reflect active progress increments in real time with a distinct color.
 - `NavigationDecorationSelector.tsx`: Added support for uploading and managing custom navigation decorations using Capacitor Filesystem.
 - `DetailTimelineCard.tsx`: Month-view date headings now come only from countable logs in the selected month; planned-only dates are hidden while same-day planned records remain attached to real activity dates.
+- `ActivityAttributeSummary.tsx`: Resolves ID-based custom attributes for compact timeline display beneath record notes.
+- `ActivityAttributeStatistics.tsx`: Uses the app-wide `--accent-color` theme for attribute statistics and type-specific visualizations.
 - `DetailTimelineCard.test.ts`: Added regression coverage for cross-month, planned-only, same-day planned, and all-record timeline grouping.

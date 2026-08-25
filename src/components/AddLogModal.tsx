@@ -55,6 +55,7 @@ interface AddLogModalProps {
   onDelete?: (id: string) => void;
   onImageRemove?: (logId: string, filename: string) => void;
   categories: Category[];
+  onUpdateActivity?: (activity: Category['activities'][number]) => void;
   todos: TodoItem[];
   todoCategories: TodoCategory[];
   scopes: Scope[];
@@ -66,7 +67,7 @@ interface AddLogModalProps {
   allLogs?: Log[]; // 添加所有日志用于计算上一条记录
 }
 
-export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, prefilledData, onClose, onSave, onCompleteLinkedTodo, onDelete, onImageRemove, categories, todos, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
+export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, prefilledData, onClose, onSave, onCompleteLinkedTodo, onDelete, onImageRemove, categories, onUpdateActivity, todos, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
   // 使用自定义 Hooks 管理状态
   const { setIsShareViewOpen, setSharingLog } = useNavigation();
   const { addToast } = useToast();
@@ -874,6 +875,8 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
             activity={selectedActivity}
             values={formState.attributeValues}
             onChange={(attributeValues) => updateField('attributeValues', attributeValues)}
+            onActivityChange={onUpdateActivity}
+            usageLogs={allLogs}
             includeReferencedArchived={Boolean(initialLog)}
           />
 

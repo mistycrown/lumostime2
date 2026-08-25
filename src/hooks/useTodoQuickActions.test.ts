@@ -16,6 +16,7 @@ import {
   buildQuickActionCategoryMoveTodo,
   buildQuickActionNoteUpdateTodo,
   buildQuickActionUpgradeToProjectTodo,
+  getQuickActionTodoNote,
   isTodoQuickActionInteractionGuardActive,
 } from './useTodoQuickActions';
 
@@ -106,5 +107,25 @@ describe('useTodoQuickActions interaction guard', () => {
       note: undefined
     });
     expect(buildQuickActionNoteUpdateTodo(todo, 'old note')).toBeNull();
+  });
+
+  test('reads only the todo note and preserves date fields when updating it', () => {
+    const todo = {
+      id: 'todo-6',
+      categoryId: 'cat-a',
+      title: 'Scheduled task',
+      isCompleted: false,
+      note: 'Existing note',
+      scheduledDate: '2026-08-24',
+      deadlineDate: '2026-08-30',
+      completedAt: '2026-08-24T10:15:00.000Z'
+    } as any;
+
+    expect(getQuickActionTodoNote(todo)).toBe('Existing note');
+    expect(buildQuickActionNoteUpdateTodo(todo, 'Updated note')).toEqual({
+      ...todo,
+      note: 'Updated note'
+    });
+    expect(getQuickActionTodoNote({ ...todo, note: undefined })).toBe('');
   });
 });

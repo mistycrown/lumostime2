@@ -13,7 +13,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ActiveSession, TodoItem, Category, Activity, TodoCategory, Scope, AutoLinkRule } from '../types';
+import { ActiveSession, TodoItem, Category, Activity, TodoCategory, Scope, AutoLinkRule, Log } from '../types';
 import { X, Check, ChevronDown, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2, Maximize2 } from 'lucide-react';
 import { TodoAssociation } from '../components/TodoAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
@@ -50,11 +50,13 @@ interface FocusDetailViewProps {
     onComplete: (session: ActiveSession) => void;
     onCompleteLinkedTodo?: (todoId: string) => boolean;
     onUpdate: (session: ActiveSession) => void;
+    onUpdateActivity?: (activity: Activity) => void;
+    logs?: Log[];
     autoFocusNote?: boolean;
     autoEnterImmersive?: boolean; // 新增：是否自动进入沉浸式模式
 }
 
-export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, onClose, onCancel, onComplete, onCompleteLinkedTodo, onUpdate, autoFocusNote = true, autoEnterImmersive = false }) => {
+export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, onClose, onCancel, onComplete, onCompleteLinkedTodo, onUpdate, onUpdateActivity, logs = [], autoFocusNote = true, autoEnterImmersive = false }) => {
     const [elapsed, setElapsed] = useState(0);
     const [note, setNote] = useState(session.note || '');
     const [attributeValues, setAttributeValues] = useState(session.attributeValues || []);
@@ -624,6 +626,8 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                         activity={selectedActivity}
                         values={attributeValues}
                         onChange={setAttributeValues}
+                        onActivityChange={onUpdateActivity}
+                        usageLogs={logs}
                     />
                 </div>
 

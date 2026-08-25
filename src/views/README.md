@@ -58,6 +58,8 @@ The views are designed as "dumb" or "presentational" components where possible, 
 
 ### Key Classifications
 
+- Update 2026-08-25: `TagDetailView.tsx` labels the attribute analytics route as `属性`, presents attribute settings as a card, and removes deleted attribute values from related logs after confirmation.
+
 *   **Main Tabs**: High-level navigation roots (e.g., `TimelineView`, `StatsView`, `TodoView`, `TagsView`).
 *   **Detail Views**: Dedicated pages for specific entities (e.g., `CategoryDetailView`, `TagDetailView`, `ScopeDetailView`).
 *   **Modals/Overlays**: Specialized interaction flows (e.g., `SettingsView`, `RecordView`, `DailyReviewView`, `DailyNewspaperView`).
@@ -204,4 +206,5 @@ The views are designed as "dumb" or "presentational" components where possible, 
 - `ObsidianExportView.tsx`: Added image folder configuration, image-section rendering, and attachment export flow for the desktop Obsidian export tool.
 - `StatsView.tsx`: Reused the shared week range helper so matrix weeks no longer overflow when a week spans two months.
 - `FocusDetailView.tsx`: Updated progress display logic to dynamically show progress increments.
+- `TimelineView.tsx`, `TagDetailView.tsx`: Display ID-based activity attributes beneath notes and use activity theme color for attribute statistics.
 - Update 2026-07-30: `TimelineView.tsx` sizes and resizes split sidebars as persisted 26%-70% workspace ratios, so mobile screens do not inherit fixed desktop pixel constraints.

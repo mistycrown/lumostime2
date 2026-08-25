@@ -1,5 +1,6 @@
 /**
  * @file TagAssociation.tsx
+ * @updated 2026-08-25: Clears the previously selected activity before applying a new category so controlled parents cannot overwrite the category selection with stale state.
  * @updated 2026-08-06: Hide archived activities and scopes from association options.
  * @updated 2026-08-02: Reused the shared adaptive association option grid so tag categories stay readable in narrow panels.
  * @updated 2026-07-21: Replaced record-detail selection shadows with outline-based dark-mode states.
@@ -45,8 +46,8 @@ export const TagAssociation: React.FC<TagAssociationProps> = ({
         items={activeCategories}
         isSelected={(cat) => selectedCategoryId === cat.id}
         onSelect={(cat) => {
-          onCategorySelect(cat.id);
           onActivitySelect('');
+          onCategorySelect(cat.id);
         }}
         selectedClassName="record-association-selected border-stone-700 text-stone-800"
         unselectedClassName="bg-transparent text-stone-500 hover:bg-stone-100"
