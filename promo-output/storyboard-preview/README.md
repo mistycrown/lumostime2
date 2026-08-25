@@ -37,3 +37,19 @@ For a static inspection after the chart and breakdown have settled, run:
 ```powershell
 node_modules/.bin/electron.cmd promo-output/storyboard-preview/capture-scene-04.cjs
 ```
+
+`scene-05-say-it-naturally.html` is the fifth ten-second shot. It rebuilds the current AI assistant conversation surface and its applied-action result treatment: one natural-language input becomes two structured, linked time records.
+
+For a static inspection after the applied records are visible, run:
+
+```powershell
+node_modules/.bin/electron.cmd promo-output/storyboard-preview/capture-scene-05.cjs
+```
+
+`scene-06-touch-to-begin.html` is the sixth ten-second shot. It translates the Android-only `NFCSettingsView` capability into a physical interaction and rebuilds the `RecordView` and floating-timer state on the Android surface.
+
+For a static inspection after the timer has started, run:
+
+```powershell
+node_modules/.bin/electron.cmd promo-output/storyboard-preview/capture-scene-06.cjs
+```
