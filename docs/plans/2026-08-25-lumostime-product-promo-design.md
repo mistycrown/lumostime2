@@ -2,7 +2,7 @@
 
 ## Goal
 
-Create an independent Android product-promo project for LumosTime. The finished vertical film introduces the product philosophy, differentiating strengths, and basic ways to start using the app without changing the application source tree.
+Create an independent Android product-promo project for LumosTime. The finished horizontal film introduces the product philosophy, differentiating strengths, and basic ways to start using the app without changing the application source tree.
 
 The intended audience is people interested in time management who want a coherent, approachable tool for starting, recording, and reflecting on their time.
 
@@ -19,7 +19,7 @@ LumosTime is not presented as a tool for controlling every minute. It helps peop
 - Audience: Android users who are interested in time management and want an approachable, durable system.
 - Tone: calm, capable, personal, and grounded in real use.
 - Language: concise Chinese subtitles, with optional concise Chinese voiceover.
-- Format: 1080 x 1920 vertical, 30 fps, approximately 75 seconds.
+- Format: 1920 x 1080 horizontal, 30 fps, approximately 78 seconds.
 - Surface: one coherent Android device surface throughout. Do not show browser chrome, desktop windows, or emulator controls.
 
 ## Narrative Spine
@@ -60,6 +60,8 @@ Use one fictional but credible learning project, such as an English-learning or 
 
 ## Storyboard
 
+> The table below is the original concept sequence. The implemented horizontal storyboard is the authoritative version in `promo-output/storyboard-preview/storyboard.md`: eight shots, 78 seconds, and a closing line of `从开始，到看见自己。`
+
 | Time | Objective | Native Evidence | Motion And Copy |
 | --- | --- | --- | --- |
 | 0-6s | State the product philosophy. | Brand asset or a deliberately constructed title scene. | A warm paper surface receives isolated time marks which resolve into one continuous line. Copy: `时间不会自动成为积累。` |
@@ -70,7 +72,8 @@ Use one fictional but credible learning project, such as an English-learning or 
 | 46-56s | Position AI as a structured assistant. | AI chat and resulting real app states. | One concise request leads to created subtasks, a planned item, or backfilled logs. The result visibly enters a Todo, Timeline, or Review screen. Copy: `AI 是管家，也住在系统里。` |
 | 56-66s | Convert records into insight and reflection. | Statistics, daily checks, daily review, search, and on-this-day state. | Timeline blocks aggregate into data views and settle on a review page. A short retrieval moment shows historical records remain findable. Copy: `看见时间，也看见自己。` |
 | 66-72s | Establish ownership and personal fit. | Settings, export/sync, theme/icon/widget states. | A local archive motif connects to export, sync, and a short set of personalized surfaces. Keep each feature legible; do not create a security claim beyond verified behavior. |
-| 72-75s | Close the promise. | Constructed brand close. | All prior marks return to the stable LumosTime mark. Copy: `LumosTime` and `记录时间，看见自己。` |
+| 66-76s | Show project continuity. | Todo and Timeline states. | A representative project preserves `安排 -> 推进 -> 完成`; planning and actual work are legible together. |
+| 76-84s | Close the promise. | Constructed brand close. | All prior marks return to the stable LumosTime mark. Copy: `LumosTime` and `从开始，到看见自己。` |
 
 ## Motion Direction
 
