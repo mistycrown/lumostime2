@@ -27,8 +27,11 @@
  * @updated 2026-08-10: Records Timeline as the return target when opening daily-check overview.
  * @updated 2026-08-09: Passes actionable real-record idle gaps into the split timeline canvas while excluding plan blocks from gap detection.
  * @updated 2026-08-24: Added an always-leftmost More menu for timeline shortcuts that are not pinned to the header.
+ * @updated 2026-08-25: Rendered the More menu through a page-level portal so split-pane dividers cannot cover it.
+ * @updated 2026-08-25: Rendered custom activity attributes below notes in the main timeline.
  */
 import React, { useMemo, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AppView, Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule, Goal, CheckItem, CheckTemplate } from '../types';
 import { CATEGORIES } from '../constants';
@@ -65,6 +68,7 @@ import { TimelineTodoSidebar } from '../components/TimelineTodoSidebar';
 import { TimelineScheduleCanvas, TimelineScheduleCanvasHandle, type TimelineQuickColorActivity } from '../components/TimelineScheduleCanvas';
 import { TimelineQuickColorSidebar } from '../components/TimelineQuickColorSidebar';
 import { TimelineReviewStack } from '../components/TimelineReviewStack';
+import { ActivityAttributeSummary } from '../components/ActivityAttributeSummary';
 import { getLocalDateStr } from '../utils/dateUtils';
 import { hasAutoCheckItemCompletionChanges, updateAutoCheckItems } from '../utils/autoCheckUtils';
 import { applyDailyCheckActionForDate, buildDailyCheckItems, filterDailyCheckItemsByEnabledTemplates } from '../utils/dailyCheckUtils';
@@ -253,6 +257,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
     const [selectedQuickColorTarget, setSelectedQuickColorTarget] = useState<TimelineQuickColorActivity | null>(null);
     const [isQuickColorContinuousMode, setIsQuickColorContinuousMode] = useState(false);
     const [isTimelineQuickActionsMenuOpen, setIsTimelineQuickActionsMenuOpen] = useState(false);
+    const [timelineQuickActionsMenuPosition, setTimelineQuickActionsMenuPosition] = useState<{ top: number; left: number } | null>(null);
+    const timelineQuickActionsButtonRef = useRef<HTMLButtonElement | null>(null);
     const [showTimePalDebugger, setShowTimePalDebugger] = useState(false);
     const {
         isGalleryViewOpen,
@@ -561,6 +567,37 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
         .filter((option) => !timelineQuickActions.includes(option.key))
         .map((option) => ({ option, action: quickActionMap[option.key] }))
         .filter((item) => Boolean(item.action));
+
+    React.useLayoutEffect(() => {
+        if (!isTimelineQuickActionsMenuOpen) {
+            return;
+        }
+
+        const updateMenuPosition = () => {
+            const button = timelineQuickActionsButtonRef.current;
+            if (!button) {
+                return;
+            }
+
+            const rect = button.getBoundingClientRect();
+            const menuWidth = 208;
+            const viewportPadding = 8;
+            const left = Math.min(
+                Math.max(viewportPadding, rect.left),
+                Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding)
+            );
+            setTimelineQuickActionsMenuPosition({ top: rect.bottom + 8, left });
+        };
+
+        updateMenuPosition();
+        window.addEventListener('resize', updateMenuPosition);
+        window.addEventListener('scroll', updateMenuPosition, true);
+
+        return () => {
+            window.removeEventListener('resize', updateMenuPosition);
+            window.removeEventListener('scroll', updateMenuPosition, true);
+        };
+    }, [isTimelineQuickActionsMenuOpen]);
 
     const logCollectionNames = useMemo(() => {
         const collectionById = new Map(collections.map((collection) => [collection.id, collection]));
@@ -1405,6 +1442,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                             <div className="relative">
                                 <button
                                     type="button"
+                                    ref={timelineQuickActionsButtonRef}
                                     onClick={() => setIsTimelineQuickActionsMenuOpen((open) => !open)}
                                     className="rounded-full p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600"
                                     title="更多"
@@ -1414,7 +1452,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                                 >
                                     <MoreHorizontal size={20} />
                                 </button>
-                                {isTimelineQuickActionsMenuOpen && (
+                                {false && isTimelineQuickActionsMenuOpen && (
                                     <>
                                         <div
                                             className="fixed inset-0 z-[100]"
@@ -1458,6 +1496,38 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                         </>
                     }
                 />
+
+                {isTimelineQuickActionsMenuOpen && timelineQuickActionsMenuPosition && typeof document !== 'undefined' && createPortal(
+                    <>
+                        <div
+                            className="fixed inset-0 z-[9998]"
+                            onClick={() => setIsTimelineQuickActionsMenuOpen(false)}
+                        />
+                        <div
+                            role="menu"
+                            aria-label="鏇村蹇嵎鎿嶄綔"
+                            style={{ top: timelineQuickActionsMenuPosition.top, left: timelineQuickActionsMenuPosition.left }}
+                            className="fixed z-[9999] flex w-52 max-h-[min(70vh,24rem)] flex-col overflow-y-auto overflow-x-hidden rounded-xl border border-stone-100 bg-white py-1 shadow-xl animate-in fade-in zoom-in-95 duration-200 origin-top-left"
+                        >
+                            {moreQuickActions.map(({ option, action }) => (
+                                <button
+                                    key={option.key}
+                                    type="button"
+                                    role="menuitem"
+                                    disabled={action.disabled}
+                                    onClick={(event) => {
+                                        setIsTimelineQuickActionsMenuOpen(false);
+                                        action.onClick(event);
+                                    }}
+                                    className="flex w-full items-center px-3 py-2.5 text-left text-sm text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <span className="truncate">{action.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </>,
+                    document.body
+                )}
 
 
             </div>
@@ -1597,6 +1667,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                                                 className={`text-sm text-stone-500 leading-relaxed mb-2 font-light ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
                                             />
                                         )}
+
+                                        <ActivityAttributeSummary
+                                            activity={item.logData.activity}
+                                            values={item.logData.attributeValues}
+                                        />
 
                                         {/* Tags Row: Linked Todo (@) and Category (#) */}
                                         <div className="flex flex-wrap items-center gap-2 mt-1">

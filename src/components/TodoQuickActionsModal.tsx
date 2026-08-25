@@ -4,6 +4,7 @@
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
  * @pos Component
  * @description A reusable bottom sheet that exposes lightweight todo planning and completion actions without opening the full todo detail editor first.
+ * @updated 2026-08-25: Made quick note editing a multi-line field; Enter saves while Shift+Enter adds a line break.
  * @updated 2026-08-24: Replaced inline title editing with the same standalone modal used for quick note editing to avoid mobile keyboard positioning conflicts.
  * @updated 2026-07-30: Added extra mobile bottom padding to keep the delete action above the fixed bottom navigation area.
  * @updated 2026-06-15: Added a mobile-only compact title-edit mode that hides the lower quick-action body while typing so the editor can sit close to the soft keyboard.
@@ -37,7 +38,7 @@ import { ArrowRightLeft, CalendarDays, Check, CheckCircle2, Copy, FilePenLine, F
 import { TodoCategory, TodoItem } from '../types';
 import { formatDateKey, formatTodoRecurrenceSummary, normalizeMaybeDates, parseDateKey } from '../utils/todoScheduleUtils';
 import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
-import { isTodoQuickActionInteractionGuardActive } from '../hooks/useTodoQuickActions';
+import { getQuickActionTodoNote, isTodoQuickActionInteractionGuardActive } from '../hooks/useTodoQuickActions';
 import { isQuickTodo } from '../utils/todoKindUtils';
 import { IconRenderer } from './IconRenderer';
 import { TodoDatePickerModal } from './TodoDatePickerModal';
@@ -104,7 +105,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   const isTitleCancelRef = useRef(false);
   const isNoteCancelRef = useRef(false);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
-  const noteInputRef = useRef<HTMLInputElement | null>(null);
+  const noteInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     setIsDeleteConfirming(false);
@@ -114,10 +115,10 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
     setIsEditingTitle(false);
     setEditedTitle(todo?.title || '');
     setIsEditingNote(false);
-    setEditedNote(todo?.note || '');
+    setEditedNote(getQuickActionTodoNote(todo));
     isTitleCancelRef.current = false;
     isNoteCancelRef.current = false;
-  }, [isOpen, todo?.id, todo?.title]);
+  }, [isOpen, todo?.id, todo?.note, todo?.title]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -158,7 +159,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
 
       if (isEditingNote) {
         isNoteCancelRef.current = true;
-        setEditedNote(todo?.note || '');
+        setEditedNote(getQuickActionTodoNote(todo));
         if (onForceClose) {
           onForceClose();
         } else {
@@ -219,10 +220,10 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
     }
 
     const trimmedNote = editedNote.trim();
-    if (trimmedNote !== (todo.note || '')) {
+    if (trimmedNote !== getQuickActionTodoNote(todo)) {
       onUpdateNote?.(trimmedNote);
     } else {
-      setEditedNote(todo.note || '');
+      setEditedNote(getQuickActionTodoNote(todo));
     }
 
     if (onForceClose) {
@@ -234,7 +235,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
 
   const handleCancelNoteEdit = () => {
     isNoteCancelRef.current = true;
-    setEditedNote(todo.note || '');
+    setEditedNote(getQuickActionTodoNote(todo));
     noteInputRef.current?.blur();
     setIsEditingNote(false);
     if (onForceClose) {
@@ -244,14 +245,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
     }
   };
 
-  if (isEditingTitle || isEditingNote) {
-    const isTitleEditor = isEditingTitle;
-    const value = isTitleEditor ? editedTitle : editedNote;
-    const setValue = isTitleEditor ? setEditedTitle : setEditedNote;
-    const inputRef = isTitleEditor ? titleInputRef : noteInputRef;
-    const onSave = isTitleEditor ? handleTitleSave : handleNoteSave;
-    const onCancel = isTitleEditor ? handleCancelTitleEdit : handleCancelNoteEdit;
-
+  if (isEditingNote) {
     return (
       <div
         className="fixed inset-0 z-[140] flex items-center justify-center bg-[rgba(15,23,42,0.12)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-12 backdrop-blur-sm"
@@ -261,34 +255,34 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
         <div className="w-full max-w-[26rem] rounded-[1.75rem] border border-stone-200 bg-[#faf9f6] p-4 shadow-[0_22px_60px_rgba(15,23,42,0.18)]">
           <div className="mb-3 px-1">
             <div className="text-[11px] uppercase tracking-[0.22em] text-stone-400">Quick Edit</div>
-            <div className="mt-1 text-base font-medium text-stone-800">{isTitleEditor ? '修改标题' : '修改备注'}</div>
+            <div className="mt-1 text-base font-medium text-stone-800">修改备注</div>
           </div>
 
-          <input
-            ref={inputRef}
-            type="text"
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            onBlur={onSave}
+          <textarea
+            ref={noteInputRef}
+            value={editedNote}
+            onChange={(event) => setEditedNote(event.target.value)}
+            onBlur={handleNoteSave}
             onKeyDown={(event) => {
-              if (event.key === 'Enter') {
+              if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
-                inputRef.current?.blur();
+                noteInputRef.current?.blur();
               } else if (event.key === 'Escape') {
                 event.preventDefault();
-                onCancel();
+                handleCancelNoteEdit();
               }
             }}
             autoFocus
-            placeholder={isTitleEditor ? '输入标题' : '添加备注'}
-            className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-800 outline-none transition-colors placeholder:text-stone-400 focus:border-stone-400"
+            placeholder="添加备注"
+            rows={4}
+            className="w-full resize-y rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm leading-6 text-stone-800 outline-none transition-colors placeholder:text-stone-400 focus:border-stone-400"
           />
 
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button
               type="button"
               onMouseDown={(event) => event.preventDefault()}
-              onClick={onCancel}
+              onClick={handleCancelNoteEdit}
               className="rounded-2xl border border-stone-200 px-4 py-3 text-sm text-stone-500 transition-colors hover:border-stone-300 hover:bg-white"
             >
               取消
@@ -296,7 +290,63 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
             <button
               type="button"
               onMouseDown={(event) => event.preventDefault()}
-              onClick={onSave}
+              onClick={handleNoteSave}
+              className="rounded-2xl border border-stone-300 bg-stone-800 px-4 py-3 text-sm text-white transition-colors hover:bg-stone-700"
+            >
+              确定
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isEditingTitle) {
+    return (
+      <div
+        className="fixed inset-0 z-[140] flex items-center justify-center bg-[rgba(15,23,42,0.12)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-12 backdrop-blur-sm"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="w-full max-w-[26rem] rounded-[1.75rem] border border-stone-200 bg-[#faf9f6] p-4 shadow-[0_22px_60px_rgba(15,23,42,0.18)]">
+          <div className="mb-3 px-1">
+            <div className="text-[11px] uppercase tracking-[0.22em] text-stone-400">Quick Edit</div>
+            <div className="mt-1 text-base font-medium text-stone-800">修改标题</div>
+          </div>
+
+          <input
+            ref={titleInputRef}
+            type="text"
+            value={editedTitle}
+            onChange={(event) => setEditedTitle(event.target.value)}
+            onBlur={handleTitleSave}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                titleInputRef.current?.blur();
+              } else if (event.key === 'Escape') {
+                event.preventDefault();
+                handleCancelTitleEdit();
+              }
+            }}
+            autoFocus
+            placeholder="输入标题"
+            className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-800 outline-none transition-colors placeholder:text-stone-400 focus:border-stone-400"
+          />
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={handleCancelTitleEdit}
+              className="rounded-2xl border border-stone-200 px-4 py-3 text-sm text-stone-500 transition-colors hover:border-stone-300 hover:bg-white"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={handleTitleSave}
               className="rounded-2xl border border-stone-300 bg-stone-800 px-4 py-3 text-sm text-white transition-colors hover:bg-stone-700"
             >
               确定
@@ -649,7 +699,8 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
                   <button
                     type="button"
                     onClick={withActionGuard(() => {
-                      setEditedNote(todo.note || '');
+                      setEditedNote(getQuickActionTodoNote(todo));
+                      isNoteCancelRef.current = false;
                       setIsEditingNote(true);
                     })}
                     className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"

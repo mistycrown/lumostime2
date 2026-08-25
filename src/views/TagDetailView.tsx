@@ -1,5 +1,6 @@
 /**
  * @file TagDetailView.tsx
+ * @updated 2026-08-25: Refined Activity attribute management, deletion cleanup, and compact record-style controls.
  * @updated 2026-08-24: Added Activity custom attribute definition management and base attribute statistics.
  * @updated 2026-08-06: Added archive and restore control for tags.
  * @input Activity ID, Logs, Associated Todos, Categories
@@ -33,6 +34,7 @@ import { AssociatedTodoList } from '../components/AssociatedTodoList';
 import { filterCountableLogs } from '../utils/statLogUtils';
 import { ActivityAttributeManager } from '../components/ActivityAttributeManager';
 import { ActivityAttributeStatistics } from '../components/ActivityAttributeStatistics';
+import { ActivityAttributeSummary } from '../components/ActivityAttributeSummary';
 
 
 interface TagDetailViewProps {
@@ -44,11 +46,12 @@ interface TagDetailViewProps {
    onUpdateActivity: (activity: Activity) => void;
    onCategoryChange?: (activityId: string, newCategoryId: string) => void;
    onEditLog?: (log: Log) => void;
+   onUpdateLog?: (log: Log) => void;
    onEditTodo?: (todo: TodoItem) => void;
    scopes: Scope[];
 }
 
-export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos, onToggleTodo, categories, onUpdateActivity, onCategoryChange, onEditLog, onEditTodo, scopes }) => {
+export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos, onToggleTodo, categories, onUpdateActivity, onCategoryChange, onEditLog, onUpdateLog, onEditTodo, scopes }) => {
    // Find Activity and Category
    let initialActivity: Activity | undefined;
    let initialCategory: Category | undefined;
@@ -137,6 +140,26 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    // Filter logs for this tag (All time)
    const tagLogs = useMemo(() => logs.filter(l => l.activityId === tagId), [logs, tagId]);
    const countableTagLogs = useMemo(() => filterCountableLogs(tagLogs), [tagLogs]);
+
+   const handleDeleteAttributeData = (attributeId: string, optionId?: string) => {
+      if (!onUpdateLog) return;
+      tagLogs.forEach((log) => {
+         const currentValues = log.attributeValues || [];
+         const nextValues = currentValues.flatMap((value) => {
+            if (value.attributeId !== attributeId) return [value];
+            if (!optionId) return [];
+            if ('optionId' in value) return value.optionId === optionId ? [] : [value];
+            if ('optionIds' in value) {
+               const nextOptionIds = value.optionIds.filter((id) => id !== optionId);
+               return nextOptionIds.length > 0 ? [{ ...value, optionIds: nextOptionIds }] : [];
+            }
+            return [value];
+         });
+         if (JSON.stringify(currentValues) !== JSON.stringify(nextValues)) {
+            onUpdateLog({ ...log, attributeValues: nextValues.length > 0 ? nextValues : undefined });
+         }
+      });
+   };
 
    // Total Stats (All time)
    const totalSeconds = countableTagLogs.reduce((acc, curr) => acc + curr.duration, 0);
@@ -583,7 +606,9 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
                   <ActivityAttributeManager
                      attributes={activity.attributes}
+                     logs={tagLogs}
                      onChange={(attributes) => setActivity({ ...activity, attributes })}
+                     onDeleteAttributeData={handleDeleteAttributeData}
                   />
 
                   {/* Keywords Section */}
@@ -658,6 +683,8 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   enableMoodScore={activity.enableMoodScore ?? category?.enableMoodScore ?? false}
                   renderLogMetadata={(log, { collectionNames }) => {
                      return (
+                        <>
+                        <ActivityAttributeSummary activity={activity} values={log.attributeValues} />
                         <div className="flex flex-wrap items-center gap-2 mt-1">
                            {/* Linked Todo */}
                            {(() => {
@@ -710,6 +737,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                               return null;
                            })}
                         </div>
+                        </>
                      );
                   }}
                />
@@ -788,7 +816,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   onClick={() => setActiveTab(tab)}
                   className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors ${activeTab === tab ? 'text-stone-900 border-b-2 border-stone-900 font-bold' : 'text-stone-400 hover:text-stone-600'}`}
                >
-                  {tab === 'Timeline' ? '時間線' : tab === 'Details' ? '细节' : tab === 'Attributes' ? '属性统计' : tab}
+                  {tab === 'Timeline' ? '時間線' : tab === 'Details' ? '细节' : tab === 'Attributes' ? '属性' : tab}
                </button>
             ))}
          </div>

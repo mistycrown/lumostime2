@@ -15,6 +15,7 @@
  * @updated 2026-05-18: Added bootstrap readiness timing logs so slow Electron startup can be traced to the async hydration gate.
  * @updated 2026-05-17: 在 Electron 主应用启动时自动恢复已启用的 PC 端小组件，并与设置页共享桌面小组件启动偏好读取逻辑。
  * @updated 2026-05-17: 增加 Electron 桌面小组件动作处理逻辑，支持 toggle_todo, open_todo 和 'start_focus' 快捷开始任务专注。
+ * @updated 2026-08-25: Passes Activity updates and full log history into custom attribute controls for quick option creation and usage ordering.
  * @updated 2026-05-13: Normalized reserved todo categories before passing them into UI editors and pickers so the system `未来` bucket behaves like a first-class category even when older saved data has not persisted it yet.
  * @updated 2026-06-13: Included data collections and collection entries in JSON backup export payloads so themed collections travel with user data backups.
  * @updated 2026-05-18: Included the full achievement bottle backup block in JSON export payloads so synced exports now carry achievement progress too.
@@ -334,7 +335,7 @@ const AppContent: React.FC = () => {
     setCurrentView(view);
   }, [currentView, defaultTimelineLayout, setCurrentView]);
 
-  const { categories, scopes, goals, majorGoals, setCategories, setScopes, setGoals, setMajorGoals } = useCategoryScope();
+  const { categories, scopes, goals, majorGoals, setCategories, setScopes, setGoals, setMajorGoals, handleUpdateActivity } = useCategoryScope();
   const { buildBackupPayload: buildAchievementBackupPayload } = useAchievement();
   const { startActivity, stopActivity, cancelSession, activeSessions, setActiveSessions } = useSession();
   const {
@@ -937,6 +938,7 @@ const AppContent: React.FC = () => {
           onDelete={logManager.handleDeleteLog}
           onImageRemove={logManager.handleLogImageRemove}
           categories={categories}
+          onUpdateActivity={handleUpdateActivity}
           todos={todos}
           todoCategories={normalizedTodoCategories}
           scopes={scopes}
@@ -1021,6 +1023,7 @@ const AppContent: React.FC = () => {
               categories={categories}
               todoCategories={normalizedTodoCategories}
               scopes={scopes}
+              logs={logs}
               autoLinkRules={autoLinkRules}
               autoApplyAutoLinkRules={autoApplyAutoLinkRules}
               autoApplyTodoLink={autoApplyTodoLink}
@@ -1041,6 +1044,7 @@ const AppContent: React.FC = () => {
                   s.id === updated.id ? updated : s
                 ));
               }}
+              onUpdateActivity={handleUpdateActivity}
               autoFocusNote={autoFocusNote}
             />
           </React.Suspense>

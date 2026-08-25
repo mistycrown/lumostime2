@@ -4,6 +4,7 @@
  * @output Active page view rendering for the main application shell
  * @pos Component (Routing)
  * @description Resolves top-level views and modal-like screens from navigation state.
+ * @updated 2026-08-25: Wires Activity attribute deletion cleanup through the log update handler.
  * @updated 2026-08-09: Added daily-check overview and detail routes.
  * @updated 2026-08-10: Routes daily-check overview back to its explicit Settings or Timeline launch source.
  * @updated 2026-08-09: Lets settings-launched review pages render above Settings with their own detail back layer.
@@ -191,7 +192,6 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     const { addToast } = useToast();
     const dailyCheckToday = React.useMemo(() => new Date(), [currentView]);
     const { activeSessions } = useSession();
-
     // Import hooks
     const { handleAddGoal, handleEditGoal, handleSaveGoal, handleDeleteGoal, handleArchiveGoal, handleExtendGoal, handleIncreaseGoalTarget } = useGoalManager();
     const { 
@@ -904,6 +904,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                         onUpdateActivity={handleUpdateActivity}
                         onCategoryChange={handleCategoryChange}
                         onEditLog={openEditModal}
+                        onUpdateLog={handleUpdateLog}
                         onEditTodo={openEditTodoModal}
                         scopes={scopes}
                     />

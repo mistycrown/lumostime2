@@ -77,6 +77,10 @@ export const buildQuickActionNoteUpdateTodo = (
   };
 };
 
+export const getQuickActionTodoNote = (todo: TodoItem | null): string => (
+  typeof todo?.note === 'string' ? todo.note : ''
+);
+
 interface UseTodoQuickActionsOptions {
   onSaveTodo: (todo: TodoItem) => void;
   onEditTodo: (todo: TodoItem) => void;
