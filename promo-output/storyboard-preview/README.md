@@ -29,3 +29,11 @@ For a static inspection after the complete connection is visible, run:
 ```powershell
 node_modules/.bin/electron.cmd promo-output/storyboard-preview/capture-scene-03.cjs
 ```
+
+`scene-04-see-your-time.html` is the fourth ten-second shot. It rebuilds the weekly `StatsView` and `PieChartView` structure: range controls, navigation, icon-only view switching, the Tags donut, and category breakdown rows.
+
+For a static inspection after the chart and breakdown have settled, run:
+
+```powershell
+node_modules/.bin/electron.cmd promo-output/storyboard-preview/capture-scene-04.cjs
+```
