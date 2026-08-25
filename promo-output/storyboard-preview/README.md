@@ -21,3 +21,11 @@ For a static inspection at the eight-second settled frame, run:
 ```powershell
 node_modules/.bin/electron.cmd promo-output/storyboard-preview/capture-scene-02.cjs
 ```
+
+`scene-03-connected-purpose.html` is the third ten-second shot. It rebuilds the ScopeDetailView goal tab and MajorGoalCard structure: a scope header, tabs, a goal series, child goals, progress, and a linked todo record.
+
+For a static inspection after the complete connection is visible, run:
+
+```powershell
+node_modules/.bin/electron.cmd promo-output/storyboard-preview/capture-scene-03.cjs
+```
