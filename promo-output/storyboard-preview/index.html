@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LumosTime Product Film - Storyboard</title>
+    <style>
+      :root { --paper:#faf9f6; --ink:#1c1917; --muted:#78716c; --line:#e7e5e4; --violet:#8b6fa8; }
+      * { box-sizing:border-box; }
+      body { margin:0; color:var(--ink); background:var(--paper); font-family:'Noto Serif SC','Source Han Serif SC','Songti SC','STSong','SimSun','Microsoft YaHei',serif; }
+      main { max-width:1480px; margin:0 auto; padding:58px 54px 80px; }
+      header { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; padding-bottom:34px; border-bottom:1px solid var(--line); }
+      h1 { margin:0; font-family:Georgia,'Times New Roman',serif; font-size:clamp(38px,5vw,76px); font-weight:600; letter-spacing:.02em; }
+      header p { max-width:310px; margin:0; color:var(--muted); font-size:15px; line-height:1.7; text-align:right; }
+      .meta { margin:27px 0 42px; color:#a8a29e; font-family:ui-sans-serif,system-ui,sans-serif; font-size:11px; letter-spacing:.13em; }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:32px 25px; }
+      a { color:inherit; text-decoration:none; }
+      .shot { display:block; overflow:hidden; border-bottom:1px solid var(--line); padding-bottom:16px; transition:transform 160ms ease; }
+      .shot:hover { transform:translateY(-3px); }
+      .image { aspect-ratio:16/9; overflow:hidden; border:1px solid #e6e1da; background:#f3f0ea; }
+      .image img { width:100%; height:100%; display:block; object-fit:cover; transition:transform 280ms ease; }
+      .shot:hover img { transform:scale(1.015); }
+      .caption { display:flex; align-items:baseline; gap:10px; padding-top:13px; }
+      .number { color:var(--violet); font-family:ui-monospace,'Cascadia Mono',monospace; font-size:12px; }
+      .title { font-size:21px; font-weight:650; }
+      .duration { margin-left:auto; color:#a8a29e; font-family:ui-sans-serif,system-ui,sans-serif; font-size:11px; }
+      footer { margin-top:56px; color:var(--muted); font-size:14px; line-height:1.7; }
+      @media (max-width:760px) { main { padding:34px 20px 54px; } header { align-items:flex-start; flex-direction:column; } header p { text-align:left; } .grid { grid-template-columns:1fr; gap:25px; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header><h1>LumosTime</h1><p>横屏产品宣传片<br />分镜与交互试片</p></header>
+      <p class="meta">08 SHOTS · 78 SECONDS · 1920 × 1080</p>
+      <section class="grid" aria-label="宣传片分镜">
+        <a class="shot" href="scene-01-from-a-start.html"><div class="image"><img src="scene-01-at-6s.png" alt="从一次开始" /></div><div class="caption"><span class="number">01</span><span class="title">从一次开始</span><span class="duration">10s</span></div></a>
+        <a class="shot" href="scene-02-time-becomes-a-thread.html"><div class="image"><img src="scene-02-at-8s.png" alt="时间成为脉络" /></div><div class="caption"><span class="number">02</span><span class="title">时间成为脉络</span><span class="duration">10s</span></div></a>
+        <a class="shot" href="scene-03-connected-purpose.html"><div class="image"><img src="scene-03-at-9s.png" alt="做什么，也知道为了什么" /></div><div class="caption"><span class="number">03</span><span class="title">做什么，也知道为了什么</span><span class="duration">10s</span></div></a>
+        <a class="shot" href="scene-04-see-your-time.html"><div class="image"><img src="scene-04-at-9s.png" alt="看见自己的时间" /></div><div class="caption"><span class="number">04</span><span class="title">看见自己的时间</span><span class="duration">10s</span></div></a>
+        <a class="shot" href="scene-05-say-it-naturally.html"><div class="image"><img src="scene-05-at-9s.png" alt="说出来，就能记下来" /></div><div class="caption"><span class="number">05</span><span class="title">说出来，就能记下来</span><span class="duration">10s</span></div></a>
+        <a class="shot" href="scene-06-touch-to-begin.html"><div class="image"><img src="scene-06-at-9s.png" alt="一触，即刻开始" /></div><div class="caption"><span class="number">06</span><span class="title">一触，即刻开始</span><span class="duration">10s</span></div></a>
+        <a class="shot" href="scene-07-project-through-time.html"><div class="image"><img src="scene-07-at-9s.png" alt="项目会留下轨迹" /></div><div class="caption"><span class="number">07</span><span class="title">项目会留下轨迹</span><span class="duration">10s</span></div></a>
+        <a class="shot" href="scene-08-from-start-to-self.html"><div class="image"><img src="scene-08-at-7s.png" alt="从开始，到看见自己" /></div><div class="caption"><span class="number">08</span><span class="title">从开始，到看见自己</span><span class="duration">8s</span></div></a>
+      </section>
+      <footer>每个镜头均为可播放 HTML 试片；点开任一缩略图即可查看其十秒内的动态与文字节奏。</footer>
+    </main>
+  </body>
+</html>
