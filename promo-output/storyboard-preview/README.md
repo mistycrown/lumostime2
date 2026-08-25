@@ -13,3 +13,11 @@ For a local static inspection at the six-second settled action frame, run:
 ```powershell
 node_modules/.bin/electron.cmd promo-output/storyboard-preview/capture-scene-preview.cjs
 ```
+
+`scene-02-time-becomes-a-thread.html` is the second ten-second shot. It rebuilds the default TimelineView and CalendarWidget structure: calendar header, 70px time rail, vertical line, time nodes, record detail, and `@todo`, `#category`, `%scope` metadata.
+
+For a static inspection at the eight-second settled frame, run:
+
+```powershell
+node_modules/.bin/electron.cmd promo-output/storyboard-preview/capture-scene-02.cjs
+```
