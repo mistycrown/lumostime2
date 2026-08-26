@@ -1,8 +1,11 @@
 # Views Layer
 
-- Update 2026-08-26: `RoutineSettingsView.tsx` now uses nested back navigation with immediate persistence, shared category and tag selectors, optional custom UI icons, and cross-category routine steps.
+- Update 2026-08-26: `RoutineSettingsView.tsx` uses nested back navigation, a shared emoji/UI icon row, cross-category tag selection that stays open until an Activity is chosen, and static per-step notes; `RecordView.tsx` renders the active note below the selected category header without placing it in timeline logs.
+- Update 2026-08-26: Routine steps now store Markdown checklist templates; the active Routine card toggles checklist items and submits the current `[x] / [ ]` Markdown through the timeline log note.
+- Update 2026-08-26: `RoutineSettingsView.tsx` now supports expandable `#标签`、`%领域`、`@待办` selectors, with Todo associations taking precedence over independent Activity and Scope choices; `RecordView.tsx` mirrors these markers in the active Routine card.
 - Update 2026-08-26: Category and tag detail pages now show explicit archive status beside their archive/restore actions, while batch tag management can archive or restore a whole category with its child tags.
 - Update 2026-08-26: `ScopeDetailView.tsx` now shows explicit domain archive status beside its archive/restore action.
+- Update 2026-08-26: `TodoBatchManageView.tsx` archives and restores whole todo categories; the `已归档` section preserves and displays all historical todos under each archived category.
 
 - Update 2026-08-26: `CategoryDetailView.tsx` now exposes category archive/restore controls; category state changes cascade to all child tags, and `TagsView.tsx` keeps archived categories in a restorable archive section.
 - Update 2026-08-26: `BatchManageView.tsx` keeps tag deletions in the local batch draft, checks them only on submit, and opens a per-deleted-tag migration review using the app's custom dropdown pattern before atomically applying the batch changes.

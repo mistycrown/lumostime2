@@ -42,7 +42,8 @@ import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { AppView } from './types';
-import type { ActiveRoutineRun, ActiveSession, AppAwarenessSessionMeta, Log, Routine } from './types';
+import type { ActiveRoutineRun, ActiveSession, AppAwarenessSessionMeta, Log, Routine, RoutineStep, TodoItem } from './types';
+import { resetRoutineChecklist, toggleRoutineChecklistItem } from './utils/routineChecklist';
 import AssistantAgent from './plugins/AssistantAgentPlugin';
 
 import { ToastProvider, useToast } from './contexts/ToastContext';
@@ -344,11 +345,24 @@ const AppContent: React.FC = () => {
   const [activeRoutineRun, setActiveRoutineRun] = useState<ActiveRoutineRun | null>(() => loadActiveRoutineRun());
   const activeRoutineRunRef = useRef<ActiveRoutineRun | null>(activeRoutineRun);
   const routinesRef = useRef<Routine[]>(routines);
+  const routinesSnapshotRef = useRef(JSON.stringify(routines));
 
   useEffect(() => {
     routinesRef.current = routines;
+    routinesSnapshotRef.current = JSON.stringify(routines);
     saveRoutines(routines);
   }, [routines]);
+
+  useEffect(() => {
+    const handleRoutinesUpdated = () => {
+      const nextRoutines = loadRoutines();
+      if (JSON.stringify(nextRoutines) !== routinesSnapshotRef.current) {
+        setRoutines(nextRoutines);
+      }
+    };
+    window.addEventListener('routinesUpdated', handleRoutinesUpdated);
+    return () => window.removeEventListener('routinesUpdated', handleRoutinesUpdated);
+  }, []);
 
   useEffect(() => {
     activeRoutineRunRef.current = activeRoutineRun;
@@ -397,6 +411,7 @@ const AppContent: React.FC = () => {
       logs, todos, categories, todoCategories, collections, collectionEntries, scopes, goals, majorGoals,
       autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
       monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, customStickerSets, customStickers, filters,
+      routines,
       customColorGroup,
       achievementData: buildAchievementBackupPayload(),
       aiData: assistantBackupService.buildBackupPayload(),
@@ -557,6 +572,21 @@ const AppContent: React.FC = () => {
     return startActivity(activity, categoryId, autoLinkRules, todoId, scopeIdOrIds, note, appAwarenessMeta);
   };
 
+  const resolveRoutineStep = useCallback((step: RoutineStep) => {
+    const linkedTodo = step.linkedTodoId ? todos.find(todo => todo.id === step.linkedTodoId) : undefined;
+    const categoryId = linkedTodo?.linkedCategoryId || step.categoryId;
+    const activityId = linkedTodo?.linkedActivityId || step.activityId;
+    const activity = categories
+      .find(category => category.id === categoryId)
+      ?.activities.find(item => item.id === activityId);
+    return {
+      linkedTodo,
+      activity,
+      categoryId,
+      scopeIds: linkedTodo?.defaultScopeIds || step.scopeIds
+    };
+  }, [categories, todos]);
+
   const startRoutine = useCallback((routine: Routine) => {
     if (activeRoutineRunRef.current) {
       addToast('info', '已有 Routine 正在运行');
@@ -569,27 +599,41 @@ const AppContent: React.FC = () => {
       return;
     }
 
-    const activity = categories
-      .find(category => category.id === firstStep.categoryId)
-      ?.activities.find(item => item.id === firstStep.activityId);
+    const { activity, categoryId, linkedTodo, scopeIds } = resolveRoutineStep(firstStep);
     if (!activity) {
       addToast('error', 'Routine 的活动已不存在，请前往设置检查');
       return;
     }
 
-    const sessionId = handleStartActivityWrapper(activity, firstStep.categoryId);
+    const checklistMarkdown = resetRoutineChecklist(firstStep.checklistMarkdown);
+    const sessionId = handleStartActivityWrapper(activity, categoryId, linkedTodo?.id, scopeIds);
     setActiveRoutineRun({
       routineId: routine.id,
       currentStepIndex: 0,
       routineStartedAt: Date.now(),
-      currentSessionId: sessionId
+      currentSessionId: sessionId,
+      checklistMarkdown
     });
-  }, [addToast, categories]);
+  }, [addToast, autoLinkRules, resolveRoutineStep, startActivity]);
 
-  const advanceRoutine = useCallback(() => {
+  const advanceRoutine = () => {
     const run = activeRoutineRunRef.current;
     if (!run) return;
-    handleStopActivityWrapper(run.currentSessionId);
+    handleStopActivityWrapper(run.currentSessionId, run.checklistMarkdown ? { note: run.checklistMarkdown } : undefined);
+  };
+
+  const toggleRoutineChecklist = useCallback((index: number) => {
+    setActiveRoutineRun(current => {
+      if (!current) return current;
+      const routine = routinesRef.current.find(item => item.id === current.routineId);
+      const step = routine?.steps[current.currentStepIndex];
+      const next = {
+        ...current,
+        checklistMarkdown: toggleRoutineChecklistItem(current.checklistMarkdown ?? step?.checklistMarkdown, index)
+      };
+      activeRoutineRunRef.current = next;
+      return next;
+    });
   }, []);
 
   const exitRoutine = useCallback(() => {
@@ -612,7 +656,7 @@ const AppContent: React.FC = () => {
     stoppedLogs.forEach((log) => logManager.handleSaveLog(log));
   };
 
-  const handleStopActivityWrapper = (sessionId: string, finalSessionData?: ActiveSession) => {
+  const handleStopActivityWrapper = (sessionId: string, finalSessionData?: Partial<ActiveSession>) => {
     const routineRun = activeRoutineRunRef.current;
     stopActivity(
       sessionId,
@@ -632,20 +676,20 @@ const AppContent: React.FC = () => {
           return;
         }
 
-        const nextActivity = categories
-          .find(category => category.id === nextStep.categoryId)
-          ?.activities.find(item => item.id === nextStep.activityId);
+        const { activity: nextActivity, categoryId: nextCategoryId, linkedTodo: nextTodo, scopeIds: nextScopeIds } = resolveRoutineStep(nextStep);
         if (!nextActivity) {
           setActiveRoutineRun(null);
           addToast('error', 'Routine 的下一步活动已不存在');
           return;
         }
 
-        const nextSessionId = startActivity(nextActivity, nextStep.categoryId, autoLinkRules);
+        const nextSessionChecklistMarkdown = resetRoutineChecklist(nextStep.checklistMarkdown);
+        const nextSessionId = startActivity(nextActivity, nextCategoryId, autoLinkRules, nextTodo?.id, nextScopeIds);
         setActiveRoutineRun({
           ...routineRun,
           currentStepIndex: nextIndex,
-          currentSessionId: nextSessionId
+          currentSessionId: nextSessionId,
+          checklistMarkdown: nextSessionChecklistMarkdown
         });
       }
     );
@@ -965,6 +1009,7 @@ const AppContent: React.FC = () => {
         activeRoutineRun={activeRoutineRun}
         onStartRoutine={startRoutine}
         onAdvanceRoutine={advanceRoutine}
+        onToggleRoutineChecklist={toggleRoutineChecklist}
         onExitRoutine={exitRoutine}
         // Activity Handlers
         handleStartActivity={handleStartActivityWrapper}
@@ -1310,6 +1355,7 @@ const AppContent: React.FC = () => {
               customStickerSets,
               customStickers,
               filters,
+              routines,
               customColorGroup: customColorGroupService.getGroup(),
               achievementData: buildAchievementBackupPayload(),
               aiData: assistantBackupService.buildBackupPayload(),
@@ -1420,6 +1466,7 @@ const AppContent: React.FC = () => {
       <TimerFloating
         sessions={activeSessions}
         todos={todos}
+        scopes={scopes}
         onStop={handleStopActivityWrapper}
         onCancel={handleCancelSessionWrapper}
         onClick={(session) => setFocusDetailSessionId(session.id)}

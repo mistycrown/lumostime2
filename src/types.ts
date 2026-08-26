@@ -1,6 +1,8 @@
 /**
  * @file types.ts
+ * @updated 2026-08-26: Added optional static notes to Routine steps.
  * @updated 2026-08-26: Added optional UI icon storage for Routine configurations.
+ * @updated 2026-08-26: Added Routine step todo and scope associations for cross-domain runs.
  * @updated 2026-08-24: Added Activity-level custom attribute definitions and ID-based values on logs and active sessions.
  * @updated 2026-08-06: Added backward-compatible archive state to activities.
  * @updated 2026-08-26: Added backward-compatible archive state to categories so category archiving can cascade to all child activities.
@@ -88,6 +90,10 @@ export interface RoutineStep {
   activityId: string;
   categoryId: string;
   order: number;
+  linkedTodoId?: string;
+  scopeIds?: string[];
+  note?: string;
+  checklistMarkdown?: string;
 }
 
 export interface Routine {
@@ -106,6 +112,7 @@ export interface ActiveRoutineRun {
   currentStepIndex: number;
   routineStartedAt: number;
   currentSessionId: string;
+  checklistMarkdown?: string;
 }
 
 export interface Category {
@@ -413,6 +420,7 @@ export interface TodoCategory {
   icon: string; // Emoji icon (for default theme)
   uiIcon?: string; // UI icon ID (for custom theme, e.g., "ui:purple:01")
   color?: string; // Stored category color for todo stats (Tailwind token or HEX)
+  isArchived?: boolean; // Missing values are treated as active for backward compatibility
 }
 
 export type TodoRecurrenceFrequency = 'daily' | 'weekly' | 'monthly';
@@ -453,7 +461,6 @@ export interface TodoItem {
   childOrder?: number; // Stable order among siblings under the same parent
   title: string;
   isCompleted: boolean;
-  isArchived?: boolean; // Missing values are treated as active for backward compatibility
   completedAt?: string; // ISO Date string for completion time
   linkedActivityId?: string; // Links to a Record Activity for stats
   linkedCategoryId?: string; // Link back to Category

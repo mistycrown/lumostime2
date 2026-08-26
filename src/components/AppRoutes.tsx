@@ -108,12 +108,14 @@ const resolveNewspaperAssistantName = (): string => {
 };
 
 // Props Interface to receive all handlers
+// @updated 2026-08-26: Passes Routine checklist toggle actions into the Record view.
 // Minimized Props Interface
 interface AppRoutesProps {
     routines: Routine[];
     activeRoutineRun: ActiveRoutineRun | null;
     onStartRoutine: (routine: Routine) => void;
     onAdvanceRoutine: () => void;
+    onToggleRoutineChecklist: (index: number) => void;
     onExitRoutine: () => void;
     activeTimelineLayout: TimelineLayoutMode;
     refreshKey: number;
@@ -158,6 +160,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     activeRoutineRun,
     onStartRoutine,
     onAdvanceRoutine,
+    onToggleRoutineChecklist,
     onExitRoutine,
     activeTimelineLayout,
     handleStartActivity,
@@ -855,10 +858,12 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 onAddLog={openAddModal}
                 categories={categories}
                 todos={todos}
+                scopes={scopes}
                 routines={routines}
                 activeRoutineRun={activeRoutineRun}
                 onStartRoutine={onStartRoutine}
                 onAdvanceRoutine={onAdvanceRoutine}
+                onToggleRoutineChecklist={onToggleRoutineChecklist}
                 onExitRoutine={onExitRoutine}
             />;
         case AppView.TIMELINE:

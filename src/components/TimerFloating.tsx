@@ -1,6 +1,6 @@
 /**
  * @file TimerFloating.tsx
- * @input props: activeSessions, todos
+ * @input props: activeSessions, todos, scopes
  * @output Floating UI Elements
  * @pos Component (Global UI)
  * @description Renders floating timer bubbles for active sessions, with responsive action visibility and a long-press cancel menu.
@@ -10,7 +10,7 @@
  * @updated 2026-03-24
  */
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ActiveSession, TodoItem, AppView } from '../types';
+import { ActiveSession, Scope, TodoItem, AppView } from '../types';
 import { X, CheckCircle2, Trash2 } from 'lucide-react';
 import { useNavigation } from '../contexts/NavigationContext';
 import { IconRenderer } from './IconRenderer';
@@ -18,6 +18,7 @@ import { IconRenderer } from './IconRenderer';
 interface TimerFloatingProps {
   sessions: ActiveSession[];
   todos: TodoItem[];
+  scopes: Scope[];
   onStop: (sessionId: string) => void;
   onCancel: (sessionId: string) => void;
   onClick: (session: ActiveSession) => void;
@@ -42,10 +43,11 @@ const LONG_PRESS_MOVE_THRESHOLD = 12;
 const SingleTimer: React.FC<{
   session: ActiveSession;
   todo?: TodoItem;
+  scopes: Scope[];
   onStop: () => void;
   onCancel: () => void;
   onClick: () => void;
-}> = ({ session, todo, onStop, onCancel, onClick }) => {
+}> = ({ session, todo, scopes, onStop, onCancel, onClick }) => {
   const [elapsed, setElapsed] = useState(0);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isBorderAnimating, setIsBorderAnimating] = useState(false);
@@ -62,6 +64,9 @@ const SingleTimer: React.FC<{
   const longPressStartPointRef = useRef<{ x: number; y: number } | null>(null);
   const didTriggerLongPressRef = useRef(false);
   const { currentView } = useNavigation();
+  const linkedScopes = (session.scopeIds || [])
+    .map(scopeId => scopes.find(scope => scope.id === scopeId))
+    .filter((scope): scope is Scope => Boolean(scope));
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -483,6 +488,11 @@ const SingleTimer: React.FC<{
                         @{todo.title}
                       </span>
                     )}
+                    {linkedScopes.map(scope => (
+                      <span key={scope.id} className="shrink-0 text-[10px] text-stone-400 truncate max-w-[90px]">
+                        %{scope.name}
+                      </span>
+                    ))}
                   </div>
                   <span
                     className="text-xl font-mono font-medium tabular-nums tracking-tight leading-none mt-0.5"
@@ -560,6 +570,7 @@ const SingleTimer: React.FC<{
 export const TimerFloating: React.FC<TimerFloatingProps> = ({
   sessions,
   todos,
+  scopes,
   onStop,
   onCancel,
   onClick
@@ -584,6 +595,7 @@ export const TimerFloating: React.FC<TimerFloatingProps> = ({
           key={session.id}
           session={session}
           todo={todos.find(t => t.id === session.linkedTodoId)}
+          scopes={scopes}
           onStop={() => onStop(session.id)}
           onCancel={() => onCancel(session.id)}
           onClick={() => onClick(session)}

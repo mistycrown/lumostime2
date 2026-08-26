@@ -16,6 +16,8 @@
  * @updated 2026-08-11: Keeps manual cloud sync acknowledgements separate from the local user-edit timestamp.
  * @updated 2026-08-11: Routes settings-originated data edits through the explicit local-edit path while reserving sync updates for cloud restores.
  * @updated 2026-08-10: Records Settings as the return target when opening daily-check overview.
+ * @updated 2026-08-26: Adds a manual Sentry action for sending recent sanitized renderer errors.
+ * @updated 2026-08-26: Allows review-overview shortcuts launched from Timeline to close back to the originating view.
  * @updated 2026-08-26: Added the Record settings group and Routine settings editor.
  */
 import React, { useState, useRef, useEffect } from 'react';
@@ -1409,6 +1411,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
         return <RoutineSettingsView
             routines={routines}
             categories={categoriesData || []}
+            scopes={scopes || []}
+            todos={todos || []}
+            todoCategories={todoCategories || []}
             onUpdateRoutines={(nextRoutines) => {
                 onUpdateRoutines?.(nextRoutines);
                 void onLocalDataUpdate({ ...syncData, routines: nextRoutines });

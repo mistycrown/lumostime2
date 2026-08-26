@@ -18,6 +18,7 @@
  * @updated 2026-05-18: Included the persisted custom color group in backup/sync payloads and now auto-sync palette-only edits as part of user data.
  * @updated 2026-08-10: Included Android widget templates in backup/sync payloads, restores them through widgetService, and auto-syncs template-only changes.
  * @updated 2026-08-11: Adds shareable error IDs to user-visible manual cloud sync failures.
+ * @updated 2026-08-26: Includes Routine configuration in backup payloads and restore handling.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -78,6 +79,7 @@ import {
     loadSceneGroupStateFromStorage,
     saveSceneGroupStateToStorage
 } from '../utils/sceneGroupStorage';
+import { loadRoutines, saveRoutines } from '../utils/routineStorage';
 
 export const useSyncManager = () => {
     type SyncMode = 'startup' | 'resume' | 'manual' | 'auto';
@@ -203,6 +205,7 @@ export const useSyncManager = () => {
             if (hasField('customStickerSets')) setCustomStickerSets(data.customStickerSets ?? []);
             if (hasField('customStickers')) setCustomStickers(data.customStickers ?? []);
             if (hasField('filters')) setFilters(normalizeFiltersOrder(data.filters));
+            if (hasField('routines')) saveRoutines(data.routines);
             
             // 恢复场景设置到 localStorage（优先新版 sceneGroupState，兼容旧版 sceneTimeSlots）
             if (hasField('sceneGroupState')) {
@@ -299,6 +302,7 @@ export const useSyncManager = () => {
             sceneGroupState,
             principles, // 添加原则库
             selfBeliefs, // 添加自我认知库
+            routines: loadRoutines(),
             version: '1.0.0',
             timestamp: getLocalDataTimestamp() // Use the latest persisted tracking timestamp
         };

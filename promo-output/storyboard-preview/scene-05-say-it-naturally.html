@@ -8,7 +8,115 @@
       :root{--paper:#faf9f6;--ink:#1c1917;--body:#57534e;--line:#e7e5e4;--lav:#8b6fa8;--lavsoft:#f2edf6;--green:#7a9176;--blue:#6b8ca8}*{box-sizing:border-box}body{min-width:960px;min-height:540px;margin:0;overflow:hidden;background:#dedad2;color:var(--ink);font-family:'Noto Serif SC','Source Han Serif SC','Songti SC','STSong','SimSun','Microsoft YaHei',serif}button{font:inherit}.film{position:relative;width:100vw;height:100vh;min-width:960px;min-height:540px;overflow:hidden;isolation:isolate;background:linear-gradient(90deg,rgba(77,68,56,.028) 1px,transparent 1px),linear-gradient(rgba(77,68,56,.022) 1px,transparent 1px),var(--paper);background-size:42px 42px}.film:after{position:absolute;inset:0;z-index:30;content:'';opacity:.16;pointer-events:none;background-image:radial-gradient(rgba(64,54,43,.18) .5px,transparent .6px);background-size:5px 5px;mix-blend-mode:multiply}.meta,.scene{position:absolute;top:5.7%;z-index:10;color:#a8a29e;font-family:Georgia,'Times New Roman',serif;font-size:clamp(9px,.82vw,14px);letter-spacing:.12em}.meta{left:6.25%}.scene{right:6.25%;letter-spacing:.08em}.copy{position:absolute;top:27%;left:6.25%;z-index:6;width:28.5%}.copy h1{margin:0;font-size:clamp(36px,4vw,76px);font-weight:600;line-height:1.18;letter-spacing:0}.copy h1 span{display:block}.copy .muted{color:#a8a29e}.copy-rule{width:0;height:1px;margin-top:29px;background:#a8a29e}.copy p{margin:26px 0 0;color:var(--body);font-size:clamp(14px,1.2vw,21px);line-height:1.75;opacity:0;transform:translateY(12px)}
       .app{position:absolute;top:13%;right:6.25%;bottom:11.5%;z-index:4;width:59%;min-width:630px;overflow:hidden;border:1px solid rgba(87,83,78,.13);border-radius:8px;background:#fbfaf8;box-shadow:0 26px 55px rgba(64,53,42,.16),0 2px 8px rgba(64,53,42,.08);opacity:0;transform:translateX(9%) scale(.97)}.titlebar{display:flex;align-items:center;height:8%;min-height:37px;padding:0 20px;border-bottom:1px solid rgba(231,229,228,.95);background:rgba(255,255,255,.72);color:#a8a29e;font-family:ui-sans-serif,system-ui,sans-serif}.avatar{display:grid;width:31px;height:31px;place-items:center;border:1px solid #e3d9eb;border-radius:10px;background:#f6f1f8;color:var(--lav);font-size:15px}.assistant-name{margin-left:10px;color:#292524;font-family:'Noto Serif SC','Source Han Serif SC','Songti SC',serif;font-size:clamp(14px,1.05vw,18px);font-weight:700}.status{margin-left:9px;color:#a8a29e;font-size:10px;letter-spacing:.08em}.close{margin-left:auto;color:#a8a29e;font-size:22px}.chat{height:82%;padding:28px 7.5% 12px;overflow:hidden;font-family:ui-sans-serif,system-ui,sans-serif}.message{display:flex;align-items:flex-start;gap:10px;margin-bottom:19px}.message.user{flex-direction:row-reverse}.face{display:grid;width:31px;height:31px;flex:0 0 31px;place-items:center;border:1px solid #e7e5e4;border-radius:10px;background:#fff;color:#78716c;font-size:13px}.message.user .face{border-color:#e3d9eb;background:#f8f3fa;color:var(--lav)}.bubble{max-width:75%;padding:12px 15px;border:1px solid #e7e5e4;border-radius:15px;background:#fff;color:#44403c;font-size:clamp(11px,.9vw,15px);line-height:1.65;box-shadow:0 0 0 1px rgba(0,0,0,.015);opacity:0;transform:translateY(11px)}.user .bubble{border-color:#e5d9ed;background:var(--lavsoft)}.assistant-copy{margin:1px 0 10px}.applied{padding-left:12px;border-left:2px solid #d7c5e2;opacity:0;transform:translateY(8px)}.applied-label{margin:0 0 8px;color:#a8a29e;font-family:'Noto Serif SC','Source Han Serif SC','Songti SC',serif;font-size:10px;letter-spacing:.08em}.log-card{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid #e7e5e4;border-radius:8px;background:#fffdfb;color:#57534e;font-size:11px}.log-card+.log-card{margin-top:7px}.time{display:flex;width:79px;flex-direction:column;color:#78716c;font-family:ui-monospace,'Cascadia Mono',monospace;font-size:10px}.log-card strong{color:#292524;font-size:12px}.tag{margin-left:auto;color:var(--lav);font-size:10px;white-space:nowrap}.composer{display:flex;height:10%;align-items:center;gap:9px;padding:9px 19px;border-top:1px solid #e7e5e4;background:#fff}.input{flex:1;padding:9px 12px;border:1px solid #e7e5e4;border-radius:9px;color:#a8a29e;font-family:ui-sans-serif,system-ui,sans-serif;font-size:11px}.send{display:grid;width:31px;height:31px;place-items:center;border-radius:10px;background:var(--lav);color:white;font-size:15px}.final{position:absolute;bottom:13.4%;left:6.25%;z-index:7;max-width:350px;margin:0;color:var(--body);font-size:clamp(14px,1.2vw,21px);line-height:1.6;opacity:0;transform:translateY(10px)}.final strong{color:var(--ink);font-weight:600}.control{position:fixed;right:20px;bottom:20px;left:20px;z-index:40;display:flex;align-items:center;gap:12px;width:min(520px,calc(100vw - 40px));margin:auto;padding:10px 12px;border:1px solid rgba(70,59,48,.12);border-radius:7px;background:rgba(253,251,247,.91);box-shadow:0 10px 32px rgba(50,42,34,.16);backdrop-filter:blur(12px);font-family:ui-sans-serif,system-ui,sans-serif}.play{display:grid;width:29px;height:29px;flex:0 0 auto;place-items:center;border:0;border-radius:50%;color:white;background:var(--ink);cursor:pointer;font-size:12px}.control input{width:100%;accent-color:var(--ink)}output{width:72px;color:#57534e;font-size:11px;text-align:right}
       .copy h1 span:first-child{animation:up 10s .1s both}.copy h1 span:last-child{animation:up 10s .6s both}.copy-rule{animation:rule 10s both}.copy p{animation:body 10s both}.app{animation:app 10s both}.user .bubble{animation:bubble 10s .2s both}.assistant .bubble{animation:bubble 10s .55s both}.applied{animation:applied 10s both}.final{animation:final 10s both}@keyframes up{0%,8%{opacity:0;transform:translateY(16px)}17%,100%{opacity:1;transform:none}}@keyframes rule{0%,25%{width:0;opacity:0}34%,100%{width:78px;opacity:1}}@keyframes body{0%,28%{opacity:0;transform:translateY(12px)}37%,100%{opacity:1;transform:none}}@keyframes app{0%,22%{opacity:0;transform:translateX(9%) scale(.97)}38%,100%{opacity:1;transform:none}}@keyframes bubble{0%,51%{opacity:0;transform:translateY(11px)}64%,100%{opacity:1;transform:none}}@keyframes applied{0%,69%{opacity:0;transform:translateY(8px)}83%,100%{opacity:1;transform:none}}@keyframes final{0%,84%{opacity:0;transform:translateY(10px)}93%,100%{opacity:1;transform:none}}@media(max-width:1100px){.app{right:4.5%;width:61%}.copy{left:4.5%;width:27%}.meta{left:4.5%}.scene{right:4.5%}.final{left:4.5%}.chat{padding-left:5%;padding-right:5%}}
+      /* The AI scene shows one compact record pass and a later proactive check-in. */
+      .chat{padding:20px 6% 10px}
+      .message{gap:8px;margin-bottom:10px}
+      .face,.avatar{font-family:'Segoe UI Emoji','Apple Color Emoji',sans-serif}
+      .bubble{max-width:88%;padding:8px 12px;border-radius:13px;font-size:clamp(10px,.78vw,13px);line-height:1.42}
+      .assistant-copy{margin:0 0 6px}
+      .assistant-note{margin:4px 0 0;color:#78716c}
+      .applied{padding-left:9px}
+      .applied-label{margin:0 0 5px}
+      .log-card{gap:8px;padding:6px 8px;font-size:10px}
+      .log-card+.log-card{margin-top:4px}
+      .time{width:62px;font-size:9px}
+      .log-card strong{font-size:11px}
+      .tag{font-size:9px}
+      .plan-time{color:#7a9176;font-family:ui-monospace,'Cascadia Mono',monospace;font-size:9px}
+      .plan-title{color:#292524;font-weight:700}
+      .plan-mark{margin-left:auto;color:#7a9176;font-size:9px}
+      .time-break{display:flex;align-items:center;gap:8px;margin:9px 0 8px;padding-left:39px;color:#a8a29e;font-family:ui-sans-serif,system-ui,sans-serif;font-size:9px;letter-spacing:.04em}
+      .time-break i{width:28px;height:1px;background:#e7e5e4}
+      .follow-up{margin-bottom:0}
+      .follow-up .bubble{max-width:90%;border-color:#dfe8dd;background:#f8fbf7}
+      .message.first .bubble{animation:ai-user-first 10s .1s both}
+      .message.first-assistant .bubble{animation:ai-first-reply 10s .8s both}
+      .message.first-assistant .applied{animation:ai-applied 10s 1.35s both}
+      .time-break{opacity:0;transform:translateY(6px);animation:ai-break 10s 4.55s both}
+      .message.follow-up .bubble{animation:ai-follow-up 10s 4.85s both}
+      @keyframes ai-user-first{0%,8%{opacity:0;transform:translateY(8px)}18%,100%{opacity:1;transform:none}}
+      @keyframes ai-first-reply{0%,17%{opacity:0;transform:translateY(8px)}28%,100%{opacity:1;transform:none}}
+      @keyframes ai-applied{0%,25%{opacity:0;transform:translateY(6px)}38%,100%{opacity:1;transform:none}}
+      @keyframes ai-break{0%,45%{opacity:0;transform:translateY(6px)}54%,100%{opacity:1;transform:none}}
+      @keyframes ai-follow-up{0%,49%{opacity:0;transform:translateY(8px)}61%,100%{opacity:1;transform:none}}
+
+      .log-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+      .log-grid .log-card{min-width:0;gap:5px;padding:6px}
+      .log-grid .time{width:47px;flex:0 0 47px;font-size:8px}
+      .log-grid .log-card strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px}
+      .log-grid .tag{overflow:hidden;text-overflow:ellipsis;font-size:8px;white-space:nowrap}
+      .todo-card{display:flex;align-items:center;gap:8px;margin-top:8px;padding:7px 9px;border:1px solid #dfe8dd;border-radius:8px;background:#fbfdf9;color:#57534e}
+      .todo-check{display:grid;width:19px;height:19px;flex:0 0 19px;place-items:center;border:1px solid #9caf98;border-radius:50%;color:#6f8b6a;font-size:11px;line-height:1}
+      .todo-main{min-width:0;flex:1}
+      .todo-title{display:block;overflow:hidden;color:#292524;font-size:11px;font-weight:700;text-overflow:ellipsis;white-space:nowrap}
+      .todo-meta{display:flex;gap:7px;margin-top:3px;color:#7a9176;font-size:8px;white-space:nowrap}
+      .todo-state{color:#7a9176;font-size:9px;white-space:nowrap}
+      .message.follow-up-user{margin-bottom:0}
+      .message.follow-up-user .bubble{animation:ai-follow-user 10s 5.9s both}
+      .message.assistant>div:last-child{flex:0 1 82%;min-width:0}
+      .message.assistant>div:last-child .bubble{width:100%;max-width:none}
+      .message.first-assistant>div:last-child{flex-basis:88%}
+      .message.follow-up>div:last-child{flex-basis:58%}
+      .message.follow-up-user>div:last-child{flex:0 1 48%;min-width:0}
+      .message.follow-up-user .bubble{width:100%;max-width:none}
+      @keyframes ai-follow-user{0%,59%{opacity:0;transform:translateY(8px)}70%,100%{opacity:1;transform:none}}
+
+      /* Keep every turn on one measured vertical rhythm; the marker is a full beat. */
+      .chat{display:flex;flex-direction:column;gap:12px;padding:24px 6% 12px}
+      .message{min-height:31px;margin:0}
+      .message.first-assistant>div:last-child{flex:0 1 78%;}
+      .message.first-assistant>div:last-child .bubble{width:100%;max-width:none}
+      .message.follow-up>div:last-child{flex:0 1 46%;}
+      .message.follow-up>div:last-child .bubble{width:100%;max-width:none}
+      .message.follow-up-user>div:last-child{flex:0 1 42%;}
+      .message.follow-up-user>div:last-child .bubble{width:100%;max-width:none}
+      .time-break{min-height:16px;margin:0;padding-left:39px}
+      .message.first .bubble{animation:chat-in-first 10s cubic-bezier(.22,.75,.2,1) both}
+      .message.first-assistant .bubble{animation:chat-in-assistant 10s cubic-bezier(.22,.75,.2,1) both}
+      .message.first-assistant .applied{opacity:1;transform:none;animation:none}
+      .time-break{animation:chat-in-marker 10s cubic-bezier(.22,.75,.2,1) both}
+      .message.follow-up .bubble{animation:chat-in-follow-up 10s cubic-bezier(.22,.75,.2,1) both}
+      .message.follow-up-user .bubble{animation:chat-in-user-follow-up 10s cubic-bezier(.22,.75,.2,1) both}
+      @keyframes chat-in-first{0%,6%{opacity:0;transform:translateY(10px)}16%,100%{opacity:1;transform:none}}
+      @keyframes chat-in-assistant{0%,14%{opacity:0;transform:translateY(10px)}25%,100%{opacity:1;transform:none}}
+      @keyframes chat-in-marker{0%,39%{opacity:0;transform:translateY(6px)}48%,100%{opacity:1;transform:none}}
+      @keyframes chat-in-follow-up{0%,45%{opacity:0;transform:translateY(10px)}56%,100%{opacity:1;transform:none}}
+      @keyframes chat-in-user-follow-up{0%,55%{opacity:0;transform:translateY(10px)}66%,100%{opacity:1;transform:none}}
+
+      /* Each message row enters as one unit so the avatar never precedes its bubble. */
+      .chat .message{opacity:0;transform:translateY(10px)}
+      .chat .message .bubble{opacity:1;transform:none;animation:none!important}
+      .chat .message.first{animation:chat-row-first 10s cubic-bezier(.22,.75,.2,1) both}
+      .chat .message.first-assistant{animation:chat-row-assistant 10s cubic-bezier(.22,.75,.2,1) both}
+      .chat .message.follow-up{animation:chat-row-follow-up 10s cubic-bezier(.22,.75,.2,1) both}
+      .chat .message.follow-up-user{animation:chat-row-follow-user 10s cubic-bezier(.22,.75,.2,1) both}
+      .chat .message.third-user{animation:chat-row-third-user 10s cubic-bezier(.22,.75,.2,1) both}
+      .chat .message.third-assistant{animation:chat-row-third-assistant 10s cubic-bezier(.22,.75,.2,1) both}
+      /* Time beats are centered and carry no caption; each beat is its own pause. */
+      .chat .time-break{justify-content:center;gap:0;padding-left:0;color:#8b6fa8;font-family:ui-monospace,'Cascadia Mono',monospace;font-size:11px;letter-spacing:.08em}
+      .chat .time-break i,.chat .time-break span:not(:first-child){display:none}
+      .chat .time-break{opacity:0;transform:translateY(6px);animation:chat-row-marker 10s cubic-bezier(.22,.75,.2,1) both}
+      .chat .evening-break{animation:chat-row-evening 10s cubic-bezier(.22,.75,.2,1) both}
+      @keyframes chat-row-first{0%,6%{opacity:0;transform:translateY(10px)}16%,100%{opacity:1;transform:none}}
+      @keyframes chat-row-assistant{0%,15%{opacity:0;transform:translateY(10px)}27%,100%{opacity:1;transform:none}}
+      @keyframes chat-row-follow-up{0%,45%{opacity:0;transform:translateY(10px)}55%,100%{opacity:1;transform:none}}
+      @keyframes chat-row-follow-user{0%,55%{opacity:0;transform:translateY(10px)}65%,100%{opacity:1;transform:none}}
+      @keyframes chat-row-third-user{0%,74%{opacity:0;transform:translateY(10px)}83%,100%{opacity:1;transform:none}}
+      @keyframes chat-row-third-assistant{0%,82%{opacity:0;transform:translateY(10px)}91%,100%{opacity:1;transform:none}}
+      @keyframes chat-row-marker{0%,31%{opacity:0;transform:translateY(6px)}39%,100%{opacity:1;transform:none}}
+      @keyframes chat-row-evening{0%,62%{opacity:0;transform:translateY(6px)}70%,100%{opacity:1;transform:none}}
+
     </style>
   </head>
-  <body><main class="film" aria-label="LumosTime 横屏宣传片分镜：说出来，就能记下来"><div class="meta">LUMOSTIME / PRODUCT FILM</div><div class="scene">SCENE 05 · SPEAK NATURALLY</div><section class="copy"><h1><span>说出来，</span><span class="muted">就能记下来。</span></h1><div class="copy-rule"></div><p>不用先整理好格式。<br />自然语言会变成<strong>可追溯的时间记录。</strong></p></section><section class="app" aria-label="按当前 AIBackfillChatModal 和对话结果卡结构重建的 AI 补记页面"><header class="titlebar"><div class="avatar">✦</div><span class="assistant-name">时间助理</span><span class="status">上下文开启</span><span class="close">×</span></header><section class="chat"><div class="message user"><div class="face">我</div><div class="bubble">今天上午 9 点到 11 点写代码，然后开会一小时。</div></div><div class="message assistant"><div class="face">✦</div><div><div class="bubble"><p class="assistant-copy">已为你整理 2 条时间记录，并自动关联到「工作」领域。</p><div class="applied"><p class="applied-label">应用结果</p><div class="log-card"><span class="time">09:00<br>11:00</span><strong>写代码</strong><span class="tag"># 工作 / 开发</span></div><div class="log-card"><span class="time">11:00<br>12:00</span><strong>开会</strong><span class="tag">% 工作</span></div></div></div></div></div></section><footer class="composer"><div class="input">描述刚刚发生的事，或告诉我下一步计划</div><div class="send">↑</div></footer></section><p class="final">说得随意一点也没关系。<strong>系统会把它安放好。</strong></p><div class="control" aria-label="试片播放控制"><button class="play" id="playPause" type="button" aria-label="暂停试片">Ⅱ</button><input id="progress" type="range" min="0" max="10" step="0.01" value="0" aria-label="试片进度"><output id="timeLabel" for="progress">0.0 / 10.0</output></div></main><script>const b=document.getElementById('playPause'),p=document.getElementById('progress'),o=document.getElementById('timeLabel'),d=10000;let playing=true,r;const a=()=>document.getAnimations();function set(t){a().forEach(x=>{x.currentTime=t;x.pause()});p.value=t/1000;o.value=`${(t/1000).toFixed(1)} / 10.0`}function sync(){const t=Math.min(Number(a()[0]?.currentTime||0),d);p.value=t/1000;o.value=`${(t/1000).toFixed(1)} / 10.0`;if(playing&&t>=d){playing=false;b.textContent='↻';return}r=requestAnimationFrame(sync)}function play(t){a().forEach(x=>{x.currentTime=t;x.play()});playing=true;b.textContent='Ⅱ';cancelAnimationFrame(r);r=requestAnimationFrame(sync)}b.onclick=()=>{const t=Number(a()[0]?.currentTime||0);if(t>=d)return play(0);if(playing){a().forEach(x=>x.pause());playing=false;b.textContent='▶';cancelAnimationFrame(r)}else play(t)};p.oninput=()=>{set(Number(p.value)*1000);playing=false;b.textContent='▶';cancelAnimationFrame(r)};requestAnimationFrame(()=>play(0));</script></body>
+  <body><main class="film" aria-label="LumosTime 横屏宣传片分镜：说出来，就能记下来"><div class="meta">LUMOSTIME / PRODUCT FILM</div><div class="scene">SCENE 05 · SPEAK NATURALLY</div><section class="copy"><h1><span>说出来，</span><span class="muted">就能记下来。</span></h1><div class="copy-rule"></div><p>不只记下刚刚发生的事。<br />也可以把接下来要做的计划交给它。<br />它会回应，也会记得回来问你。</p></section><section class="app" aria-label="按当前 AIBackfillChatModal 和对话结果卡结构重建的 AI 补记页面"><header class="titlebar"><div class="avatar">🐱</div><span class="assistant-name">小猫助手</span><span class="status">上下文开启</span><span class="close">×</span></header><section class="chat">
+  <div class="message user first"><div class="face">我</div><div class="bubble">今天 9 点到 11 点写代码，然后开会 1 小时，接下来准备看文献。</div></div>
+  <div class="message assistant first-assistant"><div class="face">🐱</div><div><div class="bubble"><p class="assistant-copy">好，上午的记录我已经添加啦！要看文献了嘛？小猫会一直陪着你哦~</p><div class="applied"><div class="log-grid"><div class="log-card"><span class="time">09:00<br />11:00</span><strong>写代码</strong><span class="tag"># 工作</span></div><div class="log-card"><span class="time">11:00<br />12:00</span><strong>开会</strong><span class="tag">% 工作</span></div></div></div></div></div></div>
+  <div class="time-break"><span>16:30</span></div>
+  <div class="message assistant follow-up"><div class="face">🐱</div><div><div class="bubble"><p class="assistant-copy">两脚兽，文献看得怎么样了？快给本喵汇报一下！</p></div></div></div>
+  <div class="message user follow-up-user"><div class="face">我</div><div class="bubble">还没有呢，我马上就看。</div></div>
+
+  <div class="time-break evening-break"><span>19:00</span></div>
+  <div class="message user third-user"><div class="face">我</div><div class="bubble">看完今天的文献了。</div></div>
+  <div class="message assistant third-assistant"><div class="face">🐱</div><div><div class="bubble"><p class="assistant-copy">主人最棒啦！本喵已经帮你把任务打勾了哦。</p><div class="todo-card"><div class="todo-check">✓</div><div class="todo-main"><strong class="todo-title">看一篇文献</strong><div class="todo-meta"><span># 学习 / 书籍文献</span><span>% 专业输入</span></div></div><span class="todo-state">已完成</span></div></div></div></div>
+</section><footer class="composer"><div class="input">描述刚刚发生的事，或告诉我下一步计划</div><div class="send">↑</div></footer></section><p class="final">也许在某个深夜，<br />它会写一封信给你。</p><div class="control" aria-label="试片播放控制"><button class="play" id="playPause" type="button" aria-label="暂停试片">Ⅱ</button><input id="progress" type="range" min="0" max="10" step="0.01" value="0" aria-label="试片进度"><output id="timeLabel" for="progress">0.0 / 10.0</output></div></main><script>const b=document.getElementById('playPause'),p=document.getElementById('progress'),o=document.getElementById('timeLabel'),d=10000;let playing=true,r;const a=()=>document.getAnimations();function set(t){a().forEach(x=>{x.currentTime=t;x.pause()});p.value=t/1000;o.value=`${(t/1000).toFixed(1)} / 10.0`}function sync(){const t=Math.min(Number(a()[0]?.currentTime||0),d);p.value=t/1000;o.value=`${(t/1000).toFixed(1)} / 10.0`;if(playing&&t>=d){playing=false;b.textContent='↻';return}r=requestAnimationFrame(sync)}function play(t){a().forEach(x=>{x.currentTime=t;x.play()});playing=true;b.textContent='Ⅱ';cancelAnimationFrame(r);r=requestAnimationFrame(sync)}b.onclick=()=>{const t=Number(a()[0]?.currentTime||0);if(t>=d)return play(0);if(playing){a().forEach(x=>x.pause());playing=false;b.textContent='▶';cancelAnimationFrame(r)}else play(t)};p.oninput=()=>{set(Number(p.value)*1000);playing=false;b.textContent='▶';cancelAnimationFrame(r)};requestAnimationFrame(()=>play(0));</script></body>
 </html>

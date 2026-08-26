@@ -3,8 +3,8 @@
  * @input Todos, Categories
  * @output Updated Categories/Todos (Reorder, CRUD)
  * @pos View (Modal/Page)
- * @description A specialized view for bulk management of To-Do items and categories with deferred reference cleanup for deleted todos and a restorable archive section.
- * @updated 2026-08-26: Added todo archive and restore actions, with archived items grouped under their original categories.
+ * @description A specialized view for bulk management of To-Do items and categories with deferred reference cleanup for deleted todos and restorable archived categories.
+ * @updated 2026-08-26: Added category archive and restore actions while preserving every todo under archived categories.
  * @updated 2026-08-26: Detects every deleted todo on submit and requires migration or unlink decisions for referenced history and timers.
  * @updated 2026-05-13: Added touch drag-and-drop support plus more reliable category drop targeting so mobile batch management can move todos across categories again.
  * @updated 2026-05-13: Added the reserved `未来` bucket alongside `小事`, keeping both system categories visible in batch management while locking their names and placement.
@@ -28,7 +28,6 @@ import {
     ensureQuickTodoCategory,
     FUTURE_TODO_CATEGORY_ID,
     FUTURE_TODO_CATEGORY_NAME,
-    getRealTodoCategories,
     isFutureTodoCategoryId,
     isQuickTodoCategoryId,
     QUICK_TODO_CATEGORY_ID,
@@ -36,7 +35,6 @@ import {
 } from '../utils/todoQuickCategoryUtils';
 import { ReferenceDeleteModal } from '../components/ReferenceDeleteModal';
 import { getDeletedTodoIds, getTodoReferenceImpact, type ReferenceDeleteDecision } from '../utils/referenceDeletion';
-import { isTodoArchived } from '../utils/archiveUtils';
 
 interface TodoBatchManageViewProps {
     onBack: () => void;
@@ -51,20 +49,6 @@ interface TodoBatchManageViewProps {
 interface CategoryWithTodos extends TodoCategory {
     items: TodoItem[];
 }
-
-const getVisibleBatchTodos = (todos: TodoItem[], categoryId: string): TodoItem[] => (
-    todos.filter((todo) => {
-        if (todo.isCompleted || isSubtask(todo)) {
-            return false;
-        }
-
-        if (isQuickTodoCategoryId(categoryId)) {
-            return isQuickTodo(todo);
-        }
-
-        return !isQuickTodo(todo) && todo.categoryId === categoryId;
-    })
-);
 
 const isSystemTodoCategoryId = (categoryId: string): boolean => (
     isQuickTodoCategoryId(categoryId) || isFutureTodoCategoryId(categoryId)
@@ -87,7 +71,9 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
     const [data, setData] = useState<CategoryWithTodos[]>(() => {
         return normalizedInitialCategories.map(cat => ({
             ...cat,
-            items: getVisibleBatchTodos(initialTodos, cat.id)
+            items: initialTodos.filter((todo) => (
+                isQuickTodoCategoryId(cat.id) ? isQuickTodo(todo) : todo.categoryId === cat.id
+            ))
         }));
     });
 
@@ -144,9 +130,9 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
             }
 
             const items = [...category.items];
-            const activeItems = items.filter((item) => !isTodoArchived(item));
-            const itemIndex = activeItems.findIndex((item) => item.id === itemId);
-            const targetItem = activeItems[direction === 'up' ? itemIndex - 1 : itemIndex + 1];
+            const visibleItems = items.filter((item) => !item.isCompleted && !isSubtask(item));
+            const itemIndex = visibleItems.findIndex((item) => item.id === itemId);
+            const targetItem = visibleItems[direction === 'up' ? itemIndex - 1 : itemIndex + 1];
 
             if (itemIndex >= 0 && targetItem) {
                 const currentIndex = items.findIndex((item) => item.id === itemId);
@@ -258,19 +244,10 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
         setIconSelectorOpen(null);
     };
 
-    const handleArchiveItem = (catId: string, itemId: string, isArchived: boolean) => {
-        setData(prev => prev.map((category) => {
-            if (category.id !== catId) {
-                return category;
-            }
-
-            return {
-                ...category,
-                items: category.items.map((item) => (
-                    item.id === itemId ? { ...item, isArchived } : item
-                ))
-            };
-        }));
+    const handleArchiveCategory = (catId: string, isArchived: boolean) => {
+        setData(prev => prev.map((category) => (
+            category.id === catId ? { ...category, isArchived } : category
+        )));
     };
 
     const handleCategoryColorChange = (catId: string, color: string) => {
@@ -547,52 +524,33 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
 
     const handleSave = () => {
         const finalCategories: TodoCategory[] = ensureQuickTodoCategory(
-            data.map(({ id, name, icon, uiIcon, color }) => ({ id, name, icon, uiIcon, color }))
+            data.map(({ id, name, icon, uiIcon, color, isArchived }) => ({ id, name, icon, uiIcon, color, isArchived }))
         );
-        const realCategoryIds = new Set(getRealTodoCategories(finalCategories).map((category) => category.id));
         const remainingCategoryIds = new Set(finalCategories.map((category) => category.id));
-        const initialVisibleTodoIds = new Set(
-            initialTodos
-                .filter((todo) => !todo.isCompleted && !isSubtask(todo))
-                .map((todo) => todo.id)
-        );
-        const editedRootTodos: TodoItem[] = data.flatMap((category) => (
+        const normalizedDataTodos: TodoItem[] = data.flatMap((category) => (
             category.items.map((todo) => ({
                 ...todo,
                 categoryId: isQuickTodoCategoryId(category.id) ? QUICK_TODO_CATEGORY_ID : category.id,
                 kind: isQuickTodoCategoryId(category.id) ? 'quick' : 'project'
             }))
         ));
-        const preservedHiddenTodos = initialTodos.filter((todo) => !initialVisibleTodoIds.has(todo.id));
-        const preservedRootTodos = preservedHiddenTodos.filter((todo) => (
-            !isSubtask(todo) && (
-                isQuickTodo(todo)
-                    ? remainingCategoryIds.has(QUICK_TODO_CATEGORY_ID)
-                    : realCategoryIds.has(todo.categoryId)
-            )
-        )).map((todo) => (
-            isQuickTodo(todo)
-                ? { ...todo, categoryId: QUICK_TODO_CATEGORY_ID }
-                : todo
-        ));
         const rootTodoMap = new Map<string, TodoItem>(
-            [...editedRootTodos, ...preservedRootTodos].map((todo) => [todo.id, todo])
+            normalizedDataTodos
+                .filter((todo) => !isSubtask(todo))
+                .map((todo) => [todo.id, todo])
         );
-        const preservedSubtasks = preservedHiddenTodos
-            .filter((todo) => isSubtask(todo))
+        const finalTodos = normalizedDataTodos
             .map((todo) => {
-                const parentTodo = todo.parentTodoId ? rootTodoMap.get(todo.parentTodoId) : null;
-                if (!parentTodo || !remainingCategoryIds.has(parentTodo.categoryId)) {
-                    return null;
+                if (!isSubtask(todo)) {
+                    return todo;
                 }
 
-                return {
-                    ...applyParentTodoInheritance(todo, parentTodo),
-                    isArchived: isTodoArchived(parentTodo)
-                };
+                const parentTodo = todo.parentTodoId ? rootTodoMap.get(todo.parentTodoId) : null;
+                return parentTodo && remainingCategoryIds.has(parentTodo.categoryId)
+                    ? applyParentTodoInheritance(todo, parentTodo)
+                    : null;
             })
             .filter((todo): todo is TodoItem => Boolean(todo));
-        const finalTodos = [...editedRootTodos, ...preservedRootTodos, ...preservedSubtasks];
 
         const deletedTodoIds = getDeletedTodoIds(initialTodos, finalTodos);
         const impactedTodoIds = deletedTodoIds.filter((todoId) => {
@@ -614,12 +572,8 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
         onSave(finalCategories, finalTodos);
     };
 
-    const archivedCategories = data
-        .map((category) => ({
-            ...category,
-            items: category.items.filter((item) => isTodoArchived(item))
-        }))
-        .filter((category) => category.items.length > 0);
+    const activeCategories = data.filter((category) => category.isArchived !== true);
+    const archivedCategories = data.filter((category) => category.isArchived === true);
 
     return (
         <div className="h-full bg-[#faf9f6] flex flex-col pt-[var(--app-safe-area-top)]">
@@ -635,13 +589,13 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
             </div>
 
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-6 pb-40">
-                {data.map((category, catIndex) => (
-                    (() => {
+                {activeCategories.map((category) => {
+                    const catIndex = data.findIndex((item) => item.id === category.id);
+                    const visibleItems = category.items.filter((item) => !item.isCompleted && !isSubtask(item));
                         const isQuickCategory = isQuickTodoCategoryId(category.id);
                         const isFutureCategory = isFutureTodoCategoryId(category.id);
                         const isSystemCategory = isQuickCategory || isFutureCategory;
-                        const activeItems = category.items.filter((item) => !isTodoArchived(item));
-                        return (
+                    return (
                     <div
                         key={category.id}
                         data-todo-batch-drop-category={category.id}
@@ -716,6 +670,14 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                                 <button onClick={() => handleDeleteCategory(category.id)} disabled={isSystemCategory} className="p-1 text-stone-300 hover:text-red-500 disabled:opacity-20 disabled:hover:text-stone-300">
                                     <Trash2 size={16} />
                                 </button>
+                                <button
+                                    onClick={() => handleArchiveCategory(category.id, true)}
+                                    disabled={isSystemCategory}
+                                    className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-20"
+                                    title="归档分类"
+                                >
+                                    <Archive size={16} />
+                                </button>
                             </div>
                         </div>
 
@@ -766,7 +728,7 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                         {/* Items List */}
                         {expandedCats.has(category.id) && (
                             <div className="p-2 space-y-1">
-                                {activeItems.map((item, itemIndex) => (
+                                {visibleItems.map((item, itemIndex) => (
                                     <div
                                         key={item.id}
                                         draggable
@@ -792,22 +754,19 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
 
                                         {/* Item Actions */}
                                         <div className="flex items-center gap-1 shrink-0">
-                                            <button onClick={() => moveItem(catIndex, item.id, 'up')} disabled={itemIndex === 0} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30" title="上移">
+                                            <button onClick={() => moveItem(catIndex, item.id, 'up')} disabled={itemIndex === 0} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
                                                 <ArrowUp size={14} />
                                             </button>
-                                            <button onClick={() => moveItem(catIndex, item.id, 'down')} disabled={itemIndex === activeItems.length - 1} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30" title="下移">
+                                            <button onClick={() => moveItem(catIndex, item.id, 'down')} disabled={itemIndex === visibleItems.length - 1} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
                                                 <ArrowDown size={14} />
                                             </button>
-                                            <button onClick={() => handleArchiveItem(category.id, item.id, true)} className="p-1 text-stone-300 hover:text-stone-600" title="归档">
-                                                <Archive size={14} />
-                                            </button>
-                                            <button onClick={() => handleDeleteItem(category.id, item.id)} className="p-1 text-stone-200 hover:text-red-400" title="删除">
+                                            <button onClick={() => handleDeleteItem(category.id, item.id)} className="p-1 text-stone-200 hover:text-red-400">
                                                 <Trash2 size={14} />
                                             </button>
                                         </div>
                                     </div>
                                 ))}
-                                {activeItems.length === 0 && (
+                                {visibleItems.length === 0 && (
                                     <div className="text-center py-4 text-xs text-stone-300 italic">
                                         拖拽任务至此
                                     </div>
@@ -815,9 +774,8 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                             </div>
                         )}
                     </div>
-                        );
-                    })()
-                ))}
+                    );
+                })}
 
                 {archivedCategories.length > 0 && (
                     <section className="border-t border-stone-300 pt-4 space-y-3">
@@ -830,18 +788,14 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                                 <div className="flex items-center gap-2 border-b border-stone-100 bg-stone-50/50 px-3 py-2.5 text-sm font-bold text-stone-700">
                                     <span>{category.icon}</span>
                                     <span>{isQuickTodoCategoryId(category.id) ? QUICK_TODO_CATEGORY_NAME : isFutureTodoCategoryId(category.id) ? FUTURE_TODO_CATEGORY_NAME : category.name}</span>
+                                    <button onClick={() => handleArchiveCategory(category.id, false)} className="ml-auto p-1 text-stone-400 hover:text-stone-700" title="取消归档分类">
+                                        <ArchiveRestore size={16} />
+                                    </button>
                                 </div>
                                 <div className="space-y-1 p-2">
                                     {category.items.map((item) => (
                                         <div key={item.id} className="flex items-center gap-3 rounded-xl border border-stone-100 bg-white p-2 text-sm text-stone-500">
                                             <span className="flex-1 min-w-0 truncate">{item.title}</span>
-                                            <button
-                                                onClick={() => handleArchiveItem(category.id, item.id, false)}
-                                                className="p-1 text-stone-400 hover:text-stone-700"
-                                                title="取消归档"
-                                            >
-                                                <ArchiveRestore size={15} />
-                                            </button>
                                         </div>
                                     ))}
                                 </div>

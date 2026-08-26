@@ -1,6 +1,5 @@
 /**
  * @file TimelineTodoSidebar.tsx
- * @updated 2026-08-26: Excludes archived todos from timeline sidebar and category-list entries.
  * @input Date-specific scheduled todos, logs, resolved daily checks, review entries, and selection callbacks
  * @output A resizable, in-flow todo-and-daily-check column for the Chronicle split workspace
  * @pos Component
@@ -20,7 +19,6 @@ import { getCheckItemCountState } from '../utils/dailyCheckUtils';
 import { TIMELINE_SIDEBAR_MAX_RATIO, TIMELINE_SIDEBAR_MIN_RATIO } from '../utils/timelineSidebarRatioUtils';
 import { buildTodoTreeItems } from '../utils/todoHierarchyUtils';
 import { buildTodoDateEntries, formatDateKey, TodoDateEntry } from '../utils/todoScheduleUtils';
-import { isTodoArchived } from '../utils/archiveUtils';
 
 interface TimelineTodoSidebarProps {
   todos: TodoItem[];
@@ -99,7 +97,7 @@ export const buildTimelineSidebarTodoEntries = (todos: TodoItem[], logs: Log[], 
     .filter((entry) => entry.primaryKind !== 'inProgress');
   const existingIds = new Set(dateEntries.map((entry) => entry.todo.id));
   const pinnedEntries = todos
-    .filter((todo) => !isTodoArchived(todo) && Boolean(todo.pin) && !todo.isCompleted && !existingIds.has(todo.id))
+    .filter((todo) => Boolean(todo.pin) && !todo.isCompleted && !existingIds.has(todo.id))
     .map((todo): SidebarTodoEntry => ({
       todo,
       badges: { scheduled: false, deadline: false, recurring: false, maybe: false, completed: false, inProgress: false },
@@ -113,7 +111,7 @@ export const buildTimelineSidebarTodoEntries = (todos: TodoItem[], logs: Log[], 
 
 export const buildTimelineSidebarCategoryTodoEntries = (todos: TodoItem[], categoryId: string): SidebarTodoEntry[] => (
   todos
-    .filter((todo) => !isTodoArchived(todo) && todo.categoryId === categoryId && !todo.isCompleted)
+    .filter((todo) => todo.categoryId === categoryId && !todo.isCompleted)
     .map(createCategoryTodoEntry)
     .sort((left, right) => left.todo.title.localeCompare(right.todo.title, 'zh-CN'))
 );
