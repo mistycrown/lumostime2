@@ -135,6 +135,7 @@ import {
 } from '../utils/lazyViews';
 
 import { NARRATIVE_TEMPLATES } from '../constants';
+import { reportRecentConsoleErrors } from '../services/errorReporting';
 
 
 interface SettingsViewProps {
@@ -268,6 +269,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
 
 
     const [isSyncing, setIsSyncing] = useState(false);
+    const [isSendingErrorLogs, setIsSendingErrorLogs] = useState(false);
+
+    const handleSendErrorLogs = () => {
+        if (isSendingErrorLogs) return;
+        setIsSendingErrorLogs(true);
+        try {
+            const result = reportRecentConsoleErrors();
+            if (result.status === 'sent') {
+                onToast('success', `错误日志已发送（${result.eventId}）`);
+            } else if (result.status === 'empty') {
+                onToast('info', '暂无可发送的错误日志');
+            } else if (result.status === 'disabled') {
+                onToast('info', '诊断服务未启用');
+            } else {
+                onToast('error', '错误日志发送失败，请稍后重试');
+            }
+        } finally {
+            setIsSendingErrorLogs(false);
+        }
+    };
 
     // Sync local user info when prop changes
     useEffect(() => {
@@ -1650,6 +1671,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
                             icon={<BookOpen size={18} />}
                             label="用户指南"
                             onClick={() => openSettingsSubmenu('guide')}
+                        />
+                        <MenuItem
+                            icon={<Send size={18} className="text-rose-500" />}
+                            label={isSendingErrorLogs ? '发送中...' : '发送错误日志'}
+                            onClick={handleSendErrorLogs}
                         />
                         <MenuItem
                             icon={<Fish size={18} className="text-pink-500" />}
