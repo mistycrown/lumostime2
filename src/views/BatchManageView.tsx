@@ -20,6 +20,7 @@ import { COLOR_OPTIONS } from '../constants';
 import { useCustomColors } from '../hooks/useCustomColors';
 import { getColorPreviewValue, isStoredColorSelected } from '../utils/colorUtils';
 import type { ActivityMigrationImpact } from '../utils/activityReferenceMigration';
+import { setCategoryArchiveState } from '../utils/archiveUtils';
 
 interface BatchManageViewProps {
     onBack: () => void;
@@ -158,6 +159,14 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
             ? { ...c, activities: c.activities.map(a => a.id === actId ? { ...a, isArchived: a.isArchived !== true } : a) }
             : c
         ));
+    };
+
+    const handleToggleCategoryArchive = (catId: string) => {
+        setCategories(prev => prev.map(category => (
+            category.id === catId
+                ? setCategoryArchiveState(category, category.isArchived !== true)
+                : category
+        )));
     };
 
     const handleNameChange = (catId: string, actId: string | null, newName: string) => {
@@ -309,7 +318,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                 {categories.map((category, catIndex) => (
                     <div
                         key={category.id}
-                        className={`bg-white rounded-2xl border transition-colors overflow-hidden ${dragOverCategory === category.id ? 'border-orange-500 ring-1 ring-orange-500 bg-orange-50' : 'border-stone-200'}`}
+                        className={`bg-white rounded-2xl border transition-colors overflow-hidden ${category.isArchived === true ? 'opacity-60' : ''} ${dragOverCategory === category.id ? 'border-orange-500 ring-1 ring-orange-500 bg-orange-50' : 'border-stone-200'}`}
                         onDragOver={(e) => handleDragOver(e, category.id)}
                         onDrop={(e) => handleDrop(e, category.id)}
                     >
@@ -379,6 +388,14 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                 </button>
                                 <button onClick={() => handleAddActivity(category.id)} className="p-1 text-stone-400 hover:text-stone-700">
                                     <Plus size={18} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleToggleCategoryArchive(category.id)}
+                                    className="p-1 text-stone-300 hover:text-amber-500"
+                                    title={category.isArchived === true ? '恢复分类' : '归档分类'}
+                                >
+                                    {category.isArchived === true ? <ArchiveRestore size={16} /> : <Archive size={16} />}
                                 </button>
                                 <button onClick={() => handleDeleteCategory(category.id)} className="p-1 text-stone-300 hover:text-red-500">
                                     <Trash2 size={16} />

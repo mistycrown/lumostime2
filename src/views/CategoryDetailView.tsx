@@ -7,6 +7,7 @@
  * @updated 2026-06-13: Reused the shared hierarchical associated-todo list so subtasks render under parent todos in the association tab.
  * @updated 2026-08-09: Planned timeline blocks are excluded from category statistics.
  * @updated 2026-08-26: Added category archive and restore control with child-activity cascading handled by the category context.
+ * @updated 2026-08-26: Moved category archive status and action into the Details basic-information section to match tag details.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -232,6 +233,21 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                         <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
                             <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">基本信息</h3>
                             <div className="space-y-4">
+                                <div className="flex items-center justify-between pb-4 border-b border-stone-100">
+                                    <span className="text-sm font-medium text-stone-600">归档状态</span>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-sm text-stone-500">{category.isArchived === true ? '已归档' : '未归档'}</span>
+                                        <button
+                                            type="button"
+                                            onClick={handleToggleArchive}
+                                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-stone-500 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                                            title={category.isArchived === true ? '恢复分类' : '归档分类'}
+                                        >
+                                            {category.isArchived === true ? <ArchiveRestore size={15} /> : <Archive size={15} />}
+                                            {category.isArchived === true ? '恢复分类' : '归档分类'}
+                                        </button>
+                                    </div>
+                                </div>
                                 <div>
                                     <label className="text-xs text-stone-400 font-medium mb-1.5 block">名称（首字符作为图标）</label>
                                     <input
@@ -459,15 +475,6 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                         className="text-2xl" 
                     />}
                     {category.name}
-                    <button
-                        type="button"
-                        onClick={handleToggleArchive}
-                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-stone-500 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                        title={category.isArchived === true ? '恢复分类' : '归档分类'}
-                    >
-                        {category.isArchived === true ? <ArchiveRestore size={16} /> : <Archive size={16} />}
-                        <span>{category.isArchived === true ? '恢复分类' : '归档分类'}</span>
-                    </button>
                 </h1>
                 <span className="text-stone-400 text-sm font-medium ml-1 mt-1 block">分类</span>
             </div>
