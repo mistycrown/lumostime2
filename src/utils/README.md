@@ -2,6 +2,8 @@
 
 Contains pure utility functions for data processing and business logic calculations.
 
+> Update 2026-08-26: `logSplitUtils.ts` builds two replacement records from a selected split time while preserving source fields and proportional manual todo progress.
+
 ## Files
 - Update 2026-08-24: `activityAttributeUtils.ts` centralizes stable ordering, lookup, and Activity-switch cleanup for ID-based custom attribute values.
 - Update 2026-08-24: `logUtils.ts` now exposes the start-day end boundary and a clamp helper so new manual logs cannot use next-day `00:00` as their end time.

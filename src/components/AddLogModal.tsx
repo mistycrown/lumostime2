@@ -1,5 +1,6 @@
 /**
  * @file AddLogModal.tsx
+ * @updated 2026-08-26: Added an existing-record time split entry that opens a single-layer split timeline modal.
  * @updated 2026-08-24: Added shared Activity custom attribute fields for backfill and record editing.
  * @updated 2026-07-21: Added dark-mode detail outlines and high-contrast time range slider handles.
  * @input props: initialLog, time ranges, categories, todos, etc.
@@ -15,7 +16,7 @@
  */
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment } from '../types';
-import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, Check, CheckCircle2, Clock, Camera, Image as ImageIcon, Maximize2, Minimize2, Share2 } from 'lucide-react';
+import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, Check, CheckCircle2, Clock, Camera, Image as ImageIcon, Maximize2, Minimize2, Share2, Scissors } from 'lucide-react';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
 import { TodoAssociation } from '../components/TodoAssociation';
@@ -30,6 +31,7 @@ import { IconRenderer } from './IconRenderer';
 import { RecommendedNoteTemplates } from './RecommendedNoteTemplates';
 import { DataCollectionSelector } from './DataCollectionSelector';
 import { ActivityAttributeFields } from './ActivityAttributeFields';
+import { SplitLogModal } from './SplitLogModal';
 import { useLogForm, useTimeCalculation, useImageManager, useSuggestions, LogFormState } from '../hooks';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useToast } from '../contexts/ToastContext';
@@ -50,6 +52,7 @@ interface AddLogModalProps {
   prefilledData?: { categoryId?: string; activityId?: string; linkedTodoId?: string };
   onClose: () => void;
   onSave: (log: Log) => void;
+  onSplit?: (id: string, splitTime: number) => boolean;
   onCompleteLinkedTodo?: (todoId: string) => boolean;
 
   onDelete?: (id: string) => void;
@@ -67,7 +70,7 @@ interface AddLogModalProps {
   allLogs?: Log[]; // 添加所有日志用于计算上一条记录
 }
 
-export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, prefilledData, onClose, onSave, onCompleteLinkedTodo, onDelete, onImageRemove, categories, onUpdateActivity, todos, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
+export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, prefilledData, onClose, onSave, onSplit, onCompleteLinkedTodo, onDelete, onImageRemove, categories, onUpdateActivity, todos, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
   // 使用自定义 Hooks 管理状态
   const { setIsShareViewOpen, setSharingLog } = useNavigation();
   const { addToast } = useToast();
@@ -171,6 +174,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   const [isDraggingEnd, setIsDraggingEnd] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
   const [completeLinkedTodoOnSave, setCompleteLinkedTodoOnSave] = useState(false);
+  const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
 
   // Refs
   const sliderRef = useRef<HTMLDivElement>(null);
@@ -647,6 +651,22 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     focusNoteInput();
   };
 
+  const handleConfirmSplit = (splitTime: number) => {
+    if (initialLog && onSplit?.(initialLog.id, splitTime)) {
+      setIsSplitModalOpen(false);
+    }
+  };
+
+  if (isSplitModalOpen && initialLog) {
+    return (
+      <SplitLogModal
+        log={initialLog}
+        onClose={handleClose}
+        onConfirm={handleConfirmSplit}
+      />
+    );
+  }
+
   return (
     <div
       className="fixed inset-0 z-[220] flex items-end md:items-center justify-center bg-stone-900/40 backdrop-blur-sm animate-fadeIn pb-[env(safe-area-inset-bottom)]"
@@ -748,7 +768,21 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 </button>
               </div>
 
-              <div className="h-px w-8 bg-stone-300 mt-6"></div>
+              <div className="mt-6 flex w-14 justify-center">
+                {initialLog && onSplit ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsSplitModalOpen(true)}
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 active:scale-95"
+                    title="将记录拆分为两个时间段"
+                  >
+                    <Scissors size={12} />
+                    <span>拆分</span>
+                  </button>
+                ) : (
+                  <div className="h-px w-8 bg-stone-300" />
+                )}
+              </div>
 
               <div className="flex flex-col items-center">
                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1">End</span>
