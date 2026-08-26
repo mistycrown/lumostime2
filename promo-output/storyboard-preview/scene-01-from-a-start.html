@@ -3,56 +3,102 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LumosTime - 从一次开始</title>
+    <title>LumosTime Product Film</title>
     <style>
-      :root { --paper:#faf9f6; --ink:#1c1917; --body:#57534e; --line:#e7e5e4; --accent:#1c1917; --purple:#8b6fa8; --purple-soft:rgba(139,111,168,.15); --green:#7a9176; --green-soft:rgba(122,145,118,.15); --blue:#6b8ca8; --blue-soft:rgba(107,140,168,.15); --orange:#c89b7a; --orange-soft:rgba(200,155,122,.15); }
-      * { box-sizing:border-box; }
-      body { min-width:960px; min-height:540px; margin:0; overflow:hidden; color:var(--ink); background:#dedad2; font-family:'Noto Serif SC','Source Han Serif SC','Songti SC','STSong','SimSun','Microsoft YaHei',serif; }
-      button { font:inherit; }
-      .film { position:relative; width:100vw; height:100vh; min-width:960px; min-height:540px; overflow:hidden; isolation:isolate; background:linear-gradient(90deg,rgba(77,68,56,.028) 1px,transparent 1px),linear-gradient(rgba(77,68,56,.022) 1px,transparent 1px),var(--paper); background-size:42px 42px; }
-      .film::after { position:absolute; inset:0; z-index:20; content:''; opacity:.18; pointer-events:none; background-image:radial-gradient(rgba(64,54,43,.18) .5px,transparent .6px); background-size:5px 5px; mix-blend-mode:multiply; }
-      .meta,.scene { position:absolute; top:5.7%; z-index:10; color:#a8a29e; font-family:Georgia,'Times New Roman',serif; font-size:clamp(9px,.82vw,14px); letter-spacing:.12em; }
-      .meta { left:6.25%; }.scene { right:6.25%; letter-spacing:.08em; }
-      .copy { position:absolute; top:29%; left:6.25%; z-index:6; width:30%; }
-      .copy h1 { margin:0; color:var(--ink); font-size:clamp(37px,4.35vw,82px); font-weight:600; line-height:1.18; letter-spacing:0; }.copy h1 span { display:block; }.copy h1 .muted { color:#a8a29e; }
-      .copy p { max-width:360px; margin:26px 0 0; color:var(--body); font-size:clamp(14px,1.25vw,22px); line-height:1.75; opacity:0; transform:translateY(12px); }.copy-rule { width:0; height:1px; margin-top:29px; background:#a8a29e; }
-      .app-window { position:absolute; top:13%; right:6.25%; bottom:11.5%; z-index:4; width:56.2%; min-width:590px; overflow:hidden; border:1px solid rgba(87,83,78,.13); border-radius:8px; background:var(--paper); box-shadow:0 26px 55px rgba(64,53,42,.16),0 2px 8px rgba(64,53,42,.08); opacity:0; transform:translateX(9%) scale(.97); }
-      .app-titlebar { display:flex; align-items:center; height:5.8%; min-height:28px; padding:0 16px; border-bottom:1px solid rgba(231,229,228,.74); color:#a8a29e; font-family:ui-sans-serif,system-ui,sans-serif; font-size:clamp(8px,.65vw,11px); }.window-dots { display:flex; gap:5px; margin-right:10px; }.window-dots i { width:7px; height:7px; border-radius:50%; background:#d6d3d1; }.window-name { opacity:.8; }
-      /* Rebuilt from src/views/RecordView.tsx: a narrow category rail and a rounded activity panel. */
-      .record-view { position:relative; display:flex; height:94.2%; overflow:hidden; background:#faf9f6; }.category-rail { position:relative; z-index:0; display:flex; width:64px; flex:0 0 64px; flex-direction:column; align-items:center; padding:24px 8px 48px 0; }.category-list { width:100%; }
-      .category { position:relative; display:flex; width:48px; height:48px; align-items:center; justify-content:center; margin-bottom:4px; border:0; border-radius:0 16px 16px 0; color:#57534e; background:transparent; cursor:default; font-family:'Segoe UI Emoji','Apple Color Emoji',sans-serif; font-size:clamp(17px,1.35vw,25px); }.category.selected { color:#1c1917; background:#fff; box-shadow:2px 2px 10px rgba(0,0,0,.02); }.category.selected::before { position:absolute; top:50%; left:0; width:4px; height:20px; border-radius:0 999px 999px 0; content:''; background:var(--accent); transform:translateY(-50%); }.rail-toggle { position:absolute; bottom:19px; display:grid; width:28px; height:28px; place-items:center; border:0; border-radius:50%; color:#a8a29e; background:transparent; font-family:ui-sans-serif,system-ui,sans-serif; font-size:21px; }
-      .record-content { position:relative; z-index:1; display:flex; min-width:0; flex:1; flex-direction:column; margin-left:-10px; padding:clamp(25px,3vw,52px); overflow:hidden; border-radius:32px 0 0 0; background:rgba(250,249,246,.5); box-shadow:-5px 0 20px rgba(0,0,0,.08); }.content-heading { display:flex; align-items:center; gap:16px; margin:2px 0 clamp(27px,4vw,48px); }.content-heading h2 { margin:0; color:#1c1917; font-size:clamp(23px,2.1vw,37px); font-weight:700; letter-spacing:0; white-space:nowrap; }.content-heading i { width:100%; height:1px; background:#e7e5e4; }
-      .activity-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:clamp(26px,3.6vw,55px) clamp(18px,2.7vw,42px); align-content:start; }.activity { position:relative; display:flex; flex-direction:column; align-items:center; gap:12px; border:0; color:#57534e; background:transparent; cursor:default; transform-origin:center; }.activity-icon { display:grid; width:clamp(56px,5.9vw,94px); height:clamp(56px,5.9vw,94px); place-items:center; border-radius:50%; box-shadow:0 1px 3px rgba(0,0,0,.1); font-family:'Segoe UI Emoji','Apple Color Emoji',sans-serif; font-size:clamp(26px,2.55vw,43px); line-height:1; }.activity-name { max-width:90px; color:#57534e; font-size:clamp(11px,.9vw,16px); font-weight:500; line-height:1.25; text-align:center; }
-      .study { color:var(--purple); background:var(--purple-soft); }.write { color:var(--orange); background:var(--orange-soft); }.read { color:var(--green); background:var(--green-soft); }.code { color:var(--blue); background:var(--blue-soft); }.meeting { color:#b88595; background:rgba(184,133,149,.15); }.language { color:#c9b577; background:rgba(201,181,119,.15); }.review { color:#7aa8a0; background:rgba(122,168,160,.15); }.exercise { color:#c93756; background:rgba(201,55,86,.13); }.plan { color:#5698c3; background:rgba(86,152,195,.14); }.other { color:#8a8a8a; background:rgba(138,138,138,.15); }
-      .activity.target::after { position:absolute; top:-12px; left:50%; width:clamp(66px,6.9vw,108px); height:clamp(66px,6.9vw,108px); border:1px solid var(--purple); border-radius:50%; content:''; opacity:0; transform:translateX(-50%) scale(.76); }
-      .active-record { position:absolute; right:clamp(22px,2.7vw,44px); bottom:clamp(20px,2.7vw,44px); z-index:6; display:flex; width:min(50%,420px); height:56px; align-items:center; gap:14px; padding:8px 10px 8px 12px; border:2px solid rgba(255,255,255,.8); border-radius:999px; color:#292524; background:rgba(255,255,255,.95); box-shadow:0 8px 30px rgba(0,0,0,.12),inset 0 1px 0 rgba(255,255,255,.8),0 0 0 1px rgba(0,0,0,.05); opacity:0; transform:translateY(20px) scale(.97); }.timer-icon { display:grid; width:40px; height:40px; flex:0 0 40px; place-items:center; border-radius:50%; color:var(--purple); background:color-mix(in srgb,var(--purple) 10%,white); box-shadow:inset 0 1px 4px rgba(68,51,84,.1); font-family:'Segoe UI Emoji',sans-serif; font-size:20px; }.timer-info { display:flex; min-width:0; flex:1; flex-direction:column; }.timer-info b { overflow:hidden; color:#44403c; font-family:ui-sans-serif,system-ui,sans-serif; font-size:14px; text-overflow:ellipsis; white-space:nowrap; }.timer-info span { margin-top:2px; color:var(--purple); font-family:ui-monospace,'Cascadia Mono',monospace; font-size:19px; font-weight:500; line-height:1; }.timer-stop { display:grid; width:38px; height:38px; place-items:center; border:0; border-left:1px solid #f5f5f4; color:var(--purple); background:transparent; font-family:ui-sans-serif,system-ui,sans-serif; font-size:21px; }
-      .time-thread { position:absolute; bottom:0; left:34.8%; z-index:3; width:1px; height:0; background:#78716c; opacity:0; transform-origin:bottom; }.time-thread::before { position:absolute; top:-5px; left:-5px; width:9px; height:9px; border:2px solid #57534e; border-radius:50%; content:''; background:var(--paper); }.caption { position:absolute; bottom:13.4%; left:6.25%; z-index:7; max-width:350px; margin:0; color:var(--body); font-size:clamp(14px,1.25vw,22px); line-height:1.6; opacity:0; transform:translateY(10px); }.caption strong { color:var(--ink); font-weight:600; }
-      .control-bar { position:fixed; right:20px; bottom:20px; left:20px; z-index:40; display:flex; align-items:center; gap:12px; width:min(520px,calc(100vw - 40px)); margin:auto; padding:10px 12px; border:1px solid rgba(70,59,48,.12); border-radius:7px; background:rgba(253,251,247,.91); box-shadow:0 10px 32px rgba(50,42,34,.16); backdrop-filter:blur(12px); font-family:ui-sans-serif,system-ui,sans-serif; }.control-button { display:grid; width:29px; height:29px; flex:0 0 auto; place-items:center; border:0; border-radius:50%; color:#fff; background:var(--ink); cursor:pointer; font-size:12px; }.control-bar input { width:100%; accent-color:var(--ink); }.control-time { width:72px; color:#57534e; font-size:11px; text-align:right; }
-      .copy h1 span:first-child { animation:copy-first 10s both; }.copy h1 span:last-child { animation:copy-second 10s both; }.copy-rule { animation:copy-rule 10s both; }.copy p { animation:copy-body 10s both; }.app-window { animation:app-enter 10s both; }.activity.target { animation:activity-tap 10s both; }.activity.target::after { animation:target-ring 10s both; }.active-record { animation:timer-enter 10s both; }.time-thread { animation:thread-grow 10s both; }.caption { animation:caption-enter 10s both; }
-      @keyframes copy-first { 0%,8% { opacity:0; transform:translateY(16px); } 17%,100% { opacity:1; transform:translateY(0); } } @keyframes copy-second { 0%,13% { opacity:0; transform:translateY(16px); } 22%,100% { opacity:1; transform:translateY(0); } } @keyframes copy-rule { 0%,25% { width:0; opacity:0; } 34%,100% { width:78px; opacity:1; } } @keyframes copy-body { 0%,27% { opacity:0; transform:translateY(12px); } 36%,100% { opacity:1; transform:translateY(0); } } @keyframes app-enter { 0%,22% { opacity:0; transform:translateX(9%) scale(.97); } 38%,100% { opacity:1; transform:translateX(0) scale(1); } } @keyframes activity-tap { 0%,42% { transform:scale(1); } 45% { transform:scale(.92); } 50%,100% { transform:scale(1); } } @keyframes target-ring { 0%,42% { opacity:0; transform:translateX(-50%) scale(.76); } 46% { opacity:.9; transform:translateX(-50%) scale(1); } 55%,100% { opacity:0; transform:translateX(-50%) scale(1.25); } } @keyframes timer-enter { 0%,49% { opacity:0; transform:translateY(20px) scale(.97); } 59%,100% { opacity:1; transform:translateY(0) scale(1); } } @keyframes thread-grow { 0%,60% { height:0; opacity:0; } 70%,100% { height:49%; opacity:1; } } @keyframes caption-enter { 0%,68% { opacity:0; transform:translateY(10px); } 78%,100% { opacity:1; transform:translateY(0); } }
-      @media (max-width:1100px) { .app-window { width:57%; right:4.5%; }.copy { left:4.5%; width:31%; }.meta { left:4.5%; }.scene { right:4.5%; }.caption { left:4.5%; }.activity-grid { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+      :root { --paper: #faf9f6; --ink: #1c1917; --muted: #78716c; --line: rgba(28, 25, 23, .16); }
+      * { box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--paper); color: var(--ink); }
+      body { font-family: Georgia, 'Times New Roman', 'Microsoft YaHei', serif; }
+      .film { position: relative; width: 100vw; height: 100vh; overflow: hidden; background: var(--paper); }
+      .scene-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; opacity: 0; pointer-events: none; transition: opacity .7s ease; background: var(--paper); }
+      .scene-frame.active { opacity: 1; }
+      .controls { position: absolute; right: 24px; bottom: 22px; left: 24px; z-index: 30; display: flex; align-items: center; gap: 12px; width: min(680px, calc(100vw - 48px)); margin: auto; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: rgba(253, 251, 247, .92); box-shadow: 0 10px 32px rgba(50, 42, 34, .14); backdrop-filter: blur(12px); font-family: ui-sans-serif, system-ui, sans-serif; }
+      button { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border: 0; border-radius: 50%; color: #fff; background: var(--ink); cursor: pointer; font-size: 13px; }
+      button:focus-visible { outline: 2px solid #8b6fa8; outline-offset: 2px; }
+      input { width: 100%; accent-color: var(--ink); cursor: pointer; }
+      output { width: 116px; color: #57534e; font: 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; text-align: right; white-space: nowrap; }
+      @media (max-width: 720px) { .controls { right: 14px; bottom: 14px; left: 14px; width: calc(100vw - 28px); } output { width: 94px; } }
     </style>
   </head>
   <body>
-    <main class="film" aria-label="LumosTime 横屏宣传片分镜试片：从一次开始">
-      <div class="meta">LUMOSTIME / PRODUCT FILM</div><div class="scene">SCENE 01 · FROM A START</div>
-      <section class="copy"><h1><span>从一次开始，</span><span class="muted">留下时间的脉络。</span></h1><div class="copy-rule"></div><p>不必先制定完美计划。<br />先把此刻的投入，<strong>留在这里。</strong></p></section>
-      <div class="time-thread" aria-hidden="true"></div>
-      <section class="app-window" aria-label="按当前 RecordView 结构重建的计时页">
-        <div class="app-titlebar"><span class="window-dots"><i></i><i></i><i></i></span><span class="window-name">LumosTime</span></div>
-        <div class="record-view"><nav class="category-rail" aria-label="分类"><div class="category-list"><button class="category selected" type="button" aria-label="学习">📚</button><button class="category" type="button" aria-label="工作">💼</button><button class="category" type="button" aria-label="生活">☕</button><button class="category" type="button" aria-label="运动">🏃</button></div><button class="rail-toggle" type="button" aria-label="展开分类">›</button></nav>
-          <section class="record-content"><header class="content-heading"><h2>学习</h2><i></i></header><div class="activity-grid"><button class="activity target" type="button"><span class="activity-icon study">📺</span><span class="activity-name">看网课</span></button><button class="activity" type="button"><span class="activity-icon write">✍️</span><span class="activity-name">写作业</span></button><button class="activity" type="button"><span class="activity-icon read">📖</span><span class="activity-name">阅读</span></button><button class="activity" type="button"><span class="activity-icon code">💻</span><span class="activity-name">写代码</span></button><button class="activity" type="button"><span class="activity-icon meeting">🧠</span><span class="activity-name">复习</span></button><button class="activity" type="button"><span class="activity-icon language">🔤</span><span class="activity-name">背单词</span></button><button class="activity" type="button"><span class="activity-icon review">📝</span><span class="activity-name">记笔记</span></button><button class="activity" type="button"><span class="activity-icon plan">🎧</span><span class="activity-name">听课</span></button><button class="activity" type="button"><span class="activity-icon other">✦</span><span class="activity-name">其他学习</span></button><button class="activity" type="button"><span class="activity-icon exercise">🏃</span><span class="activity-name">活动身体</span></button></div><aside class="active-record" aria-label="进行中的看网课计时"><span class="timer-icon">📺</span><span class="timer-info"><b>看网课</b><span>00:01</span></span><button class="timer-stop" type="button" aria-label="结束计时">✓</button></aside></section>
-        </div>
-      </section>
-      <p class="caption">点一下，时间就开始有了<strong>去处。</strong></p>
-      <div class="control-bar" aria-label="试片播放控制"><button class="control-button" id="playPause" type="button" aria-label="暂停试片">Ⅱ</button><input id="progress" type="range" min="0" max="10" step="0.01" value="0" aria-label="试片进度" /><output class="control-time" id="timeLabel" for="progress">0.0 / 10.0</output></div>
+    <main class="film" aria-label="LumosTime product film">
+      <iframe class="scene-frame active" title="Scene 01" src="scene-01-source.html"></iframe>
+      <iframe class="scene-frame" title="Scene 02" data-src="scene-02-time-becomes-a-thread.html"></iframe>
+      <iframe class="scene-frame" title="Scene 03" data-src="scene-03-connected-purpose.html"></iframe>
+      <iframe class="scene-frame" title="Scene 04" data-src="scene-04-see-your-time.html"></iframe>
+      <iframe class="scene-frame" title="Scene 05" data-src="scene-05-say-it-naturally.html"></iframe>
+      <iframe class="scene-frame" title="Scene 06" data-src="scene-06-touch-to-begin.html"></iframe>
+      <iframe class="scene-frame" title="Scene 07" data-src="scene-07-project-through-time.html"></iframe>
+      <iframe class="scene-frame" title="Scene 08" data-src="scene-08-from-start-to-self.html"></iframe>
+      <div class="controls" aria-label="Product film playback controls">
+        <button id="playPause" type="button" aria-label="Pause film">Ⅱ</button>
+        <input id="progress" type="range" min="0" max="78" step="0.01" value="0" aria-label="Film progress" />
+        <output id="timeLabel">0:00 / 1:18</output>
+      </div>
     </main>
     <script>
-      const button=document.getElementById('playPause'); const progress=document.getElementById('progress'); const timeLabel=document.getElementById('timeLabel'); const duration=10000; let isPlaying=true; let rafId; const animations=()=>document.getAnimations();
-      function setTime(ms){animations().forEach(a=>{a.currentTime=ms;a.pause();});progress.value=String(ms/1000);timeLabel.value=`${(ms/1000).toFixed(1)} / 10.0`;}
-      function sync(){const t=Math.min(Number(animations()[0]?.currentTime||0),duration);progress.value=String(t/1000);timeLabel.value=`${(t/1000).toFixed(1)} / 10.0`;if(isPlaying&&t>=duration){isPlaying=false;button.textContent='↺';button.setAttribute('aria-label','重新播放试片');return;}rafId=requestAnimationFrame(sync);}
-      function playFrom(ms){animations().forEach(a=>{a.currentTime=ms;a.play();});isPlaying=true;button.textContent='Ⅱ';button.setAttribute('aria-label','暂停试片');cancelAnimationFrame(rafId);rafId=requestAnimationFrame(sync);}
-      button.addEventListener('click',()=>{const t=Number(animations()[0]?.currentTime||0);if(t>=duration)return playFrom(0);if(isPlaying){animations().forEach(a=>a.pause());isPlaying=false;button.textContent='▶';button.setAttribute('aria-label','播放试片');cancelAnimationFrame(rafId);return;}playFrom(t);});progress.addEventListener('input',()=>{setTime(Number(progress.value)*1000);isPlaying=false;button.textContent='▶';button.setAttribute('aria-label','播放试片');cancelAnimationFrame(rafId);});requestAnimationFrame(()=>playFrom(0));
+      (() => {
+        const frames = [...document.querySelectorAll('.scene-frame')];
+        const durations = [10, 10, 10, 10, 10, 10, 10, 8];
+        const offsets = durations.reduce((acc, duration, index) => { acc.push((acc[index - 1] || 0) + duration); return acc; }, []);
+        const total = offsets[offsets.length - 1];
+        const playPause = document.getElementById('playPause');
+        const progress = document.getElementById('progress');
+        const timeLabel = document.getElementById('timeLabel');
+        let sceneIndex = 0;
+        let elapsed = 0;
+        let playing = true;
+        let last = performance.now();
+
+        const formatTime = (seconds) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
+        const updateUi = () => {
+          progress.value = String(elapsed);
+          timeLabel.value = `${formatTime(elapsed)} / ${formatTime(total)}`;
+          playPause.textContent = playing ? 'Ⅱ' : '▶';
+          playPause.setAttribute('aria-label', playing ? 'Pause film' : 'Play film');
+        };
+        const pauseFrame = (frame) => {
+          try {
+            frame.contentWindow.document.querySelectorAll('.control, .control-bar').forEach((element) => { element.style.display = 'none'; });
+            frame.contentWindow.document.querySelectorAll('button, input, output').forEach((element) => { element.tabIndex = -1; });
+          } catch (_) { /* Browser file-origin policies may prevent styling the child; the wrapper still masks interaction. */ }
+        };
+        const showScene = (index, localTime = 0) => {
+          const nextIndex = Math.max(0, Math.min(frames.length - 1, index));
+          const changed = nextIndex !== sceneIndex;
+          sceneIndex = nextIndex;
+          frames.forEach((frame, i) => frame.classList.toggle('active', i === sceneIndex));
+          const frame = frames[sceneIndex];
+          if (!frame.getAttribute('src') && frame.dataset.src) frame.setAttribute('src', frame.dataset.src);
+          else if (changed && frame.dataset.src) frame.setAttribute('src', frame.dataset.src);
+          try { if (typeof frame.contentWindow.renderSceneAt === 'function') frame.contentWindow.renderSceneAt(localTime * 1000); } catch (_) { /* Wait for iframe load. */ }
+          updateUi();
+        };
+        const setPosition = (position) => {
+          elapsed = Math.max(0, Math.min(total, position));
+          const index = offsets.findIndex((end) => elapsed < end) === -1 ? frames.length - 1 : offsets.findIndex((end) => elapsed < end);
+          const start = index === 0 ? 0 : offsets[index - 1];
+          showScene(index, elapsed - start);
+        };
+        frames.forEach((frame) => frame.addEventListener('load', () => pauseFrame(frame)));
+        const tick = (now) => {
+          if (playing) {
+            elapsed += (now - last) / 1000;
+            if (elapsed >= total) { elapsed = total; playing = false; }
+            const index = offsets.findIndex((end) => elapsed < end) === -1 ? frames.length - 1 : offsets.findIndex((end) => elapsed < end);
+            if (index !== sceneIndex) showScene(index, elapsed - (index === 0 ? 0 : offsets[index - 1]));
+            updateUi();
+          }
+          last = now;
+          requestAnimationFrame(tick);
+        };
+        playPause.addEventListener('click', () => { if (elapsed >= total) elapsed = 0; playing = !playing; last = performance.now(); updateUi(); });
+        progress.addEventListener('input', () => { playing = false; setPosition(Number(progress.value)); });
+        window.addEventListener('keydown', (event) => { if (event.key === ' ') { event.preventDefault(); playPause.click(); } if (event.key === 'ArrowRight') setPosition(Math.min(total, elapsed + durations[sceneIndex])); if (event.key === 'ArrowLeft') setPosition(Math.max(0, elapsed - durations[sceneIndex])); });
+        showScene(0, 0);
+        updateUi();
+        requestAnimationFrame(tick);
+      })();
     </script>
   </body>
 </html>

@@ -12,12 +12,13 @@
  * @updated 2026-07-21: Muted activity icon circles in dark mode while preserving each activity color as a low-contrast accent.
  * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
  * @updated 2026-04-20: Switched custom background rendering to the shared preloaded display hook and reduced mobile blur cost.
+ * @updated 2026-08-26: Added category-scoped Routine launch list and active Routine control card.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useEffect, useMemo, type CSSProperties } from 'react';
-import { Category, Activity } from '../types';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ActiveRoutineRun, Category, Activity, Routine } from '../types';
+import { ChevronLeft, ChevronRight, X, CheckCircle2, ArrowRight } from 'lucide-react';
 import { IconRenderer } from '../components/IconRenderer';
 import { getColorHexForCharts, getSoftColorCircleStyle } from '../utils/colorAdapterUtils';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
@@ -27,9 +28,22 @@ import { getActiveActivities } from '../utils/archiveUtils';
 interface RecordViewProps {
   onStartActivity: (activity: Activity, categoryId: string) => void;
   categories: Category[];
+  routines?: Routine[];
+  activeRoutineRun?: ActiveRoutineRun | null;
+  onStartRoutine?: (routine: Routine) => void;
+  onAdvanceRoutine?: () => void;
+  onExitRoutine?: () => void;
 }
 
-export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categories }) => {
+export const RecordView: React.FC<RecordViewProps> = ({
+  onStartActivity,
+  categories,
+  routines = [],
+  activeRoutineRun = null,
+  onStartRoutine,
+  onAdvanceRoutine,
+  onExitRoutine
+}) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { backgroundUrl, hasBackground, panelOverlayOpacity, useReducedEffects } = useBackgroundDisplay();
@@ -69,6 +83,36 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
   // Or if 'recent' is not implemented yet, just default to first.
   // Note: 'recent' logic was not fully implemented in previous code, it just defaulted to CATEGORIES[0] if not found.
   const selectedCategory = activeCategories.find(c => c.id === selectedCategoryId) || activeCategories[0];
+  const selectedRoutines = routines.filter(routine => routine.categoryId === selectedCategory?.id && routine.steps.length > 0);
+  const activeRoutine = activeRoutineRun ? routines.find(routine => routine.id === activeRoutineRun.routineId) : undefined;
+  const activeStep = activeRoutine && activeRoutineRun
+    ? activeRoutine.steps[activeRoutineRun.currentStepIndex]
+    : undefined;
+  const activeStepActivity = activeStep
+    ? categories.find(category => category.id === activeStep.categoryId)?.activities.find(activity => activity.id === activeStep.activityId)
+    : undefined;
+  const [routineElapsed, setRoutineElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!activeRoutineRun) {
+      setRoutineElapsed(0);
+      return;
+    }
+
+    const updateElapsed = () => {
+      setRoutineElapsed(Math.max(0, Math.floor((Date.now() - activeRoutineRun.routineStartedAt) / 1000)));
+    };
+    updateElapsed();
+    const interval = window.setInterval(updateElapsed, 1000);
+    return () => window.clearInterval(interval);
+  }, [activeRoutineRun]);
+
+  const formatElapsed = (totalSeconds: number) => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours > 0 ? `${hours}:` : ''}${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  };
 
   const getActivityButtonStyle = (activity: Activity): CSSProperties => {
     return {
@@ -167,6 +211,44 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
           }}
         />
 
+        {activeRoutineRun && activeRoutine && activeStep && activeStepActivity && (
+          <div className="mb-5 shrink-0 rounded-2xl border border-stone-200 bg-white/90 px-4 py-3 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-[11px] text-stone-400">
+                  <span className="truncate">{activeRoutine.name}</span>
+                  <span>{activeRoutineRun.currentStepIndex + 1} / {activeRoutine.steps.length}</span>
+                </div>
+                <div className="mt-1 flex items-center gap-2">
+                  <IconRenderer icon={activeStepActivity.icon} uiIcon={activeStepActivity.uiIcon} size={20} />
+                  <span className="truncate text-base font-bold text-stone-800">{activeStepActivity.name}</span>
+                  <span className="shrink-0 font-mono text-sm tabular-nums text-stone-500">{formatElapsed(routineElapsed)}</span>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={onExitRoutine}
+                  className="rounded-full p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
+                  title="退出 Routine"
+                  aria-label="退出 Routine"
+                >
+                  <X size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={onAdvanceRoutine}
+                  className="inline-flex items-center gap-1 rounded-full px-3 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                  style={{ backgroundColor: 'var(--accent-color)' }}
+                >
+                  {activeRoutineRun.currentStepIndex >= activeRoutine.steps.length - 1 ? <CheckCircle2 size={16} /> : <ArrowRight size={16} />}
+                  {activeRoutineRun.currentStepIndex >= activeRoutine.steps.length - 1 ? '完成' : '下一步'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header (Category Title) */}
         <div className="mb-8 md:mb-10 flex items-center gap-4 mt-2 md:mt-0">
           <h1 className="text-2xl md:text-2xl font-bold text-stone-900 tracking-tight whitespace-nowrap">
@@ -176,30 +258,57 @@ export const RecordView: React.FC<RecordViewProps> = ({ onStartActivity, categor
         </div>
 
         {/* Grid */}
-        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-y-8 gap-x-4 md:gap-x-6 content-start overflow-y-auto pb-24 no-scrollbar">
-          {selectedCategory?.activities.map((activity) => (
-            <div
-              key={activity.id}
-              onClick={() => onStartActivity(activity, selectedCategory.id)}
-              className="flex flex-col items-center gap-3 cursor-pointer active:scale-95 transition-transform"
-            >
-              {/* Use activity.color for background */}
+        <div className="flex-1 overflow-y-auto pb-24 no-scrollbar">
+          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-y-8 gap-x-4 md:gap-x-6 content-start">
+            {selectedCategory?.activities.map((activity) => (
               <div
-                className="record-activity-icon w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center text-3xl md:text-4xl shadow-sm"
-                style={getActivityButtonStyle(activity)}
+                key={activity.id}
+                onClick={() => onStartActivity(activity, selectedCategory.id)}
+                className="flex flex-col items-center gap-3 cursor-pointer active:scale-95 transition-transform"
               >
-                <IconRenderer 
-                  icon={activity.icon} 
-                  uiIcon={activity.uiIcon}
-                  size={32}
-                  className="text-3xl md:text-4xl" 
-                />
+                <div
+                  className="record-activity-icon w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center text-3xl md:text-4xl shadow-sm"
+                  style={getActivityButtonStyle(activity)}
+                >
+                  <IconRenderer
+                    icon={activity.icon}
+                    uiIcon={activity.uiIcon}
+                    size={32}
+                    className="text-3xl md:text-4xl"
+                  />
+                </div>
+                <span className="text-xs md:text-sm text-stone-600 font-medium text-center max-w-[80px] leading-tight">
+                  {activity.name}
+                </span>
               </div>
-              <span className="text-xs md:text-sm text-stone-600 font-medium text-center max-w-[80px] leading-tight">
-                {activity.name}
-              </span>
-            </div>
-          ))}
+            ))}
+          </div>
+
+          {selectedRoutines.length > 0 && (
+            <section className="mt-10 border-t border-stone-200 pt-5">
+              <div className="mb-3 flex items-center gap-3">
+                <h2 className="text-sm font-bold tracking-wide text-stone-700">Routine</h2>
+                <div className="h-px flex-1 bg-stone-100" />
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {selectedRoutines.map((routine) => (
+                  <button
+                    key={routine.id}
+                    type="button"
+                    onClick={() => onStartRoutine?.(routine)}
+                    disabled={Boolean(activeRoutineRun)}
+                    className="flex min-h-14 items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white/80 px-4 py-3 text-left transition-colors hover:border-stone-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span className="text-lg">{routine.icon || '↻'}</span>
+                      <span className="truncate text-sm font-semibold text-stone-700">{routine.name}</span>
+                    </span>
+                    <span className="shrink-0 text-xs text-stone-400">{routine.steps.length} 步</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       </div>
     </div>

@@ -352,5 +352,6 @@ Components for theme and appearance customization.
 - `NavigationDecorationSelector.tsx`: Added support for uploading and managing custom navigation decorations using Capacitor Filesystem.
 - `DetailTimelineCard.tsx`: Month-view date headings now come only from countable logs in the selected month; planned-only dates are hidden while same-day planned records remain attached to real activity dates.
 - `ActivityAttributeSummary.tsx`: Resolves ID-based custom attributes for compact timeline display beneath record notes.
+- `TimelineScheduleCanvas.tsx`: Displays compact activity attributes below notes in sufficiently tall split-layout time blocks.
 - `ActivityAttributeStatistics.tsx`: Uses the app-wide `--accent-color` theme for attribute statistics and type-specific visualizations.
 - `DetailTimelineCard.test.ts`: Added regression coverage for cross-month, planned-only, same-day planned, and all-record timeline grouping.

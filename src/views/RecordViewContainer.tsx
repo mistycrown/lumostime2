@@ -3,9 +3,10 @@
  * @description 计时页面容器 - 包含标签视图和场景视图的切换
  * @updated 2026-04-25: Let the floating record-view switcher inherit button theme colors when falling back to Lucide icons under the default UI theme.
  * @updated 2026-04-25: Added a flex min-height guard so Scene mode inherits a scrollable viewport height on mobile.
+ * @updated 2026-08-26: Passes Routine configuration and active-run controls into the Record view.
  */
 import React, { useState, useEffect } from 'react';
-import { Category, Activity, TodoItem } from '../types';
+import { ActiveRoutineRun, Category, Activity, TodoItem, Routine } from '../types';
 import { RecordView } from './RecordView';
 import { SceneView } from './SceneView';
 import { FloatingButton } from '../components/FloatingButton';
@@ -23,6 +24,11 @@ interface RecordViewContainerProps {
   onAddLog?: (startTime?: number, endTime?: number, prefilledData?: { categoryId?: string; activityId?: string; linkedTodoId?: string }) => void;
   categories: Category[];
   todos?: TodoItem[];
+  routines?: Routine[];
+  activeRoutineRun?: ActiveRoutineRun | null;
+  onStartRoutine?: (routine: Routine) => void;
+  onAdvanceRoutine?: () => void;
+  onExitRoutine?: () => void;
 }
 
 export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
@@ -30,7 +36,12 @@ export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
   onStartTodoFocus,
   onAddLog,
   categories,
-  todos = []
+  todos = [],
+  routines = [],
+  activeRoutineRun = null,
+  onStartRoutine,
+  onAdvanceRoutine,
+  onExitRoutine
 }) => {
   const { defaultRecordView } = useSettings();
   const { currentView } = useNavigation();
@@ -83,6 +94,11 @@ export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
         <RecordView 
           onStartActivity={onStartActivity}
           categories={categories}
+          routines={routines}
+          activeRoutineRun={activeRoutineRun}
+          onStartRoutine={onStartRoutine}
+          onAdvanceRoutine={onAdvanceRoutine}
+          onExitRoutine={onExitRoutine}
         />
       ) : (
         <SceneView 

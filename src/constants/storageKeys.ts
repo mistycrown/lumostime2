@@ -87,6 +87,10 @@ export const USER_DATA_KEYS = {
     ACTIVE_SESSIONS: 'lumostime_activeSessions',
     /** 本地修改时间戳 */
     LOCAL_TIMESTAMP: 'lumostime_local_timestamp',
+    /** 连续计时 Routine 配置 */
+    ROUTINES: 'lumostime_routines',
+    /** 当前运行中的 Routine */
+    ACTIVE_ROUTINE_RUN: 'lumostime_active_routine_run',
 } as const;
 
 /**

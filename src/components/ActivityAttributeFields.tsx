@@ -5,6 +5,7 @@
  * @pos Shared record form component
  * @description Matches the existing association selectors with compact outline states, one-line horizontal option rails, and a collapsible section.
  * @updated 2026-08-25: Added collapsed state, quick option creation, compact association styling, and horizontal option scrolling.
+ * @updated 2026-08-25: Changed the shared record-form section label to English "Attributes".
  */
 import React, { useMemo, useState } from 'react';
 import { Check, ChevronDown, Hash, ListChecks, Plus, TextCursorInput } from 'lucide-react';
@@ -66,7 +67,7 @@ export const ActivityAttributeFields: React.FC<ActivityAttributeFieldsProps> = (
   return (
     <section className="border-t border-stone-100 pt-5">
       <button type="button" onClick={() => setIsExpanded((current) => !current)} className="w-full flex items-center justify-between px-1 text-left">
-        <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">{'\u5c5e\u6027'}</span>
+        <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Attributes</span>
         <ChevronDown size={15} className={`text-stone-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
       </button>
 

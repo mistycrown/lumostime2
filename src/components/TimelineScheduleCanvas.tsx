@@ -21,6 +21,8 @@
  * @updated 2026-08-24: Uses 23:59:59.999 rather than next-day 00:00 for historical-day gaps and 24:00 timeline creations.
  * @updated 2026-08-24: Closes the plan action panel on completed backdrop clicks so the release click cannot reach the timeline underneath.
  * @updated 2026-08-24: Ignores the opening touch click inside plan actions and requires a second delete confirmation to prevent accidental starts and removals.
+ * @updated 2026-08-26: Shows activity attributes beneath notes in sufficiently tall split-layout time blocks.
+ * @updated 2026-08-26: Applies privacy-mode blurring to notes in split-layout time blocks.
  */
 import React, { useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -29,6 +31,7 @@ import { Category, Log, Scope, TodoItem } from '../types';
 import { toCssColor } from '../utils/colorUtils';
 import { isAutoRecurringPlanDeleteLocked } from '../utils/todoRecurringPlanUtils';
 import { clampEndTimeToStartDay } from '../utils/logUtils';
+import { ActivityAttributeSummary } from './ActivityAttributeSummary';
 
 const MIN_HOUR_HEIGHT = 52;
 const MAX_HOUR_HEIGHT = 180;
@@ -58,6 +61,7 @@ interface TimelineScheduleCanvasProps {
   scopes: Scope[];
   todos: TodoItem[];
   isDarkMode: boolean;
+  isPrivacyMode: boolean;
   minIdleTimeThreshold: number;
   onAddLog: (startTime: number, endTime: number) => void;
   onEditLog: (log: Log) => void;
@@ -306,7 +310,8 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   onCreateQuickColorLog,
   onStartPlannedTodo,
   onDeletePlannedLog,
-  isDarkMode
+  isDarkMode,
+  isPrivacyMode
 }, ref) => {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const pinchRef = useRef<{ distance: number; hourHeight: number } | null>(null);
@@ -402,6 +407,7 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
         startLabel: formatTime(new Date(startTime)),
         endLabel: formatTime(new Date(endTime)),
         activityLabel: plannedActivity?.name,
+        activity: plannedActivity,
         linkedTodoLabel: linkedTodo?.title,
         linkedScopeNames,
         isPlanned: Boolean(log.isPlanned)
@@ -1168,13 +1174,14 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
                 </span>
               </div>
             )}
-            {scheduledLogs.map(({ log, top, height, color, background, startLabel, endLabel, activityLabel, linkedTodoLabel, linkedScopeNames, isPlanned, column, columnCount }) => {
+            {scheduledLogs.map(({ log, top, height, color, background, startLabel, endLabel, activityLabel, activity, linkedTodoLabel, linkedScopeNames, isPlanned, column, columnCount }) => {
               const isTimeEditingLocked = isLogTimeEditingLocked(log);
               const isEditing = editingLogId === log.id && !isTimeEditingLocked;
               const isNewlyCreated = createdPlanLogId === log.id;
               const isCompact = height < 30;
               const showMetadata = height >= 34;
               const showNote = height >= 52;
+              const showAttributes = height >= 68 && !isPlanned && (log.attributeValues?.length || 0) > 0;
               const isExpandedNote = isTimelineLogNoteExpanded(height);
               const noteText = log.note?.trim() || '';
               return (
@@ -1230,12 +1237,19 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
                   )}
                   {!isEditing && showNote && noteText && (
                     <span
-                      className={`mt-0.5 block text-[11px] leading-4 text-stone-500 ${
+                      className={`mt-0.5 block text-[11px] leading-4 text-stone-500 ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'} ${
                         isExpandedNote ? 'whitespace-pre-wrap break-words' : 'truncate'
                       }`}
                     >
                       {isExpandedNote ? noteText : noteText.replace(/\s+/g, ' ')}
                     </span>
+                  )}
+                  {!isEditing && showAttributes && (
+                    <ActivityAttributeSummary
+                      activity={activity}
+                      values={log.attributeValues}
+                      className="!mt-0.5 !mb-0 !flex-nowrap !overflow-hidden !whitespace-nowrap !text-[10px] !leading-3"
+                    />
                   )}
                 </div>
               );

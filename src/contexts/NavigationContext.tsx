@@ -33,6 +33,7 @@ export type SettingsSubmenu =
     | 'collections'
     | 'sponsorship_preview'
     | 'scene'
+    | 'routine'
     | 'emoji'
     | 'principle'
     | 'review_overview'
