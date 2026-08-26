@@ -1,5 +1,7 @@
 # Views Layer
 
+- Update 2026-08-26: `CategoryDetailView.tsx` now exposes category archive/restore controls; category state changes cascade to all child tags, and `TagsView.tsx` keeps archived categories in a restorable archive section.
+
 The `views/` directory contains all the React components that represent the distinct screens or pages of the LumosTime application. This layer is responsible for the presentation logic and user interaction.
 
 - Update 2026-08-24: `TagDetailView.tsx` now owns Activity custom attribute definition management and an actual-log-only attribute statistics tab; `FocusDetailView.tsx` persists the same fields into the active session.

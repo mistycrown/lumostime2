@@ -13,6 +13,7 @@ import {
   updateLocalDataTimestamp
 } from '../utils/localDataTimestamp';
 import { reportCriticalDataError } from '../services/errorReporting';
+import { setCategoryArchiveState } from '../utils/archiveUtils';
 
 interface CategoryScopeContextType {
   isReady: boolean;
@@ -200,16 +201,20 @@ export const CategoryScopeProvider: React.FC<CategoryScopeProviderProps> = ({
   };
 
   const handleUpdateCategory = (updatedCategory: Category) => {
+    const nextCategory = updatedCategory.isArchived !== undefined
+      ? setCategoryArchiveState(updatedCategory, updatedCategory.isArchived === true)
+      : updatedCategory;
+
     setCategories((prev) => prev.map((category) => (
-      category.id === updatedCategory.id ? updatedCategory : category
+      category.id === nextCategory.id ? nextCategory : category
     )));
 
     setActiveSessions((prevSessions) => prevSessions.map((session) => {
-      if (session.categoryId !== updatedCategory.id) {
+      if (session.categoryId !== nextCategory.id) {
         return session;
       }
 
-      const activity = updatedCategory.activities.find((item) => item.id === session.activityId);
+      const activity = nextCategory.activities.find((item) => item.id === session.activityId);
       if (!activity) {
         return session;
       }

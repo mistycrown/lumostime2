@@ -6,13 +6,14 @@
  * @description Displays comprehensive analytics for a specific category, including a heatmap, history log, focus trends, cross-analysis with scopes, and inline-managed note templates.
  * @updated 2026-06-13: Reused the shared hierarchical associated-todo list so subtasks render under parent todos in the association tab.
  * @updated 2026-08-09: Planned timeline blocks are excluded from category statistics.
+ * @updated 2026-08-26: Added category archive and restore control with child-activity cascading handled by the category context.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useMemo, useState } from 'react';
 import { Log, Category, Activity, TodoItem } from '../types';
 import { COLOR_OPTIONS } from '../constants';
-import { Clock, Save, ChevronRight, Check, Zap, CheckCircle2, Circle } from 'lucide-react';
+import { Clock, Save, ChevronRight, Check, Zap, CheckCircle2, Circle, Archive, ArchiveRestore } from 'lucide-react';
 import { DateRangeFilter } from '../components/DateRangeFilter';
 import { MatrixAnalysisChart } from '../components/MatrixAnalysisChart';
 import { Scope } from '../types';
@@ -68,6 +69,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                 category.heatmapMax !== initialCategory.heatmapMax ||
                 category.enableFocusScore !== initialCategory.enableFocusScore ||
                 category.enableMoodScore !== initialCategory.enableMoodScore ||
+                category.isArchived !== initialCategory.isArchived ||
                 JSON.stringify(category.noteTemplates || []) !== JSON.stringify(initialCategory.noteTemplates || []);
             
             if (hasChanges) {
@@ -190,6 +192,11 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
     const handleColorChange = (color: string) => {
         if (!category) return;
         setCategory({ ...category, themeColor: color });
+    };
+
+    const handleToggleArchive = () => {
+        if (!category) return;
+        setCategory({ ...category, isArchived: category.isArchived !== true });
     };
 
     const renderContent = () => {
@@ -452,6 +459,15 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                         className="text-2xl" 
                     />}
                     {category.name}
+                    <button
+                        type="button"
+                        onClick={handleToggleArchive}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-stone-500 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                        title={category.isArchived === true ? '恢复分类' : '归档分类'}
+                    >
+                        {category.isArchived === true ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+                        <span>{category.isArchived === true ? '恢复分类' : '归档分类'}</span>
+                    </button>
                 </h1>
                 <span className="text-stone-400 text-sm font-medium ml-1 mt-1 block">分类</span>
             </div>
