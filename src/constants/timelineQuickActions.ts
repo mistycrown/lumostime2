@@ -5,6 +5,7 @@
  * @description Centralizes the configurable quick actions shown at the top of the timeline view.
  * @updated 2026-05-12: Added the Collection shortcut key so timeline quick actions can deep-link into the settings collection subpage.
  * @updated 2026-08-09: Added the daily-check overview shortcut key.
+ * @updated 2026-08-26: Added the review-overview shortcut key without changing the default pinned actions.
  * @updated 2026-04-25: Added shared quick-action metadata and normalization helpers for timeline header customization.
  * @updated 2026-04-25: Shortened timeline quick-action labels for the preferences UI.
  */
@@ -16,6 +17,7 @@ export type TimelineQuickActionKey =
   | 'gallery'
   | 'achievement'
   | 'daily_checks'
+  | 'review_overview'
   | 'collections'
   | 'principle'
   | 'sync';
@@ -56,6 +58,11 @@ export const TIMELINE_QUICK_ACTION_OPTIONS: TimelineQuickActionOption[] = [
     key: 'daily_checks',
     label: '日课总览',
     description: '打开日课总览页。'
+  },
+  {
+    key: 'review_overview',
+    label: '回顾总览',
+    description: '打开回顾总览页。'
   },
   {
     key: 'collections',
