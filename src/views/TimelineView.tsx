@@ -25,6 +25,7 @@
  * @updated 2026-07-31: Filters the todo sidebar daily checks against disabled template items before display and auto refresh.
  * @updated 2026-08-09: Added the configurable shortcut to the daily-check overview page.
  * @updated 2026-08-10: Records Timeline as the return target when opening daily-check overview.
+ * @updated 2026-08-26: Added the configurable review-overview shortcut with Timeline return behavior.
  * @updated 2026-08-09: Passes actionable real-record idle gaps into the split timeline canvas while excluding plan blocks from gap detection.
  * @updated 2026-08-24: Added an always-leftmost More menu for timeline shortcuts that are not pinned to the header.
  * @updated 2026-08-25: Rendered the More menu through a page-level portal so split-pane dividers cannot cover it.
@@ -530,6 +531,16 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                 setDailyChecksReturnTarget('timeline');
                 setDailyCheckDetailId(null);
                 setCurrentView(AppView.DAILY_CHECKS);
+            }
+        },
+        review_overview: {
+            label: '回顾总览',
+            title: '回顾总览',
+            icon: <BookOpen size={20} />,
+            onClick: () => {
+                setIsSettingsOpen(true);
+                setSettingsSubmenu('review_overview');
+                setSettingsSubmenuBackCloses(true);
             }
         },
         collections: {

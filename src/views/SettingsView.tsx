@@ -1066,7 +1066,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
     if (activeSubmenu === 'review_overview') {
         return renderLazySettingsSubview(
             <ReviewOverviewView
-                onBack={handleBackToMain}
+                onBack={settingsSubmenuBackCloses ? handleBackFromShortcutSubview : handleBackToMain}
                 dailyReviews={dailyReviews}
                 weeklyReviews={weeklyReviews}
                 monthlyReviews={monthlyReviews}
