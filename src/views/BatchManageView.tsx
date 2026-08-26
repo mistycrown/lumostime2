@@ -1,7 +1,8 @@
 /**
  * @file BatchManageView.tsx
  * @updated 2026-08-06: Added archive and restore actions for activities.
- * @updated 2026-08-26: Added replacement-tag confirmation before activity deletion.
+ * @updated 2026-08-26: Defers tag deletion checks until batch submission and supports per-tag migration targets.
+ * @updated 2026-08-26: Added category archive and restore controls with cascading child-tag state updates.
  * @input Categories, Activities
  * @output Updated Category Structure
  * @pos View (Settings Sub-page)
@@ -9,7 +10,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Category, Activity } from '../types';
 import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check, Archive, ArchiveRestore, AlertTriangle } from 'lucide-react';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
@@ -27,10 +28,13 @@ interface BatchManageViewProps {
     categories: Category[];
     onSave: (categories: Category[]) => void;
     onPreviewActivityMigration?: (sourceActivityId: string) => ActivityMigrationImpact;
-    onMigrateAndDeleteActivity?: (sourceActivityId: string, targetActivityId: string) => Promise<ActivityMigrationImpact>;
+    onApplyTagBatchChanges?: (
+        categories: Category[],
+        migrations: Array<{ sourceActivityId: string; targetActivityId: string }>
+    ) => Promise<ActivityMigrationImpact[]>;
 }
 
-export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, categories: initialCategories, onSave, onPreviewActivityMigration, onMigrateAndDeleteActivity }) => {
+export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, categories: initialCategories, onSave, onPreviewActivityMigration, onApplyTagBatchChanges }) => {
     const [categories, setCategories] = useState<Category[]>(JSON.parse(JSON.stringify(initialCategories)));
     const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set(initialCategories.map(c => c.id)));
 
@@ -47,10 +51,12 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
     // Drag state (kept for reference, but user said it's unusable, so we rely on buttons now)
     const [draggedActivity, setDraggedActivity] = useState<{ activity: Activity, sourceCategoryId: string } | null>(null);
     const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
-    const [deleteTarget, setDeleteTarget] = useState<{ categoryId: string; activityId: string } | null>(null);
-    const [replacementActivityId, setReplacementActivityId] = useState('');
-    const [deleteImpact, setDeleteImpact] = useState<ActivityMigrationImpact | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
+    const [migrationReviewOpen, setMigrationReviewOpen] = useState(false);
+    const [migrationSelections, setMigrationSelections] = useState<Record<string, string>>({});
+    const [migrationImpacts, setMigrationImpacts] = useState<Record<string, ActivityMigrationImpact>>({});
+    const [openMigrationMenu, setOpenMigrationMenu] = useState<string | null>(null);
+    const [isApplyingBatch, setIsApplyingBatch] = useState(false);
+    const [migrationError, setMigrationError] = useState('');
 
     const toggleExpand = (id: string) => {
         const newSet = new Set(expandedCats);
@@ -120,37 +126,73 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
     };
 
     const handleDeleteActivity = (catId: string, actId: string) => {
-        if (!onMigrateAndDeleteActivity) return;
-        setDeleteTarget({ categoryId: catId, activityId: actId });
-        setReplacementActivityId('');
-        setDeleteImpact(null);
+        setCategories(prev => prev.map(category => category.id === catId
+            ? { ...category, activities: category.activities.filter(activity => activity.id !== actId) }
+            : category
+        ));
     };
 
-    const selectedDeleteActivity = deleteTarget
-        ? categories.flatMap((category) => category.activities).find((activity) => activity.id === deleteTarget.activityId)
-        : undefined;
-    const replacementOptions = categories.flatMap((category) => category.activities
-        .filter((activity) => activity.id !== deleteTarget?.activityId && activity.isArchived !== true)
-        .map((activity) => ({ activity, category })));
+    const deletedActivities = useMemo(() => {
+        const currentActivityIds = new Set(categories.flatMap(category => category.activities).map(activity => activity.id));
+        return initialCategories.flatMap(category => category.activities
+            .filter(activity => !currentActivityIds.has(activity.id))
+            .map(activity => ({ activity, category })));
+    }, [categories, initialCategories]);
 
-    const handlePreviewDelete = async () => {
-        if (!deleteTarget || !replacementActivityId || !onPreviewActivityMigration) return;
-        setDeleteImpact(onPreviewActivityMigration(deleteTarget.activityId));
+    const migrationTargetOptions = useMemo(() => {
+        const deletedIds = new Set(deletedActivities.map(({ activity }) => activity.id));
+        const originalActivityIds = new Set(initialCategories.flatMap(category => category.activities).map(activity => activity.id));
+        return categories.flatMap(category => category.activities
+            .filter(activity => originalActivityIds.has(activity.id) && category.isArchived !== true && !deletedIds.has(activity.id) && activity.isArchived !== true)
+            .map(activity => ({ activity, category })));
+    }, [categories, deletedActivities, initialCategories]);
+
+    const handleSubmit = () => {
+        if (deletedActivities.length === 0) {
+            onSave(categories);
+            return;
+        }
+
+        const nextSelections: Record<string, string> = {};
+        const nextImpacts: Record<string, ActivityMigrationImpact> = {};
+        deletedActivities.forEach(({ activity }) => {
+            if (onPreviewActivityMigration) {
+                nextImpacts[activity.id] = onPreviewActivityMigration(activity.id);
+            }
+        });
+        setMigrationSelections(nextSelections);
+        setMigrationImpacts(nextImpacts);
+        setMigrationError('');
+        setOpenMigrationMenu(null);
+        setMigrationReviewOpen(true);
     };
 
-    const handleConfirmDelete = async () => {
-        if (!deleteTarget || !replacementActivityId || !onMigrateAndDeleteActivity) return;
-        setIsDeleting(true);
+    const handleApplyBatch = async () => {
+        if (!onApplyTagBatchChanges) {
+            onSave(categories);
+            return;
+        }
+        const missingTarget = deletedActivities.some(({ activity }) => !migrationSelections[activity.id]);
+        if (missingTarget) {
+            setMigrationError('请为每个待删除标签选择迁移目标。');
+            return;
+        }
+        setIsApplyingBatch(true);
+        setMigrationError('');
         try {
-            await onMigrateAndDeleteActivity(deleteTarget.activityId, replacementActivityId);
-            setCategories(prev => prev.map(c => ({
-                ...c,
-                activities: c.activities.filter(a => a.id !== deleteTarget.activityId)
-            })));
-            setDeleteTarget(null);
-            setDeleteImpact(null);
+            await onApplyTagBatchChanges(
+                categories,
+                deletedActivities.map(({ activity }) => ({
+                    sourceActivityId: activity.id,
+                    targetActivityId: migrationSelections[activity.id]
+                }))
+            );
+            setMigrationReviewOpen(false);
+            onBack();
+        } catch (error) {
+            setMigrationError(error instanceof Error ? error.message : '迁移失败，批量修改未应用。');
         } finally {
-            setIsDeleting(false);
+            setIsApplyingBatch(false);
         }
     };
 
@@ -309,7 +351,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                     <X size={24} />
                 </button>
                 <h1 className="font-serif font-bold text-lg text-stone-800">Tag Management</h1>
-                <button onClick={() => onSave(categories)} className="p-2 -mr-2 text-stone-400 hover:text-stone-600 transition-colors">
+                <button onClick={handleSubmit} className="p-2 -mr-2 text-stone-400 hover:text-stone-600 transition-colors" title="提交批量修改">
                     <Check size={24} />
                 </button>
             </div>
@@ -596,30 +638,85 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                     <span>添加新分类</span>
                 </button>
             </div>
-            {deleteTarget && selectedDeleteActivity && (
+            {migrationReviewOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-md overflow-hidden rounded-2xl border border-stone-200 bg-[#fdfbf7] shadow-2xl">
+                    <div className="flex h-[min(780px,calc(100vh-2rem))] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-stone-200 bg-[#fdfbf7] shadow-2xl">
                         <div className="flex items-start gap-3 border-b border-stone-100 p-5">
                             <AlertTriangle className="mt-0.5 shrink-0 text-amber-500" size={20} />
                             <div>
-                                <h2 className="font-bold text-stone-800">迁移并删除标签</h2>
-                                <p className="mt-1 text-sm leading-6 text-stone-500">删除“{selectedDeleteActivity.name}”前，请选择一个未归档标签接收所有历史关联。</p>
+                                <h2 className="font-bold text-stone-800">提交前确认标签迁移</h2>
+                                <p className="mt-1 text-sm leading-6 text-stone-500">检测到以下标签将被删除。请选择每个标签的历史记录和待办迁移目标，确认后才会应用全部批量修改。</p>
                             </div>
                         </div>
-                        <div className="space-y-4 p-5">
-                            <label className="block text-sm font-medium text-stone-700">
-                                替代标签
-                                <select value={replacementActivityId} onChange={(event) => { setReplacementActivityId(event.target.value); setDeleteImpact(null); }} className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-stone-400">
-                                    <option value="">请选择未归档标签</option>
-                                    {replacementOptions.map(({ activity, category }) => <option key={activity.id} value={activity.id}>{category.name} / {activity.name}</option>)}
-                                </select>
-                            </label>
-                            {replacementActivityId && <p className="text-xs leading-5 text-stone-500">历史记录、待办、规则、场景和小组件中的标签引用都会迁移；跨分类时，关联分类也会同步更新。</p>}
-                            {deleteImpact && <div className="grid grid-cols-2 gap-2 rounded-xl bg-stone-50 p-3 text-xs text-stone-600"><span>历史记录 {deleteImpact.logs}</span><span>待办 {deleteImpact.todos}</span><span>当前计时 {deleteImpact.activeSessions}</span><span>自动规则 {deleteImpact.autoLinkRules + deleteImpact.appRules}</span><span>成就规则 {deleteImpact.achievementRules}</span><span>场景/小组件 {deleteImpact.sceneCards + deleteImpact.widgetSlots}</span></div>}
+                        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
+                            {deletedActivities.map(({ activity, category }) => {
+                                const selectedTarget = migrationTargetOptions.find(({ activity: candidate }) => candidate.id === migrationSelections[activity.id]);
+                                const impact = migrationImpacts[activity.id];
+                                return (
+                                    <div key={activity.id} className="rounded-xl border border-stone-200 bg-white p-3">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="truncate text-sm font-bold text-stone-800">{activity.icon}{activity.name}</div>
+                                                <div className="mt-0.5 truncate text-xs text-stone-400">{category.name}</div>
+                                            </div>
+                                            <Trash2 size={15} className="shrink-0 text-red-300" />
+                                        </div>
+                                        <div className="relative mt-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => setOpenMigrationMenu(openMigrationMenu === activity.id ? null : activity.id)}
+                                                className="flex w-full items-center justify-between rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-left text-sm text-stone-700 transition-colors hover:border-stone-400"
+                                                aria-expanded={openMigrationMenu === activity.id}
+                                            >
+                                                <span className={selectedTarget ? 'text-stone-800' : 'text-stone-400'}>
+                                                    {selectedTarget ? `${selectedTarget.category.name} / ${selectedTarget.activity.icon}${selectedTarget.activity.name}` : '选择未归档标签作为迁移目标'}
+                                                </span>
+                                                <ChevronDown size={16} className={`shrink-0 text-stone-400 transition-transform ${openMigrationMenu === activity.id ? 'rotate-180' : ''}`} />
+                                            </button>
+                                            {openMigrationMenu === activity.id && (
+                                                <>
+                                                    <button type="button" aria-label="关闭标签目标菜单" className="fixed inset-0 z-10 cursor-default" onClick={() => setOpenMigrationMenu(null)} />
+                                                    <div className="absolute bottom-full left-0 right-0 z-20 mb-2 max-h-[min(18rem,40vh)] overflow-y-auto rounded-xl border border-stone-200 bg-white py-1 shadow-lg">
+                                                        {migrationTargetOptions.length === 0 ? (
+                                                            <div className="px-3 py-3 text-xs text-stone-400">没有可用的未归档标签</div>
+                                                        ) : migrationTargetOptions.map(({ activity: candidate, category: candidateCategory }) => (
+                                                            <button
+                                                                key={candidate.id}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setMigrationSelections(previous => ({ ...previous, [activity.id]: candidate.id }));
+                                                                    setOpenMigrationMenu(null);
+                                                                }}
+                                                                className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-stone-50 ${candidate.id === migrationSelections[activity.id] ? 'bg-stone-100 font-bold' : 'text-stone-700'}`}
+                                                            >
+                                                                <span className="shrink-0 text-base">{candidate.icon}</span>
+                                                                <span className="min-w-0 flex-1 truncate">{candidateCategory.name} / {candidate.name}</span>
+                                                                {candidate.id === migrationSelections[activity.id] && <Check size={15} className="shrink-0 text-stone-600" />}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                        {impact && (
+                                            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-stone-400">
+                                                <span>历史记录 {impact.logs}</span>
+                                                <span>待办 {impact.todos}</span>
+                                                <span>当前计时 {impact.activeSessions}</span>
+                                                <span>规则/应用 {impact.autoLinkRules + impact.appRules}</span>
+                                                <span>场景/小组件 {impact.sceneCards + impact.widgetSlots}</span>
+                                                <span>筛选条件 {impact.goalFilters + impact.memoirFilters + impact.timePalFilters}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                            {migrationTargetOptions.length === 0 && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs leading-5 text-red-600">当前没有可用的迁移目标，请取消后保留至少一个未归档标签。</p>}
+                            {migrationError && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs leading-5 text-red-600">{migrationError}</p>}
                         </div>
                         <div className="flex gap-3 border-t border-stone-100 bg-white p-4">
-                            <button type="button" onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="flex-1 rounded-xl border border-stone-200 py-2.5 text-sm font-medium text-stone-600">取消</button>
-                            <button type="button" onClick={deleteImpact ? handleConfirmDelete : handlePreviewDelete} disabled={!replacementActivityId || isDeleting} className="flex-1 rounded-xl bg-stone-900 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">{isDeleting ? '迁移中…' : deleteImpact ? '迁移并删除' : '查看影响'}</button>
+                            <button type="button" onClick={() => { setMigrationReviewOpen(false); setOpenMigrationMenu(null); setMigrationError(''); }} disabled={isApplyingBatch} className="flex-1 rounded-xl border border-stone-200 py-2.5 text-sm font-medium text-stone-600">取消</button>
+                            <button type="button" onClick={handleApplyBatch} disabled={isApplyingBatch || migrationTargetOptions.length === 0} className="flex-1 rounded-xl bg-stone-900 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">{isApplyingBatch ? '正在应用…' : '确定并应用修改'}</button>
                         </div>
                     </div>
                 </div>

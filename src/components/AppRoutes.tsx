@@ -40,7 +40,7 @@ import { getRealTodoCategories } from '../utils/todoQuickCategoryUtils';
 import { buildTimelinePlannedLog, isAutoRecurringPlanDeleteLocked } from '../utils/todoRecurringPlanUtils';
 import type { TimelineQuickColorActivity } from './TimelineScheduleCanvas';
 import type { TimelineLayoutMode } from '../services/timelineLayoutService';
-import { getActivityMigrationImpact, migrateActivityReferences, type ActivityReferenceMigrationInput } from '../utils/activityReferenceMigration';
+import { getActivityMigrationImpact, migrateActivityReferences, type ActivityMigrationImpact, type ActivityReferenceMigrationInput } from '../utils/activityReferenceMigration';
 import { loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from '../utils/sceneGroupStorage';
 import { loadWidgetTemplatesFromStorage, saveWidgetTemplatesToStorage } from '../services/widgetService';
 import WidgetBridge from '../plugins/WidgetBridgePlugin';
@@ -211,7 +211,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     const { addToast } = useToast();
     const dailyCheckToday = React.useMemo(() => new Date(), [currentView]);
     const { activeSessions, setActiveSessions } = useSession();
-    const { rules: achievementRules, updateRule: updateAchievementRule } = useAchievement();
+    const { rules: achievementRules, replaceRules: replaceAchievementRules } = useAchievement();
 
     const buildActivityMigrationInput = React.useCallback((): ActivityReferenceMigrationInput => ({
         logs,
@@ -235,56 +235,79 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         getActivityMigrationImpact(buildActivityMigrationInput(), sourceActivityId)
     ), [buildActivityMigrationInput]);
 
-    const migrateAndDeleteActivity = React.useCallback(async (sourceActivityId: string, targetActivityId: string) => {
-        const source = categories.flatMap((category) => category.activities).find((activity) => activity.id === sourceActivityId);
-        const targetCategory = categories.find((category) => category.activities.some((activity) => activity.id === targetActivityId));
-        if (!source || !targetCategory || sourceActivityId === targetActivityId) {
-            throw new Error('标签迁移目标无效');
-        }
-        const input = buildActivityMigrationInput();
-        const result = migrateActivityReferences(input, sourceActivityId, targetActivityId, targetCategory.id, source.name, targetCategory.activities.find((activity) => activity.id === targetActivityId)?.name || '');
+    const applyTagBatchChanges = React.useCallback(async (
+        nextCategories: typeof categories,
+        migrations: Array<{ sourceActivityId: string; targetActivityId: string }>
+    ): Promise<ActivityMigrationImpact[]> => {
+        const sourceActivities = new Map(categories.flatMap((category) => category.activities).map((activity) => [activity.id, activity]));
+        const targetActivities = new Map(nextCategories.flatMap((category) => category.activities).map((activity) => [activity.id, activity]));
+        let migrated = buildActivityMigrationInput();
+        const impacts: ActivityMigrationImpact[] = [];
 
-        setLogs(result.logs);
-        setTodos(result.todos);
-        setActiveSessions(result.activeSessions);
-        setAutoLinkRules(result.autoLinkRules);
-        setAppRules(result.appRules);
-        setAppAwarenessTemplates(result.appAwarenessTemplates);
-        setAppAwarenessActiveRun(result.appAwarenessActiveRun);
-        setFilters(result.filters);
-        setMemoirFilterConfig(result.memoirFilterConfig);
-        setGoals(result.goals);
-        setMajorGoals(result.majorGoals);
-        if (result.timePalFilterActivityIds) {
-            storage.setJSON(TIMEPAL_KEYS.FILTER_ACTIVITIES, result.timePalFilterActivityIds);
-            storage.setBoolean(TIMEPAL_KEYS.FILTER_ENABLED, result.timePalFilterActivityIds.length > 0);
+        migrations.forEach(({ sourceActivityId, targetActivityId }) => {
+            const source = sourceActivities.get(sourceActivityId);
+            const target = targetActivities.get(targetActivityId);
+            const targetCategory = nextCategories.find((category) => category.activities.some((activity) => activity.id === targetActivityId));
+            if (!source || !target || !targetCategory || targetCategory.isArchived === true || target.isArchived === true || sourceActivityId === targetActivityId || !sourceActivities.has(targetActivityId)) {
+                throw new Error('标签迁移目标无效，请重新选择未归档标签。');
+            }
+            const result = migrateActivityReferences(migrated, sourceActivityId, targetActivityId, targetCategory.id, source.name, target.name);
+            migrated = result;
+            impacts.push(result.impact);
+        });
+
+        setLogs(migrated.logs);
+        setTodos(migrated.todos);
+        setActiveSessions(migrated.activeSessions.map((session) => {
+            const target = targetActivities.get(session.activityId);
+            return target
+                ? { ...session, activityName: target.name, activityIcon: target.icon, activityUiIcon: target.uiIcon }
+                : session;
+        }));
+        setAutoLinkRules(migrated.autoLinkRules);
+        setAppRules(migrated.appRules);
+        setAppAwarenessTemplates(migrated.appAwarenessTemplates);
+        setAppAwarenessActiveRun(migrated.appAwarenessActiveRun);
+        setFilters(migrated.filters);
+        setMemoirFilterConfig(migrated.memoirFilterConfig);
+        setGoals(migrated.goals);
+        setMajorGoals(migrated.majorGoals);
+        if (migrated.timePalFilterActivityIds) {
+            storage.setJSON(TIMEPAL_KEYS.FILTER_ACTIVITIES, migrated.timePalFilterActivityIds);
+            storage.setBoolean(TIMEPAL_KEYS.FILTER_ENABLED, migrated.timePalFilterActivityIds.length > 0);
             window.dispatchEvent(new Event('timepal-filter-changed'));
         }
-        await Promise.all(Object.entries(result.appRules).map(([packageName, activityId]) => (
-            AppUsage.saveAppRule({ packageName, activityId }).catch((error) => {
-                console.error('[AppRoutes] Failed to refresh native app rule after activity migration', error);
-            })
-        )));
-        result.achievementRules.forEach((rule) => updateAchievementRule(rule));
-        if (result.sceneState) {
-            saveSceneGroupStateToStorage(result.sceneState);
+        await Promise.all(Object.entries(buildActivityMigrationInput().appRules)
+            .filter(([, activityId]) => migrations.some((migration) => migration.sourceActivityId === activityId))
+            .map(([packageName]) => AppUsage.removeAppRule({ packageName }).catch((error) => {
+                console.error('[AppRoutes] Failed to remove stale native app rule after batch activity migration', error);
+            })));
+        await Promise.all(Object.entries(migrated.appRules).map(([packageName, activityId]) => {
+            const target = targetActivities.get(activityId);
+            if (!target) return Promise.resolve();
+            return AppUsage.saveAppRule({ packageName, activityId, activityName: target.name }).catch((error) => {
+                console.error('[AppRoutes] Failed to refresh native app rule after batch activity migration', error);
+            });
+        }));
+        replaceAchievementRules(migrated.achievementRules);
+        if (migrated.sceneState) {
+            saveSceneGroupStateToStorage(migrated.sceneState);
             window.dispatchEvent(new Event('sceneGroupsUpdated'));
             window.dispatchEvent(new Event('sceneTimeSlotsUpdated'));
         }
-        if (result.widgetTemplates) {
-            saveWidgetTemplatesToStorage(result.widgetTemplates);
+        if (migrated.widgetTemplates) {
+            saveWidgetTemplatesToStorage(migrated.widgetTemplates);
             try {
-                await WidgetBridge.saveTemplates({ templates: result.widgetTemplates });
+                await WidgetBridge.saveTemplates({ templates: migrated.widgetTemplates });
             } catch (error) {
-                console.error('[AppRoutes] Failed to refresh native widget templates after activity migration', error);
+                console.error('[AppRoutes] Failed to refresh native widget templates after batch activity migration', error);
             }
         }
-        handleUpdateCategories(categories.map((category) => ({
-            ...category,
-            activities: category.activities.filter((activity) => activity.id !== sourceActivityId)
-        })));
-        return result.impact;
-    }, [buildActivityMigrationInput, categories, handleUpdateCategories, setActiveSessions, setAppAwarenessActiveRun, setAppAwarenessTemplates, setAppRules, setAutoLinkRules, setFilters, setGoals, setLogs, setMajorGoals, setMemoirFilterConfig, setTodos, updateAchievementRule]);
+        handleUpdateCategories(nextCategories);
+        const migratedReferenceCount = impacts.reduce((total, impact) => total + impact.logs + impact.todos, 0);
+        addToast('success', `已应用批量修改，并迁移 ${migratedReferenceCount} 条历史记录与待办引用`);
+        return impacts;
+    }, [addToast, buildActivityMigrationInput, categories, handleUpdateCategories, replaceAchievementRules, setActiveSessions, setAppAwarenessActiveRun, setAppAwarenessTemplates, setAppRules, setAutoLinkRules, setFilters, setGoals, setLogs, setMajorGoals, setMemoirFilterConfig, setTodos]);
     // Import hooks
     const { handleAddGoal, handleEditGoal, handleSaveGoal, handleDeleteGoal, handleArchiveGoal, handleExtendGoal, handleIncreaseGoalTarget } = useGoalManager();
     const { 
@@ -1031,7 +1054,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     categories={categories}
                     onUpdateCategories={handleUpdateCategories}
                     onPreviewActivityMigration={previewActivityMigration}
-                    onMigrateAndDeleteActivity={migrateAndDeleteActivity}
+                    onApplyTagBatchChanges={applyTagBatchChanges}
                     isManaging={isTagsManaging}
                     onStopManaging={() => setIsTagsManaging(false)}
                 />
