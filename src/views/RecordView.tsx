@@ -13,6 +13,7 @@
  * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
  * @updated 2026-04-20: Switched custom background rendering to the shared preloaded display hook and reduced mobile blur cost.
  * @updated 2026-08-26: Added category-scoped Routine launch list and active Routine control card.
+ * @updated 2026-08-26: Rendered Routine icons through the shared emoji/UI icon renderer.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -300,7 +301,7 @@ export const RecordView: React.FC<RecordViewProps> = ({
                     className="flex min-h-14 items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white/80 px-4 py-3 text-left transition-colors hover:border-stone-300 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <span className="flex min-w-0 items-center gap-3">
-                      <span className="text-lg">{routine.icon || '↻'}</span>
+                      <IconRenderer icon={routine.icon || '↻'} uiIcon={routine.uiIcon} className="text-lg" />
                       <span className="truncate text-sm font-semibold text-stone-700">{routine.name}</span>
                     </span>
                     <span className="shrink-0 text-xs text-stone-400">{routine.steps.length} 步</span>

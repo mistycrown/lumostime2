@@ -1,5 +1,6 @@
 # Views Layer
 
+- Update 2026-08-26: `RoutineSettingsView.tsx` now uses nested back navigation with immediate persistence, shared category and tag selectors, optional custom UI icons, and cross-category routine steps.
 - Update 2026-08-26: Category and tag detail pages now show explicit archive status beside their archive/restore actions, while batch tag management can archive or restore a whole category with its child tags.
 - Update 2026-08-26: `ScopeDetailView.tsx` now shows explicit domain archive status beside its archive/restore action.
 
