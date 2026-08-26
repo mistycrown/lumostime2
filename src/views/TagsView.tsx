@@ -6,7 +6,7 @@
  * @pos View (Main Tab)
  * @description The main "Library" view displaying all Categories and Activities in a hierarchical list. Supports expanding/collapsing categories, switching to a Batch Management mode, and clearer activity card icon sizing.
  * @updated 2026-08-09: Planned timeline blocks are excluded from tag and category log counts.
- * @updated 2026-08-26: Passes activity migration preview and execution handlers into batch management.
+ * @updated 2026-08-26: Defers activity migration until batch submission and passes the atomic batch apply handler.
  * @updated 2026-08-26: Separates archived categories from active categories and allows archived categories to be reopened for cascading restore.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -28,12 +28,12 @@ interface TagsViewProps {
    categories: Category[];
    onUpdateCategories: (categories: Category[]) => void;
    onPreviewActivityMigration?: (sourceActivityId: string) => ActivityMigrationImpact;
-   onMigrateAndDeleteActivity?: (sourceActivityId: string, targetActivityId: string) => Promise<ActivityMigrationImpact>;
+   onApplyTagBatchChanges?: (categories: Category[], migrations: Array<{ sourceActivityId: string; targetActivityId: string }>) => Promise<ActivityMigrationImpact[]>;
    isManaging: boolean;
    onStopManaging: () => void;
 }
 
-export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectCategory, categories, onUpdateCategories, onPreviewActivityMigration, onMigrateAndDeleteActivity, isManaging, onStopManaging }) => {
+export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectCategory, categories, onUpdateCategories, onPreviewActivityMigration, onApplyTagBatchChanges, isManaging, onStopManaging }) => {
    const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
    const [isArchivedExpanded, setIsArchivedExpanded] = useState(false);
 
@@ -80,7 +80,7 @@ export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectC
             onBack={onStopManaging}
             categories={categories}
             onPreviewActivityMigration={onPreviewActivityMigration}
-            onMigrateAndDeleteActivity={onMigrateAndDeleteActivity}
+            onApplyTagBatchChanges={onApplyTagBatchChanges}
             onSave={(newCats) => {
                onUpdateCategories(newCats);
                onStopManaging();

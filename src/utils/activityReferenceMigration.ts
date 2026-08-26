@@ -90,7 +90,8 @@ const replaceActivityInAnswer = (
   answer: AppAwarenessAnswerValue,
   sourceId: string,
   targetId: string,
-  targetCategoryId: string
+  targetCategoryId: string,
+  targetName: string
 ): AppAwarenessAnswerValue => {
   if (!answer || typeof answer !== 'object' || !('activityId' in answer)) {
     return answer;
@@ -103,7 +104,8 @@ const replaceActivityInAnswer = (
   return {
     ...answer,
     activityId: targetId,
-    categoryId: targetCategoryId
+    categoryId: targetCategoryId,
+    label: targetName
   };
 };
 
@@ -111,7 +113,8 @@ const migrateAppAwarenessTemplates = (
   templates: AppAwarenessWorkflowTemplate[],
   sourceId: string,
   targetId: string,
-  targetCategoryId: string
+  targetCategoryId: string,
+  targetName: string
 ): { templates: AppAwarenessWorkflowTemplate[]; count: number } => {
   let count = 0;
   const next = templates.map((template) => ({
@@ -126,7 +129,7 @@ const migrateAppAwarenessTemplates = (
           return option;
         }
         count += 1;
-        return { ...option, activityId: targetId, categoryId: targetCategoryId };
+        return { ...option, activityId: targetId, categoryId: targetCategoryId, label: targetName };
       });
       return { ...step, activityOptions };
     })
@@ -244,7 +247,7 @@ export const migrateActivityReferences = (
   sourceName = '',
   targetName = ''
 ): ActivityReferenceMigrationResult => {
-  const awareness = migrateAppAwarenessTemplates(input.appAwarenessTemplates, sourceId, targetId, targetCategoryId);
+  const awareness = migrateAppAwarenessTemplates(input.appAwarenessTemplates, sourceId, targetId, targetCategoryId, targetName);
   const scene = migrateSceneState(input.sceneState, sourceId, targetId, targetCategoryId);
   const widgets = migrateWidgetTemplates(input.widgetTemplates, sourceId, targetId, targetCategoryId);
   const impact = getActivityMigrationImpact(input, sourceId);
@@ -261,9 +264,24 @@ export const migrateActivityReferences = (
     todos: input.todos.map((todo) => todo.linkedActivityId === sourceId
       ? { ...todo, linkedActivityId: targetId, linkedCategoryId: targetCategoryId }
       : todo),
-    activeSessions: input.activeSessions.map((session) => session.activityId === sourceId
-      ? { ...session, activityId: targetId, categoryId: targetCategoryId }
-      : session),
+    activeSessions: input.activeSessions.map((session) => {
+      const nextSession = session.activityId === sourceId
+        ? { ...session, activityId: targetId, categoryId: targetCategoryId }
+        : session;
+      if (!nextSession.appAwarenessMeta) {
+        return nextSession;
+      }
+      return {
+        ...nextSession,
+        appAwarenessMeta: {
+          ...nextSession.appAwarenessMeta,
+          answers: Object.fromEntries(Object.entries(nextSession.appAwarenessMeta.answers).map(([key, value]) => [
+            key,
+            replaceActivityInAnswer(value, sourceId, targetId, targetCategoryId, targetName)
+          ]))
+        }
+      };
+    }),
     autoLinkRules: input.autoLinkRules.map((rule) => rule.activityId === sourceId
       ? { ...rule, activityId: targetId }
       : rule),
@@ -274,13 +292,15 @@ export const migrateActivityReferences = (
         ...input.appAwarenessActiveRun,
         answers: Object.fromEntries(Object.entries(input.appAwarenessActiveRun.answers).map(([key, value]) => [
           key,
-          replaceActivityInAnswer(value, sourceId, targetId, targetCategoryId)
+          replaceActivityInAnswer(value, sourceId, targetId, targetCategoryId, targetName)
         ]))
       }
       : input.appAwarenessActiveRun,
     achievementRules: input.achievementRules.map((rule) => rule.targetType === 'activity'
       ? { ...rule, targetIds: replaceInUniqueArray(rule.targetIds, sourceId, targetId) }
-      : rule),
+      : rule.filterExpression
+        ? { ...rule, filterExpression: replaceTagInFilterExpression(rule.filterExpression, sourceName, targetName) }
+        : rule),
     sceneState: scene.state,
     widgetTemplates: widgets.templates,
     memoirFilterConfig: {

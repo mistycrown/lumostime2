@@ -3,6 +3,7 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
+- Update 2026-08-26: `AppRoutes.tsx` coordinates atomic activity-reference migration for tag deletion, including active sessions, achievement rules, local filters, native app rules, scenes, and widget templates.
 - Update 2026-08-25: Activity attribute fields now use compact association-style controls with collapse, horizontal option rails, usage ordering, and quick option creation; the manager uses custom type selection, move buttons, and destructive deletion cleanup.
 - Update 2026-08-24: `ActivityAttributeFields.tsx` provides shared optional text, number, single-select, and multi-select controls for records and active sessions; `ActivityAttributeManager.tsx` configures Activity definitions; `ActivityAttributeStatistics.tsx` calculates numeric summaries and choice coverage from actual logs.
 - Update 2026-08-24: `TimelineScheduleCanvas.tsx` now ends historical-day idle gaps and 24:00-boundary record creation at `23:59:59.999`, preventing new Chronicle records from being saved at next-day midnight.

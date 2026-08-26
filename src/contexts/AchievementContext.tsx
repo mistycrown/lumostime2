@@ -14,6 +14,7 @@
  * @updated 2026-04-25: Added global check streak config plus active-period recomputation for streak-weighted check-category rules.
  * @updated 2026-04-17: Added filter-duration achievement rules that reuse the shared custom filter expression logic.
  * @updated 2026-08-11: Reports failed achievement-data hydration through the bootstrap recovery screen.
+ * @updated 2026-08-26: Exposes atomic rule replacement for activity-reference migration.
  */
 import React, { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { buildDefaultAchievementAttributes } from '../constants/achievementAttributes';
@@ -148,6 +149,7 @@ interface AchievementContextType {
   updateCheckStreakConfig: (config: CheckStreakConfig) => void;
   createRule: (input: CreateAchievementRuleInput) => void;
   updateRule: (rule: AchievementRule) => void;
+  replaceRules: (rules: AchievementRule[]) => void;
   deleteRule: (ruleId: string) => void;
   createAttribute: (input: CreateAchievementAttributeInput) => void;
   updateAttribute: (attribute: AchievementAttribute) => void;
@@ -736,6 +738,15 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
     });
   };
 
+  const replaceRules = (nextRules: AchievementRule[]) => {
+    setRules(nextRules);
+    syncActiveSnapshots({
+      forceRecomputeAllDates: true,
+      forceRecomputeGrowthAllDates: true,
+      rulesSource: nextRules
+    });
+  };
+
   const deleteRule = (ruleId: string) => {
     const nextRules = rules.filter((item) => item.id !== ruleId);
     setRules(nextRules);
@@ -1283,6 +1294,7 @@ export const AchievementProvider: React.FC<{ children: ReactNode }> = ({ childre
         updateCheckStreakConfig,
         createRule,
         updateRule,
+        replaceRules,
         deleteRule,
         createAttribute,
         updateAttribute,
