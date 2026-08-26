@@ -39,6 +39,9 @@
 ## Commit & Pull Request Guidelines
 - Follow the repository’s existing commit style: short, focused subjects (often concise Chinese phrases such as `修复状态栏`).
 - Keep one logical change per commit.
+- When a code change reaches a relatively complete, verifiable feature or bug fix, run the relevant checks and create a Git commit automatically in the same task. This applies to changes in `src/`, `electron/`, `android/`, `scripts/`, configuration, and tests; do not wait for a separate request to commit.
+- Do not create an automatic commit solely because a Plan, documentation, or other planning artifact was written or updated. Commit those files only when they are part of the completed code change or the user explicitly asks for it.
+- Before committing, inspect `git status` and the diff, stage only files changed for the current task, and leave unrelated pre-existing or user changes unstaged. If the feature is not yet complete or verification is unavailable, defer the commit and state why.
 - PRs should include: purpose, key files changed, test/verification steps, and screenshots/GIFs for UI changes.
 - Link related issues/tasks and call out any data migration or breaking behavior explicitly.
 
