@@ -1,6 +1,7 @@
 /**
  * @file SessionContext.tsx
  * @description 绠＄悊娲诲姩璁℃椂浼氳瘽鐨勭姸鎬佸拰閫昏緫
+ * @updated 2026-08-26: Invokes the completion callback for every stopped session so Routine transitions wait for the current step's save path.
  * @updated 2026-08-24: Preserves Activity custom attribute values when an active focus session becomes logs.
  * @updated 2026-06-21: Returns started session ids so app-awareness overlay workflows can keep overtime reminders and native prompts linked to the exact active session.
  * @updated 2026-05-14: Prevents duplicate active sessions for the same category/activity pair so repeated NFC/deep-link deliveries cannot leave one timer still running after the other is stopped.
@@ -153,6 +154,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
         onUpdateTodo?: (linkedTodoId: string, progressIncrement: number) => void
     ) => {
         const session = activeSessions.find((item) => item.id === sessionId);
+        let logs: any[] = [];
         if (session) {
             const endTime = Date.now();
             const duration = (endTime - session.startTime) / 1000;
@@ -176,7 +178,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
                     appAwarenessMeta: finalSessionData?.appAwarenessMeta || session.appAwarenessMeta
                 };
 
-                const logs = splitLogByDays(baseLog);
+                logs = splitLogByDays(baseLog);
 
                 logs.forEach((log, index) => {
                     if (index > 0) {
@@ -194,9 +196,10 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
                     onUpdateTodo(session.linkedTodoId, logs[0].progressIncrement);
                 }
 
-                if (onSaveLog) {
-                    onSaveLog(logs);
-                }
+            }
+
+            if (onSaveLog) {
+                onSaveLog(logs);
             }
         }
 

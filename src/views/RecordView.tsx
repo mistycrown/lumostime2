@@ -12,6 +12,7 @@
  * @updated 2026-07-21: Muted activity icon circles in dark mode while preserving each activity color as a low-contrast accent.
  * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
  * @updated 2026-04-20: Switched custom background rendering to the shared preloaded display hook and reduced mobile blur cost.
+ * @updated 2026-08-26: Places the active Routine card below its category heading and renders the current step's static note.
  * @updated 2026-08-26: Added category-scoped Routine launch list and active Routine control card.
  * @updated 2026-08-26: Rendered Routine icons through the shared emoji/UI icon renderer.
  *
@@ -212,6 +213,14 @@ export const RecordView: React.FC<RecordViewProps> = ({
           }}
         />
 
+        {/* Header (Category Title) */}
+        <div className="mb-8 md:mb-10 flex items-center gap-4 mt-2 md:mt-0">
+          <h1 className="text-2xl md:text-2xl font-bold text-stone-900 tracking-tight whitespace-nowrap">
+            {selectedCategory?.name || 'Select Category'}
+          </h1>
+          <div className="h-px flex-1 bg-stone-100"></div>
+        </div>
+
         {activeRoutineRun && activeRoutine && activeStep && activeStepActivity && (
           <div className="mb-5 shrink-0 rounded-2xl border border-stone-200 bg-white/90 px-4 py-3 shadow-sm">
             <div className="flex items-center justify-between gap-3">
@@ -247,16 +256,11 @@ export const RecordView: React.FC<RecordViewProps> = ({
                 </button>
               </div>
             </div>
+            {activeStep.note?.trim() && (
+              <p className="mt-3 border-t border-stone-100 pt-3 text-sm leading-6 text-stone-600 whitespace-pre-wrap">{activeStep.note.trim()}</p>
+            )}
           </div>
         )}
-
-        {/* Header (Category Title) */}
-        <div className="mb-8 md:mb-10 flex items-center gap-4 mt-2 md:mt-0">
-          <h1 className="text-2xl md:text-2xl font-bold text-stone-900 tracking-tight whitespace-nowrap">
-            {selectedCategory?.name || 'Select Category'}
-          </h1>
-          <div className="h-px flex-1 bg-stone-100"></div>
-        </div>
 
         {/* Grid */}
         <div className="flex-1 overflow-y-auto pb-24 no-scrollbar">
