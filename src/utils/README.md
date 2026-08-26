@@ -88,3 +88,4 @@ Contains pure utility functions for data processing and business logic calculati
 > Once the folder I belong to changes, please update me.
 Update 2026-07-30: `timelineSidebarRatioUtils.ts` centralizes Chronicle todo-sidebar ratio bounds, defaults, and migration from the former pixel-width preference.
 Update 2026-08-09: `detailTimelineGrouping.ts` centralizes detail timeline date grouping so month views exclude cross-month and planned-only headings while all-record views retain existing timeline records.
+- Update 2026-08-26: `archiveUtils.ts` now treats category archive state as a first-class, backward-compatible flag, hides child activities from active selectors for archived categories, and provides the shared category-to-activity cascade helper.

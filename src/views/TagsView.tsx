@@ -6,6 +6,8 @@
  * @pos View (Main Tab)
  * @description The main "Library" view displaying all Categories and Activities in a hierarchical list. Supports expanding/collapsing categories, switching to a Batch Management mode, and clearer activity card icon sizing.
  * @updated 2026-08-09: Planned timeline blocks are excluded from tag and category log counts.
+ * @updated 2026-08-26: Passes activity migration preview and execution handlers into batch management.
+ * @updated 2026-08-26: Separates archived categories from active categories and allows archived categories to be reopened for cascading restore.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -14,8 +16,9 @@ import { Log, Category } from '../types';
 import { ChevronDown, ChevronRight, Settings2, Archive } from 'lucide-react';
 import { BatchManageView } from './BatchManageView';
 import { IconRenderer } from '../components/IconRenderer';
-import { isActivityArchived } from '../utils/archiveUtils';
+import { isActivityArchived, isCategoryArchived } from '../utils/archiveUtils';
 import { filterCountableLogs } from '../utils/statLogUtils';
+import type { ActivityMigrationImpact } from '../utils/activityReferenceMigration';
 
 
 interface TagsViewProps {
@@ -24,11 +27,13 @@ interface TagsViewProps {
    onSelectCategory: (catId: string) => void;
    categories: Category[];
    onUpdateCategories: (categories: Category[]) => void;
+   onPreviewActivityMigration?: (sourceActivityId: string) => ActivityMigrationImpact;
+   onMigrateAndDeleteActivity?: (sourceActivityId: string, targetActivityId: string) => Promise<ActivityMigrationImpact>;
    isManaging: boolean;
    onStopManaging: () => void;
 }
 
-export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectCategory, categories, onUpdateCategories, isManaging, onStopManaging }) => {
+export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectCategory, categories, onUpdateCategories, onPreviewActivityMigration, onMigrateAndDeleteActivity, isManaging, onStopManaging }) => {
    const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
    const [isArchivedExpanded, setIsArchivedExpanded] = useState(false);
 
@@ -52,13 +57,20 @@ export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectC
    }, [logs]);
 
    const activeCategories = useMemo(
-      () => categories.map(category => ({ ...category, activities: category.activities.filter(activity => !isActivityArchived(activity)) })),
+      () => categories
+         .filter(category => !isCategoryArchived(category))
+         .map(category => ({ ...category, activities: category.activities.filter(activity => !isActivityArchived(activity)) })),
       [categories]
    );
    const archivedCategories = useMemo(
       () => categories
-         .map(category => ({ ...category, activities: category.activities.filter(isActivityArchived) }))
-         .filter(category => category.activities.length > 0),
+         .map(category => ({
+            ...category,
+            activities: isCategoryArchived(category)
+               ? category.activities
+               : category.activities.filter(isActivityArchived)
+         }))
+         .filter(category => isCategoryArchived(category) || category.activities.some(isActivityArchived)),
       [categories]
    );
 
@@ -67,6 +79,8 @@ export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectC
          <BatchManageView
             onBack={onStopManaging}
             categories={categories}
+            onPreviewActivityMigration={onPreviewActivityMigration}
+            onMigrateAndDeleteActivity={onMigrateAndDeleteActivity}
             onSave={(newCats) => {
                onUpdateCategories(newCats);
                onStopManaging();
@@ -86,10 +100,10 @@ export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectC
             <div className="flex items-center gap-3">
                <button
                   onClick={() => {
-                     if (expandedCategories.size === categories.length) {
+                     if (expandedCategories.size === activeCategories.length) {
                         setExpandedCategories(new Set());
                      } else {
-                        setExpandedCategories(new Set(categories.map(c => c.id)));
+                        setExpandedCategories(new Set(activeCategories.map(c => c.id)));
                      }
                   }}
                   className="text-stone-400 hover:text-stone-600 transition-colors"
@@ -203,6 +217,14 @@ export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectC
                                  <span className="font-bold text-stone-500">{category.name}</span>
                                  <span className="text-xs text-stone-400 font-mono ml-1">({category.activities.length})</span>
                               </div>
+                              <button
+                                 type="button"
+                                 onClick={(event) => { event.stopPropagation(); onSelectCategory(category.id); }}
+                                 className="p-1 text-stone-300 hover:text-stone-600 transition-colors"
+                                 title="打开分类"
+                              >
+                                 <ChevronRight size={16} />
+                              </button>
                               {isExpanded ? <ChevronDown size={18} className="text-stone-300" /> : <ChevronRight size={18} className="text-stone-300" />}
                            </div>
                            {isExpanded && (

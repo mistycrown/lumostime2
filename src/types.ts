@@ -2,6 +2,7 @@
  * @file types.ts
  * @updated 2026-08-24: Added Activity-level custom attribute definitions and ID-based values on logs and active sessions.
  * @updated 2026-08-06: Added backward-compatible archive state to activities.
+ * @updated 2026-08-26: Added backward-compatible archive state to categories so category archiving can cascade to all child activities.
  * @updated 2026-08-09: Added character attributes, experience ledgers, and optional fixed-rule attribute experience effects.
  * @input None
  * @output TypeScript Interfaces & Types
@@ -86,6 +87,7 @@ export interface Category {
   name: string;
   icon: string; // Prefix icon/emoji (for default theme)
   uiIcon?: string; // UI icon ID (for custom theme, e.g., "ui:purple:01")
+  isArchived?: boolean;
   activities: Activity[];
   themeColor: string; // Hex color for stats chart
   enableFocusScore?: boolean; // Default for all activities in category
