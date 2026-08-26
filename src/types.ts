@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-08-26: Added optional UI icon storage for Routine configurations.
  * @updated 2026-08-24: Added Activity-level custom attribute definitions and ID-based values on logs and active sessions.
  * @updated 2026-08-06: Added backward-compatible archive state to activities.
  * @updated 2026-08-26: Added backward-compatible archive state to categories so category archiving can cascade to all child activities.
@@ -93,6 +94,7 @@ export interface Routine {
   id: string;
   name: string;
   icon?: string;
+  uiIcon?: string;
   categoryId: string;
   steps: RoutineStep[];
   createdAt: number;
