@@ -55,6 +55,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
     const [migrationSelections, setMigrationSelections] = useState<Record<string, string>>({});
     const [migrationImpacts, setMigrationImpacts] = useState<Record<string, ActivityMigrationImpact>>({});
     const [openMigrationMenu, setOpenMigrationMenu] = useState<string | null>(null);
+    const [migrationMenuAnchor, setMigrationMenuAnchor] = useState<{ top: number; bottom: number; left: number; width: number } | null>(null);
     const [isApplyingBatch, setIsApplyingBatch] = useState(false);
     const [migrationError, setMigrationError] = useState('');
 
@@ -164,6 +165,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
         setMigrationImpacts(nextImpacts);
         setMigrationError('');
         setOpenMigrationMenu(null);
+        setMigrationMenuAnchor(null);
         setMigrationReviewOpen(true);
     };
 
@@ -640,7 +642,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
             </div>
             {migrationReviewOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm">
-                    <div className="flex h-[min(780px,calc(100vh-2rem))] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-stone-200 bg-[#fdfbf7] shadow-2xl">
+                    <div className="flex h-[min(640px,calc(100vh-2rem))] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-stone-200 bg-[#fdfbf7] shadow-2xl">
                         <div className="flex items-start gap-3 border-b border-stone-100 p-5">
                             <AlertTriangle className="mt-0.5 shrink-0 text-amber-500" size={20} />
                             <div>
@@ -664,7 +666,16 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                         <div className="relative mt-3">
                                             <button
                                                 type="button"
-                                                onClick={() => setOpenMigrationMenu(openMigrationMenu === activity.id ? null : activity.id)}
+                                                onClick={(event) => {
+                                                    if (openMigrationMenu === activity.id) {
+                                                        setOpenMigrationMenu(null);
+                                                        setMigrationMenuAnchor(null);
+                                                        return;
+                                                    }
+                                                    const rect = event.currentTarget.getBoundingClientRect();
+                                                    setOpenMigrationMenu(activity.id);
+                                                    setMigrationMenuAnchor({ top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width });
+                                                }}
                                                 className="flex w-full items-center justify-between rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-left text-sm text-stone-700 transition-colors hover:border-stone-400"
                                                 aria-expanded={openMigrationMenu === activity.id}
                                             >
@@ -675,8 +686,24 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                             </button>
                                             {openMigrationMenu === activity.id && (
                                                 <>
-                                                    <button type="button" aria-label="关闭标签目标菜单" className="fixed inset-0 z-10 cursor-default" onClick={() => setOpenMigrationMenu(null)} />
-                                                    <div className="absolute bottom-full left-0 right-0 z-20 mb-2 max-h-[min(18rem,40vh)] overflow-y-auto rounded-xl border border-stone-200 bg-white py-1 shadow-lg">
+                                                    <button type="button" aria-label="关闭标签目标菜单" className="fixed inset-0 z-[109] cursor-default" onClick={() => { setOpenMigrationMenu(null); setMigrationMenuAnchor(null); }} />
+                                                    {migrationMenuAnchor && (() => {
+                                                        const spaceAbove = migrationMenuAnchor.top - 16;
+                                                        const spaceBelow = window.innerHeight - migrationMenuAnchor.bottom - 16;
+                                                        const openAbove = spaceAbove >= spaceBelow;
+                                                        const maxHeight = Math.max(96, Math.min(288, openAbove ? spaceAbove : spaceBelow));
+                                                        return (
+                                                            <div
+                                                                className="fixed z-[110] overflow-y-auto rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
+                                                                style={{
+                                                                    left: migrationMenuAnchor.left,
+                                                                    width: migrationMenuAnchor.width,
+                                                                    maxHeight,
+                                                                    ...(openAbove
+                                                                        ? { bottom: window.innerHeight - migrationMenuAnchor.top + 8 }
+                                                                        : { top: migrationMenuAnchor.bottom + 8 })
+                                                                }}
+                                                            >
                                                         {migrationTargetOptions.length === 0 ? (
                                                             <div className="px-3 py-3 text-xs text-stone-400">没有可用的未归档标签</div>
                                                         ) : migrationTargetOptions.map(({ activity: candidate, category: candidateCategory }) => (
@@ -686,6 +713,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                                                 onClick={() => {
                                                                     setMigrationSelections(previous => ({ ...previous, [activity.id]: candidate.id }));
                                                                     setOpenMigrationMenu(null);
+                                                                    setMigrationMenuAnchor(null);
                                                                 }}
                                                                 className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-stone-50 ${candidate.id === migrationSelections[activity.id] ? 'bg-stone-100 font-bold' : 'text-stone-700'}`}
                                                             >
@@ -694,7 +722,9 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                                                 {candidate.id === migrationSelections[activity.id] && <Check size={15} className="shrink-0 text-stone-600" />}
                                                             </button>
                                                         ))}
-                                                    </div>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </>
                                             )}
                                         </div>
@@ -715,7 +745,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                             {migrationError && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs leading-5 text-red-600">{migrationError}</p>}
                         </div>
                         <div className="flex gap-3 border-t border-stone-100 bg-white p-4">
-                            <button type="button" onClick={() => { setMigrationReviewOpen(false); setOpenMigrationMenu(null); setMigrationError(''); }} disabled={isApplyingBatch} className="flex-1 rounded-xl border border-stone-200 py-2.5 text-sm font-medium text-stone-600">取消</button>
+                            <button type="button" onClick={() => { setMigrationReviewOpen(false); setOpenMigrationMenu(null); setMigrationMenuAnchor(null); setMigrationError(''); }} disabled={isApplyingBatch} className="flex-1 rounded-xl border border-stone-200 py-2.5 text-sm font-medium text-stone-600">取消</button>
                             <button type="button" onClick={handleApplyBatch} disabled={isApplyingBatch || migrationTargetOptions.length === 0} className="flex-1 rounded-xl bg-stone-900 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">{isApplyingBatch ? '正在应用…' : '确定并应用修改'}</button>
                         </div>
                     </div>
