@@ -6,6 +6,8 @@
  * @description The primary daily view. Visualizes time usage on a timeline, supports adding/editing logs, gap detection, gesture and lightweight calendar date-switch animation, quick search and custom filter entry points, and integrates Daily/Weekly/Monthly review plus achievement bottle entry points.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-08-26: Renders Markdown Routine checklists from timeline notes with their completion state.
+ * @updated 2026-08-26: Uses visual checkbox rows for both timeline cards and schedule blocks.
  * @updated 2026-05-14: Timeline log rows now show `◬ Collection` badges for records that belong to one or more collections, matching the existing linked-todo metadata chips.
  * @updated 2026-05-12: Swapped the Collection quick action icon to a star and kept its deep-link into the settings Collection subpage.
  * @updated 2026-04-30: Timeline done nodes now append `@parent` context to completed subtask titles using plain text.
@@ -51,6 +53,8 @@ import { FloatingButton } from '../components/FloatingButton';
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
 import { UIIcon } from '../components/UIIcon';
 import { IconRenderer } from '../components/IconRenderer';
+import { isRoutineChecklistMarkdown } from '../utils/routineChecklist';
+import { RoutineChecklistPreview } from '../components/RoutineChecklistPreview';
 import { UnreadCountBadge } from '../components/UnreadCountBadge';
 import { useData } from '../contexts/DataContext';
 import { usePrivacy } from '../contexts/PrivacyContext';
@@ -1615,6 +1619,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
 
                     {dayTimeline.map((item) => {
                         if (item.type === 'log' && item.logData) {
+                            const hasChecklist = isRoutineChecklistMarkdown(item.logData.note);
                             const currentStyledLogIndex = styledLogIndex++;
                             return (
                                 <div key={item.id} className="relative pl-8 animate-in slide-in-from-bottom-2 duration-500">
@@ -1671,7 +1676,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                                             )}
                                         </div>
 
-                                        {item.logData.note && (
+                                        {hasChecklist ? (
+                                            <RoutineChecklistPreview
+                                                markdown={item.logData.note || ''}
+                                                className="mb-2 text-stone-500"
+                                            />
+                                        ) : item.logData.note && (
                                             <CollapsibleText
                                                 text={item.logData.note}
                                                 threshold={collapseThreshold}

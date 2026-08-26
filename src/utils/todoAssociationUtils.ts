@@ -1,6 +1,5 @@
 /**
  * @file todoAssociationUtils.ts
- * @updated 2026-08-26: Excludes archived todos from association picker options.
  * @input Flat todo arrays, expanded parent ids, selected todo ids
  * @output Pure row models for hierarchical todo-association pickers
  * @pos Utility (Todo association)
@@ -19,7 +18,6 @@ import { TodoCategory, TodoItem } from '../types';
 import { isQuickTodo } from './todoKindUtils';
 import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodosForDisplay, getParentTodo, isIncompleteSubtaskHiddenByCompletedParent } from './todoHierarchyUtils';
 import { isQuickTodoCategoryId } from './todoQuickCategoryUtils';
-import { isTodoArchived } from './archiveUtils';
 
 export interface TodoAssociationRow {
   todo: TodoItem;
@@ -65,7 +63,8 @@ export const filterTodoAssociationCategories = (
     : undefined;
 
   return categories.filter((category) => (
-    !isQuickTodoCategoryId(category.id) || category.id === legacyQuickCategoryId
+    category.isArchived !== true
+    && (!isQuickTodoCategoryId(category.id) || category.id === legacyQuickCategoryId)
   ));
 };
 
@@ -74,8 +73,7 @@ export const filterTodoAssociationPickerTodos = (
   linkedTodoId?: string
 ): TodoItem[] => (
   todos.filter((todo) => (
-    !isTodoArchived(todo)
-    && isTodoEligibleForAssociationPicker(todo, linkedTodoId)
+    isTodoEligibleForAssociationPicker(todo, linkedTodoId)
     && (!todo.isCompleted || todo.id === linkedTodoId)
   ))
 );

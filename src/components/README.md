@@ -3,7 +3,8 @@
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
 ## Core UI
-- Update 2026-08-26: `TimelineTodoSidebar.tsx` now excludes archived todos from its scheduled, pinned, and category-specific task entries.
+- Update 2026-08-26: `TimerFloating.tsx` now receives Routine-linked scopes and renders `%领域` alongside `@待办` in active timer previews.
+- Update 2026-08-26: `ModalManager.tsx` keeps the floating timer's Routine association context when rendered above modals.
 - Update 2026-08-26: `AppRoutes.tsx` coordinates atomic activity-reference migration for tag deletion, including active sessions, achievement rules, local filters, native app rules, scenes, and widget templates.
 - Update 2026-08-25: Activity attribute fields now use compact association-style controls with collapse, horizontal option rails, usage ordering, and quick option creation; the manager uses custom type selection, move buttons, and destructive deletion cleanup.
 - Update 2026-08-24: `ActivityAttributeFields.tsx` provides shared optional text, number, single-select, and multi-select controls for records and active sessions; `ActivityAttributeManager.tsx` configures Activity definitions; `ActivityAttributeStatistics.tsx` calculates numeric summaries and choice coverage from actual logs.
@@ -356,5 +357,6 @@ Components for theme and appearance customization.
 - `DetailTimelineCard.tsx`: Month-view date headings now come only from countable logs in the selected month; planned-only dates are hidden while same-day planned records remain attached to real activity dates.
 - `ActivityAttributeSummary.tsx`: Resolves ID-based custom attributes for compact timeline display beneath record notes.
 - `TimelineScheduleCanvas.tsx`: Displays compact activity attributes below notes in sufficiently tall split-layout time blocks.
+- `RoutineChecklistPreview.tsx`: Renders Routine Markdown checklist notes as visual checkbox rows in timeline cards and time blocks.
 - `ActivityAttributeStatistics.tsx`: Uses the app-wide `--accent-color` theme for attribute statistics and type-specific visualizations.
 - `DetailTimelineCard.test.ts`: Added regression coverage for cross-month, planned-only, same-day planned, and all-record timeline grouping.

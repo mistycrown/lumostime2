@@ -65,6 +65,23 @@
       .todo-next { margin-top:8px; padding-top:7px; border-top:1px solid #eeeae5; color:#78716c; font-family:ui-sans-serif,system-ui,sans-serif; font-size:9px; }
       .relationship-result { display:none; }
       .relationship-result { animation:none; }
+      .record-core .record-detail { color:#78716c; }
+      .scope .goal-summary { display:block; margin-top:10px; }
+      .scope .goal-summary > span { display:block; margin-bottom:5px; color:#78716c; }
+      .scope .goal-summary strong { display:block; color:#1c1917; font-size:12px; }
+      .scope .goal-rail { margin-top:6px; }
+      .scope-goal { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:7px; color:#78716c; font-family:ui-sans-serif,system-ui,sans-serif; font-size:9px; }
+      .scope-goal span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .scope-goal span:last-child { color:#a8a29e; font-family:ui-monospace,'Cascadia Mono',monospace; }
+      .todo-progress-head { display:block; margin-top:9px; }
+      .todo-progress-head h3 { max-width:100%; }
+      .todo-progress-head p { margin-top:4px; }
+      .todo-meter { margin-top:9px; }
+      .todo-subtasks { display:grid; gap:4px; margin-top:9px; padding-top:7px; border-top:1px solid #eeeae5; color:#78716c; font-family:ui-sans-serif,system-ui,sans-serif; font-size:9px; }
+      .todo-subtask { display:flex; align-items:center; gap:6px; }
+      .todo-subtask i { display:grid; width:11px; height:11px; flex:0 0 auto; place-items:center; border:1px solid #c9c4bc; border-radius:50%; color:#a8a29e; font-size:8px; font-style:normal; }
+      .todo-subtask.done i { border-color:var(--green); color:var(--green); }
+      .ink-drop, .ink-drop i, .todo-next { display:none; }
     </style>
   </head>
   <body>
@@ -75,7 +92,7 @@
         <div class="titlebar"><span class="dots"><i></i><i></i><i></i></span><span>LumosTime</span></div>
         <div class="relationship-view" aria-label="一段上课记录关联标签、领域和待办">
           <p class="relationship-kicker">一段记录，三个位置</p>
-          <article class="record-core"><span class="record-time">09:00 - 09:45</span><div class="record-title"><h2>上课</h2><div class="record-associations"><span class="tag"># 学习 / 上课</span><span class="scope">% 说流利英语</span><span>@ 本学期的口语外教课</span></div></div><p class="record-note">口语外教课 · 第 03 讲：谈论周末安排</p><p class="record-detail">已记录 45 分钟真实投入，完成自由对话与课后表达复盘。</p></article>
+          <article class="record-core"><span class="record-time">09:00 - 09:45</span><div class="record-title"><h2>上课</h2><div class="record-associations"><span class="tag"># 学习 / 上课</span><span class="scope">% 说流利英语</span><span>@ 本学期的口语外教课</span></div></div><p class="record-note">口语外教课 · 第 03 讲：谈论周末安排</p><p class="record-detail">今天进入状态很快，周末话题比预想中顺，课后把几个表达又顺了一遍。</p></article>
           <div class="connector" aria-hidden="true"><i></i><i></i><i></i></div>
           <section class="relation-grid" aria-label="三类关联信息预览">
             <article class="relation-block tag">
@@ -90,17 +107,22 @@
             </article>
             <article class="relation-block scope">
               <b>% 领域</b>
-              <div class="relation-heading"><h3>说流利英语</h3><span class="relation-stat">19%</span></div>
-              <p>目标完成情况</p>
-              <div class="goal-summary"><span>本学期的口语外教课</span><strong>3 / 16 讲</strong></div>
-              <div class="goal-rail"><i></i></div>
-              <div class="goal-phases"><span>进行中</span><span>第 03 讲</span><span>16 讲</span></div>
+              <div class="relation-heading"><h3>说流利英语</h3><span class="relation-stat">78 / 300h</span></div>
+              <p>目标系列 · 2026 年英语学习计划</p>
+              <div class="goal-summary"><span>年度总投入</span><strong>78 / 300 小时 · 26%</strong></div>
+              <div class="goal-rail"><i style="width:26%"></i></div>
+              <div class="scope-goal"><span>上课</span><span>32 / 100 小时</span></div>
+              <div class="scope-goal"><span>自我练习</span><span>46 / 200 小时</span></div>
             </article>
             <article class="relation-block todo">
               <b>@ 待办</b>
-              <div class="todo-progress-head"><span class="ink-drop" aria-hidden="true"><i></i></span><div><h3>本学期的口语外教课</h3><p>已推进 3 / 16 讲</p></div></div>
+              <div class="todo-progress-head"><h3>本学期的口语外教课</h3><p>第 03 讲 / 共 16 讲</p></div>
               <div class="todo-meter"><span>19%</span></div>
-              <div class="todo-next">下一步 · 预约下一次外教课</div>
+              <div class="todo-subtasks">
+                <div class="todo-subtask done"><i>✓</i><span>完成第 03 讲：周末表达</span></div>
+                <div class="todo-subtask"><i></i><span>整理本课口语笔记</span></div>
+                <div class="todo-subtask"><i></i><span>预约第 04 讲</span></div>
+              </div>
             </article>
           </section>
         </div>

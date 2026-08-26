@@ -3,10 +3,11 @@
  * @description 计时页面容器 - 包含标签视图和场景视图的切换
  * @updated 2026-04-25: Let the floating record-view switcher inherit button theme colors when falling back to Lucide icons under the default UI theme.
  * @updated 2026-04-25: Added a flex min-height guard so Scene mode inherits a scrollable viewport height on mobile.
+ * @updated 2026-08-26: Passes Routine checklist controls into the Record view.
  * @updated 2026-08-26: Passes Routine configuration and active-run controls into the Record view.
  */
 import React, { useState, useEffect } from 'react';
-import { ActiveRoutineRun, Category, Activity, TodoItem, Routine } from '../types';
+import { ActiveRoutineRun, Category, Activity, Scope, TodoItem, Routine } from '../types';
 import { RecordView } from './RecordView';
 import { SceneView } from './SceneView';
 import { FloatingButton } from '../components/FloatingButton';
@@ -24,10 +25,12 @@ interface RecordViewContainerProps {
   onAddLog?: (startTime?: number, endTime?: number, prefilledData?: { categoryId?: string; activityId?: string; linkedTodoId?: string }) => void;
   categories: Category[];
   todos?: TodoItem[];
+  scopes?: Scope[];
   routines?: Routine[];
   activeRoutineRun?: ActiveRoutineRun | null;
   onStartRoutine?: (routine: Routine) => void;
   onAdvanceRoutine?: () => void;
+  onToggleRoutineChecklist?: (index: number) => void;
   onExitRoutine?: () => void;
 }
 
@@ -37,10 +40,12 @@ export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
   onAddLog,
   categories,
   todos = [],
+  scopes = [],
   routines = [],
   activeRoutineRun = null,
   onStartRoutine,
   onAdvanceRoutine,
+  onToggleRoutineChecklist,
   onExitRoutine
 }) => {
   const { defaultRecordView } = useSettings();
@@ -94,10 +99,13 @@ export const RecordViewContainer: React.FC<RecordViewContainerProps> = ({
         <RecordView 
           onStartActivity={onStartActivity}
           categories={categories}
+          todos={todos}
+          scopes={scopes}
           routines={routines}
           activeRoutineRun={activeRoutineRun}
           onStartRoutine={onStartRoutine}
           onAdvanceRoutine={onAdvanceRoutine}
+          onToggleRoutineChecklist={onToggleRoutineChecklist}
           onExitRoutine={onExitRoutine}
         />
       ) : (

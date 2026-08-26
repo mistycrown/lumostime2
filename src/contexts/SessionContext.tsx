@@ -34,7 +34,7 @@ interface SessionContextType {
     ) => string;
     stopActivity: (
         sessionId: string,
-        finalSessionData?: ActiveSession,
+        finalSessionData?: Partial<ActiveSession>,
         onSaveLog?: (logs: any[]) => void,
         onUpdateTodo?: (linkedTodoId: string, progressIncrement: number) => void
     ) => void;
@@ -149,7 +149,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
 
     const stopActivity = (
         sessionId: string,
-        finalSessionData?: ActiveSession,
+        finalSessionData?: Partial<ActiveSession>,
         onSaveLog?: (logs: any[]) => void,
         onUpdateTodo?: (linkedTodoId: string, progressIncrement: number) => void
     ) => {

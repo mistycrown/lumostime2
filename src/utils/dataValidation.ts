@@ -9,6 +9,7 @@
  * @updated 2026-08-10: Added optional Android widget template array validation while preserving compatibility with backups created before widget templates were exported.
  * @updated 2026-08-10: Added optional appearance backup validation for theme and TimePal restore data.
  * @updated 2026-08-11: Keeps missing or invalid legacy timestamps neutral instead of manufacturing a current timestamp during import or restore.
+ * @updated 2026-08-26: Validates optional Routine configuration arrays in backup payloads.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -66,7 +67,8 @@ export function validateLocalData(data: any): ValidationResult {
     'filters',
     'principles',
     'selfBeliefs',
-    'widgetTemplates'
+    'widgetTemplates',
+    'routines'
   ];
 
   for (const field of arrayFields) {

@@ -4,6 +4,7 @@
  * @output Unified Modal Management
  * @pos Component (Manager)
  * @description 统一管理所有应用模态框 - 避免 Props drilling，集中管理 Modal 状态
+ * @updated 2026-08-26: Passes scopes into floating timers for Routine association previews.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -144,6 +145,7 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
                 <TimerFloating
                     sessions={activeSessions}
                     todos={todos}
+                    scopes={scopes}
                     onStop={onStopActivity}
                     onCancel={onCancelSession}
                     onClick={onClickSession}

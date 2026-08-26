@@ -1,5 +1,6 @@
 /**
  * @file todoQuickCategoryUtils.ts
+ * @updated 2026-08-26: Excludes archived todo categories from normal category and scheduling selectors.
  * @input Todo category arrays and optional todo records
  * @output Shared helpers for reserved todo category configuration
  * @pos Utility (todo quick category)
@@ -91,11 +92,11 @@ export const ensureQuickTodoCategory = (categories: TodoCategory[]): TodoCategor
 };
 
 export const getRealTodoCategories = (categories: TodoCategory[]): TodoCategory[] => (
-  ensureQuickTodoCategory(categories).filter((category) => !isQuickTodoCategoryId(category.id))
+  ensureQuickTodoCategory(categories).filter((category) => !isQuickTodoCategoryId(category.id) && category.isArchived !== true)
 );
 
 export const getStandardTodoCategories = (categories: TodoCategory[]): TodoCategory[] => (
-  ensureQuickTodoCategory(categories).filter((category) => !isReservedTodoCategoryId(category.id))
+  ensureQuickTodoCategory(categories).filter((category) => !isReservedTodoCategoryId(category.id) && category.isArchived !== true)
 );
 
 export const getSchedulableTodoCategories = (categories: TodoCategory[]): TodoCategory[] => (

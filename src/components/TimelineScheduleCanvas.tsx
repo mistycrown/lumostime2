@@ -23,6 +23,7 @@
  * @updated 2026-08-24: Ignores the opening touch click inside plan actions and requires a second delete confirmation to prevent accidental starts and removals.
  * @updated 2026-08-26: Shows activity attributes beneath notes in sufficiently tall split-layout time blocks.
  * @updated 2026-08-26: Applies privacy-mode blurring to notes in split-layout time blocks.
+ * @updated 2026-08-26: Renders Routine Markdown checklist notes as visual checkbox rows.
  */
 import React, { useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -32,6 +33,8 @@ import { toCssColor } from '../utils/colorUtils';
 import { isAutoRecurringPlanDeleteLocked } from '../utils/todoRecurringPlanUtils';
 import { clampEndTimeToStartDay } from '../utils/logUtils';
 import { ActivityAttributeSummary } from './ActivityAttributeSummary';
+import { RoutineChecklistPreview } from './RoutineChecklistPreview';
+import { isRoutineChecklistMarkdown } from '../utils/routineChecklist';
 
 const MIN_HOUR_HEIGHT = 52;
 const MAX_HOUR_HEIGHT = 180;
@@ -1184,6 +1187,7 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
               const showAttributes = height >= 68 && !isPlanned && (log.attributeValues?.length || 0) > 0;
               const isExpandedNote = isTimelineLogNoteExpanded(height);
               const noteText = log.note?.trim() || '';
+              const hasChecklist = isRoutineChecklistMarkdown(noteText);
               return (
                 <div
                   key={log.id}
@@ -1235,7 +1239,13 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
                       {activityLabel && `#${activityLabel}`}{linkedTodoLabel && `${activityLabel ? ' ' : ''}@${linkedTodoLabel}`}{linkedScopeNames.map((scopeName) => ` %${scopeName}`).join('')}
                     </span>
                   )}
-                  {!isEditing && showNote && noteText && (
+                  {!isEditing && showNote && noteText && (hasChecklist ? (
+                    <RoutineChecklistPreview
+                      markdown={noteText}
+                      compact
+                      className={`mt-0.5 text-stone-500 ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'} ${isExpandedNote ? '' : 'max-h-3 overflow-hidden'}`}
+                    />
+                  ) : (
                     <span
                       className={`mt-0.5 block text-[11px] leading-4 text-stone-500 ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'} ${
                         isExpandedNote ? 'whitespace-pre-wrap break-words' : 'truncate'
@@ -1243,7 +1253,7 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
                     >
                       {isExpandedNote ? noteText : noteText.replace(/\s+/g, ' ')}
                     </span>
-                  )}
+                  ))}
                   {!isEditing && showAttributes && (
                     <ActivityAttributeSummary
                       activity={activity}

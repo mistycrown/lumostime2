@@ -1,6 +1,5 @@
 /**
  * @file todoScheduleUtils.test.ts
- * @updated 2026-08-26: Added archive-visibility coverage for shared schedule entries.
  * @input Todo schedule helpers with fixed reference dates
  * @output Regression coverage for virtual-category date matching, shared day entries, and week-view badge normalization
  * @pos Test (todo planning utilities)
@@ -68,14 +67,6 @@ afterEach(() => {
 });
 
 describe('todoScheduleUtils virtual category helpers', () => {
-  test('excludes archived todos from association and schedule entries', () => {
-    const active = buildTodo({ id: 'active', scheduledDate: '2026-04-20' });
-    const archived = buildTodo({ id: 'archived', scheduledDate: '2026-04-20', isArchived: true });
-
-    expect(getTodoAssociationTodayTodos([active, archived], REFERENCE_DATE).map((todo) => todo.id)).toEqual(['active']);
-    expect(buildTodoDateEntries([active, archived], [], '2026-04-20').map((entry) => entry.todo.id)).toEqual(['active']);
-  });
-
   test('builds Monday-based date keys for today, tomorrow, and this week', () => {
     expect(getTodoScheduleRangeDateKeys('today', REFERENCE_DATE)).toEqual(['2026-04-20']);
     expect(getTodoScheduleRangeDateKeys('tomorrow', REFERENCE_DATE)).toEqual(['2026-04-21']);

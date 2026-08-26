@@ -12,38 +12,46 @@
  * @updated 2026-07-21: Muted activity icon circles in dark mode while preserving each activity color as a low-contrast accent.
  * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
  * @updated 2026-04-20: Switched custom background rendering to the shared preloaded display hook and reduced mobile blur cost.
- * @updated 2026-08-26: Places the active Routine card below its category heading and renders the current step's static note.
+ * @updated 2026-08-26: Renders and toggles the current step's Markdown checklist in the active Routine card.
  * @updated 2026-08-26: Added category-scoped Routine launch list and active Routine control card.
+ * @updated 2026-08-26: Displays Routine step Activity, Scope, and Todo associations using #, %, and @ markers.
  * @updated 2026-08-26: Rendered Routine icons through the shared emoji/UI icon renderer.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useEffect, useMemo, type CSSProperties } from 'react';
-import { ActiveRoutineRun, Category, Activity, Routine } from '../types';
-import { ChevronLeft, ChevronRight, X, CheckCircle2, ArrowRight } from 'lucide-react';
+import { ActiveRoutineRun, Category, Activity, Routine, Scope, TodoItem } from '../types';
+import { ChevronLeft, ChevronRight, X, Check, CheckCircle2, ArrowRight } from 'lucide-react';
 import { IconRenderer } from '../components/IconRenderer';
 import { getColorHexForCharts, getSoftColorCircleStyle } from '../utils/colorAdapterUtils';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 import { getActiveActivities } from '../utils/archiveUtils';
+import { parseRoutineChecklist } from '../utils/routineChecklist';
 
 
 interface RecordViewProps {
   onStartActivity: (activity: Activity, categoryId: string) => void;
   categories: Category[];
+  scopes?: Scope[];
+  todos?: TodoItem[];
   routines?: Routine[];
   activeRoutineRun?: ActiveRoutineRun | null;
   onStartRoutine?: (routine: Routine) => void;
   onAdvanceRoutine?: () => void;
+  onToggleRoutineChecklist?: (index: number) => void;
   onExitRoutine?: () => void;
 }
 
 export const RecordView: React.FC<RecordViewProps> = ({
   onStartActivity,
   categories,
+  scopes = [],
+  todos = [],
   routines = [],
   activeRoutineRun = null,
   onStartRoutine,
   onAdvanceRoutine,
+  onToggleRoutineChecklist,
   onExitRoutine
 }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
@@ -90,9 +98,17 @@ export const RecordView: React.FC<RecordViewProps> = ({
   const activeStep = activeRoutine && activeRoutineRun
     ? activeRoutine.steps[activeRoutineRun.currentStepIndex]
     : undefined;
-  const activeStepActivity = activeStep
-    ? categories.find(category => category.id === activeStep.categoryId)?.activities.find(activity => activity.id === activeStep.activityId)
+  const activeStepTodo = activeStep?.linkedTodoId ? todos.find(todo => todo.id === activeStep.linkedTodoId) : undefined;
+  const activeStepCategoryId = activeStepTodo?.linkedCategoryId || activeStep?.categoryId;
+  const activeStepActivityId = activeStepTodo?.linkedActivityId || activeStep?.activityId;
+  const activeStepActivity = activeStep && activeStepCategoryId && activeStepActivityId
+    ? categories.find(category => category.id === activeStepCategoryId)?.activities.find(activity => activity.id === activeStepActivityId)
     : undefined;
+  const activeStepScopeIds = activeStepTodo?.defaultScopeIds || activeStep?.scopeIds || [];
+  const activeStepScopes = activeStepScopeIds
+    .map(scopeId => scopes.find(scope => scope.id === scopeId))
+    .filter((scope): scope is Scope => Boolean(scope));
+  const activeChecklist = parseRoutineChecklist(activeRoutineRun?.checklistMarkdown ?? activeStep?.checklistMarkdown);
   const [routineElapsed, setRoutineElapsed] = useState(0);
 
   useEffect(() => {
@@ -230,10 +246,15 @@ export const RecordView: React.FC<RecordViewProps> = ({
                   <span>{activeRoutineRun.currentStepIndex + 1} / {activeRoutine.steps.length}</span>
                 </div>
                 <div className="mt-1 flex items-center gap-2">
-                  <IconRenderer icon={activeStepActivity.icon} uiIcon={activeStepActivity.uiIcon} size={20} />
-                  <span className="truncate text-base font-bold text-stone-800">{activeStepActivity.name}</span>
+                  <span className="truncate text-base font-bold text-stone-800">#{activeStepActivity.name}</span>
                   <span className="shrink-0 font-mono text-sm tabular-nums text-stone-500">{formatElapsed(routineElapsed)}</span>
                 </div>
+                {(activeStepTodo || activeStepScopes.length > 0) && (
+                  <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-stone-400">
+                    {activeStepTodo && <span className="truncate">@{activeStepTodo.title}</span>}
+                    {activeStepScopes.map(scope => <span key={scope.id} className="truncate">%{scope.name}</span>)}
+                  </div>
+                )}
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <button
@@ -258,6 +279,23 @@ export const RecordView: React.FC<RecordViewProps> = ({
             </div>
             {activeStep.note?.trim() && (
               <p className="mt-3 border-t border-stone-100 pt-3 text-sm leading-6 text-stone-600 whitespace-pre-wrap">{activeStep.note.trim()}</p>
+            )}
+            {activeChecklist.length > 0 && (
+              <div className="mt-3 space-y-1 border-t border-stone-100 pt-3">
+                {activeChecklist.map((item, index) => (
+                  <button
+                    key={`${item.text}-${index}`}
+                    type="button"
+                    onClick={() => onToggleRoutineChecklist?.(index)}
+                    className="flex w-full items-center gap-2 rounded-lg px-1 py-1 text-left text-sm text-stone-600 hover:bg-stone-50"
+                  >
+                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all ${item.completed ? 'border-[var(--accent-color)] bg-[var(--accent-color)] text-white shadow-sm' : 'border-stone-300 bg-white text-transparent'}`}>
+                      <Check size={13} strokeWidth={3} />
+                    </span>
+                    <span className={item.completed ? 'text-stone-400 line-through' : ''}>{item.text}</span>
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         )}
