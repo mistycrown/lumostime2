@@ -1,6 +1,7 @@
 /**
  * @file ScopeDetailView.tsx
  * @updated 2026-08-06: Added archive and restore control for domains.
+ * @updated 2026-08-26: Displays explicit archive status text beside the domain archive/restore action.
  * @input Scope Data, Logs, Associated Todos/Goals/MajorGoals
  * @output Updated Scope, Managed Goals/MajorGoals/Keywords
  * @pos View (Detail Page)
@@ -312,14 +313,18 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                         <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
                             <div className="flex items-center justify-between mb-4 pb-4 border-b border-stone-100">
                                 <span className="text-sm font-medium text-stone-600">归档状态</span>
-                                <button
-                                    onClick={handleToggleArchive}
-                                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-stone-500 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                                    title={scope.isArchived ? '恢复领域' : '归档领域'}
-                                >
-                                    {scope.isArchived ? <ArchiveRestore size={15} /> : <Archive size={15} />}
-                                    {scope.isArchived ? '恢复领域' : '归档领域'}
-                                </button>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-sm text-stone-500">{scope.isArchived ? '已归档' : '未归档'}</span>
+                                    <button
+                                        type="button"
+                                        onClick={handleToggleArchive}
+                                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-stone-500 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                                        title={scope.isArchived ? '恢复领域' : '归档领域'}
+                                    >
+                                        {scope.isArchived ? <ArchiveRestore size={15} /> : <Archive size={15} />}
+                                        {scope.isArchived ? '恢复领域' : '归档领域'}
+                                    </button>
+                                </div>
                             </div>
                             <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">基本信息</h3>
 
