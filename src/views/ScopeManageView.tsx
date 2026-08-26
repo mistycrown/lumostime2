@@ -3,12 +3,13 @@
  * @input Scope List
  * @output Created/Updated/Archived Scopes
  * @pos View (Settings Sub-page)
- * @description A management interface for Scopes. Allows creating new scopes, renaming, changing colors/icons, reordering, and archiving/restoring scopes.
+ * @description A draft-based scope manager with deferred deletion-reference migration or unlink confirmation on submit.
+ * @updated 2026-08-26: Defer scope deletion reference checks until batch submission and preserve historical records through migration or unlinking.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState, useEffect } from 'react';
-import { Scope } from '../types';
+import React, { useState } from 'react';
+import { Scope, Log, ActiveSession } from '../types';
 import { Plus, Trash2, Archive, ArchiveRestore, GripVertical, ArrowUp, ArrowDown, X, Check } from 'lucide-react';
 import { IconRenderer } from '../components/IconRenderer';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
@@ -16,16 +17,24 @@ import { uiIconService } from '../services/uiIconService';
 import { COLOR_OPTIONS } from '../constants';
 import { useCustomColors } from '../hooks/useCustomColors';
 import { getColorPreviewValue, isStoredColorSelected } from '../utils/colorUtils';
+import { ReferenceDeleteModal } from '../components/ReferenceDeleteModal';
+import { getScopeReferenceImpact, type ReferenceDeleteDecision } from '../utils/referenceDeletion';
 
 interface ScopeManageViewProps {
     scopes: Scope[];
+    logs: Log[];
+    activeSessions: ActiveSession[];
     onUpdate: (scopes: Scope[]) => void;
+    onApplyScopeChanges?: (scopes: Scope[], decisions: Record<string, ReferenceDeleteDecision>) => void;
     onBack: () => void;
 }
 
 export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
     scopes,
+    logs,
+    activeSessions,
     onUpdate,
+    onApplyScopeChanges,
     onBack
 }) => {
     const [editingScopes, setEditingScopes] = useState<Scope[]>(JSON.parse(JSON.stringify(scopes)));
@@ -34,19 +43,12 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
     // Icon selector state
     const [iconSelectorOpen, setIconSelectorOpen] = useState<string | null>(null);
     const [colorPickerOpen, setColorPickerOpen] = useState<string | null>(null);
+    const [scopeDeleteReview, setScopeDeleteReview] = useState<{ ids: string[]; index: number; decisions: Record<string, ReferenceDeleteDecision> } | null>(null);
     const isCustomIconEnabled = uiIconService.isCustomTheme();
     const customColors = useCustomColors();
 
     const activeScopes = editingScopes.filter(s => !s.isArchived).sort((a, b) => a.order - b.order);
     const archivedScopes = editingScopes.filter(s => s.isArchived).sort((a, b) => a.order - b.order);
-
-    // 组件卸载时自动保存（用于硬件返回键）
-    useEffect(() => {
-        return () => {
-            // 组件卸载时保存
-            onUpdate(editingScopes);
-        };
-    }, [editingScopes, onUpdate]);
 
     const handleAddScope = () => {
         const newScope: Scope = {
@@ -104,6 +106,20 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
     };
 
     const handleSave = () => {
+        const remainingScopeIds = new Set(editingScopes.map((scope) => scope.id));
+        const deletedScopeIds = scopes
+            .filter((scope) => !remainingScopeIds.has(scope.id))
+            .map((scope) => scope.id);
+        const impactedScopeIds = deletedScopeIds.filter((scopeId) => {
+            const impact = getScopeReferenceImpact(logs, activeSessions, scopeId);
+            return impact.logs > 0 || impact.activeSessions > 0;
+        });
+
+        if (impactedScopeIds.length > 0 && onApplyScopeChanges) {
+            setScopeDeleteReview({ ids: impactedScopeIds, index: 0, decisions: {} });
+            return;
+        }
+
         onUpdate(editingScopes);
         onBack();
     };
@@ -363,6 +379,34 @@ export const ScopeManageView: React.FC<ScopeManageViewProps> = ({
                     <span>添加新领域</span>
                 </button>
             </div>
+            {scopeDeleteReview && (() => {
+                const scopeId = scopeDeleteReview.ids[scopeDeleteReview.index];
+                const target = scopes.find((scope) => scope.id === scopeId);
+                if (!target) return null;
+                return (
+                    <ReferenceDeleteModal
+                        isOpen
+                        title="提交前确认领域关联"
+                        description="检测到该领域将被删除。请选择历史记录与当前计时的迁移目标，或取消这些关联。"
+                        sourceName={`${target.icon}${target.name}`}
+                        targetLabel="领域"
+                        impact={getScopeReferenceImpact(logs, activeSessions, target.id)}
+                        targets={editingScopes.filter((scope) => !scope.isArchived && scope.id !== target.id).map((scope) => ({ id: scope.id, name: scope.name, icon: scope.icon }))}
+                        onClose={() => setScopeDeleteReview(null)}
+                        onConfirm={(decision) => {
+                            const decisions = { ...scopeDeleteReview.decisions, [target.id]: decision };
+                            const nextIndex = scopeDeleteReview.index + 1;
+                            if (nextIndex < scopeDeleteReview.ids.length) {
+                                setScopeDeleteReview({ ...scopeDeleteReview, index: nextIndex, decisions });
+                                return;
+                            }
+                            onApplyScopeChanges?.(editingScopes, decisions);
+                            setScopeDeleteReview(null);
+                            onBack();
+                        }}
+                    />
+                );
+            })()}
         </div>
     );
 };

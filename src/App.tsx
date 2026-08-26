@@ -63,6 +63,7 @@ import { AddLogModal } from './components/AddLogModal';
 import { TodoDetailModal } from './components/TodoDetailModal';
 import { GoalEditor } from './components/GoalEditor';
 import { ConfirmModal } from './components/ConfirmModal';
+import { ReferenceDeleteModal } from './components/ReferenceDeleteModal';
 import { SyncConflictModal } from './components/SyncConflictModal';
 import { SyncDirectionModal } from './components/SyncDirectionModal';
 import { BottomNavigation } from './components/BottomNavigation';
@@ -1053,17 +1054,18 @@ const AppContent: React.FC = () => {
       {!showTodoDetailPage && todoDetailModalNode}
 
       {/* Delete Todo Confirmation */}
-      <ConfirmModal
+      <ReferenceDeleteModal
         isOpen={todoManager.isDeleteTodoConfirmOpen}
-        title="删除任务"
+        title="删除待办并处理关联"
         description={todoManager.todoDeleteChildCount > 0
-          ? `这个任务已关联历史记录，并包含 ${todoManager.todoDeleteChildCount} 个子任务。删除后会一并删除这些子任务，同时解除相关历史记录的关联，但会保留时间日志。确定要删除吗？`
-          : '这个任务已关联历史记录。删除后会解除相关历史记录的关联，但会保留时间日志。确定要删除吗？'}
+          ? `该待办包含 ${todoManager.todoDeleteChildCount} 个子任务。请先选择历史记录和当前计时的处理方式。`
+          : '请先选择历史记录和当前计时的处理方式。'}
+        sourceName={todos.find((todo) => todo.id === todoManager.todoToDeleteId)?.title || '待办'}
+        targetLabel="待办"
+        impact={todoManager.todoDeleteReferenceImpact}
+        targets={todos.filter((todo) => !todo.isCompleted && !todoManager.todoDeleteTargetIds.includes(todo.id)).map((todo) => ({ id: todo.id, name: todo.title }))}
         onConfirm={todoManager.handleConfirmDeleteTodo}
         onClose={() => todoManager.setIsDeleteTodoConfirmOpen(false)}
-        confirmText="删除"
-        cancelText="取消"
-        type="warning"
       />
 
       {isGoalEditorOpen && (
