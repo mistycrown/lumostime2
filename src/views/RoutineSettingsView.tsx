@@ -4,6 +4,7 @@
  * @output Routine 的新建、编辑、排序和删除操作
  * @pos View (Settings Subview)
  * @description 管理记录页可快速启动的连续计时 Routine。
+ * @updated 2026-08-26: Aligns Routine icon editing with batch tags and adds static step notes.
  * @updated 2026-08-26: Reworked the editor to use nested back navigation, shared selectors, and cross-category steps.
  */
 import React, { useMemo, useState } from 'react';
@@ -12,7 +13,7 @@ import type { Category, Routine, RoutineStep } from '../types';
 import { CustomSelect } from '../components/CustomSelect';
 import { IconRenderer } from '../components/IconRenderer';
 import { TagAssociation } from '../components/TagAssociation';
-import { UIIconSelector } from '../components/UIIconSelector';
+import { UIIconSelectorCompact } from '../components/UIIconSelector';
 import { useSettings } from '../contexts/SettingsContext';
 
 interface RoutineSettingsViewProps {
@@ -25,8 +26,8 @@ interface RoutineSettingsViewProps {
 
 const createRoutine = (categoryId: string): Routine => ({
   id: crypto.randomUUID(),
-  name: '',
-  icon: '↻',
+  name: '新建 Routine',
+  icon: '新',
   categoryId,
   steps: [],
   createdAt: Date.now(),
@@ -63,6 +64,7 @@ export const RoutineSettingsView: React.FC<RoutineSettingsViewProps> = ({
   );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
+  const [isUIIconSelectorOpen, setIsUIIconSelectorOpen] = useState(false);
   const editingRoutine = editingId ? routines.find(routine => routine.id === editingId) : undefined;
 
   const beginCreate = () => {
@@ -81,6 +83,16 @@ export const RoutineSettingsView: React.FC<RoutineSettingsViewProps> = ({
     onUpdateRoutines(routines.map(routine => routine.id === editingRoutine.id
       ? { ...routine, ...patch, updatedAt: Date.now() }
       : routine));
+  };
+
+  const updateRoutineName = (name: string) => {
+    if (!editingRoutine) return;
+    const previousFirstCharacter = Array.from(editingRoutine.name)[0] || '';
+    const nextFirstCharacter = Array.from(name)[0] || '';
+    updateEditing({
+      name,
+      icon: editingRoutine.icon === previousFirstCharacter ? nextFirstCharacter : editingRoutine.icon
+    });
   };
 
   const updateStep = (stepId: string, patch: Partial<RoutineStep>) => {
@@ -111,11 +123,13 @@ export const RoutineSettingsView: React.FC<RoutineSettingsViewProps> = ({
     if (editingId === routineId) {
       setEditingId(null);
       setExpandedStepId(null);
+      setIsUIIconSelectorOpen(false);
     }
   };
 
   const leaveCurrentLevel = () => {
     setExpandedStepId(null);
+    setIsUIIconSelectorOpen(false);
     if (editingRoutine) {
       setEditingId(null);
       return;
@@ -175,27 +189,50 @@ export const RoutineSettingsView: React.FC<RoutineSettingsViewProps> = ({
           <div className="space-y-7">
             <section className="space-y-4">
               <h2 className="text-sm font-bold text-stone-700">基本信息</h2>
-              <label className="block text-xs font-semibold text-stone-500">
-                名称
-                <input
-                  value={editingRoutine.name}
-                  onChange={event => updateEditing({ name: event.target.value })}
-                  placeholder="例如：晨间日常"
-                  className="mt-1 w-full border-b border-stone-200 bg-transparent px-0 py-2 text-sm text-stone-800 outline-none transition-colors focus:border-stone-500 focus:outline-none focus:ring-0"
-                />
-              </label>
-              <label className="block text-xs font-semibold text-stone-500">
-                图标
-                <div className="mt-1 flex items-center gap-3">
-                  <IconRenderer icon={editingRoutine.icon || '↻'} uiIcon={editingRoutine.uiIcon} className="text-2xl" />
+              <div className="border-b border-stone-200">
+                <div className="flex items-center gap-2 py-1">
                   <input
                     value={editingRoutine.icon || ''}
                     onChange={event => updateEditing({ icon: event.target.value, uiIcon: '' })}
                     aria-label="Routine emoji 图标"
-                    className="w-20 border-b border-stone-200 bg-transparent px-0 py-2 text-center text-xl outline-none transition-colors focus:border-stone-500 focus:outline-none focus:ring-0"
+                    className="w-9 shrink-0 bg-transparent py-2 text-center text-xl outline-none focus:outline-none focus:ring-0"
                   />
+                  <input
+                    value={editingRoutine.name}
+                    onChange={event => updateRoutineName(event.target.value)}
+                    aria-label="Routine 名称"
+                    placeholder="例如：晨间日常"
+                    className="min-w-0 flex-1 bg-transparent py-2 text-sm text-stone-800 outline-none focus:outline-none focus:ring-0"
+                  />
+                  {isCustomThemeEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => setIsUIIconSelectorOpen(current => !current)}
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors ${isUIIconSelectorOpen ? 'bg-[var(--accent-color)]/10' : 'hover:bg-stone-100'}`}
+                      title="选择 UI 图标"
+                      aria-label="选择 UI 图标"
+                    >
+                      {editingRoutine.uiIcon ? (
+                        <IconRenderer icon={editingRoutine.icon || ''} uiIcon={editingRoutine.uiIcon} size={16} />
+                      ) : (
+                        <span className="text-sm text-stone-400">+</span>
+                      )}
+                    </button>
+                  )}
                 </div>
-              </label>
+                {isCustomThemeEnabled && isUIIconSelectorOpen && (
+                  <div className="border-t border-stone-100 py-3">
+                    <UIIconSelectorCompact
+                      currentIcon=""
+                      currentUiIcon={editingRoutine.uiIcon}
+                      onSelectDual={(_emoji, uiIcon) => {
+                        updateEditing({ uiIcon });
+                        setIsUIIconSelectorOpen(false);
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
               <CustomSelect
                 label="所属分类"
                 value={editingRoutine.categoryId}
@@ -203,16 +240,6 @@ export const RoutineSettingsView: React.FC<RoutineSettingsViewProps> = ({
                 onChange={categoryId => updateEditing({ categoryId })}
                 dropdownPosition="auto"
               />
-              {isCustomThemeEnabled && (
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold text-stone-500">UI 图标</div>
-                  <UIIconSelector
-                    currentIcon={editingRoutine.icon || ''}
-                    currentUiIcon={editingRoutine.uiIcon}
-                    onSelectDual={(_emoji, uiIcon) => updateEditing({ uiIcon })}
-                  />
-                </div>
-              )}
             </section>
 
             <section className="space-y-2">
@@ -249,11 +276,21 @@ export const RoutineSettingsView: React.FC<RoutineSettingsViewProps> = ({
                           selectedActivityId={step.activityId}
                           onCategorySelect={categoryId => updateStep(step.id, { categoryId, activityId: '' })}
                           onActivitySelect={activityId => {
+                            if (!activityId) return;
                             const nextCategory = categories.find(category => category.activities.some(item => item.id === activityId));
                             updateStep(step.id, { activityId, categoryId: nextCategory?.id || step.categoryId });
                             setExpandedStepId(null);
                           }}
                         />
+                        <label className="mt-3 block border-t border-stone-100 pt-3 text-xs font-semibold text-stone-500">
+                          备注
+                          <textarea
+                            value={step.note || ''}
+                            onChange={event => updateStep(step.id, { note: event.target.value })}
+                            rows={2}
+                            className="mt-1 w-full resize-none border-b border-stone-200 bg-transparent px-0 py-2 text-sm font-normal text-stone-800 outline-none transition-colors focus:border-stone-500 focus:outline-none focus:ring-0"
+                          />
+                        </label>
                       </div>
                     )}
                   </div>

@@ -6,6 +6,9 @@ Make the statistics scene communicate both category totals and the activity-leve
 
 ## Design
 
+- Keep the playback control outside the product window and horizontally centred against the film's bottom edge, matching the first scenes.
+- Use a fixed left donut column and a deliberately narrower statistics column. Increase the gap between them and the breathing room at the statistics column's right edge.
+- Keep the closing sentence in the left copy column, immediately beneath the supporting paragraph; it must not read as a caption for the donut.
 - Use the product's default category taxonomy: `生活` (commute, meals, housework), `学习` (classes, self-study, books), `与自己` (exercise, reflection), `与他人`, and `探索世界`.
 - Keep sleep out of this active-investment donut.
 - Use a five-color donut, adding a gap at the zero-degree seam so the final and first segments do not touch.
