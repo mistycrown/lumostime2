@@ -9,6 +9,7 @@
  * @updated 2026-05-14: Suppresses cross-source replays of the same NFC timer start so one physical scan cannot stop a running session and then immediately restart it through the app-link bridge.
  * @updated 2026-05-14: Normalized equivalent NFC/deep-link start URLs onto one execution key so appUrlOpen and nfcTagScanned can share a single dedupe path without leaving duplicate same-activity timers behind.
  * @updated 2026-05-13: Added a short same-activity restart guard so duplicate NFC deliveries after a stop do not immediately start a fresh timer.
+ * @updated 2026-08-26: Shows a completion Toast after repeated activity-tag scans and uses “打卡” wording for daily-check NFC feedback.
  * @updated 2026-08-24: Restored NFC activity execution by keeping quick-todo URL routing out of the activity start handler.
  */
 import { useEffect, useRef } from 'react';
@@ -35,7 +36,7 @@ import {
   shouldSuppressCrossSourceNfcStartDuplicate,
   shouldSuppressNfcActivityRestart
 } from '../utils/nfcActivityRestartGuard';
-import { decideNfcStartAction } from '../utils/nfcStartActionDecision';
+import { decideNfcStartAction, getNfcActivityStopToast } from '../utils/nfcStartActionDecision';
 import { ShortcutWidgetAction, normalizeShortcutWidgetAction } from '../services/widgetShortcutService';
 
 type DeepLinkStateSnapshot = {
@@ -173,12 +174,12 @@ export const useDeepLink = (
       }
 
       if (result.status === 'unsupported_type') {
-        addToastRef.current('error', '该日课类型暂不支持 NFC 打点');
+        addToastRef.current('error', '该日课类型暂不支持 NFC 打卡');
         return;
       }
 
       if (result.status === 'already_completed') {
-        addToastRef.current('info', '今日已完成，无需重复打点');
+        addToastRef.current('info', '今日已完成，无需重复打卡');
         return;
       }
 
@@ -192,7 +193,7 @@ export const useDeepLink = (
         if (result.item?.manualMode === 'count') {
           addToastRef.current(
             'success',
-            `已打点：${content}（${result.item.currentCount || 0}/${result.item.targetCount || 1}）`
+            `已打卡：${content}（${result.item.currentCount || 0}/${result.item.targetCount || 1}）`
           );
           return;
         }
@@ -226,6 +227,7 @@ export const useDeepLink = (
         decision.sessionIds.forEach((sessionId) => {
           requestStopActivityRef.current(sessionId);
         });
+        addToastRef.current('success', getNfcActivityStopToast(activity.name));
         return;
       }
 

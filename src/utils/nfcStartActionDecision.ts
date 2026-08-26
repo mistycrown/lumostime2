@@ -4,6 +4,7 @@
  * @output A small decision describing whether the scan should stop matching sessions or start an additional activity
  * @pos Utility (NFC timer decision)
  * @description Keeps NFC timer scans scoped to the scanned tag only: scanning the same tag again stops its matching sessions, while scanning a different tag starts another concurrent session instead of stopping unrelated timers.
+ * @updated 2026-08-26: Added the shared completion Toast text used after an activity-tag repeat scan stops matching sessions.
  * @updated 2026-06-06: Added per-tag NFC start/stop decision helper so different tags can run concurrently without stopping each other.
  */
 import { ActiveSession } from '../types';
@@ -19,6 +20,10 @@ export type NfcStartActionDecision =
       type: 'start_activity';
       activityKey: string;
     };
+
+export const getNfcActivityStopToast = (activityName: string): string => (
+  `已结束：${activityName}`
+);
 
 export const decideNfcStartAction = (
   activeSessions: ActiveSession[],

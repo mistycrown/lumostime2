@@ -1,6 +1,7 @@
 /**
  * @file NFCSettingsView.tsx
  * @description Configures NFC tag read and write actions.
+ * @updated 2026-08-26: Uses “打卡” wording for daily-check NFC actions while keeping quick punch as “快速打点”.
  * @updated 2026-07-21: Unified dark-mode NFC action buttons and disabled states.
  */
 import React, { useEffect, useMemo, useState } from 'react';
@@ -103,7 +104,7 @@ const parseReadTestResult = (result: NfcReadTestResultPayload | null): ParsedRea
       const actionLabelMap: Record<string, string> = {
         quick_punch: '快速打点',
         start: '开始活动',
-        daily_check: '日课打点',
+        daily_check: '日课打卡',
         unknown: parsed.rawAction || 'unknown'
       };
 
@@ -406,7 +407,7 @@ export const NFCSettingsView: React.FC<NFCSettingsViewProps> = ({
                 <CheckCircle2 size={20} />
               </div>
               <div>
-                <h3 className="font-bold text-stone-800">日课快速打点</h3>
+                <h3 className="font-bold text-stone-800">日课打卡</h3>
                 <p className="text-xs text-stone-400">
                   将标签写入为某项日课，扫描后可完成或递增对应计数。
                 </p>
@@ -441,7 +442,7 @@ export const NFCSettingsView: React.FC<NFCSettingsViewProps> = ({
 
             {dailyCheckOptions.length === 0 && (
               <div className="p-3 bg-stone-50 rounded-xl text-xs text-stone-500 border border-dashed border-stone-200">
-                暂无启用的手动日课项目，请先在日课模板中启用可手动打点的项目。
+                暂无启用的手动日课项目，请先在日课模板中启用可手动打卡的项目。
               </div>
             )}
           </div>
