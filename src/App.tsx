@@ -1096,6 +1096,7 @@ const AppContent: React.FC = () => {
           autoApplyTodoLink={autoApplyTodoLink}
           autoFocusNote={autoFocusNote}
           allLogs={logs}
+          onSplit={logManager.handleSplitLog}
         />
       )}
 

@@ -1,7 +1,7 @@
 /**
  * @file useLogManager.ts
- * @input DataContext (logs, setLogs, setTodos), NavigationContext (modal states, currentDate), CategoryScopeContext (categories), ToastContext (addToast)
- * @output Log CRUD Operations (handleSaveLog, handleDeleteLog, handleQuickPunch, handleBatchAddLogs), Modal Control (openAddModal, openEditModal, closeModal), Image Management (handleLogImageRemove)
+ * @input DataContext (logs, todos, collection entries and setters), NavigationContext (modal states, currentDate), CategoryScopeContext (categories), ToastContext (addToast)
+ * @output Log CRUD Operations (handleSaveLog, handleDeleteLog, handleSplitLog, handleQuickPunch, handleBatchAddLogs), Modal Control (openAddModal, openEditModal, closeModal), Image Management (handleLogImageRemove)
  * @pos Hook (Data Manager)
  * @description 日志数据管理 Hook - 处理日志的增删改查、快速打点、批量添加、图片管理等操作，并统一维护 NFC 快速打点的文案与时间补记逻辑。时间戳由 DataContext 自动管理。
  * 
@@ -9,6 +9,7 @@
  * @updated 2026-07-30: Blocks deletion of recurring auto-Plan logs while their Repeat todo auto-Plan switch remains enabled.
  * @updated 2026-08-10: Excluded timeline Plan blocks from smart backfill defaults and quick-punch start inference.
  * @updated 2026-08-24: Clamps newly saved manual records to the selected start day so they cannot end at next-day 00:00.
+ * @updated 2026-08-26: Added atomic record splitting that preserves aggregate linked-todo progress.
  * @updated 2026-06-06: Added hard-field duplicate protection for new log insertions so floating-window stop races cannot append identical timeline records twice.
  * @updated 2026-05-16: Dispatches a shared assistant log-submission event only for brand-new logs so post-save AI triggers can ignore edits.
  * @updated 2026-05-10: Let callers override the date used for backfill defaults so widget supplement-log launches can force today even when the timeline was left on an older day.
@@ -33,9 +34,14 @@ import {
 import { isAutoRecurringPlanDeleteLocked } from '../utils/todoRecurringPlanUtils';
 import { filterActualLogs, getLatestActualLogEndTimeInRange } from '../utils/statLogUtils';
 import { clampEndTimeToStartDay } from '../utils/logUtils';
+import {
+    replaceLogCollectionEntriesWithSplit,
+    replaceLogWithSplit,
+    splitLogAtTime
+} from '../utils/logSplitUtils';
 
 export const useLogManager = () => {
-    const { logs, todos, setLogs, setTodos } = useData();
+    const { logs, todos, setLogs, setTodos, setCollectionEntries } = useData();
     const {
         setIsAddModalOpen,
         setEditingLog,
@@ -163,6 +169,26 @@ export const useLogManager = () => {
         setLogs(prev => prev.filter(l => l.id !== id));
         // Timestamp automatically updated by DataContext
         if (shouldCloseModal) closeModal();
+    };
+
+    const handleSplitLog = (id: string, splitTime: number) => {
+        const sourceLog = logs.find((log) => log.id === id);
+        const splitLogs = sourceLog ? splitLogAtTime(sourceLog, splitTime) : null;
+
+        if (!splitLogs) {
+            addToast('error', '拆分时间必须位于记录时间段内');
+            return false;
+        }
+
+        // Both split records retain the source's total manual progress, so the linked todo needs no adjustment.
+        setLogs((previousLogs) => replaceLogWithSplit(previousLogs, id, splitLogs));
+        setCollectionEntries((previousEntries) => replaceLogCollectionEntriesWithSplit(
+            previousEntries,
+            id,
+            splitLogs
+        ));
+        closeModal();
+        return true;
     };
 
     /**
@@ -333,6 +359,7 @@ export const useLogManager = () => {
     return {
         handleSaveLog,
         handleDeleteLog,
+        handleSplitLog,
         handleQuickPunch,
         handleBatchAddLogs,
         openAddModal,
