@@ -6,6 +6,7 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes reserved `小事` / `未来` buckets plus a week planning view with schedule and history badges.
+ * @updated 2026-08-26: Filters archived todos from every main-list and scheduling presentation.
  * @updated 2026-07-21: Applied the shared calendar number typography to the single-column week view.
  * @updated 2026-05-18: Hid pinned recurring todos from the mobile `今天 + Pin` section when today's occurrence is explicitly skipped, while still preserving pin-only rows and other explicit today matches.
  * @updated 2026-05-14: Added a persisted schedule lock toggle across the standard week, bento week, and month planners so schedule and deadline rows can be frozen against drag-to-move until explicitly unlocked.
@@ -57,6 +58,7 @@ import { formatTodoCompactScheduleSummary, formatTodoInlineDate, orderTodoItemsB
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
 import { UnreadCountBadge } from '../components/UnreadCountBadge';
 import { isQuickTodo } from '../utils/todoKindUtils';
+import { isTodoArchived } from '../utils/archiveUtils';
 import {
   ensureQuickTodoCategory,
   FUTURE_TODO_CATEGORY_ID,
@@ -736,7 +738,7 @@ const normalizeTodoCompactDisplaySettings = (value: unknown): TodoCompactDisplay
 };
 
 const filterVisibleTodos = (todos: TodoItem[], showCompletedTodos: boolean): TodoItem[] =>
-  todos.filter((todo) => (showCompletedTodos || !todo.isCompleted) && !isIncompleteSubtaskHiddenByCompletedParent(todos, todo));
+  todos.filter((todo) => !isTodoArchived(todo) && (showCompletedTodos || !todo.isCompleted) && !isIncompleteSubtaskHiddenByCompletedParent(todos, todo));
 
 const filterQuickTodos = (todos: TodoItem[]): TodoItem[] => todos.filter((todo) => isQuickTodo(todo));
 const filterProjectTodos = (todos: TodoItem[]): TodoItem[] => todos.filter((todo) => !isQuickTodo(todo));
@@ -1364,6 +1366,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           filterProjectTodos(
             todos
               .filter((todo) => todo.categoryId === selectedCategoryId)
+              .filter((todo) => !isTodoArchived(todo))
               .filter((todo) => showCompletedTodos || !todo.isCompleted)
           )
         )
@@ -2104,6 +2107,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
     return todos.filter((todo) => {
       if (todo.isCompleted) return false;
+      if (isTodoArchived(todo)) return false;
       if (todo.recurrenceRule && assignModalType !== 'maybe') return false;
       if (isFutureTodoCategoryId(todo.categoryId)) return false;
       return true;

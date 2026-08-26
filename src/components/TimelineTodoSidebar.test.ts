@@ -1,5 +1,6 @@
 /**
  * @file TimelineTodoSidebar.test.ts
+ * @updated 2026-08-26: Verifies archived todos are omitted from timeline sidebar entries.
  * @input Todo drag movement vectors, scheduled entries, and one-level task hierarchy fixtures
  * @output Regression coverage for sidebar drag intent, marker visibility, and schedule-aware parent-child grouping
  * @pos Test
@@ -60,6 +61,15 @@ describe('isTimelineSidebarTodoCompletionLocked', () => {
 });
 
 describe('buildTimelineSidebarTodoEntries', () => {
+  test('excludes archived pinned and scheduled todos', () => {
+    const entries = buildTimelineSidebarTodoEntries([
+      { id: 'archived-scheduled', categoryId: 'cat', title: 'Archived scheduled', isCompleted: false, isArchived: true, scheduledDate: '2026-07-30' },
+      { id: 'archived-pinned', categoryId: 'cat', title: 'Archived pinned', isCompleted: false, isArchived: true, pin: true }
+    ], [], '2026-07-30');
+
+    expect(entries).toEqual([]);
+  });
+
   test('includes an unfinished pin-only todo once and puts it before dated entries', () => {
     const entries = buildTimelineSidebarTodoEntries([
       { id: 'today', categoryId: 'cat', title: 'Today task', isCompleted: false, scheduledDate: '2026-07-30' },
@@ -87,6 +97,13 @@ describe('timeline sidebar list and hierarchy', () => {
     expect(groups).toHaveLength(1);
     expect(groups[0].parentEntry.todo.id).toBe('parent');
     expect(groups[0].childEntries.map((entry) => entry.todo.id)).toEqual(['child']);
+  });
+
+  test('excludes archived todos from a specific task list', () => {
+    const archived = { id: 'archived', categoryId: 'cat-a', title: 'Archived', isCompleted: false, isArchived: true };
+    const entries = buildTimelineSidebarCategoryTodoEntries([parent, archived], 'cat-a');
+
+    expect(entries.map((entry) => entry.todo.id)).toEqual(['parent']);
   });
 
   test('hides completed todos in a specific task list while Today retains same-day completions', () => {
