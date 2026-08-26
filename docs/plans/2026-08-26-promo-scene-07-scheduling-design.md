@@ -1,4 +1,4 @@
-# Scene 06 Todo Scheduling Design
+# Scene 07 Todo Scheduling Design
 
 ## Goal
 
@@ -68,7 +68,7 @@ The animation must make those meanings intuitive even for a viewer who does not 
 
 ## Transition Context
 
-Scene 05 shows an AI conversation that can create a future plan. Scene 06 makes that plan concrete by placing it in a calendar alongside deadlines, repeated commitments, uncertainty, real work, and completion. Scene 07 can then continue the narrative with one project moving through time.
+Scene 05 shows an AI conversation that can create a future plan. Scene 06 then shows effort becoming personal growth through the achievement system. Scene 07 makes plans concrete by placing them in a calendar alongside deadlines, repeated commitments, uncertainty, real work, and completion. Scene 08 closes the loop with review.
 
 ## Verification
 
