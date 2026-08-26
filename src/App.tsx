@@ -4,6 +4,7 @@
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
+ * @updated 2026-08-26: Makes Routine transitions wait for each stopped step to enter the shared log-save path.
  * @updated 2026-06-21: Centralized active-session stop persistence so floating-ball stops and app-awareness finishes always submit logs through the same path.
  * @updated 2026-08-10: Excluded timeline Plan blocks from default backfill time inference.
  * @updated 2026-08-10: Adds temporary focus-detail ownership diagnostics for Android immersive-mode investigation.
@@ -616,36 +617,38 @@ const AppContent: React.FC = () => {
     stopActivity(
       sessionId,
       finalSessionData,
-      persistStoppedSessionLogs
+      stoppedLogs => {
+        persistStoppedSessionLogs(stoppedLogs);
+
+        if (routineRun?.currentSessionId !== sessionId) {
+          return;
+        }
+
+        const routine = routinesRef.current.find(item => item.id === routineRun.routineId);
+        const nextIndex = routineRun.currentStepIndex + 1;
+        const nextStep = routine?.steps[nextIndex];
+        if (!routine || !nextStep) {
+          setActiveRoutineRun(null);
+          return;
+        }
+
+        const nextActivity = categories
+          .find(category => category.id === nextStep.categoryId)
+          ?.activities.find(item => item.id === nextStep.activityId);
+        if (!nextActivity) {
+          setActiveRoutineRun(null);
+          addToast('error', 'Routine 的下一步活动已不存在');
+          return;
+        }
+
+        const nextSessionId = startActivity(nextActivity, nextStep.categoryId, autoLinkRules);
+        setActiveRoutineRun({
+          ...routineRun,
+          currentStepIndex: nextIndex,
+          currentSessionId: nextSessionId
+        });
+      }
     );
-
-    if (routineRun?.currentSessionId !== sessionId) {
-      return;
-    }
-
-    const routine = routinesRef.current.find(item => item.id === routineRun.routineId);
-    const nextIndex = routineRun.currentStepIndex + 1;
-    const nextStep = routine?.steps[nextIndex];
-    if (!routine || !nextStep) {
-      setActiveRoutineRun(null);
-      return;
-    }
-
-    const nextActivity = categories
-      .find(category => category.id === nextStep.categoryId)
-      ?.activities.find(item => item.id === nextStep.activityId);
-    if (!nextActivity) {
-      setActiveRoutineRun(null);
-      addToast('error', 'Routine 的下一步活动已不存在');
-      return;
-    }
-
-    const nextSessionId = handleStartActivityWrapper(nextActivity, nextStep.categoryId);
-    setActiveRoutineRun({
-      ...routineRun,
-      currentStepIndex: nextIndex,
-      currentSessionId: nextSessionId
-    });
   };
 
   const handleCancelSessionWrapper = (sessionId: string) => {
