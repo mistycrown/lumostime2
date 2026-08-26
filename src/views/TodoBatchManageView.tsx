@@ -3,7 +3,8 @@
  * @input Todos, Categories
  * @output Updated Categories/Todos (Reorder, CRUD)
  * @pos View (Modal/Page)
- * @description A specialized view for bulk management of To-Do items and categories. Supports drag-and-drop reordering and category color configuration for todo statistics.
+ * @description A specialized view for bulk management of To-Do items and categories with deferred reference cleanup for deleted todos.
+ * @updated 2026-08-26: Detects every deleted todo on submit and requires migration or unlink decisions for referenced history and timers.
  * @updated 2026-05-13: Added touch drag-and-drop support plus more reliable category drop targeting so mobile batch management can move todos across categories again.
  * @updated 2026-05-13: Added the reserved `未来` bucket alongside `小事`, keeping both system categories visible in batch management while locking their names and placement.
  * @updated 2026-05-13: Added the reserved `小事` bucket to batch management so its color can be configured and quick-todo items can be manually ordered without exposing the bucket as a normal todo list category.
@@ -12,7 +13,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { TodoCategory, TodoItem } from '../types';
+import { ActiveSession, Log, TodoCategory, TodoItem } from '../types';
 import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check } from 'lucide-react';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
 import { IconRenderer } from '../components/IconRenderer';
@@ -32,12 +33,17 @@ import {
     QUICK_TODO_CATEGORY_ID,
     QUICK_TODO_CATEGORY_NAME
 } from '../utils/todoQuickCategoryUtils';
+import { ReferenceDeleteModal } from '../components/ReferenceDeleteModal';
+import { getDeletedTodoIds, getTodoReferenceImpact, type ReferenceDeleteDecision } from '../utils/referenceDeletion';
 
 interface TodoBatchManageViewProps {
     onBack: () => void;
     categories: TodoCategory[];
     todos: TodoItem[];
+    logs: Log[];
+    activeSessions: ActiveSession[];
     onSave: (categories: TodoCategory[], todos: TodoItem[]) => void;
+    onSaveWithTodoReferences?: (categories: TodoCategory[], todos: TodoItem[], decisions: Record<string, ReferenceDeleteDecision>) => void;
 }
 
 interface CategoryWithTodos extends TodoCategory {
@@ -62,7 +68,7 @@ const isSystemTodoCategoryId = (categoryId: string): boolean => (
     isQuickTodoCategoryId(categoryId) || isFutureTodoCategoryId(categoryId)
 );
 
-export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack, categories: initialCategories, todos: initialTodos, onSave }) => {
+export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack, categories: initialCategories, todos: initialTodos, logs, activeSessions, onSave, onSaveWithTodoReferences }) => {
     const normalizedInitialCategories = React.useMemo(
         () => ensureQuickTodoCategory(initialCategories),
         [initialCategories]
@@ -97,6 +103,7 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
     const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
     const [touchDragPreview, setTouchDragPreview] = useState<{ x: number; y: number; title: string } | null>(null);
     const [isTouchDragging, setIsTouchDragging] = useState(false);
+    const [todoDeleteReview, setTodoDeleteReview] = useState<{ categories: TodoCategory[]; todos: TodoItem[]; ids: string[]; index: number; decisions: Record<string, ReferenceDeleteDecision> } | null>(null);
 
     const toggleExpand = (id: string) => {
         const newSet = new Set(expandedCats);
@@ -301,7 +308,7 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                 return prev;
             }
 
-            const movedItem = {
+            const movedItem: TodoItem = {
                 ...item,
                 categoryId: isQuickTodoCategoryId(targetCategoryId) ? QUICK_TODO_CATEGORY_ID : targetCategoryId,
                 kind: isQuickTodoCategoryId(targetCategoryId) ? 'quick' : 'project'
@@ -566,6 +573,23 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
             .filter((todo): todo is TodoItem => Boolean(todo));
         const finalTodos = [...editedRootTodos, ...preservedRootTodos, ...preservedSubtasks];
 
+        const deletedTodoIds = getDeletedTodoIds(initialTodos, finalTodos);
+        const impactedTodoIds = deletedTodoIds.filter((todoId) => {
+            const impact = getTodoReferenceImpact(logs, activeSessions, [todoId]);
+            return impact.logs > 0 || impact.activeSessions > 0;
+        });
+
+        if (impactedTodoIds.length > 0 && onSaveWithTodoReferences) {
+            setTodoDeleteReview({
+                categories: finalCategories,
+                todos: finalTodos,
+                ids: impactedTodoIds,
+                index: 0,
+                decisions: {}
+            });
+            return;
+        }
+
         onSave(finalCategories, finalTodos);
     };
 
@@ -772,6 +796,38 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                     <span>添加新列表</span>
                 </button>
             </div>
+
+            {todoDeleteReview && (() => {
+                const todoId = todoDeleteReview.ids[todoDeleteReview.index];
+                const sourceTodo = initialTodos.find((todo) => todo.id === todoId);
+                if (!sourceTodo) return null;
+                const deletedTodoIds = new Set(getDeletedTodoIds(initialTodos, todoDeleteReview.todos));
+                const migrationTargets = todoDeleteReview.todos
+                    .filter((todo) => !todo.isCompleted && !deletedTodoIds.has(todo.id))
+                    .map((todo) => ({ id: todo.id, name: todo.title }));
+                return (
+                    <ReferenceDeleteModal
+                        isOpen
+                        title="提交前确认待办关联"
+                        description="检测到该待办将被删除。请选择历史记录与当前计时的迁移目标，或取消这些关联。"
+                        sourceName={sourceTodo.title}
+                        targetLabel="待办"
+                        impact={getTodoReferenceImpact(logs, activeSessions, [todoId])}
+                        targets={migrationTargets}
+                        onClose={() => setTodoDeleteReview(null)}
+                        onConfirm={(decision) => {
+                            const decisions = { ...todoDeleteReview.decisions, [todoId]: decision };
+                            const nextIndex = todoDeleteReview.index + 1;
+                            if (nextIndex < todoDeleteReview.ids.length) {
+                                setTodoDeleteReview({ ...todoDeleteReview, index: nextIndex, decisions });
+                                return;
+                            }
+                            onSaveWithTodoReferences?.(todoDeleteReview.categories, todoDeleteReview.todos, decisions);
+                            setTodoDeleteReview(null);
+                        }}
+                    />
+                );
+            })()}
 
             {touchDragPreview && (
                 <div

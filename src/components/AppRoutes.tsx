@@ -11,6 +11,7 @@
  * @updated 2026-08-09: Lets settings-launched review pages render above Settings with their own detail back layer.
  * @updated 2026-08-10: Keeps daily-check overview and detail pinned to the current day instead of the global selected date.
  * @updated 2026-08-26: Passes Routine launch and active-run controls into the Record route.
+ * @updated 2026-08-26: Applies scope and todo deletion reference decisions together with batch changes.
  */
 import React from 'react';
 import { ChevronLeft } from 'lucide-react';
@@ -67,6 +68,7 @@ import { TodoBatchManageView } from '../views/TodoBatchManageView';
 import { TodoView } from '../views/TodoView';
 import { ScopeDetailView } from '../views/ScopeDetailView';
 import { ScopeManageView } from '../views/ScopeManageView';
+import { applyScopeReferenceDecision, applyTodoReferenceDecision, getDeletedTodoIds, type ReferenceDeleteDecision } from '../utils/referenceDeletion';
 import { ScopeView } from '../views/ScopeView';
 import { DailyCheckOverviewView } from '../views/DailyCheckOverviewView';
 import { DailyCheckDetailView } from '../views/DailyCheckDetailView';
@@ -234,6 +236,33 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     const previewActivityMigration = React.useCallback((sourceActivityId: string) => (
         getActivityMigrationImpact(buildActivityMigrationInput(), sourceActivityId)
     ), [buildActivityMigrationInput]);
+
+    const applyScopeBatchChanges = React.useCallback((nextScopes: typeof scopes, decisions: Record<string, ReferenceDeleteDecision>) => {
+        let migrated = { logs, activeSessions };
+        Object.entries(decisions).forEach(([scopeId, decision]) => {
+            migrated = applyScopeReferenceDecision(migrated.logs, migrated.activeSessions, scopeId, decision);
+        });
+        setLogs(migrated.logs);
+        setActiveSessions(migrated.activeSessions);
+        setScopes(nextScopes);
+    }, [activeSessions, logs, setActiveSessions, setLogs, setScopes]);
+
+    const applyTodoBatchChanges = React.useCallback((
+        nextCategories: TodoCategory[],
+        nextTodos: TodoItem[],
+        decisions: Record<string, ReferenceDeleteDecision>
+    ) => {
+        const deletedTodoIds = new Set(getDeletedTodoIds(todos, nextTodos));
+        let migrated = { logs, activeSessions };
+        Object.entries(decisions).forEach(([todoId, decision]) => {
+            if (deletedTodoIds.has(todoId)) {
+                migrated = applyTodoReferenceDecision(migrated.logs, migrated.activeSessions, [todoId], decision);
+            }
+        });
+        setLogs(migrated.logs);
+        setActiveSessions(migrated.activeSessions);
+        handleUpdateTodoData(nextCategories, nextTodos);
+    }, [activeSessions, handleUpdateTodoData, logs, setActiveSessions, setLogs, todos]);
 
     const applyTagBatchChanges = React.useCallback(async (
         nextCategories: typeof categories,
@@ -1066,7 +1095,10 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                         onBack={() => setIsTodoManaging(false)}
                         categories={todoCategories}
                         todos={todos}
+                        logs={logs}
+                        activeSessions={activeSessions}
                         onSave={handleUpdateTodoData}
+                        onSaveWithTodoReferences={applyTodoBatchChanges}
                     />
                 );
             }
@@ -1129,7 +1161,10 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 return (
                     <ScopeManageView
                         scopes={scopes}
+                        logs={logs}
+                        activeSessions={activeSessions}
                         onUpdate={(updatedScopes) => setScopes(updatedScopes)}
+                        onApplyScopeChanges={applyScopeBatchChanges}
                         onBack={() => setIsScopeManaging(false)}
                     />
                 );

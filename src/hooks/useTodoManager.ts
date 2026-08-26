@@ -12,6 +12,7 @@
  * @updated 2026-05-12: Added todo-detail history stacking so opening a child task from a parent detail page returns back to the parent detail instead of closing to the root todo view.
  * @updated 2026-05-11: Added an idempotent complete-only helper so focus-log flows can save first and then finish the linked todo without reopening already completed tasks.
  * @updated 2026-08-24: Removes current-day and future recurring auto-Plan blocks when auto scheduling is cancelled or a todo is deleted.
+ * @updated 2026-08-26: Requires migration or unlink decisions for historical and active-timer todo references before direct deletion.
  * @updated 2026-04-21: Blocked subtask creation for recurring parent todos so recurrence and child-task management stay mutually exclusive.
  * @updated 2026-04-21: Added one-level subtask support with inherited parent fields, cascade delete, and child draft helpers.
  * @updated 2026-04-21: Reset duplicated and newly created todos to `pin: false` unless explicitly toggled later.
@@ -41,6 +42,7 @@ import { isQuickTodo } from '../utils/todoKindUtils';
 import { getRealTodoCategories } from '../utils/todoQuickCategoryUtils';
 import { buildDuplicatedTodo, normalizeTodoScheduleFields } from '../utils/todoDuplicateUtils';
 import { isTodoRecurringPlanEnabled, removeRecurringAutoPlanLogsFromDate } from '../utils/todoRecurringPlanUtils';
+import { applyTodoReferenceDecision, getTodoReferenceImpact, type ReferenceDeleteDecision } from '../utils/referenceDeletion';
 
 export const useTodoManager = () => {
   const { todos, setTodos, todoCategories, setTodoCategories, logs, setLogs } = useData();
@@ -58,13 +60,14 @@ export const useTodoManager = () => {
     closeTodoDetail
   } = useNavigation();
   const { addToast } = useToast();
-  const { startActivity } = useSession();
+  const { startActivity, activeSessions, setActiveSessions } = useSession();
   const { autoLinkRules } = useSettings();
 
   const [isDeleteTodoConfirmOpen, setIsDeleteTodoConfirmOpen] = useState(false);
   const [todoToDeleteId, setTodoToDeleteId] = useState<string | null>(null);
   const [todoDeleteTargetIds, setTodoDeleteTargetIds] = useState<string[]>([]);
   const [todoDeleteChildCount, setTodoDeleteChildCount] = useState(0);
+  const [todoDeleteReferenceImpact, setTodoDeleteReferenceImpact] = useState({ logs: 0, activeSessions: 0 });
 
   const buildSubtaskDraft = (parentTodo: TodoItem): Partial<TodoItem> => ({
     parentTodoId: parentTodo.id,
@@ -212,10 +215,12 @@ export const useTodoManager = () => {
     const retainedLogs = removeRecurringAutoPlanLogsFromDate(logs, deleteTargetIds);
     const linkedLogs = retainedLogs.filter((log) => log.linkedTodoId && deleteTargetIds.includes(log.linkedTodoId));
 
-    if (linkedLogs.length > 0) {
+    const linkedSessions = activeSessions.filter((session) => session.linkedTodoId && deleteTargetIds.includes(session.linkedTodoId));
+    if (linkedLogs.length > 0 || linkedSessions.length > 0) {
       setTodoToDeleteId(id);
       setTodoDeleteTargetIds(deleteTargetIds);
       setTodoDeleteChildCount(Math.max(0, deleteTargetIds.length - 1));
+      setTodoDeleteReferenceImpact(getTodoReferenceImpact(retainedLogs, activeSessions, deleteTargetIds));
       setIsDeleteTodoConfirmOpen(true);
       return;
     }
@@ -225,18 +230,17 @@ export const useTodoManager = () => {
     closeTodoModal();
   };
 
-  const handleConfirmDeleteTodo = () => {
+  const handleConfirmDeleteTodo = (decision: ReferenceDeleteDecision = { action: 'unlink' }) => {
     if (!todoToDeleteId) {
       return;
     }
 
     const deleteTargetIds = todoDeleteTargetIds.length > 0 ? todoDeleteTargetIds : [todoToDeleteId];
 
-    setLogs((prev) => removeRecurringAutoPlanLogsFromDate(prev, deleteTargetIds).map((log) => (
-      log.linkedTodoId && deleteTargetIds.includes(log.linkedTodoId)
-        ? { ...log, linkedTodoId: undefined }
-        : log
-    )));
+    const retainedLogs = removeRecurringAutoPlanLogsFromDate(logs, deleteTargetIds);
+    const references = applyTodoReferenceDecision(retainedLogs, activeSessions, deleteTargetIds, decision);
+    setLogs(references.logs);
+    setActiveSessions(references.activeSessions);
 
     setTodos((prev) => syncSubtaskProgressToParentTodos(prev.filter((todo) => !deleteTargetIds.includes(todo.id))));
 
@@ -244,6 +248,7 @@ export const useTodoManager = () => {
     setTodoToDeleteId(null);
     setTodoDeleteTargetIds([]);
     setTodoDeleteChildCount(0);
+    setTodoDeleteReferenceImpact({ logs: 0, activeSessions: 0 });
     setIsDeleteTodoConfirmOpen(false);
     closeTodoModal();
     addToast(
@@ -338,7 +343,9 @@ export const useTodoManager = () => {
     isDeleteTodoConfirmOpen,
     setIsDeleteTodoConfirmOpen,
     todoToDeleteId,
+    todoDeleteTargetIds,
     todoDeleteChildCount,
+    todoDeleteReferenceImpact,
     todoCategoryToAdd
   };
 };
