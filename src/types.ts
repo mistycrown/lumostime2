@@ -82,13 +82,37 @@ export interface Activity {
   isArchived?: boolean;
 }
 
+export interface RoutineStep {
+  id: string;
+  activityId: string;
+  categoryId: string;
+  order: number;
+}
+
+export interface Routine {
+  id: string;
+  name: string;
+  icon?: string;
+  categoryId: string;
+  steps: RoutineStep[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ActiveRoutineRun {
+  routineId: string;
+  currentStepIndex: number;
+  routineStartedAt: number;
+  currentSessionId: string;
+}
+
 export interface Category {
   id: string;
   name: string;
   icon: string; // Prefix icon/emoji (for default theme)
   uiIcon?: string; // UI icon ID (for custom theme, e.g., "ui:purple:01")
-  isArchived?: boolean;
   activities: Activity[];
+  isArchived?: boolean;
   themeColor: string; // Hex color for stats chart
   enableFocusScore?: boolean; // Default for all activities in category
   enableMoodScore?: boolean; // Default for all activities in category for mood tracking

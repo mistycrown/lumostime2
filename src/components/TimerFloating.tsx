@@ -3,14 +3,15 @@
  * @input props: activeSessions, todos
  * @output Floating UI Elements
  * @pos Component (Global UI)
- * @description Renders floating timer bubbles for active sessions, with responsive action visibility that keeps the confirm button aligned on narrow layouts.
+ * @description Renders floating timer bubbles for active sessions, with responsive action visibility and a long-press cancel menu.
+ * @updated 2026-08-25: Added a long-press menu that discards an active timer without creating a record.
  * @updated 2026-04-21: Narrowed Todo-view floating timers to the same avoidance scale used by Record-style layouts so they no longer collide with the bottom-right floating action button.
  * @updated 2026-07-21: Added semantic dark-mode surfaces for the floating timer panel and its activity icon.
  * @updated 2026-03-24
  */
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ActiveSession, TodoItem, AppView } from '../types';
-import { X, CheckCircle2 } from 'lucide-react';
+import { X, CheckCircle2, Trash2 } from 'lucide-react';
 import { useNavigation } from '../contexts/NavigationContext';
 import { IconRenderer } from './IconRenderer';
 
@@ -35,6 +36,8 @@ const GROUP_ONE_TAG_HIDE_TEXT_WIDTH = 150;
 const GROUP_ONE_TAG_SHOW_TEXT_WIDTH = 176;
 const GROUP_ONE_TAG_HIDE_OVERFLOW = 10;
 const GROUP_ONE_TAG_SHOW_OVERFLOW = 0;
+const LONG_PRESS_DELAY = 500;
+const LONG_PRESS_MOVE_THRESHOLD = 12;
 
 const SingleTimer: React.FC<{
   session: ActiveSession;
@@ -47,6 +50,7 @@ const SingleTimer: React.FC<{
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isBorderAnimating, setIsBorderAnimating] = useState(false);
   const [isManuallyExpanded, setIsManuallyExpanded] = useState(false);
+  const [isLongPressMenuOpen, setIsLongPressMenuOpen] = useState(false);
   const [responsiveVisibility, setResponsiveVisibility] = useState({
     hideCancelButton: false,
     hideTodoTag: false
@@ -54,6 +58,9 @@ const SingleTimer: React.FC<{
   const containerRef = useRef<HTMLDivElement>(null);
   const textBlockRef = useRef<HTMLDivElement>(null);
   const titleRowRef = useRef<HTMLDivElement>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressStartPointRef = useRef<{ x: number; y: number } | null>(null);
+  const didTriggerLongPressRef = useRef(false);
   const { currentView } = useNavigation();
 
   useEffect(() => {
@@ -73,6 +80,10 @@ const SingleTimer: React.FC<{
       setIsManuallyExpanded(false);
     }
   }, [currentView, isCollapsed, isManuallyExpanded]);
+
+  useEffect(() => {
+    setIsLongPressMenuOpen(false);
+  }, [currentView]);
 
   useEffect(() => {
     if (isCollapsed) {
@@ -179,6 +190,31 @@ const SingleTimer: React.FC<{
     };
   }, [isCollapsed, shouldUseResponsiveVisibility, updateResponsiveVisibility]);
 
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressStartPointRef.current = null;
+  }, []);
+
+  useEffect(() => clearLongPressTimer, [clearLongPressTimer]);
+
+  useEffect(() => {
+    if (!isLongPressMenuOpen) {
+      return;
+    }
+
+    const closeMenuWhenClickingAway = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setIsLongPressMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', closeMenuWhenClickingAway);
+    return () => document.removeEventListener('pointerdown', closeMenuWhenClickingAway);
+  }, [isLongPressMenuOpen]);
+
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -191,6 +227,10 @@ const SingleTimer: React.FC<{
 
   const toggleCollapse = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (didTriggerLongPressRef.current) {
+      didTriggerLongPressRef.current = false;
+      return;
+    }
     const nextCollapsedState = !isCollapsed;
     setIsCollapsed(nextCollapsedState);
 
@@ -230,11 +270,64 @@ const SingleTimer: React.FC<{
   const shouldHideCancelButton = shouldUseResponsiveVisibility && responsiveVisibility.hideCancelButton;
   const shouldHideTodoTag = shouldUseResponsiveVisibility && responsiveVisibility.hideTodoTag;
 
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || (event.target as HTMLElement).closest('button')) {
+      return;
+    }
+
+    didTriggerLongPressRef.current = false;
+    longPressStartPointRef.current = { x: event.clientX, y: event.clientY };
+    longPressTimerRef.current = window.setTimeout(() => {
+      didTriggerLongPressRef.current = true;
+      longPressTimerRef.current = null;
+      setIsLongPressMenuOpen(true);
+    }, LONG_PRESS_DELAY);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const startPoint = longPressStartPointRef.current;
+    if (!startPoint) {
+      return;
+    }
+
+    if (
+      Math.hypot(event.clientX - startPoint.x, event.clientY - startPoint.y) >
+      LONG_PRESS_MOVE_THRESHOLD
+    ) {
+      clearLongPressTimer();
+    }
+  };
+
+  const handlePanelClick = () => {
+    if (didTriggerLongPressRef.current) {
+      didTriggerLongPressRef.current = false;
+      return;
+    }
+
+    if (isLongPressMenuOpen) {
+      setIsLongPressMenuOpen(false);
+      return;
+    }
+
+    onClick();
+  };
+
+  const handleMenuCancel = () => {
+    setIsLongPressMenuOpen(false);
+    onCancel();
+  };
+
   return (
     <div
       ref={containerRef}
-      onClick={onClick}
-      className={`timer-floating-panel relative bg-white/95 backdrop-blur-sm text-stone-800 flex items-center cursor-pointer active:scale-[0.99] overflow-hidden ${
+      onClick={handlePanelClick}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={clearLongPressTimer}
+      onPointerCancel={clearLongPressTimer}
+      onPointerLeave={clearLongPressTimer}
+      onContextMenu={event => event.preventDefault()}
+      className={`timer-floating-panel relative bg-white/95 backdrop-blur-sm text-stone-800 flex items-center cursor-pointer active:scale-[0.99] overflow-visible ${
         isCollapsed
           ? `rounded-full justify-center items-center p-0 transition-all duration-500 ease-out ${
               isBorderAnimating ? 'w-12 h-12' : 'w-[3.5rem] h-[3.5rem]'
@@ -441,6 +534,24 @@ const SingleTimer: React.FC<{
             </>
           )}
         </>
+      )}
+      {isLongPressMenuOpen && (
+        <div
+          role="menu"
+          aria-label="计时操作"
+          className="absolute bottom-[calc(100%+0.5rem)] left-0 z-[60] min-w-32 rounded-lg border border-stone-200 bg-white p-1 shadow-lg dark:border-stone-700 dark:bg-stone-800"
+          onClick={event => event.stopPropagation()}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={handleMenuCancel}
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
+          >
+            <Trash2 size={16} />
+            取消计时
+          </button>
+        </div>
       )}
     </div>
   );

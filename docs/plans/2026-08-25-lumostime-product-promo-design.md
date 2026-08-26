@@ -60,7 +60,7 @@ Use one fictional but credible learning project, such as an English-learning or 
 
 ## Storyboard
 
-> The table below is the original concept sequence. The implemented horizontal storyboard is the authoritative version in `promo-output/storyboard-preview/storyboard.md`: eight shots, 78 seconds, and a closing line of `从开始，到看见自己。`
+> The table below is the original concept sequence. The implemented horizontal storyboard is the authoritative version in `promo-output/storyboard-preview/storyboard.md`: eight shots, 78 seconds, and a closing message of `Illuminate your time, Illuminate your life` / `从开始，到看见自己。`
 
 | Time | Objective | Native Evidence | Motion And Copy |
 | --- | --- | --- | --- |
@@ -71,9 +71,8 @@ Use one fictional but credible learning project, such as an English-learning or 
 | 36-46s | Show a project moving through time. | Todo detail and Timeline views with planned and actual blocks. | A shared project card carries dates and blocks through `计划 -> 投入 -> 完成`. Use one representative project rather than listing every schedule type. |
 | 46-56s | Position AI as a structured assistant. | AI chat and resulting real app states. | One concise request leads to created subtasks, a planned item, or backfilled logs. The result visibly enters a Todo, Timeline, or Review screen. Copy: `AI 是管家，也住在系统里。` |
 | 56-66s | Convert records into insight and reflection. | Statistics, daily checks, daily review, search, and on-this-day state. | Timeline blocks aggregate into data views and settle on a review page. A short retrieval moment shows historical records remain findable. Copy: `看见时间，也看见自己。` |
-| 66-72s | Establish ownership and personal fit. | Settings, export/sync, theme/icon/widget states. | A local archive motif connects to export, sync, and a short set of personalized surfaces. Keep each feature legible; do not create a security claim beyond verified behavior. |
-| 66-76s | Show project continuity. | Todo and Timeline states. | A representative project preserves `安排 -> 推进 -> 完成`; planning and actual work are legible together. |
-| 76-84s | Close the promise. | Constructed brand close. | All prior marks return to the stable LumosTime mark. Copy: `LumosTime` and `从开始，到看见自己。` |
+| 60-70s | Show project continuity. | Todo and Timeline states. | A representative project preserves `安排 -> 推进 -> 完成`; planning and actual work are legible together. |
+| 70-78s | Close the promise. | Constructed brand close. | The final LumosTime mark is framed by a p5.js rain curtain, flowering branches, and a flying flock. Copy: `Illuminate your time, Illuminate your life` and `从开始，到看见自己。` |
 
 ## Motion Direction
 
@@ -86,6 +85,7 @@ The film's motion identity is **time becoming a visible record**.
 - The device frame and other parent containers stop moving at the settle frame. Only local signals such as a cursor, timer number, or small highlight may continue afterwards.
 - Never use generic neon, particle fields, perpetual floating phones, random decorative drift, browser captures, or synthetic device chrome that duplicates a captured status bar.
 - Use shared elements for transitions. The representative project card and timeline block are the preferred handoff anchors.
+- The final brand close uses local p5.js with seeded, fixed-time rain, branch, flower, and bird systems. It shares the warm-paper visual language without simulating an Android UI.
 
 ## Capture Contract
 
@@ -136,7 +136,7 @@ The video-production folder is created only when implementation begins. This des
 
 ## Completion Criteria
 
-- The final film communicates the philosophy and core basic use path in under 75 seconds.
+- The final film communicates the philosophy and core basic use path in 78 seconds.
 - Every functional claim is verified or visibly labeled as a demonstration.
 - Captured content is Android-only, sanitized, correctly framed, and free of duplicate status bars or device chrome.
 - Each scene is inspected at entry, peak action, settle, and exit; no black/blank frames, accidental hard cuts, cropped critical UI, or subtitle overflow remains.

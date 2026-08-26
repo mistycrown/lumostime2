@@ -1,6 +1,7 @@
 /**
  * @file BatchManageView.tsx
  * @updated 2026-08-06: Added archive and restore actions for activities.
+ * @updated 2026-08-26: Added replacement-tag confirmation before activity deletion.
  * @input Categories, Activities
  * @output Updated Category Structure
  * @pos View (Settings Sub-page)
@@ -10,7 +11,7 @@
  */
 import React, { useState } from 'react';
 import { Category, Activity } from '../types';
-import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check, Archive, ArchiveRestore } from 'lucide-react';
+import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check, Archive, ArchiveRestore, AlertTriangle } from 'lucide-react';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
 import { IconRenderer } from '../components/IconRenderer';
 import { uiIconService } from '../services/uiIconService';
@@ -18,14 +19,17 @@ import { useSettings } from '../contexts/SettingsContext';
 import { COLOR_OPTIONS } from '../constants';
 import { useCustomColors } from '../hooks/useCustomColors';
 import { getColorPreviewValue, isStoredColorSelected } from '../utils/colorUtils';
+import type { ActivityMigrationImpact } from '../utils/activityReferenceMigration';
 
 interface BatchManageViewProps {
     onBack: () => void;
     categories: Category[];
     onSave: (categories: Category[]) => void;
+    onPreviewActivityMigration?: (sourceActivityId: string) => ActivityMigrationImpact;
+    onMigrateAndDeleteActivity?: (sourceActivityId: string, targetActivityId: string) => Promise<ActivityMigrationImpact>;
 }
 
-export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, categories: initialCategories, onSave }) => {
+export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, categories: initialCategories, onSave, onPreviewActivityMigration, onMigrateAndDeleteActivity }) => {
     const [categories, setCategories] = useState<Category[]>(JSON.parse(JSON.stringify(initialCategories)));
     const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set(initialCategories.map(c => c.id)));
 
@@ -42,6 +46,10 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
     // Drag state (kept for reference, but user said it's unusable, so we rely on buttons now)
     const [draggedActivity, setDraggedActivity] = useState<{ activity: Activity, sourceCategoryId: string } | null>(null);
     const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<{ categoryId: string; activityId: string } | null>(null);
+    const [replacementActivityId, setReplacementActivityId] = useState('');
+    const [deleteImpact, setDeleteImpact] = useState<ActivityMigrationImpact | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const toggleExpand = (id: string) => {
         const newSet = new Set(expandedCats);
@@ -111,13 +119,38 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
     };
 
     const handleDeleteActivity = (catId: string, actId: string) => {
-        // No confirm as requested
-        setCategories(prev => prev.map(c => {
-            if (c.id === catId) {
-                return { ...c, activities: c.activities.filter(a => a.id !== actId) };
-            }
-            return c;
-        }));
+        if (!onMigrateAndDeleteActivity) return;
+        setDeleteTarget({ categoryId: catId, activityId: actId });
+        setReplacementActivityId('');
+        setDeleteImpact(null);
+    };
+
+    const selectedDeleteActivity = deleteTarget
+        ? categories.flatMap((category) => category.activities).find((activity) => activity.id === deleteTarget.activityId)
+        : undefined;
+    const replacementOptions = categories.flatMap((category) => category.activities
+        .filter((activity) => activity.id !== deleteTarget?.activityId && activity.isArchived !== true)
+        .map((activity) => ({ activity, category })));
+
+    const handlePreviewDelete = async () => {
+        if (!deleteTarget || !replacementActivityId || !onPreviewActivityMigration) return;
+        setDeleteImpact(onPreviewActivityMigration(deleteTarget.activityId));
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!deleteTarget || !replacementActivityId || !onMigrateAndDeleteActivity) return;
+        setIsDeleting(true);
+        try {
+            await onMigrateAndDeleteActivity(deleteTarget.activityId, replacementActivityId);
+            setCategories(prev => prev.map(c => ({
+                ...c,
+                activities: c.activities.filter(a => a.id !== deleteTarget.activityId)
+            })));
+            setDeleteTarget(null);
+            setDeleteImpact(null);
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     const handleToggleActivityArchive = (catId: string, actId: string) => {
@@ -476,7 +509,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                                 <button onClick={() => moveActivity(catIndex, actIndex, 'down')} disabled={actIndex === category.activities.length - 1} className="p-1 text-stone-300 hover:text-stone-600 disabled:opacity-30">
                                                     <ArrowDown size={14} />
                                                 </button>
-                                                <button onClick={() => handleDeleteActivity(category.id, activity.id)} className="p-1 text-stone-200 hover:text-red-400">
+                                                <button onClick={() => handleDeleteActivity(category.id, activity.id)} className="p-1 text-stone-200 hover:text-red-400" title="迁移并删除标签">
                                                     <Trash2 size={14} />
                                                 </button>
                                             </div>
@@ -546,6 +579,34 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                     <span>添加新分类</span>
                 </button>
             </div>
+            {deleteTarget && selectedDeleteActivity && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-md overflow-hidden rounded-2xl border border-stone-200 bg-[#fdfbf7] shadow-2xl">
+                        <div className="flex items-start gap-3 border-b border-stone-100 p-5">
+                            <AlertTriangle className="mt-0.5 shrink-0 text-amber-500" size={20} />
+                            <div>
+                                <h2 className="font-bold text-stone-800">迁移并删除标签</h2>
+                                <p className="mt-1 text-sm leading-6 text-stone-500">删除“{selectedDeleteActivity.name}”前，请选择一个未归档标签接收所有历史关联。</p>
+                            </div>
+                        </div>
+                        <div className="space-y-4 p-5">
+                            <label className="block text-sm font-medium text-stone-700">
+                                替代标签
+                                <select value={replacementActivityId} onChange={(event) => { setReplacementActivityId(event.target.value); setDeleteImpact(null); }} className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-stone-400">
+                                    <option value="">请选择未归档标签</option>
+                                    {replacementOptions.map(({ activity, category }) => <option key={activity.id} value={activity.id}>{category.name} / {activity.name}</option>)}
+                                </select>
+                            </label>
+                            {replacementActivityId && <p className="text-xs leading-5 text-stone-500">历史记录、待办、规则、场景和小组件中的标签引用都会迁移；跨分类时，关联分类也会同步更新。</p>}
+                            {deleteImpact && <div className="grid grid-cols-2 gap-2 rounded-xl bg-stone-50 p-3 text-xs text-stone-600"><span>历史记录 {deleteImpact.logs}</span><span>待办 {deleteImpact.todos}</span><span>当前计时 {deleteImpact.activeSessions}</span><span>自动规则 {deleteImpact.autoLinkRules + deleteImpact.appRules}</span><span>成就规则 {deleteImpact.achievementRules}</span><span>场景/小组件 {deleteImpact.sceneCards + deleteImpact.widgetSlots}</span></div>}
+                        </div>
+                        <div className="flex gap-3 border-t border-stone-100 bg-white p-4">
+                            <button type="button" onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="flex-1 rounded-xl border border-stone-200 py-2.5 text-sm font-medium text-stone-600">取消</button>
+                            <button type="button" onClick={deleteImpact ? handleConfirmDelete : handlePreviewDelete} disabled={!replacementActivityId || isDeleting} className="flex-1 rounded-xl bg-stone-900 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">{isDeleting ? '迁移中…' : deleteImpact ? '迁移并删除' : '查看影响'}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

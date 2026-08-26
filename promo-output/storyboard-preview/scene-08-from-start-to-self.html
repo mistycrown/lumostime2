@@ -1,4 +1,84 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>LumosTime - 从开始，到看见自己</title><style>
-:root{--p:#faf9f6;--i:#1c1917;--b:#57534e;--v:#8b6fa8;--g:#7a9176;--bl:#6b8ca8;--o:#c89b7a}*{box-sizing:border-box}body{min-width:960px;min-height:540px;margin:0;overflow:hidden;background:#dedad2;color:var(--i);font-family:'Noto Serif SC','Source Han Serif SC','Songti SC','STSong','SimSun','Microsoft YaHei',serif}.film{position:relative;width:100vw;height:100vh;min-width:960px;min-height:540px;overflow:hidden;isolation:isolate;background:linear-gradient(90deg,rgba(77,68,56,.028) 1px,transparent 1px),linear-gradient(rgba(77,68,56,.022) 1px,transparent 1px),var(--p);background-size:42px 42px}.film:after{position:absolute;inset:0;z-index:30;content:'';opacity:.16;pointer-events:none;background-image:radial-gradient(rgba(64,54,43,.18) .5px,transparent .6px);background-size:5px 5px;mix-blend-mode:multiply}.meta,.scene{position:absolute;top:5.7%;z-index:10;color:#a8a29e;font-family:Georgia,'Times New Roman',serif;font-size:clamp(9px,.82vw,14px);letter-spacing:.12em}.meta{left:6.25%}.scene{right:6.25%;letter-spacing:.08em}.axis{position:absolute;top:17%;bottom:17%;left:50%;width:1px;background:#dfd9d1;transform:scaleY(0);transform-origin:top}.mark{position:absolute;left:50%;display:grid;width:54px;height:54px;place-items:center;border:1px solid #dfd9d1;border-radius:50%;background:#fffdfa;color:#78716c;font-family:ui-sans-serif,system-ui,sans-serif;font-size:19px;box-shadow:0 6px 15px rgba(52,43,35,.07);opacity:0;transform:translateX(-50%) scale(.7)}.mark.one{top:23%;color:var(--v)}.mark.two{top:39%;color:var(--g)}.mark.three{top:55%;color:var(--bl)}.mark.four{top:71%;color:var(--o)}.brand{position:absolute;top:50%;left:50%;z-index:3;width:620px;max-width:74vw;text-align:center;transform:translate(-50%,-50%)}.brand h1{margin:0;color:var(--i);font-family:Georgia,'Times New Roman','Noto Serif SC',serif;font-size:clamp(54px,6.3vw,120px);font-weight:600;letter-spacing:.02em;opacity:0;transform:translateY(15px)}.brand p{margin:23px 0 0;color:#78716c;font-size:clamp(18px,1.6vw,29px);line-height:1.5;opacity:0;transform:translateY(10px)}.brand p b{color:var(--i);font-weight:600}.sub{position:absolute;bottom:14%;left:50%;color:#a8a29e;font-family:ui-sans-serif,system-ui,sans-serif;font-size:clamp(10px,.8vw,14px);letter-spacing:.12em;opacity:0;transform:translateX(-50%)}.control{position:fixed;right:20px;bottom:20px;left:20px;z-index:40;display:flex;align-items:center;gap:12px;width:min(520px,calc(100vw - 40px));margin:auto;padding:10px 12px;border:1px solid rgba(70,59,48,.12);border-radius:7px;background:rgba(253,251,247,.91);box-shadow:0 10px 32px rgba(50,42,34,.16);font-family:ui-sans-serif,system-ui,sans-serif}.play{display:grid;width:29px;height:29px;place-items:center;border:0;border-radius:50%;color:white;background:var(--i);font-size:12px}.control input{width:100%;accent-color:var(--i)}output{width:72px;color:#57534e;font-size:11px;text-align:right}.axis{animation:axis 8s both}.mark.one{animation:mark 8s .25s both}.mark.two{animation:mark 8s .55s both}.mark.three{animation:mark 8s .85s both}.mark.four{animation:mark 8s 1.15s both}.brand h1{animation:title 8s both}.brand p{animation:copy 8s both}.sub{animation:sub 8s both}@keyframes axis{0%,12%{transform:scaleY(0)}42%,100%{transform:scaleY(1)}}@keyframes mark{0%,24%{opacity:0;transform:translateX(-50%) scale(.7)}38%,100%{opacity:1;transform:translateX(-50%) scale(1)}}@keyframes title{0%,43%{opacity:0;transform:translateY(15px)}60%,100%{opacity:1;transform:none}}@keyframes copy{0%,57%{opacity:0;transform:translateY(10px)}73%,100%{opacity:1;transform:none}}@keyframes sub{0%,70%{opacity:0}85%,100%{opacity:1}}@media(max-width:1100px){.brand{max-width:65vw}}
-</style></head><body><main class="film" aria-label="LumosTime 横屏宣传片结束镜：从开始，到看见自己"><div class="meta">LUMOSTIME / PRODUCT FILM</div><div class="scene">SCENE 08 · CLOSE</div><i class="axis"></i><i class="mark one">●</i><i class="mark two">↗</i><i class="mark three">◔</i><i class="mark four">✦</i><section class="brand"><h1>LumosTime</h1><p>从开始，<b>到看见自己。</b></p></section><p class="sub">记录时间 · 看见自己</p><div class="control"><button class="play" id="playPause" type="button">Ⅱ</button><input id="progress" type="range" min="0" max="8" step="0.01" value="0"><output id="timeLabel">0.0 / 8.0</output></div></main><script>const b=document.getElementById('playPause'),p=document.getElementById('progress'),o=document.getElementById('timeLabel'),d=8e3;let playing=true,r;const a=()=>document.getAnimations();function set(t){a().forEach(x=>{x.currentTime=t;x.pause()});p.value=t/1e3;o.value=`${(t/1e3).toFixed(1)} / 8.0`}function sync(){const t=Math.min(Number(a()[0]?.currentTime||0),d);p.value=t/1e3;o.value=`${(t/1e3).toFixed(1)} / 8.0`;if(playing&&t>=d){playing=false;b.textContent='↻';return}r=requestAnimationFrame(sync)}function play(t){a().forEach(x=>{x.currentTime=t;x.play()});playing=true;b.textContent='Ⅱ';cancelAnimationFrame(r);r=requestAnimationFrame(sync)}b.onclick=()=>{const t=Number(a()[0]?.currentTime||0);if(t>=d)return play(0);if(playing){a().forEach(x=>x.pause());playing=false;b.textContent='▶';cancelAnimationFrame(r)}else play(t)};p.oninput=()=>{set(Number(p.value)*1e3);playing=false;b.textContent='▶';cancelAnimationFrame(r)};requestAnimationFrame(()=>play(0));</script></body></html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LumosTime - Illuminate your time, Illuminate your life</title>
+    <style>
+      :root { --paper:#faf9f6; --ink:#1c1917; --muted:#78716c; --line:#ded8cf; --violet:#8b6fa8; }
+      * { box-sizing:border-box; }
+      body { min-width:960px; min-height:540px; margin:0; overflow:hidden; background:var(--paper); color:var(--ink); font-family:'Noto Serif SC','Source Han Serif SC','Songti SC','STSong','SimSun','Microsoft YaHei',serif; }
+      .film { position:relative; width:100vw; height:100vh; min-width:960px; min-height:540px; overflow:hidden; isolation:isolate; background:var(--paper); }
+      #p5-stage { position:absolute; inset:0; z-index:0; }
+      #p5-stage canvas { display:block; width:100%; height:100%; }
+      .film::after { position:absolute; inset:0; z-index:7; content:''; opacity:.12; pointer-events:none; background-image:radial-gradient(rgba(64,54,43,.18) .5px,transparent .6px); background-size:5px 5px; mix-blend-mode:multiply; }
+      .meta,.scene { position:absolute; top:5.7%; z-index:10; color:#a8a29e; font-family:Georgia,'Times New Roman',serif; font-size:clamp(9px,.82vw,14px); letter-spacing:.12em; }.meta { left:6.25%; }.scene { right:6.25%; letter-spacing:.08em; }
+      .brand { position:absolute; top:50%; left:50%; z-index:8; width:min(880px,80vw); text-align:center; transform:translate(-50%,-50%); pointer-events:none; }.brand h1 { margin:0; color:var(--ink); font-family:Georgia,'Times New Roman','Noto Serif SC',serif; font-size:clamp(54px,6.3vw,120px); font-weight:600; letter-spacing:.02em; text-shadow:0 2px 18px rgba(250,249,246,.85); opacity:0; transform:translateY(15px); }.slogan { margin:22px 0 0; color:var(--ink); font-family:Georgia,'Times New Roman',serif; font-size:clamp(18px,1.7vw,31px); font-style:italic; line-height:1.45; text-shadow:0 2px 14px rgba(250,249,246,.9); opacity:0; transform:translateY(10px); }.promise { margin:12px 0 0; color:var(--muted); font-size:clamp(14px,1.15vw,21px); line-height:1.5; text-shadow:0 2px 12px rgba(250,249,246,.9); opacity:0; transform:translateY(8px); }.sub { position:absolute; bottom:12%; left:50%; z-index:8; color:#a8a29e; font-family:ui-sans-serif,system-ui,sans-serif; font-size:clamp(10px,.8vw,14px); letter-spacing:.12em; opacity:0; transform:translateX(-50%); white-space:nowrap; }
+      .control { position:fixed; right:20px; bottom:20px; left:20px; z-index:20; display:flex; align-items:center; gap:12px; width:min(520px,calc(100vw - 40px)); margin:auto; padding:10px 12px; border:1px solid rgba(70,59,48,.12); border-radius:7px; background:rgba(253,251,247,.91); box-shadow:0 10px 32px rgba(50,42,34,.16); backdrop-filter:blur(12px); font-family:ui-sans-serif,system-ui,sans-serif; }.play { display:grid; width:29px; height:29px; flex:0 0 auto; place-items:center; border:0; border-radius:50%; color:#fff; background:var(--ink); cursor:pointer; font-size:12px; }.control input { width:100%; accent-color:var(--ink); }.control output { width:72px; color:#57534e; font-size:11px; text-align:right; }
+      .brand h1 { animation:title 8s both; }.slogan { animation:copy 8s .15s both; }.promise { animation:copy 8s .38s both; }.sub { animation:sub 8s both; } @keyframes title { 0%,43% { opacity:0; transform:translateY(15px); } 60%,100% { opacity:1; transform:none; } } @keyframes copy { 0%,57% { opacity:0; transform:translateY(10px); } 73%,100% { opacity:1; transform:none; } } @keyframes sub { 0%,70% { opacity:0; } 85%,100% { opacity:1; } }
+    </style>
+  </head>
+  <body>
+    <main class="film" aria-label="LumosTime 横屏宣传片结束镜：Illuminate your time, Illuminate your life">
+      <div id="p5-stage" aria-hidden="true"></div>
+      <div class="meta">LUMOSTIME / PRODUCT FILM</div><div class="scene">SCENE 08 · CLOSE</div>
+      <section class="brand"><h1>LumosTime</h1><p class="slogan">Illuminate your time, Illuminate your life</p><p class="promise">从开始，到看见自己。</p></section>
+      <p class="sub">记录时间 · 看见自己</p>
+      <div class="control" aria-label="试片播放控制"><button class="play" id="playPause" type="button" aria-label="暂停试片">Ⅱ</button><input id="progress" type="range" min="0" max="8" step="0.01" value="0" aria-label="试片进度" /><output id="timeLabel" for="progress">0.0 / 8.0</output></div>
+    </main>
+    <script src="../../node_modules/p5/lib/p5.min.js"></script>
+    <script>
+      const DURATION = 8000;
+      let sceneTime = 0;
+      let sketchInstance;
+      const clamp01 = (value) => Math.max(0, Math.min(1, value));
+      const easeOut = (value) => 1 - Math.pow(1 - clamp01(value), 3);
+      const hash = (value) => { const x = Math.sin(value * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+      const branchData = [];
+      const flowers = [];
+      const rain = [];
+
+      sketchInstance = new p5((p) => {
+        function growBranch(x, y, angle, length, level, delay, seed) {
+          const points = [{ x, y }]; const segments = 14 + Math.floor(length / 20);
+          let px = x; let py = y; let currentAngle = angle;
+          for (let index = 0; index < segments; index += 1) { currentAngle += (hash(seed + index * 1.37) - .5) * .12; const step = length / segments; px += Math.cos(currentAngle) * step; py += Math.sin(currentAngle) * step; points.push({ x:px, y:py }); }
+          branchData.push({ points, level, delay, duration: 1900 + level * 420 });
+          const tip = points[Math.floor(points.length * (.55 + hash(seed + 8) * .2))];
+          if (level < 4) { growBranch(tip.x, tip.y, currentAngle - .52, length * .62, level + 1, delay + 350, seed + 21); growBranch(tip.x, tip.y, currentAngle + .54, length * .57, level + 1, delay + 520, seed + 42); }
+          if (level > 1 || hash(seed + 55) > .3) { flowers.push({ x:points[points.length - 1].x, y:points[points.length - 1].y, delay:delay + 900 + hash(seed + 71) * 1100, size:6 + hash(seed + 73) * 9 }); }
+        }
+        p.setup = () => {
+          const canvas = p.createCanvas(window.innerWidth, window.innerHeight);
+          canvas.parent('p5-stage'); p.pixelDensity(1); p.randomSeed(20260825); p.noiseSeed(20260825);
+          for (let index = 0; index < 34; index += 1) rain.push({ x:hash(index + 4), y:hash(index + 5), length:45 + hash(index + 8) * 115, speed:.025 + hash(index + 10) * .035, phase:hash(index + 14) * 8000 });
+          // Branches enter from every edge and converge toward the closing mark.
+          const roots = [
+            [1.04, 1.15, -2.65, .55, 700, 12],
+            [1.02, .02, 2.1, .33, 1050, 88],
+            [-.04, 1.08, -.48, .43, 900, 144],
+            [-.03, -.04, .52, .38, 1250, 233],
+            [.30, -.05, 1.12, .30, 1500, 377],
+            [1.05, .54, 2.78, .34, 1700, 521]
+          ];
+          roots.forEach(([x, y, angle, length, delay, seed]) => growBranch(p.width * x, p.height * y, angle, Math.min(p.width,p.height) * length, 1, delay, seed));
+        };
+        p.draw = () => { p.background(250,249,246); const now = sceneTime || p.millis(); p.push(); p.noFill(); rain.forEach((drop) => { const x = drop.x * p.width; const y = ((now * drop.speed + drop.phase) % (p.height + 180)) - 90; p.stroke(107,140,168,29 + hash(drop.phase) * 26); p.strokeWeight(.8); p.line(x,y,x - 7,y + drop.length); if (drop.phase % 4 < 1) { p.noStroke(); p.fill(107,140,168,52); p.circle(x - 7,y + drop.length,3); p.noFill(); } }); p.pop();
+          branchData.forEach((branch) => { const progress = easeOut((now - branch.delay) / branch.duration); const visible = Math.max(1, Math.floor(progress * branch.points.length)); p.push(); p.noFill(); p.stroke(100,83,65, branch.level === 1 ? 160 : 105); p.strokeWeight(branch.level === 1 ? 3.1 : 1.65); p.beginShape(); branch.points.slice(0,visible).forEach((point) => p.vertex(point.x,point.y)); p.endShape(); p.pop(); });
+          flowers.forEach((flower) => { const bloom = easeOut((now - flower.delay) / 900); if (bloom <= 0) return; const sway = Math.sin(now / 1500 + flower.x) * 2; p.noStroke(); for (let petal = 0; petal < 5; petal += 1) { const angle = petal * Math.PI * .4 + now / 5000; p.fill(petal % 2 ? 210 : 187, petal % 2 ? 145 : 119, petal % 2 ? 126 : 154, 125 * bloom); p.circle(flower.x + sway + Math.cos(angle) * flower.size * .33,flower.y + Math.sin(angle) * flower.size * .33,flower.size * .58 * bloom); } p.fill(117,91,68,145 * bloom); p.circle(flower.x + sway,flower.y,flower.size * .24 * bloom); });
+        };
+        p.windowResized = () => p.resizeCanvas(window.innerWidth, window.innerHeight);
+        window.setSceneTime = (time) => { sceneTime = time; p.redraw(); };
+        window.startScene = () => { sceneTime = 0; p.loop(); };
+        window.pauseScene = () => { p.noLoop(); };
+      }, document.getElementById('p5-stage'));
+      const button=document.getElementById('playPause'),progress=document.getElementById('progress'),timeLabel=document.getElementById('timeLabel'); let isPlaying=true; let rafId;
+      const animations=()=>document.getAnimations(); function setTime(ms){ animations().forEach((animation)=>{animation.currentTime=ms;animation.pause();}); window.setSceneTime(ms); progress.value=String(ms/1000); timeLabel.value=`${(ms/1000).toFixed(1)} / 8.0`; }
+      function sync(){ const t=Math.min(Number(animations()[0]?.currentTime||0),DURATION); window.setSceneTime(t); progress.value=String(t/1000); timeLabel.value=`${(t/1000).toFixed(1)} / 8.0`; if(isPlaying&&t>=DURATION){isPlaying=false;window.pauseScene();button.textContent='↻';return;} rafId=requestAnimationFrame(sync); }
+      function playFrom(ms){ animations().forEach((animation)=>{animation.currentTime=ms;animation.play();}); sceneTime=ms; isPlaying=true; window.startScene(); button.textContent='Ⅱ'; cancelAnimationFrame(rafId); rafId=requestAnimationFrame(sync); }
+      button.addEventListener('click',()=>{const t=Number(animations()[0]?.currentTime||0);if(t>=DURATION)return playFrom(0);if(isPlaying){animations().forEach((animation)=>animation.pause());isPlaying=false;window.pauseScene();button.textContent='▶';cancelAnimationFrame(rafId);return;}playFrom(t);}); progress.addEventListener('input',()=>{setTime(Number(progress.value)*1000);isPlaying=false;window.pauseScene();button.textContent='▶';cancelAnimationFrame(rafId);});
+      window.renderSceneAt = (ms) => { cancelAnimationFrame(rafId); animations().forEach((animation)=>{animation.currentTime=ms;animation.pause();}); isPlaying=false; window.pauseScene(); window.setSceneTime(ms); progress.value=String(ms/1000); timeLabel.value=`${(ms/1000).toFixed(1)} / 8.0`; button.textContent='▶'; };
+      requestAnimationFrame(()=>playFrom(0));
+    </script>
+  </body>
+</html>

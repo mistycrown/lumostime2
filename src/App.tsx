@@ -31,6 +31,7 @@
  * @updated 2026-04-26: Added Android assistant notification navigation consumption so tapping a background AI alert reopens the shared chat at the exact target message.
  * @updated 2026-07-31: Added a temporary active Chronicle layout state so tapping the active Timeline nav item toggles layouts without changing the settings default.
  * @updated 2026-08-11: Shows shareable Sentry error IDs for startup, local-data hydration, and imported-file failures.
+ * @updated 2026-08-26: Added Routine configuration state and sequential session orchestration.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -40,7 +41,7 @@ import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { AppView } from './types';
-import type { ActiveSession, AppAwarenessSessionMeta, Log } from './types';
+import type { ActiveRoutineRun, ActiveSession, AppAwarenessSessionMeta, Log, Routine } from './types';
 import AssistantAgent from './plugins/AssistantAgentPlugin';
 
 import { ToastProvider, useToast } from './contexts/ToastContext';
@@ -105,6 +106,7 @@ import { splitLogByDays } from './utils/logUtils';
 import { getLatestActualLogEndTime } from './utils/statLogUtils';
 import { buildSceneGroupStateFromLegacySlots, getActiveSceneGroup, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from './utils/sceneGroupStorage';
 import { getLocalDataTimestamp } from './utils/localDataTimestamp';
+import { loadActiveRoutineRun, loadRoutines, saveActiveRoutineRun, saveRoutines } from './utils/routineStorage';
 import { validateAndFixData } from './utils/dataValidation';
 import { ensureQuickTodoCategory } from './utils/todoQuickCategoryUtils';
 import { STORAGE_WRITE_ERROR_EVENT, StorageWriteErrorDetail } from './constants/storageKeys';
@@ -336,6 +338,20 @@ const AppContent: React.FC = () => {
   }, [currentView, defaultTimelineLayout, setCurrentView]);
 
   const { categories, scopes, goals, majorGoals, setCategories, setScopes, setGoals, setMajorGoals, handleUpdateActivity } = useCategoryScope();
+  const [routines, setRoutines] = useState<Routine[]>(() => loadRoutines());
+  const [activeRoutineRun, setActiveRoutineRun] = useState<ActiveRoutineRun | null>(() => loadActiveRoutineRun());
+  const activeRoutineRunRef = useRef<ActiveRoutineRun | null>(activeRoutineRun);
+  const routinesRef = useRef<Routine[]>(routines);
+
+  useEffect(() => {
+    routinesRef.current = routines;
+    saveRoutines(routines);
+  }, [routines]);
+
+  useEffect(() => {
+    activeRoutineRunRef.current = activeRoutineRun;
+    saveActiveRoutineRun(activeRoutineRun);
+  }, [activeRoutineRun]);
   const { buildBackupPayload: buildAchievementBackupPayload } = useAchievement();
   const { startActivity, stopActivity, cancelSession, activeSessions, setActiveSessions } = useSession();
   const {
@@ -538,6 +554,49 @@ const AppContent: React.FC = () => {
 
     return startActivity(activity, categoryId, autoLinkRules, todoId, scopeIdOrIds, note, appAwarenessMeta);
   };
+
+  const startRoutine = useCallback((routine: Routine) => {
+    if (activeRoutineRunRef.current) {
+      addToast('info', '已有 Routine 正在运行');
+      return;
+    }
+
+    const firstStep = routine.steps[0];
+    if (!firstStep) {
+      addToast('error', 'Routine 至少需要一个步骤');
+      return;
+    }
+
+    const activity = categories
+      .find(category => category.id === firstStep.categoryId)
+      ?.activities.find(item => item.id === firstStep.activityId);
+    if (!activity) {
+      addToast('error', 'Routine 的活动已不存在，请前往设置检查');
+      return;
+    }
+
+    const sessionId = handleStartActivityWrapper(activity, firstStep.categoryId);
+    setActiveRoutineRun({
+      routineId: routine.id,
+      currentStepIndex: 0,
+      routineStartedAt: Date.now(),
+      currentSessionId: sessionId
+    });
+  }, [addToast, categories]);
+
+  const advanceRoutine = useCallback(() => {
+    const run = activeRoutineRunRef.current;
+    if (!run) return;
+    handleStopActivityWrapper(run.currentSessionId);
+  }, []);
+
+  const exitRoutine = useCallback(() => {
+    const run = activeRoutineRunRef.current;
+    if (run) {
+      cancelSession(run.currentSessionId);
+    }
+    setActiveRoutineRun(null);
+  }, [cancelSession]);
   
   const handleStartTodoFocusWrapper = (todo: TodoItem, autoEnterFocus?: boolean) => {
     const resolvedJumpMode = resolveAutoStartTimerJumpMode(autoStartTimerJumpMode, autoEnterFocus);
@@ -552,11 +611,47 @@ const AppContent: React.FC = () => {
   };
 
   const handleStopActivityWrapper = (sessionId: string, finalSessionData?: ActiveSession) => {
+    const routineRun = activeRoutineRunRef.current;
     stopActivity(
       sessionId,
       finalSessionData,
       persistStoppedSessionLogs
     );
+
+    if (routineRun?.currentSessionId !== sessionId) {
+      return;
+    }
+
+    const routine = routinesRef.current.find(item => item.id === routineRun.routineId);
+    const nextIndex = routineRun.currentStepIndex + 1;
+    const nextStep = routine?.steps[nextIndex];
+    if (!routine || !nextStep) {
+      setActiveRoutineRun(null);
+      return;
+    }
+
+    const nextActivity = categories
+      .find(category => category.id === nextStep.categoryId)
+      ?.activities.find(item => item.id === nextStep.activityId);
+    if (!nextActivity) {
+      setActiveRoutineRun(null);
+      addToast('error', 'Routine 的下一步活动已不存在');
+      return;
+    }
+
+    const nextSessionId = handleStartActivityWrapper(nextActivity, nextStep.categoryId);
+    setActiveRoutineRun({
+      ...routineRun,
+      currentStepIndex: nextIndex,
+      currentSessionId: nextSessionId
+    });
+  };
+
+  const handleCancelSessionWrapper = (sessionId: string) => {
+    cancelSession(sessionId);
+    if (activeRoutineRunRef.current?.currentSessionId === sessionId) {
+      setActiveRoutineRun(null);
+    }
   };
 
   const handleRequestStopActivityWrapper = (sessionId: string) => {
@@ -862,6 +957,11 @@ const AppContent: React.FC = () => {
     >
       <div className={showTodoDetailPage ? 'hidden' : 'h-full'}>
         <AppRoutes
+        routines={routines}
+        activeRoutineRun={activeRoutineRun}
+        onStartRoutine={startRoutine}
+        onAdvanceRoutine={advanceRoutine}
+        onExitRoutine={exitRoutine}
         // Activity Handlers
         handleStartActivity={handleStartActivityWrapper}
 
@@ -1134,6 +1234,8 @@ const AppContent: React.FC = () => {
               setCustomStickerSets([]);
               setCustomStickers([]);
               setFilters([]);
+              setRoutines([]);
+              setActiveRoutineRun(null);
               resetPrinciplesToDefaults();
               resetSceneGroupsToDefaults();
               addToast('success', 'Data reset to defaults');
@@ -1157,6 +1259,8 @@ const AppContent: React.FC = () => {
               setCustomStickerSets([]);
               setCustomStickers([]);
               setFilters([]);
+              setRoutines([]);
+              setActiveRoutineRun(null);
               clearPrinciples();
               resetSceneGroupsToDefaults();
               addToast('success', 'Core data cleared; default categories were retained');
@@ -1286,6 +1390,9 @@ const AppContent: React.FC = () => {
             manualSyncMode={manualSyncMode}
             onToggleManualSyncMode={() => setManualSyncMode(!manualSyncMode)}
 
+            routines={routines}
+            onUpdateRoutines={setRoutines}
+
             onEditLog={logManager.openEditModal}
           />
         </React.Suspense>
@@ -1309,7 +1416,7 @@ const AppContent: React.FC = () => {
         sessions={activeSessions}
         todos={todos}
         onStop={handleStopActivityWrapper}
-        onCancel={cancelSession}
+        onCancel={handleCancelSessionWrapper}
         onClick={(session) => setFocusDetailSessionId(session.id)}
       />
       

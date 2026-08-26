@@ -5,6 +5,7 @@
  * @pos Component (Timeline Metadata)
  * @description Resolves stored attribute and option IDs to their current names so renamed definitions are reflected in history.
  * @updated 2026-08-25: Added compact attribute rendering below timeline notes.
+ * @updated 2026-08-26: Slightly increased timeline attribute text size for readability.
  */
 import React, { useMemo } from 'react';
 import { Activity, ActivityAttributeValue } from '../types';
@@ -51,7 +52,7 @@ export const ActivityAttributeSummary: React.FC<ActivityAttributeSummaryProps> =
   if (rows.length === 0) return null;
 
   return (
-    <div className={`mt-1 mb-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] leading-relaxed text-stone-400 ${className}`}>
+    <div className={`mt-1 mb-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] leading-relaxed text-stone-400 ${className}`}>
       {rows.map((row, index) => (
         <span key={`${row}-${index}`} className="min-w-0 max-w-full break-words">
           {row}

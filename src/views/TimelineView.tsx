@@ -2366,6 +2366,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                         scopes={scopes}
                         todos={todos}
                         isDarkMode={isDarkMode}
+                        isPrivacyMode={isPrivacyMode}
                         minIdleTimeThreshold={minIdleTimeThreshold}
                         onAddLog={onAddLog}
                         onEditLog={onEditLog}
