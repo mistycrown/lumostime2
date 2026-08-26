@@ -1,5 +1,6 @@
 /**
  * @file todoScheduleAssignUtils.ts
+ * @updated 2026-08-26: Excludes archived todos from schedule-assignment picker options.
  * @input Assignable todo subsets, full todo sources, picker category ids, and schedule-assignment modes
  * @output Shared pure filtering and ordering helpers for the schedule assignment picker
  * @pos Utility (Todo schedule assignment)
@@ -16,6 +17,7 @@ import {
   isIncompleteSubtaskHiddenByCompletedParent
 } from './todoHierarchyUtils';
 import { isFutureTodoCategoryId } from './todoQuickCategoryUtils';
+import { isTodoArchived } from './archiveUtils';
 
 export interface TodoScheduleAssignRow {
   todo: TodoItem;
@@ -164,6 +166,10 @@ export const getVisibleScheduleAssignTodos = (
     ? [...todos]
     : todos.filter((todo) => todo.categoryId === selectedCategoryId);
   const schedulableTodos = nextTodos.filter((todo) => {
+    if (isTodoArchived(todo)) {
+      return false;
+    }
+
     if (isFutureTodoCategoryId(todo.categoryId)) {
       return false;
     }

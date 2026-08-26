@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { Activity, Category, Scope } from '../types';
-import { getActiveActivities, getActiveScopes, isActivityArchived, isCategoryArchived, isScopeArchived, setCategoryArchiveState } from './archiveUtils';
+import { Activity, Category, Scope, TodoItem } from '../types';
+import { getActiveActivities, getActiveScopes, getActiveTodos, isActivityArchived, isCategoryArchived, isScopeArchived, isTodoArchived, setCategoryArchiveState } from './archiveUtils';
 
 const activity = (id: string, isArchived?: boolean): Activity => ({
   id,
@@ -48,5 +48,14 @@ describe('archiveUtils', () => {
     const archived = { id: 's2', name: 'Archived', icon: '*', isArchived: true, order: 1, themeColor: '#000' } as Scope;
     expect(isScopeArchived(archived)).toBe(true);
     expect(getActiveScopes([active, archived])).toEqual([active]);
+  });
+
+  test('treats legacy todos as active and filters archived todos', () => {
+    const legacy = { id: 'legacy', isArchived: undefined } as TodoItem;
+    const archived = { id: 'archived', isArchived: true } as TodoItem;
+
+    expect(isTodoArchived(legacy)).toBe(false);
+    expect(isTodoArchived(archived)).toBe(true);
+    expect(getActiveTodos([legacy, archived])).toEqual([legacy]);
   });
 });

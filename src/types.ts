@@ -453,6 +453,7 @@ export interface TodoItem {
   childOrder?: number; // Stable order among siblings under the same parent
   title: string;
   isCompleted: boolean;
+  isArchived?: boolean; // Missing values are treated as active for backward compatibility
   completedAt?: string; // ISO Date string for completion time
   linkedActivityId?: string; // Links to a Record Activity for stats
   linkedCategoryId?: string; // Link back to Category

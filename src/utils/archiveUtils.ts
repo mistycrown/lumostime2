@@ -1,16 +1,18 @@
 /**
  * @file archiveUtils.ts
- * @input Activity, Category, Scope collections
+ * @input Activity, Category, Scope, and Todo collections
  * @output Active and archived collection helpers, including category-level cascading state updates
  * @description Shared archive-state predicates used by indexes and selectors.
  */
-import { Activity, Category, Scope } from '../types';
+import { Activity, Category, Scope, TodoItem } from '../types';
 
 export const isActivityArchived = (activity: Activity): boolean => activity.isArchived === true;
 
 export const isCategoryArchived = (category: Category): boolean => category.isArchived === true;
 
 export const isScopeArchived = (scope: Scope): boolean => scope.isArchived === true;
+
+export const isTodoArchived = (todo: Pick<TodoItem, 'isArchived'>): boolean => todo.isArchived === true;
 
 export const getActiveActivities = (category: Category): Activity[] =>
   isCategoryArchived(category)
@@ -25,3 +27,6 @@ export const setCategoryArchiveState = (category: Category, isArchived: boolean)
 
 export const getActiveScopes = (scopes: Scope[]): Scope[] =>
   scopes.filter((scope) => !isScopeArchived(scope));
+
+export const getActiveTodos = (todos: TodoItem[]): TodoItem[] =>
+  todos.filter((todo) => !isTodoArchived(todo));

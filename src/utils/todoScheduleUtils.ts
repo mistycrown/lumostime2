@@ -1,5 +1,6 @@
 /**
  * @file todoScheduleUtils.ts
+ * @updated 2026-08-26: Excludes archived todos from association, week, and month schedule entries.
  * @input Todo items with optional schedule fields, reference dates
  * @output Week buckets, daily schedule entries, and badge metadata for todo planning views
  * @pos Utility (Todo planning)
@@ -14,6 +15,7 @@
  */
 
 import { Log, TodoItem, TodoRecurrenceRule } from '../types';
+import { isTodoArchived } from './archiveUtils';
 
 export interface TodoDateBadges {
   scheduled: boolean;
@@ -416,6 +418,7 @@ export const getTodoAssociationTodayTodos = (
   referenceDate: Date = new Date(),
   options?: { includeCompleted?: boolean }
 ): TodoItem[] => todos
+  .filter((todo) => !isTodoArchived(todo))
   .filter((todo) => options?.includeCompleted || !todo.isCompleted)
   .filter((todo) => isTodoInAssociationTodayCategory(todo, referenceDate))
   .sort((left, right) => {
@@ -798,6 +801,7 @@ const buildTodoDateEntriesWithLookup = (
   targetDateKey: string,
   inProgressLookup?: Map<string, Set<string>>
 ): TodoDateEntry[] => todos
+  .filter((todo) => !isTodoArchived(todo))
   .map((todo) => {
     const badges = getTodoDateBadges(todo, targetDateKey, inProgressLookup);
 
