@@ -16,29 +16,66 @@
       .row-value { gap:7px; }
       .trend { color:#7a9176; font-size:9px; font-weight:700; }
       .trend.down { color:#b17d6e; }
-      .sub { display:grid; gap:4px; margin-top:8px; padding-left:18px; }
-      .sub-row { display:flex; align-items:baseline; justify-content:space-between; gap:8px; color:#78716c; font-size:10px; }
-      .sub-row > span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-      .sub-meta { flex:0 0 auto; color:#a8a29e; font-family:ui-monospace,'Cascadia Mono',monospace; font-size:9px; white-space:nowrap; }
-      .sub-meta .trend { margin-left:4px; }
-      .sub::after { display:block; color:#78716c; font-family:ui-sans-serif,system-ui,sans-serif; font-size:10px; white-space:pre; }
-      .row.one .sub::after { content:'写作业                                      1h 36m · 8% · +9%'; }
-      .row.two .sub::after { content:'写代码                                      2h 48m · 15% · -4%'; color:#b17d6e; }
-      .row.three .sub::after { content:'活动身体                                  1h 20m · 7% · +17%'; }
-      .row.four .sub::after { content:'英语阅读                                      56m · 5% · +6%'; }
-      .sub > span:first-child { overflow:visible; white-space:nowrap; }
-      .row.one .sub > span:first-child::after { content:' · 4h 12m · 22%'; color:#a8a29e; font-family:ui-monospace,'Cascadia Mono',monospace; font-size:9px; }
-      .row.two .sub > span:first-child::after { content:' · 2h 14m · 12%'; color:#a8a29e; font-family:ui-monospace,'Cascadia Mono',monospace; font-size:9px; }
-      .row.three .sub > span:first-child::after { content:' · 2h 36m · 14%'; color:#a8a29e; font-family:ui-monospace,'Cascadia Mono',monospace; font-size:9px; }
-      .row.four .sub > span:first-child::after { content:' · 1h 28m · 8%'; color:#a8a29e; font-family:ui-monospace,'Cascadia Mono',monospace; font-size:9px; }
-      .sub-row:first-child > span:first-child::after { color:#a8a29e; font-family:ui-monospace,'Cascadia Mono',monospace; font-size:9px; }
-      .row.one .sub-row:first-child > span:first-child::after { content:' · 4h 12m · 22%'; }
-      .row.two .sub-row:first-child > span:first-child::after { content:' · 2h 14m · 12%'; }
-      .row.three .sub-row:first-child > span:first-child::after { content:' · 2h 36m · 14%'; }
-      .row.four .sub-row:first-child > span:first-child::after { content:' · 1h 28m · 8%'; }
       .copy h1 span:first-child{animation:up 10s .1s both}.copy h1 span:last-child{animation:up 10s .6s both}.copy-rule{animation:rule 10s both}.copy p{animation:body 10s both}.app{animation:app 10s both}.controls{animation:controls 10s both}.donut{animation:donut 10s both}.caption-mini{animation:body 10s 1.9s both}.row.one{animation:row 10s .1s both}.row.two{animation:row 10s .35s both}.row.three{animation:row 10s .6s both}.row.four{animation:row 10s .85s both}.row.one .fill{animation:fill-one 10s both}.row.two .fill{animation:fill-two 10s both}.row.three .fill{animation:fill-three 10s both}.row.four .fill{animation:fill-four 10s both}.final{animation:final 10s both}
       @keyframes up{0%,8%{opacity:0;transform:translateY(16px)}17%,100%{opacity:1;transform:none}}@keyframes rule{0%,25%{width:0;opacity:0}34%,100%{width:78px;opacity:1}}@keyframes body{0%,28%{opacity:0;transform:translateY(12px)}37%,100%{opacity:1;transform:none}}@keyframes app{0%,22%{opacity:0;transform:translateX(9%) scale(.97)}38%,100%{opacity:1;transform:translateX(0) scale(1)}}@keyframes controls{0%,42%{opacity:0;transform:translateY(-8px)}51%,100%{opacity:1;transform:none}}@keyframes donut{0%,51%{opacity:0;transform:scale(.55)}70%,100%{opacity:1;transform:scale(1)}}@keyframes row{0%,58%{opacity:0;transform:translateX(13px)}72%,100%{opacity:1;transform:none}}@keyframes fill-one{0%,70%{width:0}84%,100%{width:39%}}@keyframes fill-two{0%,72%{width:0}85%,100%{width:27%}}@keyframes fill-three{0%,74%{width:0}86%,100%{width:21%}}@keyframes fill-four{0%,76%{width:0}87%,100%{width:13%}}@keyframes final{0%,84%{opacity:0;transform:translateY(10px)}93%,100%{opacity:1;transform:none}}
+      /* Category/activity hierarchy mirrors the product's default tag taxonomy. */
+      .overview{grid-template-columns:36% 1fr;gap:34px}
+      .donut{background:conic-gradient(transparent 0deg 7deg,var(--orange) 7deg 98deg,transparent 98deg 105deg,var(--purple) 105deg 238deg,transparent 238deg 245deg,var(--green) 245deg 310deg,transparent 310deg 317deg,var(--blue) 317deg 346deg,transparent 346deg 353deg,#9aa6a0 353deg 360deg)}
+      .caption-mini{max-height:none;font-size:11px}
+      .caption-mini::before{content:none}
+      .breakdown{padding-top:3px}
+      .row{margin-bottom:11px}
+      .row-top{margin-bottom:5px}
+      .row-metrics{display:flex;align-items:center;gap:7px;color:#a8a29e;font-family:ui-monospace,'Cascadia Mono',monospace;font-size:clamp(9px,.68vw,12px)}
+      .growth{display:inline-flex;align-items:center;gap:2px;color:#7a9176;font-family:ui-sans-serif,system-ui,sans-serif;font-size:9px;font-style:normal;font-weight:700}
+      .growth::before{content:'↑';font-size:10px;line-height:1}
+      .growth.down{color:#b17d6e}
+      .growth.down::before{content:'↓'}
+      .activity-list{display:grid;gap:3px;margin-top:6px;padding-left:18px;color:#78716c;font-family:ui-sans-serif,system-ui,sans-serif;font-size:10px}
+      .activity-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;min-width:0}
+      .activity-row>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .activity-metrics{display:flex;flex:0 0 auto;align-items:center;gap:7px;color:#a8a29e;font-family:ui-monospace,'Cascadia Mono',monospace;font-size:9px;white-space:nowrap}
+      .activity-metrics b{color:#a8a29e;font-size:9px;font-weight:500}
+      .sub,.sub::after,.sub>span:first-child::after{display:none!important;content:none!important}
+      .row.one .fill{animation:fill-life 10s both}.row.two .fill{animation:fill-study 10s both}.row.three .fill{animation:fill-self 10s both}.row.four .fill{animation:fill-others 10s both}.row.five{animation:row 10s 1.1s both}.row.five .fill{animation:fill-explore 10s both}
+      @keyframes fill-life{0%,70%{width:0}84%,100%{width:28%}}@keyframes fill-study{0%,72%{width:0}85%,100%{width:39%}}@keyframes fill-self{0%,74%{width:0}86%,100%{width:19%}}@keyframes fill-others{0%,76%{width:0}87%,100%{width:8%}}@keyframes fill-explore{0%,78%{width:0}88%,100%{width:6%}}
+
     </style>
   </head>
-  <body><main class="film" aria-label="LumosTime 横屏宣传片分镜：看见自己的时间"><div class="meta">LUMOSTIME / PRODUCT FILM</div><div class="scene">SCENE 04 · SEE YOUR TIME</div><section class="copy"><h1><span>看见自己，</span><span class="muted">才会走得更稳。</span></h1><div class="copy-rule"></div><p>时间不是一串冷数字。<br />它会变成清楚的分布，<strong>帮你安排下一次投入。</strong></p></section><section class="app" aria-label="按当前 StatsView 和 PieChartView 结构重建的统计页面"><div class="titlebar"><span class="dots"><i></i><i></i><i></i></span><span>LumosTime</span></div><div class="stats"><header class="controls"><div class="ranges"><b>日</b><b class="active">周</b><b>月</b><b>年</b></div><div class="actions"><div class="nav"><span>‹</span><span>›</span></div><div class="views"><span class="active">◔</span><span>▦</span><span>⌁</span><span>□</span></div></div></header><section class="overview"><div><div class="donut-box"><i class="donut"></i><div class="donut-center"><small>TAGS</small><strong>18<em>h</em> 40<em>m</em></strong></div></div><p class="caption-mini">8 月 19 日至 8 月 25 日<br />每一段记录都有可回看的位置</p></div><div class="breakdown"><article class="row one"><div class="row-top"><div class="row-title"><i class="dot" style="background:#8b6fa8"></i>学习</div><div class="row-value">7h 18m <b class="percent">39%</b></div></div><div class="rail"><div class="fill" style="background:#8b6fa8"></div></div><div class="sub"><span>英语系统课 · 复盘</span><span>+16%</span></div></article><article class="row two"><div class="row-top"><div class="row-title"><i class="dot" style="background:#7a9176"></i>工作</div><div class="row-value">5h 02m <b class="percent">27%</b></div></div><div class="rail"><div class="fill" style="background:#7a9176"></div></div><div class="sub"><span>方案整理 · 沟通</span><span>+8%</span></div></article><article class="row three"><div class="row-top"><div class="row-title"><i class="dot" style="background:#6b8ca8"></i>运动</div><div class="row-value">3h 56m <b class="percent">21%</b></div></div><div class="rail"><div class="fill" style="background:#6b8ca8"></div></div><div class="sub"><span>跑步 · 拉伸</span><span>+24%</span></div></article><article class="row four"><div class="row-top"><div class="row-title"><i class="dot" style="background:#c89b7a"></i>阅读</div><div class="row-value">2h 24m <b class="percent">13%</b></div></div><div class="rail"><div class="fill" style="background:#c89b7a"></div></div><div class="sub"><span>非虚构 · 写作素材</span><span>+11%</span></div></article></div></section></div></section><p class="final">不是为了考核自己。<strong>是为了更了解自己怎么生活。</strong></p><div class="control" aria-label="试片播放控制"><button class="play" id="playPause" type="button" aria-label="暂停试片">Ⅱ</button><input id="progress" type="range" min="0" max="10" step="0.01" value="0" aria-label="试片进度"><output id="timeLabel" for="progress">0.0 / 10.0</output></div></main><script>const b=document.getElementById('playPause'),p=document.getElementById('progress'),o=document.getElementById('timeLabel'),d=10000;let playing=true,r;const a=()=>document.getAnimations();function set(t){a().forEach(x=>{x.currentTime=t;x.pause()});p.value=t/1000;o.value=`${(t/1000).toFixed(1)} / 10.0`}function sync(){const t=Math.min(Number(a()[0]?.currentTime||0),d);p.value=t/1000;o.value=`${(t/1000).toFixed(1)} / 10.0`;if(playing&&t>=d){playing=false;b.textContent='↻';return}r=requestAnimationFrame(sync)}function play(t){a().forEach(x=>{x.currentTime=t;x.play()});playing=true;b.textContent='Ⅱ';cancelAnimationFrame(r);r=requestAnimationFrame(sync)}b.onclick=()=>{const t=Number(a()[0]?.currentTime||0);if(t>=d)return play(0);if(playing){a().forEach(x=>x.pause());playing=false;b.textContent='▶';cancelAnimationFrame(r)}else play(t)};p.oninput=()=>{set(Number(p.value)*1000);playing=false;b.textContent='▶';cancelAnimationFrame(r)};requestAnimationFrame(()=>play(0));</script></body>
+  <body><main class="film" aria-label="LumosTime 横屏宣传片分镜：看见自己的时间"><div class="meta">LUMOSTIME / PRODUCT FILM</div><div class="scene">SCENE 04 · SEE YOUR TIME</div><section class="copy"><h1><span>看见自己，</span><span class="muted">才会走得更稳。</span></h1><div class="copy-rule"></div><p>时间不是一串冷数字。<br />它会变成清楚的分布，<strong>帮你安排下一次投入。</strong></p></section><section class="app" aria-label="按当前 StatsView 和 PieChartView 结构重建的统计页面"><div class="titlebar"><span class="dots"><i></i><i></i><i></i></span><span>LumosTime</span></div><div class="stats"><header class="controls"><div class="ranges"><b>日</b><b class="active">周</b><b>月</b><b>年</b></div><div class="actions"><div class="nav"><span>‹</span><span>›</span></div><div class="views"><span class="active">◔</span><span>▦</span><span>⌁</span><span>□</span></div></div></header><section class="overview">
+  <div class="donut-column">
+    <div class="donut-box">
+      <i class="donut"></i>
+      <div class="donut-center"><small>TAGS</small><strong>22<em>h</em> 10<em>m</em></strong></div>
+    </div>
+    <p class="caption-mini">8 月 19 日至 8 月 25 日</p>
+  </div>
+  <div class="breakdown">
+    <article class="row one">
+      <div class="row-top"><div class="row-title"><i class="dot" style="background:#c89b7a"></i>生活</div><div class="row-metrics"><span>6h 12m</span><b class="percent">28%</b><span class="growth up">12%</span></div></div>
+      <div class="rail"><div class="fill" style="background:#c89b7a"></div></div>
+      <div class="activity-list"><div class="activity-row"><span>通勤</span><span class="activity-metrics">1h 48m <b>8%</b><i class="growth up">6%</i></span></div><div class="activity-row"><span>饮食</span><span class="activity-metrics">2h 06m <b>10%</b><i class="growth up">4%</i></span></div><div class="activity-row"><span>家务</span><span class="activity-metrics">1h 22m <b>6%</b><i class="growth down">3%</i></span></div></div>
+    </article>
+    <article class="row two">
+      <div class="row-top"><div class="row-title"><i class="dot" style="background:#8b6fa8"></i>学习</div><div class="row-metrics"><span>8h 44m</span><b class="percent">39%</b><span class="growth up">16%</span></div></div>
+      <div class="rail"><div class="fill" style="background:#8b6fa8"></div></div>
+      <div class="activity-list"><div class="activity-row"><span>上课 / 开会</span><span class="activity-metrics">3h 18m <b>15%</b><i class="growth up">18%</i></span></div><div class="activity-row"><span>网课自学</span><span class="activity-metrics">2h 40m <b>12%</b><i class="growth up">21%</i></span></div><div class="activity-row"><span>书籍文献</span><span class="activity-metrics">2h 46m <b>12%</b><i class="growth up">8%</i></span></div></div>
+    </article>
+    <article class="row three">
+      <div class="row-top"><div class="row-title"><i class="dot" style="background:#7a9176"></i>与自己</div><div class="row-metrics"><span>4h 12m</span><b class="percent">19%</b><span class="growth up">24%</span></div></div>
+      <div class="rail"><div class="fill" style="background:#7a9176"></div></div>
+      <div class="activity-list"><div class="activity-row"><span>运动健身</span><span class="activity-metrics">2h 18m <b>10%</b><i class="growth up">32%</i></span></div><div class="activity-row"><span>日记复盘</span><span class="activity-metrics">1h 54m <b>9%</b><i class="growth up">14%</i></span></div></div>
+    </article>
+    <article class="row four">
+      <div class="row-top"><div class="row-title"><i class="dot" style="background:#6b8ca8"></i>与他人</div><div class="row-metrics"><span>1h 46m</span><b class="percent">8%</b><span class="growth down">6%</span></div></div>
+      <div class="rail"><div class="fill" style="background:#6b8ca8"></div></div>
+      <div class="activity-list"><div class="activity-row"><span>兼职工作</span><span class="activity-metrics">1h 02m <b>5%</b><i class="growth down">8%</i></span></div><div class="activity-row"><span>社会织网</span><span class="activity-metrics">44m <b>3%</b><i class="growth down">2%</i></span></div></div>
+    </article>
+    <article class="row five">
+      <div class="row-top"><div class="row-title"><i class="dot" style="background:#9aa6a0"></i>探索世界</div><div class="row-metrics"><span>1h 16m</span><b class="percent">6%</b><span class="growth up">9%</span></div></div>
+      <div class="rail"><div class="fill" style="background:#9aa6a0"></div></div>
+      <div class="activity-list"><div class="activity-row"><span>设计</span><span class="activity-metrics">42m <b>3%</b><i class="growth up">12%</i></span></div><div class="activity-row"><span>音乐</span><span class="activity-metrics">34m <b>3%</b><i class="growth up">5%</i></span></div></div>
+    </article>
+  </div>
+</section><p class="final">不是为了考核自己。<strong>是为了更了解自己怎么生活。</strong></p><div class="control" aria-label="试片播放控制"><button class="play" id="playPause" type="button" aria-label="暂停试片">Ⅱ</button><input id="progress" type="range" min="0" max="10" step="0.01" value="0" aria-label="试片进度"><output id="timeLabel" for="progress">0.0 / 10.0</output></div></main><script>const b=document.getElementById('playPause'),p=document.getElementById('progress'),o=document.getElementById('timeLabel'),d=10000;let playing=true,r;const a=()=>document.getAnimations();function set(t){a().forEach(x=>{x.currentTime=t;x.pause()});p.value=t/1000;o.value=`${(t/1000).toFixed(1)} / 10.0`}function sync(){const t=Math.min(Number(a()[0]?.currentTime||0),d);p.value=t/1000;o.value=`${(t/1000).toFixed(1)} / 10.0`;if(playing&&t>=d){playing=false;b.textContent='↻';return}r=requestAnimationFrame(sync)}function play(t){a().forEach(x=>{x.currentTime=t;x.play()});playing=true;b.textContent='Ⅱ';cancelAnimationFrame(r);r=requestAnimationFrame(sync)}b.onclick=()=>{const t=Number(a()[0]?.currentTime||0);if(t>=d)return play(0);if(playing){a().forEach(x=>x.pause());playing=false;b.textContent='▶';cancelAnimationFrame(r)}else play(t)};p.oninput=()=>{set(Number(p.value)*1000);playing=false;b.textContent='▶';cancelAnimationFrame(r)};requestAnimationFrame(()=>play(0));</script></body>
 </html>
