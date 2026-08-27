@@ -757,32 +757,9 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                     className="w-8 text-center text-xl font-mono font-bold text-stone-800 outline-none bg-transparent"
                   />
                 </div>
-
-                <button
-                  onClick={handleSetStartToPreviousEnd}
-                  className="mt-2 flex items-center gap-1 px-2 py-1 text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors active:scale-95"
-                  title="设置开始时间为上一条记录的结束时间"
-                >
-                  <Clock size={12} />
-                  <span>到上尾</span>
-                </button>
               </div>
 
-              <div className="mt-6 flex w-14 justify-center">
-                {initialLog && onSplit ? (
-                  <button
-                    type="button"
-                    onClick={() => setIsSplitModalOpen(true)}
-                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 active:scale-95"
-                    title="将记录拆分为两个时间段"
-                  >
-                    <Scissors size={12} />
-                    <span>拆分</span>
-                  </button>
-                ) : (
-                  <div className="h-px w-8 bg-stone-300" />
-                )}
-              </div>
+              <div className="mt-6 h-px w-8 bg-stone-300" />
 
               <div className="flex flex-col items-center">
                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1">End</span>
@@ -822,15 +799,39 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                     className="w-8 text-center text-xl font-mono font-bold text-stone-800 outline-none bg-transparent"
                   />
                 </div>
-                <button
-                  onClick={handleSetEndToNow}
-                  className="mt-2 flex items-center gap-1 px-2 py-1 text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors active:scale-95"
-                  title="设置结束时间为当前时间"
-                >
-                  <Clock size={12} />
-                  <span>到现在</span>
-                </button>
               </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={handleSetStartToPreviousEnd}
+                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 active:scale-95"
+                title="设置开始时间为上一条记录的结束时间"
+              >
+                <Clock size={12} />
+                <span>到上尾</span>
+              </button>
+              {initialLog && onSplit && (
+                <button
+                  type="button"
+                  onClick={() => setIsSplitModalOpen(true)}
+                  className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 active:scale-95"
+                  title="将记录拆分为两个时间段"
+                >
+                  <Scissors size={12} />
+                  <span>拆分</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleSetEndToNow}
+                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 active:scale-95"
+                title="设置结束时间为当前时间"
+              >
+                <Clock size={12} />
+                <span>到现在</span>
+              </button>
             </div>
 
             {/* Slider (Dual Handle) */}
