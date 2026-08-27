@@ -16,12 +16,14 @@
  * @updated 2026-08-26: Added category-scoped Routine launch list and active Routine control card.
  * @updated 2026-08-26: Displays Routine step Activity, Scope, and Todo associations using #, %, and @ markers.
  * @updated 2026-08-26: Rendered Routine icons through the shared emoji/UI icon renderer.
+ * @updated 2026-08-26: Uses icon-only controls for Routine step advance and completion actions.
+ * @updated 2026-08-27: Uses neutral gray completion markers for Routine checklists.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useEffect, useMemo, type CSSProperties } from 'react';
 import { ActiveRoutineRun, Category, Activity, Routine, Scope, TodoItem } from '../types';
-import { ChevronLeft, ChevronRight, X, Check, CheckCircle2, ArrowRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Check, ArrowRight } from 'lucide-react';
 import { IconRenderer } from '../components/IconRenderer';
 import { getColorHexForCharts, getSoftColorCircleStyle } from '../utils/colorAdapterUtils';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
@@ -269,11 +271,12 @@ export const RecordView: React.FC<RecordViewProps> = ({
                 <button
                   type="button"
                   onClick={onAdvanceRoutine}
-                  className="inline-flex items-center gap-1 rounded-full px-3 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition-opacity hover:opacity-90"
                   style={{ backgroundColor: 'var(--accent-color)' }}
+                  title={activeRoutineRun.currentStepIndex >= activeRoutine.steps.length - 1 ? '完成 Routine' : '进入下一步'}
+                  aria-label={activeRoutineRun.currentStepIndex >= activeRoutine.steps.length - 1 ? '完成 Routine' : '进入下一步'}
                 >
-                  {activeRoutineRun.currentStepIndex >= activeRoutine.steps.length - 1 ? <CheckCircle2 size={16} /> : <ArrowRight size={16} />}
-                  {activeRoutineRun.currentStepIndex >= activeRoutine.steps.length - 1 ? '完成' : '下一步'}
+                  {activeRoutineRun.currentStepIndex >= activeRoutine.steps.length - 1 ? <Check size={18} strokeWidth={2.5} /> : <ArrowRight size={18} />}
                 </button>
               </div>
             </div>
@@ -289,7 +292,7 @@ export const RecordView: React.FC<RecordViewProps> = ({
                     onClick={() => onToggleRoutineChecklist?.(index)}
                     className="flex w-full items-center gap-2 rounded-lg px-1 py-1 text-left text-sm text-stone-600 hover:bg-stone-50"
                   >
-                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all ${item.completed ? 'border-[var(--accent-color)] bg-[var(--accent-color)] text-white shadow-sm' : 'border-stone-300 bg-white text-transparent'}`}>
+                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all ${item.completed ? 'border-stone-400 bg-stone-400 text-white shadow-sm' : 'border-stone-300 bg-white text-transparent'}`}>
                       <Check size={13} strokeWidth={3} />
                     </span>
                     <span className={item.completed ? 'text-stone-400 line-through' : ''}>{item.text}</span>

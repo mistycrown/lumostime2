@@ -2,6 +2,8 @@
  * @file ScopeAssociation.tsx
  * @updated 2026-08-06: Hide archived scopes from association options.
  * @updated 2026-08-02: Reused the shared adaptive association option grid so scope chips stay readable in narrow panels.
+ * @updated 2026-08-26: Supports title-free embedding for compact settings editors.
+ * @updated 2026-08-26: Supports caller-provided title text for embedded settings editors.
  * @updated 2026-07-21: Updated record-detail scope chips to use outline-only selection.
  * @input scopes list, selected IDs
  * @output Scope Selection Grid
@@ -21,9 +23,11 @@ interface ScopeAssociationProps {
   scopes: Scope[];
   selectedScopeIds: string[] | undefined;
   onSelect: (scopeIds: string[] | undefined) => void;
+  hideTitle?: boolean;
+  title?: string;
 }
 
-export const ScopeAssociation: React.FC<ScopeAssociationProps> = ({ scopes, selectedScopeIds = [], onSelect }) => {
+export const ScopeAssociation: React.FC<ScopeAssociationProps> = ({ scopes, selectedScopeIds = [], onSelect, hideTitle = false, title = 'Associated Scope' }) => {
   const sortedScopes = useMemo(() => sortScopesForSelection(getActiveScopes(scopes)), [scopes]);
 
   const handleToggle = (scopeId: string) => {
@@ -40,17 +44,19 @@ export const ScopeAssociation: React.FC<ScopeAssociationProps> = ({ scopes, sele
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between mb-4 px-1">
-        <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest">Associated Scope</h3>
-        {selectedScopeIds && selectedScopeIds.length > 0 && (
+      {(!hideTitle || selectedScopeIds.length > 0) && (
+        <div className="mb-4 flex items-center justify-between px-1">
+          {!hideTitle && <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest">{title}</h3>}
+          {selectedScopeIds.length > 0 && (
           <button
             onClick={() => onSelect(undefined)}
             className="text-xs font-medium text-stone-400 hover:text-red-400 transition-colors"
           >
             Clear
           </button>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       <AssociationOptionGrid
         items={sortedScopes}

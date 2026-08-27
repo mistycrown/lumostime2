@@ -358,5 +358,6 @@ Components for theme and appearance customization.
 - `ActivityAttributeSummary.tsx`: Resolves ID-based custom attributes for compact timeline display beneath record notes.
 - `TimelineScheduleCanvas.tsx`: Displays compact activity attributes below notes in sufficiently tall split-layout time blocks.
 - `RoutineChecklistPreview.tsx`: Renders Routine Markdown checklist notes as visual checkbox rows in timeline cards and time blocks.
+- `ScopeAssociation.tsx` and `TodoAssociation.tsx`: Support title-free embedding in compact settings editors such as Routine steps.
 - `ActivityAttributeStatistics.tsx`: Uses the app-wide `--accent-color` theme for attribute statistics and type-specific visualizations.
 - `DetailTimelineCard.test.ts`: Added regression coverage for cross-month, planned-only, same-day planned, and all-record timeline grouping.

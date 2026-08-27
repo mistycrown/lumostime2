@@ -1,6 +1,7 @@
 /**
  * @file TagAssociation.tsx
  * @updated 2026-08-25: Clears the previously selected activity before applying a new category so controlled parents cannot overwrite the category selection with stale state.
+ * @updated 2026-08-26: Supports an optional compact title and clear action for embedded settings editors.
  * @updated 2026-08-06: Hide archived activities and scopes from association options.
  * @updated 2026-08-02: Reused the shared adaptive association option grid so tag categories stay readable in narrow panels.
  * @updated 2026-07-21: Replaced record-detail selection shadows with outline-based dark-mode states.
@@ -25,6 +26,8 @@ interface TagAssociationProps {
   selectedActivityId: string;
   onCategorySelect: (categoryId: string) => void;
   onActivitySelect: (activityId: string) => void;
+  title?: string;
+  onClear?: () => void;
 }
 
 export const TagAssociation: React.FC<TagAssociationProps> = ({
@@ -32,7 +35,9 @@ export const TagAssociation: React.FC<TagAssociationProps> = ({
   selectedCategoryId,
   selectedActivityId,
   onCategorySelect,
-  onActivitySelect
+  onActivitySelect,
+  title,
+  onClear
 }) => {
   const activeCategories = categories
     .map(category => ({ ...category, activities: getActiveActivities(category) }))
@@ -41,6 +46,20 @@ export const TagAssociation: React.FC<TagAssociationProps> = ({
 
   return (
     <div className="w-full space-y-4">
+      {title && (
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-xs font-bold text-stone-400 uppercase tracking-widest">{title}</h3>
+          {onClear && selectedActivityId && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="text-xs font-medium text-stone-400 transition-colors hover:text-red-400"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
       {/* Category Grid */}
       <AssociationOptionGrid
         items={activeCategories}
