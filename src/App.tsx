@@ -5,6 +5,7 @@
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
  * @updated 2026-08-26: Makes Routine transitions wait for each stopped step to enter the shared log-save path.
+ * @updated 2026-08-27: Keeps Routine starts on the Record page by bypassing timer auto-jump preferences.
  * @updated 2026-06-21: Centralized active-session stop persistence so floating-ball stops and app-awareness finishes always submit logs through the same path.
  * @updated 2026-08-10: Excluded timeline Plan blocks from default backfill time inference.
  * @updated 2026-08-10: Adds temporary focus-detail ownership diagnostics for Android immersive-mode investigation.
@@ -606,7 +607,10 @@ const AppContent: React.FC = () => {
     }
 
     const checklistMarkdown = resetRoutineChecklist(firstStep.checklistMarkdown);
-    const sessionId = handleStartActivityWrapper(activity, categoryId, linkedTodo?.id, scopeIds);
+    // A Routine remains in its own control card; global timer auto-jump modes apply only to standalone timers.
+    setShouldAutoOpenFocus(false);
+    setShouldAutoEnterImmersive(false);
+    const sessionId = startActivity(activity, categoryId, autoLinkRules, linkedTodo?.id, scopeIds);
     setActiveRoutineRun({
       routineId: routine.id,
       currentStepIndex: 0,

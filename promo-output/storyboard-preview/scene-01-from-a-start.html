@@ -13,6 +13,7 @@
       .scene-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; opacity: 0; pointer-events: none; transition: opacity .7s ease; background: var(--paper); }
       .scene-frame.active { opacity: 1; }
       .controls { position: absolute; right: 24px; bottom: 22px; left: 24px; z-index: 30; display: flex; align-items: center; gap: 12px; width: min(680px, calc(100vw - 48px)); margin: auto; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: rgba(253, 251, 247, .92); box-shadow: 0 10px 32px rgba(50, 42, 34, .14); backdrop-filter: blur(12px); font-family: ui-sans-serif, system-ui, sans-serif; }
+      html.controls-hidden .controls { display: none; }
       button { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border: 0; border-radius: 50%; color: #fff; background: var(--ink); cursor: pointer; font-size: 13px; }
       button:focus-visible { outline: 2px solid #8b6fa8; outline-offset: 2px; }
       input { width: 100%; accent-color: var(--ink); cursor: pointer; }
@@ -29,17 +30,24 @@
       <iframe class="scene-frame" title="Scene 05" data-src="scene-05-say-it-naturally.html"></iframe>
       <iframe class="scene-frame" title="Scene 06" data-src="scene-07-project-through-time.html"></iframe>
       <iframe class="scene-frame" title="Scene 07" data-src="scene-06-touch-to-begin.html"></iframe>
-      <iframe class="scene-frame" title="Scene 08" data-src="scene-08-from-start-to-self.html"></iframe>
+      <iframe class="scene-frame" title="Scene 08" data-src="scene-08-plan-record-review.html"></iframe>
+      <iframe class="scene-frame" title="Scene 09" data-src="scene-09-data-in-your-hands.html"></iframe>
+      <iframe class="scene-frame" title="Scene 10" data-src="scene-09-from-start-to-self.html"></iframe>
       <div class="controls" aria-label="Product film playback controls">
         <button id="playPause" type="button" aria-label="Pause film">Ⅱ</button>
-        <input id="progress" type="range" min="0" max="78" step="0.01" value="0" aria-label="Film progress" />
-        <output id="timeLabel">0:00 / 1:18</output>
+        <input id="progress" type="range" min="0" max="98" step="0.01" value="0" aria-label="Film progress" />
+        <output id="timeLabel">0:00 / 1:38</output>
       </div>
     </main>
     <script>
       (() => {
+        if (new URLSearchParams(window.location.search).get('controls') === '0') {
+          document.documentElement.classList.add('controls-hidden');
+        }
+
         const frames = [...document.querySelectorAll('.scene-frame')];
-        const durations = [10, 10, 10, 10, 10, 10, 10, 8];
+        // Each scene gets a short reading hold after its 10-second visual build.
+        const durations = [12, 12, 12, 12, 12, 12, 12, 12, 12, 10];
         const offsets = durations.reduce((acc, duration, index) => { acc.push((acc[index - 1] || 0) + duration); return acc; }, []);
         const total = offsets[offsets.length - 1];
         const playPause = document.getElementById('playPause');
@@ -81,6 +89,7 @@
           showScene(index, elapsed - start);
         };
         frames.forEach((frame) => frame.addEventListener('load', () => pauseFrame(frame)));
+        window.addEventListener('load', () => frames.forEach((frame) => pauseFrame(frame)), { once: true });
         const tick = (now) => {
           if (playing) {
             elapsed += (now - last) / 1000;

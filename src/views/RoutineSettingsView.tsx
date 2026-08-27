@@ -8,11 +8,14 @@
  * @updated 2026-08-26: Uses a single-line combined emoji and Routine name input with a default emoji.
  * @updated 2026-08-26: Adds expandable Activity, Scope, Todo, and Markdown checklist step selectors.
  * @updated 2026-08-26: Matches daily-check rows with a non-interactive summary line and direct selector expansion.
- * @updated 2026-08-26: Uses themed checklist toggles and selects item text on focus for quick replacement.
+ * @updated 2026-08-26: Uses neutral checklist toggles and selects item text on focus for quick replacement.
  * @updated 2026-08-26: Defers checklist text persistence until the input loses focus.
  * @updated 2026-08-26: Reworked the editor to use nested back navigation, shared selectors, and cross-category steps.
+ * @updated 2026-08-26: Lets hardware back return from an editor to the Routine list and gives each selector a compact title/clear header.
+ * @updated 2026-08-26: Splits step association and ordering actions into responsive rows on narrow screens.
+ * @updated 2026-08-27: Keeps Routine checklist completion markers neutral gray across themes.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronRight, Plus, Trash2, X } from 'lucide-react';
 import type { Category, Routine, RoutineStep, Scope, TodoCategory, TodoItem } from '../types';
 import { CustomSelect } from '../components/CustomSelect';
@@ -22,6 +25,7 @@ import { ScopeAssociation } from '../components/ScopeAssociation';
 import { TodoAssociation } from '../components/TodoAssociation';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
 import { useSettings } from '../contexts/SettingsContext';
+import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
 import { addRoutineChecklistItem, parseRoutineChecklist, serializeRoutineChecklist, updateRoutineChecklistItem } from '../utils/routineChecklist';
 
 interface RoutineSettingsViewProps {
@@ -62,24 +66,25 @@ const ChecklistEditor: React.FC<ChecklistEditorProps> = ({ markdown, onChange })
   const [draftTexts, setDraftTexts] = useState<Record<number, string>>({});
 
   return (
-    <div className="mt-3 border-t border-stone-100 pt-3">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-semibold text-stone-500">Checklist</span>
-        <button
-          type="button"
-          onClick={() => {
-            setDraftTexts({});
-            onChange(addRoutineChecklistItem(markdown));
-          }}
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-stone-500 hover:bg-stone-50 hover:text-stone-800"
-          aria-label="添加 checklist 条目"
-        >
-          <Plus size={14} /> 添加条目
-        </button>
+    <div className="mt-3">
+      <div className="mb-1 flex items-center justify-between px-1">
+        <h3 className="text-xs font-bold uppercase tracking-widest text-stone-400">Checklist</h3>
+        {entries.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setDraftTexts({});
+              onChange('');
+            }}
+            className="text-xs font-medium text-stone-400 transition-colors hover:text-red-400"
+          >
+            Clear
+          </button>
+        )}
       </div>
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {entries.map((entry, index) => (
-          <div key={`${index}-${entry.text}`} className="flex items-center gap-2">
+          <div key={`${index}-${entry.text}`} className="flex items-center gap-2 py-1">
             <button
               type="button"
               onClick={() => {
@@ -88,7 +93,7 @@ const ChecklistEditor: React.FC<ChecklistEditorProps> = ({ markdown, onChange })
               }}
               aria-pressed={entry.completed}
               aria-label={`Checklist ${index + 1} 完成状态`}
-              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/20 ${entry.completed ? 'border-[var(--accent-color)] bg-[var(--accent-color)] text-white shadow-sm' : 'border-stone-300 bg-white text-transparent hover:border-stone-400'}`}
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all focus:outline-none focus:ring-2 focus:ring-stone-200 ${entry.completed ? 'border-stone-400 bg-stone-400 text-white shadow-sm' : 'border-stone-300 bg-white text-transparent hover:border-stone-400'}`}
             >
               <Check size={13} strokeWidth={3} />
             </button>
@@ -110,7 +115,7 @@ const ChecklistEditor: React.FC<ChecklistEditorProps> = ({ markdown, onChange })
                   return next;
                 });
               }}
-              className="min-w-0 flex-1 border-b border-stone-100 bg-transparent py-1 text-sm text-stone-700 outline-none focus:border-stone-400 focus:ring-0"
+              className="min-w-0 flex-1 bg-transparent py-1 text-sm text-stone-700 outline-none focus:ring-0"
               aria-label={`Checklist ${index + 1} 内容`}
             />
             <button
@@ -128,6 +133,17 @@ const ChecklistEditor: React.FC<ChecklistEditorProps> = ({ markdown, onChange })
         ))}
         {entries.length === 0 && <div className="py-2 text-xs text-stone-400">暂无 checklist 条目</div>}
       </div>
+      <button
+        type="button"
+        onClick={() => {
+          setDraftTexts({});
+          onChange(addRoutineChecklistItem(markdown));
+        }}
+        className="mt-1 flex items-center gap-1 rounded-md px-2 py-1 text-xs text-stone-500 hover:bg-stone-50 hover:text-stone-800"
+        aria-label="添加 checklist 条目"
+      >
+        <Plus size={14} /> 添加条目
+      </button>
     </div>
   );
 };
@@ -161,6 +177,18 @@ export const RoutineSettingsView: React.FC<RoutineSettingsViewProps> = ({
   const [expandedPicker, setExpandedPicker] = useState<'activity' | 'scope' | 'todo' | 'checklist' | null>(null);
   const [isUIIconSelectorOpen, setIsUIIconSelectorOpen] = useState(false);
   const editingRoutine = editingId ? routines.find(routine => routine.id === editingId) : undefined;
+
+  useEffect(() => {
+    if (!editingId) return;
+
+    return registerHardwareBackHandler(() => {
+      setEditingId(null);
+      setExpandedStepId(null);
+      setExpandedPicker(null);
+      setIsUIIconSelectorOpen(false);
+      return true;
+    });
+  }, [editingId]);
 
   const beginCreate = () => {
     const category = activeCategories[0];
@@ -379,7 +407,7 @@ export const RoutineSettingsView: React.FC<RoutineSettingsViewProps> = ({
                 const isExpanded = expandedStepId === step.id && expandedPicker !== null;
                 const selectedCategoryId = step.categoryId || categories.find(category => category.activities.some(item => item.id === step.activityId))?.id || activeCategories[0]?.id || '';
                 return (
-                  <div key={step.id} className="space-y-1.5">
+                  <div key={step.id} className={`space-y-1.5 ${isExpanded && index < editingRoutine.steps.length - 1 ? 'pb-5' : ''}`}>
                     <div className="flex items-center gap-1.5">
                       <span className="w-4 shrink-0 text-center text-xs text-stone-300">{index + 1}</span>
                       <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-left">
@@ -388,32 +416,36 @@ export const RoutineSettingsView: React.FC<RoutineSettingsViewProps> = ({
                         </span>
                       </div>
                     </div>
-                    <div className="ml-[1.375rem] flex justify-end gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => !todo && toggleStepPicker(step.id, 'activity')}
-                        disabled={Boolean(todo)}
-                        className={`flex h-9 shrink-0 items-center justify-center rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${step.activityId && !todo ? 'border-blue-100 bg-blue-50 text-blue-600' : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300'}`}
-                      >标签</button>
-                      <button
-                        type="button"
-                        onClick={() => !todo && toggleStepPicker(step.id, 'scope')}
-                        disabled={Boolean(todo)}
-                        className={`flex h-9 shrink-0 items-center justify-center rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${selectedScopes.length > 0 && !todo ? 'border-emerald-100 bg-emerald-50 text-emerald-600' : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300'}`}
-                      >领域</button>
-                      <button
-                        type="button"
-                        onClick={() => toggleStepPicker(step.id, 'todo')}
-                        className={`flex h-9 shrink-0 items-center justify-center rounded-lg border px-2.5 text-xs font-medium transition-colors ${todo ? 'border-violet-100 bg-violet-50 text-violet-600' : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300'}`}
-                      >待办</button>
-                      <button
-                        type="button"
-                        onClick={() => toggleStepPicker(step.id, 'checklist')}
-                        className={`flex h-9 shrink-0 items-center justify-center rounded-lg border px-2.5 text-xs font-medium transition-colors ${step.checklistMarkdown ? 'border-amber-100 bg-amber-50 text-amber-600' : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300'}`}
-                      >清单</button>
-                      <button type="button" onClick={() => moveStep(index, -1)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-500 transition-colors hover:border-stone-300" aria-label="上移"><ArrowUp size={16} /></button>
-                      <button type="button" onClick={() => moveStep(index, 1)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-500 transition-colors hover:border-stone-300" aria-label="下移"><ArrowDown size={16} /></button>
-                      <button type="button" onClick={() => updateEditing({ steps: editingRoutine.steps.filter(item => item.id !== step.id).map((item, order) => ({ ...item, order })) })} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-stone-300 transition-colors hover:text-rose-500" aria-label="删除步骤"><X size={16} /></button>
+                    <div className="ml-[1.375rem] grid gap-1.5 min-[440px]:grid-cols-[minmax(0,1fr)_auto]">
+                      <div className="flex flex-wrap gap-1.5 min-[440px]:justify-end">
+                        <button
+                          type="button"
+                          onClick={() => !todo && toggleStepPicker(step.id, 'activity')}
+                          disabled={Boolean(todo)}
+                          className={`flex h-9 shrink-0 items-center justify-center rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${step.activityId && !todo ? 'border-blue-100 bg-blue-50 text-blue-600' : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300'}`}
+                        >标签</button>
+                        <button
+                          type="button"
+                          onClick={() => !todo && toggleStepPicker(step.id, 'scope')}
+                          disabled={Boolean(todo)}
+                          className={`flex h-9 shrink-0 items-center justify-center rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${selectedScopes.length > 0 && !todo ? 'border-emerald-100 bg-emerald-50 text-emerald-600' : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300'}`}
+                        >领域</button>
+                        <button
+                          type="button"
+                          onClick={() => toggleStepPicker(step.id, 'todo')}
+                          className={`flex h-9 shrink-0 items-center justify-center rounded-lg border px-2.5 text-xs font-medium transition-colors ${todo ? 'border-violet-100 bg-violet-50 text-violet-600' : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300'}`}
+                        >待办</button>
+                        <button
+                          type="button"
+                          onClick={() => toggleStepPicker(step.id, 'checklist')}
+                          className={`flex h-9 shrink-0 items-center justify-center rounded-lg border px-2.5 text-xs font-medium transition-colors ${step.checklistMarkdown ? 'border-amber-100 bg-amber-50 text-amber-600' : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300'}`}
+                        >清单</button>
+                      </div>
+                      <div className="flex justify-end gap-1.5">
+                        <button type="button" onClick={() => moveStep(index, -1)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-500 transition-colors hover:border-stone-300" aria-label="上移"><ArrowUp size={16} /></button>
+                        <button type="button" onClick={() => moveStep(index, 1)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-500 transition-colors hover:border-stone-300" aria-label="下移"><ArrowDown size={16} /></button>
+                        <button type="button" onClick={() => updateEditing({ steps: editingRoutine.steps.filter(item => item.id !== step.id).map((item, order) => ({ ...item, order })) })} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-stone-300 transition-colors hover:text-rose-500" aria-label="删除步骤"><X size={16} /></button>
+                      </div>
                     </div>
                     {isExpanded && (
                       <div className="ml-6 pt-2">
@@ -430,12 +462,19 @@ export const RoutineSettingsView: React.FC<RoutineSettingsViewProps> = ({
                                 updateStep(step.id, { activityId, categoryId: nextCategory?.id || step.categoryId });
                                 setExpandedPicker(null);
                               }}
+                              title="Tag"
+                              onClear={() => updateStep(step.id, { activityId: '', categoryId: '' })}
                             />
                           </div>
                         )}
                         {expandedPicker === 'scope' && !todo && (
                           <div className="pt-3">
-                            <ScopeAssociation scopes={scopes} selectedScopeIds={step.scopeIds} onSelect={scopeIds => updateStep(step.id, { scopeIds })} />
+                            <ScopeAssociation
+                              scopes={scopes}
+                              selectedScopeIds={step.scopeIds}
+                              onSelect={scopeIds => updateStep(step.id, { scopeIds })}
+                              title="Scope"
+                            />
                           </div>
                         )}
                         {expandedPicker === 'todo' && (
@@ -460,6 +499,7 @@ export const RoutineSettingsView: React.FC<RoutineSettingsViewProps> = ({
                                 setExpandedPicker(null);
                               }}
                               enableHierarchy
+                              title="Todo"
                             />
                           </div>
                         )}

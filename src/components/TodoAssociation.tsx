@@ -1,6 +1,8 @@
 /**
  * @file TodoAssociation.tsx
  * @updated 2026-08-02: Reused the adaptive association option grid for associated-todo category filters so narrow log modals switch to three readable columns.
+ * @updated 2026-08-26: Supports title-free embedding for compact settings editors.
+ * @updated 2026-08-26: Supports caller-provided title text for embedded settings editors.
  * @updated 2026-07-21: Updated record-detail category chips to use outline-only selection.
  * @input todos, categories, linked ID, optional hierarchy toggle
  * @output Todo Selection UI
@@ -43,6 +45,8 @@ interface TodoAssociationProps {
   renderExtraContent?: (todoId: string) => React.ReactNode;
   headerActions?: React.ReactNode;
   enableHierarchy?: boolean;
+  hideTitle?: boolean;
+  title?: string;
 }
 
 const VIRTUAL_TODAY_CATEGORY: TodoCategory = {
@@ -82,7 +86,9 @@ export const TodoAssociation: React.FC<TodoAssociationProps> = ({
   onChange,
   renderExtraContent,
   headerActions,
-  enableHierarchy = false
+  enableHierarchy = false,
+  hideTitle = false,
+  title = 'Associated Todo'
 }) => {
   const [selectedCatId, setSelectedCatId] = useState<string>(() => resolveSelectedCategoryId(todos, linkedTodoId));
   const [expandedParentIds, setExpandedParentIds] = useState<string[]>(() => (
@@ -168,9 +174,10 @@ export const TodoAssociation: React.FC<TodoAssociationProps> = ({
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between mb-4 px-1">
-        <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Associated Todo</span>
-        <div className="flex items-center gap-2">
+      {(!hideTitle || linkedTodoId || headerActions) && (
+        <div className="mb-4 flex items-center justify-between px-1">
+          {!hideTitle && <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">{title}</span>}
+          <div className="flex items-center gap-2">
           {!!linkedTodoId && (
             <button
               onClick={(event) => {
@@ -183,8 +190,9 @@ export const TodoAssociation: React.FC<TodoAssociationProps> = ({
             </button>
           )}
           {headerActions}
+          </div>
         </div>
-      </div>
+      )}
 
       <AssociationOptionGrid
         className="mb-2"
