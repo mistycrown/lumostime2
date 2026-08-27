@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LumosTime Product Film - Data In Your Hands</title>
+  <style>
+    :root {
+      --paper: #f7f5f1;
+      --ink: #23211f;
+      --muted: #98938d;
+      --rule: #d9d4cd;
+      --blue: #799fc0;
+      --blue-soft: #edf4f8;
+      --orange: #c6825f;
+      --orange-soft: #fbf0e9;
+      --violet: #947fb5;
+      --violet-soft: #f3eef9;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { margin: 0; min-width: 1100px; min-height: 100%; }
+
+    body {
+      overflow: hidden;
+      background:
+        linear-gradient(rgba(107, 101, 94, .045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(107, 101, 94, .045) 1px, transparent 1px),
+        var(--paper);
+      background-size: 48px 48px;
+      color: var(--ink);
+      font-family: "Noto Serif SC", "Songti SC", "SimSun", serif;
+    }
+
+    .film-note {
+      position: fixed;
+      top: 22px;
+      z-index: 5;
+      color: #aaa49d;
+      font-family: Georgia, serif;
+      font-size: 14px;
+      letter-spacing: 1.2px;
+    }
+
+    .film-note.left { left: 40px; }
+    .film-note.right { right: 40px; }
+
+    main {
+      width: 100vw;
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 31.5% 68.5%;
+      align-items: center;
+      padding: 70px 40px 44px;
+    }
+
+    .copy { align-self: stretch; display: flex; flex-direction: column; justify-content: center; padding-right: 44px; }
+
+    h1 {
+      margin: 0;
+      font-size: 58px;
+      font-weight: 500;
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+
+    h1 span { color: #aaa6a1; }
+
+    .copy-rule { width: 88px; height: 1px; margin: 30px 0 31px; background: #aaa49d; }
+
+    .copy p {
+      margin: 0;
+      color: #716c66;
+      font-size: 18px;
+      line-height: 1.85;
+      letter-spacing: .4px;
+    }
+
+    .copy .closing { margin-top: 140px; color: #79736c; }
+    .copy .closing strong { color: #302d29; font-weight: 600; }
+
+    .app-window {
+      height: min(678px, calc(100vh - 128px));
+      min-height: 620px;
+      border: 1px solid #e2ded8;
+      border-radius: 10px;
+      overflow: hidden;
+      background: rgba(252, 251, 249, .96);
+      box-shadow: 0 18px 42px rgba(50, 43, 36, .12), 0 3px 10px rgba(50, 43, 36, .05);
+    }
+
+    .window-bar {
+      height: 39px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 18px;
+      border-bottom: 1px solid #e7e3de;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 12px;
+      color: #9a958f;
+    }
+
+    .window-dot { width: 8px; height: 8px; border-radius: 50%; background: #d5d2ce; }
+    .window-title { margin-left: 4px; }
+
+    .vault {
+      height: calc(100% - 39px);
+      padding: 50px 48px 42px;
+    }
+
+    .vault-title {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      padding-bottom: 17px;
+      border-bottom: 1px solid #e4e0db;
+    }
+
+    .vault-title h2 { margin: 0; font-size: 28px; font-weight: 500; }
+    .vault-title span { color: #a6a09a; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 11px; letter-spacing: 1.2px; }
+
+    .mindmap {
+      position: relative;
+      height: calc(100% - 71px);
+      min-height: 470px;
+      overflow: hidden;
+      border-top: 1px solid rgba(217, 212, 205, .55);
+      border-bottom: 1px solid rgba(217, 212, 205, .55);
+      background:
+        linear-gradient(90deg, rgba(139, 130, 120, .045) 1px, transparent 1px),
+        linear-gradient(rgba(139, 130, 120, .045) 1px, transparent 1px);
+      background-size: 44px 44px;
+    }
+
+    .mindmap::after {
+      content: '';
+      position: absolute;
+      inset: 17px;
+      pointer-events: none;
+      border: 1px solid rgba(221, 216, 210, .42);
+    }
+
+    .map-lines { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; overflow: visible; }
+
+    .map-lines path {
+      fill: none;
+      stroke: #c7c0b8;
+      stroke-width: 1.2;
+      vector-effect: non-scaling-stroke;
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+      opacity: 0;
+      animation-duration: 10s;
+      animation-fill-mode: both;
+      animation-timing-function: cubic-bezier(.2, .72, .22, 1);
+    }
+
+    .map-lines .export-path { stroke: #d7b39e; animation-name: export-line; }
+    .map-lines .sync-path { stroke: #b9abcf; animation-name: sync-line; }
+    .map-lines .local-path { stroke: #a9c2d2; animation-name: local-line; }
+
+    .node {
+      position: absolute;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      min-width: 0;
+      border: 1px solid currentColor;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, .86);
+      box-shadow: 0 3px 9px rgba(73, 65, 58, .04);
+      opacity: 0;
+      animation-duration: 10s;
+      animation-fill-mode: both;
+      animation-timing-function: cubic-bezier(.18, .74, .24, 1);
+    }
+
+    .node .number {
+      flex: 0 0 auto;
+      padding-left: 10px;
+      color: currentColor;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 10px;
+      letter-spacing: .7px;
+      opacity: .72;
+    }
+
+    .node .node-text { min-width: 0; }
+    .node b { display: block; font-size: 16px; font-weight: 500; white-space: nowrap; }
+    .node small { display: block; margin-top: 3px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 9px; letter-spacing: .8px; opacity: .72; white-space: nowrap; }
+
+    .local {
+      left: 7%; top: 42%; width: 20%; height: 23%;
+      color: #638eac;
+      background: linear-gradient(135deg, rgba(237, 244, 248, .98), rgba(249, 252, 253, .92));
+      animation-name: local-node;
+    }
+
+    .local .node-text { padding-right: 9px; }
+    .local b { font-size: 20px; }
+    .local .data-tags { display: flex; gap: 4px; margin-top: 8px; }
+    .local .data-tags i { border: 1px solid rgba(99, 142, 172, .36); padding: 2px 4px; font: 8px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: .55px; font-style: normal; }
+
+    .branch { width: 16%; height: 16%; padding: 0 12px 0 0; }
+    .export { left: 46%; top: 18%; color: #b47151; background: var(--orange-soft); animation-name: export-node; }
+    .sync { left: 46%; top: 68%; color: #816ca3; background: var(--violet-soft); animation-name: sync-node; }
+
+    .leaf {
+      left: 77%;
+      width: 19%;
+      height: 11%;
+      padding: 0 12px 0 0;
+      color: #706a64;
+      animation-name: leaf-node;
+    }
+
+    .leaf .number { min-width: 31px; }
+    .leaf b { font-size: 13px; }
+    .leaf small { margin-top: 2px; font-size: 8px; }
+    .leaf .kind { margin-left: auto; color: currentColor; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 9px; letter-spacing: .6px; }
+
+    .export-leaf { border-color: #d5a58b; background: rgba(255, 250, 246, .95); }
+    .sync-leaf { border-color: #b6a8ca; background: rgba(250, 248, 253, .96); }
+    .excel { top: 8%; }
+    .obsidian { top: 21%; }
+    .json { top: 34%; }
+    .archive { top: 47%; }
+    .webdav { top: 64%; }
+    .s3 { top: 80%; }
+
+    .map-caption {
+      position: absolute;
+      z-index: 2;
+      left: 7%;
+      bottom: 6%;
+      color: #a49e97;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 9px;
+      letter-spacing: 1px;
+      opacity: 0;
+      animation: caption-in 10s both;
+    }
+
+    .map-index {
+      position: absolute;
+      z-index: 2;
+      right: 4%;
+      top: 4%;
+      color: #b5afa8;
+      font-family: Georgia, serif;
+      font-size: 11px;
+      letter-spacing: 1.4px;
+      opacity: 0;
+      animation: caption-in 10s both;
+    }
+
+    .control-bar {
+      position: fixed;
+      right: 30px;
+      bottom: 24px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 10px;
+      border: 1px solid rgba(203, 197, 189, .9);
+      border-radius: 5px;
+      background: rgba(250, 248, 245, .9);
+      box-shadow: 0 4px 13px rgba(64, 55, 47, .08);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .control-bar button { width: 28px; height: 28px; border: 0; background: transparent; color: #716b64; cursor: pointer; font-size: 14px; }
+    .control-bar input { width: 132px; accent-color: #8c857d; }
+    .control-bar span { width: 36px; color: #807a73; font-size: 11px; text-align: right; }
+
+    @keyframes copy-up { 0%, 5% { opacity: 0; transform: translateY(18px); } 18%, 100% { opacity: 1; transform: translateY(0); } }
+    @keyframes rule-in { 0%, 18% { opacity: 0; transform: scaleX(0); transform-origin: left; } 31%, 100% { opacity: 1; transform: scaleX(1); } }
+    @keyframes copy-body { 0%, 25% { opacity: 0; transform: translateY(9px); } 39%, 100% { opacity: 1; transform: translateY(0); } }
+    @keyframes app-enter { 0%, 16% { opacity: 0; transform: translateX(32px) scale(.985); } 37%, 100% { opacity: 1; transform: translateX(0) scale(1); } }
+    @keyframes local-line { 0%, 42% { opacity: 0; stroke-dashoffset: 1; } 57%, 100% { opacity: 1; stroke-dashoffset: 0; } }
+    @keyframes export-line { 0%, 54% { opacity: 0; stroke-dashoffset: 1; } 73%, 100% { opacity: 1; stroke-dashoffset: 0; } }
+    @keyframes sync-line { 0%, 62% { opacity: 0; stroke-dashoffset: 1; } 80%, 100% { opacity: 1; stroke-dashoffset: 0; } }
+    @keyframes local-node { 0%, 39% { opacity: 0; transform: translateY(10px); } 52%, 100% { opacity: 1; transform: translateY(0); } }
+    @keyframes export-node { 0%, 52% { opacity: 0; transform: translateX(-10px); } 65%, 100% { opacity: 1; transform: translateX(0); } }
+    @keyframes sync-node { 0%, 60% { opacity: 0; transform: translateX(-10px); } 73%, 100% { opacity: 1; transform: translateX(0); } }
+    @keyframes leaf-node { 0%, 66% { opacity: 0; transform: translateX(-8px); } 80%, 100% { opacity: 1; transform: translateX(0); } }
+    @keyframes caption-in { 0%, 73% { opacity: 0; } 88%, 100% { opacity: 1; } }
+
+    h1 { animation: copy-up 10s both; }
+    .copy-rule { animation: rule-in 10s both; }
+    .copy p { animation: copy-body 10s both; }
+    .copy .closing { animation-delay: .15s; }
+    .app-window { animation: app-enter 10s both; }
+  </style>
+</head>
+<body>
+  <div class="film-note left">LUMOSTIME / PRODUCT FILM</div>
+  <div class="film-note right">SCENE 09 · DATA IN YOUR HANDS</div>
+
+  <main>
+    <section class="copy">
+      <h1>数据，<br><span>始终在你手里。</span></h1>
+      <div class="copy-rule"></div>
+      <p>默认保存在本地。<br>需要时，按你的方式同步与导出。</p>
+      <p class="closing">记录不该被锁在工具里。<br><strong>它应该一直属于你。</strong></p>
+    </section>
+
+    <section class="app-window" aria-label="数据同步与导出">
+      <div class="window-bar">
+        <i class="window-dot"></i><i class="window-dot"></i><i class="window-dot"></i>
+        <span class="window-title">LumosTime</span>
+      </div>
+      <div class="vault">
+        <div class="vault-title"><h2>数据管理</h2><span>LOCAL FIRST · YOUR CHOICE</span></div>
+        <div class="mindmap">
+          <svg class="map-lines" viewBox="0 0 1000 500" preserveAspectRatio="none" aria-hidden="true">
+            <path class="local-path" d="M270 270H365V130H460"></path>
+            <path class="local-path" d="M270 270H365V380H460"></path>
+            <path class="export-path" d="M620 130H700M700 68V263M700 68H770M700 133H770M700 198H770M700 263H770"></path>
+            <path class="sync-path" d="M620 380H700M700 348V428M700 348H770M700 428H770"></path>
+          </svg>
+
+          <div class="node local">
+            <span class="number">01</span>
+            <div class="node-text"><b>本地存储</b><small>LOCAL FIRST</small><div class="data-tags"><i>LOG</i><i>TODO</i><i>REVIEW</i></div></div>
+          </div>
+          <div class="node branch export"><span class="number">02</span><div class="node-text"><b>数据导出</b><small>EXPORT AS YOU NEED</small></div></div>
+          <div class="node branch sync"><span class="number">03</span><div class="node-text"><b>云端同步服务</b><small>SYNC WHEN YOU CHOOSE</small></div></div>
+
+          <div class="node leaf export-leaf excel"><span class="number">A1</span><div class="node-text"><b>导出 Excel</b><small>SPREADSHEET</small></div><span class="kind">XLSX</span></div>
+          <div class="node leaf export-leaf obsidian"><span class="number">A2</span><div class="node-text"><b>导出 Obsidian</b><small>MARKDOWN</small></div><span class="kind">MD</span></div>
+          <div class="node leaf export-leaf json"><span class="number">A3</span><div class="node-text"><b>导出 JSON</b><small>STRUCTURED DATA</small></div><span class="kind">JSON</span></div>
+          <div class="node leaf export-leaf archive"><span class="number">A4</span><div class="node-text"><b>导出图片压缩包</b><small>IMAGE ARCHIVE</small></div><span class="kind">ZIP</span></div>
+          <div class="node leaf sync-leaf webdav"><span class="number">B1</span><div class="node-text"><b>WebDAV</b><small>YOUR SERVER</small></div><span class="kind">SYNC</span></div>
+          <div class="node leaf sync-leaf s3"><span class="number">B2</span><div class="node-text"><b>S3</b><small>OBJECT STORAGE</small></div><span class="kind">SYNC</span></div>
+
+          <div class="map-caption">OWNED BY YOU · AVAILABLE WHERE YOU NEED IT</div>
+          <div class="map-index">DATA MAP / 01</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="control-bar" aria-label="预览控制">
+    <button id="play" title="播放或暂停">&#9654;</button>
+    <input id="progress" type="range" min="0" max="10000" value="0" step="10">
+    <span id="clock">0:00</span>
+  </div>
+
+  <script>
+    const duration = 10000;
+    const playButton = document.getElementById('play');
+    const progress = document.getElementById('progress');
+    const clock = document.getElementById('clock');
+    const animated = [...document.querySelectorAll('[style], h1, .copy-rule, .copy p, .app-window, .map-lines path, .node, .map-caption, .map-index')];
+    const params = new URLSearchParams(window.location.search);
+    let current = Math.min(duration, Math.max(0, Number(params.get('time')) || 0));
+    let startedAt = 0;
+    let playing = false;
+    let frame = 0;
+
+    function format(ms) { return `0:${String(Math.floor(ms / 1000)).padStart(2, '0')}`; }
+
+    function renderSceneAt(milliseconds) {
+      current = Math.min(duration, Math.max(0, milliseconds));
+      animated.forEach((element) => {
+        element.style.animationDelay = `-${current}ms`;
+        element.style.animationPlayState = 'paused';
+      });
+      progress.value = current;
+      clock.textContent = format(current);
+    }
+
+    function tick(now) {
+      if (!playing) return;
+      current = Math.min(duration, now - startedAt);
+      renderSceneAt(current);
+      if (current >= duration) { pause(); return; }
+      frame = requestAnimationFrame(tick);
+    }
+
+    function play() {
+      if (current >= duration) renderSceneAt(0);
+      playing = true;
+      startedAt = performance.now() - current;
+      animated.forEach((element) => { element.style.animationPlayState = 'running'; });
+      playButton.innerHTML = '&#10074;&#10074;';
+      frame = requestAnimationFrame(tick);
+    }
+
+    function pause() {
+      playing = false;
+      cancelAnimationFrame(frame);
+      animated.forEach((element) => { element.style.animationPlayState = 'paused'; });
+      playButton.innerHTML = '&#9654;';
+    }
+
+    playButton.addEventListener('click', () => playing ? pause() : play());
+    progress.addEventListener('input', (event) => { pause(); renderSceneAt(Number(event.target.value)); });
+    window.renderSceneAt = renderSceneAt;
+    renderSceneAt(current);
+    if (!params.has('time')) play();
+  </script>
+</body>
+</html>
