@@ -4,6 +4,7 @@
  * @output Regression coverage for quick category move visibility and Maybe-date summary rendering in the shared todo quick-actions sheet
  * @pos Test
  * @description Ensures the shared quick-actions modal only exposes category move for standalone todos, still offers quick-todo project upgrades through the shared category-picker flow, and summarizes Maybe dates as compact title metadata.
+ * @updated 2026-08-27: Added coverage that long quick-actions titles use a two-line visual clamp without changing title-edit behavior.
  * @updated 2026-06-14: Added coverage for the quick-actions duplicate entry so the modal can reuse the row swipe duplicate flow.
  * @updated 2026-05-14: Added coverage for the split `Maybe` shortcut row and `+7` date labels in the quick actions sheet, alongside Maybe summary rendering under the title.
  * @updated 2026-05-14: Added coverage for single and multi-date Maybe summaries under the quick-actions title, including full multi-date expansion instead of count folding.
@@ -57,6 +58,22 @@ const baseProps = {
 };
 
 describe('TodoQuickActionsModal category move', () => {
+  test('clamps the displayed todo title to two lines', () => {
+    const html = renderToStaticMarkup(
+      <TodoQuickActionsModal
+        {...baseProps}
+        todo={{
+          id: 'todo-title-clamp',
+          categoryId: 'cat-a',
+          title: 'A deliberately long todo title that needs more than two lines in the quick actions sheet',
+          isCompleted: false
+        } as any}
+      />
+    );
+
+    expect(html).toContain('line-clamp-2');
+  });
+
   test('renders the move-category action for standalone todos', () => {
     const html = renderToStaticMarkup(
       <TodoQuickActionsModal

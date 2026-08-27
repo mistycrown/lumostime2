@@ -4,6 +4,7 @@
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
  * @pos Component
  * @description A reusable bottom sheet that exposes lightweight todo planning and completion actions without opening the full todo detail editor first.
+ * @updated 2026-08-27: Clamp non-editing quick-actions titles to two lines so long task names do not push the action list down the sheet.
  * @updated 2026-08-25: Made quick note editing a multi-line field; Enter saves while Shift+Enter adds a line break.
  * @updated 2026-08-24: Replaced inline title editing with the same standalone modal used for quick note editing to avoid mobile keyboard positioning conflicts.
  * @updated 2026-07-30: Added extra mobile bottom padding to keep the delete action above the fixed bottom navigation area.
@@ -478,7 +479,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
         <div className="relative border-b border-stone-200 px-5 py-4 pr-24">
           <div className="text-[11px] uppercase tracking-[0.22em] text-stone-400">Quick Actions</div>
           <div
-            className="-mx-1 mt-1 cursor-pointer rounded px-1 text-lg font-medium text-stone-800 transition-colors hover:bg-stone-100/60"
+            className="-mx-1 mt-1 line-clamp-2 cursor-pointer rounded px-1 text-lg font-medium text-stone-800 transition-colors hover:bg-stone-100/60"
             onClick={withActionGuard(() => {
               setEditedTitle(todo.title);
               isTitleCancelRef.current = false;
