@@ -1,7 +1,7 @@
 /**
  * @file useLogManager.ts
  * @input DataContext (logs, todos, collection entries and setters), NavigationContext (modal states, currentDate), CategoryScopeContext (categories), ToastContext (addToast)
- * @output Log CRUD Operations (handleSaveLog, handleDeleteLog, handleSplitLog, handleQuickPunch, handleBatchAddLogs), Modal Control (openAddModal, openEditModal, closeModal), Image Management (handleLogImageRemove)
+ * @output Log CRUD Operations (handleSaveLog, handleDeleteLog, handleSplitLog, handleMergeLog, handleQuickPunch, handleBatchAddLogs), Modal Control (openAddModal, openEditModal, closeModal), Image Management (handleLogImageRemove)
  * @pos Hook (Data Manager)
  * @description 日志数据管理 Hook - 处理日志的增删改查、快速打点、批量添加、图片管理等操作，并统一维护 NFC 快速打点的文案与时间补记逻辑。时间戳由 DataContext 自动管理。
  * 
@@ -10,6 +10,7 @@
  * @updated 2026-08-10: Excluded timeline Plan blocks from smart backfill defaults and quick-punch start inference.
  * @updated 2026-08-24: Clamps newly saved manual records to the selected start day so they cannot end at next-day 00:00.
  * @updated 2026-08-26: Added atomic record splitting that preserves aggregate linked-todo progress.
+ * @updated 2026-08-27: Added adjacent-record merge with gap-inclusive duration and target-owned properties.
  * @updated 2026-06-06: Added hard-field duplicate protection for new log insertions so floating-window stop races cannot append identical timeline records twice.
  * @updated 2026-05-16: Dispatches a shared assistant log-submission event only for brand-new logs so post-save AI triggers can ignore edits.
  * @updated 2026-05-10: Let callers override the date used for backfill defaults so widget supplement-log launches can force today even when the timeline was left on an older day.
@@ -35,7 +36,11 @@ import { isAutoRecurringPlanDeleteLocked } from '../utils/todoRecurringPlanUtils
 import { filterActualLogs, getLatestActualLogEndTimeInRange } from '../utils/statLogUtils';
 import { clampEndTimeToStartDay } from '../utils/logUtils';
 import {
+    getAdjacentActualLogs,
+    mergeLogCollectionEntriesIntoTarget,
+    mergeLogsIntoTarget,
     replaceLogCollectionEntriesWithSplit,
+    replaceLogsWithMerge,
     replaceLogWithSplit,
     splitLogAtTime
 } from '../utils/logSplitUtils';
@@ -187,6 +192,63 @@ export const useLogManager = () => {
             id,
             splitLogs
         ));
+        closeModal();
+        return true;
+    };
+
+    const handleMergeLog = (sourceLogId: string, targetLogId: string) => {
+        const sourceLog = logs.find((log) => log.id === sourceLogId);
+        const { previousLog, nextLog } = getAdjacentActualLogs(logs, sourceLogId);
+        const targetLog = previousLog?.id === targetLogId
+            ? previousLog
+            : nextLog?.id === targetLogId
+                ? nextLog
+                : null;
+        const mergeResult = sourceLog && targetLog ? mergeLogsIntoTarget(sourceLog, targetLog) : null;
+
+        if (!mergeResult) {
+            addToast('error', '只能合并到相邻的专注记录');
+            return false;
+        }
+
+        const sourceProgressIncrement = sourceLog.progressIncrement || 0;
+        if (sourceProgressIncrement > 0 && (sourceLog.linkedTodoId || targetLog.linkedTodoId)) {
+            setTodos((previousTodos) => previousTodos.map((todo) => {
+                if (getTodoProgressTrackingMode(todo, previousTodos) !== 'manual') {
+                    return todo;
+                }
+
+                let progressDelta = 0;
+                if (todo.id === sourceLog.linkedTodoId) {
+                    progressDelta -= sourceProgressIncrement;
+                }
+                if (todo.id === targetLog.linkedTodoId) {
+                    progressDelta += sourceProgressIncrement;
+                }
+
+                return progressDelta === 0 ? todo : {
+                    ...todo,
+                    isProgress: true,
+                    progressTrackingMode: 'manual',
+                    completedUnits: Math.max(0, (todo.completedUnits || 0) + progressDelta)
+                };
+            }));
+        }
+
+        const retainedImageNames = new Set(logs
+            .filter((log) => log.id !== sourceLogId)
+            .flatMap((log) => log.images || []));
+        const imagesToCleanUp = (sourceLog.images || []).filter((image) => !retainedImageNames.has(image));
+
+        setLogs((previousLogs) => replaceLogsWithMerge(previousLogs, mergeResult));
+        setCollectionEntries((previousEntries) => mergeLogCollectionEntriesIntoTarget(
+            previousEntries,
+            sourceLogId,
+            targetLogId
+        ));
+        imagesToCleanUp.forEach((image) => {
+            imageService.deleteImage(image).catch((error) => console.error('Failed to cleanup merged log image file:', error));
+        });
         closeModal();
         return true;
     };
@@ -360,6 +422,7 @@ export const useLogManager = () => {
         handleSaveLog,
         handleDeleteLog,
         handleSplitLog,
+        handleMergeLog,
         handleQuickPunch,
         handleBatchAddLogs,
         openAddModal,

@@ -1097,6 +1097,7 @@ const AppContent: React.FC = () => {
           autoFocusNote={autoFocusNote}
           allLogs={logs}
           onSplit={logManager.handleSplitLog}
+          onMerge={logManager.handleMergeLog}
         />
       )}
 
