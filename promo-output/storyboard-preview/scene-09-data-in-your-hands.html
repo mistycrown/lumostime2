@@ -260,23 +260,30 @@
 
     .control-bar {
       position: fixed;
-      right: 30px;
-      bottom: 24px;
-      z-index: 10;
+      right: 20px;
+      bottom: 20px;
+      left: 20px;
+      z-index: 40;
       display: flex;
       align-items: center;
-      gap: 9px;
-      padding: 8px 10px;
-      border: 1px solid rgba(203, 197, 189, .9);
-      border-radius: 5px;
-      background: rgba(250, 248, 245, .9);
-      box-shadow: 0 4px 13px rgba(64, 55, 47, .08);
+      gap: 12px;
+      width: min(520px, calc(100vw - 40px));
+      margin: auto;
+      padding: 10px 12px;
+      border: 1px solid rgba(70, 59, 48, .12);
+      border-radius: 7px;
+      background: rgba(253, 251, 247, .91);
+      box-shadow: 0 10px 32px rgba(50, 42, 34, .16);
+      backdrop-filter: blur(12px);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
-    .control-bar button { width: 28px; height: 28px; border: 0; background: transparent; color: #716b64; cursor: pointer; font-size: 14px; }
-    .control-bar input { width: 132px; accent-color: #8c857d; }
-    .control-bar span { width: 36px; color: #807a73; font-size: 11px; text-align: right; }
+    .control-bar button { display: grid; width: 29px; height: 29px; flex: 0 0 auto; place-items: center; border: 0; border-radius: 50%; background: var(--ink); color: #fff; cursor: pointer; font-size: 12px; }
+    .control-bar input { width: 100%; accent-color: var(--ink); }
+    .control-bar span { width: 72px; color: #57534e; font-size: 11px; text-align: right; }
+
+    /* The film wrapper owns playback when this scene runs in an iframe. */
+    html.embedded-scene .control-bar { display: none; }
 
     @keyframes copy-up { 0%, 5% { opacity: 0; transform: translateY(18px); } 18%, 100% { opacity: 1; transform: translateY(0); } }
     @keyframes rule-in { 0%, 18% { opacity: 0; transform: scaleX(0); transform-origin: left; } 31%, 100% { opacity: 1; transform: scaleX(1); } }
@@ -353,6 +360,8 @@
   </div>
 
   <script>
+    if (window.self !== window.top) document.documentElement.classList.add('embedded-scene');
+
     const duration = 10000;
     const playButton = document.getElementById('play');
     const progress = document.getElementById('progress');
