@@ -2,6 +2,8 @@
 
 > Update 2026-08-26: `useLogManager.ts` atomically replaces a source record with two proportional-progress segments after a confirmed split.
 
+> Update 2026-08-27: `useLogManager.ts` merges a record into an adjacent target with gap-inclusive duration, collection migration, and linked-todo progress reconciliation.
+
 > `useLogManager.ts` now excludes timeline Plan blocks from smart backfill defaults and quick-punch start inference; `useLogForm.ts` applies the same rule to the previous-record shortcut.
 
 > Update 2026-08-24: `useLogManager.ts` clamps new manual records to their start day's final millisecond before persistence, without rewriting existing records.

@@ -1,5 +1,6 @@
 /**
  * @file AddLogModal.tsx
+ * @updated 2026-08-27: Expanded the record time tool into split-and-merge with adjacent-record targeting.
  * @updated 2026-08-26: Added an existing-record time split entry that opens a single-layer split timeline modal.
  * @updated 2026-08-24: Added shared Activity custom attribute fields for backfill and record editing.
  * @updated 2026-07-21: Added dark-mode detail outlines and high-contrast time range slider handles.
@@ -39,6 +40,7 @@ import { imageService } from '../services/imageService';
 import { appendTemplateToNote, getRecommendedNoteTemplates, RecommendedNoteTemplate } from '../utils/noteTemplateUtils';
 import { getTodoProgressSnapshot, shouldTodoUseManualProgressInput } from '../utils/todoProgressUtils';
 import { filterAttributeValuesForActivity } from '../utils/activityAttributeUtils';
+import { getAdjacentActualLogs } from '../utils/logSplitUtils';
 import {
   getCompletionModeTodoId,
   isTodoEligibleForCompletionMode,
@@ -53,6 +55,7 @@ interface AddLogModalProps {
   onClose: () => void;
   onSave: (log: Log) => void;
   onSplit?: (id: string, splitTime: number) => boolean;
+  onMerge?: (sourceLogId: string, targetLogId: string) => boolean;
   onCompleteLinkedTodo?: (todoId: string) => boolean;
 
   onDelete?: (id: string) => void;
@@ -70,7 +73,7 @@ interface AddLogModalProps {
   allLogs?: Log[]; // 添加所有日志用于计算上一条记录
 }
 
-export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, prefilledData, onClose, onSave, onSplit, onCompleteLinkedTodo, onDelete, onImageRemove, categories, onUpdateActivity, todos, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
+export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialStartTime, initialEndTime, prefilledData, onClose, onSave, onSplit, onMerge, onCompleteLinkedTodo, onDelete, onImageRemove, categories, onUpdateActivity, todos, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, lastLogEndTime, autoFocusNote = true, allLogs = [] }) => {
   // 使用自定义 Hooks 管理状态
   const { setIsShareViewOpen, setSharingLog } = useNavigation();
   const { addToast } = useToast();
@@ -167,6 +170,10 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   const selectedActivity = useMemo(() => categories
     .flatMap((category) => category.activities)
     .find((activity) => activity.id === formState.selectedActivityId), [categories, formState.selectedActivityId]);
+  const mergeNeighbors = useMemo(
+    () => initialLog ? getAdjacentActualLogs(allLogs, initialLog.id) : { previousLog: null, nextLog: null },
+    [allLogs, initialLog]
+  );
 
   // UI 状态
   const [isNoteExpanded, setIsNoteExpanded] = useState(false);
@@ -657,12 +664,20 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     }
   };
 
+  const getLogActivityLabel = (log: Log) => categories
+    .flatMap((category) => category.activities)
+    .find((activity) => activity.id === log.activityId)?.name || log.note || '未命名活动';
+
   if (isSplitModalOpen && initialLog) {
     return (
       <SplitLogModal
         log={initialLog}
+        previousLog={mergeNeighbors.previousLog}
+        nextLog={mergeNeighbors.nextLog}
+        getLogLabel={getLogActivityLabel}
         onClose={handleClose}
         onConfirm={handleConfirmSplit}
+        onMerge={(targetLog) => onMerge?.(initialLog.id, targetLog.id) === true}
       />
     );
   }
@@ -812,15 +827,15 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 <Clock size={12} />
                 <span>到上尾</span>
               </button>
-              {initialLog && onSplit && (
+              {initialLog && (onSplit || onMerge) && (
                 <button
                   type="button"
                   onClick={() => setIsSplitModalOpen(true)}
                   className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 active:scale-95"
-                  title="将记录拆分为两个时间段"
+                  title="拆分记录或合并到相邻记录"
                 >
                   <Scissors size={12} />
-                  <span>拆分</span>
+                  <span>拆合</span>
                 </button>
               )}
               <button
