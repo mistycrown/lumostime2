@@ -20,7 +20,7 @@
 
     * { box-sizing: border-box; }
 
-    html, body { margin: 0; min-width: 1100px; min-height: 100%; }
+    html, body { margin: 0; min-width: 960px; min-height: 540px; }
 
     body {
       overflow: hidden;
@@ -35,54 +35,70 @@
 
     .film-note {
       position: fixed;
-      top: 22px;
+      top: 5.7%;
       z-index: 5;
       color: #aaa49d;
       font-family: Georgia, serif;
-      font-size: 14px;
-      letter-spacing: 1.2px;
+      font-size: clamp(9px, .82vw, 14px);
+      letter-spacing: .12em;
     }
 
-    .film-note.left { left: 40px; }
-    .film-note.right { right: 40px; }
+    .film-note.left { left: 6.25%; }
+    .film-note.right { right: 6.25%; letter-spacing: .08em; }
 
     main {
+      position: relative;
       width: 100vw;
       height: 100vh;
-      display: grid;
-      grid-template-columns: 31.5% 68.5%;
-      align-items: center;
-      padding: 70px 40px 44px;
     }
 
-    .copy { align-self: stretch; display: flex; flex-direction: column; justify-content: center; padding-right: 44px; }
+    .copy {
+      position: absolute;
+      top: 27%;
+      left: 6.25%;
+      z-index: 2;
+      width: 28.5%;
+    }
 
     h1 {
       margin: 0;
-      font-size: 58px;
-      font-weight: 500;
-      line-height: 1.12;
+      font-size: clamp(36px, 4vw, 76px);
+      font-weight: 600;
+      line-height: 1.18;
       letter-spacing: 0;
     }
 
     h1 span { color: #aaa6a1; }
 
-    .copy-rule { width: 88px; height: 1px; margin: 30px 0 31px; background: #aaa49d; }
+    .copy-rule { width: 78px; height: 1px; margin: 29px 0 0; background: #aaa49d; }
 
     .copy p {
-      margin: 0;
+      margin: 26px 0 0;
       color: #716c66;
-      font-size: 18px;
-      line-height: 1.85;
-      letter-spacing: .4px;
+      font-size: clamp(14px, 1.2vw, 21px);
+      line-height: 1.75;
+      letter-spacing: 0;
     }
 
-    .copy .closing { margin-top: 140px; color: #79736c; }
+    .copy .closing {
+      position: fixed;
+      bottom: 13.4%;
+      left: 6.25%;
+      z-index: 3;
+      max-width: 370px;
+      margin: 0;
+      color: #79736c;
+    }
     .copy .closing strong { color: #302d29; font-weight: 600; }
 
     .app-window {
-      height: min(678px, calc(100vh - 128px));
-      min-height: 620px;
+      position: absolute;
+      top: 13%;
+      right: 6.25%;
+      bottom: 11.5%;
+      z-index: 1;
+      width: 59%;
+      min-width: 630px;
       border: 1px solid #e2ded8;
       border-radius: 10px;
       overflow: hidden;
@@ -107,7 +123,7 @@
 
     .vault {
       height: calc(100% - 39px);
-      padding: 50px 48px 42px;
+      padding: 24px 33px 21px;
     }
 
     .vault-title {
