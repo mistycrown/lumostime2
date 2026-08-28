@@ -1,6 +1,8 @@
 /**
  * @file AddLogModal.tsx
  * @updated 2026-08-27: Expanded the record time tool into split-and-merge with adjacent-record targeting.
+ * @updated 2026-08-27: Keeps start/end time shortcuts aligned under their corresponding inputs when split is unavailable.
+ * @updated 2026-08-27: Lets the split-and-merge action reserve its own responsive center column without wrapping.
  * @updated 2026-08-26: Added an existing-record time split entry that opens a single-layer split timeline modal.
  * @updated 2026-08-24: Added shared Activity custom attribute fields for backfill and record editing.
  * @updated 2026-07-21: Added dark-mode detail outlines and high-contrast time range slider handles.
@@ -734,10 +736,10 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
           {/* Time Input & Slider */}
           <div className="space-y-6">
             {/* Manual Inputs */}
-            <div className="flex items-center justify-center gap-4">
-              <div className="flex flex-col items-center">
+            <div className="mx-auto grid w-fit grid-cols-[auto_auto_auto] items-center gap-x-4 gap-y-2 max-[400px]:gap-x-2">
+              <div className="col-start-1 row-start-1 flex flex-col items-center">
                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1">Start</span>
-                <div className="flex items-center bg-white rounded-xl border border-stone-200 px-3 py-2 shadow-sm">
+                <div className="flex items-center bg-white rounded-xl border border-stone-200 px-3 py-2 shadow-sm max-[400px]:px-2">
                   <input
                     type="text"
                     inputMode="numeric"
@@ -774,11 +776,11 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 </div>
               </div>
 
-              <div className="mt-6 h-px w-8 bg-stone-300" />
+              <div className="col-start-2 row-start-1 mt-6 h-px w-8 bg-stone-300" />
 
-              <div className="flex flex-col items-center">
+              <div className="col-start-3 row-start-1 flex flex-col items-center">
                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1">End</span>
-                <div className="flex items-center bg-white rounded-xl border border-stone-200 px-3 py-2 shadow-sm">
+                <div className="flex items-center bg-white rounded-xl border border-stone-200 px-3 py-2 shadow-sm max-[400px]:px-2">
                   <input
                     ref={endHourInputRef}
                     type="text"
@@ -815,13 +817,10 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                   />
                 </div>
               </div>
-            </div>
-
-            <div className="flex items-center justify-center gap-2">
               <button
                 type="button"
                 onClick={handleSetStartToPreviousEnd}
-                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 active:scale-95"
+                className="col-start-1 row-start-2 flex justify-self-center items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 active:scale-95"
                 title="设置开始时间为上一条记录的结束时间"
               >
                 <Clock size={12} />
@@ -831,7 +830,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 <button
                   type="button"
                   onClick={() => setIsSplitModalOpen(true)}
-                  className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 active:scale-95"
+                  className="col-start-2 row-start-2 flex justify-self-center items-center gap-1 whitespace-nowrap rounded-lg px-2 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 active:scale-95"
                   title="拆分记录或合并到相邻记录"
                 >
                   <Scissors size={12} />
@@ -841,7 +840,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
               <button
                 type="button"
                 onClick={handleSetEndToNow}
-                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 active:scale-95"
+                className="col-start-3 row-start-2 flex justify-self-center items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900 active:scale-95"
                 title="设置结束时间为当前时间"
               >
                 <Clock size={12} />

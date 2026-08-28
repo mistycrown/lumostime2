@@ -12,9 +12,10 @@
  * @updated 2026-08-10: Replaces missing daily-check value placeholders with a compact slash.
  * @updated 2026-08-10: Defers aggregate statistics until the current-month view has painted and renders operator-aware automatic targets.
  * @updated 2026-08-10: Reuses each daily check's theme color for its progress ring, heatmap, and trend.
+ * @updated 2026-08-28: Adds per-item historical recalculation for automatic daily checks.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Check, LoaderCircle, Target } from 'lucide-react';
+import { ArrowLeft, Check, LoaderCircle, RefreshCw, Target } from 'lucide-react';
 import {
   Category,
   CheckItem,
@@ -77,6 +78,7 @@ interface DailyCheckDetailViewProps {
   todoCategories: TodoCategory[];
   currentDate: Date;
   onUpdateDailyReview: (review: DailyReview) => void;
+  onRecalculate: (itemId: string) => void;
   onBack: () => void;
 }
 
@@ -135,6 +137,7 @@ const DailyCheckDetailContent: React.FC<DailyCheckDetailViewProps> = ({
   todoCategories,
   currentDate,
   onUpdateDailyReview,
+  onRecalculate,
   onBack
 }) => {
   const [heatmapMonth, setHeatmapMonth] = useState(() => new Date(currentDate));
@@ -435,6 +438,17 @@ const DailyCheckDetailContent: React.FC<DailyCheckDetailViewProps> = ({
           <ArrowLeft size={20} />
         </button>
         <h1 className="max-w-[70%] truncate text-base font-semibold text-stone-900">{item.content}</h1>
+        {item.type === 'auto' && (
+          <button
+            type="button"
+            onClick={() => onRecalculate(item.id)}
+            className="absolute right-5 flex h-9 w-9 items-center justify-center rounded-full text-stone-500 transition-colors hover:bg-white hover:text-stone-900 sm:right-8"
+            title="按当前规则重算此日课全部历史日报"
+            aria-label="按当前规则重算此日课全部历史日报"
+          >
+            <RefreshCw size={17} />
+          </button>
+        )}
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto px-5 pb-12 pt-5 sm:px-8 lg:px-10">

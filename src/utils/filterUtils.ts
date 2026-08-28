@@ -1,5 +1,6 @@
 /**
  * @file filterUtils.ts
+ * @updated 2026-08-28: Falls back to legacy log titles when activity references no longer resolve.
  * @input Filter表达式, Log数据, App上下文数据
  * @output 解析后的筛选条件, 匹配结果, 统计数据, 筛选器排序规整
  * @pos Utils (筛选逻辑)
@@ -270,10 +271,12 @@ export function matchesFilter(
     if (condition.tags.length > 0) {
         const category = context.categories.find(c => c.id === log.categoryId);
         const activity = category?.activities.find(a => a.id === log.activityId);
+        // Older logs can retain the activity label even when their reference
+        // no longer resolves after an activity move or migration.
+        const activityNameLower = (activity?.name || log.title || '').toLowerCase();
+        const categoryNameLower = (category?.name || '').toLowerCase();
 
-        if (!activity) return false;
-
-        const activityNameLower = activity.name.toLowerCase();
+        if (!activityNameLower && !categoryNameLower) return false;
 
         // 所有标签条件组都必须满足 (AND)
         const allTagGroupsMatch = condition.tags.every(tagGroup => {
@@ -282,7 +285,7 @@ export function matchesFilter(
             return tagGroup.some(tag => {
                 const lowerTag = tag.toLowerCase();
                 const activityMatch = activityNameLower.includes(lowerTag);
-                const categoryMatch = category ? category.name.toLowerCase().includes(lowerTag) : false;
+                const categoryMatch = categoryNameLower.includes(lowerTag);
                 return activityMatch || categoryMatch;
             });
         });
