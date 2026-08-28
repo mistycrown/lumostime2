@@ -18,6 +18,7 @@
  * @updated 2026-07-30: Suppresses the synthetic click after real-record taps so the detail modal is not immediately backdrop-closed.
  * @updated 2026-08-09: Renders clickable idle-time gaps from real records only; planned blocks do not split gaps and today's trailing gap ends at the current time.
  * @updated 2026-08-12: Keeps exactly adjacent schedule blocks in the same visual layout group so contiguous records do not appear staggered.
+ * @updated 2026-08-28: Ends parallel width groups when no active overlap remains so later adjacent blocks can use the full row.
  * @updated 2026-08-24: Uses 23:59:59.999 rather than next-day 00:00 for historical-day gaps and 24:00 timeline creations.
  * @updated 2026-08-24: Closes the plan action panel on completed backdrop clicks so the release click cannot reach the timeline underneath.
  * @updated 2026-08-24: Ignores the opening touch click inside plan actions and requires a second delete confirmation to prevent accidental starts and removals.
@@ -280,11 +281,9 @@ export const layoutParallelScheduleBlocks = <T extends { startMinutes: number; e
 
   sorted.forEach((block) => {
     active = active.filter((entry) => entry.endMinutes > block.startMinutes + SCHEDULE_ADJACENCY_TOLERANCE_MINUTES);
-    if (active.length === 0 && group.length > 0) {
-      const groupEndMinutes = Math.max(...group.map((entry) => entry.endMinutes));
-      // Keep a zero-gap successor in the same group so it reuses the released track.
-      if (block.startMinutes - groupEndMinutes > SCHEDULE_ADJACENCY_TOLERANCE_MINUTES) finalizeGroup();
-    }
+    // Width is scoped to actual overlap. A contiguous successor starts a new
+    // width group so it does not inherit a half-width from an earlier overlap.
+    if (active.length === 0 && group.length > 0) finalizeGroup();
     const usedColumns = new Set(active.map((entry) => entry.column));
     let column = 0;
     while (usedColumns.has(column)) column += 1;

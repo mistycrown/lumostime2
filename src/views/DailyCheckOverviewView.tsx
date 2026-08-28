@@ -1,5 +1,6 @@
 /**
  * @file DailyCheckOverviewView.tsx
+ * @updated 2026-08-28: Resolves legacy template items without persisted IDs using their stable template keys.
  * @input Daily-check templates, daily reviews, logs, and filter context
  * @output Grouped daily-check overview with continuous records and detail navigation
  * @pos View (Daily Check)
@@ -90,7 +91,10 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
         template,
         items: template.items
           .filter((item) => item.enabled !== false)
-          .map((item) => getDailyCheckTemplateItem(checkTemplates, item.id))
+          .map((item, index) => getDailyCheckTemplateItem(
+            checkTemplates,
+            getCheckTemplateItemKey(template, item, index)
+          ))
           .filter((item): item is CheckItem => Boolean(item))
       }))
       .filter((group) => group.items.length > 0)

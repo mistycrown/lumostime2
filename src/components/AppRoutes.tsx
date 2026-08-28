@@ -1,5 +1,6 @@
 /**
  * @file AppRoutes.tsx
+ * @updated 2026-08-28: Refreshes daily-check auto states whenever logs or filter context changes.
  * @input Application view state, shared data contexts, and route-level handlers
  * @output Active page view rendering for the main application shell
  * @pos Component (Routing)
@@ -375,28 +376,12 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         setPreviousView(null);
     };
 
-    const dailyCheckRefreshKeyRef = React.useRef<string | null>(null);
     React.useEffect(() => {
         if (currentView !== AppView.DAILY_CHECKS) {
-            dailyCheckRefreshKeyRef.current = null;
             return;
         }
 
         const dateStr = getLocalDateStr(dailyCheckToday);
-        const templateKey = checkTemplates
-            .filter((template) => template.enabled && template.isDaily)
-            .sort((a, b) => a.order - b.order)
-            .flatMap((template) => template.items || [])
-            .filter((item) => item.enabled !== false)
-            .map((item) => `${item.id}:${item.type || 'manual'}:${item.manualMode || 'binary'}`)
-            .join('|');
-        const refreshKey = `${dateStr}:${templateKey}`;
-
-        if (dailyCheckRefreshKeyRef.current === refreshKey) {
-            return;
-        }
-        dailyCheckRefreshKeyRef.current = refreshKey;
-
         const ensured = ensureDailyReviewForDate({
             dateStr,
             dailyReviews,

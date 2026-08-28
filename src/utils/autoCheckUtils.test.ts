@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Category, CheckItem, Log } from '../types';
-import { evaluateAutoCheck, formatTimeValue, hasAutoCheckItemCompletionChanges } from './autoCheckUtils';
+import { evaluateAutoCheck, formatTimeValue, hasAutoCheckItemCompletionChanges, updateAutoCheckItems } from './autoCheckUtils';
 import { normalizeCheckItem, normalizeCheckTemplates } from './checkItemNormalizer';
 import type { FilterContext } from './filterUtils';
 
@@ -56,6 +56,22 @@ function createNightSleepCheck(targetValue = 23 * 60): CheckItem {
 }
 
 describe('autoCheckUtils nightEarliestStart', () => {
+  it('refreshes a following-day review from the previous night', () => {
+    const checkItem = createNightSleepCheck();
+    const logs = [
+      createSleepLog('2026-04-15T22:40:00+08:00', '2026-04-16T06:40:00+08:00')
+    ];
+
+    const updated = updateAutoCheckItems(
+      [checkItem],
+      logs,
+      context,
+      new Date('2026-04-16T12:00:00+08:00')
+    );
+
+    expect(updated[0].isCompleted).toBe(true);
+  });
+
   it('passes when the earliest night sleep start is before the target', () => {
     const checkItem = createNightSleepCheck();
     const logs = [

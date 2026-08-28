@@ -1,5 +1,6 @@
 /**
  * @file autoCheckUtils.ts
+ * @updated 2026-08-28: Uses the previous local date when refreshing night-earliest checks from a daily review.
  * @input CheckItem, Logs, FilterContext
  * @output Auto-check completion status
  * @pos Utility (Auto Check)
@@ -244,6 +245,21 @@ export function evaluateAutoCheck(
 }
 
 /**
+ * Return the local log date used by an automatic check.
+ * Night sleep belongs to the night that started on the previous date when
+ * the result is displayed in the following day's review.
+ */
+export function getAutoCheckEvaluationDate(checkItem: CheckItem, targetDate: Date): Date {
+  if (checkItem.type !== 'auto' || checkItem.autoConfig?.comparisonType !== 'nightEarliestStart') {
+    return targetDate;
+  }
+
+  const previousDate = new Date(targetDate);
+  previousDate.setDate(previousDate.getDate() - 1);
+  return previousDate;
+}
+
+/**
  * 批量更新自动日课的完成状态
  */
 export function updateAutoCheckItems(
@@ -254,9 +270,10 @@ export function updateAutoCheckItems(
 ): CheckItem[] {
   return checkItems.map(item => {
     if (item.type === 'auto') {
+      const evaluationDate = getAutoCheckEvaluationDate(item, targetDate);
       return {
         ...item,
-        isCompleted: evaluateAutoCheck(item, logs, context, targetDate)
+        isCompleted: evaluateAutoCheck(item, logs, context, evaluationDate)
       };
     }
     return item;
