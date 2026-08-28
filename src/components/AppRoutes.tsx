@@ -33,7 +33,7 @@ import { aiService } from '../services/aiService';
 import { dailyNewspaperService } from '../services/dailyNewspaperService';
 import { getLocalDateStr } from '../utils/dateUtils';
 import { hasAutoCheckItemCompletionChanges, updateAutoCheckItems } from '../utils/autoCheckUtils';
-import { ensureDailyReviewForDate, upsertDailyReview } from '../utils/dailyCheckUtils';
+import { ensureDailyReviewForDate, recalculateDailyReviewAutoCheck, upsertDailyReview } from '../utils/dailyCheckUtils';
 import { ACTIVE_SESSION_KEY, CHAT_PERSONAS_KEY, CHAT_SESSIONS_KEY, DEFAULT_AI_PERSONAS } from './ai-chat/AIBackfillChatInitialization';
 import type { AIChatPersona, AIChatSession } from './ai-chat/AIBackfillChatShared';
 import { TodoQuickActionsModal } from './TodoQuickActionsModal';
@@ -375,6 +375,17 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         setDailyChecksReturnTarget('timeline');
         setPreviousView(null);
     };
+
+    const handleRecalculateDailyCheck = React.useCallback((checkItemId: string) => {
+        setDailyReviews((previousReviews) => recalculateDailyReviewAutoCheck(
+            previousReviews,
+            checkTemplates,
+            logs,
+            { categories, scopes, todos, todoCategories },
+            checkItemId
+        ));
+        addToast('success', '已按当前规则重算此自动日课的历史日报');
+    }, [addToast, categories, checkTemplates, logs, scopes, setDailyReviews, todoCategories, todos]);
 
     React.useEffect(() => {
         if (currentView !== AppView.DAILY_CHECKS) {
@@ -998,6 +1009,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     todoCategories={todoCategories}
                     currentDate={dailyCheckToday}
                     onUpdateDailyReview={handleUpdateReview}
+                    onRecalculate={handleRecalculateDailyCheck}
                     onBack={() => {
                         setDailyCheckDetailId(null);
                         setCurrentView(AppView.DAILY_CHECKS);

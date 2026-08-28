@@ -1,5 +1,6 @@
 /**
  * @file dailyCheckUtils.ts
+ * @updated 2026-08-28: Added per-item full-history automatic daily-check recalculation from current templates.
  * @input daily review data, check templates, review templates, target check item id
  * @output daily check helpers for creating reviews, locating items, and applying manual actions
  * @pos Utils (Daily Check)
@@ -11,8 +12,10 @@
  * @updated 2026-08-09: Includes per-item colors in daily-check template metadata for native weekly-widget rendering.
  * @updated 2026-08-09: Added a detail-page-only count cycle action for temporary backfill mode.
  */
-import { CheckItem, CheckTemplate, CheckTemplateItem, DailyReview, ReviewTemplate, ReviewTemplateSnapshot } from '../types';
+import { CheckItem, CheckTemplate, CheckTemplateItem, DailyReview, Log, ReviewTemplate, ReviewTemplateSnapshot } from '../types';
 import { normalizeCheckItem } from './checkItemNormalizer';
+import { updateAutoCheckItems } from './autoCheckUtils';
+import type { FilterContext } from './filterUtils';
 
 export type DailyCheckActionMode = 'toggle' | 'increment' | 'reset' | 'complete_once' | 'cycle';
 
@@ -259,6 +262,76 @@ export const normalizeDailyReviewForCheck = (
   }
 
   return updatedReview;
+};
+
+export const recalculateDailyReviewAutoCheck = (
+  dailyReviews: DailyReview[],
+  checkTemplates: CheckTemplate[],
+  logs: Log[],
+  filterContext: FilterContext,
+  checkItemId: string
+): DailyReview[] => {
+  const templateItems = checkTemplates
+    .filter((template) => template.enabled && template.isDaily)
+    .flatMap((template) => getTemplateItems(template)
+      .filter(isCheckTemplateItemEnabled)
+      .map((item, index) => ({
+        template,
+        item,
+        key: getCheckTemplateItemKey(template, item, index)
+      })));
+
+  const targetTemplateMatch = templateItems.find(({ key, item }) => key === checkItemId || item.id === checkItemId);
+  if (!targetTemplateMatch || targetTemplateMatch.item.type !== 'auto') {
+    return dailyReviews;
+  }
+
+  return dailyReviews.map((review) => {
+    if (!Array.isArray(review.checkItems) || review.checkItems.length === 0) {
+      return review;
+    }
+
+    const targetReviewIndex = review.checkItems.findIndex((reviewItem) => (
+      reviewItem.id === checkItemId
+      || reviewItem.id === targetTemplateMatch.key
+      || (reviewItem.category === targetTemplateMatch.template.title && reviewItem.content === targetTemplateMatch.item.content)
+      || (!reviewItem.category && reviewItem.content === targetTemplateMatch.item.content)
+    ));
+    if (targetReviewIndex < 0) {
+      return review;
+    }
+
+    const targetReviewItem = review.checkItems[targetReviewIndex];
+    if (targetReviewItem.type !== 'auto' && !targetReviewItem.autoConfig) {
+      return review;
+    }
+
+    const refreshedTargetItem: CheckItem = {
+      ...targetReviewItem,
+      type: 'auto',
+      category: targetTemplateMatch.template.title,
+      content: targetTemplateMatch.item.content,
+      icon: targetTemplateMatch.item.icon,
+      uiIcon: targetTemplateMatch.item.uiIcon,
+      autoConfig: targetTemplateMatch.item.autoConfig
+    };
+    const reviewDate = new Date(`${review.date}T12:00:00`);
+    const [updatedTargetItem] = updateAutoCheckItems([refreshedTargetItem], logs, filterContext, reviewDate);
+    if (!updatedTargetItem) {
+      return review;
+    }
+    const updatedItems = review.checkItems.map((reviewItem, index) => {
+      if (index !== targetReviewIndex) {
+        return reviewItem;
+      }
+      return updatedTargetItem;
+    });
+    return {
+      ...review,
+      checkItems: updatedItems,
+      updatedAt: Date.now()
+    };
+  });
 };
 
 export const getDailyCheckTemplateMeta = (

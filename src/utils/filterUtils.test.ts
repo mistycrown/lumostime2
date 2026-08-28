@@ -6,6 +6,7 @@
  * @description Verifies that todo-target and linked-log custom filter expressions reuse the same AND/OR parser while matching todo title/category, linked activity/category, default scopes, and notes.
  * @updated 2026-06-06: Added linked-log coverage so `@` expressions also match todo category names in custom filters.
  * @updated 2026-05-11: Added todo hidden-filter coverage for the month-view display-settings expression.
+ * @updated 2026-08-28: Added case-insensitive matching coverage across filter fields.
  */
 
 import { describe, expect, test } from 'vitest';
@@ -133,6 +134,56 @@ describe('matchesTodoFilterExpression', () => {
     expect(matchesTodoFilterExpression(buildTodo({}), '%健康 复盘', filterContext)).toBe(true);
     expect(matchesTodoFilterExpression(buildTodo({ note: '只有阅读' }), '%健康 复盘', filterContext)).toBe(false);
     expect(matchesTodoFilterExpression(buildTodo({ defaultScopeIds: ['scope-school'] }), '%健康 复盘', filterContext)).toBe(false);
+  });
+});
+
+describe('matchesFilter legacy activity fallback', () => {
+  test('matches a legacy log title when its activity reference is stale', () => {
+    const staleLog = buildLog({
+      activityId: 'removed-activity',
+      categoryId: 'removed-category',
+      title: '阅读'
+    });
+
+    expect(matchesFilter(
+      staleLog,
+      parseFilterExpression('#阅读'),
+      { categories: activityCategories, scopes, todos: [], todoCategories: [] }
+    )).toBe(true);
+  });
+});
+
+describe('matchesFilter case normalization', () => {
+  test('matches tags, scopes, todos, and notes without case sensitivity', () => {
+    const context = {
+      categories: [{
+        ...activityCategories[0],
+        id: 'case-category',
+        name: 'Work',
+        activities: [{ ...activityCategories[0].activities[0], id: 'case-activity', name: 'Deep Focus' }]
+      }],
+      scopes: [{ ...scopes[0], id: 'case-scope', name: 'Health' }],
+      todos: [buildTodo({
+        id: 'case-todo',
+        title: 'Plan',
+        linkedCategoryId: 'case-category',
+        linkedActivityId: 'case-activity'
+      })],
+      todoCategories
+    };
+    const log = buildLog({
+      categoryId: 'case-category',
+      activityId: 'case-activity',
+      scopeIds: ['case-scope'],
+      linkedTodoId: 'case-todo',
+      note: 'Night Focus'
+    });
+
+    expect(matchesFilter(
+      log,
+      parseFilterExpression('#dEeP %hEaLtH @pLaN nIgHt'),
+      context
+    )).toBe(true);
   });
 });
 

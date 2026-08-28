@@ -6,7 +6,8 @@ import {
   filterDailyCheckItemsByEnabledTemplates,
   getDailyCheckTemplateMeta,
   getEligibleNfcDailyCheckItems,
-  getEligibleTrackingCalendarDailyCheckItems
+  getEligibleTrackingCalendarDailyCheckItems,
+  recalculateDailyReviewAutoCheck
 } from './dailyCheckUtils';
 
 const reviewTemplates: ReviewTemplate[] = [
@@ -53,6 +54,88 @@ const checkTemplates: CheckTemplate[] = [
 ];
 
 describe('dailyCheckUtils', () => {
+  it('recalculates historical automatic checks with the current template rule', () => {
+    const autoTemplate: CheckTemplate = {
+      id: 'auto-group',
+      title: '自动',
+      enabled: true,
+      order: 0,
+      isDaily: true,
+      items: [{
+        id: 'auto-item',
+        content: '专注',
+        type: 'auto',
+        autoConfig: {
+          filterExpression: '#阅读',
+          comparisonType: 'duration',
+          operator: '>=',
+          targetValue: 60
+        }
+      }]
+    };
+    const review: DailyReview = {
+      id: 'review',
+      date: '2026-08-28',
+      createdAt: 1,
+      updatedAt: 1,
+      answers: [],
+      checkItems: [{
+        id: 'auto-item',
+        content: '专注',
+        type: 'auto',
+        isCompleted: false,
+        autoConfig: {
+          filterExpression: '#旧标签',
+          comparisonType: 'duration',
+          operator: '>=',
+          targetValue: 60
+        }
+      }, {
+        id: 'other-auto-item',
+        content: '另一个',
+        type: 'auto',
+        isCompleted: true,
+        autoConfig: {
+          filterExpression: '#旧规则',
+          comparisonType: 'count',
+          operator: '>=',
+          targetValue: 1
+        }
+      }]
+    };
+    const logs = [{
+      id: 'log',
+      categoryId: 'category',
+      activityId: 'reading',
+      startTime: new Date('2026-08-28T10:00:00').getTime(),
+      endTime: new Date('2026-08-28T11:30:00').getTime(),
+      duration: 90 * 60
+    }];
+
+    const result = recalculateDailyReviewAutoCheck(
+      [review],
+      [autoTemplate],
+      logs,
+      {
+        categories: [{
+          id: 'category',
+          name: '工作',
+          color: '',
+          activities: [{ id: 'reading', name: '阅读', icon: '', color: '' }]
+        }],
+        scopes: [],
+        todos: [],
+        todoCategories: []
+      },
+      'auto-item'
+    );
+
+    expect(result[0].checkItems?.[0].autoConfig?.filterExpression).toBe('#阅读');
+    expect(result[0].checkItems?.[0].isCompleted).toBe(true);
+    expect(result[0].checkItems?.[1].autoConfig?.filterExpression).toBe('#旧规则');
+    expect(result[0].checkItems?.[1].isCompleted).toBe(true);
+  });
+
   it('creates a daily review and completes a binary manual check on first NFC scan', () => {
     const result = applyDailyCheckActionForDate({
       dateStr: '2026-03-14',
