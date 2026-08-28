@@ -4,13 +4,14 @@
  * @output Compact optional custom-attribute controls for records and active sessions.
  * @pos Shared record form component
  * @description Matches the existing association selectors with compact outline states, one-line horizontal option rails, and a collapsible section.
+ * @updated 2026-08-28: Orders choice options by their most recent record use, with current selections first.
  * @updated 2026-08-25: Added collapsed state, quick option creation, compact association styling, and horizontal option scrolling.
  * @updated 2026-08-25: Changed the shared record-form section label to English "Attributes".
  */
 import React, { useMemo, useState } from 'react';
 import { Check, ChevronDown, Hash, ListChecks, Plus, TextCursorInput } from 'lucide-react';
 import { Activity, ActivityAttributeDefinition, ActivityAttributeOption, ActivityAttributeValue, Log } from '../types';
-import { getActivityAttributeValue, getSortedActivityAttributes } from '../utils/activityAttributeUtils';
+import { getActivityAttributeValue, getSortedActivityAttributeOptions, getSortedActivityAttributes } from '../utils/activityAttributeUtils';
 
 interface ActivityAttributeFieldsProps {
   activity?: Activity;
@@ -79,24 +80,11 @@ export const ActivityAttributeFields: React.FC<ActivityAttributeFieldsProps> = (
           const selectedSingleOptionId = value && 'optionId' in value ? value.optionId : undefined;
           const selectedMultiOptionIds = value && 'optionIds' in value ? value.optionIds : [];
           const Icon = getAttributeIcon(attribute.type);
-          const visibleOptions = (attribute.options || []).filter((option) => !option.isArchived || (
+          const visibleOptions = getSortedActivityAttributeOptions((attribute.options || []).filter((option) => !option.isArchived || (
             includeReferencedArchived && (selectedSingleOptionId === option.id || selectedMultiOptionIds.includes(option.id))
-          )).sort((left, right) => {
-            const firstUse = (optionId: string) => usageLogs.reduce<number | null>((earliest, log) => {
-              const used = (log.attributeValues || []).some((item) => {
-                if (item.attributeId !== attribute.id) return false;
-                return ('optionId' in item && item.optionId === optionId) || ('optionIds' in item && item.optionIds.includes(optionId));
-              });
-              if (!used) return earliest;
-              return earliest === null ? log.startTime : Math.min(earliest, log.startTime);
-            }, null);
-            const leftTime = firstUse(left.id);
-            const rightTime = firstUse(right.id);
-            if (leftTime === null && rightTime === null) return 0;
-            if (leftTime === null) return 1;
-            if (rightTime === null) return -1;
-            return leftTime - rightTime;
-          });
+          )), usageLogs, attribute.id, attribute.type === 'single'
+            ? (selectedSingleOptionId ? [selectedSingleOptionId] : [])
+            : selectedMultiOptionIds);
 
           return <div key={attribute.id} className="space-y-2">
             <div className="flex items-center gap-2 px-1">
