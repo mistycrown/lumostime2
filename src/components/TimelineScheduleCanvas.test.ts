@@ -10,6 +10,7 @@
  * @updated 2026-07-30: Covers compact two-digit hour-only grid labels and alpha backgrounds for timeline activity colors.
  * @updated 2026-08-09: Covers all-day idle-gap calculation, planned-block exclusion, threshold filtering, and the current-time trailing boundary.
  * @updated 2026-08-12: Covers contiguous schedule blocks staying on one visual track.
+ * @updated 2026-08-28: Covers full-width layout after an overlapping group ends.
  */
 import { describe, expect, test, vi } from 'vitest';
 import { Log, TodoItem } from '../types';
@@ -122,6 +123,20 @@ describe('layoutParallelScheduleBlocks', () => {
     expect(blocks.map(({ id, column, columnCount }) => ({ id, column, columnCount }))).toEqual([
       { id: 'first', column: 0, columnCount: 1 },
       { id: 'second', column: 0, columnCount: 1 }
+    ]);
+  });
+
+  test('restores full width for a contiguous successor after an overlap group ends', () => {
+    const blocks = layoutParallelScheduleBlocks([
+      { id: 'first', startMinutes: 60, endMinutes: 120 },
+      { id: 'overlap', startMinutes: 90, endMinutes: 180 },
+      { id: 'successor', startMinutes: 180, endMinutes: 240 }
+    ]);
+
+    expect(blocks.map(({ id, column, columnCount }) => ({ id, column, columnCount }))).toEqual([
+      { id: 'first', column: 0, columnCount: 2 },
+      { id: 'overlap', column: 1, columnCount: 2 },
+      { id: 'successor', column: 0, columnCount: 1 }
     ]);
   });
 
