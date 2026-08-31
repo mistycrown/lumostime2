@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-08-31: Added optional units and single-choice display conditions to Activity attributes.
  * @updated 2026-08-26: Added optional static notes to Routine steps.
  * @updated 2026-08-26: Added optional UI icon storage for Routine configurations.
  * @updated 2026-08-26: Added Routine step todo and scope associations for cross-domain runs.
@@ -52,11 +53,18 @@ export interface ActivityAttributeOption {
   isArchived?: boolean;
 }
 
+export interface ActivityAttributeDisplayCondition {
+  attributeId: string;
+  optionIds: string[];
+}
+
 export interface ActivityAttributeDefinition {
   id: string;
   name: string;
   type: ActivityAttributeType;
   options?: ActivityAttributeOption[];
+  unit?: string;
+  displayCondition?: ActivityAttributeDisplayCondition;
   order: number;
   isArchived?: boolean;
   createdAt: number;

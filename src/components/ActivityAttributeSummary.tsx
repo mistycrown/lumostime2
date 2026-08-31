@@ -4,6 +4,7 @@
  * @output Compact attribute labels for timeline records.
  * @pos Component (Timeline Metadata)
  * @description Resolves stored attribute and option IDs to their current names so renamed definitions are reflected in history.
+ * @updated 2026-08-31: Displays configured units next to numeric attribute values.
  * @updated 2026-08-25: Added compact attribute rendering below timeline notes.
  * @updated 2026-08-26: Slightly increased timeline attribute text size for readability.
  */
@@ -45,7 +46,8 @@ export const ActivityAttributeSummary: React.FC<ActivityAttributeSummaryProps> =
         return `${name}: ${labels.join('\u3001')}`;
       }
 
-      return `${name}: ${String(value.value)}`;
+      const unit = typeof value.value === 'number' && definition?.unit ? ` ${definition.unit}` : '';
+      return `${name}: ${String(value.value)}${unit}`;
     });
   }, [activity, values]);
 

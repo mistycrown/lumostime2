@@ -1,16 +1,17 @@
 /**
  * @file ActivityAttributeStatistics.tsx
  * @input One Activity and its actual Logs.
- * @output Type-specific attribute distribution and trend visualizations.
+ * @output Type-specific attribute distribution and condition-aware trend visualizations.
  * @pos Activity detail analytics component
  * @description Presents attribute data as a compact editorial report: text terms, choice rankings, numeric KPIs, and trends.
+ * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
 import React, { useMemo, useState } from 'react';
 import { Activity, ActivityAttributeDefinition, ActivityAttributeOption, ActivityAttributeType, ActivityAttributeValue, Log } from '../types';
-import { getSortedActivityAttributes } from '../utils/activityAttributeUtils';
+import { getActivityAttributeValue, getSortedActivityAttributes } from '../utils/activityAttributeUtils';
 
-type StatisticsAttribute = Pick<ActivityAttributeDefinition, 'id' | 'name' | 'type' | 'options'>;
+type StatisticsAttribute = Pick<ActivityAttributeDefinition, 'id' | 'name' | 'type' | 'options' | 'unit' | 'displayCondition'>;
 type RangeKey = 'all' | '7d' | '30d' | 'year';
 
 const RANGE_OPTIONS: Array<{ key: RangeKey; label: string }> = [
@@ -81,6 +82,32 @@ interface TrendPoint {
   key: string;
   value: number;
 }
+
+interface AttributeStatisticSlice {
+  logs: Log[];
+  contextLabel?: string;
+}
+
+const getAttributeStatisticSlices = (
+  attribute: StatisticsAttribute,
+  definitions: StatisticsAttribute[],
+  logs: Log[]
+): AttributeStatisticSlice[] => {
+  const condition = attribute.displayCondition;
+  if (!condition) return [{ logs }];
+
+  const parent = definitions.find((definition) => definition.id === condition.attributeId);
+  return condition.optionIds.map((optionId) => {
+    const option = parent?.options?.find((item) => item.id === optionId);
+    return {
+      contextLabel: `${parent?.name || MISSING_ATTRIBUTE}: ${option?.label || MISSING_OPTION}`,
+      logs: logs.filter((log) => {
+        const parentValue = getActivityAttributeValue(log.attributeValues, condition.attributeId);
+        return Boolean(parentValue && 'optionId' in parentValue && parentValue.optionId === optionId);
+      })
+    };
+  });
+};
 
 const AttributeSection: React.FC<{
   title: string;
@@ -164,8 +191,13 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
         <div className="border-t border-stone-200 pt-8 text-center text-sm text-stone-400">该时间范围内暂无属性数据</div>
       ) : (
         <div className="space-y-8">
-          {attributes.map((attribute) => {
-            const values = filteredLogs.flatMap((log) => (log.attributeValues || []).filter((value) => value.attributeId === attribute.id));
+          {attributes.flatMap((attribute) => getAttributeStatisticSlices(attribute, attributes, filteredLogs).map((slice) => ({ attribute, ...slice }))).map(({ attribute: baseAttribute, logs: attributeLogs, contextLabel }) => {
+            const attributeId = baseAttribute.id;
+            const attribute = contextLabel
+              ? { ...baseAttribute, id: `${baseAttribute.id}-${contextLabel}`, name: `${baseAttribute.name} · ${contextLabel}` }
+              : baseAttribute;
+            const values = attributeLogs.flatMap((log) => (log.attributeValues || []).filter((value) => value.attributeId === attributeId));
+            if (values.length === 0) return null;
             if (attribute.type === 'text') {
               const termCounts = new Map<string, number>();
               values.forEach((value) => {
@@ -193,8 +225,8 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
               if (numbers.length === 0) return null;
               const sum = numbers.reduce((total, value) => total + value, 0);
               const trendMap = new Map<string, number>();
-              filteredLogs.forEach((log) => (log.attributeValues || []).forEach((value) => {
-                if (value.attributeId !== attribute.id || !('value' in value) || typeof value.value !== 'number') return;
+              attributeLogs.forEach((log) => (log.attributeValues || []).forEach((value) => {
+                if (value.attributeId !== attributeId || !('value' in value) || typeof value.value !== 'number') return;
                 const key = getLocalDateKey(log.startTime);
                 trendMap.set(key, (trendMap.get(key) || 0) + value.value);
               }));
@@ -207,13 +239,13 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
               const getChartY = (value: number) => chartBottom - (value / trendMax) * 68;
               const points = trend.map((point, index) => `${getChartX(index)},${getChartY(point.value)}`).join(' ');
               return (
-                <AttributeSection key={attribute.id} title={attribute.name} typeLabel="NUMBER / 数字" count={numbers.length}>
+                <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '数值'}`} count={numbers.length}>
                   <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-stone-200 bg-stone-200 sm:grid-cols-4">
                     {[
-                      ['合计', formatNumber(sum)],
-                      ['平均', formatNumber(sum / numbers.length)],
-                      ['最小', formatNumber(Math.min(...numbers))],
-                      ['最大', formatNumber(Math.max(...numbers))]
+                      ['合计', `${formatNumber(sum)}${attribute.unit ? ` ${attribute.unit}` : ''}`],
+                      ['平均', `${formatNumber(sum / numbers.length)}${attribute.unit ? ` ${attribute.unit}` : ''}`],
+                      ['最小', `${formatNumber(Math.min(...numbers))}${attribute.unit ? ` ${attribute.unit}` : ''}`],
+                      ['最大', `${formatNumber(Math.max(...numbers))}${attribute.unit ? ` ${attribute.unit}` : ''}`]
                     ].map(([label, value]) => <div key={label} className="bg-white px-3 py-3"><div className="text-[10px] text-stone-400">{label}</div><div className="mt-1 font-mono text-base" style={{ color: statisticAccent }}>{value}</div></div>)}
                   </div>
                   {trend.length > 0 && (

@@ -1,9 +1,10 @@
 /**
  * @file activityAttributeUtils.ts
  * @input Activity attribute definitions and ID-based attribute values.
- * @output Attribute value filtering, lookup, and recent-option ordering helpers.
+ * @output Attribute value filtering, lookup, conditional visibility, and recent-option ordering helpers.
  * @pos Shared utility
  * @description Keeps Activity custom attribute values valid as users switch tags or archive definitions.
+ * @updated 2026-08-31: Added single-choice condition matching and stale-value cleanup helpers.
  * @updated 2026-08-28: Added recent-use ordering for choice attribute options.
  * @updated 2026-08-24: Created for Activity custom attributes.
  */
@@ -17,6 +18,40 @@ export const getActivityAttributeValue = (
   values: ActivityAttributeValue[] | undefined,
   attributeId: string
 ): ActivityAttributeValue | undefined => values?.find((item) => item.attributeId === attributeId);
+
+export const isActivityAttributeConditionMet = (
+  attribute: Pick<ActivityAttributeDefinition, 'displayCondition'>,
+  values: ActivityAttributeValue[] | undefined
+): boolean => {
+  const condition = attribute.displayCondition;
+  if (!condition) return true;
+  if (condition.optionIds.length === 0) return false;
+
+  const parentValue = getActivityAttributeValue(values, condition.attributeId);
+  return Boolean(parentValue && 'optionId' in parentValue && condition.optionIds.includes(parentValue.optionId));
+};
+
+export const getVisibleActivityAttributes = (
+  activity: Activity | undefined,
+  values: ActivityAttributeValue[] | undefined,
+  includeReferencedArchived = false
+): ActivityAttributeDefinition[] => getSortedActivityAttributes(activity).filter((attribute) => {
+  const hasStoredValue = Boolean(getActivityAttributeValue(values, attribute.id));
+  if (attribute.isArchived && !(includeReferencedArchived && hasStoredValue)) return false;
+  return isActivityAttributeConditionMet(attribute, values) || (includeReferencedArchived && hasStoredValue);
+});
+
+export const clearInapplicableActivityAttributeValues = (
+  values: ActivityAttributeValue[] | undefined,
+  activity: Activity | undefined
+): ActivityAttributeValue[] => {
+  if (!values || !activity) return [];
+  const definitions = new Map(getSortedActivityAttributes(activity).map((attribute) => [attribute.id, attribute]));
+  return values.filter((value) => {
+    const definition = definitions.get(value.attributeId);
+    return !definition || isActivityAttributeConditionMet(definition, values);
+  });
+};
 
 export const filterAttributeValuesForActivity = (
   values: ActivityAttributeValue[] | undefined,
