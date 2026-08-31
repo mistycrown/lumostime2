@@ -10,10 +10,13 @@
 import { describe, expect, it } from 'vitest';
 import { Activity } from '../types';
 import {
+  clearInapplicableActivityAttributeValues,
   filterAttributeValuesForActivity,
   getActivityAttributeValue,
   getSortedActivityAttributeOptions,
-  getSortedActivityAttributes
+  getSortedActivityAttributes,
+  getVisibleActivityAttributes,
+  isActivityAttributeConditionMet
 } from './activityAttributeUtils';
 
 const activity: Activity = {
@@ -79,6 +82,48 @@ describe('activityAttributeUtils', () => {
 
     expect(getSortedActivityAttributeOptions(options, logs, 'format', ['paper']).map((option) => option.id)).toEqual([
       'paper', 'article', 'book'
+    ]);
+  });
+
+  it('shows a conditional field only after its parent single choice is selected', () => {
+    const conditionalActivity: Activity = {
+      id: 'exercise',
+      name: 'Exercise',
+      icon: 'run',
+      color: 'bg-green-100',
+      attributes: [
+        { id: 'kind', name: 'Kind', type: 'single', options: [{ id: 'jump', label: 'Jump rope' }, { id: 'run', label: 'Run' }], order: 0, createdAt: 1, updatedAt: 1 },
+        { id: 'reps', name: 'Reps', type: 'number', unit: 'reps', displayCondition: { attributeId: 'kind', optionIds: ['jump'] }, order: 1, createdAt: 1, updatedAt: 1 }
+      ]
+    };
+    const reps = conditionalActivity.attributes?.[1];
+    if (!reps) throw new Error('Missing conditional test attribute');
+
+    expect(isActivityAttributeConditionMet(reps, [{ attributeId: 'kind', optionId: 'jump' }])).toBe(true);
+    expect(isActivityAttributeConditionMet(reps, [{ attributeId: 'kind', optionId: 'run' }])).toBe(false);
+    expect(getVisibleActivityAttributes(conditionalActivity, [{ attributeId: 'kind', optionId: 'jump' }]).map((attribute) => attribute.id)).toEqual(['kind', 'reps']);
+    expect(getVisibleActivityAttributes(conditionalActivity, [{ attributeId: 'kind', optionId: 'run' }]).map((attribute) => attribute.id)).toEqual(['kind']);
+  });
+
+  it('keeps stored conditional fields visible during historical editing and removes them after their parent changes', () => {
+    const conditionalActivity: Activity = {
+      id: 'exercise',
+      name: 'Exercise',
+      icon: 'run',
+      color: 'bg-green-100',
+      attributes: [
+        { id: 'kind', name: 'Kind', type: 'single', options: [{ id: 'jump', label: 'Jump rope' }, { id: 'run', label: 'Run' }], order: 0, createdAt: 1, updatedAt: 1 },
+        { id: 'reps', name: 'Reps', type: 'number', displayCondition: { attributeId: 'kind', optionIds: ['jump'] }, order: 1, createdAt: 1, updatedAt: 1 }
+      ]
+    };
+    const changedValues = [
+      { attributeId: 'kind', optionId: 'run' },
+      { attributeId: 'reps', value: 200 }
+    ];
+
+    expect(getVisibleActivityAttributes(conditionalActivity, changedValues, true).map((attribute) => attribute.id)).toEqual(['kind', 'reps']);
+    expect(clearInapplicableActivityAttributeValues(changedValues, conditionalActivity)).toEqual([
+      { attributeId: 'kind', optionId: 'run' }
     ]);
   });
 });

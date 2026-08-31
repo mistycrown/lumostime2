@@ -4,6 +4,7 @@
  * @output Compact optional custom-attribute controls for records and active sessions.
  * @pos Shared record form component
  * @description Matches the existing association selectors with compact outline states, one-line horizontal option rails, and a collapsible section.
+ * @updated 2026-08-31: Shows single-choice conditional fields and confirms cleanup when parent selections change.
  * @updated 2026-08-28: Orders choice options by their most recent record use, with current selections first.
  * @updated 2026-08-25: Added collapsed state, quick option creation, compact association styling, and horizontal option scrolling.
  * @updated 2026-08-25: Changed the shared record-form section label to English "Attributes".
@@ -11,7 +12,8 @@
 import React, { useMemo, useState } from 'react';
 import { Check, ChevronDown, Hash, ListChecks, Plus, TextCursorInput } from 'lucide-react';
 import { Activity, ActivityAttributeDefinition, ActivityAttributeOption, ActivityAttributeValue, Log } from '../types';
-import { getActivityAttributeValue, getSortedActivityAttributeOptions, getSortedActivityAttributes } from '../utils/activityAttributeUtils';
+import { clearInapplicableActivityAttributeValues, getActivityAttributeValue, getSortedActivityAttributeOptions, getVisibleActivityAttributes } from '../utils/activityAttributeUtils';
+import { ConfirmModal } from './ConfirmModal';
 
 interface ActivityAttributeFieldsProps {
   activity?: Activity;
@@ -20,6 +22,11 @@ interface ActivityAttributeFieldsProps {
   onActivityChange?: (activity: Activity) => void;
   usageLogs?: Log[];
   includeReferencedArchived?: boolean;
+}
+
+interface PendingConditionChange {
+  values: ActivityAttributeValue[];
+  clearedCount: number;
 }
 
 const getAttributeIcon = (type: ActivityAttributeDefinition['type']) => {
@@ -39,14 +46,29 @@ export const ActivityAttributeFields: React.FC<ActivityAttributeFieldsProps> = (
   const [isExpanded, setIsExpanded] = useState(true);
   const [addingOptionAttributeId, setAddingOptionAttributeId] = useState<string | null>(null);
   const [optionDraft, setOptionDraft] = useState('');
-  const attributes = useMemo(() => getSortedActivityAttributes(activity).filter((attribute) => {
-    if (!attribute.isArchived) return true;
-    return includeReferencedArchived && values.some((value) => value.attributeId === attribute.id);
-  }), [activity, includeReferencedArchived, values]);
+  const [pendingConditionChange, setPendingConditionChange] = useState<PendingConditionChange | null>(null);
+  const attributes = useMemo(
+    () => getVisibleActivityAttributes(activity, values, includeReferencedArchived),
+    [activity, includeReferencedArchived, values]
+  );
 
   const replaceValue = (attributeId: string, nextValue?: ActivityAttributeValue) => {
     const remaining = values.filter((item) => item.attributeId !== attributeId);
     onChange(nextValue ? [...remaining, nextValue] : remaining);
+  };
+
+  const replaceSingleChoiceValue = (attributeId: string, nextValue?: ActivityAttributeValue) => {
+    const remaining = values.filter((item) => item.attributeId !== attributeId);
+    const nextValues = nextValue ? [...remaining, nextValue] : remaining;
+    const cleanedValues = clearInapplicableActivityAttributeValues(nextValues, activity);
+    const clearedCount = nextValues.length - cleanedValues.length;
+
+    if (clearedCount > 0) {
+      setPendingConditionChange({ values: cleanedValues, clearedCount });
+      return;
+    }
+
+    onChange(nextValues);
   };
 
   const addOption = (attribute: ActivityAttributeDefinition) => {
@@ -89,7 +111,7 @@ export const ActivityAttributeFields: React.FC<ActivityAttributeFieldsProps> = (
           return <div key={attribute.id} className="space-y-2">
             <div className="flex items-center gap-2 px-1">
               <Icon size={13} className="text-stone-400" />
-              <label className="text-xs font-bold text-stone-400 uppercase tracking-wider">{attribute.name}</label>
+              <label className="text-xs font-bold text-stone-400 uppercase tracking-wider">{attribute.name}{attribute.unit ? ` (${attribute.unit})` : ''}</label>
               {attribute.isArchived && <span className="text-[10px] text-stone-300">{'\u5df2\u5f52\u6863'}</span>}
               {(attribute.type === 'single' || attribute.type === 'multi') && onActivityChange && !attribute.isArchived && <button type="button" onClick={() => { setAddingOptionAttributeId(attribute.id); setOptionDraft(''); }} className="ml-auto inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] text-stone-400 hover:bg-stone-100 hover:text-stone-700" title={'\u5feb\u901f\u6dfb\u52a0\u9009\u9879'}><Plus size={12} />{'\u6dfb\u52a0'}</button>}
             </div>
@@ -102,7 +124,16 @@ export const ActivityAttributeFields: React.FC<ActivityAttributeFieldsProps> = (
                 {visibleOptions.map((option) => {
                   const isSelected = attribute.type === 'single' ? selectedSingleOptionId === option.id : selectedMultiOptionIds.includes(option.id);
                   const nextOptionIds = isSelected ? selectedMultiOptionIds.filter((id) => id !== option.id) : [...selectedMultiOptionIds, option.id];
-                  return <button key={option.id} type="button" onClick={() => replaceValue(attribute.id, attribute.type === 'single' ? (isSelected ? undefined : { attributeId: attribute.id, optionId: option.id }) : (nextOptionIds.length > 0 ? { attributeId: attribute.id, optionIds: nextOptionIds } : undefined))} aria-pressed={isSelected} className={`association-option-button shrink-0 !min-h-0 !min-w-fit !px-2.5 !py-1.5 ${isSelected ? 'record-association-selected border-stone-700 text-stone-800' : 'bg-transparent border-stone-200 text-stone-500 hover:bg-stone-100'}`}>
+                  return <button key={option.id} type="button" onClick={() => {
+                    const nextValue = attribute.type === 'single'
+                      ? (isSelected ? undefined : { attributeId: attribute.id, optionId: option.id })
+                      : (nextOptionIds.length > 0 ? { attributeId: attribute.id, optionIds: nextOptionIds } : undefined);
+                    if (attribute.type === 'single') {
+                      replaceSingleChoiceValue(attribute.id, nextValue);
+                      return;
+                    }
+                    replaceValue(attribute.id, nextValue);
+                  }} aria-pressed={isSelected} className={`association-option-button shrink-0 !min-h-0 !min-w-fit !px-2.5 !py-1.5 ${isSelected ? 'record-association-selected border-stone-700 text-stone-800' : 'bg-transparent border-stone-200 text-stone-500 hover:bg-stone-100'}`}>
                     {isSelected && <Check size={11} />}{option.label}
                   </button>;
                 })}
@@ -115,6 +146,18 @@ export const ActivityAttributeFields: React.FC<ActivityAttributeFieldsProps> = (
           </div>;
         })}
       </div>}
+      <ConfirmModal
+        isOpen={pendingConditionChange !== null}
+        onClose={() => setPendingConditionChange(null)}
+        onConfirm={() => {
+          if (pendingConditionChange) onChange(pendingConditionChange.values);
+          setPendingConditionChange(null);
+        }}
+        title={'\u66f4\u6539\u9009\u9879'}
+        description={pendingConditionChange ? `\u66f4\u6539\u9009\u9879\u4f1a\u6e05\u9664 ${pendingConditionChange.clearedCount} \u4e2a\u5df2\u4e0d\u9002\u7528\u7684\u586b\u5199\u9879\u3002` : ''}
+        confirmText={'\u7ee7\u7eed\u5e76\u6e05\u9664'}
+        type="warning"
+      />
     </section>
   );
 };
