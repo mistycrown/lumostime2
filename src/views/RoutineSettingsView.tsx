@@ -14,6 +14,7 @@
  * @updated 2026-08-26: Lets hardware back return from an editor to the Routine list and gives each selector a compact title/clear header.
  * @updated 2026-08-26: Splits step association and ordering actions into responsive rows on narrow screens.
  * @updated 2026-08-27: Keeps Routine checklist completion markers neutral gray across themes.
+ * @updated 2026-09-02: Requires confirmation before deleting a Routine from the editor.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronRight, Plus, Trash2, X } from 'lucide-react';
@@ -24,6 +25,7 @@ import { TagAssociation } from '../components/TagAssociation';
 import { ScopeAssociation } from '../components/ScopeAssociation';
 import { TodoAssociation } from '../components/TodoAssociation';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { useSettings } from '../contexts/SettingsContext';
 import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
 import { addRoutineChecklistItem, parseRoutineChecklist, serializeRoutineChecklist, updateRoutineChecklistItem } from '../utils/routineChecklist';
@@ -176,19 +178,24 @@ export const RoutineSettingsView: React.FC<RoutineSettingsViewProps> = ({
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
   const [expandedPicker, setExpandedPicker] = useState<'activity' | 'scope' | 'todo' | 'checklist' | null>(null);
   const [isUIIconSelectorOpen, setIsUIIconSelectorOpen] = useState(false);
+  const [pendingDeleteRoutineId, setPendingDeleteRoutineId] = useState<string | null>(null);
   const editingRoutine = editingId ? routines.find(routine => routine.id === editingId) : undefined;
 
   useEffect(() => {
     if (!editingId) return;
 
     return registerHardwareBackHandler(() => {
+      if (pendingDeleteRoutineId) {
+        setPendingDeleteRoutineId(null);
+        return true;
+      }
       setEditingId(null);
       setExpandedStepId(null);
       setExpandedPicker(null);
       setIsUIIconSelectorOpen(false);
       return true;
     });
-  }, [editingId]);
+  }, [editingId, pendingDeleteRoutineId]);
 
   const beginCreate = () => {
     const category = activeCategories[0];
@@ -517,10 +524,26 @@ export const RoutineSettingsView: React.FC<RoutineSettingsViewProps> = ({
               {editingRoutine.steps.length === 0 && <div className="rounded-xl border border-dashed border-stone-300 py-8 text-center text-sm text-stone-400">添加至少一个活动步骤</div>}
             </section>
 
-            <button type="button" onClick={() => deleteRoutine(editingRoutine.id)} className="flex items-center gap-2 text-sm text-rose-600 outline-none hover:text-rose-700 focus:outline-none focus:ring-0"><Trash2 size={16} /> 删除 Routine</button>
+            <button type="button" onClick={() => setPendingDeleteRoutineId(editingRoutine.id)} className="flex items-center gap-2 text-sm text-rose-600 outline-none hover:text-rose-700 focus:outline-none focus:ring-0"><Trash2 size={16} /> 删除 Routine</button>
           </div>
         )}
       </main>
+
+      <ConfirmModal
+        isOpen={pendingDeleteRoutineId !== null}
+        onClose={() => setPendingDeleteRoutineId(null)}
+        onConfirm={() => {
+          if (pendingDeleteRoutineId) {
+            deleteRoutine(pendingDeleteRoutineId);
+          }
+          setPendingDeleteRoutineId(null);
+        }}
+        title="删除 Routine"
+        description="确定要删除这个 Routine 吗？此操作无法撤销。"
+        confirmText="删除"
+        cancelText="取消"
+        type="danger"
+      />
     </div>
   );
 };
