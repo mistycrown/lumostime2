@@ -1,5 +1,6 @@
 /**
  * @file TagDetailView.tsx
+ * @updated 2026-09-02: Debounced activity auto-save so attribute text inputs remain focused while typing.
  * @updated 2026-08-25: Refined Activity attribute management, deletion cleanup, and compact record-style controls.
  * @updated 2026-08-26: Displays the current archive status beside the tag archive/restore action.
  * @updated 2026-08-24: Added Activity custom attribute definition management and base attribute statistics.
@@ -83,7 +84,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false); // State for category dropdown
    const customColors = useCustomColors();
 
-   // 实时保存：当 activity 状态变化时自动保存
+   // 自动保存：为连续输入增加短暂防抖，避免每个按键都触发父级数据重建。
    useEffect(() => {
       if (activity && initialActivity) {
          // 检查是否有实际变化
@@ -102,7 +103,8 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
             JSON.stringify(activity.attributes || []) !== JSON.stringify(initialActivity.attributes || []);
          
          if (hasChanges) {
-            onUpdateActivity(activity);
+            const saveTimer = window.setTimeout(() => onUpdateActivity(activity), 300);
+            return () => window.clearTimeout(saveTimer);
          }
       }
    }, [activity]); // 只监听 activity 变化
