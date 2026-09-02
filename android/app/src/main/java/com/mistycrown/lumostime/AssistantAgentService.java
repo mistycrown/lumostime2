@@ -10,6 +10,7 @@
  * @updated 2026-05-15: Remove a native reminder immediately after it has been persisted as a pending `reminder_due` trigger so background retries do not re-dispatch the same completed reminder every minute.
  * @updated 2026-05-14: Changed Android reminder alarms to dispatch one metadata-rich `reminder_due` trigger back to the Web layer, preserving the local-offset request path and preventing duplicate native-plus-web AI reminder runs.
  * @updated 2026-09-02: Executes due reminders directly through the native background AI executor when its config and snapshot are ready, consuming reminders only after a successful request and retaining Web fallback retries otherwise.
+ * @updated 2026-09-02: Executes due assistant letters through the same native executor lifecycle so a suspended WebView cannot consume the scheduled letter before an AI request succeeds.
  * @updated 2026-05-13: Moved next due-reminder wakeups onto AlarmManager-backed service wakeups so reminder_due dispatch no longer depends on in-process Handler delays while the device is idle.
  * @updated 2026-05-11: Split due-reminder scheduling off the coarse base poll so reminders can fire at their exact next eligible time instead of waiting for the next 5-minute sweep.
  * @updated 2026-05-09: Refreshes the shared persistent notification title once per second while active focus timers exist so timer durations stay live during assistant-only foreground runtime.
@@ -76,6 +77,7 @@ public class AssistantAgentService extends Service {
     private long lastTaskStateChangedAtMs = 0L;
     private long lastAssistantNudgeAtMs = 0L;
     private final Set<String> nativeReminderRequestsInFlight = new HashSet<>();
+    private boolean nativeLetterRequestInFlight = false;
     private final Runnable notificationRefreshRunnable = new Runnable() {
         @Override
         public void run() {
@@ -411,6 +413,8 @@ public class AssistantAgentService extends Service {
         handler.removeCallbacks(reminderDispatchRunnable);
         handler.removeCallbacks(letterDispatchRunnable);
         handler.removeCallbacks(notificationRefreshRunnable);
+        nativeReminderRequestsInFlight.clear();
+        nativeLetterRequestInFlight = false;
         AssistantReminderAlarmScheduler.cancel(this);
         AssistantLetterAlarmScheduler.cancel(this);
         nextReminderDispatchAtMs = 0L;
@@ -552,6 +556,57 @@ public class AssistantAgentService extends Service {
         metadata.put("scheduledFor", normalizedNextLetterAt);
         metadata.put("actualDispatchAt", attemptedAt);
         metadata.put("delayMinutes", Math.max(0L, Math.round((nowMs - dueAtMs) / 60000.0)));
+
+        if (AssistantNativeBackgroundExecutor.canExecute(this) && !nativeLetterRequestInFlight) {
+            nativeLetterRequestInFlight = true;
+            org.json.JSONObject triggerPayload = AssistantNativeBackgroundExecutor.buildTriggerPayload(
+                triggerId,
+                "assistant_letter_due",
+                "Scheduled assistant letter is due",
+                "system"
+            );
+            try {
+                triggerPayload.put("metadata", metadata);
+            } catch (org.json.JSONException ignored) {
+            }
+
+            AssistantNativeBackgroundExecutor.executeAsync(
+                this,
+                triggerPayload,
+                new AssistantNativeBackgroundExecutor.ExecutionCallback() {
+                    @Override
+                    public void onCompleted() {
+                        lastLetterDispatchedFor = normalizedNextLetterAt;
+                        prefs().edit().putString(KEY_LAST_LETTER_DISPATCHED_FOR, lastLetterDispatchedFor).apply();
+                        handler.post(() -> {
+                            nativeLetterRequestInFlight = false;
+                            scheduleNextAssistantLetterDispatch(System.currentTimeMillis());
+                            syncUnifiedStatusNotification();
+                        });
+                    }
+
+                    @Override
+                    public void onFailed() {
+                        handler.post(() -> {
+                            nativeLetterRequestInFlight = false;
+                            scheduleNextAssistantLetterDispatch(System.currentTimeMillis());
+                            syncUnifiedStatusNotification();
+                        });
+                    }
+                }
+            );
+
+            appendDiagnostic(
+                "assistant_letter_due_dispatched",
+                "success",
+                "Native poll dispatched an assistant_letter_due trigger to the native AI executor",
+                triggerId,
+                "assistant_letter_due",
+                null,
+                buildPollDiagnosticContext(nowMs)
+            );
+            return;
+        }
 
         triggerId = AssistantAgentPlugin.dispatchSystemTrigger(
             this,

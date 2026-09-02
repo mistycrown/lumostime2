@@ -5,6 +5,7 @@
  * @pos Service (Assistant Orchestrator)
  * @description Orchestrates Android-first assistant system turns by loading structured memory, assembling a prompt, calling the existing AI service, and applying the resulting silent/message/reminder/memory actions back into local state.
  * @updated 2026-05-17: Persisted background chat/history writes now mark the unified AI backup state as changed so background-only AI activity can trigger cloud-sync/export timestamp updates.
+ * @updated 2026-09-02: Hydrates native request failures into background call history so failed Android executions remain visible after the WebView resumes.
  *
  * @updated 2026-05-16: Fixed submitted-log debug labels and normalized fallback assistant-notification titles to readable `AI 助理` text.
  * @updated 2026-05-14: Persisted provider-native reasoning summaries alongside surfaced background assistant messages so foreground and background chat entries share the same collapsible thinking payload shape.
@@ -742,7 +743,7 @@ export const assistantOrchestratorService = {
     let didUpdateReminders = false;
 
     diagnostics
-      .filter((entry) => entry.type === 'native_request_completed')
+      .filter((entry) => entry.type === 'native_request_completed' || entry.type === 'native_request_failed')
       .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt))
       .forEach((entry) => {
         const triggerId = entry.triggerId?.trim();
@@ -751,6 +752,26 @@ export const assistantOrchestratorService = {
         }
 
         knownTriggerIds.add(triggerId);
+        if (entry.type === 'native_request_failed') {
+          upsertBackgroundCallHistory({
+            id: buildNativeHydratedHistoryId(triggerId),
+            triggerId,
+            triggerType: entry.triggerType || 'checkin',
+            triggerText: buildNativeTriggerText(entry.triggerType),
+            ...(options?.targetSessionId ? { targetSessionId: options.targetSessionId } : {}),
+            requestedAt: normalizeAssistantText(entry.context?.requestedAt) || entry.createdAt,
+            completedAt: entry.createdAt,
+            status: 'failed',
+            action: 'silent',
+            memoryAction: 'no_update',
+            reminderCount: 0,
+            errorMessage: normalizeAssistantText(entry.context?.error) || entry.message,
+            debugExchange: buildNativeDiagnosticDebugExchange(entry)
+          });
+          didHydrateHistory = true;
+          return;
+        }
+
         const assistantReply = normalizeAssistantText(entry.context?.assistantReply);
         const decisionSummary = normalizeAssistantText(entry.context?.decisionSummary);
         const requestedAt = normalizeAssistantText(entry.context?.requestedAt) || entry.createdAt;

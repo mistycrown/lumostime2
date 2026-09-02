@@ -6,6 +6,7 @@
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
  * @updated 2026-07-31: Added a pending-message-id fallback cleanup so completed foreground turns always restore the composer send button.
  * @updated 2026-09-02: Keeps fallback system triggers pending until Web execution succeeds and surfaces native skip/request states in background history.
+ * @updated 2026-09-02: Always persists a usable native background prompt, even when no recent ordinary chat session is available for routing.
  * @updated 2026-07-31: Wired foreground `create_planned_log` tool calls into local timeline Plan creation, rendering, and undo.
  * @updated 2026-08-24: Added in-place foreground reply retry that rolls back applied tool actions before regenerating the response.
  * @updated 2026-07-21: Kept the composer Stop state tied to the active foreground request so ordinary requests remain cancellable even if a loading branch resets early.
@@ -2210,17 +2211,22 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return;
     }
 
-    if (trigger.type === 'reminder_due') {
+    if (trigger.type === 'reminder_due' || trigger.type === 'assistant_letter_due') {
       const reminderId = typeof trigger.metadata?.reminderId === 'string'
         ? trigger.metadata.reminderId.trim()
         : triggerId.startsWith('reminder_due:')
           ? triggerId.slice('reminder_due:'.length).split(':')[0]
           : '';
-      if (reminderId) {
+      const nativeTriggerId = trigger.type === 'assistant_letter_due'
+        ? triggerId
+        : reminderId
+          ? `reminder_due:${reminderId}`
+          : '';
+      if (nativeTriggerId) {
         try {
           const diagnosticResult = await AssistantAgent.listDiagnostics();
           const nativeAlreadyHandling = normalizeAssistantNativeDiagnostics(diagnosticResult.entries)
-            .some((entry) => entry.triggerId === `reminder_due:${reminderId}`
+            .some((entry) => entry.triggerId === nativeTriggerId
               && (entry.type === 'native_request_started' || entry.type === 'native_request_completed'));
           if (nativeAlreadyHandling) {
             await AssistantAgent.acknowledgeSystemTrigger({ id: triggerId });
@@ -2250,16 +2256,22 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     void refreshAssistantNativeDiagnostics();
 
     const targetSession = getBackgroundTargetSession();
-    if (!targetSession) {
+    if (!targetSession && trigger.type !== 'reminder_due') {
       console.info('[AIBackfillChatModal] Skipping assistant system trigger because no ordinary conversation has recent user activity', trigger);
       processingAssistantTriggerIdsRef.current.delete(triggerId);
       return;
     }
 
-    const conversationHistory = conversationHistoryCache.get(targetSession.id) || [];
+    const conversationHistory = targetSession
+      ? conversationHistoryCache.get(targetSession.id) || []
+      : [];
 
     try {
       if (trigger.type === 'assistant_letter_due') {
+        if (!targetSession) {
+          processingAssistantTriggerIdsRef.current.delete(triggerId);
+          return;
+        }
         const result = await runBackgroundAssistantLetter(trigger, targetSession, conversationHistory, { now: new Date() });
         if (!result) {
           processingAssistantTriggerIdsRef.current.delete(triggerId);
@@ -2453,17 +2465,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
     try {
       const targetSession = getBackgroundTargetSession();
-      if (!targetSession) {
-        await AssistantAgent.syncNativeBackgroundSnapshot({
-          systemPrompt: '',
-          conversation: assistantContextBuilder.buildConversationContext([])
-        });
-        return;
-      }
-
-      const conversationHistory = conversationHistoryCache.get(targetSession.id) || [];
+      const conversationHistory = targetSession
+        ? conversationHistoryCache.get(targetSession.id) || []
+        : [];
       const reminderSummary = buildAssistantReminderSummary();
-      const userPersonaPrompt = buildBackgroundPersonaPrompt(targetSession);
+      const userPersonaPrompt = targetSession ? buildBackgroundPersonaPrompt(targetSession) : '';
       const now = new Date();
       const stateContext = buildAssistantStateContext(now, reminderSummary);
       const [basePrompt, backgroundModePrompt] = await Promise.all([
