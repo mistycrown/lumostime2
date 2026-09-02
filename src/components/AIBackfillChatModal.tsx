@@ -734,7 +734,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const hasCompletedStartupReminderCatchupRef = useRef(false);
   const visualViewportBaselineRef = useRef<{ height: number; width: number }>({ height: 0, width: 0 });
 
-  const { logs, setLogs, todos, setTodos, todoCategories, isReady: isDataReady, usesFallbackSeedData } = useData();
+  const { logs, setLogs, todos, setTodos, todoCategories, isReady: isDataReady } = useData();
   const {
     dailyReviews,
     setDailyReviews,
@@ -797,8 +797,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const defaultDateKey = useMemo(() => formatDateKey(defaultTargetDate), [defaultTargetDate]);
   const isAssistantBackgroundContextReady = isDataReady
     && isReviewReady
-    && isCategoryScopeReady
-    && !usesFallbackSeedData;
+    && isCategoryScopeReady;
   const personaMap = useMemo(() => new Map(personas.map((persona) => [persona.id, persona])), [personas]);
   const assistantAgentIntervalErrors = useMemo(
     () => validateAssistantAgentIntervalDrafts(assistantAgentIntervalDrafts),
