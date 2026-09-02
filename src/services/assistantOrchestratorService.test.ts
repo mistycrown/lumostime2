@@ -203,6 +203,49 @@ describe('assistantOrchestratorService', () => {
     expect(AssistantAgent.showAssistantNotification).not.toHaveBeenCalled();
   });
 
+  it('does not surface stray reply text when the model explicitly chooses silent', async () => {
+    localStorage.setItem('lumostime_ai_chat_sessions_v1', JSON.stringify([{
+      id: 'session-silent-web',
+      title: 'Silent web test',
+      createdAt: 1,
+      updatedAt: 1,
+      personaId: 'persona-1',
+      contextCacheEnabled: true,
+      messages: []
+    }]));
+    vi.mocked(assistantTurnService.runUnifiedTurn).mockResolvedValue({
+      output: {
+        mode: 'background',
+        outcome: 'silent',
+        assistantReply: 'This text must not be surfaced.',
+        memoryAction: 'no_update',
+        decisionSummary: 'The assistant chose not to interrupt.'
+      },
+      debug: debugExchange
+    });
+
+    const result = await assistantOrchestratorService.runSystemTurn({
+      trigger: {
+        id: 'trigger-silent-web',
+        type: 'checkin',
+        source: 'system',
+        createdAt: '2026-04-27T10:00:00.000Z',
+        text: 'check in'
+      },
+      targetSessionId: 'session-silent-web',
+      showSystemNotification: true,
+      currentDateTime: '2026-04-27T18:00:00+08:00',
+      defaultDate: '2026-04-27',
+      todayTimelineSummary: 'timeline'
+    });
+
+    expect(result.decision.action).toBe('silent');
+    expect(result.decision.message).toBeUndefined();
+    expect(AssistantAgent.showAssistantNotification).not.toHaveBeenCalled();
+    const persistedSessions = JSON.parse(localStorage.getItem('lumostime_ai_chat_sessions_v1') || '[]');
+    expect(persistedSessions[0].messages).toHaveLength(0);
+  });
+
   it('builds a fallback silent summary when the model omits one', async () => {
     const enqueuedReminder: AssistantReminder = {
       id: 'reminder-1',
@@ -560,6 +603,44 @@ describe('assistantOrchestratorService', () => {
       body: '记得回来告诉我进展。',
       targetSessionId: 'session-1'
     }));
+  });
+
+  it('does not hydrate or notify stray reply text from an explicit native silent outcome', () => {
+    localStorage.setItem('lumostime_ai_chat_sessions_v1', JSON.stringify([{
+      id: 'session-silent-native',
+      title: 'Silent native test',
+      createdAt: 1,
+      updatedAt: 1,
+      personaId: 'persona-1',
+      contextCacheEnabled: true,
+      messages: []
+    }]));
+
+    const hydration = assistantOrchestratorService.hydrateNativeCompletedReplies([{
+      id: 'diagnostic-silent-native',
+      type: 'native_request_completed',
+      level: 'success',
+      createdAt: '2026-05-01T10:10:00.000+08:00',
+      message: 'Native background AI request completed',
+      triggerId: 'native-trigger-silent',
+      triggerType: 'checkin',
+      context: {
+        requestedAt: '2026-05-01T10:09:58.000+08:00',
+        completedAt: '2026-05-01T10:10:00.000+08:00',
+        outcome: 'silent',
+        assistantReply: 'This text must not be surfaced.',
+        decisionSummary: 'The assistant chose not to interrupt.'
+      }
+    }], {
+      targetSessionId: 'session-silent-native',
+      showSystemNotification: true
+    });
+
+    expect(hydration.surfacedMessages).toEqual([]);
+    expect(AssistantAgent.showAssistantNotification).not.toHaveBeenCalled();
+    const persistedSessions = JSON.parse(localStorage.getItem('lumostime_ai_chat_sessions_v1') || '[]');
+    expect(persistedSessions[0].messages).toHaveLength(0);
+    expect(assistantOrchestratorService.listBackgroundCallHistory()[0].action).toBe('silent');
   });
 
   it('ignores null-like native assistant replies during hydration', () => {

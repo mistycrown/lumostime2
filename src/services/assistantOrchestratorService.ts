@@ -6,6 +6,7 @@
  * @description Orchestrates Android-first assistant system turns by loading structured memory, assembling a prompt, calling the existing AI service, and applying the resulting silent/message/reminder/memory actions back into local state.
  * @updated 2026-05-17: Persisted background chat/history writes now mark the unified AI backup state as changed so background-only AI activity can trigger cloud-sync/export timestamp updates.
  * @updated 2026-09-02: Hydrates native request failures into background call history so failed Android executions remain visible after the WebView resumes.
+ * @updated 2026-09-02: Treats explicit silent outcomes as non-user-facing even if a provider also returns stray assistantReply text, preventing native and Web notification leaks.
  *
  * @updated 2026-05-16: Fixed submitted-log debug labels and normalized fallback assistant-notification titles to readable `AI 助理` text.
  * @updated 2026-05-14: Persisted provider-native reasoning summaries alongside surfaced background assistant messages so foreground and background chat entries share the same collapsible thinking payload shape.
@@ -772,7 +773,9 @@ export const assistantOrchestratorService = {
           return;
         }
 
-        const assistantReply = normalizeAssistantText(entry.context?.assistantReply);
+        const nativeOutcome = normalizeAssistantText(entry.context?.outcome);
+        const rawAssistantReply = normalizeAssistantText(entry.context?.assistantReply);
+        const assistantReply = nativeOutcome === 'silent' ? '' : rawAssistantReply;
         const decisionSummary = normalizeAssistantText(entry.context?.decisionSummary);
         const requestedAt = normalizeAssistantText(entry.context?.requestedAt) || entry.createdAt;
         const completedAt = normalizeAssistantText(entry.context?.completedAt) || entry.createdAt;
@@ -1004,12 +1007,12 @@ export const assistantOrchestratorService = {
       ? buildAssistantDisplayParts(replyContent)
       : undefined;
     let memoryUpdates: PersistedAIChatMemoryUpdateSection[] = [];
-    const hasVisibleReply = Boolean(replyContent);
+    const hasVisibleReply = output.outcome === 'reply' && Boolean(replyContent);
     const decision: AssistantSystemTurnDecision = {
       action: hasVisibleReply ? 'send_message' : 'silent',
       memoryAction: output.memoryAction,
-      ...(replyContent ? { message: replyContent } : {}),
-      ...(messageParts?.length ? { messageParts } : {}),
+      ...(hasVisibleReply ? { message: replyContent } : {}),
+      ...(hasVisibleReply && messageParts?.length ? { messageParts } : {}),
       ...(reminders.length > 0 ? { reminders } : {}),
       ...(output.memoryAction === 'update_memory' && output.memoryPatch ? { memoryPatch: output.memoryPatch } : {}),
       ...(output.silentReason ? { silentReason: output.silentReason } : {})
