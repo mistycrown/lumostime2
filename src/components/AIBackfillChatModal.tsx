@@ -5,6 +5,7 @@
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
  * @updated 2026-07-31: Added a pending-message-id fallback cleanup so completed foreground turns always restore the composer send button.
+ * @updated 2026-09-02: Keeps fallback system triggers pending until Web execution succeeds and surfaces native skip/request states in background history.
  * @updated 2026-07-31: Wired foreground `create_planned_log` tool calls into local timeline Plan creation, rendering, and undo.
  * @updated 2026-08-24: Added in-place foreground reply retry that rolls back applied tool actions before regenerating the response.
  * @updated 2026-07-21: Kept the composer Stop state tied to the active foreground request so ordinary requests remain cancellable even if a loading branch resets early.
@@ -728,6 +729,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   }, []);
   const handledNavigationKeyRef = useRef('');
   const handledAssistantTriggerIdsRef = useRef<Set<string>>(new Set());
+  const processingAssistantTriggerIdsRef = useRef<Set<string>>(new Set());
   const hasCompletedStartupReminderCatchupRef = useRef(false);
   const visualViewportBaselineRef = useRef<{ height: number; width: number }>({ height: 0, width: 0 });
 
@@ -1018,12 +1020,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const shouldUseNativeReminderTriggerDispatch = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
   const assistantBackgroundTimeline = useMemo<AssistantBackgroundTimelineEntry[]>(() => {
     const visibleNativeWakeEvents = assistantNativeDiagnostics.filter((entry) => (
-      entry.type === 'checkin_dispatched'
+      entry.type === 'checkin_skipped'
+      || entry.type === 'checkin_dispatched'
       || entry.type === 'manual_trigger_dispatched'
       || entry.type === 'reminder_due_dispatched'
+      || entry.type === 'native_request_skipped'
     ));
     const nativeRequestEvents = assistantNativeDiagnostics.filter((entry) => (
       entry.type === 'native_request_started'
+      || entry.type === 'native_request_skipped'
       || entry.type === 'native_request_completed'
       || entry.type === 'native_request_failed'
     ));
@@ -1068,6 +1073,20 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           outcomeSummary: entry.context?.decisionSummary || '原生后台请求已完成',
           message: entry.context?.assistantReply || undefined,
           ...(debugExchange ? { debugExchange } : {})
+        });
+        return;
+      }
+
+      if (entry.type === 'native_request_skipped') {
+        nativeRequestByTriggerId.set(triggerId, {
+          ...current,
+          startedAt: current.startedAt || entry.context?.requestedAt,
+          completedAt: entry.createdAt,
+          status: 'not_started',
+          outcomeSummary: entry.reason === 'native_ai_unavailable'
+            ? '原生 AI 未就绪，等待 Web fallback 或下次重试'
+            : entry.message,
+          errorMessage: entry.reason || undefined
         });
         return;
       }
@@ -1143,7 +1162,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         requestStartedAt: nativeRequest?.startedAt,
         requestCompletedAt: nativeRequest?.completedAt,
         requestStatus: nativeRequest?.status || 'not_started',
-        outcomeSummary: nativeRequest?.outcomeSummary || '原生已经醒来并派发 trigger，但 Web 侧还没有开始请求',
+        outcomeSummary: nativeRequest?.outcomeSummary
+          || (entry.reason === 'native_ai_unavailable'
+            ? '原生 AI 未就绪，已保留 Reminder 并等待 Web fallback 或下次重试'
+            : entry.type === 'checkin_skipped'
+              ? `本次 check-in 已跳过：${entry.reason || '条件未满足'}`
+              : '原生已经醒来并派发 trigger，但 Web 侧还没有开始请求'),
         ...(nativeRequest?.message ? { message: nativeRequest.message } : {}),
         ...(nativeRequest?.errorMessage ? { errorMessage: nativeRequest.errorMessage } : {}),
         ...(nativeRequest?.debugExchange ? { debugExchange: nativeRequest.debugExchange } : {})
@@ -2186,6 +2210,29 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return;
     }
 
+    if (trigger.type === 'reminder_due') {
+      const reminderId = typeof trigger.metadata?.reminderId === 'string'
+        ? trigger.metadata.reminderId.trim()
+        : triggerId.startsWith('reminder_due:')
+          ? triggerId.slice('reminder_due:'.length).split(':')[0]
+          : '';
+      if (reminderId) {
+        try {
+          const diagnosticResult = await AssistantAgent.listDiagnostics();
+          const nativeAlreadyHandling = normalizeAssistantNativeDiagnostics(diagnosticResult.entries)
+            .some((entry) => entry.triggerId === `reminder_due:${reminderId}`
+              && (entry.type === 'native_request_started' || entry.type === 'native_request_completed'));
+          if (nativeAlreadyHandling) {
+            await AssistantAgent.acknowledgeSystemTrigger({ id: triggerId });
+            handledAssistantTriggerIdsRef.current.add(triggerId);
+            return;
+          }
+        } catch (error) {
+          console.error('[AIBackfillChatModal] Failed to check native reminder execution before Web fallback', error);
+        }
+      }
+    }
+
     if (handledAssistantTriggerIdsRef.current.has(triggerId)) {
       try {
         await AssistantAgent.acknowledgeSystemTrigger({ id: triggerId });
@@ -2195,18 +2242,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return;
     }
 
-    handledAssistantTriggerIdsRef.current.add(triggerId);
-    try {
-      await AssistantAgent.acknowledgeSystemTrigger({ id: triggerId });
-    } catch (error) {
-      console.error('[AIBackfillChatModal] Failed to acknowledge assistant trigger', error);
+    if (processingAssistantTriggerIdsRef.current.has(triggerId)) {
+      return;
     }
+    processingAssistantTriggerIdsRef.current.add(triggerId);
 
     void refreshAssistantNativeDiagnostics();
 
     const targetSession = getBackgroundTargetSession();
     if (!targetSession) {
       console.info('[AIBackfillChatModal] Skipping assistant system trigger because no ordinary conversation has recent user activity', trigger);
+      processingAssistantTriggerIdsRef.current.delete(triggerId);
       return;
     }
 
@@ -2214,10 +2260,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
     try {
       if (trigger.type === 'assistant_letter_due') {
-        const result = await runBackgroundAssistantLetter(trigger, targetSession, conversationHistory, new Date());
+        const result = await runBackgroundAssistantLetter(trigger, targetSession, conversationHistory, { now: new Date() });
         if (!result) {
+          processingAssistantTriggerIdsRef.current.delete(triggerId);
           return;
         }
+        try {
+          await AssistantAgent.acknowledgeSystemTrigger({ id: triggerId });
+        } catch (error) {
+          console.error('[AIBackfillChatModal] Failed to acknowledge completed assistant letter trigger', error);
+        }
+        handledAssistantTriggerIdsRef.current.add(triggerId);
         if (result.surfacedMessage && !isOpenRef.current) {
           onUnreadAssistantMessage?.(1);
           addToast('info', `${getBackgroundPersonaDisplayName(targetSession)}：${result.surfacedMessage}`);
@@ -2234,6 +2287,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       }));
 
       completeReminderDueTrigger(trigger);
+      try {
+        await AssistantAgent.acknowledgeSystemTrigger({ id: triggerId });
+      } catch (error) {
+        console.error('[AIBackfillChatModal] Failed to acknowledge completed assistant trigger', error);
+      }
+      handledAssistantTriggerIdsRef.current.add(triggerId);
       refreshAssistantMemorySnapshot();
       reloadPersistedChatSessions();
       if (result.surfacedMessage && !isOpenRef.current) {
@@ -2242,6 +2301,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       }
     } catch (error) {
       console.error('[AIBackfillChatModal] Assistant system turn failed', error);
+    } finally {
+      processingAssistantTriggerIdsRef.current.delete(triggerId);
     }
   }, [
     addToast,
@@ -2703,7 +2764,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     };
     const conversationHistory = conversationHistoryCache.get(targetSession.id) || [];
 
-    void runBackgroundAssistantLetter(trigger, targetSession, conversationHistory, now).then((result) => {
+    void runBackgroundAssistantLetter(trigger, targetSession, conversationHistory, { now }).then((result) => {
       if (!result) {
         return;
       }
@@ -2919,12 +2980,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             return;
           }
 
-          void hydrateAssistantReminderSnapshotFromNative();
-          void drainPendingAssistantSystemTriggers();
+          void (async () => {
+            await hydrateAssistantReminderSnapshotFromNative();
+            await drainPendingAssistantSystemTriggers();
+          })();
         });
         document.addEventListener('visibilitychange', handleVisibilityChange);
-        void hydrateAssistantReminderSnapshotFromNative();
-        void drainPendingAssistantSystemTriggers();
+        void (async () => {
+          await hydrateAssistantReminderSnapshotFromNative();
+          await drainPendingAssistantSystemTriggers();
+        })();
       } catch (error) {
         console.error('[AIBackfillChatModal] Failed to bind assistant agent listener', error);
       }
@@ -2935,8 +3000,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         return;
       }
 
-      void hydrateAssistantReminderSnapshotFromNative();
-      void drainPendingAssistantSystemTriggers();
+      void (async () => {
+        await hydrateAssistantReminderSnapshotFromNative();
+        await drainPendingAssistantSystemTriggers();
+      })();
     };
 
     void bindAssistantAgent();
@@ -3059,9 +3126,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return;
     }
 
-    void hydrateAssistantReminderSnapshotFromNative();
-    void drainPendingAssistantSystemTriggers();
-    flushDueAssistantLetter();
+    void (async () => {
+      await hydrateAssistantReminderSnapshotFromNative();
+      await drainPendingAssistantSystemTriggers();
+      flushDueAssistantLetter();
+    })();
   }, [
     assistantAgentConfig.enabled,
     drainPendingAssistantSystemTriggers,

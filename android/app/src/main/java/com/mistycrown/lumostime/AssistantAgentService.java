@@ -9,6 +9,7 @@
  * @updated 2026-06-14: Persisted and reloaded the assistant enabled flag before non-start wakeups so stale reminder alarms or native repokes cannot restart polling after the user disables it.
  * @updated 2026-05-15: Remove a native reminder immediately after it has been persisted as a pending `reminder_due` trigger so background retries do not re-dispatch the same completed reminder every minute.
  * @updated 2026-05-14: Changed Android reminder alarms to dispatch one metadata-rich `reminder_due` trigger back to the Web layer, preserving the local-offset request path and preventing duplicate native-plus-web AI reminder runs.
+ * @updated 2026-09-02: Executes due reminders directly through the native background AI executor when its config and snapshot are ready, consuming reminders only after a successful request and retaining Web fallback retries otherwise.
  * @updated 2026-05-13: Moved next due-reminder wakeups onto AlarmManager-backed service wakeups so reminder_due dispatch no longer depends on in-process Handler delays while the device is idle.
  * @updated 2026-05-11: Split due-reminder scheduling off the coarse base poll so reminders can fire at their exact next eligible time instead of waiting for the next 5-minute sweep.
  * @updated 2026-05-09: Refreshes the shared persistent notification title once per second while active focus timers exist so timer durations stay live during assistant-only foreground runtime.
@@ -28,9 +29,11 @@ import android.os.Looper;
 
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 public class AssistantAgentService extends Service {
     public static final String ACTION_START = "com.mistycrown.lumostime.action.ASSISTANT_AGENT_START";
@@ -72,6 +75,7 @@ public class AssistantAgentService extends Service {
     private long lastUserTurnAtMs = 0L;
     private long lastTaskStateChangedAtMs = 0L;
     private long lastAssistantNudgeAtMs = 0L;
+    private final Set<String> nativeReminderRequestsInFlight = new HashSet<>();
     private final Runnable notificationRefreshRunnable = new Runnable() {
         @Override
         public void run() {
@@ -415,6 +419,7 @@ public class AssistantAgentService extends Service {
 
     private void dispatchDueNativeReminders(long nowMs) {
         org.json.JSONArray dueReminders = AssistantNativeReminderStore.listDue(this, nowMs);
+        boolean canExecuteNatively = AssistantNativeBackgroundExecutor.canExecute(this);
         for (int index = 0; index < dueReminders.length(); index += 1) {
             org.json.JSONObject reminder = dueReminders.optJSONObject(index);
             if (reminder == null) {
@@ -427,18 +432,63 @@ public class AssistantAgentService extends Service {
             }
 
             String attemptedAt = formatTimestamp(nowMs);
-            AssistantNativeReminderStore.recordDispatchAttempt(this, reminderId, attemptedAt);
-            String triggerId = "reminder_due:" + reminderId + ":" + nowMs;
-            com.getcapacitor.JSObject metadata = new com.getcapacitor.JSObject();
-            metadata.put("reminderId", reminderId);
-            metadata.put("reminderType", safeTrim(reminder.optString("type", "")));
-            metadata.put("scheduledDueAt", safeTrim(reminder.optString("dueAt", "")));
-            metadata.put("actualDispatchAt", attemptedAt);
-            metadata.put("dispatchAttemptCount", reminder.optInt("dispatchAttemptCount", 0));
-            long dueAtMs = AssistantTimeParser.parseIsoDateTime(reminder.optString("dueAt", ""));
-            if (dueAtMs > 0L) {
-                metadata.put("delayMinutes", Math.max(0L, Math.round((nowMs - dueAtMs) / 60000.0)));
+            if (canExecuteNatively && nativeReminderRequestsInFlight.contains(reminderId)) {
+                continue;
             }
+
+            AssistantNativeReminderStore.recordDispatchAttempt(this, reminderId, attemptedAt);
+            if (canExecuteNatively) {
+                final String triggerId = "reminder_due:" + reminderId;
+                nativeReminderRequestsInFlight.add(reminderId);
+                org.json.JSONObject triggerPayload = AssistantNativeBackgroundExecutor.buildTriggerPayload(
+                    triggerId,
+                    "reminder_due",
+                    safeTrim(reminder.optString("text", "")),
+                    "system"
+                );
+                try {
+                    triggerPayload.put("metadata", buildReminderTriggerMetadata(reminder, reminderId, attemptedAt, nowMs));
+                } catch (org.json.JSONException ignored) {
+                }
+                AssistantNativeBackgroundExecutor.executeAsync(
+                    this,
+                    triggerPayload,
+                    new AssistantNativeBackgroundExecutor.ExecutionCallback() {
+                        @Override
+                        public void onCompleted() {
+                            AssistantNativeReminderStore.markDispatched(AssistantAgentService.this, reminderId, isoNow());
+                            handler.post(() -> {
+                                nativeReminderRequestsInFlight.remove(reminderId);
+                                scheduleNextReminderDispatch(System.currentTimeMillis());
+                                syncUnifiedStatusNotification();
+                            });
+                        }
+
+                        @Override
+                        public void onFailed() {
+                            handler.post(() -> {
+                                nativeReminderRequestsInFlight.remove(reminderId);
+                                scheduleNextReminderDispatch(System.currentTimeMillis());
+                                syncUnifiedStatusNotification();
+                            });
+                        }
+                    }
+                );
+
+                appendDiagnostic(
+                    "reminder_due_dispatched",
+                    "success",
+                    "Native poll dispatched a reminder_due trigger to the native AI executor",
+                    triggerId,
+                    "reminder_due",
+                    null,
+                    buildPollDiagnosticContext(nowMs)
+                );
+                continue;
+            }
+
+            String triggerId = "reminder_due:" + reminderId;
+            com.getcapacitor.JSObject metadata = buildReminderTriggerMetadata(reminder, reminderId, attemptedAt, nowMs);
             triggerId = AssistantAgentPlugin.dispatchSystemTrigger(
                 this,
                 "reminder_due",
@@ -447,21 +497,39 @@ public class AssistantAgentService extends Service {
                 triggerId,
                 metadata
             );
-            AssistantNativeReminderStore.markDispatched(this, reminderId, attemptedAt);
 
             appendDiagnostic(
                 "reminder_due_dispatched",
-                "success",
-                "Native poll dispatched a reminder_due trigger to the Web layer",
+                "warning",
+                "Native poll dispatched a reminder_due trigger to the Web fallback because native AI is unavailable",
                 triggerId,
                 "reminder_due",
-                null,
+                "native_ai_unavailable",
                 buildPollDiagnosticContext(nowMs)
             );
         }
 
         scheduleNextReminderDispatch(System.currentTimeMillis());
         syncUnifiedStatusNotification();
+    }
+
+    private com.getcapacitor.JSObject buildReminderTriggerMetadata(
+        org.json.JSONObject reminder,
+        String reminderId,
+        String attemptedAt,
+        long nowMs
+    ) {
+        com.getcapacitor.JSObject metadata = new com.getcapacitor.JSObject();
+        metadata.put("reminderId", reminderId);
+        metadata.put("reminderType", safeTrim(reminder.optString("type", "")));
+        metadata.put("scheduledDueAt", safeTrim(reminder.optString("dueAt", "")));
+        metadata.put("actualDispatchAt", attemptedAt);
+        metadata.put("dispatchAttemptCount", reminder.optInt("dispatchAttemptCount", 0));
+        long dueAtMs = AssistantTimeParser.parseIsoDateTime(reminder.optString("dueAt", ""));
+        if (dueAtMs > 0L) {
+            metadata.put("delayMinutes", Math.max(0L, Math.round((nowMs - dueAtMs) / 60000.0)));
+        }
+        return metadata;
     }
 
     private void dispatchDueAssistantLetter(long nowMs) {
@@ -607,7 +675,7 @@ public class AssistantAgentService extends Service {
         AssistantReminderAlarmScheduler.cancel(this);
         nextReminderDispatchAtMs = 0L;
 
-        if (!enabled || !AssistantNativeBackgroundExecutor.canExecute(this)) {
+        if (!enabled) {
             return;
         }
 
