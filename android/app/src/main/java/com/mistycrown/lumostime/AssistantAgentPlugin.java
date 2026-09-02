@@ -7,7 +7,8 @@
  * @updated 2026-07-07: Forwarded assistant-letter enablement and next-send timestamps into the native service so Android can schedule due letter wakeups.
  * @updated 2026-06-14: Persisted the disabled assistant state and cancelled reminder alarms before sending the stop intent so native repokes cannot race the user's polling toggle.
  * @updated 2026-05-14: Added metadata-aware native trigger dispatch so Android reminder alarms can wake the app and hand one local-offset `reminder_due` trigger to the Web layer without also running a duplicate native AI request.
- * @updated 2026-05-13: Re-pokes the running native assistant service after AI-config and background-snapshot syncs so reminder alarms are rescheduled as soon as native execution becomes ready.
+ * @updated 2026-09-02: Stops re-poking the running assistant service for every background-prompt snapshot update; snapshot writes must not reset the random-check-in schedule.
+ * @updated 2026-05-13: Re-pokes the running native assistant service after AI-config syncs so reminder alarms are rescheduled as soon as native execution becomes ready.
  * @updated 2026-05-11: Re-pokes the running native assistant service after reminder-queue syncs so newly added reminders can reschedule their exact next due wakeup immediately.
  * @updated 2026-04-27: Added native diagnostic list, clear, and live-update bridge methods so Android poll decisions can be inspected from the shared AI history UI.
  * @updated 2026-04-28: Added pending-trigger queue list and acknowledge methods so Web can recover native assistant triggers after resume.
@@ -184,14 +185,16 @@ public class AssistantAgentPlugin extends Plugin {
     @PluginMethod
     public void syncNativeAIConfig(PluginCall call) {
         Context context = getContext();
-        AssistantNativeAIConfigStore.save(
+        boolean configChanged = AssistantNativeAIConfigStore.save(
             context,
             call.getString("provider", ""),
             call.getString("apiKey", ""),
             call.getString("baseUrl", ""),
             call.getString("modelName", "")
         );
-        repokeRunningAgentService(context);
+        if (configChanged) {
+            repokeRunningAgentService(context);
+        }
         call.resolve();
     }
 
@@ -210,7 +213,6 @@ public class AssistantAgentPlugin extends Plugin {
             call.getString("systemPrompt", ""),
             conversation == null ? "" : conversation.toString()
         );
-        repokeRunningAgentService(context);
         call.resolve();
     }
 
@@ -223,6 +225,7 @@ public class AssistantAgentPlugin extends Plugin {
         if (UnifiedServiceNotificationManager.isAssistantActive(context)) {
             Intent intent = new Intent(context, AssistantAgentService.class);
             intent.setAction(AssistantAgentService.ACTION_UPDATE_CONFIG);
+            intent.putExtra("refreshSchedules", true);
 
             try {
                 startAgentService(context, intent);
@@ -343,6 +346,7 @@ public class AssistantAgentPlugin extends Plugin {
 
         Intent intent = new Intent(context, AssistantAgentService.class);
         intent.setAction(AssistantAgentService.ACTION_UPDATE_CONFIG);
+        intent.putExtra("refreshSchedules", true);
         startAgentService(context, intent);
     }
 

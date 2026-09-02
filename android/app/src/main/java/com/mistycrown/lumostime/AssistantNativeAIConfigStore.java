@@ -4,6 +4,7 @@
  * @output SharedPreferences-backed native AI config snapshot for background assistant execution
  * @pos Native Helper
  * @description Persists the active AI provider config so the Android assistant agent can send background requests without relying on live Web/JS access.
+ * @updated 2026-09-02: Reports whether synced config changed so identical React-side refreshes do not repeatedly wake the native service.
  * @updated 2026-04-30: Added native AI config persistence helpers for background assistant execution.
  */
 package com.mistycrown.lumostime;
@@ -21,7 +22,7 @@ public final class AssistantNativeAIConfigStore {
     private AssistantNativeAIConfigStore() {
     }
 
-    public static void save(
+    public static boolean save(
         Context context,
         String provider,
         String apiKey,
@@ -29,15 +30,22 @@ public final class AssistantNativeAIConfigStore {
         String modelName
     ) {
         if (context == null) {
-            return;
+            return false;
+        }
+
+        NativeAIConfig previous = load(context);
+        NativeAIConfig next = new NativeAIConfig(provider, apiKey, baseUrl, modelName);
+        if (previous.equalsConfig(next)) {
+            return false;
         }
 
         prefs(context).edit()
-            .putString(KEY_PROVIDER, safeTrim(provider))
-            .putString(KEY_API_KEY, safeTrim(apiKey))
-            .putString(KEY_BASE_URL, safeTrim(baseUrl))
-            .putString(KEY_MODEL_NAME, safeTrim(modelName))
+            .putString(KEY_PROVIDER, next.provider)
+            .putString(KEY_API_KEY, next.apiKey)
+            .putString(KEY_BASE_URL, next.baseUrl)
+            .putString(KEY_MODEL_NAME, next.modelName)
             .apply();
+        return true;
     }
 
     public static void clear(Context context) {
@@ -86,6 +94,14 @@ public final class AssistantNativeAIConfigStore {
             this.apiKey = safeTrim(apiKey);
             this.baseUrl = safeTrim(baseUrl);
             this.modelName = safeTrim(modelName);
+        }
+
+        public boolean equalsConfig(NativeAIConfig other) {
+            return other != null
+                && provider.equals(other.provider)
+                && apiKey.equals(other.apiKey)
+                && baseUrl.equals(other.baseUrl)
+                && modelName.equals(other.modelName);
         }
     }
 }

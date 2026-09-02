@@ -11,6 +11,8 @@
  * @updated 2026-05-14: Changed Android reminder alarms to dispatch one metadata-rich `reminder_due` trigger back to the Web layer, preserving the local-offset request path and preventing duplicate native-plus-web AI reminder runs.
  * @updated 2026-09-02: Executes due reminders directly through the native background AI executor when its config and snapshot are ready, consuming reminders only after a successful request and retaining Web fallback retries otherwise.
  * @updated 2026-09-02: Executes due assistant letters through the same native executor lifecycle so a suspended WebView cannot consume the scheduled letter before an AI request succeeds.
+ * @updated 2026-09-02: Clamps the activity nudge gap to the configured minimum check-in interval so short test intervals are not silently deferred by the default gap.
+ * @updated 2026-09-02: Preserves the current random-check-in deadline when native snapshot/config refreshes only require reminder schedule reconciliation.
  * @updated 2026-05-13: Moved next due-reminder wakeups onto AlarmManager-backed service wakeups so reminder_due dispatch no longer depends on in-process Handler delays while the device is idle.
  * @updated 2026-05-11: Split due-reminder scheduling off the coarse base poll so reminders can fire at their exact next eligible time instead of waiting for the next 5-minute sweep.
  * @updated 2026-05-09: Refreshes the shared persistent notification title once per second while active focus timers exist so timer durations stay live during assistant-only foreground runtime.
@@ -385,12 +387,34 @@ public class AssistantAgentService extends Service {
             scheduleNextReminderDispatch(System.currentTimeMillis());
             scheduleNextAssistantLetterDispatch(System.currentTimeMillis());
             handler.post(pollRunnable);
-        } else {
+        } else if (shouldRescheduleAgentLoop(action, intent)) {
             rescheduleAgentLoop();
+        } else if (intent != null && intent.getBooleanExtra("refreshSchedules", false)) {
+            scheduleNextReminderDispatch(System.currentTimeMillis());
+            scheduleNextAssistantLetterDispatch(System.currentTimeMillis());
+            syncUnifiedStatusNotification();
         }
 
         syncUnifiedStatusNotification();
         return START_STICKY;
+    }
+
+    private boolean shouldRescheduleAgentLoop(String action, Intent intent) {
+        if (!ACTION_UPDATE_CONFIG.equals(action) || intent == null) {
+            return true;
+        }
+
+        return intent.hasExtra("enabled")
+            || intent.hasExtra("enableRandomCheckin")
+            || intent.hasExtra("basePollMinutes")
+            || intent.hasExtra("minCheckinMinutes")
+            || intent.hasExtra("maxCheckinMinutes")
+            || intent.hasExtra("quietHoursEnabled")
+            || intent.hasExtra("quietHoursStart")
+            || intent.hasExtra("quietHoursEnd")
+            || intent.hasExtra("minimumNudgeGapMinutes")
+            || intent.hasExtra("letterEnabled")
+            || intent.hasExtra("nextLetterAt");
     }
 
     @Override
@@ -791,8 +815,12 @@ public class AssistantAgentService extends Service {
             return false;
         }
 
-        long minimumGapMs = Math.max(1, minimumNudgeGapMinutes) * 60_000L;
+        long minimumGapMs = getEffectiveMinimumNudgeGapMinutes() * 60_000L;
         return nowMs - latestRelevantActivityAtMs < minimumGapMs;
+    }
+
+    private int getEffectiveMinimumNudgeGapMinutes() {
+        return Math.max(1, Math.min(minimumNudgeGapMinutes, minCheckinMinutes));
     }
 
     private long computeRetryCheckinAt(long nowMs) {
@@ -805,7 +833,7 @@ public class AssistantAgentService extends Service {
             if (latestRelevantActivityAtMs > 0L) {
                 retryAt = Math.max(
                     retryAt,
-                    latestRelevantActivityAtMs + (Math.max(1, minimumNudgeGapMinutes) * 60_000L)
+                    latestRelevantActivityAtMs + (getEffectiveMinimumNudgeGapMinutes() * 60_000L)
                 );
             }
         }
@@ -941,6 +969,7 @@ public class AssistantAgentService extends Service {
         context.put("minCheckinMinutes", String.valueOf(minCheckinMinutes));
         context.put("maxCheckinMinutes", String.valueOf(maxCheckinMinutes));
         context.put("minimumNudgeGapMinutes", String.valueOf(minimumNudgeGapMinutes));
+        context.put("effectiveMinimumNudgeGapMinutes", String.valueOf(getEffectiveMinimumNudgeGapMinutes()));
         context.put("quietHoursEnabled", String.valueOf(quietHoursEnabled));
         if (!safeTrim(quietHoursStart).isEmpty()) {
             context.put("quietHoursStart", safeTrim(quietHoursStart));
