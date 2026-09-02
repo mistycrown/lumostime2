@@ -13,6 +13,7 @@
  * @updated 2026-09-02: Executes due assistant letters through the same native executor lifecycle so a suspended WebView cannot consume the scheduled letter before an AI request succeeds.
  * @updated 2026-09-02: Clamps the activity nudge gap to the configured minimum check-in interval so short test intervals are not silently deferred by the default gap.
  * @updated 2026-09-02: Preserves the current random-check-in deadline when native snapshot/config refreshes only require reminder schedule reconciliation.
+ * @updated 2026-09-02: Uses a 10-minute default minimum random-check-in nudge gap for new native service state.
  * @updated 2026-05-13: Moved next due-reminder wakeups onto AlarmManager-backed service wakeups so reminder_due dispatch no longer depends on in-process Handler delays while the device is idle.
  * @updated 2026-05-11: Split due-reminder scheduling off the coarse base poll so reminders can fire at their exact next eligible time instead of waiting for the next 5-minute sweep.
  * @updated 2026-05-09: Refreshes the shared persistent notification title once per second while active focus timers exist so timer durations stay live during assistant-only foreground runtime.
@@ -67,7 +68,7 @@ public class AssistantAgentService extends Service {
     private boolean quietHoursEnabled = false;
     private String quietHoursStart = "";
     private String quietHoursEnd = "";
-    private int minimumNudgeGapMinutes = 45;
+    private int minimumNudgeGapMinutes = 10;
     private boolean letterEnabled = false;
     private String nextLetterAt = "";
     private String lastLetterDispatchedFor = "";
@@ -701,7 +702,7 @@ public class AssistantAgentService extends Service {
             quietHoursEnd = safeTrim(intent.getStringExtra("quietHoursEnd"));
         }
         if (intent.hasExtra("minimumNudgeGapMinutes")) {
-            minimumNudgeGapMinutes = Math.max(1, intent.getIntExtra("minimumNudgeGapMinutes", 45));
+            minimumNudgeGapMinutes = Math.max(1, intent.getIntExtra("minimumNudgeGapMinutes", 10));
         }
         if (intent.hasExtra("letterEnabled")) {
             letterEnabled = intent.getBooleanExtra("letterEnabled", false);

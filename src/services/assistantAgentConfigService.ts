@@ -9,6 +9,7 @@
  * @updated 2026-05-17: Assistant-agent config writes now mark the unified AI backup state as changed so background-setting edits update sync timestamps too.
  * @updated 2026-05-16: Added normalization and persistence support for post-log assistant trigger toggles plus selected activity ids.
  * @updated 2026-05-12: Normalized assistant quiet-hours values to compact `HHMM` strings so the UI can accept user-entered four-digit random-check-in protection windows while still migrating older `HH:MM` data.
+ * @updated 2026-09-02: Reduced the default minimum random-check-in nudge gap from 45 minutes to 10 minutes.
  * @updated 2026-04-26: Added persistent assistant agent config storage for AI chat settings, native polling sync, and long-term-memory control.
  */
 
@@ -26,7 +27,7 @@ const DEFAULT_ASSISTANT_AGENT_CONFIG: AssistantAgentConfig = {
   minCheckinMinutes: 45,
   maxCheckinMinutes: 120,
   quietHoursEnabled: false,
-  minimumNudgeGapMinutes: 45,
+  minimumNudgeGapMinutes: 10,
   longTermMemoryEnabled: true,
   logSubmissionTriggerEnabled: false,
   logSubmissionTriggerActivityIds: [],
