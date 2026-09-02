@@ -5,6 +5,7 @@
  * @pos Native Helper
  * @description Executes a minimal unified background AI turn directly from Android so check-in requests no longer depend on the Web runtime being awake at dispatch time.
  * @updated 2026-05-13: Captures native background request payloads plus raw provider responses inside diagnostics so the shared Web debug viewer can reconstruct the exact assembled prompts for Android-run turns.
+ * @updated 2026-09-02: Reports skipped native executions through diagnostics and invokes failure callbacks when the executor becomes unavailable before a request starts.
  * @updated 2026-05-13: Reminder_due completions now raise a native high-priority reminder notification immediately and mark that notification in diagnostics so Web hydration does not double-alert.
  * @updated 2026-05-09: Rejects empty or content-free unified background decisions so due reminders stay pending for retry instead of being deleted after blank model responses.
  * @updated 2026-05-01: Normalized JSON null-like assistant reply fields so native background diagnostics no longer persist literal "null" bubbles into chat history.
@@ -104,6 +105,21 @@ public final class AssistantNativeBackgroundExecutor {
 
     public static void executeAsync(Context context, JSONObject triggerPayload, ExecutionCallback callback) {
         if (context == null || triggerPayload == null || !canExecute(context)) {
+            if (context != null && triggerPayload != null) {
+                appendDiagnostic(
+                    context,
+                    "native_request_skipped",
+                    "warning",
+                    "Native background AI request skipped because config or snapshot is unavailable",
+                    safeTrim(triggerPayload.optString("id", "")),
+                    safeTrim(triggerPayload.optString("type", "")),
+                    "native_ai_unavailable",
+                    buildContextMap("requestedAt", isoNow())
+                );
+            }
+            if (callback != null) {
+                callback.onFailed();
+            }
             return;
         }
 

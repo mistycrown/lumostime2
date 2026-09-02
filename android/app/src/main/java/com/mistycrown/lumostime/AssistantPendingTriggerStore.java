@@ -5,6 +5,7 @@
  * @pos Native Helper
  * @description Stores native assistant triggers in SharedPreferences so background check-ins and reminders can be recovered by the Web layer after the Capacitor runtime resumes.
  * @updated 2026-04-28: Added persistent pending-trigger queue with append, list, and acknowledge helpers for background assistant trigger recovery.
+ * @updated 2026-09-02: Deduplicates fallback triggers by trigger ID so repeated native retry ticks do not accumulate duplicate pending Web work.
  */
 package com.mistycrown.lumostime;
 
@@ -31,6 +32,16 @@ public final class AssistantPendingTriggerStore {
         }
 
         JSONArray existing = readTriggers(context);
+        String triggerId = triggerPayload.optString("id", "").trim();
+        if (!triggerId.isEmpty()) {
+            for (int index = 0; index < existing.length(); index += 1) {
+                JSONObject candidate = existing.optJSONObject(index);
+                if (candidate != null && triggerId.equals(candidate.optString("id", "").trim())) {
+                    return;
+                }
+            }
+        }
+
         JSONArray next = new JSONArray();
         next.put(triggerPayload);
 

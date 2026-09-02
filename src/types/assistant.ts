@@ -7,6 +7,7 @@
  *
  * @updated 2026-08-12: Added one-turn `clientRef` / `todoRef` contracts so a newly created todo can be scheduled into a timeline Plan block immediately.
  * @updated 2026-07-31: Added the foreground `create_planned_log` tool-call contract for AI-created todo-linked timeline Plan blocks.
+ * @updated 2026-09-02: Added native request-skip diagnostics for background AI execution readiness failures.
  * @updated 2026-07-04: Added assistant-letter trigger, config, and persisted letter record types for scheduled AI letters with backup-safe local storage.
  * @updated 2026-05-16: Added log-submission trigger typing plus persisted assistant config fields for selected post-log AI reactions.
  * @updated 2026-05-18: Added optional nested `subtasks` typing under foreground `create_todo` tool calls so one assistant action can describe a parent todo plus its direct children.
@@ -237,6 +238,7 @@ export type AssistantNativeDiagnosticType =
   | 'checkin_dispatched'
   | 'reminder_due_dispatched'
   | 'native_request_started'
+  | 'native_request_skipped'
   | 'native_request_completed'
   | 'native_request_failed'
   | 'manual_trigger_dispatched'
