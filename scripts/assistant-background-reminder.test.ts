@@ -4,6 +4,7 @@
  * @output Regression coverage for the native reminder execution/fallback contract
  * @pos Test (Android Assistant Background Reminder)
  * @description Locks the Android source-level lifecycle invariants that cannot be exercised by the Web Vitest environment without compiling the native project.
+ * @updated 2026-09-02: Added regression coverage for random-check-in schedules surviving repeated native snapshot/config synchronization.
  * @updated 2026-09-02: Added native success-consumption, failure-retention, Web fallback, alarm scheduling, and fallback dedup assertions.
  */
 
@@ -17,6 +18,10 @@ const serviceSource = readFileSync(
 );
 const pendingTriggerStoreSource = readFileSync(
   new URL('../android/app/src/main/java/com/mistycrown/lumostime/AssistantPendingTriggerStore.java', import.meta.url),
+  'utf8'
+);
+const pluginSource = readFileSync(
+  new URL('../android/app/src/main/java/com/mistycrown/lumostime/AssistantAgentPlugin.java', import.meta.url),
   'utf8'
 );
 
@@ -70,5 +75,19 @@ describe('Android assistant background reminder source contract', () => {
 
   it('deduplicates repeated fallback triggers by trigger id', () => {
     expect(pendingTriggerStoreSource).toContain('triggerId.equals(candidate.optString("id", "").trim())');
+  });
+
+  it('does not reset random polling when only the native prompt snapshot changes', () => {
+    const snapshotMethod = extractMethod(
+      pluginSource,
+      'public void syncNativeBackgroundSnapshot',
+      'public void syncNativeReminders'
+    );
+
+    expect(snapshotMethod).not.toContain('repokeRunningAgentService');
+    expect(pluginSource).toContain('if (configChanged)');
+    expect(pluginSource).toContain('intent.putExtra("refreshSchedules", true)');
+    expect(serviceSource).toContain('shouldRescheduleAgentLoop(action, intent)');
+    expect(serviceSource).toContain('getEffectiveMinimumNudgeGapMinutes');
   });
 });
