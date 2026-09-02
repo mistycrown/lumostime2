@@ -8,6 +8,7 @@
  * @updated 2026-06-14: Persisted the disabled assistant state and cancelled reminder alarms before sending the stop intent so native repokes cannot race the user's polling toggle.
  * @updated 2026-05-14: Added metadata-aware native trigger dispatch so Android reminder alarms can wake the app and hand one local-offset `reminder_due` trigger to the Web layer without also running a duplicate native AI request.
  * @updated 2026-09-02: Stops re-poking the running assistant service for every background-prompt snapshot update; snapshot writes must not reset the random-check-in schedule.
+ * @updated 2026-09-02: Aligns the native minimum random-check-in nudge-gap fallback with the 10-minute frontend default.
  * @updated 2026-05-13: Re-pokes the running native assistant service after AI-config syncs so reminder alarms are rescheduled as soon as native execution becomes ready.
  * @updated 2026-05-11: Re-pokes the running native assistant service after reminder-queue syncs so newly added reminders can reschedule their exact next due wakeup immediately.
  * @updated 2026-04-27: Added native diagnostic list, clear, and live-update bridge methods so Android poll decisions can be inspected from the shared AI history UI.
@@ -382,7 +383,7 @@ public class AssistantAgentPlugin extends Plugin {
             }
         }
         if (call.getData().has("minimumNudgeGapMinutes")) {
-            intent.putExtra("minimumNudgeGapMinutes", call.getInt("minimumNudgeGapMinutes", 45));
+            intent.putExtra("minimumNudgeGapMinutes", call.getInt("minimumNudgeGapMinutes", 10));
         }
         if (call.getData().has("letterEnabled")) {
             intent.putExtra("letterEnabled", call.getBoolean("letterEnabled", false));

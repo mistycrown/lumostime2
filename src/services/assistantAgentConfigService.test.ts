@@ -35,6 +35,7 @@ describe('assistantAgentConfigService', () => {
 
   it('returns defaults for the new log-submission trigger config and letter config', () => {
     expect(assistantAgentConfigService.getConfig()).toEqual(expect.objectContaining({
+      minimumNudgeGapMinutes: 10,
       logSubmissionTriggerEnabled: false,
       logSubmissionTriggerActivityIds: [],
       letterEnabled: false,
