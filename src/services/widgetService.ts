@@ -21,6 +21,7 @@
  * @updated 2026-08-09: Added principle-card widget payload building from the local principle library with default preset fallback.
  * @updated 2026-08-09: Uses deterministic fallback ids for principle cards without stored ids so native shuffle state stays stable.
  * @updated 2026-08-10: Marks recurring TODAY + PIN items so native rows can disable completion controls.
+ * @updated 2026-09-02: Persisted stable UI icon IDs and regenerate theme-specific widget assets when the UI icon theme changes.
  */
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, CheckTemplate, DailyReview, Log, TodoItem } from '../types';
@@ -75,11 +76,50 @@ import {
 import { getLocalDateStr } from '../utils/dateUtils';
 import { splitLogByDays } from '../utils/logUtils';
 import { getTodoAssociationTodayTodos } from '../utils/todoScheduleUtils';
+import {
+  getUIIconAssetPathWithFallback,
+  getUIIconStringFromAssetPath,
+  uiIconService,
+  type UIIconType
+} from './uiIconService';
 
 const LEGACY_WIDGET_TIMER_STORAGE_KEY = 'lumostime_widget_timer_slots_v1';
 const WIDGET_TEMPLATE_STORAGE_KEY = 'lumostime_widget_templates_v1';
 export const PRINCIPLE_LIBRARY_STORAGE_KEY = 'lumostime_principles';
 const FALLBACK_WIDGET_ICON = '\u2022';
+
+const normalizeUiIconId = (value?: string | null): string | null => {
+  const normalized = normalizeNullableString(value);
+  return normalized?.startsWith('ui:') ? normalized : null;
+};
+
+const normalizeUiIconFields = (
+  uiIconId?: string | null,
+  uiIconAssetPath?: string | null,
+  uiIconFallbackAssetPath?: string | null
+): { uiIconId: string | null; uiIconAssetPath: string | null; uiIconFallbackAssetPath: string | null } => {
+  const stableId = normalizeUiIconId(uiIconId)
+    || normalizeUiIconId(getUIIconStringFromAssetPath(uiIconAssetPath));
+  if (!stableId) {
+    return {
+      uiIconId: null,
+      uiIconAssetPath: normalizeNullableString(uiIconAssetPath),
+      uiIconFallbackAssetPath: normalizeNullableString(uiIconFallbackAssetPath)
+    };
+  }
+
+  const parsed = uiIconService.parseIconString(stableId);
+  if (!parsed.isUIIcon || !uiIconService.isCustomTheme()) {
+    return { uiIconId: stableId, uiIconAssetPath: null, uiIconFallbackAssetPath: null };
+  }
+
+  const assets = getUIIconAssetPathWithFallback(parsed.value as UIIconType, uiIconService.getCurrentTheme());
+  return { uiIconId: stableId, uiIconAssetPath: assets.primary, uiIconFallbackAssetPath: assets.fallback };
+};
+
+export const refreshWidgetTemplatesForUiIconTheme = (
+  templates: WidgetTemplate[]
+): WidgetTemplate[] => normalizeWidgetTemplates(templates);
 
 export const DEFAULT_WIDGET_TYPE: WidgetType = 'timer';
 export const WIDGET_TYPE_OPTIONS: WidgetType[] = ['timer', 'daily', 'shortcut'];
@@ -282,6 +322,7 @@ export const createEmptyWidgetTemplateSlot = (
   categoryId: null,
   icon: null,
   customIcon: null,
+  uiIconId: null,
   uiIconAssetPath: null,
   uiIconFallbackAssetPath: null,
   label: null,
@@ -311,6 +352,7 @@ export const createEmptyTrackingCalendarConfig = (): WidgetTrackingCalendarConfi
   checkItemId: null,
   icon: null,
   customIcon: null,
+  uiIconId: null,
   uiIconAssetPath: null,
   uiIconFallbackAssetPath: null,
   label: null,
@@ -333,8 +375,7 @@ export const normalizeTrackingCalendarConfig = (
     checkItemId: normalizeNullableString(config.checkItemId),
     icon: normalizeNullableString(config.icon),
     customIcon: normalizeNullableString(config.customIcon),
-    uiIconAssetPath: normalizeNullableString(config.uiIconAssetPath),
-    uiIconFallbackAssetPath: normalizeNullableString(config.uiIconFallbackAssetPath),
+    ...normalizeUiIconFields(config.uiIconId, config.uiIconAssetPath, config.uiIconFallbackAssetPath),
     label: normalizeNullableString(config.label),
     color: normalizeNullableString(config.color)
   };
@@ -356,8 +397,7 @@ export const normalizeWidgetTemplateSlots = (
       categoryId: normalizeNullableString(slot?.categoryId),
       icon: normalizeNullableString(slot?.icon),
       customIcon: normalizeNullableString(slot?.customIcon),
-      uiIconAssetPath: normalizeNullableString(slot?.uiIconAssetPath),
-      uiIconFallbackAssetPath: normalizeNullableString(slot?.uiIconFallbackAssetPath),
+      ...normalizeUiIconFields(slot?.uiIconId, slot?.uiIconAssetPath, slot?.uiIconFallbackAssetPath),
       label: normalizeNullableString(slot?.label),
       color: normalizeNullableString(slot?.color),
       linkedTodoId: normalizeNullableString(slot?.linkedTodoId),
@@ -486,6 +526,7 @@ export const buildTimerWidgetSlotConfig = (
     linkedTodoId?: string | null;
     scopeIds?: string[] | null;
     customIcon?: string | null;
+    uiIconId?: string | null;
     backgroundColor?: string | null;
     uiIconAssetPath?: string | null;
     uiIconFallbackAssetPath?: string | null;
@@ -501,6 +542,7 @@ export const buildTimerWidgetSlotConfig = (
     || activity.icon
     || category.icon,
   customIcon: normalizeNullableString(overrides?.customIcon),
+  uiIconId: normalizeUiIconId(overrides?.uiIconId),
   uiIconAssetPath: normalizeNullableString(overrides?.uiIconAssetPath),
   uiIconFallbackAssetPath: normalizeNullableString(overrides?.uiIconFallbackAssetPath),
   label: activity.name,
@@ -519,6 +561,7 @@ export const buildDailyWidgetSlotConfig = (
   overrides?: {
     icon?: string | null;
     customIcon?: string | null;
+    uiIconId?: string | null;
     backgroundColor?: string | null;
     uiIconAssetPath?: string | null;
     uiIconFallbackAssetPath?: string | null;
@@ -534,6 +577,7 @@ export const buildDailyWidgetSlotConfig = (
     || binding.icon
     || FALLBACK_WIDGET_ICON,
   customIcon: normalizeNullableString(overrides?.customIcon),
+  uiIconId: normalizeUiIconId(overrides?.uiIconId),
   uiIconAssetPath: normalizeNullableString(overrides?.uiIconAssetPath),
   uiIconFallbackAssetPath: normalizeNullableString(overrides?.uiIconFallbackAssetPath),
   label: binding.content,
@@ -553,6 +597,7 @@ export const buildShortcutWidgetSlotConfig = (
     label?: string | null;
     icon?: string | null;
     customIcon?: string | null;
+    uiIconId?: string | null;
     backgroundColor?: string | null;
     uiIconAssetPath?: string | null;
     uiIconFallbackAssetPath?: string | null;
@@ -567,6 +612,7 @@ export const buildShortcutWidgetSlotConfig = (
     || normalizeNullableString(overrides?.icon)
     || getShortcutWidgetActionEmoji(shortcutAction),
   customIcon: normalizeNullableString(overrides?.customIcon),
+  uiIconId: normalizeUiIconId(overrides?.uiIconId),
   uiIconAssetPath: normalizeNullableString(overrides?.uiIconAssetPath),
   uiIconFallbackAssetPath: normalizeNullableString(overrides?.uiIconFallbackAssetPath),
   label: normalizeNullableString(overrides?.label) || getShortcutWidgetActionLabel(shortcutAction),
@@ -586,6 +632,7 @@ export const buildTrackingCalendarTagConfig = (
   overrides?: {
     icon?: string | null;
     customIcon?: string | null;
+    uiIconId?: string | null;
     color?: string | null;
     uiIconAssetPath?: string | null;
     uiIconFallbackAssetPath?: string | null;
@@ -603,6 +650,7 @@ export const buildTrackingCalendarTagConfig = (
     || activity.icon
     || category.icon,
   customIcon: normalizeNullableString(overrides?.customIcon),
+  uiIconId: normalizeUiIconId(overrides?.uiIconId),
   uiIconAssetPath: normalizeNullableString(overrides?.uiIconAssetPath),
   uiIconFallbackAssetPath: normalizeNullableString(overrides?.uiIconFallbackAssetPath),
   label: activity.name,
@@ -614,6 +662,7 @@ export const buildTrackingCalendarScopeConfig = (
   overrides?: {
     icon?: string | null;
     customIcon?: string | null;
+    uiIconId?: string | null;
     color?: string | null;
     uiIconAssetPath?: string | null;
     uiIconFallbackAssetPath?: string | null;
@@ -631,6 +680,7 @@ export const buildTrackingCalendarScopeConfig = (
     || scope.icon
     || FALLBACK_WIDGET_ICON,
   customIcon: normalizeNullableString(overrides?.customIcon),
+  uiIconId: normalizeUiIconId(overrides?.uiIconId),
   uiIconAssetPath: normalizeNullableString(overrides?.uiIconAssetPath),
   uiIconFallbackAssetPath: normalizeNullableString(overrides?.uiIconFallbackAssetPath),
   label: scope.name,
@@ -642,6 +692,7 @@ export const buildTrackingCalendarDailyConfig = (
   overrides?: {
     icon?: string | null;
     customIcon?: string | null;
+    uiIconId?: string | null;
     color?: string | null;
     uiIconAssetPath?: string | null;
     uiIconFallbackAssetPath?: string | null;
@@ -659,6 +710,7 @@ export const buildTrackingCalendarDailyConfig = (
     || binding.icon
     || FALLBACK_WIDGET_ICON,
   customIcon: normalizeNullableString(overrides?.customIcon),
+  uiIconId: normalizeUiIconId(overrides?.uiIconId),
   uiIconAssetPath: normalizeNullableString(overrides?.uiIconAssetPath),
   uiIconFallbackAssetPath: normalizeNullableString(overrides?.uiIconFallbackAssetPath),
   label: binding.content,
@@ -694,6 +746,7 @@ export const rebuildTimerWidgetSlotConfig = (
     linkedTodoId: slot.linkedTodoId ?? null,
     scopeIds: slot.scopeIds ?? null,
     customIcon: slot.customIcon ?? null,
+    uiIconId: slot.uiIconId ?? null,
     backgroundColor: slot.color ?? null,
     uiIconAssetPath: slot.uiIconAssetPath ?? null,
     uiIconFallbackAssetPath: slot.uiIconFallbackAssetPath ?? null
@@ -716,6 +769,7 @@ export const rebuildDailyWidgetSlotConfig = (
   return buildDailyWidgetSlotConfig(binding, slot.slotIndex, {
     icon: slot.icon ?? null,
     customIcon: slot.customIcon ?? null,
+    uiIconId: slot.uiIconId ?? null,
     backgroundColor: slot.color ?? DEFAULT_DAILY_WIDGET_COLOR,
     uiIconAssetPath: slot.uiIconAssetPath ?? null,
     uiIconFallbackAssetPath: slot.uiIconFallbackAssetPath ?? null
@@ -733,6 +787,7 @@ export const rebuildShortcutWidgetSlotConfig = (
     label: slot.label ?? undefined,
     icon: slot.icon ?? null,
     customIcon: slot.customIcon ?? null,
+    uiIconId: slot.uiIconId ?? null,
     backgroundColor: slot.color ?? null,
     uiIconAssetPath: slot.uiIconAssetPath ?? null,
     uiIconFallbackAssetPath: slot.uiIconFallbackAssetPath ?? null
@@ -765,6 +820,7 @@ export const rebuildTrackingCalendarConfig = (
     return buildTrackingCalendarTagConfig(category, activity, {
       icon: normalizedConfig.icon ?? null,
       customIcon: normalizedConfig.customIcon ?? null,
+      uiIconId: normalizedConfig.uiIconId ?? null,
       color: normalizedConfig.color ?? null,
       uiIconAssetPath: normalizedConfig.uiIconAssetPath ?? null,
       uiIconFallbackAssetPath: normalizedConfig.uiIconFallbackAssetPath ?? null
@@ -782,6 +838,7 @@ export const rebuildTrackingCalendarConfig = (
     return buildTrackingCalendarScopeConfig(scope, {
       icon: normalizedConfig.icon ?? null,
       customIcon: normalizedConfig.customIcon ?? null,
+      uiIconId: normalizedConfig.uiIconId ?? null,
       color: normalizedConfig.color ?? null,
       uiIconAssetPath: normalizedConfig.uiIconAssetPath ?? null,
       uiIconFallbackAssetPath: normalizedConfig.uiIconFallbackAssetPath ?? null
@@ -798,6 +855,7 @@ export const rebuildTrackingCalendarConfig = (
   return buildTrackingCalendarDailyConfig(binding, {
     icon: normalizedConfig.icon ?? null,
     customIcon: normalizedConfig.customIcon ?? null,
+    uiIconId: normalizedConfig.uiIconId ?? null,
     color: normalizedConfig.color ?? null,
     uiIconAssetPath: normalizedConfig.uiIconAssetPath ?? null,
     uiIconFallbackAssetPath: normalizedConfig.uiIconFallbackAssetPath ?? null

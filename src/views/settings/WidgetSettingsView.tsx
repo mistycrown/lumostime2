@@ -13,6 +13,7 @@
  * @updated 2026-05-03: Tightened the 2x2 tracking-calendar preview with smaller date numbers and narrower horizontal calendar padding.
  * @updated 2026-07-21: Added semantic create-template choice states for dark-mode outline selection.
  * @updated 2026-05-05: Rewrote the widget home guide copy to distinguish direct-add desktop widgets from configurable templates.
+ * @updated 2026-09-02: Stores stable UI icon IDs for widget slots and tracking-calendar icons.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
@@ -150,8 +151,8 @@ const toSlotEditorDraft = (
   shortcutAction: slot.shortcutAction ?? null,
   label: slot.label ?? null,
   customIcon: slot.customIcon ?? null,
-  iconMode: canUseUiIcon && Boolean(slot.uiIconAssetPath) ? 'uiIcon' : 'emoji',
-  uiIcon: canUseUiIcon ? getUIIconStringFromAssetPath(slot.uiIconAssetPath) : null,
+  iconMode: canUseUiIcon && Boolean(slot.uiIconId || slot.uiIconAssetPath) ? 'uiIcon' : 'emoji',
+  uiIcon: canUseUiIcon ? (slot.uiIconId || getUIIconStringFromAssetPath(slot.uiIconAssetPath)) : null,
   backgroundColor: slot.color ?? null
 });
 
@@ -177,7 +178,7 @@ const getSlotPreviewIcon = (
   canUseUiIcon: boolean
 ) => {
   if (canUseUiIcon) {
-    const uiIcon = getUIIconStringFromAssetPath(slot.uiIconAssetPath);
+    const uiIcon = slot.uiIconId || getUIIconStringFromAssetPath(slot.uiIconAssetPath);
     if (uiIcon) {
       return uiIcon;
     }
@@ -205,8 +206,8 @@ const toTrackingCalendarEditorDraft = (
     checkItemId: normalizedConfig.checkItemId ?? null,
     label: normalizedConfig.label ?? null,
     customIcon: normalizedConfig.customIcon ?? null,
-    iconMode: canUseUiIcon && Boolean(normalizedConfig.uiIconAssetPath) ? 'uiIcon' : 'emoji',
-    uiIcon: canUseUiIcon ? getUIIconStringFromAssetPath(normalizedConfig.uiIconAssetPath) : null,
+    iconMode: canUseUiIcon && Boolean(normalizedConfig.uiIconId || normalizedConfig.uiIconAssetPath) ? 'uiIcon' : 'emoji',
+    uiIcon: canUseUiIcon ? (normalizedConfig.uiIconId || getUIIconStringFromAssetPath(normalizedConfig.uiIconAssetPath)) : null,
     backgroundColor: normalizedConfig.color ?? null
   };
 };
@@ -217,7 +218,7 @@ const getTrackingPreviewIconProps = (
 ) => {
   const normalizedConfig = normalizeTrackingCalendarConfig(config);
   const uiIcon = canUseUiIcon
-    ? getUIIconStringFromAssetPath(normalizedConfig?.uiIconAssetPath) || undefined
+    ? normalizedConfig?.uiIconId || getUIIconStringFromAssetPath(normalizedConfig?.uiIconAssetPath) || undefined
     : undefined;
   const parsedUiIcon = uiIcon ? uiIconService.parseIconString(uiIcon) : null;
   const uiIconSrc =
@@ -487,6 +488,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         return {
           icon: uiIconService.convertUIIconToEmoji(draft.uiIcon),
           customIcon: null,
+          uiIconId: draft.uiIcon,
           uiIconAssetPath: assetPaths.primary,
           uiIconFallbackAssetPath: assetPaths.fallback
         };
@@ -496,6 +498,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     return {
       icon: null,
       customIcon: draft.customIcon,
+      uiIconId: null,
       uiIconAssetPath: null,
       uiIconFallbackAssetPath: null
     };
@@ -509,6 +512,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         return {
           icon: uiIconService.convertUIIconToEmoji(draft.uiIcon),
           customIcon: null,
+          uiIconId: draft.uiIcon,
           uiIconAssetPath: assetPaths.primary,
           uiIconFallbackAssetPath: assetPaths.fallback
         };
@@ -518,6 +522,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     return {
       icon: null,
       customIcon: draft.customIcon,
+      uiIconId: null,
       uiIconAssetPath: null,
       uiIconFallbackAssetPath: null
     };
@@ -547,6 +552,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
           linkedTodoId: draft.linkedTodoId,
           scopeIds: draft.scopeIds,
           customIcon: iconConfig.customIcon,
+          uiIconId: iconConfig.uiIconId,
           backgroundColor: draft.backgroundColor,
           uiIconAssetPath: iconConfig.uiIconAssetPath,
           uiIconFallbackAssetPath: iconConfig.uiIconFallbackAssetPath
@@ -562,6 +568,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         nextSlots[draft.slotIndex] = buildDailyWidgetSlotConfig(binding, draft.slotIndex, {
           icon: iconConfig.icon,
           customIcon: iconConfig.customIcon,
+          uiIconId: iconConfig.uiIconId,
           backgroundColor: draft.backgroundColor,
           uiIconAssetPath: iconConfig.uiIconAssetPath,
           uiIconFallbackAssetPath: iconConfig.uiIconFallbackAssetPath
@@ -574,6 +581,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
           label: draft.label,
           icon: iconConfig.icon,
           customIcon: iconConfig.customIcon,
+          uiIconId: iconConfig.uiIconId,
           backgroundColor: draft.backgroundColor,
           uiIconAssetPath: iconConfig.uiIconAssetPath,
           uiIconFallbackAssetPath: iconConfig.uiIconFallbackAssetPath
@@ -608,6 +616,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         nextTrackingConfig = buildTrackingCalendarTagConfig(category, activity, {
           icon: iconConfig.icon,
           customIcon: iconConfig.customIcon,
+          uiIconId: iconConfig.uiIconId,
           color: draft.backgroundColor,
           uiIconAssetPath: iconConfig.uiIconAssetPath,
           uiIconFallbackAssetPath: iconConfig.uiIconFallbackAssetPath
@@ -623,6 +632,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         nextTrackingConfig = buildTrackingCalendarScopeConfig(scope, {
           icon: iconConfig.icon,
           customIcon: iconConfig.customIcon,
+          uiIconId: iconConfig.uiIconId,
           color: draft.backgroundColor,
           uiIconAssetPath: iconConfig.uiIconAssetPath,
           uiIconFallbackAssetPath: iconConfig.uiIconFallbackAssetPath
@@ -638,6 +648,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         nextTrackingConfig = buildTrackingCalendarDailyConfig(binding, {
           icon: iconConfig.icon,
           customIcon: iconConfig.customIcon,
+          uiIconId: iconConfig.uiIconId,
           color: draft.backgroundColor,
           uiIconAssetPath: iconConfig.uiIconAssetPath,
           uiIconFallbackAssetPath: iconConfig.uiIconFallbackAssetPath
