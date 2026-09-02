@@ -12,6 +12,7 @@
  * @updated 2026-06-13: 调整月视图中各条目的颜色：Trace 和已完成任务（Completed）使用灰色，而 Maybe, Arrange, Due, Repeat 任务使用较黑的颜色以示区分。
  * Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-07-21: Unified dark-mode month headers and corrected schedule-entry text contrast.
+ * @updated 2026-09-02: Rendered lunar labels as fixed two-line vertical text beside each month-view date number.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -101,7 +102,8 @@ const MONTH_VIEW_EDGE_LOAD_THRESHOLD_PX = 280;
 const MONTH_VIEW_PROGRAMMATIC_SCROLL_SETTLE_MS = 140;
 const MONTH_VIEW_CALENDAR_SIDE_INSET_CLASS_NAME = 'px-px';
 const MONTH_VIEW_CELL_VERTICAL_PADDING_PX = 6;
-const MONTH_VIEW_DAY_NUMBER_ROW_HEIGHT_PX = 16;
+const MONTH_VIEW_DAY_NUMBER_ROW_HEIGHT_PX = 22;
+const MONTH_VIEW_LUNAR_LABEL_LINE_HEIGHT_PX = 10;
 const MONTH_VIEW_ENTRY_TOP_MARGIN_PX = 6;
 const MONTH_VIEW_ENTRY_TOP_OFFSET_PX = MONTH_VIEW_CELL_VERTICAL_PADDING_PX + MONTH_VIEW_DAY_NUMBER_ROW_HEIGHT_PX + MONTH_VIEW_ENTRY_TOP_MARGIN_PX;
 const MONTH_VIEW_ENTRY_ROW_GAP_PX = 2;
@@ -1045,7 +1047,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   const visibleEntryCount = useMemo(
     () => {
       const verticalGapPx = 2;
-      const dateHeaderReservePx = 24;
+      const dateHeaderReservePx = 30;
       const footerReservePx = 10;
       const availableHeight = Math.max(0, topRowHeight - dateHeaderReservePx - footerReservePx);
       const computedRows = Math.floor((availableHeight + verticalGapPx) / (monthCellLineHeightPx + verticalGapPx));
@@ -1397,7 +1399,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                           }}
                         >
                           <div
-                            className="flex h-4 justify-start px-2"
+                            className="flex justify-start px-2"
                             style={{ height: `${MONTH_VIEW_DAY_NUMBER_ROW_HEIGHT_PX}px` }}
                           >
                             <button
@@ -1412,11 +1414,26 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                             >
                               {format(day, 'dd')}
                             </button>
-                            {showCalendarLunar && (
-                              <span className="ml-1 self-center text-[9px] leading-none text-stone-400">
-                                {getCalendarLunarLabel(day)}
-                              </span>
-                            )}
+                            {showCalendarLunar && (() => {
+                              const lunarLabel = getCalendarLunarLabel(day);
+                              const lunarCharacters = Array.from(lunarLabel);
+                              const firstLine = lunarCharacters.slice(0, 1);
+                              const secondLine = lunarCharacters.slice(1);
+
+                              return (
+                                <span
+                                  className="ml-1 flex w-[1em] shrink-0 flex-col justify-center overflow-hidden text-center text-[9px] text-stone-400"
+                                  style={{
+                                    height: `${MONTH_VIEW_DAY_NUMBER_ROW_HEIGHT_PX}px`,
+                                    lineHeight: `${MONTH_VIEW_LUNAR_LABEL_LINE_HEIGHT_PX}px`
+                                  }}
+                                  aria-label={`Lunar date ${lunarLabel}`}
+                                >
+                                  <span>{firstLine}</span>
+                                  <span>{secondLine}</span>
+                                </span>
+                              );
+                            })()}
                           </div>
 
                           <div
