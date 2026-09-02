@@ -612,6 +612,12 @@ public final class AssistantNativeBackgroundExecutor {
         if (notificationBody.isEmpty()) {
             notificationBody = safeModelString(normalized.opt("decisionSummary"));
         }
+        String triggerType = safeTrim(triggerPayload.optString("type", ""));
+        if (notificationBody.isEmpty()
+            && !"reminder_due".equals(triggerType)
+            && !"assistant_letter_due".equals(triggerType)) {
+            return false;
+        }
         if (notificationBody.isEmpty()) {
             notificationBody = safeTrim(triggerPayload.optString("text", ""));
         }
@@ -619,7 +625,6 @@ public final class AssistantNativeBackgroundExecutor {
             notificationBody = "A reminder is due now.";
         }
 
-        String triggerType = safeTrim(triggerPayload.optString("type", ""));
         String title = "assistant_letter_due".equals(triggerType)
             ? "AI 来信"
             : "reminder_due".equals(triggerType)
