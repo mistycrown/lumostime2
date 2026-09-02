@@ -1,3 +1,12 @@
+/**
+ * @file assistantLogSubmissionTrigger.test.ts
+ * @input Assistant configuration and saved activity logs
+ * @output Regression coverage for post-log assistant trigger matching and context construction
+ * @pos Test (Assistant Log Submission Trigger)
+ * @description Verifies that only eligible new activity logs produce configured assistant background triggers.
+ * @updated 2026-09-03: Updated the assistant config fixture after removing the base polling interval.
+ */
+
 import { describe, expect, it, vi } from 'vitest';
 import type { Log } from '../types';
 import type { AssistantAgentConfig } from '../types/assistant';
@@ -12,14 +21,15 @@ import {
 const baseConfig: AssistantAgentConfig = {
   enabled: true,
   enableRandomCheckin: true,
-  basePollMinutes: 5,
   minCheckinMinutes: 30,
   maxCheckinMinutes: 90,
   quietHoursEnabled: false,
   minimumNudgeGapMinutes: 30,
   longTermMemoryEnabled: true,
   logSubmissionTriggerEnabled: true,
-  logSubmissionTriggerActivityIds: ['activity-coding']
+  logSubmissionTriggerActivityIds: ['activity-coding'],
+  letterEnabled: false,
+  letterFrequencyDays: 2
 };
 
 const sampleLog: Log = {

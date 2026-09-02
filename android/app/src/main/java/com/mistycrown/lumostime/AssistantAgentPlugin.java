@@ -3,7 +3,8 @@
  * @input JS-side assistant-agent control requests
  * @output Android foreground-service control and assistant system-trigger events
  * @pos Native Plugin
- * @description Capacitor plugin bridge for the Android-first background assistant agent. Starts and stops the foreground agent service, updates lightweight polling config, relays native system-trigger events back into the web layer, and surfaces assistant notification navigation.
+ * @description Capacitor plugin bridge for the Android-first background assistant agent. Starts and stops the foreground agent service, updates alarm scheduling config, relays native system-trigger events back into the web layer, and surfaces assistant notification navigation.
+ * @updated 2026-09-03: Removed the obsolete base polling interval and cancels the dedicated check-in alarm when the agent stops.
  * @updated 2026-07-07: Forwarded assistant-letter enablement and next-send timestamps into the native service so Android can schedule due letter wakeups.
  * @updated 2026-06-14: Persisted the disabled assistant state and cancelled reminder alarms before sending the stop intent so native repokes cannot race the user's polling toggle.
  * @updated 2026-05-14: Added metadata-aware native trigger dispatch so Android reminder alarms can wake the app and hand one local-offset `reminder_due` trigger to the Web layer without also running a duplicate native AI request.
@@ -72,6 +73,7 @@ public class AssistantAgentPlugin extends Plugin {
 
         try {
             UnifiedServiceNotificationManager.clearAssistantState(context);
+            AssistantCheckinAlarmScheduler.cancel(context);
             AssistantReminderAlarmScheduler.cancel(context);
             AssistantLetterAlarmScheduler.cancel(context);
             context.startService(intent);
@@ -357,9 +359,6 @@ public class AssistantAgentPlugin extends Plugin {
         }
         if (call.getData().has("enableRandomCheckin")) {
             intent.putExtra("enableRandomCheckin", call.getBoolean("enableRandomCheckin", true));
-        }
-        if (call.getData().has("basePollMinutes")) {
-            intent.putExtra("basePollMinutes", call.getInt("basePollMinutes", 5));
         }
         if (call.getData().has("minCheckinMinutes")) {
             intent.putExtra("minCheckinMinutes", call.getInt("minCheckinMinutes", 45));

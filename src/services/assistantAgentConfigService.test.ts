@@ -1,3 +1,12 @@
+/**
+ * @file assistantAgentConfigService.test.ts
+ * @input Persisted assistant-agent configuration candidates
+ * @output Regression coverage for assistant config defaults, normalization, and migration
+ * @pos Test (Assistant Agent Config)
+ * @description Verifies that assistant scheduling, memory, log-trigger, and letter settings remain normalized and persistable.
+ * @updated 2026-09-03: Verifies that the removed base polling interval is ignored when migrating older persisted config.
+ */
+
 import { beforeEach, describe, expect, it } from 'vitest';
 import { assistantAgentConfigService } from './assistantAgentConfigService';
 
@@ -41,6 +50,7 @@ describe('assistantAgentConfigService', () => {
       letterEnabled: false,
       letterFrequencyDays: 2
     }));
+    expect(assistantAgentConfigService.getConfig()).not.toHaveProperty('basePollMinutes');
   });
 
   it('normalizes persisted log-submission trigger values', () => {
@@ -74,6 +84,7 @@ describe('assistantAgentConfigService', () => {
       nextLetterAt: '2026-07-04T04:00:00.000Z',
       lastLetterScheduledAt: '2026-07-06T12:30:00.000Z'
     }));
+    expect(assistantAgentConfigService.getConfig()).not.toHaveProperty('basePollMinutes');
   });
 
   it('persists new log-submission trigger updates alongside existing config and letter config', () => {

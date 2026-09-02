@@ -3,8 +3,9 @@
  * @input N/A
  * @output Native assistant-agent plugin methods and events
  * @pos Plugin
- * @description Defines the Capacitor bridge for the Android-first assistant agent so the web layer can start or stop the background service, update polling config, and receive system-trigger events from the native layer.
+ * @description Defines the Capacitor bridge for the Android-first assistant agent so the web layer can start or stop alarm-backed background scheduling, update agent config, and receive system-trigger events from the native layer.
  *
+ * @updated 2026-09-03: Updated the bridge description for alarm-backed check-in scheduling without a base polling interval.
  * @updated 2026-07-07: Synced assistant-letter schedule fields through the native agent config so Android can wake and dispatch due letter triggers.
  * @updated 2026-04-27: Added native diagnostic list, clear, and live-update contracts so Android poll decisions can be inspected from the shared AI history UI.
  * @updated 2026-04-26: Added active assistant notification and pending-navigation APIs so Android system alerts can reopen the shared AI chat at the exact background message.

@@ -1,3 +1,12 @@
+/**
+ * @file assistantOrchestratorService.test.ts
+ * @input Mocked assistant turns, native diagnostics, memory, reminders, and persisted chats
+ * @output Regression coverage for background assistant orchestration and native result hydration
+ * @pos Test (Assistant Orchestrator)
+ * @description Verifies reply/silent decisions, side effects, history, notifications, and native background hydration.
+ * @updated 2026-09-03: Updated assistant config fixtures after removing the base polling interval.
+ */
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AssistantMemory, AssistantNativeDiagnosticEntry, AssistantReminder } from '../types/assistant';
 
@@ -119,14 +128,15 @@ describe('assistantOrchestratorService', () => {
     vi.mocked(assistantAgentConfigService.getConfig).mockReturnValue({
       enabled: true,
       enableRandomCheckin: true,
-      basePollMinutes: 10,
       minCheckinMinutes: 15,
       maxCheckinMinutes: 60,
       quietHoursEnabled: false,
       minimumNudgeGapMinutes: 15,
       longTermMemoryEnabled: true,
       logSubmissionTriggerEnabled: false,
-      logSubmissionTriggerActivityIds: []
+      logSubmissionTriggerActivityIds: [],
+      letterEnabled: false,
+      letterFrequencyDays: 2
     });
     vi.mocked(assistantPromptService.getAssistantBasePrompt).mockResolvedValue('base prompt');
     vi.mocked(assistantPromptService.getBackgroundModePrompt).mockResolvedValue('background prompt');
