@@ -7,6 +7,7 @@
  * @updated 2026-05-13: Captures native background request payloads plus raw provider responses inside diagnostics so the shared Web debug viewer can reconstruct the exact assembled prompts for Android-run turns.
  * @updated 2026-09-02: Reports skipped native executions through diagnostics and invokes failure callbacks when the executor becomes unavailable before a request starts.
  * @updated 2026-09-02: Surfaces every successful native background reply as an Android notification, including check-ins and scheduled assistant letters.
+ * @updated 2026-09-02: Suppresses Android notifications for explicit silent outcomes; only reply outcomes with non-empty assistantReply content may notify the user.
  * @updated 2026-05-13: Reminder_due completions now raise a native high-priority reminder notification immediately and mark that notification in diagnostics so Web hydration does not double-alert.
  * @updated 2026-05-09: Rejects empty or content-free unified background decisions so due reminders stay pending for retry instead of being deleted after blank model responses.
  * @updated 2026-05-01: Normalized JSON null-like assistant reply fields so native background diagnostics no longer persist literal "null" bubbles into chat history.
@@ -608,23 +609,17 @@ public final class AssistantNativeBackgroundExecutor {
             return false;
         }
 
-        String notificationBody = safeModelString(normalized.opt("assistantReply"));
-        if (notificationBody.isEmpty()) {
-            notificationBody = safeModelString(normalized.opt("decisionSummary"));
-        }
-        String triggerType = safeTrim(triggerPayload.optString("type", ""));
-        if (notificationBody.isEmpty()
-            && !"reminder_due".equals(triggerType)
-            && !"assistant_letter_due".equals(triggerType)) {
+        String outcome = safeTrim(normalized.optString("outcome", ""));
+        if (!"reply".equals(outcome)) {
             return false;
         }
+
+        String notificationBody = safeModelString(normalized.opt("assistantReply"));
         if (notificationBody.isEmpty()) {
-            notificationBody = safeTrim(triggerPayload.optString("text", ""));
-        }
-        if (notificationBody.isEmpty()) {
-            notificationBody = "A reminder is due now.";
+            return false;
         }
 
+        String triggerType = safeTrim(triggerPayload.optString("type", ""));
         String title = "assistant_letter_due".equals(triggerType)
             ? "AI 来信"
             : "reminder_due".equals(triggerType)

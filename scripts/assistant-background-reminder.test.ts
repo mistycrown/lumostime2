@@ -5,6 +5,7 @@
  * @pos Test (Android Assistant Background Reminder)
  * @description Locks the Android source-level lifecycle invariants that cannot be exercised by the Web Vitest environment without compiling the native project.
  * @updated 2026-09-02: Added regression coverage for random-check-in schedules surviving repeated native snapshot/config synchronization.
+ * @updated 2026-09-02: Added source-level coverage that explicit silent native outcomes cannot raise Android notifications.
  * @updated 2026-09-02: Added native success-consumption, failure-retention, Web fallback, alarm scheduling, and fallback dedup assertions.
  */
 
@@ -22,6 +23,10 @@ const pendingTriggerStoreSource = readFileSync(
 );
 const pluginSource = readFileSync(
   new URL('../android/app/src/main/java/com/mistycrown/lumostime/AssistantAgentPlugin.java', import.meta.url),
+  'utf8'
+);
+const nativeExecutorSource = readFileSync(
+  new URL('../android/app/src/main/java/com/mistycrown/lumostime/AssistantNativeBackgroundExecutor.java', import.meta.url),
   'utf8'
 );
 
@@ -89,5 +94,18 @@ describe('Android assistant background reminder source contract', () => {
     expect(pluginSource).toContain('intent.putExtra("refreshSchedules", true)');
     expect(serviceSource).toContain('shouldRescheduleAgentLoop(action, intent)');
     expect(serviceSource).toContain('getEffectiveMinimumNudgeGapMinutes');
+  });
+
+  it('notifies only for explicit replies with assistant content', () => {
+    const notificationMethod = extractMethod(
+      nativeExecutorSource,
+      'private static boolean maybeShowAssistantNotification',
+      'private static void appendDiagnostic'
+    );
+
+    expect(notificationMethod).toContain('if (!"reply".equals(outcome))');
+    expect(notificationMethod).toContain('normalized.opt("assistantReply")');
+    expect(notificationMethod).not.toContain('normalized.opt("decisionSummary")');
+    expect(notificationMethod).not.toContain('triggerPayload.optString("text"');
   });
 });
