@@ -56,6 +56,12 @@ describe('Android assistant background reminder source contract', () => {
     expect(dispatchMethod).toContain('buildReminderTriggerMetadata');
   });
 
+  it('runs scheduled assistant letters through the native executor before consuming them', () => {
+    expect(serviceSource).toContain('nativeLetterRequestInFlight');
+    expect(serviceSource).toContain('"assistant_letter_due"');
+    expect(serviceSource).toContain('Native poll dispatched an assistant_letter_due trigger to the native AI executor');
+  });
+
   it('schedules reminder alarms even before native AI config becomes ready', () => {
     expect(scheduleMethod).toContain('if (!enabled)');
     expect(scheduleMethod).not.toContain('AssistantNativeBackgroundExecutor.canExecute');
