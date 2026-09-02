@@ -3,7 +3,8 @@
  * @input Partial assistant-agent config updates from UI or startup hydration
  * @output Persistent Android-first assistant agent config snapshots
  * @pos Service (Assistant Agent Config)
- * @description Stores the background assistant agent's runtime configuration, including polling, random check-in, and long-term-memory toggles, so the shared AI window and native plugin can stay in sync.
+ * @description Stores the background assistant agent's runtime configuration, including random check-in scheduling and long-term-memory toggles, so the shared AI window and native plugin can stay in sync.
+ * @updated 2026-09-03: Removed the legacy base polling interval because random check-ins are now scheduled at their concrete alarm time.
  *
  * @updated 2026-07-04: Added assistant-letter scheduling config normalization, including frequency, time-window, and persisted next-send timestamps.
  * @updated 2026-05-17: Assistant-agent config writes now mark the unified AI backup state as changed so background-setting edits update sync timestamps too.
@@ -23,7 +24,6 @@ const ASSISTANT_AGENT_CONFIG_KEY = 'lumostime_assistant_agent_config_v1';
 const DEFAULT_ASSISTANT_AGENT_CONFIG: AssistantAgentConfig = {
   enabled: false,
   enableRandomCheckin: true,
-  basePollMinutes: 5,
   minCheckinMinutes: 45,
   maxCheckinMinutes: 120,
   quietHoursEnabled: false,
@@ -80,7 +80,6 @@ const normalizeConfig = (value: unknown): AssistantAgentConfig => {
   return {
     enabled: candidate.enabled === true,
     enableRandomCheckin: candidate.enableRandomCheckin !== false,
-    basePollMinutes: clampMinutes(candidate.basePollMinutes, DEFAULT_ASSISTANT_AGENT_CONFIG.basePollMinutes, 1, 60),
     minCheckinMinutes,
     maxCheckinMinutes,
     quietHoursEnabled: candidate.quietHoursEnabled === true,

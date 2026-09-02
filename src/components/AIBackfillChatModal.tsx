@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-09-03: Removed the base polling-frequency state path now that Android check-ins use concrete alarm times.
  * @updated 2026-07-31: Added a pending-message-id fallback cleanup so completed foreground turns always restore the composer send button.
  * @updated 2026-09-02: Keeps fallback system triggers pending until Web execution succeeds and surfaces native skip/request states in background history.
  * @updated 2026-09-02: Always persists a usable native background prompt, even when no recent ordinary chat session is available for routing.
@@ -2548,7 +2549,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   useEffect(() => {
     setAssistantAgentIntervalDrafts(buildAssistantAgentIntervalDrafts(assistantAgentConfig));
   }, [
-    assistantAgentConfig.basePollMinutes,
     assistantAgentConfig.maxCheckinMinutes,
     assistantAgentConfig.minCheckinMinutes
   ]);
@@ -2613,17 +2613,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   const commitAssistantAgentIntervalDraft = (field: AssistantAgentIntervalField) => {
     const nextErrors = validateAssistantAgentIntervalDrafts(assistantAgentIntervalDrafts);
-
-    if (field === 'basePollMinutes') {
-      if (nextErrors.basePollMinutes) {
-        return;
-      }
-
-      handleUpdateAssistantAgentConfig({
-        basePollMinutes: Number(assistantAgentIntervalDrafts.basePollMinutes.trim())
-      });
-      return;
-    }
 
     if (nextErrors.minCheckinMinutes || nextErrors.maxCheckinMinutes) {
       return;
@@ -6743,12 +6732,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     {
       title: '规划今天',
       prompt: '我今天计划推进论文初稿、整理实验数据、晚上去跑步，帮我拆成待办，也顺手安排几个提醒。',
-      requirement: '开启后台轮询和长期记忆'
+      requirement: '开启后台助理和长期记忆'
     },
     {
       title: '定时提醒',
       prompt: '今晚 8 点提醒我做拉伸，10 点再提醒我准备睡觉。',
-      requirement: '开启后台轮询和长期记忆'
+      requirement: '开启后台助理和长期记忆'
     },
     {
       title: '长期记忆',

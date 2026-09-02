@@ -4,6 +4,7 @@
  * @output Reusable background-assistant settings section for the AI chat settings panel
  * @pos Component Support (AI Integration)
  * @description Extracts the large background-assistant settings render tree from AIBackfillChatModal while leaving all state mutation logic in the parent modal.
+ * @updated 2026-09-03: Removed the polling-frequency input and retained only the random check-in minimum and maximum intervals.
  * @updated 2026-05-16: Added the log-submission trigger settings block with a multi-tag selector for post-log assistant reactions.
  * @updated 2026-05-15: Extracted the assistant settings section from AIBackfillChatModal.
  */
@@ -144,7 +145,7 @@ export const AIBackfillChatAssistantSettingsSection: React.FC<AIBackfillChatAssi
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-4 border-b pb-4" style={{ borderColor: theme.panelBorder }}>
         <div>
-          <p className="text-sm font-semibold" style={{ color: theme.textPrimary }}>开启后台轮询</p>
+          <p className="text-sm font-semibold" style={{ color: theme.textPrimary }}>开启后台助理</p>
         </div>
         <button
           onClick={() => onUpdateAgentConfig({ enabled: !assistantAgentConfig.enabled })}
@@ -167,43 +168,7 @@ export const AIBackfillChatAssistantSettingsSection: React.FC<AIBackfillChatAssi
 
       <div>
         <p className="text-sm font-semibold" style={{ color: theme.textPrimary }}>check-in 间隔</p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-stone-500">检查频率（分钟）</span>
-            <div className="relative">
-              <input
-                type="text"
-                inputMode="numeric"
-                value={assistantAgentIntervalDrafts.basePollMinutes}
-                onChange={(event) => onIntervalDraftChange('basePollMinutes', event.target.value)}
-                onBlur={() => onCommitIntervalDraft('basePollMinutes')}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    onCommitIntervalDraft('basePollMinutes');
-                  }
-                }}
-                aria-invalid={!!assistantAgentIntervalErrors.basePollMinutes}
-                className="w-full rounded-[1rem] border px-3 py-2 pr-9 text-sm outline-none"
-                style={{
-                  borderColor: assistantAgentIntervalErrors.basePollMinutes ? '#ef4444' : theme.chipBorder,
-                  backgroundColor: theme.inputBg,
-                  color: theme.textPrimary
-                }}
-              />
-              {assistantAgentIntervalErrors.basePollMinutes ? (
-                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-red-500">
-                  <XCircle size={15} aria-hidden="true" />
-                </span>
-              ) : null}
-            </div>
-            {assistantAgentIntervalErrors.basePollMinutes ? (
-              <span className="mt-1 block text-xs font-medium text-red-500" role="alert">
-                {assistantAgentIntervalErrors.basePollMinutes}
-              </span>
-            ) : null}
-          </label>
-
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-stone-500">最低间隔（分钟）</span>
             <div className="relative">

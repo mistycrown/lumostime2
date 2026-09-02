@@ -4,6 +4,7 @@
  * @output Reusable AI chat model definitions, validation helpers, and small presentational components
  * @pos Component Support (AI Integration)
  * @description Centralizes the stable data model and low-risk helper/UI pieces used by AIBackfillChatModal so the main modal focuses on orchestration instead of carrying every type and validator inline.
+ * @updated 2026-09-03: Removed the legacy polling-frequency draft and validation from random check-in interval settings.
  * @updated 2026-07-05: Extended chat debug sections so foreground local-query rounds can persist structured text blocks alongside AI request exchanges.
  * @updated 2026-08-24: Persisted pre-turn reminder and memory snapshots so retry can restore every foreground side effect.
  * @updated 2026-06-07: Added weekly/monthly newspaper result and confirmation types so periodic AI newspaper writeback can travel through chat state and guarded overwrite flows.
@@ -269,7 +270,7 @@ export interface AssistantBackgroundTurnRequestOptions {
 
 export type AISettingsMainTab = 'persona' | 'call';
 
-export type AssistantAgentIntervalField = 'basePollMinutes' | 'minCheckinMinutes' | 'maxCheckinMinutes';
+export type AssistantAgentIntervalField = 'minCheckinMinutes' | 'maxCheckinMinutes';
 
 export type AssistantAgentIntervalDrafts = Record<AssistantAgentIntervalField, string>;
 
@@ -405,11 +406,6 @@ const ASSISTANT_AGENT_INTERVAL_FIELD_META: Record<
   AssistantAgentIntervalField,
   { label: string; minimum: number; maximum: number }
 > = {
-  basePollMinutes: {
-    label: '检查频率',
-    minimum: 1,
-    maximum: 60
-  },
   minCheckinMinutes: {
     label: '最低间隔',
     minimum: 1,
@@ -438,7 +434,6 @@ const clampNumber = (value: number, min: number, max: number): number => (
 );
 
 export const buildAssistantAgentIntervalDrafts = (config: AssistantAgentConfig): AssistantAgentIntervalDrafts => ({
-  basePollMinutes: String(config.basePollMinutes),
   minCheckinMinutes: String(config.minCheckinMinutes),
   maxCheckinMinutes: String(config.maxCheckinMinutes)
 });
@@ -458,7 +453,6 @@ export const validateAssistantAgentIntervalDrafts = (
   drafts: AssistantAgentIntervalDrafts
 ): AssistantAgentIntervalErrors => {
   const errors: AssistantAgentIntervalErrors = {
-    basePollMinutes: null,
     minCheckinMinutes: null,
     maxCheckinMinutes: null
   };

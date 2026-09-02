@@ -1,9 +1,10 @@
 /**
  * @file AssistantAgentService.java
- * @input Foreground-service control intents and lightweight polling config
- * @output Persistent Android agent loop, shared runtime notification state, and bridge-triggered assistant events
+ * @input Foreground-service control intents and assistant schedule config
+ * @output Alarm-backed Android assistant scheduling, shared runtime notification state, and bridge-triggered assistant events
  * @pos Native Service
- * @description Minimal Android foreground service scaffold for the background AI agent. Maintains a lightweight polling loop, shares one persistent Android status notification with the floating-window service, and emits assistant system-trigger events through the Capacitor plugin bridge.
+ * @description Runs the Android background AI agent with dedicated alarms for random check-ins, reminders, and letters while sharing one persistent status notification with the floating-window service.
+ * @updated 2026-09-03: Replaced periodic random-check-in polling with a dedicated AlarmManager wakeup; protected due checks are abandoned and immediately rescheduled to a new random time.
  * @updated 2026-08-24: Clears the persisted assistant-letter schedule and dispatch marker whenever AI letters are disabled, preventing stale native wakeups after the feature is turned off.
  * @updated 2026-07-07: Added native assistant-letter scheduling so Android can wake at nextLetterAt and dispatch one assistant_letter_due trigger.
  * @updated 2026-06-14: Persisted and reloaded the assistant enabled flag before non-start wakeups so stale reminder alarms or native repokes cannot restart polling after the user disables it.
@@ -44,6 +45,7 @@ public class AssistantAgentService extends Service {
     public static final String ACTION_STOP = "com.mistycrown.lumostime.action.ASSISTANT_AGENT_STOP";
     public static final String ACTION_UPDATE_CONFIG = "com.mistycrown.lumostime.action.ASSISTANT_AGENT_UPDATE_CONFIG";
     public static final String ACTION_TRIGGER_IMMEDIATE = "com.mistycrown.lumostime.action.ASSISTANT_AGENT_TRIGGER_IMMEDIATE";
+    public static final String ACTION_TRIGGER_CHECKIN_TIMER = "com.mistycrown.lumostime.action.ASSISTANT_TRIGGER_CHECKIN_TIMER";
     public static final String ACTION_TRIGGER_REMINDER_TIMER = "com.mistycrown.lumostime.action.ASSISTANT_TRIGGER_REMINDER_TIMER";
     public static final String ACTION_TRIGGER_LETTER_TIMER = "com.mistycrown.lumostime.action.ASSISTANT_TRIGGER_LETTER_TIMER";
     public static final String ACTION_NOTIFY_USER_TURN = "com.mistycrown.lumostime.action.ASSISTANT_AGENT_NOTIFY_USER_TURN";
@@ -53,6 +55,14 @@ public class AssistantAgentService extends Service {
     private static final String KEY_LAST_USER_TURN_AT_MS = "last_user_turn_at_ms";
     private static final String KEY_LAST_TASK_STATE_CHANGED_AT_MS = "last_task_state_changed_at_ms";
     private static final String KEY_LAST_ASSISTANT_NUDGE_AT_MS = "last_assistant_nudge_at_ms";
+    private static final String KEY_ENABLE_RANDOM_CHECKIN = "enable_random_checkin";
+    private static final String KEY_MIN_CHECKIN_MINUTES = "min_checkin_minutes";
+    private static final String KEY_MAX_CHECKIN_MINUTES = "max_checkin_minutes";
+    private static final String KEY_QUIET_HOURS_ENABLED = "quiet_hours_enabled";
+    private static final String KEY_QUIET_HOURS_START = "quiet_hours_start";
+    private static final String KEY_QUIET_HOURS_END = "quiet_hours_end";
+    private static final String KEY_MINIMUM_NUDGE_GAP_MINUTES = "minimum_nudge_gap_minutes";
+    private static final String KEY_NEXT_RANDOM_CHECKIN_AT_MS = "next_random_checkin_at_ms";
     private static final String KEY_LETTER_ENABLED = "letter_enabled";
     private static final String KEY_NEXT_LETTER_AT = "next_letter_at";
     private static final String KEY_LAST_LETTER_DISPATCHED_FOR = "last_letter_dispatched_for";
@@ -62,7 +72,6 @@ public class AssistantAgentService extends Service {
 
     private boolean enabled = false;
     private boolean enableRandomCheckin = true;
-    private int basePollMinutes = 5;
     private int minCheckinMinutes = 45;
     private int maxCheckinMinutes = 120;
     private boolean quietHoursEnabled = false;
@@ -72,7 +81,6 @@ public class AssistantAgentService extends Service {
     private boolean letterEnabled = false;
     private String nextLetterAt = "";
     private String lastLetterDispatchedFor = "";
-    private boolean loopStarted = false;
     private long nextRandomCheckinAtMs = 0L;
     private long nextReminderDispatchAtMs = 0L;
     private long nextLetterDispatchAtMs = 0L;
@@ -90,76 +98,6 @@ public class AssistantAgentService extends Service {
 
             UnifiedServiceNotificationManager.reconcileNotificationState(AssistantAgentService.this);
             handler.postDelayed(this, 1000L);
-        }
-    };
-
-    private final Runnable pollRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (!enabled) {
-                return;
-            }
-
-            long now = System.currentTimeMillis();
-            appendDiagnostic(
-                "poll_tick",
-                "info",
-                "Assistant background poll tick",
-                null,
-                null,
-                null,
-                buildPollDiagnosticContext(now)
-            );
-            dispatchDueNativeReminders(now);
-            dispatchDueAssistantLetter(now);
-            if (enableRandomCheckin && nextRandomCheckinAtMs > 0L && now >= nextRandomCheckinAtMs) {
-                if (shouldDispatchRandomCheckin(now)) {
-                    String triggerId;
-                    if (AssistantNativeBackgroundExecutor.canExecute(AssistantAgentService.this)) {
-                        triggerId = java.util.UUID.randomUUID().toString();
-                        AssistantNativeBackgroundExecutor.executeAsync(
-                            AssistantAgentService.this,
-                            triggerId,
-                            "checkin",
-                            "Assistant background check-in trigger",
-                            "system"
-                        );
-                    } else {
-                        triggerId = AssistantAgentPlugin.dispatchSystemTrigger(
-                            AssistantAgentService.this,
-                            "checkin",
-                            "Assistant background check-in trigger",
-                            "system"
-                        );
-                    }
-                    recordAssistantNudge(now);
-                    scheduleNextRandomCheckin(now);
-                    appendDiagnostic(
-                        "checkin_dispatched",
-                        "success",
-                        "Native poll dispatched an assistant check-in trigger",
-                        triggerId,
-                        "checkin",
-                        null,
-                        buildPollDiagnosticContext(now)
-                    );
-                } else {
-                    String skipReason = resolveSkipReason(now);
-                    nextRandomCheckinAtMs = computeRetryCheckinAt(now);
-                    appendDiagnostic(
-                        "checkin_skipped",
-                        "warning",
-                        "Native poll skipped an assistant check-in trigger",
-                        null,
-                        "checkin",
-                        skipReason,
-                        buildPollDiagnosticContext(now)
-                    );
-                }
-            }
-
-            syncUnifiedStatusNotification();
-            handler.postDelayed(this, Math.max(1, basePollMinutes) * 60_000L);
         }
     };
 
@@ -251,6 +189,7 @@ public class AssistantAgentService extends Service {
             return START_NOT_STICKY;
         }
 
+        boolean randomCheckinConfigChanged = hasRandomCheckinConfigChanged(intent);
         applyConfig(intent);
         if (!enabled) {
             appendDiagnostic(
@@ -283,6 +222,7 @@ public class AssistantAgentService extends Service {
         if (ACTION_NOTIFY_USER_TURN.equals(action)) {
             long now = System.currentTimeMillis();
             recordUserTurn(now);
+            ensureRandomCheckinScheduled(now);
             appendDiagnostic(
                 "user_turn_recorded",
                 "info",
@@ -292,17 +232,14 @@ public class AssistantAgentService extends Service {
                 null,
                 buildPollDiagnosticContext(now)
             );
-            if (loopStarted) {
-                rescheduleAgentLoop();
-            } else {
-                syncUnifiedStatusNotification();
-            }
+            syncUnifiedStatusNotification();
             return START_STICKY;
         }
 
         if (ACTION_NOTIFY_TASK_STATE_CHANGED.equals(action)) {
             long now = System.currentTimeMillis();
             recordTaskStateChanged(now);
+            ensureRandomCheckinScheduled(now);
             appendDiagnostic(
                 "task_state_changed_recorded",
                 "info",
@@ -312,11 +249,7 @@ public class AssistantAgentService extends Service {
                 null,
                 buildPollDiagnosticContext(now)
             );
-            if (loopStarted) {
-                rescheduleAgentLoop();
-            } else {
-                syncUnifiedStatusNotification();
-            }
+            syncUnifiedStatusNotification();
             return START_STICKY;
         }
 
@@ -350,17 +283,24 @@ public class AssistantAgentService extends Service {
                 null,
                 buildPollDiagnosticContext(now)
             );
+            ensureRandomCheckinScheduled(now);
+            syncUnifiedStatusNotification();
+            return START_STICKY;
+        }
+
+        if (ACTION_TRIGGER_CHECKIN_TIMER.equals(action)) {
+            long now = System.currentTimeMillis();
+            handleDueRandomCheckin(now);
+            scheduleNextReminderDispatch(now);
+            scheduleNextAssistantLetterDispatch(now);
+            syncUnifiedStatusNotification();
+            return START_STICKY;
         }
 
         if (ACTION_TRIGGER_REMINDER_TIMER.equals(action)) {
             long now = System.currentTimeMillis();
-            if (!loopStarted) {
-                loopStarted = true;
-                scheduleNextRandomCheckin(now);
-                scheduleNextReminderDispatch(now);
-                scheduleNextAssistantLetterDispatch(now);
-                handler.post(pollRunnable);
-            }
+            ensureRandomCheckinScheduled(now);
+            scheduleNextAssistantLetterDispatch(now);
             handler.removeCallbacks(reminderDispatchRunnable);
             handler.post(reminderDispatchRunnable);
             syncUnifiedStatusNotification();
@@ -369,53 +309,61 @@ public class AssistantAgentService extends Service {
 
         if (ACTION_TRIGGER_LETTER_TIMER.equals(action)) {
             long now = System.currentTimeMillis();
-            if (!loopStarted) {
-                loopStarted = true;
-                scheduleNextRandomCheckin(now);
-                scheduleNextReminderDispatch(now);
-                scheduleNextAssistantLetterDispatch(now);
-                handler.post(pollRunnable);
-            }
+            ensureRandomCheckinScheduled(now);
+            scheduleNextReminderDispatch(now);
             handler.removeCallbacks(letterDispatchRunnable);
             handler.post(letterDispatchRunnable);
             syncUnifiedStatusNotification();
             return START_STICKY;
         }
 
-        if (!loopStarted) {
-            loopStarted = true;
-            scheduleNextRandomCheckin(System.currentTimeMillis());
-            scheduleNextReminderDispatch(System.currentTimeMillis());
-            scheduleNextAssistantLetterDispatch(System.currentTimeMillis());
-            handler.post(pollRunnable);
-        } else if (shouldRescheduleAgentLoop(action, intent)) {
-            rescheduleAgentLoop();
-        } else if (intent != null && intent.getBooleanExtra("refreshSchedules", false)) {
-            scheduleNextReminderDispatch(System.currentTimeMillis());
-            scheduleNextAssistantLetterDispatch(System.currentTimeMillis());
-            syncUnifiedStatusNotification();
+        long now = System.currentTimeMillis();
+        if (randomCheckinConfigChanged) {
+            scheduleNextRandomCheckin(now);
+        } else {
+            ensureRandomCheckinScheduled(now);
         }
+        scheduleNextReminderDispatch(now);
+        scheduleNextAssistantLetterDispatch(now);
 
         syncUnifiedStatusNotification();
         return START_STICKY;
     }
 
-    private boolean shouldRescheduleAgentLoop(String action, Intent intent) {
-        if (!ACTION_UPDATE_CONFIG.equals(action) || intent == null) {
-            return true;
+    private boolean hasRandomCheckinConfigChanged(Intent intent) {
+        if (intent == null) {
+            return false;
         }
 
-        return intent.hasExtra("enabled")
-            || intent.hasExtra("enableRandomCheckin")
-            || intent.hasExtra("basePollMinutes")
-            || intent.hasExtra("minCheckinMinutes")
-            || intent.hasExtra("maxCheckinMinutes")
-            || intent.hasExtra("quietHoursEnabled")
-            || intent.hasExtra("quietHoursStart")
-            || intent.hasExtra("quietHoursEnd")
-            || intent.hasExtra("minimumNudgeGapMinutes")
-            || intent.hasExtra("letterEnabled")
-            || intent.hasExtra("nextLetterAt");
+        return (intent.hasExtra("enabled") && intent.getBooleanExtra("enabled", true) != enabled)
+            || (
+                intent.hasExtra("enableRandomCheckin")
+                && intent.getBooleanExtra("enableRandomCheckin", true) != enableRandomCheckin
+            )
+            || (
+                intent.hasExtra("minCheckinMinutes")
+                && Math.max(1, intent.getIntExtra("minCheckinMinutes", 45)) != minCheckinMinutes
+            )
+            || (
+                intent.hasExtra("maxCheckinMinutes")
+                && Math.max(1, intent.getIntExtra("maxCheckinMinutes", 120)) != maxCheckinMinutes
+            )
+            || (
+                intent.hasExtra("quietHoursEnabled")
+                && intent.getBooleanExtra("quietHoursEnabled", false) != quietHoursEnabled
+            )
+            || (
+                intent.hasExtra("quietHoursStart")
+                && !safeTrim(intent.getStringExtra("quietHoursStart")).equals(quietHoursStart)
+            )
+            || (
+                intent.hasExtra("quietHoursEnd")
+                && !safeTrim(intent.getStringExtra("quietHoursEnd")).equals(quietHoursEnd)
+            )
+            || (
+                intent.hasExtra("minimumNudgeGapMinutes")
+                && Math.max(1, intent.getIntExtra("minimumNudgeGapMinutes", 10)) != minimumNudgeGapMinutes
+            );
     }
 
     @Override
@@ -433,15 +381,16 @@ public class AssistantAgentService extends Service {
     }
 
     private void stopAgentLoop() {
-        loopStarted = false;
-        handler.removeCallbacks(pollRunnable);
         handler.removeCallbacks(reminderDispatchRunnable);
         handler.removeCallbacks(letterDispatchRunnable);
         handler.removeCallbacks(notificationRefreshRunnable);
         nativeReminderRequestsInFlight.clear();
         nativeLetterRequestInFlight = false;
+        AssistantCheckinAlarmScheduler.cancel(this);
         AssistantReminderAlarmScheduler.cancel(this);
         AssistantLetterAlarmScheduler.cancel(this);
+        nextRandomCheckinAtMs = 0L;
+        prefs().edit().remove(KEY_NEXT_RANDOM_CHECKIN_AT_MS).apply();
         nextReminderDispatchAtMs = 0L;
         nextLetterDispatchAtMs = 0L;
     }
@@ -507,7 +456,7 @@ public class AssistantAgentService extends Service {
                 appendDiagnostic(
                     "reminder_due_dispatched",
                     "success",
-                    "Native poll dispatched a reminder_due trigger to the native AI executor",
+                    "Native alarm dispatched a reminder_due trigger to the native AI executor",
                     triggerId,
                     "reminder_due",
                     null,
@@ -530,7 +479,7 @@ public class AssistantAgentService extends Service {
             appendDiagnostic(
                 "reminder_due_dispatched",
                 "warning",
-                "Native poll dispatched a reminder_due trigger to the Web fallback because native AI is unavailable",
+                "Native alarm dispatched a reminder_due trigger to the Web fallback because native AI is unavailable",
                 triggerId,
                 "reminder_due",
                 "native_ai_unavailable",
@@ -624,7 +573,7 @@ public class AssistantAgentService extends Service {
             appendDiagnostic(
                 "assistant_letter_due_dispatched",
                 "success",
-                "Native poll dispatched an assistant_letter_due trigger to the native AI executor",
+                "Native alarm dispatched an assistant_letter_due trigger to the native AI executor",
                 triggerId,
                 "assistant_letter_due",
                 null,
@@ -647,7 +596,7 @@ public class AssistantAgentService extends Service {
         appendDiagnostic(
             "assistant_letter_due_dispatched",
             "success",
-            "Native poll dispatched an assistant_letter_due trigger to the Web layer",
+            "Native alarm dispatched an assistant_letter_due trigger to the Web layer",
             triggerId,
             "assistant_letter_due",
             null,
@@ -655,17 +604,70 @@ public class AssistantAgentService extends Service {
         );
     }
 
-    private void rescheduleAgentLoop() {
-        handler.removeCallbacks(pollRunnable);
-        handler.removeCallbacks(reminderDispatchRunnable);
-        handler.removeCallbacks(letterDispatchRunnable);
-        scheduleNextRandomCheckin(System.currentTimeMillis());
-        scheduleNextReminderDispatch(System.currentTimeMillis());
-        scheduleNextAssistantLetterDispatch(System.currentTimeMillis());
-        if (enabled) {
-            handler.postDelayed(pollRunnable, Math.max(1, basePollMinutes) * 60_000L);
+    private void handleDueRandomCheckin(long nowMs) {
+        if (!enabled || !enableRandomCheckin) {
+            scheduleNextRandomCheckin(nowMs);
+            return;
         }
-        syncUnifiedStatusNotification();
+
+        if (nextRandomCheckinAtMs <= 0L) {
+            scheduleNextRandomCheckin(nowMs);
+            return;
+        }
+
+        if (nowMs < nextRandomCheckinAtMs) {
+            AssistantCheckinAlarmScheduler.schedule(this, nextRandomCheckinAtMs);
+            return;
+        }
+
+        AssistantCheckinAlarmScheduler.cancel(this);
+        nextRandomCheckinAtMs = 0L;
+        prefs().edit().remove(KEY_NEXT_RANDOM_CHECKIN_AT_MS).apply();
+
+        String skipReason = resolveSkipReason(nowMs);
+        if (!shouldDispatchRandomCheckin(nowMs)) {
+            scheduleNextRandomCheckin(nowMs);
+            appendDiagnostic(
+                "checkin_skipped",
+                "warning",
+                "Scheduled assistant check-in was skipped",
+                null,
+                "checkin",
+                skipReason,
+                buildPollDiagnosticContext(nowMs)
+            );
+            return;
+        }
+
+        String triggerId;
+        if (AssistantNativeBackgroundExecutor.canExecute(this)) {
+            triggerId = java.util.UUID.randomUUID().toString();
+            AssistantNativeBackgroundExecutor.executeAsync(
+                this,
+                triggerId,
+                "checkin",
+                "Assistant background check-in trigger",
+                "system"
+            );
+        } else {
+            triggerId = AssistantAgentPlugin.dispatchSystemTrigger(
+                this,
+                "checkin",
+                "Assistant background check-in trigger",
+                "system"
+            );
+        }
+        recordAssistantNudge(nowMs);
+        scheduleNextRandomCheckin(nowMs);
+        appendDiagnostic(
+            "checkin_dispatched",
+            "success",
+            "Scheduled alarm dispatched an assistant check-in trigger",
+            triggerId,
+            "checkin",
+            null,
+            buildPollDiagnosticContext(nowMs)
+        );
     }
 
     private void applyConfig(Intent intent) {
@@ -682,9 +684,6 @@ public class AssistantAgentService extends Service {
         }
         if (intent.hasExtra("enableRandomCheckin")) {
             enableRandomCheckin = intent.getBooleanExtra("enableRandomCheckin", true);
-        }
-        if (intent.hasExtra("basePollMinutes")) {
-            basePollMinutes = Math.max(1, intent.getIntExtra("basePollMinutes", 5));
         }
         if (intent.hasExtra("minCheckinMinutes")) {
             minCheckinMinutes = Math.max(1, intent.getIntExtra("minCheckinMinutes", 45));
@@ -704,6 +703,16 @@ public class AssistantAgentService extends Service {
         if (intent.hasExtra("minimumNudgeGapMinutes")) {
             minimumNudgeGapMinutes = Math.max(1, intent.getIntExtra("minimumNudgeGapMinutes", 10));
         }
+        maxCheckinMinutes = Math.max(minCheckinMinutes, maxCheckinMinutes);
+        prefs().edit()
+            .putBoolean(KEY_ENABLE_RANDOM_CHECKIN, enableRandomCheckin)
+            .putInt(KEY_MIN_CHECKIN_MINUTES, minCheckinMinutes)
+            .putInt(KEY_MAX_CHECKIN_MINUTES, maxCheckinMinutes)
+            .putBoolean(KEY_QUIET_HOURS_ENABLED, quietHoursEnabled)
+            .putString(KEY_QUIET_HOURS_START, quietHoursStart)
+            .putString(KEY_QUIET_HOURS_END, quietHoursEnd)
+            .putInt(KEY_MINIMUM_NUDGE_GAP_MINUTES, minimumNudgeGapMinutes)
+            .apply();
         if (intent.hasExtra("letterEnabled")) {
             letterEnabled = intent.getBooleanExtra("letterEnabled", false);
             prefs().edit().putBoolean(KEY_LETTER_ENABLED, letterEnabled).apply();
@@ -738,8 +747,10 @@ public class AssistantAgentService extends Service {
     }
 
     private void scheduleNextRandomCheckin(long nowMs) {
-        if (!enableRandomCheckin) {
+        AssistantCheckinAlarmScheduler.cancel(this);
+        if (!enabled || !enableRandomCheckin) {
             nextRandomCheckinAtMs = 0L;
+            prefs().edit().remove(KEY_NEXT_RANDOM_CHECKIN_AT_MS).apply();
             return;
         }
 
@@ -748,6 +759,22 @@ public class AssistantAgentService extends Service {
         int spread = maxMinutes - minMinutes;
         int pickedMinutes = spread <= 0 ? minMinutes : minMinutes + random.nextInt(spread + 1);
         nextRandomCheckinAtMs = nowMs + (pickedMinutes * 60_000L);
+        prefs().edit().putLong(KEY_NEXT_RANDOM_CHECKIN_AT_MS, nextRandomCheckinAtMs).apply();
+        AssistantCheckinAlarmScheduler.schedule(this, nextRandomCheckinAtMs);
+    }
+
+    private void ensureRandomCheckinScheduled(long nowMs) {
+        if (!enabled || !enableRandomCheckin) {
+            scheduleNextRandomCheckin(nowMs);
+            return;
+        }
+
+        if (nextRandomCheckinAtMs <= nowMs) {
+            scheduleNextRandomCheckin(nowMs);
+            return;
+        }
+
+        AssistantCheckinAlarmScheduler.schedule(this, nextRandomCheckinAtMs);
     }
 
     private void scheduleNextReminderDispatch(long nowMs) {
@@ -824,23 +851,6 @@ public class AssistantAgentService extends Service {
         return Math.max(1, Math.min(minimumNudgeGapMinutes, minCheckinMinutes));
     }
 
-    private long computeRetryCheckinAt(long nowMs) {
-        long retryAt = nowMs + (Math.max(1, basePollMinutes) * 60_000L);
-        if (minimumNudgeGapMinutes > 0) {
-            long latestRelevantActivityAtMs = Math.max(
-                lastAssistantNudgeAtMs,
-                Math.max(lastUserTurnAtMs, lastTaskStateChangedAtMs)
-            );
-            if (latestRelevantActivityAtMs > 0L) {
-                retryAt = Math.max(
-                    retryAt,
-                    latestRelevantActivityAtMs + (getEffectiveMinimumNudgeGapMinutes() * 60_000L)
-                );
-            }
-        }
-        return retryAt;
-    }
-
     private String resolveSkipReason(long nowMs) {
         if (isWithinQuietHours(nowMs)) {
             return "quiet_hours";
@@ -899,6 +909,23 @@ public class AssistantAgentService extends Service {
 
     private void loadRuntimeSignals() {
         SharedPreferences sharedPreferences = prefs();
+        enableRandomCheckin = sharedPreferences.getBoolean(KEY_ENABLE_RANDOM_CHECKIN, true);
+        minCheckinMinutes = Math.max(1, sharedPreferences.getInt(KEY_MIN_CHECKIN_MINUTES, 45));
+        maxCheckinMinutes = Math.max(
+            minCheckinMinutes,
+            sharedPreferences.getInt(KEY_MAX_CHECKIN_MINUTES, 120)
+        );
+        quietHoursEnabled = sharedPreferences.getBoolean(KEY_QUIET_HOURS_ENABLED, false);
+        quietHoursStart = safeTrim(sharedPreferences.getString(KEY_QUIET_HOURS_START, ""));
+        quietHoursEnd = safeTrim(sharedPreferences.getString(KEY_QUIET_HOURS_END, ""));
+        minimumNudgeGapMinutes = Math.max(
+            1,
+            sharedPreferences.getInt(KEY_MINIMUM_NUDGE_GAP_MINUTES, 10)
+        );
+        nextRandomCheckinAtMs = Math.max(
+            0L,
+            sharedPreferences.getLong(KEY_NEXT_RANDOM_CHECKIN_AT_MS, 0L)
+        );
         lastUserTurnAtMs = Math.max(0L, sharedPreferences.getLong(KEY_LAST_USER_TURN_AT_MS, 0L));
         lastTaskStateChangedAtMs = Math.max(0L, sharedPreferences.getLong(KEY_LAST_TASK_STATE_CHANGED_AT_MS, 0L));
         lastAssistantNudgeAtMs = Math.max(0L, sharedPreferences.getLong(KEY_LAST_ASSISTANT_NUDGE_AT_MS, 0L));
@@ -928,7 +955,6 @@ public class AssistantAgentService extends Service {
             nextEnabled,
             nextEnabled,
             enableRandomCheckin,
-            basePollMinutes,
             nextEnabled ? nextRandomCheckinAtMs : 0L
         );
     }
@@ -966,7 +992,6 @@ public class AssistantAgentService extends Service {
         Map<String, String> context = new HashMap<>();
         context.put("enabled", String.valueOf(enabled));
         context.put("enableRandomCheckin", String.valueOf(enableRandomCheckin));
-        context.put("basePollMinutes", String.valueOf(basePollMinutes));
         context.put("minCheckinMinutes", String.valueOf(minCheckinMinutes));
         context.put("maxCheckinMinutes", String.valueOf(maxCheckinMinutes));
         context.put("minimumNudgeGapMinutes", String.valueOf(minimumNudgeGapMinutes));
@@ -1023,7 +1048,6 @@ public class AssistantAgentService extends Service {
             true,
             enabled,
             enableRandomCheckin,
-            basePollMinutes,
             nextRandomCheckinAtMs
         );
         UnifiedServiceNotificationManager.reconcileNotificationState(this);

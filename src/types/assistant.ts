@@ -5,6 +5,7 @@
  * @pos Type Definitions (Assistant Agent)
  * @description Defines the structured contracts used by the Android-first assistant agent layer so background triggers, memory updates, reminder queues, and AI system-turn decisions can stay typed and stable across services and plugins.
  *
+ * @updated 2026-09-03: Removed the obsolete base polling interval from assistant agent configuration.
  * @updated 2026-08-12: Added one-turn `clientRef` / `todoRef` contracts so a newly created todo can be scheduled into a timeline Plan block immediately.
  * @updated 2026-07-31: Added the foreground `create_planned_log` tool-call contract for AI-created todo-linked timeline Plan blocks.
  * @updated 2026-09-02: Added native request-skip diagnostics for background AI execution readiness failures.
@@ -166,7 +167,6 @@ export interface DreamUpdateCard {
 export interface AssistantAgentConfig {
   enabled: boolean;
   enableRandomCheckin: boolean;
-  basePollMinutes: number;
   minCheckinMinutes: number;
   maxCheckinMinutes: number;
   quietHoursEnabled: boolean;

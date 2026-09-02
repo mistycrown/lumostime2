@@ -581,6 +581,11 @@
             android:foregroundServiceType="dataSync" />
 
         <receiver
+            android:name=".AssistantCheckinAlarmReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <receiver
             android:name=".AssistantReminderAlarmReceiver"
             android:enabled="true"
             android:exported="false" />

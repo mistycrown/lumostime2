@@ -4,6 +4,7 @@
  * @output A single shared Android foreground-status notification for background LumosTime services
  * @pos Native Helper
  * @description Keeps the floating window service, assistant agent service, and focus-only foreground service on one shared persistent Android notification while rendering active timer labels directly in the notification title.
+ * @updated 2026-09-03: Replaced the assistant polling-frequency/countdown text with a stable next-check-in clock time for AlarmManager-based scheduling.
  * @updated 2026-06-14: Exposed the persisted assistant enabled flag so alarm wakeups and service restarts can refuse to revive the agent after the user turns polling off.
  * @updated 2026-05-09: Added app-focus session syncing, widget-runtime title aggregation, and dedicated focus-only foreground-service handoff so active timers can keep the persistent notification visible without the floating window or assistant poller.
  * @updated 2026-04-27: Exposed assistant-runtime activity lookup so plugin-side user-turn and task-state signals only wake the service when the assistant loop is already active.
@@ -45,7 +46,6 @@ public final class UnifiedServiceNotificationManager {
     private static final String KEY_ASSISTANT_ACTIVE = "assistant_active";
     private static final String KEY_ASSISTANT_ENABLED = "assistant_enabled";
     private static final String KEY_ASSISTANT_RANDOM_CHECKIN = "assistant_random_checkin";
-    private static final String KEY_ASSISTANT_BASE_POLL_MINUTES = "assistant_base_poll_minutes";
     private static final String KEY_ASSISTANT_NEXT_CHECKIN_AT_MS = "assistant_next_checkin_at_ms";
     private static final String KEY_APP_FOCUS_SESSIONS = "app_focus_sessions";
 
@@ -115,14 +115,12 @@ public final class UnifiedServiceNotificationManager {
         boolean active,
         boolean enabled,
         boolean enableRandomCheckin,
-        int basePollMinutes,
         long nextRandomCheckinAtMs
     ) {
         prefs(context).edit()
             .putBoolean(KEY_ASSISTANT_ACTIVE, active)
             .putBoolean(KEY_ASSISTANT_ENABLED, enabled)
             .putBoolean(KEY_ASSISTANT_RANDOM_CHECKIN, enableRandomCheckin)
-            .putInt(KEY_ASSISTANT_BASE_POLL_MINUTES, Math.max(1, basePollMinutes))
             .putLong(KEY_ASSISTANT_NEXT_CHECKIN_AT_MS, Math.max(0L, nextRandomCheckinAtMs))
             .apply();
     }
@@ -132,7 +130,6 @@ public final class UnifiedServiceNotificationManager {
             .putBoolean(KEY_ASSISTANT_ACTIVE, false)
             .putBoolean(KEY_ASSISTANT_ENABLED, false)
             .putBoolean(KEY_ASSISTANT_RANDOM_CHECKIN, true)
-            .putInt(KEY_ASSISTANT_BASE_POLL_MINUTES, 5)
             .putLong(KEY_ASSISTANT_NEXT_CHECKIN_AT_MS, 0L)
             .apply();
     }
@@ -226,7 +223,7 @@ public final class UnifiedServiceNotificationManager {
                 Locale.getDefault(),
                 "%s\uff0c%s",
                 floatingFocusing ? "\u60ac\u6d6e\u7403\u8ba1\u65f6\u4e2d" : "\u60ac\u6d6e\u7403\u5df2\u5f00\u542f",
-                buildAssistantStatusText(sharedPreferences, System.currentTimeMillis())
+                buildAssistantStatusText(sharedPreferences)
             );
         }
 
@@ -237,7 +234,7 @@ public final class UnifiedServiceNotificationManager {
         }
 
         if (assistantActive) {
-            return buildAssistantStatusText(sharedPreferences, System.currentTimeMillis());
+            return buildAssistantStatusText(sharedPreferences);
         }
 
         if (floatingServiceActive) {
@@ -247,29 +244,25 @@ public final class UnifiedServiceNotificationManager {
         return "LumosTime \u6b63\u5728\u540e\u53f0\u8fd0\u884c";
     }
 
-    private static String buildAssistantStatusText(SharedPreferences sharedPreferences, long nowMs) {
+    private static String buildAssistantStatusText(SharedPreferences sharedPreferences) {
         boolean assistantEnabled = sharedPreferences.getBoolean(KEY_ASSISTANT_ENABLED, true);
         if (!assistantEnabled) {
             return "AI \u52a9\u7406\u540e\u53f0\u5df2\u6682\u505c";
         }
 
         boolean enableRandomCheckin = sharedPreferences.getBoolean(KEY_ASSISTANT_RANDOM_CHECKIN, true);
-        int basePollMinutes = Math.max(1, sharedPreferences.getInt(KEY_ASSISTANT_BASE_POLL_MINUTES, 5));
         long nextRandomCheckinAtMs = sharedPreferences.getLong(KEY_ASSISTANT_NEXT_CHECKIN_AT_MS, 0L);
 
         if (!enableRandomCheckin || nextRandomCheckinAtMs <= 0L) {
-            return String.format(
-                Locale.getDefault(),
-                "AI \u52a9\u7406\u540e\u53f0\u8f6e\u8be2\u4e2d\uff0c\u6bcf %d \u5206\u949f\u68c0\u67e5\u4e00\u6b21",
-                basePollMinutes
-            );
+            return "AI \u52a9\u7406\u540e\u53f0\u5f85\u547d\u4e2d";
         }
 
-        long remainingMinutes = Math.max(0L, (nextRandomCheckinAtMs - nowMs) / 60_000L);
+        String nextCheckinTime = new java.text.SimpleDateFormat("HH:mm", Locale.getDefault())
+            .format(new java.util.Date(nextRandomCheckinAtMs));
         return String.format(
             Locale.getDefault(),
-            "AI \u52a9\u7406\u540e\u53f0\u8f6e\u8be2\u4e2d\uff0c\u4e0b\u6b21\u968f\u673a\u68c0\u67e5\u7ea6 %d \u5206\u949f\u540e",
-            remainingMinutes
+            "AI \u52a9\u7406\u540e\u53f0\u5f85\u547d\u4e2d\uff0c\u4e0b\u6b21\u968f\u673a\u68c0\u67e5\uff1a%s",
+            nextCheckinTime
         );
     }
 
