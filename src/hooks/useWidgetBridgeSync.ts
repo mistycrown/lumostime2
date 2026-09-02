@@ -21,6 +21,7 @@
  * @updated 2026-08-11: Mirrors grid templates after startup and storage-driven updates so native shortcut slots never rely on the settings screen being opened.
  * @updated 2026-08-11: Clears native daily actions only after their updated state has been sent back to the widget.
  * @updated 2026-08-11: Serializes native daily-action replay and responds immediately while the WebView is active.
+ * @updated 2026-09-02: Rebuilds persisted widget UI icon assets when the selected UI icon theme changes.
  */
 import { App as CapacitorApp } from '@capacitor/app';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -47,6 +48,7 @@ import {
   isNativeAndroidWidgetSupported,
   loadWidgetTemplatesFromStorage,
   normalizeWidgetTemplates,
+  refreshWidgetTemplatesForUiIconTheme,
   sanitizeWidgetTemplatesForUiIconSupport,
   saveWidgetTemplatesToStorage
 } from '../services/widgetService';
@@ -108,6 +110,26 @@ export const useWidgetBridgeSync = () => {
 
     window.addEventListener(WIDGET_TEMPLATES_UPDATED_EVENT, handleTemplatesUpdated);
     return () => window.removeEventListener(WIDGET_TEMPLATES_UPDATED_EVENT, handleTemplatesUpdated);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const handleUiIconThemeChanged = () => {
+      const refreshedTemplates = refreshWidgetTemplatesForUiIconTheme(loadWidgetTemplatesFromStorage());
+      saveWidgetTemplatesToStorage(refreshedTemplates);
+      if (isNativeAndroidWidgetSupported()) {
+        fireAndForgetWidgetBridgeCall(
+          'Failed to refresh widget UI icon assets after theme change',
+          () => WidgetBridge.saveTemplates({ templates: refreshedTemplates })
+        );
+      }
+    };
+
+    window.addEventListener('ui-icon-theme-changed', handleUiIconThemeChanged);
+    return () => window.removeEventListener('ui-icon-theme-changed', handleUiIconThemeChanged);
   }, []);
 
   useEffect(() => {
