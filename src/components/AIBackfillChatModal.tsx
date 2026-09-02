@@ -2992,6 +2992,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           })();
         });
         document.addEventListener('visibilitychange', handleVisibilityChange);
+        void refreshAssistantNativeDiagnostics();
         void (async () => {
           await hydrateAssistantReminderSnapshotFromNative();
           await drainPendingAssistantSystemTriggers();
@@ -3062,6 +3063,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     assistantAgentConfig.enabled,
     assistantAgentConfig.longTermMemoryEnabled,
     conversationHistoryCache,
+    isAssistantBackgroundContextReady,
     syncNativeBackgroundExecutionSnapshot
   ]);
 
@@ -3075,6 +3077,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     assistantAgentConfig.enabled,
     assistantMemorySnapshot.updatedAt,
     assistantReminderSnapshot,
+    isAssistantBackgroundContextReady,
     syncNativeBackgroundExecutionSnapshot
   ]);
 
