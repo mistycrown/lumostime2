@@ -1,5 +1,6 @@
 # Views Layer
 
+- Update 2026-09-02: `RoutineSettingsView.tsx` now requires confirmation through the shared `ConfirmModal` before deleting a Routine.
 - Update 2026-08-26: `RoutineSettingsView.tsx` uses nested back navigation, a shared emoji/UI icon row, cross-category tag selection that stays open until an Activity is chosen, and static per-step notes; `RecordView.tsx` renders the active note below the selected category header without placing it in timeline logs.
 - Update 2026-08-26: Routine steps now store Markdown checklist templates; the active Routine card toggles checklist items and submits the current `[x] / [ ]` Markdown through the timeline log note.
 - Update 2026-08-26: `RoutineSettingsView.tsx` now supports expandable `#标签`、`%领域`、`@待办` selectors, with Todo associations taking precedence over independent Activity and Scope choices; `RecordView.tsx` mirrors these markers in the active Routine card.
