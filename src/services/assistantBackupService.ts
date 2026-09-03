@@ -4,7 +4,7 @@
  * @output Unified AI backup payloads plus restore helpers for export/import/cloud sync
  * @pos Service (AI Backup)
  * @description Centralizes all AI-related data that should travel inside the app's main backup JSON, while explicitly excluding API keys and preserving any compatible local keys during restore.
- * @updated 2026-09-03: Dispatches a dedicated chat-restore event with custom prompt blocks so mounted chat UIs cannot overwrite restored cloud data with stale state.
+ * @updated 2026-09-03: Dispatches a dedicated chat-restore event with persona, prompt block, and memory state so mounted chat UIs cannot overwrite restored cloud data with stale state.
  * @updated 2026-07-04: Added assistant-letter export and restore so scheduled AI letters travel inside the unified backup payload.
  * @updated 2026-05-17: Added unified AI backup export/restore helpers covering chat sessions, persona settings, background assistant state, Dream state, and sanitized AI presets.
  */
@@ -211,15 +211,15 @@ const restoreSanitizedPresetState = async (value: unknown): Promise<void> => {
   }
 };
 
-const dispatchAssistantChatRestored = (customPromptBlocks: unknown[]): void => {
+const dispatchAssistantChatRestored = (detail: AssistantChatRestoredDetail): void => {
   if (typeof window === 'undefined') {
     return;
   }
 
-  window.dispatchEvent(new CustomEvent<AssistantChatRestoredDetail>(ASSISTANT_CHAT_RESTORED_EVENT, {
-    detail: { customPromptBlocks }
-  }));
   window.dispatchEvent(new CustomEvent(assistantOrchestratorService.getAssistantDecisionEventName()));
+  window.dispatchEvent(new CustomEvent<AssistantChatRestoredDetail>(ASSISTANT_CHAT_RESTORED_EVENT, {
+    detail
+  }));
 };
 
 export const assistantBackupService = {
@@ -259,6 +259,8 @@ export const assistantBackupService = {
 
     const payload = value as Partial<AIBackupPayload>;
     let restoredCustomPromptBlocks: unknown[] | null = null;
+    let restoredPersonas: unknown[] | null = null;
+    let restoredMemory: unknown = undefined;
 
     if (payload.chat && typeof payload.chat === 'object') {
       const chat = payload.chat as Partial<AIBackupChatState>;
@@ -274,7 +276,8 @@ export const assistantBackupService = {
         }
       }
       if (hasOwn(chat, 'personas')) {
-        localStorage.setItem(CHAT_PERSONAS_KEY, JSON.stringify(Array.isArray(chat.personas) ? chat.personas : []));
+        restoredPersonas = Array.isArray(chat.personas) ? chat.personas : [];
+        localStorage.setItem(CHAT_PERSONAS_KEY, JSON.stringify(restoredPersonas));
       }
       if (hasOwn(chat, 'customPromptBlocks')) {
         restoredCustomPromptBlocks = Array.isArray(chat.customPromptBlocks) ? chat.customPromptBlocks : [];
@@ -297,6 +300,7 @@ export const assistantBackupService = {
       }
       if (hasOwn(assistant, 'memory') && assistant.memory && typeof assistant.memory === 'object') {
         assistantMemoryService.saveMemory(assistant.memory as any);
+        restoredMemory = assistantMemoryService.getMemory();
       }
       if (hasOwn(assistant, 'scheduledTasks')) {
         assistantScheduledTaskService.saveTasks(Array.isArray(assistant.scheduledTasks) ? assistant.scheduledTasks as any[] : []);
@@ -322,6 +326,10 @@ export const assistantBackupService = {
       dreamService.saveState(payload.dream as any);
     }
 
-    dispatchAssistantChatRestored(restoredCustomPromptBlocks ?? []);
+    dispatchAssistantChatRestored({
+      ...(restoredCustomPromptBlocks ? { customPromptBlocks: restoredCustomPromptBlocks } : {}),
+      ...(restoredPersonas ? { personas: restoredPersonas } : {}),
+      ...(restoredMemory !== undefined ? { memory: restoredMemory } : {})
+    });
   }
 };
