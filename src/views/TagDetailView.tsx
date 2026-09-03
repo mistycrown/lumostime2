@@ -1,5 +1,6 @@
 /**
  * @file TagDetailView.tsx
+ * @updated 2026-09-03: Passes the selected attribute keyword source into the detail keyword calendar.
  * @updated 2026-09-02: Debounced activity auto-save so attribute text inputs remain focused while typing.
  * @updated 2026-08-25: Refined Activity attribute management, deletion cleanup, and compact record-style controls.
  * @updated 2026-08-26: Displays the current archive status beside the tag archive/restore action.
@@ -83,6 +84,11 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    const [newKeyword, setNewKeyword] = useState(''); // New State for adding keyword
    const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false); // State for category dropdown
    const customColors = useCustomColors();
+   const keywordAttribute = useMemo(() => (activity?.attributes || []).find((attribute) => (
+      attribute.isKeywordSource
+      && !attribute.isArchived
+      && (attribute.type === 'single' || attribute.type === 'multi')
+   )), [activity?.attributes]);
 
    // 自动保存：为连续输入增加短暂防抖，避免每个按键都触发父级数据重建。
    useEffect(() => {
@@ -675,6 +681,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   categories={categories}
                   todos={todos}
                   keywords={activity.keywords || []}
+                  keywordAttribute={keywordAttribute}
                   enableFocusScore={activity.enableFocusScore ?? category?.enableFocusScore ?? false}
                   enableMoodScore={activity.enableMoodScore ?? category?.enableMoodScore ?? false}
                   renderLogMetadata={(log, { collectionNames }) => {

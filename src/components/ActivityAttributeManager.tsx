@@ -1,9 +1,10 @@
 /**
  * @file ActivityAttributeManager.tsx
  * @input Activity custom attribute definitions, usage checks, and delete callbacks.
- * @output Attribute create, rename, move, delete, archive, restore, and option management.
+ * @output Attribute create, rename, move, delete, archive, restore, keyword-source, and option management.
  * @pos Activity detail settings component
  * @description Uses compact custom controls that match the existing record-association UI.
+ * @updated 2026-09-03: Added a single-per-Activity choice attribute keyword-source setting.
  * @updated 2026-08-31: Added numeric units and one-level single-choice display-condition configuration.
  * @updated 2026-08-25: Replaced drag-and-drop and native select controls with attribute move buttons, custom type menu, and destructive delete confirmation; option order follows usage.
  * @updated 2026-08-25: Replaced native delete alerts with the shared ConfirmModal.
@@ -65,6 +66,21 @@ export const ActivityAttributeManager: React.FC<ActivityAttributeManagerProps> =
     save(sortedAttributes.map((attribute) => attribute.id === attributeId
       ? { ...attribute, ...update, updatedAt: now }
       : attribute));
+  };
+
+  const toggleKeywordSource = (attributeId: string) => {
+    const target = sortedAttributes.find((attribute) => attribute.id === attributeId);
+    if (!target) return;
+    const shouldEnable = !target.isKeywordSource;
+    const now = Date.now();
+
+    save(sortedAttributes.map((attribute) => {
+      const isKeywordSource = attribute.id === attributeId
+        ? shouldEnable
+        : (shouldEnable ? false : attribute.isKeywordSource);
+      if (isKeywordSource === Boolean(attribute.isKeywordSource)) return attribute;
+      return { ...attribute, isKeywordSource: isKeywordSource || undefined, updatedAt: now };
+    }));
   };
 
   const conditionParentCandidates = (attributeId: string) => activeAttributes.filter((candidate) => (
@@ -173,7 +189,7 @@ export const ActivityAttributeManager: React.FC<ActivityAttributeManagerProps> =
               <span className="text-[11px] text-stone-400 shrink-0">{getTypeLabel(attribute.type)}</span>
               <button type="button" onClick={() => moveAttribute(attribute.id, -1)} disabled={attributeIndex === 0} className="p-1 text-stone-300 hover:text-stone-700 disabled:opacity-25" title={'\u4e0a\u79fb'}><ChevronUp size={15} /></button>
               <button type="button" onClick={() => moveAttribute(attribute.id, 1)} disabled={attributeIndex === activeAttributes.length - 1} className="p-1 text-stone-300 hover:text-stone-700 disabled:opacity-25" title={'\u4e0b\u79fb'}><ChevronDown size={15} /></button>
-              <button type="button" onClick={() => updateAttribute(attribute.id, { isArchived: true })} className="p-1 text-stone-300 hover:text-stone-700" title={'\u5f52\u6863\u5c5e\u6027'}><Archive size={15} /></button>
+              <button type="button" onClick={() => updateAttribute(attribute.id, { isArchived: true, isKeywordSource: undefined })} className="p-1 text-stone-300 hover:text-stone-700" title={'\u5f52\u6863\u5c5e\u6027'}><Archive size={15} /></button>
               <button type="button" onClick={() => requestDelete(attribute)} className="p-1 text-stone-300 hover:text-red-500" title={'\u5220\u9664\u5c5e\u6027'}><Trash2 size={15} /></button>
             </div>
 
@@ -197,6 +213,10 @@ export const ActivityAttributeManager: React.FC<ActivityAttributeManagerProps> =
             </div>}
 
             {(attribute.type === 'single' || attribute.type === 'multi') && <div className="ml-2 mt-3 space-y-2">
+              <label className="flex cursor-pointer items-center gap-2 text-[11px] text-stone-500">
+                <input type="checkbox" checked={Boolean(attribute.isKeywordSource)} onChange={() => toggleKeywordSource(attribute.id)} className="h-3.5 w-3.5 accent-stone-800" />
+                <span>{'\u5c5e\u6027\u4f5c\u4e3a\u5173\u952e\u5b57'}</span>
+              </label>
               {(attribute.options || []).filter((option) => !option.isArchived).map((option) => <div key={option.id} className="flex items-center gap-2">
                 <input value={option.label} onChange={(event) => updateAttribute(attribute.id, { options: (attribute.options || []).map((item) => item.id === option.id ? { ...item, label: event.target.value } : item) })} className="min-w-0 flex-1 bg-stone-50 border border-stone-100 rounded-md px-2.5 py-2 text-xs text-stone-600 outline-none focus:border-stone-400" aria-label={'\u9009\u9879\u540d\u79f0'} />
                 <button type="button" onClick={() => requestDelete(attribute, option)} className="p-1 text-stone-300 hover:text-red-500" title={'\u5220\u9664\u9009\u9879'}><Trash2 size={14} /></button>

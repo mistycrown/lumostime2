@@ -3,6 +3,7 @@
  * @input Filtered logs, display date, entity info
  * @output Timeline UI with detail-page month heatmap duration captions, stats, history, and shared custom timeline styling with per-day rail termination, English day-total duration labels, plus month-based quick navigation in all-record mode
  * @pos Component (Shared Detail View UI)
+ * @updated 2026-09-03: Includes selected keyword-source Activity attribute options in keyword calendar matching.
  * @updated 2026-07-21: Added dark-mode heatmap surface hooks and a readable neutral duration scale.
  * @updated 2026-05-14: Detail timelines now resolve `◬ Collection` membership for each log and pass those names into both the default metadata row and custom metadata renderers shared by detail pages.
  * @updated 2026-05-10: Added compact `4H5M`-style duration captions beneath day numbers in the detail-page month heatmap only, with automatic white-text switching on darker heatmap cells.
@@ -15,7 +16,7 @@
  * @updated 2026-08-09: Month-view groups now use only countable dates from the selected month, removing cross-month and planned-only headings.
  */
 import React, { useMemo } from 'react';
-import { Log, Category } from '../types';
+import { ActivityAttributeDefinition, Log, Category } from '../types';
 import { Clock, Zap, Heart, MessageCircle, ChevronLeft, ChevronRight, Grid, Image as ImageIcon, Hash } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
 import { IconRenderer } from './IconRenderer';
@@ -28,6 +29,7 @@ import {
     buildDetailTimelineGroupedData,
     DetailTimelineViewMode,
 } from '../utils/detailTimelineGrouping';
+import { getDetailTimelineKeywords, getLogMatchedDetailTimelineKeywords } from '../utils/detailTimelineKeywordUtils';
 type ScoreBarColor = {
     bg: string;
     bgStyle?: React.CSSProperties;
@@ -132,6 +134,7 @@ interface DetailTimelineCardProps {
     
     // 关键字支持
     keywords?: string[];
+    keywordAttribute?: ActivityAttributeDefinition;
     
     // 专注分数支持
     enableFocusScore?: boolean;
@@ -160,6 +163,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     defaultViewMode = 'month',
     todos = [],
     keywords = [],
+    keywordAttribute,
     enableFocusScore = false,
     enableMoodScore = false,
     progressTracking
@@ -170,6 +174,10 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     const activeConfig = timelineStyleConfigs[timelineStyleTheme];
     const [viewMode, setViewMode] = React.useState<DetailTimelineViewMode>(defaultViewMode);
     const [calendarViewMode, setCalendarViewMode] = React.useState<'heatmap' | 'gallery' | 'keywords'>('heatmap');
+    const timelineKeywords = useMemo(
+        () => getDetailTimelineKeywords(keywords, keywordAttribute),
+        [keywordAttribute, keywords]
+    );
     
     // 用于存储日期对应的 DOM 元素引用
     const dateRefs = React.useRef<Map<number, HTMLDivElement>>(new Map());
@@ -258,7 +266,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     ];
 
     const getKeywordColor = (keyword: string) => {
-        let index = keywords.indexOf(keyword);
+        let index = timelineKeywords.indexOf(keyword);
         if (index === -1) {
             let hash = 0;
             for (let i = 0; i < keyword.length; i++) {
@@ -284,7 +292,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     // 智能判断初始视图：检测当月是否有足够的图片
     React.useEffect(() => {
         // 如果有关键字，不自动切换视图
-        if (keywords.length > 0) return;
+        if (timelineKeywords.length > 0) return;
         
         let imageCount = 0;
         
@@ -307,7 +315,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
         } else {
             setCalendarViewMode('heatmap');
         }
-    }, [monthLogs, todos, displayMonth, displayYear, keywords.length]); // 当月份变化时重新判断
+    }, [monthLogs, todos, displayMonth, displayYear, timelineKeywords.length]); // 当月份变化时重新判断
 
     // 显示日志：根据模式选择
     const logsToDisplay = viewMode === 'month' ? monthLogs : filteredLogs;
@@ -544,7 +552,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                             >
                                 <ImageIcon size={14} />
                             </button>
-                            {keywords.length > 0 && (
+                            {timelineKeywords.length > 0 && (
                                 <button
                                     onClick={() => setCalendarViewMode('keywords')}
                                     className={`p-1.5 rounded-md transition-all ${
@@ -604,11 +612,8 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                         // 找到匹配的关键字
                                         const matchedKeywords = new Set<string>();
                                         dayLogs.forEach(log => {
-                                            keywords.forEach(kw => {
-                                                if ((log.title && log.title.includes(kw)) || (log.note && log.note.includes(kw))) {
-                                                    matchedKeywords.add(kw);
-                                                }
-                                            });
+                                            getLogMatchedDetailTimelineKeywords(log, timelineKeywords, keywordAttribute)
+                                                .forEach((keyword) => matchedKeywords.add(keyword));
                                         });
                                         
                                         cells.push(
@@ -960,14 +965,14 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                     </div>
                     
                     {/* 关键字图例 - 仅在关键字视图时显示 */}
-                    {calendarViewMode === 'keywords' && keywords.length > 0 && (
+                    {calendarViewMode === 'keywords' && timelineKeywords.length > 0 && (
                         <div className="mt-4 pt-3 border-t border-stone-100">
                             <div className="flex flex-wrap gap-2 justify-center">
                                 <div className="flex items-center gap-1.5">
                                     <div className="w-2.5 h-2.5 rounded bg-stone-100"></div>
                                     <span className="text-[10px] text-stone-400">Unmatched</span>
                                 </div>
-                                {keywords.map(kw => (
+                                {timelineKeywords.map(kw => (
                                     <div key={kw} className="flex items-center gap-1.5">
                                         <div className={`w-2.5 h-2.5 rounded ${getKeywordColor(kw).split(' ')[0]}`}></div>
                                         <span className="text-[10px] text-stone-500">{kw}</span>
