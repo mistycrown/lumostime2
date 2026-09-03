@@ -6,6 +6,7 @@
  * @description Ensures timestamp and JSON-size directions remain independent, use neutral equality inside tolerance, and block contradictory overwrite directions.
  * @updated 2026-06-15: Added JSON-size direction, tie-break, and conflict coverage for cloud sync overwrite protection.
  * @updated 2026-08-11: Covers neutral pending-auto-sync timestamps and JSON-size comparison that excludes sync metadata.
+ * @updated 2026-09-03: Covers acknowledged cloud versions remaining equal without downloading their payload.
  * @updated 2026-05-18: Added regression coverage for the narrowed sync tolerance so recent desktop edits are no longer swallowed as equal.
  */
 
@@ -108,6 +109,26 @@ describe('resolveSyncDirectionDecision', () => {
       cloudAlreadyApplied: true,
       shouldRestoreUnseenCloud: false
     });
+  });
+
+  test('keeps an acknowledged cloud version equal when its payload is not downloaded', () => {
+    const comparison = resolveSyncComparisonTimestamp({
+      localTimestamp: 15_000,
+      cloudTimestamp: 20_000,
+      lastSeenCloudUploadedAt: 20_000,
+      hasPendingLocalEdit: false,
+      mode: 'resume'
+    });
+
+    expect(resolveSyncDirectionDecision({
+      localTimestamp: comparison.comparisonLocalTimestamp,
+      cloudTimestamp: 20_000,
+      toleranceMs: 1_000,
+      mode: 'resume',
+      hadPendingAutoSync: false,
+      localJsonSize: 300,
+      cloudJsonSize: 300
+    }).direction).toBe('equal');
   });
 
   test('returns conflict when timestamp says restore but local json is larger', () => {
