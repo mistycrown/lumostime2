@@ -4,6 +4,7 @@
  * @output Unit coverage for sorting, lookups, tag-switch cleanup, and recent option ordering.
  * @pos Utility test
  * @description Verifies ID-based custom values never follow a record onto another Activity.
+ * @updated 2026-09-03: Added coverage for note-matched choice attribute values.
  * @updated 2026-08-28: Added coverage for recent choice-option ordering.
  * @updated 2026-08-24: Created for Activity custom attributes.
  */
@@ -13,6 +14,7 @@ import {
   clearInapplicableActivityAttributeValues,
   filterAttributeValuesForActivity,
   getActivityAttributeValue,
+  getNoteMatchedActivityAttributeValues,
   getSortedActivityAttributeOptions,
   getSortedActivityAttributes,
   getVisibleActivityAttributes,
@@ -125,5 +127,43 @@ describe('activityAttributeUtils', () => {
     expect(clearInapplicableActivityAttributeValues(changedValues, conditionalActivity)).toEqual([
       { attributeId: 'kind', optionId: 'run' }
     ]);
+  });
+
+  it('matches active choice options from a note, choosing the longest single-choice match', () => {
+    const matchingActivity: Activity = {
+      id: 'food',
+      name: '饮食',
+      icon: 'food',
+      color: 'bg-red-100',
+      attributes: [
+        { id: 'place', name: '地点', type: 'single', options: [{ id: 'hotpot', label: '麻辣烫' }, { id: 'short', label: '烫' }], order: 0, createdAt: 1, updatedAt: 1 },
+        { id: 'content', name: '内容', type: 'multi', options: [{ id: 'hotpot', label: '麻辣烫' }, { id: 'drink', label: '可乐' }, { id: 'old', label: '旧选项', isArchived: true }], order: 1, createdAt: 1, updatedAt: 1 },
+        { id: 'amount', name: '金额', type: 'number', options: [{ id: 'ignored', label: '麻辣烫' }], order: 2, createdAt: 1, updatedAt: 1 }
+      ]
+    };
+
+    expect(getNoteMatchedActivityAttributeValues('午饭吃了麻辣烫和可乐', matchingActivity, [])).toEqual([
+      { attributeId: 'place', optionId: 'hotpot' },
+      { attributeId: 'content', optionIds: ['hotpot', 'drink'] }
+    ]);
+  });
+
+  it('does not replace existing values and can unlock conditionally visible matched attributes', () => {
+    const matchingActivity: Activity = {
+      id: 'exercise',
+      name: '运动',
+      icon: 'run',
+      color: 'bg-green-100',
+      attributes: [
+        { id: 'kind', name: '项目', type: 'single', options: [{ id: 'run', label: '跑步' }, { id: 'rope', label: '跳绳' }], order: 0, createdAt: 1, updatedAt: 1 },
+        { id: 'place', name: '地点', type: 'multi', displayCondition: { attributeId: 'kind', optionIds: ['run'] }, options: [{ id: 'park', label: '公园' }], order: 1, createdAt: 1, updatedAt: 1 }
+      ]
+    };
+
+    expect(getNoteMatchedActivityAttributeValues('去公园跑步', matchingActivity, [])).toEqual([
+      { attributeId: 'kind', optionId: 'run' },
+      { attributeId: 'place', optionIds: ['park'] }
+    ]);
+    expect(getNoteMatchedActivityAttributeValues('去公园跑步', matchingActivity, [{ attributeId: 'kind', optionId: 'rope' }])).toEqual([]);
   });
 });

@@ -4,6 +4,7 @@
  * @output Attribute value filtering, lookup, conditional visibility, and recent-option ordering helpers.
  * @pos Shared utility
  * @description Keeps Activity custom attribute values valid as users switch tags or archive definitions.
+ * @updated 2026-09-03: Added note-text matching helpers for choice attribute auto-selection.
  * @updated 2026-08-31: Added single-choice condition matching and stale-value cleanup helpers.
  * @updated 2026-08-28: Added recent-use ordering for choice attribute options.
  * @updated 2026-08-24: Created for Activity custom attributes.
@@ -66,6 +67,53 @@ export const filterAttributeValuesForActivity = (
   );
 
   return values.filter((item) => availableAttributeIds.has(item.attributeId));
+};
+
+const normalizeAttributeOptionLabel = (label: string): string => label.trim().toLocaleLowerCase();
+
+const getMatchingChoiceOptions = (
+  note: string,
+  attribute: ActivityAttributeDefinition
+): ActivityAttributeOption[] => {
+  const normalizedNote = note.trim().toLocaleLowerCase();
+  if (!normalizedNote) return [];
+
+  return (attribute.options || []).filter((option) => {
+    const normalizedLabel = normalizeAttributeOptionLabel(option.label);
+    return !option.isArchived && normalizedLabel.length > 0 && normalizedNote.includes(normalizedLabel);
+  });
+};
+
+export const getNoteMatchedActivityAttributeValues = (
+  note: string,
+  activity: Activity | undefined,
+  values: ActivityAttributeValue[] | undefined
+): ActivityAttributeValue[] => {
+  if (!activity || !note.trim()) return [];
+
+  const matchedValues: ActivityAttributeValue[] = [];
+  let nextValues = [...(values || [])];
+
+  getSortedActivityAttributes(activity).forEach((attribute) => {
+    if (attribute.isArchived || !isActivityAttributeConditionMet(attribute, nextValues)) return;
+    if (attribute.type !== 'single' && attribute.type !== 'multi') return;
+    if (getActivityAttributeValue(nextValues, attribute.id)) return;
+
+    const matchingOptions = getMatchingChoiceOptions(note, attribute);
+    if (matchingOptions.length === 0) return;
+
+    const matchedValue: ActivityAttributeValue = attribute.type === 'single'
+      ? {
+        attributeId: attribute.id,
+        optionId: [...matchingOptions].sort((left, right) => right.label.length - left.label.length)[0].id
+      }
+      : { attributeId: attribute.id, optionIds: matchingOptions.map((option) => option.id) };
+
+    matchedValues.push(matchedValue);
+    nextValues = [...nextValues, matchedValue];
+  });
+
+  return matchedValues;
 };
 
 export const hasActivityAttributeValues = (values: ActivityAttributeValue[] | undefined): boolean => {
