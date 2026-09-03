@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-09-03: Reloads restored custom prompt blocks into mounted chat state so cloud restores cannot be overwritten by stale React state.
  * @updated 2026-09-03: Removed the base polling-frequency state path now that Android check-ins use concrete alarm times.
  * @updated 2026-07-31: Added a pending-message-id fallback cleanup so completed foreground turns always restore the composer send button.
  * @updated 2026-09-02: Keeps fallback system triggers pending until Web execution succeeds and surfaces native skip/request states in background history.
@@ -93,7 +94,11 @@ import { buildAssistantDisplayParts } from '../utils/assistantMessageParts';
 import { buildNativeDiagnosticDebugExchange } from '../utils/assistantNativeDebug';
 import { normalizeAssistantQuietHoursValue } from '../utils/assistantQuietHours';
 import { resolveLatestOrdinaryAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
-import { notifyAIBackupDataChanged } from '../utils/aiBackupChange';
+import {
+  ASSISTANT_CHAT_RESTORED_EVENT,
+  notifyAIBackupDataChanged,
+  type AssistantChatRestoredDetail
+} from '../utils/aiBackupChange';
 import {
   ASSISTANT_LOG_SUBMITTED_EVENT,
   buildAssistantLogSubmissionTrigger,
@@ -191,6 +196,7 @@ import {
   DEBUG_MODE_KEY,
   DEFAULT_AI_PERSONAS,
   loadInitialChatState,
+  normalizeCustomPromptBlocks,
   normalizePersistedSessions,
   PERSONA_EMOJI_CHOICES,
   USER_PROFILE_KEY
@@ -2935,6 +2941,19 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     window.addEventListener(ASSISTANT_CHAT_UPDATED_EVENT, handleAssistantChatUpdated);
     return () => window.removeEventListener(ASSISTANT_CHAT_UPDATED_EVENT, handleAssistantChatUpdated);
   }, [hydrateAssistantReminderSnapshotFromNative, personas, refreshAssistantNativeDiagnostics]);
+
+  useEffect(() => {
+    const handleAssistantChatRestored = (event: Event) => {
+      const restoredBlocks = (event as CustomEvent<AssistantChatRestoredDetail>).detail?.customPromptBlocks;
+
+      if (Array.isArray(restoredBlocks)) {
+        setCustomPromptBlocks(normalizeCustomPromptBlocks(restoredBlocks));
+      }
+    };
+
+    window.addEventListener(ASSISTANT_CHAT_RESTORED_EVENT, handleAssistantChatRestored as EventListener);
+    return () => window.removeEventListener(ASSISTANT_CHAT_RESTORED_EVENT, handleAssistantChatRestored as EventListener);
+  }, []);
 
   useEffect(() => {
     const handleSubmittedLog = (rawEvent: Event) => {
