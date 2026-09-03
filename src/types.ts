@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-09-03: Added an optional keyword-source marker to Activity choice attributes.
  * @updated 2026-08-31: Added optional units and single-choice display conditions to Activity attributes.
  * @updated 2026-08-26: Added optional static notes to Routine steps.
  * @updated 2026-08-26: Added optional UI icon storage for Routine configurations.
@@ -65,6 +66,7 @@ export interface ActivityAttributeDefinition {
   options?: ActivityAttributeOption[];
   unit?: string;
   displayCondition?: ActivityAttributeDisplayCondition;
+  isKeywordSource?: boolean;
   order: number;
   isArchived?: boolean;
   createdAt: number;
