@@ -4,6 +4,7 @@
  * @output Session Updates (Note, Association), Completion Event
  * @pos View (Active Focus Overlay)
  * @description The main interface displayed during an active focus session. Shows the timer, allows associating the session with a Todo or Scope, editing the note, completing the session, and applying inline note templates.
+ * @updated 2026-09-03: Passes focus notes to shared attributes for automatic choice-option matching.
  * @updated 2026-08-24: Added inline Activity custom attribute fields persisted on active focus sessions.
  * @updated 2026-05-13: Kept the focus detail overlay on the shared topmost `z-[100]` layer so collection-launched detail flows still cover the underlying settings stack cleanly.
  * @updated 2026-05-11: Added a one-shot completion-mode toggle beside the associated todo picker so finishing a focus session can also complete the linked unfinished task after the log is saved.
@@ -628,6 +629,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                         onChange={setAttributeValues}
                         onActivityChange={onUpdateActivity}
                         usageLogs={logs}
+                        note={note}
                     />
                 </div>
 

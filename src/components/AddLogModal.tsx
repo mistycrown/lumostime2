@@ -1,5 +1,6 @@
 /**
  * @file AddLogModal.tsx
+ * @updated 2026-09-03: Passes record notes to shared attributes for automatic choice-option matching.
  * @updated 2026-08-27: Expanded the record time tool into split-and-merge with adjacent-record targeting.
  * @updated 2026-08-27: Keeps start/end time shortcuts aligned under their corresponding inputs when split is unavailable.
  * @updated 2026-08-27: Lets the split-and-merge action reserve its own responsive center column without wrapping.
@@ -927,6 +928,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
             onActivityChange={onUpdateActivity}
             usageLogs={allLogs}
             includeReferencedArchived={Boolean(initialLog)}
+            note={formState.note}
           />
 
           {/* Todo Association with Embedded Progress */}
