@@ -1,6 +1,7 @@
 /**
  * @file syncConfig.ts
  * @updated 2026-05-18: Reduced timestamp tolerance to 1 second so fresh desktop edits are no longer misclassified as equal right after a sync.
+ * @updated 2026-09-03: Added a cooldown for foreground resume checks to avoid repeated lifecycle events triggering duplicate syncs.
  * @description 同步系统配置常量
  * 
  * 集中管理所有同步相关的配置参数，便于调整和测试
@@ -39,6 +40,8 @@ export const SYNC_CONFIG = {
      * 原因：避免频繁同步，减少网络请求
      */
     AUTO_SYNC_DEBOUNCE_MS: 2000,
+
+    RESUME_SYNC_COOLDOWN_MS: 30_000,
 
     /**
      * 数据更新解锁延迟（毫秒）

@@ -19,6 +19,7 @@
  * @updated 2026-08-10: Included Android widget templates in backup/sync payloads, restores them through widgetService, and auto-syncs template-only changes.
  * @updated 2026-08-11: Adds shareable error IDs to user-visible manual cloud sync failures.
  * @updated 2026-08-26: Includes Routine configuration in backup payloads and restore handling.
+ * @updated 2026-09-03: Skips full cloud payload downloads for already acknowledged versions and throttles repeated resume checks.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -673,29 +674,37 @@ export const useSyncManager = () => {
             }
 
             // 3. 比较时间戳（使用容错阈值）
+            const lastSeenCloudUploadedAt = getLastSeenCloudUploadedAt();
+            const hasPendingLocalEdit = hasPendingLocalDataEdit();
+            const cloudAlreadyApplied = mode !== 'manual'
+                && !hasPendingLocalEdit
+                && cloudTimestamp > 0
+                && cloudTimestamp <= lastSeenCloudUploadedAt;
+
             try {
-                const canonicalCloudData = await activeService.downloadData();
-                const canonicalCloudTimestamp = getSyncPayloadTimestamp(canonicalCloudData, 0);
-                cloudData = canonicalCloudData;
+                if (cloudAlreadyApplied) {
+                    console.log('[Sync][Step 2c] Skipping canonical cloud download: version already acknowledged locally.');
+                } else {
+                    const canonicalCloudData = await activeService.downloadData();
+                    const canonicalCloudTimestamp = getSyncPayloadTimestamp(canonicalCloudData, 0);
+                    cloudData = canonicalCloudData;
 
-                if (canonicalCloudTimestamp > 0 && !usedFileModTime) {
-                    cloudTimestamp = canonicalCloudTimestamp;
+                    if (canonicalCloudTimestamp > 0 && !usedFileModTime) {
+                        cloudTimestamp = canonicalCloudTimestamp;
+                    }
+
+                    console.log('[Sync][Step 2c] Canonical cloud main backup loaded:', {
+                        cloudTimestamp,
+                        cloudTimestampSource: canonicalCloudTimestamp > 0 ? 'payload' : 'metadata-fallback',
+                        cloudJsonSize: getComparableSyncJsonByteSize(cloudData)
+                    });
                 }
-
-                console.log('[Sync][Step 2c] Canonical cloud main backup loaded:', {
-                    cloudTimestamp,
-                    cloudTimestampSource: canonicalCloudTimestamp > 0 ? 'payload' : 'metadata-fallback',
-                    cloudJsonSize: getComparableSyncJsonByteSize(cloudData)
-                });
             } catch (error) {
                 console.warn('[Sync] Failed to load canonical cloud main backup; keeping metadata fallback.', error);
             }
 
-            const lastSeenCloudUploadedAt = getLastSeenCloudUploadedAt();
-            const hasPendingLocalEdit = hasPendingLocalDataEdit();
             const {
                 comparisonLocalTimestamp,
-                cloudAlreadyApplied,
                 shouldRestoreUnseenCloud
             } = resolveSyncComparisonTimestamp({
                 localTimestamp,
@@ -716,7 +725,7 @@ export const useSyncManager = () => {
             console.log(`[Sync][Step 3]   - 云端版本状态: ${cloudAlreadyApplied ? '已应用' : shouldRestoreUnseenCloud ? '未见过，优先下载' : '按本地编辑时间比较'}`);
 
             // 4. 执行操作（使用容错阈值判断）
-            if (!cloudData && cloudTimestamp > 0) {
+            if (!cloudAlreadyApplied && !cloudData && cloudTimestamp > 0) {
                 try {
                     cloudData = await activeService.downloadData();
                 } catch (error) {
@@ -724,7 +733,9 @@ export const useSyncManager = () => {
                 }
             }
 
-            const cloudJsonSize = cloudData ? getComparableSyncJsonByteSize(cloudData) : 0;
+            const cloudJsonSize = cloudAlreadyApplied
+                ? localJsonSize
+                : cloudData ? getComparableSyncJsonByteSize(cloudData) : 0;
             const decision = resolveSyncDirectionDecision({
                 localTimestamp: comparisonLocalTimestamp,
                 cloudTimestamp,
@@ -1459,15 +1470,24 @@ export const useSyncManager = () => {
     useEffect(() => {
         // A. Resume (Foreground) -> Check for Cloud Updates
         let appListener: any;
+        let lastResumeSyncAt = 0;
+        const triggerResumeSync = () => {
+            if (manualSyncMode) return;
+            const now = Date.now();
+            if (now - lastResumeSyncAt < SYNC_CONFIG.RESUME_SYNC_COOLDOWN_MS) {
+                console.log('[App] Resume sync skipped: cooldown is active.');
+                return;
+            }
+            lastResumeSyncAt = now;
+            void performSync('resume');
+        };
         const setupListener = async () => {
             appListener = await App.addListener('appStateChange', async (state) => {
                 // On native platforms, use App state
                 if (state.isActive && Capacitor.isNativePlatform()) {
                     // 如果开启了手动同步模式，跳过恢复同步
-                    if (!manualSyncMode) {
-                        console.log('[App] App resumed. Checking for updates...');
-                        performSync('resume');
-                    }
+                    console.log('[App] App resumed. Checking for updates...');
+                    triggerResumeSync();
                 }
             });
         };
@@ -1479,10 +1499,8 @@ export const useSyncManager = () => {
                 // On Web, switching tabs back to visible should also check (similar to App Resume)
                 if (!Capacitor.isNativePlatform()) {
                     // 如果开启了手动同步模式，跳过恢复同步
-                    if (!manualSyncMode) {
-                        console.log('[App] Tab visible. Checking for updates...');
-                        performSync('resume');
-                    }
+                    console.log('[App] Tab visible. Checking for updates...');
+                    triggerResumeSync();
                 }
             }
         };
