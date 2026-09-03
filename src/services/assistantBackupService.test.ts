@@ -1,10 +1,10 @@
 /**
  * @file assistantBackupService.test.ts
  * @input Mocked AI storage and unified AI backup payloads
- * @output Regression coverage for custom prompt block backup and live restore notifications
+ * @output Regression coverage for AI persona, custom prompt block, and memory backup and live restore notifications
  * @pos Test (AI Backup)
- * @description Verifies that global custom prompt blocks round-trip through the main backup and notify mounted chat interfaces after restore.
- * @updated 2026-09-03: Added custom prompt block cloud-sync backup and restore regression coverage.
+ * @description Verifies that global AI chat state round-trips through the main backup and notifies mounted chat interfaces after restore.
+ * @updated 2026-09-03: Added persona and long-term memory cloud-sync backup and restore regression coverage.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -100,6 +100,7 @@ import {
   ASSISTANT_CHAT_RESTORED_EVENT,
   type AssistantChatRestoredDetail
 } from '../utils/aiBackupChange';
+import { assistantMemoryService } from './assistantMemoryService';
 import { assistantBackupService } from './assistantBackupService';
 
 const createLocalStorageMock = () => {
@@ -113,7 +114,7 @@ const createLocalStorageMock = () => {
   };
 };
 
-describe('assistantBackupService custom prompt blocks', () => {
+describe('assistantBackupService AI chat state', () => {
   beforeEach(() => {
     Object.defineProperty(globalThis, 'localStorage', {
       value: createLocalStorageMock(),
@@ -123,6 +124,8 @@ describe('assistantBackupService custom prompt blocks', () => {
       value: new EventTarget(),
       configurable: true
     });
+    vi.mocked(assistantMemoryService.getMemory).mockReset().mockReturnValue({} as any);
+    vi.mocked(assistantMemoryService.saveMemory).mockReset();
   });
 
   it('includes every global custom prompt block in the unified backup payload', () => {
@@ -137,6 +140,18 @@ describe('assistantBackupService custom prompt blocks', () => {
     expect(payload.chat.customPromptBlocks).toEqual(blocks);
   });
 
+  it('includes personas and long-term memory in the unified backup payload', () => {
+    const personas = [{ id: 'persona-1', name: 'Cloud persona' }];
+    const memory = { version: 1, profileMemory: ['Prefers concise answers'] };
+    localStorage.setItem('test_personas', JSON.stringify(personas));
+    vi.mocked(assistantMemoryService.getMemory).mockReturnValue(memory as any);
+
+    const payload = assistantBackupService.buildBackupPayload();
+
+    expect(payload.chat.personas).toEqual(personas);
+    expect(payload.assistant.memory).toEqual(memory);
+  });
+
   it('restores prompt blocks and emits the live chat restore event', async () => {
     const blocks = [
       { id: 'block-cloud', title: 'Cloud', content: 'Restored content.', enabled: true }
@@ -144,15 +159,40 @@ describe('assistantBackupService custom prompt blocks', () => {
     const restoredEvent = vi.fn<(event: Event) => void>();
     window.addEventListener(ASSISTANT_CHAT_RESTORED_EVENT, restoredEvent);
 
+    const personas = [{ id: 'persona-cloud', name: 'Cloud persona' }];
+    const memory = { version: 1, profileMemory: ['Cloud memory'] };
+    vi.mocked(assistantMemoryService.getMemory).mockReturnValue(memory as any);
     await assistantBackupService.applyBackupPayload({
       chat: {
-        customPromptBlocks: blocks
-      }
+        customPromptBlocks: blocks,
+        personas
+      },
+      assistant: { memory }
     });
 
     expect(JSON.parse(localStorage.getItem('test_custom_prompt_blocks') || '[]')).toEqual(blocks);
     expect(restoredEvent).toHaveBeenCalledTimes(1);
     const event = restoredEvent.mock.calls[0][0] as CustomEvent<AssistantChatRestoredDetail>;
     expect(event.detail.customPromptBlocks).toEqual(blocks);
+    expect(event.detail.personas).toEqual(personas);
+    expect(event.detail.memory).toEqual(memory);
+    expect(assistantMemoryService.saveMemory).toHaveBeenCalledWith(memory);
+  });
+
+  it('preserves local persona and prompt state when an older backup omits those fields', async () => {
+    const localPersonas = [{ id: 'local-persona', name: 'Local persona' }];
+    const localBlocks = [{ id: 'local-block', title: 'Local', content: 'Keep me.', enabled: true }];
+    localStorage.setItem('test_personas', JSON.stringify(localPersonas));
+    localStorage.setItem('test_custom_prompt_blocks', JSON.stringify(localBlocks));
+    const restoredEvent = vi.fn<(event: Event) => void>();
+    window.addEventListener(ASSISTANT_CHAT_RESTORED_EVENT, restoredEvent);
+
+    await assistantBackupService.applyBackupPayload({ chat: { sessions: [] } });
+
+    expect(JSON.parse(localStorage.getItem('test_personas') || '[]')).toEqual(localPersonas);
+    expect(JSON.parse(localStorage.getItem('test_custom_prompt_blocks') || '[]')).toEqual(localBlocks);
+    const event = restoredEvent.mock.calls[0][0] as CustomEvent<AssistantChatRestoredDetail>;
+    expect(event.detail).not.toHaveProperty('personas');
+    expect(event.detail).not.toHaveProperty('customPromptBlocks');
   });
 });
