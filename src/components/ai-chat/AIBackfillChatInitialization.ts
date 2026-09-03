@@ -11,6 +11,7 @@
  * @updated 2026-05-16: Normalized per-block enabled flags for persona custom prompt blocks and defaulted legacy blocks to enabled.
  * @updated 2026-05-16: Normalized persona-scoped custom prompt blocks so extra labeled prompt snippets persist across AI chat sessions.
  * @updated 2026-05-15: Extracted built-in personas, storage keys, and persisted chat-state normalization from AIBackfillChatModal.
+ * @updated 2026-09-03: Exposed custom prompt block normalization for live cloud-restore hydration.
  */
 import { BUILTIN_PERSONA_SYSTEM_PROMPTS } from '../../constants/aiPersonaSystemPrompts';
 import type { AppliedChatAction } from '../../services/assistantActionExecutor';
@@ -292,7 +293,7 @@ const normalizeAssistantLetterResult = (value: unknown): AssistantLetterResultCa
   };
 };
 
-const normalizeCustomPromptBlocks = (value: unknown): AIChatCustomPromptBlock[] => {
+export const normalizeCustomPromptBlocks = (value: unknown): AIChatCustomPromptBlock[] => {
   if (!Array.isArray(value)) {
     return [];
   }
