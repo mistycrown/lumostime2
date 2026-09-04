@@ -5,6 +5,7 @@
  * @pos Component Support (AI Integration)
  * @description Extracts the pre-request foreground turn setup and the ordinary unified-turn execution path out of AIBackfillChatModal so the main send handler becomes a thin dispatcher.
  * @updated 2026-07-06: Passes local-query history into foreground tool-call application so principle/self-belief writes can require a prior library lookup.
+ * @updated 2026-09-04: Captures structured reminder removal results alongside reminder additions on foreground replies.
  * @updated 2026-08-24: Captures reminder and memory snapshots on foreground replies so retry can revert every persistent side effect.
  * @updated 2026-07-06: Enforced structured log-query routing, duplicate-query rejection, and clearer local-query summaries so repeated foreground retrieval rounds must actually change the retrieval expression.
  * @updated 2026-07-05: Surfaced local-query keywords and hit summaries in pending chat feedback, and added debug sections for query request/result/retry rounds.

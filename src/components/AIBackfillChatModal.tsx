@@ -5,6 +5,7 @@
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
  * @updated 2026-09-03: Reloads restored personas, prompt blocks, and long-term memory into mounted chat state so cloud restores cannot be overwritten by stale React state.
+ * @updated 2026-09-04: Applies structured AI reminder removal actions to the durable reminder queue and long-term memory.
  * @updated 2026-09-03: Removed the base polling-frequency state path now that Android check-ins use concrete alarm times.
  * @updated 2026-07-31: Added a pending-message-id fallback cleanup so completed foreground turns always restore the composer send button.
  * @updated 2026-09-02: Keeps fallback system triggers pending until Web execution succeeds and surfaces native skip/request states in background history.
@@ -5339,11 +5340,25 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   } => {
     const before = assistantReminderQueueService.listReminders();
     const reminders = output.reminders || [];
-    if (reminders.length === 0) {
+    const reminderActions = output.reminderActions || [];
+    if (reminders.length === 0 && reminderActions.length === 0) {
       return { before, updates: [] };
     }
 
     const reminderUpdates: string[] = [];
+    reminderActions.forEach((action) => {
+      if (action.action !== 'remove') {
+        return;
+      }
+
+      const removedReminder = assistantReminderQueueService.removeReminder(action.reminderId);
+      if (removedReminder) {
+        reminderUpdates.push(`已移除 reminder：${removedReminder.text}`);
+      } else {
+        console.warn('[AIBackfillChatModal] Reminder removal target was not found', action.reminderId);
+      }
+    });
+
     reminders.forEach((reminder) => {
       const normalizedDueAt = normalizeAssistantDateTime(reminder.dueAt);
       if (!normalizedDueAt) {

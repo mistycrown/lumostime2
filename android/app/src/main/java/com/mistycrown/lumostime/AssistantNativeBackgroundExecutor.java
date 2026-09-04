@@ -9,7 +9,7 @@
  * @updated 2026-09-02: Surfaces every successful native background reply as an Android notification, including check-ins and scheduled assistant letters.
  * @updated 2026-09-02: Suppresses Android notifications for explicit silent outcomes; only reply outcomes with non-empty assistantReply content may notify the user.
  * @updated 2026-05-13: Reminder_due completions now raise a native high-priority reminder notification immediately and mark that notification in diagnostics so Web hydration does not double-alert.
- * @updated 2026-05-09: Rejects empty or content-free unified background decisions so due reminders stay pending for retry instead of being deleted after blank model responses.
+ * @updated 2026-09-04: Preserves structured reminder removal actions across native background execution and WebView hydration.
  * @updated 2026-05-01: Normalized JSON null-like assistant reply fields so native background diagnostics no longer persist literal "null" bubbles into chat history.
  * @updated 2026-04-30: Added direct native OpenAI/Gemini background execution for check-in-style triggers with diagnostic request lifecycle events.
  */
@@ -331,6 +331,10 @@ public final class AssistantNativeBackgroundExecutor {
         if (reminders != null && reminders.length() > 0) {
             normalized.put("reminders", reminders);
         }
+        JSONArray reminderActions = normalizeJsonArray(rawOutput.opt("reminderActions"));
+        if (reminderActions != null && reminderActions.length() > 0) {
+            normalized.put("reminderActions", reminderActions);
+        }
         String silentReason = safeModelString(rawOutput.opt("silentReason"));
         if (!silentReason.isEmpty()) {
             normalized.put("silentReason", silentReason);
@@ -362,6 +366,11 @@ public final class AssistantNativeBackgroundExecutor {
 
         JSONArray reminders = rawOutput.optJSONArray("reminders");
         if (reminders != null && reminders.length() > 0) {
+            return true;
+        }
+
+        JSONArray reminderActions = rawOutput.optJSONArray("reminderActions");
+        if (reminderActions != null && reminderActions.length() > 0) {
             return true;
         }
 
@@ -589,6 +598,10 @@ public final class AssistantNativeBackgroundExecutor {
         Object reminders = normalized.opt("reminders");
         if (reminders instanceof JSONArray && ((JSONArray) reminders).length() > 0) {
             context.put("reminders", ((JSONArray) reminders).toString());
+        }
+        Object reminderActions = normalized.opt("reminderActions");
+        if (reminderActions instanceof JSONArray && ((JSONArray) reminderActions).length() > 0) {
+            context.put("reminderActions", ((JSONArray) reminderActions).toString());
         }
         String silentReason = safeModelString(normalized.opt("silentReason"));
         if (!silentReason.isEmpty()) {

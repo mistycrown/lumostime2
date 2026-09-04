@@ -55,6 +55,9 @@ Background schemas：
       "todoId": "todo id"
     }
   ],
+  "reminderActions": [
+    { "action": "remove", "reminderId": "existing reminder id" }
+  ],
   "memoryAction": "update_memory | no_update",
   "memoryPatch": {
     "profileMemory": ["string"],

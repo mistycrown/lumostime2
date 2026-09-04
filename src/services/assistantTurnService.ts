@@ -150,6 +150,7 @@ const buildToolSchemaPrompt = async (input: AssistantUnifiedTurnInput): Promise<
       '- outcome may be "reply" or "silent".',
       '- Do not emit toolCalls in background mode.',
       '- reminders may be returned when a future follow-up is appropriate.',
+      '- To remove an existing reminder, return reminderActions with the exact reminderId from the Memory Snapshot; never claim removal from prose alone.',
       '- If outcome is "silent", provide decisionSummary whenever possible.',
       '- If outcome is "silent", silentReason should be one of: active_focus_protection, likely_do_not_disturb, state_still_clear, insufficient_confidence, waiting_for_stronger_signal, followup_already_scheduled.',
       '- If outcome is "silent", silentSideEffects may list any state, memory, or reminder updates in short Chinese phrases.',
@@ -213,6 +214,7 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
           outcome: 'reply | silent',
           assistantReply: 'string',
           reminders: [],
+          reminderActions: [],
           memoryAction: 'no_update | update_memory',
           memoryPatch: {},
           decisionSummary: 'string',
@@ -224,6 +226,7 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
           outcome: 'reply | silent',
           assistantReply: 'string',
           reminders: [],
+          reminderActions: [],
           memoryAction: 'no_update',
           decisionSummary: 'string',
           silentReason: 'active_focus_protection | likely_do_not_disturb | state_still_clear | insufficient_confidence | waiting_for_stronger_signal | followup_already_scheduled',
@@ -244,6 +247,7 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
           },
           toolCalls: [],
           reminders: [],
+          reminderActions: [],
           memoryAction: 'no_update | update_memory',
           memoryPatch: {}
         }
@@ -259,6 +263,7 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
           },
           toolCalls: [],
           reminders: [],
+          reminderActions: [],
           memoryAction: 'no_update'
         }
     );
