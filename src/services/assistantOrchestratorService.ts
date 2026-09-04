@@ -4,6 +4,7 @@
  * @output Background assistant turn decisions plus applied reminder or memory side effects
  * @pos Service (Assistant Orchestrator)
  * @description Orchestrates Android-first assistant system turns by loading structured memory, assembling a prompt, calling the existing AI service, and applying the resulting silent/message/reminder/memory actions back into local state.
+ * @updated 2026-09-04: Executes structured AI reminder removal actions in Web and native-background hydration paths.
  * @updated 2026-05-17: Persisted background chat/history writes now mark the unified AI backup state as changed so background-only AI activity can trigger cloud-sync/export timestamp updates.
  * @updated 2026-09-02: Hydrates native request failures into background call history so failed Android executions remain visible after the WebView resumes.
  * @updated 2026-09-02: Treats explicit silent outcomes as non-user-facing even if a provider also returns stray assistantReply text, preventing native and Web notification leaks.
@@ -39,6 +40,7 @@ import {
   type AssistantOrchestratorResult,
   type AssistantReasoningSummary,
   type AssistantReminder,
+  type AssistantReminderAction,
   type AssistantReminderDraft,
   type AssistantSilentReason,
   type AssistantUnifiedTurnOutput,
@@ -430,6 +432,43 @@ const parseNativeReminderDrafts = (value: unknown): AssistantReminderDraft[] => 
   });
 };
 
+const parseNativeReminderActions = (value: unknown): AssistantReminderAction[] => {
+  const parsed = parseDiagnosticJson<unknown>(value, []);
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  return parsed.flatMap((item) => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+
+    const candidate = item as Partial<AssistantReminderAction>;
+    const reminderId = normalizeAssistantText(candidate.reminderId);
+    return candidate.action === 'remove' && reminderId
+      ? [{ action: 'remove' as const, reminderId }]
+      : [];
+  });
+};
+
+const applyReminderActions = (
+  actions: AssistantReminderAction[],
+  enabled: boolean
+): AssistantReminder[] => {
+  if (!enabled) {
+    return [];
+  }
+
+  return actions.flatMap((action) => {
+    if (action.action !== 'remove') {
+      return [];
+    }
+
+    const removedReminder = assistantReminderQueueService.removeReminder(action.reminderId);
+    return removedReminder ? [removedReminder] : [];
+  });
+};
+
 const buildNativeTriggerText = (triggerType?: AssistantSystemTrigger['type']): string => {
   switch (triggerType) {
     case 'assistant_letter_due':
@@ -538,10 +577,12 @@ const buildMemoryPatchSideEffects = (memoryPatch?: AssistantUnifiedTurnOutput['m
 const buildAppliedSideEffects = (
   output: AssistantUnifiedTurnOutput,
   appliedReminders: AssistantReminder[],
+  removedReminders: AssistantReminder[],
   usedLongTermMemory: boolean
 ): string[] => {
   return dedupeStrings([
     ...buildMemoryPatchSideEffects(output.memoryPatch),
+    ...(removedReminders.length > 0 ? [`移除了 ${removedReminders.length} 条提醒`] : []),
     ...(appliedReminders.length > 0 ? [`新增了 ${appliedReminders.length} 条后续提醒`] : []),
     ...(usedLongTermMemory ? ['记录了最近决策摘要'] : []),
     ...((output.silentSideEffects || []).map((item) => item.trim()).filter(Boolean))
@@ -783,9 +824,12 @@ export const assistantOrchestratorService = {
         const memoryAction = parseNativeMemoryAction(entry.context?.memoryAction);
         const memoryPatch = parseNativeMemoryPatch(entry.context?.memoryPatch);
         const reminderDrafts = parseNativeReminderDrafts(entry.context?.reminders);
+        const reminderActions = parseNativeReminderActions(entry.context?.reminderActions);
         const beforeMemory = assistantMemoryService.getMemory();
         let memoryUpdates: PersistedAIChatMemoryUpdateSection[] = [];
         const appliedReminders: AssistantReminder[] = [];
+        const removedReminders = applyReminderActions(reminderActions, assistantConfig.enabled);
+        didUpdateReminders = didUpdateReminders || removedReminders.length > 0;
 
         if (assistantConfig.longTermMemoryEnabled && memoryAction === 'update_memory' && memoryPatch) {
           const afterMemory = assistantMemoryService.applyPatch(memoryPatch);
@@ -814,14 +858,17 @@ export const assistantOrchestratorService = {
           didUpdateReminders = didUpdateReminders || appliedReminders.length > 0;
         }
 
-        if (assistantConfig.longTermMemoryEnabled && appliedReminders.length > 0) {
+        if (assistantConfig.longTermMemoryEnabled && (appliedReminders.length > 0 || removedReminders.length > 0)) {
           assistantMemoryService.replaceActiveReminders(
             assistantReminderQueueService.listReminders().filter((reminder) => reminder.status === 'pending')
           );
           didUpdateMemory = true;
         }
 
-        const reminderUpdates = buildPersistedReminderUpdates(appliedReminders);
+        const reminderUpdates = [
+          ...removedReminders.map((reminder) => `已移除 reminder：${reminder.text}`),
+          ...buildPersistedReminderUpdates(appliedReminders)
+        ];
         const finalDecisionSummary = decisionSummary
           || (
             assistantReply
@@ -1002,6 +1049,7 @@ export const assistantOrchestratorService = {
 
     let updatedMemory: AssistantMemory = memory;
     const reminders = output.reminders || [];
+    const reminderActions = output.reminderActions || [];
     const replyContent = output.assistantReply?.trim() || '';
     const messageParts = replyContent
       ? buildAssistantDisplayParts(replyContent)
@@ -1014,10 +1062,12 @@ export const assistantOrchestratorService = {
       ...(hasVisibleReply ? { message: replyContent } : {}),
       ...(hasVisibleReply && messageParts?.length ? { messageParts } : {}),
       ...(reminders.length > 0 ? { reminders } : {}),
+      ...(reminderActions.length > 0 ? { reminderActions } : {}),
       ...(output.memoryAction === 'update_memory' && output.memoryPatch ? { memoryPatch: output.memoryPatch } : {}),
       ...(output.silentReason ? { silentReason: output.silentReason } : {})
     };
     const appliedReminders: AssistantReminder[] = [];
+    const removedReminders = applyReminderActions(reminderActions, assistantConfig.enabled);
 
     if (assistantConfig.longTermMemoryEnabled && output.memoryAction === 'update_memory' && output.memoryPatch) {
       updatedMemory = assistantMemoryService.applyPatch(output.memoryPatch);
@@ -1044,7 +1094,7 @@ export const assistantOrchestratorService = {
       });
     }
 
-    if (assistantConfig.longTermMemoryEnabled && appliedReminders.length > 0) {
+    if (assistantConfig.longTermMemoryEnabled && (appliedReminders.length > 0 || removedReminders.length > 0)) {
       updatedMemory = assistantMemoryService.replaceActiveReminders(
         assistantReminderQueueService.listReminders().filter((reminder) => reminder.status === 'pending')
       );
@@ -1052,7 +1102,10 @@ export const assistantOrchestratorService = {
 
     let surfacedMessage: string | undefined;
     let surfacedMessageLocation: PersistedAssistantMessageLocation | null = null;
-    const reminderUpdates = buildPersistedReminderUpdates(appliedReminders);
+    const reminderUpdates = [
+      ...removedReminders.map((reminder) => `已移除 reminder：${reminder.text}`),
+      ...buildPersistedReminderUpdates(appliedReminders)
+    ];
     const shouldRecordDecisionSummary = assistantConfig.longTermMemoryEnabled;
     if (hasVisibleReply && replyContent) {
       surfacedMessage = replyContent;
@@ -1073,7 +1126,7 @@ export const assistantOrchestratorService = {
       });
     }
 
-    const sideEffects = buildAppliedSideEffects(output, appliedReminders, shouldRecordDecisionSummary);
+    const sideEffects = buildAppliedSideEffects(output, appliedReminders, removedReminders, shouldRecordDecisionSummary);
     const decisionSummary = buildDecisionSummary(output, decision.action, sideEffects, surfacedMessage);
 
     decision.decisionSummary = decisionSummary;

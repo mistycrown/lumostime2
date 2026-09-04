@@ -22,6 +22,7 @@ import type {
     AssistantLocalQueryTarget,
     AssistantReasoningSummary,
     AssistantMemoryPatch,
+    AssistantReminderAction,
     AssistantReminderDraft,
     AssistantSilentReason,
     AssistantToolCall,
@@ -1222,6 +1223,22 @@ const normalizeAssistantReminderDrafts = (value: unknown): AssistantReminderDraf
         : []
 );
 
+const normalizeAssistantReminderActions = (value: unknown): AssistantReminderAction[] => (
+    Array.isArray(value)
+        ? value.flatMap((item) => {
+            if (!item || typeof item !== 'object') {
+                return [];
+            }
+
+            const candidate = item as Record<string, unknown>;
+            const reminderId = typeof candidate.reminderId === 'string' ? candidate.reminderId.trim() : '';
+            return candidate.action === 'remove' && reminderId
+                ? [{ action: 'remove' as const, reminderId }]
+                : [];
+        })
+        : []
+);
+
 const ASSISTANT_SILENT_REASONS: AssistantSilentReason[] = [
     'active_focus_protection',
     'likely_do_not_disturb',
@@ -1734,6 +1751,10 @@ const hasMeaningfulAssistantUnifiedTurnSignal = (mode: AssistantTurnMode, rawOut
     }
 
     if (normalizeAssistantReminderDrafts(candidate.reminders).length > 0) {
+        return true;
+    }
+
+    if (normalizeAssistantReminderActions(candidate.reminderActions).length > 0) {
         return true;
     }
 
@@ -2381,6 +2402,11 @@ Output:
             const reminders = normalizeAssistantReminderDrafts(rawOutput?.reminders);
             if (reminders.length > 0) {
                 normalized.reminders = reminders;
+            }
+
+            const reminderActions = normalizeAssistantReminderActions(rawOutput?.reminderActions);
+            if (reminderActions.length > 0) {
+                normalized.reminderActions = reminderActions;
             }
 
             const normalizedMemoryPatch = normalizeAssistantMemoryPatch(rawOutput?.memoryPatch);

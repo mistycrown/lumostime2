@@ -62,6 +62,7 @@
 - `activeReminders: AssistantReminder[]`
   只保留那些仍然待触发、未来仍需跟进的 reminders。
   reminder 的 `text` 必须只描述“提醒什么”，只写主谓语，不写时间状语。因为 reminders 自带绝对时间属性，不需要在 `reminder.text` 中重复，重复提及相对时间（比如明天、下周），只会造成时间系统的混乱。
+  如果要移除已有 reminder，必须同时返回顶层 `reminderActions`，使用 Memory Snapshot 中的精确 `reminderId`；不要只在 `assistantReply` 里声称已移除。
   如果某件事是持续性的，而且未来需要再次检查用户进展，应积极主动地创建 reminder。
 
 - `recentDecisions: string[]`
@@ -80,6 +81,20 @@
 ### 5.1 顶层 `reminders` schema
 
 前台或后台轮次如果要安排未来提醒，应返回顶层 `reminders: AssistantReminderDraft[]`。
+
+### 5.1.1 顶层 `reminderActions` schema
+
+如果要移除已有提醒，应返回：
+
+```json
+{
+  "reminderActions": [
+    { "action": "remove", "reminderId": "existing reminder id" }
+  ]
+}
+```
+
+只能使用当前 Memory Snapshot 中存在的精确 `reminderId`。只有结构化删除动作实际执行成功时，才可以在回复中说“已移除”。
 
 字段如下：
 
@@ -204,4 +219,3 @@
   ]
 }
 ```
-

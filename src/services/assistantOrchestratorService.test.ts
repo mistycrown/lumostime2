@@ -4,6 +4,7 @@
  * @output Regression coverage for background assistant orchestration and native result hydration
  * @pos Test (Assistant Orchestrator)
  * @description Verifies reply/silent decisions, side effects, history, notifications, and native background hydration.
+ * @updated 2026-09-04: Added coverage for structured AI reminder removal and memory synchronization.
  * @updated 2026-09-03: Updated assistant config fixtures after removing the base polling interval.
  */
 
@@ -47,7 +48,8 @@ vi.mock('./assistantMemoryService', () => ({
 vi.mock('./assistantReminderQueueService', () => ({
   assistantReminderQueueService: {
     enqueueReminder: vi.fn(),
-    listReminders: vi.fn()
+    listReminders: vi.fn(),
+    removeReminder: vi.fn()
   }
 }));
 
@@ -302,6 +304,54 @@ describe('assistantOrchestratorService', () => {
     expect(result.decision.silentSideEffects).toEqual([
       '新增了 1 条后续提醒',
       '记录了最近决策摘要'
+    ]);
+  });
+
+  it('applies structured reminder removal actions and syncs long-term memory', async () => {
+    const existingReminder: AssistantReminder = {
+      id: 'reminder-to-remove',
+      type: 'self_followup',
+      dueAt: '2026-04-27T11:00:00.000Z',
+      status: 'pending',
+      text: '检查论文提纲',
+      source: 'agent',
+      createdAt: '2026-04-27T10:00:00.000Z'
+    };
+
+    let queuedReminders = [existingReminder];
+    vi.mocked(assistantReminderQueueService.listReminders).mockImplementation(() => queuedReminders);
+    vi.mocked(assistantReminderQueueService.removeReminder).mockImplementation(() => {
+      queuedReminders = [];
+      return existingReminder;
+    });
+    vi.mocked(assistantTurnService.runUnifiedTurn).mockResolvedValue({
+      output: {
+        mode: 'background',
+        outcome: 'reply',
+        assistantReply: '已移除这条提醒。',
+        reminderActions: [{ action: 'remove', reminderId: existingReminder.id }],
+        memoryAction: 'no_update'
+      },
+      debug: debugExchange
+    });
+
+    const result = await assistantOrchestratorService.runSystemTurn({
+      trigger: {
+        id: 'trigger-remove-reminder',
+        type: 'checkin',
+        source: 'system',
+        createdAt: '2026-04-27T10:00:00.000Z',
+        text: 'check in'
+      },
+      currentDateTime: '2026-04-27T18:00:00+08:00',
+      defaultDate: '2026-04-27',
+      todayTimelineSummary: 'timeline'
+    });
+
+    expect(assistantReminderQueueService.removeReminder).toHaveBeenCalledWith(existingReminder.id);
+    expect(assistantMemoryService.replaceActiveReminders).toHaveBeenCalledWith([]);
+    expect(result.decision.reminderActions).toEqual([
+      { action: 'remove', reminderId: existingReminder.id }
     ]);
   });
 
