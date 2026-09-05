@@ -4,6 +4,8 @@ Contains pure utility functions for data processing and business logic calculati
 
 > Update 2026-09-05: `todoProgressUtils.ts` now resolves the progress baseline shown while editing an existing record by excluding that record's previously saved manual increment.
 
+> Update 2026-09-05: `filterUtils.ts` now matches free-text note conditions against saved Activity attribute values as well as notes, without matching attribute names.
+
 > Update 2026-08-26: `logSplitUtils.ts` builds two replacement records from a selected split time while preserving source fields and proportional manual todo progress.
 
 > Update 2026-08-27: `logSplitUtils.ts` also resolves adjacent actual records and merges into a target while retaining target fields, including any gap and transferring collection memberships.
@@ -32,6 +34,7 @@ Contains pure utility functions for data processing and business logic calculati
 - Update 2026-06-15: `syncTimestampDirection.ts` now combines timestamp tolerance with full JSON-size comparison, letting cloud sync break timestamp ties by payload size and surface explicit conflicts whenever a smaller backup would overwrite a larger one.
 - Update 2026-06-13: `dataValidation.ts` now accepts data collections and collection entries in user backup payloads while preserving old backup files that omit those fields.
 - Update 2026-06-13: `todoRowInteraction.ts` now relaxes vertical drift verification once swipe intent is confirmed, ensuring left-swipe completion triggers reliably without getting canceled by post-release diagonal drifts.
+- Update 2026-09-05: `filterUtils.ts` now matches free-text note conditions against saved Activity attribute values as well as notes, without matching attribute names.
 - Update 2026-06-06: `filterUtils.ts` now treats `@` expressions in log-side custom filters the same way as todo-side hidden filters, matching both linked todo titles and todo category names.
 - Update 2026-06-06: `todoScheduleUtils.ts` now exposes the shared primary schedule-kind priority directly to view components, keeping bento-week marker colors aligned with month-view ordering when one todo matches multiple same-day badges.
 - Update 2026-05-21: `dataCollectionUtils.ts` now exposes the shared collection-timeline todo timestamp resolver, which prefers a todo's latest linked log time, then `createdAt`, then collection `addedAt`.
@@ -74,7 +77,7 @@ Contains pure utility functions for data processing and business logic calculati
 - `dailyCheckUtils.ts`: [Active] - Builds daily check items from templates, normalizes review check data, applies NFC/widget/manual punch actions, and tolerates legacy templates with missing `items` arrays.
 - `checkStreakUtils.ts`: [Active] - Resolves per-item daily check streaks, global multiplier tiers, and weighted check-category completion values for achievement rules.
 - `colorAdapterUtils.ts`: [Active] - Unifies chart/card/schedule/tag color rendering across Tailwind palette classes and custom HEX colors.
-- `filterUtils.ts`: [Active] - Parses custom filter expressions, computes stats, normalizes saved custom filter order, and now also matches month-view todo hidden-filter expressions against todo title/category, linked activity/category, default scopes, and note text.
+- `filterUtils.ts`: [Active] - Parses custom filter expressions, computes stats, normalizes saved custom filter order, and matches note conditions against log notes plus saved Activity attribute values while excluding attribute names; month-view todo hidden-filter expressions also match todo title/category, linked activity/category, default scopes, and note text.
 - `noteTemplateUtils.ts`: [Active] - Sorts note templates, builds context-aware note template recommendations, and appends template text into notes consistently.
 - `scopeStatsUtils.ts`: [Active] - Centralizes scope duration aggregation and counts full duration for every linked scope on a log.
 - `scopeSortUtils.ts`: [Active] - Centralizes scope selection ordering so batch tools, pickers, and scope-related filter chips all follow the saved scope-management order.

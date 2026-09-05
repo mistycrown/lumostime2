@@ -7,6 +7,7 @@
  * @description 自定义筛选器的核心逻辑,包括表达式解析、记录匹配、统计计算和排序规整
  * @updated 2026-06-06: Unified `@` matching so linked-log todo filters can match both todo titles and todo category names.
  * @updated 2026-08-09: Planned timeline blocks are excluded from filter statistics.
+ * @updated 2026-09-05: Note keywords also match saved Activity attribute values, excluding attribute names.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -210,6 +211,27 @@ const resolveLinkedTodoActivityNames = (
     return { linkedActivityName, linkedCategoryName };
 };
 
+const resolveLogAttributeValueTexts = (log: Log, activity?: Category['activities'][number]): string[] => {
+    if (!activity?.attributes || !log.attributeValues) return [];
+
+    const definitions = new Map(activity.attributes.map((attribute) => [attribute.id, attribute]));
+    return log.attributeValues.flatMap((attributeValue) => {
+        const definition = definitions.get(attributeValue.attributeId);
+        if (!definition) return [];
+
+        if ('value' in attributeValue) {
+            return [String(attributeValue.value)];
+        }
+
+        const optionIds = 'optionId' in attributeValue
+            ? [attributeValue.optionId]
+            : attributeValue.optionIds;
+        return optionIds
+            .map((optionId) => definition.options?.find((option) => option.id === optionId)?.label || '')
+            .filter((label) => label.length > 0);
+    });
+};
+
 export function matchesTodoFilter(
     todo: TodoItem,
     condition: ParsedFilterCondition,
@@ -328,16 +350,17 @@ export function matchesFilter(
 
     // 4. 检查全文备注筛选
     if (condition.notes.length > 0) {
-        if (!log.note) return false;
-
-        const noteLower = log.note.toLowerCase();
+        const category = context.categories.find((item) => item.id === log.categoryId);
+        const activity = category?.activities.find((item) => item.id === log.activityId);
+        const noteAndAttributeValues = [log.note || '', ...resolveLogAttributeValueTexts(log, activity)];
 
         // 所有备注条件组都必须满足 (AND)
         const allNoteGroupsMatch = condition.notes.every(noteGroup => {
             // 每个条件组内,只要有一个匹配即可 (OR)
-            return noteGroup.some(noteKeyword =>
-                noteLower.includes(noteKeyword.toLowerCase())
-            );
+            return noteGroup.some((noteKeyword) => {
+                const normalizedKeyword = noteKeyword.toLowerCase();
+                return noteAndAttributeValues.some((value) => value.toLowerCase().includes(normalizedKeyword));
+            });
         });
 
         if (!allNoteGroupsMatch) return false;
