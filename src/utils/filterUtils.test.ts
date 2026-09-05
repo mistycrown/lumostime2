@@ -7,6 +7,7 @@
  * @updated 2026-06-06: Added linked-log coverage so `@` expressions also match todo category names in custom filters.
  * @updated 2026-05-11: Added todo hidden-filter coverage for the month-view display-settings expression.
  * @updated 2026-08-28: Added case-insensitive matching coverage across filter fields.
+ * @updated 2026-09-05: Added note-filter coverage for text, numeric, single-choice, and multi-choice attribute values.
  */
 
 import { describe, expect, test } from 'vitest';
@@ -23,7 +24,13 @@ const activityCategories: Category[] = [
         id: 'activity-reading',
         name: '阅读',
         icon: '📖',
-        color: 'bg-stone-100'
+        color: 'bg-stone-100',
+        attributes: [
+          { id: 'format', name: '\u683c\u5f0f', type: 'single', options: [{ id: 'book', label: '\u4e66\u7c4d' }, { id: 'paper', label: '\u8bba\u6587' }], order: 0, createdAt: 1, updatedAt: 1 },
+          { id: 'topics', name: '\u4e3b\u9898', type: 'multi', options: [{ id: 'focus', label: '\u4e13\u6ce8' }, { id: 'review', label: '\u590d\u76d8' }], order: 1, createdAt: 1, updatedAt: 1 },
+          { id: 'pages', name: '\u9875\u6570', type: 'number', order: 2, createdAt: 1, updatedAt: 1 },
+          { id: 'remark', name: '\u5907\u6ce8\u5c5e\u6027', type: 'text', order: 3, createdAt: 1, updatedAt: 1 }
+        ]
       },
       {
         id: 'activity-writing',
@@ -210,5 +217,44 @@ describe('matchesFilter linked todo matching', () => {
         }
       )
     ).toBe(false);
+  });
+});
+
+describe('matchesFilter note and attribute-value matching', () => {
+  const context = {
+    categories: activityCategories,
+    scopes,
+    todos: [],
+    todoCategories: []
+  };
+
+  test('matches text, numeric, single-choice, and multi-choice attribute values', () => {
+    const log = buildLog({
+      linkedTodoId: undefined,
+      note: undefined,
+      attributeValues: [
+        { attributeId: 'format', optionId: 'book' },
+        { attributeId: 'topics', optionIds: ['focus', 'review'] },
+        { attributeId: 'pages', value: 24 },
+        { attributeId: 'remark', value: '\u6df1\u5ea6\u9605\u8bfb' }
+      ]
+    });
+
+    expect(matchesFilter(log, parseFilterExpression('\u4e66\u7c4d'), context)).toBe(true);
+    expect(matchesFilter(log, parseFilterExpression('\u4e13\u6ce8'), context)).toBe(true);
+    expect(matchesFilter(log, parseFilterExpression('24'), context)).toBe(true);
+    expect(matchesFilter(log, parseFilterExpression('\u6df1\u5ea6\u9605\u8bfb'), context)).toBe(true);
+  });
+
+  test('does not match attribute names and keeps note plus attribute values in the same note field', () => {
+    const log = buildLog({
+      linkedTodoId: undefined,
+      note: '\u4eca\u665a\u590d\u76d8',
+      attributeValues: [{ attributeId: 'format', optionId: 'book' }]
+    });
+
+    expect(matchesFilter(log, parseFilterExpression('\u683c\u5f0f'), context)).toBe(false);
+    expect(matchesFilter(log, parseFilterExpression('\u4eca\u665a \u4e66\u7c4d'), context)).toBe(true);
+    expect(matchesFilter(log, parseFilterExpression('\u4e0d\u5b58\u5728 \u4e66\u7c4d'), context)).toBe(false);
   });
 });
