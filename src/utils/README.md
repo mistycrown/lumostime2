@@ -2,6 +2,8 @@
 
 Contains pure utility functions for data processing and business logic calculations.
 
+> Update 2026-09-05: `todoProgressUtils.ts` now resolves the progress baseline shown while editing an existing record by excluding that record's previously saved manual increment.
+
 > Update 2026-08-26: `logSplitUtils.ts` builds two replacement records from a selected split time while preserving source fields and proportional manual todo progress.
 
 > Update 2026-08-27: `logSplitUtils.ts` also resolves adjacent actual records and merges into a target while retaining target fields, including any gap and transferring collection memberships.
