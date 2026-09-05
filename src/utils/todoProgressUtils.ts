@@ -4,12 +4,13 @@
  * @output Shared helpers for resolving todo progress modes, derived progress values, and subtask-based sync
  * @pos Utility (Todo progress)
  * @description Normalizes the new todo progress-tracking modes so detail pages, list rendering, log entry, and save logic all use the same progress rules.
+ * @updated 2026-09-05: Added an edit-safe progress display helper so existing log increments are excluded from their own preview baseline.
  * @updated 2026-04-22: Added manual/subtask progress-mode helpers and parent subtask progress syncing.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
 
-import { TodoItem, TodoProgressTrackingMode } from '../types';
+import { Log, TodoItem, TodoProgressTrackingMode } from '../types';
 import { getCompletedDirectChildCount, getDirectChildCount, isSubtask } from './todoHierarchyUtils';
 
 export interface TodoProgressSnapshot {
@@ -68,6 +69,19 @@ export const shouldTodoUseManualProgressInput = (
   todo?: Pick<TodoItem, 'id' | 'parentTodoId' | 'isProgress' | 'progressTrackingMode'> | null,
   todos: TodoItem[] = []
 ): boolean => getTodoProgressTrackingMode(todo, todos) === 'manual';
+
+/** Returns the completed amount before an existing log's contribution. */
+export const getTodoProgressDisplayCompletedUnits = (
+  completedUnits: number,
+  todoId: string,
+  editingLog?: Pick<Log, 'linkedTodoId' | 'progressIncrement'> | null
+): number => {
+  const editingIncrement = editingLog?.linkedTodoId === todoId
+    ? Math.max(0, editingLog.progressIncrement || 0)
+    : 0;
+
+  return Math.max(0, completedUnits - editingIncrement);
+};
 
 export const getTodoProgressSnapshot = (
   todo?: Pick<TodoItem, 'id' | 'parentTodoId' | 'isProgress' | 'progressTrackingMode' | 'totalAmount' | 'unitAmount' | 'completedUnits'> | null,

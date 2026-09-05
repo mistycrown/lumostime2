@@ -1,5 +1,6 @@
 /**
  * @file AddLogModal.tsx
+ * @updated 2026-09-05: Shows a linked todo's pre-record progress when editing an existing progress log.
  * @updated 2026-09-03: Passes record notes to shared attributes for automatic choice-option matching.
  * @updated 2026-08-27: Expanded the record time tool into split-and-merge with adjacent-record targeting.
  * @updated 2026-08-27: Keeps start/end time shortcuts aligned under their corresponding inputs when split is unavailable.
@@ -41,7 +42,11 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { useToast } from '../contexts/ToastContext';
 import { imageService } from '../services/imageService';
 import { appendTemplateToNote, getRecommendedNoteTemplates, RecommendedNoteTemplate } from '../utils/noteTemplateUtils';
-import { getTodoProgressSnapshot, shouldTodoUseManualProgressInput } from '../utils/todoProgressUtils';
+import {
+  getTodoProgressDisplayCompletedUnits,
+  getTodoProgressSnapshot,
+  shouldTodoUseManualProgressInput
+} from '../utils/todoProgressUtils';
 import { filterAttributeValuesForActivity } from '../utils/activityAttributeUtils';
 import { getAdjacentActualLogs } from '../utils/logSplitUtils';
 import {
@@ -978,6 +983,11 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 const t = todos.find(x => x.id === tId);
                 const progress = getTodoProgressSnapshot(t, todos);
                 if (!progress.supportsManualEntry) return null;
+                const displayCompletedUnits = getTodoProgressDisplayCompletedUnits(
+                  progress.completedUnits,
+                  tId,
+                  initialLog
+                );
                 return (
                   <div className="pt-0 flex items-center justify-between animate-in slide-in-from-top-2">
                     {/* Left: Label + Stats */}
@@ -986,11 +996,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                       <div className="flex items-center gap-1.5 text-[10px] text-stone-400 px-2 py-1 rounded-md border border-stone-100 bg-stone-50">
                         <TrendingUp size={10} />
                         <span className="font-mono">
-                          {formState.progressIncrement > 0 ? (
-                            <span className="font-bold" style={{ color: 'var(--accent-color)' }}>{progress.completedUnits + formState.progressIncrement}</span>
-                          ) : (
-                            progress.completedUnits
-                          )}
+                          {displayCompletedUnits}
                           {" / "}{progress.totalAmount}
                         </span>
                       </div>
