@@ -4,6 +4,7 @@
  * @output JS Events
  * @pos Native Plugin
  * @description Capacitor plugin for handling retained NFC tag scan events, read fallbacks, and write session cleanup.
+ * @updated 2026-09-07: Falls back to a URI-only NDEF message when the optional Android Application Record would exceed tag capacity.
  */
 package com.mistycrown.lumostime;
 
@@ -281,15 +282,25 @@ public class LumosNfcPlugin extends Plugin {
             }
 
             NdefRecord uriRecord = NdefRecord.createUri(Uri.parse(uriStr));
+            NdefMessage uriOnlyMessage = new NdefMessage(new NdefRecord[] { uriRecord });
             NdefRecord aarRecord = NdefRecord.createApplicationRecord("com.mistycrown.lumostime");
-            NdefMessage message = new NdefMessage(new NdefRecord[] { uriRecord, aarRecord });
-            writeNdefMessageToTag(tag, message);
+            NdefMessage messageWithAar = new NdefMessage(new NdefRecord[] { uriRecord, aarRecord });
+            writeNdefMessageToTag(tag, messageWithAar, uriOnlyMessage);
         } catch (Exception e) {
             rejectActiveCall("Write failed: " + (e.getMessage() != null ? e.getMessage() : "Unknown error"));
         }
     }
 
     private void writeNdefMessageToTag(Tag tag, NdefMessage message) {
+        writeNdefMessageToTag(tag, message, null);
+    }
+
+    /**
+     * Writes the preferred message when it fits, otherwise uses the fallback message.
+     * The fallback is used for small tags where the optional AAR record would otherwise
+     * make an otherwise valid URI impossible to write.
+     */
+    private void writeNdefMessageToTag(Tag tag, NdefMessage preferredMessage, NdefMessage fallbackMessage) {
         Ndef ndef = null;
         NdefFormatable formatable = null;
 
@@ -297,9 +308,18 @@ public class LumosNfcPlugin extends Plugin {
             ndef = Ndef.get(tag);
             if (ndef != null) {
                 ndef.connect();
-                if (ndef.getMaxSize() < message.toByteArray().length) {
-                    rejectActiveCall("Tag capacity is too small");
-                    return;
+                int maxSize = ndef.getMaxSize();
+                NdefMessage messageToWrite = preferredMessage;
+                int preferredSize = preferredMessage.toByteArray().length;
+                if (maxSize < preferredSize) {
+                    if (fallbackMessage == null || maxSize < fallbackMessage.toByteArray().length) {
+                        rejectActiveCall("Tag capacity is too small (needs " + preferredSize + " bytes, has " + maxSize + ")");
+                        return;
+                    }
+
+                    messageToWrite = fallbackMessage;
+                    Log.d(DEBUG_TAG, "Preferred NDEF message is too large (" + preferredSize
+                        + " bytes); writing URI-only fallback (" + messageToWrite.toByteArray().length + " bytes)");
                 }
 
                 if (!ndef.isWritable()) {
@@ -307,7 +327,7 @@ public class LumosNfcPlugin extends Plugin {
                     return;
                 }
 
-                ndef.writeNdefMessage(message);
+                ndef.writeNdefMessage(messageToWrite);
                 resolveActiveCall();
                 return;
             }
@@ -315,7 +335,10 @@ public class LumosNfcPlugin extends Plugin {
             formatable = NdefFormatable.get(tag);
             if (formatable != null) {
                 formatable.connect();
-                formatable.format(message);
+                // NdefFormatable does not expose capacity before formatting. The URI-only
+                // form is sufficient for LumosTime's manifest deep-link handler and keeps
+                // blank small tags writable without the optional AAR record.
+                formatable.format(fallbackMessage != null ? fallbackMessage : preferredMessage);
                 resolveActiveCall();
                 return;
             }
