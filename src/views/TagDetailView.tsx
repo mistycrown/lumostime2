@@ -1,5 +1,6 @@
 /**
  * @file TagDetailView.tsx
+ * @updated 2026-09-07: Uses the shared detail timeline attribute row rendered below notes.
  * @updated 2026-09-03: Passes the selected attribute keyword source into the detail keyword calendar.
  * @updated 2026-09-02: Debounced activity auto-save so attribute text inputs remain focused while typing.
  * @updated 2026-08-25: Refined Activity attribute management, deletion cleanup, and compact record-style controls.
@@ -37,7 +38,6 @@ import { AssociatedTodoList } from '../components/AssociatedTodoList';
 import { filterCountableLogs } from '../utils/statLogUtils';
 import { ActivityAttributeManager } from '../components/ActivityAttributeManager';
 import { ActivityAttributeStatistics } from '../components/ActivityAttributeStatistics';
-import { ActivityAttributeSummary } from '../components/ActivityAttributeSummary';
 
 
 interface TagDetailViewProps {
@@ -687,7 +687,6 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   renderLogMetadata={(log, { collectionNames }) => {
                      return (
                         <>
-                        <ActivityAttributeSummary activity={activity} values={log.attributeValues} />
                         <div className="flex flex-wrap items-center gap-2 mt-1">
                            {/* Linked Todo */}
                            {(() => {

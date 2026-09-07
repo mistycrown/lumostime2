@@ -3,6 +3,7 @@
  * @input Filtered logs, display date, entity info
  * @output Timeline UI with detail-page month heatmap duration captions, stats, history, and shared custom timeline styling with per-day rail termination, English day-total duration labels, plus month-based quick navigation in all-record mode
  * @pos Component (Shared Detail View UI)
+ * @updated 2026-09-07: Renders Activity attributes directly below each timeline note across detail, tag, and filter views.
  * @updated 2026-09-03: Includes selected keyword-source Activity attribute options in keyword calendar matching.
  * @updated 2026-07-21: Added dark-mode heatmap surface hooks and a readable neutral duration scale.
  * @updated 2026-05-14: Detail timelines now resolve `◬ Collection` membership for each log and pass those names into both the default metadata row and custom metadata renderers shared by detail pages.
@@ -24,6 +25,7 @@ import { useData } from '../contexts/DataContext';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { TimelineStyleRail } from './TimelineStyleRail';
+import { ActivityAttributeSummary } from './ActivityAttributeSummary';
 import { filterCountableLogs } from '../utils/statLogUtils';
 import {
     buildDetailTimelineGroupedData,
@@ -1287,6 +1289,11 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                             {log.note}
                                                         </p>
                                                     )}
+
+                                                    <ActivityAttributeSummary
+                                                        activity={activity}
+                                                        values={log.attributeValues}
+                                                    />
 
                                                     {/* 自定义元数据渲染 */}
                                                     {renderLogMetadata ? (
