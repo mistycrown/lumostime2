@@ -7,6 +7,7 @@
  * @created 2026-08-09
  * @updated 2026-08-09: Added review overview grouping utilities.
  * @updated 2026-08-09: Carries review question display metadata and sorts questions/groups by latest answer.
+ * @updated 2026-09-08: Supports per-question visibility filtering and settings-page question groups.
  */
 
 import type {
@@ -65,11 +66,33 @@ export interface ReviewOverviewSection {
   questionCount: number;
 }
 
+export interface ReviewOverviewQuestionSetting {
+  id: string;
+  question: string;
+  type: QuestionType;
+  groupTitle: string;
+  order: number;
+}
+
+export interface ReviewOverviewQuestionSettingGroup {
+  id: string;
+  title: string;
+  order: number;
+  questions: ReviewOverviewQuestionSetting[];
+}
+
+export interface ReviewOverviewQuestionSettingSection {
+  kind: ReviewOverviewKind;
+  title: string;
+  groups: ReviewOverviewQuestionSettingGroup[];
+}
+
 export interface BuildReviewOverviewParams {
   dailyReviews: DailyReview[];
   weeklyReviews: WeeklyReview[];
   monthlyReviews: MonthlyReview[];
   reviewTemplates: ReviewTemplate[];
+  questionVisibility?: Record<string, boolean>;
 }
 
 type ReviewRecord = DailyReview | WeeklyReview | MonthlyReview;
@@ -107,7 +130,7 @@ const makeGroupKey = (kind: ReviewOverviewKind, title: string): string => (
   `${kind}:${normalizeTextKey(title)}`
 );
 
-const makeQuestionKey = (
+export const makeReviewOverviewQuestionKey = (
   kind: ReviewOverviewKind,
   groupTitle: string,
   question: string
@@ -272,7 +295,8 @@ export const getReviewOverviewSections = ({
   dailyReviews,
   weeklyReviews,
   monthlyReviews,
-  reviewTemplates
+  reviewTemplates,
+  questionVisibility = {}
 }: BuildReviewOverviewParams): ReviewOverviewSection[] => {
   const descriptors: ReviewDescriptor[] = [
     { kind: 'daily', title: 'Daily review', reviews: dailyReviews },
@@ -321,7 +345,13 @@ export const getReviewOverviewSections = ({
           groupMap.set(groupKey, group);
         }
 
-        const questionKey = makeQuestionKey(descriptor.kind, groupTitle, questionText);
+        const questionKey = makeReviewOverviewQuestionKey(descriptor.kind, groupTitle, questionText);
+        const legacyQuestionKey = matchedQuestion?.question
+          ? `${descriptor.kind}:${matchedQuestion.question}`
+          : '';
+        if (questionVisibility[questionKey] === false || (legacyQuestionKey && questionVisibility[legacyQuestionKey] === false)) {
+          return;
+        }
         let question = questionMap.get(questionKey);
 
         if (!question) {
@@ -419,6 +449,121 @@ export const getReviewOverviewSections = ({
       groups,
       answerCount: groups.reduce((sum, group) => sum + group.answerCount, 0),
       questionCount: groups.reduce((sum, group) => sum + group.questions.length, 0)
+    };
+  });
+};
+
+export const getReviewOverviewQuestionSettingSections = ({
+  dailyReviews,
+  weeklyReviews,
+  monthlyReviews,
+  reviewTemplates
+}: Omit<BuildReviewOverviewParams, 'questionVisibility'>): ReviewOverviewQuestionSettingSection[] => {
+  const descriptors: ReviewDescriptor[] = [
+    { kind: 'daily', title: 'Daily review', reviews: dailyReviews },
+    { kind: 'weekly', title: 'Weekly review', reviews: weeklyReviews },
+    { kind: 'monthly', title: 'Monthly review', reviews: monthlyReviews }
+  ];
+
+  return descriptors.map((descriptor) => {
+    const groupMap = new Map<string, ReviewOverviewQuestionSettingGroup>();
+    const questionMap = new Map<string, ReviewOverviewQuestionSetting>();
+
+    const addQuestion = (
+      groupTitle: string,
+      groupOrder: number,
+      question: ReviewQuestion,
+      questionOrder: number
+    ) => {
+      const normalizedGroupTitle = groupTitle || UNGROUPED_TITLE;
+      const groupKey = makeGroupKey(descriptor.kind, normalizedGroupTitle);
+      let group = groupMap.get(groupKey);
+      if (!group) {
+        group = {
+          id: groupKey,
+          title: normalizedGroupTitle,
+          order: groupOrder,
+          questions: []
+        };
+        groupMap.set(groupKey, group);
+      }
+
+      const questionText = (question.question || '').trim();
+      if (!questionText) {
+        return;
+      }
+
+      const questionKey = makeReviewOverviewQuestionKey(
+        descriptor.kind,
+        normalizedGroupTitle,
+        questionText
+      );
+      const existing = questionMap.get(questionKey);
+      if (existing) {
+        existing.order = Math.min(existing.order, questionOrder);
+        group.order = Math.min(group.order, groupOrder);
+        return;
+      }
+
+      const setting: ReviewOverviewQuestionSetting = {
+        id: questionKey,
+        question: questionText,
+        type: question.type || 'text',
+        groupTitle: normalizedGroupTitle,
+        order: questionOrder
+      };
+      questionMap.set(questionKey, setting);
+      group.questions.push(setting);
+    };
+
+    const currentTemplates = getCurrentTemplatesForKind(descriptor.kind, reviewTemplates);
+    currentTemplates.forEach((template, templateIndex) => {
+      template.questions.forEach((question, questionIndex) => {
+        addQuestion(template.title, templateIndex, question, questionIndex);
+      });
+    });
+
+    descriptor.reviews.forEach((review) => {
+      if (!Array.isArray(review.templateSnapshot)) {
+        return;
+      }
+
+      review.templateSnapshot.forEach((template, templateIndex) => {
+        template.questions.forEach((question, questionIndex) => {
+          addQuestion(template.title, template.order ?? templateIndex, question, questionIndex);
+        });
+      });
+    });
+
+    const answeredSections = getReviewOverviewSections({
+      dailyReviews: descriptor.kind === 'daily' ? descriptor.reviews as DailyReview[] : [],
+      weeklyReviews: descriptor.kind === 'weekly' ? descriptor.reviews as WeeklyReview[] : [],
+      monthlyReviews: descriptor.kind === 'monthly' ? descriptor.reviews as MonthlyReview[] : [],
+      reviewTemplates
+    });
+    const answeredSection = answeredSections.find((section) => section.kind === descriptor.kind);
+    answeredSection?.groups.forEach((group) => {
+      group.questions.forEach((question) => {
+        addQuestion(group.title, group.order, {
+          id: question.id,
+          question: question.question,
+          type: question.type,
+          choices: question.choices,
+          icon: question.icon,
+          colorId: question.colorId
+        }, question.order);
+      });
+    });
+
+    return {
+      kind: descriptor.kind,
+      title: descriptor.title,
+      groups: Array.from(groupMap.values())
+        .map((group) => ({
+          ...group,
+          questions: [...group.questions].sort((a, b) => a.order - b.order || a.question.localeCompare(b.question, 'zh-Hans-CN'))
+        }))
+        .sort((a, b) => a.order - b.order || a.title.localeCompare(b.title, 'zh-Hans-CN'))
     };
   });
 };

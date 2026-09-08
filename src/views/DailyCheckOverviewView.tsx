@@ -12,8 +12,9 @@
  * @updated 2026-08-09: Unified the header height and applied per-item template colors.
  * @updated 2026-08-10: Reads nightEarliestStart rows from the previous night's review while retaining today for other checks.
  * @updated 2026-08-11: Keeps overview rows transparent in dark mode so the list reads as one continuous surface.
+ * @updated 2026-09-08: Restores the overview scroll position after returning from item details.
  */
-import React, { useMemo } from 'react';
+import React, { useLayoutEffect, useMemo, useRef } from 'react';
 import { ArrowLeft, Check, ChevronRight } from 'lucide-react';
 import {
   Category,
@@ -49,6 +50,8 @@ interface DailyCheckOverviewViewProps {
   currentDate: Date;
   onOpenDetail: (itemId: string) => void;
   onBack: () => void;
+  initialScrollTop?: number;
+  onScrollPositionChange?: (scrollTop: number) => void;
 }
 
 interface DailyCheckGroup {
@@ -74,8 +77,22 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
   todoCategories,
   currentDate,
   onOpenDetail,
-  onBack
+  onBack,
+  initialScrollTop = 0,
+  onScrollPositionChange
 }) => {
+  const overviewScrollRef = useRef<HTMLElement | null>(null);
+
+  useLayoutEffect(() => {
+    const restoreId = window.requestAnimationFrame(() => {
+      if (overviewScrollRef.current) {
+        overviewScrollRef.current.scrollTop = initialScrollTop;
+      }
+    });
+
+    return () => window.cancelAnimationFrame(restoreId);
+  }, [initialScrollTop]);
+
   const filterContext = useMemo(() => ({
     categories,
     scopes,
@@ -185,7 +202,11 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
         <span aria-hidden="true" />
       </header>
 
-      <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-12 pt-5 sm:px-6">
+      <main
+        ref={overviewScrollRef}
+        onScroll={() => onScrollPositionChange?.(overviewScrollRef.current?.scrollTop || 0)}
+        className="min-h-0 flex-1 overflow-y-auto px-4 pb-12 pt-5 sm:px-6"
+      >
         <div className="mx-auto max-w-3xl">
           {groups.length === 0 ? (
             <div className="border-y border-stone-200 py-20 text-center">
@@ -221,7 +242,10 @@ export const DailyCheckOverviewView: React.FC<DailyCheckOverviewViewProps> = ({
                           <button
                             key={item.id}
                             type="button"
-                            onClick={() => onOpenDetail(item.id)}
+                            onClick={() => {
+                              onScrollPositionChange?.(overviewScrollRef.current?.scrollTop || 0);
+                              onOpenDetail(item.id);
+                            }}
                             className="daily-check-overview-list-row group flex w-full items-center gap-3 py-4 text-left transition-colors hover:bg-white/60 active:bg-stone-100/70"
                             aria-label={`查看${item.content}详情`}
                           >

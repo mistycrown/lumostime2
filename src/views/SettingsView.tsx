@@ -1188,6 +1188,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             <AppAwarenessSettingsView
                 onBack={handleBackToMain}
                 categories={categories || []}
+                scopes={scopes || []}
+                todos={todos || []}
+                todoCategories={todoCategories || []}
             />,
             '正在加载应用感知...'
         );

@@ -305,6 +305,8 @@ export interface AppAwarenessActivityOption {
   activityId: string;
   label: string;
   icon?: string;
+  linkedTodoId?: string;
+  scopeIds?: string[];
 }
 
 export interface AppAwarenessStepBase {
@@ -394,6 +396,8 @@ export type AppAwarenessAnswerValue =
       activityId: string;
       label: string;
       icon?: string;
+      linkedTodoId?: string;
+      scopeIds?: string[];
     };
 
 export interface AppAwarenessRun {

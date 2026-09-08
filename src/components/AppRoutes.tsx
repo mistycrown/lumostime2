@@ -13,6 +13,7 @@
  * @updated 2026-08-10: Keeps daily-check overview and detail pinned to the current day instead of the global selected date.
  * @updated 2026-08-26: Passes Routine launch and active-run controls into the Record route.
  * @updated 2026-08-26: Applies scope and todo deletion reference decisions together with batch changes.
+ * @updated 2026-09-08: Preserves the daily-check overview scroll position across detail navigation.
  */
 import React from 'react';
 import { ChevronLeft } from 'lucide-react';
@@ -216,6 +217,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     const { userPersonalInfo, autoLinkRules, setAutoLinkRules, appRules, setAppRules, appAwarenessTemplates, setAppAwarenessTemplates, appAwarenessActiveRun, setAppAwarenessActiveRun, filters, setFilters, memoirFilterConfig, setMemoirFilterConfig, customNarrativeTemplates, minIdleTimeThreshold, timelineGalleryMode, collapseThreshold } = useSettings();
     const { addToast } = useToast();
     const dailyCheckToday = React.useMemo(() => new Date(), [currentView]);
+    const dailyCheckOverviewScrollTopRef = React.useRef(0);
     const { activeSessions, setActiveSessions } = useSession();
     const { rules: achievementRules, replaceRules: replaceAchievementRules } = useAchievement();
 
@@ -366,6 +368,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     const handleSelectTag = (id: string) => setSelectedTagId(id);
     const handleCloseDailyChecks = () => {
         setDailyCheckDetailId(null);
+        dailyCheckOverviewScrollTopRef.current = 0;
         if (dailyChecksReturnTarget === 'settings') {
             setCurrentView(previousView || AppView.TIMELINE);
             setIsSettingsOpen(true);
@@ -988,6 +991,10 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     todos={todos}
                     todoCategories={todoCategories}
                     currentDate={dailyCheckToday}
+                    initialScrollTop={dailyCheckOverviewScrollTopRef.current}
+                    onScrollPositionChange={(scrollTop) => {
+                        dailyCheckOverviewScrollTopRef.current = scrollTop;
+                    }}
                     onOpenDetail={(itemId) => {
                         setDailyCheckDetailId(itemId);
                         setCurrentView(AppView.DAILY_CHECK_DETAIL);

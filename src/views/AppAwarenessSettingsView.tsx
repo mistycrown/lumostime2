@@ -11,6 +11,7 @@
  * @updated 2026-07-21: Added dark-mode semantic states for notices, toggles, and selected workflow activities.
  * @updated 2026-07-22: Preserve native line breaks while editing single-choice option lists.
  * @updated 2026-08-12: Unified software and Android hardware back handling so nested workflow pages return to their immediate parent before Settings.
+ * @updated 2026-09-08: Added routine-style tag, domain, and TODO associations to start-record options.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -44,7 +45,10 @@ import {
   AppAwarenessTextQuestionStep,
   AppAwarenessWorkflowStep,
   AppAwarenessWorkflowTemplate,
-  Category
+  Category,
+  Scope,
+  TodoCategory,
+  TodoItem
 } from '../types';
 import { useSettings } from '../contexts/SettingsContext';
 import { useToast } from '../contexts/ToastContext';
@@ -52,12 +56,17 @@ import { summarizeAppAwarenessTemplate } from '../services/appAwarenessService';
 import AppUsage from '../plugins/AppUsagePlugin';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
 import { CustomSelect } from '../components/CustomSelect';
-import { getActiveActivities } from '../utils/archiveUtils';
 import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
+import { TagAssociation } from '../components/TagAssociation';
+import { ScopeAssociation } from '../components/ScopeAssociation';
+import { TodoAssociation } from '../components/TodoAssociation';
 
 interface Props {
   onBack: () => void;
   categories: Category[];
+  scopes: Scope[];
+  todos: TodoItem[];
+  todoCategories: TodoCategory[];
 }
 
 interface InstalledApp {
@@ -67,22 +76,6 @@ interface InstalledApp {
 }
 
 type PageMode = 'home' | 'templates' | 'template-editor' | 'bindings';
-
-const flattenActivityOptions = (categories: Category[]): AppAwarenessActivityOption[] =>
-  categories.flatMap((category) =>
-    getActiveActivities(category).map((activity) => ({
-      id: `${category.id}:${activity.id}`,
-      categoryId: category.id,
-      activityId: activity.id,
-      label: activity.name,
-      icon: activity.icon
-    }))
-  );
-
-const getActivityOptionDisplayLabel = (option: Pick<AppAwarenessActivityOption, 'label'>): string => {
-  const segments = option.label.split('/');
-  return (segments[segments.length - 1] || option.label).trim();
-};
 
 const buildChoiceOptionsFromText = (value: string): AppAwarenessChoiceOption[] =>
   value
@@ -204,7 +197,7 @@ const getStepIcon = (type: AppAwarenessStepType) => {
   }
 };
 
-export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }) => {
+export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories, scopes, todos, todoCategories }) => {
   const {
     appAwarenessTemplates,
     setAppAwarenessTemplates,
@@ -222,8 +215,9 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBindingApp, setSelectedBindingApp] = useState<InstalledApp | null>(null);
   const [stepFieldDrafts, setStepFieldDrafts] = useState<Record<string, string>>({});
+  const [expandedActivityOptionId, setExpandedActivityOptionId] = useState<string | null>(null);
+  const [expandedActivityPicker, setExpandedActivityPicker] = useState<'activity' | 'scope' | 'todo' | null>(null);
 
-  const activityOptions = useMemo(() => flattenActivityOptions(categories), [categories]);
   const editingTemplate = useMemo(
     () => appAwarenessTemplates.find((template) => template.id === editingTemplateId) || null,
     [appAwarenessTemplates, editingTemplateId]
@@ -362,7 +356,10 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
         return '“预计时长”至少需要 1 个时长选项。';
       }
 
-      if (step.type === 'start_record' && step.activityOptions.length === 0) {
+      if (step.type === 'start_record' && (step.activityOptions.length === 0 || step.activityOptions.some((option) => {
+        const todo = option.linkedTodoId ? todos.find((item) => item.id === option.linkedTodoId) : undefined;
+        return !(todo?.linkedActivityId || option.activityId);
+      }))) {
         return '“开始记录”至少需要选择 1 个可记录活动。';
       }
 
@@ -513,6 +510,34 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
 
     updateBindings(nextBindings);
     setSelectedBindingApp(null);
+  };
+
+  const updateStartRecordOption = (
+    templateId: string,
+    stepId: string,
+    optionId: string,
+    patch: Partial<AppAwarenessActivityOption>
+  ) => {
+    updateTemplate(templateId, (template) => ({
+      ...template,
+      steps: template.steps.map((item) => item.id === stepId && item.type === 'start_record'
+        ? {
+            ...item,
+            activityOptions: item.activityOptions.map((option) => option.id === optionId ? { ...option, ...patch } : option)
+          }
+        : item),
+      updatedAt: Date.now()
+    }));
+  };
+
+  const getStartRecordOptionContext = (option: AppAwarenessActivityOption) => {
+    const todo = option.linkedTodoId ? todos.find((item) => item.id === option.linkedTodoId) : undefined;
+    const categoryId = todo?.linkedCategoryId || option.categoryId;
+    const activityId = todo?.linkedActivityId || option.activityId;
+    const activity = categories.find((category) => category.id === categoryId)?.activities.find((item) => item.id === activityId);
+    const scopeIds = todo?.defaultScopeIds || option.scopeIds || [];
+    const selectedScopes = scopeIds.map((id) => scopes.find((scope) => scope.id === id)).filter((scope): scope is Scope => Boolean(scope));
+    return { todo, activity, categoryId, activityId, scopeIds, selectedScopes };
   };
 
   const renderHeader = (title: string, onLeftClick: () => void, rightSlot?: React.ReactNode) => (
@@ -1041,7 +1066,7 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
                           ...template,
                           steps: template.steps.map((item) => item.id === step.id ? {
                             ...item,
-                            allowContinueExtensions: item.allowContinueExtensions === false
+                            allowContinueExtensions: item.type === 'start_record' && item.allowContinueExtensions === false
                           } as AppAwarenessStartRecordStep : item),
                           updatedAt: Date.now()
                         })),
@@ -1078,44 +1103,122 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories }
                       </label>
 
                       <div>
-                        <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-stone-400">可选活动</div>
-                        <div className="grid grid-cols-2 gap-2">
-                          {activityOptions.map((option) => {
-                            const selected = step.activityOptions.some((item) => item.id === option.id);
+                        <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-stone-400">记录选项</div>
+                        <div className="space-y-2">
+                          {step.activityOptions.map((option) => {
+                            const context = getStartRecordOptionContext(option);
+                            const isExpanded = expandedActivityOptionId === option.id;
+                            const summary = [
+                              context.activity ? `#${context.activity.name}` : '',
+                              context.todo ? `@${context.todo.title}` : '',
+                              ...context.selectedScopes.map((scope) => `%${scope.name}`)
+                            ].filter(Boolean).join('  ');
                             return (
-                              <button
-                                key={option.id}
-                                type="button"
-                                onClick={() => updateTemplate(editingTemplate.id, (template) => ({
-                                  ...template,
-                                  steps: template.steps.map((item) => {
-                                    if (item.id !== step.id) {
-                                      return item;
-                                    }
-
-                                    const exists = item.activityOptions.some((activity) => activity.id === option.id);
-                                    return {
-                                      ...item,
-                                      activityOptions: exists
-                                        ? item.activityOptions.filter((activity) => activity.id !== option.id)
-                                        : [...item.activityOptions, option]
-                                    } as AppAwarenessStartRecordStep;
-                                  }),
-                                  updatedAt: Date.now()
-                                }))}
-                                className={`rounded-xl border px-3 py-2 text-left text-sm transition-colors ${
-                                  selected
-                                    ? 'app-awareness-activity-selected border-stone-700 bg-stone-100 text-stone-900'
-                                    : 'border-stone-200 bg-[#fdfbf7] text-stone-600 hover:bg-stone-50'
-                                }`}
-                              >
+                              <div key={option.id} className="rounded-xl border border-stone-200 bg-[#fdfbf7] p-2">
                                 <div className="flex items-center gap-2">
-                                  <span>{option.icon || '•'}</span>
-                                  <span className="truncate">{getActivityOptionDisplayLabel(option)}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setExpandedActivityOptionId(isExpanded ? null : option.id);
+                                      setExpandedActivityPicker(isExpanded ? null : 'activity');
+                                    }}
+                                    className="min-w-0 flex-1 rounded-lg px-2 py-2 text-left text-sm hover:bg-stone-50"
+                                  >
+                                    <span className={`block truncate ${summary ? 'text-stone-700' : 'text-stone-400'}`}>{summary || '选择标签、领域或待办'}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateTemplate(editingTemplate.id, (template) => ({
+                                      ...template,
+                                      steps: template.steps.map((item) => item.id === step.id && item.type === 'start_record'
+                                        ? { ...item, activityOptions: item.activityOptions.filter((itemOption) => itemOption.id !== option.id) }
+                                        : item),
+                                      updatedAt: Date.now()
+                                    }))}
+                                    className="p-2 text-stone-300 hover:text-rose-500"
+                                    aria-label="删除记录选项"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
                                 </div>
-                              </button>
+                                {isExpanded && (
+                                  <div className="mt-2 space-y-3 border-t border-stone-100 pt-3">
+                                    <div className="flex gap-2">
+                                      {(['activity', 'scope', 'todo'] as const).map((picker) => (
+                                        <button
+                                          key={picker}
+                                          type="button"
+                                          onClick={() => setExpandedActivityPicker(expandedActivityPicker === picker ? null : picker)}
+                                          className={`rounded-lg border px-2.5 py-1.5 text-xs ${expandedActivityPicker === picker ? 'border-stone-700 bg-stone-100 text-stone-800' : 'border-stone-200 text-stone-500'}`}
+                                        >
+                                          {picker === 'activity' ? '标签' : picker === 'scope' ? '领域' : '待办'}
+                                        </button>
+                                      ))}
+                                    </div>
+                                    {expandedActivityPicker === 'activity' && !context.todo && (
+                                      <TagAssociation
+                                        categories={categories}
+                                        selectedCategoryId={context.categoryId}
+                                        selectedActivityId={context.activityId}
+                                        onCategorySelect={(categoryId) => updateStartRecordOption(editingTemplate.id, step.id, option.id, { categoryId, activityId: '', label: '', icon: undefined })}
+                                        onActivitySelect={(activityId) => {
+                                          const category = categories.find((item) => item.activities.some((activity) => activity.id === activityId));
+                                          const activity = category?.activities.find((item) => item.id === activityId);
+                                          updateStartRecordOption(editingTemplate.id, step.id, option.id, {
+                                            activityId,
+                                            categoryId: category?.id || context.categoryId,
+                                            label: activity?.name || option.label,
+                                            icon: activity?.icon
+                                          });
+                                        }}
+                                        title="标签"
+                                        onClear={() => updateStartRecordOption(editingTemplate.id, step.id, option.id, { categoryId: '', activityId: '', label: '' })}
+                                      />
+                                    )}
+                                    {expandedActivityPicker === 'scope' && !context.todo && (
+                                      <ScopeAssociation scopes={scopes} selectedScopeIds={option.scopeIds} onSelect={(scopeIds) => updateStartRecordOption(editingTemplate.id, step.id, option.id, { scopeIds })} title="领域" />
+                                    )}
+                                    {expandedActivityPicker === 'todo' && (
+                                      <TodoAssociation
+                                        todos={todos}
+                                        todoCategories={todoCategories}
+                                        linkedTodoId={option.linkedTodoId}
+                                        onChange={(linkedTodoId) => {
+                                          const todo = linkedTodoId ? todos.find((item) => item.id === linkedTodoId) : undefined;
+                                          updateStartRecordOption(editingTemplate.id, step.id, option.id, todo ? {
+                                            linkedTodoId: todo.id,
+                                            categoryId: todo.linkedCategoryId || option.categoryId,
+                                            activityId: todo.linkedActivityId || option.activityId,
+                                            label: categories.find((category) => category.id === (todo.linkedCategoryId || option.categoryId))?.activities.find((activity) => activity.id === (todo.linkedActivityId || option.activityId))?.name || option.label,
+                                            scopeIds: undefined
+                                          } : { linkedTodoId: undefined });
+                                        }}
+                                        title="待办"
+                                      />
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             );
                           })}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const option: AppAwarenessActivityOption = { id: crypto.randomUUID(), categoryId: '', activityId: '', label: '' };
+                              updateTemplate(editingTemplate.id, (template) => ({
+                                ...template,
+                                steps: template.steps.map((item) => item.id === step.id && item.type === 'start_record'
+                                  ? { ...item, activityOptions: [...item.activityOptions, option] }
+                                  : item),
+                                updatedAt: Date.now()
+                              }));
+                              setExpandedActivityOptionId(option.id);
+                              setExpandedActivityPicker('activity');
+                            }}
+                            className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-stone-300 py-2 text-xs text-stone-500 hover:border-stone-400"
+                          >
+                            <Plus size={14} /> 新建选项
+                          </button>
                         </div>
                       </div>
                     </>

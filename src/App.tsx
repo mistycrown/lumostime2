@@ -385,6 +385,7 @@ const AppContent: React.FC = () => {
   const {
     dailyReviews, weeklyReviews, monthlyReviews, onThisDayEntries, setDailyReviews, setWeeklyReviews, setMonthlyReviews, setOnThisDayEntries,
     reviewTemplates, setReviewTemplates,
+    setReviewOverviewQuestionVisibility,
     checkTemplates, setCheckTemplates,
     dailyReviewTime, setDailyReviewTime,
     weeklyReviewTime, setWeeklyReviewTime,
@@ -909,7 +910,9 @@ const AppContent: React.FC = () => {
   useAppDetection(handleStartActivityWrapper);
   useAppAwarenessRuntime({
     handleStartActivity: handleStartActivityWrapper,
-    handleStopActivity: handleStopActivityWrapper
+    handleStopActivity: handleStopActivityWrapper,
+    todos,
+    scopes
   });
   useWidgetBridgeSync();
   useFloatingWindowSync();
@@ -1279,6 +1282,7 @@ const AppContent: React.FC = () => {
               setGoals(INITIAL_GOALS);
               setMajorGoals([]);
               setReviewTemplates(DEFAULT_REVIEW_TEMPLATES);
+              setReviewOverviewQuestionVisibility({});
               setCheckTemplates(DEFAULT_CHECK_TEMPLATES);
               setDailyReviews([]);
               setWeeklyReviews([]);
@@ -1304,6 +1308,7 @@ const AppContent: React.FC = () => {
               setMajorGoals([]);
               setScopes([]);
               setReviewTemplates([]);
+              setReviewOverviewQuestionVisibility({});
               setCheckTemplates([]);
               setDailyReviews([]);
               setWeeklyReviews([]);

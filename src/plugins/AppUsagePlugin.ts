@@ -51,6 +51,8 @@ export interface PendingAppAwarenessNativeStartPayload {
         activityId?: string;
         label?: string;
         icon?: string;
+        linkedTodoId?: string;
+        scopeIds?: string[];
     };
     expectedDurationMinutes?: number;
     startedAt?: number;

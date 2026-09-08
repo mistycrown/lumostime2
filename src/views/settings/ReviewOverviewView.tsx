@@ -9,10 +9,11 @@
  * @updated 2026-08-09: Linked answer dates to source review pages and aligned nested back navigation.
  * @updated 2026-08-09: Matched detail-page spacing, hid scrollbars, and added typed answer rendering.
  * @updated 2026-08-11: Keeps overview question rows transparent instead of inheriting dark gray entry backgrounds.
+ * @updated 2026-09-08: Restores the overview scroll position after returning from question details.
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, FileText, Settings2 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import type { DailyReview, MonthlyReview, ReviewTemplate, WeeklyReview } from '../../types';
 import { COLOR_OPTIONS } from '../../constants';
@@ -27,6 +28,8 @@ import {
   type ReviewOverviewTemplateGroup
 } from '../../utils/reviewOverviewUtils';
 import { parseDateKey } from '../../utils/todoScheduleUtils';
+import { useReview } from '../../contexts/ReviewContext';
+import { ReviewOverviewQuestionVisibilityView } from './ReviewOverviewQuestionVisibilityView';
 
 interface ReviewOverviewViewProps {
   onBack: () => void;
@@ -184,15 +187,20 @@ export const ReviewOverviewView: React.FC<ReviewOverviewViewProps> = ({
     setCurrentMonthlyReviewInitialTab,
     setIsMonthlyReviewOpen
   } = useNavigation();
+  const { reviewOverviewQuestionVisibility } = useReview();
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
+  const overviewScrollRef = useRef<HTMLElement | null>(null);
+  const overviewScrollTopRef = useRef(0);
+  const [isQuestionVisibilityOpen, setIsQuestionVisibilityOpen] = useState(false);
   const sections = useMemo(() => (
     getReviewOverviewSections({
       dailyReviews,
       weeklyReviews,
       monthlyReviews,
-      reviewTemplates
+      reviewTemplates,
+      questionVisibility: reviewOverviewQuestionVisibility
     })
-  ), [dailyReviews, monthlyReviews, reviewTemplates, weeklyReviews]);
+  ), [dailyReviews, monthlyReviews, reviewOverviewQuestionVisibility, reviewTemplates, weeklyReviews]);
   const selectedQuestion = useMemo(
     () => findSelectedQuestion(sections, selectedQuestionId),
     [sections, selectedQuestionId]
@@ -205,6 +213,20 @@ export const ReviewOverviewView: React.FC<ReviewOverviewViewProps> = ({
     || isOnThisDayOpen
     || isWeeklyReviewOpen
     || isMonthlyReviewOpen;
+
+  useLayoutEffect(() => {
+    if (selectedQuestionId !== null) {
+      return;
+    }
+
+    const restoreId = window.requestAnimationFrame(() => {
+      if (overviewScrollRef.current) {
+        overviewScrollRef.current.scrollTop = overviewScrollTopRef.current;
+      }
+    });
+
+    return () => window.cancelAnimationFrame(restoreId);
+  }, [selectedQuestionId]);
 
   useEffect(() => {
     if (!selectedQuestionId || isSourceReviewOpen) {
@@ -245,6 +267,18 @@ export const ReviewOverviewView: React.FC<ReviewOverviewViewProps> = ({
     setCurrentMonthlyReviewInitialTab('guide');
     setIsMonthlyReviewOpen(true);
   };
+
+  if (isQuestionVisibilityOpen) {
+    return (
+      <ReviewOverviewQuestionVisibilityView
+        onBack={() => setIsQuestionVisibilityOpen(false)}
+        dailyReviews={dailyReviews}
+        weeklyReviews={weeklyReviews}
+        monthlyReviews={monthlyReviews}
+        reviewTemplates={reviewTemplates}
+      />
+    );
+  }
 
   if (selectedQuestion) {
     const { section, group, question } = selectedQuestion;
@@ -322,9 +356,24 @@ export const ReviewOverviewView: React.FC<ReviewOverviewViewProps> = ({
           <ChevronLeft size={24} />
         </button>
         <span className="text-lg font-bold text-stone-800">回顾总览</span>
+        <button
+          type="button"
+          onClick={() => setIsQuestionVisibilityOpen(true)}
+          className="ml-auto p-1 text-stone-400 transition-colors hover:text-stone-700"
+          title="设置回顾问题显示"
+          aria-label="设置回顾问题显示"
+        >
+          <Settings2 size={20} />
+        </button>
       </header>
 
-      <main className="min-h-0 flex-1 overflow-y-auto no-scrollbar px-7 pb-24 pt-6">
+      <main
+        ref={overviewScrollRef}
+        onScroll={() => {
+          overviewScrollTopRef.current = overviewScrollRef.current?.scrollTop || 0;
+        }}
+        className="min-h-0 flex-1 overflow-y-auto no-scrollbar px-7 pb-24 pt-6"
+      >
         <div className="mx-auto max-w-4xl space-y-11">
           {totalAnswers === 0 ? (
             <div className="border-y border-stone-200 py-16 text-center">
@@ -369,7 +418,10 @@ export const ReviewOverviewView: React.FC<ReviewOverviewViewProps> = ({
                             <button
                               key={question.id}
                               type="button"
-                              onClick={() => setSelectedQuestionId(question.id)}
+                              onClick={() => {
+                                overviewScrollTopRef.current = overviewScrollRef.current?.scrollTop || 0;
+                                setSelectedQuestionId(question.id);
+                              }}
                               className="review-overview-list-row group flex w-full items-center gap-4 py-4 text-left transition-colors hover:bg-white/60"
                             >
                               <div className="min-w-0 flex-1">

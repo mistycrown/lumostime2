@@ -14,6 +14,8 @@ import { App as CapacitorApp } from '@capacitor/app';
 import {
   ActiveSession,
   Activity,
+  Scope,
+  TodoItem,
   AppAwarenessAnswerValue,
   AppAwarenessExpectedDurationStep,
   AppAwarenessRun,
@@ -54,6 +56,8 @@ interface AppAwarenessNativeStartPayload {
     activityId?: string;
     label?: string;
     icon?: string;
+    linkedTodoId?: string;
+    scopeIds?: string[];
   };
   expectedDurationMinutes?: number;
   startedAt?: number;
@@ -76,6 +80,8 @@ interface UseAppAwarenessRuntimeOptions {
     appAwarenessMeta?: AppAwarenessSessionMeta
   ) => string;
   handleStopActivity: (sessionId: string, finalSessionData?: ActiveSession) => void;
+  todos: TodoItem[];
+  scopes: Scope[];
 }
 
 const parseEventDetail = <T,>(event: Event): T | null => {
@@ -206,7 +212,9 @@ const appendExtensionNote = (baseNote: string | undefined, extendedAt: number, m
 
 export const useAppAwarenessRuntime = ({
   handleStartActivity,
-  handleStopActivity
+  handleStopActivity,
+  todos,
+  scopes
 }: UseAppAwarenessRuntimeOptions) => {
   const {
     appAwarenessTemplates,
@@ -221,6 +229,8 @@ export const useAppAwarenessRuntime = ({
   const templatesRef = useRef(appAwarenessTemplates);
   const bindingsRef = useRef(appAwarenessBindings);
   const categoriesRef = useRef(categories);
+  const todosRef = useRef(todos);
+  const scopesRef = useRef(scopes);
   const activeRunRef = useRef(appAwarenessActiveRun);
   const activeSessionsRef = useRef(activeSessions);
   const processedNativeStartIdsRef = useRef<Map<string, number>>(new Map());
@@ -240,6 +250,14 @@ export const useAppAwarenessRuntime = ({
   useEffect(() => {
     categoriesRef.current = categories;
   }, [categories]);
+
+  useEffect(() => {
+    todosRef.current = todos;
+  }, [todos]);
+
+  useEffect(() => {
+    scopesRef.current = scopes;
+  }, [scopes]);
 
   useEffect(() => {
     activeRunRef.current = appAwarenessActiveRun;
@@ -374,11 +392,19 @@ export const useAppAwarenessRuntime = ({
       nativeTimerId?: string;
     }
   ) => {
+    const linkedTodo = selection.linkedTodoId
+      ? todosRef.current.find((todo) => todo.id === selection.linkedTodoId)
+      : undefined;
+    const resolvedCategoryId = linkedTodo?.linkedCategoryId || selection.categoryId;
+    const resolvedActivityId = linkedTodo?.linkedActivityId || selection.activityId;
+    const resolvedScopeIds = linkedTodo?.defaultScopeIds || selection.scopeIds;
     const resolved = findActivityBySelection(categoriesRef.current, {
-      categoryId: selection.categoryId,
-      activityId: selection.activityId,
+      categoryId: resolvedCategoryId,
+      activityId: resolvedActivityId,
       label: selection.label,
-      icon: selection.icon
+      icon: selection.icon,
+      linkedTodoId: selection.linkedTodoId,
+      scopeIds: resolvedScopeIds
     });
     if (!resolved) {
       addToast('error', '所选活动已不存在');
@@ -401,8 +427,8 @@ export const useAppAwarenessRuntime = ({
     const sessionId = handleStartActivityRef.current(
       resolved.activity,
       resolved.categoryId,
-      undefined,
-      undefined,
+      linkedTodo?.id,
+      resolvedScopeIds,
       note,
       false,
       meta
@@ -642,13 +668,21 @@ export const useAppAwarenessRuntime = ({
             : currentStep.durationSource === 'from_step'
               ? getExpectedDurationFromAnswers(run.answers, expectedDurationStep)
               : undefined;
+        const linkedTodo = selection.linkedTodoId
+          ? todosRef.current.find((todo) => todo.id === selection.linkedTodoId)
+          : undefined;
+        const resolvedCategoryId = linkedTodo?.linkedCategoryId || selection.categoryId;
+        const resolvedActivityId = linkedTodo?.linkedActivityId || selection.activityId;
+        const resolvedScopeIds = linkedTodo?.defaultScopeIds || selection.scopeIds;
         const nextAnswers: Record<string, AppAwarenessAnswerValue> = {
           ...run.answers,
           [currentStep.answerKey]: {
-            categoryId: selection.categoryId,
-            activityId: selection.activityId,
+            categoryId: resolvedCategoryId,
+            activityId: resolvedActivityId,
             label: getActivityOptionDisplayLabel(selection.label),
-            icon: selection.icon
+            icon: selection.icon,
+            linkedTodoId: linkedTodo?.id,
+            scopeIds: resolvedScopeIds
           }
         };
 
@@ -673,24 +707,34 @@ export const useAppAwarenessRuntime = ({
         return false;
       }
 
-      const answers =
+      const answers: Record<string, AppAwarenessAnswerValue> =
         detail.answers && typeof detail.answers === 'object'
-          ? { ...detail.answers }
+          ? { ...(detail.answers as Record<string, AppAwarenessAnswerValue>) }
           : {};
       const selection = {
         id: `${detail.selectedActivity.categoryId}:${detail.selectedActivity.activityId}`,
         categoryId: detail.selectedActivity.categoryId,
         activityId: detail.selectedActivity.activityId,
         label: detail.selectedActivity.label || '',
-        icon: detail.selectedActivity.icon
+        icon: detail.selectedActivity.icon,
+        linkedTodoId: detail.selectedActivity.linkedTodoId,
+        scopeIds: detail.selectedActivity.scopeIds
       };
+      const linkedTodo = selection.linkedTodoId
+        ? todosRef.current.find((todo) => todo.id === selection.linkedTodoId)
+        : undefined;
+      const resolvedCategoryId = linkedTodo?.linkedCategoryId || selection.categoryId;
+      const resolvedActivityId = linkedTodo?.linkedActivityId || selection.activityId;
+      const resolvedScopeIds = linkedTodo?.defaultScopeIds || selection.scopeIds;
       const nextAnswers: Record<string, AppAwarenessAnswerValue> = {
         ...answers,
         [startRecordStep.answerKey]: {
-          categoryId: selection.categoryId,
-          activityId: selection.activityId,
+          categoryId: resolvedCategoryId,
+          activityId: resolvedActivityId,
           label: getActivityOptionDisplayLabel(selection.label || ''),
-          icon: selection.icon
+          icon: selection.icon,
+          linkedTodoId: linkedTodo?.id,
+          scopeIds: resolvedScopeIds
         }
       };
       const startStepIndex = template.steps.findIndex((item) => item.id === startRecordStep.id);
