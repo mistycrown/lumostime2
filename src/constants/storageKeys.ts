@@ -115,6 +115,8 @@ export const SETTINGS_KEYS = {
     AUTO_GENERATE_WEEKLY_REVIEW: 'lumostime_auto_generate_weekly_review',
     /** 自动生成每月回顾 */
     AUTO_GENERATE_MONTHLY_REVIEW: 'lumostime_auto_generate_monthly_review',
+    /** 回顾总览中各问题的显示偏好 */
+    REVIEW_OVERVIEW_QUESTION_VISIBILITY: 'lumostime_review_overview_question_visibility',
     /** 沉浸式计时画作选择 */
     IMMERSIVE_TIMER_ART: 'immersiveTimerArt',
     /** 沉浸式计时动画样式 */

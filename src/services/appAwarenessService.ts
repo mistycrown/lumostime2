@@ -6,6 +6,7 @@
  * @description Centralizes persistence and normalization for the Android-only app-awareness feature so settings views and runtime hooks share one consistent data model.
  * @updated 2026-07-06: Added non-empty option fallbacks for app-awareness duration and extension steps to prevent dead-end overlay payloads from persisted data.
  * @updated 2026-06-21: Renamed the preset workflow, removed the default text-length cap, and refreshed normalization copy for the latest app-awareness node model.
+ * @updated 2026-09-08: Preserve editable start-record associations while normalizing workflow drafts.
  */
 import {
   AppAwarenessActivityOption,
@@ -41,19 +42,29 @@ const isChoiceOption = (value: unknown): value is AppAwarenessChoiceOption => {
   return isNonEmptyString(option.id) && isNonEmptyString(option.label) && isNonEmptyString(option.value);
 };
 
-const isActivityOption = (value: unknown): value is AppAwarenessActivityOption => {
+const normalizeActivityOption = (value: unknown): AppAwarenessActivityOption | null => {
   if (!value || typeof value !== 'object') {
-    return false;
+    return null;
   }
 
   const option = value as Record<string, unknown>;
-  return (
-    isNonEmptyString(option.id) &&
-    isNonEmptyString(option.categoryId) &&
-    isNonEmptyString(option.activityId) &&
-    isNonEmptyString(option.label) &&
-    (option.icon === undefined || typeof option.icon === 'string')
-  );
+  if (!isNonEmptyString(option.id)) {
+    return null;
+  }
+
+  const scopeIds = Array.isArray(option.scopeIds)
+    ? option.scopeIds.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : undefined;
+
+  return {
+    id: option.id,
+    categoryId: typeof option.categoryId === 'string' ? option.categoryId : '',
+    activityId: typeof option.activityId === 'string' ? option.activityId : '',
+    label: typeof option.label === 'string' ? option.label : '',
+    icon: typeof option.icon === 'string' ? option.icon : undefined,
+    linkedTodoId: typeof option.linkedTodoId === 'string' ? option.linkedTodoId : undefined,
+    scopeIds: scopeIds && scopeIds.length > 0 ? scopeIds : undefined
+  };
 };
 
 const normalizeStepTitle = (value: unknown, fallback: string): string =>
@@ -111,8 +122,8 @@ const normalizeStartRecordStep = (value: Partial<AppAwarenessStartRecordStep>): 
   description: typeof value.description === 'string' ? value.description : undefined,
   required: value.required !== false,
   answerKey: isNonEmptyString(value.answerKey) ? value.answerKey : 'selectedActivity',
-  activityOptions: Array.isArray(value.activityOptions) && value.activityOptions.every(isActivityOption)
-    ? value.activityOptions
+  activityOptions: Array.isArray(value.activityOptions)
+    ? value.activityOptions.map(normalizeActivityOption).filter((item): item is AppAwarenessActivityOption => item !== null)
     : [],
   durationSource:
     value.durationSource === 'fixed' || value.durationSource === 'none' || value.durationSource === 'from_step'

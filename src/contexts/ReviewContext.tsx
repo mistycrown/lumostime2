@@ -3,6 +3,7 @@
  * @description Manages review system state, using async repository hydration for heavy review entries and localStorage for light review settings.
  * @updated 2026-08-06: Preserved item-level daily check template enabled flags during localStorage startup migration.
  * @updated 2026-08-11: Reports failed review-data hydration through the bootstrap recovery screen.
+ * @updated 2026-09-08: Added persistent per-question Review Overview visibility preferences.
  */
 import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { DEFAULT_CHECK_TEMPLATES, DEFAULT_REVIEW_TEMPLATES, INITIAL_DAILY_REVIEWS } from '../constants';
@@ -43,6 +44,9 @@ interface ReviewContextType {
 
   autoGenerateMonthlyReview: boolean;
   setAutoGenerateMonthlyReview: React.Dispatch<React.SetStateAction<boolean>>;
+
+  reviewOverviewQuestionVisibility: Record<string, boolean>;
+  setReviewOverviewQuestionVisibility: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 
   dailyReviews: DailyReview[];
   setDailyReviews: React.Dispatch<React.SetStateAction<DailyReview[]>>;
@@ -166,6 +170,13 @@ export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return storage.getJSON<boolean>(SETTINGS_KEYS.AUTO_GENERATE_MONTHLY_REVIEW, false) || false;
   });
 
+  const [reviewOverviewQuestionVisibility, setReviewOverviewQuestionVisibility] = useState<Record<string, boolean>>(() => {
+    return storage.getJSON<Record<string, boolean>>(
+      SETTINGS_KEYS.REVIEW_OVERVIEW_QUESTION_VISIBILITY,
+      {}
+    ) || {};
+  });
+
   const [dailyReviews, setDailyReviews] = useState<DailyReview[]>(normalizeDailyReviews(INITIAL_DAILY_REVIEWS));
   const [weeklyReviews, setWeeklyReviews] = useState<WeeklyReview[]>([]);
   const [monthlyReviews, setMonthlyReviews] = useState<MonthlyReview[]>([]);
@@ -247,6 +258,13 @@ export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   useEffect(() => {
     storage.setJSON(SETTINGS_KEYS.AUTO_GENERATE_MONTHLY_REVIEW, autoGenerateMonthlyReview);
   }, [autoGenerateMonthlyReview]);
+
+  useEffect(() => {
+    storage.setJSON(
+      SETTINGS_KEYS.REVIEW_OVERVIEW_QUESTION_VISIBILITY,
+      reviewOverviewQuestionVisibility
+    );
+  }, [reviewOverviewQuestionVisibility]);
 
   useEffect(() => {
     if (!isReady || !canPersist) {
@@ -340,6 +358,8 @@ export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setAutoGenerateWeeklyReview,
         autoGenerateMonthlyReview,
         setAutoGenerateMonthlyReview,
+        reviewOverviewQuestionVisibility,
+        setReviewOverviewQuestionVisibility,
         dailyReviews,
         setDailyReviews,
         weeklyReviews,

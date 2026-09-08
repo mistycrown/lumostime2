@@ -4,6 +4,8 @@
 
 ## Updates
 
+- 2026-09-08: `ReviewOverviewQuestionVisibilityView.tsx` adds per-question display toggles grouped by review template; hidden questions are filtered from Review Overview counts and details without changing review data.
+
 - 2026-08-09: `ReviewOverviewView.tsx` adds a `回顾总览` settings subpage that groups Daily/Weekly/Monthly review answers by template group and question, with newest-first answer detail.
 - 2026-08-09: `ReviewOverviewView.tsx` now makes each answer date a low-key link into its source review while preserving the return stack: source detail, answer detail, then overview.
 - 2026-08-09: `ReviewOverviewView.tsx` now matches tag-detail side spacing, hides its scrollbars, and renders choice answers as capsules plus rating answers as icon scores.

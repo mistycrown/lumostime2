@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DailyReview, ReviewTemplate, WeeklyReview } from '../types';
-import { getReviewOverviewSections } from './reviewOverviewUtils';
+import { getReviewOverviewQuestionSettingSections, getReviewOverviewSections, makeReviewOverviewQuestionKey } from './reviewOverviewUtils';
 
 const createDailyReview = (review: Partial<DailyReview>): DailyReview => ({
   id: review.id || 'daily-1',
@@ -251,5 +251,39 @@ describe('reviewOverviewUtils', () => {
       icon: 'Heart',
       colorId: 'rose'
     });
+  });
+
+  it('filters hidden questions before calculating overview counts', () => {
+    const sections = getReviewOverviewSections({
+      dailyReviews: [
+        createDailyReview({
+          answers: [
+            { questionId: 'energy-q', question: templates[0].questions[0].question, answer: 'hidden' }
+          ]
+        })
+      ],
+      weeklyReviews: [],
+      monthlyReviews: [],
+      reviewTemplates: templates,
+      questionVisibility: {
+        [makeReviewOverviewQuestionKey('daily', templates[0].title, templates[0].questions[0].question)]: false
+      }
+    });
+
+    expect(sections[0].questionCount).toBe(0);
+    expect(sections[0].answerCount).toBe(0);
+  });
+
+  it('lists questions by review template group for visibility settings', () => {
+    const sections = getReviewOverviewQuestionSettingSections({
+      dailyReviews: [],
+      weeklyReviews: [],
+      monthlyReviews: [],
+      reviewTemplates: templates
+    });
+
+    expect(sections[0].groups[0].title).toBe(templates[0].title);
+    expect(sections[0].groups[0].questions[0].question).toBe(templates[0].questions[0].question);
+    expect(sections[1].groups[0].questions[0].type).toBe('text');
   });
 });
