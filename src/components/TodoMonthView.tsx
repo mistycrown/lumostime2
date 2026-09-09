@@ -13,11 +13,10 @@
  * Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-07-21: Unified dark-mode month headers and corrected schedule-entry text contrast.
  * @updated 2026-09-02: Rendered lunar labels as fixed two-line vertical text beside each month-view date number.
- * @updated 2026-09-09: Added mutually exclusive hidden/display filter modes with local month-view display presets and CRUD controls.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CheckCircle2, ChevronLeft, ChevronRight, CircleAlert, Diff, Flag, Pencil, Plus, Repeat2, SlidersHorizontal, Trash2, TrendingUp } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, CircleAlert, Diff, Flag, Repeat2, SlidersHorizontal, TrendingUp } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import {
   addMonths,
@@ -52,13 +51,6 @@ import {
 } from '../services/calendarNumberStyleService';
 import { hexToRgba } from '../utils/colorUtils';
 import { matchesTodoFilterExpression } from '../utils/filterUtils';
-import {
-  getTodoMonthFilterExpression,
-  normalizeTodoMonthFilterMode,
-  normalizeTodoMonthFilterPresets,
-  TodoMonthFilterMode,
-  TodoMonthFilterPreset
-} from '../utils/todoMonthFilterUtils';
 import { TodoScheduleTypeColorSettings as TodoScheduleTypeColorSettingsPanel } from './TodoScheduleTypeColorSettings';
 import {
   getResolvedTodoScheduleTypeColors,
@@ -102,9 +94,6 @@ const MONTH_VIEW_ROWS_PER_SCREEN_STORAGE_KEY = 'todoMonthViewRowsPerScreen';
 const MONTH_VIEW_FONT_SIZE_STORAGE_KEY = 'todoMonthViewFontSize';
 const MONTH_VIEW_MARKER_COLOR_MODE_STORAGE_KEY = 'todoMonthViewMarkerColorMode';
 const MONTH_VIEW_HIDDEN_FILTER_EXPRESSION_STORAGE_KEY = 'todoMonthViewHiddenFilterExpression';
-const MONTH_VIEW_FILTER_MODE_STORAGE_KEY = 'todoMonthViewFilterMode';
-const MONTH_VIEW_DISPLAY_FILTER_PRESETS_STORAGE_KEY = 'todoMonthViewDisplayFilterPresets';
-const MONTH_VIEW_ACTIVE_DISPLAY_FILTER_PRESET_STORAGE_KEY = 'todoMonthViewActiveDisplayFilterPreset';
 const MONTH_VIEW_HIDE_TRACE_TYPES_STORAGE_KEY = 'todoMonthViewHideTraceTypes';
 const MONTH_VIEW_INITIAL_MONTHS_BEFORE = 2;
 const MONTH_VIEW_INITIAL_MONTHS_AFTER = 2;
@@ -317,33 +306,6 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   const [hiddenFilterExpressionDraft, setHiddenFilterExpressionDraft] = useState<string>(() => (
     localStorage.getItem(MONTH_VIEW_HIDDEN_FILTER_EXPRESSION_STORAGE_KEY) || ''
   ));
-  const [monthFilterMode, setMonthFilterMode] = useState<TodoMonthFilterMode>(() => {
-    const savedMode = localStorage.getItem(MONTH_VIEW_FILTER_MODE_STORAGE_KEY);
-    return savedMode === null
-      ? (localStorage.getItem(MONTH_VIEW_HIDDEN_FILTER_EXPRESSION_STORAGE_KEY)?.trim() ? 'hidden' : 'none')
-      : normalizeTodoMonthFilterMode(savedMode);
-  });
-  const [monthFilterModeDraft, setMonthFilterModeDraft] = useState<TodoMonthFilterMode>(() => {
-    const savedMode = localStorage.getItem(MONTH_VIEW_FILTER_MODE_STORAGE_KEY);
-    return savedMode === null
-      ? (localStorage.getItem(MONTH_VIEW_HIDDEN_FILTER_EXPRESSION_STORAGE_KEY)?.trim() ? 'hidden' : 'none')
-      : normalizeTodoMonthFilterMode(savedMode);
-  });
-  const [displayFilterPresets, setDisplayFilterPresets] = useState<TodoMonthFilterPreset[]>(() => {
-    try {
-      return normalizeTodoMonthFilterPresets(JSON.parse(
-        localStorage.getItem(MONTH_VIEW_DISPLAY_FILTER_PRESETS_STORAGE_KEY) || '[]'
-      ));
-    } catch {
-      return [];
-    }
-  });
-  const [activeDisplayFilterPresetId, setActiveDisplayFilterPresetId] = useState<string>(() => (
-    localStorage.getItem(MONTH_VIEW_ACTIVE_DISPLAY_FILTER_PRESET_STORAGE_KEY) || ''
-  ));
-  const [isDisplayFilterPresetEditorOpen, setIsDisplayFilterPresetEditorOpen] = useState(false);
-  const [displayFilterPresetDraft, setDisplayFilterPresetDraft] = useState({ name: '', filterExpression: '' });
-  const [editingDisplayFilterPresetId, setEditingDisplayFilterPresetId] = useState<string | null>(null);
   const [hideTraceTypes, setHideTraceTypes] = useState<boolean>(() => (
     localStorage.getItem(MONTH_VIEW_HIDE_TRACE_TYPES_STORAGE_KEY) === 'true'
   ));
@@ -375,12 +337,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   );
   const entriesByDate = useMemo(
     () => {
-      const expression = getTodoMonthFilterExpression({
-        mode: monthFilterMode,
-        hiddenFilterExpression,
-        presets: displayFilterPresets,
-        activePresetId: activeDisplayFilterPresetId
-      });
+      const expression = hiddenFilterExpression.trim();
 
       if (!expression && !hideTraceTypes) {
         return rawEntriesByDate;
@@ -394,22 +351,16 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
               return false;
             }
 
-            if (!expression) {
-              return true;
-            }
-
-            const matchesExpression = matchesTodoFilterExpression(entry.todo, expression, {
+            return !matchesTodoFilterExpression(entry.todo, expression, {
               categories: activityCategories,
               scopes,
               todoCategories
             });
-
-            return monthFilterMode === 'visible' ? matchesExpression : !matchesExpression;
           })
         ]))
       );
     },
-    [activeDisplayFilterPresetId, activityCategories, displayFilterPresets, hiddenFilterExpression, hideTraceTypes, monthFilterMode, rawEntriesByDate, scopes, todoCategories]
+    [activityCategories, hiddenFilterExpression, hideTraceTypes, rawEntriesByDate, scopes, todoCategories]
   );
 
   const clearActiveMonthFreezeTimeout = () => {
@@ -954,93 +905,19 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   }, [hiddenFilterExpression]);
 
   useEffect(() => {
-    localStorage.setItem(MONTH_VIEW_FILTER_MODE_STORAGE_KEY, monthFilterMode);
-  }, [monthFilterMode]);
-
-  useEffect(() => {
-    localStorage.setItem(MONTH_VIEW_DISPLAY_FILTER_PRESETS_STORAGE_KEY, JSON.stringify(displayFilterPresets));
-  }, [displayFilterPresets]);
-
-  useEffect(() => {
-    if (activeDisplayFilterPresetId && displayFilterPresets.some((preset) => preset.id === activeDisplayFilterPresetId)) {
-      localStorage.setItem(MONTH_VIEW_ACTIVE_DISPLAY_FILTER_PRESET_STORAGE_KEY, activeDisplayFilterPresetId);
-      return;
-    }
-
-    localStorage.removeItem(MONTH_VIEW_ACTIVE_DISPLAY_FILTER_PRESET_STORAGE_KEY);
-  }, [activeDisplayFilterPresetId, displayFilterPresets]);
-
-  useEffect(() => {
     localStorage.setItem(MONTH_VIEW_HIDE_TRACE_TYPES_STORAGE_KEY, hideTraceTypes ? 'true' : 'false');
   }, [hideTraceTypes]);
 
   const openDensityMenu = () => {
     setHiddenFilterExpressionDraft(hiddenFilterExpression);
-    setMonthFilterModeDraft(monthFilterMode);
     setHideTraceTypesDraft(hideTraceTypes);
     setIsDensityMenuOpen(true);
   };
 
   const closeDensityMenu = () => {
     setHiddenFilterExpression(hiddenFilterExpressionDraft);
-    setMonthFilterMode(monthFilterModeDraft);
     setHideTraceTypes(hideTraceTypesDraft);
-    setIsDisplayFilterPresetEditorOpen(false);
     setIsDensityMenuOpen(false);
-  };
-
-  const startCreateDisplayFilterPreset = () => {
-    setEditingDisplayFilterPresetId(null);
-    setDisplayFilterPresetDraft({ name: '', filterExpression: '' });
-    setIsDisplayFilterPresetEditorOpen(true);
-  };
-
-  const startEditDisplayFilterPreset = () => {
-    const preset = displayFilterPresets.find((item) => item.id === activeDisplayFilterPresetId);
-    if (!preset) {
-      return;
-    }
-
-    setEditingDisplayFilterPresetId(preset.id);
-    setDisplayFilterPresetDraft({ name: preset.name, filterExpression: preset.filterExpression });
-    setIsDisplayFilterPresetEditorOpen(true);
-  };
-
-  const saveDisplayFilterPreset = () => {
-    const name = displayFilterPresetDraft.name.trim();
-    const filterExpression = displayFilterPresetDraft.filterExpression.trim();
-    if (!name || !filterExpression) {
-      return;
-    }
-
-    if (editingDisplayFilterPresetId) {
-      setDisplayFilterPresets((previous) => previous.map((preset) => (
-        preset.id === editingDisplayFilterPresetId
-          ? { ...preset, name, filterExpression }
-          : preset
-      )));
-      setActiveDisplayFilterPresetId(editingDisplayFilterPresetId);
-    } else {
-      const id = `month-filter-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      setDisplayFilterPresets((previous) => [...previous, { id, name, filterExpression }]);
-      setActiveDisplayFilterPresetId(id);
-    }
-
-    setMonthFilterModeDraft('visible');
-    setIsDisplayFilterPresetEditorOpen(false);
-  };
-
-  const deleteActiveDisplayFilterPreset = () => {
-    if (!activeDisplayFilterPresetId) {
-      return;
-    }
-
-    setDisplayFilterPresets((previous) => previous.filter((preset) => preset.id !== activeDisplayFilterPresetId));
-    setActiveDisplayFilterPresetId('');
-    setMonthFilterModeDraft('none');
-    if (monthFilterMode === 'visible') {
-      setMonthFilterMode('none');
-    }
   };
 
   useEffect(() => {
@@ -1269,10 +1146,6 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   const resolvedScheduleTypeColors = useMemo(
     () => getResolvedTodoScheduleTypeColors(scheduleTypeColorSettings),
     [scheduleTypeColorSettings]
-  );
-  const activeDisplayFilterPreset = useMemo(
-    () => displayFilterPresets.find((preset) => preset.id === activeDisplayFilterPresetId) || null,
-    [activeDisplayFilterPresetId, displayFilterPresets]
   );
   const getTodoMarkerColor = (entry: TodoDateEntry): string => {
     if (monthMarkerColorMode === 'category') {
@@ -1952,146 +1825,29 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                 </div>
 
                 <div className="mt-4">
-                  <div className="mb-2 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
-                    月历筛选
-                  </div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {([
-                      { key: 'none' as const, label: '不筛选' },
-                      { key: 'hidden' as const, label: '隐藏筛选' },
-                      { key: 'visible' as const, label: '显示筛选' }
-                    ]).map((option) => (
+                  <div className="mb-2 flex items-center justify-between gap-3 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
+                    <span>隐藏筛选式</span>
+                    {hiddenFilterExpressionDraft.trim() && (
                       <button
-                        key={option.key}
                         type="button"
-                        onClick={() => setMonthFilterModeDraft(option.key)}
-                        className={`border-b px-2 py-2 text-center text-[13px] transition-colors ${monthFilterModeDraft === option.key
-                            ? 'border-slate-800 text-slate-800'
-                            : 'border-transparent text-slate-400 hover:text-slate-700'
-                          }`}
+                        onClick={() => setHiddenFilterExpressionDraft('')}
+                        className="rounded-full px-2 py-1 text-[0.68rem] tracking-[0.04em] text-stone-400 transition-colors hover:bg-stone-100/70 hover:text-stone-600"
                       >
-                        {option.label}
+                        清空
                       </button>
-                    ))}
+                    )}
                   </div>
-
-                  {monthFilterModeDraft === 'hidden' && (
-                    <div className="mt-3">
-                      <div className="mb-2 flex items-center justify-between gap-3 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
-                        <span>隐藏筛选式</span>
-                        {hiddenFilterExpressionDraft.trim() && (
-                          <button
-                            type="button"
-                            onClick={() => setHiddenFilterExpressionDraft('')}
-                            className="rounded-full px-2 py-1 text-[0.68rem] tracking-[0.04em] text-stone-400 transition-colors hover:bg-stone-100/70 hover:text-stone-600"
-                          >
-                            清空
-                          </button>
-                        )}
-                      </div>
-                      <textarea
-                        value={hiddenFilterExpressionDraft}
-                        onChange={(event) => setHiddenFilterExpressionDraft(event.target.value)}
-                        rows={3}
-                        spellCheck={false}
-                        placeholder="@写作 #阅读 %健康 复盘 OR 总结"
-                        className="w-full resize-none rounded-2xl border border-stone-200 bg-white/88 px-3 py-2.5 text-[13px] leading-5 text-stone-700 outline-none transition-colors placeholder:text-stone-300 focus:border-stone-300"
-                      />
-                      <p className="mt-2 text-[11px] leading-5 text-stone-400">
-                        语法同自定义筛选器：空格=与，OR=或，@待办/分类，#活动/分类，%领域，无前缀=备注。
-                      </p>
-                    </div>
-                  )}
-
-                  {monthFilterModeDraft === 'visible' && (
-                    <div className="mt-3 space-y-3">
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={activeDisplayFilterPresetId}
-                          onChange={(event) => setActiveDisplayFilterPresetId(event.target.value)}
-                          className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-white/88 px-3 py-2 text-[13px] text-stone-700 outline-none focus:border-stone-300"
-                        >
-                          <option value="">选择显示预设</option>
-                          {displayFilterPresets.map((preset) => (
-                            <option key={preset.id} value={preset.id}>{preset.name}</option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={startCreateDisplayFilterPreset}
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-800"
-                          title="新建显示预设"
-                          aria-label="新建显示预设"
-                        >
-                          <Plus size={15} />
-                        </button>
-                      </div>
-                      {activeDisplayFilterPreset && (
-                        <div className="flex items-center justify-between gap-3 rounded-xl border border-stone-200/80 bg-white/55 px-3 py-2">
-                          <span className="min-w-0 truncate text-[12px] text-stone-500">{activeDisplayFilterPreset.filterExpression}</span>
-                          <div className="flex shrink-0 items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={startEditDisplayFilterPreset}
-                              className="flex h-7 w-7 items-center justify-center rounded-full text-stone-400 hover:bg-stone-100 hover:text-stone-700"
-                              title="编辑预设"
-                              aria-label="编辑预设"
-                            >
-                              <Pencil size={13} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={deleteActiveDisplayFilterPreset}
-                              className="flex h-7 w-7 items-center justify-center rounded-full text-stone-400 hover:bg-stone-100 hover:text-red-600"
-                              title="删除预设"
-                              aria-label="删除预设"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      {displayFilterPresets.length === 0 && (
-                        <p className="text-[11px] leading-5 text-stone-400">还没有显示预设，请先新建一个。</p>
-                      )}
-                    </div>
-                  )}
-
-                  {isDisplayFilterPresetEditorOpen && (
-                    <div className="mt-3 space-y-2 border-t border-stone-200/80 pt-3">
-                      <input
-                        value={displayFilterPresetDraft.name}
-                        onChange={(event) => setDisplayFilterPresetDraft((previous) => ({ ...previous, name: event.target.value }))}
-                        placeholder="预设名称"
-                        className="w-full rounded-xl border border-stone-200 bg-white/88 px-3 py-2 text-[13px] text-stone-700 outline-none placeholder:text-stone-300 focus:border-stone-300"
-                      />
-                      <textarea
-                        value={displayFilterPresetDraft.filterExpression}
-                        onChange={(event) => setDisplayFilterPresetDraft((previous) => ({ ...previous, filterExpression: event.target.value }))}
-                        rows={3}
-                        spellCheck={false}
-                        placeholder="@写作 #阅读 %健康 复盘 OR 总结"
-                        className="w-full resize-none rounded-xl border border-stone-200 bg-white/88 px-3 py-2.5 text-[13px] leading-5 text-stone-700 outline-none placeholder:text-stone-300 focus:border-stone-300"
-                      />
-                      <div className="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setIsDisplayFilterPresetEditorOpen(false)}
-                          className="rounded-full px-3 py-1.5 text-[12px] text-stone-400 hover:bg-stone-100 hover:text-stone-700"
-                        >
-                          取消
-                        </button>
-                        <button
-                          type="button"
-                          onClick={saveDisplayFilterPreset}
-                          disabled={!displayFilterPresetDraft.name.trim() || !displayFilterPresetDraft.filterExpression.trim()}
-                          className="rounded-full bg-stone-800 px-3 py-1.5 text-[12px] text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          保存
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <textarea
+                    value={hiddenFilterExpressionDraft}
+                    onChange={(event) => setHiddenFilterExpressionDraft(event.target.value)}
+                    rows={3}
+                    spellCheck={false}
+                    placeholder="@写作 #阅读 %健康 复盘 OR 总结"
+                    className="w-full resize-none rounded-2xl border border-stone-200 bg-white/88 px-3 py-2.5 text-[13px] leading-5 text-stone-700 outline-none transition-colors placeholder:text-stone-300 focus:border-stone-300"
+                  />
+                  <p className="mt-2 text-[11px] leading-5 text-stone-400">
+                    语法同自定义筛选器：空格=与，OR=或，@待办/分类，#活动/分类，%领域，无前缀=备注。
+                  </p>
                 </div>
 
                 <button
