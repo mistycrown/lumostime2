@@ -4,7 +4,7 @@
  * @output Unit coverage for sorting, lookups, tag-switch cleanup, and recent option ordering.
  * @pos Utility test
  * @description Verifies ID-based custom values never follow a record onto another Activity.
- * @updated 2026-09-07: Verifies multi-choice note matching selects only the longest matching option.
+ * @updated 2026-09-09: Verifies multi-choice note matching keeps every matching option while single-choice matching prefers the longest label.
  * @updated 2026-09-03: Added coverage for note-matched choice attribute values.
  * @updated 2026-08-28: Added coverage for recent choice-option ordering.
  * @updated 2026-08-24: Created for Activity custom attributes.
@@ -130,7 +130,7 @@ describe('activityAttributeUtils', () => {
     ]);
   });
 
-  it('matches active choice options from a note, choosing only the longest match per choice attribute', () => {
+  it('matches active choice options from a note, keeping all multi-choice matches and the longest single-choice match', () => {
     const matchingActivity: Activity = {
       id: 'food',
       name: '饮食',
@@ -145,7 +145,7 @@ describe('activityAttributeUtils', () => {
 
     expect(getNoteMatchedActivityAttributeValues('午饭吃了麻辣烫和可乐', matchingActivity, [])).toEqual([
       { attributeId: 'place', optionId: 'hotpot' },
-      { attributeId: 'content', optionIds: ['hotpot'] }
+      { attributeId: 'content', optionIds: ['hotpot', 'drink'] }
     ]);
   });
 
