@@ -236,14 +236,14 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
     <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
       {/* Tags Chart */}
       <div className="flex flex-col items-center">
-        <div className="relative w-56 h-56 mb-8 mt-2">
-          <div className="absolute right-1 top-1 z-10 flex items-center rounded-md border border-stone-200 bg-white/90 p-0.5 shadow-sm">
+        <div className="relative mt-2 mb-8 w-full">
+          <div className="absolute right-0 top-0 z-10 flex w-fit rounded-lg bg-stone-100/50 p-0.5">
             <button
               type="button"
               onClick={() => setTagsColorMode('category')}
               aria-pressed={tagsColorMode === 'category'}
               aria-label="按一级分类显示标签颜色"
-              className={`px-1.5 py-1 text-[10px] font-bold transition-colors ${tagsColorMode === 'category' ? 'rounded bg-stone-800 text-white' : 'text-stone-400 hover:text-stone-700'}`}
+              className={`rounded-md px-2.5 py-1 text-[10px] font-bold transition-all ${tagsColorMode === 'category' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
             >
               一级
             </button>
@@ -252,29 +252,31 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
               onClick={() => setTagsColorMode('activity')}
               aria-pressed={tagsColorMode === 'activity'}
               aria-label="按二级标签显示标签颜色"
-              className={`px-1.5 py-1 text-[10px] font-bold transition-colors ${tagsColorMode === 'activity' ? 'rounded bg-stone-800 text-white' : 'text-stone-400 hover:text-stone-700'}`}
+              className={`rounded-md px-2.5 py-1 text-[10px] font-bold transition-all ${tagsColorMode === 'activity' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
             >
               二级
             </button>
           </div>
-          <ReactECharts 
-            option={tagsChartOption} 
-            style={{ height: '100%', width: '100%' }}
-            opts={{ renderer: 'svg' }}
-          />
-          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            <span className="text-xs font-bold text-stone-300 uppercase">Tags</span>
-            <div className="flex items-baseline gap-0.5 text-stone-800">
-              <span className="text-3xl font-bold font-mono">{totalH}</span>
-              <span className="text-xs text-stone-400">h</span>
-              <span className="text-xl font-bold font-mono">{totalM}</span>
-              <span className="text-xs text-stone-400">m</span>
+          <div className="relative mx-auto h-56 w-56">
+            <ReactECharts
+              option={tagsChartOption}
+              style={{ height: '100%', width: '100%' }}
+              opts={{ renderer: 'svg' }}
+            />
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-xs font-bold uppercase text-stone-300">Tags</span>
+              <div className="flex items-baseline gap-0.5 text-stone-800">
+                <span className="font-mono text-3xl font-bold">{totalH}</span>
+                <span className="text-xs text-stone-400">h</span>
+                <span className="font-mono text-xl font-bold">{totalM}</span>
+                <span className="text-xs text-stone-400">m</span>
+              </div>
             </div>
           </div>
         </div>
 
         <div className="w-full space-y-4">
-          {tagsColorMode === 'category' ? stats.categoryStats.map(cat => (
+          {stats.categoryStats.map(cat => (
             <div key={cat.id} className="group">
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
@@ -294,63 +296,44 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
                   </span>
                 </div>
               </div>
-              <div className="w-full h-1.5 bg-stone-50 rounded-full overflow-hidden mb-2">
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${cat.percentage}%`,
-                    backgroundColor: getHexColor(cat.themeColor)
-                  }}
-                />
-              </div>
-              <div className="pl-6 space-y-1">
-                {cat.items.map(act => (
+              {tagsColorMode === 'category' && (
+                <div className="mb-2 h-1.5 w-full overflow-hidden rounded-full bg-stone-50">
                   <div
-                    key={act.id}
-                    className="flex items-center justify-between text-[11px] text-stone-500 hover:bg-stone-50 rounded px-2 py-0.5 -ml-2 transition-colors"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <IconRenderer icon={act.icon} uiIcon={act.uiIcon} className="text-xs" />
-                      <span>{act.name}</span>
-                      {previousStats && renderGrowth(
-                        act.duration,
-                        previousStats.actDurations.get(act.id) || 0
-                      )}
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${cat.percentage}%`,
+                      backgroundColor: getHexColor(cat.themeColor)
+                    }}
+                  />
+                </div>
+              )}
+              <div className="space-y-1 pl-6">
+                {cat.items.map(act => (
+                  <div key={act.id}>
+                    <div className="-ml-2 flex items-center justify-between rounded px-2 py-0.5 text-[11px] text-stone-500 transition-colors hover:bg-stone-50">
+                      <div className="flex items-center gap-1.5">
+                        <IconRenderer icon={act.icon} uiIcon={act.uiIcon} className="text-xs" />
+                        <span>{act.name}</span>
+                        {previousStats && renderGrowth(
+                          act.duration,
+                          previousStats.actDurations.get(act.id) || 0
+                        )}
+                      </div>
+                      <span className="font-mono opacity-60">{formatDuration(act.duration)}</span>
                     </div>
-                    <span className="font-mono opacity-60">{formatDuration(act.duration)}</span>
+                    {tagsColorMode === 'activity' && (
+                      <div className="my-1.5 h-1.5 w-full overflow-hidden rounded-full bg-stone-50">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${stats.totalDuration > 0 ? (act.duration / stats.totalDuration) * 100 : 0}%`,
+                            backgroundColor: getHexColor(act.color)
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
-              </div>
-            </div>
-          )) : activityStats.map(activity => (
-            <div key={`${activity.categoryId}-${activity.id}`} className="group">
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex min-w-0 items-center gap-2">
-                  <IconRenderer icon={activity.icon} uiIcon={activity.uiIcon} size={14} />
-                  <span className="truncate font-bold text-stone-700 text-[13px]">{activity.name}</span>
-                  <span className="truncate text-[10px] text-stone-400">{activity.categoryName}</span>
-                  {previousStats && renderGrowth(
-                    activity.duration,
-                    previousStats.actDurations.get(activity.id) || 0
-                  )}
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className="text-xs font-mono text-stone-400">
-                    {formatDuration(activity.duration)}
-                  </span>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-stone-100 rounded text-stone-500">
-                    {activity.percentage.toFixed(0)}%
-                  </span>
-                </div>
-              </div>
-              <div className="w-full h-1.5 bg-stone-50 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${activity.percentage}%`,
-                    backgroundColor: getHexColor(activity.color)
-                  }}
-                />
               </div>
             </div>
           ))}
