@@ -119,10 +119,7 @@ import { assistantPromptService } from '../services/assistantPromptService';
 import { assistantLetterOrchestratorService } from '../services/assistantLetterOrchestratorService';
 import { assistantLetterScheduler } from '../services/assistantLetterScheduler';
 import { assistantLetterService } from '../services/assistantLetterService';
-import {
-  assistantReminderQueueService,
-  ASSISTANT_REMINDER_MAX_DISPATCH_ATTEMPTS
-} from '../services/assistantReminderQueueService';
+import { assistantReminderQueueService } from '../services/assistantReminderQueueService';
 import { assistantScheduledTaskService } from '../services/assistantScheduledTaskService';
 import {
   assistantOrchestratorService,
@@ -2335,7 +2332,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           ? trigger.metadata.dispatchAttemptCount
           : 0;
         if (reminderId) {
-          assistantReminderQueueService.markDispatchFailed(reminderId, attemptedCount);
+          const failedReminder = assistantReminderQueueService.markDispatchFailed(reminderId, attemptedCount + 1);
+          if (failedReminder?.status === 'failed') {
+            try {
+              await AssistantAgent.acknowledgeSystemTrigger({ id: triggerId });
+              handledAssistantTriggerIdsRef.current.add(triggerId);
+            } catch (acknowledgeError) {
+              console.error('[AIBackfillChatModal] Failed to acknowledge exhausted reminder trigger', acknowledgeError);
+            }
+          }
         }
       }
     } finally {
