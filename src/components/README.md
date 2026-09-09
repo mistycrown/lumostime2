@@ -2,6 +2,8 @@
 
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
+- Update 2026-09-09: `CustomSelect.tsx` supports optional portal-rendered dropdowns with viewport-aware positioning for selectors inside clipped overlays; existing selectors retain their inline behavior.
+
 - Update 2026-09-09: `TodoMonthView.tsx` now supports mutually exclusive no-filter, hidden-filter, and display-filter modes. Display-filter presets can be created, edited, deleted, quickly selected, and persisted locally without affecting week/list views or global filters.
 
 ## Core UI

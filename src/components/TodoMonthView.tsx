@@ -60,6 +60,7 @@ import {
   TodoMonthFilterPreset
 } from '../utils/todoMonthFilterUtils';
 import { TodoScheduleTypeColorSettings as TodoScheduleTypeColorSettingsPanel } from './TodoScheduleTypeColorSettings';
+import { CustomSelect } from './CustomSelect';
 import {
   getResolvedTodoScheduleTypeColors,
   todoScheduleColorService,
@@ -2006,16 +2007,14 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                   {monthFilterModeDraft === 'visible' && (
                     <div className="mt-3 space-y-3">
                       <div className="flex items-center gap-2">
-                        <select
+                        <CustomSelect
                           value={activeDisplayFilterPresetId}
-                          onChange={(event) => setActiveDisplayFilterPresetId(event.target.value)}
-                          className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-white/88 px-3 py-2 text-[13px] text-stone-700 outline-none focus:border-stone-300"
-                        >
-                          <option value="">选择显示预设</option>
-                          {displayFilterPresets.map((preset) => (
-                            <option key={preset.id} value={preset.id}>{preset.name}</option>
-                          ))}
-                        </select>
+                          onChange={setActiveDisplayFilterPresetId}
+                          options={displayFilterPresets.map((preset) => ({ value: preset.id, label: preset.name }))}
+                          placeholder="选择显示预设"
+                          className="min-w-0 flex-1"
+                          renderDropdownInPortal
+                        />
                         <button
                           type="button"
                           onClick={startCreateDisplayFilterPreset}
