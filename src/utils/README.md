@@ -8,8 +8,6 @@ Contains pure utility functions for data processing and business logic calculati
 
 > Update 2026-09-09: `activityAttributeUtils.ts` now auto-selects every matching option for multi-choice attributes when parsing record notes, while single-choice attributes continue to select the longest matching label.
 
-> Update 2026-09-09: `todoMonthFilterUtils.ts` normalizes Todo month-view filter modes and display presets, keeping hidden and visible filtering mutually exclusive across persisted local settings.
-
 > Update 2026-08-26: `logSplitUtils.ts` builds two replacement records from a selected split time while preserving source fields and proportional manual todo progress.
 
 > Update 2026-08-27: `logSplitUtils.ts` also resolves adjacent actual records and merges into a target while retaining target fields, including any gap and transferring collection memberships.
