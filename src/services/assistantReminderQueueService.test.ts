@@ -30,7 +30,10 @@ vi.mock('../plugins/AssistantAgentPlugin', () => ({
   }
 }));
 
-import { assistantReminderQueueService } from './assistantReminderQueueService';
+import {
+  assistantReminderQueueService,
+  ASSISTANT_REMINDER_MAX_DISPATCH_ATTEMPTS
+} from './assistantReminderQueueService';
 
 type LocalStorageMock = {
   getItem: (key: string) => string | null;
@@ -106,6 +109,28 @@ describe('assistantReminderQueueService', () => {
       lastDispatchedAt: '2026-05-09T08:00:05.000Z'
     });
     expect(assistantReminderQueueService.listReminders()).toEqual([]);
+  });
+
+  it('stops due dispatch after the maximum number of attempts and marks the reminder failed', () => {
+    assistantReminderQueueService.enqueueReminder({
+      id: 'reminder-max-attempts',
+      type: 'self_followup',
+      dueAt: '2026-05-09T07:00:00.000Z',
+      status: 'pending',
+      text: 'stop retrying',
+      source: 'agent',
+      createdAt: '2026-05-09T06:50:00.000Z',
+      dispatchAttemptCount: ASSISTANT_REMINDER_MAX_DISPATCH_ATTEMPTS,
+      lastDispatchAttemptAt: '2026-05-09T07:00:30.000Z'
+    });
+
+    expect(assistantReminderQueueService.listDueReminders(new Date('2026-05-09T08:00:00.000Z'))).toEqual([]);
+    expect(assistantReminderQueueService.markDispatchFailed('reminder-max-attempts')).toMatchObject({
+      id: 'reminder-max-attempts',
+      status: 'failed',
+      dispatchAttemptCount: ASSISTANT_REMINDER_MAX_DISPATCH_ATTEMPTS
+    });
+    expect(assistantReminderQueueService.listReminders()[0].status).toBe('failed');
   });
 
   it('returns the existing pending reminder when an identical agent reminder is enqueued again', () => {

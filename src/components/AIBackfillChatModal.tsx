@@ -9,6 +9,7 @@
  * @updated 2026-09-03: Removed the base polling-frequency state path now that Android check-ins use concrete alarm times.
  * @updated 2026-07-31: Added a pending-message-id fallback cleanup so completed foreground turns always restore the composer send button.
  * @updated 2026-09-02: Keeps fallback system triggers pending until Web execution succeeds and surfaces native skip/request states in background history.
+ * @updated 2026-09-09: Stops failed reminder_due executions after three attempts while preserving failure metadata.
  * @updated 2026-09-02: Always persists a usable native background prompt, even when no recent ordinary chat session is available for routing.
  * @updated 2026-07-31: Wired foreground `create_planned_log` tool calls into local timeline Plan creation, rendering, and undo.
  * @updated 2026-08-24: Added in-place foreground reply retry that rolls back applied tool actions before regenerating the response.
@@ -118,7 +119,10 @@ import { assistantPromptService } from '../services/assistantPromptService';
 import { assistantLetterOrchestratorService } from '../services/assistantLetterOrchestratorService';
 import { assistantLetterScheduler } from '../services/assistantLetterScheduler';
 import { assistantLetterService } from '../services/assistantLetterService';
-import { assistantReminderQueueService } from '../services/assistantReminderQueueService';
+import {
+  assistantReminderQueueService,
+  ASSISTANT_REMINDER_MAX_DISPATCH_ATTEMPTS
+} from '../services/assistantReminderQueueService';
 import { assistantScheduledTaskService } from '../services/assistantScheduledTaskService';
 import {
   assistantOrchestratorService,
@@ -2321,6 +2325,19 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       }
     } catch (error) {
       console.error('[AIBackfillChatModal] Assistant system turn failed', error);
+      if (trigger.type === 'reminder_due') {
+        const reminderId = typeof trigger.metadata?.reminderId === 'string'
+          ? trigger.metadata.reminderId.trim()
+          : triggerId.startsWith('reminder_due:')
+            ? triggerId.slice('reminder_due:'.length).split(':')[0]
+            : '';
+        const attemptedCount = typeof trigger.metadata?.dispatchAttemptCount === 'number'
+          ? trigger.metadata.dispatchAttemptCount
+          : 0;
+        if (reminderId) {
+          assistantReminderQueueService.markDispatchFailed(reminderId, attemptedCount);
+        }
+      }
     } finally {
       processingAssistantTriggerIdsRef.current.delete(triggerId);
     }
@@ -2856,6 +2873,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       }
     }).catch((error) => {
       console.error('[AIBackfillChatModal] Due reminder dispatch failed', error);
+      assistantReminderQueueService.markDispatchFailed(
+        reminder.id,
+        (reminder.dispatchAttemptCount || 0) + 1
+      );
       refreshAssistantMemorySnapshot();
     }).finally(() => {
       processingDueReminderIdsRef.current.delete(reminder.id);
