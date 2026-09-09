@@ -6,6 +6,7 @@
  * @description Defines the structured contracts used by the Android-first assistant agent layer so background triggers, memory updates, reminder queues, and AI system-turn decisions can stay typed and stable across services and plugins.
  *
  * @updated 2026-09-04: Added explicit structured reminder removal actions so AI-confirmed cancellations mutate the durable reminder queue.
+ * @updated 2026-09-09: Added a terminal failed reminder status for bounded background dispatch retries.
  * @updated 2026-09-03: Removed the obsolete base polling interval from assistant agent configuration.
  * @updated 2026-08-12: Added one-turn `clientRef` / `todoRef` contracts so a newly created todo can be scheduled into a timeline Plan block immediately.
  * @updated 2026-07-31: Added the foreground `create_planned_log` tool-call contract for AI-created todo-linked timeline Plan blocks.
@@ -61,7 +62,7 @@ export type AssistantReminderType =
   | 'idle_check'
   | 'focus_check';
 
-export type AssistantReminderStatus = 'pending' | 'done' | 'cancelled';
+export type AssistantReminderStatus = 'pending' | 'done' | 'cancelled' | 'failed';
 
 export interface AssistantReminder {
   id: string;

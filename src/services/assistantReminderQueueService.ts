@@ -10,6 +10,7 @@
  * @updated 2026-05-17: Deduplicate pending reminders by natural content key during queue saves and agent enqueue calls so repeated background turns cannot silently stack identical self-followup reminders that all fire at the same due time.
  * @updated 2026-05-10: Preserved scheduled-task linkage ids during queue normalization so recurring assistant tasks can reliably reconcile and dedupe pending reminders.
  * @updated 2026-05-09: Delayed failed due-reminder retries for at least one minute in the web queue so failed dispatches stay pending instead of being re-fired immediately.
+ * @updated 2026-09-09: Added a three-attempt maximum and terminal failed state for due-reminder dispatches.
  * @updated 2026-04-26: Canonicalized reminder timestamps before storage so due checks, delay math, and debug output all run against one normalized timeline.
  * @updated 2026-04-26: Added persistent assistant reminder queue helpers, due-reminder lookup, dispatch-attempt tracking, and memory synchronization for the new background AI agent.
  */
@@ -27,6 +28,7 @@ import {
 
 const ASSISTANT_REMINDER_QUEUE_KEY = 'lumostime_assistant_reminders_v1';
 const REMINDER_RETRY_DELAY_MS = 60_000;
+export const ASSISTANT_REMINDER_MAX_DISPATCH_ATTEMPTS = 3;
 
 const normalizeReminder = (value: unknown): AssistantReminder | null => {
   if (!value || typeof value !== 'object') {
@@ -260,7 +262,11 @@ export const assistantReminderQueueService = {
   listDueReminders(now = new Date()): AssistantReminder[] {
     const nowMs = now.getTime();
     return assistantReminderQueueService.listReminders().filter((reminder) => {
-      if (reminder.status !== 'pending' || !isAssistantDateTimeDue(reminder.dueAt, now)) {
+      if (
+        reminder.status !== 'pending'
+        || (reminder.dispatchAttemptCount || 0) >= ASSISTANT_REMINDER_MAX_DISPATCH_ATTEMPTS
+        || !isAssistantDateTimeDue(reminder.dueAt, now)
+      ) {
         return false;
       }
 
@@ -328,6 +334,37 @@ export const assistantReminderQueueService = {
     });
 
     assistantReminderQueueService.saveReminders(next);
+    return updatedReminder;
+  },
+
+  markDispatchFailed(id: string, attemptedCount?: number): AssistantReminder | null {
+    const normalizedId = id.trim();
+    if (!normalizedId) {
+      return null;
+    }
+
+    let updatedReminder: AssistantReminder | null = null;
+    const next = assistantReminderQueueService.listReminders().map((reminder) => {
+      if (reminder.id !== normalizedId || reminder.status !== 'pending') {
+        return reminder;
+      }
+
+      const dispatchAttemptCount = Math.max(reminder.dispatchAttemptCount || 0, attemptedCount || 0);
+      if (dispatchAttemptCount < ASSISTANT_REMINDER_MAX_DISPATCH_ATTEMPTS) {
+        return reminder;
+      }
+
+      updatedReminder = {
+        ...reminder,
+        dispatchAttemptCount,
+        status: 'failed'
+      };
+      return updatedReminder;
+    });
+
+    if (updatedReminder) {
+      assistantReminderQueueService.saveReminders(next);
+    }
     return updatedReminder;
   },
 

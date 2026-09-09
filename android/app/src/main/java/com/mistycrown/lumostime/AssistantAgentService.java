@@ -444,6 +444,7 @@ public class AssistantAgentService extends Service {
 
                         @Override
                         public void onFailed() {
+                            AssistantNativeReminderStore.markDispatchFailed(AssistantAgentService.this, reminderId);
                             handler.post(() -> {
                                 nativeReminderRequestsInFlight.remove(reminderId);
                                 scheduleNextReminderDispatch(System.currentTimeMillis());

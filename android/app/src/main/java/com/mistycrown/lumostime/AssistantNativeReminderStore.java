@@ -7,6 +7,7 @@
  * @updated 2026-05-17: Deduplicate pending reminders by natural content key while reading and saving the native queue so identical agent-created reminders cannot stack and dispatch together at the same due timestamp.
  * @updated 2026-05-11: Added next-eligible reminder lookup so the native assistant service can schedule exact due-reminder wakeups instead of waiting for the next coarse poll cycle.
  * @updated 2026-04-30: Added native reminder queue persistence, due lookup, dispatch-attempt tracking, and completion helpers.
+ * @updated 2026-09-09: Added a bounded retry policy so failed reminders stop after three dispatch attempts.
  */
 package com.mistycrown.lumostime;
 
@@ -26,6 +27,7 @@ public final class AssistantNativeReminderStore {
     private static final String PREFS_NAME = "lumostime_assistant_native_reminders";
     private static final String KEY_REMINDERS_JSON = "reminders_json";
     private static final long REMINDER_RETRY_DELAY_MS = 60_000L;
+    public static final int MAX_DISPATCH_ATTEMPTS = 3;
 
     private AssistantNativeReminderStore() {
     }
@@ -98,6 +100,19 @@ public final class AssistantNativeReminderStore {
         });
     }
 
+    public static void markDispatchFailed(Context context, String reminderId) {
+        mutateReminder(context, reminderId, (reminder) -> {
+            try {
+                if (reminder.optInt("dispatchAttemptCount", 0) >= MAX_DISPATCH_ATTEMPTS) {
+                    reminder.put("status", "failed");
+                }
+            } catch (JSONException error) {
+                Log.e(TAG, "Failed to mark reminder dispatch as failed", error);
+            }
+            return reminder;
+        });
+    }
+
     public static void markDispatched(Context context, String reminderId, String dispatchedAt) {
         JSONArray reminders = read(context);
         JSONArray next = new JSONArray();
@@ -163,6 +178,10 @@ public final class AssistantNativeReminderStore {
         }
 
         if (!"pending".equals(reminder.optString("status", "").trim())) {
+            return -1L;
+        }
+
+        if (reminder.optInt("dispatchAttemptCount", 0) >= MAX_DISPATCH_ATTEMPTS) {
             return -1L;
         }
 
