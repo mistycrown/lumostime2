@@ -1,11 +1,13 @@
 /**
  * @file CustomSelect.tsx
  * @updated 2026-07-21: Added semantic hooks for high-contrast dark-mode select states.
+ * @updated 2026-09-09: Added optional portal rendering for dropdowns inside clipped overlays.
  * @description 自定义下拉选择组件 - 与应用主题风格一致
  */
 
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 interface Option {
   value: string;
@@ -22,6 +24,7 @@ interface CustomSelectProps {
   className?: string;
   disabled?: boolean;
   dropdownPosition?: 'auto' | 'top' | 'bottom'; // 新增：下拉框位置
+  renderDropdownInPortal?: boolean;
 }
 
 export const CustomSelect: React.FC<CustomSelectProps> = ({
@@ -32,35 +35,88 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
   placeholder = '请选择',
   className = '',
   disabled = false,
-  dropdownPosition = 'auto'
+  dropdownPosition = 'auto',
+  renderDropdownInPortal = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [shouldOpenUpward, setShouldOpenUpward] = useState(false);
+  const [portalPosition, setPortalPosition] = useState({ top: 0, left: 0, width: 0, maxHeight: 240 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find(opt => opt.value === value);
 
   // 检测下拉框应该向上还是向下展开
   useEffect(() => {
-    if (isOpen && dropdownPosition === 'auto' && containerRef.current) {
+    if (isOpen && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       const viewportHeight = window.innerHeight;
       const spaceBelow = viewportHeight - rect.bottom;
       const spaceAbove = rect.top;
       const dropdownHeight = Math.min(options.length * 40 + 16, 240); // 估算下拉框高度
-      
+
       // 如果下方空间不足且上方空间更大，则向上展开
-      setShouldOpenUpward(spaceBelow < dropdownHeight && spaceAbove > spaceBelow);
-    } else if (dropdownPosition === 'top') {
-      setShouldOpenUpward(true);
-    } else if (dropdownPosition === 'bottom') {
-      setShouldOpenUpward(false);
+      const openUpward = dropdownPosition === 'top'
+        || (dropdownPosition === 'auto' && spaceBelow < dropdownHeight && spaceAbove > spaceBelow);
+      setShouldOpenUpward(openUpward);
+
+      if (renderDropdownInPortal) {
+        const availableHeight = Math.max(96, (openUpward ? spaceAbove : spaceBelow) - 16);
+        const maxHeight = Math.min(dropdownHeight, availableHeight);
+        setPortalPosition({
+          top: openUpward ? Math.max(8, rect.top - maxHeight - 4) : Math.min(window.innerHeight - maxHeight - 8, rect.bottom + 4),
+          left: rect.left,
+          width: rect.width,
+          maxHeight
+        });
+      }
     }
-  }, [isOpen, options.length, dropdownPosition]);
+  }, [isOpen, options.length, dropdownPosition, renderDropdownInPortal]);
+
+  useEffect(() => {
+    if (!isOpen || !renderDropdownInPortal) {
+      return;
+    }
+
+    const updatePosition = () => {
+      if (!containerRef.current) {
+        return;
+      }
+
+      const rect = containerRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const dropdownHeight = Math.min(options.length * 40 + 16, 240);
+      const openUpward = dropdownPosition === 'top'
+        || (dropdownPosition === 'auto' && spaceBelow < dropdownHeight && spaceAbove > spaceBelow);
+      const availableHeight = Math.max(96, (openUpward ? spaceAbove : spaceBelow) - 16);
+      const maxHeight = Math.min(dropdownHeight, availableHeight);
+
+      setShouldOpenUpward(openUpward);
+      setPortalPosition({
+        top: openUpward ? Math.max(8, rect.top - maxHeight - 4) : Math.min(window.innerHeight - maxHeight - 8, rect.bottom + 4),
+        left: rect.left,
+        width: rect.width,
+        maxHeight
+      });
+    };
+
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [dropdownPosition, isOpen, options.length, renderDropdownInPortal]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (
+        containerRef.current
+        && !containerRef.current.contains(event.target as Node)
+        && !dropdownRef.current?.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
@@ -112,43 +168,58 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
         />
       </button>
 
-      {isOpen && !disabled && (
-        <div 
-          className={`absolute z-50 w-full bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden animate-in fade-in duration-200 ${
-            shouldOpenUpward 
-              ? 'bottom-full mb-1 slide-in-from-bottom-2' 
-              : 'top-full mt-1 slide-in-from-top-2'
-          }`}
-        >
-          <div className="max-h-60 overflow-y-auto">
-            {options.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSelect(option.value);
-                }}
-                className={`w-full px-4 py-2.5 text-sm text-left hover:bg-stone-50 transition-colors flex items-center justify-between ${
-                  option.value === value ? 'theme-select-option-selected font-bold' : 'text-stone-700'
-                }`}
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  {option.icon && (
-                    <span className="shrink-0 flex items-center justify-center">
-                      {option.icon}
-                    </span>
+      {isOpen && !disabled && (() => {
+        const dropdown = (
+          <div
+            ref={dropdownRef}
+            className={`${renderDropdownInPortal ? 'fixed' : 'absolute'} z-[240] w-full overflow-hidden rounded-xl border border-stone-200 bg-white shadow-lg animate-in fade-in duration-200 ${
+              renderDropdownInPortal
+                ? ''
+                : shouldOpenUpward
+                  ? 'bottom-full mb-1 slide-in-from-bottom-2'
+                  : 'top-full mt-1 slide-in-from-top-2'
+            }`}
+            style={renderDropdownInPortal ? {
+              top: portalPosition.top,
+              left: portalPosition.left,
+              width: portalPosition.width,
+              maxHeight: portalPosition.maxHeight
+            } : undefined}
+          >
+            <div className="max-h-60 overflow-y-auto" style={renderDropdownInPortal ? { maxHeight: portalPosition.maxHeight } : undefined}>
+              {options.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelect(option.value);
+                  }}
+                  className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition-colors hover:bg-stone-50 ${
+                    option.value === value ? 'theme-select-option-selected font-bold' : 'text-stone-700'
+                  }`}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    {option.icon && (
+                      <span className="flex shrink-0 items-center justify-center">
+                        {option.icon}
+                      </span>
+                    )}
+                    <span className="truncate">{option.label}</span>
+                  </span>
+                  {option.value === value && (
+                    <Check size={16} className="theme-select-option-check" />
                   )}
-                  <span className="truncate">{option.label}</span>
-                </span>
-                {option.value === value && (
-                  <Check size={16} className="theme-select-option-check" />
-                )}
-              </button>
-            ))}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+
+        return renderDropdownInPortal && typeof document !== 'undefined'
+          ? createPortal(dropdown, document.body)
+          : dropdown;
+      })()}
     </div>
   );
 };
