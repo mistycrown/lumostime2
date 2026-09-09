@@ -4,7 +4,7 @@ Update 2026-07-31: `aiService.ts` and `assistantActionExecutor.ts` now support f
 
 Update 2026-07-29: `timelineLayoutService.ts` centralizes supported Chronicle layout modes while the schedule canvas now positions itself from the current time instead of a saved start hour.
 
-Update 2026-08-09: `updateService.ts` now reports shipped app version `1.6.4` for the 1.6.4 release line.
+Update 2026-09-09: `updateService.ts` now reports shipped app version `1.6.5` for the 1.6.5 release line.
 Update 2026-08-10: `appearanceBackupService.ts` centralizes export/cloud restore for theme, TimePal, and visual-style preferences; custom TimePal, background, and navigation assets now participate in the canonical image manifest and cleanup protection.
 Update 2026-08-26: `errorReporting.ts` now keeps a bounded, sanitized renderer error/warning buffer and exposes an explicit user-triggered Sentry report action for recent console diagnostics.
 Update 2026-08-10: `aiService.ts` now preserves Android native HTTP error response bodies through a Fetch-compatible `text()` adapter and records whether each AI debug exchange used Android Native HTTP or Web Fetch, preventing `text is not a function` from hiding the provider's actual failure.
