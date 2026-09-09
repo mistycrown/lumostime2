@@ -1,5 +1,6 @@
 /**
  * @file PieChartView.tsx
+ * @updated 2026-09-09: Added category/activity color modes for the tags chart and its progress bars.
  * @input stats, todoStats, scopeStats, pieRange, categories, excludedCategoryIds
  * @output UI (Pie Charts), Events (toggleExclusion, onExport)
  * @pos Component (Statistics - Pie Chart)
@@ -13,7 +14,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { Category } from '../../types';
 import { TrendingUp, TrendingDown, Share, Image } from 'lucide-react';
@@ -52,6 +53,8 @@ export interface PieChartViewProps {
   isFullScreen?: boolean;
 }
 
+type TagsColorMode = 'category' | 'activity';
+
 export const PieChartView: React.FC<PieChartViewProps> = ({
   stats,
   previousStats,
@@ -67,16 +70,30 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
   onExportImage,
   isFullScreen = false
 }) => {
+  const [tagsColorMode, setTagsColorMode] = useState<TagsColorMode>('category');
+
+  const activityStats = useMemo(() => (
+    stats.categoryStats.flatMap(category => category.items.map(activity => ({
+      ...activity,
+      categoryId: category.id,
+      categoryName: category.name,
+      percentage: stats.totalDuration > 0 ? (activity.duration / stats.totalDuration) * 100 : 0,
+    })))
+  ), [stats]);
   
   // 生成 Tags 图表配置
   const tagsChartOption = useMemo(() => {
-    const data = stats.categoryStats.map(cat => ({
-      value: cat.duration,
-      name: cat.name,
-      itemStyle: {
-        color: getHexColor(cat.themeColor)
-      }
-    }));
+    const data = tagsColorMode === 'category'
+      ? stats.categoryStats.map(cat => ({
+          value: cat.duration,
+          name: cat.name,
+          itemStyle: { color: getHexColor(cat.themeColor) }
+        }))
+      : activityStats.map(activity => ({
+          value: activity.duration,
+          name: activity.name,
+          itemStyle: { color: getHexColor(activity.color) }
+        }));
 
     return {
       legend: {
@@ -107,7 +124,7 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
         data
       }]
     };
-  }, [stats]);
+  }, [activityStats, stats, tagsColorMode]);
 
   // 生成 Todos 图表配置
   const todosChartOption = useMemo(() => {
@@ -220,6 +237,26 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
       {/* Tags Chart */}
       <div className="flex flex-col items-center">
         <div className="relative w-56 h-56 mb-8 mt-2">
+          <div className="absolute right-1 top-1 z-10 flex items-center rounded-md border border-stone-200 bg-white/90 p-0.5 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setTagsColorMode('category')}
+              aria-pressed={tagsColorMode === 'category'}
+              aria-label="按一级分类显示标签颜色"
+              className={`px-1.5 py-1 text-[10px] font-bold transition-colors ${tagsColorMode === 'category' ? 'rounded bg-stone-800 text-white' : 'text-stone-400 hover:text-stone-700'}`}
+            >
+              一级
+            </button>
+            <button
+              type="button"
+              onClick={() => setTagsColorMode('activity')}
+              aria-pressed={tagsColorMode === 'activity'}
+              aria-label="按二级标签显示标签颜色"
+              className={`px-1.5 py-1 text-[10px] font-bold transition-colors ${tagsColorMode === 'activity' ? 'rounded bg-stone-800 text-white' : 'text-stone-400 hover:text-stone-700'}`}
+            >
+              二级
+            </button>
+          </div>
           <ReactECharts 
             option={tagsChartOption} 
             style={{ height: '100%', width: '100%' }}
@@ -237,7 +274,7 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
         </div>
 
         <div className="w-full space-y-4">
-          {stats.categoryStats.map(cat => (
+          {tagsColorMode === 'category' ? stats.categoryStats.map(cat => (
             <div key={cat.id} className="group">
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
@@ -283,6 +320,37 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
                     <span className="font-mono opacity-60">{formatDuration(act.duration)}</span>
                   </div>
                 ))}
+              </div>
+            </div>
+          )) : activityStats.map(activity => (
+            <div key={`${activity.categoryId}-${activity.id}`} className="group">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex min-w-0 items-center gap-2">
+                  <IconRenderer icon={activity.icon} uiIcon={activity.uiIcon} size={14} />
+                  <span className="truncate font-bold text-stone-700 text-[13px]">{activity.name}</span>
+                  <span className="truncate text-[10px] text-stone-400">{activity.categoryName}</span>
+                  {previousStats && renderGrowth(
+                    activity.duration,
+                    previousStats.actDurations.get(activity.id) || 0
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="text-xs font-mono text-stone-400">
+                    {formatDuration(activity.duration)}
+                  </span>
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-stone-100 rounded text-stone-500">
+                    {activity.percentage.toFixed(0)}%
+                  </span>
+                </div>
+              </div>
+              <div className="w-full h-1.5 bg-stone-50 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${activity.percentage}%`,
+                    backgroundColor: getHexColor(activity.color)
+                  }}
+                />
               </div>
             </div>
           ))}
