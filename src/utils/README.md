@@ -6,6 +6,8 @@ Contains pure utility functions for data processing and business logic calculati
 
 > Update 2026-09-05: `filterUtils.ts` now matches free-text note conditions against saved Activity attribute values as well as notes, without matching attribute names.
 
+> Update 2026-09-09: `activityAttributeUtils.ts` now auto-selects every matching option for multi-choice attributes when parsing record notes, while single-choice attributes continue to select the longest matching label.
+
 > Update 2026-08-26: `logSplitUtils.ts` builds two replacement records from a selected split time while preserving source fields and proportional manual todo progress.
 
 > Update 2026-08-27: `logSplitUtils.ts` also resolves adjacent actual records and merges into a target while retaining target fields, including any gap and transferring collection memberships.

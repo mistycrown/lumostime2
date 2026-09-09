@@ -4,7 +4,7 @@
  * @output Attribute value filtering, lookup, conditional visibility, and recent-option ordering helpers.
  * @pos Shared utility
  * @description Keeps Activity custom attribute values valid as users switch tags or archive definitions.
- * @updated 2026-09-07: Limits note matching to one option for both single- and multi-choice attributes, using the longest matching label.
+ * @updated 2026-09-09: Keeps every matching option for multi-choice attributes while retaining longest-label matching for single-choice attributes.
  * @updated 2026-09-03: Added note-text matching helpers for choice attribute auto-selection.
  * @updated 2026-08-31: Added single-choice condition matching and stale-value cleanup helpers.
  * @updated 2026-08-28: Added recent-use ordering for choice attribute options.
@@ -103,11 +103,9 @@ export const getNoteMatchedActivityAttributeValues = (
     const matchingOptions = getMatchingChoiceOptions(note, attribute);
     if (matchingOptions.length === 0) return;
 
-    const selectedOption = [...matchingOptions]
-      .sort((left, right) => right.label.length - left.label.length)[0];
     const matchedValue: ActivityAttributeValue = attribute.type === 'single'
-      ? { attributeId: attribute.id, optionId: selectedOption.id }
-      : { attributeId: attribute.id, optionIds: [selectedOption.id] };
+      ? { attributeId: attribute.id, optionId: [...matchingOptions].sort((left, right) => right.label.length - left.label.length)[0].id }
+      : { attributeId: attribute.id, optionIds: matchingOptions.map((option) => option.id) };
 
     matchedValues.push(matchedValue);
     nextValues = [...nextValues, matchedValue];
