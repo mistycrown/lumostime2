@@ -4,6 +4,7 @@
  * @output Reusable background-assistant settings section for the AI chat settings panel
  * @pos Component Support (AI Integration)
  * @description Extracts the large background-assistant settings render tree from AIBackfillChatModal while leaving all state mutation logic in the parent modal.
+ * @updated 2026-09-09: Added an independent random check-in toggle so reminder dispatch can remain enabled when check-ins are disabled.
  * @updated 2026-09-03: Removed the polling-frequency input and retained only the random check-in minimum and maximum intervals.
  * @updated 2026-05-16: Added the log-submission trigger settings block with a multi-tag selector for post-log assistant reactions.
  * @updated 2026-05-15: Extracted the assistant settings section from AIBackfillChatModal.
@@ -163,6 +164,29 @@ export const AIBackfillChatAssistantSettingsSection: React.FC<AIBackfillChatAssi
             }}
         >
           {assistantAgentConfig.enabled ? '已开启' : '未开启'}
+        </button>
+      </div>
+
+      <div className="flex items-start justify-between gap-4 border-b pb-4" style={{ borderColor: theme.panelBorder }}>
+        <div>
+          <p className="text-sm font-semibold" style={{ color: theme.textPrimary }}>随机 Check-in</p>
+        </div>
+        <button
+          onClick={() => onUpdateAgentConfig({ enableRandomCheckin: !assistantAgentConfig.enableRandomCheckin })}
+          className="inline-flex min-w-[72px] items-center justify-center rounded-[0.75rem] border px-3 py-1.5 text-xs font-medium transition-colors"
+          style={assistantAgentConfig.enableRandomCheckin
+            ? {
+              borderColor: theme.activeBorder,
+              backgroundColor: theme.activeBg,
+              color: theme.textPrimary
+            }
+            : {
+              borderColor: theme.chipBorder,
+              backgroundColor: theme.inputBg,
+              color: theme.textMuted
+            }}
+        >
+          {assistantAgentConfig.enableRandomCheckin ? '已开启' : '未开启'}
         </button>
       </div>
 

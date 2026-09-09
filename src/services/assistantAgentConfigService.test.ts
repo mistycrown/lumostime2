@@ -4,6 +4,7 @@
  * @output Regression coverage for assistant config defaults, normalization, and migration
  * @pos Test (Assistant Agent Config)
  * @description Verifies that assistant scheduling, memory, log-trigger, and letter settings remain normalized and persistable.
+ * @updated 2026-09-09: Verifies that random check-in can be disabled independently from the background assistant config.
  * @updated 2026-09-03: Verifies that the removed base polling interval is ignored when migrating older persisted config.
  */
 
@@ -44,6 +45,7 @@ describe('assistantAgentConfigService', () => {
 
   it('returns defaults for the new log-submission trigger config and letter config', () => {
     expect(assistantAgentConfigService.getConfig()).toEqual(expect.objectContaining({
+      enableRandomCheckin: true,
       minimumNudgeGapMinutes: 10,
       logSubmissionTriggerEnabled: false,
       logSubmissionTriggerActivityIds: [],
@@ -51,6 +53,19 @@ describe('assistantAgentConfigService', () => {
       letterFrequencyDays: 2
     }));
     expect(assistantAgentConfigService.getConfig()).not.toHaveProperty('basePollMinutes');
+  });
+
+  it('persists a disabled random check-in while leaving the background agent enabled', () => {
+    const saved = assistantAgentConfigService.saveConfig({
+      enabled: true,
+      enableRandomCheckin: false
+    });
+
+    expect(saved).toEqual(expect.objectContaining({
+      enabled: true,
+      enableRandomCheckin: false
+    }));
+    expect(assistantAgentConfigService.getConfig().enableRandomCheckin).toBe(false);
   });
 
   it('normalizes persisted log-submission trigger values', () => {
