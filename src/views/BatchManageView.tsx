@@ -4,6 +4,7 @@
  * @updated 2026-08-26: Defers tag deletion checks until batch submission and supports per-tag migration targets.
  * @updated 2026-08-26: Added category archive and restore controls with cascading child-tag state updates.
  * @updated 2026-09-11: Restored activity drag-and-drop sorting and cross-category movement with an explicit leading drag handle.
+ * @updated 2026-09-11: Added touch drag preview, source highlighting, and edge auto-scroll feedback for mobile reorder mode.
  * @input Categories, Activities
  * @output Updated Category Structure
  * @pos View (Settings Sub-page)
@@ -55,8 +56,14 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
     const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
     const [dragOverActivity, setDragOverActivity] = useState<{ categoryId: string; activityId: string; position: 'before' | 'after' } | null>(null);
     const [isTouchDragging, setIsTouchDragging] = useState(false);
+    const [touchDragPreview, setTouchDragPreview] = useState<{ x: number; y: number; title: string } | null>(null);
+    const scrollRef = useRef<HTMLDivElement | null>(null);
     const touchDraggingActivityRef = useRef<{ activity: Activity; sourceCategoryId: string } | null>(null);
     const touchDragTargetRef = useRef<{ categoryId: string; activityId?: string; position?: 'before' | 'after' } | null>(null);
+    const touchDragFrameRef = useRef<number | null>(null);
+    const touchAutoScrollFrameRef = useRef<number | null>(null);
+    const touchAutoScrollSpeedRef = useRef(0);
+    const touchDragPointRef = useRef<{ x: number; y: number; title: string } | null>(null);
     const [migrationReviewOpen, setMigrationReviewOpen] = useState(false);
     const [migrationSelections, setMigrationSelections] = useState<Record<string, string>>({});
     const [migrationImpacts, setMigrationImpacts] = useState<Record<string, ActivityMigrationImpact>>({});
@@ -352,6 +359,17 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
         setDraggedActivity(null);
         setDragOverCategory(null);
         setDragOverActivity(null);
+        setTouchDragPreview(null);
+        touchDragPointRef.current = null;
+        touchAutoScrollSpeedRef.current = 0;
+        if (touchDragFrameRef.current !== null) {
+            window.cancelAnimationFrame(touchDragFrameRef.current);
+            touchDragFrameRef.current = null;
+        }
+        if (touchAutoScrollFrameRef.current !== null) {
+            window.cancelAnimationFrame(touchAutoScrollFrameRef.current);
+            touchAutoScrollFrameRef.current = null;
+        }
     };
 
     const toggleReorderMode = () => {
@@ -429,6 +447,18 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
             if (!touch || !touchDraggingActivityRef.current) return;
             if (event.cancelable) event.preventDefault();
             resolveTouchTarget(touch.clientX, touch.clientY);
+            const activity = touchDraggingActivityRef.current.activity;
+            setTouchDragPreview({ x: touch.clientX, y: touch.clientY, title: `${activity.icon}${activity.name}` });
+            const container = scrollRef.current;
+            if (container) {
+                const rect = container.getBoundingClientRect();
+                const edge = Math.min(96, Math.max(56, rect.height * 0.16));
+                if (touch.clientY < rect.top + edge) {
+                    container.scrollTop -= Math.max(6, ((rect.top + edge - touch.clientY) / edge) * 20);
+                } else if (touch.clientY > rect.bottom - edge) {
+                    container.scrollTop += Math.max(6, ((touch.clientY - (rect.bottom - edge)) / edge) * 20);
+                }
+            }
         };
         const handleTouchEnd = () => {
             const dragged = touchDraggingActivityRef.current;
@@ -460,6 +490,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
         touchDragTargetRef.current = { categoryId };
         setDraggedActivity(dragged);
         setDragOverCategory(categoryId);
+        setTouchDragPreview({ x: touch.clientX, y: touch.clientY, title: `${activity.icon}${activity.name}` });
         setIsTouchDragging(true);
     };
 
@@ -476,7 +507,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                 </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-40">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-6 pb-40">
                 {categories.map((category, catIndex) => (
                     <div
                         key={category.id}
@@ -627,7 +658,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                             onDragOver={isReorderMode ? (e) => handleActivityDragOver(e, category.id, activity.id) : undefined}
                                             onDrop={isReorderMode ? (e) => handleDrop(e, category.id) : undefined}
                                             onTouchStart={isReorderMode ? (e) => handleTouchDragStart(activity, category.id, e) : undefined}
-                                            className={`flex items-center gap-3 p-2 bg-white border border-stone-100 rounded-xl hover:border-stone-300 group transition-all ${activity.isArchived === true ? 'opacity-55' : ''} ${isReorderMode ? 'cursor-grab touch-none active:cursor-grabbing active:shadow-lg active:scale-[1.02]' : ''} ${isReorderMode && dragOverActivity?.categoryId === category.id && dragOverActivity.activityId === activity.id ? 'border-orange-300' : ''}`}
+                                            className={`flex items-center gap-3 p-2 bg-white border border-stone-100 rounded-xl hover:border-stone-300 group transition-all ${activity.isArchived === true ? 'opacity-55' : ''} ${isReorderMode ? 'cursor-grab touch-none active:cursor-grabbing active:shadow-lg active:scale-[1.02]' : ''} ${isTouchDragging && draggedActivity?.activity.id === activity.id ? 'border-orange-400 bg-orange-50/70 opacity-45' : ''} ${isReorderMode && dragOverActivity?.categoryId === category.id && dragOverActivity.activityId === activity.id ? 'border-orange-300' : ''}`}
                                         >
                                             <GripVertical size={14} className={`shrink-0 ${isReorderMode ? 'text-orange-400' : 'text-stone-300'}`} />
 
@@ -779,6 +810,17 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                     <span>{isReorderMode ? '完成调整' : '调整顺序'}</span>
                 </button>
             </div>
+            {touchDragPreview && (
+                <div
+                    className="pointer-events-none fixed z-[140] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-orange-300 bg-white/95 px-3 py-2 text-sm font-medium text-stone-700 shadow-[0_18px_40px_rgba(15,23,42,0.16)]"
+                    style={{ left: touchDragPreview.x, top: touchDragPreview.y }}
+                >
+                    <div className="flex items-center gap-2">
+                        <GripVertical size={14} className="text-orange-400" />
+                        <span className="max-w-[12rem] truncate">{touchDragPreview.title}</span>
+                    </div>
+                </div>
+            )}
             {migrationReviewOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm">
                     <div className="flex h-[min(640px,calc(100vh-2rem))] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-stone-200 bg-[#fdfbf7] shadow-2xl">
