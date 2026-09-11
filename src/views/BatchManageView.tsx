@@ -3,6 +3,7 @@
  * @updated 2026-08-06: Added archive and restore actions for activities.
  * @updated 2026-08-26: Defers tag deletion checks until batch submission and supports per-tag migration targets.
  * @updated 2026-08-26: Added category archive and restore controls with cascading child-tag state updates.
+ * @updated 2026-09-11: Restored activity drag-and-drop sorting and cross-category movement with an explicit leading drag handle.
  * @input Categories, Activities
  * @output Updated Category Structure
  * @pos View (Settings Sub-page)
@@ -48,9 +49,10 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
     const isCustomIconEnabled = uiIconService.isCustomTheme();
     const customColors = useCustomColors();
 
-    // Drag state (kept for reference, but user said it's unusable, so we rely on buttons now)
+    // Drag state for activity sorting and cross-category movement.
     const [draggedActivity, setDraggedActivity] = useState<{ activity: Activity, sourceCategoryId: string } | null>(null);
     const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
+    const [dragOverActivity, setDragOverActivity] = useState<{ categoryId: string; activityId: string; position: 'before' | 'after' } | null>(null);
     const [migrationReviewOpen, setMigrationReviewOpen] = useState(false);
     const [migrationSelections, setMigrationSelections] = useState<Record<string, string>>({});
     const [migrationImpacts, setMigrationImpacts] = useState<Record<string, ActivityMigrationImpact>>({});
@@ -314,35 +316,67 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
         return getColorPreviewValue(themeColor, 'category');
     };
 
-    // --- Drag Logic (Kept but optional now) ---
+    // --- Drag Logic ---
     const handleDragStart = (e: React.DragEvent, activity: Activity, categoryId: string) => {
         setDraggedActivity({ activity, sourceCategoryId: categoryId });
+        setDragOverActivity(null);
         e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', activity.id);
     };
 
     const handleDragOver = (e: React.DragEvent, categoryId: string) => {
         e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
         setDragOverCategory(categoryId);
+        setDragOverActivity(null);
+    };
+
+    const handleActivityDragOver = (e: React.DragEvent, categoryId: string, activityId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+        const rect = e.currentTarget.getBoundingClientRect();
+        setDragOverCategory(categoryId);
+        setDragOverActivity({
+            categoryId,
+            activityId,
+            position: e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+        });
+    };
+
+    const clearDragState = () => {
+        setDraggedActivity(null);
+        setDragOverCategory(null);
+        setDragOverActivity(null);
     };
 
     const handleDrop = (e: React.DragEvent, targetCategoryId: string) => {
         e.preventDefault();
-        setDragOverCategory(null);
+        e.stopPropagation();
         if (!draggedActivity) return;
         const { activity, sourceCategoryId } = draggedActivity;
-        if (sourceCategoryId === targetCategoryId) return;
 
         setCategories(prev => {
-            const newCats = [...prev];
-            const sourceCat = newCats.find(c => c.id === sourceCategoryId);
-            const targetCat = newCats.find(c => c.id === targetCategoryId);
-            if (sourceCat && targetCat) {
-                sourceCat.activities = sourceCat.activities.filter(a => a.id !== activity.id);
-                targetCat.activities.push(activity);
+            const nextCategories = prev.map(category => ({ ...category, activities: [...category.activities] }));
+            const sourceCat = nextCategories.find(category => category.id === sourceCategoryId);
+            const targetCat = nextCategories.find(category => category.id === targetCategoryId);
+            if (!sourceCat || !targetCat) return prev;
+
+            const sourceIndex = sourceCat.activities.findIndex(item => item.id === activity.id);
+            if (sourceIndex < 0) return prev;
+            sourceCat.activities.splice(sourceIndex, 1);
+
+            let targetIndex = targetCat.activities.length;
+            if (dragOverActivity?.categoryId === targetCategoryId) {
+                const overIndex = targetCat.activities.findIndex(item => item.id === dragOverActivity.activityId);
+                if (overIndex >= 0) {
+                    targetIndex = dragOverActivity.position === 'before' ? overIndex : overIndex + 1;
+                }
             }
-            return newCats;
+            targetCat.activities.splice(Math.max(0, targetIndex), 0, activity);
+            return nextCategories;
         });
-        setDraggedActivity(null);
+        clearDragState();
     };
 
     return (
@@ -497,11 +531,21 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                 {category.activities.map((activity, actIndex) => (
                                     <div key={activity.id}>
                                         <div
-                                            draggable
-                                            onDragStart={(e) => handleDragStart(e, activity, category.id)}
-                                            className={`flex items-center gap-3 p-2 bg-white border border-stone-100 rounded-xl hover:border-stone-300 group cursor-move active:shadow-lg active:scale-[1.02] transition-all ${activity.isArchived === true ? 'opacity-55' : ''}`}
+                                            onDragOver={(e) => handleActivityDragOver(e, category.id, activity.id)}
+                                            onDrop={(e) => handleDrop(e, category.id)}
+                                            className={`flex items-center gap-3 p-2 bg-white border border-stone-100 rounded-xl hover:border-stone-300 group transition-all ${activity.isArchived === true ? 'opacity-55' : ''} ${dragOverActivity?.categoryId === category.id && dragOverActivity.activityId === activity.id ? 'border-orange-300' : ''}`}
                                         >
-                                            <GripVertical size={14} className="text-stone-300 shrink-0" />
+                                            <button
+                                                type="button"
+                                                draggable
+                                                onDragStart={(e) => handleDragStart(e, activity, category.id)}
+                                                onDragEnd={clearDragState}
+                                                className="cursor-grab touch-none p-1 -ml-1 text-stone-300 hover:text-stone-500 active:cursor-grabbing shrink-0"
+                                                title="拖动排序或移动分类"
+                                                aria-label={`拖动标签 ${activity.name}`}
+                                            >
+                                                <GripVertical size={14} />
+                                            </button>
 
                                             {/* Combined Input for Icon + Name */}
                                             <div className="flex-1 flex items-center gap-2 min-w-0">
