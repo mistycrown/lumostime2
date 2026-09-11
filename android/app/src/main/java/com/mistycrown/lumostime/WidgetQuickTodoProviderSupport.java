@@ -60,7 +60,7 @@ public final class WidgetQuickTodoProviderSupport {
         sourceTodos.add(new WidgetTodoPinSourceTodo(
                 todoId, normalizedTitle, "quick", false, null, null, null,
                 java.util.Collections.<String>emptyList(), false, null, null,
-                java.util.Collections.<String>emptyList(), null
+                java.util.Collections.<String>emptyList(), null, null
         ));
         WidgetStores.INSTANCE.saveTodoPinPayload(context, new WidgetTodoPinPayload(
                 payload.getDate(), payload.getItems(), now, sourceTodos, payload.getSourceCategories()

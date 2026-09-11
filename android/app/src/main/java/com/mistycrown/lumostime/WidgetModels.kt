@@ -12,6 +12,7 @@ package com.mistycrown.lumostime
  * Updated 2026-08-09: Added principle-card widget payload and per-instance shuffle/flip state models.
  * Updated 2026-08-09: Added weekly range and per-item color fields to daily-check widget payloads.
  * Updated 2026-08-11: Keeps optional daily template IDs in rendered slots for scene-card compatibility.
+ * Updated 2026-09-11: Mirrors optional todo completion timestamps for native quick-todo filtering.
  */
 object WidgetTypes {
     const val TIMER = "timer"
@@ -397,7 +398,8 @@ data class WidgetTodoPinSourceTodo(
     val scheduledDate: String? = null,
     val deadlineDate: String? = null,
     val maybeDates: List<String> = emptyList(),
-    val recurrenceRule: WidgetTodoPinSourceRecurrenceRule? = null
+    val recurrenceRule: WidgetTodoPinSourceRecurrenceRule? = null,
+    val completedAt: String? = null
 )
 
 data class WidgetTodoPinSourceActivity(

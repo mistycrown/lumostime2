@@ -19,6 +19,7 @@
  * @updated 2026-08-10: Added widget template storage regression coverage for backup and restore payload persistence.
  * @updated 2026-08-12: Covers Android 12+ in-process scene-card collection rendering with the legacy service fallback retained for older launchers.
  * @updated 2026-08-12: Covers shared manual refresh-icon animation wiring across every widget family with a refresh control.
+ * @updated 2026-09-11: Covers completion timestamps and recent-completed filtering for Android quick-todo widgets.
  */
 
 import { describe, expect, it, vi } from 'vitest';
@@ -44,6 +45,7 @@ import widgetPrincipleCardBitmapRendererSource from '../../android/app/src/main/
 import widgetPrincipleCardProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetPrincipleCardProviderSupport.kt?raw';
 import widgetProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetProviderSupport.java?raw';
 import quickTodoProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetQuickTodoProviderSupport.java?raw';
+import quickTodoRemoteViewsServiceSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetQuickTodoRemoteViewsService.java?raw';
 import dailyCheckWeekProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetDailyCheckWeekProviderSupport.java?raw';
 import dailyCheckWeek4x3ProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetDailyCheckWeek4x3ProviderSupport.java?raw';
 import widgetRefreshCoordinatorSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetRefreshCoordinator.kt?raw';
@@ -276,6 +278,20 @@ describe('buildTodoPinWidgetPayload', () => {
           })
         ]
       })
+    ]);
+  });
+
+  it('mirrors todo completion timestamps for native quick-todo filtering', () => {
+    const completedAt = '2026-04-26T12:34:56.000Z';
+    const payload = buildTodoPinWidgetPayload({
+      todos: [buildTodo({ id: 'completed-todo', isCompleted: true, completedAt })],
+      categories,
+      date: REFERENCE_DATE,
+      now: 123456789
+    });
+
+    expect(payload.sourceTodos).toEqual([
+      expect.objectContaining({ id: 'completed-todo', completedAt })
     ]);
   });
 });
@@ -836,6 +852,11 @@ describe('WidgetBridgePlugin refresh routing', () => {
     expect(widgetBridgePluginSource).toContain('skipDates = optJSONArray("skipDates").toStringList()');
     expect(widgetStoresSource).toContain('put("maybeDates", item.maybeDates.toJsonArray())');
     expect(widgetStoresSource).toContain('put("skipDates", skipDates.toJsonArray())');
+    expect(widgetBridgePluginSource).toContain('completedAt = parseNullableString(item.optString("completedAt"))');
+    expect(widgetStoresSource).toContain('completedAt = parseNullableString(item.optString("completedAt"))');
+    expect(widgetStoresSource).toContain('put("completedAt", item.completedAt ?: JSONObject.NULL)');
+    expect(quickTodoRemoteViewsServiceSource).toContain('nextItems.size() - completedCount + 5');
+    expect(quickTodoRemoteViewsServiceSource).toContain('yyyy-MM-dd\'T\'HH:mm:ss.SSSZ');
     expect(widgetTodoPinProviderSupportSource).toContain('hasMaybeDate(todo, targetDate)');
     expect(widgetTodoPinProviderSupportSource).toContain('isSuppressedRecurringOccurrenceForDate(todo, targetDate)');
   });

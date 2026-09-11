@@ -18,6 +18,7 @@
  * @updated 2026-08-09: Added weekly daily-check progress and per-item color fields for the Android 4x4 widget.
  * @updated 2026-08-11: Preserves native daily toggle and count-cycle actions when replaying widget taps in the web layer.
  * @updated 2026-08-11: Exposes immediate native daily-action notifications for active WebView reconciliation.
+ * @updated 2026-09-11: Mirrors todo completion timestamps for native quick-todo list filtering.
  * @updated 2026-09-02: Added stable UI icon IDs to widget slot and tracking-calendar bridge contracts.
  */
 import { registerPlugin } from '@capacitor/core';
@@ -243,6 +244,7 @@ export interface WidgetBridgeTodoPinSourceTodo {
   deadlineDate?: string | null;
   maybeDates?: string[] | null;
   recurrenceRule?: WidgetBridgeTodoPinSourceRecurrenceRule | null;
+  completedAt?: string | null;
 }
 
 export interface WidgetBridgeTodoPinSourceActivity {

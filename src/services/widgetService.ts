@@ -22,6 +22,7 @@
  * @updated 2026-08-09: Uses deterministic fallback ids for principle cards without stored ids so native shuffle state stays stable.
  * @updated 2026-08-10: Marks recurring TODAY + PIN items so native rows can disable completion controls.
  * @updated 2026-09-02: Persisted stable UI icon IDs and regenerate theme-specific widget assets when the UI icon theme changes.
+ * @updated 2026-09-11: Mirrors todo completion timestamps so quick-todo widgets can keep only the five most recently completed items.
  */
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, CheckTemplate, DailyReview, Log, TodoItem } from '../types';
@@ -1486,7 +1487,8 @@ const buildTodoPinSourceTodos = (todos: TodoItem[]): WidgetBridgeTodoPinSourceTo
           skipDates: todo.recurrenceRule.skipDates ?? null,
           fallbackToMonthEnd: todo.recurrenceRule.fallbackToMonthEnd ?? null
         }
-      : null
+      : null,
+    completedAt: todo.completedAt ?? null
   }));
 
 const buildTodoPinSourceCategories = (categories: Category[]): WidgetBridgeTodoPinSourceCategory[] =>
