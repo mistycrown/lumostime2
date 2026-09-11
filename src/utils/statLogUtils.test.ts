@@ -7,7 +7,7 @@
  * @updated 2026-08-09: Added planned-log filtering regression coverage.
  */
 import { describe, expect, it } from 'vitest';
-import { filterActualLogs, filterCountableLogs, getLatestActualLogEndTime, getLatestActualLogEndTimeInRange, isActualLog, isCountableLog } from './statLogUtils';
+import { filterActualLogs, filterCountableLogs, getLatestActualLogEndTime, getLatestActualLogEndTimeInRange, getPreviousStatsDateRange, isActualLog, isCountableLog } from './statLogUtils';
 
 describe('statLogUtils', () => {
   it('excludes only logs explicitly marked as planned', () => {
@@ -56,5 +56,17 @@ describe('statLogUtils', () => {
       { id: 'planned-latest', endTime: 300, isPlanned: true },
       { id: 'outside', endTime: 500, isPlanned: false }
     ], 100, 400)).toBe(200);
+  });
+
+  it('keeps the previous period inclusive so midnight segments are counted', () => {
+    const currentRange = {
+      start: new Date(2026, 8, 10, 0, 0, 0, 0),
+      end: new Date(2026, 8, 10, 23, 59, 59, 999)
+    };
+
+    const previousRange = getPreviousStatsDateRange(currentRange);
+
+    expect(previousRange.start).toEqual(new Date(2026, 8, 9, 0, 0, 0, 0));
+    expect(previousRange.end).toEqual(new Date(2026, 8, 9, 23, 59, 59, 999));
   });
 });

@@ -11,12 +11,13 @@
  * - 其他需要活动统计的地方
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-09-10: Preserved inclusive previous-period boundaries so midnight segments remain in trend comparisons.
  * @updated 2026-08-09: Planned timeline blocks are excluded from hook-level statistics.
  */
 
 import { useMemo } from 'react';
 import { Log, Category, Activity } from '../types';
-import { filterCountableLogs } from '../utils/statLogUtils';
+import { filterCountableLogs, getPreviousStatsDateRange } from '../utils/statLogUtils';
 
 export interface ActivityStat extends Activity {
   duration: number;
@@ -136,9 +137,7 @@ export const useStatsCalculation = ({
     if (!includePrevious) return null;
 
     // 计算前一周期的日期范围
-    const duration = dateRange.end.getTime() - dateRange.start.getTime();
-    const previousStart = new Date(dateRange.start.getTime() - duration);
-    const previousEnd = new Date(dateRange.end.getTime() - duration);
+    const { start: previousStart, end: previousEnd } = getPreviousStatsDateRange(dateRange);
 
     const previousFilteredLogs = filterCountableLogs(logs).filter(log =>
       log.startTime >= previousStart.getTime() &&

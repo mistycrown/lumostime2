@@ -5,13 +5,14 @@
  * @pos Hook (Statistics Calculation)
  * @description Scope statistics hook. Counts the full duration for every linked scope on a log.
  * @updated 2026-03-16 Unified scope aggregation so multi-scope logs no longer split duration.
+ * @updated 2026-09-10: Reused inclusive previous-period boundaries for consistent trend comparisons.
  * @updated 2026-08-09: Planned timeline blocks are excluded from scope statistics.
  */
 
 import { useMemo } from 'react';
 import { Log, Scope, Category } from '../types';
 import { getLogDurationSeconds, getNormalizedScopeIds, summarizeScopeDurations } from '../utils/scopeStatsUtils';
-import { filterCountableLogs } from '../utils/statLogUtils';
+import { filterCountableLogs, getPreviousStatsDateRange } from '../utils/statLogUtils';
 
 export interface ScopeActivityStat {
   id: string;
@@ -121,9 +122,7 @@ export const useScopeStats = ({
       return null;
     }
 
-    const rangeDuration = dateRange.end.getTime() - dateRange.start.getTime();
-    const previousStart = new Date(dateRange.start.getTime() - rangeDuration);
-    const previousEnd = new Date(dateRange.end.getTime() - rangeDuration);
+    const { start: previousStart, end: previousEnd } = getPreviousStatsDateRange(dateRange);
 
     const logsWithScopes = filterCountableLogs(logs).filter(
       (log) =>
