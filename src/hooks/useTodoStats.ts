@@ -10,13 +10,14 @@
  * - StatsView (Line Chart View - Todos Trend)
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-09-10: Reused inclusive previous-period boundaries for consistent trend comparisons.
  * @updated 2026-08-09: Planned timeline blocks are excluded from todo statistics.
  */
 
 import { useMemo } from 'react';
 import { Log, TodoItem, TodoCategory } from '../types';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
-import { filterCountableLogs } from '../utils/statLogUtils';
+import { filterCountableLogs, getPreviousStatsDateRange } from '../utils/statLogUtils';
 
 export interface TodoItemStat {
   id: string;
@@ -150,9 +151,7 @@ export const useTodoStats = ({
     if (!includePrevious) return null;
 
     // 计算前一周期的日期范围
-    const duration = dateRange.end.getTime() - dateRange.start.getTime();
-    const previousStart = new Date(dateRange.start.getTime() - duration);
-    const previousEnd = new Date(dateRange.end.getTime() - duration);
+    const { start: previousStart, end: previousEnd } = getPreviousStatsDateRange(dateRange);
 
     const logsWithTodos = filterCountableLogs(logs).filter(
       l => l.linkedTodoId &&
