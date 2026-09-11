@@ -512,7 +512,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                     <div
                         key={category.id}
                         data-tag-batch-category={category.id}
-                        className={`bg-white rounded-2xl border transition-colors overflow-hidden ${category.isArchived === true ? 'opacity-60' : ''} ${isReorderMode && dragOverCategory === category.id ? 'border-orange-500 ring-1 ring-orange-500 bg-orange-50' : 'border-stone-200'}`}
+                        className={`bg-white rounded-2xl border transition-colors overflow-hidden ${category.isArchived === true ? 'opacity-60' : ''} ${isReorderMode && dragOverCategory === category.id ? 'border-stone-300 ring-1 ring-stone-200 bg-stone-50' : 'border-stone-200'}`}
                         onDragOver={isReorderMode ? (e) => handleDragOver(e, category.id) : undefined}
                         onDrop={isReorderMode ? (e) => handleDrop(e, category.id) : undefined}
                     >
@@ -658,9 +658,9 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                             onDragOver={isReorderMode ? (e) => handleActivityDragOver(e, category.id, activity.id) : undefined}
                                             onDrop={isReorderMode ? (e) => handleDrop(e, category.id) : undefined}
                                             onTouchStart={isReorderMode ? (e) => handleTouchDragStart(activity, category.id, e) : undefined}
-                                            className={`flex items-center gap-3 p-2 bg-white border border-stone-100 rounded-xl hover:border-stone-300 group transition-all ${activity.isArchived === true ? 'opacity-55' : ''} ${isReorderMode ? 'cursor-grab touch-none active:cursor-grabbing active:shadow-lg active:scale-[1.02]' : ''} ${isTouchDragging && draggedActivity?.activity.id === activity.id ? 'border-orange-400 bg-orange-50/70 opacity-45' : ''} ${isReorderMode && dragOverActivity?.categoryId === category.id && dragOverActivity.activityId === activity.id ? 'border-orange-300' : ''}`}
+                                            className={`flex items-center gap-3 p-2 bg-white border border-stone-100 rounded-xl hover:border-stone-300 group transition-all ${activity.isArchived === true ? 'opacity-55' : ''} ${isReorderMode ? 'cursor-grab touch-none active:cursor-grabbing active:shadow-lg active:scale-[1.02]' : ''} ${isTouchDragging && draggedActivity?.activity.id === activity.id ? 'border-stone-300 bg-stone-100/70 opacity-45' : ''} ${isReorderMode && dragOverActivity?.categoryId === category.id && dragOverActivity.activityId === activity.id ? 'border-stone-300' : ''}`}
                                         >
-                                            <GripVertical size={14} className={`shrink-0 ${isReorderMode ? 'text-orange-400' : 'text-stone-300'}`} />
+                                            <GripVertical size={14} className="shrink-0 text-stone-400" />
 
                                             {/* Combined Input for Icon + Name */}
                                             {isReorderMode ? (
@@ -812,11 +812,11 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
             </div>
             {touchDragPreview && (
                 <div
-                    className="pointer-events-none fixed z-[140] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-orange-300 bg-white/95 px-3 py-2 text-sm font-medium text-stone-700 shadow-[0_18px_40px_rgba(15,23,42,0.16)]"
+                    className="pointer-events-none fixed z-[140] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-stone-300 bg-white/95 px-3 py-2 text-sm font-medium text-stone-700 shadow-[0_18px_40px_rgba(15,23,42,0.16)]"
                     style={{ left: touchDragPreview.x, top: touchDragPreview.y }}
                 >
                     <div className="flex items-center gap-2">
-                        <GripVertical size={14} className="text-orange-400" />
+                        <GripVertical size={14} className="text-stone-400" />
                         <span className="max-w-[12rem] truncate">{touchDragPreview.title}</span>
                     </div>
                 </div>
