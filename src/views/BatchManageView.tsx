@@ -38,6 +38,7 @@ interface BatchManageViewProps {
 export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, categories: initialCategories, onSave, onPreviewActivityMigration, onApplyTagBatchChanges }) => {
     const [categories, setCategories] = useState<Category[]>(JSON.parse(JSON.stringify(initialCategories)));
     const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set(initialCategories.map(c => c.id)));
+    const [isReorderMode, setIsReorderMode] = useState(false);
 
     // Icon selector state - for both categories and activities
     const [iconSelectorOpen, setIconSelectorOpen] = useState<{ type: 'category' | 'activity', id: string } | null>(null);
@@ -350,6 +351,14 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
         setDragOverActivity(null);
     };
 
+    const toggleReorderMode = () => {
+        clearDragState();
+        setIsReorderMode(previous => {
+            if (!previous) setExpandedCats(new Set(categories.map(category => category.id)));
+            return !previous;
+        });
+    };
+
     const handleDrop = (e: React.DragEvent, targetCategoryId: string) => {
         e.preventDefault();
         e.stopPropagation();
@@ -396,9 +405,9 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                 {categories.map((category, catIndex) => (
                     <div
                         key={category.id}
-                        className={`bg-white rounded-2xl border transition-colors overflow-hidden ${category.isArchived === true ? 'opacity-60' : ''} ${dragOverCategory === category.id ? 'border-orange-500 ring-1 ring-orange-500 bg-orange-50' : 'border-stone-200'}`}
-                        onDragOver={(e) => handleDragOver(e, category.id)}
-                        onDrop={(e) => handleDrop(e, category.id)}
+                        className={`bg-white rounded-2xl border transition-colors overflow-hidden ${category.isArchived === true ? 'opacity-60' : ''} ${isReorderMode && dragOverCategory === category.id ? 'border-orange-500 ring-1 ring-orange-500 bg-orange-50' : 'border-stone-200'}`}
+                        onDragOver={isReorderMode ? (e) => handleDragOver(e, category.id) : undefined}
+                        onDrop={isReorderMode ? (e) => handleDrop(e, category.id) : undefined}
                     >
                         {/* Category Header */}
                         <div className="flex items-center gap-2 p-3 border-b border-stone-50 bg-stone-50/50">
@@ -406,15 +415,18 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                 {expandedCats.has(category.id) ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                             </button>
 
-                            {/* Category Input (Icon + Name) */}
-                            <input
-                                className="bg-transparent font-bold text-stone-800 flex-1 outline-none placeholder:text-stone-300 min-w-0"
-                                value={`${category.icon}${category.name}`}
-                                onChange={(e) => handleNameChange(category.id, null, e.target.value)}
-                            />
+                            {isReorderMode ? (
+                                <div className="flex-1 min-w-0 font-bold text-stone-800 truncate">{category.icon}{category.name}</div>
+                            ) : (
+                                <input
+                                    className="bg-transparent font-bold text-stone-800 flex-1 outline-none placeholder:text-stone-300 min-w-0"
+                                    value={`${category.icon}${category.name}`}
+                                    onChange={(e) => handleNameChange(category.id, null, e.target.value)}
+                                />
+                            )}
 
                             {/* Category Actions */}
-                            <div className="flex items-center gap-1 shrink-0">
+                            {!isReorderMode && <div className="flex items-center gap-1 shrink-0">
                                 {/* Color Picker Button for Category */}
                                 <button
                                     onClick={() => setColorPickerOpen(
@@ -478,11 +490,11 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                 <button onClick={() => handleDeleteCategory(category.id)} className="p-1 text-stone-300 hover:text-red-500">
                                     <Trash2 size={16} />
                                 </button>
-                            </div>
+                            </div>}
                         </div>
 
                         {/* Color Picker Dropdown for Category */}
-                        {colorPickerOpen?.type === 'category' && colorPickerOpen?.id === category.id && (
+                        {!isReorderMode && colorPickerOpen?.type === 'category' && colorPickerOpen?.id === category.id && (
                             <div className="p-3 border-b border-stone-100 bg-stone-50/30">
                                 <div className="flex gap-2 flex-wrap">
                                     {COLOR_OPTIONS.map(opt => (
@@ -515,7 +527,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                         )}
 
                         {/* Icon Selector Dropdown for Category */}
-                        {isCustomIconEnabled && iconSelectorOpen?.type === 'category' && iconSelectorOpen?.id === category.id && (
+                        {!isReorderMode && isCustomIconEnabled && iconSelectorOpen?.type === 'category' && iconSelectorOpen?.id === category.id && (
                             <div className="p-4 border-b border-stone-100 bg-stone-50/30">
                                 <UIIconSelectorCompact
                                     currentIcon=""
@@ -531,33 +543,28 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                 {category.activities.map((activity, actIndex) => (
                                     <div key={activity.id}>
                                         <div
-                                            onDragOver={(e) => handleActivityDragOver(e, category.id, activity.id)}
-                                            onDrop={(e) => handleDrop(e, category.id)}
-                                            className={`flex items-center gap-3 p-2 bg-white border border-stone-100 rounded-xl hover:border-stone-300 group transition-all ${activity.isArchived === true ? 'opacity-55' : ''} ${dragOverActivity?.categoryId === category.id && dragOverActivity.activityId === activity.id ? 'border-orange-300' : ''}`}
+                                            draggable={isReorderMode}
+                                            onDragStart={isReorderMode ? (e) => handleDragStart(e, activity, category.id) : undefined}
+                                            onDragEnd={isReorderMode ? clearDragState : undefined}
+                                            onDragOver={isReorderMode ? (e) => handleActivityDragOver(e, category.id, activity.id) : undefined}
+                                            onDrop={isReorderMode ? (e) => handleDrop(e, category.id) : undefined}
+                                            className={`flex items-center gap-3 p-2 bg-white border border-stone-100 rounded-xl hover:border-stone-300 group transition-all ${activity.isArchived === true ? 'opacity-55' : ''} ${isReorderMode ? 'cursor-grab active:cursor-grabbing active:shadow-lg active:scale-[1.02]' : ''} ${isReorderMode && dragOverActivity?.categoryId === category.id && dragOverActivity.activityId === activity.id ? 'border-orange-300' : ''}`}
                                         >
-                                            <button
-                                                type="button"
-                                                draggable
-                                                onDragStart={(e) => handleDragStart(e, activity, category.id)}
-                                                onDragEnd={clearDragState}
-                                                className="cursor-grab touch-none p-1 -ml-1 text-stone-300 hover:text-stone-500 active:cursor-grabbing shrink-0"
-                                                title="拖动排序或移动分类"
-                                                aria-label={`拖动标签 ${activity.name}`}
-                                            >
-                                                <GripVertical size={14} />
-                                            </button>
+                                            <GripVertical size={14} className={`shrink-0 ${isReorderMode ? 'text-orange-400' : 'text-stone-300'}`} />
 
                                             {/* Combined Input for Icon + Name */}
-                                            <div className="flex-1 flex items-center gap-2 min-w-0">
+                                            {isReorderMode ? (
+                                                <div className="flex-1 min-w-0 truncate text-sm font-medium text-stone-700">{activity.icon}{activity.name}</div>
+                                            ) : <div className="flex-1 flex items-center gap-2 min-w-0">
                                                 <input
                                                     className="w-full bg-transparent outline-none text-sm font-medium text-stone-700 min-w-0"
                                                     value={`${activity.icon}${activity.name}`}
                                                     onChange={(e) => handleNameChange(category.id, activity.id, e.target.value)}
                                                 />
-                                            </div>
+                                            </div>}
 
                                             {/* Color Picker Button */}
-                                            <button
+                                            {!isReorderMode && <button
                                                 onClick={() => setColorPickerOpen(
                                                     colorPickerOpen?.type === 'activity' && colorPickerOpen?.id === activity.id 
                                                         ? null 
@@ -570,10 +577,10 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                                     className="w-4 h-4 rounded-full border border-stone-300"
                                                     style={{ backgroundColor: getColorFromActivityColor(activity.color) }}
                                                 />
-                                            </button>
+                                            </button>}
 
                                             {/* Activity Actions */}
-                                            <div className="flex items-center gap-1 shrink-0">
+                                            {!isReorderMode && <div className="flex items-center gap-1 shrink-0">
                                                 {/* Icon Selector Button for Activity - Show current UI icon preview */}
                                                 {isCustomIconEnabled && (
                                                     <button 
@@ -617,11 +624,11 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                                 <button onClick={() => handleDeleteActivity(category.id, activity.id)} className="p-1 text-stone-200 hover:text-red-400" title="迁移并删除标签">
                                                     <Trash2 size={14} />
                                                 </button>
-                                            </div>
+                                            </div>}
                                         </div>
 
                                         {/* Color Picker Dropdown */}
-                                        {colorPickerOpen?.type === 'activity' && colorPickerOpen?.id === activity.id && (
+                                        {!isReorderMode && colorPickerOpen?.type === 'activity' && colorPickerOpen?.id === activity.id && (
                                             <div className="p-3 mt-1 bg-stone-50/50 rounded-xl border border-stone-100">
                                                 <div className="flex gap-2 flex-wrap">
                                                     {COLOR_OPTIONS.map(opt => (
@@ -654,7 +661,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                         )}
 
                                         {/* Icon Selector Dropdown for Activity */}
-                                        {isCustomIconEnabled && iconSelectorOpen?.type === 'activity' && iconSelectorOpen?.id === activity.id && (
+                                        {!isReorderMode && isCustomIconEnabled && iconSelectorOpen?.type === 'activity' && iconSelectorOpen?.id === activity.id && (
                                             <div className="p-3 mt-1 bg-stone-50/50 rounded-xl border border-stone-100">
                                                 <UIIconSelectorCompact
                                                     currentIcon=""
@@ -678,12 +685,21 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                 {/* Add Category Button */}
                 <button
                     onClick={handleAddCategory}
-                    className="w-full py-2.5 border-2 border-dashed border-stone-200 rounded-2xl text-stone-400 text-sm font-bold hover:border-stone-400 hover:text-stone-600 transition-colors flex items-center justify-center gap-2"
+                    className={`${isReorderMode ? 'hidden' : 'w-full py-2.5 border-2 border-dashed border-stone-200 rounded-2xl text-stone-400 text-sm font-bold hover:border-stone-400 hover:text-stone-600 transition-colors flex items-center justify-center gap-2'}`}
                 >
                     <Plus size={20} />
                     <span>添加新分类</span>
                 </button>
             </div>
+            <button
+                type="button"
+                onClick={toggleReorderMode}
+                className={`fixed bottom-5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full px-5 py-3 text-sm font-bold shadow-lg transition-colors ${isReorderMode ? 'bg-stone-800 text-white hover:bg-stone-700' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
+                title={isReorderMode ? '退出调整顺序' : '进入调整顺序模式'}
+            >
+                <GripVertical size={17} />
+                <span>{isReorderMode ? '完成调整' : '调整顺序'}</span>
+            </button>
             {migrationReviewOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm">
                     <div className="flex h-[min(640px,calc(100vh-2rem))] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-stone-200 bg-[#fdfbf7] shadow-2xl">
