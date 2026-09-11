@@ -11,7 +11,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Category, Activity } from '../types';
 import { ChevronDown, ChevronRight, GripVertical, Plus, Trash2, ArrowUp, ArrowDown, X, Check, Archive, ArchiveRestore, AlertTriangle } from 'lucide-react';
 import { UIIconSelectorCompact } from '../components/UIIconSelector';
@@ -54,6 +54,9 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
     const [draggedActivity, setDraggedActivity] = useState<{ activity: Activity, sourceCategoryId: string } | null>(null);
     const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
     const [dragOverActivity, setDragOverActivity] = useState<{ categoryId: string; activityId: string; position: 'before' | 'after' } | null>(null);
+    const [isTouchDragging, setIsTouchDragging] = useState(false);
+    const touchDraggingActivityRef = useRef<{ activity: Activity; sourceCategoryId: string } | null>(null);
+    const touchDragTargetRef = useRef<{ categoryId: string; activityId?: string; position?: 'before' | 'after' } | null>(null);
     const [migrationReviewOpen, setMigrationReviewOpen] = useState(false);
     const [migrationSelections, setMigrationSelections] = useState<Record<string, string>>({});
     const [migrationImpacts, setMigrationImpacts] = useState<Record<string, ActivityMigrationImpact>>({});
@@ -353,18 +356,17 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
 
     const toggleReorderMode = () => {
         clearDragState();
+        touchDraggingActivityRef.current = null;
+        touchDragTargetRef.current = null;
+        setIsTouchDragging(false);
         setIsReorderMode(previous => {
             if (!previous) setExpandedCats(new Set(categories.map(category => category.id)));
             return !previous;
         });
     };
 
-    const handleDrop = (e: React.DragEvent, targetCategoryId: string) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!draggedActivity) return;
-        const { activity, sourceCategoryId } = draggedActivity;
-
+    const applyActivityDrop = (dragged: { activity: Activity; sourceCategoryId: string }, targetCategoryId: string, targetActivity?: { activityId: string; position: 'before' | 'after' }) => {
+        const { activity, sourceCategoryId } = dragged;
         setCategories(prev => {
             const nextCategories = prev.map(category => ({ ...category, activities: [...category.activities] }));
             const sourceCat = nextCategories.find(category => category.id === sourceCategoryId);
@@ -376,16 +378,89 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
             sourceCat.activities.splice(sourceIndex, 1);
 
             let targetIndex = targetCat.activities.length;
-            if (dragOverActivity?.categoryId === targetCategoryId) {
-                const overIndex = targetCat.activities.findIndex(item => item.id === dragOverActivity.activityId);
+            if (targetActivity) {
+                const overIndex = targetCat.activities.findIndex(item => item.id === targetActivity.activityId);
                 if (overIndex >= 0) {
-                    targetIndex = dragOverActivity.position === 'before' ? overIndex : overIndex + 1;
+                    targetIndex = targetActivity.position === 'before' ? overIndex : overIndex + 1;
                 }
             }
             targetCat.activities.splice(Math.max(0, targetIndex), 0, activity);
             return nextCategories;
         });
+    };
+
+    const handleDrop = (e: React.DragEvent, targetCategoryId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!draggedActivity) return;
+        const targetActivity = dragOverActivity?.categoryId === targetCategoryId
+            ? { activityId: dragOverActivity.activityId, position: dragOverActivity.position }
+            : undefined;
+        applyActivityDrop(draggedActivity, targetCategoryId, targetActivity);
         clearDragState();
+    };
+
+    useEffect(() => {
+        if (!isTouchDragging) return;
+        const resolveTouchTarget = (clientX: number, clientY: number) => {
+            const element = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+            const activityElement = element?.closest('[data-tag-batch-activity]') as HTMLElement | null;
+            const categoryElement = element?.closest('[data-tag-batch-category]') as HTMLElement | null;
+            const categoryId = activityElement?.dataset.tagBatchCategory || categoryElement?.dataset.tagBatchCategory;
+            if (!categoryId) return;
+            if (activityElement?.dataset.tagBatchActivity) {
+                const rect = activityElement.getBoundingClientRect();
+                const target = {
+                    categoryId,
+                    activityId: activityElement.dataset.tagBatchActivity,
+                    position: clientY < rect.top + rect.height / 2 ? 'before' as const : 'after' as const
+                };
+                touchDragTargetRef.current = target;
+                setDragOverCategory(categoryId);
+                setDragOverActivity(target);
+            } else {
+                touchDragTargetRef.current = { categoryId };
+                setDragOverCategory(categoryId);
+                setDragOverActivity(null);
+            }
+        };
+        const handleTouchMove = (event: TouchEvent) => {
+            const touch = event.touches[0];
+            if (!touch || !touchDraggingActivityRef.current) return;
+            if (event.cancelable) event.preventDefault();
+            resolveTouchTarget(touch.clientX, touch.clientY);
+        };
+        const handleTouchEnd = () => {
+            const dragged = touchDraggingActivityRef.current;
+            const target = touchDragTargetRef.current;
+            if (dragged && target) {
+                applyActivityDrop(dragged, target.categoryId, target.activityId && target.position ? { activityId: target.activityId, position: target.position } : undefined);
+            }
+            touchDraggingActivityRef.current = null;
+            touchDragTargetRef.current = null;
+            setIsTouchDragging(false);
+            clearDragState();
+        };
+        window.addEventListener('touchmove', handleTouchMove, { passive: false });
+        window.addEventListener('touchend', handleTouchEnd);
+        window.addEventListener('touchcancel', handleTouchEnd);
+        return () => {
+            window.removeEventListener('touchmove', handleTouchMove);
+            window.removeEventListener('touchend', handleTouchEnd);
+            window.removeEventListener('touchcancel', handleTouchEnd);
+        };
+    }, [isTouchDragging]);
+
+    const handleTouchDragStart = (activity: Activity, categoryId: string, event: React.TouchEvent<HTMLDivElement>) => {
+        if (!isReorderMode) return;
+        const touch = event.touches[0];
+        if (!touch) return;
+        const dragged = { activity, sourceCategoryId: categoryId };
+        touchDraggingActivityRef.current = dragged;
+        touchDragTargetRef.current = { categoryId };
+        setDraggedActivity(dragged);
+        setDragOverCategory(categoryId);
+        setIsTouchDragging(true);
     };
 
     return (
@@ -405,6 +480,7 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                 {categories.map((category, catIndex) => (
                     <div
                         key={category.id}
+                        data-tag-batch-category={category.id}
                         className={`bg-white rounded-2xl border transition-colors overflow-hidden ${category.isArchived === true ? 'opacity-60' : ''} ${isReorderMode && dragOverCategory === category.id ? 'border-orange-500 ring-1 ring-orange-500 bg-orange-50' : 'border-stone-200'}`}
                         onDragOver={isReorderMode ? (e) => handleDragOver(e, category.id) : undefined}
                         onDrop={isReorderMode ? (e) => handleDrop(e, category.id) : undefined}
@@ -543,12 +619,15 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                                 {category.activities.map((activity, actIndex) => (
                                     <div key={activity.id}>
                                         <div
+                                            data-tag-batch-activity={activity.id}
+                                            data-tag-batch-category={category.id}
                                             draggable={isReorderMode}
                                             onDragStart={isReorderMode ? (e) => handleDragStart(e, activity, category.id) : undefined}
                                             onDragEnd={isReorderMode ? clearDragState : undefined}
                                             onDragOver={isReorderMode ? (e) => handleActivityDragOver(e, category.id, activity.id) : undefined}
                                             onDrop={isReorderMode ? (e) => handleDrop(e, category.id) : undefined}
-                                            className={`flex items-center gap-3 p-2 bg-white border border-stone-100 rounded-xl hover:border-stone-300 group transition-all ${activity.isArchived === true ? 'opacity-55' : ''} ${isReorderMode ? 'cursor-grab active:cursor-grabbing active:shadow-lg active:scale-[1.02]' : ''} ${isReorderMode && dragOverActivity?.categoryId === category.id && dragOverActivity.activityId === activity.id ? 'border-orange-300' : ''}`}
+                                            onTouchStart={isReorderMode ? (e) => handleTouchDragStart(activity, category.id, e) : undefined}
+                                            className={`flex items-center gap-3 p-2 bg-white border border-stone-100 rounded-xl hover:border-stone-300 group transition-all ${activity.isArchived === true ? 'opacity-55' : ''} ${isReorderMode ? 'cursor-grab touch-none active:cursor-grabbing active:shadow-lg active:scale-[1.02]' : ''} ${isReorderMode && dragOverActivity?.categoryId === category.id && dragOverActivity.activityId === activity.id ? 'border-orange-300' : ''}`}
                                         >
                                             <GripVertical size={14} className={`shrink-0 ${isReorderMode ? 'text-orange-400' : 'text-stone-300'}`} />
 
@@ -690,16 +769,16 @@ export const BatchManageView: React.FC<BatchManageViewProps> = ({ onBack, catego
                     <Plus size={20} />
                     <span>添加新分类</span>
                 </button>
+                <button
+                    type="button"
+                    onClick={toggleReorderMode}
+                    className="mt-6 flex w-full items-center gap-2 border-0 bg-transparent px-1 py-1 text-left text-xs font-medium text-stone-400 transition-colors hover:text-stone-600"
+                    title={isReorderMode ? '退出调整顺序' : '进入调整顺序模式'}
+                >
+                    <GripVertical size={14} />
+                    <span>{isReorderMode ? '完成调整' : '调整顺序'}</span>
+                </button>
             </div>
-            <button
-                type="button"
-                onClick={toggleReorderMode}
-                className={`fixed bottom-5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full px-5 py-3 text-sm font-bold shadow-lg transition-colors ${isReorderMode ? 'bg-stone-800 text-white hover:bg-stone-700' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-                title={isReorderMode ? '退出调整顺序' : '进入调整顺序模式'}
-            >
-                <GripVertical size={17} />
-                <span>{isReorderMode ? '完成调整' : '调整顺序'}</span>
-            </button>
             {migrationReviewOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm">
                     <div className="flex h-[min(640px,calc(100vh-2rem))] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-stone-200 bg-[#fdfbf7] shadow-2xl">
