@@ -28,6 +28,7 @@ import java.util.Set;
  * Updated 2026-07-22: Appends a subtask's parent title when rebuilding TODAY + PIN widget rows from mirrored sources.
  * Updated 2026-08-10: Propagates recurrence state so recurring widget rows cannot be completed.
  * Updated 2026-05-21: Matched native TODAY + PIN rebuild visibility to the app's today schedule helper, including `maybeDates` and recurrence `skipDates` suppression.
+ * Updated 2026-09-11: Keeps completion timestamps when widget-side todo completion changes are applied locally.
  */
 public final class WidgetTodoPinProviderSupport {
     public static final String ACTION_TOGGLE_TODO_ITEM =
@@ -367,7 +368,7 @@ public final class WidgetTodoPinProviderSupport {
                             todo.getId(), todo.getTitle(), todo.getKind(), isCompleted, todo.getParentTodoId(),
                             todo.getLinkedCategoryId(), todo.getLinkedActivityId(), todo.getDefaultScopeIds(),
                             todo.getPin(), todo.getScheduledDate(), todo.getDeadlineDate(), todo.getMaybeDates(),
-                            todo.getRecurrenceRule())
+                            todo.getRecurrenceRule(), isCompleted ? formatCompletionTimestamp() : null)
                     : todo);
         }
         WidgetTodoPinPayload updatedPayload = new WidgetTodoPinPayload(
@@ -734,5 +735,10 @@ public final class WidgetTodoPinProviderSupport {
             flags |= PendingIntent.FLAG_IMMUTABLE;
         }
         return flags;
+    }
+
+    private static String formatCompletionTimestamp() {
+        return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US)
+                .format(new Date());
     }
 }

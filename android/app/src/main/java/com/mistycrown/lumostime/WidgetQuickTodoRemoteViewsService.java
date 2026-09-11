@@ -6,12 +6,17 @@ import android.view.View;
 import android.widget.RemoteViews;
 import android.widget.RemoteViewsService;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
-/** Collection adapter for quick-todo rows. */
+/** Collection adapter for quick-todo rows.
+ * Updated 2026-09-11: Shows all unfinished quick todos and at most five most recently completed ones.
+ */
 public class WidgetQuickTodoRemoteViewsService extends RemoteViewsService {
     @Override
     public RemoteViewsFactory onGetViewFactory(Intent intent) {
@@ -42,10 +47,56 @@ public class WidgetQuickTodoRemoteViewsService extends RemoteViewsService {
             Collections.sort(nextItems, new Comparator<WidgetTodoPinSourceTodo>() {
                 @Override public int compare(WidgetTodoPinSourceTodo left, WidgetTodoPinSourceTodo right) {
                     if (left.isCompleted() != right.isCompleted()) return left.isCompleted() ? 1 : -1;
+                    if (left.isCompleted()) {
+                        int completedAtComparison = compareCompletedAt(left.getCompletedAt(), right.getCompletedAt());
+                        if (completedAtComparison != 0) return completedAtComparison;
+                    }
                     return left.getTitle().compareToIgnoreCase(right.getTitle());
                 }
             });
+            int completedCount = 0;
+            for (WidgetTodoPinSourceTodo item : nextItems) {
+                if (item.isCompleted()) completedCount++;
+            }
+            if (completedCount > 5) {
+                int keepCount = nextItems.size() - completedCount + 5;
+                nextItems = new ArrayList<>(nextItems.subList(0, keepCount));
+            }
             items = nextItems;
+        }
+
+        private static int compareCompletedAt(String left, String right) {
+            Long leftTime = parseCompletedAt(left);
+            Long rightTime = parseCompletedAt(right);
+            if (leftTime == null && rightTime == null) return 0;
+            if (leftTime == null) return 1;
+            if (rightTime == null) return -1;
+            return Long.compare(rightTime, leftTime);
+        }
+
+        private static Long parseCompletedAt(String value) {
+            if (value == null || value.trim().isEmpty()) return null;
+            String normalized = value.trim();
+            if (normalized.endsWith("Z")) {
+                normalized = normalized.substring(0, normalized.length() - 1) + "+0000";
+            } else if (normalized.matches(".*[+-]\\d{2}:\\d{2}$")) {
+                normalized = normalized.substring(0, normalized.length() - 3)
+                        + normalized.substring(normalized.length() - 2);
+            }
+            for (String pattern : new String[] {
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+                    "yyyy-MM-dd'T'HH:mm:ssZ"
+            }) {
+                try {
+                    SimpleDateFormat formatter = new SimpleDateFormat(pattern, Locale.US);
+                    formatter.setLenient(false);
+                    Date parsed = formatter.parse(normalized);
+                    if (parsed != null) return parsed.getTime();
+                } catch (java.text.ParseException ignored) {
+                    // Try the format without milliseconds for legacy values.
+                }
+            }
+            return null;
         }
 
         @Override public void onDestroy() { items = new ArrayList<>(); }

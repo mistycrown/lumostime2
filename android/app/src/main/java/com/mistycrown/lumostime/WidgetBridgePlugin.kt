@@ -20,6 +20,7 @@ import org.json.JSONObject
  * Updated 2026-05-05: Added log-tail synchronization so native quick-punch shortcuts can compute gap fills without opening the app.
  * Updated 2026-05-20: Wrapped non-Exception sync failures before forwarding them to Capacitor's PluginCall.reject overloads.
  * Updated 2026-08-06: Added UI icon asset paths to scene time-slot parsing for native scene-tab rendering.
+ * Updated 2026-09-11: Parses optional todo completion timestamps for native quick-todo filtering.
  * Updated 2026-08-09: Added principle-card widget payload synchronization for the dedicated Android 4x2 card widget.
  * Updated 2026-08-09: Accepts weekly daily-check progress and refreshes the dedicated 4x4 weekly widget.
  * Updated 2026-08-11: Preserves native daily progress while its widget actions are still awaiting web replay.
@@ -801,7 +802,8 @@ class WidgetBridgePlugin : Plugin() {
                     scheduledDate = parseNullableString(item.optString("scheduledDate")),
                     deadlineDate = parseNullableString(item.optString("deadlineDate")),
                     maybeDates = item.optJSONArray("maybeDates").toStringList(),
-                    recurrenceRule = item.optJSONObject("recurrenceRule")?.toTodoPinSourceRecurrenceRule()
+                    recurrenceRule = item.optJSONObject("recurrenceRule")?.toTodoPinSourceRecurrenceRule(),
+                    completedAt = parseNullableString(item.optString("completedAt"))
                 )
             )
         }

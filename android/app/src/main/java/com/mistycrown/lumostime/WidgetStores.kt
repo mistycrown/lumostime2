@@ -18,6 +18,7 @@ import org.json.JSONObject
  * Updated 2026-08-09: Persists principle-card widget payloads and per-instance shuffle state.
  * Updated 2026-08-09: Persists weekly daily-check ranges and per-item colors for the 4x4 statistics widget.
  * Updated 2026-08-12: Stores independent manual refresh animation windows for every widget instance.
+ * Updated 2026-09-11: Persists optional todo completion timestamps for native quick-todo filtering.
  */
 object WidgetStores {
     private const val PREFS_NAME = "lumostime_widget_timer"
@@ -1756,7 +1757,8 @@ object WidgetStores {
                         scheduledDate = parseNullableString(item.optString("scheduledDate")),
                         deadlineDate = parseNullableString(item.optString("deadlineDate")),
                         maybeDates = item.optJSONArray("maybeDates").toStringList(),
-                        recurrenceRule = item.optJSONObject("recurrenceRule")?.toTodoPinSourceRecurrenceRule()
+                        recurrenceRule = item.optJSONObject("recurrenceRule")?.toTodoPinSourceRecurrenceRule(),
+                        completedAt = parseNullableString(item.optString("completedAt"))
                     )
                 )
             }
@@ -1838,6 +1840,7 @@ object WidgetStores {
                 put("deadlineDate", item.deadlineDate ?: JSONObject.NULL)
                 put("maybeDates", item.maybeDates.toJsonArray())
                 put("recurrenceRule", item.recurrenceRule?.toTodoPinSourceRecurrenceRuleJson() ?: JSONObject.NULL)
+                put("completedAt", item.completedAt ?: JSONObject.NULL)
             })
         }
         return array
