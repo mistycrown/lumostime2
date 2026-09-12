@@ -242,7 +242,7 @@ export const ActivityAttributeManager: React.FC<ActivityAttributeManagerProps> =
 
             {(attribute.type === 'single' || attribute.type === 'multi') && <div className="ml-2 mt-3 space-y-2">
               <label className="flex cursor-pointer items-center gap-2 text-[11px] text-stone-500">
-                <input type="checkbox" checked={Boolean(attribute.isKeywordSource)} onChange={() => toggleKeywordSource(attribute.id)} className="h-3.5 w-3.5 accent-stone-800" />
+                <input type="checkbox" checked={Boolean(attribute.isKeywordSource)} onChange={() => toggleKeywordSource(attribute.id)} className="m-0 h-3 w-3 shrink-0 accent-stone-800" />
                 <span>{'\u5c5e\u6027\u4f5c\u4e3a\u5173\u952e\u5b57'}</span>
               </label>
               {(attribute.options || []).filter((option) => !option.isArchived).map((option) => <div key={option.id} className="flex items-center gap-2">
