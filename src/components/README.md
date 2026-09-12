@@ -2,6 +2,8 @@
 
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
+- Update 2026-09-12: `FeatureHint.tsx` provides reusable contextual help triggers with consistent modal styling and per-hint localStorage dismissal; the first integration is beside Activity attribute keyword-source settings.
+
 - Update 2026-09-12: `TodoBentoWeekView.tsx` and `TodoMonthView.tsx` constrain nested flex scroll containers and contain touch overscroll to prevent Android WebView viewport-edge clipping on Huawei P70-class devices; schedule surfaces no longer add a backdrop-filter layer over scrolling content.
 
 - Update 2026-09-09: `CustomSelect.tsx` supports optional portal-rendered dropdowns with viewport-aware positioning for selectors inside clipped overlays; existing selectors retain their inline behavior.
