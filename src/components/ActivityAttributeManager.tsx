@@ -15,6 +15,7 @@ import { Archive, ChevronDown, ChevronUp, Plus, RotateCcw, Trash2 } from 'lucide
 import { ActivityAttributeDefinition, ActivityAttributeOption, ActivityAttributeType, Log } from '../types';
 import { getSortedActivityAttributes } from '../utils/activityAttributeUtils';
 import { ConfirmModal } from './ConfirmModal';
+import { FeatureHint } from './FeatureHint';
 
 interface ActivityAttributeManagerProps {
   attributes?: ActivityAttributeDefinition[];
@@ -244,6 +245,12 @@ export const ActivityAttributeManager: React.FC<ActivityAttributeManagerProps> =
               <label className="flex cursor-pointer items-center gap-2 text-[11px] text-stone-500">
                 <input type="checkbox" checked={Boolean(attribute.isKeywordSource)} onChange={() => toggleKeywordSource(attribute.id)} className="m-0 h-3 w-3 shrink-0 accent-stone-800" />
                 <span>{'\u5c5e\u6027\u4f5c\u4e3a\u5173\u952e\u5b57'}</span>
+                <FeatureHint
+                  hintId="activity-attribute-keyword-source"
+                  message="开启后，该属性的选项会参与关键词匹配，帮助系统在记录和关联时识别对应内容。"
+                  iconSize={14}
+                  className="ml-0.5"
+                />
               </label>
               {(attribute.options || []).filter((option) => !option.isArchived).map((option) => <div key={option.id} className="flex items-center gap-2">
                 <input value={option.label} onChange={(event) => updateAttribute(attribute.id, { options: (attribute.options || []).map((item) => item.id === option.id ? { ...item, label: event.target.value } : item) })} className="min-w-0 flex-1 bg-stone-50 border border-stone-100 rounded-md px-2.5 py-2 text-xs text-stone-600 outline-none focus:border-stone-400" aria-label={'\u9009\u9879\u540d\u79f0'} />
