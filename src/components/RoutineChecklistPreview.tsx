@@ -6,6 +6,7 @@
  * @description Renders Routine Markdown checklist notes as neutral checkbox rows instead of raw Markdown.
  * @updated 2026-08-26: Added shared checklist preview for timeline cards and schedule blocks.
  * @updated 2026-08-27: Uses neutral gray completion markers instead of the active theme color.
+ * @updated 2026-09-12: Reduces checklist markers across regular and compact timeline previews.
  */
 import React from 'react';
 import { Check } from 'lucide-react';
@@ -33,9 +34,9 @@ export const RoutineChecklistPreview: React.FC<RoutineChecklistPreviewProps> = (
         <div key={`${index}-${entry.text}`} className="flex min-w-0 items-start gap-1.5">
           <span
             aria-hidden="true"
-            className={`mt-0.5 flex shrink-0 items-center justify-center rounded-[4px] border ${compact ? 'h-3 w-3 border-[1.5px]' : 'h-4 w-4 border-2'} ${entry.completed ? 'border-stone-400 bg-stone-400 text-white' : 'border-stone-300 bg-white text-transparent'}`}
+            className={`mt-0.5 flex shrink-0 items-center justify-center rounded-[3px] border-[1.5px] ${compact ? 'h-2.5 w-2.5' : 'h-3 w-3'} ${entry.completed ? 'border-stone-400 bg-stone-400 text-white' : 'border-stone-300 bg-white text-transparent'}`}
           >
-            <Check size={compact ? 8 : 11} strokeWidth={3} />
+            <Check size={compact ? 7 : 8} strokeWidth={3} />
           </span>
           <span className={`min-w-0 break-words ${entry.completed ? 'text-stone-400 line-through' : ''}`}>
             {entry.text}
