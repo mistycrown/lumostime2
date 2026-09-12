@@ -1,5 +1,7 @@
 # Views Layer
 
+- Update 2026-09-12: `TagDetailView.tsx` adds a contextual hint beside tag keyword management, including note-focus shortcuts and preference guidance.
+
 - Update 2026-09-12: `TodoView.tsx` adds explicit min-size constraints and contained touch scrolling to prevent schedule/list content clipping in Android WebView on Huawei P70-class devices.
 
 - Update 2026-09-02: `RoutineSettingsView.tsx` now requires confirmation through the shared `ConfirmModal` before deleting a Routine.
