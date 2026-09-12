@@ -99,7 +99,7 @@ export const FeatureHint: React.FC<FeatureHintProps> = ({
           </div>
           <div className="flex gap-3 border-t border-stone-100 bg-white p-5">
             <button type="button" onClick={dismissPermanently} className="flex-1 rounded-2xl border border-stone-200 bg-white py-3.5 font-bold text-stone-600 transition-colors hover:bg-stone-50">不再显示</button>
-            <button ref={confirmButtonRef} type="button" onClick={() => setIsOpen(false)} className="flex-1 rounded-2xl bg-stone-800 py-3.5 font-bold text-white shadow-xl transition-transform hover:scale-[1.01] active:scale-[0.99]">好的</button>
+            <button ref={confirmButtonRef} type="button" onClick={() => setIsOpen(false)} className="flex-1 rounded-2xl border border-stone-200 bg-white py-3.5 font-bold text-stone-600 shadow-sm transition-colors hover:bg-stone-50">好的</button>
           </div>
         </div>
       </div>}
