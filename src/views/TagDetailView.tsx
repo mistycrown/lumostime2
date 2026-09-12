@@ -1,5 +1,6 @@
 /**
  * @file TagDetailView.tsx
+ * @updated 2026-09-12: Added a contextual hint beside tag keyword management.
  * @updated 2026-09-07: Uses the shared detail timeline attribute row rendered below notes.
  * @updated 2026-09-03: Passes the selected attribute keyword source into the detail keyword calendar.
  * @updated 2026-09-02: Debounced activity auto-save so attribute text inputs remain focused while typing.
@@ -38,6 +39,7 @@ import { AssociatedTodoList } from '../components/AssociatedTodoList';
 import { filterCountableLogs } from '../utils/statLogUtils';
 import { ActivityAttributeManager } from '../components/ActivityAttributeManager';
 import { ActivityAttributeStatistics } from '../components/ActivityAttributeStatistics';
+import { FeatureHint } from '../components/FeatureHint';
 
 
 interface TagDetailViewProps {
@@ -615,7 +617,14 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
                   {/* Keywords Section */}
                   <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                     <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">关键字</h3>
+                     <div className="mb-4 flex items-center gap-1.5">
+                        <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest">关键字</h3>
+                        <FeatureHint
+                           hintId="tag-detail-keywords"
+                           message={'在此设置关键字，然后在添加记录时，备注输入关键字，系统会提示关联到此标签。\n\n偏好设置中，可以设置是否默认跳转到备注输入框，以便快速输入关键字。\n\n另外，在添加补记时，点击Total time 也可以快速定位至备注输入框，以快速输入关键字。'}
+                           iconSize={12}
+                        />
+                     </div>
                      <div className="space-y-4">
                         <div className="flex flex-wrap gap-2">
                            {(activity.keywords || []).map(keyword => (
