@@ -5,6 +5,7 @@
  * @pos Activity detail analytics component
  * @description Presents attribute data as a compact editorial report: text terms, choice rankings, numeric KPIs, and trends.
  * @updated 2026-09-02: Adds count/duration dimensions for single- and multi-choice attributes while keeping text and number statistics unchanged.
+ * @updated 2026-09-12: Uses the bundled Segmentit dictionary for consistent Chinese text terms across desktop and Android WebView.
  * @updated 2026-09-12: Keeps short Chinese and English text terms in the ranked text statistics instead of showing an empty state.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
@@ -14,6 +15,9 @@ import { Activity, ActivityAttributeDefinition, ActivityAttributeOption, Activit
 import { getActivityAttributeValue, getSortedActivityAttributes } from '../utils/activityAttributeUtils';
 import { getLogDurationSeconds } from '../utils/scopeStatsUtils';
 import { formatDuration } from '../utils/chartUtils';
+import { getTextTerms } from '../utils/textSegmentation';
+
+export { getTextTerms } from '../utils/textSegmentation';
 
 type StatisticsAttribute = Pick<ActivityAttributeDefinition, 'id' | 'name' | 'type' | 'options' | 'unit' | 'displayCondition'>;
 type RangeKey = 'all' | '7d' | '30d' | 'year';
@@ -62,42 +66,7 @@ const getRangeStart = (range: RangeKey, now: Date) => {
   return start.getTime();
 };
 
-const TEXT_STOPWORDS = new Set(['的', '了', '和', '是', '在', '有', '我', '也', '就', '都', '很', '还', '与', '及', '或', '一个', '一些']);
 const MAX_TEXT_TERMS = 50;
-
-const isTextTerm = (part: string) => {
-  if (!part || TEXT_STOPWORDS.has(part)) return false;
-  return /^[\u4e00-\u9fffA-Za-z0-9]+$/.test(part);
-};
-
-const getFallbackTextTerms = (text: string): string[] => text
-  .split(/[，。！？，、；：,.!?;:\s]+/)
-  .flatMap((part) => part.length <= 8 ? [part] : part.match(/[\u4e00-\u9fffA-Za-z0-9]{1,4}/g) || [])
-  .map((part) => part.toLowerCase())
-  .filter(isTextTerm);
-
-export const getTextTerms = (value: string): string[] => {
-  const text = value.trim().replace(/[\r\n]+/g, ' ');
-  if (!text) return [];
-
-  // Explicit separators are user-provided word boundaries. Android WebView and
-  // desktop Chromium can use different ICU dictionaries, so running Segmenter
-  // over an already separated value can turn "测试 一下" into single characters.
-  if (/[，。！？，、；：,.!?;:\s]/.test(text)) return getFallbackTextTerms(text);
-
-  const Segmenter = (Intl as typeof Intl & { Segmenter?: new (locale?: string, options?: { granularity: 'word' }) => { segment: (input: string) => Iterable<{ segment: string; isWordLike?: boolean }> } }).Segmenter;
-  if (Segmenter) {
-    const segmenter = new Segmenter('zh', { granularity: 'word' });
-    const terms = Array.from(segmenter.segment(text))
-      .map((part) => part.segment.trim().toLowerCase())
-      .filter(isTextTerm);
-    // Some Android WebView versions expose Segmenter but return every Chinese
-    // character as a separate term. Keep the deterministic fallback in that case.
-    if (terms.some((term) => term.length > 1 && /[\u4e00-\u9fff]/.test(term))) return terms;
-  }
-
-  return getFallbackTextTerms(text);
-};
 
 interface ActivityAttributeStatisticsProps {
   activity: Activity;
