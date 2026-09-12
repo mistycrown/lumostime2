@@ -4,6 +4,7 @@
  * @output Android floating overlay workflow orchestration for app-awareness prompts, countdowns, and overtime reminders
  * @pos Hook (System Integration)
  * @description Drives the native app-awareness floating workflow panel step-by-step without switching back to LumosTime, while reusing the existing session and log pipeline for actual timer records.
+ * @updated 2026-09-12: Displays complete activity, TODO, and scope filter expressions in start-record choices.
  * @updated 2026-07-06: Acknowledges pending native app-awareness events only after successful reconciliation and retries foreground races so start/finish payloads are not dropped.
  * @updated 2026-06-21: Removed dismiss/close from the overtime finish prompt so expected-duration handling only offers extend or submit.
  * @updated 2026-06-21: Added the first-pass native overlay runtime for cooldown,问答,预计时长,开始记录 and overtime extension prompts.
@@ -55,6 +56,7 @@ interface AppAwarenessNativeStartPayload {
     categoryId?: string;
     activityId?: string;
     label?: string;
+    displayLabel?: string;
     icon?: string;
     linkedTodoId?: string;
     scopeIds?: string[];
@@ -238,6 +240,27 @@ export const useAppAwarenessRuntime = ({
   const handleStopActivityRef = useRef(handleStopActivity);
   const pendingNativeReconcileRetryRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const pendingNativeReconcileRetryCountRef = useRef(0);
+
+  const getRuntimeActivityOptionDisplayLabel = (option: AppAwarenessStartRecordStep['activityOptions'][number]): string => {
+    const linkedTodo = option.linkedTodoId
+      ? todosRef.current.find((todo) => todo.id === option.linkedTodoId)
+      : undefined;
+    const categoryId = linkedTodo?.linkedCategoryId || option.categoryId;
+    const activityId = linkedTodo?.linkedActivityId || option.activityId;
+    const activity = categoriesRef.current
+      .find((category) => category.id === categoryId)
+      ?.activities.find((item) => item.id === activityId);
+    const scopeIds = linkedTodo?.defaultScopeIds || option.scopeIds || [];
+    const selectedScopes = scopeIds
+      .map((scopeId) => scopesRef.current.find((scope) => scope.id === scopeId))
+      .filter((scope): scope is Scope => Boolean(scope));
+
+    return [
+      activity?.name || option.label,
+      linkedTodo ? `@${linkedTodo.title}` : '',
+      ...selectedScopes.map((scope) => `%${scope.name}`)
+    ].filter(Boolean).join(' ');
+  };
 
   useEffect(() => {
     templatesRef.current = appAwarenessTemplates;
@@ -716,6 +739,7 @@ export const useAppAwarenessRuntime = ({
         categoryId: detail.selectedActivity.categoryId,
         activityId: detail.selectedActivity.activityId,
         label: detail.selectedActivity.label || '',
+        displayLabel: detail.selectedActivity.displayLabel,
         icon: detail.selectedActivity.icon,
         linkedTodoId: detail.selectedActivity.linkedTodoId,
         scopeIds: detail.selectedActivity.scopeIds
@@ -1049,7 +1073,7 @@ export const useAppAwarenessRuntime = ({
         buttons: [
           ...step.activityOptions.map((option) => ({
             id: 'activity-start',
-            label: getActivityOptionDisplayLabel(option.label),
+            label: getRuntimeActivityOptionDisplayLabel(option) || option.displayLabel || getActivityOptionDisplayLabel(option.label),
             style: 'secondary' as const,
             value: option.id
           }))

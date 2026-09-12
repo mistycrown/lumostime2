@@ -4,6 +4,7 @@
  * @output Native Usage Stats and App Rule State
  * @pos Native Plugin
  * @description Capacitor plugin exposing Android foreground-app access, app association rules, and per-app ignore state to the React application.
+ * @updated 2026-09-12: Uses complete activity-option display expressions in native workflow overlays.
  * @updated 2026-09-02: Keeps the current foreground package deduplicated after workflow cancellation so closing an app-awareness overlay does not immediately reopen it.
  */
 package com.mistycrown.lumostime;
@@ -1276,9 +1277,13 @@ public class AppUsagePlugin extends Plugin {
                     if (option == null) {
                         continue;
                     }
+                    String displayLabel = option.optString("displayLabel", "");
+                    if (displayLabel.trim().isEmpty()) {
+                        displayLabel = option.optString("label", "");
+                    }
                     buttons.put(createOverlayButton(
                             "activity-start",
-                            getNativeActivityDisplayLabel(option.optString("label", "")),
+                            getNativeActivityDisplayLabel(displayLabel),
                             "secondary",
                             option.optString("id", ""),
                             false));
