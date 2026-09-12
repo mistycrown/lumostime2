@@ -11,6 +11,10 @@ describe('getTextTerms', () => {
     expect(getTextTerms('测试 一下')).toEqual(['测试', '一下']);
   });
 
+  it('segments unspaced Chinese text with the bundled dictionary', () => {
+    expect(getTextTerms('我今天学习编程')).toEqual(['今天', '学习', '编程']);
+  });
+
   it('keeps segmented Chinese words and meaningful single-character values', () => {
     expect(getTextTerms('阅读 好')).toEqual(['阅读', '好']);
   });
