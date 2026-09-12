@@ -6,7 +6,7 @@
  * @description Keeps note keyword matching compatible while projecting selected Activity attribute options into keyword calendars.
  * @updated 2026-09-03: Created for Activity attribute keyword sources.
  */
-import { ActivityAttributeDefinition, Log } from '../types';
+import { Activity, ActivityAttributeDefinition, Log } from '../types';
 
 const getActiveKeywordOptions = (attribute?: ActivityAttributeDefinition) => (
   attribute?.options || []
@@ -19,6 +19,18 @@ export const getDetailTimelineKeywords = (
   ...keywords.map((keyword) => keyword.trim()).filter(Boolean),
   ...getActiveKeywordOptions(attribute).map((option) => option.label.trim())
 ]));
+
+export const getActivityKeywordCandidates = (
+  activity?: Pick<Activity, 'keywords' | 'attributes'>
+): string[] => {
+  const keywordAttribute = (activity?.attributes || []).find((attribute) => (
+    attribute.isKeywordSource
+    && !attribute.isArchived
+    && (attribute.type === 'single' || attribute.type === 'multi')
+  ));
+
+  return getDetailTimelineKeywords(activity?.keywords || [], keywordAttribute);
+};
 
 export const getLogMatchedDetailTimelineKeywords = (
   log: Log,

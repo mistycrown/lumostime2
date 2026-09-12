@@ -6,6 +6,7 @@
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
  * @updated 2026-08-26: Makes Routine transitions wait for each stopped step to enter the shared log-save path.
  * @updated 2026-08-27: Keeps Routine starts on the Record page by bypassing timer auto-jump preferences.
+ * @updated 2026-09-12: Resolves Routine activities across categories when legacy or moved steps retain stale category IDs.
  * @updated 2026-06-21: Centralized active-session stop persistence so floating-ball stops and app-awareness finishes always submit logs through the same path.
  * @updated 2026-08-10: Excluded timeline Plan blocks from default backfill time inference.
  * @updated 2026-08-10: Adds temporary focus-detail ownership diagnostics for Android immersive-mode investigation.
@@ -574,17 +575,26 @@ const AppContent: React.FC = () => {
     return startActivity(activity, categoryId, autoLinkRules, todoId, scopeIdOrIds, note, appAwarenessMeta);
   };
 
-  const resolveRoutineStep = useCallback((step: RoutineStep) => {
+  const resolveRoutineStep = useCallback((step: RoutineStep, routineCategoryId?: string) => {
     const linkedTodo = step.linkedTodoId ? todos.find(todo => todo.id === step.linkedTodoId) : undefined;
-    const categoryId = linkedTodo?.linkedCategoryId || step.categoryId;
+    const requestedCategoryId = linkedTodo?.linkedCategoryId || step.categoryId || routineCategoryId || '';
     const activityId = linkedTodo?.linkedActivityId || step.activityId;
-    const activity = categories
-      .find(category => category.id === categoryId)
-      ?.activities.find(item => item.id === activityId);
+    const requestedCategory = categories.find(category => category.id === requestedCategoryId);
+    const activityInRequestedCategory = requestedCategory?.activities.find(item => item.id === activityId);
+    // Older Routine steps can retain a stale/empty category ID after activities
+    // are moved. Resolve by activity ID so scope/checklist associations do not
+    // make an otherwise valid step fail to launch.
+    const activityMatch = activityInRequestedCategory
+      ? { activity: activityInRequestedCategory, categoryId: requestedCategoryId }
+      : categories.reduce<{ activity: typeof activityInRequestedCategory; categoryId: string } | null>((match, category) => {
+        if (match) return match;
+        const activity = category.activities.find(item => item.id === activityId);
+        return activity ? { activity, categoryId: category.id } : null;
+      }, null);
     return {
       linkedTodo,
-      activity,
-      categoryId,
+      activity: activityMatch?.activity,
+      categoryId: activityMatch?.categoryId || requestedCategoryId,
       scopeIds: linkedTodo?.defaultScopeIds || step.scopeIds
     };
   }, [categories, todos]);
@@ -601,9 +611,9 @@ const AppContent: React.FC = () => {
       return;
     }
 
-    const { activity, categoryId, linkedTodo, scopeIds } = resolveRoutineStep(firstStep);
+    const { activity, categoryId, linkedTodo, scopeIds } = resolveRoutineStep(firstStep, routine.categoryId);
     if (!activity) {
-      addToast('error', 'Routine 的活动已不存在，请前往设置检查');
+      addToast('error', 'Routine 的每个步骤都必须绑定一个标签，请前往设置检查');
       return;
     }
 
@@ -681,10 +691,10 @@ const AppContent: React.FC = () => {
           return;
         }
 
-        const { activity: nextActivity, categoryId: nextCategoryId, linkedTodo: nextTodo, scopeIds: nextScopeIds } = resolveRoutineStep(nextStep);
+        const { activity: nextActivity, categoryId: nextCategoryId, linkedTodo: nextTodo, scopeIds: nextScopeIds } = resolveRoutineStep(nextStep, routine.categoryId);
         if (!nextActivity) {
           setActiveRoutineRun(null);
-          addToast('error', 'Routine 的下一步活动已不存在');
+          addToast('error', 'Routine 的每个步骤都必须绑定一个标签，请前往设置检查');
           return;
         }
 

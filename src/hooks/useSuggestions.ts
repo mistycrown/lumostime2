@@ -1,12 +1,14 @@
 /**
  * @file useSuggestions.ts
  * @updated 2026-08-06: Exclude archived activities and scopes from suggestions.
+ * @updated 2026-09-12: Includes all active options from a keyword-source Activity attribute in note-based activity suggestions.
  * @description Custom hook for activity and scope suggestions
  */
 
 import { useMemo } from 'react';
 import { Category, TodoItem, Scope, AutoLinkRule } from '../types';
 import { isActivityArchived, isScopeArchived } from '../utils/archiveUtils';
+import { getActivityKeywordCandidates } from '../utils/detailTimelineKeywordUtils';
 
 interface Suggestion {
   activity?: {
@@ -65,7 +67,7 @@ export const useSuggestions = (
           if (isActivityArchived(act)) continue;
           if (act.id === selectedActivityId) continue;
 
-          for (const kw of (act.keywords || [])) {
+          for (const kw of getActivityKeywordCandidates(act)) {
             if (note.includes(kw)) {
               suggestions.activity = {
                 id: act.id,

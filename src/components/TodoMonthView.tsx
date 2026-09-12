@@ -15,6 +15,7 @@
  * @updated 2026-09-02: Rendered lunar labels as fixed two-line vertical text beside each month-view date number.
  * @updated 2026-09-09: Added mutually exclusive hidden/display filter modes with local month-view display presets and CRUD controls.
  * @updated 2026-09-12: Added explicit min-size constraints and contained touch scrolling to prevent Android WebView viewport-edge clipping.
+ * @updated 2026-09-12: Moved the month filter section above the cell-height settings in the month-view settings popup.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -1867,8 +1868,8 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                 </div>
               </div>
 
-              <div className="min-h-0 overflow-y-auto px-4 pb-4 pt-4">
-                <div className="mb-4">
+              <div className="min-h-0 flex flex-col overflow-y-auto px-4 pb-4 pt-4">
+                <div className="mb-4 order-2">
                   <div className="mb-2 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
                     格子高度
                   </div>
@@ -1893,7 +1894,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                   </div>
                 </div>
 
-                <div className="mb-4">
+                <div className="mb-4 order-3">
                   <div className="mb-2 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
                     字体大小
                   </div>
@@ -1918,7 +1919,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                   </div>
                 </div>
 
-                <div>
+                <div className="order-4">
                   <div className="mb-2 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
                     着色类型
                   </div>
@@ -1953,7 +1954,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                   )}
                 </div>
 
-                <div className="mt-4">
+                <div className="mb-4 order-1">
                   <div className="mb-2 text-[0.72rem] font-medium tracking-[0.08em] text-stone-400">
                     月历筛选
                   </div>
@@ -2099,7 +2100,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                   role="switch"
                   aria-checked={hideTraceTypesDraft}
                   onClick={() => setHideTraceTypesDraft((previous) => !previous)}
-                  className="mt-4 flex w-full items-center justify-between gap-3 px-1 py-3 text-left transition-colors hover:text-stone-900"
+                  className="mt-4 order-5 flex w-full items-center justify-between gap-3 px-1 py-3 text-left transition-colors hover:text-stone-900"
                 >
                   <span className="text-sm font-medium text-stone-700">隐藏 Trace 类型</span>
                   <span
