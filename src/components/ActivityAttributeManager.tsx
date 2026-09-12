@@ -226,6 +226,12 @@ export const ActivityAttributeManager: React.FC<ActivityAttributeManagerProps> =
                   aria-pressed={Boolean(attribute.displayCondition)}
                   className={`rounded px-1.5 py-0.5 ${attribute.displayCondition ? 'bg-stone-100 text-stone-700' : 'hover:bg-stone-50'}`}
                 >{'\u6761\u4ef6\u663e\u793a'}</button>
+                <FeatureHint
+                  hintId="activity-attribute-display-condition"
+                  message={'\u9009\u62e9\u6761\u4ef6\u663e\u793a\uff0c\u53ef\u4ee5\u8bbe\u5b9a\u8be5\u5c5e\u6027\u7684\u51fa\u73b0\u6761\u4ef6\u3002\n\n\u5373\uff1a\u5f53\u9898\u76eeA\u7684\u9009\u9879\u4e3aa\u65f6\uff0c\u624d\u663e\u793a\u9898\u76eeB\u3002\n\n\u4f8b\u5982\uff1a\u5f53\u8fd0\u52a8\u7c7b\u578b\u4e3a\u8dd1\u6b65\u65f6\uff0c\u663e\u793a\u8ddd\u79bb\uff08\u6570\u5b57\u7c7b\u578b\uff0c\u5355\u4f4dkm\uff09\uff0c\u5f53\u8fd0\u52a8\u7c7b\u578b\u4e3a\u8df3\u7ef3\u65f6\uff0c\u663e\u793a\u4e2a\u6570\uff08\u6570\u5b57\u7c7b\u578b\uff0c\u5355\u4f4d\u4e2a\uff09'}
+                  iconSize={12}
+                  className="ml-0.5"
+                />
               </div>
               {attribute.displayCondition && <>
                 <div className="flex flex-wrap gap-1.5">
@@ -247,7 +253,7 @@ export const ActivityAttributeManager: React.FC<ActivityAttributeManagerProps> =
                 <span>{'\u5c5e\u6027\u4f5c\u4e3a\u5173\u952e\u5b57'}</span>
                 <FeatureHint
                   hintId="activity-attribute-keyword-source"
-                  message={'开启后，该属性的选项将会作为关键字生效：\n\n1. 添加记录时，系统通过备注中输入的关键字，会自动提示关联到该活动标签\n2. 查看标签详情时间线日历时，属性选项会作为关键字在日历中显示颜色'}
+                  message={'开启后，该属性的选项将会作为关键字生效，每一标签只能选择一个属性作为关键字：\n\n1. 添加记录时，系统通过备注中输入的关键字，会自动提示关联到该活动标签\n2. 查看标签详情时间线日历时，属性选项会作为关键字在日历中显示颜色'}
                   iconSize={12}
                   className="ml-0.5"
                 />
