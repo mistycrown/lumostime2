@@ -8,6 +8,7 @@
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes reserved `小事` / `未来` buckets plus a week planning view with schedule and history badges.
  * @updated 2026-08-26: Hides archived todo categories from the main list and scheduling presentation.
  * @updated 2026-07-21: Applied the shared calendar number typography to the single-column week view.
+ * @updated 2026-09-12: Added explicit min-size constraints, contained touch scrolling, and an isolated schedule surface to prevent Android WebView edge clipping on Huawei P70-class devices.
  * @updated 2026-05-18: Hid pinned recurring todos from the mobile `今天 + Pin` section when today's occurrence is explicitly skipped, while still preserving pin-only rows and other explicit today matches.
  * @updated 2026-05-14: Added a persisted schedule lock toggle across the standard week, bento week, and month planners so schedule and deadline rows can be frozen against drag-to-move until explicitly unlocked.
  * @updated 2026-05-18: 支持点击周视图一列（标准周视图）下循环排期的 Repeat 标签以唤起快捷编辑栏。
@@ -2288,7 +2289,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   if (screenMode === 'week') {
     return (
       <div
-        className="relative isolate h-full overflow-hidden"
+        className="relative isolate h-full min-h-0 min-w-0 overflow-hidden"
         style={{
           backgroundColor: hasBackground ? 'transparent' : 'rgb(250, 249, 246)'
         }}
@@ -2308,7 +2309,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
         <div className="page-background-overlay absolute inset-0 -z-10" style={{ backgroundColor: 'rgba(250, 249, 246, 0.92)' }}></div>
 
-        <div className={`relative z-10 flex h-full flex-col pb-[calc(3rem+env(safe-area-inset-bottom))] pt-[var(--app-safe-area-top)] ${isWeekScheduleView ? 'px-4 md:px-8' : ''} ${useReducedEffects ? '' : 'backdrop-blur-[2px]'}`}>
+        <div className={`relative z-10 flex h-full min-h-0 min-w-0 flex-col pb-[calc(3rem+env(safe-area-inset-bottom))] pt-[var(--app-safe-area-top)] ${isWeekScheduleView ? 'px-4 md:px-8' : ''}`}>
           {isWeekScheduleView ? (
             <>
               <div className="shrink-0 border-b border-stone-300/70">
@@ -2573,7 +2574,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
   return (
     <div 
-      className="flex h-full relative isolate pb-[calc(3rem+env(safe-area-inset-bottom))] md:pb-16"
+      className="flex h-full min-h-0 min-w-0 relative isolate pb-[calc(3rem+env(safe-area-inset-bottom))] md:pb-16"
       style={{
         backgroundColor: hasBackground ? 'transparent' : '#faf9f6'
       }}
@@ -2745,7 +2746,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
       {/* Right Content - Task List */}
       <div 
-        className="flex-1 overflow-hidden flex flex-col p-5 md:p-10 rounded-tl-[2rem] shadow-[-5px_0_20px_rgba(0,0,0,0.08)] z-10 ml-[-10px] relative"
+        className="flex min-h-0 min-w-0 flex-1 overflow-hidden flex-col p-5 md:p-10 rounded-tl-[2rem] shadow-[-5px_0_20px_rgba(0,0,0,0.08)] z-10 ml-[-10px] relative"
         id="todo-content"
       >
         {/* 闁告锕埀顒€绻戝Σ鎴︽儌閸婄喎顥忛梺顒夊枤閸嶇數浠?- 闂侇偄绻戝Σ鎴炴償閿旂晫澹岄柟璇″枤閺併倝骞嬮悿顖ｅ晭缂傚喚鍠栨慨鈺呭箑娴ｇ晫娈堕柡?*/}
@@ -2808,7 +2809,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto pb-[calc(6.5rem+env(safe-area-inset-bottom))] no-scrollbar">
+        <div className="min-h-0 min-w-0 flex-1 touch-pan-y overscroll-contain overflow-y-auto pb-[calc(6.5rem+env(safe-area-inset-bottom))] no-scrollbar">
           {isVirtualQuickCategory && isQuickAddInputVisible && (
             <div className="mb-4 px-1">
               <div className="mb-2 flex items-center justify-between gap-3">

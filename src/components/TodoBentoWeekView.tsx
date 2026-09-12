@@ -5,6 +5,7 @@
  * @pos Component (Todo scheduling)
  * @description Renders one selected week at a time in the bento layout so the mini calendar, header range, and visible day cells always describe the same week.
  * @updated 2026-07-21: Applied the shared calendar number typography to the two-column week view.
+ * @updated 2026-09-12: Added explicit min-size constraints to the bento schedule shell so Android WebView flex scrolling does not clip day-cell content at viewport edges.
  * @updated 2026-06-13: 调整显示设置弹窗中已选择选项的视觉效果，移除背景加深，改为下划线指示器。
  * @updated 2026-06-13: 调整显示设置弹窗中已选择选项的背景和文字对比度，将 bg-stone-100 更改为更明显的 bg-stone-200，并加深文字颜色。
  * @updated 2026-06-06: Reused the shared schedule primary-kind priority for bento marker colors so overlapping badges now follow the same Done > Due > Arrange > Repeat > Maybe > Trace precedence as month view.
@@ -655,8 +656,8 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
   }, [selectedWeekId, onGoToNextWeek, onGoToPreviousWeek]);
 
   return (
-    <div className="flex min-h-0 flex-1 w-full">
-      <div className="relative flex min-h-0 flex-1 overflow-hidden bg-transparent">
+    <div className="flex min-h-0 min-w-0 flex-1 w-full">
+      <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-transparent">
         <div className={`flex min-h-0 flex-1 flex-col ${isDisplaySettingsOpen ? 'pointer-events-none blur-[6px] opacity-90' : ''}`}>
           <div className="shrink-0 border-b border-stone-300/70">
             <div className="flex h-14 items-center justify-between gap-3 px-3 md:px-5">
@@ -727,7 +728,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
             </div>
           </div>
 
-          <div className={`min-h-0 flex-1 ${displayMode === 'all' ? 'overflow-y-auto no-scrollbar' : 'overflow-hidden'}`}>
+          <div className={`min-h-0 min-w-0 flex-1 touch-pan-y overscroll-contain ${displayMode === 'all' ? 'overflow-y-auto no-scrollbar' : 'overflow-hidden'}`}>
             <div
               ref={weekSwipeSurfaceRef}
               key={selectedWeekId}

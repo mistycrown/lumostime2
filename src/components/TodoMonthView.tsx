@@ -14,6 +14,7 @@
  * @updated 2026-07-21: Unified dark-mode month headers and corrected schedule-entry text contrast.
  * @updated 2026-09-02: Rendered lunar labels as fixed two-line vertical text beside each month-view date number.
  * @updated 2026-09-09: Added mutually exclusive hidden/display filter modes with local month-view display presets and CRUD controls.
+ * @updated 2026-09-12: Added explicit min-size constraints and contained touch scrolling to prevent Android WebView viewport-edge clipping.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -1320,8 +1321,8 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className={`flex min-h-0 flex-1 flex-col ${isDensityMenuOpen ? 'pointer-events-none blur-[6px] opacity-90' : ''}`}>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${isDensityMenuOpen ? 'pointer-events-none blur-[6px] opacity-90' : ''}`}>
         <div
           ref={headerRef}
           className={`month-view-header shrink-0 bg-[rgba(250,249,246,0.34)] ${useReducedEffects ? '' : ''}`}
@@ -1423,7 +1424,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
 
         <div
           ref={scrollRef}
-          className={`min-h-0 flex-1 overflow-y-auto bg-transparent pb-[10vh] no-scrollbar ${MONTH_VIEW_CALENDAR_SIDE_INSET_CLASS_NAME}`}
+          className={`min-h-0 min-w-0 flex-1 touch-pan-y overscroll-contain overflow-y-auto bg-transparent pb-[10vh] no-scrollbar ${MONTH_VIEW_CALENDAR_SIDE_INSET_CLASS_NAME}`}
           style={{ scrollBehavior: 'smooth' }}
           onScroll={handleMonthScroll}
           onDragOver={handleMonthContainerDragOver}
