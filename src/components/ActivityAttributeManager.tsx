@@ -211,13 +211,18 @@ export const ActivityAttributeManager: React.FC<ActivityAttributeManagerProps> =
 
             {conditionParents.length > 0 && <div className="mt-3 space-y-2 border-l border-stone-100 pl-3">
               <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-stone-400">
-                <span className="mr-1">{'\u663e\u793a\u6761\u4ef6'}</span>
-                <button type="button" onClick={() => setConditionParent(attribute)} className={`rounded px-1.5 py-0.5 ${!attribute.displayCondition ? 'bg-stone-100 text-stone-700' : 'hover:bg-stone-50'}`}>{'\u59cb\u7ec8\u663e\u793a'}</button>
+                <button
+                  type="button"
+                  onClick={() => setConditionParent(attribute)}
+                  aria-pressed={!attribute.displayCondition}
+                  className={`rounded px-1.5 py-0.5 ${!attribute.displayCondition ? 'bg-stone-100 text-stone-700' : 'hover:bg-stone-50'}`}
+                >{'\u59cb\u7ec8\u663e\u793a'}</button>
                 <button
                   type="button"
                   onClick={() => {
                     if (!attribute.displayCondition) setConditionParent(attribute, conditionParents[0].id);
                   }}
+                  aria-pressed={Boolean(attribute.displayCondition)}
                   className={`rounded px-1.5 py-0.5 ${attribute.displayCondition ? 'bg-stone-100 text-stone-700' : 'hover:bg-stone-50'}`}
                 >{'\u6761\u4ef6\u663e\u793a'}</button>
               </div>
