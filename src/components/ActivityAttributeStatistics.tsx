@@ -70,23 +70,33 @@ const isTextTerm = (part: string) => {
   return /^[\u4e00-\u9fffA-Za-z0-9]+$/.test(part);
 };
 
+const getFallbackTextTerms = (text: string): string[] => text
+  .split(/[，。！？，、；：,.!?;:\s]+/)
+  .flatMap((part) => part.length <= 8 ? [part] : part.match(/[\u4e00-\u9fffA-Za-z0-9]{1,4}/g) || [])
+  .map((part) => part.toLowerCase())
+  .filter(isTextTerm);
+
 export const getTextTerms = (value: string): string[] => {
   const text = value.trim().replace(/[\r\n]+/g, ' ');
   if (!text) return [];
 
+  // Explicit separators are user-provided word boundaries. Android WebView and
+  // desktop Chromium can use different ICU dictionaries, so running Segmenter
+  // over an already separated value can turn "测试 一下" into single characters.
+  if (/[，。！？，、；：,.!?;:\s]/.test(text)) return getFallbackTextTerms(text);
+
   const Segmenter = (Intl as typeof Intl & { Segmenter?: new (locale?: string, options?: { granularity: 'word' }) => { segment: (input: string) => Iterable<{ segment: string; isWordLike?: boolean }> } }).Segmenter;
   if (Segmenter) {
     const segmenter = new Segmenter('zh', { granularity: 'word' });
-    return Array.from(segmenter.segment(text))
+    const terms = Array.from(segmenter.segment(text))
       .map((part) => part.segment.trim().toLowerCase())
       .filter(isTextTerm);
+    // Some Android WebView versions expose Segmenter but return every Chinese
+    // character as a separate term. Keep the deterministic fallback in that case.
+    if (terms.some((term) => term.length > 1 && /[\u4e00-\u9fff]/.test(term))) return terms;
   }
 
-  return text
-    .split(/[，。！？，、；：,.!?;:\s]+/)
-    .flatMap((part) => part.length <= 8 ? [part] : part.match(/[\u4e00-\u9fffA-Za-z0-9]{1,4}/g) || [])
-    .map((part) => part.toLowerCase())
-    .filter(isTextTerm);
+  return getFallbackTextTerms(text);
 };
 
 interface ActivityAttributeStatisticsProps {
