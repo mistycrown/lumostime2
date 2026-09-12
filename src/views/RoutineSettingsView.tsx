@@ -16,6 +16,7 @@
  * @updated 2026-08-27: Keeps Routine checklist completion markers neutral gray across themes.
  * @updated 2026-09-02: Requires confirmation before deleting a Routine from the editor.
  * @updated 2026-09-12: Validates that every Routine step has a bound Activity before saving.
+ * @updated 2026-09-12: Slightly reduces checklist editor checkbox size.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronRight, Plus, Trash2, X } from 'lucide-react';
@@ -96,9 +97,9 @@ const ChecklistEditor: React.FC<ChecklistEditorProps> = ({ markdown, onChange })
               }}
               aria-pressed={entry.completed}
               aria-label={`Checklist ${index + 1} 完成状态`}
-              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all focus:outline-none focus:ring-2 focus:ring-stone-200 ${entry.completed ? 'border-stone-400 bg-stone-400 text-white shadow-sm' : 'border-stone-300 bg-white text-transparent hover:border-stone-400'}`}
+              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-md border-2 transition-all focus:outline-none focus:ring-2 focus:ring-stone-200 ${entry.completed ? 'border-stone-400 bg-stone-400 text-white shadow-sm' : 'border-stone-300 bg-white text-transparent hover:border-stone-400'}`}
             >
-              <Check size={13} strokeWidth={3} />
+              <Check size={11} strokeWidth={3} />
             </button>
             <input
               value={draftTexts[index] ?? entry.text}

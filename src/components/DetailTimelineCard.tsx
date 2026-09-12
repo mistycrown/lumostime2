@@ -15,6 +15,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-08-09: Planned timeline blocks are excluded from detail-page statistics while remaining visible in timelines.
  * @updated 2026-08-09: Month-view groups now use only countable dates from the selected month, removing cross-month and planned-only headings.
+ * @updated 2026-09-12: Renders Routine checklist notes as visual checklist rows in detail timelines.
  */
 import React, { useMemo } from 'react';
 import { ActivityAttributeDefinition, Log, Category } from '../types';
@@ -26,7 +27,9 @@ import { usePrivacy } from '../contexts/PrivacyContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { TimelineStyleRail } from './TimelineStyleRail';
 import { ActivityAttributeSummary } from './ActivityAttributeSummary';
+import { RoutineChecklistPreview } from './RoutineChecklistPreview';
 import { filterCountableLogs } from '../utils/statLogUtils';
+import { isRoutineChecklistMarkdown } from '../utils/routineChecklist';
 import {
     buildDetailTimelineGroupedData,
     DetailTimelineViewMode,
@@ -1285,9 +1288,16 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                         </div>
                                                     </div>
                                                     {log.note && (
-                                                        <p className={`text-sm text-stone-500 font-light leading-relaxed mb-2 whitespace-pre-wrap ${isPrivacyMode ? 'blur-sm select-none' : ''}`}>
-                                                            {log.note}
-                                                        </p>
+                                                        isRoutineChecklistMarkdown(log.note) ? (
+                                                            <RoutineChecklistPreview
+                                                                markdown={log.note}
+                                                                className={`mb-2 text-stone-500 ${isPrivacyMode ? 'blur-sm select-none' : ''}`}
+                                                            />
+                                                        ) : (
+                                                            <p className={`text-sm text-stone-500 font-light leading-relaxed mb-2 whitespace-pre-wrap ${isPrivacyMode ? 'blur-sm select-none' : ''}`}>
+                                                                {log.note}
+                                                            </p>
+                                                        )
                                                     )}
 
                                                     <ActivityAttributeSummary
