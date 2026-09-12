@@ -1162,9 +1162,6 @@ const OperationSection: React.FC<OperationSectionProps> = ({
                             categoryId
                         })}
                     />
-                    <p className="text-xs text-stone-500 mt-3">
-                        会把每条选中记录备注中的所有“原文本”替换成这里的新文本。
-                    </p>
                 </div>
             )}
 
