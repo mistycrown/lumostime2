@@ -4,6 +4,7 @@
  * @output Attribute create, rename, move, delete, archive, restore, keyword-source, and option management.
  * @pos Activity detail settings component
  * @description Uses compact custom controls that match the existing record-association UI.
+ * @updated 2026-09-12: Clears the display-condition field completely when an attribute is set to always show.
  * @updated 2026-09-03: Added a single-per-Activity choice attribute keyword-source setting.
  * @updated 2026-08-31: Added numeric units and one-level single-choice display-condition configuration.
  * @updated 2026-08-25: Replaced drag-and-drop and native select controls with attribute move buttons, custom type menu, and destructive delete confirmation; option order follows usage.
@@ -88,9 +89,19 @@ export const ActivityAttributeManager: React.FC<ActivityAttributeManagerProps> =
   ));
 
   const setConditionParent = (attribute: ActivityAttributeDefinition, parentId?: string) => {
-    updateAttribute(attribute.id, {
-      displayCondition: parentId ? { attributeId: parentId, optionIds: [] } : undefined
-    });
+    if (parentId) {
+      updateAttribute(attribute.id, {
+        displayCondition: { attributeId: parentId, optionIds: [] }
+      });
+      return;
+    }
+
+    const now = Date.now();
+    save(sortedAttributes.map((current) => {
+      if (current.id !== attribute.id) return current;
+      const { displayCondition: _displayCondition, ...withoutCondition } = current;
+      return { ...withoutCondition, updatedAt: now };
+    }));
   };
 
   const toggleConditionOption = (attribute: ActivityAttributeDefinition, optionId: string) => {
@@ -199,17 +210,29 @@ export const ActivityAttributeManager: React.FC<ActivityAttributeManagerProps> =
             </div>}
 
             {conditionParents.length > 0 && <div className="mt-3 space-y-2 border-l border-stone-100 pl-3">
-              <div className="flex items-center gap-2 text-[11px] text-stone-400"><span>{'\u663e\u793a\u6761\u4ef6'}</span><button type="button" onClick={() => setConditionParent(attribute)} className={`rounded px-1.5 py-0.5 ${!attribute.displayCondition ? 'bg-stone-100 text-stone-700' : 'hover:bg-stone-50'}`}>{'\u59cb\u7ec8\u663e\u793a'}</button></div>
-              <div className="flex flex-wrap gap-1.5">
-                {conditionParents.map((parent) => <button key={parent.id} type="button" onClick={() => setConditionParent(attribute, parent.id)} className={`rounded border px-2 py-1 text-[11px] ${conditionParent?.id === parent.id ? 'border-stone-500 bg-stone-100 text-stone-700' : 'border-stone-200 text-stone-400 hover:border-stone-400'}`}>{parent.name}</button>)}
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-stone-400">
+                <span className="mr-1">{'\u663e\u793a\u6761\u4ef6'}</span>
+                <button type="button" onClick={() => setConditionParent(attribute)} className={`rounded px-1.5 py-0.5 ${!attribute.displayCondition ? 'bg-stone-100 text-stone-700' : 'hover:bg-stone-50'}`}>{'\u59cb\u7ec8\u663e\u793a'}</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!attribute.displayCondition) setConditionParent(attribute, conditionParents[0].id);
+                  }}
+                  className={`rounded px-1.5 py-0.5 ${attribute.displayCondition ? 'bg-stone-100 text-stone-700' : 'hover:bg-stone-50'}`}
+                >{'\u6761\u4ef6\u663e\u793a'}</button>
               </div>
-              {conditionParent && <div className="flex flex-wrap gap-1.5 pt-0.5">
-                {(conditionParent.options || []).filter((option) => !option.isArchived).map((option) => {
-                  const selected = attribute.displayCondition?.optionIds.includes(option.id);
-                  return <button key={option.id} type="button" onClick={() => toggleConditionOption(attribute, option.id)} aria-pressed={selected} className={`rounded border px-2 py-1 text-[11px] ${selected ? 'border-stone-700 bg-stone-800 text-white' : 'border-stone-200 text-stone-400 hover:border-stone-400'}`}>{option.label}</button>;
-                })}
-              </div>}
-              {conditionParent && attribute.displayCondition?.optionIds.length === 0 && <p className="text-[10px] text-amber-600">{'\u8bf7\u9009\u62e9\u81f3\u5c11\u4e00\u4e2a\u9009\u9879\u3002'}</p>}
+              {attribute.displayCondition && <>
+                <div className="flex flex-wrap gap-1.5">
+                  {conditionParents.map((parent) => <button key={parent.id} type="button" onClick={() => setConditionParent(attribute, parent.id)} className={`rounded border px-2 py-1 text-[11px] ${conditionParent?.id === parent.id ? 'border-stone-500 bg-stone-100 text-stone-700' : 'border-stone-200 text-stone-400 hover:border-stone-400'}`}>{parent.name}</button>)}
+                </div>
+                {conditionParent && <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {(conditionParent.options || []).filter((option) => !option.isArchived).map((option) => {
+                    const selected = attribute.displayCondition?.optionIds.includes(option.id);
+                    return <button key={option.id} type="button" onClick={() => toggleConditionOption(attribute, option.id)} aria-pressed={selected} className={`rounded border px-2 py-1 text-[11px] ${selected ? 'border-stone-700 bg-stone-800 text-white' : 'border-stone-200 text-stone-400 hover:border-stone-400'}`}>{option.label}</button>;
+                  })}
+                </div>}
+                {conditionParent && attribute.displayCondition.optionIds.length === 0 && <p className="text-[10px] text-amber-600">{'\u8bf7\u9009\u62e9\u81f3\u5c11\u4e00\u4e2a\u9009\u9879\u3002'}</p>}
+              </>}
             </div>}
 
             {(attribute.type === 'single' || attribute.type === 'multi') && <div className="ml-2 mt-3 space-y-2">
