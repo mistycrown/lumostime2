@@ -19,6 +19,7 @@
  * @updated 2026-08-26: Uses icon-only controls for Routine step advance and completion actions.
  * @updated 2026-08-27: Uses neutral gray completion markers for Routine checklists.
  * @updated 2026-09-12: Falls back to activity ID lookup for Routine steps with stale category IDs.
+ * @updated 2026-09-12: Slightly reduces Routine checklist checkbox size for the active card.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -294,8 +295,8 @@ export const RecordView: React.FC<RecordViewProps> = ({
                     onClick={() => onToggleRoutineChecklist?.(index)}
                     className="flex w-full items-center gap-2 rounded-lg px-1 py-1 text-left text-sm text-stone-600 hover:bg-stone-50"
                   >
-                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all ${item.completed ? 'border-stone-400 bg-stone-400 text-white shadow-sm' : 'border-stone-300 bg-white text-transparent'}`}>
-                      <Check size={13} strokeWidth={3} />
+                    <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-md border-2 transition-all ${item.completed ? 'border-stone-400 bg-stone-400 text-white shadow-sm' : 'border-stone-300 bg-white text-transparent'}`}>
+                      <Check size={11} strokeWidth={3} />
                     </span>
                     <span className={item.completed ? 'text-stone-400 line-through' : ''}>{item.text}</span>
                   </button>

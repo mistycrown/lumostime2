@@ -4,6 +4,7 @@
  * @output Memoir/timeline entry cards with text, media, reactions, and comments
  * @description Renders a single timeline entry, including media grids that keep image containers and images aligned across different image counts, plus shared metadata chips such as todo, collection, tag, and domain badges.
  * @updated 2026-07-22: Added Memoir-specific text hooks so entry titles and body content remain readable in dark mode.
+ * @updated 2026-09-12: Renders Routine Markdown checklists as visual rows in Memoir entries.
  */
 import React, { useState, useEffect } from 'react';
 import { DiaryEntry } from '../views/journalTypes';
@@ -15,6 +16,8 @@ import { IconRenderer } from './IconRenderer';
 import { CollapsibleText } from './CollapsibleText';
 import { useSettings } from '../contexts/SettingsContext';
 import { TimelineStyleRail } from './TimelineStyleRail';
+import { isRoutineChecklistMarkdown } from '../utils/routineChecklist';
+import { RoutineChecklistPreview } from './RoutineChecklistPreview';
 
 import { ReactionPicker, ReactionList } from './ReactionComponents';
 
@@ -173,6 +176,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
 
     const type = entry.type || 'normal';
     const isSummary = type !== 'normal';
+    const hasChecklist = !isSummary && isRoutineChecklistMarkdown(entry.content);
     const activeTimelineConfig = timelineStyleConfigs[timelineStyleTheme];
     const memoirMaxTimelineWidth = 3;
 
@@ -347,11 +351,18 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                 })()}
 
                 {/* Body Text */}
-                <CollapsibleText
-                    text={entry.content}
-                    threshold={collapseThreshold}
-                    className={`memoir-entry-body text-sm text-stone-500 leading-relaxed font-light ${isSummary ? 'mt-2' : 'mb-1'} ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
-                />
+                {hasChecklist ? (
+                    <RoutineChecklistPreview
+                        markdown={entry.content}
+                        className={`memoir-entry-body mb-1 text-stone-500 ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
+                    />
+                ) : (
+                    <CollapsibleText
+                        text={entry.content}
+                        threshold={collapseThreshold}
+                        className={`memoir-entry-body text-sm text-stone-500 leading-relaxed font-light ${isSummary ? 'mt-2' : 'mb-1'} ${isPrivacyMode ? 'blur-sm select-none transition-all duration-500' : 'transition-all duration-500'}`}
+                    />
+                )}
 
                 {/* Metadata Chips: @ (Todo), # (Tags), % (Domain) - HIDDEN FOR SUMMARIES */}
                 {!isSummary && hasMetadata && (
