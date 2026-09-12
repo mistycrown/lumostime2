@@ -452,6 +452,23 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories, 
     );
   };
 
+  const getStartRecordOptionDisplayLabel = (option: AppAwarenessActivityOption): string => {
+    const todo = option.linkedTodoId ? todos.find((item) => item.id === option.linkedTodoId) : undefined;
+    const categoryId = todo?.linkedCategoryId || option.categoryId;
+    const activityId = todo?.linkedActivityId || option.activityId;
+    const activity = categories.find((category) => category.id === categoryId)?.activities.find((item) => item.id === activityId);
+    const scopeIds = todo?.defaultScopeIds || option.scopeIds || [];
+    const selectedScopes = scopeIds
+      .map((id) => scopes.find((scope) => scope.id === id))
+      .filter((scope): scope is Scope => Boolean(scope));
+
+    return [
+      activity?.name || option.label,
+      todo ? `@${todo.title}` : '',
+      ...selectedScopes.map((scope) => `%${scope.name}`)
+    ].filter(Boolean).join(' ');
+  };
+
   const handleDuplicateTemplate = (template: AppAwarenessWorkflowTemplate) => {
     const createdAt = Date.now();
     const duplicate: AppAwarenessWorkflowTemplate = {
@@ -523,7 +540,14 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories, 
       steps: template.steps.map((item) => item.id === stepId && item.type === 'start_record'
         ? {
             ...item,
-            activityOptions: item.activityOptions.map((option) => option.id === optionId ? { ...option, ...patch } : option)
+            activityOptions: item.activityOptions.map((option) => {
+              if (option.id !== optionId) {
+                return option;
+              }
+
+              const nextOption = { ...option, ...patch };
+              return { ...nextOption, displayLabel: getStartRecordOptionDisplayLabel(nextOption) };
+            })
           }
         : item),
       updatedAt: Date.now()
@@ -1108,11 +1132,7 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories, 
                           {step.activityOptions.map((option) => {
                             const context = getStartRecordOptionContext(option);
                             const isExpanded = expandedActivityOptionId === option.id;
-                            const summary = [
-                              context.activity ? `#${context.activity.name}` : '',
-                              context.todo ? `@${context.todo.title}` : '',
-                              ...context.selectedScopes.map((scope) => `%${scope.name}`)
-                            ].filter(Boolean).join('  ');
+                            const summary = getStartRecordOptionDisplayLabel(option) || option.displayLabel || '';
                             return (
                               <div key={option.id} className="rounded-xl border border-stone-200 bg-[#fdfbf7] p-2">
                                 <div className="flex items-center gap-2">

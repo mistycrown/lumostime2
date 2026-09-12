@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-09-12: Added optional complete display expressions for app-awareness activity options.
  * @updated 2026-09-03: Added an optional keyword-source marker to Activity choice attributes.
  * @updated 2026-08-31: Added optional units and single-choice display conditions to Activity attributes.
  * @updated 2026-08-26: Added optional static notes to Routine steps.
@@ -304,6 +305,7 @@ export interface AppAwarenessActivityOption {
   categoryId: string;
   activityId: string;
   label: string;
+  displayLabel?: string;
   icon?: string;
   linkedTodoId?: string;
   scopeIds?: string[];

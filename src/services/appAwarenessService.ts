@@ -4,6 +4,7 @@
  * @output Normalized workflow templates, app bindings, and active run helpers
  * @pos Service
  * @description Centralizes persistence and normalization for the Android-only app-awareness feature so settings views and runtime hooks share one consistent data model.
+ * @updated 2026-09-12: Preserved optional complete activity-option display expressions during normalization.
  * @updated 2026-07-06: Added non-empty option fallbacks for app-awareness duration and extension steps to prevent dead-end overlay payloads from persisted data.
  * @updated 2026-06-21: Renamed the preset workflow, removed the default text-length cap, and refreshed normalization copy for the latest app-awareness node model.
  * @updated 2026-09-08: Preserve editable start-record associations while normalizing workflow drafts.
@@ -61,6 +62,7 @@ const normalizeActivityOption = (value: unknown): AppAwarenessActivityOption | n
     categoryId: typeof option.categoryId === 'string' ? option.categoryId : '',
     activityId: typeof option.activityId === 'string' ? option.activityId : '',
     label: typeof option.label === 'string' ? option.label : '',
+    displayLabel: typeof option.displayLabel === 'string' ? option.displayLabel : undefined,
     icon: typeof option.icon === 'string' ? option.icon : undefined,
     linkedTodoId: typeof option.linkedTodoId === 'string' ? option.linkedTodoId : undefined,
     scopeIds: scopeIds && scopeIds.length > 0 ? scopeIds : undefined

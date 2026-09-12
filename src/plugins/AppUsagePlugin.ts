@@ -4,6 +4,7 @@
  * @output Native Methods
  * @pos Plugin
  * @description Defines the interface for the AppUsage capacitor plugin, used for tracking foreground apps, managing app association rules, and controlling per-app ignore state on Android.
+ * @updated 2026-09-12: Added complete activity-option display labels to native app-awareness payloads.
  * @updated 2026-08-24: Added explicit workflow cancellation so the Android detector can clear its foreground-app deduplication cache.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -50,6 +51,7 @@ export interface PendingAppAwarenessNativeStartPayload {
         categoryId?: string;
         activityId?: string;
         label?: string;
+        displayLabel?: string;
         icon?: string;
         linkedTodoId?: string;
         scopeIds?: string[];
