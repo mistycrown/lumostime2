@@ -247,8 +247,8 @@ export const ActivityAttributeManager: React.FC<ActivityAttributeManagerProps> =
                 <span>{'\u5c5e\u6027\u4f5c\u4e3a\u5173\u952e\u5b57'}</span>
                 <FeatureHint
                   hintId="activity-attribute-keyword-source"
-                  message="开启后，该属性的选项会参与关键词匹配，帮助系统在记录和关联时识别对应内容。"
-                  iconSize={14}
+                  message={'开启后，该属性的选项将会作为关键字生效：\n\n1. 添加记录时，系统通过备注中输入的关键字，会自动提示关联到该活动标签\n2. 查看标签详情时间线日历时，属性选项会作为关键字在日历中显示颜色'}
+                  iconSize={12}
                   className="ml-0.5"
                 />
               </label>
