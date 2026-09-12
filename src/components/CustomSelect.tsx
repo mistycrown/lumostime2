@@ -1,5 +1,6 @@
 /**
  * @file CustomSelect.tsx
+ * @updated 2026-09-12: Renders portal dropdowns only after measuring their position and removes slide-in motion.
  * @updated 2026-07-21: Added semantic hooks for high-contrast dark-mode select states.
  * @updated 2026-09-09: Added optional portal rendering for dropdowns inside clipped overlays.
  * @description 自定义下拉选择组件 - 与应用主题风格一致
@@ -40,7 +41,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [shouldOpenUpward, setShouldOpenUpward] = useState(false);
-  const [portalPosition, setPortalPosition] = useState({ top: 0, left: 0, width: 0, maxHeight: 240 });
+  const [portalPosition, setPortalPosition] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -48,6 +49,11 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
 
   // 检测下拉框应该向上还是向下展开
   useEffect(() => {
+    if (!isOpen) {
+      setPortalPosition(null);
+      return;
+    }
+
     if (isOpen && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       const viewportHeight = window.innerHeight;
@@ -169,24 +175,26 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
       </button>
 
       {isOpen && !disabled && (() => {
+        if (renderDropdownInPortal && !portalPosition) {
+          return null;
+        }
+
         const dropdown = (
           <div
             ref={dropdownRef}
-            className={`${renderDropdownInPortal ? 'fixed' : 'absolute'} z-[240] w-full overflow-hidden rounded-xl border border-stone-200 bg-white shadow-lg animate-in fade-in duration-200 ${
+            className={`${renderDropdownInPortal ? 'fixed' : 'absolute'} z-[240] w-full overflow-hidden rounded-xl border border-stone-200 bg-white shadow-lg ${
               renderDropdownInPortal
                 ? ''
-                : shouldOpenUpward
-                  ? 'bottom-full mb-1 slide-in-from-bottom-2'
-                  : 'top-full mt-1 slide-in-from-top-2'
+                : shouldOpenUpward ? 'bottom-full mb-1' : 'top-full mt-1'
             }`}
             style={renderDropdownInPortal ? {
-              top: portalPosition.top,
-              left: portalPosition.left,
-              width: portalPosition.width,
-              maxHeight: portalPosition.maxHeight
+              top: portalPosition!.top,
+              left: portalPosition!.left,
+              width: portalPosition!.width,
+              maxHeight: portalPosition!.maxHeight
             } : undefined}
           >
-            <div className="max-h-60 overflow-y-auto" style={renderDropdownInPortal ? { maxHeight: portalPosition.maxHeight } : undefined}>
+            <div className="max-h-60 overflow-y-auto" style={renderDropdownInPortal ? { maxHeight: portalPosition!.maxHeight } : undefined}>
               {options.map((option) => (
                 <button
                   key={option.value}
