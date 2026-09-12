@@ -5,6 +5,7 @@
  * @pos View (Active Focus Overlay)
  * @description The main interface displayed during an active focus session. Shows the timer, allows associating the session with a Todo or Scope, editing the note, completing the session, and applying inline note templates.
  * @updated 2026-09-03: Passes focus notes to shared attributes for automatic choice-option matching.
+ * @updated 2026-09-12: Uses keyword-source Activity attribute options for note-based activity suggestions.
  * @updated 2026-08-24: Added inline Activity custom attribute fields persisted on active focus sessions.
  * @updated 2026-05-13: Kept the focus detail overlay on the shared topmost `z-[100]` layer so collection-launched detail flows still cover the underlying settings stack cleanly.
  * @updated 2026-05-11: Added a one-shot completion-mode toggle beside the associated todo picker so finishing a focus session can also complete the linked unfinished task after the log is saved.
@@ -31,6 +32,7 @@ import { appendTemplateToNote, getRecommendedNoteTemplates, RecommendedNoteTempl
 import { getTodoProgressSnapshot, shouldTodoUseManualProgressInput } from '../utils/todoProgressUtils';
 import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
 import { filterAttributeValuesForActivity } from '../utils/activityAttributeUtils';
+import { getActivityKeywordCandidates } from '../utils/detailTimelineKeywordUtils';
 import {
     getCompletionModeTodoId,
     isTodoEligibleForCompletionMode,
@@ -164,7 +166,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
             for (const cat of categories) {
                 for (const act of cat.activities) {
                     if (act.id === session.activityId) continue;
-                    for (const kw of (act.keywords || [])) {
+                    for (const kw of getActivityKeywordCandidates(act)) {
                         if (note.includes(kw)) {
                             newSuggestions.activity = {
                                 id: act.id, categoryId: cat.id, name: act.name, icon: act.icon, uiIcon: act.uiIcon, reason: '关键词匹配', matchedKeyword: kw

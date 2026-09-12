@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { ActivityAttributeDefinition, Log } from '../types';
-import { getDetailTimelineKeywords, getLogMatchedDetailTimelineKeywords } from './detailTimelineKeywordUtils';
+import { getActivityKeywordCandidates, getDetailTimelineKeywords, getLogMatchedDetailTimelineKeywords } from './detailTimelineKeywordUtils';
 
 const keywordAttribute: ActivityAttributeDefinition = {
   id: 'content',
@@ -37,6 +37,13 @@ const makeLog = (options: Partial<Log> = {}): Log => ({
 });
 
 describe('detailTimelineKeywordUtils', () => {
+  it('registers every active option from the keyword-source attribute', () => {
+    expect(getActivityKeywordCandidates({
+      keywords: ['运动'],
+      attributes: [keywordAttribute]
+    })).toEqual(['运动', '跑步', '跳绳', '爬山']);
+  });
+
   it('combines configured and attribute keywords while removing duplicate labels', () => {
     expect(getDetailTimelineKeywords(['运动', '跑步'], keywordAttribute)).toEqual([
       '运动', '跑步', '跳绳', '爬山'

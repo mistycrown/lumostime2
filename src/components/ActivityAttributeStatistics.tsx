@@ -5,6 +5,7 @@
  * @pos Activity detail analytics component
  * @description Presents attribute data as a compact editorial report: text terms, choice rankings, numeric KPIs, and trends.
  * @updated 2026-09-02: Adds count/duration dimensions for single- and multi-choice attributes while keeping text and number statistics unchanged.
+ * @updated 2026-09-12: Keeps short Chinese and English text terms in the ranked text statistics instead of showing an empty state.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
@@ -62,8 +63,14 @@ const getRangeStart = (range: RangeKey, now: Date) => {
 };
 
 const TEXT_STOPWORDS = new Set(['的', '了', '和', '是', '在', '有', '我', '也', '就', '都', '很', '还', '与', '及', '或', '一个', '一些']);
+const MAX_TEXT_TERMS = 50;
 
-const getTextTerms = (value: string) => {
+const isTextTerm = (part: string) => {
+  if (!part || TEXT_STOPWORDS.has(part)) return false;
+  return /^[\u4e00-\u9fffA-Za-z0-9]+$/.test(part);
+};
+
+export const getTextTerms = (value: string): string[] => {
   const text = value.trim().replace(/[\r\n]+/g, ' ');
   if (!text) return [];
 
@@ -72,14 +79,14 @@ const getTextTerms = (value: string) => {
     const segmenter = new Segmenter('zh', { granularity: 'word' });
     return Array.from(segmenter.segment(text))
       .map((part) => part.segment.trim().toLowerCase())
-      .filter((part) => part.length >= 2 && !TEXT_STOPWORDS.has(part) && /[\u4e00-\u9fffA-Za-z0-9]/.test(part));
+      .filter(isTextTerm);
   }
 
   return text
     .split(/[，。！？，、；：,.!?;:\s]+/)
-    .flatMap((part) => part.length <= 8 ? [part] : part.match(/[\u4e00-\u9fffA-Za-z0-9]{2,4}/g) || [])
+    .flatMap((part) => part.length <= 8 ? [part] : part.match(/[\u4e00-\u9fffA-Za-z0-9]{1,4}/g) || [])
     .map((part) => part.toLowerCase())
-    .filter((part) => part.length >= 2 && !TEXT_STOPWORDS.has(part));
+    .filter(isTextTerm);
 };
 
 interface ActivityAttributeStatisticsProps {
@@ -231,7 +238,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
               values.forEach((value) => {
                 if ('value' in value && typeof value.value === 'string') getTextTerms(value.value).forEach((term) => termCounts.set(term, (termCounts.get(term) || 0) + 1));
               });
-              const terms = [...termCounts.entries()].sort((left, right) => right[1] - left[1]).slice(0, 24);
+              const terms = [...termCounts.entries()].sort((left, right) => right[1] - left[1]).slice(0, MAX_TEXT_TERMS);
               const maxCount = terms[0]?.[1] || 1;
               return (
                 <AttributeSection key={attribute.id} title={attribute.name} typeLabel="TEXT / 文本" count={`${values.length} 条已填写`}>

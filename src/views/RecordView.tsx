@@ -18,6 +18,7 @@
  * @updated 2026-08-26: Rendered Routine icons through the shared emoji/UI icon renderer.
  * @updated 2026-08-26: Uses icon-only controls for Routine step advance and completion actions.
  * @updated 2026-08-27: Uses neutral gray completion markers for Routine checklists.
+ * @updated 2026-09-12: Falls back to activity ID lookup for Routine steps with stale category IDs.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -103,8 +104,9 @@ export const RecordView: React.FC<RecordViewProps> = ({
   const activeStepTodo = activeStep?.linkedTodoId ? todos.find(todo => todo.id === activeStep.linkedTodoId) : undefined;
   const activeStepCategoryId = activeStepTodo?.linkedCategoryId || activeStep?.categoryId;
   const activeStepActivityId = activeStepTodo?.linkedActivityId || activeStep?.activityId;
-  const activeStepActivity = activeStep && activeStepCategoryId && activeStepActivityId
+  const activeStepActivity = activeStep && activeStepActivityId
     ? categories.find(category => category.id === activeStepCategoryId)?.activities.find(activity => activity.id === activeStepActivityId)
+      || categories.reduce<Activity | undefined>((match, category) => match || category.activities.find(activity => activity.id === activeStepActivityId), undefined)
     : undefined;
   const activeStepScopeIds = activeStepTodo?.defaultScopeIds || activeStep?.scopeIds || [];
   const activeStepScopes = activeStepScopeIds

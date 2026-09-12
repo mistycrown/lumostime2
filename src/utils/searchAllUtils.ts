@@ -4,6 +4,7 @@
  * @output Reusable pure search-all result groups for UI search and assistant local-query flows
  * @pos Utils (Search)
  * @description Extracts the global search logic out of SearchView so manual search and assistant-triggered local retrieval use the same matching rules and result shaping.
+ * @updated 2026-09-12: Includes custom Activity text/number values and choice labels when searching records.
  * @updated 2026-07-04: Added shared search-all helpers for foreground assistant local queries and SearchView reuse.
  */
 
@@ -122,6 +123,29 @@ const getReviewMatch = (
   return undefined;
 };
 
+const getLogAttributeSearchText = (log: Log, activity: Category['activities'][number]): string => {
+  if (!log.attributeValues || !activity.attributes) return '';
+
+  const definitions = new Map(activity.attributes.map((attribute) => [attribute.id, attribute]));
+  return log.attributeValues.flatMap((attributeValue) => {
+    const definition = definitions.get(attributeValue.attributeId);
+    if (!definition) return [];
+
+    const labels: string[] = [];
+    if ('value' in attributeValue) {
+      labels.push(String(attributeValue.value));
+    } else {
+      const optionIds = 'optionId' in attributeValue
+        ? [attributeValue.optionId]
+        : attributeValue.optionIds;
+      labels.push(...optionIds.map((optionId) => (
+        definition.options?.find((option) => option.id === optionId)?.label || ''
+      )));
+    }
+    return labels.filter(Boolean);
+  }).join('\n');
+};
+
 export const runSearchAll = ({
   query,
   searchMode,
@@ -207,11 +231,13 @@ export const runSearchAll = ({
       const hasReactionMatch = log.reactions?.some((reaction) => (
         reaction.includes(lowerQuery) || lowerQuery.includes(reaction)
       ));
+      const attributeSearchText = getLogAttributeSearchText(log, activity).toLowerCase();
 
       if (
         log.title?.toLowerCase().includes(lowerQuery)
         || log.note?.toLowerCase().includes(lowerQuery)
         || activity.name.toLowerCase().includes(lowerQuery)
+        || attributeSearchText.includes(lowerQuery)
         || hasReactionMatch
       ) {
         results.records.push({

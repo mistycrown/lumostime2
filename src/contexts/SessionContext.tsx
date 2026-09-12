@@ -2,13 +2,14 @@
  * @file SessionContext.tsx
  * @description 绠＄悊娲诲姩璁℃椂浼氳瘽鐨勭姸鎬佸拰閫昏緫
  * @updated 2026-08-26: Invokes the completion callback for every stopped session so Routine transitions wait for the current step's save path.
+ * @updated 2026-09-12: Removes stopped sessions before Routine transition callbacks so repeated steps receive a live session ID.
  * @updated 2026-08-24: Preserves Activity custom attribute values when an active focus session becomes logs.
  * @updated 2026-06-21: Returns started session ids so app-awareness overlay workflows can keep overtime reminders and native prompts linked to the exact active session.
  * @updated 2026-05-14: Prevents duplicate active sessions for the same category/activity pair so repeated NFC/deep-link deliveries cannot leave one timer still running after the other is stopped.
  * @updated 2026-05-09: Syncs app-origin active sessions into the native notification plugin so Android can render timer labels in the persistent status notification.
  * @updated 2026-05-09: Removed direct floating-window mutations so the shared sync hook remains the single source of truth for Android focus-state reconciliation.
  */
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { ActiveSession, Activity, AppAwarenessSessionMeta, AutoLinkRule } from '../types';
 import { Capacitor } from '@capacitor/core';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
@@ -58,9 +59,11 @@ interface SessionProviderProps {
 
 export const SessionProvider: React.FC<SessionProviderProps> = ({ children, splitLogByDays }) => {
     const [activeSessions, setActiveSessions] = useState<ActiveSession[]>(() => loadPersistedActiveSessions());
+    const activeSessionsRef = useRef(activeSessions);
     const [focusDetailSessionId, setFocusDetailSessionId] = useState<string | null>(null);
 
     useEffect(() => {
+        activeSessionsRef.current = activeSessions;
         if (activeSessions.length === 0) {
             clearPersistedActiveSessions();
             return;
@@ -111,6 +114,14 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
             }
         }
 
+        const existingSameActivitySession = activeSessionsRef.current.find((session) =>
+            session.activityId === activity.id
+            && session.categoryId === categoryId
+        );
+        if (existingSameActivitySession) {
+            return existingSameActivitySession.id;
+        }
+
         const resolvedStartTime = appAwarenessMeta?.startedAt && Number.isFinite(appAwarenessMeta.startedAt)
             ? appAwarenessMeta.startedAt
             : Date.now();
@@ -130,14 +141,14 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
             appAwarenessMeta
         };
 
+        activeSessionsRef.current = [...activeSessionsRef.current, newSession];
         setActiveSessions((prev) => {
-            const existingSameActivitySession = prev.find((session) =>
+            const existingSession = prev.find((session) =>
                 session.activityId === activity.id
                 && session.categoryId === categoryId
             );
 
-            if (existingSameActivitySession) {
-                newSession.id = existingSameActivitySession.id;
+            if (existingSession) {
                 return prev;
             }
 
@@ -153,7 +164,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
         onSaveLog?: (logs: any[]) => void,
         onUpdateTodo?: (linkedTodoId: string, progressIncrement: number) => void
     ) => {
-        const session = activeSessions.find((item) => item.id === sessionId);
+        const session = activeSessionsRef.current.find((item) => item.id === sessionId);
         let logs: any[] = [];
         if (session) {
             const endTime = Date.now();
@@ -198,12 +209,20 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
 
             }
 
+            // Remove the old session before invoking Routine's transition callback.
+            // Otherwise a repeated activity can be deduplicated to this session ID,
+            // which is immediately removed after the callback and cannot be stopped.
+            activeSessionsRef.current = activeSessionsRef.current.filter((item) => item.id !== sessionId);
+            setActiveSessions((prev) => prev.filter((item) => item.id !== sessionId));
+
             if (onSaveLog) {
                 onSaveLog(logs);
             }
+        } else {
+            activeSessionsRef.current = activeSessionsRef.current.filter((item) => item.id !== sessionId);
+            setActiveSessions((prev) => prev.filter((item) => item.id !== sessionId));
         }
 
-        setActiveSessions((prev) => prev.filter((item) => item.id !== sessionId));
         if (focusDetailSessionId === sessionId) {
             setFocusDetailSessionId(null);
         }

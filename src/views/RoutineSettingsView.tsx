@@ -15,6 +15,7 @@
  * @updated 2026-08-26: Splits step association and ordering actions into responsive rows on narrow screens.
  * @updated 2026-08-27: Keeps Routine checklist completion markers neutral gray across themes.
  * @updated 2026-09-02: Requires confirmation before deleting a Routine from the editor.
+ * @updated 2026-09-12: Validates that every Routine step has a bound Activity before saving.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronRight, Plus, Trash2, X } from 'lucide-react';
@@ -181,6 +182,20 @@ export const RoutineSettingsView: React.FC<RoutineSettingsViewProps> = ({
   const [pendingDeleteRoutineId, setPendingDeleteRoutineId] = useState<string | null>(null);
   const editingRoutine = editingId ? routines.find(routine => routine.id === editingId) : undefined;
 
+  const hasBoundActivity = (step: RoutineStep): boolean => {
+    const linkedTodo = step.linkedTodoId ? todos.find(item => item.id === step.linkedTodoId) : undefined;
+    const activityId = linkedTodo?.linkedActivityId || step.activityId;
+    return Boolean(activityId && categories.some(category => category.activities.some(activity => activity.id === activityId)));
+  };
+
+  const validateRoutineBeforeLeave = (): boolean => {
+    if (!editingRoutine) return true;
+    const invalidStepIndex = editingRoutine.steps.findIndex(step => !hasBoundActivity(step));
+    if (invalidStepIndex < 0) return true;
+    onToast?.('error', `请为第 ${invalidStepIndex + 1} 个步骤绑定一个标签`);
+    return false;
+  };
+
   useEffect(() => {
     if (!editingId) return;
 
@@ -189,13 +204,16 @@ export const RoutineSettingsView: React.FC<RoutineSettingsViewProps> = ({
         setPendingDeleteRoutineId(null);
         return true;
       }
+      if (!validateRoutineBeforeLeave()) {
+        return true;
+      }
       setEditingId(null);
       setExpandedStepId(null);
       setExpandedPicker(null);
       setIsUIIconSelectorOpen(false);
       return true;
     });
-  }, [editingId, pendingDeleteRoutineId]);
+  }, [editingId, pendingDeleteRoutineId, editingRoutine, categories, todos, onToast]);
 
   const beginCreate = () => {
     const category = activeCategories[0];
@@ -294,6 +312,9 @@ export const RoutineSettingsView: React.FC<RoutineSettingsViewProps> = ({
     setExpandedPicker(null);
     setIsUIIconSelectorOpen(false);
     if (editingRoutine) {
+      if (!validateRoutineBeforeLeave()) {
+        return;
+      }
       setEditingId(null);
       return;
     }

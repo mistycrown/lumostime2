@@ -7,6 +7,7 @@ This directory contains the reusable React components for the application. They 
 - Update 2026-09-09: `CustomSelect.tsx` supports optional portal-rendered dropdowns with viewport-aware positioning for selectors inside clipped overlays; existing selectors retain their inline behavior.
 
 - Update 2026-09-09: `TodoMonthView.tsx` now supports mutually exclusive no-filter, hidden-filter, and display-filter modes. Display-filter presets can be created, edited, deleted, quickly selected, and persisted locally without affecting week/list views or global filters.
+- Update 2026-09-12: `TodoMonthView.tsx` places the month filter section above cell-height settings in the month-view settings popup while preserving existing filter and preset interactions.
 
 ## Core UI
 - Update 2026-08-26: `TimerFloating.tsx` now receives Routine-linked scopes and renders `%领域` alongside `@待办` in active timer previews.
