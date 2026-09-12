@@ -7,6 +7,10 @@ import { describe, expect, it } from 'vitest';
 import { getTextTerms } from './ActivityAttributeStatistics';
 
 describe('getTextTerms', () => {
+  it('preserves explicit whitespace boundaries across browser runtimes', () => {
+    expect(getTextTerms('测试 一下')).toEqual(['测试', '一下']);
+  });
+
   it('keeps segmented Chinese words and meaningful single-character values', () => {
     expect(getTextTerms('阅读 好')).toEqual(['阅读', '好']);
   });
