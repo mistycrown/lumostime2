@@ -20,6 +20,7 @@
  * @updated 2026-08-26: Allows review-overview shortcuts launched from Timeline to close back to the originating view.
  * @updated 2026-08-26: Added the Record settings group and Routine settings editor.
  * @updated 2026-09-12: Prevents stale full-data sync writes from overwriting Routine associations or appearance settings.
+ * @updated 2026-09-12: Keeps Routine edits from restoring appearance data such as custom fonts.
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -109,7 +110,6 @@ import { usePrivacy } from '../contexts/PrivacyContext';
 import { RedemptionService } from '../services/redemptionService';
 import { SceneSettingsView } from './SceneSettingsView';
 import { RoutineSettingsView } from './RoutineSettingsView';
-import { appearanceBackupService } from '../services/appearanceBackupService';
 import { startFloatingWindowWithGuards, type FloatingWindowStartupResult } from '../utils/floatingWindowStartup';
 import {
     AISettingsViewLazy as AISettingsView,
@@ -1421,14 +1421,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, onExport, o
             todoCategories={todoCategories || []}
             onUpdateRoutines={(nextRoutines) => {
                 onUpdateRoutines?.(nextRoutines);
-                // App persists the current Routine state directly. Do not feed each
-                // edit back through the async full-data restore path: rapid changes
-                // (activity + scope + checklist) can otherwise arrive out of order
-                // and overwrite a newer Routine snapshot. Keep the live appearance
-                // snapshot so editing a Routine cannot restore a stale font choice.
-                void onLocalDataUpdate({
-                    appearanceData: appearanceBackupService.buildBackupPayload()
-                });
+                // App persists the current Routine state directly. The empty payload
+                // only marks the local edit for sync; applying a full snapshot here
+                // can restore stale appearance data and reset custom fonts.
+                void onLocalDataUpdate({});
             }}
             onBack={handleBackToMain}
             onToast={onToast}
