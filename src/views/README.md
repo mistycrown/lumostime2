@@ -1,5 +1,7 @@
 # Views Layer
 
+- Update 2026-09-14: `ReviewHubView.tsx` localizes Chronicle page labels, statuses, actions, loading text, and empty-state copy to Chinese while preserving existing date formatting.
+
 - Update 2026-09-12: `TagDetailView.tsx` adds a contextual hint beside tag keyword management, including note-focus shortcuts and preference guidance.
 
 - Update 2026-09-12: `TodoView.tsx` adds explicit min-size constraints and contained touch scrolling to prevent schedule/list content clipping in Android WebView on Huawei P70-class devices.
