@@ -19,7 +19,6 @@ import {
   ACTIVE_SESSION_KEY,
   CHAT_CUSTOM_PROMPT_BLOCKS_KEY,
   CHAT_PERSONAS_KEY,
-  CHAT_SESSIONS_KEY,
   DEBUG_MODE_KEY,
   USER_PROFILE_KEY
 } from '../components/ai-chat/AIBackfillChatInitialization';
@@ -31,6 +30,7 @@ import { assistantOrchestratorService } from './assistantOrchestratorService';
 import { assistantReminderQueueService } from './assistantReminderQueueService';
 import { assistantScheduledTaskService } from './assistantScheduledTaskService';
 import { dreamService } from './dreamService';
+import { aiChatStorageService } from './aiChatStorageService';
 
 const AI_CONFIG_KEY = 'lumostime_ai_config';
 const AI_PRESETS_KEY = 'lumostime_ai_presets';
@@ -229,7 +229,7 @@ export const assistantBackupService = {
       version: 1,
       exportedAt: new Date().toISOString(),
       chat: {
-        sessions: safeParseJson<unknown[]>(localStorage.getItem(CHAT_SESSIONS_KEY), []),
+        sessions: aiChatStorageService.getSessions(),
         activeSessionId: localStorage.getItem(ACTIVE_SESSION_KEY) || '',
         personas: safeParseJson<unknown[]>(localStorage.getItem(CHAT_PERSONAS_KEY), []),
         customPromptBlocks: safeParseJson<unknown[]>(localStorage.getItem(CHAT_CUSTOM_PROMPT_BLOCKS_KEY), []),
@@ -265,7 +265,7 @@ export const assistantBackupService = {
     if (payload.chat && typeof payload.chat === 'object') {
       const chat = payload.chat as Partial<AIBackupChatState>;
       if (hasOwn(chat, 'sessions')) {
-        localStorage.setItem(CHAT_SESSIONS_KEY, JSON.stringify(Array.isArray(chat.sessions) ? chat.sessions : []));
+        aiChatStorageService.setSessions(Array.isArray(chat.sessions) ? chat.sessions : []);
       }
       if (hasOwn(chat, 'activeSessionId')) {
         const activeSessionId = typeof chat.activeSessionId === 'string' ? chat.activeSessionId.trim() : '';
@@ -312,9 +312,8 @@ export const assistantBackupService = {
         assistantScheduledTaskService.syncScheduledTaskReminders();
       }
       if (hasOwn(assistant, 'backgroundCallHistory')) {
-        localStorage.setItem(
-          assistantOrchestratorService.getBackgroundCallHistoryStorageKey(),
-          JSON.stringify(Array.isArray(assistant.backgroundCallHistory) ? assistant.backgroundCallHistory : [])
+        aiChatStorageService.setBackgroundHistory(
+          Array.isArray(assistant.backgroundCallHistory) ? assistant.backgroundCallHistory : []
         );
       }
       if (hasOwn(assistant, 'letters')) {

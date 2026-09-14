@@ -128,6 +128,11 @@ import {
 import { assistantTurnService } from '../services/assistantTurnService';
 import { assistantContextBuilder } from '../services/assistantContextBuilder';
 import {
+  AI_CHAT_STORAGE_READY_EVENT,
+  AI_CHAT_STORAGE_SIGNAL_KEY,
+  aiChatStorageService
+} from '../services/aiChatStorageService';
+import {
   assistantActionExecutor,
   applyLogDelete,
   applyLogSave,
@@ -1524,8 +1529,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   useEffect(() => {
     const serialized = JSON.stringify(sessions);
-    if (localStorage.getItem(CHAT_SESSIONS_KEY) !== serialized) {
-      localStorage.setItem(CHAT_SESSIONS_KEY, serialized);
+    if (JSON.stringify(aiChatStorageService.getSessions()) !== serialized) {
+      aiChatStorageService.setSessions(sessions);
       notifyAIBackupDataChanged();
     }
   }, [sessions]);
@@ -1578,7 +1583,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
 
     const handleStorageChange = (event: StorageEvent) => {
-      if (event.storageArea !== localStorage || event.key !== CHAT_SESSIONS_KEY) {
+      if (
+        event.storageArea !== localStorage
+        || (event.key !== CHAT_SESSIONS_KEY && event.key !== AI_CHAT_STORAGE_SIGNAL_KEY)
+      ) {
         return;
       }
 
@@ -1737,11 +1745,22 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   const reloadPersistedChatSessions = () => {
     setSessions(normalizePersistedSessions(
-      safeJsonParse<unknown>(localStorage.getItem(CHAT_SESSIONS_KEY), []),
+      aiChatStorageService.getSessions(),
       personas,
       getLocalDateStr
     ));
   };
+
+  useEffect(() => {
+    const handleChatStorageReady = () => {
+      reloadPersistedChatSessions();
+      refreshAssistantBackgroundCallHistory();
+    };
+
+    window.addEventListener(AI_CHAT_STORAGE_READY_EVENT, handleChatStorageReady);
+    void aiChatStorageService.initialize();
+    return () => window.removeEventListener(AI_CHAT_STORAGE_READY_EVENT, handleChatStorageReady);
+  }, [personas]);
 
   const refreshAssistantMemorySnapshot = () => {
     setAssistantMemorySnapshot(assistantMemoryService.getMemory());
@@ -2984,7 +3003,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         const nextPersonas = normalizePersonas(restoredPersonas);
         setPersonas(nextPersonas);
         setSessions(normalizePersistedSessions(
-          safeJsonParse<unknown>(localStorage.getItem(CHAT_SESSIONS_KEY), []),
+          aiChatStorageService.getSessions(),
           nextPersonas,
           getLocalDateStr
         ));
