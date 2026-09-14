@@ -7,14 +7,15 @@
             <corners android:radius="16dp" />
         </shape>
     </item>
-    <item android:top="28dp" android:left="30dp" android:right="432dp" android:bottom="120dp" android:drawable="@drawable/widget_preview_circle" />
-    <item android:top="28dp" android:left="110dp" android:right="352dp" android:bottom="120dp" android:drawable="@drawable/widget_preview_circle" />
-    <item android:top="28dp" android:left="190dp" android:right="272dp" android:bottom="120dp" android:drawable="@drawable/widget_preview_circle" />
-    <item android:top="28dp" android:left="270dp" android:right="192dp" android:bottom="120dp" android:drawable="@drawable/widget_preview_circle" />
-    <item android:top="28dp" android:left="350dp" android:right="112dp" android:bottom="120dp" android:drawable="@drawable/widget_preview_circle" />
-    <item android:top="120dp" android:left="30dp" android:right="432dp" android:bottom="28dp" android:drawable="@drawable/widget_preview_circle" />
-    <item android:top="120dp" android:left="110dp" android:right="352dp" android:bottom="28dp" android:drawable="@drawable/widget_preview_circle" />
-    <item android:top="120dp" android:left="190dp" android:right="272dp" android:bottom="28dp" android:drawable="@drawable/widget_preview_circle" />
-    <item android:top="120dp" android:left="270dp" android:right="192dp" android:bottom="28dp" android:drawable="@drawable/widget_preview_circle" />
-    <item android:top="120dp" android:left="350dp" android:right="112dp" android:bottom="28dp" android:drawable="@drawable/widget_preview_circle" />
+    <!-- Five 88dp slots with 10dp gaps and symmetric 35dp side margins. -->
+    <item android:top="28dp" android:left="35dp" android:right="427dp" android:bottom="120dp" android:drawable="@drawable/widget_preview_circle" />
+    <item android:top="28dp" android:left="133dp" android:right="329dp" android:bottom="120dp" android:drawable="@drawable/widget_preview_circle" />
+    <item android:top="28dp" android:left="231dp" android:right="231dp" android:bottom="120dp" android:drawable="@drawable/widget_preview_circle" />
+    <item android:top="28dp" android:left="329dp" android:right="133dp" android:bottom="120dp" android:drawable="@drawable/widget_preview_circle" />
+    <item android:top="28dp" android:left="427dp" android:right="35dp" android:bottom="120dp" android:drawable="@drawable/widget_preview_circle" />
+    <item android:top="120dp" android:left="35dp" android:right="427dp" android:bottom="28dp" android:drawable="@drawable/widget_preview_circle" />
+    <item android:top="120dp" android:left="133dp" android:right="329dp" android:bottom="28dp" android:drawable="@drawable/widget_preview_circle" />
+    <item android:top="120dp" android:left="231dp" android:right="231dp" android:bottom="28dp" android:drawable="@drawable/widget_preview_circle" />
+    <item android:top="120dp" android:left="329dp" android:right="133dp" android:bottom="28dp" android:drawable="@drawable/widget_preview_circle" />
+    <item android:top="120dp" android:left="427dp" android:right="35dp" android:bottom="28dp" android:drawable="@drawable/widget_preview_circle" />
 </layer-list>
