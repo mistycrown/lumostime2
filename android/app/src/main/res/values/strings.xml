@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="widget_label_5x2">&#x8BA1;&#x65F6;&#x5668; 5x2</string>
     <string name="app_name">LumosTime</string>
     <string name="title_activity_main">LumosTime</string>
     <string name="package_name">com.mistycrown.lumostime</string>

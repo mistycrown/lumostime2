@@ -34,6 +34,9 @@ import {
   buildTrackingCalendarTagConfig,
   buildTrackingCalendarWidgetPayload,
   createWidgetTemplate,
+  getWidgetGridBySize,
+  getWidgetSlotCountBySize,
+  getWidgetSizeOptions,
   loadWidgetTemplatesFromStorage,
   saveWidgetTemplatesToStorage,
   sanitizeWidgetTemplatesForUiIconSupport
@@ -41,6 +44,9 @@ import {
 import androidManifestSource from '../../android/app/src/main/AndroidManifest.xml?raw';
 import quickLogWidgetPrincipleCard4x2Source from '../../android/app/src/main/java/com/mistycrown/lumostime/QuickLogWidgetPrincipleCard4x2.java?raw';
 import widgetBridgePluginSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetBridgePlugin.kt?raw';
+import quickLogWidget5x2Source from '../../android/app/src/main/java/com/mistycrown/lumostime/QuickLogWidget5x2.java?raw';
+import widget5x2LayoutSource from '../../android/app/src/main/res/layout/widget_layout_5x2.xml?raw';
+import widget5x2InfoSource from '../../android/app/src/main/res/xml/widget_info_5x2.xml?raw';
 import widgetPrincipleCardBitmapRendererSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetPrincipleCardBitmapRenderer.kt?raw';
 import widgetPrincipleCardProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetPrincipleCardProviderSupport.kt?raw';
 import widgetProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetProviderSupport.java?raw';
@@ -61,6 +67,26 @@ import widgetSceneLayoutSource from '../../android/app/src/main/res/layout/widge
 import widgetPrincipleCardInfoSource from '../../android/app/src/main/res/xml/widget_info_principle_card_4x2.xml?raw';
 
 const REFERENCE_DATE = new Date('2026-04-26T09:30:00+08:00');
+
+describe('5x2 unified widget size', () => {
+  it('exposes ten slots in a five-column, two-row grid', () => {
+    expect(getWidgetSizeOptions()).toContain('5x2');
+    expect(getWidgetSlotCountBySize('5x2')).toBe(10);
+    expect(getWidgetGridBySize('5x2')).toEqual({ columns: 5, rows: 2 });
+  });
+
+  it('registers a dedicated native provider and refresh route', () => {
+    expect(androidManifestSource).toContain('android:name=".QuickLogWidget5x2"');
+    expect(androidManifestSource).toContain('@xml/widget_info_5x2');
+    expect(widget5x2InfoSource).toContain('android:targetCellWidth="5"');
+    expect(widget5x2InfoSource).toContain('android:targetCellHeight="2"');
+    expect(widget5x2LayoutSource.match(/widget_slot_5x2_\d+/g)).toHaveLength(10);
+    expect(quickLogWidget5x2Source.match(/R\.id\.widget_slot_\d+/g)).toHaveLength(10);
+    expect(quickLogWidget5x2Source.match(/R\.id\.widget_slot_label_\d+/g)).toHaveLength(10);
+    expect(quickLogWidget5x2Source).toContain('WidgetSizes.SIZE_5X2');
+    expect(widgetRefreshCoordinatorSource).toContain('QuickLogWidget5x2.refreshAllAsync(context)');
+  });
+});
 
 const categories: Category[] = [
   {

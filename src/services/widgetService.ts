@@ -132,7 +132,7 @@ export const TRACKING_CALENDAR_WIDGET_SIZE = '2x2';
 export const WIDGET_TEMPLATES_UPDATED_EVENT = 'lumostime:widget-templates-updated';
 export const DEFAULT_WIDGET_TEMPLATE_NAME = '\u6211\u7684\u5c0f\u7ec4\u4ef6';
 export const DEFAULT_WIDGET_SIZE = '2x2';
-export const WIDGET_SIZE_OPTIONS = ['2x1', '2x2', '3x2', '4x1', '4x2'] as const;
+export const WIDGET_SIZE_OPTIONS = ['2x1', '2x2', '3x2', '4x1', '4x2', '5x2'] as const;
 const TRACKING_CALENDAR_LOOKBACK_DAYS = 400;
 
 export type WidgetSize = (typeof WIDGET_SIZE_OPTIONS)[number];
@@ -149,7 +149,8 @@ const WIDGET_SIZE_SLOT_COUNT: Record<WidgetSize, number> = {
   '2x2': 4,
   '3x2': 6,
   '4x1': 5,
-  '4x2': 8
+  '4x2': 8,
+  '5x2': 10
 };
 
 const WIDGET_SIZE_GRID: Record<WidgetSize, { columns: number; rows: number }> = {
@@ -157,7 +158,8 @@ const WIDGET_SIZE_GRID: Record<WidgetSize, { columns: number; rows: number }> = 
   '2x2': { columns: 2, rows: 2 },
   '3x2': { columns: 3, rows: 2 },
   '4x1': { columns: 5, rows: 1 },
-  '4x2': { columns: 4, rows: 2 }
+  '4x2': { columns: 4, rows: 2 },
+  '5x2': { columns: 5, rows: 2 }
 };
 
 const normalizeNullableString = (value?: string | null): string | null => {
