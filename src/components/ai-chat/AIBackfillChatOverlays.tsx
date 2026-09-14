@@ -209,7 +209,7 @@ export const AssistantLetterHistoryOverlay: React.FC<AssistantLetterHistoryOverl
               return (
                 <div
                   key={letter.id}
-                  className="rounded-[1rem] border bg-[rgba(255,255,255,0.96)] p-4 transition-colors"
+                  className="ai-chat-letter-card rounded-[1rem] border bg-[rgba(255,255,255,0.96)] p-4 transition-colors"
                   style={{
                     borderColor: isSelected ? theme.chipBorderStrong : theme.chipBorder
                   }}

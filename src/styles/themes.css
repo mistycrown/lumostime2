@@ -3352,6 +3352,25 @@ html[data-theme-mode=dark] .ai-chat-debug-block-toggle span {
   border-color: rgb(120 113 108 / 42%) !important;
 }
 
+[data-ai-chat-theme='dark'] .ai-chat-letter-card {
+  background-color: #292524 !important;
+  border-color: #57534e !important;
+}
+
+[data-ai-chat-theme='dark'] .ai-chat-letter-card p[class*='text-[#231f1b]'] {
+  color: #f5f5f4 !important;
+}
+
+[data-ai-chat-theme='dark'] .ai-chat-letter-card button {
+  color: #d6d3d1;
+}
+
+[data-ai-chat-theme='dark'] .ai-chat-letter-card button[class*='bg-[#c46f4f]'] {
+  background-color: #9f4f3f !important;
+  border-color: #c46f4f !important;
+  color: #fff7ed !important;
+}
+
 html[data-theme-mode=dark] .dream-aspect-tab {
   color: #a8a29e !important;
   border-bottom-color: transparent !important;
