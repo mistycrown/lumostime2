@@ -4,6 +4,7 @@
  * @output Immediate Android-side background AI request execution plus diagnostic events
  * @pos Native Helper
  * @description Executes a minimal unified background AI turn directly from Android so check-in requests no longer depend on the Web runtime being awake at dispatch time.
+ * @updated 2026-09-14: Uses the synced assistant name for native background notification titles.
  * @updated 2026-05-13: Captures native background request payloads plus raw provider responses inside diagnostics so the shared Web debug viewer can reconstruct the exact assembled prompts for Android-run turns.
  * @updated 2026-09-02: Reports skipped native executions through diagnostics and invokes failure callbacks when the executor becomes unavailable before a request starts.
  * @updated 2026-09-02: Surfaces every successful native background reply as an Android notification, including check-ins and scheduled assistant letters.
@@ -162,7 +163,8 @@ public final class AssistantNativeBackgroundExecutor {
             boolean nativeNotificationShown = maybeShowAssistantNotification(
                 context,
                 triggerPayload,
-                normalized
+                normalized,
+                snapshot.assistantName
             );
 
             appendDiagnostic(
@@ -616,7 +618,8 @@ public final class AssistantNativeBackgroundExecutor {
     private static boolean maybeShowAssistantNotification(
         Context context,
         JSONObject triggerPayload,
-        JSONObject normalized
+        JSONObject normalized,
+        String assistantName
     ) {
         if (context == null || triggerPayload == null || normalized == null) {
             return false;
@@ -633,11 +636,14 @@ public final class AssistantNativeBackgroundExecutor {
         }
 
         String triggerType = safeTrim(triggerPayload.optString("type", ""));
-        String title = "assistant_letter_due".equals(triggerType)
-            ? "AI 来信"
-            : "reminder_due".equals(triggerType)
-                ? "AI Reminder"
-                : "AI 助理";
+        String title = safeTrim(assistantName);
+        if (title.isEmpty()) {
+            title = "assistant_letter_due".equals(triggerType)
+                ? "AI 来信"
+                : "reminder_due".equals(triggerType)
+                    ? "AI Reminder"
+                    : "AI 助理";
+        }
         AssistantMessageNotificationManager.showReminderNotification(
             context,
             title,

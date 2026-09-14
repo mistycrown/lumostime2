@@ -4,6 +4,7 @@
  * @output SharedPreferences-backed prompt/conversation snapshot for native background AI execution
  * @pos Native Helper
  * @description Persists the latest background system-prompt snapshot so the Android assistant agent can execute native check-ins with the most recent known context.
+ * @updated 2026-09-14: Persists the active assistant name so native status notifications use the configured persona name.
  * @updated 2026-04-30: Added native background snapshot persistence helpers for immediate Android-side check-in execution.
  */
 package com.mistycrown.lumostime;
@@ -15,11 +16,12 @@ public final class AssistantNativeBackgroundSnapshotStore {
     private static final String PREFS_NAME = "lumostime_assistant_native_background_snapshot";
     private static final String KEY_SYSTEM_PROMPT = "system_prompt";
     private static final String KEY_CONVERSATION_JSON = "conversation_json";
+    private static final String KEY_ASSISTANT_NAME = "assistant_name";
 
     private AssistantNativeBackgroundSnapshotStore() {
     }
 
-    public static void save(Context context, String systemPrompt, String conversationJson) {
+    public static void save(Context context, String systemPrompt, String conversationJson, String assistantName) {
         if (context == null) {
             return;
         }
@@ -27,18 +29,20 @@ public final class AssistantNativeBackgroundSnapshotStore {
         prefs(context).edit()
             .putString(KEY_SYSTEM_PROMPT, safeTrim(systemPrompt))
             .putString(KEY_CONVERSATION_JSON, safeTrim(conversationJson))
+            .putString(KEY_ASSISTANT_NAME, safeTrim(assistantName))
             .apply();
     }
 
     public static NativeBackgroundSnapshot load(Context context) {
         if (context == null) {
-            return new NativeBackgroundSnapshot("", "");
+            return new NativeBackgroundSnapshot("", "", "");
         }
 
         SharedPreferences sharedPreferences = prefs(context);
         return new NativeBackgroundSnapshot(
             sharedPreferences.getString(KEY_SYSTEM_PROMPT, ""),
-            sharedPreferences.getString(KEY_CONVERSATION_JSON, "")
+            sharedPreferences.getString(KEY_CONVERSATION_JSON, ""),
+            sharedPreferences.getString(KEY_ASSISTANT_NAME, "")
         );
     }
 
@@ -58,10 +62,12 @@ public final class AssistantNativeBackgroundSnapshotStore {
     public static final class NativeBackgroundSnapshot {
         public final String systemPrompt;
         public final String conversationJson;
+        public final String assistantName;
 
-        public NativeBackgroundSnapshot(String systemPrompt, String conversationJson) {
+        public NativeBackgroundSnapshot(String systemPrompt, String conversationJson, String assistantName) {
             this.systemPrompt = safeTrim(systemPrompt);
             this.conversationJson = safeTrim(conversationJson);
+            this.assistantName = safeTrim(assistantName);
         }
     }
 }
