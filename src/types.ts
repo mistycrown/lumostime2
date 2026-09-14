@@ -6,6 +6,7 @@
  * @updated 2026-08-26: Added optional static notes to Routine steps.
  * @updated 2026-08-26: Added optional UI icon storage for Routine configurations.
  * @updated 2026-08-26: Added Routine step todo and scope associations for cross-domain runs.
+ * @updated 2026-09-14: Added per-step control for including checklist content in activity notes.
  * @updated 2026-08-24: Added Activity-level custom attribute definitions and ID-based values on logs and active sessions.
  * @updated 2026-08-06: Added backward-compatible archive state to activities.
  * @updated 2026-08-26: Added backward-compatible archive state to categories so category archiving can cascade to all child activities.
@@ -105,6 +106,7 @@ export interface RoutineStep {
   scopeIds?: string[];
   note?: string;
   checklistMarkdown?: string;
+  includeChecklistInNote?: boolean;
 }
 
 export interface Routine {
@@ -124,6 +126,7 @@ export interface ActiveRoutineRun {
   routineStartedAt: number;
   currentSessionId: string;
   checklistMarkdown?: string;
+  includeChecklistInNote?: boolean;
 }
 
 export interface Category {
