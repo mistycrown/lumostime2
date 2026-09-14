@@ -736,8 +736,8 @@ describe('WidgetTodoPinProviderSupport', () => {
 
 describe('Resizable QuickTodo widgets', () => {
   it('allows both-axis launcher resizing for both registered QuickTodo sizes', () => {
-    expect(quickTodo4x2InfoSource).toContain('android:resizeMode="both"');
-    expect(quickTodo4x3InfoSource).toContain('android:resizeMode="both"');
+    expect(quickTodo4x2InfoSource).toContain('android:resizeMode="horizontal|vertical"');
+    expect(quickTodo4x3InfoSource).toContain('android:resizeMode="horizontal|vertical"');
     expect(quickTodo4x2ProviderSource).toContain('onAppWidgetOptionsChanged');
     expect(quickTodo4x2ProviderSource).toContain('refreshWidget(context, appWidgetId)');
     expect(quickTodo4x3ProviderSource).toContain('onAppWidgetOptionsChanged');
