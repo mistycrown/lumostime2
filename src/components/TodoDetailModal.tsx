@@ -1657,7 +1657,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                             </button>
                           </div>
                           <div className="space-y-1.5">
-                            <label className="text-[11px] text-stone-400 font-medium">间隔</label>
+                            <label className="text-[11px] text-stone-400 font-medium">周期</label>
                             <input
                               type="text"
                               inputMode="numeric"
