@@ -62,6 +62,7 @@ import { resolveLatestOrdinaryAssistantBackgroundSession } from '../utils/assist
 import { buildAssistantDisplayParts } from '../utils/assistantMessageParts';
 import { buildNativeDiagnosticDebugExchange } from '../utils/assistantNativeDebug';
 import { notifyAIBackupDataChanged } from '../utils/aiBackupChange';
+import { aiChatStorageService } from './aiChatStorageService';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
 
 interface AssistantSystemTurnRequest {
@@ -159,7 +160,6 @@ interface PersistedAIChatMemoryUpdateSection {
   items: string[];
 }
 
-const CHAT_SESSIONS_KEY = 'lumostime_ai_chat_sessions_v1';
 const CHAT_PERSONAS_KEY = 'lumostime_ai_chat_personas_v1';
 const ASSISTANT_DECISION_EVENT = 'lumostime:assistant-chat-updated';
 const ASSISTANT_BACKGROUND_CALL_HISTORY_KEY = 'lumostime_assistant_background_call_history_v1';
@@ -202,7 +202,7 @@ const safeParseJson = <T>(raw: string | null, fallback: T): T => {
 };
 
 const loadPersistedSessions = (): PersistedAIChatSession[] => (
-  safeParseJson<PersistedAIChatSession[]>(localStorage.getItem(CHAT_SESSIONS_KEY), [])
+  aiChatStorageService.getSessions() as PersistedAIChatSession[]
 );
 
 const loadPersistedPersonaNameMap = (): Map<string, string> => {
@@ -313,16 +313,13 @@ const normalizeBackgroundCallHistoryEntry = (value: unknown): AssistantBackgroun
 };
 
 const loadBackgroundCallHistory = (): AssistantBackgroundCallHistoryEntry[] => (
-  safeParseJson<unknown[]>(localStorage.getItem(ASSISTANT_BACKGROUND_CALL_HISTORY_KEY), [])
+  aiChatStorageService.getBackgroundHistory()
     .map(normalizeBackgroundCallHistoryEntry)
     .filter((entry): entry is AssistantBackgroundCallHistoryEntry => Boolean(entry))
 );
 
 const saveBackgroundCallHistory = (entries: AssistantBackgroundCallHistoryEntry[]) => {
-  localStorage.setItem(
-    ASSISTANT_BACKGROUND_CALL_HISTORY_KEY,
-    JSON.stringify(entries.slice(0, MAX_BACKGROUND_CALL_HISTORY))
-  );
+  aiChatStorageService.setBackgroundHistory(entries.slice(0, MAX_BACKGROUND_CALL_HISTORY));
   notifyAIBackupDataChanged();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(ASSISTANT_DECISION_EVENT));
@@ -666,7 +663,7 @@ const persistAssistantMessage = (
       : session
   ));
 
-  localStorage.setItem(CHAT_SESSIONS_KEY, JSON.stringify(nextSessions));
+  aiChatStorageService.setSessions(nextSessions);
   notifyAIBackupDataChanged();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(ASSISTANT_DECISION_EVENT));
@@ -716,7 +713,7 @@ const persistUserMessage = (
       : session
   ));
 
-  localStorage.setItem(CHAT_SESSIONS_KEY, JSON.stringify(nextSessions));
+  aiChatStorageService.setSessions(nextSessions);
   notifyAIBackupDataChanged();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(ASSISTANT_DECISION_EVENT));
@@ -754,7 +751,7 @@ export const assistantOrchestratorService = {
   },
 
   clearBackgroundCallHistory(): void {
-    localStorage.removeItem(ASSISTANT_BACKGROUND_CALL_HISTORY_KEY);
+    aiChatStorageService.setBackgroundHistory([]);
     notifyAIBackupDataChanged();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent(ASSISTANT_DECISION_EVENT));
