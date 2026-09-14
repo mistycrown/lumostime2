@@ -6,7 +6,7 @@
     android:minWidth="250dp"
     android:minHeight="250dp"
     android:minResizeHeight="250dp"
-    android:resizeMode="vertical"
+    android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="86400000"
     android:description="@string/widget_label_daily_check_week_4x4"
     android:widgetCategory="home_screen"

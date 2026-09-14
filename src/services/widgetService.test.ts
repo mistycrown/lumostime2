@@ -66,6 +66,22 @@ import quickTodo4x2ProviderSource from '../../android/app/src/main/java/com/mist
 import quickTodo4x3ProviderSource from '../../android/app/src/main/java/com/mistycrown/lumostime/QuickLogWidgetQuickTodo4x3.java?raw';
 import quickTodo4x2InfoSource from '../../android/app/src/main/res/xml/widget_info_quick_todo_4x2.xml?raw';
 import quickTodo4x3InfoSource from '../../android/app/src/main/res/xml/widget_info_quick_todo_4x3.xml?raw';
+import principleCardProviderSource from '../../android/app/src/main/java/com/mistycrown/lumostime/QuickLogWidgetPrincipleCard4x2.java?raw';
+import dailyCheckWeek4x4ProviderSource from '../../android/app/src/main/java/com/mistycrown/lumostime/QuickLogWidgetDailyCheckWeek4x4.java?raw';
+import dailyCheckWeek4x3ProviderSource from '../../android/app/src/main/java/com/mistycrown/lumostime/QuickLogWidgetDailyCheckWeek4x3.java?raw';
+import dailyRuntime4x2ProviderSource from '../../android/app/src/main/java/com/mistycrown/lumostime/QuickLogWidgetDailyRuntime4x2.java?raw';
+import dailyRuntime4x4ProviderSource from '../../android/app/src/main/java/com/mistycrown/lumostime/QuickLogWidgetDailyRuntime4x4.java?raw';
+import todoPin4x2ProviderSource from '../../android/app/src/main/java/com/mistycrown/lumostime/QuickLogWidgetTodoPin4x2.java?raw';
+import todoPin4x3ProviderSource from '../../android/app/src/main/java/com/mistycrown/lumostime/QuickLogWidgetTodoPin4x3.java?raw';
+import scene4x3ProviderSource from '../../android/app/src/main/java/com/mistycrown/lumostime/QuickLogWidgetScene4x3.java?raw';
+import principleCardInfoSource from '../../android/app/src/main/res/xml/widget_info_principle_card_4x2.xml?raw';
+import dailyCheckWeek4x4InfoSource from '../../android/app/src/main/res/xml/widget_info_daily_check_week_4x4.xml?raw';
+import dailyCheckWeek4x3InfoSource from '../../android/app/src/main/res/xml/widget_info_daily_check_week_4x3.xml?raw';
+import dailyRuntime4x2InfoSource from '../../android/app/src/main/res/xml/widget_info_daily_runtime_4x2.xml?raw';
+import dailyRuntime4x4InfoSource from '../../android/app/src/main/res/xml/widget_info_daily_runtime_4x4.xml?raw';
+import todoPin4x2InfoSource from '../../android/app/src/main/res/xml/widget_info_todo_pin_4x2.xml?raw';
+import todoPin4x3InfoSource from '../../android/app/src/main/res/xml/widget_info_todo_pin_4x3.xml?raw';
+import scene4x3InfoSource from '../../android/app/src/main/res/xml/widget_info_scene_4x3.xml?raw';
 import widgetPrincipleCardLayoutSource from '../../android/app/src/main/res/layout/widget_layout_principle_card_4x2.xml?raw';
 import widgetSceneCardItemLayoutSource from '../../android/app/src/main/res/layout/widget_scene_card_item.xml?raw';
 import widgetSceneLayoutSource from '../../android/app/src/main/res/layout/widget_layout_scene_4x3.xml?raw';
@@ -748,6 +764,49 @@ describe('Resizable QuickTodo widgets', () => {
     expect(quickTodo4x2ProviderSource).toContain('refreshWidget(context, appWidgetId)');
     expect(quickTodo4x3ProviderSource).toContain('onAppWidgetOptionsChanged');
     expect(quickTodo4x3ProviderSource).toContain('refreshWidget(context, appWidgetId)');
+  });
+});
+
+describe('Resizable widget families', () => {
+  it('allows both-axis resizing and redraws every requested widget family', () => {
+    const infoSources = [
+      principleCardInfoSource,
+      dailyCheckWeek4x4InfoSource,
+      dailyCheckWeek4x3InfoSource,
+      dailyRuntime4x2InfoSource,
+      dailyRuntime4x4InfoSource,
+      todoPin4x2InfoSource,
+      todoPin4x3InfoSource,
+      scene4x3InfoSource
+    ];
+    const providerSources = [
+      principleCardProviderSource,
+      dailyCheckWeek4x4ProviderSource,
+      dailyCheckWeek4x3ProviderSource,
+      dailyRuntime4x2ProviderSource,
+      dailyRuntime4x4ProviderSource,
+      todoPin4x2ProviderSource,
+      todoPin4x3ProviderSource,
+      scene4x3ProviderSource
+    ];
+
+    infoSources.forEach((source) => {
+      expect(source).toContain('android:resizeMode="horizontal|vertical"');
+    });
+    providerSources.forEach((source) => {
+      expect(source).toContain('onAppWidgetOptionsChanged');
+      expect(source).toContain('refreshWidget(context, appWidgetId)');
+    });
+  });
+
+  it('keeps the 5x2 timer provider adjacent to the other timer providers in the picker declaration', () => {
+    const timer4x2Index = androidManifestSource.indexOf('android:name=".QuickLogWidget4x2"');
+    const timer5x2Index = androidManifestSource.indexOf('android:name=".QuickLogWidget5x2"');
+    const nextFamilyIndex = androidManifestSource.indexOf('android:name=".QuickLogWidgetPrincipleCard4x2"');
+    expect(timer4x2Index).toBeGreaterThanOrEqual(0);
+    expect(timer5x2Index).toBeGreaterThan(timer4x2Index);
+    expect(timer5x2Index).toBeLessThan(nextFamilyIndex);
+    expect(androidManifestSource).toContain('android:label="@string/widget_label_5x2"');
   });
 });
 

@@ -49,6 +49,17 @@ public class QuickLogWidgetTodoPin4x2 extends AppWidgetProvider {
     }
 
     @Override
+    public void onAppWidgetOptionsChanged(
+            Context context,
+            AppWidgetManager appWidgetManager,
+            int appWidgetId,
+            android.os.Bundle newOptions
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions);
+        refreshWidget(context, appWidgetId);
+    }
+
+    @Override
     public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);
         if (WidgetTodoPinProviderSupport.handleCommonReceive(context, intent, QuickLogWidgetTodoPin4x2.class)) {

@@ -5,7 +5,7 @@
     android:previewLayout="@layout/widget_layout_todo_pin_4x2"
     android:minWidth="220dp"
     android:minHeight="110dp"
-    android:resizeMode="none"
+    android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="86400000"
     android:description="@string/widget_label_todo_pin_4x2"
     android:widgetCategory="home_screen"
