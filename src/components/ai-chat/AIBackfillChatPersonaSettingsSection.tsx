@@ -5,6 +5,7 @@
  * @pos Component Support (AI Integration)
  * @description Extracts the persona-management branch out of AIBackfillChatModal so the modal can keep AI settings orchestration while this section preserves the existing persona and avatar editing UI.
  * @updated 2026-05-16: Switched custom prompt blocks to a flat list with modal editing so the settings page avoids nested card-in-card editing.
+ * @updated 2026-09-14: Added the user-facing AI chat sync preference below the user avatar controls.
  * @updated 2026-05-16: Added per-item enable toggles for custom prompt blocks so each extra rule can be included or skipped independently.
  * @updated 2026-05-16: Added a separated custom-prompt-block editor with multi-item add/delete controls under persona settings.
  * @updated 2026-05-15: Extracted the persona settings branch from AIBackfillChatModal.
@@ -55,6 +56,7 @@ interface AIBackfillChatPersonaSettingsSectionProps {
   isUploadingAvatar: boolean;
   isUploadingUserAvatar: boolean;
   isUserEmojiEditorOpen: boolean;
+  chatSyncEnabled: boolean;
   onApplyEmojiAvatar: () => void | Promise<void>;
   onApplyPersonaPreset: (personaId: string) => void;
   onApplyUserEmojiAvatar: () => void | Promise<void>;
@@ -75,6 +77,7 @@ interface AIBackfillChatPersonaSettingsSectionProps {
   onUpdateCustomPromptBlock: (blockId: string, patch: { title?: string; content?: string; enabled?: boolean }) => void;
   onUseEmojiAvatar: () => void;
   onUseUserEmojiAvatar: () => void;
+  onToggleChatSync: (enabled: boolean) => void;
   onUserAvatarUpload: React.ChangeEventHandler<HTMLInputElement>;
   onUserEmojiDraftChange: (value: string) => void;
   personas: AIChatPersona[];
@@ -97,6 +100,7 @@ export const AIBackfillChatPersonaSettingsSection: React.FC<AIBackfillChatPerson
   isUploadingAvatar,
   isUploadingUserAvatar,
   isUserEmojiEditorOpen,
+  chatSyncEnabled,
   onApplyEmojiAvatar,
   onApplyPersonaPreset,
   onApplyUserEmojiAvatar,
@@ -117,6 +121,7 @@ export const AIBackfillChatPersonaSettingsSection: React.FC<AIBackfillChatPerson
   onUpdateCustomPromptBlock,
   onUseEmojiAvatar,
   onUseUserEmojiAvatar,
+  onToggleChatSync,
   onUserAvatarUpload,
   onUserEmojiDraftChange,
   personas,
@@ -225,6 +230,7 @@ export const AIBackfillChatPersonaSettingsSection: React.FC<AIBackfillChatPerson
             {activePersona.isBuiltIn ? '当前窗口：内置模板' : '当前窗口：自定义人设'}
           </span>
         </div>
+
       </section>
 
       <section
@@ -869,6 +875,25 @@ export const AIBackfillChatPersonaSettingsSection: React.FC<AIBackfillChatPerson
             )}
           </div>
         </div>
+
+        <label
+          className="mt-5 flex cursor-pointer items-center gap-3 rounded-[0.8rem] border px-3 py-3 transition-colors"
+          style={{
+            borderColor: theme.panelBorder,
+            backgroundColor: theme.inputBg
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={chatSyncEnabled}
+            onChange={(event) => onToggleChatSync(event.target.checked)}
+            className="h-4 w-4 shrink-0 cursor-pointer rounded border"
+            style={{ accentColor: theme.activeBorder }}
+          />
+          <span className="text-sm font-medium" style={{ color: theme.textPrimary }}>
+            同步 AI 聊天记录
+          </span>
+        </label>
       </section>
     </div>
   );

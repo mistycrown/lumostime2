@@ -102,6 +102,7 @@ import {
 } from '../utils/aiBackupChange';
 import { assistantMemoryService } from './assistantMemoryService';
 import { assistantBackupService } from './assistantBackupService';
+import { assistantOrchestratorService } from './assistantOrchestratorService';
 
 const createLocalStorageMock = () => {
   const store = new Map<string, string>();
@@ -126,6 +127,7 @@ describe('assistantBackupService AI chat state', () => {
     });
     vi.mocked(assistantMemoryService.getMemory).mockReset().mockReturnValue({} as any);
     vi.mocked(assistantMemoryService.saveMemory).mockReset();
+    vi.mocked(assistantOrchestratorService.listBackgroundCallHistory).mockReset().mockReturnValue([]);
   });
 
   it('includes every global custom prompt block in the unified backup payload', () => {
@@ -150,6 +152,47 @@ describe('assistantBackupService AI chat state', () => {
 
     expect(payload.chat.personas).toEqual(personas);
     expect(payload.assistant.memory).toEqual(memory);
+  });
+
+  it('includes chat sessions and background history by default', () => {
+    const sessions = [{ id: 'session-1', messages: [{ id: 'message-1', role: 'user', content: 'hello' }] }];
+    const history = [{ id: 'history-1', triggerType: 'checkin', debugExchange: { request: { body: {} } } }];
+    localStorage.setItem('lumostime_ai_chat_sessions_v1', JSON.stringify(sessions));
+    vi.mocked(assistantOrchestratorService.listBackgroundCallHistory).mockReturnValue(history as any);
+
+    const payload = assistantBackupService.buildBackupPayload();
+
+    expect(payload.chat.chatSyncEnabled).toBe(true);
+    expect(payload.chat.sessions).toEqual(sessions);
+    expect(payload.assistant.backgroundCallHistory).toEqual(history);
+  });
+
+  it('excludes chat sessions and history when chat sync is disabled', () => {
+    localStorage.setItem('lumostime_ai_chat_sync_enabled_v1', 'false');
+    localStorage.setItem('lumostime_ai_chat_sessions_v1', JSON.stringify([{ id: 'local-session' }]));
+    vi.mocked(assistantOrchestratorService.listBackgroundCallHistory).mockReturnValue([{ id: 'local-history' }] as any);
+
+    const payload = assistantBackupService.buildBackupPayload();
+
+    expect(payload.chat.chatSyncEnabled).toBe(false);
+    expect(payload.chat.sessions).toEqual([]);
+    expect(payload.chat.activeSessionId).toBe('');
+    expect(payload.assistant.backgroundCallHistory).toEqual([]);
+  });
+
+  it('does not clear local chat history when restoring a payload with chat sync disabled', async () => {
+    const sessions = [{ id: 'local-session', messages: [{ id: 'message-1' }] }];
+    localStorage.setItem('lumostime_ai_chat_sessions_v1', JSON.stringify(sessions));
+
+    await assistantBackupService.applyBackupPayload({
+      chat: {
+        chatSyncEnabled: false,
+        sessions: [],
+        activeSessionId: ''
+      }
+    });
+
+    expect(JSON.parse(localStorage.getItem('lumostime_ai_chat_sessions_v1') || '[]')).toEqual(sessions);
   });
 
   it('restores prompt blocks and emits the live chat restore event', async () => {

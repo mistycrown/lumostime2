@@ -5,6 +5,7 @@
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
  * @updated 2026-09-03: Reloads restored personas, prompt blocks, and long-term memory into mounted chat state so cloud restores cannot be overwritten by stale React state.
+ * @updated 2026-09-14: Added the persona-settings toggle for opting AI chat history out of unified sync payloads.
  * @updated 2026-09-04: Applies structured AI reminder removal actions to the durable reminder queue and long-term memory.
  * @updated 2026-09-03: Removed the base polling-frequency state path now that Android check-ins use concrete alarm times.
  * @updated 2026-07-31: Added a pending-message-id fallback cleanup so completed foreground turns always restore the composer send button.
@@ -195,6 +196,7 @@ import {
 import { AIBackfillChatDreamOverlay } from './ai-chat/AIBackfillChatDreamOverlay';
 import {
   ACTIVE_SESSION_KEY,
+  CHAT_SYNC_ENABLED_KEY,
   CHAT_CUSTOM_PROMPT_BLOCKS_KEY,
   CHAT_PERSONAS_KEY,
   CHAT_SESSIONS_KEY,
@@ -626,6 +628,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [activeSessionId, setActiveSessionId] = useState<string>(initialState.activeSessionId);
   const [debugMode, setDebugMode] = useState<boolean>(initialState.debugMode);
   const [userProfile, setUserProfile] = useState<AIChatUserProfile>(initialState.userProfile);
+  const [chatSyncEnabled, setChatSyncEnabled] = useState<boolean>(() => (
+    localStorage.getItem(CHAT_SYNC_ENABLED_KEY) !== 'false'
+  ));
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
@@ -1559,6 +1564,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       notifyAIBackupDataChanged();
     }
   }, [userProfile]);
+
+  useEffect(() => {
+    const serialized = String(chatSyncEnabled);
+    if (localStorage.getItem(CHAT_SYNC_ENABLED_KEY) !== serialized) {
+      localStorage.setItem(CHAT_SYNC_ENABLED_KEY, serialized);
+      notifyAIBackupDataChanged();
+    }
+  }, [chatSyncEnabled]);
 
   useEffect(() => {
     isOpenRef.current = isOpen;
@@ -4078,6 +4091,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     resetAssistantEditableMemoryUi();
     resetAssistantReminderUi();
     setIsAssistantMemoryViewerOpen(false);
+  };
+
+  const handleToggleChatSync = (enabled: boolean) => {
+    setChatSyncEnabled(enabled);
   };
 
   const handleOpenAssistantLetterDetail = (letterId: string) => {
@@ -7267,6 +7284,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   accentMix={accentMix}
                   activePersona={activePersona}
                   activeSessionPersonaId={activeSession?.personaId || ''}
+                  chatSyncEnabled={chatSyncEnabled}
                   avatarInputRef={avatarInputRef}
                   customPromptBlocks={customPromptBlocks}
                   deleteConfirmPersonaId={deleteConfirmPersonaId}
@@ -7290,6 +7308,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   onSelectEmoji={setEmojiDraft}
                   onSelectUserEmoji={setUserEmojiDraft}
                   onToggleDeletePersona={() => setDeleteConfirmPersonaId((current) => current === activePersona.id ? null : activePersona.id)}
+                  onToggleChatSync={handleToggleChatSync}
                   onAddCustomPromptBlock={handleAddCustomPromptBlock}
                   onDeleteCustomPromptBlock={handleDeleteCustomPromptBlock}
                   onUpdateCurrentPersona={updateCurrentPersona}
