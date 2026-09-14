@@ -47,6 +47,7 @@ import widgetBridgePluginSource from '../../android/app/src/main/java/com/mistyc
 import quickLogWidget5x2Source from '../../android/app/src/main/java/com/mistycrown/lumostime/QuickLogWidget5x2.java?raw';
 import widget5x2LayoutSource from '../../android/app/src/main/res/layout/widget_layout_5x2.xml?raw';
 import widget5x2InfoSource from '../../android/app/src/main/res/xml/widget_info_5x2.xml?raw';
+import widget5x2PreviewSource from '../../android/app/src/main/res/drawable/widget_preview_5x2.xml?raw';
 import widgetPrincipleCardBitmapRendererSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetPrincipleCardBitmapRenderer.kt?raw';
 import widgetPrincipleCardProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetPrincipleCardProviderSupport.kt?raw';
 import widgetProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetProviderSupport.java?raw';
@@ -85,6 +86,11 @@ describe('5x2 unified widget size', () => {
     expect(widget5x2InfoSource).toContain('android:targetCellWidth="5"');
     expect(widget5x2InfoSource).toContain('android:targetCellHeight="2"');
     expect(widget5x2LayoutSource.match(/widget_slot_5x2_\d+/g)).toHaveLength(10);
+    expect(widget5x2PreviewSource).toContain('android:left="35dp" android:right="427dp"');
+    expect(widget5x2PreviewSource).toContain('android:left="133dp" android:right="329dp"');
+    expect(widget5x2PreviewSource).toContain('android:left="231dp" android:right="231dp"');
+    expect(widget5x2PreviewSource).toContain('android:left="329dp" android:right="133dp"');
+    expect(widget5x2PreviewSource).toContain('android:left="427dp" android:right="35dp"');
     expect(quickLogWidget5x2Source.match(/R\.id\.widget_slot_\d+/g)).toHaveLength(10);
     expect(quickLogWidget5x2Source.match(/R\.id\.widget_slot_label_\d+/g)).toHaveLength(10);
     expect(quickLogWidget5x2Source).toContain('WidgetSizes.SIZE_5X2');
