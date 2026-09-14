@@ -167,6 +167,13 @@ const initialize = async (): Promise<void> => {
     const sessions = storedSessions ?? sessionsCache ?? [];
     const history = storedHistory ?? historyCache ?? [];
 
+    if ((sessionsCache?.length || 0) > 0 && sessions.length === 0) {
+      throw new Error('Refusing to replace non-empty legacy chat sessions with an empty IndexedDB store');
+    }
+    if ((historyCache?.length || 0) > 0 && history.length === 0) {
+      throw new Error('Refusing to replace non-empty legacy background history with an empty IndexedDB store');
+    }
+
     await writeStores(database, sessions, history);
     sessionsCache = sessions;
     historyCache = history;
@@ -234,7 +241,3 @@ export const aiChatStorageService = {
     return indexedDbReady;
   }
 };
-
-if (typeof window !== 'undefined') {
-  void aiChatStorageService.initialize();
-}
