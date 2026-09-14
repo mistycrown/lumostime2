@@ -4,7 +4,7 @@
  * @output Immediate Android-side background AI request execution plus diagnostic events
  * @pos Native Helper
  * @description Executes a minimal unified background AI turn directly from Android so check-in requests no longer depend on the Web runtime being awake at dispatch time.
- * @updated 2026-09-14: Uses the synced assistant name for native background notification titles.
+ * @updated 2026-09-14: Uses the synced persona name for native background notification titles.
  * @updated 2026-05-13: Captures native background request payloads plus raw provider responses inside diagnostics so the shared Web debug viewer can reconstruct the exact assembled prompts for Android-run turns.
  * @updated 2026-09-02: Reports skipped native executions through diagnostics and invokes failure callbacks when the executor becomes unavailable before a request starts.
  * @updated 2026-09-02: Surfaces every successful native background reply as an Android notification, including check-ins and scheduled assistant letters.
@@ -164,7 +164,7 @@ public final class AssistantNativeBackgroundExecutor {
                 context,
                 triggerPayload,
                 normalized,
-                snapshot.assistantName
+                snapshot.personaName
             );
 
             appendDiagnostic(
