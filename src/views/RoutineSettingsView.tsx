@@ -18,6 +18,7 @@
  * @updated 2026-09-12: Validates that every Routine step has a bound Activity before saving.
  * @updated 2026-09-12: Slightly reduces checklist editor checkbox size.
  * @updated 2026-09-12: Further reduces checklist editor markers to match timeline previews.
+ * @updated 2026-09-14: Adds a per-step checklist note toggle and makes template markers decorative.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronRight, Plus, Trash2, X } from 'lucide-react';
@@ -58,15 +59,18 @@ const createStep = (): RoutineStep => ({
   id: crypto.randomUUID(),
   activityId: '',
   categoryId: '',
-  order: 0
+  order: 0,
+  includeChecklistInNote: true
 });
 
 interface ChecklistEditorProps {
   markdown: string;
+  includeInNote: boolean;
   onChange: (markdown: string) => void;
+  onIncludeInNoteChange: (includeInNote: boolean) => void;
 }
 
-const ChecklistEditor: React.FC<ChecklistEditorProps> = ({ markdown, onChange }) => {
+const ChecklistEditor: React.FC<ChecklistEditorProps> = ({ markdown, includeInNote, onChange, onIncludeInNoteChange }) => {
   const entries = parseRoutineChecklist(markdown);
   const [draftTexts, setDraftTexts] = useState<Record<number, string>>({});
 
@@ -90,18 +94,12 @@ const ChecklistEditor: React.FC<ChecklistEditorProps> = ({ markdown, onChange })
       <div className="space-y-1.5">
         {entries.map((entry, index) => (
           <div key={`${index}-${entry.text}`} className="flex items-center gap-2 py-1">
-            <button
-              type="button"
-              onClick={() => {
-                setDraftTexts({});
-                onChange(updateRoutineChecklistItem(markdown, index, { completed: !entry.completed }));
-              }}
-              aria-pressed={entry.completed}
-              aria-label={`Checklist ${index + 1} 完成状态`}
+            <span
+              aria-hidden="true"
               className={`flex h-3 w-3 shrink-0 items-center justify-center rounded-[3px] border-[1.5px] transition-all focus:outline-none focus:ring-2 focus:ring-stone-200 ${entry.completed ? 'border-stone-400 bg-stone-400 text-white shadow-sm' : 'border-stone-300 bg-white text-transparent hover:border-stone-400'}`}
             >
               <Check size={8} strokeWidth={3} />
-            </button>
+            </span>
             <input
               value={draftTexts[index] ?? entry.text}
               onFocus={event => {
@@ -149,6 +147,15 @@ const ChecklistEditor: React.FC<ChecklistEditorProps> = ({ markdown, onChange })
       >
         <Plus size={14} /> 添加条目
       </button>
+      <label className="mt-3 flex items-center gap-2 px-1 text-xs text-stone-600">
+        <input
+          type="checkbox"
+          checked={includeInNote}
+          onChange={event => onIncludeInNoteChange(event.target.checked)}
+          className="h-3.5 w-3.5 rounded border-stone-300 text-stone-700 focus:ring-stone-300"
+        />
+        <span>加入备注</span>
+      </label>
     </div>
   );
 };
@@ -536,7 +543,9 @@ export const RoutineSettingsView: React.FC<RoutineSettingsViewProps> = ({
                         {expandedPicker === 'checklist' && (
                           <ChecklistEditor
                             markdown={step.checklistMarkdown || ''}
+                            includeInNote={step.includeChecklistInNote !== false}
                             onChange={checklistMarkdown => updateStep(step.id, { checklistMarkdown, note: undefined })}
+                            onIncludeInNoteChange={includeChecklistInNote => updateStep(step.id, { includeChecklistInNote })}
                           />
                         )}
                       </div>

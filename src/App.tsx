@@ -7,6 +7,7 @@
  * @updated 2026-08-26: Makes Routine transitions wait for each stopped step to enter the shared log-save path.
  * @updated 2026-08-27: Keeps Routine starts on the Record page by bypassing timer auto-jump preferences.
  * @updated 2026-09-12: Resolves Routine activities across categories when legacy or moved steps retain stale category IDs.
+ * @updated 2026-09-14: Honors per-step checklist note inclusion settings during Routine runs.
  * @updated 2026-06-21: Centralized active-session stop persistence so floating-ball stops and app-awareness finishes always submit logs through the same path.
  * @updated 2026-08-10: Excluded timeline Plan blocks from default backfill time inference.
  * @updated 2026-08-10: Adds temporary focus-detail ownership diagnostics for Android immersive-mode investigation.
@@ -627,14 +628,20 @@ const AppContent: React.FC = () => {
       currentStepIndex: 0,
       routineStartedAt: Date.now(),
       currentSessionId: sessionId,
-      checklistMarkdown
+      checklistMarkdown,
+      includeChecklistInNote: firstStep.includeChecklistInNote !== false
     });
   }, [addToast, autoLinkRules, resolveRoutineStep, startActivity]);
 
   const advanceRoutine = () => {
     const run = activeRoutineRunRef.current;
     if (!run) return;
-    handleStopActivityWrapper(run.currentSessionId, run.checklistMarkdown ? { note: run.checklistMarkdown } : undefined);
+    handleStopActivityWrapper(
+      run.currentSessionId,
+      run.includeChecklistInNote !== false && run.checklistMarkdown
+        ? { note: run.checklistMarkdown }
+        : undefined
+    );
   };
 
   const toggleRoutineChecklist = useCallback((index: number) => {
@@ -704,7 +711,8 @@ const AppContent: React.FC = () => {
           ...routineRun,
           currentStepIndex: nextIndex,
           currentSessionId: nextSessionId,
-          checklistMarkdown: nextSessionChecklistMarkdown
+          checklistMarkdown: nextSessionChecklistMarkdown,
+          includeChecklistInNote: nextStep.includeChecklistInNote !== false
         });
       }
     );
