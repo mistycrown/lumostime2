@@ -6,6 +6,7 @@
  * @description The central dashboard for accessing past reviews. Displays summaries and entry points for Daily, Weekly, and Monthly reviews, often using carousels or lists, with Android-compatible card rendering fallbacks for archive themes.
  * @updated 2026-04-17: Replaced Chronicle card color-mix shadows and blur-only surfaces with Android-safe fallbacks to avoid HarmonyOS gradient artifacts behind archive cards, then softened the archive card shadows for a lighter page feel.
  * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
+ * @updated 2026-09-14: Localized Chronicle page labels and empty-state copy to Chinese without changing date formatting.
  *
  * 鈿狅笍 Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -267,7 +268,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
       >
         <div className="max-w-xl mx-auto px-6 h-full flex items-center justify-center">
           <h1 className={`font-serif text-stone-800 font-bold transition-all duration-300 ${isScrolled ? 'text-[16px]' : 'text-[18px]'}`}>
-            Chronicle
+            档案
           </h1>
         </div>
       </header>
@@ -278,11 +279,11 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
         id="chronicle-content"
       >
         <div className="md:max-w-xl md:mx-auto w-full px-5 pt-2 pb-20">
-          <SectionTitle title="Monthly Reviews" onAdd={handleAddCurrentMonthly} className="mt-1" />
+          <SectionTitle title="月度回顾" onAdd={handleAddCurrentMonthly} className="mt-1" />
 
           {sortedMonthlyReviews.length === 0 ? (
             <div className="p-6 text-center border bg-stone-50 rounded-lg text-stone-400 text-sm">
-              No monthly reviews yet.
+              暂无月度回顾。
             </div>
           ) : (
             <div className="flex overflow-x-auto gap-4 pb-5 pt-2 -mr-5 pr-5 snap-x snap-mandatory scrollbar-hide">
@@ -318,7 +319,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                       <div className="flex justify-between items-center mb-1">
                         <h3 className="font-serif text-2xl font-extrabold text-stone-900 m-0">{monthName}</h3>
                         <div className={`px-2 py-1 text-[10px] font-bold uppercase rounded flex whitespace-nowrap ${isCurrentMonth ? 'btn-template-filled' : 'btn-template-outlined'}`}>
-                          {isCurrentMonth ? 'CURRENT' : 'PAST'}
+                          {isCurrentMonth ? '当前' : '往期'}
                         </div>
                       </div>
                       {displayTitle && (
@@ -334,7 +335,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
 
                     <div className="flex justify-between text-[10px] text-stone-500 border-t border-stone-100 pt-3">
                       <span>{reviewDate.getFullYear()}/{(reviewDate.getMonth() + 1).toString().padStart(2, '0')}</span>
-                      <span>Tap to read full report -&gt;</span>
+                      <span>点击查看完整报告 -&gt;</span>
                     </div>
                   </article>
                 );
@@ -342,11 +343,11 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
             </div>
           )}
 
-          <SectionTitle title="Weekly History" onAdd={handleAddCurrentWeekly} />
+          <SectionTitle title="每周历史" onAdd={handleAddCurrentWeekly} />
 
           {sortedWeeklyReviews.length === 0 ? (
             <div className="p-6 text-center border bg-stone-50 rounded-lg text-stone-400 text-sm">
-              No weekly reviews yet.
+              暂无每周回顾。
             </div>
           ) : (
             <div className="flex overflow-x-auto gap-3 -mr-5 pr-5 pb-5 pt-2 snap-x snap-mandatory scrollbar-hide">
@@ -383,7 +384,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                     <div className="flex justify-between items-center">
                       <span className="font-serif text-lg font-bold">W{weekNum}</span>
                       <span className={`text-[9px] uppercase px-1 py-0.5 rounded ${isCurrentWeek ? 'btn-template-filled' : 'btn-template-outlined'}`}>
-                        {isCurrentWeek ? 'CURRENT' : 'PAST'}
+                        {isCurrentWeek ? '当前' : '往期'}
                       </span>
                     </div>
 
@@ -400,11 +401,11 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
             </div>
           )}
 
-          <SectionTitle title="Latest Entries" onAdd={handleAddCurrentDaily} />
+          <SectionTitle title="最新记录" onAdd={handleAddCurrentDaily} />
 
           {sortedDailyReviews.length === 0 ? (
             <div className="p-6 text-center border bg-stone-50 rounded-lg text-stone-400 text-sm">
-              No daily reviews yet. Start by reviewing today!
+              暂无每日回顾，今天就开始回顾吧！
             </div>
           ) : (
             <div className="flex flex-col gap-4">
@@ -461,7 +462,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
               })}
               {visibleCount < sortedDailyReviews.length && (
                 <div ref={observerTarget} className="h-10 w-full flex items-center justify-center">
-                  <span className="loading loading-spinner text-stone-300">Loading...</span>
+                  <span className="loading loading-spinner text-stone-300">加载中...</span>
                 </div>
               )}
             </div>
@@ -469,7 +470,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
 
           {visibleCount >= sortedDailyReviews.length && sortedDailyReviews.length > 0 && (
             <div className="text-center mt-10 text-stone-300 text-xs">
-              End of Archive
+              已到档案末尾
             </div>
           )}
         </div>
