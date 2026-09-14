@@ -5,7 +5,7 @@
     android:previewLayout="@layout/widget_layout_principle_card_4x2"
     android:minWidth="220dp"
     android:minHeight="110dp"
-    android:resizeMode="none"
+    android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="86400000"
     android:description="@string/widget_label_principle_card_4x2"
     android:widgetCategory="home_screen"

@@ -5,7 +5,7 @@
     android:previewLayout="@layout/widget_layout_daily_runtime_4x4"
     android:minWidth="220dp"
     android:minHeight="165dp"
-    android:resizeMode="none"
+    android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="86400000"
     android:description="@string/widget_label_daily_runtime_4x4"
     android:widgetCategory="home_screen"

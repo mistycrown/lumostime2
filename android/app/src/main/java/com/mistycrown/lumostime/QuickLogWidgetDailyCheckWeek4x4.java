@@ -36,6 +36,7 @@ public class QuickLogWidgetDailyCheckWeek4x4 extends AppWidgetProvider {
             int appWidgetId,
             android.os.Bundle newOptions
     ) {
+        super.onAppWidgetOptionsChanged(context, manager, appWidgetId, newOptions);
         refreshWidget(context, appWidgetId);
     }
 

@@ -30,6 +30,17 @@ public class QuickLogWidgetDailyCheckWeek4x3 extends AppWidgetProvider {
     }
 
     @Override
+    public void onAppWidgetOptionsChanged(
+            Context context,
+            AppWidgetManager manager,
+            int appWidgetId,
+            android.os.Bundle newOptions
+    ) {
+        super.onAppWidgetOptionsChanged(context, manager, appWidgetId, newOptions);
+        refreshWidget(context, appWidgetId);
+    }
+
+    @Override
     public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);
         WidgetDailyCheckWeek4x3ProviderSupport.handleReceive(context, intent);

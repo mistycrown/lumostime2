@@ -61,6 +61,17 @@ public class QuickLogWidgetPrincipleCard4x2 extends AppWidgetProvider {
     }
 
     @Override
+    public void onAppWidgetOptionsChanged(
+            Context context,
+            AppWidgetManager appWidgetManager,
+            int appWidgetId,
+            android.os.Bundle newOptions
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions);
+        refreshWidget(context, appWidgetId);
+    }
+
+    @Override
     public void onDeleted(Context context, int[] appWidgetIds) {
         super.onDeleted(context, appWidgetIds);
         WidgetPrincipleCardProviderSupport.INSTANCE.onDeleted(context, appWidgetIds);
