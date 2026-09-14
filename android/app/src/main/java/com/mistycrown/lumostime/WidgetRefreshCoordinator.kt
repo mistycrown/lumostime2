@@ -16,6 +16,7 @@ import android.os.Looper
  * Updated 2026-08-09: Added refresh routing for the dedicated 4x4 daily-check weekly widget.
  * Updated 2026-08-10: Added the scrollable compact 4x3 daily-check weekly widget to refresh routing.
  * Updated 2026-08-12: Added a shared instance-scoped refresh-icon animation for widget families with manual refresh buttons.
+ * Updated 2026-09-14: Added refresh routing for the unified 5x2 widget provider.
  */
 object WidgetRefreshCoordinator {
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -77,6 +78,7 @@ object WidgetRefreshCoordinator {
         QuickLogWidget3x2.refreshAllAsync(context)
         QuickLogWidget4x1.refreshAllAsync(context)
         QuickLogWidget4x2.refreshAllAsync(context)
+        QuickLogWidget5x2.refreshAllAsync(context)
     }
 
     fun refreshTrackingCalendarWidgets(context: Context) {
@@ -136,6 +138,8 @@ object WidgetRefreshCoordinator {
                 QuickLogWidget4x1.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidget4x2::class.java).className ->
                 QuickLogWidget4x2.refreshWidget(context, appWidgetId)
+            ComponentName(context, QuickLogWidget5x2::class.java).className ->
+                QuickLogWidget5x2.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidgetTrackingCalendar2x2::class.java).className ->
                 QuickLogWidgetTrackingCalendar2x2.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidgetPrincipleCard4x2::class.java).className ->

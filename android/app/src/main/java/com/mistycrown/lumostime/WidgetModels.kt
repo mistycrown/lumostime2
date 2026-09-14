@@ -137,6 +137,7 @@ object WidgetSizes {
     const val SIZE_3X2 = "3x2"
     const val SIZE_4X1 = "4x1"
     const val SIZE_4X2 = "4x2"
+    const val SIZE_5X2 = "5x2"
     const val DEFAULT = SIZE_2X2
 
     @JvmStatic
@@ -146,7 +147,8 @@ object WidgetSizes {
             SIZE_2X2,
             SIZE_3X2,
             SIZE_4X1,
-            SIZE_4X2 -> size
+            SIZE_4X2,
+            SIZE_5X2 -> size
             else -> DEFAULT
         }
     }
@@ -159,6 +161,7 @@ object WidgetSizes {
             SIZE_3X2 -> 6
             SIZE_4X1 -> 5
             SIZE_4X2 -> 8
+            SIZE_5X2 -> 10
             else -> 4
         }
     }

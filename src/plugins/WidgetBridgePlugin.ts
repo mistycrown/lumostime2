@@ -79,7 +79,7 @@ export interface WidgetBridgeTrackingCalendarConfig {
 export interface WidgetBridgeTemplate {
   id: string;
   name: string;
-  size: '2x1' | '2x2' | '3x2' | '4x1' | '4x2';
+  size: '2x1' | '2x2' | '3x2' | '4x1' | '4x2' | '5x2';
   templateType?: WidgetTemplateType;
   slots: WidgetBridgeSlot[];
   trackingConfig?: WidgetBridgeTrackingCalendarConfig | null;
