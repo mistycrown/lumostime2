@@ -3275,6 +3275,83 @@ html[data-theme-mode=dark] .ai-chat-debug-block-toggle span {
   color: #f5f5f4 !important;
 }
 
+/* AI chat sub-panels still contain a few legacy utility classes. Keep those
+   local to the chat shell so settings, Dream, memory, and history overlays
+   remain readable even when they are rendered outside the global theme tree. */
+[data-ai-chat-theme='dark'] {
+  color-scheme: dark;
+}
+
+[data-ai-chat-theme='dark'] .bg-white,
+[data-ai-chat-theme='dark'] .bg-white\/50,
+[data-ai-chat-theme='dark'] .bg-white\/70,
+[data-ai-chat-theme='dark'] .bg-white\/80,
+[data-ai-chat-theme='dark'] .bg-white\/90,
+[data-ai-chat-theme='dark'] [class*='bg-[#f3f4f6]'],
+[data-ai-chat-theme='dark'] [class*='bg-[#faf9f6]'],
+[data-ai-chat-theme='dark'] [class*='bg-[#f9fafb]'] {
+  background-color: #292524 !important;
+}
+
+[data-ai-chat-theme='dark'] .bg-stone-100,
+[data-ai-chat-theme='dark'] .bg-stone-50,
+[data-ai-chat-theme='dark'] .hover\:bg-stone-100:hover,
+[data-ai-chat-theme='dark'] .hover\:bg-white:hover,
+[data-ai-chat-theme='dark'] .hover\:bg-white\/70:hover,
+[data-ai-chat-theme='dark'] .hover\:bg-white\/80:hover {
+  background-color: #44403c !important;
+}
+
+[data-ai-chat-theme='dark'] .text-stone-950,
+[data-ai-chat-theme='dark'] .text-stone-900,
+[data-ai-chat-theme='dark'] .text-stone-800,
+[data-ai-chat-theme='dark'] .text-stone-700,
+[data-ai-chat-theme='dark'] [class*='text-[#201c19]'],
+[data-ai-chat-theme='dark'] [class*='text-[#231f1b]'],
+[data-ai-chat-theme='dark'] [class*='text-[#111827]'] {
+  color: #f5f5f4 !important;
+}
+
+[data-ai-chat-theme='dark'] .text-stone-600,
+[data-ai-chat-theme='dark'] .text-stone-500,
+[data-ai-chat-theme='dark'] .text-stone-400,
+[data-ai-chat-theme='dark'] [class*='text-[#4b5563]'],
+[data-ai-chat-theme='dark'] [class*='text-[#6b7280]'],
+[data-ai-chat-theme='dark'] [class*='text-[#71685f]'],
+[data-ai-chat-theme='dark'] [class*='text-[#897f75]'] {
+  color: #a8a29e !important;
+}
+
+[data-ai-chat-theme='dark'] .border-stone-100,
+[data-ai-chat-theme='dark'] .border-stone-200,
+[data-ai-chat-theme='dark'] [class*='border-[#e5e7eb]'],
+[data-ai-chat-theme='dark'] [class*='border-[#e3ddd4]'],
+[data-ai-chat-theme='dark'] [class*='border-[#ddd6ce]'],
+[data-ai-chat-theme='dark'] [class*='border-[#d8d2ca]'],
+[data-ai-chat-theme='dark'] [style*='rgba(32,28,25'] {
+  border-color: #57534e !important;
+}
+
+[data-ai-chat-theme='dark'] input,
+[data-ai-chat-theme='dark'] textarea,
+[data-ai-chat-theme='dark'] select {
+  color-scheme: dark;
+}
+
+[data-ai-chat-theme='dark'] code {
+  background-color: #171412 !important;
+  color: #efe7db !important;
+}
+
+[data-ai-chat-theme='dark'] blockquote {
+  border-left-color: #57534e !important;
+  background-color: rgb(68 64 60 / 55%) !important;
+}
+
+[data-ai-chat-theme='dark'] hr {
+  border-color: rgb(120 113 108 / 42%) !important;
+}
+
 html[data-theme-mode=dark] .dream-aspect-tab {
   color: #a8a29e !important;
   border-bottom-color: transparent !important;

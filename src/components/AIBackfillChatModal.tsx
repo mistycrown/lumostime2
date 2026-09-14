@@ -800,9 +800,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   } = useNavigation();
   const { addToast } = useToast();
   const { autoLinkRules, autoApplyAutoLinkRules, colorScheme, themeMode } = useSettings();
+  const isDarkAIChatTheme = !forceLightTheme && themeMode === 'dark';
   const AI_CHAT_THEME = useMemo(
-    () => getAIChatTheme(colorScheme === 'default', !forceLightTheme && themeMode === 'dark'),
-    [colorScheme, forceLightTheme, themeMode]
+    () => getAIChatTheme(colorScheme === 'default', isDarkAIChatTheme),
+    [colorScheme, isDarkAIChatTheme]
   );
 
   const defaultTargetDate = useMemo(() => {
@@ -6877,7 +6878,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   return (
     <div
-      className={`fixed inset-0 z-[60] overflow-hidden ${isDesktopWidgetMode ? 'p-[4px]' : ''}`}
+      className={`ai-chat-shell fixed inset-0 z-[60] overflow-hidden ${isDesktopWidgetMode ? 'p-[4px]' : ''}`}
+      data-ai-chat-theme={isDarkAIChatTheme ? 'dark' : 'light'}
       style={{
         backgroundColor: isDesktopWidgetMode ? 'transparent' : AI_CHAT_THEME.shellBg,
         color: AI_CHAT_THEME.textPrimary
