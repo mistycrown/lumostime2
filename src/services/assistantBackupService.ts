@@ -5,6 +5,7 @@
  * @pos Service (AI Backup)
  * @description Centralizes all AI-related data that should travel inside the app's main backup JSON, while explicitly excluding API keys and preserving any compatible local keys during restore.
  * @updated 2026-09-03: Dispatches a dedicated chat-restore event with persona, prompt block, and memory state so mounted chat UIs cannot overwrite restored cloud data with stale state.
+ * @updated 2026-09-14: Filters chat sessions and background history from unified backups when chat sync is disabled, without clearing local history on restore.
  * @updated 2026-07-04: Added assistant-letter export and restore so scheduled AI letters travel inside the unified backup payload.
  * @updated 2026-05-17: Added unified AI backup export/restore helpers covering chat sessions, persona settings, background assistant state, Dream state, and sanitized AI presets.
  */
@@ -35,6 +36,7 @@ import { aiChatStorageService } from './aiChatStorageService';
 const AI_CONFIG_KEY = 'lumostime_ai_config';
 const AI_PRESETS_KEY = 'lumostime_ai_presets';
 const AI_CURRENT_PRESET_KEY = 'lumostime_ai_current_preset';
+const CHAT_SYNC_ENABLED_STORAGE_KEY = 'lumostime_ai_chat_sync_enabled_v1';
 
 type SanitizedAIConfig = Omit<AIConfig, 'apiKey'>;
 
@@ -51,6 +53,7 @@ interface AIBackupPresetState {
 
 interface AIBackupChatState {
   sessions: unknown[];
+  chatSyncEnabled: boolean;
   activeSessionId: string;
   personas: unknown[];
   customPromptBlocks: unknown[];
@@ -93,6 +96,10 @@ const hasOwn = (value: unknown, key: string): boolean => (
   Boolean(value)
   && typeof value === 'object'
   && Object.prototype.hasOwnProperty.call(value, key)
+);
+
+const isChatSyncEnabled = (): boolean => (
+  localStorage.getItem(CHAT_SYNC_ENABLED_STORAGE_KEY) !== 'false'
 );
 
 const sanitizeAIConfig = (config: AIConfig): SanitizedAIConfig => ({
@@ -229,8 +236,9 @@ export const assistantBackupService = {
       version: 1,
       exportedAt: new Date().toISOString(),
       chat: {
-        sessions: aiChatStorageService.getSessions(),
-        activeSessionId: localStorage.getItem(ACTIVE_SESSION_KEY) || '',
+        sessions: isChatSyncEnabled() ? aiChatStorageService.getSessions() : [],
+        chatSyncEnabled: isChatSyncEnabled(),
+        activeSessionId: isChatSyncEnabled() ? localStorage.getItem(ACTIVE_SESSION_KEY) || '' : '',
         personas: safeParseJson<unknown[]>(localStorage.getItem(CHAT_PERSONAS_KEY), []),
         customPromptBlocks: safeParseJson<unknown[]>(localStorage.getItem(CHAT_CUSTOM_PROMPT_BLOCKS_KEY), []),
         debugMode: localStorage.getItem(DEBUG_MODE_KEY) === 'true',
@@ -245,7 +253,9 @@ export const assistantBackupService = {
         memory: assistantMemoryService.getMemory(),
         reminders: assistantReminderQueueService.listReminders(),
         scheduledTasks: assistantScheduledTaskService.listTasks(),
-        backgroundCallHistory: assistantOrchestratorService.listBackgroundCallHistory(),
+        backgroundCallHistory: isChatSyncEnabled()
+          ? assistantOrchestratorService.listBackgroundCallHistory()
+          : [],
         letters: assistantLetterService.listLetters()
       },
       dream: dreamService.getState()
@@ -261,13 +271,17 @@ export const assistantBackupService = {
     let restoredCustomPromptBlocks: unknown[] | null = null;
     let restoredPersonas: unknown[] | null = null;
     let restoredMemory: unknown = undefined;
+    let shouldRestoreChatHistory = true;
 
     if (payload.chat && typeof payload.chat === 'object') {
       const chat = payload.chat as Partial<AIBackupChatState>;
-      if (hasOwn(chat, 'sessions')) {
+      const incomingChatSyncEnabled = chat.chatSyncEnabled !== false;
+      const localChatSyncEnabled = isChatSyncEnabled();
+      shouldRestoreChatHistory = incomingChatSyncEnabled && localChatSyncEnabled;
+      if (hasOwn(chat, 'sessions') && shouldRestoreChatHistory) {
         aiChatStorageService.setSessions(Array.isArray(chat.sessions) ? chat.sessions : []);
       }
-      if (hasOwn(chat, 'activeSessionId')) {
+      if (hasOwn(chat, 'activeSessionId') && shouldRestoreChatHistory) {
         const activeSessionId = typeof chat.activeSessionId === 'string' ? chat.activeSessionId.trim() : '';
         if (activeSessionId) {
           localStorage.setItem(ACTIVE_SESSION_KEY, activeSessionId);
@@ -311,7 +325,7 @@ export const assistantBackupService = {
       if (hasOwn(assistant, 'scheduledTasks') || hasOwn(assistant, 'reminders')) {
         assistantScheduledTaskService.syncScheduledTaskReminders();
       }
-      if (hasOwn(assistant, 'backgroundCallHistory')) {
+      if (hasOwn(assistant, 'backgroundCallHistory') && shouldRestoreChatHistory) {
         aiChatStorageService.setBackgroundHistory(
           Array.isArray(assistant.backgroundCallHistory) ? assistant.backgroundCallHistory : []
         );

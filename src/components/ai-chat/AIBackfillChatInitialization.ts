@@ -12,6 +12,7 @@
  * @updated 2026-05-16: Normalized persona-scoped custom prompt blocks so extra labeled prompt snippets persist across AI chat sessions.
  * @updated 2026-05-15: Extracted built-in personas, storage keys, and persisted chat-state normalization from AIBackfillChatModal.
  * @updated 2026-09-03: Exposed persona and custom prompt block normalization for live cloud-restore hydration.
+ * @updated 2026-09-14: Added the persisted AI chat sync preference storage key.
  */
 import { BUILTIN_PERSONA_SYSTEM_PROMPTS } from '../../constants/aiPersonaSystemPrompts';
 import type { AppliedChatAction } from '../../services/assistantActionExecutor';
@@ -56,6 +57,7 @@ export const CHAT_PERSONAS_KEY = 'lumostime_ai_chat_personas_v1';
 export const CHAT_CUSTOM_PROMPT_BLOCKS_KEY = 'lumostime_ai_chat_custom_prompt_blocks_v1';
 export const DEBUG_MODE_KEY = 'lumostime_ai_chat_debug_mode_v1';
 export const USER_PROFILE_KEY = 'lumostime_ai_chat_user_profile_v1';
+export const CHAT_SYNC_ENABLED_KEY = 'lumostime_ai_chat_sync_enabled_v1';
 
 export const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
   {
