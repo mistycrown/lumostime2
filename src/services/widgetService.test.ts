@@ -61,6 +61,10 @@ import widgetSceneProviderSupportSource from '../../android/app/src/main/java/co
 import widgetStoresSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetStores.kt?raw';
 import widgetTimerControllerSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetTimerController.kt?raw';
 import widgetTodoPinProviderSupportSource from '../../android/app/src/main/java/com/mistycrown/lumostime/WidgetTodoPinProviderSupport.java?raw';
+import quickTodo4x2ProviderSource from '../../android/app/src/main/java/com/mistycrown/lumostime/QuickLogWidgetQuickTodo4x2.java?raw';
+import quickTodo4x3ProviderSource from '../../android/app/src/main/java/com/mistycrown/lumostime/QuickLogWidgetQuickTodo4x3.java?raw';
+import quickTodo4x2InfoSource from '../../android/app/src/main/res/xml/widget_info_quick_todo_4x2.xml?raw';
+import quickTodo4x3InfoSource from '../../android/app/src/main/res/xml/widget_info_quick_todo_4x3.xml?raw';
 import widgetPrincipleCardLayoutSource from '../../android/app/src/main/res/layout/widget_layout_principle_card_4x2.xml?raw';
 import widgetSceneCardItemLayoutSource from '../../android/app/src/main/res/layout/widget_scene_card_item.xml?raw';
 import widgetSceneLayoutSource from '../../android/app/src/main/res/layout/widget_layout_scene_4x3.xml?raw';
@@ -727,6 +731,17 @@ describe('WidgetTodoPinProviderSupport', () => {
     expect(widgetTodoPinProviderSupportSource).toContain('refreshTodoPinWidgetWithFeedback');
     expect(widgetTodoPinProviderSupportSource).toContain('saveTodoPinRefreshAnimationState');
     expect(widgetTodoPinProviderSupportSource).toContain('views.setPendingIntentTemplate(');
+  });
+});
+
+describe('Resizable QuickTodo widgets', () => {
+  it('allows both-axis launcher resizing for both registered QuickTodo sizes', () => {
+    expect(quickTodo4x2InfoSource).toContain('android:resizeMode="both"');
+    expect(quickTodo4x3InfoSource).toContain('android:resizeMode="both"');
+    expect(quickTodo4x2ProviderSource).toContain('onAppWidgetOptionsChanged');
+    expect(quickTodo4x2ProviderSource).toContain('refreshWidget(context, appWidgetId)');
+    expect(quickTodo4x3ProviderSource).toContain('onAppWidgetOptionsChanged');
+    expect(quickTodo4x3ProviderSource).toContain('refreshWidget(context, appWidgetId)');
   });
 });
 

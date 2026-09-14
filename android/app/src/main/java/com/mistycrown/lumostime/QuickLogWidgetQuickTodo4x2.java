@@ -30,6 +30,12 @@ public class QuickLogWidgetQuickTodo4x2 extends AppWidgetProvider {
     }
 
     @Override
+    public void onAppWidgetOptionsChanged(Context context, AppWidgetManager manager, int appWidgetId, android.os.Bundle newOptions) {
+        super.onAppWidgetOptionsChanged(context, manager, appWidgetId, newOptions);
+        refreshWidget(context, appWidgetId);
+    }
+
+    @Override
     public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);
         if (WidgetQuickTodoProviderSupport.handleReceive(context, intent)) {
