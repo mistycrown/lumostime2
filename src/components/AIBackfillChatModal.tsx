@@ -4,6 +4,7 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-09-14: Syncs the configured assistant display name with the native background snapshot for Android notifications.
  * @updated 2026-09-03: Reloads restored personas, prompt blocks, and long-term memory into mounted chat state so cloud restores cannot be overwritten by stale React state.
  * @updated 2026-09-14: Added the persona-settings toggle for opting AI chat history out of unified sync payloads.
  * @updated 2026-09-04: Applies structured AI reminder removal actions to the durable reminder queue and long-term memory.
@@ -1724,7 +1725,9 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return 'AI';
     }
 
-    return personaMap.get(targetSession.personaId)?.name
+    const persona = personaMap.get(targetSession.personaId);
+    return persona?.assistantSelfName?.trim()
+      || persona?.name
       || assistantOrchestratorService.getBackgroundPersonaDisplayName(targetSession.id)
       || 'AI';
   }, [personaMap]);
@@ -2592,7 +2595,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         systemPrompt,
         conversation: assistantContextBuilder.buildConversationContext(
           serializeConversationTurnsForAssistantContext(conversationHistory)
-        )
+        ),
+        ...(targetSession
+          ? { assistantName: getBackgroundPersonaDisplayName(targetSession) }
+          : {})
       });
     } catch (error) {
       console.error('[AIBackfillChatModal] Failed to sync native background snapshot', error);
@@ -2604,6 +2610,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     buildAssistantStateContext,
     buildBackgroundPersonaPrompt,
     conversationHistoryCache,
+    getBackgroundPersonaDisplayName,
     getBackgroundTargetSession,
     isAssistantBackgroundContextReady
   ]);

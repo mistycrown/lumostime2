@@ -4,6 +4,7 @@
  * @output Android foreground-service control and assistant system-trigger events
  * @pos Native Plugin
  * @description Capacitor plugin bridge for the Android-first background assistant agent. Starts and stops the foreground agent service, updates alarm scheduling config, relays native system-trigger events back into the web layer, and surfaces assistant notification navigation.
+ * @updated 2026-09-14: Accepts the configured assistant name when syncing the native background snapshot.
  * @updated 2026-09-03: Removed the obsolete base polling interval and cancels the dedicated check-in alarm when the agent stops.
  * @updated 2026-07-07: Forwarded assistant-letter enablement and next-send timestamps into the native service so Android can schedule due letter wakeups.
  * @updated 2026-06-14: Persisted the disabled assistant state and cancelled reminder alarms before sending the stop intent so native repokes cannot race the user's polling toggle.
@@ -214,7 +215,8 @@ public class AssistantAgentPlugin extends Plugin {
         AssistantNativeBackgroundSnapshotStore.save(
             context,
             call.getString("systemPrompt", ""),
-            conversation == null ? "" : conversation.toString()
+            conversation == null ? "" : conversation.toString(),
+            call.getString("assistantName", "")
         );
         call.resolve();
     }
