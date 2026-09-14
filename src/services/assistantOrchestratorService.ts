@@ -4,7 +4,7 @@
  * @output Background assistant turn decisions plus applied reminder or memory side effects
  * @pos Service (Assistant Orchestrator)
  * @description Orchestrates Android-first assistant system turns by loading structured memory, assembling a prompt, calling the existing AI service, and applying the resulting silent/message/reminder/memory actions back into local state.
- * @updated 2026-09-14: Resolves notification display names from the configured AI self-name before falling back to the persona name.
+ * @updated 2026-09-14: Resolves notification display names directly from the configured persona name.
  * @updated 2026-09-04: Executes structured AI reminder removal actions in Web and native-background hydration paths.
  * @updated 2026-05-17: Persisted background chat/history writes now mark the unified AI backup state as changed so background-only AI activity can trigger cloud-sync/export timestamp updates.
  * @updated 2026-09-02: Hydrates native request failures into background call history so failed Android executions remain visible after the WebView resumes.
@@ -144,7 +144,6 @@ interface PersistedAIChatSession {
 interface PersistedAIChatPersonaSummary {
   id: string;
   name: string;
-  assistantSelfName?: string;
 }
 
 interface PersistedAssistantMessageLocation {
@@ -218,15 +217,11 @@ const loadPersistedPersonaNameMap = (): Map<string, string> => {
       const candidate = value as Partial<PersistedAIChatPersonaSummary>;
       const id = typeof candidate.id === 'string' ? candidate.id.trim() : '';
       const name = typeof candidate.name === 'string' ? candidate.name.trim() : '';
-      const assistantSelfName = typeof candidate.assistantSelfName === 'string'
-        ? candidate.assistantSelfName.trim()
-        : '';
-      const displayName = assistantSelfName || name;
-      if (!id || !displayName) {
+      if (!id || !name) {
         return [];
       }
 
-      return [[id, displayName] as const];
+      return [[id, name] as const];
     })
   );
 };

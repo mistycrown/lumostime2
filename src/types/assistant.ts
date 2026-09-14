@@ -5,7 +5,7 @@
  * @pos Type Definitions (Assistant Agent)
  * @description Defines the structured contracts used by the Android-first assistant agent layer so background triggers, memory updates, reminder queues, and AI system-turn decisions can stay typed and stable across services and plugins.
  *
- * @updated 2026-09-14: Added the optional assistant name to the native background snapshot contract for Android notification titles.
+ * @updated 2026-09-14: Added the optional persona name to the native background snapshot contract for Android notification titles.
  * @updated 2026-09-04: Added explicit structured reminder removal actions so AI-confirmed cancellations mutate the durable reminder queue.
  * @updated 2026-09-09: Added a terminal failed reminder status for bounded background dispatch retries.
  * @updated 2026-09-03: Removed the obsolete base polling interval from assistant agent configuration.
@@ -263,7 +263,7 @@ export interface AssistantNativeDiagnosticEntry {
 export interface AssistantNativeBackgroundSnapshot {
   systemPrompt: string;
   conversation: AssistantTurnConversationContext;
-  assistantName?: string;
+  personaName?: string;
 }
 
 export type AssistantMemoryAction = 'no_update' | 'update_memory';

@@ -16,12 +16,12 @@ public final class AssistantNativeBackgroundSnapshotStore {
     private static final String PREFS_NAME = "lumostime_assistant_native_background_snapshot";
     private static final String KEY_SYSTEM_PROMPT = "system_prompt";
     private static final String KEY_CONVERSATION_JSON = "conversation_json";
-    private static final String KEY_ASSISTANT_NAME = "assistant_name";
+    private static final String KEY_PERSONA_NAME = "persona_name";
 
     private AssistantNativeBackgroundSnapshotStore() {
     }
 
-    public static void save(Context context, String systemPrompt, String conversationJson, String assistantName) {
+    public static void save(Context context, String systemPrompt, String conversationJson, String personaName) {
         if (context == null) {
             return;
         }
@@ -29,7 +29,7 @@ public final class AssistantNativeBackgroundSnapshotStore {
         prefs(context).edit()
             .putString(KEY_SYSTEM_PROMPT, safeTrim(systemPrompt))
             .putString(KEY_CONVERSATION_JSON, safeTrim(conversationJson))
-            .putString(KEY_ASSISTANT_NAME, safeTrim(assistantName))
+            .putString(KEY_PERSONA_NAME, safeTrim(personaName))
             .apply();
     }
 
@@ -42,7 +42,7 @@ public final class AssistantNativeBackgroundSnapshotStore {
         return new NativeBackgroundSnapshot(
             sharedPreferences.getString(KEY_SYSTEM_PROMPT, ""),
             sharedPreferences.getString(KEY_CONVERSATION_JSON, ""),
-            sharedPreferences.getString(KEY_ASSISTANT_NAME, "")
+            sharedPreferences.getString(KEY_PERSONA_NAME, "")
         );
     }
 
@@ -62,12 +62,12 @@ public final class AssistantNativeBackgroundSnapshotStore {
     public static final class NativeBackgroundSnapshot {
         public final String systemPrompt;
         public final String conversationJson;
-        public final String assistantName;
+        public final String personaName;
 
-        public NativeBackgroundSnapshot(String systemPrompt, String conversationJson, String assistantName) {
+        public NativeBackgroundSnapshot(String systemPrompt, String conversationJson, String personaName) {
             this.systemPrompt = safeTrim(systemPrompt);
             this.conversationJson = safeTrim(conversationJson);
-            this.assistantName = safeTrim(assistantName);
+            this.personaName = safeTrim(personaName);
         }
     }
 }

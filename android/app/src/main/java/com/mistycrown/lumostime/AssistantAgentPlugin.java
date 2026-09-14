@@ -216,7 +216,7 @@ public class AssistantAgentPlugin extends Plugin {
             context,
             call.getString("systemPrompt", ""),
             conversation == null ? "" : conversation.toString(),
-            call.getString("assistantName", "")
+            call.getString("personaName", "")
         );
         call.resolve();
     }
