@@ -25,7 +25,7 @@ import {
     NarrativeTemplate
 } from '../types';
 import { DEFAULT_USER_PERSONAL_INFO } from '../constants';
-import { THEME_KEYS } from '../constants/storageKeys';
+import { SETTINGS_KEYS, THEME_KEYS } from '../constants/storageKeys';
 import { appAwarenessService } from '../services/appAwarenessService';
 import { uiIconService } from '../services/uiIconService';
 import { fontService } from '../services/fontService';
