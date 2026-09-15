@@ -28,6 +28,7 @@
  * @updated 2026-08-09: Added the configurable shortcut to the daily-check overview page.
  * @updated 2026-08-10: Records Timeline as the return target when opening daily-check overview.
  * @updated 2026-08-26: Added the configurable review-overview shortcut with Timeline return behavior.
+ * @updated 2026-09-15: Changed the Principle Library shortcut icon to Scale so it is distinct from Review Overview.
  * @updated 2026-08-09: Passes actionable real-record idle gaps into the split timeline canvas while excluding plan blocks from gap detection.
  * @updated 2026-08-24: Added an always-leftmost More menu for timeline shortcuts that are not pinned to the header.
  * @updated 2026-08-25: Rendered the More menu through a page-level portal so split-pane dividers cannot cover it.
@@ -39,7 +40,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { AppView, Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule, Goal, CheckItem, CheckTemplate } from '../types';
 import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
-import { Plus, MoreHorizontal, BarChart2, BookOpen, FlaskConical, RefreshCw, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon, Star, ChevronLeft, ChevronRight, ListFilter, ListTodo, X, Paintbrush, PanelRightClose } from 'lucide-react';
+import { Plus, MoreHorizontal, BarChart2, BookOpen, FlaskConical, RefreshCw, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon, Star, Scale, ChevronLeft, ChevronRight, ListFilter, ListTodo, X, Paintbrush, PanelRightClose } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { ParsedTimeEntry } from '../services/aiService';
 import { ToastType } from '../components/Toast';
@@ -560,7 +561,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
         principle: {
             label: '原则库',
             title: '原则库',
-            icon: <BookOpen size={20} />,
+            icon: <Scale size={20} />,
             onClick: () => {
                 setIsSettingsOpen(true);
                 setSettingsSubmenu('principle');
