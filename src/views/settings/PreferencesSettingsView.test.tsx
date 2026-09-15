@@ -3,6 +3,7 @@
  * @description Verifies the selected timer auto-jump label shown in preferences.
  * @updated 2026-05-10: Added coverage for the new three-option post-start jump selector.
  * @updated 2026-08-06: Added coverage for the shared association-selector layout preference.
+ * @updated 2026-09-15: Covers the global font-scale preference context shape.
  */
 import React from 'react';
 import { describe, expect, test, vi } from 'vitest';
@@ -12,6 +13,8 @@ vi.mock('../../contexts/SettingsContext', () => ({
   useSettings: () => ({
     themeMode: 'light',
     setThemeMode: vi.fn(),
+    fontScale: 1,
+    setFontScale: vi.fn(),
     timelineLayout: 'timeline',
     setTimelineLayout: vi.fn(),
     associationSelectorColumns: 3,

@@ -5,6 +5,7 @@
  * @pos Service (Backup and Sync)
  * @description Centralizes the user-facing appearance and TimePal settings that must survive export, cloud restore, and reinstall.
  * @updated 2026-08-10: Added the first unified appearance backup block with built-in-font fallback and theme-image reference extraction.
+ * @updated 2026-09-15: Included the global font-scale preference in appearance backups.
  */
 import { TIMEPAL_KEYS, THEME_KEYS } from '../constants/storageKeys';
 import { fontService } from './fontService';
@@ -39,6 +40,7 @@ const APPEARANCE_STORAGE_KEYS = [
   'lumostime_theme_mode',
   'lumos_selected_icon',
   'lumostime_font_family',
+  'lumostime_font_scale',
   TIMEPAL_KEYS.TYPE,
   TIMEPAL_KEYS.CUSTOM_ITEMS,
   TIMEPAL_KEYS.STAGE_THRESHOLDS,

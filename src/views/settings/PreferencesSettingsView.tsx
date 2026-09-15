@@ -8,6 +8,7 @@
  * @updated 2026-07-29: Moved display mode into the general settings group.
  * @updated 2026-07-31: Renamed the Chronicle layout selector to default Chronicle layout because in-page nav taps now handle temporary layout switching.
  * @updated 2026-08-06: Added a shared association-selector layout preference for the category, scope, tag, and todo pickers.
+ * @updated 2026-09-15: Added the global font-scale control under general preferences.
  */
 import React, { useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus, X } from 'lucide-react';
@@ -126,6 +127,8 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     const {
         themeMode,
         setThemeMode,
+        fontScale,
+        setFontScale,
         timelineLayout,
         setTimelineLayout,
         associationSelectorColumns,
@@ -216,6 +219,25 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                         </div>
                                     </>
                                 )}
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-4 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                            <div className="min-w-0 flex-1">
+                                <h4 className="font-bold text-stone-700">全局字号</h4>
+                                <p className="text-xs text-stone-400 mt-1">调整应用内文字大小</p>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-3">
+                                <input
+                                    aria-label="全局字号"
+                                    type="range"
+                                    min="0.8"
+                                    max="1.4"
+                                    step="0.05"
+                                    value={fontScale}
+                                    onChange={(event) => setFontScale(Number(event.target.value))}
+                                    className="w-28 accent-stone-800"
+                                />
+                                <span className="w-12 text-right text-sm font-bold tabular-nums text-stone-700">{Math.round(fontScale * 100)}%</span>
                             </div>
                         </div>
                         {/* Privacy Mode Toggle */}

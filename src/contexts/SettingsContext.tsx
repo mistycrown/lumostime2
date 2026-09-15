@@ -9,6 +9,7 @@
  * @updated 2026-07-30: Migrates the Chronicle quick-color split sidebar to the same responsive ratio model.
  * @updated 2026-08-06: Added a persistent association selector column preference for shared category, scope, tag, and todo pickers.
  * @updated 2026-08-10: Rehydrates appearance state after cloud or export restores so mounted settings do not overwrite restored choices.
+ * @updated 2026-09-15: Added a persisted global font-scale preference applied through the root CSS variable.
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
@@ -178,6 +179,8 @@ interface SettingsContextType {
     // 字体设置
     fontFamily: string;
     setFontFamily: React.Dispatch<React.SetStateAction<string>>;
+    fontScale: number;
+    setFontScale: React.Dispatch<React.SetStateAction<number>>;
 
     // 日程图样式
     scheduleStyle: ScheduleStyle;
@@ -577,6 +580,11 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         return stored || 'default';
     });
 
+    const [fontScale, setFontScale] = useState<number>(() => {
+        const stored = Number(localStorage.getItem('lumostime_font_scale'));
+        return Number.isFinite(stored) ? Math.min(1.4, Math.max(0.8, stored)) : 1;
+    });
+
     const [scheduleStyle, setScheduleStyle] = useState<ScheduleStyle>(() => {
         const stored = localStorage.getItem(THEME_KEYS.SCHEDULE_STYLE);
         if (stored === 'outline') return 'minimal';
@@ -671,6 +679,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setColorScheme(localStorage.getItem(THEME_KEYS.COLOR_SCHEME) || 'default');
             setThemeMode(readStoredThemeMode(localStorage));
             setFontFamily(localStorage.getItem('lumostime_font_family') || 'default');
+            const storedFontScale = Number(localStorage.getItem('lumostime_font_scale'));
+            setFontScale(Number.isFinite(storedFontScale) ? Math.min(1.4, Math.max(0.8, storedFontScale)) : 1);
             setScheduleStyle(
                 storedScheduleStyle === 'outline' ? 'minimal' :
                     (storedScheduleStyle === 'classic' || storedScheduleStyle === 'minimal' || storedScheduleStyle === 'solid' || storedScheduleStyle === 'default'
@@ -754,6 +764,12 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         // 同步到 fontService
         fontService.setFont(fontFamily);
     }, [fontFamily]);
+
+    useEffect(() => {
+        const normalizedFontScale = Math.min(1.4, Math.max(0.8, fontScale));
+        localStorage.setItem('lumostime_font_scale', normalizedFontScale.toString());
+        document.documentElement.style.setProperty('--font-scale', normalizedFontScale.toString());
+    }, [fontScale]);
 
     useEffect(() => {
         localStorage.setItem(THEME_KEYS.SCHEDULE_STYLE, scheduleStyle);
@@ -935,6 +951,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setThemeMode,
             fontFamily,
             setFontFamily,
+            fontScale,
+            setFontScale,
             scheduleStyle,
             setScheduleStyle,
             calendarNumberStyle,

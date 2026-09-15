@@ -76,7 +76,9 @@
 @layer base {
   :root {
     --font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Source Han Serif CN', 'Songti SC', 'STSong', 'SimSun', 'Microsoft YaHei', serif;
+    --font-scale: 1;
     --app-safe-area-top: env(safe-area-inset-top);
+    font-size: calc(16px * var(--font-scale));
   }
 
   html[data-native-android-top-inset] {
