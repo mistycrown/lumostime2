@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-09-15: Added structured Activity keyword records with source and color metadata.
  * @updated 2026-09-12: Added optional complete display expressions for app-awareness activity options.
  * @updated 2026-09-03: Added an optional keyword-source marker to Activity choice attributes.
  * @updated 2026-08-31: Added optional units and single-choice display conditions to Activity attributes.
@@ -75,6 +76,14 @@ export interface ActivityAttributeDefinition {
   updatedAt: number;
 }
 
+export interface ActivityKeyword {
+  label: string;
+  color?: string;
+  source: 'manual' | 'attribute';
+  attributeId?: string;
+  optionId?: string;
+}
+
 export type ActivityAttributeValue =
   | { attributeId: string; value: string }
   | { attributeId: string; value: number }
@@ -91,7 +100,7 @@ export interface Activity {
   heatmapMax?: number;
   enableFocusScore?: boolean; // Override parent setting
   enableMoodScore?: boolean; // Override parent setting for mood tracking
-  keywords?: string[]; // (NEW) Keywords for finer classification
+  keywords?: Array<string | ActivityKeyword>; // Keywords for finer classification; strings are legacy-compatible
   noteTemplates?: NoteTemplate[];
   attributes?: ActivityAttributeDefinition[];
   isArchived?: boolean;

@@ -18,7 +18,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useMemo, useState, useEffect } from 'react';
-import { Log, Category, Activity, TodoItem } from '../types';
+import { Log, Category, Activity, ActivityKeyword, TodoItem } from '../types';
 import { COLOR_OPTIONS } from '../constants';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { ArrowLeft, Clock, Calendar as CalendarIcon, MoreHorizontal, ChevronDown, Check, X, Zap, Save, CheckCircle2, Circle, Plus, Archive, ArchiveRestore } from 'lucide-react';
@@ -40,6 +40,7 @@ import { filterCountableLogs } from '../utils/statLogUtils';
 import { ActivityAttributeManager } from '../components/ActivityAttributeManager';
 import { ActivityAttributeStatistics } from '../components/ActivityAttributeStatistics';
 import { FeatureHint } from '../components/FeatureHint';
+import { getDefaultKeywordColor, normalizeActivityKeywords, syncActivityKeywordsWithAttribute } from '../utils/detailTimelineKeywordUtils';
 
 
 interface TagDetailViewProps {
@@ -84,6 +85,8 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    const [analysisRange, setAnalysisRange] = useState<'Week' | 'Month' | 'Year' | 'All'>('Month');
    const [analysisDate, setAnalysisDate] = useState(new Date());
    const [newKeyword, setNewKeyword] = useState(''); // New State for adding keyword
+   const [keywordColorTarget, setKeywordColorTarget] = useState<string | null>(null);
+   const [keywordColorDraft, setKeywordColorDraft] = useState<string | null>(null);
    const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false); // State for category dropdown
    const customColors = useCustomColors();
    const keywordAttribute = useMemo(() => (activity?.attributes || []).find((attribute) => (
@@ -91,6 +94,8 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
       && !attribute.isArchived
       && (attribute.type === 'single' || attribute.type === 'multi')
    )), [activity?.attributes]);
+
+   const keywordRecords = useMemo(() => syncActivityKeywordsWithAttribute(activity?.keywords || [], activity?.attributes || []), [activity?.attributes, activity?.keywords]);
 
    // 自动保存：为连续输入增加短暂防抖，避免每个按键都触发父级数据重建。
    useEffect(() => {
@@ -298,47 +303,15 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    };
 
    // 关键字颜色系统（用于Details tab中的关键字显示）
-   const KEYWORD_COLORS = [
-      'bg-red-100 text-red-600 border-red-200 hover:bg-red-200',
-      'bg-cyan-100 text-cyan-600 border-cyan-200 hover:bg-cyan-200',
-      'bg-yellow-100 text-yellow-600 border-yellow-200 hover:bg-yellow-200',
-      'bg-blue-100 text-blue-600 border-blue-200 hover:bg-blue-200',
-      'bg-orange-100 text-orange-600 border-orange-200 hover:bg-orange-200',
-      'bg-teal-100 text-teal-600 border-teal-200 hover:bg-teal-200',
-      'bg-amber-100 text-amber-600 border-amber-200 hover:bg-amber-200',
-      'bg-indigo-100 text-indigo-600 border-indigo-200 hover:bg-indigo-200',
-      'bg-lime-100 text-lime-600 border-lime-200 hover:bg-lime-200',
-      'bg-purple-100 text-purple-600 border-purple-200 hover:bg-purple-200',
-      'bg-green-100 text-green-600 border-green-200 hover:bg-green-200',
-      'bg-fuchsia-100 text-fuchsia-600 border-fuchsia-200 hover:bg-fuchsia-200',
-      'bg-emerald-100 text-emerald-600 border-emerald-200 hover:bg-emerald-200',
-      'bg-pink-100 text-pink-600 border-pink-200 hover:bg-pink-200',
-      'bg-sky-100 text-sky-600 border-sky-200 hover:bg-sky-200',
-      'bg-rose-100 text-rose-600 border-rose-200 hover:bg-rose-200',
-      'bg-violet-100 text-violet-600 border-violet-200 hover:bg-violet-200',
-   ];
-
-   const getKeywordColor = (keyword: string) => {
-      const keywords = activity?.keywords || [];
-      let index = keywords.indexOf(keyword);
-      if (index === -1) {
-         let hash = 0;
-         for (let i = 0; i < keyword.length; i++) {
-            hash = keyword.charCodeAt(i) + ((hash << 5) - hash);
-         }
-         index = Math.abs(hash);
-      }
-      const colorIndex = index % KEYWORD_COLORS.length;
-      return KEYWORD_COLORS[colorIndex];
-   };
+   const getKeywordColor = (keyword: ActivityKeyword) => keyword.color || getDefaultKeywordColor(keyword.label);
 
    const handleAddKeyword = () => {
       if (!newKeyword.trim() || !activity) return;
-      const currentKeywords = activity.keywords || [];
-      if (!currentKeywords.includes(newKeyword.trim())) {
+      const currentKeywords = normalizeActivityKeywords(activity.keywords || []);
+      if (!currentKeywords.some((keyword) => keyword.label === newKeyword.trim())) {
          setActivity({
             ...activity,
-            keywords: [...currentKeywords, newKeyword.trim()]
+            keywords: [...currentKeywords, { label: newKeyword.trim(), source: 'manual', color: getDefaultKeywordColor(newKeyword.trim(), currentKeywords.length) }]
          });
       }
       setNewKeyword('');
@@ -346,11 +319,37 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
    const handleRemoveKeyword = (keywordToRemove: string) => {
       if (!activity) return;
-      const currentKeywords = activity.keywords || [];
+      const currentKeywords = normalizeActivityKeywords(activity.keywords || []);
       setActivity({
          ...activity,
-         keywords: currentKeywords.filter(k => k !== keywordToRemove)
+         keywords: currentKeywords.filter((keyword) => !(keyword.source === 'manual' && keyword.label === keywordToRemove))
       });
+   };
+
+   const handleKeywordColorChange = (label: string, color: string) => {
+      if (!activity) return;
+      const currentKeywords = normalizeActivityKeywords(activity.keywords || []);
+      setActivity({ ...activity, keywords: currentKeywords.map((keyword) => keyword.label === label ? { ...keyword, color } : keyword) });
+      setKeywordColorTarget(null);
+   };
+
+   const openKeywordColorPicker = (label: string) => {
+      const target = keywordRecords.find((keyword) => keyword.label === label);
+      setKeywordColorTarget(label);
+      setKeywordColorDraft(target?.color || getDefaultKeywordColor(label));
+   };
+
+   const confirmKeywordColor = () => {
+      if (keywordColorTarget && keywordColorDraft) handleKeywordColorChange(keywordColorTarget, keywordColorDraft);
+      else setKeywordColorTarget(null);
+      setKeywordColorDraft(null);
+   };
+
+   const getKeywordSoftColor = (color: string) => `color-mix(in srgb, ${color} 16%, white)`;
+
+   const handleAttributesChange = (attributes: NonNullable<Activity['attributes']>) => {
+      if (!activity) return;
+      setActivity({ ...activity, attributes, keywords: syncActivityKeywordsWithAttribute(activity.keywords || [], attributes) });
    };
 
    const renderContent = () => {
@@ -611,7 +610,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   <ActivityAttributeManager
                      attributes={activity.attributes}
                      logs={tagLogs}
-                     onChange={(attributes) => setActivity({ ...activity, attributes })}
+                     onChange={handleAttributesChange}
                      onDeleteAttributeData={handleDeleteAttributeData}
                   />
 
@@ -627,20 +626,13 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                      </div>
                      <div className="space-y-4">
                         <div className="flex flex-wrap gap-2">
-                           {(activity.keywords || []).map(keyword => (
-                              <button
-                                 key={keyword}
-                                 onClick={() => handleRemoveKeyword(keyword)}
-                                 className={`
-                                    px-3 py-1.5 rounded-lg text-[11px] font-medium text-center border transition-colors flex items-center justify-center gap-1.5 truncate group
-                                    ${getKeywordColor(keyword)}
-                                 `}
-                              >
-                                 <span className="truncate max-w-[100px]">{keyword}</span>
-                                 <X size={10} className="opacity-40 hover:opacity-100 transition-opacity" />
-                              </button>
+                           {keywordRecords.map((keyword) => (
+                              <div key={`${keyword.source}-${keyword.attributeId || ''}-${keyword.optionId || keyword.label}`} className="inline-flex items-stretch overflow-hidden rounded-lg border text-[11px] font-medium" style={{ backgroundColor: getKeywordSoftColor(getKeywordColor(keyword)), borderColor: getKeywordColor(keyword), color: getKeywordColor(keyword) }}>
+                                 <button type="button" onClick={() => openKeywordColorPicker(keyword.label)} className="max-w-[120px] truncate px-3 py-1.5 text-left hover:brightness-90" title="修改颜色">{keyword.label}</button>
+                                 {keyword.source === 'manual' && <button type="button" onClick={() => handleRemoveKeyword(keyword.label)} className="border-l px-1.5 text-current opacity-55 hover:opacity-100" style={{ borderColor: getKeywordColor(keyword) }} title="删除关键字"><X size={10} /></button>}
+                              </div>
                            ))}
-                           {(activity.keywords || []).length === 0 && (
+                           {keywordRecords.length === 0 && (
                               <span className="text-xs text-stone-300 italic">还没有添加关键字。</span>
                            )}
                         </div>
@@ -668,6 +660,20 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                         </div>
                      </div>
                   </div>
+                  {keywordColorTarget && (() => {
+                     const target = keywordRecords.find((keyword) => keyword.label === keywordColorTarget);
+                     if (!target) return null;
+                     return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) { setKeywordColorTarget(null); setKeywordColorDraft(null); } }}>
+                        <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl" role="dialog" aria-modal="true" aria-label="选择关键字颜色">
+                           <div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-semibold text-stone-800">选择颜色</h3><button type="button" onClick={() => { setKeywordColorTarget(null); setKeywordColorDraft(null); }} className="p-1 text-stone-400 hover:text-stone-800" title="关闭"><X size={16} /></button></div>
+                           <div className="grid grid-cols-8 gap-2">
+                              {COLOR_OPTIONS.map((option) => <button key={option.id} type="button" onClick={() => setKeywordColorDraft(option.hex)} className={`h-7 w-7 rounded-full border border-white shadow-sm ring-1 ring-stone-200 ${keywordColorDraft === option.hex ? 'ring-2 ring-stone-800' : ''}`} style={{ backgroundColor: option.hex }} aria-label={option.label} />)}
+                              {customColors.map((option) => <button key={option.id} type="button" onClick={() => setKeywordColorDraft(option.color)} className={`h-7 w-7 rounded-full border border-white shadow-sm ring-1 ring-stone-200 ${keywordColorDraft === option.color ? 'ring-2 ring-stone-800' : ''}`} style={{ backgroundColor: option.color }} aria-label="自定义颜色" />)}
+                           </div>
+                           <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => { setKeywordColorTarget(null); setKeywordColorDraft(null); }} className="rounded-lg px-3 py-2 text-xs text-stone-500 hover:bg-stone-50">取消</button><button type="button" onClick={confirmKeywordColor} className="rounded-lg bg-stone-800 px-3 py-2 text-xs font-medium text-white hover:bg-stone-700">确定</button></div>
+                        </div>
+                     </div>;
+                  })()}
                </div>
             );
          case 'Timeline':
@@ -689,7 +695,8 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   onEditLog={onEditLog}
                   categories={categories}
                   todos={todos}
-                  keywords={activity.keywords || []}
+                  keywords={keywordRecords}
+                  keywordRecords={keywordRecords}
                   keywordAttribute={keywordAttribute}
                   enableFocusScore={activity.enableFocusScore ?? category?.enableFocusScore ?? false}
                   enableMoodScore={activity.enableMoodScore ?? category?.enableMoodScore ?? false}
