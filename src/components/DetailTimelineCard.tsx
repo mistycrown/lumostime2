@@ -17,6 +17,7 @@
  * @updated 2026-08-09: Month-view groups now use only countable dates from the selected month, removing cross-month and planned-only headings.
  * @updated 2026-09-12: Renders Routine checklist notes as visual checklist rows in detail timelines.
  * @updated 2026-09-15: Added contextual guidance for activity timeline calendar display modes.
+ * @updated 2026-09-15: Positioned the activity calendar hint before the mode switcher and restored its dark-red treatment.
  */
 import React, { useMemo } from 'react';
 import { ActivityAttributeDefinition, ActivityKeyword, Log, Category } from '../types';
@@ -535,6 +536,15 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
 
                         {/* 右侧：视图切换 */}
                         <div className="flex items-center gap-1.5">
+                          {entityInfo.type === 'activity' && (
+                            <FeatureHint
+                              hintId="tag-detail-timeline-calendar-modes"
+                              title="时间线月历图说明"
+                              iconSize={13}
+                              className="text-red-900/75 hover:text-red-900"
+                              message={'时间线月历图有三种模式：\n\n一、热力图\n当日专注记录时间越久，颜色越深。\n\n二、画廊\n读取的当日专注记录中的图片填充日期格子，也会读取记录所关联待办的封面图片填充日期格子。\n\n示例用法：\n饮食日历：在关联了饮食标签的记录中，添加饮食图片即可。\n读书日历：在关联了读书标签的记录中，同时关联至书籍待办，并在书籍待办中设置封面图片，即可生成图书日历。\n\n三、关键字\n读取关键字或作为关键字的属性来渲染颜色，支持多个关键字同时渲染在一个格子内。\n\n示例用法：\n训练部位记录：在运动标签的自定义属性内添加选择题“部位”，并添加腿部、腰腹、手臂等训练部位。在关联到运动的记录中，通过备注或者属性选择记录训练部位，即可生成训练部位记录日历。'}
+                            />
+                          )}
                           <div className="flex bg-stone-100/50 p-0.5 rounded-lg">
                             <button
                                 onClick={() => setCalendarViewMode('heatmap')}
@@ -572,15 +582,6 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                 </button>
                             )}
                           </div>
-                          {entityInfo.type === 'activity' && (
-                            <FeatureHint
-                              hintId="tag-detail-timeline-calendar-modes"
-                              title="时间线月历图说明"
-                              iconSize={13}
-                              className="text-stone-400 hover:text-stone-600"
-                              message={'时间线月历图有三种模式：\n\n一、热力图\n当日专注记录时间越久，颜色越深。\n\n二、画廊\n读取的当日专注记录中的图片填充日期格子，也会读取记录所关联待办的封面图片填充日期格子。\n\n示例用法：\n饮食日历：在关联了饮食标签的记录中，添加饮食图片即可。\n读书日历：在关联了读书标签的记录中，同时关联至书籍待办，并在书籍待办中设置封面图片，即可生成图书日历。\n\n三、关键字\n读取关键字或作为关键字的属性来渲染颜色，支持多个关键字同时渲染在一个格子内。\n\n示例用法：\n训练部位记录：在运动标签的自定义属性内添加选择题“部位”，并添加腿部、腰腹、手臂等训练部位。在关联到运动的记录中，通过备注或者属性选择记录训练部位，即可生成训练部位记录日历。'}
-                            />
-                          )}
                         </div>
                     </div>
 
