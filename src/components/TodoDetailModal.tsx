@@ -10,6 +10,7 @@
  * @updated 2026-07-30: Completed todos now expose an editable completion-date field that reuses the planning date picker while preserving the stored local completion time.
  * @updated 2026-07-06: Raised the overlay detail layer above collection and schedule popovers so collection-launched todo timeline entries remain visible.
  * @updated 2026-09-15: Added contextual guidance for the six todo schedule types and date rules beside the schedule section title.
+ * @updated 2026-09-15: Added contextual guidance for todo cover image ratio and timeline gallery rendering.
  * @updated 2026-05-19: Replaced the hidden monthly fallback checkbox with a pure button toggle that blocks default mouse-down focus switching, fixing the desktop white-screen triggered by tapping `31 号无则月末`.
  * @updated 2026-05-18: Defaulted timeline metadata render options so detail-page log chips still render safely when callers omit the auxiliary collection-name payload.
  * @updated 2026-05-18: Changed task title editing to update only on blur (or Enter) to prevent live-updating and redundant auto-saves during typing.
@@ -1269,7 +1270,16 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
               {/* Cover Image */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs text-stone-400 font-medium">封面图片</label>
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-xs text-stone-400 font-medium">封面图片</label>
+                    <FeatureHint
+                      hintId="todo-detail-cover-image"
+                      title="封面图片说明"
+                      iconSize={13}
+                      className="text-stone-400 hover:text-stone-600"
+                      message={'待办封面的建议比例为 1：1。\n\n时间线顶部的月历需要切换至画廊模式，才会显示封面图片。关联至该待办的时间记录会共享同一张封面图片：图片会渲染在脉络顶部可展开的月历图中，也会显示在关联至此记录的标签或领域详情时间线月历中。'}
+                    />
+                  </div>
                   {coverImage && (
                     <button
                       type="button"
