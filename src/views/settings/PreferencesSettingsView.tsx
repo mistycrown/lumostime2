@@ -13,7 +13,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus, X } from 'lucide-react';
 import { ToastType } from '../../components/Toast';
-import { useSettings } from '../../contexts/SettingsContext';
+import { useSettings, NavigationModuleKey, NavigationModuleVisibility } from '../../contexts/SettingsContext';
 import { AutoStartTimerJumpMode, DefaultArchiveView, DefaultIndexView, DefaultRecordView, ImmersiveTimerOrientation, SceneCardTimerMode, TimelineQuickActionKey, TimelineSortOrder } from '../../contexts/SettingsContext';
 import { TIMELINE_QUICK_ACTION_MAX, TIMELINE_QUICK_ACTION_OPTIONS } from '../../constants/timelineQuickActions';
 import {
@@ -72,6 +72,8 @@ interface PreferencesSettingsViewProps {
     onToggleManualSyncMode?: () => void;
     sceneCardTimerMode?: SceneCardTimerMode;
     onSetSceneCardTimerMode?: (mode: SceneCardTimerMode) => void;
+    navigationModuleVisibility?: NavigationModuleVisibility;
+    onSetNavigationModuleVisibility?: (visibility: NavigationModuleVisibility) => void;
 }
 
 export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = ({
@@ -122,7 +124,9 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     manualSyncMode = false,
     onToggleManualSyncMode,
     sceneCardTimerMode = 'realtime',
-    onSetSceneCardTimerMode
+    onSetSceneCardTimerMode,
+    navigationModuleVisibility,
+    onSetNavigationModuleVisibility
 }) => {
     const {
         themeMode,
@@ -146,6 +150,13 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
         (option) => !timelineQuickActions.includes(option.key)
     );
     const canAddMoreQuickActions = timelineQuickActions.length < TIMELINE_QUICK_ACTION_MAX;
+    const navigationOptions: Array<{ key: NavigationModuleKey; label: string }> = [
+        { key: 'record', label: '记录' },
+        { key: 'todo', label: '待办' },
+        { key: 'timeline', label: '脉络' },
+        { key: 'review', label: '档案' },
+        { key: 'index', label: '索引' }
+    ];
 
     const moveQuickAction = (index: number, direction: -1 | 1) => {
         const nextIndex = index + direction;
@@ -240,6 +251,28 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                     onChange={(event) => setFontScale(Number(event.target.value))}
                                     className="w-full accent-stone-800"
                                 />
+                            </div>
+                        </div>
+                        <div className="flex flex-col gap-3 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                            <h4 className="font-bold text-stone-700">导航模块开关</h4>
+                            <div className="grid grid-cols-5 gap-2">
+                                {navigationOptions.map((option) => {
+                                    const checked = navigationModuleVisibility?.[option.key] ?? true;
+                                    return (
+                                        <label key={option.key} className="flex min-w-0 cursor-pointer items-center justify-center gap-1.5 text-xs font-bold text-stone-600">
+                                            <input
+                                                type="checkbox"
+                                                checked={checked}
+                                                onChange={() => onSetNavigationModuleVisibility?.({
+                                                    ...(navigationModuleVisibility || { record: true, todo: true, timeline: true, review: true, index: true }),
+                                                    [option.key]: !checked
+                                                })}
+                                                className="h-4 w-4 shrink-0 accent-stone-800"
+                                            />
+                                            <span className="truncate">{option.label}</span>
+                                        </label>
+                                    );
+                                })}
                             </div>
                         </div>
                         {/* Privacy Mode Toggle */}

@@ -40,12 +40,15 @@ const NAV_ITEMS = [
     { view: AppView.TAGS, label: '索引' },
 ];
 
+const NAV_ITEM_KEYS = ['record', 'todo', 'timeline', 'review', 'index'] as const;
+
 export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     currentView,
     onViewChange,
     isVisible
 }) => {
-    const { defaultIndexView } = useSettings();
+    const { defaultIndexView, navigationModuleVisibility } = useSettings();
+    const visibleNavItems = NAV_ITEMS.filter((_, index) => navigationModuleVisibility[NAV_ITEM_KEYS[index]]);
     const [currentDecoration, setCurrentDecoration] = useState<string>('default');
     const [decorationUrl, setDecorationUrl] = useState<string>('');
     const [settings, setSettings] = useState({
@@ -164,7 +167,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
                 {/* 导航栏 */}
                 <nav className={`relative h-12 md:h-16 box-content border-t border-stone-100 flex justify-around items-center pb-[env(safe-area-inset-bottom)] ${bgColor}`}>
-                    {NAV_ITEMS.map((item) => {
+                    {visibleNavItems.map((item) => {
                         const isActive = item.view === AppView.TAGS
                             ? isIndexView(currentView)
                             : currentView === item.view;

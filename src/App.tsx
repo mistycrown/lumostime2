@@ -177,6 +177,7 @@ const AppContent: React.FC = () => {
     defaultArchiveView, setDefaultArchiveView,
     defaultIndexView, setDefaultIndexView,
     defaultRecordView, setDefaultRecordView,
+    navigationModuleVisibility, setNavigationModuleVisibility,
     customNarrativeTemplates, setCustomNarrativeTemplates,
     userPersonalInfo, setUserPersonalInfo,
     customStickerSets, setCustomStickerSets,
@@ -1411,6 +1412,8 @@ const AppContent: React.FC = () => {
 
             defaultRecordView={defaultRecordView}
             onSetDefaultRecordView={setDefaultRecordView}
+            navigationModuleVisibility={navigationModuleVisibility}
+            onSetNavigationModuleVisibility={setNavigationModuleVisibility}
 
             onOpenSearch={() => {
               setIsSearchOpenedFromSettings(true);

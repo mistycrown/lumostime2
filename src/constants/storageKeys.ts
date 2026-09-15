@@ -131,6 +131,7 @@ export const SETTINGS_KEYS = {
     APP_AWARENESS_TEMPLATES: 'lumostime_app_awareness_workflow_templates',
     APP_AWARENESS_BINDINGS: 'lumostime_app_awareness_bindings',
     APP_AWARENESS_ACTIVE_RUN: 'lumostime_app_awareness_active_run',
+    NAVIGATION_MODULE_VISIBILITY: 'lumostime_navigation_module_visibility',
 } as const;
 
 /**
