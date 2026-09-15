@@ -9,6 +9,7 @@
  * @updated 2026-07-30: Added Repeat auto-Plan settings for fixed timeline blocks with finite future occurrence generation.
  * @updated 2026-07-30: Completed todos now expose an editable completion-date field that reuses the planning date picker while preserving the stored local completion time.
  * @updated 2026-07-06: Raised the overlay detail layer above collection and schedule popovers so collection-launched todo timeline entries remain visible.
+ * @updated 2026-09-15: Added contextual guidance for the six todo schedule types and date rules beside the schedule section title.
  * @updated 2026-05-19: Replaced the hidden monthly fallback checkbox with a pure button toggle that blocks default mouse-down focus switching, fixing the desktop white-screen triggered by tapping `31 号无则月末`.
  * @updated 2026-05-18: Defaulted timeline metadata render options so detail-page log chips still render safely when callers omit the auxiliary collection-name payload.
  * @updated 2026-05-18: Changed task title editing to update only on blur (or Enter) to prevent live-updating and redundant auto-saves during typing.
@@ -44,6 +45,7 @@ import { TagAssociation } from './TagAssociation';
 import { AssociationOptionGrid } from './AssociationOptionGrid';
 import { Trash2, Check, CheckCircle2, TrendingUp, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Pin, RotateCcw, CalendarDays, Flag, Repeat2, Plus, X } from 'lucide-react';
 import { DetailTimelineCard } from './DetailTimelineCard';
+import { FeatureHint } from './FeatureHint';
 import { TimelineImage } from './TimelineImage';
 import { imageService } from '../services/imageService';
 import { IconRenderer } from './IconRenderer';
@@ -1454,7 +1456,16 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
 
             <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest">时间安排</h3>
+                <div className="flex items-center gap-1.5">
+                  <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest">时间安排</h3>
+                  <FeatureHint
+                    hintId="todo-detail-schedule-types"
+                    title="时间安排说明"
+                    iconSize={13}
+                    className="text-stone-400 hover:text-stone-600"
+                    message={'一个任务可以拥有六种排期类型：\n\nArrange：我安排这天完成\nDue：这天之前要完成\nMaybe：这几天可能做，但还没定\nRepeat：循环任务\nTrace：这天推进过\nComplete：这天正式完成\n\n前四种可以手动指定，后两种由系统自动在排期日历中生成。\n\n安排日期和截止日期可以各指定一个。可能日期可以指定未来的多个，但是当此日期过去之后，可能日期会自动更新删除。循环日期可以设定循环规则，在循环结束前，不需要点击完成。设定跳过日期可以跳过此周期循环。'}
+                  />
+                </div>
                 {(scheduledDate || deadlineDate || maybeDates.length > 0 || recurrenceRule) && (
                   <button
                     type="button"
