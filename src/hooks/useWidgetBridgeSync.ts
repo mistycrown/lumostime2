@@ -28,6 +28,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useData } from '../contexts/DataContext';
 import { useReview } from '../contexts/ReviewContext';
+import type { TodoItem } from '../types';
 import { useSession } from '../contexts/SessionContext';
 import WidgetBridge from '../plugins/WidgetBridgePlugin';
 import { RedemptionService } from '../services/redemptionService';
@@ -39,9 +40,9 @@ import {
   buildDailyWidgetSyncPayload,
   buildWidgetLogTailState,
   buildLogFromWidgetPendingAction,
+  buildWidgetRuntimeStatesFromSessions,
   buildTrackingCalendarWidgetPayload,
   buildTodoPinWidgetPayload,
-  buildWidgetRuntimeStateFromSession,
   buildWidgetSessionFromRuntimeState,
   loadPrincipleCardWidgetPayloadFromStorage,
   PRINCIPLE_LIBRARY_STORAGE_KEY,
@@ -247,7 +248,7 @@ export const useWidgetBridgeSync = () => {
       isReconciling = true;
       try {
         let reconciledDailyState = latestDailyStateRef.current;
-        const [{ actions }, { runtimeState }, { actions: dailyActions }, { actions: todoPinActions }] = await Promise.all([
+        const [{ actions }, { runtimeState, runtimeStates }, { actions: dailyActions }, { actions: todoPinActions }] = await Promise.all([
           WidgetBridge.getPendingActions(),
           WidgetBridge.getRuntimeState(),
           WidgetBridge.getPendingDailyActions(),
@@ -309,7 +310,7 @@ export const useWidgetBridgeSync = () => {
         if (todoPinActions.length > 0) {
           const completedAt = new Date().toISOString();
           setTodos((prevTodos) => {
-            const createdTodos = todoPinActions
+            const createdTodos: TodoItem[] = todoPinActions
               .filter((action) => action.actionType === 'create' && action.title?.trim())
               .filter((action) => !prevTodos.some((todo) => todo.id === action.todoId))
               .map((action) => ({
@@ -355,34 +356,27 @@ export const useWidgetBridgeSync = () => {
           const withoutCompletedSessions = prevSessions.filter(
             (session) => !completedActionIds.has(session.id)
           );
-
-          if (!runtimeState) {
-            return withoutCompletedSessions.filter((session) => session.source !== 'widget');
-          }
-
-          if (runtimeState.source !== 'widget') {
-            return withoutCompletedSessions;
-          }
-
-          const nextNativeSession = buildWidgetSessionFromRuntimeState(runtimeState, categories);
-          const existingSameSession = withoutCompletedSessions.find(
-            (session) => session.id === nextNativeSession.id
-          );
-          const reconciledSession = existingSameSession
-            ? {
-                ...existingSameSession,
-                ...nextNativeSession,
-                source: existingSameSession.source || nextNativeSession.source
-              }
-            : nextNativeSession;
-
-          const withoutDuplicateSessions = withoutCompletedSessions.filter((session) => {
-            if (session.id === reconciledSession.id) {
-              return false;
-            }
-            return session.source !== 'widget';
+          const nativeStates = runtimeStates && runtimeStates.length > 0
+            ? runtimeStates
+            : runtimeState
+              ? [runtimeState]
+              : [];
+          const nativeWidgetSessions = nativeStates
+            .filter((state) => state.source === 'widget')
+            .map((state) => buildWidgetSessionFromRuntimeState(state, categories));
+          const appSessions = withoutCompletedSessions.filter((session) => session.source !== 'widget');
+          const reconciledWidgetSessions = nativeWidgetSessions.map((nextNativeSession) => {
+            const existingSession = withoutCompletedSessions.find((session) => session.id === nextNativeSession.id);
+            return existingSession
+              ? {
+                  ...existingSession,
+                  ...nextNativeSession,
+                  source: existingSession.source || nextNativeSession.source
+                }
+              : nextNativeSession;
           });
-          return [...withoutDuplicateSessions, reconciledSession];
+          return [...appSessions, ...reconciledWidgetSessions]
+            .sort((left, right) => left.startTime - right.startTime);
         });
 
         setHasHydratedNativeState(true);
@@ -465,8 +459,13 @@ export const useWidgetBridgeSync = () => {
         if (!hasHydratedSessionRuntimeRef.current) {
           hasHydratedSessionRuntimeRef.current = true;
           try {
-            const { runtimeState: nativeRuntime } = await WidgetBridge.getRuntimeState();
-            if (nativeRuntime?.source === 'widget') {
+            const nativeRuntime = await WidgetBridge.getRuntimeState();
+            const nativeStates = nativeRuntime.runtimeStates && nativeRuntime.runtimeStates.length > 0
+              ? nativeRuntime.runtimeStates
+              : nativeRuntime.runtimeState
+                ? [nativeRuntime.runtimeState]
+                : [];
+            if (nativeStates.some((state) => state.source === 'widget')) {
               return;
             }
           } catch (error) {
@@ -475,7 +474,7 @@ export const useWidgetBridgeSync = () => {
         }
 
         try {
-          await WidgetBridge.syncRuntimeState({ runtimeState: null });
+          await WidgetBridge.syncRuntimeState({ runtimeStates: [] });
         } catch (error) {
           console.error('[useWidgetBridgeSync] Failed to clear native widget runtime state', error);
         }
@@ -483,18 +482,16 @@ export const useWidgetBridgeSync = () => {
       }
 
       hasHydratedSessionRuntimeRef.current = true;
-      const runtimeState = latestSession
-        ? buildWidgetRuntimeStateFromSession(latestSession, categories)
-        : null;
+      const runtimeStates = buildWidgetRuntimeStatesFromSessions(activeSessions, categories);
 
       fireAndForgetWidgetBridgeCall(
         'Failed to sync runtime state to native widget',
-        () => WidgetBridge.syncRuntimeState({ runtimeState })
+        () => WidgetBridge.syncRuntimeState({ runtimeStates, version: 2 })
       );
     };
 
     void syncRuntimeState();
-  }, [categories, hasHydratedNativeState, latestSession]);
+  }, [activeSessions, categories, hasHydratedNativeState]);
 
   useEffect(() => {
     if (!isNativeAndroidWidgetSupported() || !hasHydratedNativeState) {

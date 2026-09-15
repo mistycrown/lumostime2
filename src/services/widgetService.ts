@@ -1108,6 +1108,13 @@ export const buildWidgetRuntimeStateFromSession = (
   };
 };
 
+export const buildWidgetRuntimeStatesFromSessions = (
+  sessions: ActiveSession[],
+  categories: Category[]
+): WidgetBridgeRuntimeState[] => sessions.map((session) => (
+  buildWidgetRuntimeStateFromSession(session, categories)
+));
+
 export const buildWidgetSessionFromRuntimeState = (
   runtimeState: WidgetBridgeRuntimeState,
   categories: Category[]

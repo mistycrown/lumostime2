@@ -24,7 +24,7 @@ public class WidgetTodoPinRemoteViewsService extends RemoteViewsService {
         private final android.content.Context context;
         private final int appWidgetId;
         private List<WidgetTodoPinItem> items = new ArrayList<>();
-        private WidgetRuntimeState runtimeState;
+        private List<WidgetRuntimeState> runtimeStates = new ArrayList<>();
 
         private Factory(android.content.Context context, Intent intent) {
             this.context = context;
@@ -48,13 +48,13 @@ public class WidgetTodoPinRemoteViewsService extends RemoteViewsService {
             } else {
                 items = new ArrayList<>();
             }
-            runtimeState = WidgetStores.INSTANCE.loadRuntimeState(context);
+            runtimeStates = WidgetStores.INSTANCE.loadRuntimeStates(context);
         }
 
         @Override
         public void onDestroy() {
             items = new ArrayList<>();
-            runtimeState = null;
+            runtimeStates = new ArrayList<>();
         }
 
         @Override
@@ -69,8 +69,8 @@ public class WidgetTodoPinRemoteViewsService extends RemoteViewsService {
             }
 
             WidgetTodoPinItem item = items.get(position);
-            boolean isRunning = runtimeState != null
-                    && item.getTodoId().equals(runtimeState.getLinkedTodoId());
+            boolean isRunning = runtimeStates.stream()
+                    .anyMatch(runtime -> item.getTodoId().equals(runtime.getLinkedTodoId()));
             boolean isActionable = item.isActionable();
 
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_todo_pin_list_item);

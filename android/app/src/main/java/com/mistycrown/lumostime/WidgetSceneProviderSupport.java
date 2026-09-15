@@ -376,7 +376,7 @@ public final class WidgetSceneProviderSupport {
     ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             WidgetDailySyncPayload dailyPayload = WidgetStores.INSTANCE.loadDailySyncPayload(context);
-            WidgetRuntimeState runtimeState = WidgetStores.INSTANCE.loadRuntimeState(context);
+            java.util.List<WidgetRuntimeState> runtimeStates = WidgetStores.INSTANCE.loadRuntimeStates(context);
             WidgetTapAnimationState tapAnimationState = WidgetStores.INSTANCE.loadTapAnimationState(context);
             RemoteViews.RemoteCollectionItems.Builder items = new RemoteViews.RemoteCollectionItems.Builder();
             List<WidgetSceneItem> sceneItems = state.selectedSlot != null
@@ -390,7 +390,7 @@ public final class WidgetSceneProviderSupport {
                         sceneItems.get(index),
                         index,
                         dailyPayload,
-                        runtimeState,
+                        runtimeStates,
                         tapAnimationState
                 ));
             }

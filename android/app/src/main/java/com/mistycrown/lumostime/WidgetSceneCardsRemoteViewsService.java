@@ -28,7 +28,7 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
         private final int appWidgetId;
         private WidgetSceneProviderSupport.ResolvedSceneState resolvedState;
         private WidgetDailySyncPayload dailyPayload;
-        private WidgetRuntimeState runtimeState;
+        private List<WidgetRuntimeState> runtimeStates = Collections.emptyList();
         private WidgetTapAnimationState tapAnimationState;
 
         Factory(Context context, Intent intent) {
@@ -53,7 +53,7 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
         public void onDestroy() {
             resolvedState = null;
             dailyPayload = null;
-            runtimeState = null;
+            runtimeStates = Collections.emptyList();
             tapAnimationState = null;
         }
 
@@ -76,7 +76,7 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
                     items.get(position),
                     position,
                     dailyPayload,
-                    runtimeState,
+                    runtimeStates,
                     tapAnimationState
             );
         }
@@ -108,7 +108,7 @@ public class WidgetSceneCardsRemoteViewsService extends RemoteViewsService {
         private void reloadData() {
             resolvedState = WidgetSceneProviderSupport.resolveState(context, appWidgetId);
             dailyPayload = WidgetStores.INSTANCE.loadDailySyncPayload(context);
-            runtimeState = WidgetStores.INSTANCE.loadRuntimeState(context);
+            runtimeStates = WidgetStores.INSTANCE.loadRuntimeStates(context);
             tapAnimationState = WidgetStores.INSTANCE.loadTapAnimationState(context);
         }
 

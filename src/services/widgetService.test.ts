@@ -33,6 +33,7 @@ import {
   buildTrackingCalendarScopeConfig,
   buildTrackingCalendarTagConfig,
   buildTrackingCalendarWidgetPayload,
+  buildWidgetRuntimeStatesFromSessions,
   createWidgetTemplate,
   getWidgetGridBySize,
   getWidgetSlotCountBySize,
@@ -873,6 +874,36 @@ describe('WidgetPrincipleCardProviderSupport', () => {
     expect(widgetBridgePluginSource).toContain('WidgetRefreshCoordinator.refreshPrincipleCardWidgets(context)');
     expect(widgetStoresSource).toContain('KEY_PRINCIPLE_CARD_SYNC');
     expect(widgetStoresSource).toContain('KEY_PRINCIPLE_CARD_STATES');
+  });
+});
+
+describe('Widget runtime state conversion', () => {
+  it('converts every active session without collapsing the list to the latest session', () => {
+    const sessions: ActiveSession[] = [
+      {
+        id: 'session-a',
+        activityId: 'activity-a',
+        categoryId: 'category-a',
+        activityName: 'A',
+        activityIcon: 'A',
+        startTime: 100,
+        source: 'app'
+      },
+      {
+        id: 'session-b',
+        activityId: 'activity-b',
+        categoryId: 'category-b',
+        activityName: 'B',
+        activityIcon: 'B',
+        startTime: 200,
+        source: 'widget'
+      }
+    ];
+
+    expect(buildWidgetRuntimeStatesFromSessions(sessions, [])).toMatchObject([
+      { id: 'session-a', activityId: 'activity-a' },
+      { id: 'session-b', activityId: 'activity-b' }
+    ]);
   });
 });
 

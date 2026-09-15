@@ -1003,7 +1003,23 @@ public class AppUsagePlugin extends Plugin {
     }
 
     private void syncFloatingWindowForNativeStop() {
-        FloatingWindowService.updateFocusStateIfRunning("", false, 0L, null);
+        java.util.List<WidgetRuntimeState> runtimeStates = WidgetStores.INSTANCE.loadRuntimeStates(getContext());
+        WidgetRuntimeState displayedRuntime = null;
+        for (WidgetRuntimeState runtimeState : runtimeStates) {
+            if (displayedRuntime == null || runtimeState.getStartedAt() > displayedRuntime.getStartedAt()) {
+                displayedRuntime = runtimeState;
+            }
+        }
+        if (displayedRuntime == null) {
+            FloatingWindowService.updateFocusStateIfRunning("", false, 0L, null);
+            return;
+        }
+        FloatingWindowService.updateFocusStateIfRunning(
+                displayedRuntime.getIcon(),
+                true,
+                displayedRuntime.getStartedAt(),
+                displayedRuntime.getId()
+        );
     }
 
     private org.json.JSONObject buildNativeTimerBarPayload(NativeAppAwarenessTimerRuntime runtime) throws org.json.JSONException {

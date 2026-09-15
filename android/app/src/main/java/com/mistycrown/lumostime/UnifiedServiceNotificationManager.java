@@ -276,8 +276,7 @@ public final class UnifiedServiceNotificationManager {
             dedupedEntries.put(entry.id, entry);
         }
 
-        FocusEntry widgetEntry = getWidgetFocusEntry(context);
-        if (widgetEntry != null) {
+        for (FocusEntry widgetEntry : getWidgetFocusEntries(context)) {
             dedupedEntries.put(widgetEntry.id, widgetEntry);
         }
 
@@ -316,25 +315,22 @@ public final class UnifiedServiceNotificationManager {
         return entries;
     }
 
-    private static FocusEntry getWidgetFocusEntry(Context context) {
+    private static List<FocusEntry> getWidgetFocusEntries(Context context) {
+        List<FocusEntry> entries = new ArrayList<>();
         try {
-            WidgetRuntimeState runtimeState = WidgetStores.INSTANCE.loadRuntimeState(context);
-            if (runtimeState == null || runtimeState.getStartedAt() <= 0L) {
-                return null;
+            for (WidgetRuntimeState runtimeState : WidgetStores.INSTANCE.loadRuntimeStates(context)) {
+                if (runtimeState.getStartedAt() <= 0L || !"widget".equals(runtimeState.getSource())) {
+                    continue;
+                }
+                entries.add(new FocusEntry(
+                    runtimeState.getId(),
+                    sanitizeLabel(runtimeState.getLabel()),
+                    runtimeState.getStartedAt()
+                ));
             }
-
-            if (!"widget".equals(runtimeState.getSource())) {
-                return null;
-            }
-
-            return new FocusEntry(
-                runtimeState.getId(),
-                sanitizeLabel(runtimeState.getLabel()),
-                runtimeState.getStartedAt()
-            );
         } catch (Exception ignored) {
-            return null;
         }
+        return entries;
     }
 
     private static JSONArray sanitizeFocusSessions(JSONArray sessions) {

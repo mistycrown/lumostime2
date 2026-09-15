@@ -71,7 +71,7 @@ export const useFloatingWindowSync = () => {
       icon: latestSession.activityIcon,
       isFocusing: true,
       startTime: latestSession.startTime.toString(),
-      sessionId: latestSession.source === 'app' ? latestSession.id : undefined
+      sessionId: latestSession.id
     }).catch((error) => {
       console.error('[useFloatingWindowSync] Failed to sync floating window', error);
     });
