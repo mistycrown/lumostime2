@@ -40,7 +40,7 @@ import { filterCountableLogs } from '../utils/statLogUtils';
 import { ActivityAttributeManager } from '../components/ActivityAttributeManager';
 import { ActivityAttributeStatistics } from '../components/ActivityAttributeStatistics';
 import { FeatureHint } from '../components/FeatureHint';
-import { getDefaultKeywordColor, normalizeActivityKeywords, syncActivityKeywordsWithAttribute } from '../utils/detailTimelineKeywordUtils';
+import { getDefaultKeywordColor, getRandomKeywordColor, normalizeActivityKeywords, syncActivityKeywordsWithAttribute } from '../utils/detailTimelineKeywordUtils';
 
 
 interface TagDetailViewProps {
@@ -96,6 +96,13 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    )), [activity?.attributes]);
 
    const keywordRecords = useMemo(() => syncActivityKeywordsWithAttribute(activity?.keywords || [], activity?.attributes || []), [activity?.attributes, activity?.keywords]);
+
+   useEffect(() => {
+      if (!activity) return;
+      if (JSON.stringify(activity.keywords || []) !== JSON.stringify(keywordRecords)) {
+         setActivity({ ...activity, keywords: keywordRecords });
+      }
+   }, [activity, keywordRecords]);
 
    // 自动保存：为连续输入增加短暂防抖，避免每个按键都触发父级数据重建。
    useEffect(() => {
@@ -311,7 +318,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
       if (!currentKeywords.some((keyword) => keyword.label === newKeyword.trim())) {
          setActivity({
             ...activity,
-            keywords: [...currentKeywords, { label: newKeyword.trim(), source: 'manual', color: getDefaultKeywordColor(newKeyword.trim(), currentKeywords.length) }]
+            keywords: [...currentKeywords, { label: newKeyword.trim(), source: 'manual', color: getRandomKeywordColor() }]
          });
       }
       setNewKeyword('');
@@ -697,7 +704,6 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   todos={todos}
                   keywords={keywordRecords}
                   keywordRecords={keywordRecords}
-                  keywordAttribute={keywordAttribute}
                   enableFocusScore={activity.enableFocusScore ?? category?.enableFocusScore ?? false}
                   enableMoodScore={activity.enableMoodScore ?? category?.enableMoodScore ?? false}
                   renderLogMetadata={(log, { collectionNames }) => {
