@@ -6,6 +6,7 @@
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
  * @updated 2026-09-14: Syncs the configured persona name with the native background snapshot for Android notifications.
  * @updated 2026-09-03: Reloads restored personas, prompt blocks, and long-term memory into mounted chat state so cloud restores cannot be overwritten by stale React state.
+ * @updated 2026-09-15: Uses the current session persona name for native-reply Toast messages so in-app alerts match Android notifications.
  * @updated 2026-09-14: Added the persona-settings toggle for opting AI chat history out of unified sync payloads.
  * @updated 2026-09-04: Applies structured AI reminder removal actions to the durable reminder queue and long-term memory.
  * @updated 2026-09-03: Removed the base polling-frequency state path now that Android check-ins use concrete alarm times.
@@ -1843,7 +1844,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         reloadPersistedChatSessions();
         if (!isOpenRef.current) {
           onUnreadAssistantMessage?.(hydrationResult.surfacedMessages.length);
-          const personaName = assistantOrchestratorService.getBackgroundPersonaDisplayName(backgroundTargetSessionId);
+          const backgroundTargetSession = sessions.find((session) => session.id === backgroundTargetSessionId);
+          const personaName = getBackgroundPersonaDisplayName(backgroundTargetSession);
           addToast('info', `${personaName}：${hydrationResult.surfacedMessages[hydrationResult.surfacedMessages.length - 1]}`);
         }
       }
@@ -1856,7 +1858,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     } catch (error) {
       console.error('[AIBackfillChatModal] Failed to load native assistant diagnostics', error);
     }
-  }, [addToast, onUnreadAssistantMessage, sessions, shouldShowBackgroundSystemNotification, syncAssistantScheduledTasks]);
+  }, [addToast, getBackgroundPersonaDisplayName, onUnreadAssistantMessage, sessions, shouldShowBackgroundSystemNotification, syncAssistantScheduledTasks]);
 
   const resetAssistantEditableMemoryUi = () => {
     setAssistantEditableMemoryDrafts(DEFAULT_ASSISTANT_EDITABLE_MEMORY_DRAFTS);
