@@ -19,7 +19,7 @@
  * @updated 2026-09-15: Added contextual guidance for activity timeline calendar display modes.
  */
 import React, { useMemo } from 'react';
-import { ActivityAttributeDefinition, Log, Category } from '../types';
+import { ActivityAttributeDefinition, ActivityKeyword, Log, Category } from '../types';
 import { Clock, Zap, Heart, MessageCircle, ChevronLeft, ChevronRight, Grid, Image as ImageIcon, Hash } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
 import { IconRenderer } from './IconRenderer';
@@ -36,7 +36,7 @@ import {
     buildDetailTimelineGroupedData,
     DetailTimelineViewMode,
 } from '../utils/detailTimelineGrouping';
-import { getDetailTimelineKeywords, getLogMatchedDetailTimelineKeywords } from '../utils/detailTimelineKeywordUtils';
+import { getDefaultKeywordColor, getDetailTimelineKeywords, getDetailTimelineKeywordRecords, getLogMatchedDetailTimelineKeywords } from '../utils/detailTimelineKeywordUtils';
 type ScoreBarColor = {
     bg: string;
     bgStyle?: React.CSSProperties;
@@ -140,7 +140,8 @@ interface DetailTimelineCardProps {
     todos?: import('../types').TodoItem[];
     
     // 关键字支持
-    keywords?: string[];
+    keywords?: Array<string | ActivityKeyword>;
+    keywordRecords?: ActivityKeyword[];
     keywordAttribute?: ActivityAttributeDefinition;
     
     // 专注分数支持
@@ -170,6 +171,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     defaultViewMode = 'month',
     todos = [],
     keywords = [],
+    keywordRecords,
     keywordAttribute,
     enableFocusScore = false,
     enableMoodScore = false,
@@ -181,9 +183,13 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     const activeConfig = timelineStyleConfigs[timelineStyleTheme];
     const [viewMode, setViewMode] = React.useState<DetailTimelineViewMode>(defaultViewMode);
     const [calendarViewMode, setCalendarViewMode] = React.useState<'heatmap' | 'gallery' | 'keywords'>('heatmap');
+    const timelineKeywordRecords = useMemo(
+        () => keywordRecords || getDetailTimelineKeywordRecords(keywords),
+        [keywordRecords, keywords]
+    );
     const timelineKeywords = useMemo(
-        () => getDetailTimelineKeywords(keywords, keywordAttribute),
-        [keywordAttribute, keywords]
+        () => keywordRecords ? keywordRecords.map((keyword) => keyword.label) : getDetailTimelineKeywords(keywords, keywordAttribute),
+        [keywordAttribute, keywordRecords, keywords]
     );
     
     // 用于存储日期对应的 DOM 元素引用
@@ -272,17 +278,9 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
         'bg-violet-100 text-violet-600 border-violet-200',
     ];
 
-    const getKeywordColor = (keyword: string) => {
-        let index = timelineKeywords.indexOf(keyword);
-        if (index === -1) {
-            let hash = 0;
-            for (let i = 0; i < keyword.length; i++) {
-                hash = keyword.charCodeAt(i) + ((hash << 5) - hash);
-            }
-            index = Math.abs(hash);
-        }
-        const colorIndex = index % KEYWORD_COLORS.length;
-        return KEYWORD_COLORS[colorIndex];
+    const getKeywordColor = (keyword: string): React.CSSProperties => {
+        const record = timelineKeywordRecords.find((item) => item.label === keyword);
+        return { backgroundColor: record?.color || getDefaultKeywordColor(keyword) };
     };
 
     // 当月日志
@@ -630,7 +628,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                         // 找到匹配的关键字
                                         const matchedKeywords = new Set<string>();
                                         dayLogs.forEach(log => {
-                                            getLogMatchedDetailTimelineKeywords(log, timelineKeywords, keywordAttribute)
+                                            getLogMatchedDetailTimelineKeywords(log, timelineKeywordRecords, keywordAttribute)
                                                 .forEach((keyword) => matchedKeywords.add(keyword));
                                         });
                                         
@@ -651,7 +649,8 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                         {Array.from(matchedKeywords).map(kw => (
                                                             <div
                                                                 key={kw}
-                                                                className={`h-full flex-1 ${getKeywordColor(kw).split(' ')[0]}`}
+                                                                className="h-full flex-1"
+                                                                style={getKeywordColor(kw)}
                                                             />
                                                         ))}
                                                         <span className="absolute inset-0 flex items-center justify-center text-sm font-medium text-stone-700">
@@ -992,7 +991,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                 </div>
                                 {timelineKeywords.map(kw => (
                                     <div key={kw} className="flex items-center gap-1.5">
-                                        <div className={`w-2.5 h-2.5 rounded ${getKeywordColor(kw).split(' ')[0]}`}></div>
+                                        <div className="w-2.5 h-2.5 rounded" style={getKeywordColor(kw)}></div>
                                         <span className="text-[10px] text-stone-500">{kw}</span>
                                     </div>
                                 ))}

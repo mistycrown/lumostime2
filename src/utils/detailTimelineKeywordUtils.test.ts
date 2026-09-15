@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { ActivityAttributeDefinition, Log } from '../types';
-import { getActivityKeywordCandidates, getDetailTimelineKeywords, getLogMatchedDetailTimelineKeywords } from './detailTimelineKeywordUtils';
+import { getActivityKeywordCandidates, getDetailTimelineKeywords, getLogMatchedDetailTimelineKeywords, syncActivityKeywordsWithAttribute } from './detailTimelineKeywordUtils';
 
 const keywordAttribute: ActivityAttributeDefinition = {
   id: 'content',
@@ -71,5 +71,15 @@ describe('detailTimelineKeywordUtils', () => {
       keywords,
       keywordAttribute
     )).toEqual(['朋友', '跑步']);
+  });
+
+  it('registers attribute options, preserves colors, and removes stale options', () => {
+    const first = syncActivityKeywordsWithAttribute([{ label: '旧颜色', source: 'attribute', attributeId: 'content', optionId: 'run', color: '#123456' }], [keywordAttribute]);
+    expect(first.find((keyword) => keyword.optionId === 'run')?.color).toBe('#123456');
+    expect(first).toHaveLength(3);
+    const renamed = syncActivityKeywordsWithAttribute(first, [{ ...keywordAttribute, options: [{ id: 'run', label: '跑步' }] }]);
+    expect(renamed).toHaveLength(1);
+    expect(renamed[0]).toMatchObject({ label: '跑步', optionId: 'run', color: '#123456' });
+    expect(syncActivityKeywordsWithAttribute(renamed, [{ ...keywordAttribute, isKeywordSource: false }])).toEqual([]);
   });
 });
