@@ -10,6 +10,7 @@
  * @updated 2026-08-06: Added a persistent association selector column preference for shared category, scope, tag, and todo pickers.
  * @updated 2026-08-10: Rehydrates appearance state after cloud or export restores so mounted settings do not overwrite restored choices.
  * @updated 2026-09-15: Added a persisted global font-scale preference applied through the root CSS variable.
+ * @updated 2026-09-15: Fixed missing font-scale storage to default to 100% instead of the minimum value.
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
@@ -114,6 +115,21 @@ export type { TimelineQuickActionKey } from '../constants/timelineQuickActions';
 export type { AutoStartTimerJumpMode } from '../utils/autoStartTimerJumpMode';
 export type { ThemeMode } from '../utils/displayMode';
 export type { TimelineLayoutMode } from '../services/timelineLayoutService';
+
+const DEFAULT_FONT_SCALE = 1;
+const MIN_FONT_SCALE = 0.8;
+const MAX_FONT_SCALE = 1.4;
+
+const normalizeFontScale = (value: number): number => (
+    Number.isFinite(value)
+        ? Math.min(MAX_FONT_SCALE, Math.max(MIN_FONT_SCALE, value))
+        : DEFAULT_FONT_SCALE
+);
+
+const readStoredFontScale = (): number => {
+    const stored = localStorage.getItem('lumostime_font_scale');
+    return stored === null ? DEFAULT_FONT_SCALE : normalizeFontScale(Number(stored));
+};
 
 interface SettingsContextType {
     // 基础偏好设置
@@ -605,8 +621,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     });
 
     const [fontScale, setFontScale] = useState<number>(() => {
-        const stored = Number(localStorage.getItem('lumostime_font_scale'));
-        return Number.isFinite(stored) ? Math.min(1.4, Math.max(0.8, stored)) : 1;
+        return readStoredFontScale();
     });
 
     const [scheduleStyle, setScheduleStyle] = useState<ScheduleStyle>(() => {
@@ -703,8 +718,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setColorScheme(localStorage.getItem(THEME_KEYS.COLOR_SCHEME) || 'default');
             setThemeMode(readStoredThemeMode(localStorage));
             setFontFamily(localStorage.getItem('lumostime_font_family') || 'default');
-            const storedFontScale = Number(localStorage.getItem('lumostime_font_scale'));
-            setFontScale(Number.isFinite(storedFontScale) ? Math.min(1.4, Math.max(0.8, storedFontScale)) : 1);
+            setFontScale(readStoredFontScale());
             setScheduleStyle(
                 storedScheduleStyle === 'outline' ? 'minimal' :
                     (storedScheduleStyle === 'classic' || storedScheduleStyle === 'minimal' || storedScheduleStyle === 'solid' || storedScheduleStyle === 'default'
@@ -790,7 +804,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, [fontFamily]);
 
     useEffect(() => {
-        const normalizedFontScale = Math.min(1.4, Math.max(0.8, fontScale));
+        const normalizedFontScale = normalizeFontScale(fontScale);
         localStorage.setItem('lumostime_font_scale', normalizedFontScale.toString());
         document.documentElement.style.setProperty('--font-scale', normalizedFontScale.toString());
     }, [fontScale]);
