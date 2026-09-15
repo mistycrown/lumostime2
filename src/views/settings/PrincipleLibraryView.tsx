@@ -4,7 +4,7 @@
  * @updated 2026-07-06: Added the self-belief tab with manual identity/description CRUD backed by localStorage.
  */
 import React, { useState } from 'react';
-import { ChevronLeft, Plus, Trash2, Edit2, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronUp, ChevronDown, Plus, Trash2, Edit2, RotateCcw } from 'lucide-react';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { PrincipleEditModal, type PrincipleEditFormData } from '../../components/PrincipleEditModal';
 import { SelfBeliefEditModal, type SelfBeliefDescriptionDraft, type SelfBeliefDescriptionSource } from '../../components/SelfBeliefEditModal';
@@ -182,6 +182,17 @@ const loadSelfBeliefs = (): SelfBelief[] => {
     }
 };
 
+export const moveItem = <T,>(items: T[], index: number, direction: -1 | 1): T[] => {
+    const targetIndex = index + direction;
+    if (index < 0 || targetIndex < 0 || index >= items.length || targetIndex >= items.length) {
+        return items;
+    }
+
+    const reordered = [...items];
+    [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
+    return reordered;
+};
+
 export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBack }) => {
     const [activeTab, setActiveTab] = useState<PrincipleLibraryTab>('principles');
 
@@ -232,6 +243,14 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
         localStorage.setItem(SELF_BELIEFS_STORAGE_KEY, JSON.stringify(normalized));
         updateLocalDataTimestamp();
         window.dispatchEvent(new Event(SELF_BELIEF_LIBRARY_CHANGED_EVENT));
+    };
+
+    const handleMovePrinciple = (index: number, direction: -1 | 1) => {
+        savePrinciples(moveItem(principles, index, direction));
+    };
+
+    const handleMoveSelfBelief = (index: number, direction: -1 | 1) => {
+        saveSelfBeliefs(moveItem(selfBeliefs, index, direction));
     };
 
     // 开始创建新原则
@@ -497,7 +516,7 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
 
                         {/* 原则列表 */}
                         <div className="space-y-3">
-                            {principles.map(principle => (
+                            {principles.map((principle, index) => (
                                 <div
                                     key={principle.id}
                                     className="bg-white rounded-xl p-4 shadow-sm border border-stone-100"
@@ -505,6 +524,26 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
                                     <div className="flex items-start justify-between mb-3">
                                         <h3 className="text-base font-bold text-stone-800">{principle.title}</h3>
                                         <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleMovePrinciple(index, -1)}
+                                                disabled={index === 0}
+                                                className="p-1.5 hover:bg-stone-100 rounded transition-colors disabled:cursor-not-allowed disabled:opacity-25"
+                                                title="上移"
+                                                aria-label={`${principle.title} 上移`}
+                                            >
+                                                <ChevronUp size={16} className="text-stone-500" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleMovePrinciple(index, 1)}
+                                                disabled={index === principles.length - 1}
+                                                className="p-1.5 hover:bg-stone-100 rounded transition-colors disabled:cursor-not-allowed disabled:opacity-25"
+                                                title="下移"
+                                                aria-label={`${principle.title} 下移`}
+                                            >
+                                                <ChevronDown size={16} className="text-stone-500" />
+                                            </button>
                                             <button
                                                 onClick={() => handleStartEdit(principle)}
                                                 className="p-1.5 hover:bg-blue-50 rounded transition-colors"
@@ -575,7 +614,7 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
                                     <p className="mt-1 text-xs text-stone-400">先写下一句“我是一个什么样的人”。</p>
                                 </div>
                             ) : (
-                                selfBeliefs.map((selfBelief) => (
+                                selfBeliefs.map((selfBelief, index) => (
                                     <div
                                         key={selfBelief.id}
                                         className="bg-white rounded-xl p-4 shadow-sm border border-stone-100"
@@ -588,6 +627,26 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
                                                 </p>
                                             </div>
                                             <div className="flex shrink-0 items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleMoveSelfBelief(index, -1)}
+                                                    disabled={index === 0}
+                                                    className="p-1.5 hover:bg-stone-100 rounded transition-colors disabled:cursor-not-allowed disabled:opacity-25"
+                                                    title="上移"
+                                                    aria-label={`${selfBelief.title} 上移`}
+                                                >
+                                                    <ChevronUp size={16} className="text-stone-500" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleMoveSelfBelief(index, 1)}
+                                                    disabled={index === selfBeliefs.length - 1}
+                                                    className="p-1.5 hover:bg-stone-100 rounded transition-colors disabled:cursor-not-allowed disabled:opacity-25"
+                                                    title="下移"
+                                                    aria-label={`${selfBelief.title} 下移`}
+                                                >
+                                                    <ChevronDown size={16} className="text-stone-500" />
+                                                </button>
                                                 <button
                                                     onClick={() => handleStartEditSelfBelief(selfBelief)}
                                                     className="p-1.5 hover:bg-blue-50 rounded transition-colors"
