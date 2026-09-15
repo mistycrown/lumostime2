@@ -253,7 +253,7 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                 />
                             </div>
                         </div>
-                        <div className="flex flex-col gap-3 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                        <div className="hidden flex-col gap-3 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
                             <h4 className="font-bold text-stone-700">导航模块开关</h4>
                             <div className="grid grid-cols-5 gap-2">
                                 {navigationOptions.map((option) => {
@@ -689,6 +689,28 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                             </div>
                         </div>
 
+                        <div className="flex flex-col gap-3 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                            <h4 className="font-bold text-stone-700">导航模块开关</h4>
+                            <div className="grid grid-cols-5 gap-2">
+                                {navigationOptions.map((option) => {
+                                    const checked = navigationModuleVisibility?.[option.key] ?? true;
+                                    return (
+                                        <label key={option.key} className="flex min-w-0 cursor-pointer items-center justify-center gap-1.5 text-xs font-bold text-stone-600">
+                                            <input
+                                                type="checkbox"
+                                                checked={checked}
+                                                onChange={() => onSetNavigationModuleVisibility?.({
+                                                    ...(navigationModuleVisibility || { record: true, todo: true, timeline: true, review: true, index: true }),
+                                                    [option.key]: !checked
+                                                })}
+                                                className="h-4 w-4 shrink-0 accent-stone-800"
+                                            />
+                                            <span className="truncate">{option.label}</span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </div>
                         {/* Timeline Gallery Mode Toggle */}
                         <div className="flex items-center justify-between gap-3 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
                             <div className="flex-1 min-w-0">
