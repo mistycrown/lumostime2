@@ -15,6 +15,7 @@ const hashLabel = (label: string): number => {
   return Math.abs(hash);
 };
 export const getDefaultKeywordColor = (label: string, index = 0): string => DEFAULT_KEYWORD_COLORS[(hashLabel(label) + index) % DEFAULT_KEYWORD_COLORS.length];
+export const getRandomKeywordColor = (): string => DEFAULT_KEYWORD_COLORS[Math.floor(Math.random() * DEFAULT_KEYWORD_COLORS.length)];
 
 export const normalizeActivityKeywords = (keywords: Array<string | ActivityKeyword> = []): ActivityKeyword[] => {
   const seen = new Set<string>();
@@ -55,7 +56,7 @@ export const syncActivityKeywordsWithAttribute = (
     }
     retained.push({
       label: option.label.trim(),
-      color: getDefaultKeywordColor(option.label.trim(), normalized.length + index),
+      color: getRandomKeywordColor(),
       source: 'attribute',
       attributeId: keywordAttribute.id,
       optionId: option.id
@@ -106,7 +107,16 @@ export const getLogMatchedDetailTimelineKeywords = (
     if (searchableText.includes(keyword.label)) matchedKeywords.add(keyword.label);
   });
 
-  if (!attribute) return Array.from(matchedKeywords);
+  if (!attribute) {
+    records.filter((keyword) => keyword.source === 'attribute' && keyword.optionId).forEach((keyword) => {
+      const selected = (log.attributeValues || []).some((value) => (
+        ('optionId' in value && value.optionId === keyword.optionId)
+        || ('optionIds' in value && value.optionIds.includes(keyword.optionId!))
+      ));
+      if (selected) matchedKeywords.add(keyword.label);
+    });
+    return Array.from(matchedKeywords);
+  }
   const storedValue = (log.attributeValues || []).find((value) => value.attributeId === attribute.id);
   if (!storedValue) return Array.from(matchedKeywords);
 
