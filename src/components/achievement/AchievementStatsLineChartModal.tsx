@@ -6,6 +6,7 @@
  * @description Renders an editorial print-inspired statistics drawer for the active achievement ledger with draggable daily point and attribute-change lines.
  * @updated 2026-08-12: Uses stable indexed keys when historical snapshots contain duplicate dates.
  * @updated 2026-08-12: Added toggleable lines for every attribute currently visible on the character panel.
+ * @updated 2026-09-15: Split series controls into point and attribute rows and added a quick point-only mode.
  * @updated 2026-07-24: Anchored the opening scroll position to the latest daily point instead of a fixed viewport guess.
  * @updated 2026-07-06: Removed the y-axis title words and added a trailing empty day slot so the last-point label has breathing room.
  * @updated 2026-07-06: Restored fixed horizontal spacing by preventing the scrollable plot from shrinking on mobile.
@@ -97,6 +98,7 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
   const [activePointIndex, setActivePointIndex] = useState<number | null>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
   const [hiddenSeriesIds, setHiddenSeriesIds] = useState<Set<string>>(() => new Set());
+  const [onlyPointsMode, setOnlyPointsMode] = useState(false);
 
   const orderedSnapshots = useMemo(() => (
     [...snapshots].sort((first, second) => first.date.localeCompare(second.date))
@@ -257,6 +259,10 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
   const activeDate = activePointIndex !== null ? orderedSnapshots[activePointIndex]?.date : null;
 
   const toggleSeries = (seriesId: string) => {
+    if (seriesId !== 'points' && onlyPointsMode) {
+      setOnlyPointsMode(false);
+    }
+
     setHiddenSeriesIds((previous) => {
       const next = new Set(previous);
       if (next.has(seriesId)) {
@@ -264,6 +270,24 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
       } else if (previous.size < chartSeries.length - 1) {
         next.add(seriesId);
       }
+      return next;
+    });
+  };
+
+  const toggleOnlyPointsMode = () => {
+    const nextOnlyPointsMode = !onlyPointsMode;
+    setOnlyPointsMode(nextOnlyPointsMode);
+    setHiddenSeriesIds((current) => {
+      const next = new Set(current);
+      chartSeries
+        .filter((series) => series.id !== 'points')
+        .forEach((series) => {
+          if (nextOnlyPointsMode) {
+            next.add(series.id);
+          } else {
+            next.delete(series.id);
+          }
+        });
       return next;
     });
   };
@@ -338,29 +362,67 @@ export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartM
                   <div className="shrink-0 text-right text-xs text-stone-400">{orderedSnapshots[orderedSnapshots.length - 1]?.date}</div>
                 </div>
 
-                <div className="mb-3 flex flex-wrap gap-1.5 px-1">
-                  {chartSeries.map((series) => {
-                    const isVisible = !hiddenSeriesIds.has(series.id);
-                    return (
-                      <button
-                        key={series.id}
-                        type="button"
-                        onClick={() => toggleSeries(series.id)}
-                        aria-pressed={isVisible}
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
-                          isVisible
-                            ? 'border-stone-300 bg-white text-stone-800'
-                            : 'border-stone-200 bg-transparent text-stone-400'
-                        }`}
-                      >
-                        <span
-                          className="h-2 w-2 rounded-full"
-                          style={{ backgroundColor: series.color, opacity: isVisible ? 1 : 0.35 }}
-                        />
-                        {series.name}
-                      </button>
-                    );
-                  })}
+                <div className="mb-3 space-y-1.5 px-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {chartSeries.filter((series) => series.id === 'points').map((series) => {
+                      const isVisible = !hiddenSeriesIds.has(series.id);
+                      return (
+                        <button
+                          key={series.id}
+                          type="button"
+                          onClick={() => toggleSeries(series.id)}
+                          aria-pressed={isVisible}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
+                            isVisible
+                              ? 'border-stone-300 bg-white text-stone-800'
+                              : 'border-stone-200 bg-transparent text-stone-400'
+                          }`}
+                        >
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: series.color, opacity: isVisible ? 1 : 0.35 }}
+                          />
+                          {series.name}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={toggleOnlyPointsMode}
+                      aria-pressed={onlyPointsMode}
+                      className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
+                        onlyPointsMode
+                          ? 'border-stone-700 bg-stone-800 text-white'
+                          : 'border-stone-200 bg-transparent text-stone-500 hover:border-stone-400'
+                      }`}
+                    >
+                      仅光点
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {chartSeries.filter((series) => series.id !== 'points').map((series) => {
+                      const isVisible = !hiddenSeriesIds.has(series.id);
+                      return (
+                        <button
+                          key={series.id}
+                          type="button"
+                          onClick={() => toggleSeries(series.id)}
+                          aria-pressed={isVisible}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
+                            isVisible
+                              ? 'border-stone-300 bg-white text-stone-800'
+                              : 'border-stone-200 bg-transparent text-stone-400'
+                          }`}
+                        >
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: series.color, opacity: isVisible ? 1 : 0.35 }}
+                          />
+                          {series.name}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div
