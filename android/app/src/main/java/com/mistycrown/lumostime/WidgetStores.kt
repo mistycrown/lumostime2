@@ -309,79 +309,91 @@ object WidgetStores {
         }
     }
 
-    fun loadRuntimeState(context: Context): WidgetRuntimeState? {
+    fun loadRuntimeStates(context: Context): List<WidgetRuntimeState> {
         val raw = prefs(context).getString(KEY_RUNTIME, null)
         if (raw.isNullOrBlank()) {
-            return null
+            return emptyList()
         }
 
         return runCatching {
             val json = JSONObject(raw)
-            WidgetRuntimeState(
-                id = json.getString("id"),
-                widgetType = WidgetTypes.normalize(json.optString("widgetType")),
-                activityId = json.getString("activityId"),
-                categoryId = json.getString("categoryId"),
-                icon = json.optString("icon", "\u2022"),
-                label = json.optString("label", ""),
-                color = json.optString("color", "#E7E5E4"),
-                startedAt = json.getLong("startedAt"),
-                source = json.optString("source", "widget"),
-                linkedTodoId = parseNullableString(json.optString("linkedTodoId")),
-                scopeIds = json.optJSONArray("scopeIds").toStringList(),
-                slotIndex = if (json.has("slotIndex")) json.optInt("slotIndex") else null,
-                templateId = parseNullableString(json.optString("templateId")),
-                appWidgetId = if (json.has("appWidgetId")) json.optInt("appWidgetId") else null,
-                sceneGroupId = parseNullableString(json.optString("sceneGroupId")),
-                sceneSlotId = parseNullableString(json.optString("sceneSlotId")),
-                sceneItemId = parseNullableString(json.optString("sceneItemId"))
-            )
+            val states = json.optJSONArray("runtimeStates")
+            if (states != null) {
+                buildList {
+                    for (index in 0 until states.length()) {
+                        states.optJSONObject(index)?.let { add(it.toRuntimeState()) }
+                    }
+                }
+            } else if (json.has("id")) {
+                listOf(json.toRuntimeState())
+            } else {
+                emptyList()
+            }
         }.getOrNull()
+            ?: emptyList()
     }
 
-    fun saveRuntimeState(context: Context, runtimeState: WidgetRuntimeState?) {
+    fun loadRuntimeState(context: Context): WidgetRuntimeState? =
+        loadRuntimeStates(context).maxByOrNull { it.startedAt }
+
+    fun saveRuntimeStates(context: Context, runtimeStates: List<WidgetRuntimeState>) {
         val editor = prefs(context).edit()
-        if (runtimeState == null) {
+        if (runtimeStates.isEmpty()) {
             editor.remove(KEY_RUNTIME).commit()
             return
         }
 
         val json = JSONObject().apply {
-            put("id", runtimeState.id)
-            put("widgetType", WidgetTypes.normalize(runtimeState.widgetType))
-            put("activityId", runtimeState.activityId)
-            put("categoryId", runtimeState.categoryId)
-            put("icon", runtimeState.icon)
-            put("label", runtimeState.label)
-            put("color", runtimeState.color)
-            put("startedAt", runtimeState.startedAt)
-            put("source", runtimeState.source)
-            if (!runtimeState.linkedTodoId.isNullOrBlank()) {
-                put("linkedTodoId", runtimeState.linkedTodoId)
-            }
-            if (runtimeState.scopeIds.isNotEmpty()) {
-                put("scopeIds", runtimeState.scopeIds.toJsonArray())
-            }
-            if (runtimeState.slotIndex != null) {
-                put("slotIndex", runtimeState.slotIndex)
-            }
-            if (!runtimeState.templateId.isNullOrBlank()) {
-                put("templateId", runtimeState.templateId)
-            }
-            if (runtimeState.appWidgetId != null) {
-                put("appWidgetId", runtimeState.appWidgetId)
-            }
-            if (!runtimeState.sceneGroupId.isNullOrBlank()) {
-                put("sceneGroupId", runtimeState.sceneGroupId)
-            }
-            if (!runtimeState.sceneSlotId.isNullOrBlank()) {
-                put("sceneSlotId", runtimeState.sceneSlotId)
-            }
-            if (!runtimeState.sceneItemId.isNullOrBlank()) {
-                put("sceneItemId", runtimeState.sceneItemId)
-            }
+            put("version", 2)
+            put("runtimeStates", JSONArray().apply {
+                runtimeStates.forEach { put(it.toRuntimeJson()) }
+            })
         }
         editor.putString(KEY_RUNTIME, json.toString()).commit()
+    }
+
+    fun saveRuntimeState(context: Context, runtimeState: WidgetRuntimeState?) {
+        saveRuntimeStates(context, runtimeState?.let(::listOf) ?: emptyList())
+    }
+
+    private fun JSONObject.toRuntimeState(): WidgetRuntimeState = WidgetRuntimeState(
+        id = getString("id"),
+        widgetType = WidgetTypes.normalize(optString("widgetType")),
+        activityId = getString("activityId"),
+        categoryId = getString("categoryId"),
+        icon = optString("icon", "\u2022"),
+        label = optString("label", ""),
+        color = optString("color", "#E7E5E4"),
+        startedAt = getLong("startedAt"),
+        source = optString("source", "widget"),
+        linkedTodoId = parseNullableString(optString("linkedTodoId")),
+        scopeIds = optJSONArray("scopeIds").toStringList(),
+        slotIndex = if (has("slotIndex")) optInt("slotIndex") else null,
+        templateId = parseNullableString(optString("templateId")),
+        appWidgetId = if (has("appWidgetId")) optInt("appWidgetId") else null,
+        sceneGroupId = parseNullableString(optString("sceneGroupId")),
+        sceneSlotId = parseNullableString(optString("sceneSlotId")),
+        sceneItemId = parseNullableString(optString("sceneItemId"))
+    )
+
+    private fun WidgetRuntimeState.toRuntimeJson(): JSONObject = JSONObject().apply {
+        put("id", id)
+        put("widgetType", WidgetTypes.normalize(widgetType))
+        put("activityId", activityId)
+        put("categoryId", categoryId)
+        put("icon", icon)
+        put("label", label)
+        put("color", color)
+        put("startedAt", startedAt)
+        put("source", source)
+        if (!linkedTodoId.isNullOrBlank()) put("linkedTodoId", linkedTodoId)
+        if (scopeIds.isNotEmpty()) put("scopeIds", scopeIds.toJsonArray())
+        if (slotIndex != null) put("slotIndex", slotIndex)
+        if (!templateId.isNullOrBlank()) put("templateId", templateId)
+        if (appWidgetId != null) put("appWidgetId", appWidgetId)
+        if (!sceneGroupId.isNullOrBlank()) put("sceneGroupId", sceneGroupId)
+        if (!sceneSlotId.isNullOrBlank()) put("sceneSlotId", sceneSlotId)
+        if (!sceneItemId.isNullOrBlank()) put("sceneItemId", sceneItemId)
     }
 
     fun loadLastWidgetStopAt(context: Context): Long? {

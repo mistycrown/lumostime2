@@ -18,7 +18,7 @@ object WidgetSnapshotBuilder {
     ): WidgetSnapshot {
         val normalizedSize = WidgetSizes.normalize(widgetSize)
         val normalizedTemplateType = WidgetTemplateTypes.normalize(templateType)
-        val runtimeState = WidgetStores.loadRuntimeState(context)
+        val runtimeStates = WidgetStores.loadRuntimeStates(context)
         val dailyPayload = WidgetStores.loadDailySyncPayload(context)
         val tapAnimationState = WidgetStores.loadTapAnimationState(context)
         val now = System.currentTimeMillis()
@@ -143,7 +143,9 @@ object WidgetSnapshotBuilder {
                         }
                 )
             } else {
-                val matchesRuntime = matchesRuntime(template, slot, runtimeState)
+                val matchesRuntime = runtimeStates.any { runtimeState ->
+                    matchesRuntime(template, slot, runtimeState)
+                }
                 WidgetSnapshotSlot(
                     slotIndex = slot.slotIndex,
                     slotType = slot.slotType,

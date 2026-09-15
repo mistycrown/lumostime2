@@ -406,13 +406,17 @@ public class FloatingWindowService extends Service {
     }
 
     public static void syncFocusStateIfRunning(String icon, boolean focusing, long startTime) {
+        syncFocusStateIfRunning(icon, focusing, startTime, null);
+    }
+
+    public static void syncFocusStateIfRunning(String icon, boolean focusing, long startTime, String sessionId) {
         if (instance == null) {
             Log.d(TAG, "Floating window service is not running, skip widget sync");
             return;
         }
 
         new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
-            instance.updateContent(icon, focusing, startTime, null);
+            instance.updateContent(icon, focusing, startTime, sessionId);
         });
     }
 
@@ -1367,7 +1371,10 @@ public class FloatingWindowService extends Service {
             // 如果当前是专注状态,通知React Native结束计时
             if (isFocusing) {
                 Log.d(TAG, "🎯 悬浮球点击: 专注状态 -> 触发结束计时");
-                WidgetRuntimeState stoppedWidgetRuntime = WidgetTimerController.stopWidgetRuntimeFromExternalTrigger(this);
+                WidgetRuntimeState stoppedWidgetRuntime = WidgetTimerController.stopWidgetRuntimeFromExternalTrigger(
+                        this,
+                        normalizeSessionId(currentSessionId)
+                );
                 if (stoppedWidgetRuntime != null) {
                     FocusNotificationPlugin.triggerStopFocusFromFloating(stoppedWidgetRuntime.getId());
                 } else {

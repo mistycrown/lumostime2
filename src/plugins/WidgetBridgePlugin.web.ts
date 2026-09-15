@@ -45,8 +45,12 @@ export class WidgetBridgeWeb extends WebPlugin implements WidgetBridgePlugin {
 
   async clearPendingActions(): Promise<void> {}
 
-  async getRuntimeState(): Promise<{ runtimeState: WidgetBridgeRuntimeState | null }> {
-    return { runtimeState: null };
+  async getRuntimeState(): Promise<{
+    runtimeState: WidgetBridgeRuntimeState | null;
+    runtimeStates: WidgetBridgeRuntimeState[];
+    version: number;
+  }> {
+    return { runtimeState: null, runtimeStates: [], version: 2 };
   }
 
   async syncRuntimeState(): Promise<void> {}

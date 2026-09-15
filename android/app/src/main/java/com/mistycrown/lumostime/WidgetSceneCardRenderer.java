@@ -8,6 +8,7 @@ import android.widget.RemoteViews;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -28,7 +29,7 @@ final class WidgetSceneCardRenderer {
             WidgetSceneItem item,
             int position,
             WidgetDailySyncPayload dailyPayload,
-            WidgetRuntimeState runtimeState,
+            List<WidgetRuntimeState> runtimeStates,
             WidgetTapAnimationState tapAnimationState
     ) {
         WidgetSnapshotSlot snapshotSlot = buildSnapshotSlot(
@@ -36,7 +37,7 @@ final class WidgetSceneCardRenderer {
                 item,
                 position,
                 dailyPayload,
-                runtimeState,
+                runtimeStates,
                 tapAnimationState
         );
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_scene_card_item);
@@ -61,7 +62,7 @@ final class WidgetSceneCardRenderer {
             WidgetSceneItem item,
             int position,
             WidgetDailySyncPayload dailyPayload,
-            WidgetRuntimeState runtimeState,
+            List<WidgetRuntimeState> runtimeStates,
             WidgetTapAnimationState tapAnimationState
     ) {
         String widgetType = WidgetSceneItemTypes.CHECKLIST.equals(
@@ -94,7 +95,7 @@ final class WidgetSceneCardRenderer {
         return new WidgetSnapshotSlot(
                 position, WidgetTypes.TIMER, item.getActivityId(), item.getCategoryId(), null, item.getIcon(),
                 item.getUiIconAssetPath(), item.getUiIconFallbackAssetPath(), item.getTitle(), item.getColor(),
-                matchesRuntime(runtimeState, item), null, 0, 1, false,
+                matchesRuntime(runtimeStates, item), null, 0, 1, false,
                 tapAnimationMode, tapAnimationProgress, null
         );
     }
@@ -116,13 +117,26 @@ final class WidgetSceneCardRenderer {
         return null;
     }
 
-    private static boolean matchesRuntime(WidgetRuntimeState runtimeState, WidgetSceneItem item) {
-        return runtimeState != null
-                && Objects.equals(runtimeState.getActivityId(), item.getActivityId())
-                && Objects.equals(runtimeState.getCategoryId(), item.getCategoryId())
-                && Objects.equals(runtimeState.getLinkedTodoId(), item.getLinkedTodoId())
-                && runtimeState.getScopeIds().containsAll(item.getScopeIds())
-                && item.getScopeIds().containsAll(runtimeState.getScopeIds());
+    private static boolean matchesRuntime(List<WidgetRuntimeState> runtimeStates, WidgetSceneItem item) {
+        if (runtimeStates == null) return false;
+        for (WidgetRuntimeState runtimeState : runtimeStates) {
+            if (runtimeState.getSource() != null && !"widget".equals(runtimeState.getSource())) {
+                continue;
+            }
+            if (runtimeState.getSceneItemId() != null
+                    && !runtimeState.getSceneItemId().trim().isEmpty()
+                    && !Objects.equals(runtimeState.getSceneItemId(), item.getId())) {
+                continue;
+            }
+            if (Objects.equals(runtimeState.getActivityId(), item.getActivityId())
+                    && Objects.equals(runtimeState.getCategoryId(), item.getCategoryId())
+                    && Objects.equals(runtimeState.getLinkedTodoId(), item.getLinkedTodoId())
+                    && runtimeState.getScopeIds().containsAll(item.getScopeIds())
+                    && item.getScopeIds().containsAll(runtimeState.getScopeIds())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String resolveTapAnimationMode(

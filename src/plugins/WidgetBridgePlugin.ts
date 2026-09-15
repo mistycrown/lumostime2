@@ -130,6 +130,11 @@ export interface WidgetBridgeRuntimeState {
   sceneItemId?: string | null;
 }
 
+export interface WidgetBridgeRuntimeStatesPayload {
+  version: number;
+  runtimeStates: WidgetBridgeRuntimeState[];
+}
+
 export interface WidgetBridgeLogTailState {
   latestLogEndTime: number | null;
 }
@@ -365,8 +370,16 @@ export interface WidgetBridgePlugin {
   getInstanceBindings(): Promise<{ bindings: WidgetBridgeInstanceBinding[] }>;
   getPendingActions(): Promise<{ actions: WidgetBridgePendingAction[] }>;
   clearPendingActions(options: { ids: string[] }): Promise<void>;
-  getRuntimeState(): Promise<{ runtimeState: WidgetBridgeRuntimeState | null }>;
-  syncRuntimeState(options: { runtimeState: WidgetBridgeRuntimeState | null }): Promise<void>;
+  getRuntimeState(): Promise<{
+    runtimeState: WidgetBridgeRuntimeState | null;
+    runtimeStates?: WidgetBridgeRuntimeState[];
+    version?: number;
+  }>;
+  syncRuntimeState(options: {
+    runtimeState?: WidgetBridgeRuntimeState | null;
+    runtimeStates?: WidgetBridgeRuntimeState[] | null;
+    version?: number;
+  }): Promise<void>;
   getPendingDailyActions(): Promise<{ actions: WidgetBridgePendingDailyAction[] }>;
   clearPendingDailyActions(options: { ids: string[] }): Promise<void>;
   getPendingTodoPinActions(): Promise<{ actions: WidgetBridgePendingTodoPinAction[] }>;
@@ -382,7 +395,7 @@ export interface WidgetBridgePlugin {
   addListener(
     eventName: 'dailyWidgetActionPending',
     listenerFunc: () => void
-  ): Promise<PluginListenerHandle> & PluginListenerHandle;
+  ): Promise<PluginListenerHandle>;
   removeAllListeners(): Promise<void>;
 }
 

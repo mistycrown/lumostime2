@@ -177,38 +177,43 @@ class WidgetBridgePlugin : Plugin() {
     @PluginMethod
     fun getRuntimeState(call: PluginCall) {
         val result = JSObject()
-        result.put("runtimeState", WidgetStores.loadRuntimeState(context)?.let(::runtimeToJs))
+        val runtimeStates = WidgetStores.loadRuntimeStates(context)
+        result.put("version", 2)
+        result.put("runtimeStates", JSArray().apply {
+            runtimeStates.forEach { put(runtimeToJs(it)) }
+        })
+        result.put("runtimeState", runtimeStates.maxByOrNull { it.startedAt }?.let(::runtimeToJs))
         call.resolve(result)
     }
 
     @PluginMethod
     fun syncRuntimeState(call: PluginCall) {
-        val runtimeJson = call.getObject("runtimeState")
-        val runtimeState = runtimeJson?.let {
-            WidgetRuntimeState(
-                id = it.getString("id") ?: "",
-                widgetType = WidgetTypes.normalize(it.optString("widgetType")),
-                activityId = it.getString("activityId") ?: "",
-                categoryId = it.getString("categoryId") ?: "",
-                icon = it.optString("icon", "\u2022"),
-                label = it.optString("label", ""),
-                color = it.optString("color", "#E7E5E4"),
-                startedAt = it.getLong("startedAt"),
-                source = it.optString("source", "app"),
-                linkedTodoId = parseNullableString(it.optString("linkedTodoId")),
-                scopeIds = it.optJSONArray("scopeIds").toStringList(),
-                slotIndex = if (it.has("slotIndex")) it.optInt("slotIndex") else null,
-                templateId = parseNullableString(it.optString("templateId")),
-                appWidgetId = if (it.has("appWidgetId")) it.optInt("appWidgetId") else null,
-                sceneGroupId = parseNullableString(it.optString("sceneGroupId")),
-                sceneSlotId = parseNullableString(it.optString("sceneSlotId")),
-                sceneItemId = parseNullableString(it.optString("sceneItemId"))
-            )
+        val runtimeStatesArray = call.getArray("runtimeStates")
+        val runtimeStates = if (runtimeStatesArray != null) {
+            buildList {
+                for (index in 0 until runtimeStatesArray.length()) {
+                    runtimeStatesArray.optJSONObject(index)?.let { add(runtimeFromJson(it)) }
+                }
+            }
+        } else {
+            call.getObject("runtimeState")?.let(::runtimeFromJson)?.let(::listOf) ?: emptyList()
+        }
+
+        val existingWidgetStates = WidgetStores.loadRuntimeStates(context)
+            .filter { it.source == "widget" }
+        val statesToSave = if (runtimeStates.any { it.source == "app" } &&
+            runtimeStates.none { it.source == "widget" } &&
+            existingWidgetStates.isNotEmpty()
+        ) {
+            runtimeStates + existingWidgetStates.filterNot { existing ->
+                runtimeStates.any { incoming -> incoming.id == existing.id }
+            }
+        } else {
+            runtimeStates
         }
 
         val lastWidgetStopAt = WidgetStores.loadLastWidgetStopAt(context)
-        if (runtimeState != null &&
-            runtimeState.source == "app" &&
+        if (statesToSave.any { it.source == "app" } &&
             lastWidgetStopAt != null &&
             System.currentTimeMillis() - lastWidgetStopAt < 2000L
         ) {
@@ -216,12 +221,32 @@ class WidgetBridgePlugin : Plugin() {
             return
         }
 
-        WidgetStores.saveRuntimeState(context, runtimeState)
+        WidgetStores.saveRuntimeStates(context, statesToSave)
         WidgetRefreshCoordinator.refreshTimerWidgets(context)
         WidgetRefreshCoordinator.refreshTodoPinWidgets(context)
         WidgetRefreshCoordinator.refreshSceneWidgets(context)
         call.resolve()
     }
+
+    private fun runtimeFromJson(json: JSONObject): WidgetRuntimeState = WidgetRuntimeState(
+        id = json.getString("id") ?: "",
+        widgetType = WidgetTypes.normalize(json.optString("widgetType")),
+        activityId = json.getString("activityId") ?: "",
+        categoryId = json.getString("categoryId") ?: "",
+        icon = json.optString("icon", "\u2022"),
+        label = json.optString("label", ""),
+        color = json.optString("color", "#E7E5E4"),
+        startedAt = json.optLong("startedAt", 0L),
+        source = json.optString("source", "app"),
+        linkedTodoId = parseNullableString(json.optString("linkedTodoId")),
+        scopeIds = json.optJSONArray("scopeIds").toStringList(),
+        slotIndex = if (json.has("slotIndex")) json.optInt("slotIndex") else null,
+        templateId = parseNullableString(json.optString("templateId")),
+        appWidgetId = if (json.has("appWidgetId")) json.optInt("appWidgetId") else null,
+        sceneGroupId = parseNullableString(json.optString("sceneGroupId")),
+        sceneSlotId = parseNullableString(json.optString("sceneSlotId")),
+        sceneItemId = parseNullableString(json.optString("sceneItemId"))
+    )
 
     @PluginMethod
     fun syncDailyWidgetData(call: PluginCall) {

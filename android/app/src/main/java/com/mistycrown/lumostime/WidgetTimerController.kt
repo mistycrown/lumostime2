@@ -70,19 +70,19 @@ object WidgetTimerController {
         }
 
         val now = System.currentTimeMillis()
-        val currentRuntime = WidgetStores.loadRuntimeState(context)
+        val currentRuntimes = WidgetStores.loadRuntimeStates(context)
+        val currentRuntime = currentRuntimes.find {
+            it.source == "widget" && it.linkedTodoId == todoId
+        }
         val isSameTodoActive = currentRuntime?.linkedTodoId == todoId
 
         if (isSameTodoActive && currentRuntime != null) {
             finishRuntime(context, currentRuntime, now)
-            WidgetStores.saveRuntimeState(context, null)
+            val remainingRuntimes = currentRuntimes.filterNot { it.id == currentRuntime.id }
+            WidgetStores.saveRuntimeStates(context, remainingRuntimes)
             WidgetStores.saveLastWidgetStopAt(context, now)
-            FloatingWindowService.syncFocusStateIfRunning(currentRuntime.icon, false, 0L)
+            syncFloatingWindow(context, remainingRuntimes)
             return true
-        }
-
-        if (currentRuntime != null) {
-            finishRuntime(context, currentRuntime, now)
         }
 
         val nextRuntime = WidgetRuntimeState(
@@ -102,9 +102,9 @@ object WidgetTimerController {
             appWidgetId = appWidgetId
         )
 
-        WidgetStores.saveRuntimeState(context, nextRuntime)
+        WidgetStores.saveRuntimeStates(context, currentRuntimes + nextRuntime)
         WidgetStores.saveLastWidgetStopAt(context, null)
-        FloatingWindowService.syncFocusStateIfRunning(nextRuntime.icon, true, nextRuntime.startedAt)
+        syncFloatingWindow(context, currentRuntimes + nextRuntime)
         return true
     }
 
@@ -136,7 +136,17 @@ object WidgetTimerController {
         }
 
         val now = System.currentTimeMillis()
-        val currentRuntime = WidgetStores.loadRuntimeState(context)
+        val currentRuntimes = WidgetStores.loadRuntimeStates(context)
+        val currentRuntime = currentRuntimes.find { runtime ->
+            if (runtime.source == "widget" && runtime.templateId == template.id) {
+                runtime.slotIndex == slotIndex
+            } else {
+                runtime.activityId == slot.activityId &&
+                    runtime.categoryId == slot.categoryId &&
+                    runtime.linkedTodoId == slot.linkedTodoId &&
+                    runtime.scopeIds.toSet() == slot.scopeIds.toSet()
+            }
+        }
         val isSameSlotActive = currentRuntime?.let { runtime ->
             if (runtime.source == "widget" && runtime.templateId == template.id) {
                 runtime.slotIndex == slotIndex
@@ -150,7 +160,8 @@ object WidgetTimerController {
 
         if (isSameSlotActive && currentRuntime != null) {
             finishRuntime(context, currentRuntime, now)
-            WidgetStores.saveRuntimeState(context, null)
+            val remainingRuntimes = currentRuntimes.filterNot { it.id == currentRuntime.id }
+            WidgetStores.saveRuntimeStates(context, remainingRuntimes)
             WidgetStores.saveLastWidgetStopAt(context, now)
             saveTapAnimation(
                 context,
@@ -160,12 +171,8 @@ object WidgetTimerController {
                 animationMode = WidgetTapAnimationModes.TIMER_STOP,
                 startedAt = now
             )
-            FloatingWindowService.syncFocusStateIfRunning(currentRuntime.icon, false, 0L)
+            syncFloatingWindow(context, remainingRuntimes)
             return true
-        }
-
-        if (currentRuntime != null) {
-            finishRuntime(context, currentRuntime, now)
         }
 
         val nextRuntime = WidgetRuntimeState(
@@ -185,7 +192,7 @@ object WidgetTimerController {
             appWidgetId = appWidgetId
         )
 
-        WidgetStores.saveRuntimeState(context, nextRuntime)
+        WidgetStores.saveRuntimeStates(context, currentRuntimes + nextRuntime)
         WidgetStores.saveLastWidgetStopAt(context, null)
         saveTapAnimation(
             context,
@@ -195,7 +202,7 @@ object WidgetTimerController {
             animationMode = WidgetTapAnimationModes.TIMER_START,
             startedAt = now
         )
-        FloatingWindowService.syncFocusStateIfRunning(nextRuntime.icon, true, nextRuntime.startedAt)
+        syncFloatingWindow(context, currentRuntimes + nextRuntime)
         return true
     }
 
@@ -334,7 +341,15 @@ object WidgetTimerController {
         maybeLaunchSceneApp(context, item)
 
         val now = System.currentTimeMillis()
-        val currentRuntime = WidgetStores.loadRuntimeState(context)
+        val currentRuntimes = WidgetStores.loadRuntimeStates(context)
+        val currentRuntime = currentRuntimes.find { runtime ->
+            runtime.source == "widget" &&
+                runtime.activityId == item.activityId &&
+                runtime.categoryId == item.categoryId &&
+                runtime.linkedTodoId == item.linkedTodoId &&
+                runtime.scopeIds.toSet() == item.scopeIds.toSet() &&
+                (runtime.sceneItemId.isNullOrBlank() || runtime.sceneItemId == item.id)
+        }
         val isSameItemActive = currentRuntime?.let { runtime ->
             runtime.activityId == item.activityId &&
                 runtime.categoryId == item.categoryId &&
@@ -344,7 +359,8 @@ object WidgetTimerController {
 
         if (isSameItemActive && currentRuntime != null) {
             finishRuntime(context, currentRuntime, now)
-            WidgetStores.saveRuntimeState(context, null)
+            val remainingRuntimes = currentRuntimes.filterNot { it.id == currentRuntime.id }
+            WidgetStores.saveRuntimeStates(context, remainingRuntimes)
             WidgetStores.saveLastWidgetStopAt(context, now)
             saveTapAnimation(
                 context,
@@ -354,12 +370,8 @@ object WidgetTimerController {
                 animationMode = WidgetTapAnimationModes.TIMER_STOP,
                 startedAt = now
             )
-            FloatingWindowService.syncFocusStateIfRunning(currentRuntime.icon, false, 0L)
+            syncFloatingWindow(context, remainingRuntimes)
             return true
-        }
-
-        if (currentRuntime != null) {
-            finishRuntime(context, currentRuntime, now)
         }
 
         val nextRuntime = WidgetRuntimeState(
@@ -382,7 +394,7 @@ object WidgetTimerController {
             sceneItemId = item.id
         )
 
-        WidgetStores.saveRuntimeState(context, nextRuntime)
+        WidgetStores.saveRuntimeStates(context, currentRuntimes + nextRuntime)
         WidgetStores.saveLastWidgetStopAt(context, null)
         saveTapAnimation(
             context,
@@ -392,7 +404,7 @@ object WidgetTimerController {
             animationMode = WidgetTapAnimationModes.TIMER_START,
             startedAt = now
         )
-        FloatingWindowService.syncFocusStateIfRunning(nextRuntime.icon, true, nextRuntime.startedAt)
+        syncFloatingWindow(context, currentRuntimes + nextRuntime)
         return true
     }
 
@@ -563,20 +575,45 @@ object WidgetTimerController {
 
     @JvmStatic
     fun stopWidgetRuntimeFromExternalTrigger(context: Context): WidgetRuntimeState? {
-        val runtimeState = WidgetStores.loadRuntimeState(context) ?: return null
-        if (runtimeState.source != "widget") {
-            return null
-        }
+        return stopWidgetRuntimeFromExternalTrigger(context, null)
+    }
+
+    @JvmStatic
+    fun stopWidgetRuntimeFromExternalTrigger(context: Context, sessionId: String?): WidgetRuntimeState? {
+        val runtimeStates = WidgetStores.loadRuntimeStates(context)
+        val runtimeState = if (!sessionId.isNullOrBlank()) {
+            runtimeStates.firstOrNull { it.id == sessionId && it.source == "widget" }
+        } else {
+            runtimeStates
+                .filter { it.source == "widget" }
+                .maxByOrNull { it.startedAt }
+        } ?: return null
 
         val endedAt = System.currentTimeMillis()
         finishRuntime(context, runtimeState, endedAt)
-        WidgetStores.saveRuntimeState(context, null)
+        val remainingRuntimes = runtimeStates.filterNot { it.id == runtimeState.id }
+        WidgetStores.saveRuntimeStates(context, remainingRuntimes)
         WidgetStores.saveLastWidgetStopAt(context, endedAt)
         WidgetRefreshCoordinator.refreshTimerWidgets(context)
         WidgetRefreshCoordinator.refreshTodoPinWidgets(context)
         WidgetRefreshCoordinator.refreshSceneWidgets(context)
-        FloatingWindowService.syncFocusStateIfRunning(runtimeState.icon, false, 0L)
+        syncFloatingWindow(context, remainingRuntimes)
         return runtimeState
+    }
+
+    private fun syncFloatingWindow(context: Context, runtimeStates: List<WidgetRuntimeState>) {
+        val displayedRuntime = runtimeStates.maxByOrNull { it.startedAt }
+        if (displayedRuntime == null) {
+            FloatingWindowService.syncFocusStateIfRunning("", false, 0L, null)
+            return
+        }
+
+        FloatingWindowService.syncFocusStateIfRunning(
+            displayedRuntime.icon,
+            true,
+            displayedRuntime.startedAt,
+            displayedRuntime.id
+        )
     }
 
     private fun finishRuntime(context: Context, runtimeState: WidgetRuntimeState, endedAt: Long) {
