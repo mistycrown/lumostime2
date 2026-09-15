@@ -221,12 +221,15 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                 )}
                             </div>
                         </div>
-                        <div className="flex items-center justify-between gap-4 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
-                            <div className="min-w-0 flex-1">
-                                <h4 className="font-bold text-stone-700">全局字号</h4>
-                                <p className="text-xs text-stone-400 mt-1">调整应用内文字大小</p>
+                        <div className="flex flex-col gap-3 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                            <div className="flex items-center justify-between gap-4">
+                                <div className="min-w-0 flex-1">
+                                    <h4 className="font-bold text-stone-700">全局字号</h4>
+                                    <p className="text-xs text-stone-400 mt-1">调整应用内文字大小</p>
+                                </div>
+                                <span className="shrink-0 text-sm font-bold tabular-nums text-stone-700">{Math.round(fontScale * 100)}%</span>
                             </div>
-                            <div className="flex shrink-0 items-center gap-3">
+                            <div className="flex items-center gap-3">
                                 <input
                                     aria-label="全局字号"
                                     type="range"
@@ -235,9 +238,8 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                     step="0.05"
                                     value={fontScale}
                                     onChange={(event) => setFontScale(Number(event.target.value))}
-                                    className="w-28 accent-stone-800"
+                                    className="w-full accent-stone-800"
                                 />
-                                <span className="w-12 text-right text-sm font-bold tabular-nums text-stone-700">{Math.round(fontScale * 100)}%</span>
                             </div>
                         </div>
                         {/* Privacy Mode Toggle */}
