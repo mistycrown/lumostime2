@@ -100,6 +100,15 @@ export type EmojiStyle = 'native' | 'twemoji' | 'openmoji';
 export type ScheduleStyle = 'default' | 'classic' | 'minimal' | 'solid';
 export type DefaultSelectorPage = 'emoji' | string; // 'emoji' 或 sticker set ID (如 'water', 'water-1', 'water-2')
 export type SceneCardTimerMode = 'realtime' | 'backfill'; // 'realtime' 正计时, 'backfill' 补记
+export type NavigationModuleKey = 'record' | 'todo' | 'timeline' | 'review' | 'index';
+export type NavigationModuleVisibility = Record<NavigationModuleKey, boolean>;
+export const DEFAULT_NAVIGATION_MODULE_VISIBILITY: NavigationModuleVisibility = {
+    record: true,
+    todo: true,
+    timeline: true,
+    review: true,
+    index: true
+};
 export type { ImmersiveTimerOrientation } from '../utils/immersiveOrientation';
 export type { TimelineQuickActionKey } from '../constants/timelineQuickActions';
 export type { AutoStartTimerJumpMode } from '../utils/autoStartTimerJumpMode';
@@ -122,6 +131,8 @@ interface SettingsContextType {
 
     defaultRecordView: DefaultRecordView;
     setDefaultRecordView: React.Dispatch<React.SetStateAction<DefaultRecordView>>;
+    navigationModuleVisibility: NavigationModuleVisibility;
+    setNavigationModuleVisibility: React.Dispatch<React.SetStateAction<NavigationModuleVisibility>>;
     immersiveTimerDefaultOrientation: ImmersiveTimerOrientation;
     setImmersiveTimerDefaultOrientation: React.Dispatch<React.SetStateAction<ImmersiveTimerOrientation>>;
 
@@ -320,6 +331,15 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         const saved = localStorage.getItem('lumos_default_record_view');
         return (saved as DefaultRecordView) || 'TIMER';
     });
+    const [navigationModuleVisibility, setNavigationModuleVisibility] = useState<NavigationModuleVisibility>(() => {
+        const stored = localStorage.getItem(SETTINGS_KEYS.NAVIGATION_MODULE_VISIBILITY);
+        if (!stored) return DEFAULT_NAVIGATION_MODULE_VISIBILITY;
+        try {
+            return { ...DEFAULT_NAVIGATION_MODULE_VISIBILITY, ...(JSON.parse(stored) as Partial<NavigationModuleVisibility>) };
+        } catch {
+            return DEFAULT_NAVIGATION_MODULE_VISIBILITY;
+        }
+    });
     const [immersiveTimerDefaultOrientation, setImmersiveTimerDefaultOrientation] = useState<ImmersiveTimerOrientation>(() => {
         const stored = localStorage.getItem('lumostime_immersive_timer_default_orientation');
         return normalizeImmersiveTimerOrientation(stored);
@@ -458,6 +478,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem('lumos_default_record_view', defaultRecordView);
     }, [defaultRecordView]);
+
+    useEffect(() => {
+        localStorage.setItem(SETTINGS_KEYS.NAVIGATION_MODULE_VISIBILITY, JSON.stringify(navigationModuleVisibility));
+    }, [navigationModuleVisibility]);
 
     useEffect(() => {
         localStorage.setItem('lumostime_immersive_timer_default_orientation', immersiveTimerDefaultOrientation);
@@ -913,6 +937,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setDefaultIndexView,
             defaultRecordView,
             setDefaultRecordView,
+            navigationModuleVisibility,
+            setNavigationModuleVisibility,
             immersiveTimerDefaultOrientation,
             setImmersiveTimerDefaultOrientation,
             autoLinkRules,
