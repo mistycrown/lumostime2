@@ -463,38 +463,38 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
     const showAvatar = !isUser || !previousMessage || previousMessage.role !== message.role;
 
     let bubbleStyle = {
-      borderColor: theme.panelBorder,
+      borderColor: 'transparent',
       backgroundColor: theme.panelBg,
       color: theme.textPrimary,
-      boxShadow: `0 0 0 1px ${accentMix(8, 'rgba(0,0,0,0.02)')}`
+      boxShadow: 'none'
     };
     if (isUser) {
       bubbleStyle = {
-        borderColor: theme.activeBorder,
+        borderColor: 'transparent',
         backgroundColor: theme.activeBg,
         color: theme.textPrimary,
-        boxShadow: `0 0 0 1px ${accentMix(10, 'rgba(0,0,0,0.03)')}`
+        boxShadow: 'none'
       };
     } else if (tone === 'system') {
       bubbleStyle = {
-        borderColor: theme.panelBorder,
+        borderColor: 'transparent',
         backgroundColor: theme.inputBg,
         color: theme.textSecondary,
-        boxShadow: `0 0 0 1px ${accentMix(7, 'rgba(0,0,0,0.02)')}`
+        boxShadow: 'none'
       };
     } else if (tone === 'error') {
       bubbleStyle = {
-        borderColor: theme.dangerBorder,
+        borderColor: 'transparent',
         backgroundColor: theme.dangerBg,
         color: theme.dangerText,
-        boxShadow: '0 0 0 1px rgba(157,84,77,0.08)'
+        boxShadow: 'none'
       };
     } else if (tone === 'pending') {
       bubbleStyle = {
-        borderColor: theme.pendingBorder,
+        borderColor: 'transparent',
         backgroundColor: theme.pendingBg,
         color: theme.textMuted,
-        boxShadow: `0 0 0 1px ${accentMix(6, 'rgba(0,0,0,0.02)')}`
+        boxShadow: 'none'
       };
     }
 
@@ -533,14 +533,14 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
           <div className="w-8 shrink-0 pt-0.5">
             {showAvatar ? (
               <div
-                className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-[0.75rem] border"
+                className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full"
                 style={avatarStyle}
               >
                 {isUser ? (
                   <UserAvatar profile={userProfile} iconClassName="text-sm" />
                 ) : (
-                  <div className="h-full w-full overflow-hidden rounded-[0.75rem]">
-                    <PersonaAvatar persona={activePersona} className="rounded-[0.75rem]" iconClassName="text-sm" />
+                  <div className="h-full w-full overflow-hidden rounded-full">
+                    <PersonaAvatar persona={activePersona} className="rounded-full" iconClassName="text-sm" />
                   </div>
                 )}
               </div>
@@ -583,7 +583,7 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
             {visibleDisplayParts.map((part, partIndex) => (
               <RevealingMessageBubble
                 key={`${message.id}-part-${partIndex}`}
-                className={`rounded-[0.95rem] border px-4 py-3 ${isUser ? 'ml-auto' : ''}`}
+                className={`rounded-[0.95rem] px-4 py-3 ${isUser ? 'ml-auto' : ''}`}
                 style={bubbleStyle}
                 revealMode={isAnimatedAssistantMessage ? 'assistantStaggered' : 'default'}
                 partIndex={partIndex}

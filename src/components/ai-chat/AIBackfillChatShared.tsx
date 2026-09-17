@@ -779,7 +779,8 @@ export const PersonaAvatar: React.FC<{
       };
     }
 
-    imageService.getImageUrl(persona.avatarImage).then((url) => {
+    const imageRef = persona.avatarImage.startsWith('/') ? Promise.resolve(persona.avatarImage) : imageService.getImageUrl(persona.avatarImage);
+    imageRef.then((url) => {
       if (!cancelled) {
         setSrc(url);
       }

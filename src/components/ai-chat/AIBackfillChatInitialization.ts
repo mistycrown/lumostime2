@@ -68,7 +68,8 @@ export const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     userCallName: '',
     systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-default'],
     contextMessageLimit: 30,
-    isBuiltIn: true
+    isBuiltIn: true,
+    avatarImage: '/aipic/default.webp'
   },
   {
     id: 'builtin-banliang',
@@ -78,7 +79,8 @@ export const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     userCallName: '',
     systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-banliang'],
     contextMessageLimit: 30,
-    isBuiltIn: true
+    isBuiltIn: true,
+    avatarImage: '/aipic/cat.webp'
   },
   {
     id: 'builtin-shenyuqiu',
@@ -88,7 +90,8 @@ export const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     userCallName: '',
     systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-shenyuqiu'],
     contextMessageLimit: 30,
-    isBuiltIn: true
+    isBuiltIn: true,
+    avatarImage: '/aipic/professor.webp'
   },
   {
     id: 'builtin-suwanqing',
@@ -98,7 +101,8 @@ export const DEFAULT_AI_PERSONAS: AIChatPersona[] = [
     userCallName: '',
     systemPrompt: BUILTIN_PERSONA_SYSTEM_PROMPTS['builtin-suwanqing'],
     contextMessageLimit: 30,
-    isBuiltIn: true
+    isBuiltIn: true,
+    avatarImage: '/aipic/sister.webp'
   }
 ];
 
