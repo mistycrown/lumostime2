@@ -6940,9 +6940,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           />
           <div className="flex min-w-0 items-center gap-3 sm:gap-3.5">
             <div
-              className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[0.8rem] border text-base transition-all"
+              className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-base transition-all"
               style={{
-                borderColor: AI_CHAT_THEME.panelBorder,
                 backgroundColor: AI_CHAT_THEME.avatarBg,
                 boxShadow: AI_CHAT_THEME.avatarShadow,
                 ...(isDesktopWidgetMode ? { WebkitAppRegion: 'no-drag' as const } : {})
@@ -6992,9 +6991,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               <>
                 <button
                   onClick={onOpenMainApp}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-[0.75rem] border px-2.5 text-[12px] transition-colors"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] transition-colors"
                   style={{
-                    borderColor: AI_CHAT_THEME.chipBorder,
                     backgroundColor: AI_CHAT_THEME.panelBg,
                     color: AI_CHAT_THEME.textSecondary
                   }}
@@ -7005,9 +7003,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 </button>
                 <button
                   onClick={onHideToEdge}
-                  className="flex h-8 w-8 items-center justify-center rounded-[0.75rem] border transition-colors"
+                  className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
                   style={{
-                    borderColor: AI_CHAT_THEME.chipBorder,
                     backgroundColor: AI_CHAT_THEME.panelBg,
                     color: AI_CHAT_THEME.textMuted
                   }}
@@ -7017,9 +7014,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 </button>
                 <button
                   onClick={onClose}
-                  className="flex h-8 w-8 items-center justify-center rounded-[0.75rem] border transition-colors"
+                  className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
                   style={{
-                    borderColor: AI_CHAT_THEME.chipBorder,
                     backgroundColor: AI_CHAT_THEME.panelBg,
                     color: AI_CHAT_THEME.textMuted
                   }}
@@ -7033,9 +7029,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 <button
                   onClick={() => !isLoading && setIsHistoryPanelOpen(true)}
                   disabled={isLoading}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-[0.75rem] border px-2.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                   style={{
-                    borderColor: AI_CHAT_THEME.chipBorder,
                     backgroundColor: AI_CHAT_THEME.panelBg,
                     color: AI_CHAT_THEME.textSecondary
                   }}
@@ -7047,9 +7042,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
                 <button
                   onClick={onClose}
-                  className="flex h-8 w-8 items-center justify-center rounded-[0.75rem] border transition-colors"
+                  className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
                   style={{
-                    borderColor: AI_CHAT_THEME.chipBorder,
                     backgroundColor: AI_CHAT_THEME.panelBg,
                     color: AI_CHAT_THEME.textMuted
                   }}
@@ -7104,7 +7098,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         <div
           className="px-4 pb-3 pt-3 backdrop-blur-xl sm:px-5"
           style={{
-            backgroundColor: AI_CHAT_THEME.panelBg
+            backgroundColor: AI_CHAT_THEME.shellLayerBg
           }}
         >
           <div
