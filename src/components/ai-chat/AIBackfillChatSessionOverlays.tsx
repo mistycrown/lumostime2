@@ -173,14 +173,14 @@ export const AIBackfillChatHistoryOverlay: React.FC<AIBackfillChatHistoryOverlay
                       className={`flex min-w-0 flex-1 items-start gap-3 text-left ${isEditing ? '' : 'cursor-pointer'}`}
                     >
                       <div
-                        className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[0.7rem] border text-base"
+                        className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border text-base"
                         style={{
                           borderColor: theme.panelBorder,
                           backgroundColor: theme.avatarBg,
                           boxShadow: theme.avatarShadow
                         }}
                       >
-                        <PersonaAvatar persona={sessionPersona} iconClassName="text-base" />
+                        <PersonaAvatar persona={sessionPersona} className="rounded-full" iconClassName="text-base" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
