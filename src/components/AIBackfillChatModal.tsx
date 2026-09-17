@@ -6927,13 +6927,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         }}
       >
         <div
-          className="flex h-[3.25rem] items-center justify-between gap-3 border-b px-4 backdrop-blur-md"
+          className="relative flex h-[3.25rem] items-center justify-between gap-3 px-4 backdrop-blur-md"
           style={{
-            borderColor: AI_CHAT_THEME.panelBorder,
             backgroundColor: AI_CHAT_THEME.panelBg,
             ...(isDesktopWidgetMode ? { WebkitAppRegion: 'drag' as const } : {})
           }}
         >
+          <div
+            className="pointer-events-none absolute bottom-0 left-1/2 h-px w-[min(68%,24rem)] -translate-x-1/2"
+            style={{ backgroundColor: AI_CHAT_THEME.panelBorder }}
+            aria-hidden="true"
+          />
           <div className="flex min-w-0 items-center gap-3 sm:gap-3.5">
             <div
               className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[0.8rem] border text-base transition-all"
@@ -7098,9 +7102,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         />
 
         <div
-          className="border-t px-4 pb-3 pt-3 backdrop-blur-xl sm:px-5"
+          className="px-4 pb-3 pt-3 backdrop-blur-xl sm:px-5"
           style={{
-            borderColor: AI_CHAT_THEME.panelBorder,
             backgroundColor: AI_CHAT_THEME.panelBg
           }}
         >
