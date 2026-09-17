@@ -1,7 +1,7 @@
 /**
  * @file NoteTemplateManager.tsx
  * @input Note template arrays plus change callbacks
- * @output Capsule-style note template management card
+ * @output Capsule-style note template management section
  * @pos Component
  * @description Renders note templates with keyword-like capsules and reuses a shared modal editor so detail pages can add, edit, and remove templates consistently.
  * @updated 2026-04-19: Added shared note template management card for detail views.
@@ -84,7 +84,7 @@ export const NoteTemplateManager: React.FC<NoteTemplateManagerProps> = ({
 
   return (
     <>
-      <div className="rounded-2xl border border-stone-100 bg-white p-6 shadow-sm">
+      <div className="border-t border-stone-200/80 pt-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-bold uppercase tracking-widest text-stone-400">备注模板</h3>
