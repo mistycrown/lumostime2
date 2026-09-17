@@ -13,6 +13,7 @@
  * - 闁哄秷顫夊畵渚€鎳楃仦鐐彲闁煎浜滄慨鈺冩嫬閸愨晜娈婚柣妯垮煐閳ь兛鐒﹂悥顕€寮藉畡鎵
  * 
  * 闁宠法濯寸粭?Once I am updated, be sure to update my header comment and the folder's md.
+ * @updated 2026-09-17: Fixed custom background deletion reporting failure after persistence succeeds.
  * @updated 2026-08-10: Added canonical image-list storage and restore hydration for custom backgrounds.
  * @updated 2026-04-20: Added event-driven background subscriptions, image preloading, and lighter reapply scheduling to reduce mobile jank and white flashes.
  */
@@ -484,33 +485,41 @@ class BackgroundService {
     /**
      * 闁告帞濞€濞呭酣鎳涢鍕毎濞戞柨顦抽崕妤呭疾?     */
     deleteCustomBackground(backgroundId: string): boolean {
-        try {
-            const customBackgrounds = this.getCustomBackgrounds();
-            const backgroundToDelete = customBackgrounds.find(bg => bg.id === backgroundId);
-            const filteredBackgrounds = customBackgrounds.filter(bg => bg.id !== backgroundId);
-
-            if (filteredBackgrounds.length !== customBackgrounds.length) {
-                this.saveCustomBackgrounds(filteredBackgrounds);
-
-                if (backgroundToDelete?.filePath) {
-                    void this.deleteNativeBackgroundFile(backgroundToDelete.filePath);
-                }
-                if (backgroundToDelete?.imageFilename) {
-                    void imageService.deleteImage(backgroundToDelete.imageFilename).catch(() => undefined);
-                }
-
-                // 濠碘€冲€归悘澶愬礆閻樼粯鐝熼柣銊ュ濡叉瓕銇愰幘鍐差枀闁煎啿鏈▍娆撴晬瀹€鍕缂傚喚鍠曠拹鐔割渶濡鍚?                const currentBackground = this.getCurrentBackground();
-                if (currentBackground === backgroundId) {
-                    this.setCurrentBackground('default');
-                }
-
-                return true;
-            }
-            return false;
-        } catch (error) {
-            console.error('Failed to delete custom background:', error);
+        const customBackgrounds = this.getCustomBackgrounds();
+        const backgroundToDelete = customBackgrounds.find(bg => bg.id === backgroundId);
+        if (!backgroundToDelete) {
             return false;
         }
+
+        try {
+            this.saveCustomBackgrounds(customBackgrounds.filter(bg => bg.id !== backgroundId));
+        } catch (error) {
+            console.error('Failed to persist custom background deletion:', error);
+            return false;
+        }
+
+        if (backgroundToDelete.filePath) {
+            void this.deleteNativeBackgroundFile(backgroundToDelete.filePath).catch(error => {
+                console.warn('[BackgroundService] Failed to delete native background file:', error);
+            });
+        }
+        if (backgroundToDelete.imageFilename) {
+            void imageService.deleteImage(backgroundToDelete.imageFilename).catch(error => {
+                console.warn('[BackgroundService] Failed to delete background image:', error);
+            });
+        }
+
+                // 濠碘€冲€归悘澶愬礆閻樼粯鐝熼柣銊ュ濡叉瓕銇愰幘鍐差枀闁煎啿鏈▍娆撴晬瀹€鍕缂傚喚鍠曠拹鐔割渶濡鍚?                const currentBackground = this.getCurrentBackground();
+        if (this.getCurrentBackground() === backgroundId) {
+            try {
+                this.setCurrentBackground('default');
+            } catch (error) {
+                console.warn('[BackgroundService] Failed to apply default background after deletion:', error);
+                localStorage.setItem(CURRENT_BACKGROUND_KEY, 'default');
+            }
+        }
+
+        return true;
     }
 
     /**
