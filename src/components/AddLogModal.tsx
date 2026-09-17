@@ -1,5 +1,6 @@
 /**
  * @file AddLogModal.tsx
+ * @updated 2026-09-17: Uses an adaptive equal-sided time grid so the start/end inputs and center separator stay horizontally aligned across modal widths.
  * @updated 2026-09-05: Shows a linked todo's pre-record progress when editing an existing progress log.
  * @updated 2026-09-03: Passes record notes to shared attributes for automatic choice-option matching.
  * @updated 2026-08-27: Expanded the record time tool into split-and-merge with adjacent-record targeting.
@@ -742,7 +743,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
           {/* Time Input & Slider */}
           <div className="space-y-6">
             {/* Manual Inputs */}
-            <div className="mx-auto grid w-fit grid-cols-[auto_auto_auto] items-center gap-x-4 gap-y-2 max-[400px]:gap-x-2">
+            <div className="mx-auto grid w-full max-w-[42rem] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-4 gap-y-2 max-[400px]:gap-x-2">
               <div className="col-start-1 row-start-1 flex flex-col items-center">
                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1">Start</span>
                 <div className="flex items-center bg-white rounded-xl border border-stone-200 px-3 py-2 shadow-sm max-[400px]:px-2">
@@ -782,7 +783,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 </div>
               </div>
 
-              <div className="col-start-2 row-start-1 mt-6 h-px w-8 bg-stone-300" />
+              <div className="col-start-2 row-start-1 h-px w-8 justify-self-center bg-stone-300" />
 
               <div className="col-start-3 row-start-1 flex flex-col items-center">
                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1">End</span>
