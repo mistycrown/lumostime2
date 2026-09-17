@@ -363,8 +363,8 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
       switch (activeTab) {
          case 'Details':
             return (
-               <div className="space-y-6">
-                  <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
+               <div className="space-y-10">
+                  <div className="border-t border-stone-200/80 pt-6">
                      <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">基本信息</h3>
                      <div className="space-y-4">
                         <div className="flex items-center justify-between pb-4 border-b border-stone-100">
@@ -577,7 +577,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                      </div>
                   </div>
 
-                  <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
+                  <div className="border-t border-stone-200/80 pt-6">
                      <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">外观</h3>
                      <div className="space-y-4">
                         <div>
@@ -622,7 +622,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   />
 
                   {/* Keywords Section */}
-                  <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
+                  <div className="border-t border-stone-200/80 pt-6">
                      <div className="mb-4 flex items-center gap-1.5">
                         <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest">关键字</h3>
                         <FeatureHint

@@ -3,7 +3,7 @@
  * @input Activity custom attribute definitions, usage checks, and delete callbacks.
  * @output Attribute create, rename, move, delete, archive, restore, keyword-source, and option management.
  * @pos Activity detail settings component
- * @description Uses compact custom controls that match the existing record-association UI.
+ * @description Uses compact custom controls in a border-led editorial section that matches the detail view.
  * @updated 2026-09-12: Clears the display-condition field completely when an attribute is set to always show.
  * @updated 2026-09-03: Added a single-per-Activity choice attribute keyword-source setting.
  * @updated 2026-08-31: Added numeric units and one-level single-choice display-condition configuration.
@@ -170,7 +170,7 @@ export const ActivityAttributeManager: React.FC<ActivityAttributeManagerProps> =
 
   return (
     <>
-    <section className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
+    <section className="border-t border-stone-200/80 pt-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest">{'\u5c5e\u6027'}</h3>
         <span className="text-[10px] text-stone-300">{activeAttributes.length}</span>
