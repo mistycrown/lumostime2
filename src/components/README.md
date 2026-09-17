@@ -2,7 +2,7 @@
 
 This directory contains the reusable React components for the application. They are categorized by their primary function.
 
-- Update 2026-09-17: `AddLogModal.tsx` now uses equal flexible side columns and a centered fixed-width separator for the start/end time inputs, keeping the time range aligned as the modal width changes.
+- Update 2026-09-17: `AddLogModal.tsx` now uses equal flexible side columns and a centered fixed-width separator with title-height compensation, keeping the time range aligned as the modal width changes.
 
 - Update 2026-09-12: `FeatureHint.tsx` provides reusable contextual help triggers with consistent modal styling and per-hint localStorage dismissal; the first integration is beside Activity attribute keyword-source settings.
 
