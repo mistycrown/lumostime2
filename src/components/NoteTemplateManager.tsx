@@ -85,16 +85,16 @@ export const NoteTemplateManager: React.FC<NoteTemplateManagerProps> = ({
   return (
     <>
       <div className="border-t border-stone-200/80 pt-6">
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mb-5 flex items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-bold uppercase tracking-widest text-stone-400">备注模板</h3>
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">备注模板</h3>
           </div>
           <button
             onClick={() => {
               setEditingTemplate(null);
               setIsEditorOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 px-3 py-1.5 text-xs font-bold text-stone-600 transition-colors hover:bg-stone-50"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-stone-200 px-3 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50"
           >
             <Plus size={14} />
             添加

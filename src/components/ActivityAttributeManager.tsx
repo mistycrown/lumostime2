@@ -171,24 +171,24 @@ export const ActivityAttributeManager: React.FC<ActivityAttributeManagerProps> =
   return (
     <>
     <section className="border-t border-stone-200/80 pt-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest">{'\u5c5e\u6027'}</h3>
+      <div className="mb-5 flex items-center justify-between">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">{'\u5c5e\u6027'}</h3>
         <span className="text-[10px] text-stone-300">{activeAttributes.length}</span>
       </div>
 
-      <div className="flex gap-2 mb-5">
+      <div className="mb-6 flex h-10 gap-2">
         <input value={newName} onChange={(event) => setNewName(event.target.value)} onKeyDown={(event) => {
           if (event.key === 'Enter') { event.preventDefault(); addAttribute(); }
-        }} placeholder={'\u5c5e\u6027\u540d\u79f0'} className="min-w-0 flex-1 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-sm text-stone-800 outline-none focus:border-stone-500" />
+        }} placeholder={'\u5c5e\u6027\u540d\u79f0'} className="min-w-0 flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 text-sm text-stone-800 outline-none focus:border-stone-500" />
         <div className="relative shrink-0">
-          <button type="button" onClick={() => setIsTypeMenuOpen((current) => !current)} className="inline-flex min-w-[76px] items-center justify-between gap-2 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-sm text-stone-600 hover:border-stone-400" aria-haspopup="listbox" aria-expanded={isTypeMenuOpen}>
+          <button type="button" onClick={() => setIsTypeMenuOpen((current) => !current)} className="inline-flex h-full min-w-[76px] items-center justify-between gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 text-sm text-stone-600 hover:border-stone-400" aria-haspopup="listbox" aria-expanded={isTypeMenuOpen}>
             <span>{getTypeLabel(newType)}</span><ChevronDown size={15} className={`transition-transform ${isTypeMenuOpen ? 'rotate-180' : ''}`} />
           </button>
           {isTypeMenuOpen && <div className="absolute right-0 top-full z-20 mt-1 min-w-full overflow-hidden rounded-lg border border-stone-200 bg-white p-1 shadow-lg">
             {ATTRIBUTE_TYPES.map((type) => <button key={type.value} type="button" onClick={() => { setNewType(type.value); setIsTypeMenuOpen(false); }} className={`w-full whitespace-nowrap rounded-md px-3 py-2 text-left text-xs transition-colors ${newType === type.value ? 'bg-stone-100 text-stone-900 font-medium' : 'text-stone-500 hover:bg-stone-50'}`} role="option" aria-selected={newType === type.value}>{type.label}</button>)}
           </div>}
         </div>
-        <button type="button" onClick={addAttribute} disabled={!newName.trim()} className="p-2.5 rounded-lg bg-stone-900 text-white disabled:opacity-35 transition-opacity" title={'\u6dfb\u52a0\u5c5e\u6027'}><Plus size={18} /></button>
+        <button type="button" onClick={addAttribute} disabled={!newName.trim()} className="h-full w-10 rounded-lg bg-stone-900 text-white transition-opacity disabled:opacity-35" title={'\u6dfb\u52a0\u5c5e\u6027'}><Plus size={18} /></button>
       </div>
 
       <div className="space-y-4">
@@ -259,7 +259,7 @@ export const ActivityAttributeManager: React.FC<ActivityAttributeManagerProps> =
                 />
               </label>
               {(attribute.options || []).filter((option) => !option.isArchived).map((option) => <div key={option.id} className="flex items-center gap-2">
-                <input value={option.label} onChange={(event) => updateAttribute(attribute.id, { options: (attribute.options || []).map((item) => item.id === option.id ? { ...item, label: event.target.value } : item) })} className="min-w-0 flex-1 bg-stone-50 border border-stone-100 rounded-md px-2.5 py-2 text-xs text-stone-600 outline-none focus:border-stone-400" aria-label={'\u9009\u9879\u540d\u79f0'} />
+                <input value={option.label} onChange={(event) => updateAttribute(attribute.id, { options: (attribute.options || []).map((item) => item.id === option.id ? { ...item, label: event.target.value } : item) })} className="h-9 min-w-0 flex-1 rounded-md border border-stone-100 bg-stone-50 px-2.5 text-xs text-stone-600 outline-none focus:border-stone-400" aria-label={'\u9009\u9879\u540d\u79f0'} />
                 <button type="button" onClick={() => requestDelete(attribute, option)} className="p-1 text-stone-300 hover:text-red-500" title={'\u5220\u9664\u9009\u9879'}><Trash2 size={14} /></button>
               </div>)}
               {(attribute.options || []).some((option) => option.isArchived) && <div className="space-y-1 pt-1">{(attribute.options || []).filter((option) => option.isArchived).map((option) => <div key={option.id} className="flex items-center gap-2 text-xs text-stone-400"><span className="min-w-0 flex-1 truncate">{option.label}</span><button type="button" onClick={() => updateAttribute(attribute.id, { options: (attribute.options || []).map((item) => item.id === option.id ? { ...item, isArchived: false } : item) })} className="p-1 text-stone-400 hover:text-stone-900" title={'\u6062\u590d\u9009\u9879'}><RotateCcw size={13} /></button></div>)}</div>}
