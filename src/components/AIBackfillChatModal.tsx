@@ -42,6 +42,7 @@ import {
   ExternalLink,
   History,
   Pencil,
+  Plus,
   Send,
   Square,
   Undo2,
@@ -638,6 +639,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
   const [isPersonaPanelOpen, setIsPersonaPanelOpen] = useState(false);
+  const [isComposerMenuOpen, setIsComposerMenuOpen] = useState(false);
   const [isNewSessionDialogOpen, setIsNewSessionDialogOpen] = useState(false);
   const [activeSettingsMainTab, setActiveSettingsMainTab] = useState<AISettingsMainTab>('persona');
   const [debugViewer, setDebugViewer] = useState<DebugViewerState | null>(null);
@@ -740,6 +742,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const userAvatarInputRef = useRef<HTMLInputElement | null>(null);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const composerMenuRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messageElementRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const handleMessageElementRef = useCallback((messageId: string, node: HTMLDivElement | null) => {
@@ -6747,6 +6750,21 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       void handleSend();
     }
   };
+
+  useEffect(() => {
+    if (!isComposerMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (composerMenuRef.current && !composerMenuRef.current.contains(event.target as Node)) {
+        setIsComposerMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [isComposerMenuOpen]);
   const desktopWidgetTransitionOffset = hiddenEdge === 'left' ? '-12px' : '12px';
   const desktopWidgetAnimationStyles = isDesktopWidgetMode ? (
     <style>{`
@@ -7087,38 +7105,45 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           }}
         >
           <div
-            className={`mx-auto ${composerContainerClassName} rounded-[0.85rem] border px-3 pb-2 pt-2.5`}
+            className={`relative mx-auto flex ${composerContainerClassName} flex-wrap items-center gap-2 rounded-full border px-2 py-1.5`}
+            ref={composerMenuRef}
             style={{
               borderColor: AI_CHAT_THEME.panelBorder,
               backgroundColor: AI_CHAT_THEME.panelBg,
               boxShadow: AI_CHAT_THEME.cardShadow
             }}
           >
-            {!isDesktopWidgetMode && (activeWeeklyReviewShortcutOptions.length > 0 || activeMonthlyReviewShortcutOptions.length > 0) && (
-              <div className="mb-2 flex flex-wrap gap-2">
-                {[...activeWeeklyReviewShortcutOptions, ...activeMonthlyReviewShortcutOptions].map((option) => (
-                  <button
-                    key={option.key}
-                    type="button"
-                    onClick={() => {
-                      if (!isLoading) {
-                        void handleSend(option.value);
-                      }
-                    }}
-                    disabled={isLoading}
-                    className="inline-flex h-8 items-center rounded-[0.75rem] border px-3 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-                    style={{
-                      borderColor: AI_CHAT_THEME.chipBorder,
-                      backgroundColor: AI_CHAT_THEME.chipBg,
-                      color: AI_CHAT_THEME.textPrimary
-                    }}
-                  >
-                    {option.label}
+            {isComposerMenuOpen && (
+              <div
+                className="absolute bottom-[calc(100%+0.65rem)] left-0 z-20 w-[min(19rem,calc(100vw-2rem))] rounded-[1rem] border p-2"
+                style={{
+                  borderColor: AI_CHAT_THEME.panelBorder,
+                  backgroundColor: AI_CHAT_THEME.panelBg,
+                  boxShadow: AI_CHAT_THEME.cardShadowStrong
+                }}
+              >
+                <div className="grid grid-cols-2 gap-1">
+                  <button type="button" onClick={() => { if (activeSession) mutateSession(activeSession.id, (session) => ({ ...session, contextCacheEnabled: !session.contextCacheEnabled })); setIsComposerMenuOpen(false); }} className="flex min-h-10 items-center justify-between rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>
+                    <span>上下文</span><span className="text-[10px]" style={{ color: AI_CHAT_THEME.textMuted }}>{activeSession?.contextCacheEnabled ? `开 · ${activePersona.contextMessageLimit}轮` : '关'}</span>
                   </button>
-                ))}
+                  {!isDesktopWidgetMode && activeSession?.templateMeta?.templateType === 'weekly_review' && <button type="button" onClick={() => { handleFillWriteWeeklyNarrativeCommand(); setIsComposerMenuOpen(false); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>写入 AI 叙事</button>}
+                  {!isDesktopWidgetMode && activeSession?.templateMeta?.templateType === 'monthly_review' && <button type="button" onClick={() => { handleFillWriteMonthlyNarrativeCommand(); setIsComposerMenuOpen(false); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>写入 AI 叙事</button>}
+                  {!isDesktopWidgetMode && !activeSession?.templateMeta && <><button type="button" onClick={() => { handleFillDailyNarrativeCommand(); setIsComposerMenuOpen(false); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>叙事</button><button type="button" onClick={() => { handleFillDailyNewspaperCommand(); setIsComposerMenuOpen(false); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>小报</button></>}
+                  {[...activeWeeklyReviewShortcutOptions, ...activeMonthlyReviewShortcutOptions].map((option) => <button key={option.key} type="button" onClick={() => { if (!isLoading) void handleSend(option.value); setIsComposerMenuOpen(false); }} disabled={isLoading} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs disabled:opacity-50" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>{option.label}</button>)}
+                </div>
               </div>
             )}
-
+            <button
+              type="button"
+              onClick={() => setIsComposerMenuOpen((open) => !open)}
+              className="order-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors"
+              style={{ borderColor: AI_CHAT_THEME.panelBorder, backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textSecondary }}
+              title="更多功能"
+              aria-label="更多功能"
+              aria-expanded={isComposerMenuOpen}
+            >
+              <Plus size={19} strokeWidth={1.8} />
+            </button>
             <textarea
               ref={composerTextareaRef}
               value={inputText}
@@ -7130,18 +7155,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 });
               }}
               placeholder={`和 ${activePersona.assistantSelfName || 'AI'} 说点什么...`}
-              className="min-h-[42px] max-h-[68px] w-full resize-none bg-transparent px-0.5 py-0.5 text-[15px] leading-6 outline-none"
+              className="order-2 min-h-[34px] max-h-[34px] min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-1 py-1 text-[15px] leading-6 outline-none"
               style={{ color: AI_CHAT_THEME.textPrimary }}
               autoFocus
             />
 
-            <div className="mt-1.5 flex items-center justify-between gap-3">
+            <div className="contents">
               <button
                 onClick={() => activeSession && mutateSession(activeSession.id, (session) => ({
                   ...session,
                   contextCacheEnabled: !session.contextCacheEnabled
                 }))}
-                className="inline-flex h-8 shrink-0 items-center rounded-[0.75rem] border px-2.5 text-[12px] transition-colors"
+                className="hidden"
                 style={
                   activeSession?.contextCacheEnabled
                     ? {
@@ -7163,7 +7188,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 <button
                   onClick={handleFillWriteWeeklyNarrativeCommand}
                   disabled={isLoading}
-                  className="inline-flex h-8 shrink-0 items-center rounded-[0.75rem] border px-2.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  className="hidden"
                   style={{
                     borderColor: AI_CHAT_THEME.panelBorder,
                     backgroundColor: AI_CHAT_THEME.panelBgStrong,
@@ -7178,7 +7203,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 <button
                   onClick={handleFillWriteMonthlyNarrativeCommand}
                   disabled={isLoading}
-                  className="inline-flex h-8 shrink-0 items-center rounded-[0.75rem] border px-2.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  className="hidden"
                   style={{
                     borderColor: AI_CHAT_THEME.panelBorder,
                     backgroundColor: AI_CHAT_THEME.panelBgStrong,
@@ -7194,7 +7219,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   <button
                     onClick={handleFillDailyNarrativeCommand}
                     disabled={isLoading}
-                    className="inline-flex h-8 shrink-0 items-center rounded-[0.75rem] border px-2.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    className="hidden"
                     style={{
                       borderColor: AI_CHAT_THEME.panelBorder,
                       backgroundColor: AI_CHAT_THEME.panelBgStrong,
@@ -7207,7 +7232,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   <button
                     onClick={handleFillDailyNewspaperCommand}
                     disabled={isLoading}
-                    className="inline-flex h-8 shrink-0 items-center rounded-[0.75rem] border px-2.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    className="hidden"
                     style={{
                       borderColor: AI_CHAT_THEME.panelBorder,
                       backgroundColor: AI_CHAT_THEME.panelBgStrong,
@@ -7221,6 +7246,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               )}
               <button
                 onClick={() => {
+                  setIsComposerMenuOpen(false);
                   if (isStopActionVisible) {
                     handleStopRequest();
                     return;
@@ -7228,7 +7254,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   void handleSend();
                 }}
                 disabled={!isStopActionVisible && !inputText.trim()}
-                className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-[0.8rem] border transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                className="order-3 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-all disabled:cursor-not-allowed disabled:opacity-50"
                 style={
                   isStopActionVisible
                     ? {
