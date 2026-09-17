@@ -255,7 +255,7 @@ export const AIBackfillChatPersonaSettingsSection: React.FC<AIBackfillChatPerson
           <div className="space-y-4">
             <div className="flex items-center gap-4">
               <div
-                className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[0.95rem] border text-2xl"
+                className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border text-2xl"
                 style={{
                   borderColor: theme.panelBorder,
                   backgroundColor: theme.avatarBg,
@@ -744,7 +744,7 @@ export const AIBackfillChatPersonaSettingsSection: React.FC<AIBackfillChatPerson
         <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start">
           <div className="flex items-center gap-4">
             <div
-              className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[0.95rem] border text-2xl"
+              className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border text-2xl"
               style={{
                 borderColor: theme.panelBorder,
                 backgroundColor: theme.avatarBg,
