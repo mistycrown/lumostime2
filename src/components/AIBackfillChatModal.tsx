@@ -7067,6 +7067,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               </>
             ) : (
               <>
+                {!isHomeView && (
+                  <button
+                    onClick={() => setIsHomeView(true)}
+                    disabled={isLoading}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] transition-colors hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-60"
+                    style={{ color: AI_CHAT_THEME.textMuted }}
+                    title="返回 AI 工作台"
+                  >
+                    <ArrowLeft size={15} />
+                    <span className="hidden sm:inline">工作台</span>
+                  </button>
+                )}
                 <button
                   onClick={() => !isLoading && (isHomeView ? setIsPersonaPanelOpen(true) : setIsHistoryPanelOpen(true))}
                   disabled={isLoading}
@@ -7096,21 +7108,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             )}
           </div>
         </div>
-
-        {!isHomeView && (
-          <div className="pointer-events-none absolute left-4 top-[4.1rem] z-10 sm:left-6">
-            <button
-              type="button"
-              onClick={() => setIsHomeView(true)}
-              className="pointer-events-auto inline-flex h-8 items-center gap-1 rounded-full px-2 text-xs transition-colors hover:bg-black/5"
-              style={{ color: AI_CHAT_THEME.textMuted }}
-              title="返回 AI 工作台"
-            >
-              <ArrowLeft size={15} />
-              <span className="hidden sm:inline">工作台</span>
-            </button>
-          </div>
-        )}
 
         {isHomeView ? (
           <AIChatHome
