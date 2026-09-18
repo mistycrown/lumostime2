@@ -189,7 +189,7 @@ import { AIBackfillChatAssistantSettingsSection } from './ai-chat/AIBackfillChat
 import { renderAppliedChatAction } from './ai-chat/AIBackfillChatAppliedActionRenderer';
 import { AIBackfillChatCallSettingsSection } from './ai-chat/AIBackfillChatCallSettingsSection';
 import { AIBackfillChatConversationPane } from './ai-chat/AIBackfillChatConversationPane';
-import { AIChatHome } from './ai-chat/AIChatHome';
+import { AIChatHome, type AIChatNewspaperItem } from './ai-chat/AIChatHome';
 import {
   normalizeDreamRetryYearMonth,
   parseDreamMonthSelection,
@@ -714,6 +714,38 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [assistantBackgroundCallHistory, setAssistantBackgroundCallHistory] = useState<AssistantBackgroundCallHistoryEntry[]>(() => assistantOrchestratorService.listBackgroundCallHistory());
   const [assistantNativeDiagnostics, setAssistantNativeDiagnostics] = useState<AssistantNativeDiagnosticEntry[]>([]);
   const [isAssistantBackgroundHistoryViewerOpen, setIsAssistantBackgroundHistoryViewerOpen] = useState(false);
+
+  const assistantNewspaperSnapshot = useMemo<AIChatNewspaperItem[]>(() => [
+    ...dailyReviews.flatMap((review) => review.aiNewspaper ? [{
+      id: review.aiNewspaper.date,
+      title: review.aiNewspaper.title,
+      preview: review.aiNewspaper.overallComment || review.aiNewspaper.assistantReply,
+      dateLabel: review.date,
+      updatedAt: review.aiNewspaper.updatedAt,
+      period: 'daily' as const,
+      startDate: review.date
+    }] : []),
+    ...weeklyReviews.flatMap((review) => review.aiNewspaper ? [{
+      id: `${review.aiNewspaper.weekStartDate}:${review.aiNewspaper.weekEndDate}`,
+      title: review.aiNewspaper.title,
+      preview: review.aiNewspaper.overallComment || review.aiNewspaper.assistantReply,
+      dateLabel: `${review.aiNewspaper.weekStartDate} - ${review.aiNewspaper.weekEndDate}`,
+      updatedAt: review.aiNewspaper.updatedAt,
+      period: 'weekly' as const,
+      startDate: review.aiNewspaper.weekStartDate,
+      endDate: review.aiNewspaper.weekEndDate
+    }] : []),
+    ...monthlyReviews.flatMap((review) => review.aiNewspaper ? [{
+      id: `${review.aiNewspaper.monthStartDate}:${review.aiNewspaper.monthEndDate}`,
+      title: review.aiNewspaper.title,
+      preview: review.aiNewspaper.overallComment || review.aiNewspaper.assistantReply,
+      dateLabel: `${review.aiNewspaper.monthStartDate} - ${review.aiNewspaper.monthEndDate}`,
+      updatedAt: review.aiNewspaper.updatedAt,
+      period: 'monthly' as const,
+      startDate: review.aiNewspaper.monthStartDate,
+      endDate: review.aiNewspaper.monthEndDate
+    }] : [])
+  ].sort((left, right) => right.updatedAt - left.updatedAt), [dailyReviews, monthlyReviews, weeklyReviews]);
   const [expandedMemoryUpdateMessageIds, setExpandedMemoryUpdateMessageIds] = useState<Set<string>>(() => new Set());
   const [expandedReasoningMessageIds, setExpandedReasoningMessageIds] = useState<Set<string>>(() => new Set());
   const [expandedDreamUpdateMessageIds, setExpandedDreamUpdateMessageIds] = useState<Set<string>>(() => new Set());
@@ -7122,6 +7154,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             assistantMemory={assistantMemorySnapshot}
             assistantReminders={assistantReminderSnapshot}
             assistantLetters={assistantLetterSnapshot}
+            newspapers={assistantNewspaperSnapshot}
             customPromptBlocks={customPromptBlocks}
             sessions={sessions}
             sortedSessions={sortedSessions}
@@ -7135,6 +7168,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             }}
             onOpenLetters={handleOpenAssistantLetterHistoryViewer}
             onOpenLetter={handleOpenAssistantLetterDetail}
+            onOpenNewspaper={(item) => {
+              if (item.period === 'daily') {
+                handleOpenDailyNewspaper(item.startDate);
+              } else if (item.period === 'weekly' && item.endDate) {
+                handleOpenWeeklyNewspaper(item.startDate, item.endDate);
+              } else if (item.period === 'monthly' && item.endDate) {
+                handleOpenMonthlyNewspaper(item.startDate, item.endDate);
+              }
+            }}
             onOpenMemory={handleOpenAssistantMemoryViewer}
             onOpenHistory={() => setIsHistoryPanelOpen(true)}
             onOpenSettings={() => setIsShortcutPromptSettingsOpen(true)}
