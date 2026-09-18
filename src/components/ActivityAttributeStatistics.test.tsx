@@ -4,7 +4,7 @@
  * @output Regression coverage for text-term extraction used by attribute statistics.
  */
 import { describe, expect, it } from 'vitest';
-import { getTextTerms } from './ActivityAttributeStatistics';
+import { filterLogsForAttribute, getTextTerms } from './ActivityAttributeStatistics';
 
 describe('getTextTerms', () => {
   it('preserves explicit whitespace boundaries across browser runtimes', () => {
@@ -25,5 +25,40 @@ describe('getTextTerms', () => {
 
   it('handles short English values', () => {
     expect(getTextTerms('A')).toEqual(['a']);
+  });
+});
+
+describe('filterLogsForAttribute', () => {
+  it('keeps only the requested attribute values from each log', () => {
+    const logs = [
+      {
+        id: 'log-1',
+        activityId: 'activity-1',
+        categoryId: 'category-1',
+        startTime: 1,
+        endTime: 2,
+        duration: 1,
+        attributeValues: [
+          { attributeId: 'weight', value: 68 },
+          { attributeId: 'note-text', value: '训练' }
+        ]
+      },
+      {
+        id: 'log-2',
+        activityId: 'activity-1',
+        categoryId: 'category-1',
+        startTime: 3,
+        endTime: 4,
+        duration: 1,
+        attributeValues: [{ attributeId: 'note-text', value: '恢复' }]
+      }
+    ];
+
+    expect(filterLogsForAttribute(logs, 'weight')).toEqual([
+      {
+        ...logs[0],
+        attributeValues: [{ attributeId: 'weight', value: 68 }]
+      }
+    ]);
   });
 });

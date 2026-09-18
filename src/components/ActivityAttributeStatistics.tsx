@@ -7,6 +7,7 @@
  * @updated 2026-09-02: Adds count/duration dimensions for single- and multi-choice attributes while keeping text and number statistics unchanged.
  * @updated 2026-09-12: Uses the bundled Segmentit dictionary for consistent Chinese text terms across desktop and Android WebView.
  * @updated 2026-09-12: Keeps short Chinese and English text terms in the ranked text statistics instead of showing an empty state.
+ * @updated 2026-09-18: Restricts each statistic card to its own attribute values so unrelated fields are not reported as deleted attributes.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
@@ -338,6 +339,13 @@ const getCardAttribute = (activity: Activity, source: ActivityStatisticCardSourc
   ? activity.attributes?.find((attribute) => attribute.id === source.attributeId)
   : undefined;
 
+export const filterLogsForAttribute = (logs: Log[], attributeId: string): Log[] => logs
+  .map((log) => {
+    const attributeValues = (log.attributeValues || []).filter((value) => value.attributeId === attributeId);
+    return attributeValues.length > 0 ? { ...log, attributeValues } : null;
+  })
+  .filter((log): log is Log => log !== null);
+
 const DonutPreview: React.FC<{ attribute: ActivityAttributeDefinition; logs: Log[]; mode: StatisticMode }> = ({ attribute, logs, mode }) => {
   const counts = new Map<string, number>();
   let total = 0;
@@ -429,10 +437,11 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     }
     const attribute = getCardAttribute(activity, card.source);
     if (!attribute) return null;
+    const attributeLogs = filterLogsForAttribute(cardLogs, attribute.id);
     if (card.chartType === 'choiceDonut') {
-      return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE DONUT / {attribute.type === 'single' ? '单选' : '多选'}</div></div></div><DonutPreview attribute={attribute} logs={cardLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} /></section>;
+      return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE DONUT / {attribute.type === 'single' ? '单选' : '多选'}</div></div></div><DonutPreview attribute={attribute} logs={attributeLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} /></section>;
     }
-    return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [attribute] }} logs={cardLogs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} onChange={undefined} /></section>;
+    return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [attribute] }} logs={attributeLogs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} onChange={undefined} /></section>;
   };
 
   const addCard = () => {
