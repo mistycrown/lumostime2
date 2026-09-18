@@ -374,12 +374,13 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                         <NoteTemplateManager
                             templates={category.noteTemplates}
                             onChange={(noteTemplates) => setCategory({ ...category, noteTemplates })}
+                            sectionNumber="02"
                         />
 
                         <section className="border-t border-stone-300 pt-6">
                             <div className="mb-7 flex items-end justify-between gap-4">
                                 <div>
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">04 / Activities</p>
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">03 / Activities</p>
                                     <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900">活动</h2>
                                 </div>
                             </div>
