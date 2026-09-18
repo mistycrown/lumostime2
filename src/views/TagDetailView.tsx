@@ -120,7 +120,8 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
             activity.isArchived !== initialActivity.isArchived ||
             JSON.stringify(activity.keywords) !== JSON.stringify(initialActivity.keywords) ||
             JSON.stringify(activity.noteTemplates || []) !== JSON.stringify(initialActivity.noteTemplates || []) ||
-            JSON.stringify(activity.attributes || []) !== JSON.stringify(initialActivity.attributes || []);
+            JSON.stringify(activity.attributes || []) !== JSON.stringify(initialActivity.attributes || []) ||
+            JSON.stringify(activity.statisticCards || []) !== JSON.stringify(initialActivity.statisticCards || []);
          
          if (hasChanges) {
             const saveTimer = window.setTimeout(() => onUpdateActivity(activity), 300);
@@ -363,10 +364,16 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
       switch (activeTab) {
          case 'Details':
             return (
-               <div className="space-y-10">
-                  <div className="border-t border-stone-200/80 pt-6">
-                     <h3 className="mb-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">基本信息</h3>
-                     <div className="space-y-4">
+               <div className="space-y-12">
+                  <section className="border-t-2 border-stone-900 pt-5">
+                     <div className="mb-7 flex items-end justify-between gap-4">
+                        <div>
+                           <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">01 / Identity</p>
+                           <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900">基本信息</h2>
+                        </div>
+                        <span className="text-xs text-stone-400">标签设置</span>
+                     </div>
+                     <div className="space-y-7">
                         <div className="flex items-center justify-between pb-4 border-b border-stone-100">
                            <span className="text-sm font-medium text-stone-600">归档状态</span>
                            <div className="flex items-center gap-3">
@@ -374,7 +381,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                               <button
                                  type="button"
                                  onClick={handleToggleArchive}
-                              className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-medium text-stone-500 transition-colors hover:bg-amber-50 hover:text-amber-600"
+                                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-stone-500 hover:text-amber-600 hover:bg-amber-50 transition-colors"
                                  title={activity.isArchived === true ? '恢复标签' : '归档标签'}
                               >
                                  {activity.isArchived === true ? <ArchiveRestore size={15} /> : <Archive size={15} />}
@@ -383,20 +390,20 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                            </div>
                         </div>
                         <div>
-                           <label className="mb-2 block text-[11px] font-medium tracking-wide text-stone-400">名称（首字符作为图标）</label>
+                           <label className="mb-2 block text-sm font-semibold text-stone-600">名称（首字符作为图标）</label>
                            <input
                               type="text"
                               value={`${activity.icon}${activity.name} `}
                               onChange={(e) => handleNameChange(e.target.value)}
-                              className="h-11 w-full rounded-lg border border-stone-200 bg-stone-50 px-3.5 text-sm font-medium text-stone-800 outline-none transition-colors focus:border-stone-400"
+                              className="h-11 w-full rounded-lg border border-stone-200 bg-stone-50 px-3.5 text-[13px] font-medium text-stone-800 outline-none transition-colors focus:border-stone-400"
                            />
                         </div>
                         <div>
-                           <label className="mb-2 block text-[11px] font-medium tracking-wide text-stone-400">一级分类</label>
+                           <label className="mb-2 block text-sm font-semibold text-stone-600">一级分类</label>
                            <div className="relative category-dropdown-container">
                               <button
                                  onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-                                 className="flex h-11 w-full items-center justify-between rounded-lg border border-stone-200 bg-stone-50 px-3.5 text-sm font-medium text-stone-800 outline-none transition-colors hover:border-stone-400"
+                                 className="flex h-11 w-full items-center justify-between rounded-lg border border-stone-200 bg-stone-50 px-3.5 text-[13px] font-medium text-stone-800 outline-none transition-colors hover:border-stone-400"
                               >
                                  <div className="flex items-center gap-2">
                                     <span className="text-lg">{category?.icon}</span>
@@ -416,7 +423,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                                              }
                                              setIsCategoryDropdownOpen(false);
                                           }}
-                                          className={`flex h-10 w-full items-center gap-2 px-3.5 text-left text-sm transition-colors hover:bg-stone-50 ${cat.id === category?.id ? 'bg-stone-100' : ''}`}
+                                          className={`flex h-10 w-full items-center gap-2 px-3.5 text-left text-[13px] transition-colors hover:bg-stone-50 ${cat.id === category?.id ? 'bg-stone-100' : ''}`}
                                        >
                                           <span className="text-lg">{cat.icon}</span>
                                           <span className="font-bold text-stone-800">{cat.name}</span>
@@ -432,7 +439,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
                         {/* Focus Score Setting */}
                         <div>
-                           <label className="mb-2 block text-[11px] font-medium tracking-wide text-stone-400">专注评分</label>
+                           <label className="mb-2 block text-sm font-semibold text-stone-600">专注评分</label>
                            <div className="flex h-11 rounded-lg bg-stone-100 p-1">
                               {[
                                  { value: 'inherit', label: '继承' },
@@ -481,7 +488,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
                         {/* Mood Score Setting */}
                         <div>
-                           <label className="mb-2 block text-[11px] font-medium tracking-wide text-stone-400">情绪评分</label>
+                           <label className="mb-2 block text-sm font-semibold text-stone-600">情绪评分</label>
                            <div className="flex h-11 rounded-lg bg-stone-100 p-1">
                               {[
                                  { value: 'inherit', label: '继承' },
@@ -530,28 +537,28 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
                         {/* Heatmap Scale */}
                         <div>
-                           <label className="mb-2 block text-[11px] font-medium tracking-wide text-stone-400">热力图范围（分钟）</label>
+                           <label className="mb-2 block text-sm font-semibold text-stone-600">热力图范围（分钟）</label>
                            <div className="flex gap-4">
                               <div className="flex-1">
-                                 <label className="mb-2 block text-[11px] font-medium tracking-wide text-stone-400">最小值（最浅）</label>
+                                 <label className="mb-2 block text-sm font-semibold text-stone-600">最小值（最浅）</label>
                                  <input
                                     type="number"
                                     min={0}
                                     value={activity.heatmapMin ?? ''}
                                     onChange={(e) => setActivity({ ...activity, heatmapMin: parseInt(e.target.value) || undefined })}
                                     placeholder="默认：0"
-                                    className="h-11 w-full rounded-lg border border-stone-200 bg-stone-50 px-3.5 text-sm font-medium text-stone-800 outline-none transition-colors focus:border-stone-400"
+                                    className="h-11 w-full rounded-lg border border-stone-200 bg-stone-50 px-3.5 text-[13px] font-medium text-stone-800 outline-none transition-colors focus:border-stone-400"
                                  />
                               </div>
                               <div className="flex-1">
-                                 <label className="mb-2 block text-[11px] font-medium tracking-wide text-stone-400">最大值（最深）</label>
+                                 <label className="mb-2 block text-sm font-semibold text-stone-600">最大值（最深）</label>
                                  <input
                                     type="number"
                                     min={0}
                                     value={activity.heatmapMax ?? ''}
                                     onChange={(e) => setActivity({ ...activity, heatmapMax: parseInt(e.target.value) || undefined })}
                                     placeholder="默认：240"
-                                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
+                                    className="h-11 w-full rounded-lg border border-stone-200 bg-stone-50 px-3.5 text-[13px] font-medium text-stone-800 outline-none transition-colors focus:border-stone-400"
                                  />
                               </div>
                            </div>
@@ -560,7 +567,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                         {/* UI Icon Selector - 仅在启用自定义主题时显示 */}
                         {isCustomThemeEnabled && (
                            <div>
-                              <label className="text-xs text-stone-400 font-medium mb-2 block">
+                              <label className="mb-2 block text-sm font-semibold text-stone-600">
                                  UI 图标
                                  <span className="text-stone-300 ml-1">(可选)</span>
                               </label>
@@ -575,13 +582,18 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                            </div>
                         )}
                      </div>
-                  </div>
+                  </section>
 
-                  <div className="border-t border-stone-200/80 pt-6">
-                     <h3 className="mb-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">外观</h3>
-                     <div className="space-y-4">
+                  <section className="border-t-2 border-stone-900 pt-5">
+                     <div className="mb-7 flex items-end justify-between gap-4">
                         <div>
-                           <label className="mb-2 block text-[11px] font-medium tracking-wide text-stone-400">背景颜色</label>
+                           <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">02 / Appearance</p>
+                           <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900">外观</h2>
+                        </div>
+                     </div>
+                     <div className="space-y-6">
+                        <div>
+                           <label className="mb-2 block text-sm font-semibold text-stone-600">背景颜色</label>
                            <div className="flex gap-2 flex-wrap">
                               {COLOR_OPTIONS.map(opt => (
                                  <button
@@ -607,7 +619,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                            </div>
                         </div>
                      </div>
-                  </div>
+                  </section>
 
                   <NoteTemplateManager
                      templates={activity.noteTemplates}
@@ -622,16 +634,19 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   />
 
                   {/* Keywords Section */}
-                  <div className="border-t border-stone-200/80 pt-6">
-                     <div className="mb-4 flex items-center gap-1.5">
-                        <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">关键字</h3>
+                  <section className="border-t-2 border-stone-900 pt-5">
+                     <div className="mb-7 flex items-end justify-between gap-4">
+                        <div>
+                           <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">05 / Keywords</p>
+                           <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900">关键字</h2>
+                        </div>
                         <FeatureHint
                            hintId="tag-detail-keywords"
                            message={'在此设置关键字，然后在添加记录时，备注输入关键字，系统会提示关联到此标签。\n\n偏好设置中，可以设置是否默认跳转到备注输入框，以便快速输入关键字。\n\n另外，在添加补记时，点击Total time 也可以快速定位至备注输入框，以快速输入关键字。'}
                            iconSize={12}
                         />
                      </div>
-                     <div className="space-y-4">
+                     <div className="space-y-5">
                         <div className="flex flex-wrap gap-2">
                            {keywordRecords.map((keyword) => (
                               <div key={`${keyword.source}-${keyword.attributeId || ''}-${keyword.optionId || keyword.label}`} className="inline-flex items-stretch overflow-hidden rounded-lg border text-[11px] font-medium" style={{ backgroundColor: getKeywordSoftColor(getKeywordColor(keyword)), borderColor: getKeywordColor(keyword), color: getKeywordColor(keyword) }}>
@@ -655,7 +670,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                                  }
                               }}
                               placeholder="添加关键字..."
-                              className="h-11 min-w-0 flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3.5 text-sm font-medium text-stone-700 outline-none transition-colors placeholder:font-normal focus:border-stone-400 focus:bg-white"
+                              className="h-11 min-w-0 flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3.5 text-[13px] font-medium text-stone-700 outline-none transition-colors placeholder:font-normal focus:border-stone-400 focus:bg-white"
                            />
                            <button
                               onClick={handleAddKeyword}
@@ -666,7 +681,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                            </button>
                         </div>
                      </div>
-                  </div>
+                  </section>
                   {keywordColorTarget && (() => {
                      const target = keywordRecords.find((keyword) => keyword.label === keywordColorTarget);
                      if (!target) return null;
@@ -768,7 +783,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
             );
 
          case 'Attributes':
-            return <ActivityAttributeStatistics activity={activity} logs={countableTagLogs} />;
+            return <ActivityAttributeStatistics activity={activity} logs={countableTagLogs} onChange={setActivity} />;
 
          case '关联':
             return (

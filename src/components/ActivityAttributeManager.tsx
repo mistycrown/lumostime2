@@ -170,16 +170,19 @@ export const ActivityAttributeManager: React.FC<ActivityAttributeManagerProps> =
 
   return (
     <>
-    <section className="border-t border-stone-200/80 pt-6">
+    <section className="border-t-2 border-stone-900 pt-5">
       <div className="mb-5 flex items-center justify-between">
-        <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">{'\u5c5e\u6027'}</h3>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">04 / Attributes</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900">{'\u5c5e\u6027'}</h2>
+        </div>
         <span className="text-[10px] text-stone-300">{activeAttributes.length}</span>
       </div>
 
       <div className="mb-6 flex h-10 gap-2">
         <input value={newName} onChange={(event) => setNewName(event.target.value)} onKeyDown={(event) => {
           if (event.key === 'Enter') { event.preventDefault(); addAttribute(); }
-        }} placeholder={'\u5c5e\u6027\u540d\u79f0'} className="min-w-0 flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 text-sm text-stone-800 outline-none focus:border-stone-500" />
+        }} placeholder={'\u5c5e\u6027\u540d\u79f0'} className="h-11 min-w-0 flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 text-[13px] text-stone-800 outline-none focus:border-stone-500" />
         <div className="relative shrink-0">
           <button type="button" onClick={() => setIsTypeMenuOpen((current) => !current)} className="inline-flex h-full min-w-[76px] items-center justify-between gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 text-sm text-stone-600 hover:border-stone-400" aria-haspopup="listbox" aria-expanded={isTypeMenuOpen}>
             <span>{getTypeLabel(newType)}</span><ChevronDown size={15} className={`transition-transform ${isTypeMenuOpen ? 'rotate-180' : ''}`} />
@@ -207,7 +210,7 @@ export const ActivityAttributeManager: React.FC<ActivityAttributeManagerProps> =
 
             {attribute.type === 'number' && <div className="mt-3 flex items-center gap-2 pl-2">
               <span className="shrink-0 text-[11px] text-stone-400">{'\u5355\u4f4d'}</span>
-              <input value={attribute.unit || ''} onChange={(event) => updateAttribute(attribute.id, { unit: event.target.value || undefined })} placeholder={'\u4f8b\u5982\uff1a\u516c\u91cc\u3001\u4e0b\u3001\u5143'} className="min-w-0 flex-1 bg-transparent border-b border-stone-200 px-1 py-1.5 text-xs text-stone-600 outline-none focus:border-stone-500" aria-label={'\u6570\u5b57\u5c5e\u6027\u5355\u4f4d'} />
+              <input value={attribute.unit || ''} onChange={(event) => updateAttribute(attribute.id, { unit: event.target.value || undefined })} placeholder={'\u4f8b\u5982\uff1a\u516c\u91cc\u3001\u4e0b\u3001\u5143'} className="h-10 min-w-0 flex-1 bg-transparent border-b border-stone-200 px-1 text-[13px] text-stone-600 outline-none focus:border-stone-500" aria-label={'\u6570\u5b57\u5c5e\u6027\u5355\u4f4d'} />
             </div>}
 
             {conditionParents.length > 0 && <div className="mt-3 space-y-2 border-l border-stone-100 pl-3">
@@ -259,7 +262,7 @@ export const ActivityAttributeManager: React.FC<ActivityAttributeManagerProps> =
                 />
               </label>
               {(attribute.options || []).filter((option) => !option.isArchived).map((option) => <div key={option.id} className="flex items-center gap-2">
-                <input value={option.label} onChange={(event) => updateAttribute(attribute.id, { options: (attribute.options || []).map((item) => item.id === option.id ? { ...item, label: event.target.value } : item) })} className="h-9 min-w-0 flex-1 rounded-md border border-stone-100 bg-stone-50 px-2.5 text-xs text-stone-600 outline-none focus:border-stone-400" aria-label={'\u9009\u9879\u540d\u79f0'} />
+                <input value={option.label} onChange={(event) => updateAttribute(attribute.id, { options: (attribute.options || []).map((item) => item.id === option.id ? { ...item, label: event.target.value } : item) })} className="h-10 min-w-0 flex-1 rounded-md border border-stone-100 bg-stone-50 px-2.5 text-[13px] text-stone-600 outline-none focus:border-stone-400" aria-label={'\u9009\u9879\u540d\u79f0'} />
                 <button type="button" onClick={() => requestDelete(attribute, option)} className="p-1 text-stone-300 hover:text-red-500" title={'\u5220\u9664\u9009\u9879'}><Trash2 size={14} /></button>
               </div>)}
               {(attribute.options || []).some((option) => option.isArchived) && <div className="space-y-1 pt-1">{(attribute.options || []).filter((option) => option.isArchived).map((option) => <div key={option.id} className="flex items-center gap-2 text-xs text-stone-400"><span className="min-w-0 flex-1 truncate">{option.label}</span><button type="button" onClick={() => updateAttribute(attribute.id, { options: (attribute.options || []).map((item) => item.id === option.id ? { ...item, isArchived: false } : item) })} className="p-1 text-stone-400 hover:text-stone-900" title={'\u6062\u590d\u9009\u9879'}><RotateCcw size={13} /></button></div>)}</div>}
