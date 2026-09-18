@@ -10,6 +10,7 @@
  * @updated 2026-06-13: Added shared hierarchical associated-todo list for detail pages.
  * @updated 2026-08-09: Planned timeline blocks are excluded from associated todo duration totals.
  * @updated 2026-09-18: Replaced the association card shell with a divider-led editorial section.
+ * @updated 2026-09-18: Localized the shared association list title and empty state for Chinese detail pages.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -58,7 +59,7 @@ export const AssociatedTodoList: React.FC<AssociatedTodoListProps> = ({
   logs,
   onEditTodo,
   onToggleTodo,
-  title = 'Associated Todos',
+  title = '关联待办',
   emptyDescription,
   showCompletionSummary = false
 }) => {
@@ -128,7 +129,7 @@ export const AssociatedTodoList: React.FC<AssociatedTodoListProps> = ({
       <div className="space-y-0 text-sm">
         {todos.length === 0 ? (
           <div className="py-6 text-center text-stone-400">
-            <p className="text-xs font-medium opacity-60">No associated todos</p>
+            <p className="text-xs font-medium opacity-60">暂无关联待办</p>
             {emptyDescription && (
               <p className="text-xs mt-2 opacity-40">{emptyDescription}</p>
             )}
