@@ -37,6 +37,7 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import {
   Check,
+  ArrowLeft,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -44,6 +45,7 @@ import {
   Pencil,
   Plus,
   Send,
+  Settings,
   Square,
   Undo2,
   X,
@@ -187,6 +189,7 @@ import { AIBackfillChatAssistantSettingsSection } from './ai-chat/AIBackfillChat
 import { renderAppliedChatAction } from './ai-chat/AIBackfillChatAppliedActionRenderer';
 import { AIBackfillChatCallSettingsSection } from './ai-chat/AIBackfillChatCallSettingsSection';
 import { AIBackfillChatConversationPane } from './ai-chat/AIBackfillChatConversationPane';
+import { AIChatHome } from './ai-chat/AIChatHome';
 import {
   normalizeDreamRetryYearMonth,
   parseDreamMonthSelection,
@@ -639,6 +642,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
   const [isPersonaPanelOpen, setIsPersonaPanelOpen] = useState(false);
+  const [isHomeView, setIsHomeView] = useState(true);
   const [isComposerMenuOpen, setIsComposerMenuOpen] = useState(false);
   const [isNewSessionDialogOpen, setIsNewSessionDialogOpen] = useState(false);
   const [activeSettingsMainTab, setActiveSettingsMainTab] = useState<AISettingsMainTab>('persona');
@@ -733,6 +737,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const isDesktopWidgetMode = displayMode === 'desktop-widget';
   const isOpenRef = useRef(isOpen);
   const wasOpenRef = useRef(isOpen);
+  const homeWasOpenRef = useRef(isOpen);
   const processingDueReminderIdsRef = useRef<Set<string>>(new Set());
   const isProcessingAssistantLetterRef = useRef(false);
   const assistantPartRevealTimeoutsRef = useRef<Map<string, number[]>>(new Map());
@@ -743,6 +748,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const userAvatarInputRef = useRef<HTMLInputElement | null>(null);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const composerMenuRef = useRef<HTMLDivElement | null>(null);
+  const pendingHomeMessageRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messageElementRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const handleMessageElementRef = useCallback((messageId: string, node: HTMLDivElement | null) => {
@@ -1621,13 +1627,21 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       onMarkRead?.();
+      if (isDesktopWidgetMode) {
+        setIsHomeView(false);
+      } else if (!homeWasOpenRef.current) {
+        setIsHomeView(Boolean(!targetSessionId && !targetMessageId && !initialInputText));
+      }
     }
-  }, [isOpen, onMarkRead]);
+    homeWasOpenRef.current = isOpen;
+  }, [initialInputText, isDesktopWidgetMode, isOpen, onMarkRead, targetMessageId, targetSessionId]);
 
   useEffect(() => {
     if (!isOpen || !initialInputText) {
       return;
     }
+
+    setIsHomeView(false);
 
     if (activeSession?.templateMeta) {
       const nextSession = createDefaultSession(activeSession.personaId);
@@ -1648,6 +1662,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     if (!targetSessionId || !hasPendingNavigation) {
       return;
     }
+
+    setIsHomeView(false);
 
     if (!sessions.some((session) => session.id === targetSessionId)) {
       handledNavigationKeyRef.current = activeNavigationKey;
@@ -3390,6 +3406,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setDeleteConfirmSessionId(null);
     setDeleteConfirmPersonaId(null);
     setIsHistoryPanelOpen(false);
+    setIsHomeView(false);
   };
 
   const handleOpenWeeklyReviewTemplateSelection = () => {
@@ -3404,6 +3421,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     handleCloseNewSessionDialog();
     setIsHistoryPanelOpen(false);
     setInputText('');
+    setIsHomeView(false);
   };
 
   const handleOpenMonthlyReviewTemplateSelection = () => {
@@ -3418,6 +3436,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     handleCloseNewSessionDialog();
     setIsHistoryPanelOpen(false);
     setInputText('');
+    setIsHomeView(false);
   };
 
   const handleFillWriteWeeklyNarrativeCommand = () => {
@@ -4104,6 +4123,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setIsAssistantMemoryViewerOpen(false);
   };
 
+  const handleOpenChatView = useCallback((sessionId?: string) => {
+    if (sessionId && sessions.some((session) => session.id === sessionId)) {
+      setActiveSessionId(sessionId);
+    }
+    setIsHomeView(false);
+    window.requestAnimationFrame(() => composerTextareaRef.current?.focus());
+  }, [sessions]);
+
+
   const handleToggleChatSync = (enabled: boolean) => {
     setChatSyncEnabled(enabled);
   };
@@ -4548,6 +4576,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return true;
     }
 
+    if (!isHomeView) {
+      setIsHomeView(true);
+      return true;
+    }
+
     onClose();
     return true;
   }, [
@@ -4579,6 +4612,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     isDreamTopicComposerOpen,
     isEmojiEditorOpen,
     isHistoryPanelOpen,
+    isHomeView,
     isNewSessionDialogOpen,
     isOpen,
     isPersonaPanelOpen,
@@ -6744,6 +6778,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }, 0);
   };
 
+  useEffect(() => {
+    const pendingText = pendingHomeMessageRef.current;
+    if (!pendingText || isHomeView || !activeSession || activeSession.id !== activeSessionId) {
+      return;
+    }
+
+    pendingHomeMessageRef.current = null;
+    window.setTimeout(() => {
+      void handleSend(pendingText);
+    }, 0);
+  }, [activeSession, activeSessionId, handleSend, isHomeView]);
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -7022,17 +7068,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             ) : (
               <>
                 <button
-                  onClick={() => !isLoading && setIsHistoryPanelOpen(true)}
+                  onClick={() => !isLoading && (isHomeView ? setIsPersonaPanelOpen(true) : setIsHistoryPanelOpen(true))}
                   disabled={isLoading}
                   className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                   style={{
                     backgroundColor: AI_CHAT_THEME.panelBg,
                     color: AI_CHAT_THEME.textSecondary
                   }}
-                  title="历史对话"
+                  title={isHomeView ? 'AI 设置' : '历史对话'}
                 >
-                  <History size={18} />
-                  <span className="hidden sm:inline">历史</span>
+                  {isHomeView ? <Settings size={18} /> : <History size={18} />}
+                  <span className="hidden sm:inline">{isHomeView ? '设置' : '历史'}</span>
                 </button>
 
                 <button
@@ -7051,7 +7097,56 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           </div>
         </div>
 
-        <AIBackfillChatConversationPane
+        {!isHomeView && (
+          <div className="pointer-events-none absolute left-4 top-[4.1rem] z-10 sm:left-6">
+            <button
+              type="button"
+              onClick={() => setIsHomeView(true)}
+              className="pointer-events-auto inline-flex h-8 items-center gap-1 rounded-full px-2 text-xs transition-colors hover:bg-black/5"
+              style={{ color: AI_CHAT_THEME.textMuted }}
+              title="返回 AI 工作台"
+            >
+              <ArrowLeft size={15} />
+              <span className="hidden sm:inline">工作台</span>
+            </button>
+          </div>
+        )}
+
+        {isHomeView ? (
+          <AIChatHome
+            assistantMemory={assistantMemorySnapshot}
+            assistantReminders={assistantReminderSnapshot}
+            assistantLetters={assistantLetterSnapshot}
+            customPromptBlocks={customPromptBlocks}
+            sessions={sessions}
+            sortedSessions={sortedSessions}
+            theme={AI_CHAT_THEME}
+            isLoading={isLoading}
+            formatConversationTime={formatConversationTime}
+            getSessionPersona={resolveSessionPersona}
+            onOpenChat={handleOpenChatView}
+            onStartNewSession={() => {
+              handleOpenNewSessionDialog();
+            }}
+            onOpenLetters={handleOpenAssistantLetterHistoryViewer}
+            onOpenLetter={handleOpenAssistantLetterDetail}
+            onOpenMemory={handleOpenAssistantMemoryViewer}
+            onOpenHistory={() => setIsHistoryPanelOpen(true)}
+            onOpenSettings={() => setIsPersonaPanelOpen(true)}
+            onSendShortcut={(text) => {
+              const latestSession = sortedSessions[0] || activeSession;
+              if (!latestSession) return;
+              setActiveSessionId(latestSession.id);
+              setIsHomeView(false);
+              if (activeSession?.id === latestSession.id) {
+                window.setTimeout(() => void handleSend(text), 0);
+              } else {
+                pendingHomeMessageRef.current = text;
+              }
+            }}
+          />
+        ) : (
+          <AIBackfillChatConversationPane
           accentMix={accentMix}
           activePersona={activePersona}
           activeSession={activeSession}
@@ -7088,9 +7183,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           setReminderUpdateExpansion={toggleReminderUpdateExpansion}
           theme={AI_CHAT_THEME}
           userProfile={userProfile}
-        />
+          />
+        )}
 
-        <div
+        {!isHomeView && <div
           className="px-4 pb-3 pt-3 backdrop-blur-xl sm:px-5"
           style={{
             backgroundColor: AI_CHAT_THEME.shellLayerBg
@@ -7266,7 +7362,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>}
 
         {!isDesktopWidgetMode && (
           <>
