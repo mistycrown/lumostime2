@@ -223,7 +223,7 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
 
               <section>
                 <SectionHeading index="02" icon={Mail} title="来信与小报" theme={theme} action={<button type="button" onClick={onOpenLetters} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>查看全部 <ChevronRight size={13} /></button>} />
-                <div className="relative mt-3 min-h-[13rem] pr-1 sm:min-h-[14rem]">
+                <div className="relative mt-3 pr-1" style={{ minHeight: `${Math.max(8, 6.4 + visibleLetters.length * 1.05)}rem` }}>
                   {visibleLetters.length === 0 ? (
                     <div className="flex h-32 items-center justify-center text-sm" style={{ color: theme.textMuted }}>暂时没有新的来信</div>
                   ) : visibleLetters.map((letter, index) => {
