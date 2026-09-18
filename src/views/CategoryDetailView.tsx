@@ -229,10 +229,16 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                 );
             case 'Details':
                 return (
-                    <div className="space-y-6">
-                        <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">基本信息</h3>
-                            <div className="space-y-4">
+                    <div className="space-y-12">
+                        <section className="pt-0">
+                            <div className="mb-7 flex items-end justify-between gap-4">
+                                <div>
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">01 / Identity</p>
+                                    <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900">基本信息</h2>
+                                </div>
+                                <span className="text-xs text-stone-400">分类设置</span>
+                            </div>
+                            <div className="space-y-7">
                                 <div className="flex items-center justify-between pb-4 border-b border-stone-100">
                                     <span className="text-sm font-medium text-stone-600">归档状态</span>
                                     <div className="flex items-center gap-3">
@@ -249,18 +255,18 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">名称（首字符作为图标）</label>
+                                    <label className="mb-2 block text-sm font-semibold text-stone-600">名称（首字符作为图标）</label>
                                     <input
                                         type="text"
                                         value={`${category.icon}${category.name}`}
                                         onChange={(e) => handleNameChange(e.target.value)}
-                                        className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
+                                        className="h-11 w-full rounded-lg border border-stone-200 bg-stone-50 px-3.5 text-[13px] font-medium text-stone-800 outline-none transition-colors focus:border-stone-400"
                                     />
                                 </div>
                                 
                                 {/* Theme Color */}
                                 <div>
-                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">主题颜色</label>
+                                    <label className="mb-2 block text-sm font-semibold text-stone-600">主题颜色</label>
                                     <div className="flex gap-2 flex-wrap">
                                         {COLOR_OPTIONS.map(opt => (
                                             <button
@@ -288,7 +294,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
 
                                 {/* Heatmap Scale */}
                                 <div>
-                                    <label className="text-xs text-stone-400 font-medium mb-1.5 block">热力图范围（分钟）</label>
+                                    <label className="mb-2 block text-sm font-semibold text-stone-600">热力图范围（分钟）</label>
                                     <div className="flex gap-4">
                                         <div className="flex-1">
                                             <input
@@ -297,7 +303,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                                 value={category.heatmapMin ?? ''}
                                                 onChange={(e) => setCategory({ ...category, heatmapMin: parseInt(e.target.value) || undefined })}
                                                 placeholder="最小值：0"
-                                                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
+                                                className="h-11 w-full rounded-lg border border-stone-200 bg-stone-50 px-3.5 text-[13px] font-medium text-stone-800 outline-none transition-colors focus:border-stone-400"
                                             />
                                         </div>
                                         <div className="flex-1">
@@ -307,7 +313,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                                 value={category.heatmapMax ?? ''}
                                                 onChange={(e) => setCategory({ ...category, heatmapMax: parseInt(e.target.value) || undefined })}
                                                 placeholder="最大值：240"
-                                                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
+                                                className="h-11 w-full rounded-lg border border-stone-200 bg-stone-50 px-3.5 text-[13px] font-medium text-stone-800 outline-none transition-colors focus:border-stone-400"
                                             />
                                         </div>
                                     </div>
@@ -363,15 +369,20 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                     </div>
                                 )}
                             </div>
-                        </div>
+                        </section>
 
                         <NoteTemplateManager
                             templates={category.noteTemplates}
                             onChange={(noteTemplates) => setCategory({ ...category, noteTemplates })}
                         />
 
-                        <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">活动</h3>
+                        <section className="border-t border-stone-300 pt-6">
+                            <div className="mb-7 flex items-end justify-between gap-4">
+                                <div>
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">04 / Activities</p>
+                                    <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900">活动</h2>
+                                </div>
+                            </div>
                             <div className="space-y-2">
                                 {category.activities.map(act => (
                                     <div key={act.id} className="flex items-center gap-3 p-3 bg-stone-50 rounded-xl">
@@ -380,7 +391,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                                     </div>
                                 ))}
                             </div>
-                        </div>
+                        </section>
                     </div>
                 );
             case 'Timeline':
