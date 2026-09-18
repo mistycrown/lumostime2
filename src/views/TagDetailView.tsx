@@ -801,9 +801,9 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                      onToggleTodo={onToggleTodo}
                      emptyDescription="Link todos to this activity to see them here."
                   />
-                  {/* Cross Analysis Card (Scope Distribution) */}
-                  <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                     <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Scope Analysis</h3>
+                  {/* Cross Analysis Section (Scope Distribution) */}
+                  <div className="border-t border-stone-300 pt-6">
+                     <h3 className="mb-5 text-xl font-semibold tracking-tight text-stone-900">Scope Analysis</h3>
                      <DateRangeFilter
                         rangeType={analysisRange}
                         date={analysisDate}
