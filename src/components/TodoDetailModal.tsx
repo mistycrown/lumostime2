@@ -11,6 +11,7 @@
  * @updated 2026-07-06: Raised the overlay detail layer above collection and schedule popovers so collection-launched todo timeline entries remain visible.
  * @updated 2026-09-15: Added contextual guidance for the six todo schedule types and date rules beside the schedule section title.
  * @updated 2026-09-18: Replaced todo detail association and schedule card shells with divider-led editorial sections.
+ * @updated 2026-09-18: Matched association and schedule section headings to the numbered basic-information hierarchy.
  * @updated 2026-09-15: Added contextual guidance for todo cover image ratio and timeline gallery rendering.
  * @updated 2026-05-19: Replaced the hidden monthly fallback checkbox with a pure button toggle that blocks default mouse-down focus switching, fixing the desktop white-screen triggered by tapping `31 号无则月末`.
  * @updated 2026-05-18: Defaulted timeline metadata render options so detail-page log chips still render safely when callers omit the auxiliary collection-name payload.
@@ -1433,9 +1434,12 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
             {!isSubtask && !isQuickReminder && (
               <>
                 {/* Link Activity */}
-                <div className="border-t border-stone-300 pt-6">
-                  <div className="mb-5 flex items-end justify-between gap-4">
-                    <h3 className="text-xl font-semibold tracking-tight text-stone-900">关联标签</h3>
+                <section className="border-t border-stone-300 pt-6">
+                  <div className="mb-7 flex items-end justify-between gap-4">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">02 / Associations</p>
+                      <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900">关联标签</h2>
+                    </div>
                     {(linkedCategoryId || linkedActivityId) && (
                       <button
                         onClick={() => {
@@ -1455,12 +1459,15 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                     onCategorySelect={setLinkedCategoryId}
                     onActivitySelect={setLinkedActivityId}
                   />
-                </div>
+                </section>
 
                 {/* Scope Association */}
-                <div className="border-t border-stone-300 pt-6">
-                  <div className="mb-5 flex items-end justify-between gap-4">
-                    <h3 className="text-xl font-semibold tracking-tight text-stone-900">关联领域</h3>
+                <section className="border-t border-stone-300 pt-6">
+                  <div className="mb-7 flex items-end justify-between gap-4">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">03 / Domains</p>
+                      <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900">关联领域</h2>
+                    </div>
                   </div>
                   <ScopeAssociation
                     scopes={scopes}
@@ -1468,21 +1475,26 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                     onSelect={setDefaultScopeIds}
                     hideTitle
                   />
-                </div>
+                </section>
               </>
             )}
 
-            <div className="border-t border-stone-300 pt-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <h3 className="text-xl font-semibold tracking-tight text-stone-900">时间安排</h3>
-                  <FeatureHint
-                    hintId="todo-detail-schedule-types"
-                    title="时间安排说明"
-                    iconSize={13}
-                    className="text-stone-400 hover:text-stone-600"
-                    message={'一个任务可以拥有六种排期类型：\n\nArrange：我安排这天完成\nDue：这天之前要完成\nMaybe：这几天可能做，但还没定\nRepeat：循环任务\nTrace：这天推进过\nComplete：这天正式完成\n\n前四种可以手动指定，后两种由系统自动在排期日历中生成。\n\n安排日期和截止日期可以各指定一个。可能日期可以指定未来的多个，但是当此日期过去之后，可能日期会自动更新删除。循环日期可以设定循环规则，在循环结束前，不需要点击完成。设定跳过日期可以跳过此周期循环。'}
-                  />
+            <section className="border-t border-stone-300 pt-6">
+              <div className="mb-7 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">
+                    {!isSubtask && !isQuickReminder ? '04 / Schedule' : '02 / Schedule'}
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900">时间安排</h2>
+                    <FeatureHint
+                      hintId="todo-detail-schedule-types"
+                      title="时间安排说明"
+                      iconSize={13}
+                      className="text-stone-400 hover:text-stone-600"
+                      message={'一个任务可以拥有六种排期类型：\n\nArrange：我安排这天完成\nDue：这天之前要完成\nMaybe：这几天可能做，但还没定\nRepeat：循环任务\nTrace：这天推进过\nComplete：这天正式完成\n\n前四种可以手动指定，后两种由系统自动在排期日历中生成。\n\n安排日期和截止日期可以各指定一个。可能日期可以指定未来的多个，但是当此日期过去之后，可能日期会自动更新删除。循环日期可以设定循环规则，在循环结束前，不需要点击完成。设定跳过日期可以跳过此周期循环。'}
+                    />
+                  </div>
                 </div>
                 {(scheduledDate || deadlineDate || maybeDates.length > 0 || recurrenceRule) && (
                   <button
@@ -1847,7 +1859,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                   </div>
                 )}
               </div>
-            </div>
+            </section>
 
 
             {initialTodo && onDelete && (
