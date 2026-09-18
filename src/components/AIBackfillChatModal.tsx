@@ -7233,7 +7233,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           />
         )}
 
-        {!isHomeView && <div
+        {!isHomeView && !isPersonaPanelOpen && !isShortcutPromptSettingsOpen && <div
           className="px-4 pb-3 pt-3 backdrop-blur-xl sm:px-5"
           style={{
             backgroundColor: AI_CHAT_THEME.shellLayerBg
