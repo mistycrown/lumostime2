@@ -1,6 +1,7 @@
 /**
  * @file types.ts
  * @updated 2026-09-15: Added structured Activity keyword records with source and color metadata.
+ * @updated 2026-09-17: Added activity statistic card sources and per-card chart configuration.
  * @updated 2026-09-12: Added optional complete display expressions for app-awareness activity options.
  * @updated 2026-09-03: Added an optional keyword-source marker to Activity choice attributes.
  * @updated 2026-08-31: Added optional units and single-choice display conditions to Activity attributes.
@@ -90,6 +91,23 @@ export type ActivityAttributeValue =
   | { attributeId: string; optionId: string }
   | { attributeId: string; optionIds: string[] };
 
+export type ActivityStatisticCardType = 'textCloud' | 'numberTrend' | 'numberKpi' | 'choiceBar' | 'choiceDonut';
+export type ActivityStatisticRange = 'all' | '7d' | '30d' | 'year';
+export type ActivityStatisticMetric = 'value' | 'count' | 'duration' | 'average' | 'sum';
+
+export type ActivityStatisticCardSource =
+  | { type: 'attribute'; attributeId: string }
+  | { type: 'note' };
+
+export interface ActivityStatisticCard {
+  id: string;
+  source: ActivityStatisticCardSource;
+  chartType: ActivityStatisticCardType;
+  range: ActivityStatisticRange;
+  metric: ActivityStatisticMetric;
+  order: number;
+}
+
 export interface Activity {
   id: string;
   name: string;
@@ -103,6 +121,7 @@ export interface Activity {
   keywords?: Array<string | ActivityKeyword>; // Keywords for finer classification; strings are legacy-compatible
   noteTemplates?: NoteTemplate[];
   attributes?: ActivityAttributeDefinition[];
+  statisticCards?: ActivityStatisticCard[];
   isArchived?: boolean;
 }
 
