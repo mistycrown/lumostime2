@@ -5,7 +5,7 @@
  * @pos Component (AI Integration)
  * @description Presents an editorial AI workbench before the user enters a conversation.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   ArrowRight,
   Bell,
@@ -78,12 +78,6 @@ const getLastMessage = (session: AIChatSession) => (
   [...session.messages].reverse().find((message) => message.tone !== 'pending')
 );
 
-const todayLabel = (): string => new Intl.DateTimeFormat('zh-CN', {
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit'
-}).format(new Date()).replace(/\//g, '.');
-
 const SectionHeading: React.FC<{
   index: string;
   icon: LucideIcon;
@@ -123,9 +117,15 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
   onSendShortcut,
 }) => {
   const [quickChatText, setQuickChatText] = useState('');
+  const [dismissedLetterIds, setDismissedLetterIds] = useState<string[]>([]);
+  const [draggedLetterId, setDraggedLetterId] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [swipingLetterId, setSwipingLetterId] = useState<string | null>(null);
+  const letterDragRef = useRef<{ id: string; startX: number } | null>(null);
+  const suppressLetterClickRef = useRef(false);
   const latestSession = sortedSessions[0] || sessions[0] || null;
   const pendingReminders = assistantReminders.filter((reminder) => reminder.status === 'pending');
-  const visibleLetters = assistantLetters.slice(0, 3);
+  const visibleLetters = assistantLetters.filter((letter) => !dismissedLetterIds.includes(letter.id)).slice(0, 3);
   const visibleSessions = sortedSessions.slice(0, 3);
   const memoryItems = [...assistantMemory.profileMemory, ...assistantMemory.preferenceMemory].slice(0, 4);
   const memoryLabels = ['偏好', '研究', '写作', '状态'];
@@ -150,24 +150,57 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
     onSendShortcut(text);
   };
 
+  const handleLetterPointerDown = (event: React.PointerEvent<HTMLButtonElement>, letterId: string) => {
+    if (swipingLetterId || visibleLetters[0]?.id !== letterId) return;
+    letterDragRef.current = { id: letterId, startX: event.clientX };
+    suppressLetterClickRef.current = false;
+    setDraggedLetterId(letterId);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleLetterPointerMove = (event: React.PointerEvent<HTMLButtonElement>, letterId: string) => {
+    if (letterDragRef.current?.id !== letterId) return;
+    const offset = event.clientX - letterDragRef.current.startX;
+    if (Math.abs(offset) > 6) suppressLetterClickRef.current = true;
+    setDragOffset(offset);
+  };
+
+  const resetLetterDrag = () => {
+    letterDragRef.current = null;
+    setDraggedLetterId(null);
+    setDragOffset(0);
+  };
+
+  const handleLetterPointerUp = (event: React.PointerEvent<HTMLButtonElement>, letterId: string) => {
+    if (letterDragRef.current?.id !== letterId) return;
+    const offset = event.clientX - letterDragRef.current.startX;
+    if (Math.abs(offset) > 72) {
+      setSwipingLetterId(letterId);
+      setDragOffset(offset > 0 ? 560 : -560);
+      window.setTimeout(() => {
+        setDismissedLetterIds((current) => current.includes(letterId) ? current : [...current, letterId]);
+        resetLetterDrag();
+        setSwipingLetterId(null);
+      }, 180);
+      letterDragRef.current = null;
+      return;
+    }
+    resetLetterDrag();
+  };
+
+  const handleLetterClick = (letterId: string) => {
+    if (suppressLetterClickRef.current) {
+      suppressLetterClickRef.current = false;
+      return;
+    }
+    onOpenLetter(letterId);
+  };
+
   return (
     <div className="relative min-h-0 flex-1">
       <div className="h-full min-h-0 overflow-y-auto px-4 pb-32 pt-3 sm:px-8 sm:pb-36 sm:pt-4">
         <div className="mx-auto max-w-6xl">
-          <header className="border-b pb-3" style={{ borderColor: theme.textPrimary }}>
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="text-[9px] font-semibold uppercase tracking-[0.3em]" style={{ color: theme.textMuted }}>LUMOS / AI DESK</p>
-                <h1 className="mt-1 font-serif text-2xl tracking-[0.02em] sm:text-3xl" style={{ color: theme.textPrimary }}>今日工作台</h1>
-              </div>
-              <div className="text-right text-[9px] leading-4 tracking-[0.12em]" style={{ color: theme.textMuted }}>
-                <div>AI EDITION · 01</div>
-                <div>{todayLabel()} · DAILY BRIEF</div>
-              </div>
-            </div>
-          </header>
-
-          <main className="mt-4 space-y-5">
+          <main className="space-y-5">
             <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
               <section>
                 <SectionHeading index="01" icon={MessageCircle} title="继续对话" theme={theme} action={<span className="text-[9px] tracking-[0.12em]" style={{ color: theme.textFaint }}>LATEST THREAD</span>} />
@@ -186,7 +219,6 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
                     <button type="button" onClick={onStartNewSession} className="inline-flex items-center gap-2 border-b pb-1 text-sm" style={{ borderColor: theme.panelBorderStrong, color: theme.textSecondary }}><Plus size={15} /> 新对话</button>
                   </div>
                 </div>
-                <button type="button" onClick={onStartNewSession} className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-[0.55rem] text-sm font-medium" style={{ backgroundColor: theme.primaryButtonBg, color: theme.primaryButtonText }}><Plus size={16} /> 开始新对话</button>
               </section>
 
               <section>
@@ -194,12 +226,17 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
                 <div className="relative mt-3 min-h-[13rem] pr-1 sm:min-h-[14rem]">
                   {visibleLetters.length === 0 ? (
                     <div className="flex h-32 items-center justify-center text-sm" style={{ color: theme.textMuted }}>暂时没有新的来信</div>
-                  ) : visibleLetters.map((letter, index) => (
-                    <button key={letter.id} type="button" onClick={() => onOpenLetter(letter.id)} className="absolute left-1 right-0 rounded-[0.65rem] p-3.5 text-left transition-transform hover:-translate-y-1 sm:p-4" style={{ top: `${index * 1.05}rem`, zIndex: visibleLetters.length - index, backgroundColor: theme.panelBg, boxShadow: theme.cardShadowStrong, transform: `rotate(${index === 0 ? '-0.6deg' : index === 1 ? '0.5deg' : '-0.2deg'})` }}>
+                  ) : visibleLetters.map((letter, index) => {
+                    const isTopLetter = index === 0;
+                    const isDragging = draggedLetterId === letter.id;
+                    const isSwiping = swipingLetterId === letter.id;
+                    const rotation = index === 0 ? '-0.6deg' : index === 1 ? '0.5deg' : '-0.2deg';
+                    const translatedX = isTopLetter && (isDragging || isSwiping) ? dragOffset : 0;
+                    return <button key={letter.id} type="button" onClick={() => handleLetterClick(letter.id)} onPointerDown={(event) => handleLetterPointerDown(event, letter.id)} onPointerMove={(event) => handleLetterPointerMove(event, letter.id)} onPointerUp={(event) => handleLetterPointerUp(event, letter.id)} onPointerCancel={resetLetterDrag} aria-label={isTopLetter ? '拖拽移除这封来信，或点击打开' : undefined} className={`absolute left-1 right-0 rounded-[0.65rem] p-3.5 text-left sm:p-4 ${isTopLetter ? 'cursor-grab active:cursor-grabbing' : ''}`} style={{ top: `${index * 1.05}rem`, zIndex: visibleLetters.length - index, pointerEvents: isTopLetter ? 'auto' : 'none', backgroundColor: theme.panelBg, boxShadow: theme.cardShadowStrong, transform: `translate3d(${translatedX}px, 0, 0) rotate(${rotation})`, transition: isDragging ? 'none' : 'transform 180ms ease-out', touchAction: 'pan-y' }}>
                       <div className="flex items-center justify-between gap-3"><span className="truncate font-serif text-base" style={{ color: theme.textPrimary }}>{letter.title}</span><span className="shrink-0 text-[11px]" style={{ color: theme.textMuted }}>{formatShortDate(letter.sentAt)}</span></div>
                       <p className="mt-1.5 line-clamp-2 text-xs leading-5" style={{ color: theme.textSecondary }}>{letter.preview}</p>
-                    </button>
-                  ))}
+                    </button>;
+                  })}
                 </div>
               </section>
             </div>
