@@ -289,9 +289,9 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                             onToggleTodo={onToggleTodo}
                             showCompletionSummary={true}
                         />
-                        {/* Cross Analysis Card */}
-                        <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                            <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">TAGS</h3>
+                        {/* Cross Analysis Section */}
+                        <div className="border-t border-stone-300 pt-6">
+                            <h3 className="mb-5 text-xl font-semibold tracking-tight text-stone-900">TAGS</h3>
                             <DateRangeFilter
                                 rangeType={analysisRange}
                                 date={analysisDate}

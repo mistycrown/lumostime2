@@ -1,7 +1,7 @@
 /**
  * @file AssociatedTodoList.tsx
  * @input Filtered associated todos, logs, and todo edit/toggle callbacks
- * @output Shared associated-todo card with one-level parent/subtask hierarchy
+ * @output Shared associated-todo section with one-level parent/subtask hierarchy
  * @pos Component (Todo association display)
  * @description Renders the associated todo list used by tag, category, and scope detail pages, preserving completion and duration metadata while nesting direct subtasks beneath their parent tasks.
  * @updated 2026-06-13: Moved the parent expand/collapse button to the right side of associated todo rows.
@@ -9,6 +9,7 @@
  * @updated 2026-06-13: Removed the child-row branch line so subtasks use indentation only.
  * @updated 2026-06-13: Added shared hierarchical associated-todo list for detail pages.
  * @updated 2026-08-09: Planned timeline blocks are excluded from associated todo duration totals.
+ * @updated 2026-09-18: Replaced the association card shell with a divider-led editorial section.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -114,11 +115,11 @@ export const AssociatedTodoList: React.FC<AssociatedTodoListProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest">{title}</h3>
+    <div className="border-t border-stone-300 pt-6">
+      <div className="mb-5 flex items-end justify-between gap-4">
+        <h3 className="text-xl font-semibold tracking-tight text-stone-900">{title}</h3>
         {showCompletionSummary && (
-          <div className="text-xs font-bold text-stone-500 tabular-nums">
+          <div className="text-xs font-medium tabular-nums text-stone-400">
             {todos.filter((todo) => todo.isCompleted).length} / {todos.length}
           </div>
         )}
@@ -126,7 +127,7 @@ export const AssociatedTodoList: React.FC<AssociatedTodoListProps> = ({
 
       <div className="space-y-0 text-sm">
         {todos.length === 0 ? (
-          <div className="text-center py-6 text-stone-400 border border-dashed border-stone-200 rounded-xl">
+          <div className="py-6 text-center text-stone-400">
             <p className="text-xs font-medium opacity-60">No associated todos</p>
             {emptyDescription && (
               <p className="text-xs mt-2 opacity-40">{emptyDescription}</p>
