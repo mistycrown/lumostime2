@@ -291,7 +291,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                         />
                         {/* Cross Analysis Section */}
                         <div className="border-t border-stone-300 pt-6">
-                            <h3 className="mb-5 text-xl font-semibold tracking-tight text-stone-900">TAGS</h3>
+                            <h3 className="mb-5 text-xl font-semibold tracking-tight text-stone-900">标签分析</h3>
                             <DateRangeFilter
                                 rangeType={analysisRange}
                                 date={analysisDate}

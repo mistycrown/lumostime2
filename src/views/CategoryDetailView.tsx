@@ -213,7 +213,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                         />
                         {/* Cross Analysis Section (Scope Distribution) */}
                         <div className="border-t border-stone-300 pt-6">
-                            <h3 className="mb-5 text-xl font-semibold tracking-tight text-stone-900">Scope Analysis</h3>
+                            <h3 className="mb-5 text-xl font-semibold tracking-tight text-stone-900">领域分析</h3>
                             <DateRangeFilter
                                 rangeType={analysisRange}
                                 date={analysisDate}

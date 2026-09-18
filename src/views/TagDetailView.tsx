@@ -799,11 +799,11 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                      logs={logs}
                      onEditTodo={onEditTodo}
                      onToggleTodo={onToggleTodo}
-                     emptyDescription="Link todos to this activity to see them here."
+                     emptyDescription="关联到此标签的待办会显示在这里。"
                   />
                   {/* Cross Analysis Section (Scope Distribution) */}
                   <div className="border-t border-stone-300 pt-6">
-                     <h3 className="mb-5 text-xl font-semibold tracking-tight text-stone-900">Scope Analysis</h3>
+                     <h3 className="mb-5 text-xl font-semibold tracking-tight text-stone-900">领域分析</h3>
                      <DateRangeFilter
                         rangeType={analysisRange}
                         date={analysisDate}
