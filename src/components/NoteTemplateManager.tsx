@@ -84,7 +84,7 @@ export const NoteTemplateManager: React.FC<NoteTemplateManagerProps> = ({
 
   return (
     <>
-      <div className="border-t-2 border-stone-900 pt-5">
+      <div className="border-t border-stone-300 pt-6">
         <div className="mb-5 flex items-center justify-between gap-3">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">03 / Templates</p>

@@ -41,6 +41,7 @@ import { ActivityAttributeManager } from '../components/ActivityAttributeManager
 import { ActivityAttributeStatistics } from '../components/ActivityAttributeStatistics';
 import { FeatureHint } from '../components/FeatureHint';
 import { getDefaultKeywordColor, getRandomKeywordColor, normalizeActivityKeywords, syncActivityKeywordsWithAttribute } from '../utils/detailTimelineKeywordUtils';
+import { createDefaultStatisticCard, normalizeStatisticCards } from '../utils/activityStatisticCardUtils';
 
 
 interface TagDetailViewProps {
@@ -357,7 +358,12 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
    const handleAttributesChange = (attributes: NonNullable<Activity['attributes']>) => {
       if (!activity) return;
-      setActivity({ ...activity, attributes, keywords: syncActivityKeywordsWithAttribute(activity.keywords || [], attributes) });
+      const existingCards = activity.statisticCards === undefined ? [] : normalizeStatisticCards(activity);
+      const knownAttributeIds = new Set(existingCards.filter((card) => card.source.type === 'attribute').map((card) => card.source.attributeId));
+      const nextCards = attributes.reduce((cards, attribute) => (
+         knownAttributeIds.has(attribute.id) ? cards : [...cards, createDefaultStatisticCard(attribute, cards.length)]
+      ), existingCards).map((card, index) => ({ ...card, order: index }));
+      setActivity({ ...activity, attributes, statisticCards: nextCards, keywords: syncActivityKeywordsWithAttribute(activity.keywords || [], attributes) });
    };
 
    const renderContent = () => {
@@ -365,7 +371,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
          case 'Details':
             return (
                <div className="space-y-12">
-                  <section className="border-t-2 border-stone-900 pt-5">
+                  <section className="pt-0">
                      <div className="mb-7 flex items-end justify-between gap-4">
                         <div>
                            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">01 / Identity</p>
@@ -584,7 +590,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                      </div>
                   </section>
 
-                  <section className="border-t-2 border-stone-900 pt-5">
+                  <section className="border-t border-stone-300 pt-6">
                      <div className="mb-7 flex items-end justify-between gap-4">
                         <div>
                            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">02 / Appearance</p>
@@ -634,7 +640,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   />
 
                   {/* Keywords Section */}
-                  <section className="border-t-2 border-stone-900 pt-5">
+                  <section className="border-t border-stone-300 pt-6">
                      <div className="mb-7 flex items-end justify-between gap-4">
                         <div>
                            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">05 / Keywords</p>

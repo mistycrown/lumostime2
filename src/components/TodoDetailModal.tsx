@@ -1165,11 +1165,14 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
 
         {/* Content */}
         {activeTab === '细节' && (
-          <div className="space-y-6 animate-in slide-in-from-left-4 fade-in">
+          <div className="space-y-12 animate-in slide-in-from-left-4 fade-in">
             {/* Edit Form */}
-            <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm space-y-4">
+            <section className="space-y-7">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest">基本信息</h3>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">01 / Identity</p>
+                  <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900">基本信息</h2>
+                </div>
                 <button
                   onClick={handleCompletionToggle}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${isCompleted ? 'bg-stone-900 text-white shadow-md' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'}`}
@@ -1180,7 +1183,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
               </div>
               {isSubtask ? (
                 <div>
-                  <label className="text-xs text-stone-400 font-medium mb-1.5 block">继承信息</label>
+                  <label className="mb-2 block text-sm font-semibold text-stone-600">继承信息</label>
                   <div className="space-y-2 text-sm leading-6 text-stone-500">
                     <div>分类：{selectedCategory.name}</div>
                     <div>关联活动：{linkedActivityLabel}</div>
@@ -1200,7 +1203,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                 </div>
               ) : (
                 <div>
-                  <label className="text-xs text-stone-400 font-medium mb-1.5 block">分类</label>
+                  <label className="mb-2 block text-sm font-semibold text-stone-600">分类</label>
                   <AssociationOptionGrid
                     items={realTodoCategories}
                     isSelected={(cat) => selectedCategoryId === cat.id}
@@ -1212,7 +1215,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                 </div>
               )}
               <div>
-                <label className="text-xs text-stone-400 font-medium mb-1.5 block">待办名称</label>
+                <label className="mb-2 block text-sm font-semibold text-stone-600">待办名称</label>
                 <input
                   ref={taskNameInputRef}
                   type="text"
@@ -1224,15 +1227,15 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                       taskNameInputRef.current?.blur();
                     }
                   }}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-800 font-bold outline-none focus:border-stone-400 transition-colors"
+                  className="h-11 w-full rounded-lg border border-stone-200 bg-stone-50 px-3.5 text-[13px] font-medium text-stone-800 outline-none transition-colors focus:border-stone-400"
                 />
               </div>
               <div>
-                <label className="text-xs text-stone-400 font-medium mb-1.5 block">备注</label>
+                <label className="mb-2 block text-sm font-semibold text-stone-600">备注</label>
                 <textarea
                   value={note}
                   onChange={e => setNote(e.target.value)}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-stone-700 text-sm outline-none focus:border-stone-400 transition-colors min-h-[100px] resize-none"
+                  className="min-h-[100px] w-full resize-none rounded-lg border border-stone-200 bg-stone-50 px-3.5 py-3 text-[13px] text-stone-700 outline-none transition-colors focus:border-stone-400"
                   placeholder="添加备注..."
                 />
               </div>
@@ -1424,7 +1427,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
               </div>
                 </>
               )}
-            </div>
+            </section>
 
             {!isSubtask && !isQuickReminder && (
               <>
