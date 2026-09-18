@@ -13,6 +13,7 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, BarChart3, LineChart, PieChart, Plus, Settings2, Table2, Trash2, Type, X } from 'lucide-react';
 import { Activity, ActivityAttributeDefinition, ActivityAttributeOption, ActivityAttributeType, ActivityAttributeValue, ActivityStatisticCard, ActivityStatisticCardSource, ActivityStatisticCardType, Log } from '../types';
+import { CustomSelect } from './CustomSelect';
 import { getActivityAttributeValue, getSortedActivityAttributes } from '../utils/activityAttributeUtils';
 import { getLogDurationSeconds } from '../utils/scopeStatsUtils';
 import { formatDuration } from '../utils/chartUtils';
@@ -337,15 +338,6 @@ const getCardAttribute = (activity: Activity, source: ActivityStatisticCardSourc
   ? activity.attributes?.find((attribute) => attribute.id === source.attributeId)
   : undefined;
 
-const CardLocalControls: React.FC<{ card: ActivityStatisticCard; onUpdate: (update: Partial<ActivityStatisticCard>) => void }> = ({ card, onUpdate }) => (
-  <div className="mb-3 flex flex-wrap justify-end gap-2 border-b border-[#eee7de] pb-2">
-    <div className="flex overflow-x-auto rounded-md border border-[#e5ddd2] bg-[#f7f3ed] p-0.5" aria-label="卡片时间范围">
-      {RANGE_OPTIONS.map((option) => <button key={option.key} type="button" onClick={() => onUpdate({ range: option.key })} className={`whitespace-nowrap rounded px-2 py-1 text-[10px] ${card.range === option.key ? 'bg-[#ead9cb] font-medium text-[#8f4f32]' : 'text-[#9b8d80]'}`}>{option.label}</button>)}
-    </div>
-    {(card.chartType === 'choiceBar' || card.chartType === 'choiceDonut') && <div className="flex overflow-hidden rounded-md border border-[#e5ddd2] bg-[#f7f3ed] p-0.5" aria-label="卡片统计维度"><button type="button" onClick={() => onUpdate({ metric: 'count' })} className={`rounded px-2 py-1 text-[10px] ${card.metric !== 'duration' ? 'bg-[#ead9cb] font-medium text-[#8f4f32]' : 'text-[#9b8d80]'}`}>次数</button><button type="button" onClick={() => onUpdate({ metric: 'duration' })} className={`rounded px-2 py-1 text-[10px] ${card.metric === 'duration' ? 'bg-[#ead9cb] font-medium text-[#8f4f32]' : 'text-[#9b8d80]'}`}>时长</button></div>}
-  </div>
-);
-
 const DonutPreview: React.FC<{ attribute: ActivityAttributeDefinition; logs: Log[]; mode: StatisticMode }> = ({ attribute, logs, mode }) => {
   const counts = new Map<string, number>();
   let total = 0;
@@ -366,8 +358,9 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
   const attributes = useMemo(() => getSortedActivityAttributes(activity), [activity]);
   const [cards, setCards] = useState<ActivityStatisticCard[]>(() => activity.statisticCards === undefined ? ensureStatisticCards(activity) : normalizeStatisticCards(activity));
   const [manageOpen, setManageOpen] = useState(false);
-  const [source, setSource] = useState<ActivityStatisticCardSource>({ type: 'attribute', attributeId: attributes[0]?.id || '' });
-  const [chartType, setChartType] = useState<ActivityStatisticCardType>('textCloud');
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [newSource, setNewSource] = useState<ActivityStatisticCardSource>({ type: 'attribute', attributeId: attributes[0]?.id || '' });
+  const [newChartType, setNewChartType] = useState<ActivityStatisticCardType>('textCloud');
 
   const commit = (next: ActivityStatisticCard[]) => {
     const normalized = next.map((card, index) => ({ ...card, order: index }));
@@ -384,36 +377,75 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     ...attributes.map((attribute) => ({ key: `attribute:${attribute.id}`, source: { type: 'attribute', attributeId: attribute.id } as ActivityStatisticCardSource, label: attribute.name })),
     { key: 'note', source: { type: 'note' } as ActivityStatisticCardSource, label: '备注' }
   ];
-  const availableTypes = getChartTypesForSource(source, attributes);
-  const selectedType = availableTypes.includes(chartType) ? chartType : availableTypes[0];
+  const sourceToKey = (value: ActivityStatisticCardSource) => value.type === 'note' ? 'note' : `attribute:${value.attributeId}`;
+  const selectedCard = cards.find((card) => card.id === selectedCardId) || null;
+  const selectedTypes = selectedCard ? getChartTypesForSource(selectedCard.source, attributes) : [];
+  const availableTypes = getChartTypesForSource(newSource, attributes);
+  const selectedType = availableTypes.includes(newChartType) ? newChartType : availableTypes[0];
+
+  React.useEffect(() => {
+    if (!manageOpen) return;
+    if (selectedCardId && cards.some((card) => card.id === selectedCardId)) return;
+    setSelectedCardId(cards[0]?.id || null);
+  }, [cards, manageOpen, selectedCardId]);
+
+  React.useEffect(() => {
+    const firstSource = sourceChoices[0]?.source || { type: 'note' as const };
+    if (!sourceChoices.some((item) => sourceToKey(item.source) === sourceToKey(newSource))) {
+      setNewSource(firstSource);
+      setNewChartType(getChartTypesForSource(firstSource, attributes)[0] || 'textCloud');
+    }
+  }, [activity.id, activity.attributes]);
 
   const updateCard = (id: string, update: Partial<ActivityStatisticCard>) => commit(cards.map((card) => card.id === id ? { ...card, ...update } : card));
+  const updateSelectedCard = (update: Partial<ActivityStatisticCard>) => {
+    if (selectedCard) updateCard(selectedCard.id, update);
+  };
+
+  const changeExistingSource = (key: string) => {
+    if (!selectedCard) return;
+    const next = sourceChoices.find((item) => item.key === key);
+    if (!next) return;
+    const types = getChartTypesForSource(next.source, attributes);
+    const nextType = types.includes(selectedCard.chartType) ? selectedCard.chartType : types[0];
+    updateSelectedCard({
+      source: next.source,
+      chartType: nextType || 'textCloud',
+      metric: nextType === 'numberTrend' ? 'value' : nextType === 'choiceBar' || nextType === 'choiceDonut' ? selectedCard.metric === 'duration' ? 'duration' : 'count' : 'count'
+    });
+  };
+
+  const changeExistingType = (type: ActivityStatisticCardType) => {
+    if (!selectedCard) return;
+    updateSelectedCard({ chartType: type, metric: type === 'numberTrend' ? 'value' : type === 'choiceBar' || type === 'choiceDonut' ? selectedCard.metric === 'duration' ? 'duration' : 'count' : 'count' });
+  };
+
   const renderCard = (card: ActivityStatisticCard) => {
     const cardLogs = filterLogsByRange(logs, card.range);
     if (card.source.type === 'note') {
       const noteAttribute: ActivityAttributeDefinition = { id: '__note__', name: '备注', type: 'text', order: 0, createdAt: 0, updatedAt: 0 };
       const noteLogs = cardLogs.map((log) => ({ ...log, attributeValues: log.note ? [{ attributeId: noteAttribute.id, value: log.note }] : undefined }));
-      return <div key={card.id} className="rounded-xl border border-[#d8d0c5] bg-[#fcfaf6] p-1"><CardLocalControls card={card} onUpdate={(update) => updateCard(card.id, update)} /><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [noteAttribute] }} logs={noteLogs} hideToolbar onChange={undefined} /></div>;
+      return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [noteAttribute] }} logs={noteLogs} hideToolbar onChange={undefined} /></section>;
     }
     const attribute = getCardAttribute(activity, card.source);
     if (!attribute) return null;
     if (card.chartType === 'choiceDonut') {
-      return <div key={card.id} className="rounded-xl border border-[#d8d0c5] bg-[#fcfaf6] p-5"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE DONUT / {attribute.type === 'single' ? '单选' : '多选'}</div></div></div><CardLocalControls card={card} onUpdate={(update) => updateCard(card.id, update)} /><DonutPreview attribute={attribute} logs={cardLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} /></div>;
+      return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE DONUT / {attribute.type === 'single' ? '单选' : '多选'}</div></div></div><DonutPreview attribute={attribute} logs={cardLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} /></section>;
     }
-    return <div key={card.id} className="rounded-xl border border-[#d8d0c5] bg-[#fcfaf6] p-1"><CardLocalControls card={card} onUpdate={(update) => updateCard(card.id, update)} /><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [attribute] }} logs={cardLogs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} onChange={undefined} /></div>;
+    return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [attribute] }} logs={cardLogs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} onChange={undefined} /></section>;
   };
 
   const addCard = () => {
-    if (!source || !selectedType) return;
-    commit([...cards, { id: crypto.randomUUID(), source, chartType: selectedType, range: 'all', metric: selectedType === 'numberTrend' ? 'value' : 'count', order: cards.length }]);
+    if (!newSource || !selectedType) return;
+    commit([...cards, { id: crypto.randomUUID(), source: newSource, chartType: selectedType, range: 'all', metric: selectedType === 'numberTrend' ? 'value' : 'count', order: cards.length }]);
   };
 
   return <div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#ddd3c7] pb-4">
       <div><p className="text-[10px] uppercase tracking-[0.2em] text-[#a08f7d]">属性统计</p><p className="mt-1 text-sm text-[#67594d]">{logs.length} 条记录 <span className="text-[#c8b9a9]">/</span> {cards.length} 张卡片</p></div>
-      <button type="button" onClick={() => setManageOpen(true)} className="inline-flex items-center gap-1.5 rounded-md border border-[#d8cabb] bg-[#fffdfa] px-3 py-2 text-xs font-medium text-[#77523d] shadow-sm hover:bg-[#f5ebe1]"><Settings2 size={14} />管理</button>
+      <button type="button" onClick={() => { setSelectedCardId(cards[0]?.id || null); setManageOpen(true); }} className="inline-flex items-center gap-1.5 rounded-md border border-[#d8cabb] bg-[#fffdfa] px-3 py-2 text-xs font-medium text-[#77523d] shadow-sm hover:bg-[#f5ebe1]"><Settings2 size={14} />管理</button>
     </div>
-    <div className="grid gap-5 xl:grid-cols-2">{cards.map(renderCard)}</div>
-    {manageOpen && <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#3b2e24]/25 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setManageOpen(false); }}><div className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-[#d8cabb] bg-[#fcfaf6] p-5 shadow-2xl sm:rounded-2xl" role="dialog" aria-modal="true" aria-label="管理统计卡片"><div className="mb-5 flex items-center justify-between"><h2 className="font-serif text-lg text-[#4a3b30]">管理统计卡片</h2><button type="button" onClick={() => setManageOpen(false)} title="关闭" aria-label="关闭" className="p-1.5 text-[#a08f7d]"><X size={17} /></button></div><div className="space-y-2">{cards.map((card, index) => <div key={card.id} className="flex items-center gap-2 border-b border-[#ece5dc] py-2.5"><span className="min-w-0 flex-1 truncate text-sm text-[#5c4b3c]">{getStatisticCardLabel(card, attributes)}</span><button type="button" onClick={() => { if (index > 0) { const next = [...cards]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; commit(next); } }} disabled={index === 0} title="上移" aria-label="上移" className="p-1 text-[#aa927e] disabled:opacity-25"><ArrowUp size={14} /></button><button type="button" onClick={() => { if (index < cards.length - 1) { const next = [...cards]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; commit(next); } }} disabled={index === cards.length - 1} title="下移" aria-label="下移" className="p-1 text-[#aa927e] disabled:opacity-25"><ArrowDown size={14} /></button><button type="button" onClick={() => commit(cards.filter((item) => item.id !== card.id))} title="删除" aria-label="删除" className="p-1 text-[#b17961]"><Trash2 size={14} /></button></div>)}</div><div className="mt-5 border-t border-[#e5dbcf] pt-5"><h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#8f7f70]">新增统计卡片</h3><label className="block text-xs text-[#766657]">数据来源<select value={sourceChoices.find((item) => item.source.type === source.type && (source.type === 'note' || item.source.attributeId === source.attributeId))?.key || ''} onChange={(event) => { const selected = sourceChoices.find((item) => item.key === event.target.value); if (selected) { setSource(selected.source); setChartType(getChartTypesForSource(selected.source, attributes)[0] || 'textCloud'); } }} className="mt-1.5 w-full rounded-md border border-[#ddcfbf] bg-[#fffdfa] px-3 py-2 text-sm text-[#5c4b3c]"><option value="">选择来源</option>{sourceChoices.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label><div className="mt-3 grid grid-cols-2 gap-2">{availableTypes.map((type) => <button key={type} type="button" onClick={() => setChartType(type)} className={`rounded-md border px-3 py-2 text-xs ${selectedType === type ? 'border-[#b16d4c] bg-[#f1e1d5] text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{CARD_TYPE_LABELS[type]}</button>)}</div><button type="button" onClick={addCard} disabled={!selectedType} className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-[#9b5c3f] px-3 py-2 text-xs font-medium text-white disabled:opacity-40"><Plus size={14} />添加卡片</button></div><button type="button" onClick={() => commit(ensureStatisticCards({ ...activity, statisticCards: cards }))} className="mt-5 text-xs text-[#9b5c3f] underline-offset-2 hover:underline">恢复默认卡片</button></div></div>}
+    <div className="divide-y divide-[#d8d0c5]">{cards.map(renderCard)}</div>
+    {manageOpen && <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#3b2e24]/25 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setManageOpen(false); }}><div className="max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-[#d8cabb] bg-[#fcfaf6] p-5 shadow-2xl sm:rounded-2xl" role="dialog" aria-modal="true" aria-label="管理统计卡片"><div className="mb-5 flex items-center justify-between"><div><h2 className="font-serif text-lg text-[#4a3b30]">管理统计卡片</h2><p className="mt-1 text-xs text-[#a08f7d]">点选卡片后，在下方编辑来源、图表和统计范围</p></div><button type="button" onClick={() => setManageOpen(false)} title="关闭" aria-label="关闭" className="p-1.5 text-[#a08f7d]"><X size={17} /></button></div><div className="space-y-1">{cards.map((card, index) => <div key={card.id} role="button" tabIndex={0} onClick={() => setSelectedCardId(card.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedCardId(card.id); } }} className={`flex items-center gap-2 border-b border-[#ece5dc] px-2 py-2.5 transition-colors ${selectedCardId === card.id ? 'bg-[#f3e7dc]' : 'hover:bg-[#faf5ef]'}`}><span className="min-w-0 flex-1 truncate text-sm text-[#5c4b3c]">{getStatisticCardLabel(card, attributes)}</span><span className="text-[10px] text-[#a08f7d]">{CARD_TYPE_LABELS[card.chartType]}</span><button type="button" onClick={(event) => { event.stopPropagation(); if (index > 0) { const next = [...cards]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; commit(next); } }} disabled={index === 0} title="上移" aria-label="上移" className="p-1 text-[#aa927e] disabled:opacity-25"><ArrowUp size={14} /></button><button type="button" onClick={(event) => { event.stopPropagation(); if (index < cards.length - 1) { const next = [...cards]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; commit(next); } }} disabled={index === cards.length - 1} title="下移" aria-label="下移" className="p-1 text-[#aa927e] disabled:opacity-25"><ArrowDown size={14} /></button><button type="button" onClick={(event) => { event.stopPropagation(); const next = cards.filter((item) => item.id !== card.id); commit(next); setSelectedCardId(next[Math.min(index, next.length - 1)]?.id || null); }} title="删除" aria-label="删除" className="p-1 text-[#b17961]"><Trash2 size={14} /></button></div>)}</div>{selectedCard && <div className="mt-5 border-t border-[#e5dbcf] pt-5"><div className="mb-4 flex items-center justify-between gap-3"><h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8f7f70]">编辑所选卡片</h3><span className="text-[10px] text-[#b09e8c]">#{cards.findIndex((card) => card.id === selectedCard.id) + 1}</span></div><CustomSelect label="数据来源" value={sourceToKey(selectedCard.source)} options={sourceChoices.map((item) => ({ value: item.key, label: item.label }))} onChange={changeExistingSource} renderDropdownInPortal /><div className="mt-4"><p className="mb-2 text-xs text-[#766657]">图表类型</p><div className="grid grid-cols-2 gap-2">{selectedTypes.map((type) => <button key={type} type="button" onClick={() => changeExistingType(type)} className={`rounded-md border px-3 py-2 text-xs transition-colors ${selectedCard.chartType === type ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70] hover:border-[#c9b6a4]'}`}>{CARD_TYPE_LABELS[type]}</button>)}</div></div><div className="mt-4"><p className="mb-2 text-xs text-[#766657]">时间范围</p><div className="flex flex-wrap gap-1.5">{RANGE_OPTIONS.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ range: option.key })} className={`rounded-md border px-2.5 py-1.5 text-xs ${selectedCard.range === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>{(selectedCard.chartType === 'choiceBar' || selectedCard.chartType === 'choiceDonut') && <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">统计维度</p><div className="flex gap-1.5">{STATISTIC_MODE_OPTIONS.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ metric: option.key })} className={`rounded-md border px-3 py-1.5 text-xs ${selectedCard.metric === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>}</div>}<div className="mt-5 border-t border-[#e5dbcf] pt-5"><h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#8f7f70]">新增统计卡片</h3><CustomSelect label="数据来源" value={sourceChoices.some((item) => item.key === sourceToKey(newSource)) ? sourceToKey(newSource) : ''} options={sourceChoices.map((item) => ({ value: item.key, label: item.label }))} onChange={(value) => { const next = sourceChoices.find((item) => item.key === value); if (next) { setNewSource(next.source); setNewChartType(getChartTypesForSource(next.source, attributes)[0] || 'textCloud'); } }} placeholder="选择来源" renderDropdownInPortal /><div className="mt-3 grid grid-cols-2 gap-2">{availableTypes.map((type) => <button key={type} type="button" onClick={() => setNewChartType(type)} className={`rounded-md border px-3 py-2 text-xs ${selectedType === type ? 'border-[#b16d4c] bg-[#f1e1d5] text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{CARD_TYPE_LABELS[type]}</button>)}</div><button type="button" onClick={addCard} disabled={!selectedType} className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-[#9b5c3f] px-3 py-2 text-xs font-medium text-white disabled:opacity-40"><Plus size={14} />添加卡片</button></div><button type="button" onClick={() => commit(ensureStatisticCards({ ...activity, statisticCards: cards }))} className="mt-5 text-xs text-[#9b5c3f] underline-offset-2 hover:underline">恢复默认卡片</button></div></div>}
   </div>;
 };
