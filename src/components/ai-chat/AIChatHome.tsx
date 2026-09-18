@@ -26,6 +26,28 @@ import type { AssistantLetter, AssistantMemory, AssistantReminder } from '../../
 import type { AIChatCustomPromptBlock, AIChatPersona, AIChatSession } from './AIBackfillChatShared';
 import { PersonaAvatar } from './AIBackfillChatShared';
 
+export interface AIChatNewspaperItem {
+  id: string;
+  title: string;
+  preview: string;
+  dateLabel: string;
+  updatedAt: number;
+  period: 'daily' | 'weekly' | 'monthly';
+  startDate: string;
+  endDate?: string;
+}
+
+interface AIChatFeedItem {
+  id: string;
+  title: string;
+  preview: string;
+  dateLabel: string;
+  updatedAt: number;
+  kind: 'letter' | 'newspaper';
+  letterId?: string;
+  newspaper?: AIChatNewspaperItem;
+}
+
 interface AIChatHomeTheme {
   shellBg: string;
   shellLayerBg: string;
@@ -51,6 +73,7 @@ interface AIChatHomeProps {
   assistantMemory: AssistantMemory;
   assistantReminders: AssistantReminder[];
   assistantLetters: AssistantLetter[];
+  newspapers: AIChatNewspaperItem[];
   customPromptBlocks: AIChatCustomPromptBlock[];
   sessions: AIChatSession[];
   sortedSessions: AIChatSession[];
@@ -62,6 +85,7 @@ interface AIChatHomeProps {
   onStartNewSession: () => void;
   onOpenLetters: () => void;
   onOpenLetter: (letterId: string) => void;
+  onOpenNewspaper: (item: AIChatNewspaperItem) => void;
   onOpenMemory: () => void;
   onOpenHistory: () => void;
   onOpenSettings: () => void;
@@ -100,6 +124,7 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
   assistantMemory,
   assistantReminders,
   assistantLetters,
+  newspapers,
   customPromptBlocks,
   sessions,
   sortedSessions,
@@ -111,13 +136,14 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
   onStartNewSession,
   onOpenLetters,
   onOpenLetter,
+  onOpenNewspaper,
   onOpenMemory,
   onOpenHistory,
   onOpenSettings,
   onSendShortcut,
 }) => {
   const [quickChatText, setQuickChatText] = useState('');
-  const [dismissedLetterIds, setDismissedLetterIds] = useState<string[]>([]);
+  const [dismissedFeedIds, setDismissedFeedIds] = useState<string[]>([]);
   const [draggedLetterId, setDraggedLetterId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
   const [swipingLetterId, setSwipingLetterId] = useState<string | null>(null);
@@ -125,7 +151,27 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
   const suppressLetterClickRef = useRef(false);
   const latestSession = sortedSessions[0] || sessions[0] || null;
   const pendingReminders = assistantReminders.filter((reminder) => reminder.status === 'pending');
-  const visibleLetters = assistantLetters.filter((letter) => !dismissedLetterIds.includes(letter.id)).slice(0, 3);
+  const feedItems = useMemo<AIChatFeedItem[]>(() => [
+    ...assistantLetters.map((letter) => ({
+      id: `letter:${letter.id}`,
+      title: letter.title,
+      preview: letter.preview,
+      dateLabel: formatShortDate(letter.sentAt),
+      updatedAt: new Date(letter.sentAt).getTime(),
+      kind: 'letter' as const,
+      letterId: letter.id
+    })),
+    ...newspapers.map((newspaper) => ({
+      id: `newspaper:${newspaper.id}`,
+      title: newspaper.title,
+      preview: newspaper.preview,
+      dateLabel: newspaper.dateLabel,
+      updatedAt: newspaper.updatedAt,
+      kind: 'newspaper' as const,
+      newspaper
+    }))
+  ].sort((left, right) => right.updatedAt - left.updatedAt), [assistantLetters, newspapers]);
+  const visibleFeedItems = feedItems.filter((item) => !dismissedFeedIds.includes(item.id)).slice(0, 3);
   const visibleSessions = sortedSessions.slice(0, 3);
   const memoryItems = [...assistantMemory.profileMemory, ...assistantMemory.preferenceMemory].slice(0, 4);
   const memoryLabels = ['偏好', '研究', '写作', '状态'];
@@ -150,16 +196,16 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
     onSendShortcut(text);
   };
 
-  const handleLetterPointerDown = (event: React.PointerEvent<HTMLButtonElement>, letterId: string) => {
-    if (swipingLetterId || visibleLetters[0]?.id !== letterId) return;
-    letterDragRef.current = { id: letterId, startX: event.clientX };
+  const handleLetterPointerDown = (event: React.PointerEvent<HTMLButtonElement>, feedId: string) => {
+    if (swipingLetterId || visibleFeedItems[0]?.id !== feedId) return;
+    letterDragRef.current = { id: feedId, startX: event.clientX };
     suppressLetterClickRef.current = false;
-    setDraggedLetterId(letterId);
+    setDraggedLetterId(feedId);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
-  const handleLetterPointerMove = (event: React.PointerEvent<HTMLButtonElement>, letterId: string) => {
-    if (letterDragRef.current?.id !== letterId) return;
+  const handleLetterPointerMove = (event: React.PointerEvent<HTMLButtonElement>, feedId: string) => {
+    if (letterDragRef.current?.id !== feedId) return;
     const offset = event.clientX - letterDragRef.current.startX;
     if (Math.abs(offset) > 6) suppressLetterClickRef.current = true;
     setDragOffset(offset);
@@ -171,14 +217,14 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
     setDragOffset(0);
   };
 
-  const handleLetterPointerUp = (event: React.PointerEvent<HTMLButtonElement>, letterId: string) => {
-    if (letterDragRef.current?.id !== letterId) return;
+  const handleLetterPointerUp = (event: React.PointerEvent<HTMLButtonElement>, feedId: string) => {
+    if (letterDragRef.current?.id !== feedId) return;
     const offset = event.clientX - letterDragRef.current.startX;
     if (Math.abs(offset) > 72) {
-      setSwipingLetterId(letterId);
+      setSwipingLetterId(feedId);
       setDragOffset(offset > 0 ? 560 : -560);
       window.setTimeout(() => {
-        setDismissedLetterIds((current) => current.includes(letterId) ? current : [...current, letterId]);
+        setDismissedFeedIds((current) => current.includes(feedId) ? current : [...current, feedId]);
         resetLetterDrag();
         setSwipingLetterId(null);
       }, 180);
@@ -188,12 +234,16 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
     resetLetterDrag();
   };
 
-  const handleLetterClick = (letterId: string) => {
+  const handleFeedItemClick = (item: AIChatFeedItem) => {
     if (suppressLetterClickRef.current) {
       suppressLetterClickRef.current = false;
       return;
     }
-    onOpenLetter(letterId);
+    if (item.kind === 'letter' && item.letterId) {
+      onOpenLetter(item.letterId);
+    } else if (item.newspaper) {
+      onOpenNewspaper(item.newspaper);
+    }
   };
 
   return (
@@ -223,18 +273,18 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
 
               <section>
                 <SectionHeading index="02" icon={Mail} title="来信与小报" theme={theme} action={<button type="button" onClick={onOpenLetters} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>查看全部 <ChevronRight size={13} /></button>} />
-                <div className="relative mt-3 pr-1" style={{ minHeight: `${Math.max(8, 6.4 + visibleLetters.length * 1.05)}rem` }}>
-                  {visibleLetters.length === 0 ? (
-                    <div className="flex h-32 items-center justify-center text-sm" style={{ color: theme.textMuted }}>暂时没有新的来信</div>
-                  ) : visibleLetters.map((letter, index) => {
+                <div className="relative mt-3 pr-1" style={{ minHeight: `${Math.max(8, 6.4 + visibleFeedItems.length * 1.05)}rem` }}>
+                  {visibleFeedItems.length === 0 ? (
+                    <div className="flex h-32 items-center justify-center text-sm" style={{ color: theme.textMuted }}>暂时没有新的来信或小报</div>
+                  ) : visibleFeedItems.map((item, index) => {
                     const isTopLetter = index === 0;
-                    const isDragging = draggedLetterId === letter.id;
-                    const isSwiping = swipingLetterId === letter.id;
+                    const isDragging = draggedLetterId === item.id;
+                    const isSwiping = swipingLetterId === item.id;
                     const rotation = index === 0 ? '-0.6deg' : index === 1 ? '0.5deg' : '-0.2deg';
                     const translatedX = isTopLetter && (isDragging || isSwiping) ? dragOffset : 0;
-                    return <button key={letter.id} type="button" onClick={() => handleLetterClick(letter.id)} onPointerDown={(event) => handleLetterPointerDown(event, letter.id)} onPointerMove={(event) => handleLetterPointerMove(event, letter.id)} onPointerUp={(event) => handleLetterPointerUp(event, letter.id)} onPointerCancel={resetLetterDrag} aria-label={isTopLetter ? '拖拽移除这封来信，或点击打开' : undefined} className={`absolute left-1 right-0 rounded-[0.65rem] p-3.5 text-left sm:p-4 ${isTopLetter ? 'cursor-grab active:cursor-grabbing' : ''}`} style={{ top: `${index * 1.05}rem`, zIndex: visibleLetters.length - index, pointerEvents: isTopLetter ? 'auto' : 'none', backgroundColor: theme.panelBg, boxShadow: theme.cardShadowStrong, transform: `translate3d(${translatedX}px, 0, 0) rotate(${rotation})`, transition: isDragging ? 'none' : 'transform 180ms ease-out', touchAction: 'pan-y' }}>
-                      <div className="flex items-center justify-between gap-3"><span className="truncate font-serif text-base" style={{ color: theme.textPrimary }}>{letter.title}</span><span className="shrink-0 text-[11px]" style={{ color: theme.textMuted }}>{formatShortDate(letter.sentAt)}</span></div>
-                      <p className="mt-1.5 line-clamp-2 text-xs leading-5" style={{ color: theme.textSecondary }}>{letter.preview}</p>
+                    return <button key={item.id} type="button" onClick={() => handleFeedItemClick(item)} onPointerDown={(event) => handleLetterPointerDown(event, item.id)} onPointerMove={(event) => handleLetterPointerMove(event, item.id)} onPointerUp={(event) => handleLetterPointerUp(event, item.id)} onPointerCancel={resetLetterDrag} aria-label={isTopLetter ? '拖拽移除这条内容，或点击打开' : undefined} className={`absolute left-1 right-0 rounded-[0.65rem] p-3.5 text-left sm:p-4 ${isTopLetter ? 'cursor-grab active:cursor-grabbing' : ''}`} style={{ top: `${index * 1.05}rem`, zIndex: visibleFeedItems.length - index, pointerEvents: isTopLetter ? 'auto' : 'none', backgroundColor: theme.panelBg, boxShadow: theme.cardShadowStrong, transform: `translate3d(${translatedX}px, 0, 0) rotate(${rotation})`, transition: isDragging ? 'none' : 'transform 180ms ease-out', touchAction: 'pan-y' }}>
+                      <div className="flex items-center justify-between gap-3"><span className="flex min-w-0 items-center gap-2 truncate font-serif text-base" style={{ color: theme.textPrimary }}>{item.kind === 'newspaper' ? <FileText size={14} className="shrink-0" style={{ color: theme.primaryButtonBg }} /> : <Mail size={14} className="shrink-0" style={{ color: theme.primaryButtonBg }} />}<span className="truncate">{item.title}</span></span><span className="shrink-0 text-[11px]" style={{ color: theme.textMuted }}>{item.dateLabel}</span></div>
+                      <p className="mt-1.5 line-clamp-2 text-xs leading-5" style={{ color: theme.textSecondary }}>{item.preview}</p>
                     </button>;
                   })}
                 </div>
