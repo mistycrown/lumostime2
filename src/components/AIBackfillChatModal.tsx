@@ -240,6 +240,7 @@ import {
   runWeeklyReviewNarrativeWriteback as runWeeklyReviewNarrativeWritebackFlow
 } from './ai-chat/AIBackfillChatReviewWriteback';
 import { AIBackfillChatSettingsOverlay } from './ai-chat/AIBackfillChatSettingsOverlay';
+import { AIChatShortcutSettingsOverlay } from './ai-chat/AIChatShortcutSettingsOverlay';
 import {
   AIBackfillChatHistoryOverlay,
   AIBackfillChatNewSessionDialog
@@ -642,6 +643,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
   const [isPersonaPanelOpen, setIsPersonaPanelOpen] = useState(false);
+  const [isShortcutPromptSettingsOpen, setIsShortcutPromptSettingsOpen] = useState(false);
   const [isHomeView, setIsHomeView] = useState(true);
   const [isComposerMenuOpen, setIsComposerMenuOpen] = useState(false);
   const [isNewSessionDialogOpen, setIsNewSessionDialogOpen] = useState(false);
@@ -4546,6 +4548,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return true;
     }
 
+    if (isShortcutPromptSettingsOpen) {
+      setIsShortcutPromptSettingsOpen(false);
+      return true;
+    }
+
     if (isEmojiEditorOpen) {
       setIsEmojiEditorOpen(false);
       return true;
@@ -4614,6 +4621,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     isHistoryPanelOpen,
     isHomeView,
     isNewSessionDialogOpen,
+    isShortcutPromptSettingsOpen,
     isOpen,
     isPersonaPanelOpen,
     isUserEmojiEditorOpen,
@@ -7129,7 +7137,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             onOpenLetter={handleOpenAssistantLetterDetail}
             onOpenMemory={handleOpenAssistantMemoryViewer}
             onOpenHistory={() => setIsHistoryPanelOpen(true)}
-            onOpenSettings={() => setIsPersonaPanelOpen(true)}
+            onOpenSettings={() => setIsShortcutPromptSettingsOpen(true)}
             onSendShortcut={(text) => {
               const latestSession = sortedSessions[0] || activeSession;
               if (!latestSession) return;
@@ -7391,6 +7399,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               onCreateGenericSession={handleCreateGenericSession}
               onOpenMonthlyReviewTemplateSelection={handleOpenMonthlyReviewTemplateSelection}
               onOpenWeeklyReviewTemplateSelection={handleOpenWeeklyReviewTemplateSelection}
+              theme={AI_CHAT_THEME}
+            />
+
+            <AIChatShortcutSettingsOverlay
+              customPromptBlocks={customPromptBlocks}
+              isOpen={isShortcutPromptSettingsOpen}
+              onAddCustomPromptBlock={handleAddCustomPromptBlock}
+              onClose={() => setIsShortcutPromptSettingsOpen(false)}
+              onDeleteCustomPromptBlock={handleDeleteCustomPromptBlock}
+              onUpdateCustomPromptBlock={handleUpdateCustomPromptBlock}
               theme={AI_CHAT_THEME}
             />
 
