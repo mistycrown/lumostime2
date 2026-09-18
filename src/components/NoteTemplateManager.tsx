@@ -16,6 +16,7 @@ interface NoteTemplateManagerProps {
   templates?: NoteTemplate[];
   onChange: (templates: NoteTemplate[]) => void;
   emptyText?: string;
+  sectionNumber?: string;
 }
 
 const TEMPLATE_TONES = [
@@ -42,7 +43,8 @@ const getTemplateTone = (templateName: string, index: number) => {
 export const NoteTemplateManager: React.FC<NoteTemplateManagerProps> = ({
   templates,
   onChange,
-  emptyText = '还没有添加备注模板。'
+  emptyText = '还没有添加备注模板。',
+  sectionNumber = '03'
 }) => {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<NoteTemplate | null>(null);
@@ -87,7 +89,7 @@ export const NoteTemplateManager: React.FC<NoteTemplateManagerProps> = ({
       <div className="border-t border-stone-300 pt-6">
         <div className="mb-5 flex items-center justify-between gap-3">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">03 / Templates</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">{sectionNumber} / Templates</p>
             <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900">备注模板</h2>
           </div>
           <button

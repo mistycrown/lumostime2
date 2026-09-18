@@ -424,13 +424,14 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                         <NoteTemplateManager
                             templates={scope.noteTemplates}
                             onChange={(noteTemplates) => setScope(prev => ({ ...prev, noteTemplates }))}
+                            sectionNumber="02"
                         />
 
                         {/* Keywords Section */}
                         <section className="border-t border-stone-300 pt-6">
                             <div className="mb-7 flex items-end justify-between gap-4">
                                 <div>
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">04 / Keywords</p>
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">03 / Keywords</p>
                                     <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900">关键字</h2>
                                 </div>
                             </div>
