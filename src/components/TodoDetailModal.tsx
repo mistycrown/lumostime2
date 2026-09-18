@@ -10,6 +10,7 @@
  * @updated 2026-07-30: Completed todos now expose an editable completion-date field that reuses the planning date picker while preserving the stored local completion time.
  * @updated 2026-07-06: Raised the overlay detail layer above collection and schedule popovers so collection-launched todo timeline entries remain visible.
  * @updated 2026-09-15: Added contextual guidance for the six todo schedule types and date rules beside the schedule section title.
+ * @updated 2026-09-18: Replaced todo detail association and schedule card shells with divider-led editorial sections.
  * @updated 2026-09-15: Added contextual guidance for todo cover image ratio and timeline gallery rendering.
  * @updated 2026-05-19: Replaced the hidden monthly fallback checkbox with a pure button toggle that blocks default mouse-down focus switching, fixing the desktop white-screen triggered by tapping `31 号无则月末`.
  * @updated 2026-05-18: Defaulted timeline metadata render options so detail-page log chips still render safely when callers omit the auxiliary collection-name payload.
@@ -1432,9 +1433,9 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
             {!isSubtask && !isQuickReminder && (
               <>
                 {/* Link Activity */}
-                <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">关联标签</span>
+                <div className="border-t border-stone-300 pt-6">
+                  <div className="mb-5 flex items-end justify-between gap-4">
+                    <h3 className="text-xl font-semibold tracking-tight text-stone-900">关联标签</h3>
                     {(linkedCategoryId || linkedActivityId) && (
                       <button
                         onClick={() => {
@@ -1457,20 +1458,24 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                 </div>
 
                 {/* Scope Association */}
-                <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm">
+                <div className="border-t border-stone-300 pt-6">
+                  <div className="mb-5 flex items-end justify-between gap-4">
+                    <h3 className="text-xl font-semibold tracking-tight text-stone-900">关联领域</h3>
+                  </div>
                   <ScopeAssociation
                     scopes={scopes}
                     selectedScopeIds={defaultScopeIds}
                     onSelect={setDefaultScopeIds}
+                    hideTitle
                   />
                 </div>
               </>
             )}
 
-            <div className="bg-white rounded-2xl p-6 border border-stone-100 shadow-sm space-y-4">
+            <div className="border-t border-stone-300 pt-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest">时间安排</h3>
+                  <h3 className="text-xl font-semibold tracking-tight text-stone-900">时间安排</h3>
                   <FeatureHint
                     hintId="todo-detail-schedule-types"
                     title="时间安排说明"
