@@ -3,7 +3,7 @@
  * @input Active AI persona, persisted sessions, letters, reminders, memory, and prompt shortcuts
  * @output The AI assistant landing workspace with entry points into chat and assistant tools
  * @pos Component (AI Integration)
- * @description Presents a calm, information-dense AI workspace before the user enters a conversation.
+ * @description Presents an editorial AI workbench before the user enters a conversation.
  */
 import React, { useMemo, useState } from 'react';
 import {
@@ -27,6 +27,7 @@ import { PersonaAvatar } from './AIBackfillChatShared';
 
 interface AIChatHomeTheme {
   shellBg: string;
+  shellLayerBg: string;
   panelBg: string;
   panelBgStrong: string;
   panelBgSoft: string;
@@ -76,6 +77,12 @@ const getLastMessage = (session: AIChatSession) => (
   [...session.messages].reverse().find((message) => message.tone !== 'pending')
 );
 
+const todayLabel = (): string => new Intl.DateTimeFormat('zh-CN', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+}).format(new Date()).replace(/\//g, '.');
+
 export const AIChatHome: React.FC<AIChatHomeProps> = ({
   assistantMemory,
   assistantReminders,
@@ -101,6 +108,7 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
   const pendingReminders = assistantReminders.filter((reminder) => reminder.status === 'pending');
   const visibleLetters = assistantLetters.slice(0, 2);
   const visibleSessions = sortedSessions.slice(0, 4);
+  const memoryItems = [...assistantMemory.profileMemory, ...assistantMemory.preferenceMemory].slice(0, 3);
   const defaultShortcuts = useMemo(() => [
     { id: 'newspaper', title: '生成小报', text: '小报', icon: FileText },
     { id: 'narrative', title: '生成叙事', text: '叙事', icon: Sparkles }
@@ -123,80 +131,229 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
   };
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.08fr)_minmax(19rem,0.92fr)]">
-          <section className="flex min-h-[15rem] flex-col justify-between rounded-[1.25rem] p-5 sm:p-6" style={{ backgroundColor: theme.panelBg, boxShadow: theme.cardShadowStrong }}>
-            <div>
-              <div className="flex items-center gap-2 text-xs font-medium tracking-[0.08em]" style={{ color: theme.textMuted }}>
-                <MessageCircle size={15} />
-                继续对话
+    <div className="relative min-h-0 flex-1">
+      <div className="h-full min-h-0 overflow-y-auto px-4 pb-36 pt-5 sm:px-8 sm:pb-40 sm:pt-7">
+        <div className="mx-auto max-w-6xl">
+          <header className="border-b pb-4" style={{ borderColor: theme.textPrimary }}>
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.28em]" style={{ color: theme.textMuted }}>
+                  LUMOS / AI DESK
+                </p>
+                <h1 className="mt-2 font-serif text-3xl tracking-[0.02em] sm:text-4xl" style={{ color: theme.textPrimary }}>
+                  今日工作台
+                </h1>
               </div>
-              {latestSession ? (
-                <button type="button" onClick={() => onOpenChat(latestSession.id)} className="mt-5 block w-full text-left">
-                  <p className="truncate font-serif text-2xl" style={{ color: theme.textPrimary }}>{latestSession.title || '最近一次对话'}</p>
-                  <p className="mt-3 line-clamp-2 text-sm leading-6" style={{ color: theme.textSecondary }}>
-                    {getLastMessage(latestSession)?.content || '还没有消息，从这里开始吧。'}
-                  </p>
-                  <p className="mt-4 text-xs" style={{ color: theme.textMuted }}>{formatConversationTime(latestSession.updatedAt)}</p>
-                </button>
-              ) : (
-                <p className="mt-6 text-sm" style={{ color: theme.textMuted }}>还没有对话记录。</p>
-              )}
+              <div className="text-right text-[10px] leading-5 tracking-[0.12em]" style={{ color: theme.textMuted }}>
+                <div>AI EDITION · 01</div>
+                <div>{todayLabel()} · DAILY BRIEF</div>
+              </div>
             </div>
-            <div className="mt-6 flex flex-wrap gap-2">
-              <button type="button" onClick={() => onOpenChat(latestSession?.id)} className="inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium" style={{ backgroundColor: theme.primaryButtonBg, color: theme.primaryButtonText }}>
-                继续对话 <ArrowRight size={15} />
-              </button>
-              <button type="button" onClick={onStartNewSession} className="inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm" style={{ borderColor: theme.panelBorderStrong, color: theme.textSecondary }}>
-                <Plus size={15} /> 新对话
-              </button>
-            </div>
-          </section>
+          </header>
 
-          <section className="rounded-[1.25rem] p-5 sm:p-6" style={{ backgroundColor: theme.panelBgSoft, boxShadow: theme.cardShadow }}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-xs font-medium tracking-[0.08em]" style={{ color: theme.textMuted }}><Mail size={15} /> 来信与小报</div>
-              <button type="button" onClick={onOpenLetters} className="text-xs" style={{ color: theme.textSecondary }}>查看全部 <ChevronRight size={13} className="inline" /></button>
+          <main className="mt-6 space-y-7">
+            <div className="grid gap-7 lg:grid-cols-[minmax(0,1.08fr)_minmax(19rem,0.92fr)]">
+              <section className="border-y py-5 sm:py-6" style={{ borderColor: theme.panelBorder }}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.16em]" style={{ color: theme.textMuted }}>
+                    <span style={{ color: theme.textFaint }}>01</span>
+                    <MessageCircle size={14} />
+                    继续对话
+                  </div>
+                  <span className="text-[10px] tracking-[0.12em]" style={{ color: theme.textFaint }}>LATEST THREAD</span>
+                </div>
+                {latestSession ? (
+                  <button type="button" onClick={() => onOpenChat(latestSession.id)} className="mt-6 block w-full text-left">
+                    <p className="truncate font-serif text-2xl sm:text-[1.7rem]" style={{ color: theme.textPrimary }}>
+                      {latestSession.title || '最近一次对话'}
+                    </p>
+                    <p className="mt-3 line-clamp-2 max-w-2xl text-sm leading-6" style={{ color: theme.textSecondary }}>
+                      {getLastMessage(latestSession)?.content || '还没有消息，从这里开始吧。'}
+                    </p>
+                    <p className="mt-4 text-[11px] tracking-[0.08em]" style={{ color: theme.textMuted }}>
+                      {formatConversationTime(latestSession.updatedAt)}
+                    </p>
+                  </button>
+                ) : (
+                  <p className="mt-6 text-sm" style={{ color: theme.textMuted }}>还没有对话记录。</p>
+                )}
+                <div className="mt-6 flex flex-wrap items-center gap-4">
+                  <button type="button" onClick={() => onOpenChat(latestSession?.id)} className="inline-flex items-center gap-2 border-b pb-1 text-sm font-medium" style={{ borderColor: theme.primaryButtonBg, color: theme.primaryButtonBg }}>
+                    继续对话 <ArrowRight size={15} />
+                  </button>
+                  <button type="button" onClick={onStartNewSession} className="inline-flex items-center gap-2 border-b pb-1 text-sm" style={{ borderColor: theme.panelBorderStrong, color: theme.textSecondary }}>
+                    <Plus size={15} /> 新对话
+                  </button>
+                </div>
+              </section>
+
+              <section className="border-y py-5 sm:py-6" style={{ borderColor: theme.panelBorder }}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.16em]" style={{ color: theme.textMuted }}>
+                    <span style={{ color: theme.textFaint }}>02</span>
+                    <Mail size={14} />
+                    来信与小报
+                  </div>
+                  <button type="button" onClick={onOpenLetters} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>
+                    查看全部 <ChevronRight size={13} />
+                  </button>
+                </div>
+                <div className="relative mt-5 min-h-[9.5rem] pr-2">
+                  {visibleLetters.length === 0 ? (
+                    <div className="flex h-32 items-center justify-center text-sm" style={{ color: theme.textMuted }}>暂时没有新的来信</div>
+                  ) : visibleLetters.map((letter, index) => (
+                    <button
+                      key={letter.id}
+                      type="button"
+                      onClick={() => onOpenLetter(letter.id)}
+                      className="absolute left-1 right-0 rounded-[0.65rem] p-4 text-left transition-transform hover:-translate-y-1"
+                      style={{
+                        top: `${index * 0.7}rem`,
+                        zIndex: visibleLetters.length - index,
+                        backgroundColor: theme.panelBg,
+                        boxShadow: theme.cardShadowStrong,
+                        transform: `rotate(${index === 0 ? '-1deg' : '1.2deg'})`
+                      }}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="truncate font-serif text-base" style={{ color: theme.textPrimary }}>{letter.title}</span>
+                        <span className="shrink-0 text-[11px]" style={{ color: theme.textMuted }}>{formatShortDate(letter.sentAt)}</span>
+                      </div>
+                      <p className="mt-2 line-clamp-2 text-xs leading-5" style={{ color: theme.textSecondary }}>{letter.preview}</p>
+                    </button>
+                  ))}
+                </div>
+              </section>
             </div>
-            <div className="relative mt-5 min-h-[9.5rem]">
-              {visibleLetters.length === 0 ? (
-                <div className="flex h-32 items-center justify-center text-sm" style={{ color: theme.textMuted }}>暂时没有新的来信</div>
-              ) : visibleLetters.map((letter, index) => (
-                <button key={letter.id} type="button" onClick={() => onOpenLetter(letter.id)} className="absolute left-0 right-0 rounded-[0.95rem] p-4 text-left transition-transform hover:-translate-y-1" style={{ top: `${index * 0.7}rem`, zIndex: visibleLetters.length - index, backgroundColor: theme.panelBg, boxShadow: theme.cardShadowStrong, transform: `rotate(${index === 0 ? '-1deg' : '1.2deg'})` }}>
-                  <div className="flex items-center justify-between gap-3"><span className="truncate font-serif text-base" style={{ color: theme.textPrimary }}>{letter.title}</span><span className="shrink-0 text-[11px]" style={{ color: theme.textMuted }}>{formatShortDate(letter.sentAt)}</span></div>
-                  <p className="mt-2 line-clamp-2 text-xs leading-5" style={{ color: theme.textSecondary }}>{letter.preview}</p>
+
+            <section className="border-y py-4" style={{ borderColor: theme.panelBorder }}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.16em]" style={{ color: theme.textMuted }}>
+                  <span style={{ color: theme.textFaint }}>03</span>
+                  <Zap size={14} />
+                  快捷指令
+                </div>
+                <button type="button" onClick={onOpenSettings} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }} title="设置快捷指令" aria-label="设置快捷指令">
+                  <Settings size={14} /> 设置
                 </button>
-              ))}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
+                {shortcuts.map((shortcut) => {
+                  const Icon = shortcut.icon;
+                  return (
+                    <button
+                      key={shortcut.id}
+                      type="button"
+                      disabled={isLoading}
+                      onClick={() => onSendShortcut(shortcut.text)}
+                      className="group inline-flex min-h-9 items-center gap-2 border-b pb-1 text-left text-sm transition-colors disabled:opacity-50"
+                      style={{ borderColor: theme.panelBorder, color: theme.textPrimary }}
+                    >
+                      <Icon size={15} style={{ color: theme.textSecondary }} />
+                      <span className="truncate">{shortcut.title}</span>
+                      <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" style={{ color: theme.textFaint }} />
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <div className="grid gap-7 lg:grid-cols-2">
+              <section className="border-y py-5" style={{ borderColor: theme.panelBorder }}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.16em]" style={{ color: theme.textMuted }}>
+                    <span style={{ color: theme.textFaint }}>04</span>
+                    <Bell size={14} />
+                    提醒
+                  </div>
+                  <span className="text-[11px]" style={{ color: theme.textMuted }}>{pendingReminders.length} 条</span>
+                </div>
+                {pendingReminders.length ? (
+                  <div className="mt-4 divide-y" style={{ borderColor: theme.panelBorder }}>
+                    {pendingReminders.slice(0, 3).map((reminder) => (
+                      <button key={reminder.id} type="button" onClick={onOpenMemory} className="flex w-full items-start gap-3 py-3 text-left first:pt-0 last:pb-0">
+                        <Clock3 size={15} className="mt-0.5 shrink-0" style={{ color: theme.textSecondary }} />
+                        <span className="min-w-0 flex-1 text-sm leading-5" style={{ color: theme.textPrimary }}>{reminder.text}</span>
+                        <span className="shrink-0 text-[11px]" style={{ color: theme.textMuted }}>{formatShortDate(reminder.dueAt)}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm" style={{ color: theme.textMuted }}>暂无待处理提醒</p>
+                )}
+              </section>
+
+              <section className="border-y py-5 lg:border-l lg:pl-7" style={{ borderColor: theme.panelBorder }}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.16em]" style={{ color: theme.textMuted }}>
+                    <span style={{ color: theme.textFaint }}>05</span>
+                    <Brain size={14} />
+                    长期记忆
+                  </div>
+                  <button type="button" onClick={onOpenMemory} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>
+                    查看全部 <ChevronRight size={13} />
+                  </button>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {memoryItems.map((item) => (
+                    <p key={item} className="line-clamp-1 text-sm leading-6" style={{ color: theme.textPrimary }}>{item}</p>
+                  ))}
+                  {memoryItems.length === 0 && <p className="text-sm" style={{ color: theme.textMuted }}>还没有形成长期记忆</p>}
+                </div>
+              </section>
             </div>
-          </section>
+
+            <section className="border-y py-5" style={{ borderColor: theme.panelBorder }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.16em]" style={{ color: theme.textMuted }}>
+                  <span style={{ color: theme.textFaint }}>06</span>
+                  <History size={14} />
+                  最近对话
+                </div>
+                <button type="button" onClick={onOpenHistory} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>
+                  查看全部 <ChevronRight size={13} />
+                </button>
+              </div>
+              <div className="mt-3 divide-y" style={{ borderColor: theme.panelBorder }}>
+                {visibleSessions.map((session) => (
+                  <button key={session.id} type="button" onClick={() => onOpenChat(session.id)} className="flex w-full items-center gap-3 py-3 text-left first:pt-2">
+                    <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full" style={{ backgroundColor: theme.avatarBg }}>
+                      <PersonaAvatar persona={getSessionPersona(session)} className="rounded-full" iconClassName="text-sm" />
+                    </div>
+                    <span className="min-w-0 flex-1 truncate text-sm" style={{ color: theme.textPrimary }}>{session.title}</span>
+                    <span className="shrink-0 text-[11px]" style={{ color: theme.textMuted }}>{formatConversationTime(session.updatedAt)}</span>
+                  </button>
+                ))}
+                {visibleSessions.length === 0 && <p className="py-3 text-sm" style={{ color: theme.textMuted }}>还没有对话记录</p>}
+              </div>
+            </section>
+          </main>
         </div>
+      </div>
 
-        <section className="rounded-[1.25rem] p-5 sm:p-6" style={{ backgroundColor: theme.panelBg, boxShadow: theme.cardShadow }}>
-          <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2 text-xs font-medium tracking-[0.08em]" style={{ color: theme.textMuted }}><Zap size={15} /> 快捷按钮</div><button type="button" onClick={onOpenSettings} className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5" style={{ color: theme.textMuted }} title="设置快捷按钮" aria-label="设置快捷按钮"><Settings size={15} /></button></div>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {shortcuts.map((shortcut) => { const Icon = shortcut.icon; return <button key={shortcut.id} type="button" disabled={isLoading} onClick={() => onSendShortcut(shortcut.text)} className="flex min-h-12 items-center gap-3 rounded-[0.85rem] px-3 text-left transition-colors hover:bg-black/[0.04] disabled:opacity-50" style={{ backgroundColor: theme.panelBgSoft, color: theme.textPrimary }}><Icon size={16} style={{ color: theme.textSecondary }} /><span className="truncate text-sm">{shortcut.title}</span><ArrowRight size={14} className="ml-auto shrink-0" style={{ color: theme.textFaint }} /></button>; })}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4 pb-4 sm:px-8 sm:pb-5">
+        <div className="pointer-events-auto mx-auto max-w-6xl border-t pt-3" style={{ borderColor: theme.panelBorder, backgroundColor: theme.shellLayerBg }}>
+          <div className="rounded-full border p-1.5" style={{ borderColor: theme.panelBorderStrong, backgroundColor: theme.panelBg }}>
+            <div className="flex items-center gap-2">
+              <MessageCircle size={17} className="ml-3 shrink-0" style={{ color: theme.textMuted }} />
+              <input
+                value={quickChatText}
+                onChange={(event) => setQuickChatText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    sendQuickChat();
+                  }
+                }}
+                placeholder="和 AI 说点什么…"
+                className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-sm outline-none"
+                style={{ color: theme.textPrimary }}
+              />
+              <button type="button" onClick={sendQuickChat} disabled={!quickChatText.trim() || isLoading} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full disabled:opacity-40" style={{ backgroundColor: theme.primaryButtonBg, color: theme.primaryButtonText }} title="发送" aria-label="发送">
+                <ArrowRight size={16} />
+              </button>
+            </div>
           </div>
-        </section>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <section className="rounded-[1.25rem] p-5" style={{ backgroundColor: theme.panelBg, boxShadow: theme.cardShadow }}>
-            <div className="flex items-center justify-between"><div className="flex items-center gap-2 text-xs font-medium tracking-[0.08em]" style={{ color: theme.textMuted }}><Bell size={15} /> 提醒</div><span className="text-xs" style={{ color: theme.textMuted }}>{pendingReminders.length} 条</span></div>
-            {pendingReminders.length ? <div className="mt-4 space-y-2">{pendingReminders.slice(0, 3).map((reminder) => <button key={reminder.id} type="button" onClick={onOpenMemory} className="flex w-full items-start gap-3 text-left"><Clock3 size={15} className="mt-0.5 shrink-0" style={{ color: theme.textSecondary }} /><span className="min-w-0 flex-1 text-sm leading-5" style={{ color: theme.textPrimary }}>{reminder.text}</span><span className="shrink-0 text-[11px]" style={{ color: theme.textMuted }}>{formatShortDate(reminder.dueAt)}</span></button>)}</div> : <p className="mt-4 text-sm" style={{ color: theme.textMuted }}>暂无待处理提醒</p>}
-          </section>
-          <section className="rounded-[1.25rem] p-5" style={{ backgroundColor: theme.panelBg, boxShadow: theme.cardShadow }}>
-            <div className="flex items-center justify-between"><div className="flex items-center gap-2 text-xs font-medium tracking-[0.08em]" style={{ color: theme.textMuted }}><Brain size={15} /> 长期记忆</div><button type="button" onClick={onOpenMemory} className="text-xs" style={{ color: theme.textSecondary }}>查看全部 <ChevronRight size={13} className="inline" /></button></div>
-            <div className="mt-4 space-y-2">{[...assistantMemory.profileMemory, ...assistantMemory.preferenceMemory].slice(0, 3).map((item) => <p key={item} className="line-clamp-1 text-sm" style={{ color: theme.textPrimary }}>{item}</p>)}{assistantMemory.profileMemory.length + assistantMemory.preferenceMemory.length === 0 && <p className="text-sm" style={{ color: theme.textMuted }}>还没有形成长期记忆</p>}</div>
-          </section>
-        </div>
-
-        <section className="rounded-[1.25rem] p-5" style={{ backgroundColor: theme.panelBg, boxShadow: theme.cardShadow }}>
-          <div className="flex items-center justify-between"><div className="flex items-center gap-2 text-xs font-medium tracking-[0.08em]" style={{ color: theme.textMuted }}><History size={15} /> 最近对话</div><button type="button" onClick={onOpenHistory} className="text-xs" style={{ color: theme.textSecondary }}>查看全部 <ChevronRight size={13} className="inline" /></button></div>
-          <div className="mt-3 divide-y" style={{ borderColor: theme.panelBorder }}>{visibleSessions.map((session) => <button key={session.id} type="button" onClick={() => onOpenChat(session.id)} className="flex w-full items-center gap-3 py-3 text-left"><div className="h-8 w-8 shrink-0 overflow-hidden rounded-full" style={{ backgroundColor: theme.avatarBg }}><PersonaAvatar persona={getSessionPersona(session)} className="rounded-full" iconClassName="text-sm" /></div><span className="min-w-0 flex-1 truncate text-sm" style={{ color: theme.textPrimary }}>{session.title}</span><span className="shrink-0 text-[11px]" style={{ color: theme.textMuted }}>{formatConversationTime(session.updatedAt)}</span></button>)}</div>
-        </section>
-
-        <div className="rounded-full border p-1.5" style={{ borderColor: theme.panelBorderStrong, backgroundColor: theme.panelBg }}>
-          <div className="flex items-center gap-2"><MessageCircle size={17} className="ml-3 shrink-0" style={{ color: theme.textMuted }} /><input value={quickChatText} onChange={(event) => setQuickChatText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); sendQuickChat(); } }} placeholder="和 AI 说点什么…" className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-sm outline-none" style={{ color: theme.textPrimary }} /><button type="button" onClick={sendQuickChat} disabled={!quickChatText.trim() || isLoading} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full disabled:opacity-40" style={{ backgroundColor: theme.primaryButtonBg, color: theme.primaryButtonText }} title="发送" aria-label="发送"><ArrowRight size={16} /></button></div>
         </div>
       </div>
     </div>
