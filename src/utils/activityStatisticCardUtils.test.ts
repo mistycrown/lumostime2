@@ -32,4 +32,10 @@ describe('activity statistic cards', () => {
   it('allows note only as a text cloud source', () => {
     expect(getChartTypesForSource({ type: 'note' }, activity().attributes || [])).toEqual(['textCloud']);
   });
+
+  it('exposes chart families that match each attribute shape', () => {
+    const attributes = activity().attributes || [];
+    expect(getChartTypesForSource({ type: 'attribute', attributeId: 'weight' }, attributes)).toEqual(['numberTrend', 'numberArea', 'numberHistogram', 'numberKpi']);
+    expect(getChartTypesForSource({ type: 'attribute', attributeId: 'parts' }, attributes)).toEqual(['choiceBar', 'choiceDonut', 'choiceHeatmap']);
+  });
 });
