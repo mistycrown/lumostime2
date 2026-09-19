@@ -489,7 +489,7 @@ const DonutPreview: React.FC<{ attribute: ActivityAttributeDefinition; logs: Log
 const ChoiceHeatmapPreview: React.FC<{ attribute: ActivityAttributeDefinition; logs: Log[]; mode: StatisticMode; range: RangeKey }> = ({ attribute, logs, mode, range }) => {
   const daily = new Map<string, Map<string, number>>();
   const totals = new Map<string, number>();
-  const colors = ['#b16d4c', '#748b84', '#c39a77', '#8c91a3', '#9d8063', '#bdafa0'];
+  const colors = ['#b16d4c', '#748b84', '#c39a77', '#8c91a3', '#9d8063', '#bdafa0', '#9a6f58', '#687b86'];
   logs.forEach((log) => {
     const day = getLocalDateKey(log.startTime);
     const dayMap = daily.get(day) || new Map<string, number>();
