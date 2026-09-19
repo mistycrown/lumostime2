@@ -4,7 +4,7 @@
  * @output Regression coverage for default card migration and source capabilities.
  */
 import { describe, expect, it } from 'vitest';
-import { Activity } from '../types';
+import { Activity, ActivityStatisticCard } from '../types';
 import { ensureStatisticCards, getChartTypesForSource, normalizeStatisticCards } from './activityStatisticCardUtils';
 
 const activity = (statisticCards?: Activity['statisticCards']): Activity => ({
@@ -12,21 +12,53 @@ const activity = (statisticCards?: Activity['statisticCards']): Activity => ({
   attributes: [
     { id: 'weight', name: '体重', type: 'number', order: 0, createdAt: 1, updatedAt: 1 },
     { id: 'parts', name: '锻炼部位', type: 'multi', options: [{ id: 'leg', label: '腿' }], order: 1, createdAt: 1, updatedAt: 1 },
-    { id: 'memo', name: '感受', type: 'text', order: 2, createdAt: 1, updatedAt: 1 }
+    { id: 'kind', name: '训练类型', type: 'single', options: [{ id: 'run', label: '跑步' }], order: 2, createdAt: 1, updatedAt: 1 },
+    { id: 'memo', name: '感受', type: 'text', order: 3, createdAt: 1, updatedAt: 1 }
   ]
 });
 
 describe('activity statistic cards', () => {
   it('creates one default card per attribute and is repeatable with persisted cards', () => {
     const first = ensureStatisticCards(activity());
-    expect(first.map((card) => card.chartType)).toEqual(['numberTrend', 'choiceBar', 'textCloud']);
+    expect(first.map((card) => card.chartType)).toEqual(['numberTrend', 'choiceBar', 'choiceBar', 'textCloud']);
+    expect(ensureStatisticCards(activity([]))).toHaveLength(4);
     expect(ensureStatisticCards(activity(first)).map((card) => card.id)).toEqual(first.map((card) => card.id));
   });
 
   it('does not recreate a card that the user deleted', () => {
     const first = ensureStatisticCards(activity());
     const remaining = first.slice(1);
-    expect(normalizeStatisticCards(activity(remaining))).toHaveLength(2);
+    expect(normalizeStatisticCards(activity(remaining))).toHaveLength(3);
+  });
+
+  it('uses a bounded default range and migrates legacy all-time cards', () => {
+    const first = ensureStatisticCards(activity());
+    expect(first.every((card) => card.range === '30d')).toBe(true);
+    expect(normalizeStatisticCards(activity([{ ...first[0], range: 'all' }]))[0]?.range).toBe('30d');
+  });
+
+  it('keeps heatmap metrics on counts', () => {
+    const heatmapCard: ActivityStatisticCard = {
+      id: 'heatmap', source: { type: 'attribute', attributeId: 'parts' }, chartType: 'choiceHeatmap', range: '30d', metric: 'duration', order: 0
+    };
+    expect(normalizeStatisticCards(activity([heatmapCard]))[0]?.metric).toBe('count');
+  });
+
+  it('offers Lieflat-inspired numeric charts and rejects donut charts for multi-choice data', () => {
+    const attributes = activity().attributes || [];
+    expect(getChartTypesForSource({ type: 'attribute', attributeId: 'weight' }, attributes)).toEqual([
+      'numberTrend', 'numberArea', 'numberHistogram', 'numberBox', 'numberCalendar', 'numberKpi'
+    ]);
+    expect(getChartTypesForSource({ type: 'attribute', attributeId: 'kind' }, attributes)).toEqual(['choiceBar', 'choiceDonut', 'choiceHeatmap']);
+    expect(getChartTypesForSource({ type: 'attribute', attributeId: 'parts' }, attributes)).toEqual(['choiceBar', 'choiceHeatmap']);
+    const legacyMultiDonut: ActivityStatisticCard = {
+      id: 'legacy-donut', source: { type: 'attribute', attributeId: 'parts' }, chartType: 'choiceDonut', range: '30d', metric: 'count', order: 0
+    };
+    expect(normalizeStatisticCards(activity([legacyMultiDonut]))[0]?.chartType).toBe('choiceBar');
+    const calendarCard: ActivityStatisticCard = {
+      id: 'calendar', source: { type: 'attribute', attributeId: 'weight' }, chartType: 'numberCalendar', range: '7d', metric: 'value', order: 0
+    };
+    expect(normalizeStatisticCards(activity([calendarCard]))[0]?.range).toBe('year');
   });
 
   it('allows note only as a text cloud source', () => {
@@ -35,7 +67,7 @@ describe('activity statistic cards', () => {
 
   it('exposes chart families that match each attribute shape', () => {
     const attributes = activity().attributes || [];
-    expect(getChartTypesForSource({ type: 'attribute', attributeId: 'weight' }, attributes)).toEqual(['numberTrend', 'numberArea', 'numberHistogram', 'numberKpi']);
-    expect(getChartTypesForSource({ type: 'attribute', attributeId: 'parts' }, attributes)).toEqual(['choiceBar', 'choiceDonut', 'choiceHeatmap']);
+    expect(getChartTypesForSource({ type: 'attribute', attributeId: 'weight' }, attributes)).toEqual(['numberTrend', 'numberArea', 'numberHistogram', 'numberBox', 'numberCalendar', 'numberKpi']);
+    expect(getChartTypesForSource({ type: 'attribute', attributeId: 'parts' }, attributes)).toEqual(['choiceBar', 'choiceHeatmap']);
   });
 });
