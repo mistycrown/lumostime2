@@ -9,7 +9,7 @@
  * @updated 2026-09-12: Keeps short Chinese and English text terms in the ranked text statistics instead of showing an empty state.
  * @updated 2026-09-18: Restricts each statistic card to its own attribute values so unrelated fields are not reported as deleted attributes.
  * @updated 2026-09-18: Unifies new-card creation with the existing card editor and removes the persistent add form.
- * @updated 2026-09-19: Adds Lieflat-inspired numeric box and calendar charts, direct short-range heatmap composition rows, and ranked option rows.
+ * @updated 2026-09-19: Adds Lieflat-inspired numeric box and calendar charts, direct short-range heatmap composition rows, ranked option rows, and countable tick rows.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
@@ -418,9 +418,10 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                     const option = options.get(optionId);
                     const color = index === 0 ? statisticAccent : index < 3 ? accentMuted : '#d6d3d1';
                     const relativeWidth = metric > 0 ? Math.max((metric / maxOptionMetric) * 100, 3) : 0;
+                    const tickCount = Math.max(0, Math.round(metric));
                     return <div key={optionId}>
                       <div className="mb-1 flex items-center justify-between gap-3 text-xs"><span className="flex min-w-0 items-center gap-2 text-stone-600"><span className="w-5 shrink-0 font-mono text-[10px] text-stone-400">{String(index + 1).padStart(2, '0')}</span><span className="truncate">{option?.label || MISSING_OPTION}</span></span><span className="shrink-0 font-mono text-stone-400">{statisticMode === 'duration' ? formatDuration(metric) : metric}</span></div>
-                      <div className="h-2 overflow-hidden rounded-full bg-stone-100" aria-label={`${option?.label || MISSING_OPTION} 相对排行条`}><div className="h-full rounded-full transition-all" style={{ width: `${relativeWidth}%`, backgroundColor: color, opacity: Math.max(0.55, 1 - index * 0.12) }} /></div>
+                      {statisticMode === 'duration' ? <div className="h-2 overflow-hidden rounded-full bg-stone-100" aria-label={`${option?.label || MISSING_OPTION} 相对时长条`}><div className="h-full rounded-full transition-all" style={{ width: `${relativeWidth}%`, backgroundColor: color, opacity: Math.max(0.55, 1 - index * 0.12) }} /></div> : <div className="flex h-4 items-end border-b border-stone-200" aria-label={`${option?.label || MISSING_OPTION} ${tickCount} 次，每个刻度代表一次选择`}>{Array.from({ length: tickCount }, (_, tickIndex) => <span key={tickIndex} className="relative flex h-full flex-1 items-end justify-center"><span className="h-2 w-px rounded-full" style={{ backgroundColor: color, opacity: Math.max(0.55, 1 - index * 0.12) }} />{tickIndex % 5 === 4 && <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-stone-300" />}</span>)}</div>}
                     </div>;
                   })}
                 </div>
