@@ -4,6 +4,7 @@
  * @output Normalized card settings, default cards, and chart capability helpers.
  * @pos Utility (Activity Statistics)
  * @description Keeps per-activity statistic card configuration backward-compatible and type-safe.
+ * @updated 2026-09-19: Adds numeric box/calendar chart capabilities and normalizes multi-choice donut cards.
  */
 import {
   Activity,
@@ -17,7 +18,7 @@ import {
 
 const RANGES: ActivityStatisticRange[] = ['all', '7d', '30d', 'year'];
 const METRICS: ActivityStatisticMetric[] = ['value', 'count', 'duration', 'average', 'sum'];
-const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberTrend', 'numberArea', 'numberHistogram', 'numberKpi', 'choiceBar', 'choiceDonut', 'choiceHeatmap'];
+const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberTrend', 'numberArea', 'numberHistogram', 'numberBox', 'numberCalendar', 'numberKpi', 'choiceBar', 'choiceDonut', 'choiceHeatmap'];
 
 export const getDefaultChartType = (type: ActivityAttributeDefinition['type']): ActivityStatisticCardType => {
   if (type === 'text') return 'textCloud';
@@ -30,8 +31,9 @@ export const getChartTypesForSource = (source: ActivityStatisticCardSource, attr
   const attribute = attributes.find((item) => item.id === source.attributeId);
   if (!attribute) return [];
   if (attribute.type === 'text') return ['textCloud'];
-  if (attribute.type === 'number') return ['numberTrend', 'numberArea', 'numberHistogram', 'numberKpi'];
-  return ['choiceBar', 'choiceDonut', 'choiceHeatmap'];
+  if (attribute.type === 'number') return ['numberTrend', 'numberArea', 'numberHistogram', 'numberBox', 'numberCalendar', 'numberKpi'];
+  if (attribute.type === 'single') return ['choiceBar', 'choiceDonut', 'choiceHeatmap'];
+  return ['choiceBar', 'choiceHeatmap'];
 };
 
 const isCardSource = (value: unknown): value is ActivityStatisticCardSource => {
@@ -54,16 +56,24 @@ const normalizeCard = (raw: unknown, index: number, attributes: ActivityAttribut
   const item = raw as Record<string, unknown>;
   const source = normalizeSource(item.source ?? item);
   if (!source) return null;
-  const chartType = CARD_TYPES.includes(item.chartType as ActivityStatisticCardType)
+  const rawChartType = CARD_TYPES.includes(item.chartType as ActivityStatisticCardType)
     ? item.chartType as ActivityStatisticCardType
     : null;
-  if (!chartType || !getChartTypesForSource(source, attributes).includes(chartType)) return null;
-  const range = RANGES.includes(item.range as ActivityStatisticRange) ? item.range as ActivityStatisticRange : 'all';
-  const metric = METRICS.includes(item.metric as ActivityStatisticMetric) ? item.metric as ActivityStatisticMetric : 'count';
+  if (!rawChartType) return null;
   const sourceAttribute = source.type === 'attribute' ? attributes.find((attribute) => attribute.id === source.attributeId) : undefined;
+  const allowedTypes = getChartTypesForSource(source, attributes);
+  const chartType = rawChartType === 'choiceDonut' && sourceAttribute?.type === 'multi'
+    ? 'choiceBar'
+    : rawChartType;
+  if (!allowedTypes.includes(chartType)) return null;
+  const rawRange = RANGES.includes(item.range as ActivityStatisticRange) ? item.range as ActivityStatisticRange : '30d';
+  const range = chartType === 'numberCalendar' ? 'year' : rawRange === 'all' ? '30d' : rawRange;
+  const metric = METRICS.includes(item.metric as ActivityStatisticMetric) ? item.metric as ActivityStatisticMetric : 'count';
   const normalizedMetric = source.type === 'attribute' && sourceAttribute?.type === 'number'
     ? (chartType === 'numberKpi' ? (metric === 'average' || metric === 'sum' ? metric : 'average') : 'value')
-    : source.type === 'note' || sourceAttribute?.type === 'text'
+    : chartType === 'choiceHeatmap'
+      ? 'count'
+      : source.type === 'note' || sourceAttribute?.type === 'text'
       ? 'count'
       : metric === 'duration' ? 'duration' : 'count';
   return {
@@ -85,7 +95,7 @@ export const createDefaultStatisticCard = (attribute: ActivityAttributeDefinitio
   id: crypto.randomUUID(),
   source: { type: 'attribute', attributeId: attribute.id },
   chartType: getDefaultChartType(attribute.type),
-  range: 'all',
+  range: '30d',
   metric: attribute.type === 'number' ? 'value' : 'count',
   order
 });
@@ -108,6 +118,8 @@ export const getStatisticCardLabel = (card: ActivityStatisticCard, attributes: A
     numberTrend: '数值趋势',
     numberArea: '数值面积趋势',
     numberHistogram: '数值分布',
+    numberBox: '数值箱线图',
+    numberCalendar: '数值日历',
     numberKpi: '数值概览',
     choiceBar: '选项分布',
     choiceDonut: '选项环形图',

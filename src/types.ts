@@ -2,6 +2,7 @@
  * @file types.ts
  * @updated 2026-09-15: Added structured Activity keyword records with source and color metadata.
  * @updated 2026-09-17: Added activity statistic card sources and per-card chart configuration.
+ * @updated 2026-09-19: Added numeric box and calendar statistic card types.
  * @updated 2026-09-12: Added optional complete display expressions for app-awareness activity options.
  * @updated 2026-09-03: Added an optional keyword-source marker to Activity choice attributes.
  * @updated 2026-08-31: Added optional units and single-choice display conditions to Activity attributes.
@@ -91,7 +92,7 @@ export type ActivityAttributeValue =
   | { attributeId: string; optionId: string }
   | { attributeId: string; optionIds: string[] };
 
-export type ActivityStatisticCardType = 'textCloud' | 'numberTrend' | 'numberArea' | 'numberHistogram' | 'numberKpi' | 'choiceBar' | 'choiceDonut' | 'choiceHeatmap';
+export type ActivityStatisticCardType = 'textCloud' | 'numberTrend' | 'numberArea' | 'numberHistogram' | 'numberBox' | 'numberCalendar' | 'numberKpi' | 'choiceBar' | 'choiceDonut' | 'choiceHeatmap';
 export type ActivityStatisticRange = 'all' | '7d' | '30d' | 'year';
 export type ActivityStatisticMetric = 'value' | 'count' | 'duration' | 'average' | 'sum';
 
