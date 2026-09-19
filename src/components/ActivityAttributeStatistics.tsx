@@ -255,12 +255,50 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
               }));
               const trend: TrendPoint[] = [...trendMap.entries()].sort((left, right) => left[0].localeCompare(right[0])).slice(-14).map(([key, value]) => ({ key, value }));
               const trendMax = Math.max(...trend.map((point) => point.value), 1);
+              const histogramMin = Math.min(...numbers);
+              const histogramMax = Math.max(...numbers);
+              const histogramBinCount = Math.min(8, Math.max(3, Math.ceil(Math.sqrt(numbers.length))));
+              const histogramWidth = histogramMax - histogramMin || 1;
+              const histogramBins = Array.from({ length: histogramBinCount }, (_, index) => {
+                const start = histogramMin + (index / histogramBinCount) * histogramWidth;
+                const end = histogramMin + ((index + 1) / histogramBinCount) * histogramWidth;
+                return { start, end, count: numbers.filter((value) => index === histogramBinCount - 1 ? value >= start && value <= histogramMax : value >= start && value < end).length };
+              });
+              const histogramMaxCount = Math.max(...histogramBins.map((bin) => bin.count), 1);
               const chartWidth = 320;
               const chartHeight = 96;
               const chartBottom = 86;
               const getChartX = (index: number) => trend.length === 1 ? chartWidth / 2 : (index / (trend.length - 1)) * chartWidth;
               const getChartY = (value: number) => chartBottom - (value / trendMax) * 68;
               const points = trend.map((point, index) => `${getChartX(index)},${getChartY(point.value)}`).join(' ');
+              const areaPoints = `${points} ${trend.length ? `${getChartX(trend.length - 1)},${chartBottom} 0,${chartBottom}` : ''}`;
+              if (chartVariant === 'numberHistogram') {
+                return (
+                  <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '数值分布'}`} count={`${numbers.length} 条已填写`}>
+                    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-stone-200 bg-stone-200 sm:grid-cols-4">
+                      {[
+                        ['合计', `${formatNumber(sum)}${attribute.unit ? ` ${attribute.unit}` : ''}`],
+                        ['平均', `${formatNumber(sum / numbers.length)}${attribute.unit ? ` ${attribute.unit}` : ''}`],
+                        ['最小', `${formatNumber(histogramMin)}${attribute.unit ? ` ${attribute.unit}` : ''}`],
+                        ['最大', `${formatNumber(histogramMax)}${attribute.unit ? ` ${attribute.unit}` : ''}`]
+                      ].map(([label, value]) => <div key={label} className="bg-white px-3 py-3"><div className="text-[10px] text-stone-400">{label}</div><div className="mt-1 font-mono text-base" style={{ color: statisticAccent }}>{value}</div></div>)}
+                    </div>
+                    <div className="mt-5 rounded-xl border border-stone-200 bg-white p-3">
+                      <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-stone-400"><span>数值分布</span><span>{histogramBinCount} 个区间</span></div>
+                      <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="aspect-[10/3] w-full overflow-visible" role="img" aria-label={`${attribute.name} 数值分布`}>
+                        <line x1="0" y1={chartBottom} x2={chartWidth} y2={chartBottom} stroke="#e7e5e4" strokeWidth="1" />
+                        {histogramBins.map((bin, index) => {
+                          const barWidth = chartWidth / histogramBinCount - 4;
+                          const x = index * (chartWidth / histogramBinCount) + 2;
+                          const height = (bin.count / histogramMaxCount) * 66;
+                          return <rect key={`${bin.start}-${index}`} x={x} y={chartBottom - height} width={barWidth} height={height} rx="3" fill={statisticAccent} opacity={0.35 + (bin.count / histogramMaxCount) * 0.55} />;
+                        })}
+                      </svg>
+                      <div className="mt-1 flex justify-between text-[10px] text-stone-400"><span>{formatNumber(histogramMin)}</span><span>{formatNumber(histogramMax)}</span></div>
+                    </div>
+                  </AttributeSection>
+                );
+              }
               return (
                 <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '数值'}`} count={`${numbers.length} 条已填写`}>
                   <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-stone-200 bg-stone-200 sm:grid-cols-4">
@@ -276,6 +314,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                       <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-stone-400"><span>日趋势</span><span>{trend.length} 个有数据日</span></div>
                       <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="aspect-[10/3] w-full overflow-visible">
                         <line x1="0" y1={chartBottom} x2={chartWidth} y2={chartBottom} stroke="#e7e5e4" strokeWidth="1" />
+                        {chartVariant === 'numberArea' && trend.length > 1 && <polygon points={areaPoints} fill={accentSoft} />}
                         {trend.length > 1 && <polyline points={points} fill="none" stroke={statisticAccent} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
                         {trend.map((point, index) => <circle key={point.key} cx={getChartX(index)} cy={getChartY(point.value)} r="3.5" fill={statisticAccent} vectorEffect="non-scaling-stroke" />)}
                       </svg>
@@ -323,7 +362,17 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
 };
 
 const CARD_TYPE_LABELS: Record<ActivityStatisticCardType, string> = {
-  textCloud: '词云', numberTrend: '数值趋势', numberKpi: '数值概览', choiceBar: '选项分布', choiceDonut: '选项环形图'
+  textCloud: '词云', numberTrend: '数值趋势', numberArea: '面积趋势', numberHistogram: '数值分布', numberKpi: '数值概览', choiceBar: '选项分布', choiceDonut: '选项环形图', choiceHeatmap: '选项热力图'
+};
+const CARD_TYPE_ICONS: Record<ActivityStatisticCardType, React.ComponentType<{ size?: number }>> = {
+  textCloud: Type,
+  numberTrend: LineChart,
+  numberArea: LineChart,
+  numberHistogram: BarChart3,
+  numberKpi: Table2,
+  choiceBar: BarChart3,
+  choiceDonut: PieChart,
+  choiceHeatmap: Table2
 };
 const RANGE_DAYS: Record<string, number> = { '7d': 7, '30d': 30 };
 
@@ -361,6 +410,51 @@ const DonutPreview: React.FC<{ attribute: ActivityAttributeDefinition; logs: Log
   const colors = ['#b16d4c', '#748b84', '#c39a77', '#8c91a3', '#9d8063', '#bdafa0'];
   let angle = 0;
   return <div className="grid items-center gap-5 sm:grid-cols-[150px_1fr]"><div className="relative mx-auto h-36 w-36"><div className="h-full w-full rounded-full" style={{ background: `conic-gradient(${items.map((item, index) => { const start = angle; angle += item.percentage; return `${colors[index % colors.length]} ${start}% ${angle}%`; }).join(', ')})` }} /><div className="absolute inset-[25%] flex flex-col items-center justify-center rounded-full bg-[#fcfaf6]"><span className="font-serif text-xl text-[#4a3b30]">{mode === 'duration' ? formatDuration(total) : Math.round(total)}</span><span className="text-[10px] text-[#a08f7d]">{mode === 'duration' ? '总时长' : '总次数'}</span></div></div><div className="space-y-2">{items.map((item, index) => <div key={item.label} className="flex items-center justify-between gap-2 text-xs"><span className="flex min-w-0 items-center gap-2 text-[#67594d]"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: colors[index % colors.length] }} /><span className="truncate">{item.label}</span></span><span className="shrink-0 font-mono text-[#927e6c]">{mode === 'duration' ? formatDuration(item.value) : item.value}</span></div>)}</div></div>;
+};
+
+const ChoiceHeatmapPreview: React.FC<{ attribute: ActivityAttributeDefinition; logs: Log[]; mode: StatisticMode }> = ({ attribute, logs, mode }) => {
+  const daily = new Map<string, Map<string, number>>();
+  const totals = new Map<string, number>();
+  logs.forEach((log) => {
+    const day = getLocalDateKey(log.startTime);
+    const dayMap = daily.get(day) || new Map<string, number>();
+    (log.attributeValues || []).filter((value) => value.attributeId === attribute.id).forEach((value) => {
+      const metric = mode === 'duration' ? getLogDurationSeconds(log) : 1;
+      const ids = 'optionId' in value ? [value.optionId] : 'optionIds' in value ? value.optionIds : [];
+      ids.forEach((id) => {
+        dayMap.set(id, (dayMap.get(id) || 0) + metric);
+        totals.set(id, (totals.get(id) || 0) + metric);
+      });
+    });
+    daily.set(day, dayMap);
+  });
+  const labels = new Map((attribute.options || []).map((option) => [option.id, option.label]));
+  const days = [...daily.keys()].sort().slice(-14);
+  const optionIds = [...totals.entries()].sort((left, right) => right[1] - left[1]).slice(0, 8).map(([id]) => id);
+  const maxValue = Math.max(...[...daily.values()].flatMap((day) => optionIds.map((id) => day.get(id) || 0)), 1);
+  if (days.length === 0 || optionIds.length === 0) return <p className="py-8 text-center text-xs text-[#aa9b8b]">当前范围暂无选项数据</p>;
+  return (
+    <div className="rounded-xl border border-[#e5dbcf] bg-[#fffdfa] p-3">
+      <div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]"><span>日期 × 选项</span><span>{days.length} 天</span></div>
+      <div className="overflow-x-auto pb-1">
+        <div className="min-w-[460px] space-y-2">
+          <div className="grid gap-1" style={{ gridTemplateColumns: `minmax(88px, 1fr) repeat(${days.length}, minmax(20px, 1fr))` }}>
+            <span />
+            {days.map((day) => <span key={day} className="text-center text-[9px] text-[#b09e8c]">{getDateLabel(day)}</span>)}
+          </div>
+          {optionIds.map((optionId) => (
+            <div key={optionId} className="grid items-center gap-1" style={{ gridTemplateColumns: `minmax(88px, 1fr) repeat(${days.length}, minmax(20px, 1fr))` }}>
+              <span className="truncate pr-2 text-[11px] text-[#67594d]">{labels.get(optionId) || MISSING_OPTION}</span>
+              {days.map((day) => {
+                const value = daily.get(day)?.get(optionId) || 0;
+                return <span key={`${optionId}-${day}`} title={`${labels.get(optionId) || MISSING_OPTION} · ${getDateLabel(day)} · ${mode === 'duration' ? formatDuration(value) : value}`} className="aspect-square rounded-[4px] border border-[#eadfd4]" style={{ backgroundColor: value ? statisticAccent : '#f7f2ec', opacity: value ? 0.25 + (value / maxValue) * 0.7 : 1 }} />;
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, onChange }) => {
@@ -408,13 +502,13 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     updateSelectedCard({
       source: next.source,
       chartType: nextType || 'textCloud',
-      metric: nextType === 'numberTrend' ? 'value' : nextType === 'choiceBar' || nextType === 'choiceDonut' ? selectedCard.metric === 'duration' ? 'duration' : 'count' : 'count'
+      metric: nextType === 'numberTrend' || nextType === 'numberArea' || nextType === 'numberHistogram' ? 'value' : nextType === 'choiceBar' || nextType === 'choiceDonut' || nextType === 'choiceHeatmap' ? selectedCard.metric === 'duration' ? 'duration' : 'count' : 'count'
     });
   };
 
   const changeExistingType = (type: ActivityStatisticCardType) => {
     if (!selectedCard) return;
-    updateSelectedCard({ chartType: type, metric: type === 'numberTrend' ? 'value' : type === 'choiceBar' || type === 'choiceDonut' ? selectedCard.metric === 'duration' ? 'duration' : 'count' : 'count' });
+    updateSelectedCard({ chartType: type, metric: type === 'numberTrend' || type === 'numberArea' || type === 'numberHistogram' ? 'value' : type === 'choiceBar' || type === 'choiceDonut' || type === 'choiceHeatmap' ? selectedCard.metric === 'duration' ? 'duration' : 'count' : 'count' });
   };
 
   const renderCard = (card: ActivityStatisticCard) => {
@@ -428,15 +522,18 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     if (!attribute) return null;
     const attributeLogs = filterLogsForAttribute(cardLogs, attribute.id);
     if (card.chartType === 'choiceDonut') {
-      return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE DONUT / {attribute.type === 'single' ? '单选' : '多选'}</div></div></div><DonutPreview attribute={attribute} logs={attributeLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} /></section>;
+       return <section key={card.id} className="border-l-2 border-[#b16d4c]/35 py-7 pl-4 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE DONUT / {attribute.type === 'single' ? '单选' : '多选'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{card.range === 'all' ? 'ALL' : card.range.toUpperCase()}</span></div><DonutPreview attribute={attribute} logs={attributeLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} /></section>;
     }
-    return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [attribute] }} logs={attributeLogs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} onChange={undefined} /></section>;
+    if (card.chartType === 'choiceHeatmap') {
+       return <section key={card.id} className="border-l-2 border-[#b16d4c]/35 py-7 pl-4 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE HEATMAP / {attribute.type === 'single' ? '单选' : '多选'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{card.range === 'all' ? 'ALL' : card.range.toUpperCase()}</span></div><ChoiceHeatmapPreview attribute={attribute} logs={attributeLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} /></section>;
+    }
+     return <section key={card.id} className="border-l-2 border-[#b16d4c]/35 py-7 pl-4 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [attribute] }} logs={attributeLogs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} onChange={undefined} /></section>;
   };
 
   const addCard = () => {
     const source = sourceChoices[0]?.source || { type: 'note' as const };
     const chartType = getChartTypesForSource(source, attributes)[0] || 'textCloud';
-    const newCard: ActivityStatisticCard = { id: crypto.randomUUID(), source, chartType, range: 'all', metric: chartType === 'numberTrend' ? 'value' : 'count', order: cards.length };
+    const newCard: ActivityStatisticCard = { id: crypto.randomUUID(), source, chartType, range: 'all', metric: chartType === 'numberTrend' || chartType === 'numberArea' || chartType === 'numberHistogram' ? 'value' : 'count', order: cards.length };
     commit([...cards, newCard]);
     setSelectedCardId(newCard.id);
     setManageOpen(true);
@@ -453,7 +550,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#3b2e24]/25 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setManageOpen(false); }}>
           <div className="max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-[#d8cabb] bg-[#fcfaf6] p-5 shadow-2xl sm:rounded-2xl" role="dialog" aria-modal="true" aria-label="管理统计卡片">
             <div className="mb-5 flex items-center justify-between">
-              <div><h2 className="font-serif text-lg text-[#4a3b30]">管理统计卡片</h2><p className="mt-1 text-xs text-[#a08f7d]">点选卡片后，在下方编辑来源、图表和统计范围</p></div>
+              <div><h2 className="font-serif text-lg text-[#4a3b30]">管理统计卡片</h2></div>
               <div className="flex items-center gap-2">
                 <button type="button" onClick={addCard} title="新增统计卡片" className="inline-flex items-center gap-1.5 rounded-md border border-[#d8cabb] bg-[#fffdfa] px-2.5 py-1.5 text-xs font-medium text-[#77523d] hover:bg-[#f5ebe1]"><Plus size={14} />新增卡片</button>
                 <button type="button" onClick={() => setManageOpen(false)} title="关闭" aria-label="关闭" className="p-1.5 text-[#a08f7d]"><X size={17} /></button>
@@ -474,9 +571,9 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
               <div className="mt-5 border-t border-[#e5dbcf] pt-5">
                 <div className="mb-4 flex items-center justify-between gap-3"><h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8f7f70]">编辑所选卡片</h3><span className="text-[10px] text-[#b09e8c]">#{cards.findIndex((card) => card.id === selectedCard.id) + 1}</span></div>
                 <CustomSelect label="数据来源" value={sourceToKey(selectedCard.source)} options={sourceChoices.map((item) => ({ value: item.key, label: item.label }))} onChange={changeExistingSource} renderDropdownInPortal />
-                <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">图表类型</p><div className="grid grid-cols-2 gap-2">{selectedTypes.map((type) => <button key={type} type="button" onClick={() => changeExistingType(type)} className={`rounded-md border px-3 py-2 text-xs transition-colors ${selectedCard.chartType === type ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70] hover:border-[#c9b6a4]'}`}>{CARD_TYPE_LABELS[type]}</button>)}</div></div>
+                <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">图表类型</p><div className="grid grid-cols-2 gap-2">{selectedTypes.map((type) => { const Icon = CARD_TYPE_ICONS[type]; return <button key={type} type="button" onClick={() => changeExistingType(type)} className={`inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-left text-xs transition-colors ${selectedCard.chartType === type ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70] hover:border-[#c9b6a4]'}`}><Icon size={14} /><span>{CARD_TYPE_LABELS[type]}</span></button>; })}</div></div>
                 <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">时间范围</p><div className="flex flex-wrap gap-1.5">{RANGE_OPTIONS.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ range: option.key })} className={`rounded-md border px-2.5 py-1.5 text-xs ${selectedCard.range === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>
-                {(selectedCard.chartType === 'choiceBar' || selectedCard.chartType === 'choiceDonut') && <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">统计维度</p><div className="flex gap-1.5">{STATISTIC_MODE_OPTIONS.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ metric: option.key })} className={`rounded-md border px-3 py-1.5 text-xs ${selectedCard.metric === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>}
+                {(selectedCard.chartType === 'choiceBar' || selectedCard.chartType === 'choiceDonut' || selectedCard.chartType === 'choiceHeatmap') && <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">统计维度</p><div className="flex gap-1.5">{STATISTIC_MODE_OPTIONS.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ metric: option.key })} className={`rounded-md border px-3 py-1.5 text-xs ${selectedCard.metric === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>}
               </div>
             )}
             <button type="button" onClick={() => commit(ensureStatisticCards({ ...activity, statisticCards: cards }))} className="mt-5 text-xs text-[#9b5c3f] underline-offset-2 hover:underline">恢复默认卡片</button>

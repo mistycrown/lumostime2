@@ -17,7 +17,7 @@ import {
 
 const RANGES: ActivityStatisticRange[] = ['all', '7d', '30d', 'year'];
 const METRICS: ActivityStatisticMetric[] = ['value', 'count', 'duration', 'average', 'sum'];
-const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberTrend', 'numberKpi', 'choiceBar', 'choiceDonut'];
+const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberTrend', 'numberArea', 'numberHistogram', 'numberKpi', 'choiceBar', 'choiceDonut', 'choiceHeatmap'];
 
 export const getDefaultChartType = (type: ActivityAttributeDefinition['type']): ActivityStatisticCardType => {
   if (type === 'text') return 'textCloud';
@@ -30,8 +30,8 @@ export const getChartTypesForSource = (source: ActivityStatisticCardSource, attr
   const attribute = attributes.find((item) => item.id === source.attributeId);
   if (!attribute) return [];
   if (attribute.type === 'text') return ['textCloud'];
-  if (attribute.type === 'number') return ['numberTrend', 'numberKpi'];
-  return ['choiceBar', 'choiceDonut'];
+  if (attribute.type === 'number') return ['numberTrend', 'numberArea', 'numberHistogram', 'numberKpi'];
+  return ['choiceBar', 'choiceDonut', 'choiceHeatmap'];
 };
 
 const isCardSource = (value: unknown): value is ActivityStatisticCardSource => {
@@ -106,9 +106,12 @@ export const getStatisticCardLabel = (card: ActivityStatisticCard, attributes: A
   const labels: Record<ActivityStatisticCardType, string> = {
     textCloud: '词云',
     numberTrend: '数值趋势',
+    numberArea: '数值面积趋势',
+    numberHistogram: '数值分布',
     numberKpi: '数值概览',
     choiceBar: '选项分布',
-    choiceDonut: '选项环形图'
+    choiceDonut: '选项环形图',
+    choiceHeatmap: '选项热力图'
   };
   return `${name} · ${labels[card.chartType]}`;
 };
