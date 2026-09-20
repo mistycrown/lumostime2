@@ -13,12 +13,13 @@
  * @updated 2026-09-20: Replaces numeric trends with Lieflat-inspired histogram stripes and adds count/duration modes to ordinary choice bars.
  * @updated 2026-09-20: Reduces numeric trend area opacity so the line remains the primary visual signal.
  * @updated 2026-09-20: Adds a vertical fade-to-transparent fill for numeric area trends.
+ * @updated 2026-09-20: Adds calendar ranges, tag-duration cards, single-choice treemaps, and layered card editing.
  * @updated 2026-09-20: Preserves parent attribute values while splitting conditional statistic cards.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
 import React, { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, BarChart3, CalendarDays, LineChart, PieChart, Plus, Settings2, Table2, Trash2, Type, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, BarChart3, CalendarDays, LineChart, Palette, PieChart, Plus, Settings2, Table2, Trash2, Type, X } from 'lucide-react';
 import { Activity, ActivityAttributeDefinition, ActivityAttributeOption, ActivityAttributeType, ActivityAttributeValue, ActivityStatisticCard, ActivityStatisticCardSource, ActivityStatisticCardType, ActivityStatisticPaletteId, Log } from '../types';
 import { CustomSelect } from './CustomSelect';
 import { ChartPaletteSelector } from './ChartPaletteSelector';
@@ -35,12 +36,13 @@ import { useSponsorshipUnlocked } from '../hooks/useSponsorshipUnlocked';
 export { getTextTerms } from '../utils/textSegmentation';
 
 type StatisticsAttribute = Pick<ActivityAttributeDefinition, 'id' | 'name' | 'type' | 'options' | 'unit' | 'displayCondition'>;
-type RangeKey = 'all' | '7d' | '30d' | 'year';
+type RangeKey = 'all' | '7d' | '30d' | 'month' | 'year';
 type StatisticMode = 'count' | 'duration';
 
 const RANGE_OPTIONS: Array<{ key: RangeKey; label: string }> = [
   { key: '7d', label: '近 7 天' },
   { key: '30d', label: '近 30 天' },
+  { key: 'month', label: '本月' },
   { key: 'year', label: '本年' }
 ];
 
@@ -75,7 +77,9 @@ const getDateKeysForRange = (range: RangeKey, now = new Date()) => {
   end.setHours(0, 0, 0, 0);
   const start = range === 'year'
     ? new Date(end.getFullYear(), 0, 1)
-    : new Date(end.getTime() - ((range === '7d' ? 7 : 30) - 1) * 24 * 60 * 60 * 1000);
+    : range === 'month'
+      ? new Date(end.getFullYear(), end.getMonth(), 1)
+      : new Date(end.getTime() - ((range === '7d' ? 7 : 30) - 1) * 24 * 60 * 60 * 1000);
   const keys: string[] = [];
   for (const cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) keys.push(getLocalDateKey(cursor.getTime()));
   return keys;
@@ -83,6 +87,7 @@ const getDateKeysForRange = (range: RangeKey, now = new Date()) => {
 
 const getRangeStart = (range: RangeKey, now: Date) => {
   if (range === 'year') return new Date(now.getFullYear(), 0, 1).getTime();
+  if (range === 'month') return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   const days = range === '7d' ? 7 : 30;
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
@@ -101,6 +106,7 @@ interface ActivityAttributeStatisticsProps {
   chartVariant?: ActivityStatisticCardType;
   rangeLabel?: string;
   paletteId?: ActivityStatisticPaletteId;
+  fixedRange?: RangeKey;
 }
 
 interface TrendPoint {
@@ -153,8 +159,8 @@ const AttributeSection: React.FC<{
   </section>
 );
 
-const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, hideToolbar = false, fixedMode, chartVariant, rangeLabel, paletteId }) => {
-  const [range, setRange] = useState<RangeKey>('30d');
+const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, hideToolbar = false, fixedMode, chartVariant, rangeLabel, paletteId, fixedRange }) => {
+  const [range, setRange] = useState<RangeKey>(fixedRange || '30d');
   const [statisticMode, setStatisticMode] = useState<StatisticMode>(fixedMode || 'count');
   const customSequences = useChartPaletteSequences();
   const isSponsorshipUnlocked = useSponsorshipUnlocked();
@@ -299,7 +305,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
               const points = trend.map((point, index) => `${getChartX(index)},${getChartY(point.value)}`).join(' ');
               const areaPoints = `${points} ${trend.length ? `${getChartX(trend.length - 1)},${chartBottom} 0,${chartBottom}` : ''}`;
               if (chartVariant === 'numberCalendar') {
-                const calendarDays = getDateKeysForRange('year');
+                const calendarDays = getDateKeysForRange(range);
                 const dailyValues = new Map<string, number>();
                 attributeLogs.forEach((log) => (log.attributeValues || []).forEach((value) => {
                   if (value.attributeId !== attributeId || !('value' in value) || typeof value.value !== 'number') return;
@@ -309,7 +315,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                 const calendarMax = Math.max(...dailyValues.values(), 1);
                 const calendarMonths = [...new Set(calendarDays.map((day) => day.slice(0, 7)))];
                 return (
-                  <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '全年日历'}`} rangeLabel="本年" count={`${numbers.length} 条已填写`}>
+                  <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '全年日历'}`} rangeLabel={rangeLabel || getRangeLabel(range)} count={`${numbers.length} 条已填写`}>
                     <div className="mt-5 py-1">
                       <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-stone-400"><span>日历热力</span><span>按日合计</span></div>
                       <div className="grid grid-cols-2 gap-x-3 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -317,7 +323,8 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                           const monthDays = calendarDays.filter((day) => day.startsWith(monthKey));
                           const [year, month] = monthKey.split('-').map(Number);
                           const leadingBlanks = new Date(year, month - 1, 1).getDay();
-                          return <div key={monthKey}><div className="mb-1 text-[10px] text-stone-500">{month} 月</div><div className="grid grid-cols-7 gap-0.5">{Array.from({ length: leadingBlanks }).map((_, index) => <span key={`blank-${monthKey}-${index}`} />)}{monthDays.map((day) => { const value = dailyValues.get(day) || 0; return <span key={day} aria-label={`${getDateLabel(day)} · ${formatNumber(value)}${attribute.unit ? ` ${attribute.unit}` : ''}`} className="aspect-square rounded-[2px] border border-stone-200" style={{ backgroundColor: value ? statisticAccent : '#f5f5f4', opacity: value ? 0.3 + (value / calendarMax) * 0.7 : 1 }} />; })}</div></div>;
+                          const monthColor = chartPalette.colors[calendarMonths.indexOf(monthKey) % chartPalette.colors.length] || statisticAccent;
+                          return <div key={monthKey}><div className="mb-1 text-[10px] text-stone-500">{month} 月</div><div className="grid grid-cols-7 gap-0.5">{Array.from({ length: leadingBlanks }).map((_, index) => <span key={`blank-${monthKey}-${index}`} />)}{monthDays.map((day) => { const value = dailyValues.get(day) || 0; return <span key={day} aria-label={`${getDateLabel(day)} · ${formatNumber(value)}${attribute.unit ? ` ${attribute.unit}` : ''}`} className="aspect-square rounded-[2px] border border-stone-200" style={{ backgroundColor: value ? monthColor : '#f5f5f4', opacity: value ? 0.3 + (value / calendarMax) * 0.7 : 1 }} />; })}</div></div>;
                         })}
                       </div>
                     </div>
@@ -365,7 +372,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                     <div className="mt-5 py-1">
                       <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-stone-400"><span>日趋势</span><span>{trend.length} 个有数据日</span></div>
                       <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="aspect-[10/3] w-full overflow-visible">
-                        {chartVariant === 'numberArea' && <defs><linearGradient id={areaGradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={accentSoft} stopOpacity="0.48" /><stop offset="100%" stopColor={accentSoft} stopOpacity="0" /></linearGradient></defs>}
+                        {chartVariant === 'numberArea' && <defs><linearGradient id={areaGradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={statisticAccent} stopOpacity="0.28" /><stop offset="100%" stopColor={statisticAccent} stopOpacity="0" /></linearGradient></defs>}
                         <line x1="0" y1={chartBottom} x2={chartWidth} y2={chartBottom} stroke="#e7e5e4" strokeWidth="1" />
                         {chartVariant === 'numberArea' && trend.length > 1 && <polygon points={areaPoints} fill={`url(#${areaGradientId})`} />}
                         {trend.length > 1 && <polyline points={points} fill="none" stroke={statisticAccent} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
@@ -416,7 +423,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
 };
 
 const CARD_TYPE_LABELS: Record<ActivityStatisticCardType, string> = {
-  textCloud: '词云', numberArea: '面积趋势', numberHistogram: '数值分布', numberCalendar: '数值日历', numberKpi: '数值概览', choiceBar: '选项分布', choiceDonut: '选项环形图', choiceHeatmap: '选项热力图'
+  textCloud: '词云', numberArea: '面积趋势', numberHistogram: '数值分布', numberCalendar: '数值日历', numberKpi: '数值概览', choiceBar: '选项分布', choiceDonut: '选项环形图', choiceHeatmap: '选项热力图', choiceTreemap: '选项矩形图'
 };
 const CARD_TYPE_ICONS: Record<ActivityStatisticCardType, React.ComponentType<{ size?: number }>> = {
   textCloud: Type,
@@ -426,7 +433,8 @@ const CARD_TYPE_ICONS: Record<ActivityStatisticCardType, React.ComponentType<{ s
   numberKpi: Table2,
   choiceBar: BarChart3,
   choiceDonut: PieChart,
-  choiceHeatmap: Table2
+  choiceHeatmap: Table2,
+  choiceTreemap: Table2
 };
 const RANGE_DAYS: Record<string, number> = { '7d': 7, '30d': 30 };
 const getRangeLabel = (range: RangeKey) => RANGE_OPTIONS.find((option) => option.key === range)?.label || '近 30 天';
@@ -435,6 +443,8 @@ const filterLogsByRange = (logs: Log[], range: string) => {
   const now = new Date();
   const start = range === 'year'
     ? new Date(now.getFullYear(), 0, 1).getTime()
+    : range === 'month'
+      ? new Date(now.getFullYear(), now.getMonth(), 1).getTime()
     : (() => { const date = new Date(now); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() - (RANGE_DAYS[range] || 7) + 1); return date.getTime(); })();
   return logs.filter((log) => log.startTime >= start);
 };
@@ -442,6 +452,13 @@ const filterLogsByRange = (logs: Log[], range: string) => {
 const getCardAttribute = (activity: Activity, source: ActivityStatisticCardSource) => source.type === 'attribute'
   ? activity.attributes?.find((attribute) => attribute.id === source.attributeId)
   : undefined;
+
+const createTagDurationLogs = (logs: Log[], attributeId: string): Log[] => logs.map((log) => ({
+  ...log,
+  attributeValues: [{ attributeId, value: getLogDurationSeconds(log) }]
+}));
+
+const TAG_DURATION_ATTRIBUTE: ActivityAttributeDefinition = { id: '__tag-duration__', name: '标签时长', type: 'number', unit: '秒', order: 0, createdAt: 0, updatedAt: 0 };
 
 export const filterLogsForAttribute = (logs: Log[], attributeId: string): Log[] => logs
   .map((log) => {
@@ -475,6 +492,56 @@ const DonutPreview: React.FC<{ attribute: ActivityAttributeDefinition; logs: Log
   if (items.length === 0) return <p className="py-8 text-center text-xs text-[#aa9b8b]">当前范围暂无选项数据</p>;
   let angle = 0;
   return <div className="grid items-center gap-5 sm:grid-cols-[150px_1fr]"><div className="mx-auto w-36"><div className="relative h-36 w-36"><div className="h-full w-full rounded-full" role="img" aria-label={`${attribute.name} 选项占比`} style={{ background: `conic-gradient(${items.map((item, index) => { const start = angle; angle += item.percentage; return `${palette.colors[index % palette.colors.length]} ${start}% ${angle}%`; }).join(', ')})` }} /><div className="absolute inset-[25%] rounded-full bg-[#fcfaf6]" aria-hidden="true" /></div><div className="mt-3 border-t border-[#e5dbcf] pt-2 text-center"><span className="block break-words font-serif text-lg leading-tight text-[#4a3b30]">{mode === 'duration' ? formatDuration(total) : Math.round(total)}</span><span className="mt-0.5 block text-[10px] text-[#a08f7d]">{mode === 'duration' ? '总时长' : '总次数'}</span></div></div><div className="space-y-2">{items.map((item, index) => <div key={item.label} className="flex items-center justify-between gap-2 text-xs"><span className="flex min-w-0 items-center gap-2 text-[#67594d]"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: palette.colors[index % palette.colors.length] }} /><span className="truncate">{item.label}</span></span><span className="shrink-0 font-mono text-[#927e6c]">{mode === 'duration' ? formatDuration(item.value) : item.value}</span></div>)}</div></div>;
+};
+
+interface TreemapRect {
+  id: string;
+  value: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const buildTreemapRects = (items: Array<[string, number]>, x = 0, y = 0, width = 100, height = 100): TreemapRect[] => {
+  if (items.length === 0) return [];
+  if (items.length === 1) return [{ id: items[0][0], value: items[0][1], x, y, width, height }];
+  const total = items.reduce((sum, [, value]) => sum + value, 0);
+  const half = total / 2;
+  let splitIndex = 1;
+  let running = items[0][1];
+  for (let index = 1; index < items.length - 1; index += 1) {
+    const next = running + items[index][1];
+    if (Math.abs(half - next) > Math.abs(half - running)) break;
+    running = next;
+    splitIndex = index + 1;
+  }
+  const left = items.slice(0, splitIndex);
+  const right = items.slice(splitIndex);
+  const leftTotal = left.reduce((sum, [, value]) => sum + value, 0);
+  if (width >= height) {
+    const leftWidth = width * (leftTotal / total);
+    return [...buildTreemapRects(left, x, y, leftWidth, height), ...buildTreemapRects(right, x + leftWidth, y, width - leftWidth, height)];
+  }
+  const leftHeight = height * (leftTotal / total);
+  return [...buildTreemapRects(left, x, y, width, leftHeight), ...buildTreemapRects(right, x, y + leftHeight, width, height - leftHeight)];
+};
+
+const ChoiceTreemapPreview: React.FC<{ attribute: ActivityAttributeDefinition; logs: Log[]; mode: StatisticMode; palette: ChartPalette }> = ({ attribute, logs, mode, palette }) => {
+  const totals = new Map<string, number>();
+  logs.forEach((log) => (log.attributeValues || []).filter((value) => value.attributeId === attribute.id).forEach((value) => {
+    const ids = 'optionId' in value ? [value.optionId] : [];
+    const metric = mode === 'duration' ? getLogDurationSeconds(log) : 1;
+    ids.forEach((id) => totals.set(id, (totals.get(id) || 0) + metric));
+  }));
+  const labels = new Map((attribute.options || []).map((option) => [option.id, option.label]));
+  const items = [...totals.entries()].sort((left, right) => right[1] - left[1]).slice(0, 24);
+  const total = items.reduce((sum, [, value]) => sum + value, 0);
+  if (items.length === 0 || total === 0) return <p className="py-8 text-center text-xs text-[#aa9b8b]">当前范围暂无选项数据</p>;
+  const rects = buildTreemapRects(items);
+  return <div className="relative aspect-[16/9] overflow-hidden border border-[#eadfd4] bg-[#eadfd4]" role="img" aria-label={`${attribute.name} 选项面积分布`}>
+    {rects.map((rect, index) => <div key={rect.id} className="absolute flex items-center justify-center border border-white/70 p-2 text-center text-xs font-medium text-white transition-opacity hover:z-10 hover:opacity-90" style={{ left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.width}%`, height: `${rect.height}%`, backgroundColor: palette.colors[index % palette.colors.length] }} title={`${labels.get(rect.id) || MISSING_OPTION} · ${mode === 'duration' ? formatDuration(rect.value) : rect.value}`}><span className="line-clamp-2 max-w-full break-words">{labels.get(rect.id) || MISSING_OPTION}</span></div>)}
+  </div>;
 };
 
 const ChoiceHeatmapPreview: React.FC<{ attribute: ActivityAttributeDefinition; logs: Log[]; mode: StatisticMode; range: RangeKey; palette: ChartPalette }> = ({ attribute, logs, mode, range, palette }) => {
@@ -518,8 +585,8 @@ const ChoiceHeatmapPreview: React.FC<{ attribute: ActivityAttributeDefinition; l
     const monthKeys = [...new Set(days.map((day) => day.slice(0, 7)))];
     return <div className="py-1"><div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]"><span>选项 × 日期</span><span>本年 · 多选分段显示</span></div><div className="grid grid-cols-3 gap-x-2 gap-y-3 sm:grid-cols-4">{monthKeys.map((monthKey) => { const monthDays = days.filter((day) => day.startsWith(monthKey)); const [year, month] = monthKey.split('-').map(Number); const leadingBlanks = new Date(year, month - 1, 1).getDay(); return <div key={monthKey}><div className="mb-1 text-[10px] text-[#8f7f70]">{month} 月</div><div className="grid grid-cols-7 gap-px">{Array.from({ length: leadingBlanks }).map((_, index) => <span key={`blank-${monthKey}-${index}`} />)}{monthDays.map((day) => { const items = getDayItems(day); const total = items.reduce((sum, [, value]) => sum + value, 0); return <span key={day} aria-label={`${getDateLabel(day)} · ${items.map(([id, amount]) => `${labels.get(id) || MISSING_OPTION} ${mode === 'duration' ? formatDuration(amount) : amount}`).join(' / ') || '无记录'}`} className="aspect-square rounded-[2px] border border-[#eadfd4]" style={{ background: getDayBackground(day), opacity: total ? 0.3 + (Math.min(total, maxValue * optionIds.length) / (maxValue * optionIds.length)) * 0.7 : 1 }} />; })}</div></div>; })}</div>{legend}</div>;
   }
-  const tileGridClass = range === '7d' ? 'grid-cols-7' : 'grid-cols-5 sm:grid-cols-6 lg:grid-cols-10';
-  return <div className="py-1"><div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]"><span>按日构成</span><span>{range === '7d' ? '近 7 天' : '近 30 天'}</span></div><div className={`grid gap-x-2 gap-y-3 ${tileGridClass}`}>{days.map((day) => { const items = getDayItems(day); const total = items.reduce((sum, [, value]) => sum + value, 0); const topItem = items[0]; const dayLabel = `${getDateLabel(day)} · ${items.map(([id, amount]) => `${labels.get(id) || MISSING_OPTION} ${mode === 'duration' ? formatDuration(amount) : amount}`).join(' / ') || '无记录'}`; return <div key={day} aria-label={dayLabel} className="min-w-0 border-b border-[#e5dbcf] pb-2"><div className="flex items-center justify-between gap-1 text-[10px] text-[#8f7f70]"><span className="font-mono">{getDateLabel(day)}</span><span className="font-mono font-medium text-[#67594d]">{total || '-'}</span></div><div className="mt-2 flex h-2 overflow-hidden rounded-full bg-[#f1ebe4]">{items.map(([optionId, value]) => <span key={optionId} className="min-w-[2px]" style={{ width: `${total ? (value / total) * 100 : 0}%`, backgroundColor: getOptionColor(optionId) }} />)}</div><div className="mt-1 truncate text-[9px] leading-tight text-[#a08f7d]">{topItem ? `${labels.get(topItem[0]) || MISSING_OPTION} · ${mode === 'duration' ? formatDuration(topItem[1]) : topItem[1]}` : '无记录'}</div></div>; })}</div>{legend}</div>;
+  const tileGridClass = range === '7d' ? 'grid-cols-7' : range === 'month' ? 'grid-cols-5 sm:grid-cols-7' : 'grid-cols-5 sm:grid-cols-6 lg:grid-cols-10';
+  return <div className="py-1"><div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]"><span>按日构成</span><span>{range === '7d' ? '近 7 天' : range === 'month' ? '本月' : '近 30 天'}</span></div><div className={`grid gap-x-2 gap-y-3 ${tileGridClass}`}>{days.map((day) => { const items = getDayItems(day); const total = items.reduce((sum, [, value]) => sum + value, 0); const labelsText = items.map(([id, amount]) => `${labels.get(id) || MISSING_OPTION} · ${mode === 'duration' ? formatDuration(amount) : amount}`).join(' / ') || '无记录'; return <div key={day} aria-label={`${getDateLabel(day)} · ${labelsText}`} className="min-w-0 border-b border-[#e5dbcf] pb-2"><div className="flex items-center justify-between gap-1 text-[10px] text-[#8f7f70]"><span className="font-mono">{getDateLabel(day)}</span><span className="font-mono font-medium text-[#67594d]">{total || '-'}</span></div><div className="mt-2 flex h-2 overflow-hidden rounded-full bg-[#f1ebe4]">{items.map(([optionId, value]) => <span key={optionId} className="min-w-[2px]" style={{ width: `${total ? (value / total) * 100 : 0}%`, backgroundColor: getOptionColor(optionId) }} />)}</div><div className="mt-1 truncate text-[9px] leading-tight text-[#a08f7d]" title={labelsText}>{labelsText}</div></div>; })}</div>{legend}</div>;
 };
 
 interface ConditionalStatisticCardProps {
@@ -549,6 +616,9 @@ const ConditionalStatisticCard: React.FC<ConditionalStatisticCardProps> = ({ act
     if (card.chartType === 'choiceHeatmap') {
       return <section key={key} className="py-7 first:pt-2">{cardHeading}<ChoiceHeatmapPreview attribute={sliceAttribute} logs={slice.logs} mode="count" range={card.range} palette={chartPalette} /></section>;
     }
+    if (card.chartType === 'choiceTreemap') {
+      return <section key={key} className="py-7 first:pt-2">{cardHeading}<ChoiceTreemapPreview attribute={sliceAttribute} logs={slice.logs} mode="count" palette={chartPalette} /></section>;
+    }
     return <section key={key} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [sliceAttribute] }} logs={slice.logs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} rangeLabel={rangeLabel} paletteId={paletteId} onChange={undefined} /></section>;
   })}</React.Fragment>;
 };
@@ -564,6 +634,8 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
   const activityIdRef = React.useRef(activity.id);
   const [cards, setCards] = useState<ActivityStatisticCard[]>(() => !activity.statisticCards || activity.statisticCards.length === 0 ? ensureStatisticCards(activity) : normalizeStatisticCards(activity));
   const [manageOpen, setManageOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
   const commit = (next: ActivityStatisticCard[]) => {
@@ -586,9 +658,10 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
 
   const sourceChoices = [
     ...attributes.map((attribute) => ({ key: `attribute:${attribute.id}`, source: { type: 'attribute', attributeId: attribute.id } as ActivityStatisticCardSource, label: attribute.name })),
-    { key: 'note', source: { type: 'note' } as ActivityStatisticCardSource, label: '备注' }
+    { key: 'note', source: { type: 'note' } as ActivityStatisticCardSource, label: '备注' },
+    { key: 'tagDuration', source: { type: 'tagDuration' } as ActivityStatisticCardSource, label: '标签时长' }
   ];
-  const sourceToKey = (value: ActivityStatisticCardSource) => value.type === 'note' ? 'note' : `attribute:${value.attributeId}`;
+  const sourceToKey = (value: ActivityStatisticCardSource) => value.type === 'note' ? 'note' : value.type === 'tagDuration' ? 'tagDuration' : `attribute:${value.attributeId}`;
   const selectedCard = cards.find((card) => card.id === selectedCardId) || null;
   const selectedTypes = selectedCard ? getChartTypesForSource(selectedCard.source, attributes) : [];
 
@@ -625,6 +698,10 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
   const renderCard = (card: ActivityStatisticCard) => {
     const cardLogs = filterLogsByRange(logs, card.range);
     const rangeLabel = getRangeLabel(card.range);
+    if (card.source.type === 'tagDuration') {
+      const tagLogs = createTagDurationLogs(cardLogs, TAG_DURATION_ATTRIBUTE.id);
+      return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [TAG_DURATION_ATTRIBUTE] }} logs={tagLogs} hideToolbar chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} onChange={undefined} /></section>;
+    }
     if (card.source.type === 'note') {
       const noteAttribute: ActivityAttributeDefinition = { id: '__note__', name: '备注', type: 'text', order: 0, createdAt: 0, updatedAt: 0 };
       const noteLogs = cardLogs.map((log) => ({ ...log, attributeValues: log.note ? [{ attributeId: noteAttribute.id, value: log.note }] : undefined }));
@@ -651,13 +728,16 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     if (card.chartType === 'choiceHeatmap') {
        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE HEATMAP / {attribute.type === 'single' ? '单选' : '多选'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceHeatmapPreview attribute={attribute} logs={attributeLogs} mode="count" range={card.range} palette={chartPalette} /></section>;
     }
+    if (card.chartType === 'choiceTreemap') {
+      return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE TREEMAP / 单选</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceTreemapPreview attribute={attribute} logs={attributeLogs} mode="count" palette={chartPalette} /></section>;
+    }
      return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [attribute] }} logs={attributeLogs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} rangeLabel={rangeLabel} paletteId={paletteId} onChange={undefined} /></section>;
   };
 
   const addCard = () => {
     const source = sourceChoices[0]?.source || { type: 'note' as const };
     const chartType = getChartTypesForSource(source, attributes)[0] || 'textCloud';
-    const newCard: ActivityStatisticCard = { id: crypto.randomUUID(), source, chartType, range: chartType === 'numberCalendar' ? 'year' : '30d', metric: chartType === 'numberArea' || chartType === 'numberHistogram' || chartType === 'numberCalendar' || chartType === 'numberKpi' ? 'value' : 'count', order: cards.length };
+    const newCard: ActivityStatisticCard = { id: crypto.randomUUID(), source, chartType, range: '30d', metric: chartType === 'numberArea' || chartType === 'numberHistogram' || chartType === 'numberCalendar' || chartType === 'numberKpi' ? 'value' : 'count', order: cards.length };
     commit([...cards, newCard]);
     setSelectedCardId(newCard.id);
     setManageOpen(true);
@@ -667,7 +747,10 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#ddd3c7] pb-4">
         <div><p className="text-[10px] uppercase tracking-[0.2em] text-[#a08f7d]">属性统计</p><p className="mt-1 text-sm text-[#67594d]">{logs.length} 条记录 <span className="text-[#c8b9a9]">/</span> {cards.length} 张卡片</p></div>
-        <button type="button" onClick={() => { setSelectedCardId(cards[0]?.id || null); setManageOpen(true); }} className="inline-flex items-center gap-1.5 rounded-md border border-[#d8cabb] bg-[#fffdfa] px-3 py-2 text-xs font-medium text-[#77523d] shadow-sm hover:bg-[#f5ebe1]"><Settings2 size={14} />管理</button>
+        <div className="flex items-center gap-2">
+          {isSponsorshipUnlocked && <button type="button" onClick={() => setPaletteOpen(true)} title="图表配色" aria-label="图表配色" className="inline-flex items-center gap-1.5 rounded-md border border-[#d8cabb] bg-[#fffdfa] px-3 py-2 text-xs font-medium text-[#77523d] shadow-sm hover:bg-[#f5ebe1]"><Palette size={14} />图表配色</button>}
+          <button type="button" onClick={() => { setSelectedCardId(cards[0]?.id || null); setManageOpen(true); }} className="inline-flex items-center gap-1.5 rounded-md border border-[#d8cabb] bg-[#fffdfa] px-3 py-2 text-xs font-medium text-[#77523d] shadow-sm hover:bg-[#f5ebe1]"><Settings2 size={14} />管理</button>
+        </div>
       </div>
       <div className="divide-y divide-[#d8d0c5]">{cards.map(renderCard)}</div>
       {manageOpen && (
@@ -691,23 +774,13 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
                 </div>
               ))}
             </div>
-            {selectedCard && (
-              <div className="mt-5 border-t border-[#e5dbcf] pt-5">
-                <div className="mb-4 flex items-center justify-between gap-3"><h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8f7f70]">编辑所选卡片</h3><span className="text-[10px] text-[#b09e8c]">#{cards.findIndex((card) => card.id === selectedCard.id) + 1}</span></div>
-                <CustomSelect label="数据来源" value={sourceToKey(selectedCard.source)} options={sourceChoices.map((item) => ({ value: item.key, label: item.label }))} onChange={changeExistingSource} renderDropdownInPortal />
-                <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">图表类型</p><div className="grid grid-cols-2 gap-2">{selectedTypes.map((type) => { const Icon = CARD_TYPE_ICONS[type]; return <button key={type} type="button" onClick={() => changeExistingType(type)} className={`inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-left text-xs transition-colors ${selectedCard.chartType === type ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70] hover:border-[#c9b6a4]'}`}><Icon size={14} /><span>{CARD_TYPE_LABELS[type]}</span></button>; })}</div></div>
-                <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">时间范围</p><div className="flex flex-wrap gap-1.5">{(selectedCard.chartType === 'numberCalendar' ? RANGE_OPTIONS.filter((option) => option.key === 'year') : RANGE_OPTIONS).map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ range: option.key })} className={`rounded-md border px-2.5 py-1.5 text-xs ${selectedCard.range === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>
-                {(selectedCard.chartType === 'choiceBar' || selectedCard.chartType === 'choiceDonut') && <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">统计维度</p><div className="flex gap-1.5">{STATISTIC_MODE_OPTIONS.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ metric: option.key })} className={`rounded-md border px-3 py-1.5 text-xs ${selectedCard.metric === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>}
-              </div>
-            )}
-            <div className="mt-5 border-t border-[#e5dbcf] pt-5">
-              <div className="mb-3 flex items-center justify-between gap-3"><h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8f7f70]">图表配色</h3><span className="text-[10px] text-[#b09e8c]">{chartPalette.label}</span></div>
-              <ChartPaletteSelector value={effectivePaletteId} onChange={updatePalette} customSequences={customSequences} unlocked={isSponsorshipUnlocked} />
-            </div>
+            {selectedCard && <button type="button" onClick={() => setEditorOpen(true)} className="mt-5 w-full border-t border-[#e5dbcf] pt-5 text-left text-xs font-medium text-[#9b5c3f] hover:underline">编辑所选卡片 <span className="ml-1 text-[10px] text-[#b09e8c]">#{cards.findIndex((card) => card.id === selectedCard.id) + 1}</span></button>}
             <button type="button" onClick={() => commit(ensureStatisticCards({ ...activity, statisticCards: cards }))} className="mt-5 text-xs text-[#9b5c3f] underline-offset-2 hover:underline">恢复默认卡片</button>
           </div>
         </div>
       )}
+      {paletteOpen && <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#3b2e24]/35 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setPaletteOpen(false); }}><div className="w-full max-w-xl rounded-t-2xl border border-[#d8cabb] bg-[#fcfaf6] p-5 shadow-2xl sm:rounded-2xl" role="dialog" aria-modal="true" aria-label="图表配色"><div className="mb-5 flex items-center justify-between"><h2 className="font-serif text-lg text-[#4a3b30]">图表配色</h2><button type="button" onClick={() => setPaletteOpen(false)} title="关闭" aria-label="关闭" className="p-1.5 text-[#a08f7d]"><X size={17} /></button></div><ChartPaletteSelector value={effectivePaletteId} onChange={updatePalette} customSequences={customSequences} unlocked={isSponsorshipUnlocked} /></div></div>}
+      {editorOpen && selectedCard && <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#3b2e24]/35 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditorOpen(false); }}><div className="max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-[#d8cabb] bg-[#fcfaf6] p-5 shadow-2xl sm:rounded-2xl" role="dialog" aria-modal="true" aria-label="编辑所选卡片"><div className="mb-5 flex items-center justify-between"><div><h2 className="font-serif text-lg text-[#4a3b30]">编辑所选卡片</h2><span className="text-[10px] text-[#b09e8c]">#{cards.findIndex((card) => card.id === selectedCard.id) + 1}</span></div><button type="button" onClick={() => setEditorOpen(false)} title="关闭" aria-label="关闭" className="p-1.5 text-[#a08f7d]"><X size={17} /></button></div><CustomSelect label="数据来源" value={sourceToKey(selectedCard.source)} options={sourceChoices.map((item) => ({ value: item.key, label: item.label }))} onChange={changeExistingSource} renderDropdownInPortal /><div className="mt-4"><p className="mb-2 text-xs text-[#766657]">图表类型</p><div className="grid grid-cols-2 gap-2">{selectedTypes.map((type) => { const Icon = CARD_TYPE_ICONS[type]; return <button key={type} type="button" onClick={() => changeExistingType(type)} className={`inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-left text-xs transition-colors ${selectedCard.chartType === type ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70] hover:border-[#c9b6a4]'}`}><Icon size={14} /><span>{CARD_TYPE_LABELS[type]}</span></button>; })}</div></div><div className="mt-4"><p className="mb-2 text-xs text-[#766657]">时间范围</p><div className="flex flex-wrap gap-1.5">{RANGE_OPTIONS.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ range: option.key })} className={`rounded-md border px-2.5 py-1.5 text-xs ${selectedCard.range === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>{(selectedCard.chartType === 'choiceBar' || selectedCard.chartType === 'choiceDonut') && <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">统计维度</p><div className="flex gap-1.5">{STATISTIC_MODE_OPTIONS.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ metric: option.key })} className={`rounded-md border px-3 py-1.5 text-xs ${selectedCard.metric === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>}</div></div>}
     </div>
   );
 };

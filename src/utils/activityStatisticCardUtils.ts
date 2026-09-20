@@ -16,9 +16,9 @@ import {
   ActivityStatisticRange
 } from '../types';
 
-const RANGES: ActivityStatisticRange[] = ['all', '7d', '30d', 'year'];
+const RANGES: ActivityStatisticRange[] = ['all', '7d', '30d', 'month', 'year'];
 const METRICS: ActivityStatisticMetric[] = ['value', 'count', 'duration', 'average', 'sum'];
-const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi', 'choiceBar', 'choiceDonut', 'choiceHeatmap'];
+const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi', 'choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap'];
 
 export const getDefaultChartType = (type: ActivityAttributeDefinition['type']): ActivityStatisticCardType => {
   if (type === 'text') return 'textCloud';
@@ -28,11 +28,12 @@ export const getDefaultChartType = (type: ActivityAttributeDefinition['type']): 
 
 export const getChartTypesForSource = (source: ActivityStatisticCardSource, attributes: ActivityAttributeDefinition[]): ActivityStatisticCardType[] => {
   if (source.type === 'note') return ['textCloud'];
+  if (source.type === 'tagDuration') return ['numberArea', 'numberCalendar', 'numberKpi'];
   const attribute = attributes.find((item) => item.id === source.attributeId);
   if (!attribute) return [];
   if (attribute.type === 'text') return ['textCloud'];
   if (attribute.type === 'number') return ['numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi'];
-  if (attribute.type === 'single') return ['choiceBar', 'choiceDonut', 'choiceHeatmap'];
+  if (attribute.type === 'single') return ['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap'];
   return ['choiceBar', 'choiceHeatmap'];
 };
 
@@ -40,6 +41,7 @@ const isCardSource = (value: unknown): value is ActivityStatisticCardSource => {
   if (!value || typeof value !== 'object') return false;
   const source = value as Record<string, unknown>;
   return source.type === 'note'
+    || source.type === 'tagDuration'
     || (source.type === 'attribute' && typeof source.attributeId === 'string' && source.attributeId.length > 0);
 };
 
@@ -67,8 +69,10 @@ const normalizeCard = (raw: unknown, index: number, attributes: ActivityAttribut
     ? 'choiceBar'
     : rawChartType;
   if (!allowedTypes.includes(chartType)) return null;
-  const rawRange = RANGES.includes(item.range as ActivityStatisticRange) ? item.range as ActivityStatisticRange : '30d';
-  const range = chartType === 'numberCalendar' ? 'year' : rawRange === 'all' ? '30d' : rawRange;
+  const rawRange = RANGES.includes(item.range as ActivityStatisticRange)
+    ? item.range as ActivityStatisticRange
+    : chartType === 'numberCalendar' ? 'year' : '30d';
+  const range = rawRange === 'all' ? '30d' : rawRange;
   const metric = METRICS.includes(item.metric as ActivityStatisticMetric) ? item.metric as ActivityStatisticMetric : 'count';
   const normalizedMetric = source.type === 'attribute' && sourceAttribute?.type === 'number'
     ? (chartType === 'numberKpi' ? (metric === 'average' || metric === 'sum' ? metric : 'average') : 'value')
@@ -111,7 +115,12 @@ export const ensureStatisticCards = (activity: Activity): ActivityStatisticCard[
 };
 
 export const getStatisticCardLabel = (card: ActivityStatisticCard, attributes: ActivityAttributeDefinition[]): string => {
-  const name = card.source.type === 'note' ? '备注' : attributes.find((attribute) => attribute.id === card.source.attributeId)?.name || '已删除属性';
+  const attributeId = card.source.type === 'attribute' ? card.source.attributeId : null;
+  const name = card.source.type === 'note'
+    ? '备注'
+    : card.source.type === 'tagDuration'
+      ? '标签时长'
+      : attributes.find((attribute) => attribute.id === attributeId)?.name || '已删除属性';
   const labels: Record<ActivityStatisticCardType, string> = {
     textCloud: '词云',
     numberArea: '数值面积趋势',
@@ -120,7 +129,8 @@ export const getStatisticCardLabel = (card: ActivityStatisticCard, attributes: A
     numberKpi: '数值概览',
     choiceBar: '选项分布',
     choiceDonut: '选项环形图',
-    choiceHeatmap: '选项热力图'
+    choiceHeatmap: '选项热力图',
+    choiceTreemap: '选项矩形图'
   };
   return `${name} · ${labels[card.chartType]}`;
 };

@@ -4,7 +4,9 @@
  * @output Regression coverage for text-term extraction used by attribute statistics.
  */
 import { describe, expect, it } from 'vitest';
+import type { Activity } from '../types';
 import { filterLogsForAttribute, getCardAttributeStatisticSlices, getTextTerms } from './ActivityAttributeStatistics';
+import { getChartTypesForSource, normalizeStatisticCards } from '../utils/activityStatisticCardUtils';
 
 describe('getTextTerms', () => {
   it('preserves explicit whitespace boundaries across browser runtimes', () => {
@@ -101,5 +103,24 @@ describe('getCardAttributeStatisticSlices', () => {
     expect(slices[0]?.contextLabel).toBe('Kind: Run');
     expect(slices[0]?.logs.map((log) => log.id)).toEqual(['run-log']);
     expect(slices[0]?.logs[0]?.attributeValues).toEqual([{ attributeId: 'pace', value: 5 }]);
+  });
+});
+
+describe('extended statistic card sources', () => {
+  it('supports tag duration charts and single-choice treemaps', () => {
+    const single = { id: 'mood', name: 'Mood', type: 'single' as const, options: [{ id: 'good', label: 'Good' }], order: 0, createdAt: 1, updatedAt: 1 };
+    expect(getChartTypesForSource({ type: 'tagDuration' }, [single])).toEqual(['numberArea', 'numberCalendar', 'numberKpi']);
+    expect(getChartTypesForSource({ type: 'attribute', attributeId: 'mood' }, [single])).toContain('choiceTreemap');
+  });
+
+  it('keeps an explicit calendar range while defaulting missing calendar ranges to a year', () => {
+    const number = { id: 'weight', name: 'Weight', type: 'number' as const, order: 0, createdAt: 1, updatedAt: 1 };
+    const activity = { id: 'activity-1', name: 'Activity', color: '#000', attributes: [number], statisticCards: [
+      { id: 'calendar-month', source: { type: 'attribute' as const, attributeId: 'weight' }, chartType: 'numberCalendar' as const, range: 'month' as const, metric: 'value' as const, order: 0 },
+      { id: 'calendar-default', source: { type: 'attribute' as const, attributeId: 'weight' }, chartType: 'numberCalendar' as const, metric: 'value' as const, order: 1 }
+    ] };
+    const cards = normalizeStatisticCards(activity as unknown as Activity);
+    expect(cards[0]?.range).toBe('month');
+    expect(cards[1]?.range).toBe('year');
   });
 });
