@@ -6,7 +6,7 @@ import {
   rollbackAppliedChatActions,
   type AssistantActionExecutionContext
 } from './assistantActionExecutor';
-import type { AICreatePrincipleToolCall, AICreateSelfBeliefToolCall, AIPlannedLogToolCall, AITodoToolCall } from './aiService';
+import type { AICreatePrincipleToolCall, AICreateSelfBeliefToolCall, AIBackfillToolCall, AIPlannedLogToolCall, AITodoToolCall } from './aiService';
 
 const installLocalStorageMock = () => {
   const store = new Map<string, string>();
@@ -231,6 +231,42 @@ describe('assistantActionExecutor applyPlannedLogToolCalls', () => {
     expect(action.kind).toBe('create_planned_log');
     expect(action.status).toBe('failed');
     expect(result.nextLogs).toEqual([]);
+  });
+});
+
+describe('assistantActionExecutor applyLogToolCalls quick-punch fallback', () => {
+  beforeEach(() => {
+    installLocalStorageMock();
+  });
+
+  it('creates a quick-punch log when no local category or activity matches', () => {
+    const toolCalls: AIBackfillToolCall[] = [{
+      toolName: 'create_log',
+      args: {
+        date: '2026-05-15',
+        startTime: '14:00',
+        endTime: '14:30',
+        description: '临时电话沟通',
+        categoryId: 'uncategorized',
+        activityId: 'quick_punch'
+      }
+    }];
+
+    const result = assistantActionExecutor.applyLogToolCalls(buildBaseContext(), toolCalls);
+    const action = result.actions[0];
+
+    expect(action.kind).toBe('create_log');
+    expect(action.status).toBe('applied');
+    expect(result.nextLogs[0]).toMatchObject({
+      categoryId: 'uncategorized',
+      activityId: 'quick_punch',
+      title: '快速打点',
+      note: '临时电话沟通'
+    });
+    expect(action.snapshot).toMatchObject({
+      categoryName: '未分类',
+      activityName: '快速打点'
+    });
   });
 });
 

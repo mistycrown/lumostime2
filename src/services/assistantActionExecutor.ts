@@ -5,6 +5,7 @@
  * @pos Service (Assistant Action Executor)
  * @description Executes AI-planned log/todo/subtask/edit/principle/self-belief tool calls against local app data using shared helpers so the UI can reuse one execution layer instead of keeping tool application logic inside a modal component.
  *
+ * @updated 2026-09-20: Allows the quick-add-backfill flow to persist the reserved virtual quick-punch category when local matching fails.
  * @updated 2026-08-12: Added ordered todo-and-plan execution that resolves one-turn temporary todo references into persisted ids.
  * @updated 2026-08-24: Added reverse-order batch rollback for retrying foreground assistant replies without retaining their tool effects.
  * @updated 2026-07-31: Added `create_planned_log` execution for AI-created todo-linked timeline Plan blocks.
@@ -230,6 +231,11 @@ interface AssistantActionExecutionResult {
 const dedupeStringArray = (values: Array<string | undefined | null>): string[] => (
   Array.from(new Set(values.filter((value): value is string => Boolean(value && value.trim())).map((value) => value.trim())))
 );
+
+const QUICK_PUNCH_CATEGORY_ID = 'uncategorized';
+const QUICK_PUNCH_CATEGORY_NAME = '未分类';
+const QUICK_PUNCH_ACTIVITY_ID = 'quick_punch';
+const QUICK_PUNCH_ACTIVITY_NAME = '快速打点';
 
 const getRuleScopeIdsForActivity = (
   context: AssistantActionExecutionContext,
@@ -1069,11 +1075,16 @@ export const assistantActionExecutor = {
         || context.categories.find((item) => item.activities.some((activity) => activity.id === args.activityId));
       const activity = category?.activities.find((item) => item.id === args.activityId)
         || context.categories.flatMap((item) => item.activities).find((item) => item.id === args.activityId);
+      const isQuickPunchFallback = args.categoryId === QUICK_PUNCH_CATEGORY_ID && args.activityId === QUICK_PUNCH_ACTIVITY_ID;
+      const resolvedCategoryId = category?.id || (isQuickPunchFallback ? QUICK_PUNCH_CATEGORY_ID : args.categoryId);
+      const resolvedCategoryName = category?.name || (isQuickPunchFallback ? QUICK_PUNCH_CATEGORY_NAME : '未知分类');
+      const resolvedActivityId = activity?.id || (isQuickPunchFallback ? QUICK_PUNCH_ACTIVITY_ID : args.activityId);
+      const resolvedActivityName = activity?.name || (isQuickPunchFallback ? QUICK_PUNCH_ACTIVITY_NAME : '未知活动');
       const linkedTodo = args.linkedTodoId
         ? nextTodos.find((todo) => todo.id === args.linkedTodoId)
         : undefined;
 
-      if (!startTime || !endTime || endTime <= startTime || !category || !activity) {
+      if (!startTime || !endTime || endTime <= startTime || ((!category || !activity) && !isQuickPunchFallback)) {
         actions.push({
           actionId: buildActionId(),
           kind: 'create_log',
@@ -1083,10 +1094,10 @@ export const assistantActionExecutor = {
             startTime: startTime || Date.now(),
             endTime: endTime || Date.now(),
             description: args.description || '',
-            categoryId: category?.id || args.categoryId,
-            categoryName: category?.name || '未知分类',
-            activityId: activity?.id || args.activityId,
-            activityName: activity?.name || '未知活动',
+            categoryId: resolvedCategoryId,
+            categoryName: resolvedCategoryName,
+            activityId: resolvedActivityId,
+            activityName: resolvedActivityName,
             scopeIds: [],
             scopeNames: []
           }
@@ -1097,7 +1108,7 @@ export const assistantActionExecutor = {
       const scopeIds = dedupeStringArray([
         ...(args.scopeIds || []),
         ...(linkedTodo?.defaultScopeIds || []),
-        ...getRuleScopeIdsForActivity(context, activity.id)
+        ...getRuleScopeIdsForActivity(context, resolvedActivityId)
       ]).filter((scopeId) => context.scopes.some((scope) => scope.id === scopeId));
 
       const progressIncrement = (
@@ -1123,9 +1134,9 @@ export const assistantActionExecutor = {
 
       const newLog: Log = {
         id: crypto.randomUUID(),
-        categoryId: category.id,
-        activityId: activity.id,
-        title: activity.name,
+        categoryId: resolvedCategoryId,
+        activityId: resolvedActivityId,
+        title: resolvedActivityName,
         startTime,
         endTime,
         duration: Math.max(0, (endTime - startTime) / 1000),
@@ -1147,10 +1158,10 @@ export const assistantActionExecutor = {
           startTime,
           endTime,
           description: args.description,
-          categoryId: category.id,
-          categoryName: category.name,
-          activityId: activity.id,
-          activityName: activity.name,
+          categoryId: resolvedCategoryId,
+          categoryName: resolvedCategoryName,
+          activityId: resolvedActivityId,
+          activityName: resolvedActivityName,
           scopeIds,
           scopeNames: getScopeNames(context, scopeIds),
           ...(linkedTodo ? { linkedTodoId: linkedTodo.id, linkedTodoTitle: linkedTodo.title } : {}),

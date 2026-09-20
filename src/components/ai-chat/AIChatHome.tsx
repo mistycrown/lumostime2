@@ -93,6 +93,7 @@ interface AIChatHomeProps {
   onOpenSettings: () => void;
   onSendShortcut: (text: string) => void;
   onQuickAddTodo: () => void;
+  onQuickAddBackfill: () => void;
 }
 
 const formatShortDate = (value: string): string => {
@@ -141,6 +142,7 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
   onOpenSettings,
   onSendShortcut,
   onQuickAddTodo,
+  onQuickAddBackfill,
 }) => {
   const [quickChatText, setQuickChatText] = useState('');
   const [dismissedFeedIds, setDismissedFeedIds] = useState<string[]>([]);
@@ -176,6 +178,7 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
   const memoryLabels = ['偏好', '研究', '写作', '状态'];
   const defaultShortcuts = useMemo(() => [
     { id: 'quick-todo', title: '+待办', text: '', icon: Zap },
+    { id: 'quick-backfill', title: '+补记', text: '', icon: Clock3 },
     { id: 'newspaper', title: '生成小报', text: '小报', icon: FileText },
     { id: 'narrative', title: '生成叙事', text: '叙事', icon: Sparkles }
   ], []);
@@ -286,7 +289,7 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
               <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
                 {shortcuts.map((shortcut) => {
                   const Icon = shortcut.icon;
-                  return <button key={shortcut.id} type="button" disabled={isLoading} onClick={() => shortcut.id === 'quick-todo' ? onQuickAddTodo() : onSendShortcut(shortcut.text)} className="group inline-flex min-h-7 items-center gap-1.5 border-b pb-0.5 text-xs disabled:opacity-50" style={{ borderColor: theme.panelBorder, color: theme.textPrimary }}><Icon size={15} style={{ color: theme.textSecondary }} /><span>{shortcut.title}</span><ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" style={{ color: theme.textFaint }} /></button>;
+                  return <button key={shortcut.id} type="button" disabled={isLoading} onClick={() => shortcut.id === 'quick-todo' ? onQuickAddTodo() : shortcut.id === 'quick-backfill' ? onQuickAddBackfill() : onSendShortcut(shortcut.text)} className="group inline-flex min-h-7 items-center gap-1.5 border-b pb-0.5 text-xs disabled:opacity-50" style={{ borderColor: theme.panelBorder, color: theme.textPrimary }}><Icon size={15} style={{ color: theme.textSecondary }} /><span>{shortcut.title}</span><ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" style={{ color: theme.textFaint }} /></button>;
                 })}
               </div>
             </section>
