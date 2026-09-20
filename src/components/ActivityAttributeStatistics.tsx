@@ -344,7 +344,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                   <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '全年日历'}`} rangeLabel={rangeLabel || getRangeLabel(range)} count={`${numbers.length} 条已填写`}>
                     <div className="mt-5 py-1">
                       <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-stone-400"><span>日历热力</span><span>按日合计</span></div>
-                      <div className="grid grid-cols-2 gap-x-3 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
+                      <div className={`grid gap-x-3 gap-y-3 ${range === 'month' ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'}`}>
                         {calendarMonths.map((monthKey) => {
                           const monthDays = calendarDays.filter((day) => day.startsWith(monthKey));
                           const [year, month] = monthKey.split('-').map(Number);
