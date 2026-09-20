@@ -18,7 +18,7 @@ import {
 
 const RANGES: ActivityStatisticRange[] = ['all', '7d', '30d', 'month', 'year'];
 const METRICS: ActivityStatisticMetric[] = ['value', 'count', 'duration', 'average', 'sum'];
-const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi', 'choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap'];
+const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi', 'choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap'];
 
 export const getDefaultChartType = (type: ActivityAttributeDefinition['type']): ActivityStatisticCardType => {
   if (type === 'text') return 'textCloud';
@@ -28,7 +28,7 @@ export const getDefaultChartType = (type: ActivityAttributeDefinition['type']): 
 
 export const getChartTypesForSource = (source: ActivityStatisticCardSource, attributes: ActivityAttributeDefinition[]): ActivityStatisticCardType[] => {
   if (source.type === 'note') return ['textCloud'];
-  if (source.type === 'tagDuration') return ['numberArea', 'numberCalendar', 'numberKpi'];
+  if (source.type === 'tagDuration') return ['numberArea', 'numberCalendar', 'numberKpi', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap'];
   const attribute = attributes.find((item) => item.id === source.attributeId);
   if (!attribute) return [];
   if (attribute.type === 'text') return ['textCloud'];
@@ -71,8 +71,10 @@ const normalizeCard = (raw: unknown, index: number, attributes: ActivityAttribut
   if (!allowedTypes.includes(chartType)) return null;
   const rawRange = RANGES.includes(item.range as ActivityStatisticRange)
     ? item.range as ActivityStatisticRange
-    : chartType === 'numberCalendar' ? 'year' : '30d';
-  const range = rawRange === 'all' ? '30d' : rawRange;
+    : chartType === 'numberCalendar' || chartType === 'tagDurationBoxplot' ? 'year'
+      : chartType === 'tagDurationWeekHourHeatmap' ? 'all'
+        : '30d';
+  const range = rawRange === 'all' && source.type !== 'tagDuration' ? '30d' : rawRange;
   const metric = METRICS.includes(item.metric as ActivityStatisticMetric) ? item.metric as ActivityStatisticMetric : 'count';
   const normalizedMetric = source.type === 'attribute' && sourceAttribute?.type === 'number'
     ? (chartType === 'numberKpi' ? (metric === 'average' || metric === 'sum' ? metric : 'average') : 'value')
@@ -130,7 +132,9 @@ export const getStatisticCardLabel = (card: ActivityStatisticCard, attributes: A
     choiceBar: '选项分布',
     choiceDonut: '选项环形图',
     choiceHeatmap: '选项热力图',
-    choiceTreemap: '选项矩形图'
+    choiceTreemap: '选项矩形图',
+    tagDurationBoxplot: '标签时长箱线图',
+    tagDurationWeekHourHeatmap: '星期 × 小时热力图'
   };
   return `${name} · ${labels[card.chartType]}`;
 };
