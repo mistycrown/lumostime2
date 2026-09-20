@@ -4,6 +4,7 @@
  * @output The AI assistant landing workspace with entry points into chat and assistant tools
  * @pos Component (AI Integration)
  * @description Presents an editorial AI workbench before the user enters a conversation.
+ * @updated 2026-09-20: Removed the composer separator line and increased the spacing before the shortcut section.
  */
 import React, { useMemo, useRef, useState } from 'react';
 import {
@@ -260,7 +261,7 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
               </div>
             </section>
 
-            <section className="py-3">
+            <section className="pt-8 pb-3">
               <SectionHeading index="02" icon={Zap} title="快捷指令" theme={theme} action={<button type="button" onClick={onOpenSettings} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }} title="设置快捷指令" aria-label="设置快捷指令"><Settings size={14} /> 设置</button>} />
               <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
                 {shortcuts.map((shortcut) => {
@@ -295,7 +296,7 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
       </div>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4 pb-4 sm:px-8 sm:pb-5">
-        <div className="pointer-events-auto mx-auto max-w-6xl border-t pt-3" style={{ borderColor: theme.panelBorder, backgroundColor: theme.shellLayerBg }}>
+        <div className="pointer-events-auto mx-auto max-w-6xl pt-3" style={{ backgroundColor: theme.shellLayerBg }}>
           <div className="rounded-full border p-1.5" style={{ borderColor: theme.panelBorderStrong, backgroundColor: theme.panelBg }}>
             <div className="flex items-center gap-2"><MessageCircle size={17} className="ml-3 shrink-0" style={{ color: theme.textMuted }} /><input value={quickChatText} onChange={(event) => setQuickChatText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); sendQuickChat(); } }} placeholder="和 AI 说点什么…" className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-sm outline-none" style={{ color: theme.textPrimary }} /><button type="button" onClick={sendQuickChat} disabled={!quickChatText.trim() || isLoading} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full disabled:opacity-40" style={{ backgroundColor: theme.primaryButtonBg, color: theme.primaryButtonText }} title="发送" aria-label="发送"><ArrowRight size={16} /></button></div>
           </div>
