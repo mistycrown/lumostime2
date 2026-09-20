@@ -93,7 +93,7 @@ export type ActivityAttributeValue =
   | { attributeId: string; optionId: string }
   | { attributeId: string; optionIds: string[] };
 
-export type ActivityStatisticCardType = 'textCloud' | 'numberArea' | 'numberHistogram' | 'numberCalendar' | 'numberKpi' | 'choiceBar' | 'choiceDonut' | 'choiceHeatmap' | 'choiceTreemap';
+export type ActivityStatisticCardType = 'textCloud' | 'numberArea' | 'numberHistogram' | 'numberCalendar' | 'numberKpi' | 'choiceBar' | 'choiceDonut' | 'choiceHeatmap' | 'choiceTreemap' | 'tagDurationBoxplot' | 'tagDurationWeekHourHeatmap';
 export type ActivityStatisticRange = 'all' | '7d' | '30d' | 'month' | 'year';
 export type ActivityStatisticMetric = 'value' | 'count' | 'duration' | 'average' | 'sum';
 export type ActivityStatisticPaletteId =

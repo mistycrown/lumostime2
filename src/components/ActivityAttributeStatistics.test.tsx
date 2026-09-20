@@ -109,7 +109,7 @@ describe('getCardAttributeStatisticSlices', () => {
 describe('extended statistic card sources', () => {
   it('supports tag duration charts and single-choice treemaps', () => {
     const single = { id: 'mood', name: 'Mood', type: 'single' as const, options: [{ id: 'good', label: 'Good' }], order: 0, createdAt: 1, updatedAt: 1 };
-    expect(getChartTypesForSource({ type: 'tagDuration' }, [single])).toEqual(['numberArea', 'numberCalendar', 'numberKpi']);
+    expect(getChartTypesForSource({ type: 'tagDuration' }, [single])).toEqual(['numberArea', 'numberCalendar', 'numberKpi', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap']);
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'mood' }, [single])).toContain('choiceTreemap');
   });
 
@@ -122,5 +122,14 @@ describe('extended statistic card sources', () => {
     const cards = normalizeStatisticCards(activity as unknown as Activity);
     expect(cards[0]?.range).toBe('month');
     expect(cards[1]?.range).toBe('year');
+  });
+
+  it('defaults tag-duration chart ranges to their supported scopes', () => {
+    const activity = { id: 'activity-2', name: 'Activity', color: '#000', attributes: [], statisticCards: [
+      { id: 'boxplot', source: { type: 'tagDuration' as const }, chartType: 'tagDurationBoxplot' as const, metric: 'count' as const, order: 0 },
+      { id: 'heatmap', source: { type: 'tagDuration' as const }, chartType: 'tagDurationWeekHourHeatmap' as const, metric: 'count' as const, order: 1 }
+    ] };
+    const cards = normalizeStatisticCards(activity as unknown as Activity);
+    expect(cards.map((card) => card.range)).toEqual(['year', 'all']);
   });
 });
