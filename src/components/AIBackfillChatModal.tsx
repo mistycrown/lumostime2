@@ -4,8 +4,11 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-09-20: Preserves AI-home return paths when opening review newspapers and enters selected history sessions directly into chat.
  * @updated 2026-09-14: Syncs the configured persona name with the native background snapshot for Android notifications.
+ * @updated 2026-09-20: Defers chat-session persistence and active-session sync until storage hydration completes, preventing startup defaults from overwriting restored history.
  * @updated 2026-09-20: Resets assistant-part reveal state before in-place reply retries so reused message IDs render metadata after the retried response completes.
+ * @updated 2026-09-20: Added the minimal quick-add-todo command path, keeping its AI request limited to the todo description and create_todo tool.
  * @updated 2026-09-19: Builds the newspaper snapshot only after review context values are initialized.
  * @updated 2026-09-03: Reloads restored personas, prompt blocks, and long-term memory into mounted chat state so cloud restores cannot be overwritten by stale React state.
  * @updated 2026-09-15: Uses the current session persona name for native-reply Toast messages so in-app alerts match Android notifications.
@@ -119,6 +122,7 @@ import {
   upsertLogForAssistantContext
 } from '../utils/assistantLogSubmissionTrigger';
 import { getTodoProgressTrackingMode } from '../utils/todoProgressUtils';
+import { extractQuickAddTodoDescription, QUICK_ADD_TODO_PREFIX } from '../utils/quickAddTodo';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
 import { assistantAgentConfigService } from '../services/assistantAgentConfigService';
 import { assistantMemoryService } from '../services/assistantMemoryService';
@@ -428,6 +432,7 @@ interface AIBackfillChatModalProps {
   registerBackHandler?: (handler: (() => boolean) | null) => void;
   onUnreadAssistantMessage?: (count?: number) => void;
   onMarkRead?: () => void;
+  onRequestReturnToAI?: () => void;
 }
 
 interface ActiveRequestRef {
@@ -630,7 +635,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   initialInputText,
   registerBackHandler,
   onUnreadAssistantMessage,
-  onMarkRead
+  onMarkRead,
+  onRequestReturnToAI
 }) => {
   const [initialState] = useState<InitialChatState>(() => {
     const state = loadInitialChatState(getLocalDateStr);
@@ -1735,6 +1741,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       const nextSession = createDefaultSession(activeSession.personaId);
       setSessions((prev) => [...prev, nextSession]);
       setActiveSessionId(nextSession.id);
+      setInputText(initialInputText);
       return;
     }
 
@@ -3491,6 +3498,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setActiveSessionId(nextSession.id);
     handleCloseNewSessionDialog();
     setIsHistoryPanelOpen(false);
+    setIsHomeView(false);
   };
 
   const handleCreateSessionWithPersona = (personaId: string) => {
@@ -3578,6 +3586,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const handleSelectSessionFromHistory = (sessionId: string) => {
     setActiveSessionId(sessionId);
     setIsHistoryPanelOpen(false);
+    setIsHomeView(false);
   };
 
   const handleToggleDeleteSession = (sessionId: string) => {
@@ -5710,6 +5719,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setCurrentView(AppView.REVIEW);
     setCurrentDailyNewspaperDate(reviewDate);
     setIsDailyNewspaperOpen(true);
+    onRequestReturnToAI?.();
     onClose();
   };
 
@@ -5730,6 +5740,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setCurrentWeeklyNewspaperStart(weekStart);
     setCurrentWeeklyNewspaperEnd(weekEnd);
     setIsWeeklyNewspaperOpen(true);
+    onRequestReturnToAI?.();
     onClose();
   };
 
@@ -5771,6 +5782,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setCurrentMonthlyNewspaperStart(monthStart);
     setCurrentMonthlyNewspaperEnd(monthEnd);
     setIsMonthlyNewspaperOpen(true);
+    onRequestReturnToAI?.();
     onClose();
   };
 
@@ -5906,6 +5918,98 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
 
     return rawContent;
+  };
+
+  const handleQuickAddTodo = async (
+    description: string,
+    commandText: string,
+    options?: ForegroundSendOptions
+  ) => {
+    if (!activeSession) {
+      return;
+    }
+
+    const {
+      pendingMessageId,
+      sessionId,
+      userMessageId
+    } = prepareForegroundTurn({
+      activeSession,
+      buildRetryConversationHistory,
+      conversationHistoryCache,
+      createSessionTitleFromUserMessage,
+      isMonthlyReviewTemplateSession: false,
+      isWeeklyReviewTemplateSession: false,
+      mutateSession,
+      notifyUserTurn: async () => undefined,
+      onNotifyUserTurnError: () => undefined,
+      ...(options?.replaceMessageId ? { replaceMessageId: options.replaceMessageId } : {}),
+      ...(options?.retrySourceUserMessageId ? { retrySourceUserMessageId: options.retrySourceUserMessageId } : {}),
+      setInputText,
+      trimmedText: commandText
+    });
+
+    setIsLoading(true);
+    setIsHistoryPanelOpen(false);
+    setIsPersonaPanelOpen(false);
+
+    const controller = new AbortController();
+    activeRequestRef.current = {
+      controller,
+      sessionId,
+      pendingMessageId
+    };
+    setActiveRequestId(pendingMessageId);
+
+    try {
+      const result = await aiService.requestQuickAddTodoWithDebug(description, { signal: controller.signal });
+      if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
+        return;
+      }
+
+      const appliedActions = result.toolCall
+        ? applyTodoAndPlannedTimelineLogToolCalls([result.toolCall], description)
+        : [];
+      const successfulActions = appliedActions.filter((action) => action.status === 'applied');
+      if (successfulActions.length === 0) {
+        throw new Error('AI 未返回有效的待办工具调用。');
+      }
+
+      replacePendingWithResult(sessionId, pendingMessageId, '已添加待办', {
+        ...(debugMode ? { debugSections: [{ label: '快速添加待办', exchange: result.debug }] } : {}),
+        appliedActions,
+        retryInput: commandText,
+        retrySourceUserMessageId: userMessageId
+      });
+      notifyAssistantTaskStateChanged();
+    } catch (error) {
+      const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
+      if (isAbortError(error)) {
+        if (isCurrentPendingRequest) {
+          replacePendingWithResult(sessionId, pendingMessageId, '已停止这次请求。', { tone: 'system' });
+        }
+        return;
+      }
+
+      if (!isCurrentPendingRequest || controller.signal.aborted) {
+        return;
+      }
+
+      replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), {
+        tone: 'error',
+        retryInput: commandText,
+        retrySourceUserMessageId: userMessageId,
+        debugSections: getErrorDebugSections(error, '快速添加待办', debugMode)
+      });
+    } finally {
+      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
+        activeRequestRef.current = null;
+      }
+      setActiveRequestId((currentRequestId) => (
+        currentRequestId === pendingMessageId ? null : currentRequestId
+      ));
+      setIsLoading(false);
+    }
   };
 
   const runWeeklyReviewNarrativeWriteback = async (
@@ -6463,6 +6567,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const isMonthlyReviewTemplateSession = activeSession.templateMeta?.templateType === 'monthly_review';
 
     if (handleDebugCommand(trimmedText, options)) {
+      return;
+    }
+
+    const quickAddTodoDescription = extractQuickAddTodoDescription(trimmedText);
+    if (quickAddTodoDescription) {
+      await handleQuickAddTodo(quickAddTodoDescription, trimmedText, options);
       return;
     }
 
@@ -7256,6 +7366,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             onOpenMemory={handleOpenAssistantMemoryViewer}
             onOpenHistory={() => setIsHistoryPanelOpen(true)}
             onOpenSettings={() => setIsShortcutPromptSettingsOpen(true)}
+            onQuickAddTodo={() => {
+              if (activeSession?.templateMeta) {
+                const nextSession = createDefaultSession(activeSession.personaId);
+                setSessions((prev) => [...prev, nextSession]);
+                setActiveSessionId(nextSession.id);
+              }
+              setIsHomeView(false);
+              setInputText(QUICK_ADD_TODO_PREFIX);
+              window.requestAnimationFrame(() => composerTextareaRef.current?.focus());
+            }}
             onSendShortcut={(text) => {
               const latestSession = sortedSessions[0] || activeSession;
               if (!latestSession) return;
@@ -7334,6 +7454,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 }}
               >
                 <div className="grid grid-cols-2 gap-1">
+                  <button type="button" onClick={() => { setInputText(QUICK_ADD_TODO_PREFIX); setIsComposerMenuOpen(false); window.requestAnimationFrame(() => composerTextareaRef.current?.focus()); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>快速添加待办</button>
                   <button type="button" onClick={() => { if (activeSession) mutateSession(activeSession.id, (session) => ({ ...session, contextCacheEnabled: !session.contextCacheEnabled })); setIsComposerMenuOpen(false); }} className="flex min-h-10 items-center justify-between rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>
                     <span>上下文</span><span className="text-[10px]" style={{ color: AI_CHAT_THEME.textMuted }}>{activeSession?.contextCacheEnabled ? `开 · ${activePersona.contextMessageLimit}轮` : '关'}</span>
                   </button>

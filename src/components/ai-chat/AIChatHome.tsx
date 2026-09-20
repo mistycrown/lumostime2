@@ -6,6 +6,7 @@
  * @description Presents an editorial AI workbench before the user enters a conversation.
  * @updated 2026-09-20: Hide the homepage composer while a settings overlay is open so it does not remain visible beneath the settings page.
  * @updated 2026-09-20: Removed the composer separator line and kept compact spacing before the shortcut section.
+ * @updated 2026-09-20: Added the +待办 shortcut that opens chat with the quick-add command prefilled without sending it.
  */
 import React, { useMemo, useRef, useState } from 'react';
 import {
@@ -91,6 +92,7 @@ interface AIChatHomeProps {
   onOpenHistory: () => void;
   onOpenSettings: () => void;
   onSendShortcut: (text: string) => void;
+  onQuickAddTodo: () => void;
 }
 
 const formatShortDate = (value: string): string => {
@@ -138,6 +140,7 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
   onOpenHistory,
   onOpenSettings,
   onSendShortcut,
+  onQuickAddTodo,
 }) => {
   const [quickChatText, setQuickChatText] = useState('');
   const [dismissedFeedIds, setDismissedFeedIds] = useState<string[]>([]);
@@ -172,6 +175,7 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
   const memoryItems = [...assistantMemory.profileMemory, ...assistantMemory.preferenceMemory].slice(0, 4);
   const memoryLabels = ['偏好', '研究', '写作', '状态'];
   const defaultShortcuts = useMemo(() => [
+    { id: 'quick-todo', title: '+待办', text: '', icon: Zap },
     { id: 'newspaper', title: '生成小报', text: '小报', icon: FileText },
     { id: 'narrative', title: '生成叙事', text: '叙事', icon: Sparkles }
   ], []);
@@ -277,12 +281,12 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
               </div>
             </section>
 
-            <section className="pt-4 pb-3">
+            <section className="pb-3">
               <SectionHeading index="02" icon={Zap} title="快捷指令" theme={theme} action={<button type="button" onClick={onOpenSettings} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }} title="设置快捷指令" aria-label="设置快捷指令"><Settings size={14} /> 设置</button>} />
               <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
                 {shortcuts.map((shortcut) => {
                   const Icon = shortcut.icon;
-                  return <button key={shortcut.id} type="button" disabled={isLoading} onClick={() => onSendShortcut(shortcut.text)} className="group inline-flex min-h-7 items-center gap-1.5 border-b pb-0.5 text-xs disabled:opacity-50" style={{ borderColor: theme.panelBorder, color: theme.textPrimary }}><Icon size={15} style={{ color: theme.textSecondary }} /><span>{shortcut.title}</span><ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" style={{ color: theme.textFaint }} /></button>;
+                  return <button key={shortcut.id} type="button" disabled={isLoading} onClick={() => shortcut.id === 'quick-todo' ? onQuickAddTodo() : onSendShortcut(shortcut.text)} className="group inline-flex min-h-7 items-center gap-1.5 border-b pb-0.5 text-xs disabled:opacity-50" style={{ borderColor: theme.panelBorder, color: theme.textPrimary }}><Icon size={15} style={{ color: theme.textSecondary }} /><span>{shortcut.title}</span><ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" style={{ color: theme.textFaint }} /></button>;
                 })}
               </div>
             </section>

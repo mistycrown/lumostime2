@@ -9,6 +9,7 @@
  * @updated 2026-07-21: Corrected Android native AI request timeout to 120 seconds; the HTTP plugin timeout unit is seconds.
  * @updated 2026-07-06: Added principle-library and self-belief create tool-call payloads for foreground assistant writeback.
  * @updated 2026-05-18: `create_todo` unified-turn tool calls can now carry nested `subtasks`, letting one assistant action create a parent todo together with its direct children in one pass.
+ * @updated 2026-09-20: Added a minimal quick-add-todo request that only exposes the create_todo tool and omits ordinary assistant context.
  * @updated 2026-05-17: AI preset/config writes now mark the unified AI backup state as changed so provider/preset edits participate in the main backup and cloud-sync timestamp.
  * @updated 2026-05-17: Structured-JSON requests now expose provider-native reasoning metadata to custom normalizers, allowing report/newspaper writeback flows to persist the same collapsible thinking block used by ordinary chat.
  * @updated 2026-05-14: Enhanced debug error capture: responses are now read as text first to ensure non-JSON server replies (like HTML error pages) are preserved in `rawResponseText` for the debug viewer.
@@ -155,6 +156,11 @@ export interface AITodoCreateArgs {
 export interface AITodoToolCall {
     toolName: 'create_todo';
     args: AITodoCreateArgs;
+}
+
+export interface AIQuickAddTodoResult {
+    toolCall?: AITodoToolCall;
+    debug: AIDebugExchange;
 }
 
 export interface AITodoUpdatePatch {
@@ -2449,6 +2455,50 @@ Output:
 
         return {
             output: result,
+            debug
+        };
+    },
+
+    requestQuickAddTodoWithDebug: async (
+        description: string,
+        options: AIRequestOptions = {}
+    ): Promise<AIQuickAddTodoResult> => {
+        const systemPrompt = [
+            '你是一个快速添加待办的结构化工具调用器。',
+            '只根据用户提供的待办描述创建一个待办，不要闲聊、解释、总结或调用其他工具。',
+            '必须返回 JSON 对象，格式为：{"toolCalls":[{"toolName":"create_todo","args":{"title":"待办标题","kind":"quick","categoryId":"quick"}}]}。',
+            'title 保留用户描述中的关键信息；kind 必须是 quick；categoryId 固定为 quick。',
+            '如果描述包含明确的备注、日期或截止日期，可以分别写入 note、scheduledDate、deadlineDate；不要臆造用户没有提供的信息。',
+            '只能返回一个 create_todo 工具调用。'
+        ].join('\n');
+
+        const { result, debug } = await requestJsonObjectWithDebug(aiService.getConfig(), Capacitor.isNativePlatform() ? nativeFetch : fetch, {
+            systemPrompt,
+            userPrompt: description.trim(),
+            normalizeResult: (rawValue: any) => {
+                const rawToolCalls = Array.isArray(rawValue?.toolCalls)
+                    ? rawValue.toolCalls.map((item: any) => (
+                        item?.toolName === 'create_todo'
+                            ? {
+                                ...item,
+                                args: {
+                                    ...(item.args || {}),
+                                    kind: 'quick',
+                                    categoryId: 'quick'
+                                }
+                            }
+                            : item
+                    ))
+                    : [];
+                const toolCall = normalizeAssistantToolCalls(rawToolCalls)
+                    .find((candidate): candidate is AITodoToolCall => candidate.toolName === 'create_todo');
+                return { toolCall };
+            },
+            options
+        });
+
+        return {
+            toolCall: result.toolCall,
             debug
         };
     },
