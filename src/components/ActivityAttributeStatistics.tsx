@@ -12,6 +12,7 @@
  * @updated 2026-09-20: Adds activity-level grouped palettes shared by all statistic cards.
  * @updated 2026-09-20: Replaces numeric trends with Lieflat-inspired histogram stripes and adds count/duration modes to ordinary choice bars.
  * @updated 2026-09-20: Reduces numeric trend area opacity so the line remains the primary visual signal.
+ * @updated 2026-09-20: Adds a vertical fade-to-transparent fill for numeric area trends.
  * @updated 2026-09-20: Preserves parent attribute values while splitting conditional statistic cards.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
@@ -162,6 +163,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
   const statisticAccent = chartPalette.accent;
   const accentSoft = chartPalette.accentSoft;
   const accentMuted = chartPalette.muted;
+  const areaGradientId = `number-area-gradient-${React.useId().replace(/:/g, '')}`;
 
   const filteredLogs = useMemo(() => {
     const start = getRangeStart(range, new Date());
@@ -363,8 +365,9 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                     <div className="mt-5 py-1">
                       <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-stone-400"><span>日趋势</span><span>{trend.length} 个有数据日</span></div>
                       <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="aspect-[10/3] w-full overflow-visible">
+                        {chartVariant === 'numberArea' && <defs><linearGradient id={areaGradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={accentSoft} stopOpacity="0.48" /><stop offset="100%" stopColor={accentSoft} stopOpacity="0" /></linearGradient></defs>}
                         <line x1="0" y1={chartBottom} x2={chartWidth} y2={chartBottom} stroke="#e7e5e4" strokeWidth="1" />
-                        {chartVariant === 'numberArea' && trend.length > 1 && <polygon points={areaPoints} fill={accentSoft} opacity="0.48" />}
+                        {chartVariant === 'numberArea' && trend.length > 1 && <polygon points={areaPoints} fill={`url(#${areaGradientId})`} />}
                         {trend.length > 1 && <polyline points={points} fill="none" stroke={statisticAccent} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
                         {trend.map((point, index) => <circle key={point.key} cx={getChartX(index)} cy={getChartY(point.value)} r="3.5" fill={statisticAccent} vectorEffect="non-scaling-stroke" />)}
                       </svg>
