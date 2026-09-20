@@ -4,6 +4,7 @@
  * @output Synchronous cached storage with IndexedDB persistence and localStorage fallback
  * @pos Service (AI Chat Storage)
  * @description Migrates large AI chat records out of localStorage without changing the backup payload shape or blocking first render.
+ * @updated 2026-09-20: Exposes completion state so consumers can avoid persisting pre-hydration fallback sessions during startup.
  * @updated 2026-09-14: Added IndexedDB-backed chat/history persistence with idempotent legacy migration and fallback handling.
  */
 
@@ -23,6 +24,7 @@ let sessionsCache: StorageRecord | undefined;
 let historyCache: StorageRecord | undefined;
 let indexedDbReady = false;
 let initializationStarted = false;
+let initializationCompleted = false;
 let initializationPromise: Promise<void> | undefined;
 let databasePromise: Promise<IDBDatabase> | undefined;
 let fallbackWarningShown = false;
@@ -156,6 +158,7 @@ const initialize = async (): Promise<void> => {
   historyCache = historyCache || parseLegacy(HISTORY_KEY);
 
   if (!canUseIndexedDb()) {
+    initializationCompleted = true;
     notifyReady();
     return;
   }
@@ -188,6 +191,7 @@ const initialize = async (): Promise<void> => {
     indexedDbReady = false;
   }
 
+  initializationCompleted = true;
   notifyReady();
 };
 
@@ -239,5 +243,9 @@ export const aiChatStorageService = {
 
   isIndexedDbReady(): boolean {
     return indexedDbReady;
+  },
+
+  isReady(): boolean {
+    return initializationCompleted;
   }
 };

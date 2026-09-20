@@ -631,10 +631,32 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   onUnreadAssistantMessage,
   onMarkRead
 }) => {
-  const [initialState] = useState<InitialChatState>(() => loadInitialChatState(getLocalDateStr));
+  const [initialState] = useState<InitialChatState>(() => {
+    const state = loadInitialChatState(getLocalDateStr);
+    if (!aiChatStorageService.isReady()) {
+      return state;
+    }
+
+    const hydratedSessions = normalizePersistedSessions(
+      aiChatStorageService.getSessions(),
+      state.personas,
+      getLocalDateStr
+    );
+    const hydratedActiveSessionId = hydratedSessions.some((session) => session.id === state.activeSessionId)
+      ? state.activeSessionId
+      : hydratedSessions[0]?.id || state.activeSessionId;
+
+    return {
+      ...state,
+      sessions: hydratedSessions,
+      activeSessionId: hydratedActiveSessionId
+    };
+  });
   const [personas, setPersonas] = useState<AIChatPersona[]>(initialState.personas);
   const [customPromptBlocks, setCustomPromptBlocks] = useState<AIChatCustomPromptBlock[]>(initialState.customPromptBlocks);
   const [sessions, setSessions] = useState<AIChatSession[]>(initialState.sessions);
+  const [isChatStorageReady, setIsChatStorageReady] = useState(() => aiChatStorageService.isReady());
+  const isChatStorageHydratingRef = useRef(false);
   const [activeSessionId, setActiveSessionId] = useState<string>(initialState.activeSessionId);
   const [debugMode, setDebugMode] = useState<boolean>(initialState.debugMode);
   const [userProfile, setUserProfile] = useState<AIChatUserProfile>(initialState.userProfile);
@@ -1597,14 +1619,24 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   }, [customPromptBlocks]);
 
   useEffect(() => {
+    if (!isChatStorageReady) {
+      return;
+    }
+
     const serialized = JSON.stringify(sessions);
     if (JSON.stringify(aiChatStorageService.getSessions()) !== serialized) {
       aiChatStorageService.setSessions(sessions);
-      notifyAIBackupDataChanged();
+      if (!isChatStorageHydratingRef.current) {
+        notifyAIBackupDataChanged();
+      }
     }
-  }, [sessions]);
+    isChatStorageHydratingRef.current = false;
+  }, [isChatStorageReady, sessions]);
 
   useEffect(() => {
+    if (!isChatStorageReady) {
+      return;
+    }
     if (activeSessionId) {
       if (localStorage.getItem(ACTIVE_SESSION_KEY) !== activeSessionId) {
         localStorage.setItem(ACTIVE_SESSION_KEY, activeSessionId);
@@ -1642,7 +1674,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   }, [isOpen]);
 
   useEffect(() => {
-    if (sessions.length === 0) {
+    if (!isChatStorageReady || sessions.length === 0) {
+      if (!isChatStorageReady) {
+        return;
+      }
       const fallbackSession = createDefaultSession(personas[0]?.id || DEFAULT_AI_PERSONAS[0].id);
       setSessions([fallbackSession]);
       setActiveSessionId(fallbackSession.id);
@@ -1652,7 +1687,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     if (!sessions.some((session) => session.id === activeSessionId)) {
       setActiveSessionId((desktopWidgetPreferredSession || sortedSessions[0]).id);
     }
-  }, [activeSessionId, desktopWidgetPreferredSession, personas, sessions, sortedSessions]);
+  }, [activeSessionId, desktopWidgetPreferredSession, isChatStorageReady, personas, sessions, sortedSessions]);
 
   useEffect(() => {
     if (!isDesktopWidgetMode || typeof window === 'undefined') {
@@ -1839,14 +1874,23 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   };
 
   useEffect(() => {
+    let cancelled = false;
     const handleChatStorageReady = () => {
+      if (cancelled) {
+        return;
+      }
+      isChatStorageHydratingRef.current = true;
       reloadPersistedChatSessions();
       refreshAssistantBackgroundCallHistory();
+      setIsChatStorageReady(true);
     };
 
     window.addEventListener(AI_CHAT_STORAGE_READY_EVENT, handleChatStorageReady);
-    void aiChatStorageService.initialize();
-    return () => window.removeEventListener(AI_CHAT_STORAGE_READY_EVENT, handleChatStorageReady);
+    void aiChatStorageService.initialize().then(handleChatStorageReady);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(AI_CHAT_STORAGE_READY_EVENT, handleChatStorageReady);
+    };
   }, [personas]);
 
   const refreshAssistantMemorySnapshot = () => {
