@@ -1,5 +1,6 @@
 /**
  * @file TagDetailView.tsx
+ * @updated 2026-09-20: Vertically centered the keyword section hint beside its title.
  * @updated 2026-09-12: Added a contextual hint beside tag keyword management.
  * @updated 2026-09-07: Uses the shared detail timeline attribute row rendered below notes.
  * @updated 2026-09-03: Passes the selected attribute keyword source into the detail keyword calendar.
@@ -641,7 +642,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
                   {/* Keywords Section */}
                   <section className="border-t border-stone-300 pt-6">
-                     <div className="mb-7 flex items-end justify-between gap-4">
+                     <div className="mb-7 flex items-center justify-between gap-4">
                         <div>
                            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">05 / Keywords</p>
                            <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900">关键字</h2>
