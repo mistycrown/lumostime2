@@ -25,6 +25,8 @@ export interface RedemptionResult {
   error?: string;
 }
 
+export const SPONSORSHIP_STATUS_UPDATED_EVENT = 'lumostime:sponsorship-status-updated';
+
 /**
  * Encode user identifier with transformation
  */
@@ -176,6 +178,7 @@ export class RedemptionService {
       if (userId) {
         storage.set(SPONSORSHIP_KEYS.SUPPORTER_ID, userId.toString());
       }
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(SPONSORSHIP_STATUS_UPDATED_EVENT));
     } catch (error) {
       console.warn('LocalStorage not available, using session-only mode:', error);
     }
@@ -217,6 +220,7 @@ export class RedemptionService {
       storage.remove(SPONSORSHIP_KEYS.SUPPORTER_ID);
       this.verificationCache.clear();
       FastDecoder.clearCache();
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(SPONSORSHIP_STATUS_UPDATED_EVENT));
     } catch (error) {
       console.warn('LocalStorage not available:', error);
     }

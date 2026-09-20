@@ -97,6 +97,7 @@ export type ActivityStatisticCardType = 'textCloud' | 'numberArea' | 'numberHist
 export type ActivityStatisticRange = 'all' | '7d' | '30d' | 'year';
 export type ActivityStatisticMetric = 'value' | 'count' | 'duration' | 'average' | 'sum';
 export type ActivityStatisticPaletteId =
+  | 'default'
   | 'theme'
   | 'morandi-mist-blue'
   | 'morandi-sage'
@@ -105,7 +106,16 @@ export type ActivityStatisticPaletteId =
   | 'traditional-porcelain'
   | 'traditional-cinnabar'
   | 'traditional-bamboo'
-  | 'traditional-dai';
+  | 'traditional-dai'
+  | `custom:${string}`;
+
+export interface CustomChartPaletteSequence {
+  id: `custom:${string}`;
+  name: string;
+  colors: string[];
+  createdAt: number;
+  updatedAt: number;
+}
 
 export type ActivityStatisticCardSource =
   | { type: 'attribute'; attributeId: string }

@@ -26,6 +26,8 @@ import { getTextTerms } from '../utils/textSegmentation';
 import { ensureStatisticCards, getChartTypesForSource, getStatisticCardLabel, normalizeStatisticCards } from '../utils/activityStatisticCardUtils';
 import { getChartPalette } from '../utils/chartPalette';
 import type { ChartPalette } from '../utils/chartPalette';
+import { useChartPaletteSequences } from '../hooks/useChartPaletteSequences';
+import { useSponsorshipUnlocked } from '../hooks/useSponsorshipUnlocked';
 
 export { getTextTerms } from '../utils/textSegmentation';
 
@@ -151,7 +153,10 @@ const AttributeSection: React.FC<{
 const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, hideToolbar = false, fixedMode, chartVariant, rangeLabel, paletteId }) => {
   const [range, setRange] = useState<RangeKey>('30d');
   const [statisticMode, setStatisticMode] = useState<StatisticMode>(fixedMode || 'count');
-  const chartPalette = getChartPalette(paletteId);
+  const customSequences = useChartPaletteSequences();
+  const isSponsorshipUnlocked = useSponsorshipUnlocked();
+  const effectivePaletteId = isSponsorshipUnlocked ? paletteId : 'default';
+  const chartPalette = getChartPalette(effectivePaletteId, customSequences);
   const statisticAccent = chartPalette.accent;
   const accentSoft = chartPalette.accentSoft;
   const accentMuted = chartPalette.muted;
@@ -503,7 +508,10 @@ const ChoiceHeatmapPreview: React.FC<{ attribute: ActivityAttributeDefinition; l
 export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, onChange }) => {
   const attributes = useMemo(() => getSortedActivityAttributes(activity), [activity]);
   const paletteId = activity.statisticPalette || 'theme';
-  const chartPalette = getChartPalette(paletteId);
+  const customSequences = useChartPaletteSequences();
+  const isSponsorshipUnlocked = useSponsorshipUnlocked();
+  const effectivePaletteId = isSponsorshipUnlocked ? paletteId : 'default';
+  const chartPalette = getChartPalette(effectivePaletteId, customSequences);
   const userEditedCardsRef = React.useRef(false);
   const activityIdRef = React.useRef(activity.id);
   const [cards, setCards] = useState<ActivityStatisticCard[]>(() => !activity.statisticCards || activity.statisticCards.length === 0 ? ensureStatisticCards(activity) : normalizeStatisticCards(activity));
@@ -634,7 +642,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
             )}
             <div className="mt-5 border-t border-[#e5dbcf] pt-5">
               <div className="mb-3 flex items-center justify-between gap-3"><h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8f7f70]">图表配色</h3><span className="text-[10px] text-[#b09e8c]">{chartPalette.label}</span></div>
-              <ChartPaletteSelector value={paletteId} onChange={updatePalette} />
+              <ChartPaletteSelector value={effectivePaletteId} onChange={updatePalette} customSequences={customSequences} unlocked={isSponsorshipUnlocked} />
             </div>
             <button type="button" onClick={() => commit(ensureStatisticCards({ ...activity, statisticCards: cards }))} className="mt-5 text-xs text-[#9b5c3f] underline-offset-2 hover:underline">恢复默认卡片</button>
           </div>
