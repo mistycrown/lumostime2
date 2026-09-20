@@ -617,7 +617,7 @@ const TagDurationBoxplotPreview: React.FC<{ logs: Log[]; palette: ChartPalette }
         const color = palette.colors[item.month % palette.colors.length];
         const boxWidth = 16;
         return <g key={item.month}>
-          {item.values.length > 0 && <><line x1={x} y1={getY(item.min)} x2={x} y2={getY(item.max)} stroke={color} strokeWidth="1.1" /><line x1={x - 5} y1={getY(item.min)} x2={x + 5} y2={getY(item.min)} stroke={color} strokeWidth="1.1" /><line x1={x - 5} y1={getY(item.max)} x2={x + 5} y2={getY(item.max)} stroke={color} strokeWidth="1.1" /><rect x={x - boxWidth / 2} y={getY(item.q3)} width={boxWidth} height={Math.max(2, getY(item.q1) - getY(item.q3))} rx="2" fill={color} fillOpacity="0.18" stroke={color} strokeWidth="1.2" /><line x1={x - boxWidth / 2} y1={getY(item.median)} x2={x + boxWidth / 2} y2={getY(item.median)} stroke={color} strokeWidth="2" />{item.values.map((value, index) => <circle key={`${item.month}-${index}`} cx={x + ((index % 5) - 2) * 2.2} cy={getY(value)} r="2.3" fill="#fffdf9" stroke={color} strokeWidth="1.2" opacity="0.95"><title>{`${item.month + 1}月 · ${formatMinutes(value)} min`}</title></circle>)}</>}
+          {item.values.length > 0 && <><line x1={x} y1={getY(item.min)} x2={x} y2={getY(item.max)} stroke={color} strokeWidth="1.1" /><line x1={x - 5} y1={getY(item.min)} x2={x + 5} y2={getY(item.min)} stroke={color} strokeWidth="1.1" /><line x1={x - 5} y1={getY(item.max)} x2={x + 5} y2={getY(item.max)} stroke={color} strokeWidth="1.1" /><rect x={x - boxWidth / 2} y={getY(item.q3)} width={boxWidth} height={Math.max(2, getY(item.q1) - getY(item.q3))} rx="2" fill={color} fillOpacity="0.18" stroke={color} strokeWidth="1.2" /><line x1={x - boxWidth / 2} y1={getY(item.median)} x2={x + boxWidth / 2} y2={getY(item.median)} stroke={color} strokeWidth="2" /> </>}
           <text x={x} y={chartBottom + 22} textAnchor="middle" fill="#806f60" fontSize="10" fontVariant="tabular-nums">{item.month + 1}月</text>
         </g>;
       })}
@@ -647,15 +647,15 @@ const TagDurationWeekHourHeatmap: React.FC<{ logs: Log[]; range: RangeKey; palet
   if (filteredLogs.length === 0) return <p className="py-8 text-center text-xs text-[#aa9b8b]">当前范围暂无标签时长数据</p>;
   return <div>
     <div className="mb-3 text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]">记录分布 · 星期 × 小时</div>
-    <div className="grid grid-cols-[34px_repeat(7,minmax(0,1fr))] gap-1 text-[10px] text-[#8f7f70]">
+    <div className="grid gap-1 text-[10px] text-[#8f7f70]" style={{ gridTemplateColumns: `34px repeat(${hours.length}, minmax(0, 1fr))` }}>
       <span />
-      {weekLabels.map((label) => <span key={label} className="text-center font-medium">{label}</span>)}
-      {hours.map((hour) => <React.Fragment key={hour}>
-        <span className="flex items-center justify-end pr-1 font-mono text-[9px] text-[#a08f7d]">{String(hour).padStart(2, '0')}</span>
-        {weekLabels.map((label, weekday) => {
+      {hours.map((hour) => <span key={hour} className="truncate text-center font-mono text-[9px]">{String(hour).padStart(2, '0')}</span>)}
+      {weekLabels.map((label, weekday) => <React.Fragment key={label}>
+        <span className="flex items-center justify-end pr-1 font-medium">{label}</span>
+        {hours.map((hour) => {
           const bucket = buckets.get(`${weekday}-${hour}`);
           const intensity = bucket ? 0.08 + (bucket.duration / maxDuration) * 0.92 : 0;
-          return <span key={`${weekday}-${hour}`} title={`${label} ${String(hour).padStart(2, '0')}:00 · ${bucket ? `${formatDuration(bucket.duration)} · ${bucket.count} 条` : '无记录'}`} className="aspect-square min-h-7 rounded-[3px] border border-[#e8dfd5]" style={{ backgroundColor: bucket ? heatColor : '#f8f4ef', opacity: bucket ? intensity : 1 }} />;
+          return <span key={`${weekday}-${hour}`} title={`${label} ${String(hour).padStart(2, '0')}:00 · ${bucket ? `${formatDuration(bucket.duration)} · ${bucket.count} 条` : '无记录'}`} className="aspect-square min-w-0 rounded-[3px] border border-[#e8dfd5]" style={{ backgroundColor: bucket ? heatColor : '#f8f4ef', opacity: bucket ? intensity : 1 }} />;
         })}
       </React.Fragment>)}
     </div>
