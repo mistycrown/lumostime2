@@ -1,5 +1,6 @@
 /**
  * @file TagDetailView.tsx
+ * @updated 2026-09-20: Moves unlocked keyword color sequence controls into a compact title action popover.
  * @updated 2026-09-20: Adds shared, unlock-aware keyword color sequences without changing existing keyword colors.
  * @updated 2026-09-12: Added a contextual hint beside tag keyword management.
  * @updated 2026-09-07: Uses the shared detail timeline attribute row rendered below notes.
@@ -22,7 +23,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Log, Category, Activity, ActivityKeyword, TodoItem } from '../types';
 import { COLOR_OPTIONS } from '../constants';
 import { CalendarWidget } from '../components/CalendarWidget';
-import { ArrowLeft, Clock, Calendar as CalendarIcon, MoreHorizontal, ChevronDown, Check, X, Zap, Save, CheckCircle2, Circle, Plus, Archive, ArchiveRestore } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar as CalendarIcon, MoreHorizontal, ChevronDown, Check, X, Zap, Save, CheckCircle2, Circle, Plus, Archive, ArchiveRestore, Palette } from 'lucide-react';
 import { DateRangeFilter } from '../components/DateRangeFilter';
 import { MatrixAnalysisChart } from '../components/MatrixAnalysisChart';
 import { Scope } from '../types';
@@ -93,6 +94,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    const [newKeyword, setNewKeyword] = useState(''); // New State for adding keyword
    const [keywordColorTarget, setKeywordColorTarget] = useState<string | null>(null);
    const [keywordColorDraft, setKeywordColorDraft] = useState<string | null>(null);
+   const [isKeywordSequencePopoverOpen, setIsKeywordSequencePopoverOpen] = useState(false);
    const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false); // State for category dropdown
    const customColors = useCustomColors();
    const customSequences = useChartPaletteSequences();
@@ -656,17 +658,62 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
                   {/* Keywords Section */}
                   <section className="border-t border-stone-300 pt-6">
-                     <div className="mb-7 flex items-center justify-between gap-4">
+                     <div className="mb-7 flex items-start justify-between gap-4">
                         <div>
                            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">05 / Keywords</p>
                            <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900">关键字</h2>
-                        </div>
-                        <FeatureHint
+                         </div>
+                         <div className="flex items-start gap-1">
+                           {isSponsorshipUnlocked && (
+                              <div className="relative">
+                                 <button
+                                    type="button"
+                                    onClick={() => setIsKeywordSequencePopoverOpen((open) => !open)}
+                                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+                                       isKeywordSequencePopoverOpen || activity.keywordColorSequenceEnabled
+                                          ? 'bg-stone-100 text-stone-800'
+                                          : 'text-stone-400 hover:bg-stone-100 hover:text-stone-700'
+                                    }`}
+                                    title="关键字色彩序列"
+                                    aria-label="关键字色彩序列"
+                                    aria-expanded={isKeywordSequencePopoverOpen}
+                                 >
+                                    <Palette size={16} strokeWidth={1.8} />
+                                 </button>
+                                 {isKeywordSequencePopoverOpen && (
+                                    <div className="absolute right-0 top-10 z-30 w-[min(22rem,calc(100vw-3.5rem))] rounded-xl border border-stone-200 bg-white p-4 shadow-lg">
+                                       <div className="mb-3 flex items-center justify-between gap-3">
+                                          <span className="text-xs font-medium text-stone-800">使用色彩序列</span>
+                                          <input
+                                             type="checkbox"
+                                             checked={Boolean(activity.keywordColorSequenceEnabled)}
+                                             onChange={(event) => setActivity({
+                                                ...activity,
+                                                keywordColorSequenceEnabled: event.target.checked || undefined,
+                                                keywordColorSequenceId: activity.keywordColorSequenceId || 'default'
+                                             })}
+                                             className="h-4 w-4 accent-stone-800"
+                                          />
+                                       </div>
+                                       {activity.keywordColorSequenceEnabled && (
+                                          <ChartPaletteSelector
+                                             value={effectiveKeywordSequenceId}
+                                             onChange={(keywordColorSequenceId) => setActivity({ ...activity, keywordColorSequenceId })}
+                                             customSequences={customSequences}
+                                             unlocked={isSponsorshipUnlocked}
+                                          />
+                                       )}
+                                    </div>
+                                 )}
+                              </div>
+                           )}
+                           <FeatureHint
                            hintId="tag-detail-keywords"
                            message={'在此设置关键字，然后在添加记录时，备注输入关键字，系统会提示关联到此标签。\n\n偏好设置中，可以设置是否默认跳转到备注输入框，以便快速输入关键字。\n\n另外，在添加补记时，点击Total time 也可以快速定位至备注输入框，以快速输入关键字。'}
                            iconSize={12}
-                        />
-                     </div>
+                           />
+                         </div>
+                      </div>
                      <div className="space-y-5">
                         <div className="flex flex-wrap gap-2">
                            {keywordRecords.map((keyword) => (
@@ -694,37 +741,14 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                               className="h-11 min-w-0 flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3.5 text-[13px] font-medium text-stone-700 outline-none transition-colors placeholder:font-normal focus:border-stone-400 focus:bg-white"
                            />
                            <button
+                              type="button"
                               onClick={handleAddKeyword}
                               disabled={!newKeyword.trim()}
-                              className="h-11 w-11 shrink-0 rounded-lg bg-stone-800 text-white transition-colors hover:bg-stone-700 disabled:opacity-50 disabled:hover:bg-stone-800"
+                              aria-label="添加关键字"
+                              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-stone-800 text-white transition-colors hover:bg-stone-700 disabled:opacity-50 disabled:hover:bg-stone-800"
                            >
                               <Plus size={18} />
                            </button>
-                        </div>
-                        <div className="border-t border-stone-100 pt-4">
-                           <label className="flex items-center justify-between gap-3 text-sm text-stone-700">
-                              <span>使用色彩序列</span>
-                              <input
-                                 type="checkbox"
-                                 checked={Boolean(activity.keywordColorSequenceEnabled)}
-                                 onChange={(event) => setActivity({
-                                    ...activity,
-                                    keywordColorSequenceEnabled: event.target.checked || undefined,
-                                    keywordColorSequenceId: activity.keywordColorSequenceId || 'default'
-                                 })}
-                                 className="h-4 w-4 accent-stone-800"
-                              />
-                           </label>
-                           {activity.keywordColorSequenceEnabled && (
-                              <div className="mt-3">
-                                 <ChartPaletteSelector
-                                    value={effectiveKeywordSequenceId}
-                                    onChange={(keywordColorSequenceId) => setActivity({ ...activity, keywordColorSequenceId })}
-                                    customSequences={customSequences}
-                                    unlocked={isSponsorshipUnlocked}
-                                 />
-                              </div>
-                           )}
                         </div>
                      </div>
                   </section>
