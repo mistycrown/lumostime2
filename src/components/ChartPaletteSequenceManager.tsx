@@ -3,6 +3,7 @@
  * @input Built-in and persisted custom chart palette sequences.
  * @output Visual sequence gallery and modal editor for sponsorship settings.
  * @pos Component
+ * @updated 2026-09-20: Removes card borders from built-in and custom sequence items.
  */
 import React, { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2, X } from "lucide-react";
@@ -99,7 +100,7 @@ export const ChartPaletteSequenceManager: React.FC<Props> = ({ onToast }) => {
         {presets.map((palette) => (
           <div
             key={palette.id}
-            className="rounded-lg border border-stone-100 bg-stone-50/70 p-2.5"
+            className="rounded-lg bg-stone-50/70 p-2.5"
           >
             <div className="mb-2 flex h-4 overflow-hidden rounded-sm">
               {palette.colors.map((color, index) => (
@@ -121,7 +122,7 @@ export const ChartPaletteSequenceManager: React.FC<Props> = ({ onToast }) => {
             key={sequence.id}
             type="button"
             onClick={() => openEdit(sequence)}
-            className="rounded-lg border border-[#e8d6c8] bg-[#fffaf5] p-2.5 text-left hover:border-[#c9a98e]"
+            className="rounded-lg bg-[#fffaf5] p-2.5 text-left hover:bg-[#fff7ef]"
           >
             <div className="mb-2 flex h-4 overflow-hidden rounded-sm">
               {sequence.colors.map((color, index) => (
