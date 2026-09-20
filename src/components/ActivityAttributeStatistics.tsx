@@ -67,15 +67,6 @@ const getDateKeysForRange = (range: RangeKey, now = new Date()) => {
   return keys;
 };
 
-const getQuantile = (sortedValues: number[], probability: number) => {
-  if (sortedValues.length === 0) return 0;
-  const position = (sortedValues.length - 1) * probability;
-  const lower = Math.floor(position);
-  const upper = Math.ceil(position);
-  if (lower === upper) return sortedValues[lower];
-  return sortedValues[lower] + (sortedValues[upper] - sortedValues[lower]) * (position - lower);
-};
-
 const getRangeStart = (range: RangeKey, now: Date) => {
   if (range === 'year') return new Date(now.getFullYear(), 0, 1).getTime();
   const days = range === '7d' ? 7 : 30;
@@ -262,16 +253,6 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                 return { start, end, count: numbers.filter((value) => index === histogramBinCount - 1 ? value >= start && value <= histogramMax : value >= start && value < end).length };
               });
               const histogramMaxCount = Math.max(...histogramBins.map((bin) => bin.count), 1);
-              const sortedNumbers = [...numbers].sort((left, right) => left - right);
-              const boxMin = sortedNumbers[0];
-              const boxMax = sortedNumbers[sortedNumbers.length - 1];
-              const boxQ1 = getQuantile(sortedNumbers, 0.25);
-              const boxMedian = getQuantile(sortedNumbers, 0.5);
-              const boxQ3 = getQuantile(sortedNumbers, 0.75);
-              const boxIqr = boxQ3 - boxQ1;
-              const lowerFence = boxQ1 - boxIqr * 1.5;
-              const upperFence = boxQ3 + boxIqr * 1.5;
-              const outliers = numbers.filter((value) => value < lowerFence || value > upperFence);
               const chartWidth = 320;
               const chartHeight = 96;
               const chartBottom = 86;
@@ -279,28 +260,6 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
               const getChartY = (value: number) => chartBottom - (value / trendMax) * 68;
               const points = trend.map((point, index) => `${getChartX(index)},${getChartY(point.value)}`).join(' ');
               const areaPoints = `${points} ${trend.length ? `${getChartX(trend.length - 1)},${chartBottom} 0,${chartBottom}` : ''}`;
-              if (chartVariant === 'numberBox') {
-                const scaleMax = Math.max(boxMax, upperFence, boxQ3, 1);
-                const scaleMin = Math.min(boxMin, lowerFence, boxQ1);
-                const scaleRange = scaleMax - scaleMin || 1;
-                const getBoxX = (value: number) => ((value - scaleMin) / scaleRange) * chartWidth;
-                return (
-                  <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '五数概括'}`} rangeLabel={rangeLabel} count={`${numbers.length} 条已填写`}>
-                    <div className="mt-5 py-1">
-                      <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-stone-400"><span>五数概括</span><span>{outliers.length} 个异常值</span></div>
-                      <svg viewBox={`0 0 ${chartWidth} 72`} className="aspect-[10/2.25] w-full overflow-visible" role="img" aria-label={`${attribute.name} 五数概括`}>
-                        <line x1={getBoxX(boxMin)} y1="36" x2={getBoxX(boxMax)} y2="36" stroke="#a8a29e" strokeWidth="2" />
-                        <line x1={getBoxX(boxMin)} y1="26" x2={getBoxX(boxMin)} y2="46" stroke="#78716c" strokeWidth="1.5" />
-                        <line x1={getBoxX(boxMax)} y1="26" x2={getBoxX(boxMax)} y2="46" stroke="#78716c" strokeWidth="1.5" />
-                        <rect x={getBoxX(boxQ1)} y="20" width={Math.max(getBoxX(boxQ3) - getBoxX(boxQ1), 2)} height="32" fill={accentSoft} stroke={statisticAccent} strokeWidth="1.5" />
-                        <line x1={getBoxX(boxMedian)} y1="20" x2={getBoxX(boxMedian)} y2="52" stroke={statisticAccent} strokeWidth="2.5" />
-                        {outliers.map((value, index) => <circle key={`${value}-${index}`} cx={getBoxX(value)} cy={36 + (index % 2 ? -8 : 8)} r="3" fill={statisticAccent} />)}
-                      </svg>
-                      <div className="mt-1 grid grid-cols-5 text-[10px] text-stone-400"><span>{formatNumber(boxMin)}</span><span className="text-center">{formatNumber(boxQ1)}</span><span className="text-center">{formatNumber(boxMedian)}</span><span className="text-center">{formatNumber(boxQ3)}</span><span className="text-right">{formatNumber(boxMax)}</span></div>
-                    </div>
-                  </AttributeSection>
-                );
-              }
               if (chartVariant === 'numberCalendar') {
                 const calendarDays = getDateKeysForRange('year');
                 const dailyValues = new Map<string, number>();
@@ -415,13 +374,12 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
 };
 
 const CARD_TYPE_LABELS: Record<ActivityStatisticCardType, string> = {
-  textCloud: '词云', numberArea: '面积趋势', numberHistogram: '数值分布', numberBox: '数值箱线图', numberCalendar: '数值日历', numberKpi: '数值概览', choiceBar: '选项分布', choiceDonut: '选项环形图', choiceHeatmap: '选项热力图'
+  textCloud: '词云', numberArea: '面积趋势', numberHistogram: '数值分布', numberCalendar: '数值日历', numberKpi: '数值概览', choiceBar: '选项分布', choiceDonut: '选项环形图', choiceHeatmap: '选项热力图'
 };
 const CARD_TYPE_ICONS: Record<ActivityStatisticCardType, React.ComponentType<{ size?: number }>> = {
   textCloud: Type,
   numberArea: LineChart,
   numberHistogram: BarChart3,
-  numberBox: Table2,
   numberCalendar: CalendarDays,
   numberKpi: Table2,
   choiceBar: BarChart3,
@@ -566,13 +524,13 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
       source: next.source,
       chartType: nextType || 'textCloud',
       range: nextType === 'numberCalendar' ? 'year' : selectedCard.range,
-       metric: nextType === 'numberArea' || nextType === 'numberHistogram' || nextType === 'numberBox' || nextType === 'numberCalendar' || nextType === 'numberKpi' ? 'value' : 'count'
+       metric: nextType === 'numberArea' || nextType === 'numberHistogram' || nextType === 'numberCalendar' || nextType === 'numberKpi' ? 'value' : 'count'
     });
   };
 
   const changeExistingType = (type: ActivityStatisticCardType) => {
     if (!selectedCard) return;
-    updateSelectedCard({ chartType: type, range: type === 'numberCalendar' ? 'year' : selectedCard.range, metric: type === 'numberArea' || type === 'numberHistogram' || type === 'numberBox' || type === 'numberCalendar' || type === 'numberKpi' ? 'value' : 'count' });
+    updateSelectedCard({ chartType: type, range: type === 'numberCalendar' ? 'year' : selectedCard.range, metric: type === 'numberArea' || type === 'numberHistogram' || type === 'numberCalendar' || type === 'numberKpi' ? 'value' : 'count' });
   };
 
   const renderCard = (card: ActivityStatisticCard) => {
@@ -598,7 +556,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
   const addCard = () => {
     const source = sourceChoices[0]?.source || { type: 'note' as const };
     const chartType = getChartTypesForSource(source, attributes)[0] || 'textCloud';
-    const newCard: ActivityStatisticCard = { id: crypto.randomUUID(), source, chartType, range: chartType === 'numberCalendar' ? 'year' : '30d', metric: chartType === 'numberArea' || chartType === 'numberHistogram' || chartType === 'numberBox' || chartType === 'numberCalendar' || chartType === 'numberKpi' ? 'value' : 'count', order: cards.length };
+    const newCard: ActivityStatisticCard = { id: crypto.randomUUID(), source, chartType, range: chartType === 'numberCalendar' ? 'year' : '30d', metric: chartType === 'numberArea' || chartType === 'numberHistogram' || chartType === 'numberCalendar' || chartType === 'numberKpi' ? 'value' : 'count', order: cards.length };
     commit([...cards, newCard]);
     setSelectedCardId(newCard.id);
     setManageOpen(true);

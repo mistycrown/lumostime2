@@ -47,7 +47,7 @@ describe('activity statistic cards', () => {
   it('offers Lieflat-inspired numeric charts and rejects donut charts for multi-choice data', () => {
     const attributes = activity().attributes || [];
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'weight' }, attributes)).toEqual([
-      'numberArea', 'numberHistogram', 'numberBox', 'numberCalendar', 'numberKpi'
+      'numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi'
     ]);
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'kind' }, attributes)).toEqual(['choiceBar', 'choiceDonut', 'choiceHeatmap']);
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'parts' }, attributes)).toEqual(['choiceBar', 'choiceHeatmap']);
@@ -59,6 +59,10 @@ describe('activity statistic cards', () => {
       id: 'legacy-trend', source: { type: 'attribute', attributeId: 'weight' }, chartType: 'numberTrend', range: '30d', metric: 'value', order: 0
     } as unknown as ActivityStatisticCard;
     expect(normalizeStatisticCards(activity([legacyTrend]))[0]?.chartType).toBe('numberHistogram');
+    const legacyBox = {
+      id: 'legacy-box', source: { type: 'attribute', attributeId: 'weight' }, chartType: 'numberBox', range: '30d', metric: 'value', order: 0
+    } as unknown as ActivityStatisticCard;
+    expect(normalizeStatisticCards(activity([legacyBox]))[0]?.chartType).toBe('numberHistogram');
     const durationChoice: ActivityStatisticCard = {
       id: 'duration-choice', source: { type: 'attribute', attributeId: 'parts' }, chartType: 'choiceBar', range: '30d', metric: 'duration', order: 0
     };
@@ -75,7 +79,7 @@ describe('activity statistic cards', () => {
 
   it('exposes chart families that match each attribute shape', () => {
     const attributes = activity().attributes || [];
-    expect(getChartTypesForSource({ type: 'attribute', attributeId: 'weight' }, attributes)).toEqual(['numberArea', 'numberHistogram', 'numberBox', 'numberCalendar', 'numberKpi']);
+    expect(getChartTypesForSource({ type: 'attribute', attributeId: 'weight' }, attributes)).toEqual(['numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi']);
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'parts' }, attributes)).toEqual(['choiceBar', 'choiceHeatmap']);
   });
 });
