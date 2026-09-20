@@ -568,32 +568,37 @@ const TagDurationBoxplotPreview: React.FC<{ logs: Log[]; palette: ChartPalette }
     const day = getLocalDateKey(log.startTime);
     dailyTotals.set(day, (dailyTotals.get(day) || 0) + getLogDurationSeconds(log));
   });
+  const currentYear = new Date().getFullYear();
   const monthly = Array.from({ length: 12 }, (_, month) => {
     const values = [...dailyTotals.entries()]
-      .filter(([day]) => Number(day.slice(0, 4)) === new Date().getFullYear() && Number(day.slice(5, 7)) === month + 1)
+      .filter(([day]) => Number(day.slice(0, 4)) === currentYear && Number(day.slice(5, 7)) === month + 1)
       .map(([, value]) => value)
       .sort((a, b) => a - b);
     return { month, values, min: values[0] || 0, q1: quantile(values, 0.25), median: quantile(values, 0.5), q3: quantile(values, 0.75), max: values[values.length - 1] || 0 };
   });
   const maximum = Math.max(...monthly.map((item) => item.max), 1);
-  const chartWidth = 360;
-  const chartHeight = 190;
-  const chartTop = 10;
-  const chartBottom = 160;
-  const getY = (value: number) => chartBottom - (value / maximum) * (chartBottom - chartTop);
-  const getX = (month: number) => 18 + month * ((chartWidth - 36) / 11);
+  const chartWidth = 560;
+  const chartHeight = 250;
+  const chartLeft = 44;
+  const chartRight = 12;
+  const chartTop = 16;
+  const chartBottom = 206;
+  const chartRange = chartBottom - chartTop;
+  const getY = (value: number) => chartBottom - (value / maximum) * chartRange;
+  const getX = (month: number) => chartLeft + month * ((chartWidth - chartLeft - chartRight) / 11);
+  const formatMinutes = (seconds: number) => String(Math.round(seconds / 60));
   if (!dailyTotals.size) return <p className="py-8 text-center text-xs text-[#aa9b8b]">本年暂无标签时长数据</p>;
   return <div>
     <div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]"><span>每日汇总时长分布</span><span>本年 · 按月</span></div>
-    <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="aspect-[1.9/1] w-full" role="img" aria-label="标签时长年度箱线图">
-      <line x1="12" y1={chartBottom} x2={chartWidth - 8} y2={chartBottom} stroke="#d9cec1" />
-      {[0, 0.25, 0.5, 0.75, 1].map((ratio) => <g key={ratio}><line x1="12" y1={getY(maximum * ratio)} x2={chartWidth - 8} y2={getY(maximum * ratio)} stroke="#eee7df" /><text x="0" y={getY(maximum * ratio) + 3} fill="#a08f7d" fontSize="8">{formatDuration(maximum * ratio)}</text></g>)}
+    <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="aspect-[2.24/1] w-full" role="img" aria-label="标签时长年度箱线图">
+      {[0, 0.25, 0.5, 0.75, 1].map((ratio) => <g key={ratio}><line x1={chartLeft} y1={getY(maximum * ratio)} x2={chartWidth - chartRight} y2={getY(maximum * ratio)} stroke={ratio === 0 ? '#d8cdc0' : '#eee8e1'} strokeWidth={ratio === 0 ? 1.2 : 1} /><text x={chartLeft - 9} y={getY(maximum * ratio) + 3} textAnchor="end" fill="#9d8d7d" fontSize="9" fontVariant="tabular-nums">{formatMinutes(maximum * ratio)}</text></g>)}
       {monthly.map((item) => {
         const x = getX(item.month);
-        const boxWidth = 12;
+        const color = palette.colors[item.month % palette.colors.length];
+        const boxWidth = 16;
         return <g key={item.month}>
-          {item.values.length > 0 && <><line x1={x} y1={getY(item.min)} x2={x} y2={getY(item.max)} stroke={palette.colors[item.month % palette.colors.length]} strokeWidth="1.2" /><line x1={x - 4} y1={getY(item.min)} x2={x + 4} y2={getY(item.min)} stroke={palette.colors[item.month % palette.colors.length]} /><line x1={x - 4} y1={getY(item.max)} x2={x + 4} y2={getY(item.max)} stroke={palette.colors[item.month % palette.colors.length]} /><rect x={x - boxWidth / 2} y={getY(item.q3)} width={boxWidth} height={Math.max(1, getY(item.q1) - getY(item.q3))} fill={palette.colors[item.month % palette.colors.length]} fillOpacity="0.32" stroke={palette.colors[item.month % palette.colors.length]} /><line x1={x - boxWidth / 2} y1={getY(item.median)} x2={x + boxWidth / 2} y2={getY(item.median)} stroke={palette.colors[item.month % palette.colors.length]} strokeWidth="1.5" />{item.values.map((value, index) => <circle key={`${item.month}-${index}`} cx={x + ((index % 5) - 2) * 1.8} cy={getY(value)} r="1.8" fill={palette.colors[item.month % palette.colors.length]} opacity="0.78" />)}</>}
-          <text x={x} y={chartBottom + 14} textAnchor="middle" fill="#8f7f70" fontSize="8">{item.month + 1}月</text>
+          {item.values.length > 0 && <><line x1={x} y1={getY(item.min)} x2={x} y2={getY(item.max)} stroke={color} strokeWidth="1.1" /><line x1={x - 5} y1={getY(item.min)} x2={x + 5} y2={getY(item.min)} stroke={color} strokeWidth="1.1" /><line x1={x - 5} y1={getY(item.max)} x2={x + 5} y2={getY(item.max)} stroke={color} strokeWidth="1.1" /><rect x={x - boxWidth / 2} y={getY(item.q3)} width={boxWidth} height={Math.max(2, getY(item.q1) - getY(item.q3))} rx="2" fill={color} fillOpacity="0.18" stroke={color} strokeWidth="1.2" /><line x1={x - boxWidth / 2} y1={getY(item.median)} x2={x + boxWidth / 2} y2={getY(item.median)} stroke={color} strokeWidth="2" />{item.values.map((value, index) => <circle key={`${item.month}-${index}`} cx={x + ((index % 5) - 2) * 2.2} cy={getY(value)} r="2.3" fill="#fffdf9" stroke={color} strokeWidth="1.2" opacity="0.95"><title>{`${item.month + 1}月 · ${formatMinutes(value)} min`}</title></circle>)}</>}
+          <text x={x} y={chartBottom + 22} textAnchor="middle" fill="#806f60" fontSize="10" fontVariant="tabular-nums">{item.month + 1}月</text>
         </g>;
       })}
     </svg>
@@ -844,7 +849,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#ddd3c7] pb-4">
         <div><p className="text-[10px] uppercase tracking-[0.2em] text-[#a08f7d]">属性统计</p><p className="mt-1 text-sm text-[#67594d]">{logs.length} 条记录 <span className="text-[#c8b9a9]">/</span> {cards.length} 张卡片</p></div>
         <div className="flex items-center gap-2">
-          {isSponsorshipUnlocked && <button type="button" onClick={() => setPaletteOpen(true)} title="图表配色" aria-label="图表配色" className="inline-flex items-center gap-1.5 rounded-md border border-[#d8cabb] bg-[#fffdfa] px-3 py-2 text-xs font-medium text-[#77523d] shadow-sm hover:bg-[#f5ebe1]"><Palette size={14} />图表配色</button>}
+          {isSponsorshipUnlocked && <button type="button" onClick={() => setPaletteOpen(true)} title="配色" aria-label="配色" className="inline-flex items-center gap-1.5 rounded-md border border-[#d8cabb] bg-[#fffdfa] px-3 py-2 text-xs font-medium text-[#77523d] shadow-sm hover:bg-[#f5ebe1]"><Palette size={14} />配色</button>}
           <button type="button" onClick={() => { setSelectedCardId(cards[0]?.id || null); setManageOpen(true); }} className="inline-flex items-center gap-1.5 rounded-md border border-[#d8cabb] bg-[#fffdfa] px-3 py-2 text-xs font-medium text-[#77523d] shadow-sm hover:bg-[#f5ebe1]"><Settings2 size={14} />管理</button>
         </div>
       </div>
@@ -876,7 +881,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
           </div>
         </div>
       )}
-      {paletteOpen && <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#3b2e24]/35 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setPaletteOpen(false); }}><div className="w-full max-w-xl rounded-t-2xl border border-[#d8cabb] bg-[#fcfaf6] p-5 shadow-2xl sm:rounded-2xl" role="dialog" aria-modal="true" aria-label="图表配色"><div className="mb-5 flex items-center justify-between"><h2 className="font-serif text-lg text-[#4a3b30]">图表配色</h2><button type="button" onClick={() => setPaletteOpen(false)} title="关闭" aria-label="关闭" className="p-1.5 text-[#a08f7d]"><X size={17} /></button></div><ChartPaletteSelector value={effectivePaletteId} onChange={updatePalette} customSequences={customSequences} unlocked={isSponsorshipUnlocked} /></div></div>}
+      {paletteOpen && <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#3b2e24]/35 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setPaletteOpen(false); }}><div className="w-full max-w-xl rounded-t-2xl border border-[#d8cabb] bg-[#fcfaf6] p-5 shadow-2xl sm:rounded-2xl" role="dialog" aria-modal="true" aria-label="配色"><div className="mb-5 flex items-center justify-between"><h2 className="font-serif text-lg text-[#4a3b30]">配色</h2><button type="button" onClick={() => setPaletteOpen(false)} title="关闭" aria-label="关闭" className="p-1.5 text-[#a08f7d]"><X size={17} /></button></div><ChartPaletteSelector value={effectivePaletteId} onChange={updatePalette} customSequences={customSequences} unlocked={isSponsorshipUnlocked} /></div></div>}
       {editorOpen && selectedCard && <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#3b2e24]/35 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditorOpen(false); }}><div className="max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-[#d8cabb] bg-[#fcfaf6] p-5 shadow-2xl sm:rounded-2xl" role="dialog" aria-modal="true" aria-label="编辑所选卡片"><div className="mb-5 flex items-center justify-between"><div><h2 className="font-serif text-lg text-[#4a3b30]">编辑所选卡片</h2><span className="text-[10px] text-[#b09e8c]">#{cards.findIndex((card) => card.id === selectedCard.id) + 1}</span></div><button type="button" onClick={() => setEditorOpen(false)} title="关闭" aria-label="关闭" className="p-1.5 text-[#a08f7d]"><X size={17} /></button></div><CustomSelect label="数据来源" value={sourceToKey(selectedCard.source)} options={sourceChoices.map((item) => ({ value: item.key, label: item.label }))} onChange={changeExistingSource} renderDropdownInPortal /><div className="mt-4"><p className="mb-2 text-xs text-[#766657]">图表类型</p><div className="grid grid-cols-2 gap-2">{selectedTypes.map((type) => { const Icon = CARD_TYPE_ICONS[type]; return <button key={type} type="button" onClick={() => changeExistingType(type)} className={`inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-left text-xs transition-colors ${selectedCard.chartType === type ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70] hover:border-[#c9b6a4]'}`}><Icon size={14} /><span>{CARD_TYPE_LABELS[type]}</span></button>; })}</div></div><div className="mt-4"><p className="mb-2 text-xs text-[#766657]">时间范围</p><div className="flex flex-wrap gap-1.5">{selectedRangeOptions.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ range: option.key })} className={`rounded-md border px-2.5 py-1.5 text-xs ${selectedCard.range === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>{(selectedCard.chartType === 'choiceBar' || selectedCard.chartType === 'choiceDonut') && <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">统计维度</p><div className="flex gap-1.5">{STATISTIC_MODE_OPTIONS.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ metric: option.key })} className={`rounded-md border px-3 py-1.5 text-xs ${selectedCard.metric === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>}</div></div>}
     </div>
   );
