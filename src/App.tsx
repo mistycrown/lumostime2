@@ -4,6 +4,7 @@
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
+ * @updated 2026-09-20: Restores the AI workspace after review newspaper details opened from the AI homepage are closed.
  * @updated 2026-08-26: Makes Routine transitions wait for each stopped step to enter the shared log-save path.
  * @updated 2026-08-27: Keeps Routine starts on the Record page by bypassing timer auto-jump preferences.
  * @updated 2026-09-12: Resolves Routine activities across categories when legacy or moved steps retain stale category IDs.
@@ -194,7 +195,11 @@ const AppContent: React.FC = () => {
   } = useSettings();
 
   const { addToast } = useToast();
-  const { openAIChat } = useAIChatWindow();
+  const {
+    openAIChat,
+    shouldReturnToAIChat,
+    consumeAIChatReturn
+  } = useAIChatWindow();
   const [activeTimelineLayout, setActiveTimelineLayout] = useState<TimelineLayoutMode>(defaultTimelineLayout);
   const lastStorageErrorToastRef = useRef<{ signature: string; timestamp: number } | null>(null);
   const hasRestoredDesktopWidgetsRef = useRef(false);
@@ -290,6 +295,8 @@ const AppContent: React.FC = () => {
     activeFilterId, setActiveFilterId,
     isDailyReviewOpen, setIsDailyReviewOpen,
     isDailyNewspaperOpen, setIsDailyNewspaperOpen,
+    isWeeklyNewspaperOpen,
+    isMonthlyNewspaperOpen,
     setIsWeeklyNewspaperOpen,
     setIsMonthlyNewspaperOpen,
     isOnThisDayOpen, setIsOnThisDayOpen,
@@ -331,6 +338,18 @@ const AppContent: React.FC = () => {
     }
     previousMainViewRef.current = currentView;
   }, [currentView, defaultTimelineLayout]);
+
+  const hasReviewNewspaperOpen = isDailyNewspaperOpen
+    || isWeeklyNewspaperOpen
+    || isMonthlyNewspaperOpen;
+
+  useEffect(() => {
+    if (hasReviewNewspaperOpen || !shouldReturnToAIChat || !consumeAIChatReturn()) {
+      return;
+    }
+
+    openAIChat();
+  }, [consumeAIChatReturn, hasReviewNewspaperOpen, openAIChat, shouldReturnToAIChat]);
 
   const handlePrimaryViewChange = useCallback((view: AppView) => {
     if (view === AppView.TIMELINE) {
