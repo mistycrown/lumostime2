@@ -4,7 +4,7 @@
  * @output Normalized card settings, default cards, and chart capability helpers.
  * @pos Utility (Activity Statistics)
  * @description Keeps per-activity statistic card configuration backward-compatible and type-safe.
- * @updated 2026-09-19: Adds numeric box/calendar chart capabilities and normalizes multi-choice donut cards.
+ * @updated 2026-09-20: Removes the numeric trend card, defaults numeric attributes to histogram cards, and keeps choice cards on count metrics.
  */
 import {
   Activity,
@@ -18,11 +18,11 @@ import {
 
 const RANGES: ActivityStatisticRange[] = ['all', '7d', '30d', 'year'];
 const METRICS: ActivityStatisticMetric[] = ['value', 'count', 'duration', 'average', 'sum'];
-const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberTrend', 'numberArea', 'numberHistogram', 'numberBox', 'numberCalendar', 'numberKpi', 'choiceBar', 'choiceDonut', 'choiceHeatmap'];
+const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberArea', 'numberHistogram', 'numberBox', 'numberCalendar', 'numberKpi', 'choiceBar', 'choiceDonut', 'choiceHeatmap'];
 
 export const getDefaultChartType = (type: ActivityAttributeDefinition['type']): ActivityStatisticCardType => {
   if (type === 'text') return 'textCloud';
-  if (type === 'number') return 'numberTrend';
+  if (type === 'number') return 'numberHistogram';
   return 'choiceBar';
 };
 
@@ -31,7 +31,7 @@ export const getChartTypesForSource = (source: ActivityStatisticCardSource, attr
   const attribute = attributes.find((item) => item.id === source.attributeId);
   if (!attribute) return [];
   if (attribute.type === 'text') return ['textCloud'];
-  if (attribute.type === 'number') return ['numberTrend', 'numberArea', 'numberHistogram', 'numberBox', 'numberCalendar', 'numberKpi'];
+  if (attribute.type === 'number') return ['numberArea', 'numberHistogram', 'numberBox', 'numberCalendar', 'numberKpi'];
   if (attribute.type === 'single') return ['choiceBar', 'choiceDonut', 'choiceHeatmap'];
   return ['choiceBar', 'choiceHeatmap'];
 };
@@ -56,8 +56,9 @@ const normalizeCard = (raw: unknown, index: number, attributes: ActivityAttribut
   const item = raw as Record<string, unknown>;
   const source = normalizeSource(item.source ?? item);
   if (!source) return null;
-  const rawChartType = CARD_TYPES.includes(item.chartType as ActivityStatisticCardType)
-    ? item.chartType as ActivityStatisticCardType
+  const persistedChartType = item.chartType === 'numberTrend' ? 'numberHistogram' : item.chartType;
+  const rawChartType = CARD_TYPES.includes(persistedChartType as ActivityStatisticCardType)
+    ? persistedChartType as ActivityStatisticCardType
     : null;
   if (!rawChartType) return null;
   const sourceAttribute = source.type === 'attribute' ? attributes.find((attribute) => attribute.id === source.attributeId) : undefined;
@@ -71,11 +72,7 @@ const normalizeCard = (raw: unknown, index: number, attributes: ActivityAttribut
   const metric = METRICS.includes(item.metric as ActivityStatisticMetric) ? item.metric as ActivityStatisticMetric : 'count';
   const normalizedMetric = source.type === 'attribute' && sourceAttribute?.type === 'number'
     ? (chartType === 'numberKpi' ? (metric === 'average' || metric === 'sum' ? metric : 'average') : 'value')
-    : chartType === 'choiceHeatmap'
-      ? 'count'
-      : source.type === 'note' || sourceAttribute?.type === 'text'
-      ? 'count'
-      : metric === 'duration' ? 'duration' : 'count';
+    : 'count';
   return {
     id: typeof item.id === 'string' && item.id ? item.id : crypto.randomUUID(),
     source,
@@ -115,7 +112,6 @@ export const getStatisticCardLabel = (card: ActivityStatisticCard, attributes: A
   const name = card.source.type === 'note' ? '备注' : attributes.find((attribute) => attribute.id === card.source.attributeId)?.name || '已删除属性';
   const labels: Record<ActivityStatisticCardType, string> = {
     textCloud: '词云',
-    numberTrend: '数值趋势',
     numberArea: '数值面积趋势',
     numberHistogram: '数值分布',
     numberBox: '数值箱线图',

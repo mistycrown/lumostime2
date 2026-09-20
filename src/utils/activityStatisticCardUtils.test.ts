@@ -20,7 +20,7 @@ const activity = (statisticCards?: Activity['statisticCards']): Activity => ({
 describe('activity statistic cards', () => {
   it('creates one default card per attribute and is repeatable with persisted cards', () => {
     const first = ensureStatisticCards(activity());
-    expect(first.map((card) => card.chartType)).toEqual(['numberTrend', 'choiceBar', 'choiceBar', 'textCloud']);
+    expect(first.map((card) => card.chartType)).toEqual(['numberHistogram', 'choiceBar', 'choiceBar', 'textCloud']);
     expect(ensureStatisticCards(activity([]))).toHaveLength(4);
     expect(ensureStatisticCards(activity(first)).map((card) => card.id)).toEqual(first.map((card) => card.id));
   });
@@ -47,7 +47,7 @@ describe('activity statistic cards', () => {
   it('offers Lieflat-inspired numeric charts and rejects donut charts for multi-choice data', () => {
     const attributes = activity().attributes || [];
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'weight' }, attributes)).toEqual([
-      'numberTrend', 'numberArea', 'numberHistogram', 'numberBox', 'numberCalendar', 'numberKpi'
+      'numberArea', 'numberHistogram', 'numberBox', 'numberCalendar', 'numberKpi'
     ]);
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'kind' }, attributes)).toEqual(['choiceBar', 'choiceDonut', 'choiceHeatmap']);
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'parts' }, attributes)).toEqual(['choiceBar', 'choiceHeatmap']);
@@ -55,6 +55,14 @@ describe('activity statistic cards', () => {
       id: 'legacy-donut', source: { type: 'attribute', attributeId: 'parts' }, chartType: 'choiceDonut', range: '30d', metric: 'count', order: 0
     };
     expect(normalizeStatisticCards(activity([legacyMultiDonut]))[0]?.chartType).toBe('choiceBar');
+    const legacyTrend = {
+      id: 'legacy-trend', source: { type: 'attribute', attributeId: 'weight' }, chartType: 'numberTrend', range: '30d', metric: 'value', order: 0
+    } as unknown as ActivityStatisticCard;
+    expect(normalizeStatisticCards(activity([legacyTrend]))[0]?.chartType).toBe('numberHistogram');
+    const durationChoice: ActivityStatisticCard = {
+      id: 'duration-choice', source: { type: 'attribute', attributeId: 'parts' }, chartType: 'choiceBar', range: '30d', metric: 'duration', order: 0
+    };
+    expect(normalizeStatisticCards(activity([durationChoice]))[0]?.metric).toBe('count');
     const calendarCard: ActivityStatisticCard = {
       id: 'calendar', source: { type: 'attribute', attributeId: 'weight' }, chartType: 'numberCalendar', range: '7d', metric: 'value', order: 0
     };
@@ -67,7 +75,7 @@ describe('activity statistic cards', () => {
 
   it('exposes chart families that match each attribute shape', () => {
     const attributes = activity().attributes || [];
-    expect(getChartTypesForSource({ type: 'attribute', attributeId: 'weight' }, attributes)).toEqual(['numberTrend', 'numberArea', 'numberHistogram', 'numberBox', 'numberCalendar', 'numberKpi']);
+    expect(getChartTypesForSource({ type: 'attribute', attributeId: 'weight' }, attributes)).toEqual(['numberArea', 'numberHistogram', 'numberBox', 'numberCalendar', 'numberKpi']);
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'parts' }, attributes)).toEqual(['choiceBar', 'choiceHeatmap']);
   });
 });
