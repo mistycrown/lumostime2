@@ -14,6 +14,7 @@ describe('chart palettes', () => {
     CHART_PALETTES.forEach((palette) => {
       expect(palette.colors.length).toBeGreaterThanOrEqual(6);
       expect(palette.colors[0]).toBeTruthy();
+      if (palette.id !== 'theme') expect(new Set(palette.colors).size).toBe(palette.colors.length);
     });
   });
 
