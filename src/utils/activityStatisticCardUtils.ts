@@ -72,7 +72,9 @@ const normalizeCard = (raw: unknown, index: number, attributes: ActivityAttribut
   const metric = METRICS.includes(item.metric as ActivityStatisticMetric) ? item.metric as ActivityStatisticMetric : 'count';
   const normalizedMetric = source.type === 'attribute' && sourceAttribute?.type === 'number'
     ? (chartType === 'numberKpi' ? (metric === 'average' || metric === 'sum' ? metric : 'average') : 'value')
-    : 'count';
+    : chartType === 'choiceBar' || chartType === 'choiceDonut'
+      ? metric === 'duration' ? 'duration' : 'count'
+      : 'count';
   return {
     id: typeof item.id === 'string' && item.id ? item.id : crypto.randomUUID(),
     source,

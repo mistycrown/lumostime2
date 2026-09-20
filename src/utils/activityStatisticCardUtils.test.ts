@@ -66,7 +66,7 @@ describe('activity statistic cards', () => {
     const durationChoice: ActivityStatisticCard = {
       id: 'duration-choice', source: { type: 'attribute', attributeId: 'parts' }, chartType: 'choiceBar', range: '30d', metric: 'duration', order: 0
     };
-    expect(normalizeStatisticCards(activity([durationChoice]))[0]?.metric).toBe('count');
+    expect(normalizeStatisticCards(activity([durationChoice]))[0]?.metric).toBe('duration');
     const calendarCard: ActivityStatisticCard = {
       id: 'calendar', source: { type: 'attribute', attributeId: 'weight' }, chartType: 'numberCalendar', range: '7d', metric: 'value', order: 0
     };
