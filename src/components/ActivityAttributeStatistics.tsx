@@ -12,6 +12,7 @@
  * @updated 2026-09-20: Adds activity-level grouped palettes shared by all statistic cards.
  * @updated 2026-09-20: Replaces numeric trends with Lieflat-inspired histogram stripes and adds count/duration modes to ordinary choice bars.
  * @updated 2026-09-20: Reduces numeric trend area opacity so the line remains the primary visual signal.
+ * @updated 2026-09-20: Preserves parent attribute values while splitting conditional statistic cards.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
@@ -111,7 +112,7 @@ interface AttributeStatisticSlice {
   contextLabel?: string;
 }
 
-const getAttributeStatisticSlices = (
+export const getAttributeStatisticSlices = (
   attribute: StatisticsAttribute,
   definitions: StatisticsAttribute[],
   logs: Log[]
@@ -446,6 +447,18 @@ export const filterLogsForAttribute = (logs: Log[], attributeId: string): Log[] 
   })
   .filter((log): log is Log & { attributeValues: NonNullable<Log['attributeValues']> } => log !== null);
 
+/**
+ * Splits a card's complete logs by a conditional attribute's parent option,
+ * then removes unrelated attribute values before chart aggregation.
+ */
+export const getCardAttributeStatisticSlices = (
+  attribute: StatisticsAttribute,
+  definitions: StatisticsAttribute[],
+  logs: Log[]
+): AttributeStatisticSlice[] => getAttributeStatisticSlices(attribute, definitions, logs)
+  .map((slice) => ({ ...slice, logs: filterLogsForAttribute(slice.logs, attribute.id) }))
+  .filter((slice) => slice.logs.length > 0);
+
 const DonutPreview: React.FC<{ attribute: ActivityAttributeDefinition; logs: Log[]; mode: StatisticMode; palette: ReturnType<typeof getChartPalette> }> = ({ attribute, logs, mode, palette }) => {
   const counts = new Map<string, number>();
   let total = 0;
@@ -504,6 +517,37 @@ const ChoiceHeatmapPreview: React.FC<{ attribute: ActivityAttributeDefinition; l
   }
   const tileGridClass = range === '7d' ? 'grid-cols-7' : 'grid-cols-5 sm:grid-cols-6 lg:grid-cols-10';
   return <div className="py-1"><div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]"><span>按日构成</span><span>{range === '7d' ? '近 7 天' : '近 30 天'}</span></div><div className={`grid gap-x-2 gap-y-3 ${tileGridClass}`}>{days.map((day) => { const items = getDayItems(day); const total = items.reduce((sum, [, value]) => sum + value, 0); const topItem = items[0]; const dayLabel = `${getDateLabel(day)} · ${items.map(([id, amount]) => `${labels.get(id) || MISSING_OPTION} ${mode === 'duration' ? formatDuration(amount) : amount}`).join(' / ') || '无记录'}`; return <div key={day} aria-label={dayLabel} className="min-w-0 border-b border-[#e5dbcf] pb-2"><div className="flex items-center justify-between gap-1 text-[10px] text-[#8f7f70]"><span className="font-mono">{getDateLabel(day)}</span><span className="font-mono font-medium text-[#67594d]">{total || '-'}</span></div><div className="mt-2 flex h-2 overflow-hidden rounded-full bg-[#f1ebe4]">{items.map(([optionId, value]) => <span key={optionId} className="min-w-[2px]" style={{ width: `${total ? (value / total) * 100 : 0}%`, backgroundColor: getOptionColor(optionId) }} />)}</div><div className="mt-1 truncate text-[9px] leading-tight text-[#a08f7d]">{topItem ? `${labels.get(topItem[0]) || MISSING_OPTION} · ${mode === 'duration' ? formatDuration(topItem[1]) : topItem[1]}` : '无记录'}</div></div>; })}</div>{legend}</div>;
+};
+
+interface ConditionalStatisticCardProps {
+  activity: Activity;
+  attributes: ActivityAttributeDefinition[];
+  attribute: ActivityAttributeDefinition;
+  logs: Log[];
+  card: ActivityStatisticCard;
+  rangeLabel: string;
+  paletteId?: ActivityStatisticPaletteId;
+  chartPalette: ReturnType<typeof getChartPalette>;
+}
+
+const ConditionalStatisticCard: React.FC<ConditionalStatisticCardProps> = ({ activity, attributes, attribute, logs, card, rangeLabel, paletteId, chartPalette }) => {
+  const slices = getCardAttributeStatisticSlices(attribute, attributes, logs);
+  return <React.Fragment>{slices.map((slice, index) => {
+    const sliceAttribute: ActivityAttributeDefinition = {
+      ...attribute,
+      name: slice.contextLabel ? `${attribute.name} · ${slice.contextLabel}` : attribute.name,
+      displayCondition: undefined
+    };
+    const key = `${card.id}-${index}`;
+    const cardHeading = <div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, [sliceAttribute])}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">{card.chartType === 'choiceDonut' ? 'CHOICE DONUT' : 'CHOICE HEATMAP'} / {attribute.type === 'single' ? '单选' : '多选'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div>;
+    if (card.chartType === 'choiceDonut') {
+      return <section key={key} className="py-7 first:pt-2">{cardHeading}<DonutPreview attribute={sliceAttribute} logs={slice.logs} mode={card.metric === 'duration' ? 'duration' : 'count'} palette={chartPalette} /></section>;
+    }
+    if (card.chartType === 'choiceHeatmap') {
+      return <section key={key} className="py-7 first:pt-2">{cardHeading}<ChoiceHeatmapPreview attribute={sliceAttribute} logs={slice.logs} mode="count" range={card.range} palette={chartPalette} /></section>;
+    }
+    return <section key={key} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [sliceAttribute] }} logs={slice.logs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} rangeLabel={rangeLabel} paletteId={paletteId} onChange={undefined} /></section>;
+  })}</React.Fragment>;
 };
 
 export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, onChange }) => {
@@ -585,6 +629,18 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     }
     const attribute = getCardAttribute(activity, card.source);
     if (!attribute) return null;
+    if (attribute.displayCondition) {
+      return <ConditionalStatisticCard
+        activity={activity}
+        attributes={attributes}
+        attribute={attribute}
+        logs={cardLogs}
+        card={card}
+        rangeLabel={rangeLabel}
+        paletteId={paletteId}
+        chartPalette={chartPalette}
+      />;
+    }
     const attributeLogs = filterLogsForAttribute(cardLogs, attribute.id);
     if (card.chartType === 'choiceDonut') {
        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE DONUT / {attribute.type === 'single' ? '单选' : '多选'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><DonutPreview attribute={attribute} logs={attributeLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} palette={chartPalette} /></section>;
