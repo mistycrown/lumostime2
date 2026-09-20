@@ -68,6 +68,15 @@ const inferAttributeType = (value: ActivityAttributeValue): ActivityAttributeTyp
 
 const formatNumber = (value: number) => new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value);
 
+const formatHoursMinutes = (seconds: number) => {
+  const totalMinutes = Math.max(0, Math.floor(seconds / 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+};
+
 const getLocalDateKey = (timestamp: number) => {
   const date = new Date(timestamp);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -284,6 +293,9 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
             if (attribute.type === 'number') {
               const numbers = values.flatMap((value) => 'value' in value && typeof value.value === 'number' ? [value.value] : []);
               if (numbers.length === 0) return null;
+              const isDurationNumber = attribute.id === '__tag-duration__';
+              const formatNumericValue = (value: number) => isDurationNumber ? formatHoursMinutes(value) : formatNumber(value);
+              const numericUnit = isDurationNumber ? '' : attribute.unit ? ` ${attribute.unit}` : '';
               const sum = numbers.reduce((total, value) => total + value, 0);
               const trendMap = new Map<string, number>();
               attributeLogs.forEach((log) => (log.attributeValues || []).forEach((value) => {
@@ -332,8 +344,8 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                             const [year, month, dayOfMonth] = day.split('-').map(Number);
                             const weekday = weekdayLabels[new Date(year, month - 1, dayOfMonth).getDay()];
                             const intensity = value ? 0.3 + (value / calendarMax) * 0.7 : 1;
-                            const valueLabel = value ? `${formatNumber(value)}${attribute.unit ? ` ${attribute.unit}` : ''}` : '无记录';
-                            return <div key={day} aria-label={`${getDateLabel(day)} 周${weekday} · ${valueLabel}`} className="min-w-0 text-center"><div className="text-[9px] text-stone-400">周{weekday}</div><div className="mt-0.5 font-mono text-[10px] text-stone-600">{getDateLabel(day)}</div><div className="mt-2 h-12 rounded-[3px] border border-stone-200" style={{ backgroundColor: value ? statisticAccent : '#f5f5f4', opacity: value ? intensity : 1 }} /><div className="mt-1 truncate font-mono text-[9px] text-stone-500" title={valueLabel}>{value ? formatNumber(value) : '—'}</div></div>;
+                            const valueLabel = value ? `${formatNumericValue(value)}${numericUnit}` : '无记录';
+                            return <div key={day} aria-label={`${getDateLabel(day)} 周${weekday} · ${valueLabel}`} className="min-w-0 text-center"><div className="text-[9px] text-stone-400">周{weekday}</div><div className="mt-0.5 font-mono text-[10px] text-stone-600">{getDateLabel(day)}</div><div className="mt-2 h-12 rounded-[3px] border border-stone-200" style={{ backgroundColor: value ? statisticAccent : '#f5f5f4', opacity: value ? intensity : 1 }} /><div className="mt-1 truncate font-mono text-[9px] text-stone-500" title={valueLabel}>{value ? formatNumericValue(value) : '—'}</div></div>;
                           })}
                         </div>
                       </div>
@@ -350,7 +362,8 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                           const [year, month] = monthKey.split('-').map(Number);
                           const leadingBlanks = new Date(year, month - 1, 1).getDay();
                           const monthColor = chartPalette.colors[calendarMonths.indexOf(monthKey) % chartPalette.colors.length] || statisticAccent;
-                          return <div key={monthKey}><div className="mb-1 text-[10px] text-stone-500">{month} 月</div><div className="grid grid-cols-7 gap-0.5">{Array.from({ length: leadingBlanks }).map((_, index) => <span key={`blank-${monthKey}-${index}`} />)}{monthDays.map((day) => { const value = dailyValues.get(day) || 0; return <span key={day} aria-label={`${getDateLabel(day)} · ${formatNumber(value)}${attribute.unit ? ` ${attribute.unit}` : ''}`} className="aspect-square rounded-[2px] border border-stone-200" style={{ backgroundColor: value ? monthColor : '#f5f5f4', opacity: value ? 0.3 + (value / calendarMax) * 0.7 : 1 }} />; })}</div></div>;
+                          const isSingleMonth = range === 'month';
+                          return <div key={monthKey}><div className="mb-1 text-[10px] text-stone-500">{month} 月</div><div className={isSingleMonth ? 'grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1' : 'grid grid-cols-7 gap-0.5'}>{!isSingleMonth && Array.from({ length: leadingBlanks }).map((_, index) => <span key={`blank-${monthKey}-${index}`} />)}{monthDays.map((day) => { const value = dailyValues.get(day) || 0; return <span key={day} aria-label={`${getDateLabel(day)} · ${formatNumericValue(value)}${numericUnit}`} className="aspect-square rounded-[2px] border border-stone-200" style={{ backgroundColor: value ? monthColor : '#f5f5f4', opacity: value ? 0.3 + (value / calendarMax) * 0.7 : 1 }} />; })}</div></div>;
                         })}
                       </div>
                     </div>
@@ -388,10 +401,10 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                 <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '数值'}`} rangeLabel={rangeLabel} count={`${numbers.length} 条已填写`}>
                   {chartVariant === 'numberKpi' && <div className="grid grid-cols-2 border-y border-stone-200 sm:grid-cols-4">
                     {[
-                      ['合计', `${formatNumber(sum)}${attribute.unit ? ` ${attribute.unit}` : ''}`],
-                      ['平均', `${formatNumber(sum / numbers.length)}${attribute.unit ? ` ${attribute.unit}` : ''}`],
-                      ['最小', `${formatNumber(Math.min(...numbers))}${attribute.unit ? ` ${attribute.unit}` : ''}`],
-                      ['最大', `${formatNumber(Math.max(...numbers))}${attribute.unit ? ` ${attribute.unit}` : ''}`]
+                      ['合计', `${formatNumericValue(sum)}${numericUnit}`],
+                      ['平均', `${formatNumericValue(sum / numbers.length)}${numericUnit}`],
+                      ['最小', `${formatNumericValue(Math.min(...numbers))}${numericUnit}`],
+                      ['最大', `${formatNumericValue(Math.max(...numbers))}${numericUnit}`]
                     ].map(([label, value]) => <div key={label} className="border-stone-200 px-3 py-3 odd:border-r sm:border-r sm:last:border-r-0"><div className="text-[10px] text-stone-400">{label}</div><div className="mt-1 font-mono text-base" style={{ color: statisticAccent }}>{value}</div></div>)}
                   </div>}
                   {chartVariant !== 'numberKpi' && trend.length > 0 && (
@@ -487,7 +500,7 @@ const createTagDurationLogs = (logs: Log[], attributeId: string): Log[] => logs.
   attributeValues: [{ attributeId, value: getLogDurationSeconds(log) }]
 }));
 
-const TAG_DURATION_ATTRIBUTE: ActivityAttributeDefinition = { id: '__tag-duration__', name: '标签时长', type: 'number', unit: '秒', order: 0, createdAt: 0, updatedAt: 0 };
+const TAG_DURATION_ATTRIBUTE: ActivityAttributeDefinition = { id: '__tag-duration__', name: '标签时长', type: 'number', unit: '时长', order: 0, createdAt: 0, updatedAt: 0 };
 
 export const filterLogsForAttribute = (logs: Log[], attributeId: string): Log[] => logs
   .map((log) => {
@@ -655,7 +668,7 @@ const TagDurationWeekHourHeatmap: React.FC<{ logs: Log[]; range: RangeKey; palet
         {hours.map((hour) => {
           const bucket = buckets.get(`${weekday}-${hour}`);
           const intensity = bucket ? 0.08 + (bucket.duration / maxDuration) * 0.92 : 0;
-          return <span key={`${weekday}-${hour}`} title={`${label} ${String(hour).padStart(2, '0')}:00 · ${bucket ? `${formatDuration(bucket.duration)} · ${bucket.count} 条` : '无记录'}`} className="aspect-square min-w-0 rounded-[3px] border border-[#e8dfd5]" style={{ backgroundColor: bucket ? heatColor : '#f8f4ef', opacity: bucket ? intensity : 1 }} />;
+          return <span key={`${weekday}-${hour}`} title={`${label} ${String(hour).padStart(2, '0')}:00 · ${bucket ? `${formatHoursMinutes(bucket.duration)} · ${bucket.count} 条` : '无记录'}`} className="aspect-square min-w-0 rounded-[3px] border border-[#e8dfd5]" style={{ backgroundColor: bucket ? heatColor : '#f8f4ef', opacity: bucket ? intensity : 1 }} />;
         })}
       </React.Fragment>)}
     </div>
