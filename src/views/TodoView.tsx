@@ -6,6 +6,7 @@
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes reserved `小事` / `未来` buckets plus a week planning view with schedule and history badges.
+ * @updated 2026-09-20: Prefills the quick-add-todo command when opening AI from the todo header.
  * @updated 2026-08-26: Hides archived todo categories from the main list and scheduling presentation.
  * @updated 2026-07-21: Applied the shared calendar number typography to the single-column week view.
  * @updated 2026-09-12: Added explicit min-size constraints, contained touch scrolling, and an isolated schedule surface to prevent Android WebView edge clipping on Huawei P70-class devices.
@@ -59,6 +60,7 @@ import { formatTodoCompactScheduleSummary, formatTodoInlineDate, orderTodoItemsB
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
 import { UnreadCountBadge } from '../components/UnreadCountBadge';
 import { isQuickTodo } from '../utils/todoKindUtils';
+import { QUICK_ADD_TODO_PREFIX } from '../utils/quickAddTodo';
 import { isTodoCategoryArchived } from '../utils/archiveUtils';
 import {
   ensureQuickTodoCategory,
@@ -2793,7 +2795,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => openAIChat({ targetDate: todayDate })}
+              onClick={() => openAIChat({ targetDate: todayDate, initialInputText: QUICK_ADD_TODO_PREFIX })}
               className="theme-icon-button relative overflow-visible"
               title="AI 助理"
             >
