@@ -14,6 +14,7 @@
  * 
  * 闁宠法濯寸粭?Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-09-17: Fixed custom background deletion reporting failure after persistence succeeds.
+ * @updated 2026-09-20: Prevented Base64 image URLs from being persisted in localStorage and added runtime hydration for native file-backed backgrounds.
  * @updated 2026-08-10: Added canonical image-list storage and restore hydration for custom backgrounds.
  * @updated 2026-04-20: Added event-driven background subscriptions, image preloading, and lighter reapply scheduling to reduce mobile jank and white flashes.
  */
@@ -208,6 +209,27 @@ const BACKGROUND_OPACITY_KEY = 'lumos_background_opacity';
 const BACKGROUND_DIRECTORY = 'backgrounds';
 const BACKGROUND_CHANGED_EVENT = 'lumostime:background-changed';
 
+const isDataUrl = (value?: string): boolean => Boolean(value?.startsWith('data:'));
+
+export const sanitizeBackgroundForStorage = (background: BackgroundOption): BackgroundOption => {
+    const persisted = { ...background };
+
+    // Image bytes belong in Filesystem/IndexedDB. Keep only the image reference in localStorage.
+    if (persisted.type === 'custom' && persisted.imageFilename) {
+        persisted.url = '';
+        delete persisted.thumbnail;
+    } else {
+        if (isDataUrl(persisted.url)) {
+            persisted.url = '';
+        }
+        if (isDataUrl(persisted.thumbnail)) {
+            delete persisted.thumbnail;
+        }
+    }
+
+    return persisted;
+};
+
 // 闂傚洠鍋撻悷鏇氱缁ㄦ煡鎮介妸銊ュ壒闁哄拋鍨冲▓鎴炪亜閻㈠憡妗ㄩ柛蹇撳暟缁€瀛朌
 const TARGET_ELEMENTS = [
     'scopes-content',      // Scopes濡炪倗鏁诲?
@@ -221,6 +243,7 @@ class BackgroundService {
     private reapplyTimeoutId: number | null = null;
     private preloadPromises = new Map<string, Promise<void>>();
     private preloadedUrls = new Set<string>();
+    private hydratedBackgroundUrls = new Map<string, Pick<BackgroundOption, 'url' | 'thumbnail'>>();
 
     private loadStoredCustomBackgrounds(): BackgroundOption[] {
         try {
@@ -238,7 +261,8 @@ class BackgroundService {
     }
 
     private saveCustomBackgrounds(customBackgrounds: BackgroundOption[]): void {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(customBackgrounds));
+        const persistedBackgrounds = customBackgrounds.map(sanitizeBackgroundForStorage);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(persistedBackgrounds));
     }
 
     private async ensureBackgroundDirectory(): Promise<void> {
@@ -330,6 +354,23 @@ class BackgroundService {
         }).catch(() => undefined);
     }
 
+    private async getNativeBackgroundUrl(filePath?: string): Promise<string> {
+        if (!Capacitor.isNativePlatform() || !filePath) {
+            return '';
+        }
+
+        try {
+            const uriResult = await Filesystem.getUri({
+                path: `${BACKGROUND_DIRECTORY}/${filePath}`,
+                directory: Directory.Data
+            });
+            return Capacitor.convertFileSrc(uriResult.uri);
+        } catch (error) {
+            console.warn('[BackgroundService] Failed to resolve native background URI:', filePath, error);
+            return '';
+        }
+    }
+
     private async migrateLegacyCustomBackgrounds(): Promise<void> {
         if (!Capacitor.isNativePlatform() || this.isMigratingLegacyBackgrounds) {
             return;
@@ -368,6 +409,7 @@ class BackgroundService {
                 this.emitBackgroundChange();
                 this.applyBackgroundToElements();
                 void this.updateStatusBar();
+                void this.hydrateImageBackedCustomBackgrounds();
             }
         } finally {
             this.isMigratingLegacyBackgrounds = false;
@@ -402,7 +444,10 @@ class BackgroundService {
                 }
             }));
 
-            if (changed) this.saveCustomBackgrounds(migrated);
+            if (changed) {
+                this.saveCustomBackgrounds(migrated);
+                void this.hydrateImageBackedCustomBackgrounds();
+            }
         } finally {
             this.isMigratingImageReferences = false;
         }
@@ -429,23 +474,49 @@ class BackgroundService {
     /**
      * 闁兼儳鍢茶ぐ鍥嚊椤忓嫮鏆板☉鏂款槼閸庢寮?     */
     getCustomBackgrounds(): BackgroundOption[] {
-        return this.loadStoredCustomBackgrounds();
+        return this.loadStoredCustomBackgrounds().map((background) => {
+            const hydrated = this.hydratedBackgroundUrls.get(background.id);
+            return hydrated ? { ...background, ...hydrated } : background;
+        });
     }
 
     async hydrateImageBackedCustomBackgrounds(): Promise<void> {
         const backgrounds = this.loadStoredCustomBackgrounds();
         let changed = false;
         const hydrated = await Promise.all(backgrounds.map(async (background) => {
-            if (background.type !== 'custom' || !background.imageFilename) return background;
+            if (background.type !== 'custom') return background;
 
-            const url = await imageService.getImageUrl(background.imageFilename);
-            if (!url || background.url === url) return background;
-            changed = true;
-            return { ...background, url, thumbnail: url };
+            const nativeUrl = await this.getNativeBackgroundUrl(background.filePath);
+            const imageUrl = nativeUrl || (background.imageFilename
+                ? await imageService.getImageUrl(background.imageFilename)
+                : '');
+            if (!imageUrl) return background;
+
+            this.hydratedBackgroundUrls.set(background.id, {
+                url: imageUrl,
+                thumbnail: imageUrl
+            });
+
+            if (
+                background.url !== imageUrl
+                || background.thumbnail !== imageUrl
+                || isDataUrl(background.url)
+                || isDataUrl(background.thumbnail)
+            ) {
+                changed = true;
+                return { ...background, url: imageUrl, thumbnail: imageUrl };
+            }
+
+            return background;
         }));
 
         if (changed) {
-            this.saveCustomBackgrounds(hydrated);
+            try {
+                this.saveCustomBackgrounds(hydrated);
+            } catch (error) {
+                // Hydration remains usable even if another localStorage key consumed the remaining quota.
+                console.error('[BackgroundService] Failed to persist hydrated background metadata:', error);
+            }
             this.emitBackgroundChange();
             this.applyBackgroundToElements();
         }
@@ -477,6 +548,10 @@ class BackgroundService {
 
         const customBackgrounds = this.getCustomBackgrounds();
         customBackgrounds.push(customBackground);
+        this.hydratedBackgroundUrls.set(customBackground.id, {
+            url: customBackground.url,
+            thumbnail: customBackground.thumbnail
+        });
         this.saveCustomBackgrounds(customBackgrounds);
 
         return customBackground;
@@ -508,6 +583,7 @@ class BackgroundService {
                 console.warn('[BackgroundService] Failed to delete background image:', error);
             });
         }
+        this.hydratedBackgroundUrls.delete(backgroundId);
 
                 // 濠碘€冲€归悘澶愬礆閻樼粯鐝熼柣銊ュ濡叉瓕銇愰幘鍐差枀闁煎啿鏈▍娆撴晬瀹€鍕缂傚喚鍠曠拹鐔割渶濡鍚?                const currentBackground = this.getCurrentBackground();
         if (this.getCurrentBackground() === backgroundId) {

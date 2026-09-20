@@ -3,6 +3,7 @@
  * @input onToast (callback), currentBackground (optional string), onBackgroundChange (optional callback)
  * @output Toast Messages (onToast), Background Selection (onBackgroundChange or backgroundService)
  * @pos Component (Selector)
+ * @updated 2026-09-20: Refreshes previews when asynchronously hydrated image-backed backgrounds become available.
  * @description 背景图片选择组件 - 支持预设背景、自定义上传、透明度调节
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -42,6 +43,10 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
             setInternalBackground(backgroundService.getCurrentBackground());
         }
         setBackgroundOpacity(backgroundService.getBackgroundOpacity());
+
+        const handleBackgroundChange = () => loadBackgrounds();
+        window.addEventListener('lumostime:background-changed', handleBackgroundChange);
+        return () => window.removeEventListener('lumostime:background-changed', handleBackgroundChange);
     }, [isControlled]);
 
     const loadBackgrounds = () => {
