@@ -13,6 +13,7 @@ import { ChevronDown, ChevronRight, X } from 'lucide-react';
 import type { AIDebugExchange } from '../../services/aiService';
 import type { AssistantLetter } from '../../types/assistant';
 import { formatAssistantDateTimeForDisplay } from '../../utils/assistantTime';
+import type { AIChatNewspaperItem } from './AIChatHome';
 import type {
   AssistantBackgroundTimelineEntry,
   AIChatDebugTextBlock,
@@ -274,6 +275,88 @@ export const AssistantLetterHistoryOverlay: React.FC<AssistantLetterHistoryOverl
                 </div>
               );
             })
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+interface AIChatNewspaperHistoryOverlayProps {
+  newspapers: AIChatNewspaperItem[];
+  theme: AIChatOverlayTheme;
+  onClose: () => void;
+  onOpenNewspaper: (item: AIChatNewspaperItem) => void;
+}
+
+const getNewspaperPeriodLabel = (period: AIChatNewspaperItem['period']): string => {
+  if (period === 'daily') return '日报';
+  if (period === 'weekly') return '周报';
+  return '月报';
+};
+
+export const AIChatNewspaperHistoryOverlay: React.FC<AIChatNewspaperHistoryOverlayProps> = ({
+  newspapers,
+  theme,
+  onClose,
+  onOpenNewspaper
+}) => (
+  <div className="ai-chat-overlay absolute inset-0 z-20 bg-[rgba(15,23,42,0.14)] backdrop-blur-[10px]">
+    <div
+      className="flex h-full flex-col bg-[#f3f4f6]"
+      style={{
+        paddingTop: 'var(--app-safe-area-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)'
+      }}
+    >
+      <div className="ai-chat-overlay-header flex h-14 items-center justify-between border-b border-[#e5e7eb] bg-[rgba(255,255,255,0.9)] px-4 backdrop-blur-md">
+        <div>
+          <h3 className="font-serif text-lg font-bold leading-none text-[#201c19]">小报记录</h3>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-9 w-9 items-center justify-center rounded-[0.8rem] border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:border-[#cfd8e3] hover:bg-[#f9fafb] hover:text-[#111827]"
+          title="关闭小报记录"
+          aria-label="关闭小报记录"
+        >
+          <X size={20} />
+        </button>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+        <div className="mx-auto max-w-3xl space-y-3">
+          {newspapers.length === 0 ? (
+            <div
+              className="rounded-[0.95rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-5"
+              style={{
+                borderColor: 'color-mix(in srgb, var(--accent-color) 10%, #e5e7eb)',
+                backgroundColor: 'color-mix(in srgb, var(--accent-color) 2.5%, white)'
+              }}
+            >
+              <p className="text-sm leading-6 text-stone-600">还没有生成过小报。</p>
+            </div>
+          ) : (
+            newspapers.map((newspaper) => (
+              <button
+                key={`${newspaper.period}:${newspaper.id}`}
+                type="button"
+                onClick={() => onOpenNewspaper(newspaper)}
+                className="block w-full rounded-[1rem] border bg-[rgba(255,255,255,0.96)] p-4 text-left transition-colors hover:bg-white"
+                style={{ borderColor: theme.chipBorder }}
+              >
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="rounded-full border px-2 py-0.5 text-[11px]" style={{ borderColor: theme.chipBorderStrong, color: theme.textSecondary }}>
+                    {getNewspaperPeriodLabel(newspaper.period)}
+                  </span>
+                  <span className="text-[11px]" style={{ color: theme.textSecondary }}>{newspaper.dateLabel}</span>
+                </div>
+                <p className="mt-2 font-serif text-[1.08rem] leading-7 text-[#231f1b]">{newspaper.title}</p>
+                <p className="mt-1.5 line-clamp-3 whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: theme.textSecondary }}>
+                  {newspaper.preview}
+                </p>
+              </button>
+            ))
           )}
         </div>
       </div>
