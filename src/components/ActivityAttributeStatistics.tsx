@@ -88,8 +88,11 @@ const getDateLabel = (dateKey: string) => {
 };
 
 const getDateKeysForRange = (range: RangeKey, now = new Date()) => {
-  const end = new Date(now);
-  end.setHours(0, 0, 0, 0);
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const end = range === 'month'
+    ? new Date(today.getFullYear(), today.getMonth() + 1, 0)
+    : today;
   const start = range === 'year'
     ? new Date(end.getFullYear(), 0, 1)
     : range === 'month'
@@ -363,7 +366,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                           const leadingBlanks = new Date(year, month - 1, 1).getDay();
                           const monthColor = chartPalette.colors[calendarMonths.indexOf(monthKey) % chartPalette.colors.length] || statisticAccent;
                           const isSingleMonth = range === 'month';
-                          return <div key={monthKey}><div className="mb-1 text-[10px] text-stone-500">{month} 月</div><div className={isSingleMonth ? 'grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1' : 'grid grid-cols-7 gap-0.5'}>{!isSingleMonth && Array.from({ length: leadingBlanks }).map((_, index) => <span key={`blank-${monthKey}-${index}`} />)}{monthDays.map((day) => { const value = dailyValues.get(day) || 0; return <span key={day} aria-label={`${getDateLabel(day)} · ${formatNumericValue(value)}${numericUnit}`} className="aspect-square rounded-[2px] border border-stone-200" style={{ backgroundColor: value ? monthColor : '#f5f5f4', opacity: value ? 0.3 + (value / calendarMax) * 0.7 : 1 }} />; })}</div></div>;
+                          return <div key={monthKey}><div className="mb-1 text-[10px] text-stone-500">{month} 月</div><div className={isSingleMonth ? 'grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1' : 'grid grid-cols-7 gap-0.5'}>{!isSingleMonth && Array.from({ length: leadingBlanks }).map((_, index) => <span key={`blank-${monthKey}-${index}`} />)}{monthDays.map((day) => { const value = dailyValues.get(day) || 0; const dayOfMonth = Number(day.slice(8, 10)); const showDayMarker = isSingleMonth && [5, 10, 15, 25, 30].includes(dayOfMonth); return <span key={day} aria-label={`${getDateLabel(day)} · ${formatNumericValue(value)}${numericUnit}`} className="flex aspect-square items-center justify-center rounded-[2px] border border-stone-200 font-mono text-[8px]" style={{ backgroundColor: value ? monthColor : '#f5f5f4', color: value ? '#ffffff' : '#a8a29e', opacity: value ? 0.3 + (value / calendarMax) * 0.7 : 1 }} title={`${getDateLabel(day)} · ${formatNumericValue(value)}${numericUnit || ''}`}>{showDayMarker ? dayOfMonth : null}</span>; })}</div></div>;
                         })}
                       </div>
                     </div>
