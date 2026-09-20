@@ -9,6 +9,7 @@
  * @updated 2026-09-20: Defers chat-session persistence and active-session sync until storage hydration completes, preventing startup defaults from overwriting restored history.
  * @updated 2026-09-20: Resets assistant-part reveal state before in-place reply retries so reused message IDs render metadata after the retried response completes.
  * @updated 2026-09-20: Added the minimal quick-add-todo command path, keeping its AI request limited to the todo description and create_todo tool.
+ * @updated 2026-09-20: Places the composer caret at the end after quick-add command prefills.
  * @updated 2026-09-19: Builds the newspaper snapshot only after review context values are initialized.
  * @updated 2026-09-03: Reloads restored personas, prompt blocks, and long-term memory into mounted chat state so cloud restores cannot be overwritten by stale React state.
  * @updated 2026-09-15: Uses the current session persona name for native-reply Toast messages so in-app alerts match Android notifications.
@@ -786,6 +787,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const composerMenuRef = useRef<HTMLDivElement | null>(null);
   const pendingHomeMessageRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const focusComposerAtEnd = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      const textarea = composerTextareaRef.current;
+      if (!textarea) {
+        return;
+      }
+
+      textarea.focus();
+      const end = textarea.value.length;
+      textarea.setSelectionRange(end, end);
+    });
+  }, []);
   const messageElementRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const handleMessageElementRef = useCallback((messageId: string, node: HTMLDivElement | null) => {
     if (node) {
@@ -1742,11 +1755,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       setSessions((prev) => [...prev, nextSession]);
       setActiveSessionId(nextSession.id);
       setInputText(initialInputText);
+      focusComposerAtEnd();
       return;
     }
 
     setInputText(initialInputText);
-  }, [activeSession, initialInputText, isOpen]);
+    focusComposerAtEnd();
+  }, [activeSession, focusComposerAtEnd, initialInputText, isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -7374,7 +7389,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               }
               setIsHomeView(false);
               setInputText(QUICK_ADD_TODO_PREFIX);
-              window.requestAnimationFrame(() => composerTextareaRef.current?.focus());
+              focusComposerAtEnd();
             }}
             onSendShortcut={(text) => {
               const latestSession = sortedSessions[0] || activeSession;
@@ -7454,7 +7469,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 }}
               >
                 <div className="grid grid-cols-2 gap-1">
-                  <button type="button" onClick={() => { setInputText(QUICK_ADD_TODO_PREFIX); setIsComposerMenuOpen(false); window.requestAnimationFrame(() => composerTextareaRef.current?.focus()); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>快速添加待办</button>
+                  <button type="button" onClick={() => { setInputText(QUICK_ADD_TODO_PREFIX); setIsComposerMenuOpen(false); focusComposerAtEnd(); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>快速添加待办</button>
                   <button type="button" onClick={() => { if (activeSession) mutateSession(activeSession.id, (session) => ({ ...session, contextCacheEnabled: !session.contextCacheEnabled })); setIsComposerMenuOpen(false); }} className="flex min-h-10 items-center justify-between rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>
                     <span>上下文</span><span className="text-[10px]" style={{ color: AI_CHAT_THEME.textMuted }}>{activeSession?.contextCacheEnabled ? `开 · ${activePersona.contextMessageLimit}轮` : '关'}</span>
                   </button>
