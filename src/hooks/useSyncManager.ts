@@ -20,6 +20,7 @@
  * @updated 2026-08-11: Adds shareable error IDs to user-visible manual cloud sync failures.
  * @updated 2026-08-26: Includes Routine configuration in backup payloads and restore handling.
  * @updated 2026-09-03: Skips full cloud payload downloads for already acknowledged versions and throttles repeated resume checks.
+ * @updated 2026-09-20: Waits for AI chat storage hydration before building sync payloads so startup sync cannot upload a pre-hydration empty chat state.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -37,6 +38,7 @@ import { webdavService } from '../services/webdavService';
 import { s3Service } from '../services/s3Service';
 import { compatibleS3Service } from '../services/compatibleS3Service';
 import { assistantBackupService } from '../services/assistantBackupService';
+import { aiChatStorageService } from '../services/aiChatStorageService';
 import { appearanceBackupService } from '../services/appearanceBackupService';
 import {
     loadWidgetTemplatesFromStorage,
@@ -573,6 +575,8 @@ export const useSyncManager = () => {
         setIsSyncing(true);
 
         try {
+            await aiChatStorageService.initialize();
+
             // [Fix] Clear pending flag immediately when starting sync.
             // If new changes happen *during* sync, useEffect will set it to true again,
             // allowing the finally block to catch them. This prevents infinite loops on error.
