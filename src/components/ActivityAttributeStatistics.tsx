@@ -1,7 +1,7 @@
 /**
  * @file ActivityAttributeStatistics.tsx
  * @input One Activity and its actual Logs.
- * @output Type-specific attribute distribution and condition-aware trend visualizations.
+ * @output Tag-wide statistic cards with type-specific distributions and condition-aware trend visualizations.
  * @pos Activity detail analytics component
  * @description Presents attribute data as a compact editorial report: text terms, choice rankings, numeric KPIs, and trends.
  * @updated 2026-09-02: Adds count/duration dimensions for single- and multi-choice attributes while keeping text and number statistics unchanged.
@@ -605,8 +605,7 @@ const TagDurationBoxplotPreview: React.FC<{ logs: Log[]; palette: ChartPalette }
   </div>;
 };
 
-const TagDurationWeekHourHeatmap: React.FC<{ logs: Log[]; initialRange: RangeKey; palette: ChartPalette }> = ({ logs, initialRange, palette }) => {
-  const [range, setRange] = useState<RangeKey>(initialRange === 'all' || initialRange === 'month' || initialRange === 'year' ? initialRange : 'year');
+const TagDurationWeekHourHeatmap: React.FC<{ logs: Log[]; range: RangeKey; palette: ChartPalette }> = ({ logs, range, palette }) => {
   const filteredLogs = useMemo(() => filterLogsByRange(logs, range), [logs, range]);
   const buckets = new Map<string, { duration: number; count: number }>();
   filteredLogs.forEach((log) => {
@@ -618,11 +617,28 @@ const TagDurationWeekHourHeatmap: React.FC<{ logs: Log[]; initialRange: RangeKey
     current.count += 1;
     buckets.set(key, current);
   });
-  const maxCount = Math.max(...[...buckets.values()].map((bucket) => bucket.count), 1);
   const weekLabels = ['一', '二', '三', '四', '五', '六', '日'];
+  const activeHours = filteredLogs.map((log) => new Date(log.startTime).getHours());
+  const minHour = activeHours.length > 0 ? Math.min(...activeHours) : 0;
+  const maxHour = activeHours.length > 0 ? Math.max(...activeHours) : 0;
+  const hours = Array.from({ length: maxHour - minHour + 1 }, (_, index) => minHour + index);
+  const maxDuration = Math.max(...[...buckets.values()].map((bucket) => bucket.duration), 1);
+  const heatColor = palette.accent;
+  if (filteredLogs.length === 0) return <p className="py-8 text-center text-xs text-[#aa9b8b]">当前范围暂无标签时长数据</p>;
   return <div>
-    <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><span className="text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]">记录分布 · 星期 × 小时</span><div className="flex gap-1">{TAG_DURATION_RANGE_OPTIONS.map((option) => <button key={option.key} type="button" onClick={() => setRange(option.key)} className={`rounded-md border px-2 py-1 text-[10px] ${range === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] text-[#8f4f32]' : 'border-[#e5dbcf] text-[#a08f7d]'}`}>{option.label}</button>)}</div></div>
-    <div className="overflow-x-auto"><div className="min-w-[560px]"><div className="grid grid-cols-[30px_repeat(24,minmax(18px,1fr))] gap-px text-[8px] text-[#a08f7d]"><span />{Array.from({ length: 24 }, (_, hour) => <span key={hour} className="text-center">{hour}</span>)}{weekLabels.map((label, weekday) => <React.Fragment key={label}><span className="flex items-center justify-center">{label}</span>{Array.from({ length: 24 }, (_, hour) => { const bucket = buckets.get(`${weekday}-${hour}`); const intensity = bucket ? 0.14 + (bucket.count / maxCount) * 0.86 : 0; return <span key={`${weekday}-${hour}`} title={`${label} ${hour}:00 · ${bucket ? `${formatDuration(bucket.duration)} · ${bucket.count} 条` : '无记录'}`} className="aspect-square rounded-[2px] border border-[#eee7df]" style={{ backgroundColor: bucket ? palette.colors[weekday % palette.colors.length] : '#f7f3ee', opacity: bucket ? intensity : 1 }} />; })}</React.Fragment>)}</div></div></div>
+    <div className="mb-3 text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]">记录分布 · 星期 × 小时</div>
+    <div className="grid grid-cols-[34px_repeat(7,minmax(0,1fr))] gap-1 text-[10px] text-[#8f7f70]">
+      <span />
+      {weekLabels.map((label) => <span key={label} className="text-center font-medium">{label}</span>)}
+      {hours.map((hour) => <React.Fragment key={hour}>
+        <span className="flex items-center justify-end pr-1 font-mono text-[9px] text-[#a08f7d]">{String(hour).padStart(2, '0')}</span>
+        {weekLabels.map((label, weekday) => {
+          const bucket = buckets.get(`${weekday}-${hour}`);
+          const intensity = bucket ? 0.08 + (bucket.duration / maxDuration) * 0.92 : 0;
+          return <span key={`${weekday}-${hour}`} title={`${label} ${String(hour).padStart(2, '0')}:00 · ${bucket ? `${formatDuration(bucket.duration)} · ${bucket.count} 条` : '无记录'}`} className="aspect-square min-h-7 rounded-[3px] border border-[#e8dfd5]" style={{ backgroundColor: bucket ? heatColor : '#f8f4ef', opacity: bucket ? intensity : 1 }} />;
+        })}
+      </React.Fragment>)}
+    </div>
   </div>;
 };
 
@@ -798,7 +814,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
         return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">TAG DURATION BOXPLOT / 每日汇总</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">本年</span></div><TagDurationBoxplotPreview logs={filterLogsByRange(logs, 'year')} palette={chartPalette} /></section>;
       }
       if (card.chartType === 'tagDurationWeekHourHeatmap') {
-        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">TAG DURATION / 星期 × 小时</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">可切换范围</span></div><TagDurationWeekHourHeatmap logs={logs} initialRange={card.range} palette={chartPalette} /></section>;
+        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">TAG DURATION / 星期 × 小时</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><TagDurationWeekHourHeatmap logs={logs} range={card.range} palette={chartPalette} /></section>;
       }
       const tagLogs = createTagDurationLogs(cardLogs, TAG_DURATION_ATTRIBUTE.id);
       return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [TAG_DURATION_ATTRIBUTE] }} logs={tagLogs} hideToolbar chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} onChange={undefined} /></section>;
@@ -847,7 +863,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#ddd3c7] pb-4">
-        <div><p className="text-[10px] uppercase tracking-[0.2em] text-[#a08f7d]">属性统计</p><p className="mt-1 text-sm text-[#67594d]">{logs.length} 条记录 <span className="text-[#c8b9a9]">/</span> {cards.length} 张卡片</p></div>
+        <div><p className="text-[10px] uppercase tracking-[0.2em] text-[#a08f7d]">标签统计</p><p className="mt-1 text-sm text-[#67594d]">{logs.length} 条记录 <span className="text-[#c8b9a9]">/</span> {cards.length} 张卡片</p></div>
         <div className="flex items-center gap-2">
           {isSponsorshipUnlocked && <button type="button" onClick={() => setPaletteOpen(true)} title="配色" aria-label="配色" className="inline-flex items-center gap-1.5 rounded-md border border-[#d8cabb] bg-[#fffdfa] px-3 py-2 text-xs font-medium text-[#77523d] shadow-sm hover:bg-[#f5ebe1]"><Palette size={14} />配色</button>}
           <button type="button" onClick={() => { setSelectedCardId(cards[0]?.id || null); setManageOpen(true); }} className="inline-flex items-center gap-1.5 rounded-md border border-[#d8cabb] bg-[#fffdfa] px-3 py-2 text-xs font-medium text-[#77523d] shadow-sm hover:bg-[#f5ebe1]"><Settings2 size={14} />管理</button>
