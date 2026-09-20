@@ -10,6 +10,7 @@
  * @updated 2026-09-03: Reloads restored personas, prompt blocks, and long-term memory into mounted chat state so cloud restores cannot be overwritten by stale React state.
  * @updated 2026-09-15: Uses the current session persona name for native-reply Toast messages so in-app alerts match Android notifications.
  * @updated 2026-09-14: Added the persona-settings toggle for opting AI chat history out of unified sync payloads.
+ * @updated 2026-09-20: Hide the AI homepage composer while persona or shortcut settings overlays are open.
  * @updated 2026-09-04: Applies structured AI reminder removal actions to the durable reminder queue and long-term memory.
  * @updated 2026-09-03: Removed the base polling-frequency state path now that Android check-ins use concrete alarm times.
  * @updated 2026-07-31: Added a pending-message-id fallback cleanup so completed foreground turns always restore the composer send button.
@@ -7236,6 +7237,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             sortedSessions={sortedSessions}
             theme={AI_CHAT_THEME}
             isLoading={isLoading}
+            isOverlayOpen={isPersonaPanelOpen || isShortcutPromptSettingsOpen}
             formatConversationTime={formatConversationTime}
             getSessionPersona={resolveSessionPersona}
             onOpenChat={handleOpenChatView}
