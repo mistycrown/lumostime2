@@ -1,5 +1,7 @@
 # Views Layer
 
+- Update 2026-09-20: `TagDetailView.tsx` labels the tag-wide statistic card tab as `统计` instead of `属性` and uses the `Statistics` internal tab key.
+
 - Update 2026-09-20: `TagDetailView.tsx` hides the keyword sequence action until sponsorship unlock and exposes its toggle and selector through a compact Palette title popover; the add-keyword action is explicitly centered.
 
 - Update 2026-09-20: `TagDetailView.tsx` lets each tag opt into the shared chart color sequences for newly added keywords while preserving individual keyword overrides.
@@ -23,7 +25,7 @@
 
 The `views/` directory contains all the React components that represent the distinct screens or pages of the LumosTime application. This layer is responsible for the presentation logic and user interaction.
 
-- Update 2026-08-24: `TagDetailView.tsx` now owns Activity custom attribute definition management and an actual-log-only attribute statistics tab; `FocusDetailView.tsx` persists the same fields into the active session.
+- Update 2026-08-24: `TagDetailView.tsx` now owns Activity custom attribute definition management and an actual-log-only statistics tab; `FocusDetailView.tsx` persists the same fields into the active session.
 - Update 2026-08-10: `DailyCheckOverviewView.tsx` caches each row's current value and manual history before rendering, renders one full-width detail button per row, and uses `/` for a missing daily-check snapshot.
 - Update 2026-08-10: `DailyCheckOverviewView.tsx` and `DailyCheckDetailView.tsx` show `nightEarliestStart` checks against the completed previous night during the daytime.
 - Update 2026-08-10: `DailyCheckDetailView.tsx` presents an immediate loading screen, renders the current-month data first, and defers all-history statistics plus the 30-day trend until after first paint.
