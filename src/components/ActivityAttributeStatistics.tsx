@@ -647,11 +647,11 @@ const TagDurationWeekHourHeatmap: React.FC<{ logs: Log[]; range: RangeKey; palet
   if (filteredLogs.length === 0) return <p className="py-8 text-center text-xs text-[#aa9b8b]">当前范围暂无标签时长数据</p>;
   return <div>
     <div className="mb-3 text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]">记录分布 · 星期 × 小时</div>
-    <div className="grid gap-1 text-[10px] text-[#8f7f70]" style={{ gridTemplateColumns: `34px repeat(${hours.length}, minmax(0, 1fr))` }}>
+    <div className="grid gap-1 text-[10px] text-[#8f7f70]" style={{ gridTemplateColumns: `22px repeat(${hours.length}, minmax(0, 1fr))` }}>
       <span />
       {hours.map((hour) => <span key={hour} className="truncate text-center font-mono text-[9px]">{String(hour).padStart(2, '0')}</span>)}
       {weekLabels.map((label, weekday) => <React.Fragment key={label}>
-        <span className="flex items-center justify-end pr-1 font-medium">{label}</span>
+        <span className="flex items-center justify-center font-medium">{label}</span>
         {hours.map((hour) => {
           const bucket = buckets.get(`${weekday}-${hour}`);
           const intensity = bucket ? 0.08 + (bucket.duration / maxDuration) * 0.92 : 0;
