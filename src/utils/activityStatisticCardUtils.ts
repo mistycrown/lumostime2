@@ -18,7 +18,7 @@ import {
 
 const RANGES: ActivityStatisticRange[] = ['all', '7d', '30d', 'year'];
 const METRICS: ActivityStatisticMetric[] = ['value', 'count', 'duration', 'average', 'sum'];
-const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberArea', 'numberHistogram', 'numberBox', 'numberCalendar', 'numberKpi', 'choiceBar', 'choiceDonut', 'choiceHeatmap'];
+const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi', 'choiceBar', 'choiceDonut', 'choiceHeatmap'];
 
 export const getDefaultChartType = (type: ActivityAttributeDefinition['type']): ActivityStatisticCardType => {
   if (type === 'text') return 'textCloud';
@@ -31,7 +31,7 @@ export const getChartTypesForSource = (source: ActivityStatisticCardSource, attr
   const attribute = attributes.find((item) => item.id === source.attributeId);
   if (!attribute) return [];
   if (attribute.type === 'text') return ['textCloud'];
-  if (attribute.type === 'number') return ['numberArea', 'numberHistogram', 'numberBox', 'numberCalendar', 'numberKpi'];
+  if (attribute.type === 'number') return ['numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi'];
   if (attribute.type === 'single') return ['choiceBar', 'choiceDonut', 'choiceHeatmap'];
   return ['choiceBar', 'choiceHeatmap'];
 };
@@ -56,7 +56,7 @@ const normalizeCard = (raw: unknown, index: number, attributes: ActivityAttribut
   const item = raw as Record<string, unknown>;
   const source = normalizeSource(item.source ?? item);
   if (!source) return null;
-  const persistedChartType = item.chartType === 'numberTrend' ? 'numberHistogram' : item.chartType;
+  const persistedChartType = item.chartType === 'numberTrend' || item.chartType === 'numberBox' ? 'numberHistogram' : item.chartType;
   const rawChartType = CARD_TYPES.includes(persistedChartType as ActivityStatisticCardType)
     ? persistedChartType as ActivityStatisticCardType
     : null;
@@ -114,7 +114,6 @@ export const getStatisticCardLabel = (card: ActivityStatisticCard, attributes: A
     textCloud: '词云',
     numberArea: '数值面积趋势',
     numberHistogram: '数值分布',
-    numberBox: '数值箱线图',
     numberCalendar: '数值日历',
     numberKpi: '数值概览',
     choiceBar: '选项分布',

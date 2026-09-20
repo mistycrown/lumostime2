@@ -12,7 +12,7 @@
 
 ## 第一阶段范围
 
-- 数值属性新增 `numberBox`，表达五数概括和异常值，参考 Lieflat `F15 Tick Box`。
+- 数值属性保留分布、面积趋势、日历和概览图，移除箱线图以保持统计卡片聚焦。
 - 数值属性新增 `numberCalendar`，按本年日期聚合，参考 `L17 Calendar Heat`。
 - 单选属性保留 `choiceDonut`；多选属性不再提供环形图能力。
 - 选项热力图在年度范围保留选项 × 日期矩阵；短周期改用按日构成网格，每天用分段条表达选项构成，避免 30 列矩阵和圆形渐变造成的拥挤。
@@ -23,7 +23,7 @@
 
 ## 数据与渲染约束
 
-- `numberBox` 使用原始数值计算 min、Q1、median、Q3、max；异常值按 1.5×IQR 规则标记。
+- 存量 `numberBox` 配置读取时迁移为 `numberHistogram`，避免删除旧卡片后出现空白。
 - `numberCalendar` 仅对本年范围显示，按本地日期聚合数值属性；其他时间范围继续使用现有趋势图。
 - `choiceHeatmap` 只使用次数口径，按选项行、日期列保留每个单元格的实际值。
 - 存量不合法的多选 `choiceDonut` 配置在读取时清洗为 `choiceBar`，避免破坏 Activity 加载。
