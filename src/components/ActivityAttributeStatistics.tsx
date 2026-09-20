@@ -9,7 +9,7 @@
  * @updated 2026-09-12: Keeps short Chinese and English text terms in the ranked text statistics instead of showing an empty state.
  * @updated 2026-09-18: Restricts each statistic card to its own attribute values so unrelated fields are not reported as deleted attributes.
  * @updated 2026-09-18: Unifies new-card creation with the existing card editor and removes the persistent add form.
- * @updated 2026-09-19: Adds Lieflat-inspired numeric box and calendar charts, direct short-range heatmap composition rows, ranked option rows, and normalized countable unit blocks.
+ * @updated 2026-09-20: Replaces numeric trends with Lieflat-inspired histogram stripes and standardizes choice distribution cards on count bars.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
@@ -33,11 +33,6 @@ const RANGE_OPTIONS: Array<{ key: RangeKey; label: string }> = [
   { key: '7d', label: '近 7 天' },
   { key: '30d', label: '近 30 天' },
   { key: 'year', label: '本年' }
-];
-
-const STATISTIC_MODE_OPTIONS: Array<{ key: StatisticMode; label: string }> = [
-  { key: 'count', label: '次数' },
-  { key: 'duration', label: '时长' }
 ];
 
 const MISSING_ATTRIBUTE = '已删除属性';
@@ -97,7 +92,6 @@ interface ActivityAttributeStatisticsProps {
   logs: Log[];
   onChange?: (activity: Activity) => void;
   hideToolbar?: boolean;
-  fixedMode?: StatisticMode;
   chartVariant?: ActivityStatisticCardType;
   rangeLabel?: string;
 }
@@ -152,9 +146,8 @@ const AttributeSection: React.FC<{
   </section>
 );
 
-const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, hideToolbar = false, fixedMode, chartVariant, rangeLabel }) => {
+const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, hideToolbar = false, chartVariant, rangeLabel }) => {
   const [range, setRange] = useState<RangeKey>('30d');
-  const [statisticMode, setStatisticMode] = useState<StatisticMode>(fixedMode || 'count');
   const statisticAccent = 'var(--accent-color)';
   const accentSoft = 'color-mix(in srgb, var(--accent-color) 12%, white)';
   const accentMuted = 'color-mix(in srgb, var(--accent-color) 42%, #a8a29e)';
@@ -186,8 +179,6 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
   }, [activity, filteredLogs]);
 
   const filledValueCount = filteredLogs.reduce((total, log) => total + (log.attributeValues || []).length, 0);
-  const hasChoiceAttributes = attributes.some((attribute) => attribute.type === 'single' || attribute.type === 'multi');
-
   if (logs.length === 0) {
     return <div className="py-20 text-center text-sm text-stone-400">暂无可分析的属性数据</div>;
   }
@@ -213,21 +204,6 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
               </button>
             ))}
           </div>
-          {hasChoiceAttributes && (
-            <div className="flex max-w-full overflow-x-auto rounded-lg border border-stone-200 bg-white p-0.5 no-scrollbar" aria-label="切换统计维度">
-              {STATISTIC_MODE_OPTIONS.map((option) => (
-                <button
-                  key={option.key}
-                  type="button"
-                  onClick={() => setStatisticMode(option.key)}
-                  className={`whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs transition-colors ${statisticMode === option.key ? 'font-medium text-stone-900' : 'text-stone-400 hover:text-stone-700'}`}
-                  style={statisticMode === option.key ? { backgroundColor: accentSoft, color: statisticAccent } : undefined}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </div>}
 
@@ -359,10 +335,18 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                       <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="aspect-[10/3] w-full overflow-visible" role="img" aria-label={`${attribute.name} 数值分布`}>
                         <line x1="0" y1={chartBottom} x2={chartWidth} y2={chartBottom} stroke="#e7e5e4" strokeWidth="1" />
                         {histogramBins.map((bin, index) => {
-                          const barWidth = chartWidth / histogramBinCount - 4;
-                          const x = index * (chartWidth / histogramBinCount) + 2;
-                          const height = (bin.count / histogramMaxCount) * 66;
-                          return <rect key={`${bin.start}-${index}`} x={x} y={chartBottom - height} width={barWidth} height={height} rx="3" fill={statisticAccent} opacity={0.35 + (bin.count / histogramMaxCount) * 0.55} />;
+                          const slotWidth = chartWidth / histogramBinCount;
+                          const center = index * slotWidth + slotWidth / 2;
+                          const barWidth = Math.min(24, slotWidth * 0.58);
+                          const stripeCount = bin.count > 0 ? Math.max(1, Math.ceil((bin.count / histogramMaxCount) * 16)) : 0;
+                          return <g key={`${bin.start}-${index}`} aria-label={`${formatNumber(bin.start)} 至 ${formatNumber(bin.end)}：${bin.count} 条`}>
+                            {Array.from({ length: stripeCount }, (_, stripeIndex) => {
+                              const y = chartBottom - 4 - stripeIndex * 4;
+                              const inset = (stripeIndex % 3) * 1.5;
+                              return <line key={stripeIndex} x1={center - barWidth / 2 + inset} y1={y} x2={center + barWidth / 2 - inset} y2={y} stroke={statisticAccent} strokeWidth="2" strokeLinecap="round" opacity={0.46 + (stripeIndex / Math.max(stripeCount, 1)) * 0.34} />;
+                            })}
+                            {bin.count > 0 && <text x={center} y={Math.max(10, chartBottom - stripeCount * 4 - 8)} textAnchor="middle" fill="#57534e" fontSize="9" fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace">{bin.count}</text>}
+                          </g>;
                         })}
                       </svg>
                       <div className="mt-1 flex justify-between text-[10px] text-stone-400"><span>{formatNumber(histogramMin)}</span><span>{formatNumber(histogramMax)}</span></div>
@@ -397,14 +381,11 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
             }
 
             const selectedByOption = new Map<string, number>();
-            let totalMetric = 0;
             attributeLogs.forEach((log) => {
               const logValues = (log.attributeValues || []).filter((value) => value.attributeId === attributeId);
               logValues.forEach((value) => {
                 const optionIds = 'optionId' in value ? [value.optionId] : 'optionIds' in value ? value.optionIds : [];
-                const metric = statisticMode === 'duration' ? getLogDurationSeconds(log) : 1;
-                totalMetric += metric;
-                optionIds.forEach((optionId) => selectedByOption.set(optionId, (selectedByOption.get(optionId) || 0) + metric));
+                optionIds.forEach((optionId) => selectedByOption.set(optionId, (selectedByOption.get(optionId) || 0) + 1));
               });
             });
             const options = new Map<string, ActivityAttributeOption>((attribute.options || []).map((option) => [option.id, option]));
@@ -412,19 +393,15 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
             const rankedOptions = [...selectedByOption.entries()].sort((left, right) => right[1] - left[1]);
             const maxOptionMetric = Math.max(...rankedOptions.map(([, metric]) => metric), 1);
             return (
-              <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`${attribute.type === 'single' ? 'SINGLE' : 'MULTI'} / ${attribute.type === 'single' ? '单选' : '多选'}`} rangeLabel={rangeLabel} count={statisticMode === 'duration' ? `${formatDuration(totalMetric)} 时长` : `${values.length} 条已填写`}>
+              <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`${attribute.type === 'single' ? 'SINGLE' : 'MULTI'} / ${attribute.type === 'single' ? '单选' : '多选'}`} rangeLabel={rangeLabel} count={`${values.length} 条已填写`}>
                 <div className="space-y-3">
                   {rankedOptions.map(([optionId, metric], index) => {
                     const option = options.get(optionId);
                     const color = index === 0 ? statisticAccent : index < 3 ? accentMuted : '#d6d3d1';
                     const relativeWidth = metric > 0 ? Math.max((metric / maxOptionMetric) * 100, 3) : 0;
-                    const tickCount = Math.max(0, Math.round(metric));
-                    const unitGap = maxOptionMetric > 48 ? 1 : maxOptionMetric > 24 ? 2 : 3;
-                    const unitCount = Math.max(1, Math.ceil(maxOptionMetric));
-                    const unitWidth = `calc((100% - ${(unitCount - 1) * unitGap}px) / ${unitCount})`;
                     return <div key={optionId}>
-                      <div className="mb-1 flex items-center justify-between gap-3 text-xs"><span className="flex min-w-0 items-center gap-2 text-stone-600"><span className="w-5 shrink-0 font-mono text-[10px] text-stone-400">{String(index + 1).padStart(2, '0')}</span><span className="truncate">{option?.label || MISSING_OPTION}</span></span><span className="shrink-0 font-mono text-stone-400">{statisticMode === 'duration' ? formatDuration(metric) : metric}</span></div>
-                      {statisticMode === 'duration' ? <div className="h-2 overflow-hidden rounded-full bg-stone-100" aria-label={`${option?.label || MISSING_OPTION} 相对时长条`}><div className="h-full rounded-full transition-all" style={{ width: `${relativeWidth}%`, backgroundColor: color, opacity: Math.max(0.55, 1 - index * 0.12) }} /></div> : <div className="flex h-4 w-full min-w-0 items-center overflow-hidden border-b border-stone-200" aria-label={`${option?.label || MISSING_OPTION} ${tickCount} 次，每个单位块代表一次选择`}><div className="flex h-2 w-full min-w-0 items-center rounded-[2px] bg-stone-100/70" style={{ gap: `${unitGap}px` }}>{Array.from({ length: tickCount }, (_, tickIndex) => <span key={tickIndex} className="block h-2 flex-none rounded-[2px]" style={{ width: unitWidth, backgroundColor: color, opacity: Math.max(0.55, 1 - index * 0.12), boxShadow: tickIndex % 5 === 4 ? 'inset -1px 0 rgba(255,255,255,0.7)' : undefined }} />)}</div></div>}
+                      <div className="mb-1 flex items-center justify-between gap-3 text-xs"><span className="flex min-w-0 items-center gap-2 text-stone-600"><span className="w-5 shrink-0 font-mono text-[10px] text-stone-400">{String(index + 1).padStart(2, '0')}</span><span className="truncate">{option?.label || MISSING_OPTION}</span></span><span className="shrink-0 font-mono text-stone-400">{metric}</span></div>
+                      <div className="h-2 overflow-hidden rounded-full bg-stone-100" aria-label={`${option?.label || MISSING_OPTION} ${metric} 次`}><div className="h-full rounded-full transition-all" style={{ width: `${relativeWidth}%`, backgroundColor: color, opacity: Math.max(0.55, 1 - index * 0.12) }} /></div>
                     </div>;
                   })}
                 </div>
@@ -438,11 +415,10 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
 };
 
 const CARD_TYPE_LABELS: Record<ActivityStatisticCardType, string> = {
-  textCloud: '词云', numberTrend: '数值趋势', numberArea: '面积趋势', numberHistogram: '数值分布', numberBox: '数值箱线图', numberCalendar: '数值日历', numberKpi: '数值概览', choiceBar: '选项分布', choiceDonut: '选项环形图', choiceHeatmap: '选项热力图'
+  textCloud: '词云', numberArea: '面积趋势', numberHistogram: '数值分布', numberBox: '数值箱线图', numberCalendar: '数值日历', numberKpi: '数值概览', choiceBar: '选项分布', choiceDonut: '选项环形图', choiceHeatmap: '选项热力图'
 };
 const CARD_TYPE_ICONS: Record<ActivityStatisticCardType, React.ComponentType<{ size?: number }>> = {
   textCloud: Type,
-  numberTrend: LineChart,
   numberArea: LineChart,
   numberHistogram: BarChart3,
   numberBox: Table2,
@@ -590,13 +566,13 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
       source: next.source,
       chartType: nextType || 'textCloud',
       range: nextType === 'numberCalendar' ? 'year' : selectedCard.range,
-       metric: nextType === 'numberTrend' || nextType === 'numberArea' || nextType === 'numberHistogram' || nextType === 'numberBox' || nextType === 'numberCalendar' ? 'value' : nextType === 'choiceBar' || nextType === 'choiceDonut' ? selectedCard.metric === 'duration' ? 'duration' : 'count' : 'count'
+       metric: nextType === 'numberArea' || nextType === 'numberHistogram' || nextType === 'numberBox' || nextType === 'numberCalendar' || nextType === 'numberKpi' ? 'value' : 'count'
     });
   };
 
   const changeExistingType = (type: ActivityStatisticCardType) => {
     if (!selectedCard) return;
-    updateSelectedCard({ chartType: type, range: type === 'numberCalendar' ? 'year' : selectedCard.range, metric: type === 'numberTrend' || type === 'numberArea' || type === 'numberHistogram' || type === 'numberBox' || type === 'numberCalendar' ? 'value' : type === 'choiceBar' || type === 'choiceDonut' ? selectedCard.metric === 'duration' ? 'duration' : 'count' : 'count' });
+    updateSelectedCard({ chartType: type, range: type === 'numberCalendar' ? 'year' : selectedCard.range, metric: type === 'numberArea' || type === 'numberHistogram' || type === 'numberBox' || type === 'numberCalendar' || type === 'numberKpi' ? 'value' : 'count' });
   };
 
   const renderCard = (card: ActivityStatisticCard) => {
@@ -616,13 +592,13 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     if (card.chartType === 'choiceHeatmap') {
        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE HEATMAP / {attribute.type === 'single' ? '单选' : '多选'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceHeatmapPreview attribute={attribute} logs={attributeLogs} mode="count" range={card.range} /></section>;
     }
-     return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [attribute] }} logs={attributeLogs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} rangeLabel={rangeLabel} onChange={undefined} /></section>;
+     return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [attribute] }} logs={attributeLogs} hideToolbar chartVariant={card.chartType} rangeLabel={rangeLabel} onChange={undefined} /></section>;
   };
 
   const addCard = () => {
     const source = sourceChoices[0]?.source || { type: 'note' as const };
     const chartType = getChartTypesForSource(source, attributes)[0] || 'textCloud';
-    const newCard: ActivityStatisticCard = { id: crypto.randomUUID(), source, chartType, range: chartType === 'numberCalendar' ? 'year' : '30d', metric: chartType === 'numberTrend' || chartType === 'numberArea' || chartType === 'numberHistogram' || chartType === 'numberBox' || chartType === 'numberCalendar' ? 'value' : 'count', order: cards.length };
+    const newCard: ActivityStatisticCard = { id: crypto.randomUUID(), source, chartType, range: chartType === 'numberCalendar' ? 'year' : '30d', metric: chartType === 'numberArea' || chartType === 'numberHistogram' || chartType === 'numberBox' || chartType === 'numberCalendar' || chartType === 'numberKpi' ? 'value' : 'count', order: cards.length };
     commit([...cards, newCard]);
     setSelectedCardId(newCard.id);
     setManageOpen(true);
@@ -662,7 +638,6 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
                 <CustomSelect label="数据来源" value={sourceToKey(selectedCard.source)} options={sourceChoices.map((item) => ({ value: item.key, label: item.label }))} onChange={changeExistingSource} renderDropdownInPortal />
                 <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">图表类型</p><div className="grid grid-cols-2 gap-2">{selectedTypes.map((type) => { const Icon = CARD_TYPE_ICONS[type]; return <button key={type} type="button" onClick={() => changeExistingType(type)} className={`inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-left text-xs transition-colors ${selectedCard.chartType === type ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70] hover:border-[#c9b6a4]'}`}><Icon size={14} /><span>{CARD_TYPE_LABELS[type]}</span></button>; })}</div></div>
                 <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">时间范围</p><div className="flex flex-wrap gap-1.5">{(selectedCard.chartType === 'numberCalendar' ? RANGE_OPTIONS.filter((option) => option.key === 'year') : RANGE_OPTIONS).map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ range: option.key })} className={`rounded-md border px-2.5 py-1.5 text-xs ${selectedCard.range === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>
-                {(selectedCard.chartType === 'choiceBar' || selectedCard.chartType === 'choiceDonut') && <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">统计维度</p><div className="flex gap-1.5">{STATISTIC_MODE_OPTIONS.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ metric: option.key })} className={`rounded-md border px-3 py-1.5 text-xs ${selectedCard.metric === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>}
               </div>
             )}
             <button type="button" onClick={() => commit(ensureStatisticCards({ ...activity, statisticCards: cards }))} className="mt-5 text-xs text-[#9b5c3f] underline-offset-2 hover:underline">恢复默认卡片</button>
