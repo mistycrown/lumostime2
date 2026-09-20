@@ -320,6 +320,26 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                 }));
                 const calendarMax = Math.max(...dailyValues.values(), 1);
                 const calendarMonths = [...new Set(calendarDays.map((day) => day.slice(0, 7)))];
+                if (range === '7d') {
+                  const weekdayLabels = ['日', '一', '二', '三', '四', '五', '六'];
+                  return (
+                    <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '近 7 天'}`} rangeLabel={rangeLabel || getRangeLabel(range)} count={`${numbers.length} 条已填写`}>
+                      <div className="mt-5 py-1">
+                        <div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-stone-400"><span>近 7 日投入</span><span>按日合计</span></div>
+                        <div className="grid grid-cols-7 gap-2">
+                          {calendarDays.map((day) => {
+                            const value = dailyValues.get(day) || 0;
+                            const [year, month, dayOfMonth] = day.split('-').map(Number);
+                            const weekday = weekdayLabels[new Date(year, month - 1, dayOfMonth).getDay()];
+                            const intensity = value ? 0.3 + (value / calendarMax) * 0.7 : 1;
+                            const valueLabel = value ? `${formatNumber(value)}${attribute.unit ? ` ${attribute.unit}` : ''}` : '无记录';
+                            return <div key={day} aria-label={`${getDateLabel(day)} 周${weekday} · ${valueLabel}`} className="min-w-0 text-center"><div className="text-[9px] text-stone-400">周{weekday}</div><div className="mt-0.5 font-mono text-[10px] text-stone-600">{getDateLabel(day)}</div><div className="mt-2 h-12 rounded-[3px] border border-stone-200" style={{ backgroundColor: value ? statisticAccent : '#f5f5f4', opacity: value ? intensity : 1 }} /><div className="mt-1 truncate font-mono text-[9px] text-stone-500" title={valueLabel}>{value ? formatNumber(value) : '—'}</div></div>;
+                          })}
+                        </div>
+                      </div>
+                    </AttributeSection>
+                  );
+                }
                 return (
                   <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '全年日历'}`} rangeLabel={rangeLabel || getRangeLabel(range)} count={`${numbers.length} 条已填写`}>
                     <div className="mt-5 py-1">
