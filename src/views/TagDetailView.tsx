@@ -1,6 +1,6 @@
 /**
  * @file TagDetailView.tsx
- * @updated 2026-09-20: Moves unlocked keyword color sequence controls into a compact title action popover.
+ * @updated 2026-09-20: Places the unlocked keyword color sequence action beside the title and opens a centered modal.
  * @updated 2026-09-20: Adds shared, unlock-aware keyword color sequences without changing existing keyword colors.
  * @updated 2026-09-12: Added a contextual hint beside tag keyword management.
  * @updated 2026-09-07: Uses the shared detail timeline attribute row rendered below notes.
@@ -41,7 +41,7 @@ import { AssociatedTodoList } from '../components/AssociatedTodoList';
 import { filterCountableLogs } from '../utils/statLogUtils';
 import { ActivityAttributeManager } from '../components/ActivityAttributeManager';
 import { ActivityAttributeStatistics } from '../components/ActivityAttributeStatistics';
-import { ChartPaletteSelector } from '../components/ChartPaletteSelector';
+import { KeywordColorSequenceModal } from '../components/KeywordColorSequenceModal';
 import { FeatureHint } from '../components/FeatureHint';
 import { getDefaultKeywordColor, getRandomKeywordColor, normalizeActivityKeywords, syncActivityKeywordsWithAttribute } from '../utils/detailTimelineKeywordUtils';
 import { createDefaultStatisticCard, normalizeStatisticCards } from '../utils/activityStatisticCardUtils';
@@ -94,7 +94,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    const [newKeyword, setNewKeyword] = useState(''); // New State for adding keyword
    const [keywordColorTarget, setKeywordColorTarget] = useState<string | null>(null);
    const [keywordColorDraft, setKeywordColorDraft] = useState<string | null>(null);
-   const [isKeywordSequencePopoverOpen, setIsKeywordSequencePopoverOpen] = useState(false);
+   const [isKeywordSequenceModalOpen, setIsKeywordSequenceModalOpen] = useState(false);
    const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false); // State for category dropdown
    const customColors = useCustomColors();
    const customSequences = useChartPaletteSequences();
@@ -661,59 +661,31 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                      <div className="mb-7 flex items-start justify-between gap-4">
                         <div>
                            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">05 / Keywords</p>
-                           <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900">关键字</h2>
-                         </div>
-                         <div className="flex items-start gap-1">
-                           {isSponsorshipUnlocked && (
-                              <div className="relative">
+                           <div className="mt-1 flex items-center gap-2">
+                              <h2 className="text-xl font-semibold tracking-tight text-stone-900">关键字</h2>
+                              {isSponsorshipUnlocked && (
                                  <button
                                     type="button"
-                                    onClick={() => setIsKeywordSequencePopoverOpen((open) => !open)}
-                                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
-                                       isKeywordSequencePopoverOpen || activity.keywordColorSequenceEnabled
+                                    onClick={() => setIsKeywordSequenceModalOpen(true)}
+                                    className={`inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
+                                       activity.keywordColorSequenceEnabled
                                           ? 'bg-stone-100 text-stone-800'
                                           : 'text-stone-400 hover:bg-stone-100 hover:text-stone-700'
                                     }`}
                                     title="关键字色彩序列"
                                     aria-label="关键字色彩序列"
-                                    aria-expanded={isKeywordSequencePopoverOpen}
                                  >
-                                    <Palette size={16} strokeWidth={1.8} />
+                                    <Palette size={15} strokeWidth={1.8} />
                                  </button>
-                                 {isKeywordSequencePopoverOpen && (
-                                    <div className="absolute right-0 top-10 z-30 w-[min(22rem,calc(100vw-3.5rem))] rounded-xl border border-stone-200 bg-white p-4 shadow-lg">
-                                       <div className="mb-3 flex items-center justify-between gap-3">
-                                          <span className="text-xs font-medium text-stone-800">使用色彩序列</span>
-                                          <input
-                                             type="checkbox"
-                                             checked={Boolean(activity.keywordColorSequenceEnabled)}
-                                             onChange={(event) => setActivity({
-                                                ...activity,
-                                                keywordColorSequenceEnabled: event.target.checked || undefined,
-                                                keywordColorSequenceId: activity.keywordColorSequenceId || 'default'
-                                             })}
-                                             className="h-4 w-4 accent-stone-800"
-                                          />
-                                       </div>
-                                       {activity.keywordColorSequenceEnabled && (
-                                          <ChartPaletteSelector
-                                             value={effectiveKeywordSequenceId}
-                                             onChange={(keywordColorSequenceId) => setActivity({ ...activity, keywordColorSequenceId })}
-                                             customSequences={customSequences}
-                                             unlocked={isSponsorshipUnlocked}
-                                          />
-                                       )}
-                                    </div>
-                                 )}
-                              </div>
-                           )}
-                           <FeatureHint
+                              )}
+                           </div>
+                        </div>
+                        <FeatureHint
                            hintId="tag-detail-keywords"
                            message={'在此设置关键字，然后在添加记录时，备注输入关键字，系统会提示关联到此标签。\n\n偏好设置中，可以设置是否默认跳转到备注输入框，以便快速输入关键字。\n\n另外，在添加补记时，点击Total time 也可以快速定位至备注输入框，以快速输入关键字。'}
                            iconSize={12}
-                           />
-                         </div>
-                      </div>
+                        />
+                     </div>
                      <div className="space-y-5">
                         <div className="flex flex-wrap gap-2">
                            {keywordRecords.map((keyword) => (
@@ -752,6 +724,15 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                         </div>
                      </div>
                   </section>
+                  <KeywordColorSequenceModal
+                     isOpen={isKeywordSequenceModalOpen}
+                     activity={activity}
+                     customSequences={customSequences}
+                     effectiveSequenceId={effectiveKeywordSequenceId}
+                     unlocked={isSponsorshipUnlocked}
+                     onChange={setActivity}
+                     onClose={() => setIsKeywordSequenceModalOpen(false)}
+                  />
                   {keywordColorTarget && (() => {
                      const target = keywordRecords.find((keyword) => keyword.label === keywordColorTarget);
                      if (!target) return null;
