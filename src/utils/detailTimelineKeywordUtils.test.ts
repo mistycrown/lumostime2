@@ -5,6 +5,7 @@
  * @pos Utility test
  * @description Verifies attribute selections join keyword calendars without replacing existing note keyword behavior.
  * @updated 2026-09-03: Created for Activity attribute keyword sources.
+ * @updated 2026-09-20: Covers caller-provided color sequences for newly created attribute keywords.
  */
 import { describe, expect, it } from 'vitest';
 import { ActivityAttributeDefinition, Log } from '../types';
@@ -81,5 +82,18 @@ describe('detailTimelineKeywordUtils', () => {
     expect(renamed).toHaveLength(1);
     expect(renamed[0]).toMatchObject({ label: '跑步', optionId: 'run', color: '#123456' });
     expect(syncActivityKeywordsWithAttribute(renamed, [{ ...keywordAttribute, isKeywordSource: false }])).toEqual([]);
+  });
+
+  it('uses the supplied sequence only for newly registered attribute keywords', () => {
+    const result = syncActivityKeywordsWithAttribute(
+      [{ label: '已有关键字', source: 'manual', color: '#111111' }],
+      [keywordAttribute],
+      (index) => ['#112233', '#445566', '#778899'][index % 3]
+    );
+
+    expect(result.find((keyword) => keyword.label === '已有关键字')?.color).toBe('#111111');
+    expect(result.filter((keyword) => keyword.source === 'attribute').map((keyword) => keyword.color)).toEqual([
+      '#445566', '#778899', '#112233'
+    ]);
   });
 });

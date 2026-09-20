@@ -1,6 +1,6 @@
 /**
  * @file TagDetailView.tsx
- * @updated 2026-09-20: Vertically centered the keyword section hint beside its title.
+ * @updated 2026-09-20: Adds shared, unlock-aware keyword color sequences without changing existing keyword colors.
  * @updated 2026-09-12: Added a contextual hint beside tag keyword management.
  * @updated 2026-09-07: Uses the shared detail timeline attribute row rendered below notes.
  * @updated 2026-09-03: Passes the selected attribute keyword source into the detail keyword calendar.
@@ -40,9 +40,13 @@ import { AssociatedTodoList } from '../components/AssociatedTodoList';
 import { filterCountableLogs } from '../utils/statLogUtils';
 import { ActivityAttributeManager } from '../components/ActivityAttributeManager';
 import { ActivityAttributeStatistics } from '../components/ActivityAttributeStatistics';
+import { ChartPaletteSelector } from '../components/ChartPaletteSelector';
 import { FeatureHint } from '../components/FeatureHint';
 import { getDefaultKeywordColor, getRandomKeywordColor, normalizeActivityKeywords, syncActivityKeywordsWithAttribute } from '../utils/detailTimelineKeywordUtils';
 import { createDefaultStatisticCard, normalizeStatisticCards } from '../utils/activityStatisticCardUtils';
+import { getChartPalette } from '../utils/chartPalette';
+import { useChartPaletteSequences } from '../hooks/useChartPaletteSequences';
+import { useSponsorshipUnlocked } from '../hooks/useSponsorshipUnlocked';
 
 
 interface TagDetailViewProps {
@@ -91,13 +95,21 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    const [keywordColorDraft, setKeywordColorDraft] = useState<string | null>(null);
    const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false); // State for category dropdown
    const customColors = useCustomColors();
+   const customSequences = useChartPaletteSequences();
+   const isSponsorshipUnlocked = useSponsorshipUnlocked();
+   const keywordSequenceId = activity?.keywordColorSequenceId || 'default';
+   const effectiveKeywordSequenceId = isSponsorshipUnlocked ? keywordSequenceId : 'default';
+   const keywordSequence = useMemo(() => getChartPalette(effectiveKeywordSequenceId, customSequences), [customSequences, effectiveKeywordSequenceId]);
+   const getNewKeywordColor = (index: number) => activity?.keywordColorSequenceEnabled
+      ? keywordSequence.colors[index % keywordSequence.colors.length]
+      : getRandomKeywordColor();
    const keywordAttribute = useMemo(() => (activity?.attributes || []).find((attribute) => (
       attribute.isKeywordSource
       && !attribute.isArchived
       && (attribute.type === 'single' || attribute.type === 'multi')
    )), [activity?.attributes]);
 
-   const keywordRecords = useMemo(() => syncActivityKeywordsWithAttribute(activity?.keywords || [], activity?.attributes || []), [activity?.attributes, activity?.keywords]);
+   const keywordRecords = useMemo(() => syncActivityKeywordsWithAttribute(activity?.keywords || [], activity?.attributes || [], getNewKeywordColor), [activity?.attributes, activity?.keywords, keywordSequence.colors, activity?.keywordColorSequenceEnabled]);
 
    useEffect(() => {
       if (!activity) return;
@@ -120,6 +132,8 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
             activity.enableFocusScore !== initialActivity.enableFocusScore ||
             activity.enableMoodScore !== initialActivity.enableMoodScore ||
             activity.isArchived !== initialActivity.isArchived ||
+            activity.keywordColorSequenceEnabled !== initialActivity.keywordColorSequenceEnabled ||
+            activity.keywordColorSequenceId !== initialActivity.keywordColorSequenceId ||
             JSON.stringify(activity.keywords) !== JSON.stringify(initialActivity.keywords) ||
             JSON.stringify(activity.noteTemplates || []) !== JSON.stringify(initialActivity.noteTemplates || []) ||
             JSON.stringify(activity.attributes || []) !== JSON.stringify(initialActivity.attributes || []) ||
@@ -321,7 +335,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
       if (!currentKeywords.some((keyword) => keyword.label === newKeyword.trim())) {
          setActivity({
             ...activity,
-            keywords: [...currentKeywords, { label: newKeyword.trim(), source: 'manual', color: getRandomKeywordColor() }]
+            keywords: [...currentKeywords, { label: newKeyword.trim(), source: 'manual', color: getNewKeywordColor(currentKeywords.length) }]
          });
       }
       setNewKeyword('');
@@ -364,7 +378,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
       const nextCards = attributes.reduce((cards, attribute) => (
          knownAttributeIds.has(attribute.id) ? cards : [...cards, createDefaultStatisticCard(attribute, cards.length)]
       ), existingCards).map((card, index) => ({ ...card, order: index }));
-      setActivity({ ...activity, attributes, statisticCards: nextCards, keywords: syncActivityKeywordsWithAttribute(activity.keywords || [], attributes) });
+      setActivity({ ...activity, attributes, statisticCards: nextCards, keywords: syncActivityKeywordsWithAttribute(activity.keywords || [], attributes, getNewKeywordColor) });
    };
 
    const renderContent = () => {
@@ -687,6 +701,31 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                               <Plus size={18} />
                            </button>
                         </div>
+                        <div className="border-t border-stone-100 pt-4">
+                           <label className="flex items-center justify-between gap-3 text-sm text-stone-700">
+                              <span>使用色彩序列</span>
+                              <input
+                                 type="checkbox"
+                                 checked={Boolean(activity.keywordColorSequenceEnabled)}
+                                 onChange={(event) => setActivity({
+                                    ...activity,
+                                    keywordColorSequenceEnabled: event.target.checked || undefined,
+                                    keywordColorSequenceId: activity.keywordColorSequenceId || 'default'
+                                 })}
+                                 className="h-4 w-4 accent-stone-800"
+                              />
+                           </label>
+                           {activity.keywordColorSequenceEnabled && (
+                              <div className="mt-3">
+                                 <ChartPaletteSelector
+                                    value={effectiveKeywordSequenceId}
+                                    onChange={(keywordColorSequenceId) => setActivity({ ...activity, keywordColorSequenceId })}
+                                    customSequences={customSequences}
+                                    unlocked={isSponsorshipUnlocked}
+                                 />
+                              </div>
+                           )}
+                        </div>
                      </div>
                   </section>
                   {keywordColorTarget && (() => {
@@ -698,6 +737,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                            <div className="grid grid-cols-8 gap-2">
                               {COLOR_OPTIONS.map((option) => <button key={option.id} type="button" onClick={() => setKeywordColorDraft(option.hex)} className={`h-7 w-7 rounded-full border border-white shadow-sm ring-1 ring-stone-200 ${keywordColorDraft === option.hex ? 'ring-2 ring-stone-800' : ''}`} style={{ backgroundColor: option.hex }} aria-label={option.label} />)}
                               {customColors.map((option) => <button key={option.id} type="button" onClick={() => setKeywordColorDraft(option.color)} className={`h-7 w-7 rounded-full border border-white shadow-sm ring-1 ring-stone-200 ${keywordColorDraft === option.color ? 'ring-2 ring-stone-800' : ''}`} style={{ backgroundColor: option.color }} aria-label="自定义颜色" />)}
+                              {activity.keywordColorSequenceEnabled && keywordSequence.colors.map((color, index) => <button key={`sequence-${index}-${color}`} type="button" onClick={() => setKeywordColorDraft(color)} className={`h-7 w-7 rounded-full border border-white shadow-sm ring-1 ring-stone-200 ${keywordColorDraft === color ? 'ring-2 ring-stone-800' : ''}`} style={{ backgroundColor: color }} aria-label={`${keywordSequence.label} ${index + 1}`} />)}
                            </div>
                            <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => { setKeywordColorTarget(null); setKeywordColorDraft(null); }} className="rounded-lg px-3 py-2 text-xs text-stone-500 hover:bg-stone-50">取消</button><button type="button" onClick={confirmKeywordColor} className="rounded-lg bg-stone-800 px-3 py-2 text-xs font-medium text-white hover:bg-stone-700">确定</button></div>
                         </div>

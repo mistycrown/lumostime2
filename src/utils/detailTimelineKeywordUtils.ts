@@ -4,7 +4,7 @@
  * @output Normalized keyword records, label candidates, and per-log keyword matches.
  * @pos Shared detail timeline utility
  * @description Centralizes Activity keyword migration, attribute registration, and timeline matching.
- * @updated 2026-09-15: Unified manual and Activity attribute keywords with persisted colors.
+ * @updated 2026-09-20: Accepts a caller-supplied color generator for newly registered keyword-source options.
  */
 import { Activity, ActivityAttributeDefinition, ActivityKeyword, Log } from '../types';
 
@@ -34,7 +34,8 @@ const getActiveKeywordOptions = (attribute?: ActivityAttributeDefinition) => (
 
 export const syncActivityKeywordsWithAttribute = (
   keywords: Array<string | ActivityKeyword> = [],
-  attributes: ActivityAttributeDefinition[] = []
+  attributes: ActivityAttributeDefinition[] = [],
+  getNewKeywordColor: (index: number) => string = () => getRandomKeywordColor()
 ): ActivityKeyword[] => {
   const normalized = normalizeActivityKeywords(keywords);
   const keywordAttribute = attributes.find((attribute) => (
@@ -56,7 +57,7 @@ export const syncActivityKeywordsWithAttribute = (
     }
     retained.push({
       label: option.label.trim(),
-      color: getRandomKeywordColor(),
+      color: getNewKeywordColor(retained.length),
       source: 'attribute',
       attributeId: keywordAttribute.id,
       optionId: option.id

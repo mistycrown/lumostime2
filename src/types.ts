@@ -1,6 +1,6 @@
 /**
  * @file types.ts
- * @updated 2026-09-15: Added structured Activity keyword records with source and color metadata.
+ * @updated 2026-09-20: Adds per-tag keyword color sequence settings for newly created keywords.
  * @updated 2026-09-17: Added activity statistic card sources and per-card chart configuration.
  * @updated 2026-09-20: Added activity-level statistic palette groups.
  * @updated 2026-09-19: Added numeric box and calendar statistic card types.
@@ -141,6 +141,8 @@ export interface Activity {
   enableFocusScore?: boolean; // Override parent setting
   enableMoodScore?: boolean; // Override parent setting for mood tracking
   keywords?: Array<string | ActivityKeyword>; // Keywords for finer classification; strings are legacy-compatible
+  keywordColorSequenceEnabled?: boolean;
+  keywordColorSequenceId?: ActivityStatisticPaletteId;
   noteTemplates?: NoteTemplate[];
   attributes?: ActivityAttributeDefinition[];
   statisticCards?: ActivityStatisticCard[];
