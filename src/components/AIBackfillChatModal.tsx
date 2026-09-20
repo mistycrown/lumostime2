@@ -5,6 +5,7 @@
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
  * @updated 2026-09-14: Syncs the configured persona name with the native background snapshot for Android notifications.
+ * @updated 2026-09-20: Resets assistant-part reveal state before in-place reply retries so reused message IDs render metadata after the retried response completes.
  * @updated 2026-09-19: Builds the newspaper snapshot only after review context values are initialized.
  * @updated 2026-09-03: Reloads restored personas, prompt blocks, and long-term memory into mounted chat state so cloud restores cannot be overwritten by stale React state.
  * @updated 2026-09-15: Uses the current session persona name for native-reply Toast messages so in-app alerts match Android notifications.
@@ -1008,6 +1009,20 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     });
     assistantPartRevealTimeoutsRef.current.clear();
   }, []);
+  const resetAssistantPartRevealState = useCallback((messageId: string) => {
+    clearAssistantPartRevealTimeouts(messageId);
+    delete revealedAssistantPartCountsRef.current[messageId];
+    assistantRevealTargetCountsRef.current.delete(messageId);
+    setRevealedAssistantPartCounts((current) => {
+      if (!(messageId in current)) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[messageId];
+      return next;
+    });
+  }, [clearAssistantPartRevealTimeouts]);
   const toggleMemoryUpdateExpansion = useCallback((messageId: string) => {
     setExpandedMemoryUpdateMessageIds((current) => {
       const next = new Set(current);
@@ -6764,6 +6779,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
 
     retryingMessageIdRef.current = message.id;
+    resetAssistantPartRevealState(message.id);
 
     try {
       if (message.remindersBefore) {
