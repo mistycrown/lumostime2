@@ -22,6 +22,7 @@ import { TimelineStyleSelector } from '../components/TimelineStyleSelector';
 import { ScheduleStyleSelector } from '../components/ScheduleStyleSelector';
 import { ColorSchemeSelector } from '../components/ColorSchemeSelector';
 import { CustomColorGroupManager } from '../components/CustomColorGroupManager';
+import { ChartPaletteSequenceManager } from '../components/ChartPaletteSequenceManager';
 import { AchievementBottleIconPackSelector } from '../components/achievement/AchievementBottleIconPackSelector';
 import { AchievementBottleStyleSelector } from '../components/achievement/AchievementBottleStyleSelector';
 import { CalendarNumberStyleSelector } from '../components/CalendarNumberStyleSelector';
@@ -1464,6 +1465,9 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                             <span className="text-xs text-stone-400">输入色值保存</span>
                                         </div>
                                         <CustomColorGroupManager onToast={onToast} />
+                                    </div>
+                                    <div className="bg-white rounded-2xl p-5 shadow-sm">
+                                        <ChartPaletteSequenceManager onToast={onToast} />
                                     </div>
                                 </div>
                             )}
