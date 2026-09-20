@@ -4,7 +4,7 @@
  * @output The AI assistant landing workspace with entry points into chat and assistant tools
  * @pos Component (AI Integration)
  * @description Presents an editorial AI workbench before the user enters a conversation.
- * @updated 2026-09-20: Removed the composer separator line and increased the spacing before the shortcut section.
+ * @updated 2026-09-20: Removed the composer separator line and kept compact spacing before the shortcut section.
  */
 import React, { useMemo, useRef, useState } from 'react';
 import {
@@ -261,7 +261,7 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
               </div>
             </section>
 
-            <section className="pt-8 pb-3">
+            <section className="pt-4 pb-3">
               <SectionHeading index="02" icon={Zap} title="快捷指令" theme={theme} action={<button type="button" onClick={onOpenSettings} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }} title="设置快捷指令" aria-label="设置快捷指令"><Settings size={14} /> 设置</button>} />
               <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
                 {shortcuts.map((shortcut) => {
