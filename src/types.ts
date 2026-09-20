@@ -2,6 +2,7 @@
  * @file types.ts
  * @updated 2026-09-15: Added structured Activity keyword records with source and color metadata.
  * @updated 2026-09-17: Added activity statistic card sources and per-card chart configuration.
+ * @updated 2026-09-20: Added activity-level statistic palette groups.
  * @updated 2026-09-19: Added numeric box and calendar statistic card types.
  * @updated 2026-09-12: Added optional complete display expressions for app-awareness activity options.
  * @updated 2026-09-03: Added an optional keyword-source marker to Activity choice attributes.
@@ -95,6 +96,16 @@ export type ActivityAttributeValue =
 export type ActivityStatisticCardType = 'textCloud' | 'numberArea' | 'numberHistogram' | 'numberCalendar' | 'numberKpi' | 'choiceBar' | 'choiceDonut' | 'choiceHeatmap';
 export type ActivityStatisticRange = 'all' | '7d' | '30d' | 'year';
 export type ActivityStatisticMetric = 'value' | 'count' | 'duration' | 'average' | 'sum';
+export type ActivityStatisticPaletteId =
+  | 'theme'
+  | 'morandi-mist-blue'
+  | 'morandi-sage'
+  | 'morandi-clay'
+  | 'morandi-lotus'
+  | 'traditional-porcelain'
+  | 'traditional-cinnabar'
+  | 'traditional-bamboo'
+  | 'traditional-dai';
 
 export type ActivityStatisticCardSource =
   | { type: 'attribute'; attributeId: string }
@@ -123,6 +134,7 @@ export interface Activity {
   noteTemplates?: NoteTemplate[];
   attributes?: ActivityAttributeDefinition[];
   statisticCards?: ActivityStatisticCard[];
+  statisticPalette?: ActivityStatisticPaletteId;
   isArchived?: boolean;
 }
 
