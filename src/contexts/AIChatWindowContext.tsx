@@ -3,6 +3,7 @@
  * @description Keeps the shared AI chat window mounted at the app level so closing the modal only hides UI and does not interrupt in-flight AI execution.
  * @updated 2026-04-30: Added a shared hardware-back bridge so Android back presses can unwind AI subpages before closing the root chat window.
  * @updated 2026-04-26: Added session/message navigation targets so Android assistant notifications can reopen the shared chat at the exact background message.
+ * @updated 2026-09-20: Added a one-shot return intent for review detail pages opened from the AI workspace.
  */
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AIBackfillChatModal } from '../components/AIBackfillChatModal';
@@ -26,6 +27,9 @@ interface AIChatWindowContextValue {
   handleAIChatBack: () => boolean;
   incrementUnreadCount: (count?: number) => void;
   markAIChatRead: () => void;
+  shouldReturnToAIChat: boolean;
+  requestAIChatReturn: () => void;
+  consumeAIChatReturn: () => boolean;
 }
 
 const AIChatWindowContext = createContext<AIChatWindowContextValue | undefined>(undefined);
@@ -45,6 +49,8 @@ export const AIChatWindowProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [targetSessionId, setTargetSessionId] = useState<string | undefined>(undefined);
   const [targetMessageId, setTargetMessageId] = useState<string | undefined>(undefined);
   const [initialInputText, setInitialInputText] = useState<string | undefined>(undefined);
+  const [shouldReturnToAIChat, setShouldReturnToAIChat] = useState(false);
+  const shouldReturnToAIChatRef = useRef(false);
   const aiChatBackHandlerRef = useRef<(() => boolean) | null>(null);
 
   const openAIChat = useCallback((options?: OpenAIChatOptions) => {
@@ -62,6 +68,20 @@ export const AIChatWindowProvider: React.FC<{ children: ReactNode }> = ({ childr
     setTargetSessionId(undefined);
     setTargetMessageId(undefined);
     setInitialInputText(undefined);
+  }, []);
+
+  const requestAIChatReturn = useCallback(() => {
+    shouldReturnToAIChatRef.current = true;
+    setShouldReturnToAIChat(true);
+  }, []);
+
+  const consumeAIChatReturn = useCallback(() => {
+    const shouldReturn = shouldReturnToAIChatRef.current;
+    shouldReturnToAIChatRef.current = false;
+    if (shouldReturn) {
+      setShouldReturnToAIChat(false);
+    }
+    return shouldReturn;
   }, []);
 
   const registerAIChatBackHandler = useCallback((handler: (() => boolean) | null) => {
@@ -104,7 +124,10 @@ export const AIChatWindowProvider: React.FC<{ children: ReactNode }> = ({ childr
     closeAIChat,
     handleAIChatBack,
     incrementUnreadCount,
-    markAIChatRead
+    markAIChatRead,
+    shouldReturnToAIChat,
+    requestAIChatReturn,
+    consumeAIChatReturn
   }), [
     closeAIChat,
     handleAIChatBack,
@@ -112,7 +135,10 @@ export const AIChatWindowProvider: React.FC<{ children: ReactNode }> = ({ childr
     isAIChatOpen,
     initialInputText,
     markAIChatRead,
+    consumeAIChatReturn,
     openAIChat,
+    requestAIChatReturn,
+    shouldReturnToAIChat,
     targetDate,
     targetMessageId,
     targetSessionId,
@@ -132,6 +158,7 @@ export const AIChatWindowProvider: React.FC<{ children: ReactNode }> = ({ childr
         registerBackHandler={registerAIChatBackHandler}
         onUnreadAssistantMessage={incrementUnreadCount}
         onMarkRead={markAIChatRead}
+        onRequestReturnToAI={requestAIChatReturn}
       />
     </AIChatWindowContext.Provider>
   );
