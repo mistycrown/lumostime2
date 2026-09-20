@@ -16,7 +16,6 @@ import {
   History,
   Mail,
   MessageCircle,
-  Plus,
   Settings,
   Sparkles,
   Zap,
@@ -75,14 +74,12 @@ interface AIChatHomeProps {
   assistantLetters: AssistantLetter[];
   newspapers: AIChatNewspaperItem[];
   customPromptBlocks: AIChatCustomPromptBlock[];
-  sessions: AIChatSession[];
   sortedSessions: AIChatSession[];
   theme: AIChatHomeTheme;
   isLoading: boolean;
   formatConversationTime: (value: number) => string;
   getSessionPersona: (session: AIChatSession) => AIChatPersona;
   onOpenChat: (sessionId?: string) => void;
-  onStartNewSession: () => void;
   onOpenLetters: () => void;
   onOpenLetter: (letterId: string) => void;
   onOpenNewspaper: (item: AIChatNewspaperItem) => void;
@@ -97,10 +94,6 @@ const formatShortDate = (value: string): string => {
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
 };
-
-const getLastMessage = (session: AIChatSession) => (
-  [...session.messages].reverse().find((message) => message.tone !== 'pending')
-);
 
 const SectionHeading: React.FC<{
   index: string;
@@ -126,14 +119,12 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
   assistantLetters,
   newspapers,
   customPromptBlocks,
-  sessions,
   sortedSessions,
   theme,
   isLoading,
   formatConversationTime,
   getSessionPersona,
   onOpenChat,
-  onStartNewSession,
   onOpenLetters,
   onOpenLetter,
   onOpenNewspaper,
@@ -149,7 +140,6 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
   const [swipingLetterId, setSwipingLetterId] = useState<string | null>(null);
   const letterDragRef = useRef<{ id: string; startX: number } | null>(null);
   const suppressLetterClickRef = useRef(false);
-  const latestSession = sortedSessions[0] || sessions[0] || null;
   const pendingReminders = assistantReminders.filter((reminder) => reminder.status === 'pending');
   const feedItems = useMemo<AIChatFeedItem[]>(() => [
     ...assistantLetters.map((letter) => ({
@@ -251,29 +241,9 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
       <div className="h-full min-h-0 overflow-y-auto px-4 pb-32 pt-3 sm:px-8 sm:pb-36 sm:pt-4">
         <div className="mx-auto max-w-6xl">
           <main className="space-y-5">
-            <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
-              <section>
-                <SectionHeading index="01" icon={MessageCircle} title="继续对话" theme={theme} action={<span className="text-[9px] tracking-[0.12em]" style={{ color: theme.textFaint }}>LATEST THREAD</span>} />
-                <div className="mt-3 rounded-[0.8rem] p-4 sm:p-5" style={{ backgroundColor: theme.panelBg, boxShadow: theme.cardShadowStrong }}>
-                  {latestSession ? (
-                    <button type="button" onClick={() => onOpenChat(latestSession.id)} className="block w-full text-left">
-                      <p className="truncate font-serif text-xl sm:text-2xl" style={{ color: theme.textPrimary }}>{latestSession.title || '最近一次对话'}</p>
-                      <p className="mt-2 line-clamp-3 text-sm leading-6" style={{ color: theme.textSecondary }}>{getLastMessage(latestSession)?.content || '还没有消息，从这里开始吧。'}</p>
-                      <p className="mt-3 text-[10px] tracking-[0.08em]" style={{ color: theme.textMuted }}>{formatConversationTime(latestSession.updatedAt)}</p>
-                    </button>
-                  ) : (
-                    <p className="text-sm" style={{ color: theme.textMuted }}>还没有对话记录。</p>
-                  )}
-                  <div className="mt-4 flex flex-wrap items-center gap-4">
-                    <button type="button" onClick={() => onOpenChat(latestSession?.id)} className="inline-flex items-center gap-2 border-b pb-1 text-sm font-medium" style={{ borderColor: theme.primaryButtonBg, color: theme.primaryButtonBg }}>继续对话 <ArrowRight size={15} /></button>
-                    <button type="button" onClick={onStartNewSession} className="inline-flex items-center gap-2 border-b pb-1 text-sm" style={{ borderColor: theme.panelBorderStrong, color: theme.textSecondary }}><Plus size={15} /> 新对话</button>
-                  </div>
-                </div>
-              </section>
-
-              <section>
-                <SectionHeading index="02" icon={Mail} title="来信与小报" theme={theme} action={<button type="button" onClick={onOpenLetters} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>查看全部 <ChevronRight size={13} /></button>} />
-                <div className="relative mt-3 pr-1" style={{ minHeight: `${Math.max(8, 6.4 + visibleFeedItems.length * 1.05)}rem` }}>
+            <section>
+              <SectionHeading index="01" icon={Mail} title="来信与小报" theme={theme} action={<button type="button" onClick={onOpenLetters} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>查看全部 <ChevronRight size={13} /></button>} />
+              <div className="relative mt-3 pr-1" style={{ minHeight: `${Math.max(8, 6.4 + visibleFeedItems.length * 1.05)}rem` }}>
                   {visibleFeedItems.length === 0 ? (
                     <div className="flex h-32 items-center justify-center text-sm" style={{ color: theme.textMuted }}>暂时没有新的来信或小报</div>
                   ) : visibleFeedItems.map((item, index) => {
@@ -287,12 +257,11 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
                       <p className="mt-1.5 line-clamp-2 text-xs leading-5" style={{ color: theme.textSecondary }}>{item.preview}</p>
                     </button>;
                   })}
-                </div>
-              </section>
-            </div>
+              </div>
+            </section>
 
-            <section className="border-y py-3" style={{ borderColor: theme.panelBorder }}>
-              <SectionHeading index="03" icon={Zap} title="快捷指令" theme={theme} action={<button type="button" onClick={onOpenSettings} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }} title="设置快捷指令" aria-label="设置快捷指令"><Settings size={14} /> 设置</button>} />
+            <section className="py-3">
+              <SectionHeading index="02" icon={Zap} title="快捷指令" theme={theme} action={<button type="button" onClick={onOpenSettings} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }} title="设置快捷指令" aria-label="设置快捷指令"><Settings size={14} /> 设置</button>} />
               <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
                 {shortcuts.map((shortcut) => {
                   const Icon = shortcut.icon;
@@ -301,21 +270,21 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
               </div>
             </section>
 
-            <section className="border-y py-3" style={{ borderColor: theme.panelBorder }}>
-              <SectionHeading index="04" icon={Bell} title="提醒" theme={theme} action={<span className="text-[11px]" style={{ color: theme.textMuted }}>{pendingReminders.length} 条</span>} />
+            <section className="py-3">
+              <SectionHeading index="03" icon={Bell} title="提醒" theme={theme} action={<span className="text-[11px]" style={{ color: theme.textMuted }}>{pendingReminders.length} 条</span>} />
               {pendingReminders.length ? <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">{pendingReminders.slice(0, 3).map((reminder) => <button key={reminder.id} type="button" onClick={onOpenMemory} className="inline-flex max-w-full items-center gap-2 text-left text-xs" style={{ color: theme.textPrimary }}><Clock3 size={14} className="shrink-0" style={{ color: theme.textSecondary }} /><span className="line-clamp-1">{reminder.text}</span><span className="shrink-0 text-[10px]" style={{ color: theme.textMuted }}>{formatShortDate(reminder.dueAt)}</span></button>)}</div> : <p className="mt-2 text-sm" style={{ color: theme.textMuted }}>暂无待处理提醒</p>}
             </section>
 
-            <section className="border-y py-3" style={{ borderColor: theme.panelBorder }}>
-              <SectionHeading index="05" icon={Brain} title="长期记忆" theme={theme} action={<button type="button" onClick={onOpenMemory} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>查看全部 <ChevronRight size={13} /></button>} />
+            <section className="py-3">
+              <SectionHeading index="04" icon={Brain} title="长期记忆" theme={theme} action={<button type="button" onClick={onOpenMemory} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>查看全部 <ChevronRight size={13} /></button>} />
               <div className="mt-3 space-y-2">
                 {memoryItems.map((item, index) => <button key={item} type="button" onClick={onOpenMemory} className="flex w-full items-center gap-3 text-left"><span className="w-12 shrink-0 rounded-[0.35rem] px-2 py-1 text-center text-xs" style={{ backgroundColor: theme.panelBgSoft, color: theme.primaryButtonBg }}>{memoryLabels[index] || '记忆'}</span><span className="line-clamp-1 text-sm" style={{ color: theme.textPrimary }}>{item}</span></button>)}
                 {memoryItems.length === 0 && <p className="text-sm" style={{ color: theme.textMuted }}>还没有形成长期记忆</p>}
               </div>
             </section>
 
-            <section className="border-y py-3" style={{ borderColor: theme.panelBorder }}>
-              <SectionHeading index="06" icon={History} title="最近对话" theme={theme} action={<button type="button" onClick={onOpenHistory} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>查看全部 <ChevronRight size={13} /></button>} />
+            <section className="py-3">
+              <SectionHeading index="05" icon={History} title="最近对话" theme={theme} action={<button type="button" onClick={onOpenHistory} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>查看全部 <ChevronRight size={13} /></button>} />
               <div className="mt-2 divide-y" style={{ borderColor: theme.panelBorder }}>
                 {visibleSessions.map((session) => <button key={session.id} type="button" onClick={() => onOpenChat(session.id)} className="flex w-full items-center gap-2 py-2 text-left first:pt-1"><div className="h-6 w-6 shrink-0 overflow-hidden rounded-full" style={{ backgroundColor: theme.avatarBg }}><PersonaAvatar persona={getSessionPersona(session)} className="rounded-full" iconClassName="text-sm" /></div><span className="min-w-0 flex-1 truncate text-sm" style={{ color: theme.textPrimary }}>{session.title}</span><span className="shrink-0 text-[10px]" style={{ color: theme.textMuted }}>{formatConversationTime(session.updatedAt)}</span><ChevronRight size={14} className="shrink-0" style={{ color: theme.textFaint }} /></button>)}
                 {visibleSessions.length === 0 && <p className="py-2 text-sm" style={{ color: theme.textMuted }}>还没有对话记录</p>}
