@@ -82,6 +82,7 @@ interface AIChatHomeProps {
   getSessionPersona: (session: AIChatSession) => AIChatPersona;
   onOpenChat: (sessionId?: string) => void;
   onOpenLetters: () => void;
+  onOpenNewspapers: () => void;
   onOpenLetter: (letterId: string) => void;
   onOpenNewspaper: (item: AIChatNewspaperItem) => void;
   onOpenMemory: () => void;
@@ -127,6 +128,7 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
   getSessionPersona,
   onOpenChat,
   onOpenLetters,
+  onOpenNewspapers,
   onOpenLetter,
   onOpenNewspaper,
   onOpenMemory,
@@ -243,7 +245,18 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
         <div className="mx-auto max-w-6xl">
           <main className="space-y-5">
             <section>
-              <SectionHeading index="01" icon={Mail} title="来信与小报" theme={theme} action={<button type="button" onClick={onOpenLetters} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>查看全部 <ChevronRight size={13} /></button>} />
+              <SectionHeading
+                index="01"
+                icon={Mail}
+                title="来信与小报"
+                theme={theme}
+                action={(
+                  <div className="flex items-center gap-3">
+                    <button type="button" onClick={onOpenLetters} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>来信 <ChevronRight size={13} /></button>
+                    <button type="button" onClick={onOpenNewspapers} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>小报 <ChevronRight size={13} /></button>
+                  </div>
+                )}
+              />
               <div className="relative mt-3 pr-1" style={{ minHeight: `${Math.max(8, 6.4 + visibleFeedItems.length * 1.05)}rem` }}>
                   {visibleFeedItems.length === 0 ? (
                     <div className="flex h-32 items-center justify-center text-sm" style={{ color: theme.textMuted }}>暂时没有新的来信或小报</div>

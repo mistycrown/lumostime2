@@ -185,7 +185,8 @@ import {
   AIChatDebugViewerOverlay,
   AssistantBackgroundHistoryOverlay,
   AssistantLetterDetailSheet,
-  AssistantLetterHistoryOverlay
+  AssistantLetterHistoryOverlay,
+  AIChatNewspaperHistoryOverlay
 } from './ai-chat/AIBackfillChatOverlays';
 import { AIBackfillChatAssistantSettingsSection } from './ai-chat/AIBackfillChatAssistantSettingsSection';
 import { renderAppliedChatAction } from './ai-chat/AIBackfillChatAppliedActionRenderer';
@@ -682,6 +683,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const [isAssistantMemoryViewerOpen, setIsAssistantMemoryViewerOpen] = useState(false);
   const [isDreamViewerOpen, setIsDreamViewerOpen] = useState(false);
   const [isAssistantLetterHistoryViewerOpen, setIsAssistantLetterHistoryViewerOpen] = useState(false);
+  const [isNewspaperHistoryViewerOpen, setIsNewspaperHistoryViewerOpen] = useState(false);
   const [isAssistantLetterDetailSheetOpen, setIsAssistantLetterDetailSheetOpen] = useState(false);
   const [selectedAssistantLetterId, setSelectedAssistantLetterId] = useState<string | null>(null);
   const [assistantLetterDeleteTargetId, setAssistantLetterDeleteTargetId] = useState<string | null>(null);
@@ -4207,6 +4209,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setIsAssistantLetterHistoryViewerOpen(false);
   };
 
+  const handleOpenNewspaperHistoryViewer = () => {
+    setIsNewspaperHistoryViewerOpen(true);
+  };
+
+  const handleCloseNewspaperHistoryViewer = () => {
+    setIsNewspaperHistoryViewerOpen(false);
+  };
+
   const handleToggleAssistantLetterDelete = (letterId: string) => {
     setAssistantLetterDeleteTargetId((current) => current === letterId ? null : letterId);
   };
@@ -4516,6 +4526,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return true;
     }
 
+    if (isNewspaperHistoryViewerOpen) {
+      handleCloseNewspaperHistoryViewer();
+      return true;
+    }
+
     if (isAssistantBackgroundHistoryViewerOpen) {
       handleCloseAssistantBackgroundHistoryViewer();
       return true;
@@ -4660,6 +4675,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     isAssistantLetterDetailSheetOpen,
     isAssistantBackgroundHistoryViewerOpen,
     isAssistantLetterHistoryViewerOpen,
+    isNewspaperHistoryViewerOpen,
     isDreamViewerOpen,
     isAssistantMemoryViewerOpen,
     isAssistantReminderComposerOpen,
@@ -7180,6 +7196,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             getSessionPersona={resolveSessionPersona}
             onOpenChat={handleOpenChatView}
             onOpenLetters={handleOpenAssistantLetterHistoryViewer}
+            onOpenNewspapers={handleOpenNewspaperHistoryViewer}
             onOpenLetter={handleOpenAssistantLetterDetail}
             onOpenNewspaper={(item) => {
               if (item.period === 'daily') {
@@ -7648,6 +7665,24 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             onOpenLetter={handleOpenAssistantLetterDetail}
             onToggleDelete={handleToggleAssistantLetterDelete}
             onConfirmDelete={handleConfirmAssistantLetterDelete}
+          />
+            )}
+
+            {isNewspaperHistoryViewerOpen && (
+          <AIChatNewspaperHistoryOverlay
+            newspapers={assistantNewspaperSnapshot}
+            theme={AI_CHAT_THEME}
+            onClose={handleCloseNewspaperHistoryViewer}
+            onOpenNewspaper={(item) => {
+              handleCloseNewspaperHistoryViewer();
+              if (item.period === 'daily') {
+                handleOpenDailyNewspaper(item.startDate);
+              } else if (item.period === 'weekly' && item.endDate) {
+                handleOpenWeeklyNewspaper(item.startDate, item.endDate);
+              } else if (item.period === 'monthly' && item.endDate) {
+                handleOpenMonthlyNewspaper(item.startDate, item.endDate);
+              }
+            }}
           />
             )}
 
