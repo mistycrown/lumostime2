@@ -20,7 +20,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useMemo, useState, useEffect } from 'react';
-import { Log, Category, Activity, ActivityKeyword, TodoItem } from '../types';
+import { Log, Category, Activity, ActivityKeyword, TodoItem, ActivityStatisticCard } from '../types';
 import { COLOR_OPTIONS } from '../constants';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { ArrowLeft, Clock, Calendar as CalendarIcon, MoreHorizontal, ChevronDown, Check, X, Zap, Save, CheckCircle2, Circle, Plus, Archive, ArchiveRestore, Palette } from 'lucide-react';
@@ -376,7 +376,9 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    const handleAttributesChange = (attributes: NonNullable<Activity['attributes']>) => {
       if (!activity) return;
       const existingCards = activity.statisticCards === undefined ? [] : normalizeStatisticCards(activity);
-      const knownAttributeIds = new Set(existingCards.filter((card) => card.source.type === 'attribute').map((card) => card.source.attributeId));
+      const knownAttributeIds = new Set(existingCards
+         .filter((card): card is ActivityStatisticCard & { source: { type: 'attribute'; attributeId: string } } => card.source.type === 'attribute')
+         .map((card) => card.source.attributeId));
       const nextCards = attributes.reduce((cards, attribute) => (
          knownAttributeIds.has(attribute.id) ? cards : [...cards, createDefaultStatisticCard(attribute, cards.length)]
       ), existingCards).map((card, index) => ({ ...card, order: index }));
