@@ -1,5 +1,7 @@
 # Components Directory
 
+- Update 2026-09-20: `ActivityAttributeStatistics.tsx` presents tag-wide statistic cards, including tag duration, notes, and custom attribute sources.
+
 - Update 2026-09-20: `KeywordColorSequenceModal.tsx` provides the shared centered modal for enabling and selecting keyword color sequences.
 
 - Update 2026-09-20: `ActivityAttributeStatistics.tsx` keeps numeric trend area fills subdued so the trend line remains legible; `ChartPaletteSelector.tsx` provides UTF-8 Chinese labels across chart and keyword palette settings.

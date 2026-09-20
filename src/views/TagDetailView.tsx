@@ -1,5 +1,6 @@
 /**
  * @file TagDetailView.tsx
+ * @updated 2026-09-20: Renames the tag detail attribute analytics tab to statistics to reflect all tag statistic cards.
  * @updated 2026-09-20: Places the unlocked keyword color sequence action beside the title and opens a centered modal.
  * @updated 2026-09-20: Adds shared, unlock-aware keyword color sequences without changing existing keyword colors.
  * @updated 2026-09-12: Added a contextual hint beside tag keyword management.
@@ -836,7 +837,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                />
             );
 
-         case 'Attributes':
+         case 'Statistics':
             return <ActivityAttributeStatistics activity={activity} logs={countableTagLogs} onChange={setActivity} />;
 
          case '关联':
@@ -896,13 +897,13 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
 
          {/* Tabs */}
          <div className="flex gap-6 border-b border-stone-200 mb-8 overflow-x-auto no-scrollbar">
-            {['Details', 'Timeline', 'Attributes', '关联'].map((tab) => (
+            {['Details', 'Timeline', 'Statistics', '关联'].map((tab) => (
                <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors ${activeTab === tab ? 'text-stone-900 border-b-2 border-stone-900 font-bold' : 'text-stone-400 hover:text-stone-600'}`}
                >
-                  {tab === 'Timeline' ? '時間線' : tab === 'Details' ? '细节' : tab === 'Attributes' ? '属性' : tab}
+                  {tab === 'Timeline' ? '時間線' : tab === 'Details' ? '细节' : tab === 'Statistics' ? '统计' : tab}
                </button>
             ))}
          </div>
