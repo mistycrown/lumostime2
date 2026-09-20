@@ -112,6 +112,52 @@ describe('aiService unified turn normalization', () => {
     expect(result.output.toolCalls).toBeUndefined();
   });
 
+  it('keeps quick-add-backfill requests limited to the description and create_log tool', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(createJsonTextResponse({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            toolCalls: [{
+              toolName: 'create_log',
+              args: {
+                date: '2026-05-15',
+                startTime: '09:00',
+                endTime: '09:30',
+                description: '和客户沟通需求',
+                categoryName: '工作',
+                activityName: '沟通'
+              }
+            }]
+          })
+        }
+      }]
+    }));
+    Object.defineProperty(globalThis, 'fetch', {
+      value: fetchSpy,
+      configurable: true
+    });
+
+    const result = await aiService.requestQuickAddBackfillWithDebug('和客户沟通需求');
+    const requestInit = fetchSpy.mock.calls[0]?.[1] as { body?: string } | undefined;
+    const requestBody = requestInit?.body ? JSON.parse(requestInit.body) : {};
+
+    expect(result.toolCall).toEqual({
+      toolName: 'create_log',
+      args: {
+        date: '2026-05-15',
+        startTime: '09:00',
+        endTime: '09:30',
+        description: '和客户沟通需求',
+        categoryName: '工作',
+        activityName: '沟通'
+      }
+    });
+    expect(requestBody.messages).toHaveLength(2);
+    expect(requestBody.messages[1]).toMatchObject({ role: 'user', content: '和客户沟通需求' });
+    expect(requestBody.response_format).toEqual({ type: 'json_object' });
+    expect(requestBody.messages[0].content).toContain('只能返回一个 create_log 工具调用');
+  });
+
   it('keeps quick create_todo tool calls for the reserved 小事 bucket without linkedActivityId', async () => {
     Object.defineProperty(globalThis, 'fetch', {
       value: vi.fn().mockResolvedValue(createJsonTextResponse({

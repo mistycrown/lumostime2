@@ -8,7 +8,7 @@
  * @updated 2026-09-14: Syncs the configured persona name with the native background snapshot for Android notifications.
  * @updated 2026-09-20: Defers chat-session persistence and active-session sync until storage hydration completes, preventing startup defaults from overwriting restored history.
  * @updated 2026-09-20: Resets assistant-part reveal state before in-place reply retries so reused message IDs render metadata after the retried response completes.
- * @updated 2026-09-20: Added the minimal quick-add-todo command path, keeping its AI request limited to the todo description and create_todo tool.
+ * @updated 2026-09-20: Added minimal quick-add-todo and quick-add-backfill command paths, keeping their AI requests limited to the description and dedicated tool.
  * @updated 2026-09-20: Places the composer caret at the end after quick-add command prefills.
  * @updated 2026-09-19: Builds the newspaper snapshot only after review context values are initialized.
  * @updated 2026-09-03: Reloads restored personas, prompt blocks, and long-term memory into mounted chat state so cloud restores cannot be overwritten by stale React state.
@@ -62,6 +62,7 @@ import {
   aiService,
   type AIDebugExchange,
   type AIBackfillToolCall,
+  type AIQuickAddBackfillToolCall,
   type AIPlannedLogToolCall,
   type AIConversationTurn,
   type AITodoToolCall,
@@ -97,7 +98,7 @@ import type {
   DreamTopic,
   DreamUpdateCard
 } from '../types/assistant';
-import { formatDateKey } from '../utils/aiBackfillUtils';
+import { formatDateKey, isValidBackfillDate, isValidBackfillTime } from '../utils/aiBackfillUtils';
 import { getLocalDateStr } from '../utils/dateUtils';
 import {
   formatAssistantDateTimeForDisplay,
@@ -123,6 +124,7 @@ import {
   upsertLogForAssistantContext
 } from '../utils/assistantLogSubmissionTrigger';
 import { getTodoProgressTrackingMode } from '../utils/todoProgressUtils';
+import { extractQuickAddBackfillDescription, QUICK_ADD_BACKFILL_PREFIX } from '../utils/quickAddBackfill';
 import { extractQuickAddTodoDescription, QUICK_ADD_TODO_PREFIX } from '../utils/quickAddTodo';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
 import { assistantAgentConfigService } from '../services/assistantAgentConfigService';
@@ -5935,6 +5937,54 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     return rawContent;
   };
 
+  const resolveQuickAddBackfillToolCall = (
+    toolCall: AIQuickAddBackfillToolCall
+  ): AIBackfillToolCall => {
+    const rawArgs = toolCall.args;
+    const categoryName = rawArgs.categoryName?.trim().toLowerCase();
+    const activityName = rawArgs.activityName?.trim().toLowerCase();
+    const matchingCategory = categoryName
+      ? categories.find((category) => category.name.trim().toLowerCase() === categoryName)
+        || categories.find((category) => category.name.trim().toLowerCase().includes(categoryName))
+      : undefined;
+    const matchingActivity = activityName
+      ? categories
+        .filter((category) => !matchingCategory || category.id === matchingCategory.id)
+        .flatMap((category) => category.activities.map((activity) => ({ activity, category })))
+        .find(({ activity }) => activity.name.trim().toLowerCase() === activityName)
+        || categories
+          .filter((category) => !matchingCategory || category.id === matchingCategory.id)
+          .flatMap((category) => category.activities.map((activity) => ({ activity, category })))
+          .find(({ activity }) => activity.name.trim().toLowerCase().includes(activityName))
+      : undefined;
+    const resolvedCategory = matchingActivity?.category || matchingCategory;
+    const resolvedActivity = matchingActivity?.activity;
+    const hasResolvedActivity = Boolean(resolvedCategory && resolvedActivity);
+    const fallbackDate = isValidBackfillDate(rawArgs.date) ? rawArgs.date!.trim() : defaultDateKey;
+    const now = new Date();
+    const fallbackEnd = fallbackDate === formatDateKey(now)
+      ? `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+      : '18:00';
+    const fallbackStartDate = new Date(now.getTime() - 60 * 60 * 1000);
+    const fallbackStart = fallbackDate === formatDateKey(now)
+      ? `${String(fallbackStartDate.getHours()).padStart(2, '0')}:${String(fallbackStartDate.getMinutes()).padStart(2, '0')}`
+      : '17:00';
+    const startTime = isValidBackfillTime(rawArgs.startTime) ? rawArgs.startTime.trim() : fallbackStart;
+    const endTime = isValidBackfillTime(rawArgs.endTime) ? rawArgs.endTime.trim() : fallbackEnd;
+
+    return {
+      toolName: 'create_log',
+      args: {
+        date: fallbackDate,
+        startTime,
+        endTime,
+        description: rawArgs.description.trim(),
+        categoryId: hasResolvedActivity ? resolvedCategory!.id : 'uncategorized',
+        activityId: hasResolvedActivity ? resolvedActivity!.id : 'quick_punch'
+      }
+    };
+  };
+
   const handleQuickAddTodo = async (
     description: string,
     commandText: string,
@@ -6015,6 +6065,89 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         retryInput: commandText,
         retrySourceUserMessageId: userMessageId,
         debugSections: getErrorDebugSections(error, '快速添加待办', debugMode)
+      });
+    } finally {
+      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
+        activeRequestRef.current = null;
+      }
+      setActiveRequestId((currentRequestId) => (
+        currentRequestId === pendingMessageId ? null : currentRequestId
+      ));
+      setIsLoading(false);
+    }
+  };
+
+  const handleQuickAddBackfill = async (
+    description: string,
+    commandText: string,
+    options?: ForegroundSendOptions
+  ) => {
+    if (!activeSession) {
+      return;
+    }
+
+    const { pendingMessageId, sessionId, userMessageId } = prepareForegroundTurn({
+      activeSession,
+      buildRetryConversationHistory,
+      conversationHistoryCache,
+      createSessionTitleFromUserMessage,
+      isMonthlyReviewTemplateSession: false,
+      isWeeklyReviewTemplateSession: false,
+      mutateSession,
+      notifyUserTurn: async () => undefined,
+      onNotifyUserTurnError: () => undefined,
+      ...(options?.replaceMessageId ? { replaceMessageId: options.replaceMessageId } : {}),
+      ...(options?.retrySourceUserMessageId ? { retrySourceUserMessageId: options.retrySourceUserMessageId } : {}),
+      setInputText,
+      trimmedText: commandText
+    });
+
+    setIsLoading(true);
+    setIsHistoryPanelOpen(false);
+    setIsPersonaPanelOpen(false);
+
+    const controller = new AbortController();
+    activeRequestRef.current = { controller, sessionId, pendingMessageId };
+    setActiveRequestId(pendingMessageId);
+
+    try {
+      const result = await aiService.requestQuickAddBackfillWithDebug(description, { signal: controller.signal });
+      if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
+        return;
+      }
+
+      const toolCall = result.toolCall ? resolveQuickAddBackfillToolCall(result.toolCall) : undefined;
+      const appliedActions = toolCall ? applyPlannedLogToolCalls([toolCall]) : [];
+      const successfulActions = appliedActions.filter((action) => action.status === 'applied');
+      if (successfulActions.length === 0) {
+        throw new Error('AI 未返回有效的补记工具调用。');
+      }
+
+      replacePendingWithResult(sessionId, pendingMessageId, '已添加补记', {
+        ...(debugMode ? { debugSections: [{ label: '快速添加补记', exchange: result.debug }] } : {}),
+        appliedActions,
+        retryInput: commandText,
+        retrySourceUserMessageId: userMessageId
+      });
+      notifyAssistantTaskStateChanged();
+    } catch (error) {
+      const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
+      if (isAbortError(error)) {
+        if (isCurrentPendingRequest) {
+          replacePendingWithResult(sessionId, pendingMessageId, '已停止这次请求。', { tone: 'system' });
+        }
+        return;
+      }
+
+      if (!isCurrentPendingRequest || controller.signal.aborted) {
+        return;
+      }
+
+      replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), {
+        tone: 'error',
+        retryInput: commandText,
+        retrySourceUserMessageId: userMessageId,
+        debugSections: getErrorDebugSections(error, '快速添加补记', debugMode)
       });
     } finally {
       if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
@@ -6588,6 +6721,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const quickAddTodoDescription = extractQuickAddTodoDescription(trimmedText);
     if (quickAddTodoDescription) {
       await handleQuickAddTodo(quickAddTodoDescription, trimmedText, options);
+      return;
+    }
+
+    const quickAddBackfillDescription = extractQuickAddBackfillDescription(trimmedText);
+    if (quickAddBackfillDescription) {
+      await handleQuickAddBackfill(quickAddBackfillDescription, trimmedText, options);
       return;
     }
 
@@ -7391,6 +7530,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               setInputText(QUICK_ADD_TODO_PREFIX);
               focusComposerAtEnd();
             }}
+            onQuickAddBackfill={() => {
+              if (activeSession?.templateMeta) {
+                const nextSession = createDefaultSession(activeSession.personaId);
+                setSessions((prev) => [...prev, nextSession]);
+                setActiveSessionId(nextSession.id);
+              }
+              setIsHomeView(false);
+              setInputText(QUICK_ADD_BACKFILL_PREFIX);
+              focusComposerAtEnd();
+            }}
             onSendShortcut={(text) => {
               const latestSession = sortedSessions[0] || activeSession;
               if (!latestSession) return;
@@ -7470,6 +7619,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               >
                 <div className="grid grid-cols-2 gap-1">
                   <button type="button" onClick={() => { setInputText(QUICK_ADD_TODO_PREFIX); setIsComposerMenuOpen(false); focusComposerAtEnd(); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>快速添加待办</button>
+                  <button type="button" onClick={() => { setInputText(QUICK_ADD_BACKFILL_PREFIX); setIsComposerMenuOpen(false); focusComposerAtEnd(); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>快速添加补记</button>
                   <button type="button" onClick={() => { if (activeSession) mutateSession(activeSession.id, (session) => ({ ...session, contextCacheEnabled: !session.contextCacheEnabled })); setIsComposerMenuOpen(false); }} className="flex min-h-10 items-center justify-between rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>
                     <span>上下文</span><span className="text-[10px]" style={{ color: AI_CHAT_THEME.textMuted }}>{activeSession?.contextCacheEnabled ? `开 · ${activePersona.contextMessageLimit}轮` : '关'}</span>
                   </button>
