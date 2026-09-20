@@ -1,5 +1,7 @@
 # Views Layer
 
+- Update 2026-09-20: `TagDetailView.tsx` hides the keyword sequence action until sponsorship unlock and exposes its toggle and selector through a compact Palette title popover; the add-keyword action is explicitly centered.
+
 - Update 2026-09-20: `TagDetailView.tsx` lets each tag opt into the shared chart color sequences for newly added keywords while preserving individual keyword overrides.
 
 - Update 2026-09-14: `ReviewHubView.tsx` localizes Chronicle page labels, statuses, actions, loading text, and empty-state copy to Chinese while preserving existing date formatting.
