@@ -3,6 +3,7 @@
  * @input The selected activity statistic palette, custom sequences, and unlock state.
  * @output A reusable palette swatch selector for chart configuration surfaces.
  * @description Keeps the locked default and premium sequence options in one selector.
+ * @updated 2026-09-20: Uses UTF-8 Chinese accessibility labels in every palette surface.
  */
 import React from 'react';
 import type { ActivityStatisticPaletteId, CustomChartPaletteSequence } from '../types';
@@ -16,13 +17,13 @@ interface ChartPaletteSelectorProps {
 }
 
 export const ChartPaletteSelector: React.FC<ChartPaletteSelectorProps> = ({ value, onChange, customSequences = [], unlocked = true }) => (
-  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="鍥捐〃閰嶈壊">
+  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="图表配色">
     {getChartPaletteOptions(customSequences, !unlocked).filter((palette) => unlocked || palette.id === 'default').map((palette) => (
       <button
         key={palette.id}
         type="button"
         onClick={() => onChange(palette.id)}
-        aria-label={`閫夋嫨${palette.label}閰嶈壊`}
+        aria-label={`选择${palette.label}配色`}
         aria-pressed={value === palette.id}
         className={`rounded-md border px-2.5 py-2 text-left transition-colors ${value === palette.id ? 'border-[#b16d4c] bg-[#f1e1d5]' : 'border-[#e0d6ca] bg-[#fffdfa] hover:border-[#c9b6a4]'}`}
       >

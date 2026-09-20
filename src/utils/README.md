@@ -1,5 +1,7 @@
 # Utils Architecture
 
+> Update 2026-09-20: `detailTimelineKeywordUtils.ts` accepts a caller-provided generator when keyword-source attribute options need a shared color sequence.
+
 Contains pure utility functions for data processing and business logic calculations.
 
 > Update 2026-09-05: `todoProgressUtils.ts` now resolves the progress baseline shown while editing an existing record by excluding that record's previously saved manual increment.
