@@ -1,5 +1,7 @@
 # Components Directory
 
+- Update 2026-09-20: `KeywordColorSequenceModal.tsx` provides the shared centered modal for enabling and selecting keyword color sequences.
+
 - Update 2026-09-20: `ActivityAttributeStatistics.tsx` keeps numeric trend area fills subdued so the trend line remains legible; `ChartPaletteSelector.tsx` provides UTF-8 Chinese labels across chart and keyword palette settings.
 
 This directory contains the reusable React components for the application. They are categorized by their primary function.
