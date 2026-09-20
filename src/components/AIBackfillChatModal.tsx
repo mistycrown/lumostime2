@@ -7157,16 +7157,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             assistantLetters={assistantLetterSnapshot}
             newspapers={assistantNewspaperSnapshot}
             customPromptBlocks={customPromptBlocks}
-            sessions={sessions}
             sortedSessions={sortedSessions}
             theme={AI_CHAT_THEME}
             isLoading={isLoading}
             formatConversationTime={formatConversationTime}
             getSessionPersona={resolveSessionPersona}
             onOpenChat={handleOpenChatView}
-            onStartNewSession={() => {
-              handleOpenNewSessionDialog();
-            }}
             onOpenLetters={handleOpenAssistantLetterHistoryViewer}
             onOpenLetter={handleOpenAssistantLetterDetail}
             onOpenNewspaper={(item) => {
