@@ -4,6 +4,7 @@
  * @output Persona-settings branch for the AI settings overlay
  * @pos Component Support (AI Integration)
  * @description Extracts the persona-management branch out of AIBackfillChatModal so the modal can keep AI settings orchestration while this section preserves the existing persona and avatar editing UI.
+ * @updated 2026-09-20: Removed the outer frame from the AI chat history sync checkbox so it renders directly on the settings background.
  * @updated 2026-05-16: Switched custom prompt blocks to a flat list with modal editing so the settings page avoids nested card-in-card editing.
  * @updated 2026-09-14: Added the user-facing AI chat sync preference below the user avatar controls.
  * @updated 2026-05-16: Added per-item enable toggles for custom prompt blocks so each extra rule can be included or skipped independently.
@@ -877,11 +878,7 @@ export const AIBackfillChatPersonaSettingsSection: React.FC<AIBackfillChatPerson
         </div>
 
         <label
-          className="mt-5 flex cursor-pointer items-center gap-3 rounded-[0.8rem] border px-3 py-3 transition-colors"
-          style={{
-            borderColor: theme.panelBorder,
-            backgroundColor: theme.inputBg
-          }}
+          className="mt-5 flex cursor-pointer items-center gap-3 transition-colors"
         >
           <input
             type="checkbox"
