@@ -9,7 +9,7 @@
  * @updated 2026-09-12: Keeps short Chinese and English text terms in the ranked text statistics instead of showing an empty state.
  * @updated 2026-09-18: Restricts each statistic card to its own attribute values so unrelated fields are not reported as deleted attributes.
  * @updated 2026-09-18: Unifies new-card creation with the existing card editor and removes the persistent add form.
- * @updated 2026-09-19: Adds Lieflat-inspired numeric box and calendar charts, direct short-range heatmap composition rows, ranked option rows, and countable unit blocks.
+ * @updated 2026-09-19: Adds Lieflat-inspired numeric box and calendar charts, direct short-range heatmap composition rows, ranked option rows, and normalized countable unit blocks.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
@@ -420,11 +420,11 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                     const relativeWidth = metric > 0 ? Math.max((metric / maxOptionMetric) * 100, 3) : 0;
                     const tickCount = Math.max(0, Math.round(metric));
                     const unitGap = maxOptionMetric > 48 ? 1 : maxOptionMetric > 24 ? 2 : 3;
-                    const unitWidth = maxOptionMetric > 48 ? 2 : maxOptionMetric > 24 ? 3 : 6;
-                    const unitRowWidth = tickCount > 0 ? tickCount * (unitWidth + unitGap) - unitGap : 0;
+                    const unitCount = Math.max(1, Math.ceil(maxOptionMetric));
+                    const unitWidth = `calc((100% - ${(unitCount - 1) * unitGap}px) / ${unitCount})`;
                     return <div key={optionId}>
                       <div className="mb-1 flex items-center justify-between gap-3 text-xs"><span className="flex min-w-0 items-center gap-2 text-stone-600"><span className="w-5 shrink-0 font-mono text-[10px] text-stone-400">{String(index + 1).padStart(2, '0')}</span><span className="truncate">{option?.label || MISSING_OPTION}</span></span><span className="shrink-0 font-mono text-stone-400">{statisticMode === 'duration' ? formatDuration(metric) : metric}</span></div>
-                      {statisticMode === 'duration' ? <div className="h-2 overflow-hidden rounded-full bg-stone-100" aria-label={`${option?.label || MISSING_OPTION} 相对时长条`}><div className="h-full rounded-full transition-all" style={{ width: `${relativeWidth}%`, backgroundColor: color, opacity: Math.max(0.55, 1 - index * 0.12) }} /></div> : <div className="flex h-4 min-w-0 items-center overflow-hidden border-b border-stone-200" aria-label={`${option?.label || MISSING_OPTION} ${tickCount} 次，每个单位块代表一次选择`}><div className="flex h-2 flex-none items-center" style={{ width: `${unitRowWidth}px`, gap: `${unitGap}px` }}>{Array.from({ length: tickCount }, (_, tickIndex) => <span key={tickIndex} className="block flex-none rounded-[2px]" style={{ width: `${unitWidth}px`, height: '8px', backgroundColor: color, opacity: Math.max(0.55, 1 - index * 0.12), boxShadow: tickIndex % 5 === 4 ? 'inset -1px 0 rgba(255,255,255,0.7)' : undefined }} />)}</div></div>}
+                      {statisticMode === 'duration' ? <div className="h-2 overflow-hidden rounded-full bg-stone-100" aria-label={`${option?.label || MISSING_OPTION} 相对时长条`}><div className="h-full rounded-full transition-all" style={{ width: `${relativeWidth}%`, backgroundColor: color, opacity: Math.max(0.55, 1 - index * 0.12) }} /></div> : <div className="flex h-4 w-full min-w-0 items-center overflow-hidden border-b border-stone-200" aria-label={`${option?.label || MISSING_OPTION} ${tickCount} 次，每个单位块代表一次选择`}><div className="flex h-2 w-full min-w-0 items-center rounded-[2px] bg-stone-100/70" style={{ gap: `${unitGap}px` }}>{Array.from({ length: tickCount }, (_, tickIndex) => <span key={tickIndex} className="block h-2 flex-none rounded-[2px]" style={{ width: unitWidth, backgroundColor: color, opacity: Math.max(0.55, 1 - index * 0.12), boxShadow: tickIndex % 5 === 4 ? 'inset -1px 0 rgba(255,255,255,0.7)' : undefined }} />)}</div></div>}
                     </div>;
                   })}
                 </div>
