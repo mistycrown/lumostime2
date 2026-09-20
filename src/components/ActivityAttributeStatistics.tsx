@@ -671,7 +671,7 @@ const TagDurationWeekHourHeatmap: React.FC<{ logs: Log[]; range: RangeKey; palet
         {hours.map((hour) => {
           const bucket = buckets.get(`${weekday}-${hour}`);
           const intensity = bucket ? 0.08 + (bucket.duration / maxDuration) * 0.92 : 0;
-          return <span key={`${weekday}-${hour}`} title={`${label} ${String(hour).padStart(2, '0')}:00 · ${bucket ? `${formatHoursMinutes(bucket.duration)} · ${bucket.count} 条` : '无记录'}`} className="aspect-square min-w-0 rounded-[3px] border border-[#e8dfd5]" style={{ backgroundColor: bucket ? heatColor : '#f8f4ef', opacity: bucket ? intensity : 1 }} />;
+          return <span key={`${weekday}-${hour}`} title={`${label} ${String(hour).padStart(2, '0')}:00 · ${bucket ? `${formatHoursMinutes(bucket.duration)} · ${bucket.count} 条` : '无记录'}`} className="aspect-square min-w-0 rounded-[3px] border border-stone-200" style={{ backgroundColor: bucket ? heatColor : '#f5f5f4', opacity: bucket ? intensity : 1 }} />;
         })}
       </React.Fragment>)}
     </div>
