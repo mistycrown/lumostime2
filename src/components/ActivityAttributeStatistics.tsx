@@ -1000,6 +1000,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     if (!attribute) return null;
     if (attribute.displayCondition) {
       return <ConditionalStatisticCard
+        key={card.id}
         activity={activity}
         attributes={attributes}
         attribute={attribute}
