@@ -1,6 +1,6 @@
 /**
  * @file AIBackfillChatCallSettingsSection.tsx
- * @input Context-limit state, theme tokens, and nested assistant-settings content
+ * @input Context-limit state, shortcut settings entry, theme tokens, and nested assistant-settings content
  * @output Call-settings branch for the AI settings overlay
  * @pos Component Support (AI Integration)
  * @description Extracts the call-settings branch wrapper out of AIBackfillChatModal so the modal can supply the nested assistant-settings section without carrying the surrounding layout inline.
@@ -20,6 +20,7 @@ interface AIBackfillChatCallSettingsSectionProps {
   assistantSettingsContent: React.ReactNode;
   contextMessageLimit: number;
   onContextMessageLimitChange: (value: number) => void;
+  shortcutEntry: React.ReactNode;
   theme: AIChatCallSettingsTheme;
 }
 
@@ -27,6 +28,7 @@ export const AIBackfillChatCallSettingsSection: React.FC<AIBackfillChatCallSetti
   assistantSettingsContent,
   contextMessageLimit,
   onContextMessageLimitChange,
+  shortcutEntry,
   theme
 }) => (
   <div className="space-y-8">
@@ -63,6 +65,8 @@ export const AIBackfillChatCallSettingsSection: React.FC<AIBackfillChatCallSetti
         />
       </label>
     </section>
+
+    {shortcutEntry}
 
     {assistantSettingsContent}
   </div>

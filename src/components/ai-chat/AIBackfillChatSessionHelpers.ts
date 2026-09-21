@@ -13,6 +13,7 @@ import { monthlyReviewTemplateService, type MonthlyReviewTemplateSessionMeta } f
 import { weeklyReviewTemplateService, type WeeklyReviewTemplateSessionMeta } from '../../services/weeklyReviewTemplateService';
 import type {
   AIChatCustomPromptBlock,
+  AIChatShortcut,
   AIChatDebugSection,
   AIChatMessage,
   AIChatPersona,
@@ -27,6 +28,7 @@ interface ChatStorageKeys {
   chatPersonasKey: string;
   chatSessionsKey: string;
   customPromptBlocksKey: string;
+  shortcutsKey: string;
   debugModeKey: string;
   userProfileKey: string;
 }
@@ -37,6 +39,7 @@ interface LoadInitialChatStateOptions {
   normalizeSessions: (value: unknown, personas: AIChatPersona[]) => AIChatSession[];
   normalizeUserProfile: (value: unknown) => AIChatUserProfile;
   normalizeCustomPromptBlocks: (value: unknown, rawPersonasValue: unknown) => AIChatCustomPromptBlock[];
+  normalizeShortcuts: (value: unknown) => AIChatShortcut[];
   storage?: Pick<Storage, 'getItem'>;
 }
 
@@ -133,6 +136,7 @@ export const loadInitialChatStateFromStorage = ({
   normalizeSessions,
   normalizeUserProfile,
   normalizeCustomPromptBlocks,
+  normalizeShortcuts,
   storage = localStorage
 }: LoadInitialChatStateOptions): InitialChatState => {
   const rawPersonas = safeJsonParse<unknown>(storage.getItem(keys.chatPersonasKey), []);
@@ -142,6 +146,7 @@ export const loadInitialChatStateFromStorage = ({
     safeJsonParse<unknown>(storage.getItem(keys.customPromptBlocksKey), []),
     rawPersonas
   );
+  const shortcuts = normalizeShortcuts(safeJsonParse<unknown>(storage.getItem(keys.shortcutsKey), []));
   const userProfile = normalizeUserProfile(safeJsonParse<unknown>(storage.getItem(keys.userProfileKey), null));
   const activeSessionId = resolveInitialActiveSessionId(
     sessions,
@@ -154,7 +159,8 @@ export const loadInitialChatStateFromStorage = ({
     activeSessionId,
     debugMode: storage.getItem(keys.debugModeKey) === 'true',
     userProfile,
-    customPromptBlocks
+    customPromptBlocks,
+    shortcuts
   };
 };
 

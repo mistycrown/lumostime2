@@ -15,6 +15,7 @@ export const ASSISTANT_CHAT_RESTORED_EVENT = 'lumostime:ai-chat-restored';
 
 export interface AssistantChatRestoredDetail {
   customPromptBlocks?: unknown[];
+  shortcuts?: unknown[];
   personas?: unknown[];
   memory?: unknown;
 }

@@ -7,6 +7,8 @@
  * @updated 2026-09-21: Connects the homepage composer plus action to the shortcut options and recent-session context toggle.
  * @updated 2026-09-21: Sends the complete assistant dictionary and target-day time context into quick-add todo/backfill requests, then resolves returned category, activity, and scope ids before applying them.
  * @updated 2026-09-21: Pins both chat composers to the bottom, reserves message-space beneath them, and removes the plus button circle.
+ * @updated 2026-09-21: Extracts view-state and assistant-snapshot state into dedicated hooks while keeping request and background orchestration in this coordinator.
+ * @updated 2026-09-21: Extracts chat persistence state initialization into a dedicated session-state hook without changing hydration effects.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -184,6 +186,7 @@ import {
   ACTIVE_SESSION_KEY,
   CHAT_SYNC_ENABLED_KEY,
   CHAT_CUSTOM_PROMPT_BLOCKS_KEY,
+  CHAT_SHORTCUTS_KEY,
   CHAT_PERSONAS_KEY,
   CHAT_SESSIONS_KEY,
   clampContextLimit,
@@ -192,6 +195,7 @@ import {
   DEFAULT_AI_PERSONAS,
   loadInitialChatState,
   normalizeCustomPromptBlocks,
+  normalizeShortcuts,
   normalizePersonas,
   normalizePersistedSessions,
   PERSONA_EMOJI_CHOICES,
@@ -199,6 +203,7 @@ import {
 } from './ai-chat/AIBackfillChatInitialization';
 import { AIBackfillChatMemoryOverlay } from './ai-chat/AIBackfillChatMemoryOverlay';
 import { AIBackfillChatPersonaSettingsSection } from './ai-chat/AIBackfillChatPersonaSettingsSection';
+import { AIChatShortcutSettingsOverlay } from './ai-chat/AIChatShortcutSettingsOverlay';
 import {
   runDailyNewspaperCommand as runDailyNewspaperCommandFlow,
   runDailyNewspaperOverwriteConfirmation as runDailyNewspaperOverwriteConfirmationFlow,
@@ -220,7 +225,9 @@ import {
   runWeeklyReviewNarrativeWriteback as runWeeklyReviewNarrativeWritebackFlow
 } from './ai-chat/AIBackfillChatReviewWriteback';
 import { AIBackfillChatSettingsOverlay } from './ai-chat/AIBackfillChatSettingsOverlay';
-import { AIChatShortcutSettingsOverlay } from './ai-chat/AIChatShortcutSettingsOverlay';
+import { useAIBackfillChatViewState } from './ai-chat/useAIBackfillChatViewState';
+import { useAIBackfillChatAssistantState } from './ai-chat/useAIBackfillChatAssistantState';
+import { useAIBackfillChatSessionState } from './ai-chat/useAIBackfillChatSessionState';
 import {
   AIBackfillChatHistoryOverlay,
   AIBackfillChatNewSessionDialog
@@ -285,6 +292,7 @@ import {
   type AIChatMonthlyNewspaperWritebackResult,
   type AIChatMonthlyReviewWritebackResult,
   type AIChatCustomPromptBlock,
+  type AIChatShortcut,
   type AIChatPersona,
   type AIChatSession,
   type AIChatUserProfile,
@@ -405,12 +413,6 @@ interface AIBackfillChatModalProps {
   onUnreadAssistantMessage?: (count?: number) => void;
   onMarkRead?: () => void;
   onRequestReturnToAI?: () => void;
-}
-
-interface ActiveRequestRef {
-  controller: AbortController;
-  sessionId: string;
-  pendingMessageId: string;
 }
 
 interface ForegroundSendOptions {
@@ -610,180 +612,78 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   onMarkRead,
   onRequestReturnToAI
 }) => {
-  const [initialState] = useState<InitialChatState>(() => {
-    const state = loadInitialChatState(getLocalDateStr);
-    if (!aiChatStorageService.isReady()) {
-      return state;
-    }
-
-    const hydratedSessions = normalizePersistedSessions(
-      aiChatStorageService.getSessions(),
-      state.personas,
-      getLocalDateStr
-    );
-    const hydratedActiveSessionId = hydratedSessions.some((session) => session.id === state.activeSessionId)
-      ? state.activeSessionId
-      : hydratedSessions[0]?.id || state.activeSessionId;
-
-    return {
-      ...state,
-      sessions: hydratedSessions,
-      activeSessionId: hydratedActiveSessionId
-    };
-  });
-  const [personas, setPersonas] = useState<AIChatPersona[]>(initialState.personas);
-  const [customPromptBlocks, setCustomPromptBlocks] = useState<AIChatCustomPromptBlock[]>(initialState.customPromptBlocks);
-  const [sessions, setSessions] = useState<AIChatSession[]>(initialState.sessions);
-  const [isChatStorageReady, setIsChatStorageReady] = useState(() => aiChatStorageService.isReady());
-  const isChatStorageHydratingRef = useRef(false);
-  const [activeSessionId, setActiveSessionId] = useState<string>(initialState.activeSessionId);
-  const [debugMode, setDebugMode] = useState<boolean>(initialState.debugMode);
-  const [userProfile, setUserProfile] = useState<AIChatUserProfile>(initialState.userProfile);
-  const [chatSyncEnabled, setChatSyncEnabled] = useState<boolean>(() => (
-    localStorage.getItem(CHAT_SYNC_ENABLED_KEY) !== 'false'
-  ));
-  const [inputText, setInputText] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
-  const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
-  const [isPersonaPanelOpen, setIsPersonaPanelOpen] = useState(false);
-  const [isShortcutPromptSettingsOpen, setIsShortcutPromptSettingsOpen] = useState(false);
-  const [isHomeView, setIsHomeView] = useState(true);
-  const [isComposerMenuOpen, setIsComposerMenuOpen] = useState(false);
-  const [isNewSessionDialogOpen, setIsNewSessionDialogOpen] = useState(false);
-  const [activeSettingsMainTab, setActiveSettingsMainTab] = useState<AISettingsMainTab>('persona');
-  const [debugViewer, setDebugViewer] = useState<DebugViewerState | null>(null);
-  const [expandedDebugBlockKeys, setExpandedDebugBlockKeys] = useState<Set<string>>(new Set());
-  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
-  const [editingSessionTitle, setEditingSessionTitle] = useState('');
-  const [deleteConfirmSessionId, setDeleteConfirmSessionId] = useState<string | null>(null);
-  const [deleteConfirmPersonaId, setDeleteConfirmPersonaId] = useState<string | null>(null);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [isEmojiEditorOpen, setIsEmojiEditorOpen] = useState(false);
-  const [emojiDraft, setEmojiDraft] = useState('');
-  const [isUploadingUserAvatar, setIsUploadingUserAvatar] = useState(false);
-  const [isUserEmojiEditorOpen, setIsUserEmojiEditorOpen] = useState(false);
-  const [userEmojiDraft, setUserEmojiDraft] = useState('');
-  const [assistantAgentConfig, setAssistantAgentConfig] = useState<AssistantAgentConfig>(() => assistantAgentConfigService.getConfig());
-  const [assistantAgentIntervalDrafts, setAssistantAgentIntervalDrafts] = useState<AssistantAgentIntervalDrafts>(() => (
-    buildAssistantAgentIntervalDrafts(assistantAgentConfigService.getConfig())
-  ));
-  const [assistantAgentQuietHoursDrafts, setAssistantAgentQuietHoursDrafts] = useState<AssistantAgentQuietHoursDrafts>(() => (
-    buildAssistantAgentQuietHoursDrafts(assistantAgentConfigService.getConfig())
-  ));
-  const [assistantLetterDrafts, setAssistantLetterDrafts] = useState<AssistantLetterDrafts>(() => (
-    buildAssistantLetterDrafts(assistantAgentConfigService.getConfig())
-  ));
-  const [assistantMemorySnapshot, setAssistantMemorySnapshot] = useState<AssistantMemory>(() => assistantMemoryService.getMemory());
-  const [dreamSnapshot, setDreamSnapshot] = useState<DreamState>(() => dreamService.getState());
-  const [assistantReminderSnapshot, setAssistantReminderSnapshot] = useState<AssistantReminder[]>(() => assistantReminderQueueService.listReminders());
-  const [assistantScheduledTaskSnapshot, setAssistantScheduledTaskSnapshot] = useState<AssistantScheduledTask[]>(
-    () => assistantScheduledTaskService.listTasks()
-  );
-  const [assistantLetterSnapshot, setAssistantLetterSnapshot] = useState<AssistantLetter[]>(() => assistantLetterService.listLetters());
-  const [isAssistantMemoryViewerOpen, setIsAssistantMemoryViewerOpen] = useState(false);
-  const [isDreamViewerOpen, setIsDreamViewerOpen] = useState(false);
-  const [isAssistantLetterHistoryViewerOpen, setIsAssistantLetterHistoryViewerOpen] = useState(false);
-  const [isNewspaperHistoryViewerOpen, setIsNewspaperHistoryViewerOpen] = useState(false);
-  const [isAssistantLetterDetailSheetOpen, setIsAssistantLetterDetailSheetOpen] = useState(false);
-  const [selectedAssistantLetterId, setSelectedAssistantLetterId] = useState<string | null>(null);
-  const [assistantLetterDeleteTargetId, setAssistantLetterDeleteTargetId] = useState<string | null>(null);
-  const [dreamMonthSelectionState, setDreamMonthSelectionState] = useState<DreamMonthSelectionState | null>(null);
-  const [dailyReviewWritebackConfirmation, setDailyReviewWritebackConfirmation] = useState<DailyReviewWritebackConfirmationState | null>(null);
-  const [dailyNewspaperWritebackConfirmation, setDailyNewspaperWritebackConfirmation] = useState<DailyNewspaperWritebackConfirmationState | null>(null);
-  const [weeklyNewspaperWritebackConfirmation, setWeeklyNewspaperWritebackConfirmation] = useState<WeeklyNewspaperWritebackConfirmationState | null>(null);
-  const [monthlyNewspaperWritebackConfirmation, setMonthlyNewspaperWritebackConfirmation] = useState<MonthlyNewspaperWritebackConfirmationState | null>(null);
-  const [selectedDreamTopicId, setSelectedDreamTopicId] = useState('');
-  const [isDreamTopicNoteExpanded, setIsDreamTopicNoteExpanded] = useState(false);
-  const [dreamTopicDrafts, setDreamTopicDrafts] = useState<DreamTopicDrafts>(DEFAULT_DREAM_TOPIC_DRAFTS);
-  const [isDreamTopicComposerOpen, setIsDreamTopicComposerOpen] = useState(false);
-  const [editingDreamTopicId, setEditingDreamTopicId] = useState<string | null>(null);
-  const [isDreamResetConfirmOpen, setIsDreamResetConfirmOpen] = useState(false);
-  const [dreamTopicDeleteTargetId, setDreamTopicDeleteTargetId] = useState<string | null>(null);
-  const [editingDreamEntryId, setEditingDreamEntryId] = useState<string | null>(null);
-  const [dreamEntryDrafts, setDreamEntryDrafts] = useState<DreamEntryDrafts>(DEFAULT_DREAM_ENTRY_DRAFTS);
-  const [dreamEntryDeleteTargetId, setDreamEntryDeleteTargetId] = useState<string | null>(null);
-  const [assistantEditableMemoryDrafts, setAssistantEditableMemoryDrafts] = useState<Record<AssistantEditableMemoryListKey, string>>(
-    DEFAULT_ASSISTANT_EDITABLE_MEMORY_DRAFTS
-  );
-  const [assistantEditableMemoryComposerKey, setAssistantEditableMemoryComposerKey] = useState<AssistantEditableMemoryListKey | null>(null);
-  const [assistantEditableMemoryDeleteTarget, setAssistantEditableMemoryDeleteTarget] = useState<AssistantEditableMemoryDeleteTarget | null>(null);
-  const [assistantReminderDrafts, setAssistantReminderDrafts] = useState<AssistantReminderDrafts>(DEFAULT_ASSISTANT_REMINDER_DRAFTS);
-  const [isAssistantReminderComposerOpen, setIsAssistantReminderComposerOpen] = useState(false);
-  const [assistantReminderDeleteTarget, setAssistantReminderDeleteTarget] = useState<AssistantReminderDeleteTarget | null>(null);
-  const [assistantScheduledTaskDrafts, setAssistantScheduledTaskDrafts] = useState<AssistantScheduledTaskDrafts>(
-    DEFAULT_ASSISTANT_SCHEDULED_TASK_DRAFTS
-  );
-  const [isAssistantScheduledTaskComposerOpen, setIsAssistantScheduledTaskComposerOpen] = useState(false);
-  const [assistantScheduledTaskDeleteTarget, setAssistantScheduledTaskDeleteTarget] = useState<AssistantScheduledTaskDeleteTarget | null>(null);
-  const [assistantBackgroundCallHistory, setAssistantBackgroundCallHistory] = useState<AssistantBackgroundCallHistoryEntry[]>(() => assistantOrchestratorService.listBackgroundCallHistory());
-  const [assistantNativeDiagnostics, setAssistantNativeDiagnostics] = useState<AssistantNativeDiagnosticEntry[]>([]);
+  const {
+    initialState,
+    personas, setPersonas,
+    customPromptBlocks, setCustomPromptBlocks,
+    shortcuts, setShortcuts,
+    sessions, setSessions,
+    isChatStorageReady, setIsChatStorageReady,
+    isChatStorageHydratingRef,
+    activeSessionId, setActiveSessionId,
+    debugMode, setDebugMode,
+    userProfile, setUserProfile,
+    chatSyncEnabled, setChatSyncEnabled
+  } = useAIBackfillChatSessionState();
+  const {
+    inputText, setInputText, isLoading, setIsLoading, activeRequestId, setActiveRequestId,
+    isHistoryPanelOpen, setIsHistoryPanelOpen, isPersonaPanelOpen, setIsPersonaPanelOpen,
+    isHomeView, setIsHomeView, isShortcutSettingsOpen, setIsShortcutSettingsOpen,
+    isComposerMenuOpen, setIsComposerMenuOpen, isNewSessionDialogOpen, setIsNewSessionDialogOpen,
+    activeSettingsMainTab, setActiveSettingsMainTab, debugViewer, setDebugViewer,
+    expandedDebugBlockKeys, setExpandedDebugBlockKeys, editingSessionId, setEditingSessionId,
+    editingSessionTitle, setEditingSessionTitle, deleteConfirmSessionId, setDeleteConfirmSessionId,
+    deleteConfirmPersonaId, setDeleteConfirmPersonaId, isUploadingAvatar, setIsUploadingAvatar,
+    isEmojiEditorOpen, setIsEmojiEditorOpen, emojiDraft, setEmojiDraft,
+    isUploadingUserAvatar, setIsUploadingUserAvatar, isUserEmojiEditorOpen, setIsUserEmojiEditorOpen,
+    userEmojiDraft, setUserEmojiDraft, isAssistantMemoryViewerOpen, setIsAssistantMemoryViewerOpen,
+    isDreamViewerOpen, setIsDreamViewerOpen, isAssistantLetterHistoryViewerOpen, setIsAssistantLetterHistoryViewerOpen,
+    isNewspaperHistoryViewerOpen, setIsNewspaperHistoryViewerOpen, isAssistantLetterDetailSheetOpen, setIsAssistantLetterDetailSheetOpen,
+    selectedAssistantLetterId, setSelectedAssistantLetterId, assistantLetterDeleteTargetId, setAssistantLetterDeleteTargetId,
+    dreamMonthSelectionState, setDreamMonthSelectionState, dailyReviewWritebackConfirmation, setDailyReviewWritebackConfirmation,
+    dailyNewspaperWritebackConfirmation, setDailyNewspaperWritebackConfirmation, weeklyNewspaperWritebackConfirmation, setWeeklyNewspaperWritebackConfirmation,
+    monthlyNewspaperWritebackConfirmation, setMonthlyNewspaperWritebackConfirmation, selectedDreamTopicId, setSelectedDreamTopicId,
+    isDreamTopicNoteExpanded, setIsDreamTopicNoteExpanded, dreamTopicDrafts, setDreamTopicDrafts,
+    isDreamTopicComposerOpen, setIsDreamTopicComposerOpen, editingDreamTopicId, setEditingDreamTopicId,
+    isDreamResetConfirmOpen, setIsDreamResetConfirmOpen, dreamTopicDeleteTargetId, setDreamTopicDeleteTargetId,
+    editingDreamEntryId, setEditingDreamEntryId, dreamEntryDrafts, setDreamEntryDrafts, dreamEntryDeleteTargetId, setDreamEntryDeleteTargetId,
+    assistantEditableMemoryDrafts, setAssistantEditableMemoryDrafts, assistantEditableMemoryComposerKey, setAssistantEditableMemoryComposerKey,
+    assistantEditableMemoryDeleteTarget, setAssistantEditableMemoryDeleteTarget, assistantReminderDrafts, setAssistantReminderDrafts,
+    isAssistantReminderComposerOpen, setIsAssistantReminderComposerOpen, assistantReminderDeleteTarget, setAssistantReminderDeleteTarget,
+    assistantScheduledTaskDrafts, setAssistantScheduledTaskDrafts, isAssistantScheduledTaskComposerOpen, setIsAssistantScheduledTaskComposerOpen,
+    assistantScheduledTaskDeleteTarget, setAssistantScheduledTaskDeleteTarget, expandedMemoryUpdateMessageIds, setExpandedMemoryUpdateMessageIds,
+    expandedReasoningMessageIds, setExpandedReasoningMessageIds, expandedDreamUpdateMessageIds, setExpandedDreamUpdateMessageIds,
+    expandedReminderUpdateMessageIds, setExpandedReminderUpdateMessageIds, expandedLocalQueryMessageIds, setExpandedLocalQueryMessageIds,
+    revealedAssistantPartCounts, setRevealedAssistantPartCounts, editingPrincipleId, setEditingPrincipleId,
+    principleEditFormData, setPrincipleEditFormData, editingSelfBeliefId, setEditingSelfBeliefId,
+    selfBeliefTitleDraft, setSelfBeliefTitleDraft, selfBeliefDescriptionDrafts, setSelfBeliefDescriptionDrafts,
+    newSelfBeliefDescriptionText, setNewSelfBeliefDescriptionText, editingSelfBeliefDescriptionId, setEditingSelfBeliefDescriptionId,
+    editingSelfBeliefDescriptionText, setEditingSelfBeliefDescriptionText, keyboardBottomInset, setKeyboardBottomInset,
+    activeRequestRef, retryingMessageIdRef, isOpenRef, wasOpenRef, homeWasOpenRef,
+    processingDueReminderIdsRef, isProcessingAssistantLetterRef, assistantPartRevealTimeoutsRef,
+    revealedAssistantPartCountsRef, hydratedRevealSessionIdsRef, assistantRevealTargetCountsRef,
+    avatarInputRef, userAvatarInputRef, composerTextareaRef, composerMenuRef, pendingHomeMessageRef,
+    messagesEndRef, messageElementRefs, handledNavigationKeyRef, handledAssistantTriggerIdsRef,
+    processingAssistantTriggerIdsRef, hasCompletedStartupReminderCatchupRef, visualViewportBaselineRef,
+    focusComposerAtEnd, handleMessageElementRef
+  } = useAIBackfillChatViewState(isOpen);
+  const {
+    assistantAgentConfig, setAssistantAgentConfig,
+    assistantAgentIntervalDrafts, setAssistantAgentIntervalDrafts,
+    assistantAgentQuietHoursDrafts, setAssistantAgentQuietHoursDrafts,
+    assistantLetterDrafts, setAssistantLetterDrafts,
+    assistantMemorySnapshot, setAssistantMemorySnapshot,
+    dreamSnapshot, setDreamSnapshot,
+    assistantReminderSnapshot, setAssistantReminderSnapshot,
+    assistantScheduledTaskSnapshot, setAssistantScheduledTaskSnapshot,
+    assistantLetterSnapshot, setAssistantLetterSnapshot,
+    assistantBackgroundCallHistory, setAssistantBackgroundCallHistory,
+    assistantNativeDiagnostics, setAssistantNativeDiagnostics
+  } = useAIBackfillChatAssistantState();
   const [isAssistantBackgroundHistoryViewerOpen, setIsAssistantBackgroundHistoryViewerOpen] = useState(false);
 
-  const [expandedMemoryUpdateMessageIds, setExpandedMemoryUpdateMessageIds] = useState<Set<string>>(() => new Set());
-  const [expandedReasoningMessageIds, setExpandedReasoningMessageIds] = useState<Set<string>>(() => new Set());
-  const [expandedDreamUpdateMessageIds, setExpandedDreamUpdateMessageIds] = useState<Set<string>>(() => new Set());
-  const [expandedReminderUpdateMessageIds, setExpandedReminderUpdateMessageIds] = useState<Set<string>>(() => new Set());
-  const [expandedLocalQueryMessageIds, setExpandedLocalQueryMessageIds] = useState<Set<string>>(() => new Set());
-  const [revealedAssistantPartCounts, setRevealedAssistantPartCounts] = useState<Record<string, number>>({});
-  const [editingPrincipleId, setEditingPrincipleId] = useState<string | null>(null);
-  const [principleEditFormData, setPrincipleEditFormData] = useState<PrincipleEditFormData>({
-    title: '',
-    frontText: '',
-    backText: ''
-  });
-  const [editingSelfBeliefId, setEditingSelfBeliefId] = useState<string | null>(null);
-  const [selfBeliefTitleDraft, setSelfBeliefTitleDraft] = useState('');
-  const [selfBeliefDescriptionDrafts, setSelfBeliefDescriptionDrafts] = useState<SelfBeliefDescriptionDraft[]>([]);
-  const [newSelfBeliefDescriptionText, setNewSelfBeliefDescriptionText] = useState('');
-  const [editingSelfBeliefDescriptionId, setEditingSelfBeliefDescriptionId] = useState<string | null>(null);
-  const [editingSelfBeliefDescriptionText, setEditingSelfBeliefDescriptionText] = useState('');
-  const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
-  const activeRequestRef = useRef<ActiveRequestRef | null>(null);
-  const retryingMessageIdRef = useRef<string | null>(null);
   const isStopActionVisible = isLoading || activeRequestId !== null;
   const isDesktopWidgetMode = displayMode === 'desktop-widget';
-  const isOpenRef = useRef(isOpen);
-  const wasOpenRef = useRef(isOpen);
-  const homeWasOpenRef = useRef(isOpen);
-  const processingDueReminderIdsRef = useRef<Set<string>>(new Set());
-  const isProcessingAssistantLetterRef = useRef(false);
-  const assistantPartRevealTimeoutsRef = useRef<Map<string, number[]>>(new Map());
-  const revealedAssistantPartCountsRef = useRef<Record<string, number>>({});
-  const hydratedRevealSessionIdsRef = useRef<Set<string>>(new Set());
-  const assistantRevealTargetCountsRef = useRef<Map<string, number>>(new Map());
-  const avatarInputRef = useRef<HTMLInputElement | null>(null);
-  const userAvatarInputRef = useRef<HTMLInputElement | null>(null);
-  const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const composerMenuRef = useRef<HTMLDivElement | null>(null);
-  const pendingHomeMessageRef = useRef<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const focusComposerAtEnd = useCallback(() => {
-    window.requestAnimationFrame(() => {
-      const textarea = composerTextareaRef.current;
-      if (!textarea) {
-        return;
-      }
-
-      textarea.focus();
-      const end = textarea.value.length;
-      textarea.setSelectionRange(end, end);
-    });
-  }, []);
-  const messageElementRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
-  const handleMessageElementRef = useCallback((messageId: string, node: HTMLDivElement | null) => {
-    if (node) {
-      messageElementRefs.current.set(messageId, node);
-      return;
-    }
-
-    messageElementRefs.current.delete(messageId);
-  }, []);
-  const handledNavigationKeyRef = useRef('');
-  const handledAssistantTriggerIdsRef = useRef<Set<string>>(new Set());
-  const processingAssistantTriggerIdsRef = useRef<Set<string>>(new Set());
-  const hasCompletedStartupReminderCatchupRef = useRef(false);
-  const visualViewportBaselineRef = useRef<{ height: number; width: number }>({ height: 0, width: 0 });
 
   const { logs, setLogs, todos, setTodos, todoCategories, isReady: isDataReady } = useData();
   const {
@@ -1608,6 +1508,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       notifyAIBackupDataChanged();
     }
   }, [customPromptBlocks]);
+
+  useEffect(() => {
+    const serialized = JSON.stringify(shortcuts);
+    if (localStorage.getItem(CHAT_SHORTCUTS_KEY) !== serialized) {
+      localStorage.setItem(CHAT_SHORTCUTS_KEY, serialized);
+      notifyAIBackupDataChanged();
+    }
+  }, [shortcuts]);
 
   useEffect(() => {
     if (!isChatStorageReady) {
@@ -3139,10 +3047,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const handleAssistantChatRestored = (event: Event) => {
       const detail = (event as CustomEvent<AssistantChatRestoredDetail>).detail;
       const restoredBlocks = detail?.customPromptBlocks;
+      const restoredShortcuts = detail?.shortcuts;
       const restoredPersonas = detail?.personas;
 
       if (Array.isArray(restoredBlocks)) {
         setCustomPromptBlocks(normalizeCustomPromptBlocks(restoredBlocks));
+      }
+
+      if (Array.isArray(restoredShortcuts)) {
+        setShortcuts(normalizeShortcuts(restoredShortcuts));
       }
 
       if (Array.isArray(restoredPersonas)) {
@@ -3768,6 +3681,32 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   const handleDeleteCustomPromptBlock = (blockId: string) => {
     setCustomPromptBlocks((prev) => prev.filter((block) => block.id !== blockId));
+  };
+
+  const handleAddShortcut = (): string => {
+    const shortcutId = crypto.randomUUID();
+    setShortcuts((prev) => [...prev, {
+      id: shortcutId,
+      title: '',
+      content: '',
+      enabled: true
+    }]);
+    return shortcutId;
+  };
+
+  const handleUpdateShortcut = (
+    shortcutId: string,
+    patch: Partial<Pick<AIChatShortcut, 'title' | 'content' | 'enabled'>>
+  ) => {
+    setShortcuts((prev) => prev.map((shortcut) => (
+      shortcut.id === shortcutId
+        ? { ...shortcut, ...patch }
+        : shortcut
+    )));
+  };
+
+  const handleDeleteShortcut = (shortcutId: string) => {
+    setShortcuts((prev) => prev.filter((shortcut) => shortcut.id !== shortcutId));
   };
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -4667,8 +4606,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       return true;
     }
 
-    if (isShortcutPromptSettingsOpen) {
-      setIsShortcutPromptSettingsOpen(false);
+    if (isShortcutSettingsOpen) {
+      setIsShortcutSettingsOpen(false);
       return true;
     }
 
@@ -4741,7 +4680,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     isHistoryPanelOpen,
     isHomeView,
     isNewSessionDialogOpen,
-    isShortcutPromptSettingsOpen,
+    isShortcutSettingsOpen,
     isOpen,
     isPersonaPanelOpen,
     isUserEmojiEditorOpen,
@@ -5230,6 +5169,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       setLogs(result.nextLogs);
       setTodos(result.nextTodos);
     }
+
     return result.actions;
   };
   const applyTodoAndPlannedTimelineLogToolCalls = (
@@ -7614,11 +7554,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             assistantReminders={assistantReminderSnapshot}
             assistantLetters={assistantLetterSnapshot}
             newspapers={assistantNewspaperSnapshot}
-            customPromptBlocks={customPromptBlocks}
+            shortcuts={shortcuts}
             sortedSessions={sortedSessions}
             theme={AI_CHAT_THEME}
             isLoading={isLoading}
-            isOverlayOpen={isPersonaPanelOpen || isShortcutPromptSettingsOpen}
+            isOverlayOpen={isPersonaPanelOpen || isShortcutSettingsOpen}
             formatConversationTime={formatConversationTime}
             getSessionPersona={resolveSessionPersona}
             onOpenChat={handleOpenChatView}
@@ -7636,7 +7576,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             }}
             onOpenMemory={handleOpenAssistantMemoryViewer}
             onOpenHistory={() => setIsHistoryPanelOpen(true)}
-            onOpenSettings={() => setIsShortcutPromptSettingsOpen(true)}
+            onOpenSettings={() => {
+              setActiveSettingsMainTab('call');
+              setIsPersonaPanelOpen(true);
+            }}
             onQuickAddTodo={() => {
               if (activeSession?.templateMeta) {
                 const nextSession = createDefaultSession(activeSession.personaId);
@@ -7667,29 +7610,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               setInputText(QUICK_ADD_BACKFILL_PREFIX);
               focusComposerAtEnd();
             }}
-            hasRecentSession={Boolean(sortedSessions[0] || activeSession)}
-            recentSessionContextEnabled={Boolean((sortedSessions[0] || activeSession)?.contextCacheEnabled)}
-            contextMessageLimit={activePersona.contextMessageLimit}
-            onToggleRecentSessionContext={() => {
-              const recentSession = sortedSessions[0] || activeSession;
-              if (!recentSession) {
-                return;
-              }
-              mutateSession(recentSession.id, (session) => ({
-                ...session,
-                contextCacheEnabled: !session.contextCacheEnabled
-              }));
-            }}
             onSendShortcut={(text) => {
               const latestSession = sortedSessions[0] || activeSession;
               if (!latestSession) return;
               setActiveSessionId(latestSession.id);
               setIsHomeView(false);
-              if (activeSession?.id === latestSession.id) {
-                window.setTimeout(() => void handleSend(text), 0);
-              } else {
-                pendingHomeMessageRef.current = text;
-              }
+              setInputText(text);
+              focusComposerAtEnd();
             }}
           />
         ) : (
@@ -7733,7 +7660,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           />
         )}
 
-        {!isHomeView && !isPersonaPanelOpen && !isShortcutPromptSettingsOpen && <div
+        {!isHomeView && !isPersonaPanelOpen && <div
           className="absolute inset-x-0 bottom-0 z-30 px-4 pt-3 backdrop-blur-xl sm:px-5"
           style={{
             backgroundColor: AI_CHAT_THEME.shellLayerBg,
@@ -7762,12 +7689,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   <button type="button" onClick={() => { setInputText(QUICK_ADD_TODO_PREFIX); setIsComposerMenuOpen(false); focusComposerAtEnd(); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>快速添加待办</button>
                   <button type="button" onClick={() => { setInputText(QUICK_ADD_NOTE_PREFIX); setIsComposerMenuOpen(false); focusComposerAtEnd(); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>快速添加备注</button>
                   <button type="button" onClick={() => { setInputText(QUICK_ADD_BACKFILL_PREFIX); setIsComposerMenuOpen(false); focusComposerAtEnd(); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>快速添加补记</button>
-                  <button type="button" onClick={() => { if (activeSession) mutateSession(activeSession.id, (session) => ({ ...session, contextCacheEnabled: !session.contextCacheEnabled })); setIsComposerMenuOpen(false); }} className="flex min-h-10 items-center justify-between rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>
-                    <span>上下文</span><span className="text-[10px]" style={{ color: AI_CHAT_THEME.textMuted }}>{activeSession?.contextCacheEnabled ? `开 · ${activePersona.contextMessageLimit}轮` : '关'}</span>
-                  </button>
                   {!isDesktopWidgetMode && activeSession?.templateMeta?.templateType === 'weekly_review' && <button type="button" onClick={() => { handleFillWriteWeeklyNarrativeCommand(); setIsComposerMenuOpen(false); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>写入 AI 叙事</button>}
                   {!isDesktopWidgetMode && activeSession?.templateMeta?.templateType === 'monthly_review' && <button type="button" onClick={() => { handleFillWriteMonthlyNarrativeCommand(); setIsComposerMenuOpen(false); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>写入 AI 叙事</button>}
                   {!isDesktopWidgetMode && !activeSession?.templateMeta && <><button type="button" onClick={() => { handleFillDailyNarrativeCommand(); setIsComposerMenuOpen(false); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>叙事</button><button type="button" onClick={() => { handleFillDailyNewspaperCommand(); setIsComposerMenuOpen(false); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>小报</button></>}
+                  {shortcuts.filter((shortcut) => shortcut.enabled).map((shortcut) => <button key={shortcut.id} type="button" onClick={() => { setInputText(shortcut.content); setIsComposerMenuOpen(false); focusComposerAtEnd(); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>{shortcut.title}</button>)}
                   {[...activeWeeklyReviewShortcutOptions, ...activeMonthlyReviewShortcutOptions].map((option) => <button key={option.key} type="button" onClick={() => { if (!isLoading) void handleSend(option.value); setIsComposerMenuOpen(false); }} disabled={isLoading} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs disabled:opacity-50" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>{option.label}</button>)}
                 </div>
               </div>
@@ -7800,29 +7725,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             />
 
             <div className="contents">
-              <button
-                onClick={() => activeSession && mutateSession(activeSession.id, (session) => ({
-                  ...session,
-                  contextCacheEnabled: !session.contextCacheEnabled
-                }))}
-                className="hidden"
-                style={
-                  activeSession?.contextCacheEnabled
-                    ? {
-                        borderColor: AI_CHAT_THEME.activeBorder,
-                        backgroundColor: AI_CHAT_THEME.activeBg,
-                        color: AI_CHAT_THEME.textPrimary
-                      }
-                    : {
-                        borderColor: AI_CHAT_THEME.chipBorder,
-                        backgroundColor: AI_CHAT_THEME.inputBg,
-                        color: AI_CHAT_THEME.textMuted
-                      }
-                }
-                title="快速上下文开关"
-              >
-                {activeSession?.contextCacheEnabled ? `上下文 开 · ${activePersona.contextMessageLimit}轮` : '上下文 关'}
-              </button>
               {!isDesktopWidgetMode && activeSession?.templateMeta?.templateType === 'weekly_review' && (
                 <button
                   onClick={handleFillWriteWeeklyNarrativeCommand}
@@ -7948,16 +7850,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               theme={AI_CHAT_THEME}
             />
 
-            <AIChatShortcutSettingsOverlay
-              customPromptBlocks={customPromptBlocks}
-              isOpen={isShortcutPromptSettingsOpen}
-              onAddCustomPromptBlock={handleAddCustomPromptBlock}
-              onClose={() => setIsShortcutPromptSettingsOpen(false)}
-              onDeleteCustomPromptBlock={handleDeleteCustomPromptBlock}
-              onUpdateCustomPromptBlock={handleUpdateCustomPromptBlock}
-              theme={AI_CHAT_THEME}
-            />
-
             <AIBackfillChatSettingsOverlay
               activeTab={activeSettingsMainTab}
               isOpen={isPersonaPanelOpen}
@@ -8013,6 +7905,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   contextMessageLimit={activePersona.contextMessageLimit}
                   onContextMessageLimitChange={(value) => updateCurrentPersona({ contextMessageLimit: value })}
                   theme={AI_CHAT_THEME}
+                  shortcutEntry={(
+                    <button type="button" onClick={() => setIsShortcutSettingsOpen(true)} className="flex w-full items-center justify-between border-y py-4 text-left" style={{ borderColor: AI_CHAT_THEME.panelBorder }}>
+                      <span><span className="block text-sm font-bold text-stone-800">快捷指令</span><span className="mt-1 block text-xs" style={{ color: AI_CHAT_THEME.textMuted }}>{shortcuts.filter((shortcut) => shortcut.enabled).length} 条已启用</span></span>
+                      <span className="text-xs" style={{ color: AI_CHAT_THEME.textMuted }}>管理</span>
+                    </button>
+                  )}
                   assistantSettingsContent={(
                   <AIBackfillChatAssistantSettingsSection
                     assistantAgentConfig={assistantAgentConfig}
@@ -8056,6 +7954,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                   )}
                 />
               )}
+              theme={AI_CHAT_THEME}
+            />
+
+            <AIChatShortcutSettingsOverlay
+              shortcuts={shortcuts}
+              isOpen={isShortcutSettingsOpen}
+              onAddShortcut={handleAddShortcut}
+              onClose={() => setIsShortcutSettingsOpen(false)}
+              onDeleteShortcut={handleDeleteShortcut}
+              onUpdateShortcut={handleUpdateShortcut}
               theme={AI_CHAT_THEME}
             />
 
