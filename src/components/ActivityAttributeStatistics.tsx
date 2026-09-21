@@ -22,6 +22,7 @@
  * @updated 2026-09-21: Keeps local statistic-card edits visible immediately and separates rolling ranges from complete calendar-month display grids.
  * @updated 2026-09-21: Makes fixed statistic-card ranges reactive across reused legacy chart renderers.
  * @updated 2026-09-21: Makes fixed statistic-card metrics reactive so count/duration switches refresh immediately.
+ * @updated 2026-09-21: Enlarges cross-month choice heatmaps to two monthly columns and removes redundant chart subtitles.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
@@ -193,7 +194,6 @@ const AttributeSection: React.FC<{
     <div className="mb-4 flex items-baseline justify-between gap-3">
       <div className="min-w-0">
         <h2 className="truncate text-base font-semibold tracking-tight text-stone-800">{title}</h2>
-        <span className="text-[10px] uppercase tracking-[0.16em] text-stone-400">{typeLabel}{rangeLabel ? <span className="ml-2 normal-case tracking-normal text-stone-400">· {rangeLabel}</span> : null}</span>
       </div>
       <span className="shrink-0 text-xs text-stone-400">{count}</span>
     </div>
@@ -373,7 +373,6 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                   return (
                     <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '近 7 天'}`} rangeLabel={rangeLabel || getRangeLabel(range)} count={`${numbers.length} 条已填写`}>
                       <div className="mt-5 py-1">
-                        <div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-stone-400"><span>近 7 日投入</span><span>按日合计</span></div>
                         <div className="grid grid-cols-7 gap-2">
                           {calendarDays.map((day) => {
                             const value = dailyValues.get(day) || 0;
@@ -391,7 +390,6 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                 return (
                   <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '全年日历'}`} rangeLabel={rangeLabel || getRangeLabel(range)} count={`${numbers.length} 条已填写`}>
                     <div className="mt-5 py-1">
-                      <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-stone-400"><span>日历热力</span><span>按日合计</span></div>
                       <div className={`grid gap-x-3 gap-y-3 ${range === 'month' ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'}`}>
                         {calendarMonths.map((monthKey) => {
                           const [year, month] = monthKey.split('-').map(Number);
@@ -410,7 +408,6 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                 return (
                   <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '数值分布'}`} rangeLabel={rangeLabel} count={`${numbers.length} 条已填写`}>
                     <div className="mt-5 py-1">
-                      <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-stone-400"><span>数值分布</span><span>{histogramBinCount} 个区间</span></div>
                       <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="aspect-[10/3] w-full overflow-visible" role="img" aria-label={`${attribute.name} 数值分布`}>
                         <line x1="0" y1={chartBottom} x2={chartWidth} y2={chartBottom} stroke="#e7e5e4" strokeWidth="1" />
                         {histogramBins.map((bin, index) => {
@@ -445,7 +442,6 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                   </div>}
                   {chartVariant !== 'numberKpi' && trend.length > 0 && (
                     <div className="mt-5 py-1">
-                      <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-stone-400"><span>日趋势</span><span>{trend.length} 个有数据日</span></div>
                       <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="aspect-[10/3] w-full overflow-visible">
                         {chartVariant === 'numberArea' && <defs><linearGradient id={areaGradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={statisticAccent} stopOpacity="0.28" /><stop offset="100%" stopColor={statisticAccent} stopOpacity="0" /></linearGradient></defs>}
                         <line x1="0" y1={chartBottom} x2={chartWidth} y2={chartBottom} stroke="#e7e5e4" strokeWidth="1" />
@@ -671,7 +667,6 @@ const TagDurationBoxplotPreview: React.FC<{ logs: Log[]; palette: ChartPalette }
   const formatMinutes = (seconds: number) => String(Math.round(seconds / 60));
   if (!dailyTotals.size) return <p className="py-8 text-center text-xs text-[#aa9b8b]">本年暂无标签时长数据</p>;
   return <div>
-    <div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]"><span>每日汇总时长分布</span><span>本年 · 按月</span></div>
     <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="aspect-[2.24/1] w-full" role="img" aria-label="标签时长年度箱线图">
       {[0, 0.25, 0.5, 0.75, 1].map((ratio) => <g key={ratio}><line x1={chartLeft} y1={getY(maximum * ratio)} x2={chartWidth - chartRight} y2={getY(maximum * ratio)} stroke={ratio === 0 ? '#d8cdc0' : '#eee8e1'} strokeWidth={ratio === 0 ? 1.2 : 1} /><text x={chartLeft - 9} y={getY(maximum * ratio) + 3} textAnchor="end" fill="#9d8d7d" fontSize="9" fontVariant="tabular-nums">{formatMinutes(maximum * ratio)}</text></g>)}
       {monthly.map((item) => {
@@ -708,7 +703,6 @@ const TagDurationWeekHourHeatmap: React.FC<{ logs: Log[]; range: RangeKey; palet
   const heatColor = palette.accent;
   if (filteredLogs.length === 0) return <p className="py-8 text-center text-xs text-[#aa9b8b]">当前范围暂无标签时长数据</p>;
   return <div>
-    <div className="mb-3 text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]">记录分布 · 星期 × 小时</div>
     <div className="grid gap-1 text-[10px] text-[#8f7f70]" style={{ gridTemplateColumns: `22px repeat(${hours.length}, minmax(0, 1fr))` }}>
       <span />
       {hours.map((hour) => <span key={hour} className="truncate text-center font-mono text-[9px]">{String(hour).padStart(2, '0')}</span>)}
@@ -763,11 +757,11 @@ const ChoiceHeatmapPreview: React.FC<{ attribute: ActivityAttributeDefinition; l
   if (days.length === 0 || optionIds.length === 0) return <p className="py-8 text-center text-xs text-[#aa9b8b]">当前范围暂无选项数据</p>;
   const monthKeys = [...new Set(days.map((day) => day.slice(0, 7)))];
   if (range === 'year' || monthKeys.length > 1) {
-    const rangeLabel = range === 'year' ? '本年' : range === '30d' ? '近 30 天' : range === '7d' ? '近 7 天' : '本月';
-    return <div className="py-1"><div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]"><span>选项 × 日期</span><span>{rangeLabel} · 多选分段显示</span></div><div className="grid grid-cols-3 gap-x-2 gap-y-3 sm:grid-cols-4">{monthKeys.map((monthKey) => { const [year, month] = monthKey.split('-').map(Number); const leadingBlanks = new Date(year, month - 1, 1).getDay(); const daysInMonth = new Date(year, month, 0).getDate(); const cellCount = Math.ceil((leadingBlanks + daysInMonth) / 7) * 7; return <div key={monthKey}><div className="mb-1 text-[10px] text-[#8f7f70]">{month} 月</div><div className="grid grid-cols-7 gap-px">{Array.from({ length: cellCount }, (_, cellIndex) => { const dayOfMonth = cellIndex - leadingBlanks + 1; if (dayOfMonth < 1 || dayOfMonth > daysInMonth) return <span key={`blank-${monthKey}-${cellIndex}`} aria-hidden="true" />; const day = `${monthKey}-${String(dayOfMonth).padStart(2, '0')}`; const items = getDayItems(day); const total = items.reduce((sum, [, value]) => sum + value, 0); return <span key={day} aria-label={`${getDateLabel(day)} · ${items.map(([id, amount]) => `${labels.get(id) || MISSING_OPTION} ${mode === 'duration' ? formatDuration(amount) : amount}`).join(' / ') || '无记录'}`} className="aspect-square rounded-[2px] border border-[#eadfd4]" style={{ background: getDayBackground(day), opacity: total ? 0.3 + (Math.min(total, maxValue * optionIds.length) / (maxValue * optionIds.length)) * 0.7 : 1 }} />; })}</div></div>; })}</div>{legend}</div>;
+    const monthGridClass = range === '30d' ? 'grid-cols-2 gap-4' : 'grid-cols-3 gap-x-2 gap-y-3 sm:grid-cols-4';
+    return <div className="py-1"><div className={`grid ${monthGridClass}`}>{monthKeys.map((monthKey) => { const [year, month] = monthKey.split('-').map(Number); const leadingBlanks = new Date(year, month - 1, 1).getDay(); const daysInMonth = new Date(year, month, 0).getDate(); const cellCount = Math.ceil((leadingBlanks + daysInMonth) / 7) * 7; return <div key={monthKey}><div className="mb-1 text-[10px] text-[#8f7f70]">{month} 月</div><div className="grid grid-cols-7 gap-px">{Array.from({ length: cellCount }, (_, cellIndex) => { const dayOfMonth = cellIndex - leadingBlanks + 1; if (dayOfMonth < 1 || dayOfMonth > daysInMonth) return <span key={`blank-${monthKey}-${cellIndex}`} aria-hidden="true" />; const day = `${monthKey}-${String(dayOfMonth).padStart(2, '0')}`; const items = getDayItems(day); const total = items.reduce((sum, [, value]) => sum + value, 0); return <span key={day} aria-label={`${getDateLabel(day)} · ${items.map(([id, amount]) => `${labels.get(id) || MISSING_OPTION} ${mode === 'duration' ? formatDuration(amount) : amount}`).join(' / ') || '无记录'}`} className="aspect-square rounded-[2px] border border-[#eadfd4]" style={{ background: getDayBackground(day), opacity: total ? 0.3 + (Math.min(total, maxValue * optionIds.length) / (maxValue * optionIds.length)) * 0.7 : 1 }} />; })}</div></div>; })}</div>{legend}</div>;
   }
   const tileGridClass = range === '7d' ? 'grid-cols-7' : range === 'month' ? 'grid-cols-5 sm:grid-cols-7' : 'grid-cols-5 sm:grid-cols-6 lg:grid-cols-10';
-  return <div className="py-1"><div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]"><span>按日构成</span><span>{range === '7d' ? '近 7 天' : range === 'month' ? '本月' : range === 'year' ? '本年' : '近 30 天'}</span></div><div className={`grid gap-x-2 gap-y-3 ${tileGridClass}`}>{days.map((day) => { const items = getDayItems(day); const total = items.reduce((sum, [, value]) => sum + value, 0); const labelsText = items.map(([id]) => labels.get(id) || MISSING_OPTION).join(' / ') || '无记录'; const detailsText = items.map(([id, amount]) => `${labels.get(id) || MISSING_OPTION} · ${mode === 'duration' ? formatDuration(amount) : amount}`).join(' / ') || '无记录'; return <div key={day} aria-label={`${getDateLabel(day)} · ${detailsText}`} className="min-w-0 border-b border-[#e5dbcf] pb-2"><div className="flex items-center justify-between gap-1 text-[10px] text-[#8f7f70]"><span className="font-mono">{getDateLabel(day)}</span><span className="font-mono font-medium text-[#67594d]">{total || '-'}</span></div><div className="mt-2 flex h-2 overflow-hidden rounded-full bg-[#f1ebe4]">{items.map(([optionId, value]) => <span key={optionId} className="min-w-[2px]" style={{ width: `${total ? (value / total) * 100 : 0}%`, backgroundColor: getOptionColor(optionId) }} />)}</div><div className="mt-1 truncate text-[9px] leading-tight text-[#a08f7d]" title={detailsText}>{labelsText}</div></div>; })}</div>{legend}</div>;
+  return <div className="py-1"><div className={`grid gap-x-2 gap-y-3 ${tileGridClass}`}>{days.map((day) => { const items = getDayItems(day); const total = items.reduce((sum, [, value]) => sum + value, 0); const labelsText = items.map(([id]) => labels.get(id) || MISSING_OPTION).join(' / ') || '无记录'; const detailsText = items.map(([id, amount]) => `${labels.get(id) || MISSING_OPTION} · ${mode === 'duration' ? formatDuration(amount) : amount}`).join(' / ') || '无记录'; return <div key={day} aria-label={`${getDateLabel(day)} · ${detailsText}`} className="min-w-0 border-b border-[#e5dbcf] pb-2"><div className="flex items-center justify-between gap-1 text-[10px] text-[#8f7f70]"><span className="font-mono">{getDateLabel(day)}</span><span className="font-mono font-medium text-[#67594d]">{total || '-'}</span></div><div className="mt-2 flex h-2 overflow-hidden rounded-full bg-[#f1ebe4]">{items.map(([optionId, value]) => <span key={optionId} className="min-w-[2px]" style={{ width: `${total ? (value / total) * 100 : 0}%`, backgroundColor: getOptionColor(optionId) }} />)}</div><div className="mt-1 truncate text-[9px] leading-tight text-[#a08f7d]" title={detailsText}>{labelsText}</div></div>; })}</div>{legend}</div>;
 };
 
 const ChoiceStackedPreview: React.FC<{ attribute: ActivityAttributeDefinition; logs: Log[]; mode: StatisticMode; range: RangeKey; palette: ChartPalette }> = ({ attribute, logs, mode, range, palette }) => {
@@ -806,7 +800,6 @@ const ChoiceStackedPreview: React.FC<{ attribute: ActivityAttributeDefinition; l
   const labelStep = days.length <= 14 ? 1 : days.length <= 45 ? 7 : 30;
   const valueLabel = (value: number) => mode === 'duration' ? formatHoursMinutes(value) : String(value);
   return <div>
-    <div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]"><span>按日选项构成</span><span>{mode === 'duration' ? '时长' : '次数'}</span></div>
     <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="aspect-[2.35/1] w-full" role="img" aria-label={`${attribute.name}选项堆叠图`}>
       {[0, 0.25, 0.5, 0.75, 1].map((ratio) => <g key={ratio}><line x1={chartLeft} y1={chartBottom - ratio * chartRange} x2={chartWidth - chartRight} y2={chartBottom - ratio * chartRange} stroke={ratio === 0 ? '#d8cdc0' : '#eee8e1'} strokeWidth={ratio === 0 ? 1.2 : 1} /><text x={chartLeft - 8} y={chartBottom - ratio * chartRange + 3} textAnchor="end" fill="#9d8d7d" fontSize="9" fontVariant="tabular-nums">{valueLabel(maximum * ratio)}</text></g>)}
       {days.map((day, dayIndex) => {
@@ -850,7 +843,7 @@ const ConditionalStatisticCard: React.FC<ConditionalStatisticCardProps> = ({ act
       displayCondition: undefined
     };
     const key = `${card.id}-${index}`;
-    const cardHeading = <div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, [sliceAttribute])}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">{card.chartType === 'choiceDonut' ? 'CHOICE DONUT' : card.chartType === 'choiceStacked' ? 'CHOICE STACKED' : 'CHOICE HEATMAP'} / {attribute.type === 'single' ? '单选' : '多选'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div>;
+    const cardHeading = <div className="mb-3 flex items-center justify-between gap-3"><h2 className="min-w-0 truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, [sliceAttribute])}</h2><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div>;
     if (card.chartType === 'choiceDonut') {
       return <section key={key} className="py-7 first:pt-2">{cardHeading}<DonutPreview attribute={sliceAttribute} logs={slice.logs} mode={card.metric === 'duration' ? 'duration' : 'count'} palette={chartPalette} /></section>;
     }
@@ -993,10 +986,10 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
         ? { ...TAG_DURATION_ATTRIBUTE, id: '__category-duration__', name: '分类时长' }
         : TAG_DURATION_ATTRIBUTE;
       if (card.chartType === 'tagDurationBoxplot') {
-        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">TAG DURATION BOXPLOT / 每日汇总</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">本年</span></div><TagDurationBoxplotPreview logs={filterLogsByRange(logs, 'year')} palette={chartPalette} /></section>;
+        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="min-w-0 truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">本年</span></div><TagDurationBoxplotPreview logs={filterLogsByRange(logs, 'year')} palette={chartPalette} /></section>;
       }
       if (card.chartType === 'tagDurationWeekHourHeatmap') {
-        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">TAG DURATION / 星期 × 小时</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><TagDurationWeekHourHeatmap logs={logs} range={card.range} palette={chartPalette} /></section>;
+        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="min-w-0 truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><TagDurationWeekHourHeatmap logs={logs} range={card.range} palette={chartPalette} /></section>;
       }
        const tagLogs = createTagDurationLogs(cardLogs, durationAttribute.id);
        return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [durationAttribute] }} logs={tagLogs} hideToolbar chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} onChange={undefined} /></section>;
@@ -1025,16 +1018,16 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
       ? cardLogs.map((log) => ({ ...log, attributeValues: [{ attributeId: attribute.id, optionId: log.activityId }] }))
       : filterLogsForAttribute(cardLogs, attribute.id);
     if (card.chartType === 'choiceDonut') {
-       return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE DONUT / {attribute.type === 'single' ? '单选' : '多选'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><DonutPreview attribute={attribute} logs={attributeLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} palette={chartPalette} /></section>;
+        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="min-w-0 truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><DonutPreview attribute={attribute} logs={attributeLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} palette={chartPalette} /></section>;
     }
     if (card.chartType === 'choiceHeatmap') {
-       return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE HEATMAP / {attribute.type === 'single' ? '单选' : '多选'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceHeatmapPreview attribute={attribute} logs={attributeLogs} mode="count" range={card.range} palette={chartPalette} /></section>;
+       return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="min-w-0 truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceHeatmapPreview attribute={attribute} logs={attributeLogs} mode="count" range={card.range} palette={chartPalette} /></section>;
     }
     if (card.chartType === 'choiceTreemap') {
-      return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE TREEMAP / 单选</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceTreemapPreview attribute={attribute} logs={attributeLogs} mode="count" palette={chartPalette} /></section>;
+      return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="min-w-0 truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceTreemapPreview attribute={attribute} logs={attributeLogs} mode="count" palette={chartPalette} /></section>;
     }
     if (card.chartType === 'choiceStacked') {
-      return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE STACKED / 单选</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceStackedPreview attribute={attribute} logs={attributeLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} range={card.range} palette={chartPalette} /></section>;
+       return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="min-w-0 truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceStackedPreview attribute={attribute} logs={attributeLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} range={card.range} palette={chartPalette} /></section>;
     }
       return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [attribute] }} logs={attributeLogs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} onChange={undefined} /></section>;
   };
