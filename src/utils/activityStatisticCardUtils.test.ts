@@ -79,6 +79,14 @@ describe('activity statistic cards', () => {
     expect(getChartTypesForSource({ type: 'note' }, activity().attributes || [])).toEqual(['textCloud']);
   });
 
+  it('migrates stacked choice charts away from the unsupported year range', () => {
+    const single = { id: 'mood', name: 'Mood', type: 'single' as const, options: [], order: 0, createdAt: 1, updatedAt: 1 };
+    const card: ActivityStatisticCard = {
+      id: 'stacked-year', source: { type: 'attribute', attributeId: 'mood' }, chartType: 'choiceStacked', range: 'year', metric: 'count', order: 0
+    };
+    expect(normalizeStatisticCards({ id: 'activity-3', name: 'Activity', color: '#000', attributes: [single], statisticCards: [card] } as Activity)[0]?.range).toBe('30d');
+  });
+
   it('exposes chart families that match each attribute shape', () => {
     const attributes = activity().attributes || [];
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'weight' }, attributes)).toEqual(['numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi']);

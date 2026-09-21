@@ -7,6 +7,7 @@
  * @updated 2026-09-20: Removes the numeric trend card, defaults numeric attributes to histogram cards, and keeps choice cards on count metrics.
  * @updated 2026-09-21: Supports category duration and second-level activity choice sources.
  * @updated 2026-09-21: Adds stacked charts to single-choice sources.
+ * @updated 2026-09-21: Restricts stacked choice charts to rolling/month ranges by migrating legacy year cards to 30d.
  */
 import {
   Activity,
@@ -79,7 +80,9 @@ const normalizeCard = (raw: unknown, index: number, attributes: ActivityAttribut
     : chartType === 'numberCalendar' || chartType === 'tagDurationBoxplot' ? 'year'
       : chartType === 'tagDurationWeekHourHeatmap' ? 'all'
         : '30d';
-  const range = rawRange === 'all' && source.type !== 'tagDuration' && source.type !== 'categoryDuration' ? '30d' : rawRange;
+  const range = chartType === 'choiceStacked' && rawRange === 'year'
+    ? '30d'
+    : rawRange === 'all' && source.type !== 'tagDuration' && source.type !== 'categoryDuration' ? '30d' : rawRange;
   const metric = METRICS.includes(item.metric as ActivityStatisticMetric) ? item.metric as ActivityStatisticMetric : 'count';
   const normalizedMetric = source.type === 'attribute' && sourceAttribute?.type === 'number'
     ? (chartType === 'numberKpi' ? (metric === 'average' || metric === 'sum' ? metric : 'average') : 'value')

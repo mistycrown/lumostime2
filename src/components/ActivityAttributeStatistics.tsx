@@ -52,6 +52,8 @@ const RANGE_OPTIONS: Array<{ key: RangeKey; label: string }> = [
   { key: 'year', label: '本年' }
 ];
 
+const CHOICE_STACKED_RANGE_OPTIONS = RANGE_OPTIONS.filter((option) => option.key !== 'year');
+
 const TAG_DURATION_RANGE_OPTIONS: Array<{ key: RangeKey; label: string }> = [
   { key: 'all', label: '全部' },
   { key: 'month', label: '本月' },
@@ -933,7 +935,9 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
   const sourceToKey = (value: ActivityStatisticCardSource) => value.type === 'note' ? 'note' : value.type === 'tagDuration' ? 'tagDuration' : value.type === 'categoryDuration' ? 'categoryDuration' : value.type === 'categoryActivity' ? 'categoryActivity' : `attribute:${value.attributeId}`;
   const selectedCard = cards.find((card) => card.id === selectedCardId) || null;
   const selectedTypes = selectedCard ? getChartTypesForSource(selectedCard.source, attributes) : [];
-  const selectedRangeOptions = selectedCard?.source.type === 'tagDuration' || selectedCard?.source.type === 'categoryDuration'
+  const selectedRangeOptions = selectedCard?.chartType === 'choiceStacked'
+    ? CHOICE_STACKED_RANGE_OPTIONS
+    : selectedCard?.source.type === 'tagDuration' || selectedCard?.source.type === 'categoryDuration'
     ? selectedCard.chartType === 'tagDurationBoxplot'
       ? [{ key: 'year' as const, label: '本年' }]
       : selectedCard.chartType === 'tagDurationWeekHourHeatmap'
@@ -958,7 +962,8 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     if (!next) return;
     const types = getChartTypesForSource(next.source, attributes);
     const nextType = types.includes(selectedCard.chartType) ? selectedCard.chartType : types[0];
-    const nextRange = nextType === 'tagDurationBoxplot' ? 'year'
+    const nextRange = nextType === 'choiceStacked' && selectedCard.range === 'year' ? '30d'
+      : nextType === 'tagDurationBoxplot' ? 'year'
       : nextType === 'tagDurationWeekHourHeatmap' ? 'all'
         : nextType === 'numberCalendar' ? 'year' : selectedCard.range;
     updateSelectedCard({
@@ -971,7 +976,8 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
 
   const changeExistingType = (type: ActivityStatisticCardType) => {
     if (!selectedCard) return;
-    const nextRange = type === 'tagDurationBoxplot' ? 'year'
+    const nextRange = type === 'choiceStacked' && selectedCard.range === 'year' ? '30d'
+      : type === 'tagDurationBoxplot' ? 'year'
       : type === 'tagDurationWeekHourHeatmap' ? 'all'
         : type === 'numberCalendar' ? 'year' : selectedCard.range;
     updateSelectedCard({ chartType: type, range: nextRange, metric: type === 'numberArea' || type === 'numberHistogram' || type === 'numberCalendar' || type === 'numberKpi' ? 'value' : type === 'choiceBar' || type === 'choiceDonut' || type === 'choiceStacked' ? selectedCard.metric === 'duration' ? 'duration' : 'count' : 'count' });
