@@ -9,6 +9,8 @@
  * @updated 2026-09-21: Pins both chat composers to the bottom, reserves message-space beneath them, and removes the plus button circle.
  * @updated 2026-09-21: Extracts view-state and assistant-snapshot state into dedicated hooks while keeping request and background orchestration in this coordinator.
  * @updated 2026-09-21: Extracts chat persistence state initialization into a dedicated session-state hook without changing hydration effects.
+ * @updated 2026-09-21: Extracts normalized todo/log action context and assistant message reveal lifecycle into focused support hooks.
+ * @updated 2026-09-21: Extracts viewport navigation, keyboard inset handling, and Markdown presentation into focused support modules.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -228,6 +230,12 @@ import { AIBackfillChatSettingsOverlay } from './ai-chat/AIBackfillChatSettingsO
 import { useAIBackfillChatViewState } from './ai-chat/useAIBackfillChatViewState';
 import { useAIBackfillChatAssistantState } from './ai-chat/useAIBackfillChatAssistantState';
 import { useAIBackfillChatSessionState } from './ai-chat/useAIBackfillChatSessionState';
+import { accentMix, getAIChatTheme } from './ai-chat/AIBackfillChatTheme';
+import { useAIBackfillChatMessageState } from './ai-chat/useAIBackfillChatMessageState';
+import { useAIBackfillChatContextData } from './ai-chat/useAIBackfillChatContextData';
+import { useAIBackfillChatViewport } from './ai-chat/useAIBackfillChatViewport';
+import { CHAT_MARKDOWN_COMPONENTS } from './ai-chat/AIBackfillChatMarkdown';
+import { useAIBackfillChatDebugViewer } from './ai-chat/useAIBackfillChatDebugViewer';
 import {
   AIBackfillChatHistoryOverlay,
   AIBackfillChatNewSessionDialog
@@ -263,7 +271,6 @@ import {
 import {
   TIME_SENSITIVE_MESSAGE_PATTERN,
   buildAssistantCurrentTimeSnapshot,
-  buildBackgroundSummaryDebugExchange,
   buildDebugBlocks,
   buildMemoryUpdateSections,
   buildPersonaPrompt,
@@ -314,7 +321,6 @@ import {
   type ChatTone,
   type DailyNewspaperWritebackConfirmationState,
   type DailyReviewWritebackConfirmationState,
-  type DebugViewerState,
   type DreamEntryDrafts,
   type DreamMonthRangeSelection,
   type DreamMonthSelectionState,
@@ -331,7 +337,6 @@ import {
   DREAM_MONTH_SELECTION_PROMPT,
   LOG_EDIT_REQUEST_PATTERN,
   LOG_EDIT_SUCCESS_REPLY_PATTERN,
-  MOBILE_KEYBOARD_INSET_THRESHOLD,
   ASSISTANT_EDITABLE_MEMORY_SECTION_META,
   ASSISTANT_SCHEDULED_TASK_WEEKDAY_OPTIONS,
   PersonaAvatar,
@@ -346,53 +351,6 @@ import {
   validateAssistantAgentQuietHoursDrafts,
   validateAssistantLetterDrafts
 } from './ai-chat/AIBackfillChatShared';
-
-const CHAT_MARKDOWN_COMPONENTS = {
-  h1: ({ node, ...props }: any) => <h1 className="mb-3 mt-1 text-[1.05rem] font-bold leading-7" {...props} />,
-  h2: ({ node, ...props }: any) => <h2 className="mb-3 mt-1 text-base font-bold leading-7" {...props} />,
-  h3: ({ node, ...props }: any) => <h3 className="mb-2 mt-1 text-[15px] font-semibold leading-6" {...props} />,
-  p: ({ node, ...props }: any) => <p className="mb-3 last:mb-0 leading-6" {...props} />,
-  strong: ({ node, ...props }: any) => (
-    <strong
-      className="rounded-[0.25rem] bg-[rgba(180,138,82,0.14)] px-1 py-[0.05rem] font-black text-[1.02em] text-stone-950"
-      {...props}
-    />
-  ),
-  em: ({ node, ...props }: any) => <em className="italic" {...props} />,
-  ul: ({ node, ...props }: any) => <ul className="my-3 list-disc space-y-1 pl-5" {...props} />,
-  ol: ({ node, ...props }: any) => <ol className="my-3 list-decimal space-y-1 pl-5" {...props} />,
-  li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
-  blockquote: ({ node, ...props }: any) => (
-    <blockquote
-      className="my-3 rounded-r-[0.7rem] border-l-[3px] border-[rgba(120,113,108,0.38)] bg-[rgba(0,0,0,0.03)] py-1.5 pl-3 pr-2 italic"
-      {...props}
-    />
-  ),
-  code: ({ node, inline, className, children, ...props }: any) => (
-    inline
-      ? (
-        <code
-          className="rounded-[0.35rem] bg-[rgba(0,0,0,0.08)] px-1.5 py-0.5 text-[0.92em]"
-          {...props}
-        >
-          {children}
-        </code>
-      )
-      : (
-        <code className={className} {...props}>
-          {children}
-        </code>
-      )
-  ),
-  pre: ({ node, ...props }: any) => (
-    <pre
-      className="my-3 overflow-x-auto rounded-[0.75rem] bg-[rgba(0,0,0,0.08)] px-3 py-2 text-[13px] leading-6"
-      {...props}
-    />
-  ),
-  hr: ({ node, ...props }: any) => <hr className="my-4 border-[rgba(120,113,108,0.22)]" {...props} />,
-  a: ({ node, ...props }: any) => <a className="underline underline-offset-2" {...props} />
-};
 
 interface AIBackfillChatModalProps {
   isOpen: boolean;
@@ -421,163 +379,6 @@ interface ForegroundSendOptions {
 }
 
 const ASSISTANT_CHAT_UPDATED_EVENT = assistantOrchestratorService.getAssistantDecisionEventName();
-const ASSISTANT_MULTI_BUBBLE_REVEAL_DELAY_MS = 540;
-const ASSISTANT_MULTI_BUBBLE_REVEAL_DURATION_MS = 320;
-const ASSISTANT_MULTI_BUBBLE_REVEAL_INITIAL_SCALE = 0.975;
-const ASSISTANT_MULTI_BUBBLE_REVEAL_BASE_OFFSET_PX = 10;
-const ASSISTANT_MULTI_BUBBLE_REVEAL_MAX_OFFSET_PX = 18;
-
-const accentMix = (accentPercent: number, baseColor: string): string => (
-  `color-mix(in srgb, var(--accent-color) ${accentPercent}%, ${baseColor})`
-);
-
-const ACCENT_AI_CHAT_THEME = {
-  shellBg: accentMix(8, '#f4efe7'),
-  shellLayerBg: accentMix(4, '#fbf8f2'),
-  panelBg: accentMix(3, '#fffdf8'),
-  panelBgStrong: accentMix(5, '#faf5ec'),
-  panelBgSoft: accentMix(7, '#f8f2e8'),
-  panelBgMuted: accentMix(9, '#f2eadf'),
-  panelBorder: accentMix(16, '#ddd3c6'),
-  panelBorderStrong: accentMix(26, '#d4c6b6'),
-  chipBg: accentMix(8, '#fffaf4'),
-  chipBorder: accentMix(18, '#ddd1c3'),
-  chipBorderStrong: accentMix(28, '#d1c0ad'),
-  inputBg: accentMix(6, '#f8f2e8'),
-  inputBgStrong: accentMix(10, '#f1e7da'),
-  activeBg: accentMix(12, '#fff8f0'),
-  activeBorder: accentMix(30, '#d5c5b3'),
-  avatarBg: accentMix(4, '#ffffff'),
-  textPrimary: '#201c19',
-  textSecondary: '#655d55',
-  textMuted: '#8b8176',
-  textFaint: '#a19386',
-  primaryButtonBg: accentMix(56, '#2f2b28'),
-  primaryButtonHoverBg: accentMix(64, '#2b2623'),
-  primaryButtonBorder: accentMix(30, '#2f2b28'),
-  primaryButtonText: '#fffaf3',
-  successBg: '#edf3ea',
-  successBorder: '#ced8ca',
-  successText: '#556a52',
-  undoneBg: accentMix(7, '#f1ebe3'),
-  undoneBorder: accentMix(16, '#ddd2c4'),
-  undoneText: '#7a7067',
-  dangerBg: accentMix(8, '#f8e9e6'),
-  dangerBorder: accentMix(20, '#e2b4ab'),
-  dangerText: '#9d544d',
-  pendingBg: accentMix(6, '#f3eee7'),
-  pendingBorder: accentMix(12, '#ddd3c8'),
-  codeBg: '#2d2926',
-  codeBorder: '#433a34',
-  codeText: '#efe7db',
-  overlayDark: 'rgba(32, 25, 19, 0.18)',
-  overlayLight: 'rgba(247, 241, 233, 0.94)',
-  cardShadow: '0 4px 12px rgba(52, 38, 27, 0.025)',
-  cardShadowStrong: '0 8px 18px rgba(52, 38, 27, 0.04)',
-  avatarShadow: '0 2px 8px rgba(52, 38, 27, 0.035)'
-} as const;
-
-const DARK_AI_CHAT_THEME = {
-  shellBg: '#1c1917',
-  shellLayerBg: '#1c1917',
-  panelBg: '#292524',
-  panelBgStrong: '#292524',
-  panelBgSoft: '#292524',
-  panelBgMuted: '#44403c',
-  panelBorder: '#57534e',
-  panelBorderStrong: '#78716c',
-  chipBg: '#292524',
-  chipBorder: '#57534e',
-  chipBorderStrong: '#78716c',
-  inputBg: '#292524',
-  inputBgStrong: '#44403c',
-  activeBg: '#44403c',
-  activeBorder: '#f5f5f4',
-  avatarBg: '#292524',
-  textPrimary: '#f5f5f4',
-  textSecondary: '#d6d3d1',
-  textMuted: '#a8a29e',
-  textFaint: '#78716c',
-  primaryButtonBg: '#292524',
-  primaryButtonHoverBg: '#44403c',
-  primaryButtonBorder: '#78716c',
-  primaryButtonText: '#f5f5f4',
-  successBg: '#1f3d2b',
-  successBorder: '#4ade80',
-  successText: '#bbf7d0',
-  undoneBg: '#292524',
-  undoneBorder: '#57534e',
-  undoneText: '#a8a29e',
-  dangerBg: '#3f1d1d',
-  dangerBorder: '#991b1b',
-  dangerText: '#fecaca',
-  pendingBg: '#292524',
-  pendingBorder: '#57534e',
-  codeBg: '#171412',
-  codeBorder: '#57534e',
-  codeText: '#efe7db',
-  overlayDark: 'rgba(0, 0, 0, 0.48)',
-  overlayLight: 'rgba(41, 37, 36, 0.94)',
-  cardShadow: 'none',
-  cardShadowStrong: 'none',
-  avatarShadow: 'none'
-} as const;
-
-const getAIChatTheme = (isDefaultTheme: boolean, isDarkTheme: boolean) => {
-  if (isDarkTheme) {
-    return DARK_AI_CHAT_THEME;
-  }
-  if (isDefaultTheme) {
-    return {
-      shellBg: '#f5f5f5',
-      shellLayerBg: '#fafafa',
-      panelBg: '#ffffff',
-      panelBgStrong: '#fafafa',
-      panelBgSoft: '#f5f5f5',
-      panelBgMuted: '#f0f0f0',
-      panelBorder: '#e7e5e4',
-      panelBorderStrong: '#d6d3d1',
-      chipBg: '#fafaf9',
-      chipBorder: '#e7e5e4',
-      chipBorderStrong: '#d6d3d1',
-      inputBg: '#f5f5f4',
-      inputBgStrong: '#f0f0ef',
-      activeBg: '#f5f5f4',
-      activeBorder: '#d6d3d1',
-      avatarBg: '#ffffff',
-      textPrimary: '#1c1917',
-      textSecondary: '#57534e',
-      textMuted: '#78716c',
-      textFaint: '#a8a29e',
-      primaryButtonBg: '#1c1917',
-      primaryButtonHoverBg: '#292524',
-      primaryButtonBorder: '#1c1917',
-      primaryButtonText: '#ffffff',
-      successBg: '#f5f5f4',
-      successBorder: '#d6d3d1',
-      successText: '#57534e',
-      undoneBg: '#fafaf9',
-      undoneBorder: '#e7e5e4',
-      undoneText: '#78716c',
-      dangerBg: '#f5f5f4',
-      dangerBorder: '#d6d3d1',
-      dangerText: '#57534e',
-      pendingBg: '#fafaf9',
-      pendingBorder: '#e7e5e4',
-      codeBg: '#2d2926',
-      codeBorder: '#433a34',
-      codeText: '#efe7db',
-      overlayDark: 'rgba(0, 0, 0, 0.18)',
-      overlayLight: 'rgba(250, 250, 250, 0.94)',
-      cardShadow: '0 4px 12px rgba(0, 0, 0, 0.025)',
-      cardShadowStrong: '0 8px 18px rgba(0, 0, 0, 0.04)',
-      avatarShadow: '0 2px 8px rgba(0, 0, 0, 0.035)'
-    } as const;
-  }
-
-  return ACCENT_AI_CHAT_THEME;
-};
-
 const clampNumber = (value: number, min: number, max: number): number => (
   Math.min(max, Math.max(min, value))
 );
@@ -699,6 +500,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   } = useReview();
   const { activeSessions } = useSession();
   const { categories, scopes, isReady: isCategoryScopeReady } = useCategoryScope();
+  const { todoUpdateContext, subtaskParentContext, logEditContext } = useAIBackfillChatContextData({
+    categories,
+    logs,
+    scopes,
+    todoCategories,
+    todos
+  });
   const assistantNewspaperSnapshot = useMemo<AIChatNewspaperItem[]>(() => [
     ...dailyReviews.flatMap((review) => review.aiNewspaper ? [{
       id: review.aiNewspaper.date,
@@ -824,6 +632,45 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
     return sessions.find((session) => session.id === activeSessionId) || sortedSessions[0] || null;
   }, [activeSessionId, desktopWidgetPreferredSession, isDesktopWidgetMode, sessions, sortedSessions]);
+  const {
+    clearAssistantPartRevealTimeouts,
+    resetAssistantPartRevealState,
+    toggleMemoryUpdateExpansion,
+    toggleReasoningExpansion,
+    toggleDreamUpdateExpansion,
+    toggleReminderUpdateExpansion,
+    toggleLocalQueryExpansion
+  } = useAIBackfillChatMessageState({
+    setExpandedMemoryUpdateMessageIds,
+    setExpandedReasoningMessageIds,
+    setExpandedDreamUpdateMessageIds,
+    setExpandedReminderUpdateMessageIds,
+    setExpandedLocalQueryMessageIds,
+    setRevealedAssistantPartCounts,
+    activeSession,
+    assistantPartRevealTimeoutsRef,
+    revealedAssistantPartCountsRef,
+    assistantRevealTargetCountsRef,
+    hydratedRevealSessionIdsRef
+  });
+  const { scrollToLatestMessage } = useAIBackfillChatViewport({
+    isOpen,
+    targetSessionId,
+    targetMessageId,
+    activeSessionId,
+    activeSession,
+    sessions,
+    isLoading,
+    setActiveSessionId,
+    setIsHomeView,
+    setKeyboardBottomInset,
+    messagesEndRef,
+    messageElementRefs,
+    handledNavigationKeyRef,
+    wasOpenRef,
+    visualViewportBaselineRef,
+    composerTextareaRef
+  });
   const activeWeeklyReviewShortcutOptions = useMemo(() => {
     if (activeSession?.templateMeta?.templateType !== 'weekly_review') {
       return [];
@@ -878,123 +725,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       ? dreamSnapshot.entries.filter((entry) => entry.topicId === activeDreamTopic.id)
       : []
   ), [activeDreamTopic, dreamSnapshot.entries]);
-  const scrollToLatestMessage = useCallback((behavior: ScrollBehavior = 'smooth') => {
-    messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
-  }, []);
-  const shouldUseVisualViewportKeyboardInset = !(Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android');
-  const getKeyboardBottomInset = useCallback(() => {
-    if (!shouldUseVisualViewportKeyboardInset || typeof window === 'undefined' || !window.visualViewport) {
-      return 0;
-    }
-
-    const viewport = window.visualViewport;
-    const currentVisibleHeight = viewport.height + viewport.offsetTop;
-    const currentViewportWidth = viewport.width;
-
-    if (currentVisibleHeight <= 0 || currentViewportWidth <= 0) {
-      return 0;
-    }
-
-    const baseline = visualViewportBaselineRef.current;
-    const widthDelta = Math.abs(currentViewportWidth - baseline.width);
-
-    if (baseline.height === 0 || widthDelta > 120) {
-      visualViewportBaselineRef.current = { height: currentVisibleHeight, width: currentViewportWidth };
-      return 0;
-    }
-
-    if (currentVisibleHeight > baseline.height) {
-      visualViewportBaselineRef.current = { height: currentVisibleHeight, width: currentViewportWidth };
-      return 0;
-    }
-
-    const inset = Math.round(baseline.height - currentVisibleHeight);
-    return inset > MOBILE_KEYBOARD_INSET_THRESHOLD ? inset : 0;
-  }, [shouldUseVisualViewportKeyboardInset]);
-  const clearAssistantPartRevealTimeouts = useCallback((messageId?: string) => {
-    if (messageId) {
-      const handles = assistantPartRevealTimeoutsRef.current.get(messageId) || [];
-      handles.forEach((handle) => window.clearTimeout(handle));
-      assistantPartRevealTimeoutsRef.current.delete(messageId);
-      return;
-    }
-
-    assistantPartRevealTimeoutsRef.current.forEach((handles) => {
-      handles.forEach((handle) => window.clearTimeout(handle));
-    });
-    assistantPartRevealTimeoutsRef.current.clear();
-  }, []);
-  const resetAssistantPartRevealState = useCallback((messageId: string) => {
-    clearAssistantPartRevealTimeouts(messageId);
-    delete revealedAssistantPartCountsRef.current[messageId];
-    assistantRevealTargetCountsRef.current.delete(messageId);
-    setRevealedAssistantPartCounts((current) => {
-      if (!(messageId in current)) {
-        return current;
-      }
-
-      const next = { ...current };
-      delete next[messageId];
-      return next;
-    });
-  }, [clearAssistantPartRevealTimeouts]);
-  const toggleMemoryUpdateExpansion = useCallback((messageId: string) => {
-    setExpandedMemoryUpdateMessageIds((current) => {
-      const next = new Set(current);
-      if (next.has(messageId)) {
-        next.delete(messageId);
-      } else {
-        next.add(messageId);
-      }
-      return next;
-    });
-  }, []);
-
-  const toggleReasoningExpansion = useCallback((messageId: string) => {
-    setExpandedReasoningMessageIds((current) => {
-      const next = new Set(current);
-      if (next.has(messageId)) {
-        next.delete(messageId);
-      } else {
-        next.add(messageId);
-      }
-      return next;
-    });
-  }, []);
-  const toggleDreamUpdateExpansion = useCallback((messageId: string) => {
-    setExpandedDreamUpdateMessageIds((current) => {
-      const next = new Set(current);
-      if (next.has(messageId)) {
-        next.delete(messageId);
-      } else {
-        next.add(messageId);
-      }
-      return next;
-    });
-  }, []);
-  const toggleReminderUpdateExpansion = useCallback((messageId: string) => {
-    setExpandedReminderUpdateMessageIds((current) => {
-      const next = new Set(current);
-      if (next.has(messageId)) {
-        next.delete(messageId);
-      } else {
-        next.add(messageId);
-      }
-      return next;
-    });
-  }, []);
-  const toggleLocalQueryExpansion = useCallback((messageId: string) => {
-    setExpandedLocalQueryMessageIds((current) => {
-      const next = new Set(current);
-      if (next.has(messageId)) {
-        next.delete(messageId);
-      } else {
-        next.add(messageId);
-      }
-      return next;
-    });
-  }, []);
-
   useEffect(() => {
     if (!dreamSnapshot.topics.some((topic) => topic.id === selectedDreamTopicId)) {
       setSelectedDreamTopicId(dreamSnapshot.topics[0]?.id || '');
@@ -1178,57 +908,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     });
   }, [assistantBackgroundCallHistory, assistantNativeDiagnostics]);
 
-  const resolveMessageDebugViewer = useCallback((message: AIChatMessage): DebugViewerState | null => {
-    if (!debugMode || message.role !== 'assistant') {
-      return null;
-    }
-
-    if (message.debugSections && message.debugSections.length > 0) {
-      return {
-        title: `${activePersona.assistantSelfName || 'AI'} 调试`,
-        sections: message.debugSections
-      };
-    }
-
-    const normalizedMessage = message.content.trim();
-    const matchedBackgroundEntry = assistantBackgroundCallHistory.find((entry) => {
-      if (entry.persistedMessageId === message.id) {
-        return true;
-      }
-
-      if (message.backgroundDebugHistoryId && entry.id === message.backgroundDebugHistoryId) {
-        return true;
-      }
-
-      if (message.tone !== 'system' || !activeSession || entry.targetSessionId !== activeSession.id) {
-        return false;
-      }
-
-      if ((entry.message?.trim() || '') !== normalizedMessage) {
-        return false;
-      }
-
-      const entryTime = Date.parse(entry.completedAt || entry.requestedAt || '');
-      return Number.isFinite(entryTime) && Math.abs(entryTime - message.createdAt) <= 2 * 60 * 1000;
-    });
-
-    if (!matchedBackgroundEntry) {
-      return null;
-    }
-
-    return {
-      title: `后台请求调试 · ${getAssistantBackgroundTriggerLabel(matchedBackgroundEntry.triggerType)}`,
-      sections: [{
-        label: '后台 AI 调用',
-        exchange: matchedBackgroundEntry.debugExchange || buildBackgroundSummaryDebugExchange(matchedBackgroundEntry)
-      }]
-    };
-  }, [
-    activePersona.assistantSelfName,
+  const resolveMessageDebugViewer = useAIBackfillChatDebugViewer({
+    debugMode,
+    activePersona,
     activeSession,
-    assistantBackgroundCallHistory,
-    debugMode
-  ]);
+    assistantBackgroundCallHistory
+  });
 
   useEffect(() => {
     setEmojiDraft(activePersona.avatarIcon || '✨');
@@ -1254,244 +939,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     };
   }, [clearAssistantPartRevealTimeouts]);
 
-  useEffect(() => {
-    if (!activeSession) {
-      return;
-    }
-
-    const { id: sessionId, messages } = activeSession;
-
-    if (!hydratedRevealSessionIdsRef.current.has(sessionId)) {
-      hydratedRevealSessionIdsRef.current.add(sessionId);
-      setRevealedAssistantPartCounts((current) => {
-        const next = { ...current };
-        messages.forEach((message) => {
-          const totalParts = message.displayParts && message.displayParts.length > 0
-            ? message.displayParts.length
-            : 1;
-          next[message.id] = totalParts;
-          assistantRevealTargetCountsRef.current.set(message.id, totalParts);
-        });
-        return next;
-      });
-      return;
-    }
-
-    const immediateUpdates: Record<string, number> = {};
-
-    messages.forEach((message) => {
-      const totalParts = message.displayParts && message.displayParts.length > 0
-        ? message.displayParts.length
-        : 1;
-      const currentRevealed = revealedAssistantPartCountsRef.current[message.id] ?? 0;
-      const currentTarget = assistantRevealTargetCountsRef.current.get(message.id) ?? 0;
-      const isAnimatableAssistantMessage = message.role === 'assistant'
-        && (message.tone || 'normal') === 'normal'
-        && totalParts > 1;
-
-      if (isAnimatableAssistantMessage && totalParts > currentRevealed && totalParts > currentTarget) {
-        clearAssistantPartRevealTimeouts(message.id);
-
-        const startCount = Math.max(1, currentRevealed || 1);
-        immediateUpdates[message.id] = startCount;
-        assistantRevealTargetCountsRef.current.set(message.id, totalParts);
-
-        const handles: number[] = [];
-        for (let count = startCount + 1; count <= totalParts; count += 1) {
-          const handle = window.setTimeout(() => {
-            setRevealedAssistantPartCounts((current) => ({
-              ...current,
-              [message.id]: count
-            }));
-          }, ASSISTANT_MULTI_BUBBLE_REVEAL_DELAY_MS * (count - startCount));
-          handles.push(handle);
-        }
-
-        assistantPartRevealTimeoutsRef.current.set(message.id, handles);
-        return;
-      }
-
-      if (currentRevealed !== totalParts && !isAnimatableAssistantMessage) {
-        immediateUpdates[message.id] = totalParts;
-      }
-
-      if (!currentTarget || totalParts > currentTarget) {
-        assistantRevealTargetCountsRef.current.set(message.id, totalParts);
-      }
-    });
-
-    if (Object.keys(immediateUpdates).length > 0) {
-      setRevealedAssistantPartCounts((current) => ({
-        ...current,
-        ...immediateUpdates
-      }));
-    }
-  }, [activeSession, clearAssistantPartRevealTimeouts]);
-
-  const todoUpdateContext = useMemo(() => (
-    todos.map((todo) => {
-      const parentTodo = todo.parentTodoId
-        ? todos.find((candidate) => candidate.id === todo.parentTodoId)
-        : undefined;
-      const todoCategory = todoCategories.find((category) => category.id === todo.categoryId);
-      const linkedCategory = todo.linkedCategoryId
-        ? categories.find((category) => category.id === todo.linkedCategoryId)
-        : undefined;
-      const linkedActivity = todo.linkedActivityId
-        ? linkedCategory?.activities.find((activity) => activity.id === todo.linkedActivityId)
-          || categories.flatMap((category) => category.activities).find((activity) => activity.id === todo.linkedActivityId)
-        : undefined;
-
-      return {
-        id: todo.id,
-        title: todo.title,
-        path: parentTodo ? `${parentTodo.title} / ${todo.title}` : todo.title,
-        categoryId: todo.categoryId,
-        categoryName: todoCategory?.name || '',
-        isCompleted: todo.isCompleted,
-        parentTodoId: todo.parentTodoId,
-        parentTodoTitle: parentTodo?.title,
-        linkedCategoryId: todo.linkedCategoryId,
-        linkedActivityId: todo.linkedActivityId,
-        linkedActivityName: linkedActivity?.name,
-        scheduledDate: todo.scheduledDate,
-        deadlineDate: todo.deadlineDate,
-        pin: Boolean(todo.pin)
-      };
-    })
-  ), [categories, todoCategories, todos]);
-
-  const subtaskParentContext = useMemo(() => (
-    todos
-      .filter((todo) => !todo.parentTodoId && !todo.recurrenceRule)
-      .map((todo) => {
-        const todoCategory = todoCategories.find((category) => category.id === todo.categoryId);
-        const linkedCategory = todo.linkedCategoryId
-          ? categories.find((category) => category.id === todo.linkedCategoryId)
-          : undefined;
-        const linkedActivity = todo.linkedActivityId
-          ? linkedCategory?.activities.find((activity) => activity.id === todo.linkedActivityId)
-            || categories.flatMap((category) => category.activities).find((activity) => activity.id === todo.linkedActivityId)
-          : undefined;
-
-        return {
-          id: todo.id,
-          title: todo.title,
-          categoryId: todo.categoryId,
-          categoryName: todoCategory?.name || '',
-          linkedActivityId: todo.linkedActivityId,
-          linkedActivityName: linkedActivity?.name,
-          defaultScopeIds: todo.defaultScopeIds,
-          defaultScopeNames: (todo.defaultScopeIds || [])
-            .map((scopeId) => scopes.find((scope) => scope.id === scopeId)?.name)
-            .filter((name): name is string => Boolean(name))
-        };
-      })
-  ), [categories, scopes, todoCategories, todos]);
-
-  const logEditContext = useMemo(() => (
-    [...logs]
-      .sort((left, right) => right.startTime - left.startTime)
-      .slice(0, 40)
-      .map((log) => {
-        const category = categories.find((item) => item.id === log.categoryId);
-        const activity = category?.activities.find((item) => item.id === log.activityId)
-          || categories.flatMap((item) => item.activities).find((item) => item.id === log.activityId);
-        const linkedTodo = log.linkedTodoId
-          ? todos.find((todo) => todo.id === log.linkedTodoId)
-          : undefined;
-
-        return {
-          id: log.id,
-          date: formatDateKey(new Date(log.startTime)),
-          startTime: `${String(new Date(log.startTime).getHours()).padStart(2, '0')}:${String(new Date(log.startTime).getMinutes()).padStart(2, '0')}`,
-          endTime: `${String(new Date(log.endTime).getHours()).padStart(2, '0')}:${String(new Date(log.endTime).getMinutes()).padStart(2, '0')}`,
-          categoryId: log.categoryId,
-          categoryName: category?.name || '',
-          activityId: log.activityId,
-          activityName: activity?.name || log.title || '',
-          note: log.note,
-          linkedTodoId: log.linkedTodoId,
-          linkedTodoTitle: linkedTodo?.title
-        };
-      })
-  ), [categories, logs, todos]);
-
-  const activeNavigationKey = isOpen && targetSessionId
-    ? `${targetSessionId}:${targetMessageId || ''}`
-    : '';
-  const hasPendingNavigation = Boolean(activeNavigationKey)
-    && handledNavigationKeyRef.current !== activeNavigationKey;
-  const hasResolvablePendingNavigation = hasPendingNavigation
-    && Boolean(targetSessionId)
-    && sessions.some((session) => session.id === targetSessionId);
-
-  useEffect(() => {
-    if (hasResolvablePendingNavigation) {
-      return;
-    }
-
-    scrollToLatestMessage();
-  }, [activeSession?.messages, activeSessionId, hasResolvablePendingNavigation, isLoading, scrollToLatestMessage]);
-
-  useEffect(() => {
-    const wasOpen = wasOpenRef.current;
-    wasOpenRef.current = isOpen;
-
-    if (!isOpen || wasOpen || hasResolvablePendingNavigation) {
-      return;
-    }
-
-    const frameId = window.requestAnimationFrame(() => {
-      scrollToLatestMessage('auto');
-    });
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-    };
-  }, [hasResolvablePendingNavigation, isOpen, scrollToLatestMessage]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      visualViewportBaselineRef.current = { height: 0, width: 0 };
-      setKeyboardBottomInset(0);
-      return;
-    }
-
-    if (!shouldUseVisualViewportKeyboardInset || typeof window === 'undefined' || !window.visualViewport) {
-      setKeyboardBottomInset(0);
-      return;
-    }
-
-    const viewport = window.visualViewport;
-    let frameId: number | null = null;
-
-    const syncKeyboardBottomInset = () => {
-      const nextInset = getKeyboardBottomInset();
-      setKeyboardBottomInset((current) => (current === nextInset ? current : nextInset));
-
-      if (nextInset > 0 && document.activeElement === composerTextareaRef.current) {
-        if (frameId !== null) {
-          window.cancelAnimationFrame(frameId);
-        }
-        frameId = window.requestAnimationFrame(() => {
-          scrollToLatestMessage('auto');
-        });
-      }
-    };
-
-    syncKeyboardBottomInset();
-    viewport.addEventListener('resize', syncKeyboardBottomInset);
-    viewport.addEventListener('scroll', syncKeyboardBottomInset);
-
-    return () => {
-      viewport.removeEventListener('resize', syncKeyboardBottomInset);
-      viewport.removeEventListener('scroll', syncKeyboardBottomInset);
-      if (frameId !== null) {
-        window.cancelAnimationFrame(frameId);
-      }
-    };
-  }, [getKeyboardBottomInset, isOpen, scrollToLatestMessage, shouldUseVisualViewportKeyboardInset]);
 
   useEffect(() => {
     const serialized = JSON.stringify(personas);
@@ -1641,53 +1088,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setInputText(initialInputText);
     focusComposerAtEnd();
   }, [activeSession, focusComposerAtEnd, initialInputText, isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      handledNavigationKeyRef.current = '';
-      return;
-    }
-
-    if (!targetSessionId || !hasPendingNavigation) {
-      return;
-    }
-
-    setIsHomeView(false);
-
-    if (!sessions.some((session) => session.id === targetSessionId)) {
-      handledNavigationKeyRef.current = activeNavigationKey;
-      return;
-    }
-
-    if (activeSessionId !== targetSessionId) {
-      setActiveSessionId(targetSessionId);
-      return;
-    }
-
-    window.requestAnimationFrame(() => {
-      if (targetMessageId) {
-        const targetElement = messageElementRefs.current.get(targetMessageId);
-        if (targetElement) {
-          targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          handledNavigationKeyRef.current = activeNavigationKey;
-          return;
-        }
-      }
-
-      scrollToLatestMessage();
-      handledNavigationKeyRef.current = activeNavigationKey;
-    });
-  }, [
-    activeNavigationKey,
-    activeSession?.messages,
-    activeSessionId,
-    hasPendingNavigation,
-    isOpen,
-    sessions,
-    scrollToLatestMessage,
-    targetMessageId,
-    targetSessionId
-  ]);
 
   useEffect(() => {
     if (activeSession && !personaMap.has(activeSession.personaId)) {
