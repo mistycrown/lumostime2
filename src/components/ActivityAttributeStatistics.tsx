@@ -21,6 +21,7 @@
  * @updated 2026-09-21: Fixes note-cloud range propagation and streams text-term aggregation to avoid year-range omissions and intermediate arrays.
  * @updated 2026-09-21: Keeps local statistic-card edits visible immediately and separates rolling ranges from complete calendar-month display grids.
  * @updated 2026-09-21: Makes fixed statistic-card ranges reactive across reused legacy chart renderers.
+ * @updated 2026-09-21: Makes fixed statistic-card metrics reactive so count/duration switches refresh immediately.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
@@ -203,7 +204,8 @@ const AttributeSection: React.FC<{
 const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, hideToolbar = false, fixedMode, chartVariant, rangeLabel, paletteId, fixedRange }) => {
   const [selectedRange, setSelectedRange] = useState<RangeKey>('30d');
   const range = fixedRange || selectedRange;
-  const [statisticMode, setStatisticMode] = useState<StatisticMode>(fixedMode || 'count');
+  const [selectedMode, setSelectedMode] = useState<StatisticMode>('count');
+  const statisticMode = fixedMode || selectedMode;
   const customSequences = useChartPaletteSequences();
   const isSponsorshipUnlocked = useSponsorshipUnlocked();
   const effectivePaletteId = isSponsorshipUnlocked ? paletteId : 'default';
@@ -274,7 +276,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                 <button
                   key={option.key}
                   type="button"
-                  onClick={() => setStatisticMode(option.key)}
+                  onClick={() => setSelectedMode(option.key)}
                   className={`whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs transition-colors ${statisticMode === option.key ? 'font-medium text-stone-900' : 'text-stone-400 hover:text-stone-700'}`}
                   style={statisticMode === option.key ? { backgroundColor: accentSoft, color: statisticAccent } : undefined}
                 >
