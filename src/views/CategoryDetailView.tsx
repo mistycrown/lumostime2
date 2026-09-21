@@ -8,7 +8,7 @@
  * @updated 2026-08-09: Planned timeline blocks are excluded from category statistics.
  * @updated 2026-08-26: Added category archive and restore control with child-activity cascading handled by the category context.
  * @updated 2026-08-26: Moved category archive status and action into the Details basic-information section to match tag details.
- * @updated 2026-09-21: Added a shared statistics tab limited to direct category logs, tag duration, and notes.
+ * @updated 2026-09-21: Added a shared statistics tab limited to direct category logs, category duration, notes, and second-level tags.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -88,6 +88,12 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
     // Filter logs for this category (All time)
     const catLogs = useMemo(() => logs.filter(l => l.categoryId === categoryId), [logs, categoryId]);
     const countableCatLogs = useMemo(() => filterCountableLogs(catLogs), [catLogs]);
+    const categoryActivityOptions = useMemo(() => category.activities.map((activity) => ({ id: activity.id, label: activity.name })), [category.activities]);
+    const categoryStatisticCards = useMemo(() => (category.statisticCards || []).map((card) => (
+        card.source.type === 'tagDuration'
+            ? { ...card, source: { type: 'categoryDuration' as const } }
+            : card
+    )), [category.statisticCards]);
 
     // Associated Todos
     const catTodos = useMemo(() =>
@@ -480,11 +486,13 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                             ...category,
                             color: category.themeColor,
                             attributes: [],
-                            statisticCards: category.statisticCards,
+                            statisticCards: categoryStatisticCards,
                             statisticPalette: category.statisticPalette
                         }}
                         logs={countableCatLogs}
-                        allowedSourceTypes={['tagDuration', 'note']}
+                        title="分类统计"
+                        allowedSourceTypes={['categoryDuration', 'note', 'categoryActivity']}
+                        categoryActivityOptions={categoryActivityOptions}
                         onChange={(nextActivity) => setCategory((current) => current ? {
                             ...current,
                             statisticCards: nextActivity.statisticCards,

@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-09-21: Adds category statistic duration and second-level activity sources.
  * @updated 2026-09-20: Adds per-tag keyword color sequence settings for newly created keywords.
  * @updated 2026-09-17: Added activity statistic card sources and per-card chart configuration.
  * @updated 2026-09-20: Added activity-level statistic palette groups.
@@ -120,7 +121,9 @@ export interface CustomChartPaletteSequence {
 export type ActivityStatisticCardSource =
   | { type: 'attribute'; attributeId: string }
   | { type: 'note' }
-  | { type: 'tagDuration' };
+  | { type: 'tagDuration' }
+  | { type: 'categoryDuration' }
+  | { type: 'categoryActivity' };
 
 export interface ActivityStatisticCard {
   id: string;

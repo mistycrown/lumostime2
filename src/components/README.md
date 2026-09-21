@@ -2,7 +2,7 @@
 
 - Update 2026-09-20: `ActivityAttributeStatistics.tsx` presents tag-wide statistic cards, including tag duration, notes, and custom attribute sources.
 
-- Update 2026-09-21: `ActivityAttributeStatistics.tsx` accepts restricted sources so category details can reuse the same cards for tag duration and notes only.
+- Update 2026-09-21: `ActivityAttributeStatistics.tsx` accepts restricted sources so category details can reuse the same cards for category duration, notes, and second-level activity choices.
 
 - Update 2026-09-20: `KeywordColorSequenceModal.tsx` provides the shared centered modal for enabling and selecting keyword color sequences.
 

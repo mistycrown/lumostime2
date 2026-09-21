@@ -49,8 +49,10 @@ describe('activity statistic cards', () => {
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'weight' }, attributes)).toEqual([
       'numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi'
     ]);
-    expect(getChartTypesForSource({ type: 'attribute', attributeId: 'kind' }, attributes)).toEqual(['choiceBar', 'choiceDonut', 'choiceHeatmap']);
+    expect(getChartTypesForSource({ type: 'attribute', attributeId: 'kind' }, attributes)).toEqual(['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap']);
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'parts' }, attributes)).toEqual(['choiceBar', 'choiceHeatmap']);
+    expect(getChartTypesForSource({ type: 'categoryActivity' }, attributes)).toEqual(['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap']);
+    expect(getChartTypesForSource({ type: 'categoryDuration' }, attributes)).toEqual(['numberArea', 'numberCalendar', 'numberKpi', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap']);
     const legacyMultiDonut: ActivityStatisticCard = {
       id: 'legacy-donut', source: { type: 'attribute', attributeId: 'parts' }, chartType: 'choiceDonut', range: '30d', metric: 'count', order: 0
     };
@@ -70,7 +72,7 @@ describe('activity statistic cards', () => {
     const calendarCard: ActivityStatisticCard = {
       id: 'calendar', source: { type: 'attribute', attributeId: 'weight' }, chartType: 'numberCalendar', range: '7d', metric: 'value', order: 0
     };
-    expect(normalizeStatisticCards(activity([calendarCard]))[0]?.range).toBe('year');
+    expect(normalizeStatisticCards(activity([calendarCard]))[0]?.range).toBe('7d');
   });
 
   it('allows note only as a text cloud source', () => {
