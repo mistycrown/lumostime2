@@ -25,6 +25,10 @@ describe('getTextTerms', () => {
     expect(getTextTerms('的，\n和')).toEqual([]);
   });
 
+  it('filters common Chinese function words without removing meaningful short terms', () => {
+    expect(getTextTerms('这个任务可以通过学习完成，但是好')).toEqual(['任务', '学习', '完成', '好']);
+  });
+
   it('handles short English values', () => {
     expect(getTextTerms('A')).toEqual(['a']);
   });
