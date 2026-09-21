@@ -95,6 +95,13 @@ describe('statistic calendar ranges', () => {
     expect(days).toContain('2026-08-31');
     expect(days).toContain('2026-09-30');
   });
+
+  it('keeps the seven-day range bounded to seven dates instead of expanding a month', () => {
+    const days = getDateKeysForRange('7d', new Date(2026, 8, 5, 15, 57, 0));
+    expect(days).toHaveLength(7);
+    expect(days[0]).toBe('2026-08-30');
+    expect(days.at(-1)).toBe('2026-09-05');
+  });
 });
 
 describe('getCardAttributeStatisticSlices', () => {
