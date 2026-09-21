@@ -7576,10 +7576,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             }}
             onOpenMemory={handleOpenAssistantMemoryViewer}
             onOpenHistory={() => setIsHistoryPanelOpen(true)}
-            onOpenSettings={() => {
-              setActiveSettingsMainTab('call');
-              setIsPersonaPanelOpen(true);
-            }}
+            onOpenSettings={() => setIsShortcutSettingsOpen(true)}
             onQuickAddTodo={() => {
               if (activeSession?.templateMeta) {
                 const nextSession = createDefaultSession(activeSession.personaId);
