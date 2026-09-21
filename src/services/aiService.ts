@@ -10,7 +10,7 @@
  * @updated 2026-07-21: Corrected Android native AI request timeout to 120 seconds; the HTTP plugin timeout unit is seconds.
  * @updated 2026-07-06: Added principle-library and self-belief create tool-call payloads for foreground assistant writeback.
  * @updated 2026-05-18: `create_todo` unified-turn tool calls can now carry nested `subtasks`, letting one assistant action create a parent todo together with its direct children in one pass.
- * @updated 2026-09-20: Added minimal quick-add-todo and quick-add-backfill requests that only expose their dedicated tool and omit ordinary assistant context.
+ * @updated 2026-09-21: Quick-add backfill requests now include the current local time and target-day timeline summary so relative phrases such as “刚才” can be resolved against real context.
  * @updated 2026-05-17: AI preset/config writes now mark the unified AI backup state as changed so provider/preset edits participate in the main backup and cloud-sync timestamp.
  * @updated 2026-05-17: Structured-JSON requests now expose provider-native reasoning metadata to custom normalizers, allowing report/newspaper writeback flows to persist the same collapsible thinking block used by ordinary chat.
  * @updated 2026-05-14: Enhanced debug error capture: responses are now read as text first to ensure non-JSON server replies (like HTML error pages) are preserved in `rawResponseText` for the debug viewer.
@@ -185,6 +185,11 @@ export interface AIQuickAddBackfillToolCall {
 export interface AIQuickAddBackfillResult {
     toolCall?: AIQuickAddBackfillToolCall;
     debug: AIDebugExchange;
+}
+
+export interface AIQuickAddBackfillTimeContext {
+    currentDateTime?: string;
+    todayTimelineSummary?: string;
 }
 
 export interface AITodoUpdatePatch {
@@ -2533,14 +2538,20 @@ Output:
     requestQuickAddBackfillWithDebug: async (
         description: string,
         options: AIRequestOptions = {},
-        dictionaryContext: AssistantTurnDictionaryContext = {}
+        dictionaryContext: AssistantTurnDictionaryContext = {},
+        timeContext: AIQuickAddBackfillTimeContext = {}
     ): Promise<AIQuickAddBackfillResult> => {
+        const currentDateTime = timeContext.currentDateTime?.trim();
+        const todayTimelineSummary = timeContext.todayTimelineSummary?.trim();
         const systemPrompt = [
             '你是一个快速添加补记的结构化工具调用器。',
             '只根据用户提供的补记描述创建一条已发生的时间记录，不要闲聊、解释、总结或调用其他工具。',
             '必须返回 JSON 对象，格式为：{"toolCalls":[{"toolName":"create_log","args":{"date":"YYYY-MM-DD","startTime":"HH:mm","endTime":"HH:mm","description":"补记内容","categoryId":"标签分类 id","activityId":"标签 id","scopeIds":["领域 id"]}}]}。',
             '只能返回一个 create_log 工具调用。',
-            '如果用户没有明确提供日期、时间或分类/活动名称，对应字段可以留空；不要臆造用户没有提供的具体信息。',
+            '当前本地时间：' + (currentDateTime || '未提供。'),
+            '目标日期的时间轴摘要：' + (todayTimelineSummary || '暂无已记录活动。'),
+            '如果用户说“刚才”“刚刚”或“刚结束”，应将当前本地时间理解为这件事的结束时间；起始时间优先参考时间轴中最近一条记录的结束时间或当天最近空档。只有在无法合理判断时才留空，不要臆造用户没有提供的具体日期或活动内容。',
+            '如果目标日期不是当前本地时间对应的日期，不要把“刚才”强行映射到历史日期，日期和时间字段可以留空。',
             'description 保留用户描述中的全部关键信息；categoryId、activityId、scopeIds 必须从用户词典中选择，无法判断时留空。',
             '用户完整词典（只允许使用其中的 id）：',
             JSON.stringify(dictionaryContext)
