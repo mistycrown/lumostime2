@@ -5,6 +5,7 @@
  * @pos Utility (Activity Statistics)
  * @description Keeps per-activity statistic card configuration backward-compatible and type-safe.
  * @updated 2026-09-20: Removes the numeric trend card, defaults numeric attributes to histogram cards, and keeps choice cards on count metrics.
+ * @updated 2026-09-21: Supports category duration and second-level activity choice sources.
  */
 import {
   Activity,
@@ -28,7 +29,8 @@ export const getDefaultChartType = (type: ActivityAttributeDefinition['type']): 
 
 export const getChartTypesForSource = (source: ActivityStatisticCardSource, attributes: ActivityAttributeDefinition[]): ActivityStatisticCardType[] => {
   if (source.type === 'note') return ['textCloud'];
-  if (source.type === 'tagDuration') return ['numberArea', 'numberCalendar', 'numberKpi', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap'];
+  if (source.type === 'tagDuration' || source.type === 'categoryDuration') return ['numberArea', 'numberCalendar', 'numberKpi', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap'];
+  if (source.type === 'categoryActivity') return ['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap'];
   const attribute = attributes.find((item) => item.id === source.attributeId);
   if (!attribute) return [];
   if (attribute.type === 'text') return ['textCloud'];
@@ -42,6 +44,8 @@ const isCardSource = (value: unknown): value is ActivityStatisticCardSource => {
   const source = value as Record<string, unknown>;
   return source.type === 'note'
     || source.type === 'tagDuration'
+    || source.type === 'categoryDuration'
+    || source.type === 'categoryActivity'
     || (source.type === 'attribute' && typeof source.attributeId === 'string' && source.attributeId.length > 0);
 };
 
@@ -74,7 +78,7 @@ const normalizeCard = (raw: unknown, index: number, attributes: ActivityAttribut
     : chartType === 'numberCalendar' || chartType === 'tagDurationBoxplot' ? 'year'
       : chartType === 'tagDurationWeekHourHeatmap' ? 'all'
         : '30d';
-  const range = rawRange === 'all' && source.type !== 'tagDuration' ? '30d' : rawRange;
+  const range = rawRange === 'all' && source.type !== 'tagDuration' && source.type !== 'categoryDuration' ? '30d' : rawRange;
   const metric = METRICS.includes(item.metric as ActivityStatisticMetric) ? item.metric as ActivityStatisticMetric : 'count';
   const normalizedMetric = source.type === 'attribute' && sourceAttribute?.type === 'number'
     ? (chartType === 'numberKpi' ? (metric === 'average' || metric === 'sum' ? metric : 'average') : 'value')
@@ -122,6 +126,10 @@ export const getStatisticCardLabel = (card: ActivityStatisticCard, attributes: A
     ? '备注'
     : card.source.type === 'tagDuration'
       ? '标签时长'
+      : card.source.type === 'categoryDuration'
+        ? '分类时长'
+        : card.source.type === 'categoryActivity'
+          ? '二级标签'
       : attributes.find((attribute) => attribute.id === attributeId)?.name || '已删除属性';
   const labels: Record<ActivityStatisticCardType, string> = {
     textCloud: '词云',

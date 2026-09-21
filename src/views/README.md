@@ -1,6 +1,6 @@
 # Views Layer
 
-- Update 2026-09-21: `CategoryDetailView.tsx` now includes a shared `Statistics` tab using direct category logs with only tag-duration and note sources.
+- Update 2026-09-21: `CategoryDetailView.tsx` now includes a shared `Statistics` tab using direct category logs with category-duration, note, and second-level activity sources.
 
 - Update 2026-09-20: `TagDetailView.tsx` labels the tag-wide statistic card tab as `统计` instead of `属性` and uses the `Statistics` internal tab key.
 

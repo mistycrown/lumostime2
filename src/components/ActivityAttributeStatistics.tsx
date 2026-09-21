@@ -16,6 +16,7 @@
  * @updated 2026-09-20: Adds calendar ranges, tag-duration cards, single-choice treemaps, and layered card editing.
  * @updated 2026-09-20: Preserves parent attribute values while splitting conditional statistic cards.
  * @updated 2026-09-21: Supports restricted statistic sources for category-level reuse.
+ * @updated 2026-09-21: Adds category-duration and second-level activity choice sources.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
@@ -127,6 +128,8 @@ interface ActivityAttributeStatisticsProps {
   paletteId?: ActivityStatisticPaletteId;
   fixedRange?: RangeKey;
   allowedSourceTypes?: Array<ActivityStatisticCardSource['type']>;
+  categoryActivityOptions?: ActivityAttributeOption[];
+  title?: string;
 }
 
 interface TrendPoint {
@@ -496,9 +499,21 @@ const filterLogsByRange = (logs: Log[], range: string) => {
   return logs.filter((log) => log.startTime >= start);
 };
 
-const getCardAttribute = (activity: Activity, source: ActivityStatisticCardSource) => source.type === 'attribute'
-  ? activity.attributes?.find((attribute) => attribute.id === source.attributeId)
-  : undefined;
+const getCardAttribute = (activity: Activity, source: ActivityStatisticCardSource, categoryActivityOptions: ActivityAttributeOption[] = []) => {
+  if (source.type === 'attribute') return activity.attributes?.find((attribute) => attribute.id === source.attributeId);
+  if (source.type === 'categoryActivity') {
+    return {
+      id: '__category-activity__',
+      name: '二级标签',
+      type: 'single' as const,
+      options: categoryActivityOptions,
+      order: 0,
+      createdAt: 0,
+      updatedAt: 0
+    };
+  }
+  return undefined;
+};
 
 const createTagDurationLogs = (logs: Log[], attributeId: string): Log[] => logs.map((log) => ({
   ...log,
@@ -777,13 +792,15 @@ const getInitialStatisticCards = (
   }));
 };
 
-export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, onChange, allowedSourceTypes }) => {
+export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, onChange, allowedSourceTypes, categoryActivityOptions = [], title = '标签统计' }) => {
   const attributes = useMemo(() => getSortedActivityAttributes(activity), [activity]);
   const availableSourceChoices = useMemo(() => {
     const choices = [
       ...attributes.map((attribute) => ({ key: `attribute:${attribute.id}`, source: { type: 'attribute', attributeId: attribute.id } as ActivityStatisticCardSource, label: attribute.name })),
+      ...(allowedSourceTypes?.includes('categoryDuration') ? [{ key: 'categoryDuration', source: { type: 'categoryDuration' } as ActivityStatisticCardSource, label: '分类时长' }] : []),
       { key: 'note', source: { type: 'note' } as ActivityStatisticCardSource, label: '备注' },
-      { key: 'tagDuration', source: { type: 'tagDuration' } as ActivityStatisticCardSource, label: '标签时长' }
+      ...(allowedSourceTypes?.includes('tagDuration') || !allowedSourceTypes ? [{ key: 'tagDuration', source: { type: 'tagDuration' } as ActivityStatisticCardSource, label: '标签时长' }] : []),
+      ...(allowedSourceTypes?.includes('categoryActivity') ? [{ key: 'categoryActivity', source: { type: 'categoryActivity' } as ActivityStatisticCardSource, label: '二级标签' }] : [])
     ];
     return allowedSourceTypes ? choices.filter((item) => allowedSourceTypes.includes(item.source.type)) : choices;
   }, [attributes, allowedSourceTypes]);
@@ -821,10 +838,10 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
   }, [activity.id, activity.attributes, activity.statisticCards, availableSourceChoices, allowedSourceTypes]);
 
   const sourceChoices = availableSourceChoices;
-  const sourceToKey = (value: ActivityStatisticCardSource) => value.type === 'note' ? 'note' : value.type === 'tagDuration' ? 'tagDuration' : `attribute:${value.attributeId}`;
+  const sourceToKey = (value: ActivityStatisticCardSource) => value.type === 'note' ? 'note' : value.type === 'tagDuration' ? 'tagDuration' : value.type === 'categoryDuration' ? 'categoryDuration' : value.type === 'categoryActivity' ? 'categoryActivity' : `attribute:${value.attributeId}`;
   const selectedCard = cards.find((card) => card.id === selectedCardId) || null;
   const selectedTypes = selectedCard ? getChartTypesForSource(selectedCard.source, attributes) : [];
-  const selectedRangeOptions = selectedCard?.source.type === 'tagDuration'
+  const selectedRangeOptions = selectedCard?.source.type === 'tagDuration' || selectedCard?.source.type === 'categoryDuration'
     ? selectedCard.chartType === 'tagDurationBoxplot'
       ? [{ key: 'year' as const, label: '本年' }]
       : selectedCard.chartType === 'tagDurationWeekHourHeatmap'
@@ -871,22 +888,25 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
   const renderCard = (card: ActivityStatisticCard) => {
     const cardLogs = filterLogsByRange(logs, card.range);
     const rangeLabel = getRangeLabel(card.range);
-    if (card.source.type === 'tagDuration') {
+    if (card.source.type === 'tagDuration' || card.source.type === 'categoryDuration') {
+      const durationAttribute = card.source.type === 'categoryDuration'
+        ? { ...TAG_DURATION_ATTRIBUTE, id: '__category-duration__', name: '分类时长' }
+        : TAG_DURATION_ATTRIBUTE;
       if (card.chartType === 'tagDurationBoxplot') {
         return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">TAG DURATION BOXPLOT / 每日汇总</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">本年</span></div><TagDurationBoxplotPreview logs={filterLogsByRange(logs, 'year')} palette={chartPalette} /></section>;
       }
       if (card.chartType === 'tagDurationWeekHourHeatmap') {
         return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">TAG DURATION / 星期 × 小时</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><TagDurationWeekHourHeatmap logs={logs} range={card.range} palette={chartPalette} /></section>;
       }
-      const tagLogs = createTagDurationLogs(cardLogs, TAG_DURATION_ATTRIBUTE.id);
-      return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [TAG_DURATION_ATTRIBUTE] }} logs={tagLogs} hideToolbar chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} onChange={undefined} /></section>;
+       const tagLogs = createTagDurationLogs(cardLogs, durationAttribute.id);
+       return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [durationAttribute] }} logs={tagLogs} hideToolbar chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} onChange={undefined} /></section>;
     }
     if (card.source.type === 'note') {
       const noteAttribute: ActivityAttributeDefinition = { id: '__note__', name: '备注', type: 'text', order: 0, createdAt: 0, updatedAt: 0 };
       const noteLogs = cardLogs.map((log) => ({ ...log, attributeValues: log.note ? [{ attributeId: noteAttribute.id, value: log.note }] : undefined }));
       return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [noteAttribute] }} logs={noteLogs} hideToolbar rangeLabel={rangeLabel} paletteId={paletteId} onChange={undefined} /></section>;
     }
-    const attribute = getCardAttribute(activity, card.source);
+    const attribute = getCardAttribute(activity, card.source, categoryActivityOptions);
     if (!attribute) return null;
     if (attribute.displayCondition) {
       return <ConditionalStatisticCard
@@ -900,7 +920,9 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
         chartPalette={chartPalette}
       />;
     }
-    const attributeLogs = filterLogsForAttribute(cardLogs, attribute.id);
+    const attributeLogs = card.source.type === 'categoryActivity'
+      ? cardLogs.map((log) => ({ ...log, attributeValues: [{ attributeId: attribute.id, optionId: log.activityId }] }))
+      : filterLogsForAttribute(cardLogs, attribute.id);
     if (card.chartType === 'choiceDonut') {
        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE DONUT / {attribute.type === 'single' ? '单选' : '多选'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><DonutPreview attribute={attribute} logs={attributeLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} palette={chartPalette} /></section>;
     }
@@ -925,7 +947,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#ddd3c7] pb-4">
-        <div><p className="text-[10px] uppercase tracking-[0.2em] text-[#a08f7d]">标签统计</p><p className="mt-1 text-sm text-[#67594d]">{logs.length} 条记录 <span className="text-[#c8b9a9]">/</span> {cards.length} 张卡片</p></div>
+        <div><p className="text-[10px] uppercase tracking-[0.2em] text-[#a08f7d]">{title}</p><p className="mt-1 text-sm text-[#67594d]">{logs.length} 条记录 <span className="text-[#c8b9a9]">/</span> {cards.length} 张卡片</p></div>
         <div className="flex items-center gap-2">
           {isSponsorshipUnlocked && <button type="button" onClick={() => setPaletteOpen(true)} title="配色" aria-label="配色" className="inline-flex items-center gap-1.5 rounded-md border border-[#d8cabb] bg-[#fffdfa] px-3 py-2 text-xs font-medium text-[#77523d] shadow-sm hover:bg-[#f5ebe1]"><Palette size={14} />配色</button>}
           <button type="button" onClick={() => { setSelectedCardId(cards[0]?.id || null); setManageOpen(true); }} className="inline-flex items-center gap-1.5 rounded-md border border-[#d8cabb] bg-[#fffdfa] px-3 py-2 text-xs font-medium text-[#77523d] shadow-sm hover:bg-[#f5ebe1]"><Settings2 size={14} />管理</button>
