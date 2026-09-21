@@ -20,6 +20,7 @@
  * @updated 2026-09-21: Adds daily stacked charts for single-choice statistics with count and duration modes.
  * @updated 2026-09-21: Fixes note-cloud range propagation and streams text-term aggregation to avoid year-range omissions and intermediate arrays.
  * @updated 2026-09-21: Keeps local statistic-card edits visible immediately and separates rolling ranges from complete calendar-month display grids.
+ * @updated 2026-09-21: Makes fixed statistic-card ranges reactive across reused legacy chart renderers.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
@@ -198,7 +199,8 @@ const AttributeSection: React.FC<{
 );
 
 const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, hideToolbar = false, fixedMode, chartVariant, rangeLabel, paletteId, fixedRange }) => {
-  const [range, setRange] = useState<RangeKey>(fixedRange || '30d');
+  const [selectedRange, setSelectedRange] = useState<RangeKey>('30d');
+  const range = fixedRange || selectedRange;
   const [statisticMode, setStatisticMode] = useState<StatisticMode>(fixedMode || 'count');
   const customSequences = useChartPaletteSequences();
   const isSponsorshipUnlocked = useSponsorshipUnlocked();
@@ -214,7 +216,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
     if (fixedRange) return logs;
     const start = getRangeStart(range, new Date());
     return logs.filter((log) => start === 0 || log.startTime >= start);
-  }, [fixedRange, logs, range]);
+  }, [fixedRange, logs, selectedRange]);
 
   const attributes = useMemo<StatisticsAttribute[]>(() => {
     const definitions = getSortedActivityAttributes(activity);
@@ -256,7 +258,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
               <button
                 key={option.key}
                 type="button"
-                onClick={() => setRange(option.key)}
+                onClick={() => setSelectedRange(option.key)}
                 className={`whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs transition-colors ${range === option.key ? 'font-medium text-stone-900' : 'text-stone-400 hover:text-stone-700'}`}
                 style={range === option.key ? { backgroundColor: accentSoft, color: statisticAccent } : undefined}
               >
@@ -353,7 +355,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
               const points = trend.map((point, index) => `${getChartX(index)},${getChartY(point.value)}`).join(' ');
               const areaPoints = `${points} ${trend.length ? `${getChartX(trend.length - 1)},${chartBottom} 0,${chartBottom}` : ''}`;
               if (chartVariant === 'numberCalendar') {
-                const calendarDays = getCalendarDaysForRange(range);
+                const calendarDays = range === '7d' ? getDateKeysForRange(range) : getCalendarDaysForRange(range);
                 const dailyValues = new Map<string, number>();
                 attributeLogs.forEach((log) => (log.attributeValues || []).forEach((value) => {
                   if (value.attributeId !== attributeId || !('value' in value) || typeof value.value !== 'number') return;
@@ -393,7 +395,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                           const daysInMonth = new Date(year, month, 0).getDate();
                           const cellCount = Math.ceil((leadingBlanks + daysInMonth) / 7) * 7;
                           const monthColor = chartPalette.colors[calendarMonths.indexOf(monthKey) % chartPalette.colors.length] || statisticAccent;
-                          return <div key={monthKey}><div className="mb-1 text-[10px] text-stone-500">{month} 月</div><div className="grid grid-cols-7 gap-0.5">{Array.from({ length: cellCount }, (_, cellIndex) => { const dayOfMonth = cellIndex - leadingBlanks + 1; if (dayOfMonth < 1 || dayOfMonth > daysInMonth) return <span key={`blank-${monthKey}-${cellIndex}`} aria-hidden="true" />; const day = `${monthKey}-${String(dayOfMonth).padStart(2, '0')}`; const value = dailyValues.get(day) || 0; const showDayMarker = range === 'year' || range === '30d' ? [10, 20].includes(dayOfMonth) : range === 'month' ? [5, 10, 15, 25, 30].includes(dayOfMonth) : false; return <span key={day} aria-label={`${getDateLabel(day)} · ${formatNumericValue(value)}${numericUnit}`} className="flex aspect-square items-center justify-center rounded-[2px] border border-stone-200 font-mono text-[8px]" style={{ backgroundColor: value ? monthColor : '#f5f5f4', color: value ? '#ffffff' : '#a8a29e', opacity: value ? 0.3 + (value / calendarMax) * 0.7 : 1 }} title={`${getDateLabel(day)} · ${formatNumericValue(value)}${numericUnit || ''}`}>{showDayMarker ? dayOfMonth : null}</span>; })}</div></div>;
+                          return <div key={monthKey}><div className="mb-1 text-[10px] text-stone-500">{month} 月</div><div className={range === 'month' ? 'grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1' : 'grid grid-cols-7 gap-0.5'}>{Array.from({ length: range === 'month' ? daysInMonth : cellCount }, (_, cellIndex) => { const dayOfMonth = range === 'month' ? cellIndex + 1 : cellIndex - leadingBlanks + 1; if (dayOfMonth < 1 || dayOfMonth > daysInMonth) return <span key={`blank-${monthKey}-${cellIndex}`} aria-hidden="true" />; const day = `${monthKey}-${String(dayOfMonth).padStart(2, '0')}`; const value = dailyValues.get(day) || 0; const showDayMarker = range === 'year' || range === '30d' ? [10, 20].includes(dayOfMonth) : range === 'month' ? [5, 10, 15, 25, 30].includes(dayOfMonth) : false; return <span key={day} aria-label={`${getDateLabel(day)} · ${formatNumericValue(value)}${numericUnit}`} className="flex aspect-square items-center justify-center rounded-[2px] border border-stone-200 font-mono text-[8px]" style={{ backgroundColor: value ? monthColor : '#f5f5f4', color: value ? '#ffffff' : '#a8a29e', opacity: value ? 0.3 + (value / calendarMax) * 0.7 : 1 }} title={`${getDateLabel(day)} · ${formatNumericValue(value)}${numericUnit || ''}`}>{showDayMarker ? dayOfMonth : null}</span>; })}</div></div>;
                         })}
                       </div>
                     </div>
@@ -735,7 +737,7 @@ const ChoiceHeatmapPreview: React.FC<{ attribute: ActivityAttributeDefinition; l
     daily.set(day, dayMap);
   });
   const labels = new Map((attribute.options || []).map((option) => [option.id, option.label]));
-  const days = getCalendarDaysForRange(range);
+  const days = range === '7d' ? getDateKeysForRange(range) : getCalendarDaysForRange(range);
   const optionIds = [...totals.entries()].sort((left, right) => right[1] - left[1]).map(([id]) => id);
   const maxValue = Math.max(...[...daily.values()].flatMap((day) => optionIds.map((id) => day.get(id) || 0)), 1);
   const getOptionColor = (optionId: string) => palette.colors[Math.max(optionIds.indexOf(optionId), 0) % palette.colors.length];
@@ -785,7 +787,7 @@ const ChoiceStackedPreview: React.FC<{ attribute: ActivityAttributeDefinition; l
   const labels = new Map((attribute.options || []).map((option) => [option.id, option.label]));
   const days = range === 'all'
     ? [...new Set(logs.map((log) => getLocalDateKey(log.startTime)))].sort()
-    : getDateKeysForRange(range);
+    : range === '7d' ? getDateKeysForRange(range) : getCalendarDaysForRange(range);
   const maximum = Math.max(...days.map((day) => [...(daily.get(day)?.values() || [])].reduce((sum, value) => sum + value, 0)), 1);
   const chartWidth = 640;
   const chartHeight = 270;
@@ -857,7 +859,7 @@ const ConditionalStatisticCard: React.FC<ConditionalStatisticCardProps> = ({ act
     if (card.chartType === 'choiceStacked') {
       return <section key={key} className="py-7 first:pt-2">{cardHeading}<ChoiceStackedPreview attribute={sliceAttribute} logs={slice.logs} mode={card.metric === 'duration' ? 'duration' : 'count'} range={card.range} palette={chartPalette} /></section>;
     }
-    return <section key={key} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [sliceAttribute] }} logs={slice.logs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} rangeLabel={rangeLabel} paletteId={paletteId} onChange={undefined} /></section>;
+    return <section key={key} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [sliceAttribute] }} logs={slice.logs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} onChange={undefined} /></section>;
   })}</React.Fragment>;
 };
 
@@ -1026,7 +1028,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     if (card.chartType === 'choiceStacked') {
       return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE STACKED / 单选</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceStackedPreview attribute={attribute} logs={attributeLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} range={card.range} palette={chartPalette} /></section>;
     }
-      return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [attribute] }} logs={attributeLogs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} rangeLabel={rangeLabel} paletteId={paletteId} onChange={undefined} /></section>;
+      return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [attribute] }} logs={attributeLogs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} onChange={undefined} /></section>;
   };
 
   const addCard = () => {
