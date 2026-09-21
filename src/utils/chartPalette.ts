@@ -3,7 +3,7 @@
  * @input Activity-level statistic palette identifiers and the current theme CSS variables.
  * @output Reusable color groups for activity statistic charts and palette selectors.
  * @description Keeps categorical chart colors consistent while preserving the active theme as a dynamic palette.
- * @updated 2026-09-20: Replaced built-in palette sequences used by the fish-snack sponsorship settings.
+ * @updated 2026-09-21: Increased contrast for the final colors in the Morandi and Spring East palettes.
  */
 import type {
   ActivityStatisticPaletteId,
@@ -124,7 +124,7 @@ export const CHART_PALETTES: ChartPalette[] = [
     "#D9A5A5",
     "#9E9E9E",
     "#6B7C93",
-    "#E8E4DF",
+    "#8C9A92",
   ]),
   shared("traditional-cinnabar", "春日东方", [
     "#F6BDC0",
@@ -134,7 +134,7 @@ export const CHART_PALETTES: ChartPalette[] = [
     "#E07A5F",
     "#81B29A",
     "#3D405B",
-    "#F8F9FA",
+    "#D9B08C",
   ]),
   shared("traditional-bamboo", "雨后花园", [
     "#52796F",
