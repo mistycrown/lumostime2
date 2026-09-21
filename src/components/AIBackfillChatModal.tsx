@@ -4,6 +4,8 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
+ * @updated 2026-09-21: Sends the complete assistant dictionary into quick-add todo/backfill requests, then resolves returned category, activity, and scope ids before applying them.
+ * @updated 2026-09-21: Pins both chat composers to the bottom, reserves message-space beneath them, and removes the plus button circle.
  * @updated 2026-09-20: Preserves AI-home return paths when opening review newspapers and enters selected history sessions directly into chat.
  * @updated 2026-09-14: Syncs the configured persona name with the native background snapshot for Android notifications.
  * @updated 2026-09-20: Defers chat-session persistence and active-session sync until storage hydration completes, preventing startup defaults from overwriting restored history.
@@ -5941,6 +5943,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     toolCall: AIQuickAddBackfillToolCall
   ): AIBackfillToolCall => {
     const rawArgs = toolCall.args;
+    const categoryById = rawArgs.categoryId
+      ? categories.find((category) => category.id === rawArgs.categoryId)
+      : undefined;
+    const activityById = rawArgs.activityId
+      ? categories
+        .flatMap((category) => category.activities.map((activity) => ({ activity, category })))
+        .find(({ activity }) => activity.id === rawArgs.activityId)
+      : undefined;
     const categoryName = rawArgs.categoryName?.trim().toLowerCase();
     const activityName = rawArgs.activityName?.trim().toLowerCase();
     const matchingCategory = categoryName
@@ -5957,8 +5967,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           .flatMap((category) => category.activities.map((activity) => ({ activity, category })))
           .find(({ activity }) => activity.name.trim().toLowerCase().includes(activityName))
       : undefined;
-    const resolvedCategory = matchingActivity?.category || matchingCategory;
-    const resolvedActivity = matchingActivity?.activity;
+    const resolvedCategory = activityById?.category || categoryById || matchingActivity?.category || matchingCategory;
+    const resolvedActivity = activityById?.activity || matchingActivity?.activity;
     const hasResolvedActivity = Boolean(resolvedCategory && resolvedActivity);
     const fallbackDate = isValidBackfillDate(rawArgs.date) ? rawArgs.date!.trim() : defaultDateKey;
     const now = new Date();
@@ -5980,7 +5990,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         endTime,
         description: rawArgs.description.trim(),
         categoryId: hasResolvedActivity ? resolvedCategory!.id : 'uncategorized',
-        activityId: hasResolvedActivity ? resolvedActivity!.id : 'quick_punch'
+        activityId: hasResolvedActivity ? resolvedActivity!.id : 'quick_punch',
+        ...(rawArgs.scopeIds?.length ? { scopeIds: rawArgs.scopeIds } : {})
       }
     };
   };
@@ -6027,7 +6038,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setActiveRequestId(pendingMessageId);
 
     try {
-      const result = await aiService.requestQuickAddTodoWithDebug(description, { signal: controller.signal });
+      const result = await aiService.requestQuickAddTodoWithDebug(
+        description,
+        { signal: controller.signal },
+        buildAssistantDictionaryContext()
+      );
       if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
         return;
       }
@@ -6111,7 +6126,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setActiveRequestId(pendingMessageId);
 
     try {
-      const result = await aiService.requestQuickAddBackfillWithDebug(description, { signal: controller.signal });
+      const result = await aiService.requestQuickAddBackfillWithDebug(
+        description,
+        { signal: controller.signal },
+        buildAssistantDictionaryContext()
+      );
       if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
         return;
       }

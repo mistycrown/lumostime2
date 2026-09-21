@@ -112,7 +112,7 @@ describe('aiService unified turn normalization', () => {
     expect(result.output.toolCalls).toBeUndefined();
   });
 
-  it('keeps quick-add-backfill requests limited to the description and create_log tool', async () => {
+  it('passes the full dictionary to quick-add-backfill and preserves selected ids', async () => {
     const fetchSpy = vi.fn().mockResolvedValue(createJsonTextResponse({
       choices: [{
         message: {
@@ -124,8 +124,9 @@ describe('aiService unified turn normalization', () => {
                 startTime: '09:00',
                 endTime: '09:30',
                 description: '和客户沟通需求',
-                categoryName: '工作',
-                activityName: '沟通'
+                categoryId: 'category-work',
+                activityId: 'activity-communication',
+                scopeIds: ['scope-work']
               }
             }]
           })
@@ -137,7 +138,15 @@ describe('aiService unified turn normalization', () => {
       configurable: true
     });
 
-    const result = await aiService.requestQuickAddBackfillWithDebug('和客户沟通需求');
+    const result = await aiService.requestQuickAddBackfillWithDebug('和客户沟通需求', {}, {
+      activityCategories: [{
+        id: 'category-work',
+        name: '工作',
+        activities: [{ id: 'activity-communication', name: '沟通' }]
+      }],
+      scopes: [{ id: 'scope-work', name: '工作' }],
+      todoCategories: [{ id: 'todo-work', name: '工作事项' }]
+    });
     const requestInit = fetchSpy.mock.calls[0]?.[1] as { body?: string } | undefined;
     const requestBody = requestInit?.body ? JSON.parse(requestInit.body) : {};
 
@@ -148,14 +157,67 @@ describe('aiService unified turn normalization', () => {
         startTime: '09:00',
         endTime: '09:30',
         description: '和客户沟通需求',
-        categoryName: '工作',
-        activityName: '沟通'
+        categoryId: 'category-work',
+        activityId: 'activity-communication',
+        scopeIds: ['scope-work']
       }
     });
     expect(requestBody.messages).toHaveLength(2);
     expect(requestBody.messages[1]).toMatchObject({ role: 'user', content: '和客户沟通需求' });
     expect(requestBody.response_format).toEqual({ type: 'json_object' });
     expect(requestBody.messages[0].content).toContain('只能返回一个 create_log 工具调用');
+    expect(requestBody.messages[0].content).toContain('activity-communication');
+  });
+
+  it('uses dictionary ids for quick-add-todo instead of forcing the 小事 bucket', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(createJsonTextResponse({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            toolCalls: [{
+              toolName: 'create_todo',
+              args: {
+                title: '整理会议纪要',
+                categoryId: 'todo-work',
+                linkedCategoryId: 'category-work',
+                linkedActivityId: 'activity-writing',
+                defaultScopeIds: ['scope-career']
+              }
+            }]
+          })
+        }
+      }]
+    }));
+    Object.defineProperty(globalThis, 'fetch', {
+      value: fetchSpy,
+      configurable: true
+    });
+
+    const result = await aiService.requestQuickAddTodoWithDebug('整理会议纪要', {}, {
+      activityCategories: [{
+        id: 'category-work',
+        name: '工作',
+        activities: [{ id: 'activity-writing', name: '文档整理' }]
+      }],
+      scopes: [{ id: 'scope-career', name: '职业发展' }],
+      todoCategories: [{ id: 'todo-work', name: '工作事项' }]
+    });
+    const requestInit = fetchSpy.mock.calls[0]?.[1] as { body?: string } | undefined;
+    const requestBody = requestInit?.body ? JSON.parse(requestInit.body) : {};
+
+    expect(result.toolCall).toMatchObject({
+      toolName: 'create_todo',
+      args: {
+        title: '整理会议纪要',
+        kind: 'project',
+        categoryId: 'todo-work',
+        linkedCategoryId: 'category-work',
+        linkedActivityId: 'activity-writing',
+        defaultScopeIds: ['scope-career']
+      }
+    });
+    expect(requestBody.messages[0].content).toContain('todo-work');
+    expect(requestBody.messages[0].content).not.toContain('categoryId 固定为 quick');
   });
 
   it('keeps quick create_todo tool calls for the reserved 小事 bucket without linkedActivityId', async () => {
