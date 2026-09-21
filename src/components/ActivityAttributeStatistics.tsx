@@ -17,11 +17,13 @@
  * @updated 2026-09-20: Preserves parent attribute values while splitting conditional statistic cards.
  * @updated 2026-09-21: Supports restricted statistic sources for category-level reuse.
  * @updated 2026-09-21: Adds category-duration and second-level activity choice sources.
+ * @updated 2026-09-21: Adds daily stacked charts for single-choice statistics with count and duration modes.
+ * @updated 2026-09-21: Fixes note-cloud range propagation and streams text-term aggregation to avoid year-range omissions and intermediate arrays.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
 import React, { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, BarChart3, CalendarDays, Clock3, LineChart, Palette, PieChart, Plus, Settings2, Table2, Trash2, Type, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, BarChart3, CalendarDays, Clock3, Layers3, LineChart, Palette, PieChart, Plus, Settings2, Table2, Trash2, Type, X } from 'lucide-react';
 import { Activity, ActivityAttributeDefinition, ActivityAttributeOption, ActivityAttributeType, ActivityAttributeValue, ActivityStatisticCard, ActivityStatisticCardSource, ActivityStatisticCardType, ActivityStatisticPaletteId, Log } from '../types';
 import { CustomSelect } from './CustomSelect';
 import { ChartPaletteSelector } from './ChartPaletteSelector';
@@ -195,9 +197,11 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
   const areaGradientId = `number-area-gradient-${React.useId().replace(/:/g, '')}`;
 
   const filteredLogs = useMemo(() => {
+    // Card callers already apply their range before entering this legacy renderer.
+    if (fixedRange) return logs;
     const start = getRangeStart(range, new Date());
     return logs.filter((log) => start === 0 || log.startTime >= start);
-  }, [logs, range]);
+  }, [fixedRange, logs, range]);
 
   const attributes = useMemo<StatisticsAttribute[]>(() => {
     const definitions = getSortedActivityAttributes(activity);
@@ -274,17 +278,19 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
             const attribute = contextLabel
               ? { ...baseAttribute, id: `${baseAttribute.id}-${contextLabel}`, name: `${baseAttribute.name} · ${contextLabel}` }
               : baseAttribute;
-            const values = attributeLogs.flatMap((log) => (log.attributeValues || []).filter((value) => value.attributeId === attributeId));
-            if (values.length === 0) return null;
             if (attribute.type === 'text') {
               const termCounts = new Map<string, number>();
-              values.forEach((value) => {
-                if ('value' in value && typeof value.value === 'string') getTextTerms(value.value).forEach((term) => termCounts.set(term, (termCounts.get(term) || 0) + 1));
-              });
+              let textValueCount = 0;
+              attributeLogs.forEach((log) => (log.attributeValues || []).forEach((value) => {
+                if (value.attributeId !== attributeId || !('value' in value) || typeof value.value !== 'string') return;
+                textValueCount += 1;
+                getTextTerms(value.value).forEach((term) => termCounts.set(term, (termCounts.get(term) || 0) + 1));
+              }));
+              if (textValueCount === 0) return null;
               const terms = [...termCounts.entries()].sort((left, right) => right[1] - left[1]).slice(0, MAX_TEXT_TERMS);
               const maxCount = terms[0]?.[1] || 1;
               return (
-                  <AttributeSection key={attribute.id} title={attribute.name} typeLabel="TEXT / 文本" rangeLabel={rangeLabel} count={`${values.length} 条已填写`}>
+                  <AttributeSection key={attribute.id} title={attribute.name} typeLabel="TEXT / 文本" rangeLabel={rangeLabel} count={`${textValueCount} 条已填写`}>
                   {terms.length === 0 ? <p className="text-sm text-stone-400">暂无有效文本</p> : (
                     <div className="flex flex-wrap items-baseline gap-x-4 gap-y-3 rounded-xl px-1 py-2">
                       {terms.map(([term, count], index) => {
@@ -297,6 +303,9 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                 </AttributeSection>
               );
             }
+
+            const values = attributeLogs.flatMap((log) => (log.attributeValues || []).filter((value) => value.attributeId === attributeId));
+            if (values.length === 0) return null;
 
             if (attribute.type === 'number') {
               const numbers = values.flatMap((value) => 'value' in value && typeof value.value === 'number' ? [value.value] : []);
@@ -470,7 +479,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
 };
 
 const CARD_TYPE_LABELS: Record<ActivityStatisticCardType, string> = {
-  textCloud: '词云', numberArea: '面积趋势', numberHistogram: '数值分布', numberCalendar: '数值日历', numberKpi: '数值概览', choiceBar: '选项分布', choiceDonut: '选项环形图', choiceHeatmap: '选项热力图', choiceTreemap: '选项矩形图', tagDurationBoxplot: '标签时长箱线图', tagDurationWeekHourHeatmap: '星期 × 小时热力图'
+  textCloud: '词云', numberArea: '面积趋势', numberHistogram: '数值分布', numberCalendar: '数值日历', numberKpi: '数值概览', choiceBar: '选项分布', choiceDonut: '选项环形图', choiceHeatmap: '选项热力图', choiceTreemap: '选项矩形图', choiceStacked: '选项堆叠图', tagDurationBoxplot: '标签时长箱线图', tagDurationWeekHourHeatmap: '星期 × 小时热力图'
 };
 const CARD_TYPE_ICONS: Record<ActivityStatisticCardType, React.ComponentType<{ size?: number }>> = {
   textCloud: Type,
@@ -482,21 +491,22 @@ const CARD_TYPE_ICONS: Record<ActivityStatisticCardType, React.ComponentType<{ s
   choiceDonut: PieChart,
   choiceHeatmap: Table2,
   choiceTreemap: Table2,
+  choiceStacked: Layers3,
   tagDurationBoxplot: BarChart3,
   tagDurationWeekHourHeatmap: Clock3
 };
 const RANGE_DAYS: Record<string, number> = { '7d': 7, '30d': 30 };
 const getRangeLabel = (range: RangeKey) => range === 'all' ? '全部' : RANGE_OPTIONS.find((option) => option.key === range)?.label || '近 30 天';
 
-const filterLogsByRange = (logs: Log[], range: string) => {
+export const filterLogsByRange = (logs: Log[], range: string, now = new Date()) => {
   if (range === 'all') return logs;
-  const now = new Date();
   const start = range === 'year'
     ? new Date(now.getFullYear(), 0, 1).getTime()
     : range === 'month'
       ? new Date(now.getFullYear(), now.getMonth(), 1).getTime()
     : (() => { const date = new Date(now); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() - (RANGE_DAYS[range] || 7) + 1); return date.getTime(); })();
-  return logs.filter((log) => log.startTime >= start);
+  const end = now.getTime();
+  return logs.filter((log) => log.startTime >= start && log.startTime <= end);
 };
 
 const getCardAttribute = (activity: Activity, source: ActivityStatisticCardSource, categoryActivityOptions: ActivityAttributeOption[] = []) => {
@@ -740,6 +750,66 @@ const ChoiceHeatmapPreview: React.FC<{ attribute: ActivityAttributeDefinition; l
   return <div className="py-1"><div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]"><span>按日构成</span><span>{range === '7d' ? '近 7 天' : range === 'month' ? '本月' : '近 30 天'}</span></div><div className={`grid gap-x-2 gap-y-3 ${tileGridClass}`}>{days.map((day) => { const items = getDayItems(day); const total = items.reduce((sum, [, value]) => sum + value, 0); const labelsText = items.map(([id]) => labels.get(id) || MISSING_OPTION).join(' / ') || '无记录'; const detailsText = items.map(([id, amount]) => `${labels.get(id) || MISSING_OPTION} · ${mode === 'duration' ? formatDuration(amount) : amount}`).join(' / ') || '无记录'; return <div key={day} aria-label={`${getDateLabel(day)} · ${detailsText}`} className="min-w-0 border-b border-[#e5dbcf] pb-2"><div className="flex items-center justify-between gap-1 text-[10px] text-[#8f7f70]"><span className="font-mono">{getDateLabel(day)}</span><span className="font-mono font-medium text-[#67594d]">{total || '-'}</span></div><div className="mt-2 flex h-2 overflow-hidden rounded-full bg-[#f1ebe4]">{items.map(([optionId, value]) => <span key={optionId} className="min-w-[2px]" style={{ width: `${total ? (value / total) * 100 : 0}%`, backgroundColor: getOptionColor(optionId) }} />)}</div><div className="mt-1 truncate text-[9px] leading-tight text-[#a08f7d]" title={detailsText}>{labelsText}</div></div>; })}</div>{legend}</div>;
 };
 
+const ChoiceStackedPreview: React.FC<{ attribute: ActivityAttributeDefinition; logs: Log[]; mode: StatisticMode; range: RangeKey; palette: ChartPalette }> = ({ attribute, logs, mode, range, palette }) => {
+  const daily = new Map<string, Map<string, number>>();
+  const totals = new Map<string, number>();
+  logs.forEach((log) => {
+    const day = getLocalDateKey(log.startTime);
+    const dayMap = daily.get(day) || new Map<string, number>();
+    (log.attributeValues || []).filter((value) => value.attributeId === attribute.id).forEach((value) => {
+      const metric = mode === 'duration' ? getLogDurationSeconds(log) : 1;
+      const ids = 'optionId' in value ? [value.optionId] : 'optionIds' in value ? value.optionIds : [];
+      ids.forEach((id) => {
+        dayMap.set(id, (dayMap.get(id) || 0) + metric);
+        totals.set(id, (totals.get(id) || 0) + metric);
+      });
+    });
+    daily.set(day, dayMap);
+  });
+  const optionIds = [...totals.entries()].sort((left, right) => right[1] - left[1]).map(([id]) => id);
+  if (optionIds.length === 0) return <p className="py-8 text-center text-xs text-[#aa9b8b]">当前范围暂无选项数据</p>;
+  const labels = new Map((attribute.options || []).map((option) => [option.id, option.label]));
+  const days = range === 'all'
+    ? [...new Set(logs.map((log) => getLocalDateKey(log.startTime)))].sort()
+    : getDateKeysForRange(range);
+  const maximum = Math.max(...days.map((day) => [...(daily.get(day)?.values() || [])].reduce((sum, value) => sum + value, 0)), 1);
+  const chartWidth = 640;
+  const chartHeight = 270;
+  const chartLeft = 42;
+  const chartRight = 14;
+  const chartTop = 16;
+  const chartBottom = 212;
+  const chartRange = chartBottom - chartTop;
+  const plotWidth = chartWidth - chartLeft - chartRight;
+  const getX = (index: number) => days.length <= 1 ? chartLeft + plotWidth / 2 : chartLeft + (index / (days.length - 1)) * plotWidth;
+  const barWidth = Math.max(2, Math.min(22, (plotWidth / Math.max(days.length, 1)) * 0.72));
+  const labelStep = days.length <= 14 ? 1 : days.length <= 45 ? 7 : 30;
+  const valueLabel = (value: number) => mode === 'duration' ? formatHoursMinutes(value) : String(value);
+  return <div>
+    <div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]"><span>按日选项构成</span><span>{mode === 'duration' ? '时长' : '次数'}</span></div>
+    <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="aspect-[2.35/1] w-full" role="img" aria-label={`${attribute.name}选项堆叠图`}>
+      {[0, 0.25, 0.5, 0.75, 1].map((ratio) => <g key={ratio}><line x1={chartLeft} y1={chartBottom - ratio * chartRange} x2={chartWidth - chartRight} y2={chartBottom - ratio * chartRange} stroke={ratio === 0 ? '#d8cdc0' : '#eee8e1'} strokeWidth={ratio === 0 ? 1.2 : 1} /><text x={chartLeft - 8} y={chartBottom - ratio * chartRange + 3} textAnchor="end" fill="#9d8d7d" fontSize="9" fontVariant="tabular-nums">{valueLabel(maximum * ratio)}</text></g>)}
+      {days.map((day, dayIndex) => {
+        const dayMap = daily.get(day) || new Map<string, number>();
+        const total = [...dayMap.values()].reduce((sum, value) => sum + value, 0);
+        let cursor = chartBottom;
+        const x = getX(dayIndex);
+        return <g key={day}>
+          {optionIds.map((optionId, optionIndex) => {
+            const value = dayMap.get(optionId) || 0;
+            const height = (value / maximum) * chartRange;
+            cursor -= height;
+            return value > 0 ? <rect key={optionId} x={x - barWidth / 2} y={cursor} width={barWidth} height={Math.max(0.8, height)} fill={palette.colors[optionIndex % palette.colors.length]} opacity="0.88"><title>{`${getDateLabel(day)} / ${labels.get(optionId) || MISSING_OPTION}: ${valueLabel(value)}`}</title></rect> : null;
+          })}
+          {dayIndex % labelStep === 0 && <text x={x} y={chartBottom + 22} textAnchor="middle" fill="#806f60" fontSize="9" fontVariant="tabular-nums">{getDateLabel(day)}</text>}
+          {total > 0 && <title>{`${getDateLabel(day)} / ${valueLabel(total)}`}</title>}
+        </g>;
+      })}
+    </svg>
+    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-[#806f60]">{optionIds.slice(0, 16).map((optionId, index) => <span key={optionId} className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm" style={{ backgroundColor: palette.colors[index % palette.colors.length] }} />{labels.get(optionId) || MISSING_OPTION}</span>)}</div>
+  </div>;
+};
+
 interface ConditionalStatisticCardProps {
   activity: Activity;
   attributes: ActivityAttributeDefinition[];
@@ -760,7 +830,7 @@ const ConditionalStatisticCard: React.FC<ConditionalStatisticCardProps> = ({ act
       displayCondition: undefined
     };
     const key = `${card.id}-${index}`;
-    const cardHeading = <div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, [sliceAttribute])}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">{card.chartType === 'choiceDonut' ? 'CHOICE DONUT' : 'CHOICE HEATMAP'} / {attribute.type === 'single' ? '单选' : '多选'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div>;
+    const cardHeading = <div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, [sliceAttribute])}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">{card.chartType === 'choiceDonut' ? 'CHOICE DONUT' : card.chartType === 'choiceStacked' ? 'CHOICE STACKED' : 'CHOICE HEATMAP'} / {attribute.type === 'single' ? '单选' : '多选'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div>;
     if (card.chartType === 'choiceDonut') {
       return <section key={key} className="py-7 first:pt-2">{cardHeading}<DonutPreview attribute={sliceAttribute} logs={slice.logs} mode={card.metric === 'duration' ? 'duration' : 'count'} palette={chartPalette} /></section>;
     }
@@ -769,6 +839,9 @@ const ConditionalStatisticCard: React.FC<ConditionalStatisticCardProps> = ({ act
     }
     if (card.chartType === 'choiceTreemap') {
       return <section key={key} className="py-7 first:pt-2">{cardHeading}<ChoiceTreemapPreview attribute={sliceAttribute} logs={slice.logs} mode="count" palette={chartPalette} /></section>;
+    }
+    if (card.chartType === 'choiceStacked') {
+      return <section key={key} className="py-7 first:pt-2">{cardHeading}<ChoiceStackedPreview attribute={sliceAttribute} logs={slice.logs} mode={card.metric === 'duration' ? 'duration' : 'count'} range={card.range} palette={chartPalette} /></section>;
     }
     return <section key={key} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [sliceAttribute] }} logs={slice.logs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} rangeLabel={rangeLabel} paletteId={paletteId} onChange={undefined} /></section>;
   })}</React.Fragment>;
@@ -873,7 +946,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
       source: next.source,
       chartType: nextType || 'textCloud',
       range: nextRange,
-       metric: nextType === 'numberArea' || nextType === 'numberHistogram' || nextType === 'numberCalendar' || nextType === 'numberKpi' ? 'value' : nextType === 'choiceBar' || nextType === 'choiceDonut' ? selectedCard.metric === 'duration' ? 'duration' : 'count' : 'count'
+        metric: nextType === 'numberArea' || nextType === 'numberHistogram' || nextType === 'numberCalendar' || nextType === 'numberKpi' ? 'value' : nextType === 'choiceBar' || nextType === 'choiceDonut' || nextType === 'choiceStacked' ? selectedCard.metric === 'duration' ? 'duration' : 'count' : 'count'
     });
   };
 
@@ -882,7 +955,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     const nextRange = type === 'tagDurationBoxplot' ? 'year'
       : type === 'tagDurationWeekHourHeatmap' ? 'all'
         : type === 'numberCalendar' ? 'year' : selectedCard.range;
-    updateSelectedCard({ chartType: type, range: nextRange, metric: type === 'numberArea' || type === 'numberHistogram' || type === 'numberCalendar' || type === 'numberKpi' ? 'value' : type === 'choiceBar' || type === 'choiceDonut' ? selectedCard.metric === 'duration' ? 'duration' : 'count' : 'count' });
+    updateSelectedCard({ chartType: type, range: nextRange, metric: type === 'numberArea' || type === 'numberHistogram' || type === 'numberCalendar' || type === 'numberKpi' ? 'value' : type === 'choiceBar' || type === 'choiceDonut' || type === 'choiceStacked' ? selectedCard.metric === 'duration' ? 'duration' : 'count' : 'count' });
   };
 
   const renderCard = (card: ActivityStatisticCard) => {
@@ -904,7 +977,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     if (card.source.type === 'note') {
       const noteAttribute: ActivityAttributeDefinition = { id: '__note__', name: '备注', type: 'text', order: 0, createdAt: 0, updatedAt: 0 };
       const noteLogs = cardLogs.map((log) => ({ ...log, attributeValues: log.note ? [{ attributeId: noteAttribute.id, value: log.note }] : undefined }));
-      return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [noteAttribute] }} logs={noteLogs} hideToolbar rangeLabel={rangeLabel} paletteId={paletteId} onChange={undefined} /></section>;
+       return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [noteAttribute] }} logs={noteLogs} hideToolbar rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} onChange={undefined} /></section>;
     }
     const attribute = getCardAttribute(activity, card.source, categoryActivityOptions);
     if (!attribute) return null;
@@ -932,7 +1005,10 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     if (card.chartType === 'choiceTreemap') {
       return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE TREEMAP / 单选</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceTreemapPreview attribute={attribute} logs={attributeLogs} mode="count" palette={chartPalette} /></section>;
     }
-     return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [attribute] }} logs={attributeLogs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} rangeLabel={rangeLabel} paletteId={paletteId} onChange={undefined} /></section>;
+    if (card.chartType === 'choiceStacked') {
+      return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE STACKED / 单选</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceStackedPreview attribute={attribute} logs={attributeLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} range={card.range} palette={chartPalette} /></section>;
+    }
+      return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [attribute] }} logs={attributeLogs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} rangeLabel={rangeLabel} paletteId={paletteId} onChange={undefined} /></section>;
   };
 
   const addCard = () => {
@@ -982,7 +1058,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
         </div>
       )}
       {paletteOpen && <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#3b2e24]/35 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setPaletteOpen(false); }}><div className="w-full max-w-xl rounded-t-2xl border border-[#d8cabb] bg-[#fcfaf6] p-5 shadow-2xl sm:rounded-2xl" role="dialog" aria-modal="true" aria-label="配色"><div className="mb-5 flex items-center justify-between"><h2 className="font-serif text-lg text-[#4a3b30]">配色</h2><button type="button" onClick={() => setPaletteOpen(false)} title="关闭" aria-label="关闭" className="p-1.5 text-[#a08f7d]"><X size={17} /></button></div><ChartPaletteSelector value={effectivePaletteId} onChange={updatePalette} customSequences={customSequences} unlocked={isSponsorshipUnlocked} /></div></div>}
-      {editorOpen && selectedCard && <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#3b2e24]/35 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditorOpen(false); }}><div className="max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-[#d8cabb] bg-[#fcfaf6] p-5 shadow-2xl sm:rounded-2xl" role="dialog" aria-modal="true" aria-label="编辑所选卡片"><div className="mb-5 flex items-center justify-between"><div><h2 className="font-serif text-lg text-[#4a3b30]">编辑所选卡片</h2><span className="text-[10px] text-[#b09e8c]">#{cards.findIndex((card) => card.id === selectedCard.id) + 1}</span></div><button type="button" onClick={() => setEditorOpen(false)} title="关闭" aria-label="关闭" className="p-1.5 text-[#a08f7d]"><X size={17} /></button></div><CustomSelect label="数据来源" value={sourceToKey(selectedCard.source)} options={sourceChoices.map((item) => ({ value: item.key, label: item.label }))} onChange={changeExistingSource} renderDropdownInPortal /><div className="mt-4"><p className="mb-2 text-xs text-[#766657]">图表类型</p><div className="grid grid-cols-2 gap-2">{selectedTypes.map((type) => { const Icon = CARD_TYPE_ICONS[type]; return <button key={type} type="button" onClick={() => changeExistingType(type)} className={`inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-left text-xs transition-colors ${selectedCard.chartType === type ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70] hover:border-[#c9b6a4]'}`}><Icon size={14} /><span>{CARD_TYPE_LABELS[type]}</span></button>; })}</div></div><div className="mt-4"><p className="mb-2 text-xs text-[#766657]">时间范围</p><div className="flex flex-wrap gap-1.5">{selectedRangeOptions.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ range: option.key })} className={`rounded-md border px-2.5 py-1.5 text-xs ${selectedCard.range === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>{(selectedCard.chartType === 'choiceBar' || selectedCard.chartType === 'choiceDonut') && <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">统计维度</p><div className="flex gap-1.5">{STATISTIC_MODE_OPTIONS.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ metric: option.key })} className={`rounded-md border px-3 py-1.5 text-xs ${selectedCard.metric === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>}</div></div>}
+      {editorOpen && selectedCard && <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#3b2e24]/35 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditorOpen(false); }}><div className="max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-[#d8cabb] bg-[#fcfaf6] p-5 shadow-2xl sm:rounded-2xl" role="dialog" aria-modal="true" aria-label="编辑所选卡片"><div className="mb-5 flex items-center justify-between"><div><h2 className="font-serif text-lg text-[#4a3b30]">编辑所选卡片</h2><span className="text-[10px] text-[#b09e8c]">#{cards.findIndex((card) => card.id === selectedCard.id) + 1}</span></div><button type="button" onClick={() => setEditorOpen(false)} title="关闭" aria-label="关闭" className="p-1.5 text-[#a08f7d]"><X size={17} /></button></div><CustomSelect label="数据来源" value={sourceToKey(selectedCard.source)} options={sourceChoices.map((item) => ({ value: item.key, label: item.label }))} onChange={changeExistingSource} renderDropdownInPortal /><div className="mt-4"><p className="mb-2 text-xs text-[#766657]">图表类型</p><div className="grid grid-cols-2 gap-2">{selectedTypes.map((type) => { const Icon = CARD_TYPE_ICONS[type]; return <button key={type} type="button" onClick={() => changeExistingType(type)} className={`inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-left text-xs transition-colors ${selectedCard.chartType === type ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70] hover:border-[#c9b6a4]'}`}><Icon size={14} /><span>{CARD_TYPE_LABELS[type]}</span></button>; })}</div></div><div className="mt-4"><p className="mb-2 text-xs text-[#766657]">时间范围</p><div className="flex flex-wrap gap-1.5">{selectedRangeOptions.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ range: option.key })} className={`rounded-md border px-2.5 py-1.5 text-xs ${selectedCard.range === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>{(selectedCard.chartType === 'choiceBar' || selectedCard.chartType === 'choiceDonut' || selectedCard.chartType === 'choiceStacked') && <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">统计维度</p><div className="flex gap-1.5">{STATISTIC_MODE_OPTIONS.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ metric: option.key })} className={`rounded-md border px-3 py-1.5 text-xs ${selectedCard.metric === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>}</div></div>}
     </div>
   );
 };

@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { Activity } from '../types';
-import { filterLogsForAttribute, getCardAttributeStatisticSlices, getTextTerms } from './ActivityAttributeStatistics';
+import { filterLogsForAttribute, filterLogsByRange, getCardAttributeStatisticSlices, getTextTerms } from './ActivityAttributeStatistics';
 import { getChartTypesForSource, normalizeStatisticCards } from '../utils/activityStatisticCardUtils';
 
 describe('getTextTerms', () => {
@@ -62,6 +62,20 @@ describe('filterLogsForAttribute', () => {
         attributeValues: [{ attributeId: 'weight', value: 68 }]
       }
     ]);
+  });
+});
+
+describe('filterLogsByRange', () => {
+  it('keeps the full local calendar year while excluding prior-year and future logs', () => {
+    const now = new Date(2026, 8, 21, 15, 57, 0);
+    const logs = [
+      { id: 'new-year', startTime: new Date(2026, 0, 1, 0, 0, 0).getTime() },
+      { id: 'current', startTime: new Date(2026, 8, 20, 12, 0, 0).getTime() },
+      { id: 'previous-year', startTime: new Date(2025, 11, 31, 23, 59, 59).getTime() },
+      { id: 'future', startTime: new Date(2026, 8, 21, 16, 0, 0).getTime() }
+    ];
+
+    expect(filterLogsByRange(logs as never, 'year', now).map((log) => log.id)).toEqual(['new-year', 'current']);
   });
 });
 
