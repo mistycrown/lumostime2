@@ -10,6 +10,7 @@
  * @updated 2026-05-21: Treat assistant messages as standalone avatar groups so each AI reply starts with an avatar while multi-bubble displayParts still share one avatar.
  * @updated 2026-05-18: Added configurable width classes so compact desktop AI shells can reuse the conversation renderer without forcing the full-screen modal measure.
  * @updated 2026-05-15: Rebuilt the conversation pane with the extracted empty state, message bubble rendering, and writeback cards.
+ * @updated 2026-09-21: Reserves bottom space for the fixed chat composer so the latest message remains visible.
  */
 import React from 'react';
 import { ChevronDown, ChevronRight, Loader2, RotateCcw } from 'lucide-react';
@@ -937,7 +938,7 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
   };
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
+    <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-4 sm:px-5 sm:pb-32 sm:pt-5">
       {!activeSession || activeSession.messages.length === 0 ? (
         <div
           className={`mx-auto mt-10 ${emptyStateMaxWidthClassName} rounded-[0.9rem] border border-dashed px-6 py-7 text-sm leading-7`}

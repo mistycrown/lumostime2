@@ -7594,9 +7594,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         )}
 
         {!isHomeView && !isPersonaPanelOpen && !isShortcutPromptSettingsOpen && <div
-          className="px-4 pb-3 pt-3 backdrop-blur-xl sm:px-5"
+          className="absolute inset-x-0 bottom-0 z-30 px-4 pt-3 backdrop-blur-xl sm:px-5"
           style={{
-            backgroundColor: AI_CHAT_THEME.shellLayerBg
+            backgroundColor: AI_CHAT_THEME.shellLayerBg,
+            paddingBottom: `calc(env(safe-area-inset-bottom) + ${keyboardBottomInset}px + 0.75rem)`
           }}
         >
           <div
@@ -7633,8 +7634,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             <button
               type="button"
               onClick={() => setIsComposerMenuOpen((open) => !open)}
-              className="order-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors"
-              style={{ borderColor: AI_CHAT_THEME.panelBorder, backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textSecondary }}
+              className="order-1 inline-flex h-9 w-9 shrink-0 items-center justify-center p-0 transition-opacity hover:opacity-70"
+              style={{ color: AI_CHAT_THEME.textSecondary }}
               title="更多功能"
               aria-label="更多功能"
               aria-expanded={isComposerMenuOpen}
