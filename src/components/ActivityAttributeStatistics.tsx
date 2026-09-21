@@ -19,6 +19,7 @@
  * @updated 2026-09-21: Adds category-duration and second-level activity choice sources.
  * @updated 2026-09-21: Adds daily stacked charts for single-choice statistics with count and duration modes.
  * @updated 2026-09-21: Fixes note-cloud range propagation and streams text-term aggregation to avoid year-range omissions and intermediate arrays.
+ * @updated 2026-09-21: Keeps local statistic-card edits visible immediately and separates rolling ranges from complete calendar-month display grids.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
@@ -91,12 +92,10 @@ const getDateLabel = (dateKey: string) => {
   return `${Number(month)}/${Number(day)}`;
 };
 
-const getDateKeysForRange = (range: RangeKey, now = new Date()) => {
+export const getDateKeysForRange = (range: RangeKey, now = new Date()) => {
   const today = new Date(now);
   today.setHours(0, 0, 0, 0);
-  const end = range === 'month'
-    ? new Date(today.getFullYear(), today.getMonth() + 1, 0)
-    : today;
+  const end = today;
   const start = range === 'year'
     ? new Date(end.getFullYear(), 0, 1)
     : range === 'month'
@@ -105,6 +104,20 @@ const getDateKeysForRange = (range: RangeKey, now = new Date()) => {
   const keys: string[] = [];
   for (const cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) keys.push(getLocalDateKey(cursor.getTime()));
   return keys;
+};
+
+/** Expands a selected range to complete local calendar months for heatmap/calendar displays. */
+export const getCalendarDaysForRange = (range: RangeKey, now = new Date()) => {
+  const rangeDays = getDateKeysForRange(range, now);
+  const monthKeys = [...new Set(rangeDays.map((day) => day.slice(0, 7)))];
+  const days: string[] = [];
+  monthKeys.forEach((monthKey) => {
+    const [year, month] = monthKey.split('-').map(Number);
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = new Date(year, month, 0);
+    for (const cursor = monthStart; cursor <= monthEnd; cursor.setDate(cursor.getDate() + 1)) days.push(getLocalDateKey(cursor.getTime()));
+  });
+  return days;
 };
 
 const getRangeStart = (range: RangeKey, now: Date) => {
@@ -340,7 +353,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
               const points = trend.map((point, index) => `${getChartX(index)},${getChartY(point.value)}`).join(' ');
               const areaPoints = `${points} ${trend.length ? `${getChartX(trend.length - 1)},${chartBottom} 0,${chartBottom}` : ''}`;
               if (chartVariant === 'numberCalendar') {
-                const calendarDays = getDateKeysForRange(range);
+                const calendarDays = getCalendarDaysForRange(range);
                 const dailyValues = new Map<string, number>();
                 attributeLogs.forEach((log) => (log.attributeValues || []).forEach((value) => {
                   if (value.attributeId !== attributeId || !('value' in value) || typeof value.value !== 'number') return;
@@ -375,12 +388,12 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                       <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-stone-400"><span>日历热力</span><span>按日合计</span></div>
                       <div className={`grid gap-x-3 gap-y-3 ${range === 'month' ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'}`}>
                         {calendarMonths.map((monthKey) => {
-                          const monthDays = calendarDays.filter((day) => day.startsWith(monthKey));
                           const [year, month] = monthKey.split('-').map(Number);
                           const leadingBlanks = new Date(year, month - 1, 1).getDay();
+                          const daysInMonth = new Date(year, month, 0).getDate();
+                          const cellCount = Math.ceil((leadingBlanks + daysInMonth) / 7) * 7;
                           const monthColor = chartPalette.colors[calendarMonths.indexOf(monthKey) % chartPalette.colors.length] || statisticAccent;
-                          const isSingleMonth = range === 'month';
-                          return <div key={monthKey}><div className="mb-1 text-[10px] text-stone-500">{month} 月</div><div className={isSingleMonth ? 'grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1' : 'grid grid-cols-7 gap-0.5'}>{!isSingleMonth && Array.from({ length: leadingBlanks }).map((_, index) => <span key={`blank-${monthKey}-${index}`} />)}{monthDays.map((day) => { const value = dailyValues.get(day) || 0; const dayOfMonth = Number(day.slice(8, 10)); const showDayMarker = isSingleMonth && [5, 10, 15, 25, 30].includes(dayOfMonth); return <span key={day} aria-label={`${getDateLabel(day)} · ${formatNumericValue(value)}${numericUnit}`} className="flex aspect-square items-center justify-center rounded-[2px] border border-stone-200 font-mono text-[8px]" style={{ backgroundColor: value ? monthColor : '#f5f5f4', color: value ? '#ffffff' : '#a8a29e', opacity: value ? 0.3 + (value / calendarMax) * 0.7 : 1 }} title={`${getDateLabel(day)} · ${formatNumericValue(value)}${numericUnit || ''}`}>{showDayMarker ? dayOfMonth : null}</span>; })}</div></div>;
+                          return <div key={monthKey}><div className="mb-1 text-[10px] text-stone-500">{month} 月</div><div className="grid grid-cols-7 gap-0.5">{Array.from({ length: cellCount }, (_, cellIndex) => { const dayOfMonth = cellIndex - leadingBlanks + 1; if (dayOfMonth < 1 || dayOfMonth > daysInMonth) return <span key={`blank-${monthKey}-${cellIndex}`} aria-hidden="true" />; const day = `${monthKey}-${String(dayOfMonth).padStart(2, '0')}`; const value = dailyValues.get(day) || 0; const showDayMarker = range === 'year' || range === '30d' ? [10, 20].includes(dayOfMonth) : range === 'month' ? [5, 10, 15, 25, 30].includes(dayOfMonth) : false; return <span key={day} aria-label={`${getDateLabel(day)} · ${formatNumericValue(value)}${numericUnit}`} className="flex aspect-square items-center justify-center rounded-[2px] border border-stone-200 font-mono text-[8px]" style={{ backgroundColor: value ? monthColor : '#f5f5f4', color: value ? '#ffffff' : '#a8a29e', opacity: value ? 0.3 + (value / calendarMax) * 0.7 : 1 }} title={`${getDateLabel(day)} · ${formatNumericValue(value)}${numericUnit || ''}`}>{showDayMarker ? dayOfMonth : null}</span>; })}</div></div>;
                         })}
                       </div>
                     </div>
@@ -722,7 +735,7 @@ const ChoiceHeatmapPreview: React.FC<{ attribute: ActivityAttributeDefinition; l
     daily.set(day, dayMap);
   });
   const labels = new Map((attribute.options || []).map((option) => [option.id, option.label]));
-  const days = getDateKeysForRange(range);
+  const days = getCalendarDaysForRange(range);
   const optionIds = [...totals.entries()].sort((left, right) => right[1] - left[1]).map(([id]) => id);
   const maxValue = Math.max(...[...daily.values()].flatMap((day) => optionIds.map((id) => day.get(id) || 0)), 1);
   const getOptionColor = (optionId: string) => palette.colors[Math.max(optionIds.indexOf(optionId), 0) % palette.colors.length];
@@ -742,12 +755,13 @@ const ChoiceHeatmapPreview: React.FC<{ attribute: ActivityAttributeDefinition; l
   };
   const legend = <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5 border-t border-[#e5dbcf] pt-2">{optionIds.map((optionId) => <span key={optionId} className="inline-flex min-w-0 items-center gap-1 text-[10px] text-[#67594d]"><span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ backgroundColor: getOptionColor(optionId) }} /><span className="max-w-28 truncate">{labels.get(optionId) || MISSING_OPTION}</span></span>)}</div>;
   if (days.length === 0 || optionIds.length === 0) return <p className="py-8 text-center text-xs text-[#aa9b8b]">当前范围暂无选项数据</p>;
-  if (range === 'year') {
-    const monthKeys = [...new Set(days.map((day) => day.slice(0, 7)))];
-    return <div className="py-1"><div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]"><span>选项 × 日期</span><span>本年 · 多选分段显示</span></div><div className="grid grid-cols-3 gap-x-2 gap-y-3 sm:grid-cols-4">{monthKeys.map((monthKey) => { const monthDays = days.filter((day) => day.startsWith(monthKey)); const [year, month] = monthKey.split('-').map(Number); const leadingBlanks = new Date(year, month - 1, 1).getDay(); return <div key={monthKey}><div className="mb-1 text-[10px] text-[#8f7f70]">{month} 月</div><div className="grid grid-cols-7 gap-px">{Array.from({ length: leadingBlanks }).map((_, index) => <span key={`blank-${monthKey}-${index}`} />)}{monthDays.map((day) => { const items = getDayItems(day); const total = items.reduce((sum, [, value]) => sum + value, 0); return <span key={day} aria-label={`${getDateLabel(day)} · ${items.map(([id, amount]) => `${labels.get(id) || MISSING_OPTION} ${mode === 'duration' ? formatDuration(amount) : amount}`).join(' / ') || '无记录'}`} className="aspect-square rounded-[2px] border border-[#eadfd4]" style={{ background: getDayBackground(day), opacity: total ? 0.3 + (Math.min(total, maxValue * optionIds.length) / (maxValue * optionIds.length)) * 0.7 : 1 }} />; })}</div></div>; })}</div>{legend}</div>;
+  const monthKeys = [...new Set(days.map((day) => day.slice(0, 7)))];
+  if (range === 'year' || monthKeys.length > 1) {
+    const rangeLabel = range === 'year' ? '本年' : range === '30d' ? '近 30 天' : range === '7d' ? '近 7 天' : '本月';
+    return <div className="py-1"><div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]"><span>选项 × 日期</span><span>{rangeLabel} · 多选分段显示</span></div><div className="grid grid-cols-3 gap-x-2 gap-y-3 sm:grid-cols-4">{monthKeys.map((monthKey) => { const [year, month] = monthKey.split('-').map(Number); const leadingBlanks = new Date(year, month - 1, 1).getDay(); const daysInMonth = new Date(year, month, 0).getDate(); const cellCount = Math.ceil((leadingBlanks + daysInMonth) / 7) * 7; return <div key={monthKey}><div className="mb-1 text-[10px] text-[#8f7f70]">{month} 月</div><div className="grid grid-cols-7 gap-px">{Array.from({ length: cellCount }, (_, cellIndex) => { const dayOfMonth = cellIndex - leadingBlanks + 1; if (dayOfMonth < 1 || dayOfMonth > daysInMonth) return <span key={`blank-${monthKey}-${cellIndex}`} aria-hidden="true" />; const day = `${monthKey}-${String(dayOfMonth).padStart(2, '0')}`; const items = getDayItems(day); const total = items.reduce((sum, [, value]) => sum + value, 0); return <span key={day} aria-label={`${getDateLabel(day)} · ${items.map(([id, amount]) => `${labels.get(id) || MISSING_OPTION} ${mode === 'duration' ? formatDuration(amount) : amount}`).join(' / ') || '无记录'}`} className="aspect-square rounded-[2px] border border-[#eadfd4]" style={{ background: getDayBackground(day), opacity: total ? 0.3 + (Math.min(total, maxValue * optionIds.length) / (maxValue * optionIds.length)) * 0.7 : 1 }} />; })}</div></div>; })}</div>{legend}</div>;
   }
   const tileGridClass = range === '7d' ? 'grid-cols-7' : range === 'month' ? 'grid-cols-5 sm:grid-cols-7' : 'grid-cols-5 sm:grid-cols-6 lg:grid-cols-10';
-  return <div className="py-1"><div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]"><span>按日构成</span><span>{range === '7d' ? '近 7 天' : range === 'month' ? '本月' : '近 30 天'}</span></div><div className={`grid gap-x-2 gap-y-3 ${tileGridClass}`}>{days.map((day) => { const items = getDayItems(day); const total = items.reduce((sum, [, value]) => sum + value, 0); const labelsText = items.map(([id]) => labels.get(id) || MISSING_OPTION).join(' / ') || '无记录'; const detailsText = items.map(([id, amount]) => `${labels.get(id) || MISSING_OPTION} · ${mode === 'duration' ? formatDuration(amount) : amount}`).join(' / ') || '无记录'; return <div key={day} aria-label={`${getDateLabel(day)} · ${detailsText}`} className="min-w-0 border-b border-[#e5dbcf] pb-2"><div className="flex items-center justify-between gap-1 text-[10px] text-[#8f7f70]"><span className="font-mono">{getDateLabel(day)}</span><span className="font-mono font-medium text-[#67594d]">{total || '-'}</span></div><div className="mt-2 flex h-2 overflow-hidden rounded-full bg-[#f1ebe4]">{items.map(([optionId, value]) => <span key={optionId} className="min-w-[2px]" style={{ width: `${total ? (value / total) * 100 : 0}%`, backgroundColor: getOptionColor(optionId) }} />)}</div><div className="mt-1 truncate text-[9px] leading-tight text-[#a08f7d]" title={detailsText}>{labelsText}</div></div>; })}</div>{legend}</div>;
+  return <div className="py-1"><div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-[#a08f7d]"><span>按日构成</span><span>{range === '7d' ? '近 7 天' : range === 'month' ? '本月' : range === 'year' ? '本年' : '近 30 天'}</span></div><div className={`grid gap-x-2 gap-y-3 ${tileGridClass}`}>{days.map((day) => { const items = getDayItems(day); const total = items.reduce((sum, [, value]) => sum + value, 0); const labelsText = items.map(([id]) => labels.get(id) || MISSING_OPTION).join(' / ') || '无记录'; const detailsText = items.map(([id, amount]) => `${labels.get(id) || MISSING_OPTION} · ${mode === 'duration' ? formatDuration(amount) : amount}`).join(' / ') || '无记录'; return <div key={day} aria-label={`${getDateLabel(day)} · ${detailsText}`} className="min-w-0 border-b border-[#e5dbcf] pb-2"><div className="flex items-center justify-between gap-1 text-[10px] text-[#8f7f70]"><span className="font-mono">{getDateLabel(day)}</span><span className="font-mono font-medium text-[#67594d]">{total || '-'}</span></div><div className="mt-2 flex h-2 overflow-hidden rounded-full bg-[#f1ebe4]">{items.map(([optionId, value]) => <span key={optionId} className="min-w-[2px]" style={{ width: `${total ? (value / total) * 100 : 0}%`, backgroundColor: getOptionColor(optionId) }} />)}</div><div className="mt-1 truncate text-[9px] leading-tight text-[#a08f7d]" title={detailsText}>{labelsText}</div></div>; })}</div>{legend}</div>;
 };
 
 const ChoiceStackedPreview: React.FC<{ attribute: ActivityAttributeDefinition; logs: Log[]; mode: StatisticMode; range: RangeKey; palette: ChartPalette }> = ({ attribute, logs, mode, range, palette }) => {
@@ -898,10 +912,13 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
   };
   const updatePalette = (nextPalette: ActivityStatisticPaletteId) => onChange?.({ ...activity, statisticPalette: nextPalette });
   React.useEffect(() => {
-    if (activityIdRef.current !== activity.id) {
+    const activityChanged = activityIdRef.current !== activity.id;
+    if (activityChanged) {
       activityIdRef.current = activity.id;
       userEditedCardsRef.current = false;
     }
+    // Persistence can update the parent one render after a local edit; keep the edited cards visible.
+    if (!activityChanged && userEditedCardsRef.current) return;
     const useDefaultCards = !userEditedCardsRef.current && (!activity.statisticCards || activity.statisticCards.length === 0);
     const next = useDefaultCards
       ? getInitialStatisticCards(activity, availableSourceChoices, allowedSourceTypes)
