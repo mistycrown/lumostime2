@@ -1,10 +1,11 @@
 /**
  * @file assistantBackupService.test.ts
  * @input Mocked AI storage and unified AI backup payloads
- * @output Regression coverage for AI persona, custom prompt block, and memory backup and live restore notifications
+ * @output Regression coverage for AI persona, prompt block, shortcut, and memory backup and live restore notifications
  * @pos Test (AI Backup)
  * @description Verifies that global AI chat state round-trips through the main backup and notifies mounted chat interfaces after restore.
  * @updated 2026-09-03: Added persona and long-term memory cloud-sync backup and restore regression coverage.
+ * @updated 2026-09-21: Added independent shortcut backup and restore coverage.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -24,6 +25,7 @@ vi.mock('../plugins/AssistantAgentPlugin', () => ({
 vi.mock('../components/ai-chat/AIBackfillChatInitialization', () => ({
   ACTIVE_SESSION_KEY: 'test_active_session',
   CHAT_CUSTOM_PROMPT_BLOCKS_KEY: 'test_custom_prompt_blocks',
+  CHAT_SHORTCUTS_KEY: 'test_shortcuts',
   CHAT_PERSONAS_KEY: 'test_personas',
   CHAT_SESSIONS_KEY: 'test_sessions',
   DEBUG_MODE_KEY: 'test_debug_mode',
@@ -142,6 +144,18 @@ describe('assistantBackupService AI chat state', () => {
     expect(payload.chat.customPromptBlocks).toEqual(blocks);
   });
 
+  it('keeps shortcuts separate from custom prompt blocks in the unified backup payload', () => {
+    const blocks = [{ id: 'block-1', title: 'Persona', content: 'Use Chinese.', enabled: true }];
+    const shortcuts = [{ id: 'shortcut-1', title: '整理今天', content: '帮我整理今天的记录。', enabled: true }];
+    localStorage.setItem('test_custom_prompt_blocks', JSON.stringify(blocks));
+    localStorage.setItem('test_shortcuts', JSON.stringify(shortcuts));
+
+    const payload = assistantBackupService.buildBackupPayload();
+
+    expect(payload.chat.customPromptBlocks).toEqual(blocks);
+    expect(payload.chat.shortcuts).toEqual(shortcuts);
+  });
+
   it('includes personas and long-term memory in the unified backup payload', () => {
     const personas = [{ id: 'persona-1', name: 'Cloud persona' }];
     const memory = { version: 1, profileMemory: ['Prefers concise answers'] };
@@ -220,6 +234,20 @@ describe('assistantBackupService AI chat state', () => {
     expect(event.detail.personas).toEqual(personas);
     expect(event.detail.memory).toEqual(memory);
     expect(assistantMemoryService.saveMemory).toHaveBeenCalledWith(memory);
+  });
+
+  it('restores shortcuts independently and emits them in the live chat restore event', async () => {
+    const shortcuts = [{ id: 'shortcut-cloud', title: '整理今天', content: '帮我整理今天的记录。', enabled: true }];
+    const restoredEvent = vi.fn<(event: Event) => void>();
+    window.addEventListener(ASSISTANT_CHAT_RESTORED_EVENT, restoredEvent);
+
+    await assistantBackupService.applyBackupPayload({
+      chat: { shortcuts }
+    });
+
+    expect(JSON.parse(localStorage.getItem('test_shortcuts') || '[]')).toEqual(shortcuts);
+    const event = restoredEvent.mock.calls[0][0] as CustomEvent<AssistantChatRestoredDetail>;
+    expect(event.detail.shortcuts).toEqual(shortcuts);
   });
 
   it('preserves local persona and prompt state when an older backup omits those fields', async () => {

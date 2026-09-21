@@ -64,6 +64,13 @@ export interface AIChatCustomPromptBlock {
   enabled: boolean;
 }
 
+export interface AIChatShortcut {
+  id: string;
+  title: string;
+  content: string;
+  enabled: boolean;
+}
+
 export interface AIChatPersona {
   id: string;
   name: string;
@@ -308,6 +315,7 @@ export interface InitialChatState {
   debugMode: boolean;
   userProfile: AIChatUserProfile;
   customPromptBlocks: AIChatCustomPromptBlock[];
+  shortcuts: AIChatShortcut[];
 }
 
 export interface AssistantBackgroundTimelineEntry {

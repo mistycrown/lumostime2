@@ -29,7 +29,7 @@ import {
   type LucideIcon
 } from 'lucide-react';
 import type { AssistantLetter, AssistantMemory, AssistantReminder } from '../../types/assistant';
-import type { AIChatCustomPromptBlock, AIChatPersona, AIChatSession } from './AIBackfillChatShared';
+import type { AIChatPersona, AIChatSession, AIChatShortcut } from './AIBackfillChatShared';
 import { PersonaAvatar } from './AIBackfillChatShared';
 
 export interface AIChatNewspaperItem {
@@ -81,7 +81,7 @@ interface AIChatHomeProps {
   assistantReminders: AssistantReminder[];
   assistantLetters: AssistantLetter[];
   newspapers: AIChatNewspaperItem[];
-  customPromptBlocks: AIChatCustomPromptBlock[];
+  shortcuts: AIChatShortcut[];
   sortedSessions: AIChatSession[];
   theme: AIChatHomeTheme;
   isLoading: boolean;
@@ -100,10 +100,6 @@ interface AIChatHomeProps {
   onQuickAddTodo: () => void;
   onQuickAddNote: () => void;
   onQuickAddBackfill: () => void;
-  hasRecentSession: boolean;
-  recentSessionContextEnabled: boolean;
-  contextMessageLimit: number;
-  onToggleRecentSessionContext: () => void;
 }
 
 const formatShortDate = (value: string): string => {
@@ -135,7 +131,7 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
   assistantReminders,
   assistantLetters,
   newspapers,
-  customPromptBlocks,
+  shortcuts: configuredShortcuts,
   sortedSessions,
   theme,
   isLoading,
@@ -154,10 +150,6 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
   onQuickAddTodo,
   onQuickAddNote,
   onQuickAddBackfill,
-  hasRecentSession,
-  recentSessionContextEnabled,
-  contextMessageLimit,
-  onToggleRecentSessionContext,
 }) => {
   const [quickChatText, setQuickChatText] = useState('');
   const [isQuickInputMenuOpen, setIsQuickInputMenuOpen] = useState(false);
@@ -200,12 +192,12 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
     { id: 'newspaper', title: '生成小报', text: '小报', icon: FileText },
     { id: 'narrative', title: '生成叙事', text: '叙事', icon: Sparkles }
   ], []);
-  const shortcuts = [
+  const shortcutItems = [
     ...defaultShortcuts,
-    ...customPromptBlocks.filter((block) => block.enabled).slice(0, 4).map((block) => ({
-      id: block.id,
-      title: block.title || '自定义指令',
-      text: block.content,
+    ...configuredShortcuts.filter((shortcut) => shortcut.enabled).slice(0, 4).map((shortcut) => ({
+      id: shortcut.id,
+      title: shortcut.title,
+      text: shortcut.content,
       icon: Zap
     }))
   ];
@@ -322,7 +314,7 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
             <section className="pb-3">
               <SectionHeading index="02" icon={Zap} title="快捷指令" theme={theme} action={<button type="button" onClick={onOpenSettings} className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }} title="设置快捷指令" aria-label="设置快捷指令"><Settings size={14} /> 设置</button>} />
               <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
-                {shortcuts.map((shortcut) => {
+                {shortcutItems.map((shortcut) => {
                   const Icon = shortcut.icon;
                   return <button key={shortcut.id} type="button" disabled={isLoading} onClick={() => shortcut.id === 'quick-todo' ? onQuickAddTodo() : shortcut.id === 'quick-note' ? onQuickAddNote() : shortcut.id === 'quick-backfill' ? onQuickAddBackfill() : onSendShortcut(shortcut.text)} className="group inline-flex min-h-7 items-center gap-1.5 border-b pb-0.5 text-xs disabled:opacity-50" style={{ borderColor: theme.panelBorder, color: theme.textPrimary }}><Icon size={15} style={{ color: theme.textSecondary }} /><span>{shortcut.title}</span><ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" style={{ color: theme.textFaint }} /></button>;
                 })}
@@ -361,11 +353,9 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
                 <button type="button" onClick={() => { closeQuickInputMenu(); onQuickAddTodo(); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: theme.inputBg, color: theme.textPrimary }}>快速添加待办</button>
                 <button type="button" onClick={() => { closeQuickInputMenu(); onQuickAddNote(); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: theme.inputBg, color: theme.textPrimary }}>快速添加备注</button>
                 <button type="button" onClick={() => { closeQuickInputMenu(); onQuickAddBackfill(); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: theme.inputBg, color: theme.textPrimary }}>快速添加补记</button>
-                <button type="button" onClick={() => { closeQuickInputMenu(); onToggleRecentSessionContext(); }} disabled={!hasRecentSession} className="flex min-h-10 items-center justify-between rounded-[0.7rem] px-3 text-left text-xs disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: theme.inputBg, color: theme.textPrimary }}>
-                  <span>上下文</span><span className="text-[10px]" style={{ color: theme.textMuted }}>{hasRecentSession ? `${recentSessionContextEnabled ? '开' : '关'} · ${contextMessageLimit}轮` : '无对话'}</span>
-                </button>
                 <button type="button" onClick={() => { closeQuickInputMenu(); onSendShortcut('叙事'); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: theme.inputBg, color: theme.textPrimary }}>叙事</button>
                 <button type="button" onClick={() => { closeQuickInputMenu(); onSendShortcut('小报'); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: theme.inputBg, color: theme.textPrimary }}>小报</button>
+                {configuredShortcuts.filter((shortcut) => shortcut.enabled).map((shortcut) => <button key={shortcut.id} type="button" onClick={() => { closeQuickInputMenu(); onSendShortcut(shortcut.content); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: theme.inputBg, color: theme.textPrimary }}>{shortcut.title}</button>)}
               </div>
             </div>
           )}

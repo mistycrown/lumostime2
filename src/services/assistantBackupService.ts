@@ -19,6 +19,7 @@ import {
 import {
   ACTIVE_SESSION_KEY,
   CHAT_CUSTOM_PROMPT_BLOCKS_KEY,
+  CHAT_SHORTCUTS_KEY,
   CHAT_PERSONAS_KEY,
   DEBUG_MODE_KEY,
   USER_PROFILE_KEY
@@ -57,6 +58,7 @@ interface AIBackupChatState {
   activeSessionId: string;
   personas: unknown[];
   customPromptBlocks: unknown[];
+  shortcuts: unknown[];
   debugMode: boolean;
   userProfile: unknown;
 }
@@ -241,6 +243,7 @@ export const assistantBackupService = {
         activeSessionId: isChatSyncEnabled() ? localStorage.getItem(ACTIVE_SESSION_KEY) || '' : '',
         personas: safeParseJson<unknown[]>(localStorage.getItem(CHAT_PERSONAS_KEY), []),
         customPromptBlocks: safeParseJson<unknown[]>(localStorage.getItem(CHAT_CUSTOM_PROMPT_BLOCKS_KEY), []),
+        shortcuts: safeParseJson<unknown[]>(localStorage.getItem(CHAT_SHORTCUTS_KEY), []),
         debugMode: localStorage.getItem(DEBUG_MODE_KEY) === 'true',
         userProfile: safeParseJson<unknown>(localStorage.getItem(USER_PROFILE_KEY), null)
       },
@@ -269,6 +272,7 @@ export const assistantBackupService = {
 
     const payload = value as Partial<AIBackupPayload>;
     let restoredCustomPromptBlocks: unknown[] | null = null;
+    let restoredShortcuts: unknown[] | null = null;
     let restoredPersonas: unknown[] | null = null;
     let restoredMemory: unknown = undefined;
     let shouldRestoreChatHistory = true;
@@ -296,6 +300,10 @@ export const assistantBackupService = {
       if (hasOwn(chat, 'customPromptBlocks')) {
         restoredCustomPromptBlocks = Array.isArray(chat.customPromptBlocks) ? chat.customPromptBlocks : [];
         localStorage.setItem(CHAT_CUSTOM_PROMPT_BLOCKS_KEY, JSON.stringify(restoredCustomPromptBlocks));
+      }
+      if (hasOwn(chat, 'shortcuts')) {
+        restoredShortcuts = Array.isArray(chat.shortcuts) ? chat.shortcuts : [];
+        localStorage.setItem(CHAT_SHORTCUTS_KEY, JSON.stringify(restoredShortcuts));
       }
       if (hasOwn(chat, 'debugMode')) {
         localStorage.setItem(DEBUG_MODE_KEY, String(chat.debugMode === true));
@@ -341,6 +349,7 @@ export const assistantBackupService = {
 
     dispatchAssistantChatRestored({
       ...(restoredCustomPromptBlocks ? { customPromptBlocks: restoredCustomPromptBlocks } : {}),
+      ...(restoredShortcuts ? { shortcuts: restoredShortcuts } : {}),
       ...(restoredPersonas ? { personas: restoredPersonas } : {}),
       ...(restoredMemory !== undefined ? { memory: restoredMemory } : {})
     });

@@ -44,6 +44,7 @@ import type {
   AIChatMonthlyReviewWritebackResult,
   AIChatPersona,
   AIChatSession,
+  AIChatShortcut,
   AIChatUserProfile,
   AIChatWeeklyNewspaperWritebackResult,
   AIChatWeeklyReviewWritebackResult,
@@ -55,6 +56,7 @@ export const CHAT_SESSIONS_KEY = 'lumostime_ai_chat_sessions_v1';
 export const ACTIVE_SESSION_KEY = 'lumostime_ai_chat_active_session_v1';
 export const CHAT_PERSONAS_KEY = 'lumostime_ai_chat_personas_v1';
 export const CHAT_CUSTOM_PROMPT_BLOCKS_KEY = 'lumostime_ai_chat_custom_prompt_blocks_v1';
+export const CHAT_SHORTCUTS_KEY = 'lumostime_ai_chat_shortcuts_v1';
 export const DEBUG_MODE_KEY = 'lumostime_ai_chat_debug_mode_v1';
 export const USER_PROFILE_KEY = 'lumostime_ai_chat_user_profile_v1';
 export const CHAT_SYNC_ENABLED_KEY = 'lumostime_ai_chat_sync_enabled_v1';
@@ -325,6 +327,30 @@ export const normalizeCustomPromptBlocks = (value: unknown): AIChatCustomPromptB
       content,
       enabled
     }];
+  });
+};
+
+export const normalizeShortcuts = (value: unknown): AIChatShortcut[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+
+    const candidate = item as Partial<AIChatShortcut>;
+    const id = typeof candidate.id === 'string' ? candidate.id.trim() : '';
+    const title = typeof candidate.title === 'string' ? candidate.title.trim() : '';
+    const content = typeof candidate.content === 'string' ? candidate.content.trim() : '';
+    const enabled = typeof candidate.enabled === 'boolean' ? candidate.enabled : true;
+
+    if (!id || !title || !content) {
+      return [];
+    }
+
+    return [{ id, title, content, enabled }];
   });
 };
 
@@ -884,6 +910,7 @@ export const loadInitialChatState = (getLocalDateStr: (date: Date) => string): I
       chatPersonasKey: CHAT_PERSONAS_KEY,
       chatSessionsKey: CHAT_SESSIONS_KEY,
       customPromptBlocksKey: CHAT_CUSTOM_PROMPT_BLOCKS_KEY,
+      shortcutsKey: CHAT_SHORTCUTS_KEY,
       debugModeKey: DEBUG_MODE_KEY,
       userProfileKey: USER_PROFILE_KEY
     },
@@ -895,6 +922,7 @@ export const loadInitialChatState = (getLocalDateStr: (date: Date) => string): I
       return normalized.length > 0
         ? normalized
         : normalizeLegacyPersonaBoundCustomPromptBlocks(rawPersonasValue);
-    }
+    },
+    normalizeShortcuts
   })
 );
