@@ -15,6 +15,7 @@
  * @updated 2026-09-20: Adds a vertical fade-to-transparent fill for numeric area trends.
  * @updated 2026-09-20: Adds calendar ranges, tag-duration cards, single-choice treemaps, and layered card editing.
  * @updated 2026-09-20: Preserves parent attribute values while splitting conditional statistic cards.
+ * @updated 2026-09-21: Supports restricted statistic sources for category-level reuse.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
@@ -125,6 +126,7 @@ interface ActivityAttributeStatisticsProps {
   rangeLabel?: string;
   paletteId?: ActivityStatisticPaletteId;
   fixedRange?: RangeKey;
+  allowedSourceTypes?: Array<ActivityStatisticCardSource['type']>;
 }
 
 interface TrendPoint {
@@ -757,8 +759,34 @@ const ConditionalStatisticCard: React.FC<ConditionalStatisticCardProps> = ({ act
   })}</React.Fragment>;
 };
 
-export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, onChange }) => {
+const getInitialStatisticCards = (
+  activity: Activity,
+  sourceChoices: Array<{ key: string; source: ActivityStatisticCardSource; label: string }>,
+  allowedSourceTypes?: Array<ActivityStatisticCardSource['type']>
+) => {
+  if (!allowedSourceTypes) return activity.statisticCards?.length ? normalizeStatisticCards(activity) : ensureStatisticCards(activity);
+  const existing = normalizeStatisticCards(activity).filter((card) => sourceChoices.some((item) => item.source.type === card.source.type && (item.source.type !== 'attribute' || item.source.attributeId === card.source.attributeId)));
+  if (existing.length > 0 || sourceChoices.length === 0) return existing;
+  return sourceChoices.map((item, index) => ({
+    id: `${activity.id}-stat-${item.key}`,
+    source: item.source,
+    chartType: getChartTypesForSource(item.source, activity.attributes || [])[0] || 'textCloud',
+    range: '30d' as const,
+    metric: item.source.type === 'tagDuration' ? 'value' as const : 'count' as const,
+    order: index
+  }));
+};
+
+export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, onChange, allowedSourceTypes }) => {
   const attributes = useMemo(() => getSortedActivityAttributes(activity), [activity]);
+  const availableSourceChoices = useMemo(() => {
+    const choices = [
+      ...attributes.map((attribute) => ({ key: `attribute:${attribute.id}`, source: { type: 'attribute', attributeId: attribute.id } as ActivityStatisticCardSource, label: attribute.name })),
+      { key: 'note', source: { type: 'note' } as ActivityStatisticCardSource, label: '备注' },
+      { key: 'tagDuration', source: { type: 'tagDuration' } as ActivityStatisticCardSource, label: '标签时长' }
+    ];
+    return allowedSourceTypes ? choices.filter((item) => allowedSourceTypes.includes(item.source.type)) : choices;
+  }, [attributes, allowedSourceTypes]);
   const paletteId = activity.statisticPalette || 'theme';
   const customSequences = useChartPaletteSequences();
   const isSponsorshipUnlocked = useSponsorshipUnlocked();
@@ -766,7 +794,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
   const chartPalette = getChartPalette(effectivePaletteId, customSequences);
   const userEditedCardsRef = React.useRef(false);
   const activityIdRef = React.useRef(activity.id);
-  const [cards, setCards] = useState<ActivityStatisticCard[]>(() => !activity.statisticCards || activity.statisticCards.length === 0 ? ensureStatisticCards(activity) : normalizeStatisticCards(activity));
+  const [cards, setCards] = useState<ActivityStatisticCard[]>(() => getInitialStatisticCards(activity, availableSourceChoices, allowedSourceTypes));
   const [manageOpen, setManageOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -785,16 +813,14 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
       userEditedCardsRef.current = false;
     }
     const useDefaultCards = !userEditedCardsRef.current && (!activity.statisticCards || activity.statisticCards.length === 0);
-    const next = useDefaultCards ? ensureStatisticCards(activity) : normalizeStatisticCards(activity);
+    const next = useDefaultCards
+      ? getInitialStatisticCards(activity, availableSourceChoices, allowedSourceTypes)
+      : getInitialStatisticCards({ ...activity, statisticCards: activity.statisticCards || [] }, availableSourceChoices, allowedSourceTypes);
     setCards(next);
     if (JSON.stringify(next) !== JSON.stringify(activity.statisticCards || [])) onChange?.({ ...activity, statisticCards: next });
-  }, [activity.id, activity.attributes, activity.statisticCards]);
+  }, [activity.id, activity.attributes, activity.statisticCards, availableSourceChoices, allowedSourceTypes]);
 
-  const sourceChoices = [
-    ...attributes.map((attribute) => ({ key: `attribute:${attribute.id}`, source: { type: 'attribute', attributeId: attribute.id } as ActivityStatisticCardSource, label: attribute.name })),
-    { key: 'note', source: { type: 'note' } as ActivityStatisticCardSource, label: '备注' },
-    { key: 'tagDuration', source: { type: 'tagDuration' } as ActivityStatisticCardSource, label: '标签时长' }
-  ];
+  const sourceChoices = availableSourceChoices;
   const sourceToKey = (value: ActivityStatisticCardSource) => value.type === 'note' ? 'note' : value.type === 'tagDuration' ? 'tagDuration' : `attribute:${value.attributeId}`;
   const selectedCard = cards.find((card) => card.id === selectedCardId) || null;
   const selectedTypes = selectedCard ? getChartTypesForSource(selectedCard.source, attributes) : [];

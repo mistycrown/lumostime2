@@ -8,6 +8,7 @@
  * @updated 2026-08-09: Planned timeline blocks are excluded from category statistics.
  * @updated 2026-08-26: Added category archive and restore control with child-activity cascading handled by the category context.
  * @updated 2026-08-26: Moved category archive status and action into the Details basic-information section to match tag details.
+ * @updated 2026-09-21: Added a shared statistics tab limited to direct category logs, tag duration, and notes.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -30,6 +31,7 @@ import { getNormalizedScopeIds } from '../utils/scopeStatsUtils';
 import { NoteTemplateManager } from '../components/NoteTemplateManager';
 import { AssociatedTodoList } from '../components/AssociatedTodoList';
 import { filterCountableLogs } from '../utils/statLogUtils';
+import { ActivityAttributeStatistics } from '../components/ActivityAttributeStatistics';
 
 interface CategoryDetailViewProps {
     categoryId: string;
@@ -71,6 +73,8 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                 category.enableFocusScore !== initialCategory.enableFocusScore ||
                 category.enableMoodScore !== initialCategory.enableMoodScore ||
                 category.isArchived !== initialCategory.isArchived ||
+                JSON.stringify(category.statisticCards || []) !== JSON.stringify(initialCategory.statisticCards || []) ||
+                category.statisticPalette !== initialCategory.statisticPalette ||
                 JSON.stringify(category.noteTemplates || []) !== JSON.stringify(initialCategory.noteTemplates || []);
             
             if (hasChanges) {
@@ -469,6 +473,25 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
                         }}
                     />
                 );
+            case 'Statistics':
+                return (
+                    <ActivityAttributeStatistics
+                        activity={{
+                            ...category,
+                            color: category.themeColor,
+                            attributes: [],
+                            statisticCards: category.statisticCards,
+                            statisticPalette: category.statisticPalette
+                        }}
+                        logs={countableCatLogs}
+                        allowedSourceTypes={['tagDuration', 'note']}
+                        onChange={(nextActivity) => setCategory((current) => current ? {
+                            ...current,
+                            statisticCards: nextActivity.statisticCards,
+                            statisticPalette: nextActivity.statisticPalette
+                        } : current)}
+                    />
+                );
             default:
                 return null;
         }
@@ -493,13 +516,13 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
 
             {/* Tabs */}
             <div className="flex gap-6 border-b border-stone-200 mb-8 overflow-x-auto no-scrollbar">
-                {['Details', 'Timeline', '关联'].map((tab) => (
+                {['Details', 'Timeline', 'Statistics', '关联'].map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
                         className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors ${activeTab === tab ? 'text-stone-900 border-b-2 border-stone-900 font-bold' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                        {tab === 'Timeline' ? '時間線' : tab === 'Details' ? '细节' : tab}
+                        {tab === 'Timeline' ? '時間線' : tab === 'Details' ? '细节' : tab === 'Statistics' ? '统计' : tab}
                     </button>
                 ))}
             </div>

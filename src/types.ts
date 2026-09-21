@@ -196,6 +196,8 @@ export interface Category {
   heatmapMin?: number; // Custom heatmap scale (Minutes)
   heatmapMax?: number;
   noteTemplates?: NoteTemplate[];
+  statisticCards?: ActivityStatisticCard[];
+  statisticPalette?: ActivityStatisticPaletteId;
 }
 
 export interface Scope {
