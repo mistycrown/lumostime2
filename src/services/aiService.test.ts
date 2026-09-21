@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { aiService, normalizeNativeFetchError } from './aiService';
+import { quickAddService } from './quickAddService';
 
 type LocalStorageMock = {
   getItem: (key: string) => string | null;
@@ -138,7 +139,7 @@ describe('aiService unified turn normalization', () => {
       configurable: true
     });
 
-    const result = await aiService.requestQuickAddBackfillWithDebug('和客户沟通需求', {}, {
+    const result = await quickAddService.requestQuickAddBackfillWithDebug('和客户沟通需求', {}, {
       activityCategories: [{
         id: 'category-work',
         name: '工作',
@@ -168,7 +169,7 @@ describe('aiService unified turn normalization', () => {
     expect(requestBody.messages).toHaveLength(2);
     expect(requestBody.messages[1]).toMatchObject({ role: 'user', content: '和客户沟通需求' });
     expect(requestBody.response_format).toEqual({ type: 'json_object' });
-    expect(requestBody.messages[0].content).toContain('只能返回一个 create_log 工具调用');
+    expect(requestBody.messages[0].content).toContain('Create exactly one already-happened timeline log');
     expect(requestBody.messages[0].content).toContain('activity-communication');
     expect(requestBody.messages[0].content).toContain('2026-09-21 15:42');
     expect(requestBody.messages[0].content).toContain('14:00-15:30 Work / Meeting');
@@ -198,7 +199,7 @@ describe('aiService unified turn normalization', () => {
       configurable: true
     });
 
-    const result = await aiService.requestQuickAddTodoWithDebug('整理会议纪要', {}, {
+    const result = await quickAddService.requestQuickAddTodoWithDebug('整理会议纪要', {}, {
       activityCategories: [{
         id: 'category-work',
         name: '工作',
@@ -223,6 +224,46 @@ describe('aiService unified turn normalization', () => {
     });
     expect(requestBody.messages[0].content).toContain('todo-work');
     expect(requestBody.messages[0].content).not.toContain('categoryId 固定为 quick');
+  });
+
+  it('normalizes quick-add-note fragments without rewriting their text', async () => {
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockResolvedValue(createJsonTextResponse({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              toolCalls: [{
+                toolName: 'append_log_notes',
+                args: {
+                  items: [
+                    { logId: 'log-1', text: '完成实验记录' },
+                    { logId: 'log-2', text: '发现一个异常' }
+                  ]
+                }
+              }]
+            })
+          }
+        }]
+      })),
+      configurable: true
+    });
+
+    const result = await quickAddService.requestQuickAddNoteWithDebug(
+      '完成实验记录，发现一个异常',
+      {},
+      { logs: [{ id: 'log-1', date: '2026-09-21', timeRange: '10:00-11:00', activityName: '实验' }] },
+      { currentDateTime: '2026-09-21 11:05' }
+    );
+
+    expect(result.toolCall).toEqual({
+      toolName: 'append_log_notes',
+      args: {
+        items: [
+          { logId: 'log-1', text: '完成实验记录' },
+          { logId: 'log-2', text: '发现一个异常' }
+        ]
+      }
+    });
   });
 
   it('keeps quick create_todo tool calls for the reserved 小事 bucket without linkedActivityId', async () => {

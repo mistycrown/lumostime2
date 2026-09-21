@@ -4,6 +4,8 @@ Update 2026-09-20: `backgroundService.ts` now keeps custom background image byte
 
 Update 2026-09-21: `aiService.ts` now supplies the full user dictionary to dedicated quick-add todo/backfill requests, which select real todo-category, activity-category, activity, and scope ids instead of routing quick adds into the reserved 小事 bucket.
 
+Update 2026-09-21: `quickAddService.ts` now owns the independent quick-add todo, backfill, and append-only note request contracts/prompts; `aiService.ts` remains focused on shared AI configuration and general structured turns.
+
 Update 2026-07-31: `aiService.ts` and `assistantActionExecutor.ts` now support foreground `create_planned_log` tool calls, letting AI create todo-linked timeline Plan blocks without treating them as completed activity logs.
 
 Update 2026-07-29: `timelineLayoutService.ts` centralizes supported Chronicle layout modes while the schedule canvas now positions itself from the current time instead of a saved start hour.

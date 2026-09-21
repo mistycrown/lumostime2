@@ -5,6 +5,7 @@
  * @pos Service (AI Integration Layer)
  * @updated 2026-08-10: Restored native HTTP error bodies and exposed the request transport in AI debug exchanges so Android failures retain their real status and response text.
  * @updated 2026-09-21: Quick-add todo and backfill requests now receive the full user dictionary and return dictionary ids for todo categories, linked activities, and scopes instead of forcing the reserved quick bucket.
+ * @updated 2026-09-21: Moved quick-add todo, backfill, and note request contracts/prompts into quickAddService.ts so this module only owns general AI requests and configuration.
  * @updated 2026-08-12: Preserved one-turn todo `clientRef` / planned-log `todoRef` links for create-and-schedule requests.
  * @updated 2026-07-31: Added normalization for foreground `create_planned_log` tool calls so AI can create todo-linked timeline Plan blocks.
  * @updated 2026-07-21: Corrected Android native AI request timeout to 120 seconds; the HTTP plugin timeout unit is seconds.
@@ -32,7 +33,6 @@ import type {
     AssistantUnifiedTurnOutput,
     AssistantTurnMode
 } from '../types/assistant';
-import { normalizeAIBackfillToolCalls } from '../utils/aiBackfillUtils';
 import { buildAssistantReasoningSummary } from '../utils/assistantReasoning';
 export interface AIConfig {
     provider: 'openai' | 'gemini';
@@ -102,23 +102,6 @@ export interface AIAssistantUnifiedTurnResult {
     debug: AIDebugExchange;
 }
 
-export interface AIBackfillCreateLogArgs {
-    date: string; // YYYY-MM-DD
-    startTime: string; // HH:mm
-    endTime: string; // HH:mm
-    description: string;
-    categoryId: string;
-    activityId: string;
-    scopeIds?: string[];
-    linkedTodoId?: string;
-    progressIncrement?: number;
-}
-
-export interface AIBackfillToolCall {
-    toolName: 'create_log';
-    args: AIBackfillCreateLogArgs;
-}
-
 export interface AIPlannedLogCreateArgs {
     todoId?: string;
     todoRef?: string;
@@ -158,38 +141,6 @@ export interface AITodoCreateArgs {
 export interface AITodoToolCall {
     toolName: 'create_todo';
     args: AITodoCreateArgs;
-}
-
-export interface AIQuickAddTodoResult {
-    toolCall?: AITodoToolCall;
-    debug: AIDebugExchange;
-}
-
-export interface AIQuickAddBackfillCreateLogArgs {
-    date?: string;
-    startTime?: string;
-    endTime?: string;
-    description: string;
-    categoryId?: string;
-    activityId?: string;
-    scopeIds?: string[];
-    categoryName?: string;
-    activityName?: string;
-}
-
-export interface AIQuickAddBackfillToolCall {
-    toolName: 'create_log';
-    args: AIQuickAddBackfillCreateLogArgs;
-}
-
-export interface AIQuickAddBackfillResult {
-    toolCall?: AIQuickAddBackfillToolCall;
-    debug: AIDebugExchange;
-}
-
-export interface AIQuickAddBackfillTimeContext {
-    currentDateTime?: string;
-    todayTimelineSummary?: string;
 }
 
 export interface AITodoUpdatePatch {
@@ -2488,126 +2439,7 @@ Output:
         };
     },
 
-    requestQuickAddTodoWithDebug: async (
-        description: string,
-        options: AIRequestOptions = {},
-        dictionaryContext: AssistantTurnDictionaryContext = {}
-    ): Promise<AIQuickAddTodoResult> => {
-        const systemPrompt = [
-            '你是一个快速添加待办的结构化工具调用器。',
-            '只根据用户提供的待办描述创建一个待办，不要闲聊、解释、总结或调用其他工具。',
-            '必须返回 JSON 对象，格式为：{"toolCalls":[{"toolName":"create_todo","args":{"title":"待办标题","kind":"project","categoryId":"待办分类 id","linkedCategoryId":"标签分类 id","linkedActivityId":"标签 id","defaultScopeIds":["领域 id"]}}]}。',
-            'title 保留用户描述中的关键信息；kind 固定为 project；categoryId 必须从用户词典的 TodoCategories 中选择，linkedCategoryId/linkedActivityId 分别关联标签分类和标签，defaultScopeIds 从 Scopes 中选择。',
-            '不得使用保留的 小事/quick 分类；必须根据词典选择可关联标签和领域的正常待办分类。',
-            '如果描述包含明确的备注、日期或截止日期，可以分别写入 note、scheduledDate、deadlineDate；不要臆造用户没有提供的信息。',
-            '只能返回一个 create_todo 工具调用。',
-            '用户完整词典（只允许使用其中的 id）：',
-            JSON.stringify(dictionaryContext)
-        ].join('\n');
 
-        const { result, debug } = await requestJsonObjectWithDebug(aiService.getConfig(), Capacitor.isNativePlatform() ? nativeFetch : fetch, {
-            systemPrompt,
-            userPrompt: description.trim(),
-            normalizeResult: (rawValue: any) => {
-                const rawToolCalls = Array.isArray(rawValue?.toolCalls)
-                    ? rawValue.toolCalls.map((item: any) => (
-                        item?.toolName === 'create_todo'
-                            ? {
-                                ...item,
-                                args: {
-                                    ...(item.args || {}),
-                                    kind: 'project'
-                                }
-                            }
-                            : item
-                    ))
-                    : [];
-                const toolCall = normalizeAssistantToolCalls(rawToolCalls)
-                    .find((candidate): candidate is AITodoToolCall => candidate.toolName === 'create_todo');
-                return { toolCall };
-            },
-            options
-        });
-
-        return {
-            toolCall: result.toolCall,
-            debug
-        };
-    },
-
-    requestQuickAddBackfillWithDebug: async (
-        description: string,
-        options: AIRequestOptions = {},
-        dictionaryContext: AssistantTurnDictionaryContext = {},
-        timeContext: AIQuickAddBackfillTimeContext = {}
-    ): Promise<AIQuickAddBackfillResult> => {
-        const currentDateTime = timeContext.currentDateTime?.trim();
-        const todayTimelineSummary = timeContext.todayTimelineSummary?.trim();
-        const systemPrompt = [
-            '你是一个快速添加补记的结构化工具调用器。',
-            '只根据用户提供的补记描述创建一条已发生的时间记录，不要闲聊、解释、总结或调用其他工具。',
-            '必须返回 JSON 对象，格式为：{"toolCalls":[{"toolName":"create_log","args":{"date":"YYYY-MM-DD","startTime":"HH:mm","endTime":"HH:mm","description":"补记内容","categoryId":"标签分类 id","activityId":"标签 id","scopeIds":["领域 id"]}}]}。',
-            '只能返回一个 create_log 工具调用。',
-            '当前本地时间：' + (currentDateTime || '未提供。'),
-            '目标日期的时间轴摘要：' + (todayTimelineSummary || '暂无已记录活动。'),
-            '如果用户说“刚才”“刚刚”或“刚结束”，应将当前本地时间理解为这件事的结束时间；起始时间优先参考时间轴中最近一条记录的结束时间或当天最近空档。只有在无法合理判断时才留空，不要臆造用户没有提供的具体日期或活动内容。',
-            '如果目标日期不是当前本地时间对应的日期，不要把“刚才”强行映射到历史日期，日期和时间字段可以留空。',
-            'description 保留用户描述中的全部关键信息；categoryId、activityId、scopeIds 必须从用户词典中选择，无法判断时留空。',
-            '用户完整词典（只允许使用其中的 id）：',
-            JSON.stringify(dictionaryContext)
-        ].join('\n');
-
-        const { result, debug } = await requestJsonObjectWithDebug(aiService.getConfig(), Capacitor.isNativePlatform() ? nativeFetch : fetch, {
-            systemPrompt,
-            userPrompt: description.trim(),
-            normalizeResult: (rawValue: any) => {
-                const rawToolCall = Array.isArray(rawValue?.toolCalls)
-                    ? rawValue.toolCalls.find((item: any) => item?.toolName === 'create_log')
-                    : undefined;
-                if (!rawToolCall || !rawToolCall.args || typeof rawToolCall.args !== 'object') {
-                    return { toolCall: undefined };
-                }
-
-                const args = rawToolCall.args as Record<string, unknown>;
-                const normalizedDescription = typeof args.description === 'string' && args.description.trim()
-                    ? args.description.trim()
-                    : description.trim();
-                if (!normalizedDescription) {
-                    return { toolCall: undefined };
-                }
-
-                const normalizeText = (value: unknown): string | undefined => (
-                    typeof value === 'string' && value.trim() ? value.trim() : undefined
-                );
-
-                return {
-                    toolCall: {
-                        toolName: 'create_log' as const,
-                        args: {
-                            ...(normalizeText(args.date) ? { date: normalizeText(args.date) } : {}),
-                            ...(normalizeText(args.startTime) ? { startTime: normalizeText(args.startTime) } : {}),
-                            ...(normalizeText(args.endTime) ? { endTime: normalizeText(args.endTime) } : {}),
-                            description: normalizedDescription,
-                            ...(normalizeText(args.categoryId) ? { categoryId: normalizeText(args.categoryId) } : {}),
-                            ...(normalizeText(args.activityId) ? { activityId: normalizeText(args.activityId) } : {}),
-                            ...(Array.isArray(args.scopeIds) ? { scopeIds: args.scopeIds.map((scopeId: unknown) => String(scopeId).trim()).filter(Boolean) } : {}),
-                            ...(normalizeText(args.categoryName) ? { categoryName: normalizeText(args.categoryName) } : {}),
-                            ...(normalizeText(args.activityName) ? { activityName: normalizeText(args.activityName) } : {})
-                        }
-                    }
-                };
-            },
-            options
-        });
-
-        return {
-            toolCall: result.toolCall,
-            debug
-        };
-    },
-
-
-    // 闂佽绻愮换鎰板箰濞ｆ岸鏌℃径鍡樻珕闁哄被鍔岀叅闁哄稁鍘介崕宥夋煕閺囥劌澧い蟻鍥ㄢ拻闁稿本绻冭ぐ褏绱掓潏銊㈡敜H:mm闂備焦瀵х粙鎴λ囬鍓х當鐎光偓閸曨剙浠洪梺闈涱煭缁犳垿鎮￠弴銏♀拺妞ゆ劑鍩勫Σ褰掓倵濮樸儱濮傞柟顖氬暣瀹曠喖顢楁笟濠勭闂備礁鎼悧蹇涘窗閹捐泛鍨濈€广儱顦憴锕傛煕椤愩倕鏋庨柣蹇撴喘閹鎮烽悧鍫熸嫳闂佸搫妫寸紞渚€骞嗛崘顔肩妞ゃ劎鐡岄梺璇插缁嬫帡銆冮崼銉晞濞达絽婀遍埢?
     requestStructuredJsonWithDebug: async <T>(
         params: AIStructuredJsonRequestParams<T>,
         options: AIRequestOptions = {}

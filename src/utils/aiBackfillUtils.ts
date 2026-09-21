@@ -9,7 +9,7 @@
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
 
-import type { AIBackfillToolCall } from '../services/aiService';
+import type { AIBackfillToolCall } from '../services/quickAddService';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^(\d{2}):(\d{2})$/;
