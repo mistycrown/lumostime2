@@ -49,9 +49,9 @@ describe('activity statistic cards', () => {
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'weight' }, attributes)).toEqual([
       'numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi'
     ]);
-    expect(getChartTypesForSource({ type: 'attribute', attributeId: 'kind' }, attributes)).toEqual(['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap']);
+    expect(getChartTypesForSource({ type: 'attribute', attributeId: 'kind' }, attributes)).toEqual(['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'choiceStacked']);
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'parts' }, attributes)).toEqual(['choiceBar', 'choiceHeatmap']);
-    expect(getChartTypesForSource({ type: 'categoryActivity' }, attributes)).toEqual(['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap']);
+    expect(getChartTypesForSource({ type: 'categoryActivity' }, attributes)).toEqual(['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'choiceStacked']);
     expect(getChartTypesForSource({ type: 'categoryDuration' }, attributes)).toEqual(['numberArea', 'numberCalendar', 'numberKpi', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap']);
     const legacyMultiDonut: ActivityStatisticCard = {
       id: 'legacy-donut', source: { type: 'attribute', attributeId: 'parts' }, chartType: 'choiceDonut', range: '30d', metric: 'count', order: 0

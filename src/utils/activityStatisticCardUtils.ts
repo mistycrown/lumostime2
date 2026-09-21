@@ -6,6 +6,7 @@
  * @description Keeps per-activity statistic card configuration backward-compatible and type-safe.
  * @updated 2026-09-20: Removes the numeric trend card, defaults numeric attributes to histogram cards, and keeps choice cards on count metrics.
  * @updated 2026-09-21: Supports category duration and second-level activity choice sources.
+ * @updated 2026-09-21: Adds stacked charts to single-choice sources.
  */
 import {
   Activity,
@@ -19,7 +20,7 @@ import {
 
 const RANGES: ActivityStatisticRange[] = ['all', '7d', '30d', 'month', 'year'];
 const METRICS: ActivityStatisticMetric[] = ['value', 'count', 'duration', 'average', 'sum'];
-const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi', 'choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap'];
+const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi', 'choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'choiceStacked', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap'];
 
 export const getDefaultChartType = (type: ActivityAttributeDefinition['type']): ActivityStatisticCardType => {
   if (type === 'text') return 'textCloud';
@@ -30,12 +31,12 @@ export const getDefaultChartType = (type: ActivityAttributeDefinition['type']): 
 export const getChartTypesForSource = (source: ActivityStatisticCardSource, attributes: ActivityAttributeDefinition[]): ActivityStatisticCardType[] => {
   if (source.type === 'note') return ['textCloud'];
   if (source.type === 'tagDuration' || source.type === 'categoryDuration') return ['numberArea', 'numberCalendar', 'numberKpi', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap'];
-  if (source.type === 'categoryActivity') return ['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap'];
+  if (source.type === 'categoryActivity') return ['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'choiceStacked'];
   const attribute = attributes.find((item) => item.id === source.attributeId);
   if (!attribute) return [];
   if (attribute.type === 'text') return ['textCloud'];
   if (attribute.type === 'number') return ['numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi'];
-  if (attribute.type === 'single') return ['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap'];
+  if (attribute.type === 'single') return ['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'choiceStacked'];
   return ['choiceBar', 'choiceHeatmap'];
 };
 
@@ -82,7 +83,7 @@ const normalizeCard = (raw: unknown, index: number, attributes: ActivityAttribut
   const metric = METRICS.includes(item.metric as ActivityStatisticMetric) ? item.metric as ActivityStatisticMetric : 'count';
   const normalizedMetric = source.type === 'attribute' && sourceAttribute?.type === 'number'
     ? (chartType === 'numberKpi' ? (metric === 'average' || metric === 'sum' ? metric : 'average') : 'value')
-    : chartType === 'choiceBar' || chartType === 'choiceDonut'
+    : chartType === 'choiceBar' || chartType === 'choiceDonut' || chartType === 'choiceStacked'
       ? metric === 'duration' ? 'duration' : 'count'
       : 'count';
   return {
@@ -141,6 +142,7 @@ export const getStatisticCardLabel = (card: ActivityStatisticCard, attributes: A
     choiceDonut: '选项环形图',
     choiceHeatmap: '选项热力图',
     choiceTreemap: '选项矩形图',
+    choiceStacked: '选项堆叠图',
     tagDurationBoxplot: '标签时长箱线图',
     tagDurationWeekHourHeatmap: '星期 × 小时热力图'
   };

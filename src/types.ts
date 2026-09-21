@@ -1,6 +1,7 @@
 /**
  * @file types.ts
  * @updated 2026-09-21: Adds category statistic duration and second-level activity sources.
+ * @updated 2026-09-21: Adds stacked time-series charts for single-choice statistics.
  * @updated 2026-09-20: Adds per-tag keyword color sequence settings for newly created keywords.
  * @updated 2026-09-17: Added activity statistic card sources and per-card chart configuration.
  * @updated 2026-09-20: Added activity-level statistic palette groups.
@@ -94,7 +95,7 @@ export type ActivityAttributeValue =
   | { attributeId: string; optionId: string }
   | { attributeId: string; optionIds: string[] };
 
-export type ActivityStatisticCardType = 'textCloud' | 'numberArea' | 'numberHistogram' | 'numberCalendar' | 'numberKpi' | 'choiceBar' | 'choiceDonut' | 'choiceHeatmap' | 'choiceTreemap' | 'tagDurationBoxplot' | 'tagDurationWeekHourHeatmap';
+export type ActivityStatisticCardType = 'textCloud' | 'numberArea' | 'numberHistogram' | 'numberCalendar' | 'numberKpi' | 'choiceBar' | 'choiceDonut' | 'choiceHeatmap' | 'choiceTreemap' | 'choiceStacked' | 'tagDurationBoxplot' | 'tagDurationWeekHourHeatmap';
 export type ActivityStatisticRange = 'all' | '7d' | '30d' | 'month' | 'year';
 export type ActivityStatisticMetric = 'value' | 'count' | 'duration' | 'average' | 'sum';
 export type ActivityStatisticPaletteId =
