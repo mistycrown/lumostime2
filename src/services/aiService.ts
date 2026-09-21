@@ -4,6 +4,7 @@
  * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
  * @pos Service (AI Integration Layer)
  * @updated 2026-08-10: Restored native HTTP error bodies and exposed the request transport in AI debug exchanges so Android failures retain their real status and response text.
+ * @updated 2026-09-21: Quick-add todo and backfill requests now receive the full user dictionary and return dictionary ids for todo categories, linked activities, and scopes instead of forcing the reserved quick bucket.
  * @updated 2026-08-12: Preserved one-turn todo `clientRef` / planned-log `todoRef` links for create-and-schedule requests.
  * @updated 2026-07-31: Added normalization for foreground `create_planned_log` tool calls so AI can create todo-linked timeline Plan blocks.
  * @updated 2026-07-21: Corrected Android native AI request timeout to 120 seconds; the HTTP plugin timeout unit is seconds.
@@ -27,6 +28,7 @@ import type {
     AssistantReminderDraft,
     AssistantSilentReason,
     AssistantToolCall,
+    AssistantTurnDictionaryContext,
     AssistantUnifiedTurnOutput,
     AssistantTurnMode
 } from '../types/assistant';
@@ -168,6 +170,9 @@ export interface AIQuickAddBackfillCreateLogArgs {
     startTime?: string;
     endTime?: string;
     description: string;
+    categoryId?: string;
+    activityId?: string;
+    scopeIds?: string[];
     categoryName?: string;
     activityName?: string;
 }
@@ -2480,15 +2485,19 @@ Output:
 
     requestQuickAddTodoWithDebug: async (
         description: string,
-        options: AIRequestOptions = {}
+        options: AIRequestOptions = {},
+        dictionaryContext: AssistantTurnDictionaryContext = {}
     ): Promise<AIQuickAddTodoResult> => {
         const systemPrompt = [
             '你是一个快速添加待办的结构化工具调用器。',
             '只根据用户提供的待办描述创建一个待办，不要闲聊、解释、总结或调用其他工具。',
-            '必须返回 JSON 对象，格式为：{"toolCalls":[{"toolName":"create_todo","args":{"title":"待办标题","kind":"quick","categoryId":"quick"}}]}。',
-            'title 保留用户描述中的关键信息；kind 必须是 quick；categoryId 固定为 quick。',
+            '必须返回 JSON 对象，格式为：{"toolCalls":[{"toolName":"create_todo","args":{"title":"待办标题","kind":"project","categoryId":"待办分类 id","linkedCategoryId":"标签分类 id","linkedActivityId":"标签 id","defaultScopeIds":["领域 id"]}}]}。',
+            'title 保留用户描述中的关键信息；kind 固定为 project；categoryId 必须从用户词典的 TodoCategories 中选择，linkedCategoryId/linkedActivityId 分别关联标签分类和标签，defaultScopeIds 从 Scopes 中选择。',
+            '不得使用保留的 小事/quick 分类；必须根据词典选择可关联标签和领域的正常待办分类。',
             '如果描述包含明确的备注、日期或截止日期，可以分别写入 note、scheduledDate、deadlineDate；不要臆造用户没有提供的信息。',
-            '只能返回一个 create_todo 工具调用。'
+            '只能返回一个 create_todo 工具调用。',
+            '用户完整词典（只允许使用其中的 id）：',
+            JSON.stringify(dictionaryContext)
         ].join('\n');
 
         const { result, debug } = await requestJsonObjectWithDebug(aiService.getConfig(), Capacitor.isNativePlatform() ? nativeFetch : fetch, {
@@ -2502,8 +2511,7 @@ Output:
                                 ...item,
                                 args: {
                                     ...(item.args || {}),
-                                    kind: 'quick',
-                                    categoryId: 'quick'
+                                    kind: 'project'
                                 }
                             }
                             : item
@@ -2524,16 +2532,19 @@ Output:
 
     requestQuickAddBackfillWithDebug: async (
         description: string,
-        options: AIRequestOptions = {}
+        options: AIRequestOptions = {},
+        dictionaryContext: AssistantTurnDictionaryContext = {}
     ): Promise<AIQuickAddBackfillResult> => {
         const systemPrompt = [
             '你是一个快速添加补记的结构化工具调用器。',
             '只根据用户提供的补记描述创建一条已发生的时间记录，不要闲聊、解释、总结或调用其他工具。',
-            '必须返回 JSON 对象，格式为：{"toolCalls":[{"toolName":"create_log","args":{"date":"YYYY-MM-DD","startTime":"HH:mm","endTime":"HH:mm","description":"补记内容","categoryName":"分类名称","activityName":"活动名称"}}]}。',
+            '必须返回 JSON 对象，格式为：{"toolCalls":[{"toolName":"create_log","args":{"date":"YYYY-MM-DD","startTime":"HH:mm","endTime":"HH:mm","description":"补记内容","categoryId":"标签分类 id","activityId":"标签 id","scopeIds":["领域 id"]}}]}。',
             '只能返回一个 create_log 工具调用。',
             '如果用户没有明确提供日期、时间或分类/活动名称，对应字段可以留空；不要臆造用户没有提供的具体信息。',
-            'description 保留用户描述中的全部关键信息。'
-        ].join('\\n');
+            'description 保留用户描述中的全部关键信息；categoryId、activityId、scopeIds 必须从用户词典中选择，无法判断时留空。',
+            '用户完整词典（只允许使用其中的 id）：',
+            JSON.stringify(dictionaryContext)
+        ].join('\n');
 
         const { result, debug } = await requestJsonObjectWithDebug(aiService.getConfig(), Capacitor.isNativePlatform() ? nativeFetch : fetch, {
             systemPrompt,
@@ -2566,6 +2577,9 @@ Output:
                             ...(normalizeText(args.startTime) ? { startTime: normalizeText(args.startTime) } : {}),
                             ...(normalizeText(args.endTime) ? { endTime: normalizeText(args.endTime) } : {}),
                             description: normalizedDescription,
+                            ...(normalizeText(args.categoryId) ? { categoryId: normalizeText(args.categoryId) } : {}),
+                            ...(normalizeText(args.activityId) ? { activityId: normalizeText(args.activityId) } : {}),
+                            ...(Array.isArray(args.scopeIds) ? { scopeIds: args.scopeIds.map((scopeId: unknown) => String(scopeId).trim()).filter(Boolean) } : {}),
                             ...(normalizeText(args.categoryName) ? { categoryName: normalizeText(args.categoryName) } : {}),
                             ...(normalizeText(args.activityName) ? { activityName: normalizeText(args.activityName) } : {})
                         }
