@@ -6,7 +6,8 @@ import {
   rollbackAppliedChatActions,
   type AssistantActionExecutionContext
 } from './assistantActionExecutor';
-import type { AICreatePrincipleToolCall, AICreateSelfBeliefToolCall, AIBackfillToolCall, AIPlannedLogToolCall, AITodoToolCall } from './aiService';
+import type { AICreatePrincipleToolCall, AICreateSelfBeliefToolCall, AIPlannedLogToolCall, AITodoToolCall } from './aiService';
+import type { AIBackfillToolCall, AIQuickAddNoteToolCall } from './quickAddService';
 
 const installLocalStorageMock = () => {
   const store = new Map<string, string>();
@@ -267,6 +268,70 @@ describe('assistantActionExecutor applyLogToolCalls quick-punch fallback', () =>
       categoryName: '未分类',
       activityName: '快速打点'
     });
+  });
+});
+
+describe('assistantActionExecutor applyAppendLogNotesToolCalls', () => {
+  beforeEach(() => {
+    installLocalStorageMock();
+  });
+
+  it('appends exact fragments and preserves the existing note', () => {
+    const now = Date.now();
+    const context: AssistantActionExecutionContext = {
+      ...buildBaseContext(),
+      logs: [{
+        id: 'log-1',
+        categoryId: 'study',
+        activityId: 'writing',
+        title: 'Writing',
+        startTime: now - 60_000,
+        endTime: now,
+        duration: 60,
+        note: 'existing note'
+      }]
+    };
+    const toolCalls: AIQuickAddNoteToolCall[] = [{
+      toolName: 'append_log_notes',
+      args: {
+        items: [
+          { logId: 'missing-log', text: 'first fragment' },
+          { text: 'second fragment' }
+        ]
+      }
+    }];
+
+    const result = assistantActionExecutor.applyAppendLogNotesToolCalls(
+      context,
+      toolCalls,
+      'first fragment and second fragment'
+    );
+
+    expect(result.actions[0]).toMatchObject({ kind: 'edit_log', status: 'applied' });
+    expect(result.nextLogs[0]?.note).toBe('existing note\nfirst fragment\nsecond fragment');
+  });
+
+  it('does not write model text that is not a source fragment', () => {
+    const context: AssistantActionExecutionContext = {
+      ...buildBaseContext(),
+      logs: [{
+        id: 'log-1',
+        categoryId: 'study',
+        activityId: 'writing',
+        title: 'Writing',
+        startTime: Date.now() - 60_000,
+        endTime: Date.now(),
+        duration: 60,
+        note: 'existing note'
+      }]
+    };
+    const result = assistantActionExecutor.applyAppendLogNotesToolCalls(context, [{
+      toolName: 'append_log_notes',
+      args: { items: [{ logId: 'log-1', text: 'rewritten fragment' }] }
+    }], 'original fragment');
+
+    expect(result.actions[0]?.status).toBe('failed');
+    expect(result.nextLogs[0]?.note).toBe('existing note');
   });
 });
 

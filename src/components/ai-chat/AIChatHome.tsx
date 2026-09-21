@@ -4,12 +4,13 @@
  * @output The AI assistant landing workspace with entry points into chat and assistant tools
  * @pos Component (AI Integration)
  * @description Presents an editorial AI workbench before the user enters a conversation.
+ * @updated 2026-09-21: Opens the homepage quick-input options from the bare plus action instead of directly adding a todo.
  * @updated 2026-09-20: Hide the homepage composer while a settings overlay is open so it does not remain visible beneath the settings page.
  * @updated 2026-09-20: Removed the composer separator line and kept compact spacing before the shortcut section.
  * @updated 2026-09-20: Added the +待办 shortcut that opens chat with the quick-add command prefilled without sending it.
  * @updated 2026-09-21: Keeps the homepage composer pinned to the bottom with a bare plus action and a unified send icon.
  */
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight,
   Bell,
@@ -23,6 +24,7 @@ import {
   Send,
   Settings,
   Sparkles,
+  StickyNote,
   Zap,
   type LucideIcon
 } from 'lucide-react';
@@ -58,6 +60,7 @@ interface AIChatHomeTheme {
   panelBg: string;
   panelBgStrong: string;
   panelBgSoft: string;
+  inputBg: string;
   panelBorder: string;
   panelBorderStrong: string;
   textPrimary: string;
@@ -95,7 +98,12 @@ interface AIChatHomeProps {
   onOpenSettings: () => void;
   onSendShortcut: (text: string) => void;
   onQuickAddTodo: () => void;
+  onQuickAddNote: () => void;
   onQuickAddBackfill: () => void;
+  hasRecentSession: boolean;
+  recentSessionContextEnabled: boolean;
+  contextMessageLimit: number;
+  onToggleRecentSessionContext: () => void;
 }
 
 const formatShortDate = (value: string): string => {
@@ -144,15 +152,22 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
   onOpenSettings,
   onSendShortcut,
   onQuickAddTodo,
+  onQuickAddNote,
   onQuickAddBackfill,
+  hasRecentSession,
+  recentSessionContextEnabled,
+  contextMessageLimit,
+  onToggleRecentSessionContext,
 }) => {
   const [quickChatText, setQuickChatText] = useState('');
+  const [isQuickInputMenuOpen, setIsQuickInputMenuOpen] = useState(false);
   const [dismissedFeedIds, setDismissedFeedIds] = useState<string[]>([]);
   const [draggedLetterId, setDraggedLetterId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
   const [swipingLetterId, setSwipingLetterId] = useState<string | null>(null);
   const letterDragRef = useRef<{ id: string; startX: number } | null>(null);
   const suppressLetterClickRef = useRef(false);
+  const composerMenuRef = useRef<HTMLDivElement | null>(null);
   const pendingReminders = assistantReminders.filter((reminder) => reminder.status === 'pending');
   const feedItems = useMemo<AIChatFeedItem[]>(() => [
     ...assistantLetters.map((letter) => ({
@@ -180,6 +195,7 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
   const memoryLabels = ['偏好', '研究', '写作', '状态'];
   const defaultShortcuts = useMemo(() => [
     { id: 'quick-todo', title: '+待办', text: '', icon: Zap },
+    { id: 'quick-note', title: '+备注', text: '', icon: StickyNote },
     { id: 'quick-backfill', title: '+补记', text: '', icon: Clock3 },
     { id: 'newspaper', title: '生成小报', text: '小报', icon: FileText },
     { id: 'narrative', title: '生成叙事', text: '叙事', icon: Sparkles }
@@ -200,6 +216,23 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
     setQuickChatText('');
     onSendShortcut(text);
   };
+
+  useEffect(() => {
+    if (!isQuickInputMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (composerMenuRef.current && !composerMenuRef.current.contains(event.target as Node)) {
+        setIsQuickInputMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [isQuickInputMenuOpen]);
+
+  const closeQuickInputMenu = () => setIsQuickInputMenuOpen(false);
 
   const handleLetterPointerDown = (event: React.PointerEvent<HTMLButtonElement>, feedId: string) => {
     if (swipingLetterId || visibleFeedItems[0]?.id !== feedId) return;
@@ -291,7 +324,7 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
               <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
                 {shortcuts.map((shortcut) => {
                   const Icon = shortcut.icon;
-                  return <button key={shortcut.id} type="button" disabled={isLoading} onClick={() => shortcut.id === 'quick-todo' ? onQuickAddTodo() : shortcut.id === 'quick-backfill' ? onQuickAddBackfill() : onSendShortcut(shortcut.text)} className="group inline-flex min-h-7 items-center gap-1.5 border-b pb-0.5 text-xs disabled:opacity-50" style={{ borderColor: theme.panelBorder, color: theme.textPrimary }}><Icon size={15} style={{ color: theme.textSecondary }} /><span>{shortcut.title}</span><ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" style={{ color: theme.textFaint }} /></button>;
+                  return <button key={shortcut.id} type="button" disabled={isLoading} onClick={() => shortcut.id === 'quick-todo' ? onQuickAddTodo() : shortcut.id === 'quick-note' ? onQuickAddNote() : shortcut.id === 'quick-backfill' ? onQuickAddBackfill() : onSendShortcut(shortcut.text)} className="group inline-flex min-h-7 items-center gap-1.5 border-b pb-0.5 text-xs disabled:opacity-50" style={{ borderColor: theme.panelBorder, color: theme.textPrimary }}><Icon size={15} style={{ color: theme.textSecondary }} /><span>{shortcut.title}</span><ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" style={{ color: theme.textFaint }} /></button>;
                 })}
               </div>
             </section>
@@ -321,10 +354,24 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
       </div>
 
       {!isOverlayOpen && <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4 pb-4 sm:px-8 sm:pb-5">
-        <div className="pointer-events-auto mx-auto max-w-6xl pt-3" style={{ backgroundColor: theme.shellLayerBg }}>
+        <div ref={composerMenuRef} className="pointer-events-auto relative mx-auto max-w-6xl pt-3" style={{ backgroundColor: theme.shellLayerBg }}>
+          {isQuickInputMenuOpen && (
+            <div className="absolute bottom-[calc(100%+0.65rem)] left-0 z-30 w-[min(20rem,calc(100vw-2rem))] rounded-[1rem] border p-2" style={{ borderColor: theme.panelBorder, backgroundColor: theme.panelBg, boxShadow: theme.cardShadowStrong }}>
+              <div className="grid grid-cols-2 gap-1">
+                <button type="button" onClick={() => { closeQuickInputMenu(); onQuickAddTodo(); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: theme.inputBg, color: theme.textPrimary }}>快速添加待办</button>
+                <button type="button" onClick={() => { closeQuickInputMenu(); onQuickAddNote(); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: theme.inputBg, color: theme.textPrimary }}>快速添加备注</button>
+                <button type="button" onClick={() => { closeQuickInputMenu(); onQuickAddBackfill(); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: theme.inputBg, color: theme.textPrimary }}>快速添加补记</button>
+                <button type="button" onClick={() => { closeQuickInputMenu(); onToggleRecentSessionContext(); }} disabled={!hasRecentSession} className="flex min-h-10 items-center justify-between rounded-[0.7rem] px-3 text-left text-xs disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: theme.inputBg, color: theme.textPrimary }}>
+                  <span>上下文</span><span className="text-[10px]" style={{ color: theme.textMuted }}>{hasRecentSession ? `${recentSessionContextEnabled ? '开' : '关'} · ${contextMessageLimit}轮` : '无对话'}</span>
+                </button>
+                <button type="button" onClick={() => { closeQuickInputMenu(); onSendShortcut('叙事'); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: theme.inputBg, color: theme.textPrimary }}>叙事</button>
+                <button type="button" onClick={() => { closeQuickInputMenu(); onSendShortcut('小报'); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: theme.inputBg, color: theme.textPrimary }}>小报</button>
+              </div>
+            </div>
+          )}
           <div className="rounded-full border p-1.5" style={{ borderColor: theme.panelBorderStrong, backgroundColor: theme.panelBg }}>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={onQuickAddTodo} className="inline-flex h-9 w-9 shrink-0 items-center justify-center p-0 transition-opacity hover:opacity-70" style={{ color: theme.textSecondary }} title="添加待办" aria-label="添加待办">
+              <button type="button" onClick={() => setIsQuickInputMenuOpen((open) => !open)} className="inline-flex h-9 w-9 shrink-0 items-center justify-center p-0 transition-opacity hover:opacity-70" style={{ color: theme.textSecondary }} title="更多功能" aria-label="更多功能" aria-expanded={isQuickInputMenuOpen}>
                 <Plus size={19} strokeWidth={1.8} />
               </button>
               <input value={quickChatText} onChange={(event) => setQuickChatText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); sendQuickChat(); } }} placeholder="和 AI 说点什么…" className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-sm outline-none" style={{ color: theme.textPrimary }} />

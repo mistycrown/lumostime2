@@ -4,42 +4,9 @@
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
- * @updated 2026-09-21: Sends the complete assistant dictionary into quick-add todo/backfill requests, then resolves returned category, activity, and scope ids before applying them.
+ * @updated 2026-09-21: Connects the homepage composer plus action to the shortcut options and recent-session context toggle.
+ * @updated 2026-09-21: Sends the complete assistant dictionary and target-day time context into quick-add todo/backfill requests, then resolves returned category, activity, and scope ids before applying them.
  * @updated 2026-09-21: Pins both chat composers to the bottom, reserves message-space beneath them, and removes the plus button circle.
- * @updated 2026-09-20: Preserves AI-home return paths when opening review newspapers and enters selected history sessions directly into chat.
- * @updated 2026-09-14: Syncs the configured persona name with the native background snapshot for Android notifications.
- * @updated 2026-09-20: Defers chat-session persistence and active-session sync until storage hydration completes, preventing startup defaults from overwriting restored history.
- * @updated 2026-09-20: Resets assistant-part reveal state before in-place reply retries so reused message IDs render metadata after the retried response completes.
- * @updated 2026-09-20: Added minimal quick-add-todo and quick-add-backfill command paths, keeping their AI requests limited to the description and dedicated tool.
- * @updated 2026-09-20: Places the composer caret at the end after quick-add command prefills.
- * @updated 2026-09-19: Builds the newspaper snapshot only after review context values are initialized.
- * @updated 2026-09-03: Reloads restored personas, prompt blocks, and long-term memory into mounted chat state so cloud restores cannot be overwritten by stale React state.
- * @updated 2026-09-15: Uses the current session persona name for native-reply Toast messages so in-app alerts match Android notifications.
- * @updated 2026-09-14: Added the persona-settings toggle for opting AI chat history out of unified sync payloads.
- * @updated 2026-09-20: Hide the AI homepage composer while persona or shortcut settings overlays are open.
- * @updated 2026-09-04: Applies structured AI reminder removal actions to the durable reminder queue and long-term memory.
- * @updated 2026-09-03: Removed the base polling-frequency state path now that Android check-ins use concrete alarm times.
- * @updated 2026-07-31: Added a pending-message-id fallback cleanup so completed foreground turns always restore the composer send button.
- * @updated 2026-09-02: Keeps fallback system triggers pending until Web execution succeeds and surfaces native skip/request states in background history.
- * @updated 2026-09-09: Stops failed reminder_due executions after three attempts while preserving failure metadata.
- * @updated 2026-09-02: Always persists a usable native background prompt, even when no recent ordinary chat session is available for routing.
- * @updated 2026-07-31: Wired foreground `create_planned_log` tool calls into local timeline Plan creation, rendering, and undo.
- * @updated 2026-08-24: Added in-place foreground reply retry that rolls back applied tool actions before regenerating the response.
- * @updated 2026-07-21: Kept the composer Stop state tied to the active foreground request so ordinary requests remain cancellable even if a loading branch resets early.
- * @updated 2026-07-06: Added assistant-created principle and self-belief tool-call writeback with in-chat undo support.
- * @updated 2026-07-05: Connected ordinary foreground assistant local-query turns to the real category/review datasets and fed local-query history back into follow-up unified turns.
- * @updated 2026-07-21: Added a dedicated dark-mode AI chat theme for shell, messages, cards, and composer controls.
- * @updated 2026-06-07: Added guarded review-command dispatch so weekly/monthly newspaper command setup errors now surface as chat error messages instead of failing silently.
- * @updated 2026-05-21: Synced native background conversation snapshots through the same timestamp-preserving serializer used by foreground assistant prompts so Android-side AI turns can distinguish old context from current context.
- * @updated 2026-05-19: Added short desktop-widget hide/restore shell transitions so edge collapsing no longer hard-cuts between the full quick-chat panel and the hidden handle.
- * @updated 2026-05-19: Desktop widget mode now follows the latest ordinary chat session and listens for cross-window session storage updates so the floating quick-chat stays in sync with the newest conversation.
- * @updated 2026-05-19: Added a lightly rounded outer shell for the desktop AI widget so the floating quick-chat no longer reads as a hard square panel.
- * @updated 2026-05-18: Added a compact desktop-widget rendering mode plus edge-hidden handle state so the shared AI chat can power the new Electron quick-chat window without mounting the full settings/history shell.
- * @updated 2026-05-18: Foreground `create_todo` tool applications can now carry nested child tasks, and undoing that parent action removes the whole AI-created parent-plus-subtasks bundle together.
- * @updated 2026-05-17: AI chat session/persona/profile persistence now marks the unified AI backup state as changed so foreground-only AI edits can auto-sync with the main backup JSON.
- * @updated 2026-05-16: Added event-driven background assistant reactions for selected newly submitted logs, including linked todo and scope context.
- * @updated 2026-05-16: Added persona-level custom prompt blocks in AI settings so each persona can append multiple labeled extra prompt snippets to outgoing AI requests.
- * @updated 2026-05-15: Continued the refactor by extracting the conversation pane, Dream command flow, review command/writeback helpers, weekly/monthly template session flow helpers, shared chat types/helpers, memory/Dream/debug/background/session/settings overlays, the persona/call settings sections, and the session/template helper layer into `src/components/ai-chat/`, reducing local file size while preserving behavior.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -63,8 +30,6 @@ import {
 import {
   aiService,
   type AIDebugExchange,
-  type AIBackfillToolCall,
-  type AIQuickAddBackfillToolCall,
   type AIPlannedLogToolCall,
   type AIConversationTurn,
   type AITodoToolCall,
@@ -74,6 +39,7 @@ import {
   type AICreatePrincipleToolCall,
   type AICreateSelfBeliefToolCall
 } from '../services/aiService';
+import { quickAddService, type AIBackfillToolCall, type AIQuickAddNoteToolCall, type AIQuickAddBackfillToolCall } from '../services/quickAddService';
 import { useData } from '../contexts/DataContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useNavigation } from '../contexts/NavigationContext';
@@ -128,6 +94,7 @@ import {
 import { getTodoProgressTrackingMode } from '../utils/todoProgressUtils';
 import { extractQuickAddBackfillDescription, QUICK_ADD_BACKFILL_PREFIX } from '../utils/quickAddBackfill';
 import { extractQuickAddTodoDescription, QUICK_ADD_TODO_PREFIX } from '../utils/quickAddTodo';
+import { extractQuickAddNoteDescription, QUICK_ADD_NOTE_PREFIX } from '../utils/quickAddNote';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
 import { assistantAgentConfigService } from '../services/assistantAgentConfigService';
 import { assistantMemoryService } from '../services/assistantMemoryService';
@@ -2091,6 +2058,22 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       .sort((left, right) => left.startTime - right.startTime)
       .slice(0, 60)
   }), [categories, defaultDateKey, logs, scopes, todoCategories, todos]);
+
+  const buildQuickAddNoteDictionaryContext = useCallback(() => {
+    const recentCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const candidateLogs = logs
+      .filter((log) => formatDateKey(new Date(log.startTime)) === defaultDateKey || log.endTime >= recentCutoff)
+      .sort((left, right) => right.startTime - left.startTime)
+      .slice(0, 80);
+
+    return assistantContextBuilder.buildDictionaryContext({
+      categories,
+      scopes,
+      todoCategories,
+      todos: todos.filter((todo) => !todo.isCompleted).slice(0, 60),
+      logs: candidateLogs
+    });
+  }, [categories, defaultDateKey, logs, scopes, todoCategories, todos]);
 
   useEffect(() => {
     if (dreamMonthSelectionState && !sessions.some((session) => session.id === dreamMonthSelectionState.sessionId)) {
@@ -5234,6 +5217,21 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
     return result.actions;
   };
+  const applyQuickAddNoteToolCalls = (
+    toolCalls: AIQuickAddNoteToolCall[],
+    sourceText: string
+  ): AppliedChatAction[] => {
+    const result = assistantActionExecutor.applyAppendLogNotesToolCalls(
+      buildAssistantActionContext(),
+      toolCalls,
+      sourceText
+    );
+    if (result.actions.some((action) => action.kind === 'edit_log' && action.status === 'applied')) {
+      setLogs(result.nextLogs);
+      setTodos(result.nextTodos);
+    }
+    return result.actions;
+  };
   const applyTodoAndPlannedTimelineLogToolCalls = (
     toolCalls: Array<AITodoToolCall | AIPlannedLogToolCall>,
     sourceText: string
@@ -6038,7 +6036,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setActiveRequestId(pendingMessageId);
 
     try {
-      const result = await aiService.requestQuickAddTodoWithDebug(
+      const result = await quickAddService.requestQuickAddTodoWithDebug(
         description,
         { signal: controller.signal },
         buildAssistantDictionaryContext()
@@ -6092,6 +6090,95 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
   };
 
+  const handleQuickAddNote = async (
+    description: string,
+    commandText: string,
+    options?: ForegroundSendOptions
+  ) => {
+    if (!activeSession) {
+      return;
+    }
+
+    const { pendingMessageId, sessionId, userMessageId } = prepareForegroundTurn({
+      activeSession,
+      buildRetryConversationHistory,
+      conversationHistoryCache,
+      createSessionTitleFromUserMessage,
+      isMonthlyReviewTemplateSession: false,
+      isWeeklyReviewTemplateSession: false,
+      mutateSession,
+      notifyUserTurn: async () => undefined,
+      onNotifyUserTurnError: () => undefined,
+      ...(options?.replaceMessageId ? { replaceMessageId: options.replaceMessageId } : {}),
+      ...(options?.retrySourceUserMessageId ? { retrySourceUserMessageId: options.retrySourceUserMessageId } : {}),
+      setInputText,
+      trimmedText: commandText
+    });
+
+    setIsLoading(true);
+    setIsHistoryPanelOpen(false);
+    setIsPersonaPanelOpen(false);
+
+    const controller = new AbortController();
+    activeRequestRef.current = { controller, sessionId, pendingMessageId };
+    setActiveRequestId(pendingMessageId);
+
+    try {
+      const result = await quickAddService.requestQuickAddNoteWithDebug(
+        description,
+        { signal: controller.signal },
+        buildQuickAddNoteDictionaryContext(),
+        { currentDateTime: formatAssistantLocalDateTime(new Date()) }
+      );
+      if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
+        return;
+      }
+
+      const appliedActions = result.toolCall
+        ? applyQuickAddNoteToolCalls([result.toolCall], description)
+        : [];
+      const successfulActions = appliedActions.filter((action) => action.status === 'applied');
+      if (successfulActions.length === 0) {
+        throw new Error('AI 没有找到可追加备注的已有活动记录。');
+      }
+
+      replacePendingWithResult(sessionId, pendingMessageId, '已添加备注', {
+        ...(debugMode ? { debugSections: [{ label: '快速添加备注', exchange: result.debug }] } : {}),
+        appliedActions,
+        retryInput: commandText,
+        retrySourceUserMessageId: userMessageId
+      });
+      notifyAssistantTaskStateChanged();
+    } catch (error) {
+      const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
+      if (isAbortError(error)) {
+        if (isCurrentPendingRequest) {
+          replacePendingWithResult(sessionId, pendingMessageId, '已停止这次请求。', { tone: 'system' });
+        }
+        return;
+      }
+
+      if (!isCurrentPendingRequest || controller.signal.aborted) {
+        return;
+      }
+
+      replacePendingWithResult(sessionId, pendingMessageId, getRetryableAIErrorMessage(error), {
+        tone: 'error',
+        retryInput: commandText,
+        retrySourceUserMessageId: userMessageId,
+        debugSections: getErrorDebugSections(error, '快速添加备注', debugMode)
+      });
+    } finally {
+      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
+        activeRequestRef.current = null;
+      }
+      setActiveRequestId((currentRequestId) => (
+        currentRequestId === pendingMessageId ? null : currentRequestId
+      ));
+      setIsLoading(false);
+    }
+  };
+
   const handleQuickAddBackfill = async (
     description: string,
     commandText: string,
@@ -6127,7 +6214,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const quickAddTimeContext = buildAssistantStateContext(new Date());
 
     try {
-      const result = await aiService.requestQuickAddBackfillWithDebug(
+      const result = await quickAddService.requestQuickAddBackfillWithDebug(
         description,
         { signal: controller.signal },
         buildAssistantDictionaryContext(),
@@ -6745,6 +6832,12 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const quickAddTodoDescription = extractQuickAddTodoDescription(trimmedText);
     if (quickAddTodoDescription) {
       await handleQuickAddTodo(quickAddTodoDescription, trimmedText, options);
+      return;
+    }
+
+    const quickAddNoteDescription = extractQuickAddNoteDescription(trimmedText);
+    if (quickAddNoteDescription) {
+      await handleQuickAddNote(quickAddNoteDescription, trimmedText, options);
       return;
     }
 
@@ -7554,6 +7647,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               setInputText(QUICK_ADD_TODO_PREFIX);
               focusComposerAtEnd();
             }}
+            onQuickAddNote={() => {
+              if (activeSession?.templateMeta) {
+                const nextSession = createDefaultSession(activeSession.personaId);
+                setSessions((prev) => [...prev, nextSession]);
+                setActiveSessionId(nextSession.id);
+              }
+              setIsHomeView(false);
+              setInputText(QUICK_ADD_NOTE_PREFIX);
+              focusComposerAtEnd();
+            }}
             onQuickAddBackfill={() => {
               if (activeSession?.templateMeta) {
                 const nextSession = createDefaultSession(activeSession.personaId);
@@ -7563,6 +7666,19 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               setIsHomeView(false);
               setInputText(QUICK_ADD_BACKFILL_PREFIX);
               focusComposerAtEnd();
+            }}
+            hasRecentSession={Boolean(sortedSessions[0] || activeSession)}
+            recentSessionContextEnabled={Boolean((sortedSessions[0] || activeSession)?.contextCacheEnabled)}
+            contextMessageLimit={activePersona.contextMessageLimit}
+            onToggleRecentSessionContext={() => {
+              const recentSession = sortedSessions[0] || activeSession;
+              if (!recentSession) {
+                return;
+              }
+              mutateSession(recentSession.id, (session) => ({
+                ...session,
+                contextCacheEnabled: !session.contextCacheEnabled
+              }));
             }}
             onSendShortcut={(text) => {
               const latestSession = sortedSessions[0] || activeSession;
@@ -7644,6 +7760,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               >
                 <div className="grid grid-cols-2 gap-1">
                   <button type="button" onClick={() => { setInputText(QUICK_ADD_TODO_PREFIX); setIsComposerMenuOpen(false); focusComposerAtEnd(); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>快速添加待办</button>
+                  <button type="button" onClick={() => { setInputText(QUICK_ADD_NOTE_PREFIX); setIsComposerMenuOpen(false); focusComposerAtEnd(); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>快速添加备注</button>
                   <button type="button" onClick={() => { setInputText(QUICK_ADD_BACKFILL_PREFIX); setIsComposerMenuOpen(false); focusComposerAtEnd(); }} className="min-h-10 rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>快速添加补记</button>
                   <button type="button" onClick={() => { if (activeSession) mutateSession(activeSession.id, (session) => ({ ...session, contextCacheEnabled: !session.contextCacheEnabled })); setIsComposerMenuOpen(false); }} className="flex min-h-10 items-center justify-between rounded-[0.7rem] px-3 text-left text-xs" style={{ backgroundColor: AI_CHAT_THEME.inputBg, color: AI_CHAT_THEME.textPrimary }}>
                     <span>上下文</span><span className="text-[10px]" style={{ color: AI_CHAT_THEME.textMuted }}>{activeSession?.contextCacheEnabled ? `开 · ${activePersona.contextMessageLimit}轮` : '关'}</span>

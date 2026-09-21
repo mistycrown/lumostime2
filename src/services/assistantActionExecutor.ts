@@ -25,7 +25,6 @@ import type {
   TodoRecurrenceRule
 } from '../types';
 import type {
-  AIBackfillToolCall,
   AIPlannedLogToolCall,
   AICreateSubtaskToolCall,
   AICreatePrincipleToolCall,
@@ -35,6 +34,7 @@ import type {
   AITodoToolCall,
   AITodoUpdateToolCall
 } from './aiService';
+import type { AIBackfillToolCall, AIQuickAddNoteToolCall } from './quickAddService';
 import { formatDateKey, normalizeAIBackfillToolCalls, normalizeBackfillDate, parseTimeOnDateKey } from '../utils/aiBackfillUtils';
 import { getTodoProgressTrackingMode, syncSubtaskProgressToParentTodos } from '../utils/todoProgressUtils';
 import { getNextChildOrder, normalizeTodoHierarchy, syncDirectChildTodosWithParent } from '../utils/todoHierarchyUtils';
@@ -1055,6 +1055,86 @@ export const assistantActionExecutor = {
     }
 
     return actions;
+  },
+
+  applyAppendLogNotesToolCalls(
+    context: AssistantActionExecutionContext,
+    toolCalls: AIQuickAddNoteToolCall[],
+    sourceText: string
+  ): AssistantActionExecutionResult {
+    const actions: AppliedChatAction[] = [];
+    let nextLogs = [...context.logs];
+    let nextTodos = [...context.todos];
+    const now = Date.now();
+    const nearestLog = [...nextLogs].sort((left, right) => {
+      const distance = (log: Log) => now < log.startTime
+        ? log.startTime - now
+        : now > log.endTime
+          ? now - log.endTime
+          : 0;
+      return distance(left) - distance(right);
+    })[0];
+
+    toolCalls.forEach((toolCall) => {
+      const groupedItems = new Map<string, string[]>();
+      toolCall.args.items.forEach((item) => {
+        const text = item.text;
+        if (!text.trim() || !sourceText.includes(text)) {
+          return;
+        }
+
+        const targetLog = nextLogs.find((log) => log.id === item.logId) || nearestLog;
+        if (!targetLog) {
+          return;
+        }
+
+        const currentItems = groupedItems.get(targetLog.id) || [];
+        groupedItems.set(targetLog.id, [...currentItems, text]);
+      });
+
+      groupedItems.forEach((items, logId) => {
+        const currentLog = nextLogs.find((log) => log.id === logId);
+        if (!currentLog) {
+          return;
+        }
+
+        const appendedText = items.join('\n');
+        const currentNote = currentLog.note || '';
+        const nextLog: Log = {
+          ...currentLog,
+          note: currentNote ? `${currentNote}\n${appendedText}` : appendedText
+        };
+        const saveResult = applyLogSave(nextLogs, nextTodos, nextLog);
+        nextLogs = saveResult.logs;
+        nextTodos = saveResult.todos;
+        actions.push({
+          actionId: buildActionId(),
+          kind: 'edit_log',
+          status: 'applied',
+          snapshot: {
+            logId: nextLog.id,
+            previousLog: currentLog,
+            nextLog
+          }
+        });
+      });
+
+      if (toolCall.args.items.length > 0 && actions.length === 0) {
+        actions.push({
+          actionId: buildActionId(),
+          kind: 'edit_log',
+          status: 'failed',
+          errorMessage: '没有找到可追加备注的已有活动记录。',
+          snapshot: {}
+        });
+      }
+    });
+
+    return {
+      actions,
+      nextLogs,
+      nextTodos
+    };
   },
 
   applyLogToolCalls(
