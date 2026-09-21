@@ -1,5 +1,7 @@
 # Views Layer
 
+- Update 2026-09-21: `CategoryDetailView.tsx` now includes a shared `Statistics` tab using direct category logs with only tag-duration and note sources.
+
 - Update 2026-09-20: `TagDetailView.tsx` labels the tag-wide statistic card tab as `统计` instead of `属性` and uses the `Statistics` internal tab key.
 
 - Update 2026-09-20: `TagDetailView.tsx` hides the keyword sequence action until sponsorship unlock and exposes its toggle and selector through a compact Palette title popover; the add-keyword action is explicitly centered.
