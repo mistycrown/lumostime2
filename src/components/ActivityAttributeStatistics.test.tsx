@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { Activity } from '../types';
-import { filterLogsForAttribute, filterLogsByRange, getCardAttributeStatisticSlices, getTextTerms } from './ActivityAttributeStatistics';
+import { filterLogsForAttribute, filterLogsByRange, getCalendarDaysForRange, getCardAttributeStatisticSlices, getDateKeysForRange, getTextTerms } from './ActivityAttributeStatistics';
 import { getChartTypesForSource, normalizeStatisticCards } from '../utils/activityStatisticCardUtils';
 
 describe('getTextTerms', () => {
@@ -76,6 +76,24 @@ describe('filterLogsByRange', () => {
     ];
 
     expect(filterLogsByRange(logs as never, 'year', now).map((log) => log.id)).toEqual(['new-year', 'current']);
+  });
+});
+
+describe('statistic calendar ranges', () => {
+  it('keeps month and rolling thirty-day ranges distinct across a month boundary', () => {
+    const now = new Date(2026, 8, 5, 15, 57, 0);
+    expect(getDateKeysForRange('month', now)[0]).toBe('2026-09-01');
+    expect(getDateKeysForRange('month', now).at(-1)).toBe('2026-09-05');
+    expect(getDateKeysForRange('30d', now)[0]).toBe('2026-08-07');
+    expect(getDateKeysForRange('30d', now).at(-1)).toBe('2026-09-05');
+  });
+
+  it('expands a cross-month range to complete month grids', () => {
+    const days = getCalendarDaysForRange('30d', new Date(2026, 8, 5, 15, 57, 0));
+    expect(days[0]).toBe('2026-08-01');
+    expect(days.at(-1)).toBe('2026-09-30');
+    expect(days).toContain('2026-08-31');
+    expect(days).toContain('2026-09-30');
   });
 });
 
