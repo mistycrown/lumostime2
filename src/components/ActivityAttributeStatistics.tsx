@@ -23,6 +23,7 @@
  * @updated 2026-09-21: Makes fixed statistic-card ranges reactive across reused legacy chart renderers.
  * @updated 2026-09-21: Makes fixed statistic-card metrics reactive so count/duration switches refresh immediately.
  * @updated 2026-09-21: Enlarges cross-month choice heatmaps to two monthly columns and removes redundant chart subtitles.
+ * @updated 2026-09-21: Restores statistic-card type subtitles while keeping the redundant inner chart description removed.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
@@ -194,6 +195,7 @@ const AttributeSection: React.FC<{
     <div className="mb-4 flex items-baseline justify-between gap-3">
       <div className="min-w-0">
         <h2 className="truncate text-base font-semibold tracking-tight text-stone-800">{title}</h2>
+        <span className="text-[10px] uppercase tracking-[0.16em] text-stone-400">{typeLabel}{rangeLabel ? <span className="ml-2 normal-case tracking-normal text-stone-400">· {rangeLabel}</span> : null}</span>
       </div>
       <span className="shrink-0 text-xs text-stone-400">{count}</span>
     </div>
@@ -843,7 +845,7 @@ const ConditionalStatisticCard: React.FC<ConditionalStatisticCardProps> = ({ act
       displayCondition: undefined
     };
     const key = `${card.id}-${index}`;
-    const cardHeading = <div className="mb-3 flex items-center justify-between gap-3"><h2 className="min-w-0 truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, [sliceAttribute])}</h2><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div>;
+    const cardHeading = <div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, [sliceAttribute])}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">{card.chartType === 'choiceDonut' ? 'CHOICE DONUT' : card.chartType === 'choiceStacked' ? 'CHOICE STACKED' : 'CHOICE HEATMAP'} / {attribute.type === 'single' ? '单选' : '多选'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div>;
     if (card.chartType === 'choiceDonut') {
       return <section key={key} className="py-7 first:pt-2">{cardHeading}<DonutPreview attribute={sliceAttribute} logs={slice.logs} mode={card.metric === 'duration' ? 'duration' : 'count'} palette={chartPalette} /></section>;
     }
@@ -986,10 +988,10 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
         ? { ...TAG_DURATION_ATTRIBUTE, id: '__category-duration__', name: '分类时长' }
         : TAG_DURATION_ATTRIBUTE;
       if (card.chartType === 'tagDurationBoxplot') {
-        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="min-w-0 truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">本年</span></div><TagDurationBoxplotPreview logs={filterLogsByRange(logs, 'year')} palette={chartPalette} /></section>;
+        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">TAG DURATION BOXPLOT / 每日汇总</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">本年</span></div><TagDurationBoxplotPreview logs={filterLogsByRange(logs, 'year')} palette={chartPalette} /></section>;
       }
       if (card.chartType === 'tagDurationWeekHourHeatmap') {
-        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="min-w-0 truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><TagDurationWeekHourHeatmap logs={logs} range={card.range} palette={chartPalette} /></section>;
+        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">TAG DURATION / 星期 × 小时</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><TagDurationWeekHourHeatmap logs={logs} range={card.range} palette={chartPalette} /></section>;
       }
        const tagLogs = createTagDurationLogs(cardLogs, durationAttribute.id);
        return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [durationAttribute] }} logs={tagLogs} hideToolbar chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} onChange={undefined} /></section>;
@@ -1018,16 +1020,16 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
       ? cardLogs.map((log) => ({ ...log, attributeValues: [{ attributeId: attribute.id, optionId: log.activityId }] }))
       : filterLogsForAttribute(cardLogs, attribute.id);
     if (card.chartType === 'choiceDonut') {
-        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="min-w-0 truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><DonutPreview attribute={attribute} logs={attributeLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} palette={chartPalette} /></section>;
+        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE DONUT / {attribute.type === 'single' ? '单选' : '多选'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><DonutPreview attribute={attribute} logs={attributeLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} palette={chartPalette} /></section>;
     }
     if (card.chartType === 'choiceHeatmap') {
-       return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="min-w-0 truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceHeatmapPreview attribute={attribute} logs={attributeLogs} mode="count" range={card.range} palette={chartPalette} /></section>;
+       return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE HEATMAP / {attribute.type === 'single' ? '单选' : '多选'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceHeatmapPreview attribute={attribute} logs={attributeLogs} mode="count" range={card.range} palette={chartPalette} /></section>;
     }
     if (card.chartType === 'choiceTreemap') {
-      return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="min-w-0 truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceTreemapPreview attribute={attribute} logs={attributeLogs} mode="count" palette={chartPalette} /></section>;
+      return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE TREEMAP / 单选</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceTreemapPreview attribute={attribute} logs={attributeLogs} mode="count" palette={chartPalette} /></section>;
     }
     if (card.chartType === 'choiceStacked') {
-       return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="min-w-0 truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceStackedPreview attribute={attribute} logs={attributeLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} range={card.range} palette={chartPalette} /></section>;
+       return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE STACKED / 单选</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceStackedPreview attribute={attribute} logs={attributeLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} range={card.range} palette={chartPalette} /></section>;
     }
       return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [attribute] }} logs={attributeLogs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} onChange={undefined} /></section>;
   };
