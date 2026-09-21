@@ -146,6 +146,9 @@ describe('aiService unified turn normalization', () => {
       }],
       scopes: [{ id: 'scope-work', name: '工作' }],
       todoCategories: [{ id: 'todo-work', name: '工作事项' }]
+    }, {
+      currentDateTime: '2026-09-21 15:42',
+      todayTimelineSummary: '09:00-10:00 Work / Reading\n14:00-15:30 Work / Meeting'
     });
     const requestInit = fetchSpy.mock.calls[0]?.[1] as { body?: string } | undefined;
     const requestBody = requestInit?.body ? JSON.parse(requestInit.body) : {};
@@ -167,6 +170,8 @@ describe('aiService unified turn normalization', () => {
     expect(requestBody.response_format).toEqual({ type: 'json_object' });
     expect(requestBody.messages[0].content).toContain('只能返回一个 create_log 工具调用');
     expect(requestBody.messages[0].content).toContain('activity-communication');
+    expect(requestBody.messages[0].content).toContain('2026-09-21 15:42');
+    expect(requestBody.messages[0].content).toContain('14:00-15:30 Work / Meeting');
   });
 
   it('uses dictionary ids for quick-add-todo instead of forcing the 小事 bucket', async () => {

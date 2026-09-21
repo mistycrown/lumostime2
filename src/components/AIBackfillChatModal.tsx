@@ -6124,12 +6124,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const controller = new AbortController();
     activeRequestRef.current = { controller, sessionId, pendingMessageId };
     setActiveRequestId(pendingMessageId);
+    const quickAddTimeContext = buildAssistantStateContext(new Date());
 
     try {
       const result = await aiService.requestQuickAddBackfillWithDebug(
         description,
         { signal: controller.signal },
-        buildAssistantDictionaryContext()
+        buildAssistantDictionaryContext(),
+        {
+          currentDateTime: quickAddTimeContext.currentDateTime,
+          todayTimelineSummary: quickAddTimeContext.timelineSummaryForDate || ''
+        }
       );
       if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
         return;
