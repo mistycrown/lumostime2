@@ -13,6 +13,7 @@
  * @updated 2026-09-21: Extracts viewport navigation, keyboard inset handling, and Markdown presentation into focused support modules.
  * @updated 2026-09-22: Hides the bottom composer scrollbar while preserving multi-line scrolling.
  * @updated 2026-09-22: Extracts Dream editing and shared conversation-history orchestration into dedicated support hooks.
+ * @updated 2026-09-22: Extracts review command adapters and overwrite confirmation handling into a focused hook.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -206,18 +207,6 @@ import { AIBackfillChatMemoryOverlay } from './ai-chat/AIBackfillChatMemoryOverl
 import { AIBackfillChatPersonaSettingsSection } from './ai-chat/AIBackfillChatPersonaSettingsSection';
 import { AIChatShortcutSettingsOverlay } from './ai-chat/AIChatShortcutSettingsOverlay';
 import {
-  runDailyNewspaperCommand as runDailyNewspaperCommandFlow,
-  runDailyNewspaperOverwriteConfirmation as runDailyNewspaperOverwriteConfirmationFlow,
-  runDailyReviewNarrativeCommand as runDailyReviewNarrativeCommandFlow,
-  runDailyReviewNarrativeOverwriteConfirmation as runDailyReviewNarrativeOverwriteConfirmationFlow,
-  runMonthlyNewspaperCommand as runMonthlyNewspaperCommandFlow,
-  runMonthlyNewspaperOverwriteConfirmation as runMonthlyNewspaperOverwriteConfirmationFlow,
-  runMonthlyReviewNarrativeWritebackCommand as runMonthlyReviewNarrativeWritebackCommandFlow,
-  runWeeklyNewspaperCommand as runWeeklyNewspaperCommandFlow,
-  runWeeklyNewspaperOverwriteConfirmation as runWeeklyNewspaperOverwriteConfirmationFlow,
-  runWeeklyReviewNarrativeWritebackCommand as runWeeklyReviewNarrativeWritebackCommandFlow
-} from './ai-chat/AIBackfillChatReviewCommands';
-import {
   runDailyNewspaperWriteback as runDailyNewspaperWritebackFlow,
   runDailyReviewNarrativeWriteback as runDailyReviewNarrativeWritebackFlow,
   runMonthlyNewspaperWriteback as runMonthlyNewspaperWritebackFlow,
@@ -228,6 +217,7 @@ import {
 import { AIBackfillChatSettingsOverlay } from './ai-chat/AIBackfillChatSettingsOverlay';
 import { useAIBackfillChatViewState } from './ai-chat/useAIBackfillChatViewState';
 import { useAIBackfillChatAssistantState } from './ai-chat/useAIBackfillChatAssistantState';
+import { useAIBackfillChatReviewCommandHandlers } from './ai-chat/useAIBackfillChatReviewCommandHandlers';
 import { useAIBackfillChatSessionState } from './ai-chat/useAIBackfillChatSessionState';
 import { accentMix, getAIChatTheme } from './ai-chat/AIBackfillChatTheme';
 import { useAIBackfillChatMessageState } from './ai-chat/useAIBackfillChatMessageState';
@@ -5029,230 +5019,55 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setMonthlyReviews
   });
 
-  const handleWeeklyReviewNarrativeWritebackCommand = async (session: AIChatSession) => (
-    runWeeklyReviewNarrativeWritebackCommandFlow({
-      addToast,
-      buildWeekDataText: buildWeeklyReviewTemplateWeekDataText,
-      resolveTemplateMeta: resolveWeeklyReviewTemplateSessionMeta,
-      reviewTemplates,
-      runWriteback: runWeeklyReviewNarrativeWriteback,
-      session,
-      weeklyReviews
-    })
-  );
-
-  const handleDailyReviewNarrativeCommand = async (session: AIChatSession) => (
-    runDailyReviewNarrativeCommandFlow({
-      appendSystemMessage,
-      categories,
-      checkTemplates,
-      dailyReviews,
-      getLocalDateStr,
-      logs,
-      prepareForInteraction: prepareForTemplateInteraction,
-      reviewTemplates,
-      runWriteback: runDailyReviewNarrativeWriteback,
-      scopes,
-      session,
-      setConfirmation: setDailyReviewWritebackConfirmation,
-      todoCategories,
-      todos
-    })
-  );
-
-  const handleDailyNewspaperCommand = async (session: AIChatSession, commandText: string) => (
-    runDailyNewspaperCommandFlow({
-      appendSystemMessage,
-      categories,
-      checkTemplates,
-      commandText,
-      dailyReviews,
-      fallbackDate: targetDate ? getLocalDateStr(defaultTargetDate) : undefined,
-      getLocalDateStr,
-      logs,
-      prepareForInteraction: prepareForTemplateInteraction,
-      reviewTemplates,
-      runWriteback: runDailyNewspaperWriteback,
-      scopes,
-      session,
-      setConfirmation: setDailyNewspaperWritebackConfirmation,
-      todoCategories,
-      todos
-    })
-  );
-
-  const handleWeeklyNewspaperCommand = async (session: AIChatSession, commandText: string) => (
-    runWeeklyNewspaperCommandFlow({
-      appendSystemMessage,
-      categories,
-      commandText,
-      dailyReviews,
-      fallbackDate: targetDate ? getLocalDateStr(defaultTargetDate) : undefined,
-      getLocalDateStr,
-      logs,
-      monthlyReviews,
-      prepareForInteraction: prepareForTemplateInteraction,
-      reviewTemplates,
-      runWriteback: runWeeklyNewspaperWriteback,
-      scopes,
-      session,
-      setConfirmation: setWeeklyNewspaperWritebackConfirmation,
-      todoCategories,
-      todos,
-      weeklyReviews
-    })
-  );
-
-  const handleDailyReviewNarrativeOverwriteConfirmation = async (
-    session: AIChatSession,
-    userInput: string
-  ): Promise<boolean> => (
-    runDailyReviewNarrativeOverwriteConfirmationFlow({
-      appendSystemMessage,
-      appendUserMessage,
-      categories,
-      checkTemplates,
-      confirmation: dailyReviewWritebackConfirmation,
-      dailyReviews,
-      getLocalDateStr,
-      logs,
-      prepareForInteraction: prepareForTemplateInteraction,
-      reviewTemplates,
-      runWriteback: runDailyReviewNarrativeWriteback,
-      scopes,
-      session,
-      setConfirmation: setDailyReviewWritebackConfirmation,
-      todoCategories,
-      todos,
-      userInput
-    })
-  );
-
-  const handleDailyNewspaperOverwriteConfirmation = async (
-    session: AIChatSession,
-    userInput: string
-  ): Promise<boolean> => (
-    runDailyNewspaperOverwriteConfirmationFlow({
-      appendSystemMessage,
-      appendUserMessage,
-      categories,
-      checkTemplates,
-      confirmation: dailyNewspaperWritebackConfirmation,
-      dailyReviews,
-      getLocalDateStr,
-      logs,
-      prepareForInteraction: prepareForTemplateInteraction,
-      reviewTemplates,
-      runWriteback: runDailyNewspaperWriteback,
-      scopes,
-      session,
-      setConfirmation: setDailyNewspaperWritebackConfirmation,
-      todoCategories,
-      todos,
-      userInput
-    })
-  );
-
-  const handleWeeklyNewspaperOverwriteConfirmation = async (
-    session: AIChatSession,
-    userInput: string
-  ): Promise<boolean> => (
-    runWeeklyNewspaperOverwriteConfirmationFlow({
-      appendSystemMessage,
-      appendUserMessage,
-      categories,
-      confirmation: weeklyNewspaperWritebackConfirmation,
-      dailyReviews,
-      getLocalDateStr,
-      logs,
-      monthlyReviews,
-      prepareForInteraction: prepareForTemplateInteraction,
-      reviewTemplates,
-      runWriteback: runWeeklyNewspaperWriteback,
-      scopes,
-      session,
-      setConfirmation: setWeeklyNewspaperWritebackConfirmation,
-      todoCategories,
-      todos,
-      userInput,
-      weeklyReviews
-    })
-  );
-
-  const handleMonthlyReviewNarrativeWritebackCommand = async (session: AIChatSession) => (
-    runMonthlyReviewNarrativeWritebackCommandFlow({
-      addToast,
-      buildMonthDataText: buildMonthlyReviewTemplateMonthDataText,
-      monthlyReviews,
-      resolveTemplateMeta: resolveMonthlyReviewTemplateSessionMeta,
-      reviewTemplates,
-      runWriteback: runMonthlyReviewNarrativeWriteback,
-      session
-    })
-  );
-
-  const handleMonthlyNewspaperCommand = async (session: AIChatSession, commandText: string) => (
-    runMonthlyNewspaperCommandFlow({
-      appendSystemMessage,
-      categories,
-      commandText,
-      dailyReviews,
-      fallbackDate: targetDate ? getLocalDateStr(defaultTargetDate) : undefined,
-      getLocalDateStr,
-      logs,
-      monthlyReviews,
-      prepareForInteraction: prepareForTemplateInteraction,
-      reviewTemplates,
-      runWriteback: runMonthlyNewspaperWriteback,
-      scopes,
-      session,
-      setConfirmation: setMonthlyNewspaperWritebackConfirmation,
-      todoCategories,
-      todos,
-      weeklyReviews
-    })
-  );
-
-  const handleMonthlyNewspaperOverwriteConfirmation = async (
-    session: AIChatSession,
-    userInput: string
-  ): Promise<boolean> => (
-    runMonthlyNewspaperOverwriteConfirmationFlow({
-      appendSystemMessage,
-      appendUserMessage,
-      categories,
-      confirmation: monthlyNewspaperWritebackConfirmation,
-      dailyReviews,
-      getLocalDateStr,
-      logs,
-      monthlyReviews,
-      prepareForInteraction: prepareForTemplateInteraction,
-      reviewTemplates,
-      runWriteback: runMonthlyNewspaperWriteback,
-      scopes,
-      session,
-      setConfirmation: setMonthlyNewspaperWritebackConfirmation,
-      todoCategories,
-      todos,
-      userInput,
-      weeklyReviews
-    })
-  );
-
-  const runReviewCommandSafely = async <T,>(
-    sessionId: string,
-    label: string,
-    command: () => Promise<T>,
-    fallbackValue: T
-  ): Promise<T> => {
-    try {
-      return await command();
-    } catch (error) {
-      console.error(`[AIBackfillChatModal] Failed to run ${label}`, error);
-      appendSystemMessage(sessionId, getRetryableAIErrorMessage(error));
-      return fallbackValue;
-    }
-  };
+  const {
+    handleDailyNewspaperCommand,
+    handleDailyNewspaperOverwriteConfirmation,
+    handleDailyReviewNarrativeCommand,
+    handleDailyReviewNarrativeOverwriteConfirmation,
+    handleMonthlyNewspaperCommand,
+    handleMonthlyNewspaperOverwriteConfirmation,
+    handleMonthlyReviewNarrativeWritebackCommand,
+    handleWeeklyNewspaperCommand,
+    handleWeeklyNewspaperOverwriteConfirmation,
+    handleWeeklyReviewNarrativeWritebackCommand,
+    runReviewCommandSafely
+  } = useAIBackfillChatReviewCommandHandlers({
+    addToast,
+    appendSystemMessage,
+    appendUserMessage,
+    buildMonthDataText: buildMonthlyReviewTemplateMonthDataText,
+    buildWeekDataText: buildWeeklyReviewTemplateWeekDataText,
+    categories,
+    checkTemplates,
+    dailyNewspaperWriteback: runDailyNewspaperWriteback,
+    dailyNewspaperWritebackConfirmation,
+    dailyReviewWriteback: runDailyReviewNarrativeWriteback,
+    dailyReviewWritebackConfirmation,
+    dailyReviews,
+    fallbackDate: targetDate ? getLocalDateStr(defaultTargetDate) : undefined,
+    getLocalDateStr,
+    getRetryableAIErrorMessage,
+    logs,
+    monthlyNewspaperWriteback: runMonthlyNewspaperWriteback,
+    monthlyNewspaperWritebackConfirmation,
+    monthlyReviewWriteback: runMonthlyReviewNarrativeWriteback,
+    monthlyReviews,
+    prepareForInteraction: prepareForTemplateInteraction,
+    resolveMonthlyReviewTemplateSessionMeta,
+    resolveWeeklyReviewTemplateSessionMeta,
+    reviewTemplates,
+    scopes,
+    setDailyNewspaperWritebackConfirmation,
+    setDailyReviewWritebackConfirmation,
+    setMonthlyNewspaperWritebackConfirmation,
+    setWeeklyNewspaperWritebackConfirmation,
+    todoCategories,
+    todos,
+    weeklyReviewWriteback: runWeeklyReviewNarrativeWriteback,
+    weeklyNewspaperWriteback: runWeeklyNewspaperWriteback,
+    weeklyNewspaperWritebackConfirmation,
+    weeklyReviews
+  });
 
   const handleDreamCommand = async (
     session: AIChatSession,
