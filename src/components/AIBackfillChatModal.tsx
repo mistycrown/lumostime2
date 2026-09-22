@@ -14,6 +14,7 @@
  * @updated 2026-09-22: Hides the bottom composer scrollbar while preserving multi-line scrolling.
  * @updated 2026-09-22: Extracts Dream editing and shared conversation-history orchestration into dedicated support hooks.
  * @updated 2026-09-22: Extracts review command adapters and overwrite confirmation handling into a focused hook.
+ * @updated 2026-09-22: Extracts persona, prompt-block, shortcut, and avatar profile editing into a focused hook.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -99,7 +100,6 @@ import AssistantAgent from '../plugins/AssistantAgentPlugin';
 import { assistantAgentConfigService } from '../services/assistantAgentConfigService';
 import { assistantMemoryService } from '../services/assistantMemoryService';
 import { dreamService } from '../services/dreamService';
-import { imageService } from '../services/imageService';
 import { assistantPromptService } from '../services/assistantPromptService';
 import { assistantLetterOrchestratorService } from '../services/assistantLetterOrchestratorService';
 import { assistantLetterScheduler } from '../services/assistantLetterScheduler';
@@ -184,6 +184,7 @@ import { useAIBackfillChatSessionMutations } from './ai-chat/useAIBackfillChatSe
 import { buildAssistantReminderDueTrigger } from './ai-chat/AIBackfillChatReminderTrigger';
 import { useAIBackfillChatAssistantSettings } from './ai-chat/useAIBackfillChatAssistantSettings';
 import { useAIBackfillChatActionHandlers } from './ai-chat/useAIBackfillChatActionHandlers';
+import { useAIBackfillChatPersonaProfile } from './ai-chat/useAIBackfillChatPersonaProfile';
 import { useAIBackfillChatDreamManager } from './ai-chat/useAIBackfillChatDreamManager';
 import {
   ACTIVE_SESSION_KEY,
@@ -192,7 +193,6 @@ import {
   CHAT_SHORTCUTS_KEY,
   CHAT_PERSONAS_KEY,
   CHAT_SESSIONS_KEY,
-  clampContextLimit,
   createDefaultSession,
   DEBUG_MODE_KEY,
   DEFAULT_AI_PERSONAS,
@@ -285,10 +285,8 @@ import {
   type AIChatMonthlyNewspaperWritebackResult,
   type AIChatMonthlyReviewWritebackResult,
   type AIChatCustomPromptBlock,
-  type AIChatShortcut,
   type AIChatPersona,
   type AIChatSession,
-  type AIChatUserProfile,
   type AIChatWeeklyNewspaperWritebackResult,
   type AIChatWeeklyReviewWritebackResult,
   type AISettingsMainTab,
@@ -2434,334 +2432,50 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     addToast('success', '已删除对话');
   };
 
-  const ensureEditablePersona = (): AIChatPersona => {
-    if (!activeSession) {
-      return activePersona;
-    }
-
-    if (!activePersona.isBuiltIn) {
-      return activePersona;
-    }
-
-    const clonedPersona: AIChatPersona = {
-      ...activePersona,
-      id: crypto.randomUUID(),
-      isBuiltIn: false,
-      name: `${activePersona.name} 自定义`
-    };
-
-    setPersonas((prev) => [...prev, clonedPersona]);
-    mutateSession(activeSession.id, (session) => ({
-      ...session,
-      personaId: clonedPersona.id
-    }));
-
-    return clonedPersona;
-  };
-
-  const handleApplyPersonaPreset = (personaId: string) => {
-    if (!personaId || personaId === activeSession?.personaId) {
-      return;
-    }
-
-    handleCreateSessionWithPersona(personaId);
-  };
-
-  const handleCreatePersona = () => {
-    const newPersona: AIChatPersona = {
-      id: crypto.randomUUID(),
-      name: '新的人设',
-      avatarIcon: '✨',
-      assistantSelfName: '',
-      userCallName: '',
-      systemPrompt: '',
-      contextMessageLimit: 30,
-      isBuiltIn: false
-    };
-
-    setPersonas((prev) => [...prev, newPersona]);
-    handleCreateSessionWithPersona(newPersona.id);
-  };
-
-  const handleDeleteCurrentPersona = async () => {
-    if (activePersona.isBuiltIn) {
-      return;
-    }
-
-    const deletingPersonaId = activePersona.id;
-    const fallbackPersonaId = DEFAULT_AI_PERSONAS[0]?.id || personas[0]?.id;
-    if (!fallbackPersonaId || fallbackPersonaId === deletingPersonaId) {
-      return;
-    }
-
-    if (activePersona.avatarImage) {
-      try {
-        await imageService.deleteImage(activePersona.avatarImage);
-      } catch (error) {
-        console.error('[AIBackfillChatModal] Failed to delete persona avatar image', error);
-      }
-    }
-
-    setPersonas((prev) => prev.filter((persona) => persona.id !== deletingPersonaId));
-    setSessions((prev) => prev.map((session) => (
-      session.personaId === deletingPersonaId
-        ? {
-          ...session,
-          personaId: fallbackPersonaId,
-          updatedAt: Date.now()
-        }
-        : session
-    )));
-    setDeleteConfirmPersonaId(null);
-    setIsEmojiEditorOpen(false);
-    addToast('success', '已删除人设');
-  };
-
-  const updateCurrentPersona = (patch: Partial<AIChatPersona>) => {
-    const editablePersona = ensureEditablePersona();
-
-    setPersonas((prev) => prev.map((persona) => (
-      persona.id === editablePersona.id
-        ? {
-          ...persona,
-          ...patch,
-          contextMessageLimit: clampContextLimit(patch.contextMessageLimit ?? persona.contextMessageLimit)
-        }
-        : persona
-    )));
-  };
-
-  const handleAddCustomPromptBlock = (): string => {
-    const blockId = crypto.randomUUID();
-    setCustomPromptBlocks((prev) => (
-      [
-        ...prev,
-        {
-          id: blockId,
-          title: '',
-          content: '',
-          enabled: true
-        }
-      ]
-    ));
-    return blockId;
-  };
-
-  const handleUpdateCustomPromptBlock = (
-    blockId: string,
-    patch: { title?: string; content?: string; enabled?: boolean }
-  ) => {
-    setCustomPromptBlocks((prev) => prev.map((block) => (
-        block.id === blockId
-          ? {
-            ...block,
-            ...patch
-          }
-          : block
-      )));
-  };
-
-  const handleDeleteCustomPromptBlock = (blockId: string) => {
-    setCustomPromptBlocks((prev) => prev.filter((block) => block.id !== blockId));
-  };
-
-  const handleAddShortcut = (): string => {
-    const shortcutId = crypto.randomUUID();
-    setShortcuts((prev) => [...prev, {
-      id: shortcutId,
-      title: '',
-      content: '',
-      enabled: true
-    }]);
-    return shortcutId;
-  };
-
-  const handleUpdateShortcut = (
-    shortcutId: string,
-    patch: Partial<Pick<AIChatShortcut, 'title' | 'content' | 'enabled'>>
-  ) => {
-    setShortcuts((prev) => prev.map((shortcut) => (
-      shortcut.id === shortcutId
-        ? { ...shortcut, ...patch }
-        : shortcut
-    )));
-  };
-
-  const handleDeleteShortcut = (shortcutId: string) => {
-    setShortcuts((prev) => prev.filter((shortcut) => shortcut.id !== shortcutId));
-  };
-
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) {
-      return;
-    }
-
-    if (!file.type.startsWith('image/')) {
-      addToast('warning', '请选择图片文件');
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      addToast('warning', '图片大小不能超过 10MB');
-      return;
-    }
-
-    const previousAvatarImage = activePersona.avatarImage;
-
-    setIsEmojiEditorOpen(false);
-    setIsUploadingAvatar(true);
-    try {
-      const filename = await imageService.saveImage(file);
-      if (previousAvatarImage) {
-        await imageService.deleteImage(previousAvatarImage).catch((error) => {
-          console.error('[AIBackfillChatModal] Failed to delete previous avatar image', error);
-        });
-      }
-
-      setPersonas((prev) => prev.map((persona) =>
-        persona.id === activePersona.id
-          ? {
-            ...persona,
-            avatarImage: filename,
-            avatarIcon: persona.avatarIcon || '✨'
-          }
-          : persona
-      ));
-    } catch (error) {
-      console.error('[AIBackfillChatModal] Failed to upload persona avatar', error);
-      addToast('error', '头像上传失败，请重试');
-    } finally {
-      setIsUploadingAvatar(false);
-    }
-  };
-
-  const handleUseEmojiAvatar = () => {
-    setEmojiDraft(activePersona.avatarIcon || '✨');
-    setIsEmojiEditorOpen(true);
-  };
-
-  const handleCancelEmojiAvatarEdit = () => {
-    setEmojiDraft(activePersona.avatarIcon || '✨');
-    setIsEmojiEditorOpen(false);
-  };
-
-  const handleApplyEmojiAvatar = async () => {
-    const trimmedEmoji = emojiDraft.trim() || '✨';
-    const previousAvatarImage = activePersona.avatarImage;
-
-    if (previousAvatarImage) {
-      try {
-        await imageService.deleteImage(previousAvatarImage);
-      } catch (error) {
-        console.error('[AIBackfillChatModal] Failed to delete avatar image when switching to emoji', error);
-      }
-    }
-
-    setPersonas((prev) => prev.map((persona) =>
-      persona.id === activePersona.id
-        ? {
-          ...persona,
-          avatarIcon: trimmedEmoji,
-          avatarImage: undefined
-        }
-        : persona
-    ));
-    setIsEmojiEditorOpen(false);
-  };
-
-  const updateUserProfile = (patch: Partial<AIChatUserProfile>) => {
-    setUserProfile((prev) => ({
-      ...prev,
-      ...patch
-    }));
-  };
-
-  const handleUserAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) {
-      return;
-    }
-
-    if (!file.type.startsWith('image/')) {
-      addToast('warning', '请选择图片文件');
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      addToast('warning', '图片大小不能超过 10MB');
-      return;
-    }
-
-    const previousAvatarImage = userProfile.avatarImage;
-    setIsUserEmojiEditorOpen(false);
-    setIsUploadingUserAvatar(true);
-    try {
-      const filename = await imageService.saveImage(file);
-      if (previousAvatarImage) {
-        await imageService.deleteImage(previousAvatarImage).catch((error) => {
-          console.error('[AIBackfillChatModal] Failed to delete previous user avatar image', error);
-        });
-      }
-
-      updateUserProfile({
-        avatarImage: filename
-      });
-    } catch (error) {
-      console.error('[AIBackfillChatModal] Failed to upload user avatar', error);
-      addToast('error', '用户头像上传失败，请重试');
-    } finally {
-      setIsUploadingUserAvatar(false);
-    }
-  };
-
-  const handleUseUserEmojiAvatar = () => {
-    setUserEmojiDraft(userProfile.avatarIcon || '');
-    setIsUserEmojiEditorOpen(true);
-  };
-
-  const handleCancelUserEmojiAvatarEdit = () => {
-    setUserEmojiDraft(userProfile.avatarIcon || '');
-    setIsUserEmojiEditorOpen(false);
-  };
-
-  const handleApplyUserEmojiAvatar = async () => {
-    const previousAvatarImage = userProfile.avatarImage;
-
-    if (previousAvatarImage) {
-      try {
-        await imageService.deleteImage(previousAvatarImage);
-      } catch (error) {
-        console.error('[AIBackfillChatModal] Failed to delete user avatar image when switching to emoji', error);
-      }
-    }
-
-    updateUserProfile({
-      avatarIcon: userEmojiDraft.trim(),
-      avatarImage: undefined
-    });
-    setIsUserEmojiEditorOpen(false);
-  };
-
-  const handleResetUserAvatar = async () => {
-    const previousAvatarImage = userProfile.avatarImage;
-
-    if (previousAvatarImage) {
-      try {
-        await imageService.deleteImage(previousAvatarImage);
-      } catch (error) {
-        console.error('[AIBackfillChatModal] Failed to delete user avatar image on reset', error);
-      }
-    }
-
-    setUserProfile({
-      avatarIcon: ''
-    });
-    setUserEmojiDraft('');
-    setIsUserEmojiEditorOpen(false);
-  };
+  const {
+    ensureEditablePersona,
+    handleAddCustomPromptBlock,
+    handleAddShortcut,
+    handleApplyEmojiAvatar,
+    handleApplyPersonaPreset,
+    handleApplyUserEmojiAvatar,
+    handleAvatarUpload,
+    handleCancelEmojiAvatarEdit,
+    handleCancelUserEmojiAvatarEdit,
+    handleCreatePersona,
+    handleDeleteCurrentPersona,
+    handleDeleteShortcut,
+    handleUpdateCustomPromptBlock,
+    handleUpdateShortcut,
+    handleUserAvatarUpload,
+    handleUseEmojiAvatar,
+    handleUseUserEmojiAvatar,
+    handleResetUserAvatar,
+    updateCurrentPersona
+  } = useAIBackfillChatPersonaProfile({
+    activePersona,
+    activeSession,
+    addToast,
+    emojiDraft,
+    handleCreateSessionWithPersona,
+    mutateSession,
+    personas,
+    sessions,
+    setCustomPromptBlocks,
+    setDeleteConfirmPersonaId,
+    setEmojiDraft,
+    setIsEmojiEditorOpen,
+    setIsUploadingAvatar,
+    setIsUploadingUserAvatar,
+    setIsUserEmojiEditorOpen,
+    setPersonas,
+    setSessions,
+    setShortcuts,
+    setUserEmojiDraft,
+    setUserProfile,
+    userEmojiDraft,
+    userProfile
+  });
 
 
   const handleOpenAssistantMemoryViewer = () => {
