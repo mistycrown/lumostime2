@@ -65,5 +65,5 @@ export const buildAssistantBackgroundTurnRequest = ({
   ...(userPersonaPrompt ? { userPersonaPrompt } : {}),
   dictionaryContext,
   conversationHistory,
-  ...(includeDebugInPersistedMessage ? { includeDebugInPersistedMessage: true } : {})
+  ...(typeof includeDebugInPersistedMessage === 'boolean' ? { includeDebugInPersistedMessage } : {})
 });

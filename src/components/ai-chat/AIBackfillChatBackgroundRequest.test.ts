@@ -64,5 +64,22 @@ describe('buildAssistantBackgroundTurnRequest', () => {
     });
 
     expect(request.includeDebugInPersistedMessage).toBe(true);
+
+    const disabledRequest = buildAssistantBackgroundTurnRequest({
+      trigger: {
+        type: 'checkin',
+        source: 'system',
+        text: 'Check in',
+        createdAt: '2026-09-22T10:00:00+08:00'
+      },
+      showSystemNotification: true,
+      stateContext: {
+        currentDateTime: 'now',
+        stateContextDate: 'today'
+      },
+      includeDebugInPersistedMessage: false
+    });
+
+    expect(disabledRequest.includeDebugInPersistedMessage).toBe(false);
   });
 });
