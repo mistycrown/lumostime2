@@ -21,6 +21,7 @@
  * @updated 2026-08-26: Includes Routine configuration in backup payloads and restore handling.
  * @updated 2026-09-03: Skips full cloud payload downloads for already acknowledged versions and throttles repeated resume checks.
  * @updated 2026-09-20: Waits for AI chat storage hydration before building sync payloads so startup sync cannot upload a pre-hydration empty chat state.
+ * @updated 2026-09-22: Syncs Memoir filters and a separate persisted-preferences snapshot, with restore events for mounted contexts.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -83,6 +84,10 @@ import {
     saveSceneGroupStateToStorage
 } from '../utils/sceneGroupStorage';
 import { loadRoutines, saveRoutines } from '../utils/routineStorage';
+import {
+    PREFERENCES_CHANGED_EVENT,
+    preferencesBackupService
+} from '../services/preferencesBackupService';
 
 export const useSyncManager = () => {
     type SyncMode = 'startup' | 'resume' | 'manual' | 'auto';
@@ -113,6 +118,7 @@ export const useSyncManager = () => {
         customStickerSets, setCustomStickerSets,
         customStickers, setCustomStickers,
         filters, setFilters,
+        memoirFilterConfig, setMemoirFilterConfig,
         lastSyncTime, updateLastSyncTime,
         isRestoring,
         isSyncing, setIsSyncing,
@@ -208,6 +214,18 @@ export const useSyncManager = () => {
             if (hasField('customStickerSets')) setCustomStickerSets(data.customStickerSets ?? []);
             if (hasField('customStickers')) setCustomStickers(data.customStickers ?? []);
             if (hasField('filters')) setFilters(normalizeFiltersOrder(data.filters));
+            if (hasField('memoirFilterConfig') && data.memoirFilterConfig && typeof data.memoirFilterConfig === 'object') {
+                setMemoirFilterConfig((previous) => ({
+                    ...previous,
+                    ...data.memoirFilterConfig,
+                    relatedTagIds: Array.isArray(data.memoirFilterConfig.relatedTagIds)
+                        ? data.memoirFilterConfig.relatedTagIds
+                        : previous.relatedTagIds,
+                    relatedScopeIds: Array.isArray(data.memoirFilterConfig.relatedScopeIds)
+                        ? data.memoirFilterConfig.relatedScopeIds
+                        : previous.relatedScopeIds
+                }));
+            }
             if (hasField('routines')) saveRoutines(data.routines);
             
             // 恢复场景设置到 localStorage（优先新版 sceneGroupState，兼容旧版 sceneTimeSlots）
@@ -253,6 +271,10 @@ export const useSyncManager = () => {
                 appearanceBackupService.applyBackupPayload(data.appearanceData);
             }
 
+            if (hasField('preferencesData')) {
+                preferencesBackupService.applyBackupPayload(data.preferencesData);
+            }
+
             await new Promise(resolve => setTimeout(resolve, 10));
             console.log(`[Sync] Applied ${source} data payload`);
 
@@ -296,10 +318,12 @@ export const useSyncManager = () => {
             logs, todos, categories, todoCategories, collections, collectionEntries, scopes, goals, majorGoals,
             autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
             monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, customStickerSets, customStickers, filters,
+            memoirFilterConfig,
             customColorGroup,
             achievementData: buildAchievementBackupPayload(),
             aiData: assistantBackupService.buildBackupPayload(),
             appearanceData: appearanceBackupService.buildBackupPayload(),
+            preferencesData: preferencesBackupService.buildBackupPayload(),
             widgetTemplates,
             sceneTimeSlots,
             sceneGroupState,
@@ -1426,7 +1450,38 @@ export const useSyncManager = () => {
         };
     }, [manualSyncMode]);
 
-    // 2f. Android widget template Auto Sync
+    // 2f. Preference and Memoir filter Auto Sync
+    useEffect(() => {
+        let timer: NodeJS.Timeout | null = null;
+        let serializedPreferences = JSON.stringify(preferencesBackupService.buildBackupPayload());
+
+        const handlePreferencesChanged = () => {
+            if (isRestoring.current) return;
+
+            const nextSerializedPreferences = JSON.stringify(preferencesBackupService.buildBackupPayload());
+            if (nextSerializedPreferences === serializedPreferences) return;
+            serializedPreferences = nextSerializedPreferences;
+            updateLocalDataTimestamp();
+
+            if (manualSyncMode) return;
+            if (timer) clearTimeout(timer);
+            pendingAutoSyncRef.current = true;
+            timer = setTimeout(async () => {
+                if (!isSyncingRef.current && !isRestoring.current) {
+                    await performSync('auto');
+                    pendingAutoSyncRef.current = false;
+                }
+            }, SYNC_CONFIG.AUTO_SYNC_DEBOUNCE_MS);
+        };
+
+        window.addEventListener(PREFERENCES_CHANGED_EVENT, handlePreferencesChanged);
+        return () => {
+            window.removeEventListener(PREFERENCES_CHANGED_EVENT, handlePreferencesChanged);
+            if (timer) clearTimeout(timer);
+        };
+    }, [manualSyncMode]);
+
+    // 2g. Android widget template Auto Sync
     useEffect(() => {
         let timer: NodeJS.Timeout | null = null;
         let serializedWidgetTemplates = JSON.stringify(loadWidgetTemplatesFromStorage());

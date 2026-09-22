@@ -11,6 +11,7 @@
  * @updated 2026-08-10: Rehydrates appearance state after cloud or export restores so mounted settings do not overwrite restored choices.
  * @updated 2026-09-15: Added a persisted global font-scale preference applied through the root CSS variable.
  * @updated 2026-09-15: Fixed missing font-scale storage to default to 100% instead of the minimum value.
+ * @updated 2026-09-22: Rehydrates persisted preference and Memoir filter state from cloud/export restore events.
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
@@ -77,6 +78,7 @@ import {
 import {
     AUTO_START_TIMER_JUMP_MODE_STORAGE_KEY,
     LEGACY_AUTO_OPEN_FOCUS_DETAIL_STORAGE_KEY,
+    normalizeAutoStartTimerJumpMode,
     readStoredAutoStartTimerJumpMode,
     type AutoStartTimerJumpMode
 } from '../utils/autoStartTimerJumpMode';
@@ -92,6 +94,11 @@ import {
     type AssociationSelectorColumns
 } from '../services/associationSelectorLayoutService';
 import { APPEARANCE_RESTORED_EVENT } from '../services/appearanceBackupService';
+import {
+    PREFERENCES_CHANGED_EVENT,
+    PREFERENCES_RESTORED_EVENT,
+    preferencesBackupService
+} from '../services/preferencesBackupService';
 
 export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
 export type DefaultIndexView = 'TAGS' | 'SCOPE';
@@ -765,6 +772,73 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         return () => window.removeEventListener(APPEARANCE_RESTORED_EVENT, restoreAppearanceState);
     }, []);
 
+    useEffect(() => {
+        const restorePreferencesState = (event: Event) => {
+            const detail = (event as CustomEvent<{ storage?: Record<string, string | null> }>).detail;
+            const snapshot = detail?.storage || preferencesBackupService.buildBackupPayload().storage;
+            const get = (key: string): string | null => (
+                Object.prototype.hasOwnProperty.call(snapshot, key) ? snapshot[key] : localStorage.getItem(key)
+            );
+            const parse = <T,>(key: string, fallback: T): T => preferencesBackupService.parseJson(get(key), fallback);
+
+            const minIdle = Number.parseInt(get('lumos_min_idle_time') || '', 10);
+            if (Number.isFinite(minIdle)) setMinIdleTimeThreshold(Math.max(0, minIdle));
+
+            const nextDefaultView = get('lumos_default_view');
+            if (nextDefaultView) setDefaultView(nextDefaultView as AppView);
+            const nextArchiveView = get('lumos_default_archive_view');
+            if (nextArchiveView === 'CHRONICLE' || nextArchiveView === 'MEMOIR') setDefaultArchiveView(nextArchiveView);
+            const nextIndexView = get('lumos_default_index_view');
+            if (nextIndexView === 'TAGS' || nextIndexView === 'SCOPE') setDefaultIndexView(nextIndexView);
+            const nextRecordView = get('lumos_default_record_view');
+            if (nextRecordView === 'TIMER' || nextRecordView === 'SCENE') setDefaultRecordView(nextRecordView);
+
+            setNavigationModuleVisibility({
+                ...DEFAULT_NAVIGATION_MODULE_VISIBILITY,
+                ...parse<Partial<NavigationModuleVisibility>>('lumostime_navigation_module_visibility', {})
+            });
+            setImmersiveTimerDefaultOrientation(normalizeImmersiveTimerOrientation(get('lumostime_immersive_timer_default_orientation')));
+            setAutoApplyAutoLinkRules(get('lumostime_autoApplyAutoLinkRules') !== 'false');
+            setAutoApplyTodoLink(get('lumostime_autoApplyTodoLink') !== 'false');
+            setAutoFocusNote(get('lumostime_auto_focus_note') !== 'false');
+            const nextAutoStartTimerJumpMode = get(AUTO_START_TIMER_JUMP_MODE_STORAGE_KEY);
+            setAutoStartTimerJumpMode(nextAutoStartTimerJumpMode
+                ? normalizeAutoStartTimerJumpMode(nextAutoStartTimerJumpMode)
+                : (get(LEGACY_AUTO_OPEN_FOCUS_DETAIL_STORAGE_KEY) === 'true' ? 'focus-detail' : 'none'));
+            setTimelineGalleryMode(get('lumostime_timeline_gallery_mode') === 'true');
+            setTimelineSortOrder(get('lumostime_timeline_sort_order') === 'desc' || get('lumos_timeline_sort') === 'desc' ? 'desc' : 'asc');
+            setTimelineQuickActions(normalizeTimelineQuickActions(parse<unknown[]>('lumostime_timeline_quick_actions', [])));
+
+            const collapse = Number.parseInt(get('lumostime_collapse_threshold') || '', 10);
+            if (Number.isFinite(collapse)) setCollapseThreshold(Math.max(0, collapse));
+            const nextSceneCardTimerMode = get('lumostime_scene_card_timer_mode');
+            if (nextSceneCardTimerMode === 'realtime' || nextSceneCardTimerMode === 'backfill') setSceneCardTimerMode(nextSceneCardTimerMode);
+            const nextSelectorPage = get('lumostime_default_selector_page');
+            if (nextSelectorPage) setDefaultSelectorPage(nextSelectorPage);
+            setTimelineLayout(isTimelineLayoutMode(get('lumostime_timeline_layout')) ? get('lumostime_timeline_layout') as TimelineLayoutMode : DEFAULT_TIMELINE_LAYOUT_MODE);
+            setTimelineTodoSidebarCollapsed(get('lumostime_timeline_todo_sidebar_collapsed') === 'true');
+            const todoRatio = Number.parseFloat(get('lumostime_timeline_todo_sidebar_ratio') || '');
+            if (Number.isFinite(todoRatio)) setTimelineTodoSidebarRatio(todoRatio);
+            const quickColorRatio = Number.parseFloat(get('lumostime_timeline_quick_color_sidebar_ratio') || '');
+            if (Number.isFinite(quickColorRatio)) setTimelineQuickColorSidebarRatio(quickColorRatio);
+            setAssociationSelectorColumns(normalizeAssociationSelectorColumns(get('lumostime_association_selector_columns')));
+            const restoredMemoirFilter = parse<Partial<MemoirFilterConfig>>('lumostime_memoir_filter_config', {});
+            setMemoirFilterConfig({
+                hasImage: false,
+                hasReaction: false,
+                minNoteLength: 40,
+                showDailyReviews: true,
+                showWeeklyReviews: true,
+                ...restoredMemoirFilter,
+                relatedTagIds: Array.isArray(restoredMemoirFilter.relatedTagIds) ? restoredMemoirFilter.relatedTagIds : [],
+                relatedScopeIds: Array.isArray(restoredMemoirFilter.relatedScopeIds) ? restoredMemoirFilter.relatedScopeIds : []
+            });
+        };
+
+        window.addEventListener(PREFERENCES_RESTORED_EVENT, restorePreferencesState);
+        return () => window.removeEventListener(PREFERENCES_RESTORED_EVENT, restorePreferencesState);
+    }, []);
+
     const [defaultSelectorPage, setDefaultSelectorPage] = useState<DefaultSelectorPage>(() => {
         const stored = localStorage.getItem('lumostime_default_selector_page');
         return stored || 'emoji';
@@ -926,6 +1000,34 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem('lumostime_memoir_filter_config', JSON.stringify(memoirFilterConfig));
     }, [memoirFilterConfig]);
+
+    useEffect(() => {
+        window.dispatchEvent(new Event(PREFERENCES_CHANGED_EVENT));
+    }, [
+        minIdleTimeThreshold,
+        defaultView,
+        defaultArchiveView,
+        defaultIndexView,
+        defaultRecordView,
+        navigationModuleVisibility,
+        immersiveTimerDefaultOrientation,
+        autoApplyAutoLinkRules,
+        autoApplyTodoLink,
+        autoFocusNote,
+        autoStartTimerJumpMode,
+        timelineGalleryMode,
+        timelineSortOrder,
+        timelineQuickActions,
+        collapseThreshold,
+        sceneCardTimerMode,
+        defaultSelectorPage,
+        timelineLayout,
+        timelineTodoSidebarCollapsed,
+        timelineTodoSidebarRatio,
+        timelineQuickColorSidebarRatio,
+        associationSelectorColumns,
+        memoirFilterConfig
+    ]);
 
     useEffect(() => {
         localStorage.setItem('lumos_data_last_modified', dataLastModified.toString());

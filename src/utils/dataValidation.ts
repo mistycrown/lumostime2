@@ -10,6 +10,7 @@
  * @updated 2026-08-10: Added optional appearance backup validation for theme and TimePal restore data.
  * @updated 2026-08-11: Keeps missing or invalid legacy timestamps neutral instead of manufacturing a current timestamp during import or restore.
  * @updated 2026-08-26: Validates optional Routine configuration arrays in backup payloads.
+ * @updated 2026-09-22: Validates optional preference and Memoir filter backup blocks.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -99,6 +100,18 @@ export function validateLocalData(data: any): ValidationResult {
 
   if (data.appearanceData?.storage !== undefined && data.appearanceData.storage !== null && typeof data.appearanceData.storage !== 'object') {
     errors.push('Field appearanceData.storage must be an object');
+  }
+
+  if (data.preferencesData !== undefined && data.preferencesData !== null && typeof data.preferencesData !== 'object') {
+    errors.push('Field preferencesData must be an object');
+  }
+
+  if (data.preferencesData?.storage !== undefined && data.preferencesData.storage !== null && typeof data.preferencesData.storage !== 'object') {
+    errors.push('Field preferencesData.storage must be an object');
+  }
+
+  if (data.memoirFilterConfig !== undefined && data.memoirFilterConfig !== null && typeof data.memoirFilterConfig !== 'object') {
+    errors.push('Field memoirFilterConfig must be an object');
   }
 
   if (!data.version) {

@@ -3,6 +3,7 @@
  * @input User privacy mode preference
  * @output Privacy mode state, Toggle function
  * @pos Context (Privacy Management)
+ * @updated 2026-09-22: Rehydrates privacy preference from the shared sync preferences block.
  * @description 隐私模式上下文 - 管理应用的隐私模式状态，用于隐藏敏感信息
  * 
  * 核心功能：
@@ -16,6 +17,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { SETTINGS_KEYS } from '../constants/storageKeys';
+import { PREFERENCES_CHANGED_EVENT, PREFERENCES_RESTORED_EVENT } from '../services/preferencesBackupService';
 
 interface PrivacyContextType {
     isPrivacyMode: boolean;
@@ -69,6 +71,21 @@ export const PrivacyProvider: React.FC<{ children: ReactNode }> = ({ children })
             delete window.setPrivacyMode;
         };
     }, []);
+
+    useEffect(() => {
+        const restorePrivacyMode = (event: Event) => {
+            const detail = (event as CustomEvent<{ storage?: Record<string, string | null> }>).detail;
+            const stored = detail?.storage?.[SETTINGS_KEYS.PRIVACY_MODE] ?? localStorage.getItem(SETTINGS_KEYS.PRIVACY_MODE);
+            setIsPrivacyMode(stored === 'true');
+        };
+
+        window.addEventListener(PREFERENCES_RESTORED_EVENT, restorePrivacyMode);
+        return () => window.removeEventListener(PREFERENCES_RESTORED_EVENT, restorePrivacyMode);
+    }, []);
+
+    useEffect(() => {
+        window.dispatchEvent(new Event(PREFERENCES_CHANGED_EVENT));
+    }, [isPrivacyMode]);
 
     return (
         <PrivacyContext.Provider value={{ isPrivacyMode, togglePrivacyMode }}>
