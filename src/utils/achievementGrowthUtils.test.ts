@@ -4,6 +4,7 @@
  * @output Regression coverage for character growth experience and level calculations
  * @pos Test (Achievement)
  * @description Covers proportional fixed-rule attribute experience, deleted-attribute aggregation, and the cumulative level curve.
+ * @updated 2026-09-22: Covers two-decimal daily character experience and aggregate totals.
  * @updated 2026-08-12: Added negative attribute experience and zero-clamped visual level regression coverage.
  * @updated 2026-08-11: Added proportional daily experience, multi-attribute effects, and attribute deletion reference regression coverage.
  */
@@ -69,7 +70,7 @@ const log: Log = {
 };
 
 describe('achievement character growth', () => {
-  it('converts matched rule units into positive integer attribute experience', () => {
+  it('converts matched rule units into positive attribute experience', () => {
     const snapshot = computeAchievementGrowthDailySnapshot(
       '2026-08-09',
       [log],
@@ -113,7 +114,7 @@ describe('achievement character growth', () => {
     expect(calculateAchievementTotalExperience([first, second])).toBe(50);
   });
 
-  it('floors proportional experience once for each daily rule', () => {
+  it('rounds proportional experience once for each daily rule', () => {
     const halfUnitRule: AchievementRule = {
       ...rule,
       unitAmount: 60
@@ -137,6 +138,33 @@ describe('achievement character growth', () => {
       appliedUnits: 0.5,
       deltaExp: 5
     });
+  });
+
+  it('rounds fractional daily experience and aggregate totals to two decimals', () => {
+    const thirdUnitRule: AchievementRule = {
+      ...rule,
+      unitAmount: 60
+    };
+    const thirdUnitLog: Log = {
+      ...log,
+      duration: 20 * 60
+    };
+
+    const snapshot = computeAchievementGrowthDailySnapshot(
+      '2026-08-09',
+      [thirdUnitLog],
+      [],
+      [],
+      [thirdUnitRule],
+      [attribute]
+    );
+
+    expect(snapshot.attributeChanges[0]).toMatchObject({ deltaExp: 3.33 });
+    expect(snapshot.attributeChanges[0]?.ruleBreakdown[0]).toMatchObject({ deltaExp: 3.33 });
+    expect(calculateAchievementAttributeExperience([snapshot], [attribute])).toEqual({
+      [attribute.id]: 3.33
+    });
+    expect(calculateAchievementTotalExperience([snapshot], [attribute])).toBe(3.33);
   });
 
   it('applies independent experience values to multiple attributes, including hidden attributes', () => {
