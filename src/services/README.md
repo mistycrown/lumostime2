@@ -2,6 +2,8 @@
 
 Update 2026-09-20: `backgroundService.ts` now keeps custom background image bytes out of `localStorage`, hydrates native file-backed URLs at runtime, and cleans legacy Base64 records during migration.
 
+Update 2026-09-22: `preferencesBackupService.ts` now snapshots user-facing preferences and Memoir filters for export/cloud restore while excluding sync-provider credentials; custom background and TimePal files continue to use the protected canonical image manifest.
+
 Update 2026-09-21: `aiService.ts` now supplies the full user dictionary to dedicated quick-add todo/backfill requests, which select real todo-category, activity-category, activity, and scope ids instead of routing quick adds into the reserved 小事 bucket.
 
 Update 2026-09-21: `quickAddService.ts` now owns the independent quick-add todo, backfill, and append-only note request contracts/prompts; `aiService.ts` remains focused on shared AI configuration and general structured turns.
@@ -102,6 +104,7 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 - `aiService.ts`: [Active] - Handles AI integration (OpenAI/Gemini) for text parsing, unified foreground/background assistant-turn requests, persona-aware chat replies, dated AI-planned backfill tool calls, root-todo creation, todo updates, subtask creation, log editing, abort-aware chat requests, narrative generation, named local AI preset persistence/migration, robust non-JSON error capture for debug transparency, and sync-relevant AI preset/config change signaling.
 - `assistantBackupService.ts`: [Active] - Builds and restores the unified AI backup block used by JSON export/import and cloud sync, including sanitized AI preset metadata plus chat, assistant-agent, Dream, and background-history state.
 - `appearanceBackupService.ts`: [Active] - Builds and restores the unified appearance block for theme presets, custom palettes, backgrounds, navigation decorations, TimePal settings, built-in font choices, and visual style selections. Custom appearance image references are included in cloud manifests.
+- `preferencesBackupService.ts`: [Active] - Builds and restores the versioned persisted-preferences block, including Memoir filters and review preference settings, and emits restore/change events for mounted contexts.
 - `achievementBackupService.ts`: [Active] - Builds and parses the unified achievement backup block used by JSON export/import and cloud sync, covering bottle meta, rules, rewards, collections, snapshots, redemption history, archived bottles, and bottle action records.
 - `assistantAgentConfigService.ts`: [Active] - Persists background assistant runtime settings such as polling enablement, long-term-memory enablement, user-editable random check-in ranges, and the new post-log trigger toggle plus selected activity ids so the AI chat settings panel and native Android service can stay aligned.
 - `assistantActionExecutor.ts`: [Active] - Executes assistant-planned create/edit tool calls for logs, todos, and subtasks against local app data, including the reserved `小事` quick-reminder bucket and the reserved `未来` future bucket, returning applied-action snapshots plus the next logs/todos state for UI reuse.

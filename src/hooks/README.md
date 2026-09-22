@@ -20,6 +20,7 @@
 
 > `useFloatingWindowSync.ts` now stops the Android floating-window service when the global floating-ball switch is off, and no longer sends an idle update that could restart the overlay during app launch.
 > `useSyncManager.ts` now includes Android widget templates in unified cloud backup payloads, restores them through the shared widget storage service, and treats template-only edits as timestamped auto-sync changes.
+> `useSyncManager.ts` now includes Memoir filters and the versioned persisted-preferences block in unified export/cloud sync, with change events for automatic synchronization.
 > `useSyncManager.ts` now includes the self-belief library in unified backup/sync payloads and restores it to local storage, so AI-created identity descriptions travel with the main user data.
 > `useSyncManager.ts` now forces a read of the canonical cloud main backup before making direction decisions, preferring the JSON payload timestamp over remote file metadata so stale `LastModified` values cannot drive old restores.
 > `useSyncManager.ts` now treats confirmed pending local auto-sync edits as upload-worthy even when the local/cloud timestamps are still within the equal-tolerance window, so creating a new todo right after a sync no longer gets skipped.

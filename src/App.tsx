@@ -37,6 +37,7 @@
  * @updated 2026-07-31: Added a temporary active Chronicle layout state so tapping the active Timeline nav item toggles layouts without changing the settings default.
  * @updated 2026-08-11: Shows shareable Sentry error IDs for startup, local-data hydration, and imported-file failures.
  * @updated 2026-08-26: Added Routine configuration state and sequential session orchestration.
+ * @updated 2026-09-22: Included Memoir filters and persisted user preferences in export/sync payloads.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -105,6 +106,7 @@ import {
 import { useRecurringPlanAutoCreation } from './hooks/useRecurringPlanAutoCreation';
 import { assistantBackupService } from './services/assistantBackupService';
 import { appearanceBackupService } from './services/appearanceBackupService';
+import { preferencesBackupService } from './services/preferencesBackupService';
 import { customColorGroupService } from './services/customColorGroupService';
 import { getDesktopWidgetType, loadEnabledDesktopWidgetTypes } from './services/desktopWidgetService';
 import { ShortcutWidgetAction } from './services/widgetShortcutService';
@@ -184,6 +186,7 @@ const AppContent: React.FC = () => {
     customStickerSets, setCustomStickerSets,
     customStickers, setCustomStickers,
     filters, setFilters,
+    memoirFilterConfig,
     autoFocusNote, setAutoFocusNote,
     autoStartTimerJumpMode,
     timelineGalleryMode, setTimelineGalleryMode,
@@ -435,11 +438,13 @@ const AppContent: React.FC = () => {
       logs, todos, categories, todoCategories, collections, collectionEntries, scopes, goals, majorGoals,
       autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
       monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, customStickerSets, customStickers, filters,
+      memoirFilterConfig,
       routines,
       customColorGroup,
       achievementData: buildAchievementBackupPayload(),
       aiData: assistantBackupService.buildBackupPayload(),
       appearanceData: appearanceBackupService.buildBackupPayload(),
+      preferencesData: preferencesBackupService.buildBackupPayload(),
       widgetTemplates,
       sceneGroupState, // 新版：场景组状态
       sceneTimeSlots, // 添加场景设置
@@ -1404,11 +1409,13 @@ const AppContent: React.FC = () => {
               customStickerSets,
               customStickers,
               filters,
+              memoirFilterConfig,
               routines,
               customColorGroup: customColorGroupService.getGroup(),
               achievementData: buildAchievementBackupPayload(),
               aiData: assistantBackupService.buildBackupPayload(),
               appearanceData: appearanceBackupService.buildBackupPayload(),
+              preferencesData: preferencesBackupService.buildBackupPayload(),
               widgetTemplates: loadWidgetTemplatesFromStorage(),
               selfBeliefs: JSON.parse(localStorage.getItem('lumostime_self_beliefs') || '[]')
             }}
