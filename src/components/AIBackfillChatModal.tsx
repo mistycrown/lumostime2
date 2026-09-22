@@ -22,6 +22,7 @@
  * @updated 2026-09-22: Extracts result-card navigation handlers into a focused hook.
  * @updated 2026-09-22: Extracts review writeback runner adapters into a focused hook.
  * @updated 2026-09-22: Extracts assistant result composition and reply normalization into a focused hook.
+ * @updated 2026-09-22: Extracts session history and composer command handlers into a focused hook.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -202,6 +203,7 @@ import { useAIBackfillChatAssistantState } from './ai-chat/useAIBackfillChatAssi
 import { useAIBackfillChatReviewCommandHandlers } from './ai-chat/useAIBackfillChatReviewCommandHandlers';
 import { useAIBackfillChatReviewWritebackHandlers } from './ai-chat/useAIBackfillChatReviewWritebackHandlers';
 import { useAIBackfillChatResultHandlers } from './ai-chat/useAIBackfillChatResultHandlers';
+import { useAIBackfillChatSessionCommandHandlers } from './ai-chat/useAIBackfillChatSessionCommandHandlers';
 import { useAIBackfillChatSessionState } from './ai-chat/useAIBackfillChatSessionState';
 import { accentMix, getAIChatTheme } from './ai-chat/AIBackfillChatTheme';
 import { useAIBackfillChatMessageState } from './ai-chat/useAIBackfillChatMessageState';
@@ -218,8 +220,6 @@ import {
   AIBackfillChatNewSessionDialog
 } from './ai-chat/AIBackfillChatSessionOverlays';
 import {
-  createMonthlyReviewTemplateSession,
-  createWeeklyReviewTemplateSession,
   runMonthlyReviewTemplateChatTurn,
   runMonthlyReviewTemplateGuidedSelection,
   runMonthlyReviewTemplateOpeningTurn as runMonthlyReviewTemplateOpeningTurnFlow,
@@ -2231,169 +2231,46 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   });
 
 
-  const handleCloseNewSessionDialog = () => {
-    setIsNewSessionDialogOpen(false);
-  };
-
-  const handleOpenNewSessionDialog = () => {
-    if (!activeSession) {
-      return;
-    }
-
-    setEditingSessionId(null);
-    setEditingSessionTitle('');
-    setDeleteConfirmSessionId(null);
-    setIsNewSessionDialogOpen(true);
-  };
-
-  const handleCreateGenericSession = () => {
-    if (!activeSession) {
-      return;
-    }
-
-    const nextSession = createDefaultSession(activeSession.personaId);
-    setSessions((prev) => [nextSession, ...prev]);
-    setActiveSessionId(nextSession.id);
-    handleCloseNewSessionDialog();
-    setIsHistoryPanelOpen(false);
-    setIsHomeView(false);
-  };
-
-  const handleCreateSessionWithPersona = (personaId: string) => {
-    const nextSession = createDefaultSession(personaId);
-    setSessions((prev) => [nextSession, ...prev]);
-    setActiveSessionId(nextSession.id);
-    handleCloseNewSessionDialog();
-    setEditingSessionId(null);
-    setEditingSessionTitle('');
-    setDeleteConfirmSessionId(null);
-    setDeleteConfirmPersonaId(null);
-    setIsHistoryPanelOpen(false);
-    setIsHomeView(false);
-  };
-
-  const handleOpenWeeklyReviewTemplateSelection = () => {
-    if (!activeSession) {
-      return;
-    }
-
-    const templateSession = createWeeklyReviewTemplateSession(activeSession.personaId);
-
-    setSessions((prev) => [templateSession, ...prev]);
-    setActiveSessionId(templateSession.id);
-    handleCloseNewSessionDialog();
-    setIsHistoryPanelOpen(false);
-    setInputText('');
-    setIsHomeView(false);
-  };
-
-  const handleOpenMonthlyReviewTemplateSelection = () => {
-    if (!activeSession) {
-      return;
-    }
-
-    const templateSession = createMonthlyReviewTemplateSession(activeSession.personaId);
-
-    setSessions((prev) => [templateSession, ...prev]);
-    setActiveSessionId(templateSession.id);
-    handleCloseNewSessionDialog();
-    setIsHistoryPanelOpen(false);
-    setInputText('');
-    setIsHomeView(false);
-  };
-
-  const handleFillWriteWeeklyNarrativeCommand = () => {
-    setInputText('写入 AI 叙事');
-    window.requestAnimationFrame(() => {
-      composerTextareaRef.current?.focus();
-    });
-  };
-
-  const handleFillWriteMonthlyNarrativeCommand = () => {
-    setInputText('写入 AI 叙事');
-    window.requestAnimationFrame(() => {
-      composerTextareaRef.current?.focus();
-    });
-  };
-
-  const handleFillDailyNarrativeCommand = () => {
-    setInputText('叙事');
-    window.requestAnimationFrame(() => {
-      composerTextareaRef.current?.focus();
-    });
-  };
-
-  const handleFillDailyNewspaperCommand = () => {
-    setInputText('小报');
-    window.requestAnimationFrame(() => {
-      composerTextareaRef.current?.focus();
-    });
-  };
-
-  const handleStartRenameSession = (session: AIChatSession) => {
-    setDeleteConfirmSessionId(null);
-    setEditingSessionId(session.id);
-    setEditingSessionTitle(session.title);
-  };
-
-  const handleCancelRenameSession = () => {
-    setEditingSessionId(null);
-    setEditingSessionTitle('');
-  };
-
-  const handleSelectSessionFromHistory = (sessionId: string) => {
-    setActiveSessionId(sessionId);
-    setIsHistoryPanelOpen(false);
-    setIsHomeView(false);
-  };
-
-  const handleToggleDeleteSession = (sessionId: string) => {
-    setEditingSessionId(null);
-    setEditingSessionTitle('');
-    setDeleteConfirmSessionId((current) => (current === sessionId ? null : sessionId));
-  };
-
-  const handleCommitRenameSession = (sessionId: string) => {
-    const nextTitle = editingSessionTitle.trim() || '新对话';
-    mutateSession(sessionId, (session) => ({
-      ...session,
-      title: nextTitle
-    }));
-    setEditingSessionId(null);
-    setEditingSessionTitle('');
-    addToast('success', '已重命名对话');
-  };
-
-  const handleDeleteSession = (sessionId: string) => {
-    const targetSession = sessions.find((session) => session.id === sessionId);
-    if (!targetSession) {
-      return;
-    }
-
-    if (isLoading && activeRequestRef.current?.sessionId === sessionId) {
-      addToast('warning', '当前对话正在请求中，请先停止再删除。');
-      return;
-    }
-
-    const remainingSessions = sortedSessions.filter((session) => session.id !== sessionId);
-
-    if (remainingSessions.length === 0) {
-      const fallbackSession = createDefaultSession(targetSession.personaId);
-      setSessions([fallbackSession]);
-      setActiveSessionId(fallbackSession.id);
-    } else {
-      setSessions((prev) => prev.filter((session) => session.id !== sessionId));
-      if (activeSessionId === sessionId) {
-        setActiveSessionId(remainingSessions[0].id);
-      }
-    }
-
-    if (editingSessionId === sessionId) {
-      handleCancelRenameSession();
-    }
-    setDeleteConfirmSessionId(null);
-    addToast('success', '已删除对话');
-  };
+  const {
+    handleCancelRenameSession,
+    handleCloseNewSessionDialog,
+    handleCommitRenameSession,
+    handleCreateGenericSession,
+    handleCreateSessionWithPersona,
+    handleDeleteSession,
+    handleFillDailyNarrativeCommand,
+    handleFillDailyNewspaperCommand,
+    handleFillWriteMonthlyNarrativeCommand,
+    handleFillWriteWeeklyNarrativeCommand,
+    handleOpenMonthlyReviewTemplateSelection,
+    handleOpenNewSessionDialog,
+    handleOpenWeeklyReviewTemplateSelection,
+    handleSelectSessionFromHistory,
+    handleStartRenameSession,
+    handleToggleDeleteSession
+  } = useAIBackfillChatSessionCommandHandlers({
+    activeRequestRef,
+    activeSession,
+    activeSessionId,
+    addToast,
+    composerTextareaRef,
+    editingSessionId,
+    editingSessionTitle,
+    isLoading,
+    mutateSession,
+    sessions,
+    sortedSessions,
+    setActiveSessionId,
+    setDeleteConfirmPersonaId,
+    setDeleteConfirmSessionId,
+    setEditingSessionId,
+    setEditingSessionTitle,
+    setInputText,
+    setIsHistoryPanelOpen,
+    setIsHomeView,
+    setIsNewSessionDialogOpen,
+    setSessions
+  });
 
   const {
     ensureEditablePersona,
