@@ -12,6 +12,7 @@
  * @updated 2026-09-21: Extracts normalized todo/log action context and assistant message reveal lifecycle into focused support hooks.
  * @updated 2026-09-21: Extracts viewport navigation, keyboard inset handling, and Markdown presentation into focused support modules.
  * @updated 2026-09-22: Hides the bottom composer scrollbar while preserving multi-line scrolling.
+ * @updated 2026-09-22: Extracts Dream editing and shared conversation-history orchestration into dedicated support hooks.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -65,9 +66,6 @@ import type {
   AssistantReminder,
   AssistantScheduledTask,
   AssistantSystemTrigger,
-  DreamEntry,
-  DreamState,
-  DreamTopic,
   DreamUpdateCard
 } from '../types/assistant';
 import { formatDateKey, isValidBackfillDate, isValidBackfillTime } from '../utils/aiBackfillUtils';
@@ -184,6 +182,7 @@ import { buildAssistantBackgroundTurnRequest } from './ai-chat/AIBackfillChatBac
 import { useAIBackfillChatSessionMutations } from './ai-chat/useAIBackfillChatSessionMutations';
 import { buildAssistantReminderDueTrigger } from './ai-chat/AIBackfillChatReminderTrigger';
 import { useAIBackfillChatAssistantSettings } from './ai-chat/useAIBackfillChatAssistantSettings';
+import { useAIBackfillChatDreamManager } from './ai-chat/useAIBackfillChatDreamManager';
 import {
   ACTIVE_SESSION_KEY,
   CHAT_SYNC_ENABLED_KEY,
@@ -239,6 +238,7 @@ import { useAIBackfillChatDebugViewer } from './ai-chat/useAIBackfillChatDebugVi
 import { useAIBackfillChatNewspaperSnapshot } from './ai-chat/useAIBackfillChatNewspaperSnapshot';
 import { useAIBackfillChatAssistantDraftValidation } from './ai-chat/useAIBackfillChatAssistantDraftValidation';
 import { useAIBackfillChatDreamSelection } from './ai-chat/useAIBackfillChatDreamSelection';
+import { useAIBackfillChatConversationHistory } from './ai-chat/useAIBackfillChatConversationHistory';
 import {
   AIBackfillChatHistoryOverlay,
   AIBackfillChatNewSessionDialog
@@ -254,10 +254,7 @@ import {
   runWeeklyReviewTemplateOpeningTurn as runWeeklyReviewTemplateOpeningTurnFlow
 } from './ai-chat/AIBackfillChatTemplateFlow';
 import {
-  buildConversationHistoryFromSessionMessages,
-  buildRetryConversationHistory as buildRetryConversationHistoryFromSessions,
   mutateChatSessions,
-  narrowConversationHistoryForTimeSensitiveTurn,
   replaceSessionMessage,
   serializeConversationTurnsForAssistantContext,
   resolveMonthlyReviewTemplateRangeMeta,
@@ -268,7 +265,6 @@ import {
   sortChatSessionsByUpdatedAt,
 } from './ai-chat/AIBackfillChatSessionHelpers';
 import {
-  TIME_SENSITIVE_MESSAGE_PATTERN,
   buildAssistantCurrentTimeSnapshot,
   buildDebugBlocks,
   buildMemoryUpdateSections,
@@ -314,20 +310,13 @@ import {
   type ChatTone,
   type DailyNewspaperWritebackConfirmationState,
   type DailyReviewWritebackConfirmationState,
-  type DreamEntryDrafts,
   type DreamMonthRangeSelection,
-  type DreamMonthSelectionState,
-  type DreamTopicDrafts,
   type InitialChatState,
   type MonthlyNewspaperWritebackConfirmationState,
   type WeeklyNewspaperWritebackConfirmationState,
   DEFAULT_ASSISTANT_EDITABLE_MEMORY_DRAFTS,
   DEFAULT_ASSISTANT_REMINDER_DRAFTS,
   DEFAULT_ASSISTANT_SCHEDULED_TASK_DRAFTS,
-  DEFAULT_DREAM_ENTRY_DRAFTS,
-  DEFAULT_DREAM_TOPIC_DRAFTS,
-  DREAM_MONTH_SELECTION_INVALID_PROMPT,
-  DREAM_MONTH_SELECTION_PROMPT,
   LOG_EDIT_REQUEST_PATTERN,
   LOG_EDIT_SUCCESS_REPLY_PATTERN,
   ASSISTANT_EDITABLE_MEMORY_SECTION_META,
@@ -478,6 +467,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     assistantNativeDiagnostics, setAssistantNativeDiagnostics
   } = useAIBackfillChatAssistantState();
   const [isAssistantBackgroundHistoryViewerOpen, setIsAssistantBackgroundHistoryViewerOpen] = useState(false);
+  const dreamUiHandlersRef = useRef({
+    resetDreamEntryUi: () => undefined,
+    resetDreamTopicUi: () => undefined,
+    handleCloseDreamViewer: () => undefined
+  });
 
   const isStopActionVisible = isLoading || activeRequestId !== null;
   const isDesktopWidgetMode = displayMode === 'desktop-widget';
@@ -690,7 +684,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   useEffect(() => {
     if (editingDreamEntryId && !dreamSnapshot.entries.some((entry) => entry.id === editingDreamEntryId)) {
-      resetDreamEntryUi();
+      dreamUiHandlersRef.current.resetDreamEntryUi();
     }
   }, [dreamSnapshot.entries, editingDreamEntryId]);
   const activePersona = useMemo(
@@ -908,62 +902,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     }
   ), []);
 
-  const resolveSessionPersona = useCallback((session: AIChatSession) => (
-    personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0]
-  ), [personaMap, personas]);
-
-  const buildConversationHistoryFromMessages = (
-    session: AIChatSession,
-    messages: AIChatMessage[]
-  ): AIConversationTurn[] => {
-    const sessionPersona = personaMap.get(session.personaId) || personas[0] || DEFAULT_AI_PERSONAS[0];
-    return buildConversationHistoryFromSessionMessages(messages, {
-      contextCacheEnabled: session.contextCacheEnabled,
-      contextMessageLimit: sessionPersona.contextMessageLimit,
-      formatCreatedAt: formatAssistantLocalDateTime
-    });
-  };
-
-  const buildConversationHistory = (session: AIChatSession): AIConversationTurn[] => (
-    buildConversationHistoryFromMessages(session, session.messages)
-  );
-
-  const getBackgroundPersonaDisplayName = useCallback((targetSession?: AIChatSession): string => {
-    if (!targetSession) {
-      return 'AI';
-    }
-
-    return personaMap.get(targetSession.personaId)?.name
-      || assistantOrchestratorService.getBackgroundPersonaDisplayName(targetSession.id)
-      || 'AI';
-  }, [personaMap]);
-
-  const narrowHistoryForTimeSensitiveTurn = useCallback((
-    history: AIConversationTurn[],
-    sourceText: string
-  ): AIConversationTurn[] => narrowConversationHistoryForTimeSensitiveTurn(
-    history,
-    sourceText,
-    TIME_SENSITIVE_MESSAGE_PATTERN
-  ), []);
-
-  const buildRetryConversationHistory = (
-    sessionId: string,
-    retrySourceUserMessageId?: string
-  ): AIConversationTurn[] => buildRetryConversationHistoryFromSessions({
+  const {
+    resolveSessionPersona,
     buildConversationHistoryFromMessages,
-    conversationHistoryCache,
-    retrySourceUserMessageId,
-    sessionId,
-    sessions
-  });
-
-  const conversationHistoryCache = useMemo(
-    () => new Map(
-      sessions.map((session) => [session.id, buildConversationHistory(session)])
-    ),
-    [personas, personaMap, sessions]
-  );
+    buildConversationHistory,
+    getBackgroundPersonaDisplayName,
+    narrowHistoryForTimeSensitiveTurn,
+    buildRetryConversationHistory,
+    conversationHistoryCache
+  } = useAIBackfillChatConversationHistory({ sessions, personas, personaMap });
 
   const reloadPersistedChatSessions = () => {
     setSessions(normalizePersistedSessions(
@@ -2825,280 +2772,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setIsUserEmojiEditorOpen(false);
   };
 
-  const resetDreamTopicUi = () => {
-    setDreamTopicDrafts(DEFAULT_DREAM_TOPIC_DRAFTS);
-    setIsDreamTopicComposerOpen(false);
-    setEditingDreamTopicId(null);
-    setDreamTopicDeleteTargetId(null);
-  };
-
-  const resetDreamEntryUi = () => {
-    setDreamEntryDrafts(DEFAULT_DREAM_ENTRY_DRAFTS);
-    setEditingDreamEntryId(null);
-    setDreamEntryDeleteTargetId(null);
-  };
-
-  const updateDreamTopicDraft = (key: keyof DreamTopicDrafts, value: string) => {
-    setDreamTopicDrafts((current) => ({
-      ...current,
-      [key]: value
-    }));
-  };
-
-  const handleOpenDreamViewer = () => {
-    refreshDreamSnapshot();
-    resetDreamTopicUi();
-    resetDreamEntryUi();
-    setIsDreamResetConfirmOpen(false);
-    setIsDreamViewerOpen(true);
-  };
-
-  const handleCloseDreamViewer = () => {
-    resetDreamTopicUi();
-    resetDreamEntryUi();
-    setIsDreamResetConfirmOpen(false);
-    setIsDreamViewerOpen(false);
-  };
-
-  const handleOpenDreamTopicComposer = (topic?: DreamTopic) => {
-    setDreamTopicDrafts({
-      title: topic?.title || '',
-      note: topic?.note || ''
-    });
-    setEditingDreamTopicId(topic?.id || null);
-    setIsDreamResetConfirmOpen(false);
-    setDreamTopicDeleteTargetId(null);
-    setIsDreamTopicComposerOpen(true);
-  };
-
-  const handleCancelDreamTopicComposer = () => {
-    resetDreamTopicUi();
-  };
-
-  const handleOpenDreamEntryEditor = (entry: DreamEntry) => {
-    setDreamEntryDrafts({
-      content: entry.content
-    });
-    setEditingDreamEntryId(entry.id);
-    setDreamEntryDeleteTargetId(null);
-  };
-
-  const handleCancelDreamEntryEditor = () => {
-    resetDreamEntryUi();
-  };
-
-  const handleUpdateDreamEntryDraft = (value: string) => {
-    setDreamEntryDrafts({ content: value });
-  };
-
-  const handleSaveDreamEntry = (entryId: string) => {
-    const content = dreamEntryDrafts.content.trim();
-    if (!content) {
-      addToast('warning', '先写一点条目内容再保存吧。');
-      return;
-    }
-
-    dreamService.updateEntry(entryId, { content });
-    refreshDreamSnapshot();
-    resetDreamEntryUi();
-    addToast('success', '已更新 Dream 条目');
-  };
-
-  const handleSaveDreamTopic = () => {
-    const title = dreamTopicDrafts.title.trim();
-    const note = dreamTopicDrafts.note.trim();
-    if (!title) {
-      addToast('warning', '先写一个 Dream aspect 标题再保存吧。');
-      return;
-    }
-
-    if (
-      dreamSnapshot.topics.some((topic) => (
-        topic.id !== editingDreamTopicId
-        && topic.title.trim().toLowerCase() === title.toLowerCase()
-      ))
-    ) {
-      addToast('info', '这个 Dream aspect 已经存在了。');
-      return;
-    }
-
-    if (editingDreamTopicId) {
-      dreamService.updateTopic(editingDreamTopicId, {
-        title,
-        note
-      });
-      addToast('success', '已更新 Dream aspect');
-    } else {
-      dreamService.createTopic({
-        title,
-        note
-      });
-      addToast('success', '已新增 Dream aspect');
-    }
-
-    refreshDreamSnapshot();
-    resetDreamTopicUi();
-  };
-
-  const handleToggleDreamTopicDelete = (topicId: string) => {
-    setIsDreamResetConfirmOpen(false);
-    setDreamTopicDeleteTargetId((current) => (current === topicId ? null : topicId));
-  };
-
-  const handleToggleDreamEntryDelete = (entryId: string) => {
-    setIsDreamResetConfirmOpen(false);
-    setDreamEntryDeleteTargetId((current) => (current === entryId ? null : entryId));
-    setEditingDreamEntryId((current) => (current === entryId ? null : current));
-    setDreamEntryDrafts(DEFAULT_DREAM_ENTRY_DRAFTS);
-  };
-
-  const handleConfirmDreamTopicDelete = (topicId: string) => {
-    dreamService.deleteTopic(topicId);
-    refreshDreamSnapshot();
-    setDreamTopicDeleteTargetId((current) => (current === topicId ? null : current));
-    addToast('success', '已删除 Dream aspect');
-  };
-
-  const handleConfirmDreamEntryDelete = (entryId: string) => {
-    dreamService.deleteEntry(entryId);
-    refreshDreamSnapshot();
-    setDreamEntryDeleteTargetId((current) => (current === entryId ? null : current));
-    setEditingDreamEntryId((current) => (current === entryId ? null : current));
-    setDreamEntryDrafts(DEFAULT_DREAM_ENTRY_DRAFTS);
-    addToast('success', '已删除 Dream 条目');
-  };
-
-  const handleToggleDreamTopicEnabled = (topic: DreamTopic) => {
-    dreamService.updateTopic(topic.id, {
-      enabled: !topic.enabled
-    });
-    refreshDreamSnapshot();
-  };
-
-  const handleConfirmDreamReset = () => {
-    dreamService.resetState();
-    refreshDreamSnapshot();
-    resetDreamTopicUi();
-    resetDreamEntryUi();
-    setIsDreamResetConfirmOpen(false);
-    setIsDreamTopicNoteExpanded(false);
-    addToast('success', '已重置 Dream');
-  };
-
-  const handleToggleDreamResetConfirm = () => {
-    setIsDreamResetConfirmOpen((current) => !current);
-    setDreamTopicDeleteTargetId(null);
-    setDreamEntryDeleteTargetId(null);
-    setEditingDreamEntryId(null);
-    setDreamEntryDrafts(DEFAULT_DREAM_ENTRY_DRAFTS);
-  };
-
-  const handleCancelDreamReset = () => {
-    setIsDreamResetConfirmOpen(false);
-  };
-
-  const handleCancelDreamTopicDelete = () => {
-    setDreamTopicDeleteTargetId(null);
-  };
-
-  const handleCancelDreamEntryDelete = () => {
-    setDreamEntryDeleteTargetId(null);
-  };
-
-  const handleSelectDreamTopic = (topicId: string) => {
-    setSelectedDreamTopicId(topicId);
-  };
-
-  const handleToggleDreamTopicNoteExpanded = () => {
-    setIsDreamTopicNoteExpanded((current) => !current);
-  };
-
-  const handleRunDreamFromViewer = () => {
-    if (!isLoading && activeSession) {
-      handleCloseDreamViewer();
-      handleStartDreamMonthSelection(activeSession.id);
-    }
-  };
-
-  const handleStartDreamMonthSelection = (sessionId: string) => {
-    const now = Date.now();
-    mutateSession(sessionId, (currentSession) => ({
-      ...currentSession,
-      messages: [
-        ...currentSession.messages,
-        {
-          id: crypto.randomUUID(),
-          role: 'user',
-          content: 'dream',
-          createdAt: now
-        },
-        {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: DREAM_MONTH_SELECTION_PROMPT,
-          createdAt: now + 1,
-          tone: 'system'
-        }
-      ]
-    }));
-    setDreamMonthSelectionState({ sessionId });
-    setInputText('');
-    setIsHistoryPanelOpen(false);
-    setIsPersonaPanelOpen(false);
-  };
-
-  const handleSubmitDreamMonthSelection = async (
-    session: AIChatSession,
-    userInput: string
-  ) => {
-    const trimmedInput = userInput.trim();
-    if (!trimmedInput) {
-      return;
-    }
-
-    const sessionId = session.id;
-    const userMessageId = crypto.randomUUID();
-    const now = Date.now();
-    mutateSession(sessionId, (currentSession) => ({
-      ...currentSession,
-      messages: [
-        ...currentSession.messages,
-        {
-          id: userMessageId,
-          role: 'user',
-          content: trimmedInput,
-          createdAt: now
-        }
-      ]
-    }));
-    setInputText('');
-
-    const selectedMonth = parseDreamMonthSelection(trimmedInput, getLocalDateStr);
-    if (!selectedMonth) {
-      mutateSession(sessionId, (currentSession) => ({
-        ...currentSession,
-        messages: [
-          ...currentSession.messages,
-          {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: DREAM_MONTH_SELECTION_INVALID_PROMPT,
-            createdAt: now + 1,
-            tone: 'system'
-          }
-        ]
-      }));
-      return;
-    }
-
-    setDreamMonthSelectionState((current) => (
-      current?.sessionId === sessionId ? null : current
-    ));
-    await handleDreamCommand(session, selectedMonth, userMessageId, {
-      retrySourceUserMessageId: userMessageId,
-      userMessageAlreadyExists: true
-    });
-  };
 
   const handleOpenAssistantMemoryViewer = () => {
     refreshAssistantMemorySnapshot();
@@ -3522,7 +3195,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       }
 
       if (editingDreamEntryId) {
-        resetDreamEntryUi();
+        dreamUiHandlersRef.current.resetDreamEntryUi();
         return true;
       }
 
@@ -3532,11 +3205,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       }
 
       if (isDreamTopicComposerOpen) {
-        resetDreamTopicUi();
+        dreamUiHandlersRef.current.resetDreamTopicUi();
         return true;
       }
 
-      handleCloseDreamViewer();
+      dreamUiHandlersRef.current.handleCloseDreamViewer();
       return true;
     }
 
@@ -3606,7 +3279,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     handleCloseAssistantLetterHistoryViewer,
     handleCancelRenameSession,
     handleCloseAssistantBackgroundHistoryViewer,
-    handleCloseDreamViewer,
     handleCloseAssistantMemoryViewer,
     dreamEntryDeleteTargetId,
     editingDreamEntryId,
@@ -3630,8 +3302,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     isUserEmojiEditorOpen,
     dreamTopicDeleteTargetId,
     resetAssistantScheduledTaskUi,
-    resetDreamEntryUi,
-    resetDreamTopicUi,
     handleCloseNewSessionDialog,
     onClose
   ]);
@@ -5698,6 +5368,68 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       session,
       setIsLoading
     });
+  };
+
+  const {
+    resetDreamTopicUi,
+    resetDreamEntryUi,
+    updateDreamTopicDraft,
+    handleOpenDreamViewer,
+    handleCloseDreamViewer,
+    handleOpenDreamTopicComposer,
+    handleCancelDreamTopicComposer,
+    handleOpenDreamEntryEditor,
+    handleCancelDreamEntryEditor,
+    handleUpdateDreamEntryDraft,
+    handleSaveDreamEntry,
+    handleSaveDreamTopic,
+    handleToggleDreamTopicDelete,
+    handleToggleDreamEntryDelete,
+    handleConfirmDreamTopicDelete,
+    handleConfirmDreamEntryDelete,
+    handleToggleDreamTopicEnabled,
+    handleConfirmDreamReset,
+    handleToggleDreamResetConfirm,
+    handleCancelDreamReset,
+    handleCancelDreamTopicDelete,
+    handleCancelDreamEntryDelete,
+    handleSelectDreamTopic,
+    handleToggleDreamTopicNoteExpanded,
+    handleRunDreamFromViewer,
+    handleStartDreamMonthSelection,
+    handleSubmitDreamMonthSelection
+  } = useAIBackfillChatDreamManager({
+    dreamSnapshot,
+    selectedDreamTopicId,
+    setSelectedDreamTopicId,
+    dreamTopicDrafts,
+    setDreamTopicDrafts,
+    dreamEntryDrafts,
+    setDreamEntryDrafts,
+    editingDreamTopicId,
+    setEditingDreamTopicId,
+    setEditingDreamEntryId,
+    setDreamTopicDeleteTargetId,
+    setDreamEntryDeleteTargetId,
+    setDreamMonthSelectionState,
+    setIsDreamViewerOpen,
+    setIsDreamTopicComposerOpen,
+    setIsDreamResetConfirmOpen,
+    setIsDreamTopicNoteExpanded,
+    setInputText,
+    setIsHistoryPanelOpen,
+    setIsPersonaPanelOpen,
+    activeSession,
+    isLoading,
+    mutateSession,
+    refreshDreamSnapshot,
+    addToast,
+    handleDreamCommand
+  });
+  dreamUiHandlersRef.current = {
+    resetDreamEntryUi,
+    resetDreamTopicUi,
+    handleCloseDreamViewer
   };
 
   const handleSend = async (overrideText?: string, options?: ForegroundSendOptions) => {
