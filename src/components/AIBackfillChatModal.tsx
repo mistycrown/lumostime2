@@ -33,6 +33,7 @@
  * @updated 2026-09-22: Extracts assistant message retry and rollback handling into a focused hook.
  * @updated 2026-09-22: Extracts the chat header toolbar into a focused component.
  * @updated 2026-09-22: Extracts the desktop edge restore view into a focused component.
+ * @updated 2026-09-22: Extracts applied-action rendering and prompt layout helpers.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -224,6 +225,7 @@ import { useAIBackfillChatTemplateOpeningHandlers } from './ai-chat/useAIBackfil
 import { useAIBackfillChatRetry } from './ai-chat/useAIBackfillChatRetry';
 import { AIBackfillChatHeader } from './ai-chat/AIBackfillChatHeader';
 import { AIBackfillChatEdgeRestore } from './ai-chat/AIBackfillChatEdgeRestore';
+import { useAIBackfillChatRenderHelpers } from './ai-chat/useAIBackfillChatRenderHelpers';
 import { useAIBackfillChatSessionState } from './ai-chat/useAIBackfillChatSessionState';
 import { accentMix, getAIChatTheme } from './ai-chat/AIBackfillChatTheme';
 import { useAIBackfillChatMessageState } from './ai-chat/useAIBackfillChatMessageState';
@@ -2583,75 +2585,40 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
 
 
-  const renderAppliedAction = (messageId: string, action: AppliedChatAction) => (
-    renderAppliedChatAction({
-      action,
-      categories,
-      formatActionDate,
-      formatTimeRange,
-      getActivityById,
-      getActivityCategory,
-      getScopeNames,
-      logs,
-      messageId,
-      onOpenLogEditor: handleOpenLogEditor,
-      onOpenPrincipleEditor: handleOpenPrincipleEditor,
-      onOpenSelfBeliefEditor: handleOpenSelfBeliefEditor,
-      onOpenTodoDetail: handleOpenTodoDetail,
-      onUndoCreateSubtaskAction: handleUndoCreateSubtaskAction,
-      onUndoEditLogAction: handleUndoEditLogAction,
-      onUndoLogAction: handleUndoLogAction,
-      onUndoPlannedLogAction: handleUndoPlannedLogAction,
-      onUndoPrincipleAction: handleUndoPrincipleAction,
-      onUndoSelfBeliefAction: handleUndoSelfBeliefAction,
-      onUndoTodoAction: handleUndoTodoAction,
-      onUndoUpdateTodoAction: handleUndoUpdateTodoAction,
-      theme: AI_CHAT_THEME,
-      todoCategories,
-      todos
-    })
-  );
+  const {
+    renderAppliedAction,
+    emptyPromptExampleGroups,
+    conversationMaxWidthClassName,
+    emptyStateMaxWidthClassName,
+    composerContainerClassName
+  } = useAIBackfillChatRenderHelpers({
+    AI_CHAT_THEME,
+    categories,
+    formatActionDate,
+    formatTimeRange,
+    getActivityById,
+    getActivityCategory,
+    getScopeNames,
+    handleOpenLogEditor,
+    handleOpenPrincipleEditor,
+    handleOpenSelfBeliefEditor,
+    handleOpenTodoDetail,
+    handleUndoCreateSubtaskAction,
+    handleUndoEditLogAction,
+    handleUndoLogAction,
+    handleUndoPlannedLogAction,
+    handleUndoPrincipleAction,
+    handleUndoSelfBeliefAction,
+    handleUndoTodoAction,
+    handleUndoUpdateTodoAction,
+    isDesktopWidgetMode,
+    logs,
+    renderAppliedChatAction,
+    todoCategories,
+    todos
+  });
 
-  const fullPromptExampleGroups: Array<{
-    title: string;
-    prompt: string;
-    requirement?: string;
-  }> = [
-    {
-      title: '添加补记',
-      prompt: '今天下午两点到三点半写周报，挂到工作 / 写作。'
-    },
-    {
-      title: '添加待办',
-      prompt: '帮我建一个明天下午提交的待办：论文初稿。'
-    },
-    {
-      title: '规划今天',
-      prompt: '我今天计划推进论文初稿、整理实验数据、晚上去跑步，帮我拆成待办，也顺手安排几个提醒。',
-      requirement: '开启后台助理和长期记忆'
-    },
-    {
-      title: '定时提醒',
-      prompt: '今晚 8 点提醒我做拉伸，10 点再提醒我准备睡觉。',
-      requirement: '开启后台助理和长期记忆'
-    },
-    {
-      title: '长期记忆',
-      prompt: '记住我喜欢先做难的事，提醒时语气可以直接一点。',
-      requirement: '开启长期记忆'
-    },
-    {
-      title: '随口聊聊',
-      prompt: '我今天感觉有点乱，也有点累，陪我理一理现在最该做什么。'
-    }
-  ];
-  const compactPromptExampleGroups = fullPromptExampleGroups.slice(0, 3);
-  const emptyPromptExampleGroups = isDesktopWidgetMode
-    ? compactPromptExampleGroups
-    : fullPromptExampleGroups;
-  const conversationMaxWidthClassName = isDesktopWidgetMode ? 'max-w-none' : 'max-w-[920px]';
-  const emptyStateMaxWidthClassName = isDesktopWidgetMode ? 'max-w-none' : 'max-w-2xl';
-  const composerContainerClassName = isDesktopWidgetMode ? 'max-w-none' : 'max-w-[920px]';
+
 
   return (
     <div
