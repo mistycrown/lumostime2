@@ -4,6 +4,7 @@
  * @updated 2026-08-12: Displays signed daily character experience changes for attribute loss rules.
  * @updated 2026-08-12: Displays each character-growth rule's signed applied experience in record details.
  * @updated 2026-08-12: Supplies active attribute growth snapshots to the daily statistics chart.
+ * @updated 2026-09-22: Displays daily character experience changes with two decimal places.
  * @updated 2026-08-09: Added merged daily character growth details alongside the existing star ledger.
  * @updated 2026-07-11: Shows todo-completion rule subtask counting scope in daily rule details.
  * @updated 2026-07-11: Added a low-key full recomputation entry with confirmation for restoring archived achievement data into the active ledger.
@@ -25,6 +26,7 @@ import {
 import { formatRelativeTime, getLocalDateTimeStr } from '../../utils/dateUtils';
 import { AchievementDialog } from './AchievementDialog';
 import {
+  formatAchievementSignedExperience,
   formatAchievementSignedStars,
   formatAchievementStars
 } from '../../utils/achievementUtils';
@@ -306,13 +308,13 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
                       {attributeNameMap.get(change.attributeId) || change.attributeName}
                     </div>
                     <div className={`text-sm font-medium ${change.deltaExp < 0 ? 'text-[#9f3e37]' : 'text-stone-900'}`}>
-                      {change.deltaExp < 0 ? '-' : '+'}{Math.abs(Math.floor(change.deltaExp || 0)).toLocaleString('en-US')} EXP
+                      {formatAchievementSignedExperience(change.deltaExp)} EXP
                     </div>
                   </div>
                   <div className="mt-2 text-xs leading-6 text-stone-500">
                     {change.ruleBreakdown.map((rule) => (
                       <div key={rule.ruleId}>
-                        {rule.ruleName} · {rule.appliedUnits} × {rule.expPerUnit} EXP · {rule.deltaExp < 0 ? '-' : '+'}{Math.abs(rule.deltaExp)} EXP
+                        {rule.ruleName} · {rule.appliedUnits} × {rule.expPerUnit} EXP · {formatAchievementSignedExperience(rule.deltaExp)} EXP
                       </div>
                     ))}
                   </div>

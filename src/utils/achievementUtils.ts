@@ -9,6 +9,7 @@
  * @updated 2026-08-11: Calculates daily attribute experience proportionally and excludes deleted attributes from aggregate experience.
  * @updated 2026-08-11: Normalizes legacy single-attribute rules into independent multi-attribute effects.
  * @updated 2026-08-12: Uses a fixed five-attribute threshold curve for total character level progress.
+ * @updated 2026-09-22: Preserves daily character experience changes and aggregates to two decimal places.
  * @updated 2026-07-11: Added todo-category subtask inclusion handling so achievement rules can count parent tasks only unless explicitly configured otherwise.
  * @updated 2026-06-30: Added shared seal validation so bottles cannot be sealed while the current active balance is negative.
  * @updated 2026-07-07: Added explicit current/history account summaries and made seal previews use the current-bottle account balance.
@@ -49,6 +50,8 @@ import { filterCountableLogs } from './statLogUtils';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ACHIEVEMENT_STAR_DECIMALS = 1;
 const ACHIEVEMENT_STAR_FACTOR = 10 ** ACHIEVEMENT_STAR_DECIMALS;
+const ACHIEVEMENT_EXPERIENCE_DECIMALS = 2;
+const ACHIEVEMENT_EXPERIENCE_FACTOR = 10 ** ACHIEVEMENT_EXPERIENCE_DECIMALS;
 const ACHIEVEMENT_TOTAL_LEVEL_ATTRIBUTE_COUNT = 5;
 
 interface AchievementSpendRecordLike {
@@ -113,6 +116,13 @@ const getDurationMinutesFromLogs = (logs: Log[]): number => {
 export const normalizeAchievementStarValue = (value: number): number => {
   const safeValue = Number.isFinite(value) ? value : 0;
   const rounded = Math.round((safeValue + Number.EPSILON) * ACHIEVEMENT_STAR_FACTOR) / ACHIEVEMENT_STAR_FACTOR;
+  return Object.is(rounded, -0) ? 0 : rounded;
+};
+
+export const normalizeAchievementExperience = (value: number): number => {
+  const safeValue = Number.isFinite(value) ? value : 0;
+  const sign = safeValue < 0 ? -1 : 1;
+  const rounded = sign * Math.round((Math.abs(safeValue) + Number.EPSILON) * ACHIEVEMENT_EXPERIENCE_FACTOR) / ACHIEVEMENT_EXPERIENCE_FACTOR;
   return Object.is(rounded, -0) ? 0 : rounded;
 };
 
@@ -420,7 +430,7 @@ export const normalizeAchievementGrowthSnapshot = (
     ...change,
     attributeId: change.attributeId || '',
     attributeName: change.attributeName || '未命名属性',
-    deltaExp: Math.floor(change.deltaExp || 0),
+    deltaExp: normalizeAchievementExperience(change.deltaExp || 0),
     ruleBreakdown: (change.ruleBreakdown || []).map((item) => ({
       ...item,
       attributeId: item.attributeId || change.attributeId || '',
@@ -429,7 +439,7 @@ export const normalizeAchievementGrowthSnapshot = (
       unitAmount: Math.max(1, Math.floor(item.unitAmount || 1)),
       appliedUnits: Math.max(0, normalizeAchievementStarValue(item.appliedUnits || 0)),
       expPerUnit: Math.max(1, Math.floor(item.expPerUnit || 1)),
-      deltaExp: Math.floor(item.deltaExp || 0),
+      deltaExp: normalizeAchievementExperience(item.deltaExp || 0),
       targetIds: Array.isArray(item.targetIds) ? item.targetIds : []
     }))
   }))
@@ -490,7 +500,7 @@ export const computeAchievementGrowthDailySnapshot = (
           return;
         }
         const appliedUnits = Math.max(0, matchedRule.matchedValue) / Math.max(1, rule.unitAmount);
-        const absoluteDeltaExp = Math.floor(appliedUnits * attributeEffect.expPerUnit);
+        const absoluteDeltaExp = normalizeAchievementExperience(appliedUnits * attributeEffect.expPerUnit);
         if (absoluteDeltaExp <= 0) {
           return;
         }
@@ -511,7 +521,7 @@ export const computeAchievementGrowthDailySnapshot = (
         };
         const previous = changesByAttributeId.get(attribute.id);
         if (previous) {
-          previous.deltaExp += deltaExp;
+          previous.deltaExp = normalizeAchievementExperience(previous.deltaExp + deltaExp);
           previous.ruleBreakdown.push(ruleBreakdown);
           return;
         }
@@ -541,12 +551,14 @@ export const calculateAchievementAttributeExperience = (
   snapshots.forEach((snapshot) => {
     snapshot.attributeChanges.forEach((change) => {
       if (Object.prototype.hasOwnProperty.call(experience, change.attributeId)) {
-        experience[change.attributeId] += Math.floor(change.deltaExp || 0);
+        experience[change.attributeId] = normalizeAchievementExperience(
+          experience[change.attributeId] + normalizeAchievementExperience(change.deltaExp || 0)
+        );
       }
     });
   });
   return Object.fromEntries(
-    Object.entries(experience).map(([attributeId, value]) => [attributeId, Math.floor(value)])
+    Object.entries(experience).map(([attributeId, value]) => [attributeId, normalizeAchievementExperience(value)])
   );
 };
 
@@ -558,11 +570,11 @@ export const calculateAchievementTotalExperience = (
     ? new Set(attributes.map((attribute) => attribute.id))
     : null;
 
-  return Math.floor(
+  return normalizeAchievementExperience(
     snapshots.reduce((sum, snapshot) => (
       sum + snapshot.attributeChanges.reduce((changeSum, change) => (
         !activeAttributeIds || activeAttributeIds.has(change.attributeId)
-          ? changeSum + Math.floor(change.deltaExp || 0)
+          ? changeSum + normalizeAchievementExperience(change.deltaExp || 0)
           : changeSum
       ), 0)
     ), 0)
@@ -609,9 +621,23 @@ const getAchievementLevelProgressWithThreshold = (
   };
 };
 
-export const formatAchievementExperience = (value: number): string => (
-  Math.max(0, Math.floor(value || 0)).toLocaleString('en-US')
+const formatAchievementExperienceValue = (value: number): string => (
+  normalizeAchievementExperience(value).toLocaleString('en-US', {
+    minimumFractionDigits: ACHIEVEMENT_EXPERIENCE_DECIMALS,
+    maximumFractionDigits: ACHIEVEMENT_EXPERIENCE_DECIMALS
+  })
 );
+
+export const formatAchievementExperience = (value: number): string => (
+  formatAchievementExperienceValue(Math.max(0, value || 0))
+);
+
+export const formatAchievementSignedExperience = (value: number): string => {
+  const normalized = normalizeAchievementExperience(value || 0);
+  return normalized > 0
+    ? `+${formatAchievementExperienceValue(normalized)}`
+    : formatAchievementExperienceValue(normalized);
+};
 
 export const sortAchievementSnapshots = (snapshots: AchievementDailySnapshot[]): AchievementDailySnapshot[] => {
   return [...snapshots].sort((first, second) => first.date.localeCompare(second.date));

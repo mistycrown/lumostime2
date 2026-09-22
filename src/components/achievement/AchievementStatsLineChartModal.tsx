@@ -7,6 +7,7 @@
  * @updated 2026-08-12: Uses stable indexed keys when historical snapshots contain duplicate dates.
  * @updated 2026-08-12: Added toggleable lines for every attribute currently visible on the character panel.
  * @updated 2026-09-15: Split series controls into point and attribute rows and added a quick point-only mode.
+ * @updated 2026-09-22: Formats character experience chart values with two decimal places.
  * @updated 2026-07-24: Anchored the opening scroll position to the latest daily point instead of a fixed viewport guess.
  * @updated 2026-07-06: Removed the y-axis title words and added a trailing empty day slot so the last-point label has breathing room.
  * @updated 2026-07-06: Restored fixed horizontal spacing by preventing the scrollable plot from shrinking on mobile.
@@ -19,7 +20,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { AchievementAttribute, AchievementDailySnapshot, AchievementGrowthDailySnapshot } from '../../types';
-import { formatAchievementSignedStars } from '../../utils/achievementUtils';
+import {
+  formatAchievementSignedExperience,
+  formatAchievementSignedStars
+} from '../../utils/achievementUtils';
 
 interface AchievementStatsLineChartModalProps {
   isOpen: boolean;
@@ -83,7 +87,7 @@ const buildChartPath = (points: Array<{ x: number; y: number }>): string => {
 const formatChartValue = (value: number, unit: ChartSeries['unit']): string => (
   unit === 'points'
     ? formatAchievementSignedStars(value)
-    : `${value >= 0 ? '+' : '-'}${Math.abs(Math.floor(value || 0)).toLocaleString('en-US')} EXP`
+    : `${formatAchievementSignedExperience(value)} EXP`
 );
 
 export const AchievementStatsLineChartModal: React.FC<AchievementStatsLineChartModalProps> = ({

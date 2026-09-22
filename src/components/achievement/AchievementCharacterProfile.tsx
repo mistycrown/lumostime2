@@ -4,6 +4,7 @@
  * @output Fixed-height achievement character status panel
  * @pos Component (Achievement)
  * @description Renders the character profile view inside the same top viewport occupied by the achievement bottle.
+ * @updated 2026-09-22: Displays cumulative character experience with two decimal places.
  * @updated 2026-08-12: Shows an attribute's real negative experience while leaving its visual progress at zero.
  * @updated 2026-08-09: Added the initial character profile layout with total experience and scrollable attribute rows.
  * @updated 2026-08-09: Compressed the profile header and hid the attribute list scrollbar for the fixed achievement viewport.
@@ -14,6 +15,7 @@ import { Settings2 } from 'lucide-react';
 import type { AchievementAttribute, AchievementLevelProgress } from '../../types';
 import {
   formatAchievementExperience,
+  formatAchievementSignedExperience,
   getAchievementExperienceRequiredForLevel,
   getAchievementLevelProgress
 } from '../../utils/achievementUtils';
@@ -155,7 +157,7 @@ export const AchievementCharacterProfile: React.FC<AchievementCharacterProfilePr
                   </div>
                   <div className="text-right text-[10px] text-stone-500">
                     <div className={`font-medium ${experience < 0 ? 'text-[#9f3e37]' : 'text-stone-700'}`}>
-                      {Math.floor(experience || 0).toLocaleString('en-US')}
+                      {experience < 0 ? formatAchievementSignedExperience(experience) : formatAchievementExperience(experience)}
                     </div>
                     <div className="mt-1 whitespace-nowrap">
                       {formatAchievementExperience(progress.nextLevelExperience)}
