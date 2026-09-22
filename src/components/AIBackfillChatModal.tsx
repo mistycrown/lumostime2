@@ -28,6 +28,7 @@
  * @updated 2026-09-22: Extracts native assistant lifecycle and background catch-up effects into a focused hook.
  * @updated 2026-09-22: Extracts background assistant trigger processing into a focused hook.
  * @updated 2026-09-22: Extracts native background snapshot and due-item dispatch into a focused hook.
+ * @updated 2026-09-22: Extracts the foreground send command router into a focused hook.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -214,6 +215,7 @@ import { useAIBackfillChatInternalBack } from './ai-chat/useAIBackfillChatIntern
 import { useAIBackfillChatBackgroundEffects } from './ai-chat/useAIBackfillChatBackgroundEffects';
 import { useAIBackfillChatBackgroundTriggers } from './ai-chat/useAIBackfillChatBackgroundTriggers';
 import { useAIBackfillChatBackgroundDispatch } from './ai-chat/useAIBackfillChatBackgroundDispatch';
+import { useAIBackfillChatSend } from './ai-chat/useAIBackfillChatSend';
 import { useAIBackfillChatSessionState } from './ai-chat/useAIBackfillChatSessionState';
 import { accentMix, getAIChatTheme } from './ai-chat/AIBackfillChatTheme';
 import { useAIBackfillChatMessageState } from './ai-chat/useAIBackfillChatMessageState';
@@ -2410,360 +2412,88 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     handleCloseDreamViewer
   };
 
-  const handleSend = async (overrideText?: string, options?: ForegroundSendOptions) => {
-    const trimmedText = (overrideText ?? inputText).trim();
-    if (!trimmedText || isStopActionVisible || !activeSession) {
-      return;
-    }
+  const handleSend = useAIBackfillChatSend({
 
-    const isWeeklyReviewTemplateSession = activeSession.templateMeta?.templateType === 'weekly_review';
-    const isMonthlyReviewTemplateSession = activeSession.templateMeta?.templateType === 'monthly_review';
-
-    if (handleDebugCommand(trimmedText, options)) {
-      return;
-    }
-
-    const quickAddTodoDescription = extractQuickAddTodoDescription(trimmedText);
-    if (quickAddTodoDescription) {
-      await handleQuickAddTodo(quickAddTodoDescription, trimmedText, options);
-      return;
-    }
-
-    const quickAddNoteDescription = extractQuickAddNoteDescription(trimmedText);
-    if (quickAddNoteDescription) {
-      await handleQuickAddNote(quickAddNoteDescription, trimmedText, options);
-      return;
-    }
-
-    const quickAddBackfillDescription = extractQuickAddBackfillDescription(trimmedText);
-    if (quickAddBackfillDescription) {
-      await handleQuickAddBackfill(quickAddBackfillDescription, trimmedText, options);
-      return;
-    }
-
-    if (dreamMonthSelectionState?.sessionId === activeSession.id && !options?.replaceMessageId) {
-      await handleSubmitDreamMonthSelection(activeSession, trimmedText);
-      return;
-    }
-
-    if (trimmedText === 'dream' && !options?.replaceMessageId) {
-      handleStartDreamMonthSelection(activeSession.id);
-      return;
-    }
-
-    if (
-      isWeeklyReviewTemplateSession
-      && activeSession.templateMeta?.stage !== 'ready'
-      && !options?.replaceMessageId
-    ) {
-      await handleWeeklyReviewTemplateGuidedSelection(activeSession, trimmedText);
-      return;
-    }
-
-    if (
-      isMonthlyReviewTemplateSession
-      && activeSession.templateMeta?.stage !== 'ready'
-      && !options?.replaceMessageId
-    ) {
-      await handleMonthlyReviewTemplateGuidedSelection(activeSession, trimmedText);
-      return;
-    }
-
-    if (isWeeklyReviewTemplateSession && weeklyReviewTemplateService.isWriteNarrativeCommand(trimmedText)) {
-      await handleWeeklyReviewNarrativeWritebackCommand(activeSession);
-      return;
-    }
-
-    if (isMonthlyReviewTemplateSession && monthlyReviewTemplateService.isWriteNarrativeCommand(trimmedText)) {
-      await handleMonthlyReviewNarrativeWritebackCommand(activeSession);
-      return;
-    }
-
-    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession) {
-      const consumedDailyReviewConfirmation = await runReviewCommandSafely(
-        activeSession.id,
-        'daily review overwrite confirmation',
-        () => handleDailyReviewNarrativeOverwriteConfirmation(activeSession, trimmedText),
-        false
-      );
-      if (consumedDailyReviewConfirmation) {
-        return;
-      }
-    }
-
-    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession) {
-      const consumedDailyNewspaperConfirmation = await runReviewCommandSafely(
-        activeSession.id,
-        'daily newspaper overwrite confirmation',
-        () => handleDailyNewspaperOverwriteConfirmation(activeSession, trimmedText),
-        false
-      );
-      if (consumedDailyNewspaperConfirmation) {
-        return;
-      }
-    }
-
-    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession) {
-      const consumedWeeklyNewspaperConfirmation = await runReviewCommandSafely(
-        activeSession.id,
-        'weekly newspaper overwrite confirmation',
-        () => handleWeeklyNewspaperOverwriteConfirmation(activeSession, trimmedText),
-        false
-      );
-      if (consumedWeeklyNewspaperConfirmation) {
-        return;
-      }
-    }
-
-    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession) {
-      const consumedMonthlyNewspaperConfirmation = await runReviewCommandSafely(
-        activeSession.id,
-        'monthly newspaper overwrite confirmation',
-        () => handleMonthlyNewspaperOverwriteConfirmation(activeSession, trimmedText),
-        false
-      );
-      if (consumedMonthlyNewspaperConfirmation) {
-        return;
-      }
-    }
-
-    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession && (trimmedText === '日报' || trimmedText === '叙事') && !options?.replaceMessageId) {
-      appendUserMessage(activeSession.id, trimmedText);
-      await runReviewCommandSafely(
-        activeSession.id,
-        'daily review command',
-        () => handleDailyReviewNarrativeCommand(activeSession),
-        undefined
-      );
-      return;
-    }
-
-    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession && /^小报(?:\s+.+)?$/.test(trimmedText) && !options?.replaceMessageId) {
-      appendUserMessage(activeSession.id, trimmedText);
-      await runReviewCommandSafely(
-        activeSession.id,
-        'daily newspaper command',
-        () => handleDailyNewspaperCommand(activeSession, trimmedText),
-        undefined
-      );
-      return;
-    }
-
-    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession && /^周小报(?:\s+.+)?$/.test(trimmedText) && !options?.replaceMessageId) {
-      appendUserMessage(activeSession.id, trimmedText);
-      await runReviewCommandSafely(
-        activeSession.id,
-        'weekly newspaper command',
-        () => handleWeeklyNewspaperCommand(activeSession, trimmedText),
-        undefined
-      );
-      return;
-    }
-
-    if (!isWeeklyReviewTemplateSession && !isMonthlyReviewTemplateSession && /^月小报(?:\s+.+)?$/.test(trimmedText) && !options?.replaceMessageId) {
-      appendUserMessage(activeSession.id, trimmedText);
-      await runReviewCommandSafely(
-        activeSession.id,
-        'monthly newspaper command',
-        () => handleMonthlyNewspaperCommand(activeSession, trimmedText),
-        undefined
-      );
-      return;
-    }
-
-    const {
-      canRetryInPlace,
-      historyBeforeCurrent,
-      now,
-      pendingMessageId,
-      sessionId,
-      userMessageId
-    } = prepareForegroundTurn({
-      activeSession,
-      buildRetryConversationHistory,
-      conversationHistoryCache,
-      createSessionTitleFromUserMessage,
-      isMonthlyReviewTemplateSession,
-      isWeeklyReviewTemplateSession,
-      mutateSession,
-      notifyUserTurn: (text, at) => AssistantAgent.notifyUserTurn({ text, at }),
-      onNotifyUserTurnError: (error) => {
-        console.error('[AIBackfillChatModal] Failed to notify assistant agent about user turn', error);
-      },
-      ...(options?.replaceMessageId ? { replaceMessageId: options.replaceMessageId } : {}),
-      ...(options?.retrySourceUserMessageId ? { retrySourceUserMessageId: options.retrySourceUserMessageId } : {}),
-      setInputText,
-      trimmedText
-    });
-    const promptHistory = narrowHistoryForTimeSensitiveTurn(historyBeforeCurrent, trimmedText);
-    setIsLoading(true);
-    setIsHistoryPanelOpen(false);
-    setIsPersonaPanelOpen(false);
-
-    const controller = new AbortController();
-    activeRequestRef.current = {
-      controller,
-      sessionId,
-      pendingMessageId
-    };
-    setActiveRequestId(pendingMessageId);
-
-    try {
-      if (isWeeklyReviewTemplateSession) {
-        const weekDataText = buildWeeklyReviewTemplateWeekDataText(activeSession);
-        if (!weekDataText) {
-          throw new Error('周复盘上下文还没有准备好。');
-        }
-
-        await runWeeklyReviewTemplateChatTurn({
-          activePersona,
-          activeRequestRef,
-          buildPersonaPrompt: buildSharedPersonaPrompt,
-          controller,
-          debugMode,
-          getErrorDebugSections,
-          getRetryableAIErrorMessage,
-          historyBeforeCurrent,
-          isAbortError,
-          pendingMessageId,
-          replacePendingWithResult,
-          resolveAssistantDisplayParts,
-          resolveAssistantReplyContent,
-          session: activeSession,
-          userMessage: trimmedText,
-          weekDataText
-        });
-        return;
-      }
-
-      if (isMonthlyReviewTemplateSession) {
-        const monthDataText = buildMonthlyReviewTemplateMonthDataText(activeSession);
-        if (!monthDataText) {
-          throw new Error('月复盘上下文还没有准备好。');
-        }
-
-        await runMonthlyReviewTemplateChatTurn({
-          activePersona,
-          activeRequestRef,
-          buildPersonaPrompt: buildSharedPersonaPrompt,
-          controller,
-          debugMode,
-          getErrorDebugSections,
-          getRetryableAIErrorMessage,
-          historyBeforeCurrent,
-          isAbortError,
-          monthDataText,
-          pendingMessageId,
-          replacePendingWithResult,
-          resolveAssistantDisplayParts,
-          resolveAssistantReplyContent,
-          session: activeSession,
-          userMessage: trimmedText
-        });
-        return;
-      }
-
-      await runOrdinaryForegroundTurn({
-        activePersona,
-        activeRequestRef,
-        applyAssistantMemoryPatch,
-        applyUnifiedReminders,
-        applyUnifiedToolCalls,
-        assistantMemoryEnabled: assistantAgentConfig.longTermMemoryEnabled,
-        buildDictionaryContext: buildAssistantDictionaryContext,
-        buildDreamContext,
-        buildForegroundAssistantMemory,
-        buildForegroundAssistantReminderSummary,
-        categories,
-        buildPromptLayers: async () => {
-          const [basePrompt, foregroundModePrompt] = await Promise.all([
-            assistantPromptService.getAssistantBasePrompt(),
-            assistantPromptService.getForegroundModePrompt()
-          ]);
-          return { basePrompt, foregroundModePrompt };
-        },
-        buildStateContext: buildAssistantStateContext,
-        controller,
-        debugMode,
-        getErrorDebugSections,
-        getRetryableAIErrorMessage,
-        handleRunUnifiedTurn: async (args, runnerOptions) => assistantTurnService.runUnifiedTurn({
-          mode: 'foreground',
-          trigger: {
-            type: 'user_message',
-            source: 'user',
-            text: args.userMessage,
-            createdAt: formatAssistantLocalDateTime(new Date(args.now))
-          },
-          promptLayers: {
-            basePrompt: args.systemPrompt,
-            modePrompt: args.modePrompt,
-            userPersonaPrompt: buildSharedPersonaPrompt(activePersona)
-          },
-          memoryEnabled: args.memoryEnabled,
-          memory: args.memory,
-          conversation: args.conversation,
-          stateContext: args.stateContext,
-          ...(args.dictionaryContext ? { dictionaryContext: args.dictionaryContext } : {}),
-          ...(args.localQueryHistory?.length ? { localQueryHistory: args.localQueryHistory } : {}),
-          ...(args.dreamContext ? { dreamContext: args.dreamContext } : {})
-        }, runnerOptions),
-        historyBeforeCurrent,
-        isAbortError,
-        logs,
-        narrowConversationContext: assistantContextBuilder.buildConversationContext,
-        notifyAssistantTaskStateChanged,
-        now,
-        pendingMessageId,
-        replacePendingWithResult,
-        resolveAssistantDisplayParts,
-        resolveAssistantReplyContent,
-        resolveForegroundAssistantReply,
-        scopes,
-        sessionId,
-        setIsLoading,
-        todoCategories,
-        todos,
-        trimmedText,
-        userMessageId,
-        weeklyReviews,
-        monthlyReviews,
-        dailyReviews
-      });
-      return;
-    } catch (error) {
-      const isCurrentPendingRequest = activeRequestRef.current?.pendingMessageId === pendingMessageId;
-
-      if (isAbortError(error)) {
-        if (isCurrentPendingRequest) {
-          replacePendingWithResult(sessionId, pendingMessageId, '已停止这次请求。', {
-            tone: 'system'
-          });
-        }
-        return;
-      }
-
-      if (!isCurrentPendingRequest || controller.signal.aborted) {
-        return;
-      }
-
-      const message = getRetryableAIErrorMessage(error);
-      replacePendingWithResult(sessionId, pendingMessageId, message, {
-        tone: 'error',
-        retryInput: trimmedText,
-        retrySourceUserMessageId: userMessageId,
-        debugSections: getErrorDebugSections(error, '统一单轮调用', debugMode)
-      });
-    } finally {
-      if (activeRequestRef.current?.pendingMessageId === pendingMessageId) {
-        activeRequestRef.current = null;
-      }
-      setActiveRequestId((currentRequestId) => (
-        currentRequestId === pendingMessageId ? null : currentRequestId
-      ));
-      setIsLoading(false);
-    }
-  };
+    activePersona,
+    activeRequestRef,
+    activeSession,
+    addToast,
+    applyAssistantMemoryPatch,
+    applyUnifiedReminders,
+    applyUnifiedToolCalls,
+    assistantAgentConfig,
+    assistantContextBuilder,
+    assistantMemoryService,
+    assistantPromptService,
+    assistantTurnService,
+    buildAssistantDictionaryContext,
+    buildAssistantStateContext,
+    buildDreamContext,
+    buildForegroundAssistantMemory,
+    buildForegroundAssistantReminderSummary,
+    buildMonthlyReviewTemplateMonthDataText,
+    buildRetryConversationHistory,
+    buildSharedPersonaPrompt,
+    buildWeeklyReviewTemplateWeekDataText,
+    categories,
+    conversationHistoryCache,
+    createSessionTitleFromUserMessage,
+    dailyReviews,
+    debugMode,
+    dreamMonthSelectionState,
+    extractQuickAddBackfillDescription,
+    extractQuickAddNoteDescription,
+    extractQuickAddTodoDescription,
+    formatAssistantLocalDateTime,
+    getErrorDebugSections,
+    getRetryableAIErrorMessage,
+    handleDailyNewspaperCommand,
+    handleDailyNewspaperOverwriteConfirmation,
+    handleDailyReviewNarrativeCommand,
+    handleDailyReviewNarrativeOverwriteConfirmation,
+    handleDebugCommand,
+    handleMonthlyNewspaperCommand,
+    handleMonthlyNewspaperOverwriteConfirmation,
+    handleMonthlyReviewNarrativeWritebackCommand,
+    handleQuickAddBackfill,
+    handleQuickAddNote,
+    handleQuickAddTodo,
+    handleStartDreamMonthSelection,
+    handleSubmitDreamMonthSelection,
+    handleWeeklyNewspaperCommand,
+    handleWeeklyNewspaperOverwriteConfirmation,
+    handleWeeklyReviewNarrativeWritebackCommand,
+    handleWeeklyReviewTemplateGuidedSelection,
+    handleMonthlyReviewTemplateGuidedSelection,
+    inputText,
+    isAbortError,
+    isStopActionVisible,
+    logs,
+    monthlyReviews,
+    monthlyReviewTemplateService,
+    mutateSession,
+    narrowHistoryForTimeSensitiveTurn,
+    notifyAssistantTaskStateChanged,
+    prepareForegroundTurn,
+    replacePendingWithResult,
+    resolveAssistantDisplayParts,
+    resolveAssistantReplyContent,
+    resolveForegroundAssistantReply,
+    runMonthlyReviewTemplateChatTurn,
+    runOrdinaryForegroundTurn,
+    runReviewCommandSafely,
+    runWeeklyReviewTemplateChatTurn,
+    scopes,
+    setActiveRequestId,
+    setInputText,
+    setIsHistoryPanelOpen,
+    setIsLoading,
+    setIsPersonaPanelOpen,
+    todoCategories,
+    todos,
+    weeklyReviews,
+    weeklyReviewTemplateService
+  });
 
   const handleStopRequest = () => {
     const activeRequest = activeRequestRef.current;
