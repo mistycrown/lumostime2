@@ -237,6 +237,8 @@ import { useAIBackfillChatViewport } from './ai-chat/useAIBackfillChatViewport';
 import { CHAT_MARKDOWN_COMPONENTS } from './ai-chat/AIBackfillChatMarkdown';
 import { useAIBackfillChatDebugViewer } from './ai-chat/useAIBackfillChatDebugViewer';
 import { useAIBackfillChatNewspaperSnapshot } from './ai-chat/useAIBackfillChatNewspaperSnapshot';
+import { useAIBackfillChatAssistantDraftValidation } from './ai-chat/useAIBackfillChatAssistantDraftValidation';
+import { useAIBackfillChatDreamSelection } from './ai-chat/useAIBackfillChatDreamSelection';
 import {
   AIBackfillChatHistoryOverlay,
   AIBackfillChatNewSessionDialog
@@ -565,28 +567,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     && isReviewReady
     && isCategoryScopeReady;
   const personaMap = useMemo(() => new Map(personas.map((persona) => [persona.id, persona])), [personas]);
-  const assistantAgentIntervalErrors = useMemo(
-    () => validateAssistantAgentIntervalDrafts(assistantAgentIntervalDrafts),
-    [assistantAgentIntervalDrafts]
-  );
-  const assistantAgentQuietHoursErrors = useMemo(
-    () => validateAssistantAgentQuietHoursDrafts(
-      assistantAgentQuietHoursDrafts,
-      assistantAgentConfig.quietHoursEnabled
-    ),
-    [assistantAgentConfig.quietHoursEnabled, assistantAgentQuietHoursDrafts]
-  );
-  const assistantLetterDraftErrors = useMemo(
-    () => validateAssistantLetterDrafts(
-      assistantLetterDrafts,
-      assistantAgentConfig.letterEnabled
-    ),
-    [assistantAgentConfig.letterEnabled, assistantLetterDrafts]
-  );
-  const nextAssistantLetterPreview = useMemo(
-    () => assistantLetterScheduler.formatNextLetterPreview(assistantAgentConfig.nextLetterAt),
-    [assistantAgentConfig.nextLetterAt]
-  );
+  const {
+    assistantAgentIntervalErrors,
+    assistantAgentQuietHoursErrors,
+    assistantLetterDraftErrors,
+    nextAssistantLetterPreview
+  } = useAIBackfillChatAssistantDraftValidation({
+    assistantAgentConfig,
+    assistantAgentIntervalDrafts,
+    assistantAgentQuietHoursDrafts,
+    assistantLetterDrafts
+  });
   const weeklyReviewMethodOptions = useMemo(
     () => weeklyReviewTemplateService.listMethodOptions(),
     []
@@ -690,16 +681,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
     return [];
   }, [activeSession, monthlyReviewMethodOptions]);
-  const activeDreamTopic = useMemo<DreamTopic | null>(() => (
-    dreamSnapshot.topics.find((topic) => topic.id === selectedDreamTopicId)
-    || dreamSnapshot.topics[0]
-    || null
-  ), [dreamSnapshot.topics, selectedDreamTopicId]);
-  const activeDreamEntries = useMemo(() => (
-    activeDreamTopic
-      ? dreamSnapshot.entries.filter((entry) => entry.topicId === activeDreamTopic.id)
-      : []
-  ), [activeDreamTopic, dreamSnapshot.entries]);
+  const { activeDreamTopic, activeDreamEntries } = useAIBackfillChatDreamSelection(
+    dreamSnapshot,
+    selectedDreamTopicId
+  );
   useEffect(() => {
     if (!dreamSnapshot.topics.some((topic) => topic.id === selectedDreamTopicId)) {
       setSelectedDreamTopicId(dreamSnapshot.topics[0]?.id || '');
