@@ -184,6 +184,7 @@ import {
 } from './ai-chat/AIBackfillChatForegroundTurn';
 import { AIBackfillChatDreamOverlay } from './ai-chat/AIBackfillChatDreamOverlay';
 import { buildAssistantBackgroundTimeline } from './ai-chat/AIBackfillChatBackgroundTimeline';
+import { buildAssistantBackgroundTurnRequest } from './ai-chat/AIBackfillChatBackgroundRequest';
 import {
   ACTIVE_SESSION_KEY,
   CHAT_SYNC_ENABLED_KEY,
@@ -1336,25 +1337,17 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     const effectiveLogs = logsOverride ?? logs;
     const stateContext = buildAssistantStateContext(now, reminderSummary, effectiveLogs);
 
-    return {
+    return buildAssistantBackgroundTurnRequest({
       trigger,
-      ...(targetSession ? { targetSessionId: targetSession.id } : {}),
+      targetSessionId: targetSession?.id,
       showSystemNotification,
-      currentDateTime: stateContext.currentDateTime,
-      defaultDate: stateContext.stateContextDate,
-      todayTimelineSummary: stateContext.timelineSummaryForDate || '',
-      ...(stateContext.timelineSummaryForPreviousDate ? { yesterdayTimelineSummary: stateContext.timelineSummaryForPreviousDate } : {}),
-      ...(stateContext.timelineReviewSummary ? { timelineReviewSummary: stateContext.timelineReviewSummary } : {}),
-      ...(stateContext.activeSessionSummary ? { activeSessionSummary: stateContext.activeSessionSummary } : {}),
-      ...(stateContext.scheduledTodosForDateSummary ? { todayScheduledTodoSummary: stateContext.scheduledTodosForDateSummary } : {}),
-      ...(stateContext.pinnedTodoSummary ? { pinnedTodoSummary: stateContext.pinnedTodoSummary } : {}),
-      ...(stateContext.overdueTodoSummary ? { overdueTodoSummary: stateContext.overdueTodoSummary } : {}),
-      ...(reminderSummary ? { reminderSummary } : {}),
-      ...(userPersonaPrompt ? { userPersonaPrompt } : {}),
+      stateContext,
+      reminderSummary,
+      userPersonaPrompt,
       dictionaryContext: buildAssistantDictionaryContext(effectiveLogs),
       conversationHistory,
       includeDebugInPersistedMessage: debugMode
-    };
+    });
   }, [
     buildAssistantDictionaryContext,
     buildAssistantReminderSummary,
