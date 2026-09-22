@@ -24,6 +24,7 @@
  * @updated 2026-09-22: Extracts assistant result composition and reply normalization into a focused hook.
  * @updated 2026-09-22: Extracts session history and composer command handlers into a focused hook.
  * @updated 2026-09-22: Extracts chat view, assistant letter, and diagnostics viewer handlers into a focused hook.
+ * @updated 2026-09-22: Extracts layered internal back-navigation policy into a focused hook.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -206,6 +207,7 @@ import { useAIBackfillChatReviewWritebackHandlers } from './ai-chat/useAIBackfil
 import { useAIBackfillChatResultHandlers } from './ai-chat/useAIBackfillChatResultHandlers';
 import { useAIBackfillChatSessionCommandHandlers } from './ai-chat/useAIBackfillChatSessionCommandHandlers';
 import { useAIBackfillChatViewerHandlers } from './ai-chat/useAIBackfillChatViewerHandlers';
+import { useAIBackfillChatInternalBack } from './ai-chat/useAIBackfillChatInternalBack';
 import { useAIBackfillChatSessionState } from './ai-chat/useAIBackfillChatSessionState';
 import { accentMix, getAIChatTheme } from './ai-chat/AIBackfillChatTheme';
 import { useAIBackfillChatMessageState } from './ai-chat/useAIBackfillChatMessageState';
@@ -2405,154 +2407,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setSelectedAssistantLetterId
   });
 
-  const handleAIInternalBack = useCallback((): boolean => {
-    if (!isOpen) {
-      return false;
-    }
-
-    if (debugViewer) {
-      setDebugViewer(null);
-      return true;
-    }
-
-    if (isAssistantLetterDetailSheetOpen) {
-      handleCloseAssistantLetterDetail();
-      return true;
-    }
-
-    if (isAssistantLetterHistoryViewerOpen) {
-      handleCloseAssistantLetterHistoryViewer();
-      return true;
-    }
-
-    if (isNewspaperHistoryViewerOpen) {
-      handleCloseNewspaperHistoryViewer();
-      return true;
-    }
-
-    if (isAssistantBackgroundHistoryViewerOpen) {
-      handleCloseAssistantBackgroundHistoryViewer();
-      return true;
-    }
-
-    if (isAssistantMemoryViewerOpen) {
-      if (assistantReminderDeleteTarget) {
-        setAssistantReminderDeleteTarget(null);
-        return true;
-      }
-
-      if (assistantScheduledTaskDeleteTarget) {
-        setAssistantScheduledTaskDeleteTarget(null);
-        return true;
-      }
-
-      if (isAssistantScheduledTaskComposerOpen) {
-        resetAssistantScheduledTaskUi();
-        return true;
-      }
-
-      if (isAssistantReminderComposerOpen) {
-        resetAssistantReminderUi();
-        return true;
-      }
-
-      if (assistantEditableMemoryDeleteTarget) {
-        setAssistantEditableMemoryDeleteTarget(null);
-        return true;
-      }
-
-      if (assistantEditableMemoryComposerKey) {
-        handleCancelAssistantEditableMemoryComposer(assistantEditableMemoryComposerKey);
-        return true;
-      }
-
-      handleCloseAssistantMemoryViewer();
-      return true;
-    }
-
-    if (isDreamViewerOpen) {
-      if (isDreamResetConfirmOpen) {
-        setIsDreamResetConfirmOpen(false);
-        return true;
-      }
-
-      if (dreamEntryDeleteTargetId) {
-        setDreamEntryDeleteTargetId(null);
-        return true;
-      }
-
-      if (editingDreamEntryId) {
-        dreamUiHandlersRef.current.resetDreamEntryUi();
-        return true;
-      }
-
-      if (dreamTopicDeleteTargetId) {
-        setDreamTopicDeleteTargetId(null);
-        return true;
-      }
-
-      if (isDreamTopicComposerOpen) {
-        dreamUiHandlersRef.current.resetDreamTopicUi();
-        return true;
-      }
-
-      dreamUiHandlersRef.current.handleCloseDreamViewer();
-      return true;
-    }
-
-    if (isUserEmojiEditorOpen) {
-      setIsUserEmojiEditorOpen(false);
-      return true;
-    }
-
-    if (isNewSessionDialogOpen) {
-      handleCloseNewSessionDialog();
-      return true;
-    }
-
-    if (isShortcutSettingsOpen) {
-      setIsShortcutSettingsOpen(false);
-      return true;
-    }
-
-    if (isEmojiEditorOpen) {
-      setIsEmojiEditorOpen(false);
-      return true;
-    }
-
-    if (isPersonaPanelOpen) {
-      if (deleteConfirmPersonaId) {
-        setDeleteConfirmPersonaId(null);
-        return true;
-      }
-
-      setIsPersonaPanelOpen(false);
-      return true;
-    }
-
-    if (isHistoryPanelOpen) {
-      if (deleteConfirmSessionId) {
-        setDeleteConfirmSessionId(null);
-        return true;
-      }
-
-      if (editingSessionId) {
-        handleCancelRenameSession();
-        return true;
-      }
-
-      setIsHistoryPanelOpen(false);
-      return true;
-    }
-
-    if (!isHomeView) {
-      setIsHomeView(true);
-      return true;
-    }
-
-    onClose();
-    return true;
-  }, [
+  const handleAIInternalBack = useAIBackfillChatInternalBack({
     assistantEditableMemoryComposerKey,
     assistantEditableMemoryDeleteTarget,
     assistantReminderDeleteTarget,
@@ -2560,38 +2415,56 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     debugViewer,
     deleteConfirmPersonaId,
     deleteConfirmSessionId,
+    dreamEntryDeleteTargetId,
+    dreamTopicDeleteTargetId,
+    dreamUiHandlersRef,
+    editingDreamEntryId,
     editingSessionId,
     handleCancelAssistantEditableMemoryComposer,
-    handleCloseAssistantLetterDetail,
-    handleCloseAssistantLetterHistoryViewer,
     handleCancelRenameSession,
     handleCloseAssistantBackgroundHistoryViewer,
+    handleCloseAssistantLetterDetail,
+    handleCloseAssistantLetterHistoryViewer,
     handleCloseAssistantMemoryViewer,
-    dreamEntryDeleteTargetId,
-    editingDreamEntryId,
-    isDreamResetConfirmOpen,
-    isAssistantLetterDetailSheetOpen,
+    handleCloseNewspaperHistoryViewer,
+    handleCloseNewSessionDialog,
     isAssistantBackgroundHistoryViewerOpen,
+    isAssistantLetterDetailSheetOpen,
     isAssistantLetterHistoryViewerOpen,
-    isNewspaperHistoryViewerOpen,
-    isDreamViewerOpen,
     isAssistantMemoryViewerOpen,
     isAssistantReminderComposerOpen,
     isAssistantScheduledTaskComposerOpen,
+    isDreamResetConfirmOpen,
     isDreamTopicComposerOpen,
+    isDreamViewerOpen,
     isEmojiEditorOpen,
     isHistoryPanelOpen,
     isHomeView,
     isNewSessionDialogOpen,
-    isShortcutSettingsOpen,
     isOpen,
     isPersonaPanelOpen,
+    isShortcutSettingsOpen,
     isUserEmojiEditorOpen,
-    dreamTopicDeleteTargetId,
+    isNewspaperHistoryViewerOpen,
+    onClose,
+    resetAssistantReminderUi,
     resetAssistantScheduledTaskUi,
-    handleCloseNewSessionDialog,
-    onClose
-  ]);
+    setAssistantEditableMemoryDeleteTarget,
+    setAssistantReminderDeleteTarget,
+    setAssistantScheduledTaskDeleteTarget,
+    setDebugViewer,
+    setDeleteConfirmPersonaId,
+    setDeleteConfirmSessionId,
+    setIsDreamResetConfirmOpen,
+    setIsEmojiEditorOpen,
+    setIsHistoryPanelOpen,
+    setIsHomeView,
+    setIsPersonaPanelOpen,
+    setIsShortcutSettingsOpen,
+    setIsUserEmojiEditorOpen,
+    setDreamEntryDeleteTargetId,
+    setDreamTopicDeleteTargetId
+  });
 
   useEffect(() => {
     if (!registerBackHandler) {
