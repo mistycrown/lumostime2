@@ -29,6 +29,7 @@
  * @updated 2026-09-22: Extracts background assistant trigger processing into a focused hook.
  * @updated 2026-09-22: Extracts native background snapshot and due-item dispatch into a focused hook.
  * @updated 2026-09-22: Extracts the foreground send command router into a focused hook.
+ * @updated 2026-09-22: Extracts dream and review-template opening handlers into a focused hook.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -216,6 +217,7 @@ import { useAIBackfillChatBackgroundEffects } from './ai-chat/useAIBackfillChatB
 import { useAIBackfillChatBackgroundTriggers } from './ai-chat/useAIBackfillChatBackgroundTriggers';
 import { useAIBackfillChatBackgroundDispatch } from './ai-chat/useAIBackfillChatBackgroundDispatch';
 import { useAIBackfillChatSend } from './ai-chat/useAIBackfillChatSend';
+import { useAIBackfillChatTemplateOpeningHandlers } from './ai-chat/useAIBackfillChatTemplateOpeningHandlers';
 import { useAIBackfillChatSessionState } from './ai-chat/useAIBackfillChatSessionState';
 import { accentMix, getAIChatTheme } from './ai-chat/AIBackfillChatTheme';
 import { useAIBackfillChatMessageState } from './ai-chat/useAIBackfillChatMessageState';
@@ -2234,121 +2236,54 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     weeklyReviews
   });
 
-  const handleDreamCommand = async (
-    session: AIChatSession,
-    selectedMonth: DreamMonthRangeSelection,
-    userMessageId?: string,
-    options?: {
-      replaceMessageId?: string;
-      retrySourceUserMessageId?: string;
-      userMessageAlreadyExists?: boolean;
-    }
-  ) => {
-    const historyBeforeCurrent = options?.replaceMessageId
-      ? buildRetryConversationHistory(session.id, options?.retrySourceUserMessageId)
-      : (conversationHistoryCache.get(session.id) || []);
+  const {
+    handleDreamCommand,
+    handleWeeklyReviewTemplateOpeningTurn,
+    handleMonthlyReviewTemplateOpeningTurn
+  } = useAIBackfillChatTemplateOpeningHandlers({
+    activePersona,
+    activeRequestRef,
+    activeSession,
+    activeSessions,
+    addToast,
+    appendSystemMessage,
+    assistantContextBuilder,
+    buildAssistantCurrentTimeSnapshot,
+    buildAssistantTimelineSummary,
+    buildConversationHistory,
+    buildDreamRangeDictionaryContext,
+    buildForegroundAssistantReminderSummary,
+    buildMonthlyReviewTemplateMonthDataText,
+    buildRetryConversationHistory,
+    buildSharedPersonaPrompt,
+    buildWeeklyReviewTemplateWeekDataText,
+    categories,
+    conversationHistoryCache,
+    debugMode,
+    formatAssistantLocalDateTime,
+    formatDateKey,
+    getErrorDebugSections,
+    getRetryableAIErrorMessage,
+    isAbortError,
+    logs,
+    mutateSession,
+    prepareForTemplateInteraction,
+    refreshDreamSnapshot,
+    replacePendingWithResult,
+    resolveAssistantDisplayParts,
+    resolveAssistantReplyContent,
+    runDreamCommandFlow,
+    runMonthlyReviewTemplateOpeningTurnFlow,
+    runWeeklyReviewTemplateOpeningTurnFlow,
+    setInputText,
+    setIsHistoryPanelOpen,
+    setIsLoading,
+    setIsPersonaPanelOpen,
+    setSelectedDreamTopicId,
+    todos
+  });
 
-    await runDreamCommandFlow({
-      activeRequestRef,
-      buildConversationSummary: (history) => assistantContextBuilder.summarizeConversationTurns(history, 24),
-      buildDictionaryDigestText: (monthSelection) => assistantContextBuilder.buildDictionaryDigest(
-        buildDreamRangeDictionaryContext(monthSelection.startDate, monthSelection.endDate)
-      ),
-      buildStateContextText: (monthSelection, currentTurnDate) => {
-        const reminderSummary = buildForegroundAssistantReminderSummary();
-        return JSON.stringify({
-          ...assistantContextBuilder.buildStateContext({
-            ...buildAssistantCurrentTimeSnapshot(currentTurnDate),
-            defaultDate: monthSelection.endDate,
-            logs: logs.filter((log) => {
-              const logDate = formatDateKey(new Date(log.startTime));
-              return logDate >= monthSelection.startDate && logDate <= monthSelection.endDate;
-            }),
-            categories,
-            todos,
-            activeSessions,
-            timelineReviewSummary: buildAssistantTimelineSummary(),
-            ...(reminderSummary ? { reminderSummary } : {})
-          }),
-          dreamRangeLabel: monthSelection.label,
-          dreamRangeStart: monthSelection.startDate,
-          dreamRangeEnd: monthSelection.endDate
-        }, null, 2);
-      },
-      debugMode,
-      formatCurrentDateTime: formatAssistantLocalDateTime,
-      getErrorDebugSections,
-      getRetryableAIErrorMessage,
-      historyBeforeCurrent,
-      isAbortError,
-      mutateSession,
-      options,
-      refreshDreamSnapshot,
-      replacePendingWithResult,
-      selectedMonth,
-      session,
-      setInputText,
-      setIsHistoryPanelOpen,
-      setIsLoading,
-      setIsPersonaPanelOpen,
-      setSelectedDreamTopicId,
-      userMessageId
-    });
-  };
 
-  const handleWeeklyReviewTemplateOpeningTurn = async (session: AIChatSession) => {
-    const weekDataText = buildWeeklyReviewTemplateWeekDataText(session);
-    if (!weekDataText) {
-      throw new Error('周复盘上下文还没有准备好。');
-    }
-
-    await runWeeklyReviewTemplateOpeningTurnFlow({
-      activePersona,
-      activeRequestRef,
-      appendSystemMessage,
-      buildConversationHistory,
-      buildPersonaPrompt: buildSharedPersonaPrompt,
-      debugMode,
-      getErrorDebugSections,
-      getRetryableAIErrorMessage,
-      isAbortError,
-      mutateSession,
-      prepareForTemplateInteraction,
-      replacePendingWithResult,
-      resolveAssistantDisplayParts,
-      resolveAssistantReplyContent,
-      session,
-      setIsLoading,
-      weekDataText
-    });
-  };
-
-  const handleMonthlyReviewTemplateOpeningTurn = async (session: AIChatSession) => {
-    const monthDataText = buildMonthlyReviewTemplateMonthDataText(session);
-    if (!monthDataText) {
-      throw new Error('月复盘上下文还没有准备好。');
-    }
-
-    await runMonthlyReviewTemplateOpeningTurnFlow({
-      activePersona,
-      activeRequestRef,
-      appendSystemMessage,
-      buildConversationHistory,
-      buildPersonaPrompt: buildSharedPersonaPrompt,
-      debugMode,
-      getErrorDebugSections,
-      getRetryableAIErrorMessage,
-      isAbortError,
-      monthDataText,
-      mutateSession,
-      prepareForTemplateInteraction,
-      replacePendingWithResult,
-      resolveAssistantDisplayParts,
-      resolveAssistantReplyContent,
-      session,
-      setIsLoading
-    });
-  };
 
   const {
     resetDreamTopicUi,
