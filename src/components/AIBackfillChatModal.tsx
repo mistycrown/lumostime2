@@ -143,7 +143,6 @@ import {
   type AppliedCreateTodoAction,
   type AppliedEditLogAction,
   type AppliedUpdateTodoAction,
-  type AppliedActionStatus
 } from '../services/assistantActionExecutor';
 import { PrincipleEditModal, type PrincipleEditFormData } from './PrincipleEditModal';
 import { SelfBeliefEditModal, type SelfBeliefDescriptionDraft } from './SelfBeliefEditModal';
@@ -151,7 +150,6 @@ import {
   weeklyReviewTemplateService,
   type WeeklyReviewMethodId,
   type WeeklyReviewTemplateSelectionResult,
-  type WeeklyReviewTemplateSessionMeta
 } from '../services/weeklyReviewTemplateService';
 import {
   monthlyReviewTemplateService,
@@ -185,6 +183,7 @@ import {
 import { AIBackfillChatDreamOverlay } from './ai-chat/AIBackfillChatDreamOverlay';
 import { buildAssistantBackgroundTimeline } from './ai-chat/AIBackfillChatBackgroundTimeline';
 import { buildAssistantBackgroundTurnRequest } from './ai-chat/AIBackfillChatBackgroundRequest';
+import { useAIBackfillChatSessionMutations } from './ai-chat/useAIBackfillChatSessionMutations';
 import {
   ACTIVE_SESSION_KEY,
   CHAT_SYNC_ENABLED_KEY,
@@ -255,8 +254,6 @@ import {
   runWeeklyReviewTemplateOpeningTurn as runWeeklyReviewTemplateOpeningTurnFlow
 } from './ai-chat/AIBackfillChatTemplateFlow';
 import {
-  appendSystemMessageToChatSession,
-  appendUserMessageToChatSession,
   buildConversationHistoryFromSessionMessages,
   buildRetryConversationHistory as buildRetryConversationHistoryFromSessions,
   mutateChatSessions,
@@ -269,8 +266,6 @@ import {
   resolveWeeklyReviewTemplateSessionMeta,
   safeJsonParse,
   sortChatSessionsByUpdatedAt,
-  updateSessionAppliedActionStatus,
-  updateWeeklyReviewTemplateStageInSessions
 } from './ai-chat/AIBackfillChatSessionHelpers';
 import {
   TIME_SENSITIVE_MESSAGE_PATTERN,
@@ -429,6 +424,15 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     userProfile, setUserProfile,
     chatSyncEnabled, setChatSyncEnabled
   } = useAIBackfillChatSessionState();
+  const {
+    mutateSession,
+    replaceMessage,
+    updateAppliedActionStatus,
+    appendSystemMessage,
+    appendUserMessage,
+    updateWeeklyReviewTemplateStage,
+    appendDebugSectionToMessage
+  } = useAIBackfillChatSessionMutations(setSessions);
   const {
     inputText, setInputText, isLoading, setIsLoading, activeRequestId, setActiveRequestId,
     isHistoryPanelOpen, setIsHistoryPanelOpen, isPersonaPanelOpen, setIsPersonaPanelOpen,
@@ -2466,45 +2470,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     isAssistantBackgroundContextReady
   ]);
 
-  const mutateSession = (sessionId: string, updater: (session: AIChatSession) => AIChatSession) => {
-    setSessions((prev) => mutateChatSessions(prev, sessionId, updater));
-  };
-
-  const replaceMessage = (sessionId: string, messageId: string, nextMessage: AIChatMessage) => {
-    setSessions((prev) => replaceSessionMessage(prev, sessionId, messageId, nextMessage));
-  };
-
-  const updateAppliedActionStatus = (
-    sessionId: string,
-    messageId: string,
-    actionId: string,
-    nextStatus: AppliedActionStatus
-  ) => {
-    setSessions((prev) => updateSessionAppliedActionStatus(prev, sessionId, messageId, actionId, nextStatus));
-  };
-
-  const appendSystemMessage = (
-    sessionId: string,
-    content: string,
-    options?: {
-      debugSections?: AIChatDebugSection[];
-      tone?: ChatTone;
-    }
-  ) => {
-    setSessions((prev) => appendSystemMessageToChatSession(prev, sessionId, content, options));
-  };
-
-  const appendUserMessage = (sessionId: string, content: string) => {
-    setSessions((prev) => appendUserMessageToChatSession(prev, sessionId, content));
-  };
-
-  const updateWeeklyReviewTemplateStage = (
-    sessionId: string,
-    stage: WeeklyReviewTemplateSessionMeta['stage'],
-    pendingWriteIntent = false
-  ) => {
-    setSessions((prev) => updateWeeklyReviewTemplateStageInSessions(prev, sessionId, stage, pendingWriteIntent));
-  };
 
   const prepareForTemplateInteraction = useCallback(() => {
     setInputText('');
@@ -2556,26 +2521,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     userInput
   });
 
-  const appendDebugSectionToMessage = (
-    sessionId: string,
-    messageId: string,
-    section: AIChatDebugSection
-  ) => {
-    mutateSession(sessionId, (session) => ({
-      ...session,
-      messages: session.messages.map((message) => {
-        if (message.id !== messageId) {
-          return message;
-        }
-
-        const nextSections = [...(message.debugSections || []), section];
-        return {
-          ...message,
-          debugSections: nextSections
-        };
-      })
-    }));
-  };
 
   const handleCloseNewSessionDialog = () => {
     setIsNewSessionDialogOpen(false);
