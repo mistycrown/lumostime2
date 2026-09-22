@@ -78,7 +78,6 @@ import {
   normalizeAssistantDateTime
 } from '../utils/assistantTime';
 import { buildAssistantDisplayParts } from '../utils/assistantMessageParts';
-import { normalizeAssistantQuietHoursValue } from '../utils/assistantQuietHours';
 import { resolveLatestOrdinaryAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
 import {
   ASSISTANT_CHAT_RESTORED_EVENT,
@@ -184,6 +183,7 @@ import { buildAssistantBackgroundTimeline } from './ai-chat/AIBackfillChatBackgr
 import { buildAssistantBackgroundTurnRequest } from './ai-chat/AIBackfillChatBackgroundRequest';
 import { useAIBackfillChatSessionMutations } from './ai-chat/useAIBackfillChatSessionMutations';
 import { buildAssistantReminderDueTrigger } from './ai-chat/AIBackfillChatReminderTrigger';
+import { useAIBackfillChatAssistantSettings } from './ai-chat/useAIBackfillChatAssistantSettings';
 import {
   ACTIVE_SESSION_KEY,
   CHAT_SYNC_ENABLED_KEY,
@@ -305,11 +305,6 @@ import {
   type AIChatWeeklyNewspaperWritebackResult,
   type AIChatWeeklyReviewWritebackResult,
   type AISettingsMainTab,
-  type AssistantAgentIntervalDrafts,
-  type AssistantAgentIntervalField,
-  type AssistantAgentQuietHoursDrafts,
-  type AssistantAgentQuietHoursField,
-  type AssistantLetterDrafts,
   type AssistantBackgroundTurnRequestOptions,
   type AssistantEditableMemoryDeleteTarget,
   type AssistantReminderDeleteTarget,
@@ -338,16 +333,10 @@ import {
   ASSISTANT_EDITABLE_MEMORY_SECTION_META,
   ASSISTANT_SCHEDULED_TASK_WEEKDAY_OPTIONS,
   PersonaAvatar,
-  buildAssistantAgentIntervalDrafts,
-  buildAssistantAgentQuietHoursDrafts,
-  buildAssistantLetterDrafts,
   buildAssistantScheduledTaskRecurrenceRule,
   buildAssistantScheduledTaskTime,
   buildManualAssistantReminderDueAt,
-  formatAssistantScheduledTaskRecurrence,
-  validateAssistantAgentIntervalDrafts,
-  validateAssistantAgentQuietHoursDrafts,
-  validateAssistantLetterDrafts
+  formatAssistantScheduledTaskRecurrence
 } from './ai-chat/AIBackfillChatShared';
 
 interface AIBackfillChatModalProps {
@@ -1007,6 +996,28 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const refreshAssistantMemorySnapshot = () => {
     setAssistantMemorySnapshot(assistantMemoryService.getMemory());
   };
+
+  const {
+    handleUpdateAssistantAgentConfig,
+    handleAssistantAgentIntervalDraftChange,
+    handleAssistantAgentQuietHoursDraftChange,
+    handleAssistantLetterDraftChange,
+    commitAssistantAgentIntervalDraft,
+    commitAssistantAgentQuietHoursDraft,
+    handleToggleAssistantQuietHours,
+    commitAssistantLetterDraft,
+    handleToggleAssistantLetterEnabled
+  } = useAIBackfillChatAssistantSettings({
+    assistantAgentConfig,
+    setAssistantAgentConfig,
+    assistantAgentIntervalDrafts,
+    setAssistantAgentIntervalDrafts,
+    assistantAgentQuietHoursDrafts,
+    setAssistantAgentQuietHoursDrafts,
+    assistantLetterDrafts,
+    setAssistantLetterDrafts,
+    refreshAssistantMemorySnapshot
+  });
 
   const refreshDreamSnapshot = () => {
     setDreamSnapshot(dreamService.getState());
@@ -1842,187 +1853,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     isAssistantBackgroundContextReady
   ]);
 
-  useEffect(() => {
-    setAssistantAgentIntervalDrafts(buildAssistantAgentIntervalDrafts(assistantAgentConfig));
-  }, [
-    assistantAgentConfig.maxCheckinMinutes,
-    assistantAgentConfig.minCheckinMinutes
-  ]);
-
-  useEffect(() => {
-    setAssistantAgentQuietHoursDrafts(buildAssistantAgentQuietHoursDrafts(assistantAgentConfig));
-  }, [
-    assistantAgentConfig.quietHoursEnabled,
-    assistantAgentConfig.quietHoursEnd,
-    assistantAgentConfig.quietHoursStart
-  ]);
-
-  useEffect(() => {
-    setAssistantLetterDrafts(buildAssistantLetterDrafts(assistantAgentConfig));
-  }, [
-    assistantAgentConfig.letterFrequencyDays,
-    assistantAgentConfig.letterWindowEnd,
-    assistantAgentConfig.letterWindowStart
-  ]);
-
-  const handleUpdateAssistantAgentConfig = (patch: Partial<AssistantAgentConfig>) => {
-    const nextConfig = assistantAgentConfigService.saveConfig(patch);
-    setAssistantAgentConfig(nextConfig);
-    if (patch.longTermMemoryEnabled === false) {
-      refreshAssistantMemorySnapshot();
-    }
-  };
-
-  const handleAssistantAgentIntervalDraftChange = (
-    field: AssistantAgentIntervalField,
-    nextValue: string
-  ) => {
-    setAssistantAgentIntervalDrafts((current) => ({
-      ...current,
-      [field]: nextValue
-    }));
-  };
-
-  const handleAssistantAgentQuietHoursDraftChange = (
-    field: AssistantAgentQuietHoursField,
-    nextValue: string
-  ) => {
-    const digitsOnly = nextValue.replace(/\D+/g, '').slice(0, 4);
-    setAssistantAgentQuietHoursDrafts((current) => ({
-      ...current,
-      [field]: digitsOnly
-    }));
-  };
-
-  const handleAssistantLetterDraftChange = (
-    field: keyof AssistantLetterDrafts,
-    nextValue: string
-  ) => {
-    const normalizedValue = field === 'letterFrequencyDays'
-      ? nextValue.replace(/\D+/g, '').slice(0, 2)
-      : nextValue.replace(/\D+/g, '').slice(0, 4);
-    setAssistantLetterDrafts((current) => ({
-      ...current,
-      [field]: normalizedValue
-    }));
-  };
-
-  const commitAssistantAgentIntervalDraft = (field: AssistantAgentIntervalField) => {
-    const nextErrors = validateAssistantAgentIntervalDrafts(assistantAgentIntervalDrafts);
-
-    if (nextErrors.minCheckinMinutes || nextErrors.maxCheckinMinutes) {
-      return;
-    }
-
-    handleUpdateAssistantAgentConfig({
-      minCheckinMinutes: Number(assistantAgentIntervalDrafts.minCheckinMinutes.trim()),
-      maxCheckinMinutes: Number(assistantAgentIntervalDrafts.maxCheckinMinutes.trim())
-    });
-  };
-
-  const commitAssistantAgentQuietHoursDraft = () => {
-    const nextErrors = validateAssistantAgentQuietHoursDrafts(assistantAgentQuietHoursDrafts, true);
-    if (nextErrors.quietHoursStart || nextErrors.quietHoursEnd) {
-      return;
-    }
-
-    handleUpdateAssistantAgentConfig({
-      quietHoursStart: assistantAgentQuietHoursDrafts.quietHoursStart.trim(),
-      quietHoursEnd: assistantAgentQuietHoursDrafts.quietHoursEnd.trim()
-    });
-  };
-
-  const handleToggleAssistantQuietHours = () => {
-    if (assistantAgentConfig.quietHoursEnabled) {
-      handleUpdateAssistantAgentConfig({ quietHoursEnabled: false });
-      return;
-    }
-
-    const nextDrafts: AssistantAgentQuietHoursDrafts = {
-      quietHoursStart: normalizeAssistantQuietHoursValue(assistantAgentQuietHoursDrafts.quietHoursStart) || '2300',
-      quietHoursEnd: normalizeAssistantQuietHoursValue(assistantAgentQuietHoursDrafts.quietHoursEnd) || '0800'
-    };
-    setAssistantAgentQuietHoursDrafts(nextDrafts);
-
-    const nextErrors = validateAssistantAgentQuietHoursDrafts(nextDrafts, true);
-    if (nextErrors.quietHoursStart || nextErrors.quietHoursEnd) {
-      return;
-    }
-
-    handleUpdateAssistantAgentConfig({
-      quietHoursEnabled: true,
-      quietHoursStart: nextDrafts.quietHoursStart,
-      quietHoursEnd: nextDrafts.quietHoursEnd
-    });
-  };
-
-  const commitAssistantLetterDraft = () => {
-    const nextErrors = validateAssistantLetterDrafts(assistantLetterDrafts, true);
-    if (nextErrors.letterFrequencyDays || nextErrors.letterWindowStart || nextErrors.letterWindowEnd) {
-      return;
-    }
-
-    const basePatch: Partial<AssistantAgentConfig> = {
-      letterFrequencyDays: Number(assistantLetterDrafts.letterFrequencyDays.trim()),
-      letterWindowStart: assistantLetterDrafts.letterWindowStart.trim(),
-      letterWindowEnd: assistantLetterDrafts.letterWindowEnd.trim()
-    };
-    const nextSchedulePatch = assistantAgentConfig.letterEnabled
-      ? assistantLetterScheduler.buildNextSchedulePatch({
-        letterFrequencyDays: basePatch.letterFrequencyDays!,
-        letterWindowStart: basePatch.letterWindowStart,
-        letterWindowEnd: basePatch.letterWindowEnd,
-        lastLetterSentAt: assistantAgentConfig.lastLetterSentAt
-      }, {
-        now: new Date()
-      })
-      : null;
-    const nextConfig = assistantAgentConfigService.saveConfig({
-      ...basePatch,
-      ...(nextSchedulePatch || {})
-    });
-    setAssistantAgentConfig(nextConfig);
-  };
-
-  const handleToggleAssistantLetterEnabled = () => {
-    if (assistantAgentConfig.letterEnabled) {
-      const nextConfig = assistantAgentConfigService.saveConfig({
-        letterEnabled: false,
-        ...assistantLetterScheduler.clearSchedule()
-      });
-      setAssistantAgentConfig(nextConfig);
-      return;
-    }
-
-    const nextDrafts: AssistantLetterDrafts = {
-      letterFrequencyDays: assistantLetterDrafts.letterFrequencyDays.trim() || String(assistantAgentConfig.letterFrequencyDays || 2),
-      letterWindowStart: normalizeAssistantQuietHoursValue(assistantLetterDrafts.letterWindowStart) || '2000',
-      letterWindowEnd: normalizeAssistantQuietHoursValue(assistantLetterDrafts.letterWindowEnd) || '2200'
-    };
-    setAssistantLetterDrafts(nextDrafts);
-
-    const nextErrors = validateAssistantLetterDrafts(nextDrafts, true);
-    if (nextErrors.letterFrequencyDays || nextErrors.letterWindowStart || nextErrors.letterWindowEnd) {
-      return;
-    }
-
-    const nextSchedulePatch = assistantLetterScheduler.buildNextSchedulePatch({
-      letterFrequencyDays: Number(nextDrafts.letterFrequencyDays),
-      letterWindowStart: nextDrafts.letterWindowStart,
-      letterWindowEnd: nextDrafts.letterWindowEnd,
-      lastLetterSentAt: assistantAgentConfig.lastLetterSentAt
-    }, {
-      now: new Date()
-    });
-    const nextConfig = assistantAgentConfigService.saveConfig({
-      letterEnabled: true,
-      letterFrequencyDays: Number(nextDrafts.letterFrequencyDays),
-      letterWindowStart: nextDrafts.letterWindowStart,
-      letterWindowEnd: nextDrafts.letterWindowEnd,
-      ...(nextSchedulePatch || {})
-    });
-    setAssistantAgentConfig(nextConfig);
-  };
 
   const flushDueAssistantLetter = useCallback(() => {
     if (
