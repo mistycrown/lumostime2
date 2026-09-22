@@ -75,8 +75,7 @@ import { getLocalDateStr } from '../utils/dateUtils';
 import {
   formatAssistantDateTimeForDisplay,
   formatAssistantLocalDateTime,
-  normalizeAssistantDateTime,
-  parseAssistantDateTime
+  normalizeAssistantDateTime
 } from '../utils/assistantTime';
 import { buildAssistantDisplayParts } from '../utils/assistantMessageParts';
 import { normalizeAssistantQuietHoursValue } from '../utils/assistantQuietHours';
@@ -184,6 +183,7 @@ import { AIBackfillChatDreamOverlay } from './ai-chat/AIBackfillChatDreamOverlay
 import { buildAssistantBackgroundTimeline } from './ai-chat/AIBackfillChatBackgroundTimeline';
 import { buildAssistantBackgroundTurnRequest } from './ai-chat/AIBackfillChatBackgroundRequest';
 import { useAIBackfillChatSessionMutations } from './ai-chat/useAIBackfillChatSessionMutations';
+import { buildAssistantReminderDueTrigger } from './ai-chat/AIBackfillChatReminderTrigger';
 import {
   ACTIVE_SESSION_KEY,
   CHAT_SYNC_ENABLED_KEY,
@@ -2076,31 +2076,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     runBackgroundAssistantLetter
   ]);
 
-  const buildReminderDueTrigger = (reminder: AssistantReminder): AssistantSystemTrigger => {
-    const now = new Date();
-    const nowLocal = formatAssistantLocalDateTime(now);
-    const scheduledDueAt = formatAssistantDateTimeForDisplay(reminder.dueAt);
-    const dueAtMs = parseAssistantDateTime(reminder.dueAt);
-    const delayMinutes = Number.isFinite(dueAtMs)
-      ? Math.max(0, Math.round((now.getTime() - dueAtMs) / 60000))
-      : 0;
+  const buildReminderDueTrigger = (reminder: AssistantReminder): AssistantSystemTrigger => (
+    buildAssistantReminderDueTrigger(reminder)
+  );
 
-    return {
-      id: `reminder_due:${reminder.id}:${now.getTime()}`,
-      type: 'reminder_due',
-      source: 'system',
-      createdAt: nowLocal,
-      text: reminder.text,
-      metadata: {
-        reminderId: reminder.id,
-        reminderType: reminder.type,
-        scheduledDueAt,
-        actualDispatchAt: nowLocal,
-        delayMinutes,
-        dispatchAttemptCount: reminder.dispatchAttemptCount || 0
-      }
-    };
-  };
+
 
   const dispatchDueReminder = useCallback((reminder: AssistantReminder) => {
     if (!isAssistantBackgroundContextReady) {
