@@ -1295,26 +1295,18 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       ? getBackgroundPersonaDisplayName(targetSession)
       : 'AI';
 
-    return {
+    return buildAssistantBackgroundTurnRequest({
       trigger,
-      ...(targetSession ? { targetSessionId: targetSession.id } : {}),
-      ...(targetSession?.personaId ? { personaId: targetSession.personaId } : {}),
-      ...(personaName ? { personaName } : {}),
+      targetSessionId: targetSession?.id,
+      personaId: targetSession?.personaId,
+      personaName,
       showSystemNotification: shouldShowBackgroundSystemNotification(),
-      currentDateTime: stateContext.currentDateTime,
-      defaultDate: stateContext.stateContextDate,
-      todayTimelineSummary: stateContext.timelineSummaryForDate || '',
-      ...(stateContext.timelineSummaryForPreviousDate ? { yesterdayTimelineSummary: stateContext.timelineSummaryForPreviousDate } : {}),
-      ...(stateContext.timelineReviewSummary ? { timelineReviewSummary: stateContext.timelineReviewSummary } : {}),
-      ...(stateContext.activeSessionSummary ? { activeSessionSummary: stateContext.activeSessionSummary } : {}),
-      ...(stateContext.scheduledTodosForDateSummary ? { todayScheduledTodoSummary: stateContext.scheduledTodosForDateSummary } : {}),
-      ...(stateContext.pinnedTodoSummary ? { pinnedTodoSummary: stateContext.pinnedTodoSummary } : {}),
-      ...(stateContext.overdueTodoSummary ? { overdueTodoSummary: stateContext.overdueTodoSummary } : {}),
-      ...(reminderSummary ? { reminderSummary } : {}),
-      ...(userPersonaPrompt ? { userPersonaPrompt } : {}),
+      stateContext,
+      reminderSummary,
+      userPersonaPrompt,
       dictionaryContext: buildAssistantDictionaryContext(),
       conversationHistory
-    };
+    });
   }, [
     buildAssistantDictionaryContext,
     buildAssistantReminderSummary,

@@ -25,6 +25,8 @@ export interface AssistantBackgroundStateContext {
 export const buildAssistantBackgroundTurnRequest = ({
   trigger,
   targetSessionId,
+  personaId,
+  personaName,
   showSystemNotification,
   stateContext,
   reminderSummary,
@@ -35,6 +37,8 @@ export const buildAssistantBackgroundTurnRequest = ({
 }: {
   trigger: AssistantSystemTrigger;
   targetSessionId?: string;
+  personaId?: string;
+  personaName?: string;
   showSystemNotification: boolean;
   stateContext: AssistantBackgroundStateContext;
   reminderSummary?: string;
@@ -45,6 +49,8 @@ export const buildAssistantBackgroundTurnRequest = ({
 }) => ({
   trigger,
   ...(targetSessionId ? { targetSessionId } : {}),
+  ...(personaId ? { personaId } : {}),
+  ...(personaName ? { personaName } : {}),
   showSystemNotification,
   currentDateTime: stateContext.currentDateTime,
   defaultDate: stateContext.stateContextDate,
