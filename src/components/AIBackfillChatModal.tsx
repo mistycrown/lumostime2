@@ -34,6 +34,7 @@
  * @updated 2026-09-22: Extracts the chat header toolbar into a focused component.
  * @updated 2026-09-22: Extracts the desktop edge restore view into a focused component.
  * @updated 2026-09-22: Extracts applied-action rendering and prompt layout helpers.
+ * @updated 2026-09-22: Extracts home and conversation main view composition.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -226,6 +227,7 @@ import { useAIBackfillChatRetry } from './ai-chat/useAIBackfillChatRetry';
 import { AIBackfillChatHeader } from './ai-chat/AIBackfillChatHeader';
 import { AIBackfillChatEdgeRestore } from './ai-chat/AIBackfillChatEdgeRestore';
 import { useAIBackfillChatRenderHelpers } from './ai-chat/useAIBackfillChatRenderHelpers';
+import { AIBackfillChatMainView } from './ai-chat/AIBackfillChatMainView';
 import { useAIBackfillChatSessionState } from './ai-chat/useAIBackfillChatSessionState';
 import { accentMix, getAIChatTheme } from './ai-chat/AIBackfillChatTheme';
 import { useAIBackfillChatMessageState } from './ai-chat/useAIBackfillChatMessageState';
@@ -2666,80 +2668,20 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         />
 
 
-        {isHomeView ? (
-          <AIChatHome
-            assistantMemory={assistantMemorySnapshot}
-            assistantReminders={assistantReminderSnapshot}
-            assistantLetters={assistantLetterSnapshot}
-            newspapers={assistantNewspaperSnapshot}
-            shortcuts={shortcuts}
-            sortedSessions={sortedSessions}
-            theme={AI_CHAT_THEME}
-            isLoading={isLoading}
-            isOverlayOpen={isPersonaPanelOpen || isShortcutSettingsOpen}
-            formatConversationTime={formatConversationTime}
-            getSessionPersona={resolveSessionPersona}
-            onOpenChat={handleOpenChatView}
-            onOpenLetters={handleOpenAssistantLetterHistoryViewer}
-            onOpenNewspapers={handleOpenNewspaperHistoryViewer}
-            onOpenLetter={handleOpenAssistantLetterDetail}
-            onOpenNewspaper={(item) => {
-              if (item.period === 'daily') {
-                handleOpenDailyNewspaper(item.startDate);
-              } else if (item.period === 'weekly' && item.endDate) {
-                handleOpenWeeklyNewspaper(item.startDate, item.endDate);
-              } else if (item.period === 'monthly' && item.endDate) {
-                handleOpenMonthlyNewspaper(item.startDate, item.endDate);
-              }
-            }}
-            onOpenMemory={handleOpenAssistantMemoryViewer}
-            onOpenHistory={() => setIsHistoryPanelOpen(true)}
-            onOpenSettings={() => setIsShortcutSettingsOpen(true)}
-            onQuickAddTodo={() => {
-              if (activeSession?.templateMeta) {
-                const nextSession = createDefaultSession(activeSession.personaId);
-                setSessions((prev) => [...prev, nextSession]);
-                setActiveSessionId(nextSession.id);
-              }
-              setIsHomeView(false);
-              setInputText(QUICK_ADD_TODO_PREFIX);
-              focusComposerAtEnd();
-            }}
-            onQuickAddNote={() => {
-              if (activeSession?.templateMeta) {
-                const nextSession = createDefaultSession(activeSession.personaId);
-                setSessions((prev) => [...prev, nextSession]);
-                setActiveSessionId(nextSession.id);
-              }
-              setIsHomeView(false);
-              setInputText(QUICK_ADD_NOTE_PREFIX);
-              focusComposerAtEnd();
-            }}
-            onQuickAddBackfill={() => {
-              if (activeSession?.templateMeta) {
-                const nextSession = createDefaultSession(activeSession.personaId);
-                setSessions((prev) => [...prev, nextSession]);
-                setActiveSessionId(nextSession.id);
-              }
-              setIsHomeView(false);
-              setInputText(QUICK_ADD_BACKFILL_PREFIX);
-              focusComposerAtEnd();
-            }}
-            onSendShortcut={(text) => {
-              const latestSession = sortedSessions[0] || activeSession;
-              if (!latestSession) return;
-              setActiveSessionId(latestSession.id);
-              setIsHomeView(false);
-              setInputText(text);
-              focusComposerAtEnd();
-            }}
-          />
-        ) : (
-          <AIBackfillChatConversationPane
+        <AIBackfillChatMainView
+          AI_CHAT_THEME={AI_CHAT_THEME}
+          CHAT_MARKDOWN_COMPONENTS={CHAT_MARKDOWN_COMPONENTS}
+          QUICK_ADD_BACKFILL_PREFIX={QUICK_ADD_BACKFILL_PREFIX}
+          QUICK_ADD_NOTE_PREFIX={QUICK_ADD_NOTE_PREFIX}
+          QUICK_ADD_TODO_PREFIX={QUICK_ADD_TODO_PREFIX}
           accentMix={accentMix}
           activePersona={activePersona}
           activeSession={activeSession}
-          conversationMaxWidthClassName={conversationMaxWidthClassName}
+          assistantLetterSnapshot={assistantLetterSnapshot}
+          assistantMemorySnapshot={assistantMemorySnapshot}
+          assistantNewspaperSnapshot={assistantNewspaperSnapshot}
+          assistantReminderSnapshot={assistantReminderSnapshot}
+          createDefaultSession={createDefaultSession}
           emptyPromptExampleGroups={emptyPromptExampleGroups}
           emptyStateMaxWidthClassName={emptyStateMaxWidthClassName}
           expandedDreamUpdateMessageIds={expandedDreamUpdateMessageIds}
@@ -2747,33 +2689,49 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           expandedMemoryUpdateMessageIds={expandedMemoryUpdateMessageIds}
           expandedReasoningMessageIds={expandedReasoningMessageIds}
           expandedReminderUpdateMessageIds={expandedReminderUpdateMessageIds}
+          focusComposerAtEnd={focusComposerAtEnd}
           formatAssistantDateTimeForDisplay={formatAssistantDateTimeForDisplay}
           formatConversationTime={formatConversationTime}
-          getMessageDebugViewer={resolveMessageDebugViewer}
+          handleMessageElementRef={handleMessageElementRef}
+          handleOpenAssistantLetterDetail={handleOpenAssistantLetterDetail}
+          handleOpenAssistantLetterHistoryViewer={handleOpenAssistantLetterHistoryViewer}
+          handleOpenChatView={handleOpenChatView}
+          handleOpenDailyNewspaper={handleOpenDailyNewspaper}
+          handleOpenDailyReviewNarrative={handleOpenDailyReviewNarrative}
+          handleOpenMonthlyNewspaper={handleOpenMonthlyNewspaper}
+          handleOpenMonthlyReviewNarrative={handleOpenMonthlyReviewNarrative}
+          handleOpenNewspaperHistoryViewer={handleOpenNewspaperHistoryViewer}
+          handleOpenAssistantMemoryViewer={handleOpenAssistantMemoryViewer}
+          handleOpenWeeklyNewspaper={handleOpenWeeklyNewspaper}
+          handleOpenWeeklyReviewNarrative={handleOpenWeeklyReviewNarrative}
+          handleRetryMessage={handleRetryMessage}
+          isHomeView={isHomeView}
           isLoading={isLoading}
-          markdownComponents={CHAT_MARKDOWN_COMPONENTS}
+          isPersonaPanelOpen={isPersonaPanelOpen}
+          isShortcutSettingsOpen={isShortcutSettingsOpen}
           messagesEndRef={messagesEndRef}
-          onMessageRef={handleMessageElementRef}
-          onOpenDailyNewspaper={handleOpenDailyNewspaper}
-          onOpenDailyReviewNarrative={handleOpenDailyReviewNarrative}
-          onOpenAssistantLetter={handleOpenAssistantLetterDetail}
-          onOpenDebugViewer={setDebugViewer}
-          onOpenMonthlyNewspaper={handleOpenMonthlyNewspaper}
-          onOpenMonthlyReviewNarrative={handleOpenMonthlyReviewNarrative}
-          onOpenWeeklyNewspaper={handleOpenWeeklyNewspaper}
-          onOpenWeeklyReviewNarrative={handleOpenWeeklyReviewNarrative}
-          onRetryMessage={handleRetryMessage}
           renderAppliedAction={renderAppliedAction}
           revealedAssistantPartCounts={revealedAssistantPartCounts}
-          setDreamUpdateExpansion={toggleDreamUpdateExpansion}
-          setLocalQueryExpansion={toggleLocalQueryExpansion}
-          setMemoryUpdateExpansion={toggleMemoryUpdateExpansion}
-          setReasoningExpansion={toggleReasoningExpansion}
-          setReminderUpdateExpansion={toggleReminderUpdateExpansion}
-          theme={AI_CHAT_THEME}
+          resolveMessageDebugViewer={resolveMessageDebugViewer}
+          resolveSessionPersona={resolveSessionPersona}
+          setActiveSessionId={setActiveSessionId}
+          setDebugViewer={setDebugViewer}
+          setInputText={setInputText}
+          setIsHistoryPanelOpen={setIsHistoryPanelOpen}
+          setIsHomeView={setIsHomeView}
+          setIsPersonaPanelOpen={setIsPersonaPanelOpen}
+          setSessions={setSessions}
+          shortcuts={shortcuts}
+          sortedSessions={sortedSessions}
+          toggleDreamUpdateExpansion={toggleDreamUpdateExpansion}
+          toggleLocalQueryExpansion={toggleLocalQueryExpansion}
+          toggleMemoryUpdateExpansion={toggleMemoryUpdateExpansion}
+          toggleReasoningExpansion={toggleReasoningExpansion}
+          toggleReminderUpdateExpansion={toggleReminderUpdateExpansion}
           userProfile={userProfile}
-          />
-        )}
+          conversationMaxWidthClassName={conversationMaxWidthClassName}
+        />
+
 
         {!isHomeView && !isPersonaPanelOpen && <div
           className="absolute inset-x-0 bottom-0 z-30 px-4 pt-3 backdrop-blur-xl sm:px-5"
