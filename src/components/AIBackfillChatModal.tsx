@@ -30,6 +30,7 @@
  * @updated 2026-09-22: Extracts native background snapshot and due-item dispatch into a focused hook.
  * @updated 2026-09-22: Extracts the foreground send command router into a focused hook.
  * @updated 2026-09-22: Extracts dream and review-template opening handlers into a focused hook.
+ * @updated 2026-09-22: Extracts assistant message retry and rollback handling into a focused hook.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -218,6 +219,7 @@ import { useAIBackfillChatBackgroundTriggers } from './ai-chat/useAIBackfillChat
 import { useAIBackfillChatBackgroundDispatch } from './ai-chat/useAIBackfillChatBackgroundDispatch';
 import { useAIBackfillChatSend } from './ai-chat/useAIBackfillChatSend';
 import { useAIBackfillChatTemplateOpeningHandlers } from './ai-chat/useAIBackfillChatTemplateOpeningHandlers';
+import { useAIBackfillChatRetry } from './ai-chat/useAIBackfillChatRetry';
 import { useAIBackfillChatSessionState } from './ai-chat/useAIBackfillChatSessionState';
 import { accentMix, getAIChatTheme } from './ai-chat/AIBackfillChatTheme';
 import { useAIBackfillChatMessageState } from './ai-chat/useAIBackfillChatMessageState';
@@ -459,6 +461,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const { todoUpdateContext, subtaskParentContext, logEditContext } = useAIBackfillChatContextData({
     categories,
     logs,
+    parseDreamMonthSelection,
     scopes,
     todoCategories,
     todos
@@ -2470,71 +2473,28 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     return undefined;
   };
 
-  const handleRetryMessage = (message: AIChatMessage) => {
-    if (!message.retryInput || isLoading || retryingMessageIdRef.current) {
-      return;
-    }
+  const handleRetryMessage = useAIBackfillChatRetry({
 
-    if (message.role !== 'assistant' || !activeSession) {
-      return;
-    }
-
-    retryingMessageIdRef.current = message.id;
-    resetAssistantPartRevealState(message.id);
-
-    try {
-      if (message.remindersBefore) {
-        assistantReminderQueueService.saveReminders(message.remindersBefore);
-      }
-      if (message.memoryBefore) {
-        assistantMemoryService.saveMemory(message.memoryBefore);
-      }
-      if (message.remindersBefore || message.memoryBefore) {
-        refreshAssistantReminderSnapshot();
-        refreshAssistantMemorySnapshot();
-      }
-
-      if (message.appliedActions?.some((action) => action.status === 'applied')) {
-        const rollbackResult = rollbackAppliedChatActions(message.appliedActions, logs, todos);
-        setLogs(rollbackResult.logs);
-        setTodos(rollbackResult.todos);
-        rollbackResult.undoneActionIds.forEach((actionId) => {
-          updateAppliedActionStatus(activeSession.id, message.id, actionId, 'undone');
-        });
-      }
-    } catch (error) {
-      console.error('[AIBackfillChatModal] Failed to rollback assistant actions before retry', error);
-      addToast('error', '撤销本次 AI 操作失败，未重新发送。');
-      retryingMessageIdRef.current = null;
-      return;
-    }
-
-    const retryOptions = {
-      replaceMessageId: message.id,
-      retrySourceUserMessageId: resolveRetrySourceUserMessageId(message)
-    };
-
-    if (message.retryInput === 'dream' && message.dreamRetryYearMonth && activeSession) {
-      const selectedMonth = parseDreamMonthSelection(message.dreamRetryYearMonth, getLocalDateStr);
-      if (!selectedMonth) {
-        retryingMessageIdRef.current = null;
-        addToast('info', '这次 Dream 重试缺少可用的年月。');
-        return;
-      }
-
-      window.setTimeout(() => {
-        retryingMessageIdRef.current = null;
-        void handleDreamCommand(activeSession, selectedMonth, undefined, retryOptions);
-      }, 0);
-      return;
-    }
-
-    // Let the state updates above commit before the runner snapshots logs/todos.
-    window.setTimeout(() => {
-      retryingMessageIdRef.current = null;
-      void handleSend(message.retryInput, retryOptions);
-    }, 0);
-  };
+    activeSession,
+    addToast,
+    assistantMemoryService,
+    assistantReminderQueueService,
+    getLocalDateStr,
+    handleDreamCommand,
+    handleSend,
+    isLoading,
+    logs,
+    refreshAssistantMemorySnapshot,
+    refreshAssistantReminderSnapshot,
+    resetAssistantPartRevealState,
+    resolveRetrySourceUserMessageId,
+    retryingMessageIdRef,
+    rollbackAppliedChatActions,
+    setLogs,
+    setTodos,
+    todos,
+    updateAppliedActionStatus
+  });
 
   useEffect(() => {
     const pendingText = pendingHomeMessageRef.current;
