@@ -20,6 +20,7 @@
  * @updated 2026-09-22: Extracts applied-action undo and principle/self-belief editing into a focused hook.
  * @updated 2026-09-22: Extracts quick-add todo, note, and backfill request handlers into a focused hook.
  * @updated 2026-09-22: Extracts result-card navigation handlers into a focused hook.
+ * @updated 2026-09-22: Extracts review writeback runner adapters into a focused hook.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -196,18 +197,11 @@ import {
 import { AIBackfillChatMemoryOverlay } from './ai-chat/AIBackfillChatMemoryOverlay';
 import { AIBackfillChatPersonaSettingsSection } from './ai-chat/AIBackfillChatPersonaSettingsSection';
 import { AIChatShortcutSettingsOverlay } from './ai-chat/AIChatShortcutSettingsOverlay';
-import {
-  runDailyNewspaperWriteback as runDailyNewspaperWritebackFlow,
-  runDailyReviewNarrativeWriteback as runDailyReviewNarrativeWritebackFlow,
-  runMonthlyNewspaperWriteback as runMonthlyNewspaperWritebackFlow,
-  runMonthlyReviewNarrativeWriteback as runMonthlyReviewNarrativeWritebackFlow,
-  runWeeklyNewspaperWriteback as runWeeklyNewspaperWritebackFlow,
-  runWeeklyReviewNarrativeWriteback as runWeeklyReviewNarrativeWritebackFlow
-} from './ai-chat/AIBackfillChatReviewWriteback';
 import { AIBackfillChatSettingsOverlay } from './ai-chat/AIBackfillChatSettingsOverlay';
 import { useAIBackfillChatViewState } from './ai-chat/useAIBackfillChatViewState';
 import { useAIBackfillChatAssistantState } from './ai-chat/useAIBackfillChatAssistantState';
 import { useAIBackfillChatReviewCommandHandlers } from './ai-chat/useAIBackfillChatReviewCommandHandlers';
+import { useAIBackfillChatReviewWritebackHandlers } from './ai-chat/useAIBackfillChatReviewWritebackHandlers';
 import { useAIBackfillChatSessionState } from './ai-chat/useAIBackfillChatSessionState';
 import { accentMix, getAIChatTheme } from './ai-chat/AIBackfillChatTheme';
 import { useAIBackfillChatMessageState } from './ai-chat/useAIBackfillChatMessageState';
@@ -3176,208 +3170,45 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setIsPersonaPanelOpen
   });
 
-  const runWeeklyReviewNarrativeWriteback = async (
-    session: AIChatSession,
-    params: {
-      weeklyReview: WeeklyReview;
-      weekDataText: string;
-      mergeMode: 'create' | 'overwrite';
-      createdReview: boolean;
-    }
-  ) => runWeeklyReviewNarrativeWritebackFlow({
+  const {
+    runDailyNewspaperWriteback,
+    runDailyReviewNarrativeWriteback,
+    runMonthlyNewspaperWriteback,
+    runMonthlyReviewNarrativeWriteback,
+    runWeeklyNewspaperWriteback,
+    runWeeklyReviewNarrativeWriteback
+  } = useAIBackfillChatReviewWritebackHandlers({
     activeRequestRef,
-    addToast,
-    buildConversationHistory,
-    buildPersonaPrompt: buildSharedPersonaPrompt,
-    getConversationSummary: (sessionId) => assistantContextBuilder.summarizeConversationTurns(
-      conversationHistoryCache.get(sessionId) || [],
-      24
-    ),
-    getRetryableAIErrorMessage,
-    isAbortError,
-    mutateSession,
-    params,
-    replacePendingWithResult,
-    resolveSessionPersona,
-    resolveTemplateMeta: resolveWeeklyReviewTemplateSessionMeta,
-    session,
-    setInputText,
-    setIsHistoryPanelOpen,
-    setIsLoading,
-    setIsPersonaPanelOpen,
-    setWeeklyReviews,
-    updateWeeklyReviewTemplateStage
-  });
-
-  const runDailyReviewNarrativeWriteback = async (
-    session: AIChatSession,
-    params: {
-      dailyReview: DailyReview;
-      dayDataText: string;
-      mergeMode: 'create' | 'overwrite';
-      createdReview: boolean;
-    }
-  ) => runDailyReviewNarrativeWritebackFlow({
-    activeRequestRef,
-    addToast,
-    buildConversationHistory,
-    buildPersonaPrompt: buildSharedPersonaPrompt,
-    debugMode,
-    getConversationSummary: (sessionId) => assistantContextBuilder.summarizeConversationTurns(
-      conversationHistoryCache.get(sessionId) || [],
-      24
-    ),
-    getRetryableAIErrorMessage,
-    isAbortError,
-    mutateSession,
-    params,
-    replacePendingWithResult,
-    resolveSessionPersona,
-    session,
-    setDailyReviewWritebackConfirmation,
-    setDailyReviews,
-    setInputText,
-    setIsHistoryPanelOpen,
-    setIsLoading,
-    setIsPersonaPanelOpen
-  });
-
-  const runDailyNewspaperWriteback = async (
-    session: AIChatSession,
-    params: {
-      dailyReview: DailyReview;
-      dayDataText: string;
-      mergeMode: 'create' | 'overwrite';
-      createdReview: boolean;
-    }
-  ) => runDailyNewspaperWritebackFlow({
-    activeRequestRef,
-    assistantMemoryEnabled: assistantAgentConfig.longTermMemoryEnabled,
     addToast,
     applyUnifiedToolCalls,
+    assistantMemoryEnabled: assistantAgentConfig.longTermMemoryEnabled,
+    buildAssistantStateContext,
     buildConversationHistory,
     buildDreamContext,
     buildForegroundAssistantMemory,
     buildForegroundAssistantReminderSummary,
-    buildPersonaPrompt: buildSharedPersonaPrompt,
-    buildStateContext: buildAssistantStateContext,
+    buildSharedPersonaPrompt,
+    conversationHistoryCache,
     debugMode,
-    getConversationSummary: (sessionId) => assistantContextBuilder.summarizeConversationTurns(
-      conversationHistoryCache.get(sessionId) || [],
-      24
-    ),
     getRetryableAIErrorMessage,
     isAbortError,
     mutateSession,
-    params,
     replacePendingWithResult,
     resolveSessionPersona,
-    session,
+    resolveMonthlyReviewTemplateSessionMeta,
+    resolveWeeklyReviewTemplateSessionMeta,
     setDailyNewspaperWritebackConfirmation: () => setDailyNewspaperWritebackConfirmation(null),
     setDailyReviews,
-    setInputText,
-    setIsHistoryPanelOpen,
-    setIsLoading,
-    setIsPersonaPanelOpen
-  });
-
-  const runWeeklyNewspaperWriteback = async (
-    session: AIChatSession,
-    params: {
-      weeklyReview: WeeklyReview;
-      weekDataText: string;
-      mergeMode: 'create' | 'overwrite';
-      createdReview: boolean;
-    }
-  ) => runWeeklyNewspaperWritebackFlow({
-    activeRequestRef,
-    addToast,
-    buildConversationHistory,
-    buildPersonaPrompt: buildSharedPersonaPrompt,
-    debugMode,
-    getConversationSummary: (sessionId) => assistantContextBuilder.summarizeConversationTurns(
-      conversationHistoryCache.get(sessionId) || [],
-      24
-    ),
-    getRetryableAIErrorMessage,
-    isAbortError,
-    mutateSession,
-    params,
-    replacePendingWithResult,
-    resolveSessionPersona,
-    session,
-    setInputText,
-    setIsHistoryPanelOpen,
-    setIsLoading,
-    setIsPersonaPanelOpen,
-    setWeeklyNewspaperWritebackConfirmation: () => setWeeklyNewspaperWritebackConfirmation(null),
-    setWeeklyReviews
-  });
-
-  const runMonthlyReviewNarrativeWriteback = async (
-    session: AIChatSession,
-    params: {
-      monthlyReview: MonthlyReview;
-      monthDataText: string;
-      mergeMode: 'create' | 'overwrite';
-      createdReview: boolean;
-    }
-  ) => runMonthlyReviewNarrativeWritebackFlow({
-    activeRequestRef,
-    addToast,
-    buildConversationHistory,
-    buildPersonaPrompt: buildSharedPersonaPrompt,
-    getConversationSummary: (sessionId) => assistantContextBuilder.summarizeConversationTurns(
-      conversationHistoryCache.get(sessionId) || [],
-      24
-    ),
-    getRetryableAIErrorMessage,
-    isAbortError,
-    mutateSession,
-    params,
-    replacePendingWithResult,
-    resolveSessionPersona,
-    resolveTemplateMeta: resolveMonthlyReviewTemplateSessionMeta,
-    session,
-    setInputText,
-    setIsHistoryPanelOpen,
-    setIsLoading,
-    setIsPersonaPanelOpen,
-    setMonthlyReviews,
-    updateWeeklyReviewTemplateStage
-  });
-
-  const runMonthlyNewspaperWriteback = async (
-    session: AIChatSession,
-    params: {
-      monthlyReview: MonthlyReview;
-      monthDataText: string;
-      mergeMode: 'create' | 'overwrite';
-      createdReview: boolean;
-    }
-  ) => runMonthlyNewspaperWritebackFlow({
-    activeRequestRef,
-    addToast,
-    buildConversationHistory,
-    buildPersonaPrompt: buildSharedPersonaPrompt,
-    debugMode,
-    getConversationSummary: (sessionId) => assistantContextBuilder.summarizeConversationTurns(
-      conversationHistoryCache.get(sessionId) || [],
-      24
-    ),
-    getRetryableAIErrorMessage,
-    isAbortError,
-    mutateSession,
-    params,
-    replacePendingWithResult,
-    resolveSessionPersona,
-    session,
+    setDailyReviewWritebackConfirmation,
     setInputText,
     setIsHistoryPanelOpen,
     setIsLoading,
     setIsPersonaPanelOpen,
     setMonthlyNewspaperWritebackConfirmation: () => setMonthlyNewspaperWritebackConfirmation(null),
-    setMonthlyReviews
+    setMonthlyReviews,
+    setWeeklyNewspaperWritebackConfirmation: () => setWeeklyNewspaperWritebackConfirmation(null),
+    setWeeklyReviews,
+    updateWeeklyReviewTemplateStage
   });
 
   const {
