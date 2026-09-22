@@ -23,6 +23,7 @@
  * @updated 2026-09-22: Extracts review writeback runner adapters into a focused hook.
  * @updated 2026-09-22: Extracts assistant result composition and reply normalization into a focused hook.
  * @updated 2026-09-22: Extracts session history and composer command handlers into a focused hook.
+ * @updated 2026-09-22: Extracts chat view, assistant letter, and diagnostics viewer handlers into a focused hook.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -204,6 +205,7 @@ import { useAIBackfillChatReviewCommandHandlers } from './ai-chat/useAIBackfillC
 import { useAIBackfillChatReviewWritebackHandlers } from './ai-chat/useAIBackfillChatReviewWritebackHandlers';
 import { useAIBackfillChatResultHandlers } from './ai-chat/useAIBackfillChatResultHandlers';
 import { useAIBackfillChatSessionCommandHandlers } from './ai-chat/useAIBackfillChatSessionCommandHandlers';
+import { useAIBackfillChatViewerHandlers } from './ai-chat/useAIBackfillChatViewerHandlers';
 import { useAIBackfillChatSessionState } from './ai-chat/useAIBackfillChatSessionState';
 import { accentMix, getAIChatTheme } from './ai-chat/AIBackfillChatTheme';
 import { useAIBackfillChatMessageState } from './ai-chat/useAIBackfillChatMessageState';
@@ -2369,83 +2371,39 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     syncAssistantScheduledTasks
   });
 
-  const handleOpenChatView = useCallback((sessionId?: string) => {
-    if (sessionId && sessions.some((session) => session.id === sessionId)) {
-      setActiveSessionId(sessionId);
-    }
-    setIsHomeView(false);
-    window.requestAnimationFrame(() => composerTextareaRef.current?.focus());
-  }, [sessions]);
-
-
-  const handleToggleChatSync = (enabled: boolean) => {
-    setChatSyncEnabled(enabled);
-  };
-
-  const handleOpenAssistantLetterDetail = (letterId: string) => {
-    refreshAssistantLetterSnapshot();
-    setSelectedAssistantLetterId(letterId);
-    setIsAssistantLetterDetailSheetOpen(true);
-  };
-
-  const handleCloseAssistantLetterDetail = () => {
-    setIsAssistantLetterDetailSheetOpen(false);
-  };
-
-  const handleOpenAssistantLetterHistoryViewer = () => {
-    refreshAssistantLetterSnapshot();
-    setAssistantLetterDeleteTargetId(null);
-    setIsAssistantLetterHistoryViewerOpen(true);
-  };
-
-  const handleCloseAssistantLetterHistoryViewer = () => {
-    setAssistantLetterDeleteTargetId(null);
-    setIsAssistantLetterHistoryViewerOpen(false);
-  };
-
-  const handleOpenNewspaperHistoryViewer = () => {
-    setIsNewspaperHistoryViewerOpen(true);
-  };
-
-  const handleCloseNewspaperHistoryViewer = () => {
-    setIsNewspaperHistoryViewerOpen(false);
-  };
-
-  const handleToggleAssistantLetterDelete = (letterId: string) => {
-    setAssistantLetterDeleteTargetId((current) => current === letterId ? null : letterId);
-  };
-
-  const handleConfirmAssistantLetterDelete = (letterId: string) => {
-    assistantLetterService.deleteLetter(letterId);
-    setAssistantLetterDeleteTargetId((current) => current === letterId ? null : current);
-    refreshAssistantLetterSnapshot();
-    setIsAssistantLetterDetailSheetOpen((current) => (
-      selectedAssistantLetterId === letterId ? false : current
-    ));
-    addToast('success', '已删除来信');
-  };
-
-  const handleOpenAssistantBackgroundHistoryViewer = () => {
-    refreshAssistantBackgroundCallHistory();
-    void refreshAssistantNativeDiagnostics();
-    setIsAssistantBackgroundHistoryViewerOpen(true);
-  };
-
-  const handleCloseAssistantBackgroundHistoryViewer = () => {
-    setIsAssistantBackgroundHistoryViewerOpen(false);
-  };
-
-  const handleClearAssistantBackgroundCallHistory = async () => {
-    assistantOrchestratorService.clearBackgroundCallHistory();
-    try {
-      await AssistantAgent.clearDiagnostics();
-    } catch (error) {
-      console.error('[AIBackfillChatModal] Failed to clear native assistant diagnostics', error);
-    }
-    refreshAssistantBackgroundCallHistory();
-    void refreshAssistantNativeDiagnostics();
-    addToast('success', '已清空后台诊断记录');
-  };
+  const {
+    handleClearAssistantBackgroundCallHistory,
+    handleCloseAssistantBackgroundHistoryViewer,
+    handleCloseAssistantLetterDetail,
+    handleCloseAssistantLetterHistoryViewer,
+    handleCloseNewspaperHistoryViewer,
+    handleConfirmAssistantLetterDelete,
+    handleOpenAssistantBackgroundHistoryViewer,
+    handleOpenAssistantLetterDetail,
+    handleOpenAssistantLetterHistoryViewer,
+    handleOpenChatView,
+    handleOpenNewspaperHistoryViewer,
+    handleToggleAssistantLetterDelete,
+    handleToggleChatSync
+  } = useAIBackfillChatViewerHandlers({
+    addToast,
+    composerTextareaRef,
+    refreshAssistantBackgroundCallHistory,
+    refreshAssistantLetterSnapshot,
+    refreshAssistantNativeDiagnostics,
+    selectedAssistantLetterId,
+    sessions,
+    setActiveSessionId,
+    setAssistantLetterDeleteTargetId,
+    setChatSyncEnabled,
+    setInputText,
+    setIsAssistantBackgroundHistoryViewerOpen,
+    setIsAssistantLetterDetailSheetOpen,
+    setIsAssistantLetterHistoryViewerOpen,
+    setIsHomeView,
+    setIsNewspaperHistoryViewerOpen,
+    setSelectedAssistantLetterId
+  });
 
   const handleAIInternalBack = useCallback((): boolean => {
     if (!isOpen) {
