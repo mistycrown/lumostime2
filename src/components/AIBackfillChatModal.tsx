@@ -21,6 +21,7 @@
  * @updated 2026-09-22: Extracts quick-add todo, note, and backfill request handlers into a focused hook.
  * @updated 2026-09-22: Extracts result-card navigation handlers into a focused hook.
  * @updated 2026-09-22: Extracts review writeback runner adapters into a focused hook.
+ * @updated 2026-09-22: Extracts assistant result composition and reply normalization into a focused hook.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -69,7 +70,6 @@ import type {
   AssistantLetterResultCard,
   AssistantLocalQueryResult,
   AssistantMemory,
-  AssistantReasoningSummary,
   AssistantReminder,
   AssistantSystemTrigger,
   DreamUpdateCard
@@ -81,7 +81,6 @@ import {
   formatAssistantLocalDateTime,
   normalizeAssistantDateTime
 } from '../utils/assistantTime';
-import { buildAssistantDisplayParts } from '../utils/assistantMessageParts';
 import { resolveLatestOrdinaryAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
 import {
   ASSISTANT_CHAT_RESTORED_EVENT,
@@ -202,6 +201,7 @@ import { useAIBackfillChatViewState } from './ai-chat/useAIBackfillChatViewState
 import { useAIBackfillChatAssistantState } from './ai-chat/useAIBackfillChatAssistantState';
 import { useAIBackfillChatReviewCommandHandlers } from './ai-chat/useAIBackfillChatReviewCommandHandlers';
 import { useAIBackfillChatReviewWritebackHandlers } from './ai-chat/useAIBackfillChatReviewWritebackHandlers';
+import { useAIBackfillChatResultHandlers } from './ai-chat/useAIBackfillChatResultHandlers';
 import { useAIBackfillChatSessionState } from './ai-chat/useAIBackfillChatSessionState';
 import { accentMix, getAIChatTheme } from './ai-chat/AIBackfillChatTheme';
 import { useAIBackfillChatMessageState } from './ai-chat/useAIBackfillChatMessageState';
@@ -241,7 +241,6 @@ import {
 import {
   buildAssistantCurrentTimeSnapshot,
   buildDebugBlocks,
-  buildMemoryUpdateSections,
   buildPersonaPrompt,
   createSessionTitleFromUserMessage,
   dedupeStringArray,
@@ -259,19 +258,11 @@ import {
   normalizeAssistantNativeDiagnostics
 } from './ai-chat/AIBackfillChatHelpers';
 import {
-  type AIChatDailyReviewWritebackResult,
   type AIChatDebugSection,
-  type AIChatDreamUpdateCard,
-  type AIChatDailyNewspaperWritebackResult,
-  type AIChatMemoryUpdateSection,
   type AIChatMessage,
-  type AIChatMonthlyNewspaperWritebackResult,
-  type AIChatMonthlyReviewWritebackResult,
   type AIChatCustomPromptBlock,
   type AIChatPersona,
   type AIChatSession,
-  type AIChatWeeklyNewspaperWritebackResult,
-  type AIChatWeeklyReviewWritebackResult,
   type AISettingsMainTab,
   type AssistantBackgroundTurnRequestOptions,
   type ChatTone,
@@ -284,8 +275,6 @@ import {
   DEFAULT_ASSISTANT_EDITABLE_MEMORY_DRAFTS,
   DEFAULT_ASSISTANT_REMINDER_DRAFTS,
   DEFAULT_ASSISTANT_SCHEDULED_TASK_DRAFTS,
-  LOG_EDIT_REQUEST_PATTERN,
-  LOG_EDIT_SUCCESS_REPLY_PATTERN,
   ASSISTANT_SCHEDULED_TASK_WEEKDAY_OPTIONS,
   PersonaAvatar,
   formatAssistantScheduledTaskRecurrence
@@ -2981,74 +2970,19 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     todos
   });
 
-  const replacePendingWithResult = (
-    sessionId: string,
-    pendingMessageId: string,
-    content: string,
-    options?: {
-      tone?: ChatTone;
-      reasoning?: AssistantReasoningSummary;
-      displayParts?: string[];
-      debugSections?: AIChatDebugSection[];
-      appliedActions?: AppliedChatAction[];
-      assistantLetterResult?: AssistantLetterResultCard;
-      localQueryResults?: AssistantLocalQueryResult[];
-      memoryUpdates?: AIChatMemoryUpdateSection[];
-      memoryBefore?: AssistantMemory;
-      dreamUpdates?: AIChatDreamUpdateCard[];
-      reminderUpdates?: string[];
-      remindersBefore?: AssistantReminder[];
-      dailyNewspaperWriteback?: AIChatDailyNewspaperWritebackResult;
-      dailyReviewWriteback?: AIChatDailyReviewWritebackResult;
-      weeklyNewspaperWriteback?: AIChatWeeklyNewspaperWritebackResult;
-      weeklyReviewWriteback?: AIChatWeeklyReviewWritebackResult;
-      monthlyNewspaperWriteback?: AIChatMonthlyNewspaperWritebackResult;
-      monthlyReviewWriteback?: AIChatMonthlyReviewWritebackResult;
-      retryInput?: string;
-      retrySourceUserMessageId?: string;
-      dreamRetryYearMonth?: string;
-    }
-  ) => {
-    replaceMessage(sessionId, pendingMessageId, {
-      id: pendingMessageId,
-      role: 'assistant',
-      content,
-      ...(options?.reasoning ? { reasoning: options.reasoning } : {}),
-      ...(options?.displayParts?.length ? { displayParts: options.displayParts } : {}),
-      createdAt: Date.now(),
-      ...(options?.tone ? { tone: options.tone } : {}),
-      ...(options?.debugSections && options.debugSections.length > 0 ? { debugSections: options.debugSections } : {}),
-      ...(options?.appliedActions && options.appliedActions.length > 0 ? { appliedActions: options.appliedActions } : {}),
-      ...(options?.assistantLetterResult ? { assistantLetterResult: options.assistantLetterResult } : {}),
-      ...(options?.localQueryResults && options.localQueryResults.length > 0 ? { localQueryResults: options.localQueryResults } : {}),
-      ...(options?.memoryUpdates && options.memoryUpdates.length > 0 ? { memoryUpdates: options.memoryUpdates } : {}),
-      ...(options?.memoryBefore ? { memoryBefore: options.memoryBefore } : {}),
-      ...(options?.dreamUpdates && options.dreamUpdates.length > 0 ? { dreamUpdates: options.dreamUpdates } : {}),
-      ...(options?.reminderUpdates && options.reminderUpdates.length > 0 ? { reminderUpdates: options.reminderUpdates } : {}),
-      ...(options?.remindersBefore ? { remindersBefore: options.remindersBefore } : {}),
-      ...(options?.dailyNewspaperWriteback ? { dailyNewspaperWriteback: options.dailyNewspaperWriteback } : {}),
-      ...(options?.dailyReviewWriteback ? { dailyReviewWriteback: options.dailyReviewWriteback } : {}),
-      ...(options?.weeklyNewspaperWriteback ? { weeklyNewspaperWriteback: options.weeklyNewspaperWriteback } : {}),
-      ...(options?.weeklyReviewWriteback ? { weeklyReviewWriteback: options.weeklyReviewWriteback } : {}),
-      ...(options?.monthlyNewspaperWriteback ? { monthlyNewspaperWriteback: options.monthlyNewspaperWriteback } : {}),
-      ...(options?.monthlyReviewWriteback ? { monthlyReviewWriteback: options.monthlyReviewWriteback } : {}),
-      ...(options?.retryInput ? { retryInput: options.retryInput } : {}),
-      ...(options?.retrySourceUserMessageId ? { retrySourceUserMessageId: options.retrySourceUserMessageId } : {}),
-      ...(options?.dreamRetryYearMonth ? { dreamRetryYearMonth: options.dreamRetryYearMonth } : {})
-    });
-
-    if (options?.dreamUpdates && options.dreamUpdates.length > 0) {
-      setExpandedDreamUpdateMessageIds((current) => {
-        const next = new Set(current);
-        next.add(pendingMessageId);
-        return next;
-      });
-    }
-
-    if (!isOpenRef.current) {
-      onUnreadAssistantMessage?.(1);
-    }
-  };
+  const {
+    applyAssistantMemoryPatch,
+    replacePendingWithResult,
+    resolveAssistantDisplayParts,
+    resolveAssistantReplyContent,
+    resolveForegroundAssistantReply
+  } = useAIBackfillChatResultHandlers({
+    isOpenRef,
+    onUnreadAssistantMessage,
+    replaceMessage,
+    refreshAssistantMemorySnapshot,
+    setExpandedDreamUpdateMessageIds
+  });
 
   const {
     handleDebugCommand
@@ -3072,70 +3006,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setIsLoading
   });
 
-  const applyAssistantMemoryPatch = (
-    patch?: AssistantUnifiedTurnOutput['memoryPatch'],
-  ): { before: AssistantMemory; updates: AIChatMemoryUpdateSection[] } | null => {
-    if (!patch) {
-      return null;
-    }
-
-    const before = assistantMemoryService.getMemory();
-    const after = assistantMemoryService.applyPatch(patch);
-    refreshAssistantMemorySnapshot();
-    return {
-      before,
-      updates: buildMemoryUpdateSections(before, after)
-    };
-  };
-
-  const resolveAssistantDisplayParts = (
-    content: string
-  ): string[] | undefined => (
-    buildAssistantDisplayParts(content)
-  );
-
-  const resolveAssistantReplyContent = (
-    output?: Pick<AssistantUnifiedTurnOutput, 'assistantReply' | 'outcome'>,
-    fallbackReply?: string
-  ): string => {
-    const assistantReply = output?.assistantReply?.trim() || '';
-    if (assistantReply) {
-      return assistantReply;
-    }
-
-    return fallbackReply?.trim() || (
-      output?.outcome === 'clarify'
-        ? '这次还差一点关键信息，你再补一句我就能继续。'
-        : '我在。'
-    );
-  };
-
-  const resolveForegroundAssistantReply = (
-    rawContent: string,
-    sourceText: string,
-    appliedActions: AppliedChatAction[]
-  ): string => {
-    const editLogActions = appliedActions.filter((action) => action.kind === 'edit_log');
-    const successfulEditLogCount = editLogActions.filter((action) => action.status === 'applied').length;
-    const failedEditLogActions = editLogActions.filter((action) => action.status === 'failed');
-
-    if (failedEditLogActions.length > 0 && successfulEditLogCount === 0) {
-      return failedEditLogActions[0]?.errorMessage?.trim() || '这次我还没实际改动这条记录。';
-    }
-
-    if (successfulEditLogCount > 0) {
-      return rawContent;
-    }
-
-    if (
-      LOG_EDIT_REQUEST_PATTERN.test(sourceText)
-      && LOG_EDIT_SUCCESS_REPLY_PATTERN.test(rawContent)
-    ) {
-      return '这次我还没实际改动这条记录。要么是没有匹配到目标记录，要么是修改条件还不够明确。你可以再说得更具体一点，我再帮你改。';
-    }
-
-    return rawContent;
-  };
 
   const {
     handleQuickAddBackfill,
