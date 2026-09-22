@@ -17,6 +17,7 @@
  * @updated 2026-09-22: Extracts persona, prompt-block, shortcut, and avatar profile editing into a focused hook.
  * @updated 2026-09-22: Extracts assistant memory, reminder, and scheduled-task management into a focused hook.
  * @updated 2026-09-22: Extracts manual assistant debug commands into a focused hook and fixes their retry history path.
+ * @updated 2026-09-22: Extracts applied-action undo and principle/self-belief editing into a focused hook.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -119,30 +120,11 @@ import {
 } from '../services/aiChatStorageService';
 import {
   assistantActionExecutor,
-  applyLogDelete,
-  applyLogSave,
-  applyTodoSave,
-  getStoredPrincipleById,
-  getStoredSelfBeliefById,
-  removeStoredPrincipleById,
-  removeStoredSelfBeliefById,
-  restoreStoredPrinciple,
-  restoreStoredSelfBelief,
   rollbackAppliedChatActions,
-  updateStoredPrinciple,
-  updateStoredSelfBelief,
   type AppliedChatAction,
-  type AppliedCreateLogAction,
-  type AppliedCreatePlannedLogAction,
-  type AppliedCreatePrincipleAction,
-  type AppliedCreateSelfBeliefAction,
-  type AppliedCreateSubtaskAction,
-  type AppliedCreateTodoAction,
-  type AppliedEditLogAction,
-  type AppliedUpdateTodoAction,
 } from '../services/assistantActionExecutor';
-import { PrincipleEditModal, type PrincipleEditFormData } from './PrincipleEditModal';
-import { SelfBeliefEditModal, type SelfBeliefDescriptionDraft } from './SelfBeliefEditModal';
+import { PrincipleEditModal } from './PrincipleEditModal';
+import { SelfBeliefEditModal } from './SelfBeliefEditModal';
 import {
   weeklyReviewTemplateService,
   type WeeklyReviewMethodId,
@@ -187,6 +169,7 @@ import { useAIBackfillChatActionHandlers } from './ai-chat/useAIBackfillChatActi
 import { useAIBackfillChatAssistantTaskHandlers } from './ai-chat/useAIBackfillChatAssistantTaskHandlers';
 import { useAIBackfillChatDebugCommands } from './ai-chat/useAIBackfillChatDebugCommands';
 import { useAIBackfillChatPersonaProfile } from './ai-chat/useAIBackfillChatPersonaProfile';
+import { useAIBackfillChatAppliedActionHandlers } from './ai-chat/useAIBackfillChatAppliedActionHandlers';
 import { useAIBackfillChatDreamManager } from './ai-chat/useAIBackfillChatDreamManager';
 import {
   ACTIVE_SESSION_KEY,
@@ -2826,297 +2809,53 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     todos
   });
 
-  const handleUndoLogAction = (messageId: string, action: AppliedCreateLogAction) => {
-    if (action.status !== 'applied' || !activeSession || !action.snapshot.logId) {
-      return;
-    }
-
-    const liveLog = logs.find((log) => log.id === action.snapshot.logId);
-    if (!liveLog) {
-      updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
-      return;
-    }
-
-    const deleteResult = applyLogDelete(logs, todos, liveLog.id);
-    setLogs(deleteResult.logs);
-    setTodos(deleteResult.todos);
-
-    updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
-    addToast('success', '已撤销这条 AI 补记');
-  };
-
-  const handleUndoPlannedLogAction = (messageId: string, action: AppliedCreatePlannedLogAction) => {
-    if (action.status !== 'applied' || !activeSession || !action.snapshot.logId) {
-      return;
-    }
-
-    const liveLog = logs.find((log) => log.id === action.snapshot.logId);
-    if (!liveLog) {
-      updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
-      return;
-    }
-
-    const deleteResult = applyLogDelete(logs, todos, liveLog.id);
-    setLogs(deleteResult.logs);
-    setTodos(deleteResult.todos);
-
-    updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
-    addToast('success', '已撤销这条 AI 计划');
-  };
-
-  const handleUndoTodoAction = (messageId: string, action: AppliedCreateTodoAction) => {
-    if (action.status !== 'applied' || !activeSession || !action.snapshot.todoId) {
-      return;
-    }
-
-    const deleteTodoIds = new Set([
-      action.snapshot.todoId,
-      ...(action.snapshot.createdSubtaskIds || [])
-    ]);
-    setTodos((prev) => prev.filter((todo) => !deleteTodoIds.has(todo.id)));
-    updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
-    addToast('success', '已撤销这条 AI 待办');
-  };
-
-  const handleUndoUpdateTodoAction = (messageId: string, action: AppliedUpdateTodoAction) => {
-    if (action.status !== 'applied' || !activeSession || !action.snapshot.previousTodo) {
-      return;
-    }
-
-    setTodos((prev) => applyTodoSave(prev, action.snapshot.previousTodo!));
-    updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
-    addToast('success', '已撤销这次 AI 待办修改');
-  };
-
-  const handleUndoCreateSubtaskAction = (messageId: string, action: AppliedCreateSubtaskAction) => {
-    if (action.status !== 'applied' || !activeSession || !action.snapshot.todoId) {
-      return;
-    }
-
-    setTodos((prev) => prev.filter((todo) => todo.id !== action.snapshot.todoId));
-    updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
-    addToast('success', '已撤销这条 AI 子任务');
-  };
-
-  const handleUndoEditLogAction = (messageId: string, action: AppliedEditLogAction) => {
-    if (action.status !== 'applied' || !activeSession || !action.snapshot.previousLog) {
-      return;
-    }
-
-    const restoreResult = applyLogSave(logs, todos, action.snapshot.previousLog);
-    setLogs(restoreResult.logs);
-    setTodos(restoreResult.todos);
-    updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
-    addToast('success', '已撤销这次 AI 记录修改');
-  };
-
-  const handleUndoPrincipleAction = (messageId: string, action: AppliedCreatePrincipleAction) => {
-    if (action.status !== 'applied' || !activeSession || !action.snapshot.principleId) {
-      return;
-    }
-
-    if (action.snapshot.previousPrinciple) {
-      restoreStoredPrinciple(action.snapshot.previousPrinciple);
-    } else {
-      removeStoredPrincipleById(action.snapshot.principleId);
-    }
-    updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
-    addToast('success', action.snapshot.previousPrinciple ? '已恢复原则原文' : '已撤销这条 AI 原则');
-  };
-
-  const handleOpenPrincipleEditor = (principleId?: string) => {
-    if (!principleId) {
-      return;
-    }
-
-    const principle = getStoredPrincipleById(principleId);
-    if (!principle) {
-      addToast('error', '没有找到这条原则');
-      return;
-    }
-
-    setEditingPrincipleId(principle.id);
-    setPrincipleEditFormData({
-      title: principle.title,
-      frontText: principle.frontText,
-      backText: principle.backText
-    });
-  };
-
-  const handleCancelPrincipleEditor = () => {
-    setEditingPrincipleId(null);
-    setPrincipleEditFormData({
-      title: '',
-      frontText: '',
-      backText: ''
-    });
-  };
-
-  const handleSavePrincipleEditor = () => {
-    if (!editingPrincipleId) {
-      return;
-    }
-
-    const title = principleEditFormData.title.trim();
-    const frontText = principleEditFormData.frontText.trim();
-    if (!title || !frontText) {
-      return;
-    }
-
-    const currentPrinciple = getStoredPrincipleById(editingPrincipleId);
-    if (!currentPrinciple) {
-      addToast('error', '没有找到这条原则');
-      handleCancelPrincipleEditor();
-      return;
-    }
-
-    const saved = updateStoredPrinciple({
-      ...currentPrinciple,
-      title,
-      frontText,
-      backText: principleEditFormData.backText.trim()
-    });
-    if (!saved) {
-      addToast('error', '保存原则失败');
-      return;
-    }
-
-    addToast('success', '已保存原则');
-    handleCancelPrincipleEditor();
-  };
-
-  const handleOpenSelfBeliefEditor = (selfBeliefId?: string) => {
-    if (!selfBeliefId) {
-      return;
-    }
-
-    const selfBelief = getStoredSelfBeliefById(selfBeliefId);
-    if (!selfBelief) {
-      addToast('error', '没有找到这条自我认知');
-      return;
-    }
-
-    setEditingSelfBeliefId(selfBelief.id);
-    setSelfBeliefTitleDraft(selfBelief.title);
-    setSelfBeliefDescriptionDrafts(selfBelief.descriptions);
-    setNewSelfBeliefDescriptionText('');
-    setEditingSelfBeliefDescriptionId(null);
-    setEditingSelfBeliefDescriptionText('');
-  };
-
-  const handleCancelSelfBeliefEditor = () => {
-    setEditingSelfBeliefId(null);
-    setSelfBeliefTitleDraft('');
-    setSelfBeliefDescriptionDrafts([]);
-    setNewSelfBeliefDescriptionText('');
-    setEditingSelfBeliefDescriptionId(null);
-    setEditingSelfBeliefDescriptionText('');
-  };
-
-  const handleSaveSelfBeliefEditor = () => {
-    if (!editingSelfBeliefId) {
-      return;
-    }
-
-    const title = selfBeliefTitleDraft.trim();
-    if (!title) {
-      return;
-    }
-
-    const currentSelfBelief = getStoredSelfBeliefById(editingSelfBeliefId);
-    if (!currentSelfBelief) {
-      addToast('error', '没有找到这条自我认知');
-      handleCancelSelfBeliefEditor();
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const saved = updateStoredSelfBelief({
-      ...currentSelfBelief,
-      title,
-      descriptions: selfBeliefDescriptionDrafts,
-      updatedAt: now
-    });
-    if (!saved) {
-      addToast('error', '保存自我认知失败');
-      return;
-    }
-
-    addToast('success', '已保存自我认知');
-    handleCancelSelfBeliefEditor();
-  };
-
-  const handleAddSelfBeliefDescription = () => {
-    const text = newSelfBeliefDescriptionText.trim();
-    if (!text) {
-      return;
-    }
-
-    const now = new Date().toISOString();
-    setSelfBeliefDescriptionDrafts((current) => [
-      ...current,
-      {
-        id: createChatLibraryId('description'),
-        text,
-        date: getTodayDateKey(),
-        source: 'manual',
-        createdAt: now,
-        updatedAt: now
-      }
-    ]);
-    setNewSelfBeliefDescriptionText('');
-  };
-
-  const handleStartEditSelfBeliefDescription = (description: SelfBeliefDescriptionDraft) => {
-    setEditingSelfBeliefDescriptionId(description.id);
-    setEditingSelfBeliefDescriptionText(description.text);
-  };
-
-  const handleSaveSelfBeliefDescriptionEdit = () => {
-    if (!editingSelfBeliefDescriptionId) {
-      return;
-    }
-
-    const text = editingSelfBeliefDescriptionText.trim();
-    if (!text) {
-      return;
-    }
-
-    const now = new Date().toISOString();
-    setSelfBeliefDescriptionDrafts((current) => current.map((description) => (
-      description.id === editingSelfBeliefDescriptionId
-        ? { ...description, text, updatedAt: now }
-        : description
-    )));
-    setEditingSelfBeliefDescriptionId(null);
-    setEditingSelfBeliefDescriptionText('');
-  };
-
-  const handleCancelSelfBeliefDescriptionEdit = () => {
-    setEditingSelfBeliefDescriptionId(null);
-    setEditingSelfBeliefDescriptionText('');
-  };
-
-  const handleDeleteSelfBeliefDescription = (descriptionId: string) => {
-    setSelfBeliefDescriptionDrafts((current) => current.filter((description) => description.id !== descriptionId));
-    if (editingSelfBeliefDescriptionId === descriptionId) {
-      handleCancelSelfBeliefDescriptionEdit();
-    }
-  };
-
-  const handleUndoSelfBeliefAction = (messageId: string, action: AppliedCreateSelfBeliefAction) => {
-    if (action.status !== 'applied' || !activeSession || !action.snapshot.selfBeliefId) {
-      return;
-    }
-
-    if (action.snapshot.previousSelfBelief) {
-      restoreStoredSelfBelief(action.snapshot.previousSelfBelief);
-    } else {
-      removeStoredSelfBeliefById(action.snapshot.selfBeliefId);
-    }
-    updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
-    addToast('success', action.snapshot.previousSelfBelief ? '已恢复自我认知原文' : '已撤销这条 AI 自我认知');
-  };
+  const {
+    handleAddSelfBeliefDescription,
+    handleCancelPrincipleEditor,
+    handleCancelSelfBeliefDescriptionEdit,
+    handleCancelSelfBeliefEditor,
+    handleDeleteSelfBeliefDescription,
+    handleOpenPrincipleEditor,
+    handleOpenSelfBeliefEditor,
+    handleSavePrincipleEditor,
+    handleSaveSelfBeliefDescriptionEdit,
+    handleSaveSelfBeliefEditor,
+    handleStartEditSelfBeliefDescription,
+    handleUndoCreateSubtaskAction,
+    handleUndoEditLogAction,
+    handleUndoLogAction,
+    handleUndoPlannedLogAction,
+    handleUndoPrincipleAction,
+    handleUndoSelfBeliefAction,
+    handleUndoTodoAction,
+    handleUndoUpdateTodoAction
+  } = useAIBackfillChatAppliedActionHandlers({
+    activeSession,
+    addToast,
+    createChatLibraryId,
+    editingPrincipleId,
+    editingSelfBeliefDescriptionId,
+    editingSelfBeliefDescriptionText,
+    editingSelfBeliefId,
+    getTodayDateKey,
+    newSelfBeliefDescriptionText,
+    principleEditFormData,
+    selfBeliefDescriptionDrafts,
+    selfBeliefTitleDraft,
+    logs,
+    todos,
+    updateAppliedActionStatus,
+    setEditingPrincipleId,
+    setEditingSelfBeliefDescriptionId,
+    setEditingSelfBeliefDescriptionText,
+    setEditingSelfBeliefId,
+    setNewSelfBeliefDescriptionText,
+    setPrincipleEditFormData,
+    setSelfBeliefDescriptionDrafts,
+    setSelfBeliefTitleDraft,
+    setLogs,
+    setTodos
+  });
 
   const applyUnifiedToolCalls = (
     toolCalls: AssistantToolCall[],
