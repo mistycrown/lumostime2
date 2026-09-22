@@ -173,7 +173,7 @@ import { AIBackfillChatAssistantSettingsSection } from './ai-chat/AIBackfillChat
 import { renderAppliedChatAction } from './ai-chat/AIBackfillChatAppliedActionRenderer';
 import { AIBackfillChatCallSettingsSection } from './ai-chat/AIBackfillChatCallSettingsSection';
 import { AIBackfillChatConversationPane } from './ai-chat/AIBackfillChatConversationPane';
-import { AIChatHome, type AIChatNewspaperItem } from './ai-chat/AIChatHome';
+import { AIChatHome } from './ai-chat/AIChatHome';
 import {
   normalizeDreamRetryYearMonth,
   parseDreamMonthSelection,
@@ -236,6 +236,7 @@ import { useAIBackfillChatContextData } from './ai-chat/useAIBackfillChatContext
 import { useAIBackfillChatViewport } from './ai-chat/useAIBackfillChatViewport';
 import { CHAT_MARKDOWN_COMPONENTS } from './ai-chat/AIBackfillChatMarkdown';
 import { useAIBackfillChatDebugViewer } from './ai-chat/useAIBackfillChatDebugViewer';
+import { useAIBackfillChatNewspaperSnapshot } from './ai-chat/useAIBackfillChatNewspaperSnapshot';
 import {
   AIBackfillChatHistoryOverlay,
   AIBackfillChatNewSessionDialog
@@ -507,37 +508,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     todoCategories,
     todos
   });
-  const assistantNewspaperSnapshot = useMemo<AIChatNewspaperItem[]>(() => [
-    ...dailyReviews.flatMap((review) => review.aiNewspaper ? [{
-      id: review.aiNewspaper.date,
-      title: review.aiNewspaper.title,
-      preview: review.aiNewspaper.overallComment || review.aiNewspaper.assistantReply,
-      dateLabel: review.date,
-      updatedAt: review.aiNewspaper.updatedAt,
-      period: 'daily' as const,
-      startDate: review.date
-    }] : []),
-    ...weeklyReviews.flatMap((review) => review.aiNewspaper ? [{
-      id: `${review.aiNewspaper.weekStartDate}:${review.aiNewspaper.weekEndDate}`,
-      title: review.aiNewspaper.title,
-      preview: review.aiNewspaper.overallComment || review.aiNewspaper.assistantReply,
-      dateLabel: `${review.aiNewspaper.weekStartDate} - ${review.aiNewspaper.weekEndDate}`,
-      updatedAt: review.aiNewspaper.updatedAt,
-      period: 'weekly' as const,
-      startDate: review.aiNewspaper.weekStartDate,
-      endDate: review.aiNewspaper.weekEndDate
-    }] : []),
-    ...monthlyReviews.flatMap((review) => review.aiNewspaper ? [{
-      id: `${review.aiNewspaper.monthStartDate}:${review.aiNewspaper.monthEndDate}`,
-      title: review.aiNewspaper.title,
-      preview: review.aiNewspaper.overallComment || review.aiNewspaper.assistantReply,
-      dateLabel: `${review.aiNewspaper.monthStartDate} - ${review.aiNewspaper.monthEndDate}`,
-      updatedAt: review.aiNewspaper.updatedAt,
-      period: 'monthly' as const,
-      startDate: review.aiNewspaper.monthStartDate,
-      endDate: review.aiNewspaper.monthEndDate
-    }] : [])
-  ].sort((left, right) => right.updatedAt - left.updatedAt), [dailyReviews, monthlyReviews, weeklyReviews]);
+  const assistantNewspaperSnapshot = useAIBackfillChatNewspaperSnapshot(
+    dailyReviews,
+    weeklyReviews,
+    monthlyReviews
+  );
   const {
     setCurrentView,
     setEditingLog,
