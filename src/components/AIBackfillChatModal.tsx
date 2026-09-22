@@ -11,6 +11,7 @@
  * @updated 2026-09-21: Extracts chat persistence state initialization into a dedicated session-state hook without changing hydration effects.
  * @updated 2026-09-21: Extracts normalized todo/log action context and assistant message reveal lifecycle into focused support hooks.
  * @updated 2026-09-21: Extracts viewport navigation, keyboard inset handling, and Markdown presentation into focused support modules.
+ * @updated 2026-09-22: Hides the bottom composer scrollbar while preserving multi-line scrolling.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -60,7 +61,6 @@ import type {
   AssistantLetterResultCard,
   AssistantLocalQueryResult,
   AssistantMemory,
-  AssistantNativeDiagnosticEntry,
   AssistantReasoningSummary,
   AssistantReminder,
   AssistantScheduledTask,
@@ -79,7 +79,6 @@ import {
   parseAssistantDateTime
 } from '../utils/assistantTime';
 import { buildAssistantDisplayParts } from '../utils/assistantMessageParts';
-import { buildNativeDiagnosticDebugExchange } from '../utils/assistantNativeDebug';
 import { normalizeAssistantQuietHoursValue } from '../utils/assistantQuietHours';
 import { resolveLatestOrdinaryAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
 import {
@@ -184,6 +183,7 @@ import {
   runOrdinaryForegroundTurn
 } from './ai-chat/AIBackfillChatForegroundTurn';
 import { AIBackfillChatDreamOverlay } from './ai-chat/AIBackfillChatDreamOverlay';
+import { buildAssistantBackgroundTimeline } from './ai-chat/AIBackfillChatBackgroundTimeline';
 import {
   ACTIVE_SESSION_KEY,
   CHAT_SYNC_ENABLED_KEY,
@@ -314,7 +314,6 @@ import {
   type AssistantAgentQuietHoursDrafts,
   type AssistantAgentQuietHoursField,
   type AssistantLetterDrafts,
-  type AssistantBackgroundTimelineEntry,
   type AssistantBackgroundTurnRequestOptions,
   type AssistantEditableMemoryDeleteTarget,
   type AssistantReminderDeleteTarget,
@@ -705,168 +704,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     [activeSession, personaMap, personas]
   );
   const shouldUseNativeReminderTriggerDispatch = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
-  const assistantBackgroundTimeline = useMemo<AssistantBackgroundTimelineEntry[]>(() => {
-    const visibleNativeWakeEvents = assistantNativeDiagnostics.filter((entry) => (
-      entry.type === 'checkin_skipped'
-      || entry.type === 'checkin_dispatched'
-      || entry.type === 'manual_trigger_dispatched'
-      || entry.type === 'reminder_due_dispatched'
-      || entry.type === 'native_request_skipped'
-    ));
-    const nativeRequestEvents = assistantNativeDiagnostics.filter((entry) => (
-      entry.type === 'native_request_started'
-      || entry.type === 'native_request_skipped'
-      || entry.type === 'native_request_completed'
-      || entry.type === 'native_request_failed'
-    ));
-    const nativeByTriggerId = new Map<string, AssistantNativeDiagnosticEntry>();
-    visibleNativeWakeEvents.forEach((entry) => {
-      if (entry.triggerId) {
-        nativeByTriggerId.set(entry.triggerId, entry);
-      }
-    });
-    const nativeRequestByTriggerId = new Map<string, {
-      startedAt?: string;
-      completedAt?: string;
-      status?: AssistantBackgroundTimelineEntry['requestStatus'];
-      outcomeSummary?: string;
-      message?: string;
-      errorMessage?: string;
-      debugExchange?: AIDebugExchange;
-    }>();
-    nativeRequestEvents.forEach((entry) => {
-      const triggerId = entry.triggerId?.trim();
-      if (!triggerId) {
-        return;
-      }
-
-      const current = nativeRequestByTriggerId.get(triggerId) || {};
-      if (entry.type === 'native_request_started') {
-        nativeRequestByTriggerId.set(triggerId, {
-          ...current,
-          startedAt: entry.context?.requestedAt || entry.createdAt,
-          status: 'pending'
-        });
-        return;
-      }
-
-      if (entry.type === 'native_request_completed') {
-        const debugExchange = buildNativeDiagnosticDebugExchange(entry);
-        nativeRequestByTriggerId.set(triggerId, {
-          ...current,
-          startedAt: current.startedAt || entry.context?.requestedAt,
-          completedAt: entry.context?.completedAt || entry.createdAt,
-          status: 'completed',
-          outcomeSummary: entry.context?.decisionSummary || '原生后台请求已完成',
-          message: entry.context?.assistantReply || undefined,
-          ...(debugExchange ? { debugExchange } : {})
-        });
-        return;
-      }
-
-      if (entry.type === 'native_request_skipped') {
-        nativeRequestByTriggerId.set(triggerId, {
-          ...current,
-          startedAt: current.startedAt || entry.context?.requestedAt,
-          completedAt: entry.createdAt,
-          status: 'not_started',
-          outcomeSummary: entry.reason === 'native_ai_unavailable'
-            ? '原生 AI 未就绪，等待 Web fallback 或下次重试'
-            : entry.message,
-          errorMessage: entry.reason || undefined
-        });
-        return;
-      }
-
-      const debugExchange = buildNativeDiagnosticDebugExchange(entry);
-      nativeRequestByTriggerId.set(triggerId, {
-        ...current,
-        startedAt: current.startedAt || entry.context?.requestedAt,
-        completedAt: entry.createdAt,
-        status: 'failed',
-        outcomeSummary: '原生后台请求失败了',
-        errorMessage: entry.context?.error || entry.message,
-        ...(debugExchange ? { debugExchange } : {})
-      });
-    });
-
-    const usedNativeIds = new Set<string>();
-    const mergedEntries: AssistantBackgroundTimelineEntry[] = assistantBackgroundCallHistory.map((entry) => {
-      const nativeEvent = entry.triggerId ? nativeByTriggerId.get(entry.triggerId) : undefined;
-      const nativeRequest = entry.triggerId ? nativeRequestByTriggerId.get(entry.triggerId) : undefined;
-      if (nativeEvent) {
-        usedNativeIds.add(nativeEvent.id);
-      }
-
-      const trimmedMessage = entry.message?.trim() || '';
-      const trimmedDecisionSummary = entry.decisionSummary?.trim() || '';
-      const outcomeSummary = entry.status === 'failed'
-        ? '这次后台请求失败了'
-        : trimmedDecisionSummary && trimmedDecisionSummary !== trimmedMessage
-          ? trimmedDecisionSummary
-          : entry.action === 'reply' && trimmedMessage
-            ? '这次请求成功并返回了一条消息'
-            : entry.action === 'silent'
-              ? '这次请求成功，但选择了静默'
-              : '这次请求已完成';
-
-      return {
-        id: entry.id,
-        ...(entry.triggerId ? { triggerId: entry.triggerId } : {}),
-        triggerType: entry.triggerType || nativeEvent?.triggerType,
-        ...(entry.persistedMessageId ? { persistedMessageId: entry.persistedMessageId } : {}),
-        wakeAt: nativeEvent?.createdAt || entry.requestedAt,
-        requestStartedAt: nativeRequest?.startedAt || entry.requestedAt,
-        requestCompletedAt: nativeRequest?.completedAt || entry.completedAt,
-        requestStatus: entry.status === 'failed'
-          ? 'failed'
-          : entry.status === 'pending'
-            ? 'pending'
-            : 'completed',
-        outcomeSummary,
-        ...(trimmedMessage && trimmedMessage !== outcomeSummary ? { message: trimmedMessage } : {}),
-        ...(entry.errorMessage?.trim() ? { errorMessage: entry.errorMessage.trim() } : {}),
-        ...(entry.debugExchange
-          ? { debugExchange: entry.debugExchange }
-          : nativeRequest?.debugExchange
-            ? { debugExchange: nativeRequest.debugExchange }
-            : {})
-      };
-    });
-
-    visibleNativeWakeEvents.forEach((entry) => {
-      if (usedNativeIds.has(entry.id)) {
-        return;
-      }
-
-      const nativeRequest = entry.triggerId ? nativeRequestByTriggerId.get(entry.triggerId) : undefined;
-
-      mergedEntries.push({
-        id: entry.id,
-        ...(entry.triggerId ? { triggerId: entry.triggerId } : {}),
-        triggerType: entry.triggerType,
-        wakeAt: entry.createdAt,
-        requestStartedAt: nativeRequest?.startedAt,
-        requestCompletedAt: nativeRequest?.completedAt,
-        requestStatus: nativeRequest?.status || 'not_started',
-        outcomeSummary: nativeRequest?.outcomeSummary
-          || (entry.reason === 'native_ai_unavailable'
-            ? '原生 AI 未就绪，已保留 Reminder 并等待 Web fallback 或下次重试'
-            : entry.type === 'checkin_skipped'
-              ? `本次 check-in 已跳过：${entry.reason || '条件未满足'}`
-              : '原生已经醒来并派发 trigger，但 Web 侧还没有开始请求'),
-        ...(nativeRequest?.message ? { message: nativeRequest.message } : {}),
-        ...(nativeRequest?.errorMessage ? { errorMessage: nativeRequest.errorMessage } : {}),
-        ...(nativeRequest?.debugExchange ? { debugExchange: nativeRequest.debugExchange } : {})
-      });
-    });
-
-    return mergedEntries.sort((left, right) => {
-      const leftTime = Date.parse(left.requestCompletedAt || left.requestStartedAt || left.wakeAt || '') || 0;
-      const rightTime = Date.parse(right.requestCompletedAt || right.requestStartedAt || right.wakeAt || '') || 0;
-      return rightTime - leftTime;
-    });
-  }, [assistantBackgroundCallHistory, assistantNativeDiagnostics]);
+  const assistantBackgroundTimeline = useMemo(
+    () => buildAssistantBackgroundTimeline({
+      backgroundCallHistory: assistantBackgroundCallHistory,
+      nativeDiagnostics: assistantNativeDiagnostics
+    }),
+    [assistantBackgroundCallHistory, assistantNativeDiagnostics]
+  );
 
   const resolveMessageDebugViewer = useAIBackfillChatDebugViewer({
     debugMode,
@@ -7076,7 +6920,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
                 });
               }}
               placeholder={`和 ${activePersona.assistantSelfName || 'AI'} 说点什么...`}
-              className="order-2 min-h-[34px] max-h-[34px] min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-1 py-1 text-[15px] leading-6 outline-none"
+              className="scrollbar-hide order-2 min-h-[34px] max-h-[34px] min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-1 py-1 text-[15px] leading-6 outline-none"
               style={{ color: AI_CHAT_THEME.textPrimary }}
               autoFocus
             />
