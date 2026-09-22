@@ -32,6 +32,7 @@
  * @updated 2026-09-22: Extracts dream and review-template opening handlers into a focused hook.
  * @updated 2026-09-22: Extracts assistant message retry and rollback handling into a focused hook.
  * @updated 2026-09-22: Extracts the chat header toolbar into a focused component.
+ * @updated 2026-09-22: Extracts the desktop edge restore view into a focused component.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -222,6 +223,7 @@ import { useAIBackfillChatSend } from './ai-chat/useAIBackfillChatSend';
 import { useAIBackfillChatTemplateOpeningHandlers } from './ai-chat/useAIBackfillChatTemplateOpeningHandlers';
 import { useAIBackfillChatRetry } from './ai-chat/useAIBackfillChatRetry';
 import { AIBackfillChatHeader } from './ai-chat/AIBackfillChatHeader';
+import { AIBackfillChatEdgeRestore } from './ai-chat/AIBackfillChatEdgeRestore';
 import { useAIBackfillChatSessionState } from './ai-chat/useAIBackfillChatSessionState';
 import { accentMix, getAIChatTheme } from './ai-chat/AIBackfillChatTheme';
 import { useAIBackfillChatMessageState } from './ai-chat/useAIBackfillChatMessageState';
@@ -2562,35 +2564,24 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     return null;
   }
 
-  if (isDesktopWidgetMode && edgeHidden) {
-    const restoreIcon = hiddenEdge === 'left' ? <ChevronRight size={16} /> : <ChevronLeft size={16} />;
+  if (!isOpen) {
+    return null;
+  }
 
+  if (isDesktopWidgetMode && edgeHidden) {
     return (
-      <div
-        className="fixed inset-0 flex h-full w-full items-center justify-center bg-transparent"
-        style={{
-          color: AI_CHAT_THEME.textSecondary
-        }}
-      >
-        {desktopWidgetAnimationStyles}
-        <button
-          type="button"
-          onClick={onRestoreFromEdge}
-          className="flex h-14 w-4 items-center justify-center rounded-full border shadow-sm transition-colors"
-          style={{
-            borderColor: AI_CHAT_THEME.chipBorder,
-            backgroundColor: AI_CHAT_THEME.panelBg,
-            color: AI_CHAT_THEME.textPrimary,
-            animation: 'aiWidgetHandleReveal 150ms cubic-bezier(0.22, 1, 0.36, 1)',
-            ['--ai-widget-enter-x' as string]: hiddenEdge === 'left' ? '-7px' : '7px'
-          }}
-          title="展开 AI 对话窗"
-        >
-          {restoreIcon}
-        </button>
-      </div>
+      <AIBackfillChatEdgeRestore
+        AI_CHAT_THEME={AI_CHAT_THEME}
+        desktopWidgetAnimationStyles={desktopWidgetAnimationStyles}
+        edgeHidden={edgeHidden}
+        hiddenEdge={hiddenEdge}
+        isDesktopWidgetMode={isDesktopWidgetMode}
+        onRestoreFromEdge={onRestoreFromEdge}
+      />
     );
   }
+
+
 
   const renderAppliedAction = (messageId: string, action: AppliedChatAction) => (
     renderAppliedChatAction({
