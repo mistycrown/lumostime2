@@ -25,6 +25,7 @@
  * @updated 2026-09-22: Extracts session history and composer command handlers into a focused hook.
  * @updated 2026-09-22: Extracts chat view, assistant letter, and diagnostics viewer handlers into a focused hook.
  * @updated 2026-09-22: Extracts layered internal back-navigation policy into a focused hook.
+ * @updated 2026-09-22: Extracts native assistant lifecycle and background catch-up effects into a focused hook.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -208,6 +209,7 @@ import { useAIBackfillChatResultHandlers } from './ai-chat/useAIBackfillChatResu
 import { useAIBackfillChatSessionCommandHandlers } from './ai-chat/useAIBackfillChatSessionCommandHandlers';
 import { useAIBackfillChatViewerHandlers } from './ai-chat/useAIBackfillChatViewerHandlers';
 import { useAIBackfillChatInternalBack } from './ai-chat/useAIBackfillChatInternalBack';
+import { useAIBackfillChatBackgroundEffects } from './ai-chat/useAIBackfillChatBackgroundEffects';
 import { useAIBackfillChatSessionState } from './ai-chat/useAIBackfillChatSessionState';
 import { accentMix, getAIChatTheme } from './ai-chat/AIBackfillChatTheme';
 import { useAIBackfillChatMessageState } from './ai-chat/useAIBackfillChatMessageState';
@@ -1994,194 +1996,24 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     };
   }, [handleAssistantLogSubmittedEvent]);
 
-  useEffect(() => {
-    let cancelled = false;
-    let pluginListener: Awaited<ReturnType<typeof AssistantAgent.addListener>> | null = null;
-    let diagnosticsListener: Awaited<ReturnType<typeof AssistantAgent.addListener>> | null = null;
-    let appStateListener: Awaited<ReturnType<typeof CapacitorApp.addListener>> | null = null;
-
-    const bindAssistantAgent = async () => {
-      try {
-        pluginListener = await AssistantAgent.addListener('assistantSystemTrigger', (trigger) => {
-          if (cancelled || !assistantAgentConfig.enabled) {
-            return;
-          }
-
-          void handleAssistantSystemTrigger(trigger as AssistantSystemTrigger);
-        });
-        diagnosticsListener = await AssistantAgent.addListener('assistantDiagnosticsUpdated', () => {
-          if (cancelled) {
-            return;
-          }
-
-          void refreshAssistantNativeDiagnostics();
-        });
-        appStateListener = await CapacitorApp.addListener('appStateChange', ({ isActive }) => {
-          if (cancelled || !isActive || !assistantAgentConfig.enabled) {
-            return;
-          }
-
-          void (async () => {
-            await hydrateAssistantReminderSnapshotFromNative();
-            await drainPendingAssistantSystemTriggers();
-          })();
-        });
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        void refreshAssistantNativeDiagnostics();
-        void (async () => {
-          await hydrateAssistantReminderSnapshotFromNative();
-          await drainPendingAssistantSystemTriggers();
-        })();
-      } catch (error) {
-        console.error('[AIBackfillChatModal] Failed to bind assistant agent listener', error);
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (cancelled || document.hidden || !assistantAgentConfig.enabled) {
-        return;
-      }
-
-      void (async () => {
-        await hydrateAssistantReminderSnapshotFromNative();
-        await drainPendingAssistantSystemTriggers();
-      })();
-    };
-
-    void bindAssistantAgent();
-
-    return () => {
-      cancelled = true;
-      pluginListener?.remove();
-      diagnosticsListener?.remove();
-      void appStateListener?.remove();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [
-    assistantAgentConfig.enabled,
-    drainPendingAssistantSystemTriggers,
-    handleAssistantSystemTrigger,
-    hydrateAssistantReminderSnapshotFromNative,
-    refreshAssistantNativeDiagnostics,
-  ]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const syncAssistantAgent = async () => {
-      try {
-        if (assistantAgentConfig.enabled) {
-          await AssistantAgent.startAgent(assistantAgentConfig);
-        } else {
-          await AssistantAgent.stopAgent();
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error('[AIBackfillChatModal] Failed to sync assistant agent config', error);
-        }
-      }
-    };
-
-    void syncAssistantAgent();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [assistantAgentConfig]);
-
-  useEffect(() => {
-    void AssistantAgent.syncNativeAIConfig(aiService.getConfig()).catch((error) => {
-      console.error('[AIBackfillChatModal] Failed to sync native AI config on mount/update', error);
-    });
-    void syncNativeBackgroundExecutionSnapshot();
-  }, [
-    assistantAgentConfig.enabled,
-    assistantAgentConfig.longTermMemoryEnabled,
-    conversationHistoryCache,
-    isAssistantBackgroundContextReady,
-    syncNativeBackgroundExecutionSnapshot
-  ]);
-
-  useEffect(() => {
-    if (!assistantAgentConfig.enabled) {
-      return;
-    }
-
-    void syncNativeBackgroundExecutionSnapshot();
-  }, [
-    assistantAgentConfig.enabled,
-    assistantMemorySnapshot.updatedAt,
+  useAIBackfillChatBackgroundEffects({
+    AssistantAgent,
+    CapacitorApp,
+    aiService,
+    assistantAgentConfig,
+    assistantMemorySnapshot,
     assistantReminderSnapshot,
-    isAssistantBackgroundContextReady,
-    syncNativeBackgroundExecutionSnapshot
-  ]);
-
-  useEffect(() => {
-    if (
-      !assistantAgentConfig.enabled
-      || !isAssistantBackgroundContextReady
-      || hasCompletedStartupReminderCatchupRef.current
-    ) {
-      return;
-    }
-
-    hasCompletedStartupReminderCatchupRef.current = true;
-
-    void (async () => {
-      try {
-        await hydrateAssistantReminderSnapshotFromNative();
-        flushDueReminders();
-        flushDueAssistantLetter();
-      } catch (error) {
-        hasCompletedStartupReminderCatchupRef.current = false;
-        console.error('[AIBackfillChatModal] Failed cold-start reminder catch-up', error);
-      }
-    })();
-  }, [
-    assistantAgentConfig.enabled,
+    conversationHistoryCache,
+    drainPendingAssistantSystemTriggers,
     flushDueAssistantLetter,
     flushDueReminders,
+    handleAssistantSystemTrigger,
+    hasCompletedStartupReminderCatchupRef,
     hydrateAssistantReminderSnapshotFromNative,
-    isAssistantBackgroundContextReady
-  ]);
-
-  useEffect(() => {
-    flushDueReminders();
-    flushDueAssistantLetter();
-
-    if (!assistantAgentConfig.enabled) {
-      return;
-    }
-
-    const timer = window.setInterval(() => {
-      flushDueReminders();
-      flushDueAssistantLetter();
-    }, 60_000);
-
-    return () => window.clearInterval(timer);
-  }, [
-    assistantAgentConfig.enabled,
-    flushDueAssistantLetter,
-    flushDueReminders
-  ]);
-
-  useEffect(() => {
-    if (!assistantAgentConfig.enabled || !isAssistantBackgroundContextReady) {
-      return;
-    }
-
-    void (async () => {
-      await hydrateAssistantReminderSnapshotFromNative();
-      await drainPendingAssistantSystemTriggers();
-      flushDueAssistantLetter();
-    })();
-  }, [
-    assistantAgentConfig.enabled,
-    drainPendingAssistantSystemTriggers,
-    flushDueAssistantLetter,
-    hydrateAssistantReminderSnapshotFromNative,
-    isAssistantBackgroundContextReady
-  ]);
+    isAssistantBackgroundContextReady,
+    refreshAssistantNativeDiagnostics,
+    syncNativeBackgroundExecutionSnapshot
+  });
 
 
   const prepareForTemplateInteraction = useCallback(() => {
