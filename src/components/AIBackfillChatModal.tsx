@@ -19,6 +19,7 @@
  * @updated 2026-09-22: Extracts manual assistant debug commands into a focused hook and fixes their retry history path.
  * @updated 2026-09-22: Extracts applied-action undo and principle/self-belief editing into a focused hook.
  * @updated 2026-09-22: Extracts quick-add todo, note, and backfill request handlers into a focused hook.
+ * @updated 2026-09-22: Extracts result-card navigation handlers into a focused hook.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -172,6 +173,7 @@ import { useAIBackfillChatDebugCommands } from './ai-chat/useAIBackfillChatDebug
 import { useAIBackfillChatPersonaProfile } from './ai-chat/useAIBackfillChatPersonaProfile';
 import { useAIBackfillChatAppliedActionHandlers } from './ai-chat/useAIBackfillChatAppliedActionHandlers';
 import { useAIBackfillChatQuickAddHandlers } from './ai-chat/useAIBackfillChatQuickAddHandlers';
+import { useAIBackfillChatResultNavigation } from './ai-chat/useAIBackfillChatResultNavigation';
 import { useAIBackfillChatDreamManager } from './ai-chat/useAIBackfillChatDreamManager';
 import {
   ACTIVE_SESSION_KEY,
@@ -2939,174 +2941,51 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     return { before, updates: reminderUpdates };
   };
 
-  const handleOpenLogEditor = (logId?: string) => {
-    if (!logId) {
-      return;
-    }
-
-    if (isDesktopWidgetMode) {
-      onOpenMainApp?.();
-      return;
-    }
-
-    const liveLog = logs.find((log) => log.id === logId);
-    if (!liveLog) {
-      addToast('info', '这条记录已经不存在了。');
-      return;
-    }
-
-    setEditingLog(liveLog);
-    setInitialLogTimes(null);
-    setIsAddModalOpen(true);
-  };
-
-  const handleOpenTodoDetail = (todoId?: string) => {
-    if (!todoId) {
-      return;
-    }
-
-    if (isDesktopWidgetMode) {
-      onOpenMainApp?.();
-      window.desktopWidget?.requestMainAction({
-        type: 'open_todo',
-        todoId
-      });
-      return;
-    }
-
-    const liveTodo = todos.find((todo) => todo.id === todoId);
-    if (!liveTodo) {
-      addToast('info', '这条待办已经不存在了。');
-      return;
-    }
-
-    setEditingTodo(liveTodo);
-    setTodoCategoryToAdd(liveTodo.categoryId);
-    setNewTodoDraft(null);
-    setIsTodoModalOpen(true);
-  };
-
-  const handleOpenWeeklyReviewNarrative = (weekStartDate: string, weekEndDate: string) => {
-    if (isDesktopWidgetMode) {
-      onOpenMainApp?.();
-      return;
-    }
-
-    const weekStart = new Date(`${weekStartDate}T12:00:00`);
-    const weekEnd = new Date(`${weekEndDate}T12:00:00`);
-    if (Number.isNaN(weekStart.getTime()) || Number.isNaN(weekEnd.getTime())) {
-      addToast('info', '这个周回顾的日期范围无效。');
-      return;
-    }
-
-    setCurrentView(AppView.REVIEW);
-    setCurrentWeeklyReviewInitialTab('narrative');
-    setCurrentWeeklyReviewStart(weekStart);
-    setCurrentWeeklyReviewEnd(weekEnd);
-    setIsWeeklyReviewOpen(true);
-    onClose();
-  };
-
-  const handleOpenDailyReviewNarrative = (date: string) => {
-    if (isDesktopWidgetMode) {
-      onOpenMainApp?.();
-      return;
-    }
-
-    const reviewDate = new Date(`${date}T12:00:00`);
-    if (Number.isNaN(reviewDate.getTime())) {
-      addToast('info', '这个日报日期无效。');
-      return;
-    }
-
-    setCurrentView(AppView.REVIEW);
-    setCurrentReviewDate(reviewDate);
-    setCurrentDailyReviewInitialTab('narrative');
-    setIsDailyReviewOpen(true);
-    onClose();
-  };
-
-  const handleOpenDailyNewspaper = (date: string) => {
-    if (isDesktopWidgetMode) {
-      onOpenMainApp?.();
-      return;
-    }
-
-    const reviewDate = new Date(`${date}T12:00:00`);
-    if (Number.isNaN(reviewDate.getTime())) {
-      addToast('info', '这个小报日期无效。');
-      return;
-    }
-
-    setCurrentView(AppView.REVIEW);
-    setCurrentDailyNewspaperDate(reviewDate);
-    setIsDailyNewspaperOpen(true);
-    onRequestReturnToAI?.();
-    onClose();
-  };
-
-  const handleOpenWeeklyNewspaper = (weekStartDate: string, weekEndDate: string) => {
-    if (isDesktopWidgetMode) {
-      onOpenMainApp?.();
-      return;
-    }
-
-    const weekStart = new Date(`${weekStartDate}T12:00:00`);
-    const weekEnd = new Date(`${weekEndDate}T12:00:00`);
-    if (Number.isNaN(weekStart.getTime()) || Number.isNaN(weekEnd.getTime())) {
-      addToast('info', '这个周小报的日期范围无效。');
-      return;
-    }
-
-    setCurrentView(AppView.REVIEW);
-    setCurrentWeeklyNewspaperStart(weekStart);
-    setCurrentWeeklyNewspaperEnd(weekEnd);
-    setIsWeeklyNewspaperOpen(true);
-    onRequestReturnToAI?.();
-    onClose();
-  };
-
-  const handleOpenMonthlyReviewNarrative = (monthStartDate: string, monthEndDate: string) => {
-    if (isDesktopWidgetMode) {
-      onOpenMainApp?.();
-      return;
-    }
-
-    const monthStart = new Date(`${monthStartDate}T12:00:00`);
-    const monthEnd = new Date(`${monthEndDate}T12:00:00`);
-    if (Number.isNaN(monthStart.getTime()) || Number.isNaN(monthEnd.getTime())) {
-      addToast('info', '这个月回顾的日期范围无效。');
-      return;
-    }
-
-    setCurrentView(AppView.REVIEW);
-    setCurrentMonthlyReviewInitialTab('narrative');
-    setCurrentMonthlyReviewStart(monthStart);
-    setCurrentMonthlyReviewEnd(monthEnd);
-    setIsMonthlyReviewOpen(true);
-    onClose();
-  };
-
-  const handleOpenMonthlyNewspaper = (monthStartDate: string, monthEndDate: string) => {
-    if (isDesktopWidgetMode) {
-      onOpenMainApp?.();
-      return;
-    }
-
-    const monthStart = new Date(`${monthStartDate}T12:00:00`);
-    const monthEnd = new Date(`${monthEndDate}T12:00:00`);
-    if (Number.isNaN(monthStart.getTime()) || Number.isNaN(monthEnd.getTime())) {
-      addToast('info', '这个月小报的日期范围无效。');
-      return;
-    }
-
-    setCurrentView(AppView.REVIEW);
-    setCurrentMonthlyNewspaperStart(monthStart);
-    setCurrentMonthlyNewspaperEnd(monthEnd);
-    setIsMonthlyNewspaperOpen(true);
-    onRequestReturnToAI?.();
-    onClose();
-  };
+  const {
+    handleOpenDailyNewspaper,
+    handleOpenDailyReviewNarrative,
+    handleOpenLogEditor,
+    handleOpenMonthlyNewspaper,
+    handleOpenMonthlyReviewNarrative,
+    handleOpenTodoDetail,
+    handleOpenWeeklyNewspaper,
+    handleOpenWeeklyReviewNarrative
+  } = useAIBackfillChatResultNavigation({
+    addToast,
+    isDesktopWidgetMode,
+    logs,
+    onClose,
+    onOpenMainApp,
+    onRequestReturnToAI,
+    setCurrentDailyNewspaperDate,
+    setCurrentDailyReviewInitialTab,
+    setCurrentMonthlyNewspaperStart,
+    setCurrentMonthlyNewspaperEnd,
+    setCurrentMonthlyReviewInitialTab,
+    setCurrentMonthlyReviewStart,
+    setCurrentMonthlyReviewEnd,
+    setCurrentReviewDate,
+    setCurrentView,
+    setCurrentWeeklyNewspaperStart,
+    setCurrentWeeklyNewspaperEnd,
+    setCurrentWeeklyReviewInitialTab,
+    setCurrentWeeklyReviewStart,
+    setCurrentWeeklyReviewEnd,
+    setEditingLog,
+    setEditingTodo,
+    setInitialLogTimes,
+    setIsAddModalOpen,
+    setIsDailyNewspaperOpen,
+    setIsDailyReviewOpen,
+    setIsMonthlyNewspaperOpen,
+    setIsMonthlyReviewOpen,
+    setIsTodoModalOpen,
+    setIsWeeklyNewspaperOpen,
+    setIsWeeklyReviewOpen,
+    setNewTodoDraft,
+    setTodoCategoryToAdd,
+    todos
+  });
 
   const replacePendingWithResult = (
     sessionId: string,
