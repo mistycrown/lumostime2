@@ -167,20 +167,16 @@ export const UIIconSelector: React.FC<UIIconSelectorProps> = ({
                             `}
                             title={label}
                         >
-                            {primary ? (
-                                <img
-                                    src={primary}
-                                    alt={label}
-                                    className="w-full h-full object-contain"
-                                    onError={(e) => {
-                                        if (fallback && e.currentTarget.src === primary) {
-                                            e.currentTarget.src = fallback;
-                                        }
-                                    }}
-                                />
-                            ) : (
-                                <span className="h-7 w-7 rounded bg-stone-100" role="img" aria-label={label} />
-                            )}
+                            <img
+                                src={primary}
+                                alt={label}
+                                className="w-full h-full object-contain"
+                                onError={(e) => {
+                                    if (e.currentTarget.src === primary) {
+                                        e.currentTarget.src = fallback;
+                                    }
+                                }}
+                            />
                             
                             {/* 选中标记 */}
                             {isSelected && (
@@ -308,20 +304,16 @@ export const UIIconSelectorCompact: React.FC<UIIconSelectorProps> = ({
                             `}
                             title={label}
                         >
-                            {primary ? (
-                                <img
-                                    src={primary}
-                                    alt={label}
-                                    className="w-full h-full object-contain"
-                                    onError={(e) => {
-                                        if (fallback && e.currentTarget.src === primary) {
-                                            e.currentTarget.src = fallback;
-                                        }
-                                    }}
-                                />
-                            ) : (
-                                <span className="h-7 w-7 rounded bg-stone-100" role="img" aria-label={label} />
-                            )}
+                            <img
+                                src={primary}
+                                alt={label}
+                                className="w-full h-full object-contain"
+                                onError={(e) => {
+                                    if (e.currentTarget.src === primary) {
+                                        e.currentTarget.src = fallback;
+                                    }
+                                }}
+                            />
                             
                             {isSelected && (
                                 <div 

@@ -3,24 +3,27 @@
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.text.TextPaint
+import androidx.collection.LruCache
 import java.util.Calendar
 import java.util.Locale
 import kotlin.math.min
 
 /**
  * Renders the dedicated 2x2 tracking-calendar widget as a single bitmap.
- * @updated 2026-09-23: Reuses the shared loader for downloaded and bundled UI icons.
  * @updated 2026-08-06: Wraps sparse sixth-week dates into the first row while keeping the original six-row spacing.
  */
 object WidgetTrackingCalendarBitmapRenderer {
     private const val FALLBACK_WIDGET_SIZE_DP = 220f
     private const val DEFAULT_ACCENT_COLOR = "#E7E5E4"
     private val WEEKDAY_LABELS = listOf("M", "T", "W", "T", "F", "S", "S")
+
+    private val iconBitmapCache = object : LruCache<String, Bitmap>(24) {}
 
     @JvmStatic
     fun render(
@@ -234,12 +237,43 @@ object WidgetTrackingCalendarBitmapRenderer {
     ): Bitmap? {
         val primaryPath = config.uiIconAssetPath?.takeIf { it.isNotBlank() } ?: return null
         val fallbackPath = config.uiIconFallbackAssetPath?.takeIf { it.isNotBlank() }
-        return WidgetSlotBitmapRenderer.loadUiIconBitmap(
-            context,
-            primaryPath,
-            fallbackPath,
-            iconSizePx
-        )
+        return decodePackagedBitmap(context, primaryPath, iconSizePx)
+            ?: fallbackPath?.let { decodePackagedBitmap(context, it, iconSizePx) }
+    }
+
+    private fun decodePackagedBitmap(
+        context: Context,
+        assetPath: String,
+        iconSizePx: Int
+    ): Bitmap? {
+        val normalizedAssetPath = assetPath.replace('\\', '/').trimStart('/')
+        val cacheKey = "$normalizedAssetPath@$iconSizePx"
+        iconBitmapCache.get(cacheKey)?.let { cached ->
+            if (!cached.isRecycled) {
+                return cached
+            }
+            iconBitmapCache.remove(cacheKey)
+        }
+
+        return try {
+            context.assets.open("public/$normalizedAssetPath").use { inputStream ->
+                val decoded = BitmapFactory.decodeStream(inputStream) ?: return null
+                val scaledBitmap =
+                    if (decoded.width == iconSizePx && decoded.height == iconSizePx) {
+                        decoded
+                    } else {
+                        Bitmap.createScaledBitmap(decoded, iconSizePx, iconSizePx, true).also {
+                            if (it != decoded) {
+                                decoded.recycle()
+                            }
+                        }
+                    }
+                iconBitmapCache.put(cacheKey, scaledBitmap)
+                scaledBitmap
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun ellipsizeText(

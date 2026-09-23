@@ -9,15 +9,13 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.text.TextPaint
 import android.util.LruCache
-import java.io.File
-import java.io.FileInputStream
 
 /**
  * Renders widget slot visuals as bitmaps so RemoteViews can show
  * dynamic timer states and daily-check progress states.
  *
- * Updated 2026-09-23: Reads downloaded UI icons from app data before bundled preview assets.
- * Updated 2026-04-25: Cache decoded bitmaps so unlocked icon rendering does not add visible lag.
+ * Updated 2026-04-25: Prefer packaged UI icon assets for widget slots and
+ * cache decoded bitmaps so unlocked icon rendering does not add visible lag.
  * Updated 2026-05-05: Reused the daily completion checkmark for successful quick-punch shortcut taps.
  * Updated 2026-08-06: Exposed packaged UI icon loading for scene time-slot tab rendering.
  */
@@ -313,11 +311,11 @@ object WidgetSlotBitmapRenderer {
     ): Bitmap? {
         val primaryPathValue = primaryPath?.takeIf { it.isNotBlank() } ?: return null
         val fallbackPathValue = fallbackPath?.takeIf { it.isNotBlank() }
-        return decodeUiIconBitmap(context, primaryPathValue, iconSizePx)
-            ?: fallbackPathValue?.let { decodeUiIconBitmap(context, it, iconSizePx) }
+        return decodePackagedBitmap(context, primaryPathValue, iconSizePx)
+            ?: fallbackPathValue?.let { decodePackagedBitmap(context, it, iconSizePx) }
     }
 
-    private fun decodeUiIconBitmap(
+    private fun decodePackagedBitmap(
         context: Context,
         assetPath: String,
         iconSizePx: Int
@@ -332,14 +330,8 @@ object WidgetSlotBitmapRenderer {
         }
 
         return try {
-            val downloadedFile = File(context.filesDir, "images/$normalizedAssetPath")
-            val inputStream = if (downloadedFile.isFile) {
-                FileInputStream(downloadedFile)
-            } else {
-                context.assets.open("public/$normalizedAssetPath")
-            }
-            inputStream.use {
-                val decoded = BitmapFactory.decodeStream(it) ?: return null
+            context.assets.open("public/$normalizedAssetPath").use { inputStream ->
+                val decoded = BitmapFactory.decodeStream(inputStream) ?: return null
                 val scaledBitmap =
                     if (decoded.width == iconSizePx && decoded.height == iconSizePx) {
                         decoded

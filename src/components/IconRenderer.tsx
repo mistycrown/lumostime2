@@ -2,7 +2,6 @@
  * @file IconRenderer.tsx
  * @description 通用图标渲染组件 - 支持双图标系统（emoji + uiIcon）
  * @updated 2026-08-06: Added an explicit UI-icon precedence option for scene time-slot rendering while preserving emoji fallback data.
- * @updated 2026-09-23: Avoids empty image sources while a selected downloadable UI theme is being fetched.
  * 
  * 新的双图标系统：
  * - icon: 始终保存 emoji（用于默认主题）
@@ -326,18 +325,6 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     if (shouldUseUIIcon) {
         const iconType = value as UIIconType;
         const { primary, fallback } = uiIconService.getIconPathWithFallback(iconType);
-
-        if (!primary) {
-            return (
-                <span
-                    ref={emojiRef}
-                    className={`inline-flex items-center justify-center ${className}`}
-                    style={{ fontSize: getEmojiSize(), lineHeight: 1 }}
-                >
-                    {displayEmoji}
-                </span>
-            );
-        }
         
         const imageSize = getImageSize();
         const sizeStyle = { 
@@ -356,11 +343,7 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
                     onError={(e) => {
                         if (!hasFallbackAttempted) {
                             setHasFallbackAttempted(true);
-                            if (fallback) {
-                                e.currentTarget.src = fallback;
-                            } else {
-                                setImageError(true);
-                            }
+                            e.currentTarget.src = fallback;
                         } else {
                             setImageError(true);
                         }
