@@ -486,7 +486,11 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
             setDownloadedUiIconThemes(uiIconAssetService.listDownloadedThemes());
         };
         window.addEventListener('ui-icon-assets-ready', refreshDownloadedThemes);
-        return () => window.removeEventListener('ui-icon-assets-ready', refreshDownloadedThemes);
+        window.addEventListener('ui-icon-assets-invalidated', refreshDownloadedThemes);
+        return () => {
+            window.removeEventListener('ui-icon-assets-ready', refreshDownloadedThemes);
+            window.removeEventListener('ui-icon-assets-invalidated', refreshDownloadedThemes);
+        };
     }, []);
 
     const handleUiIconThemeDownload = async (theme: string) => {
