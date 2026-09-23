@@ -149,7 +149,7 @@ export const UIIconSelector: React.FC<UIIconSelectorProps> = ({
                 </button>
                 
                 {ICON_GROUPS[selectedGroup].icons.map((iconType) => {
-                    const { primary, fallback } = uiIconService.getRemoteIconPathWithFallback(iconType);
+                    const { primary, fallback } = uiIconService.getIconPathWithFallback(iconType);
                     const isSelected = currentSelectedIconType === iconType;
                     const label = uiIconService.getIconLabel(iconType);
                     
@@ -286,7 +286,7 @@ export const UIIconSelectorCompact: React.FC<UIIconSelectorProps> = ({
                 </button>
                 
                 {allIcons.map((iconType) => {
-                    const { primary, fallback } = uiIconService.getRemoteIconPathWithFallback(iconType);
+                    const { primary, fallback } = uiIconService.getIconPathWithFallback(iconType);
                     const isSelected = currentSelectedIconType === iconType;
                     const label = uiIconService.getIconLabel(iconType);
                     

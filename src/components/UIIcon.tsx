@@ -60,7 +60,7 @@ export const UIIcon: React.FC<UIIconProps> = ({
             return;
         }
 
-        const paths = uiIconService.getRemoteIconPathWithFallback(type);
+        const paths = uiIconService.getIconPathWithFallback(type);
         setImageSrc(paths.primary);
         setImageError(false);
     }, [currentTheme, type]);
@@ -68,7 +68,7 @@ export const UIIcon: React.FC<UIIconProps> = ({
     // 处理图片加载错误（降级到 PNG）
     const handleImageError = () => {
         if (!imageError && imageSrc.endsWith('.webp')) {
-            const paths = uiIconService.getRemoteIconPathWithFallback(type);
+            const paths = uiIconService.getIconPathWithFallback(type);
             setImageSrc(paths.fallback);
         } else {
             setImageError(true);
