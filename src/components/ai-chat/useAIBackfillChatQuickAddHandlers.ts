@@ -5,6 +5,7 @@
  * @pos Component Support (AI Integration)
  * @description Keeps quick-add request orchestration and backfill argument resolution out of the main chat modal.
  * @updated 2026-09-22: Extracted quick-add command handlers from AIBackfillChatModal.
+ * @updated 2026-09-23: Passes local date context to quick-add todo parsing.
  */
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { Category } from '../../types';
@@ -232,12 +233,18 @@ export const useAIBackfillChatQuickAddHandlers = ({
         pendingMessageId
       };
       setActiveRequestId(pendingMessageId);
-  
+      const quickAddNow = new Date();
+      const quickAddTimeContext = buildAssistantStateContext(quickAddNow);
+
       try {
         const result = await quickAddService.requestQuickAddTodoWithDebug(
           description,
           { signal: controller.signal },
-          buildAssistantDictionaryContext()
+          buildAssistantDictionaryContext(),
+          {
+            currentDateTime: quickAddTimeContext.currentDateTime,
+            currentDateKey: formatDateKey(quickAddNow)
+          }
         );
         if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) {
           return;
