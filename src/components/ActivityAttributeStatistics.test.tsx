@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Activity } from '../types';
 import { filterLogsForAttribute, filterLogsByRange, getCalendarDaysForRange, getCardAttributeStatisticSlices, getDateKeysForRange, getTextTerms } from './ActivityAttributeStatistics';
-import { aggregateHourBuckets } from './stats/TimeOrbitChart';
+import { aggregateHourBuckets } from './stats/PetalTimelineChart';
 import { getChartTypesForSource, normalizeStatisticCards } from '../utils/activityStatisticCardUtils';
 
 describe('getTextTerms', () => {
@@ -153,7 +153,7 @@ describe('getCardAttributeStatisticSlices', () => {
 describe('extended statistic card sources', () => {
   it('supports tag duration charts and single-choice treemaps', () => {
     const single = { id: 'mood', name: 'Mood', type: 'single' as const, options: [{ id: 'good', label: 'Good' }], order: 0, createdAt: 1, updatedAt: 1 };
-    expect(getChartTypesForSource({ type: 'tagDuration' }, [single])).toEqual(['numberArea', 'numberCalendar', 'numberKpi', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap', 'tagDurationTimeOrbit', 'tagDurationPetalTimeline']);
+    expect(getChartTypesForSource({ type: 'tagDuration' }, [single])).toEqual(['numberArea', 'numberCalendar', 'numberKpi', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap', 'tagDurationPetalTimeline']);
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'mood' }, [single])).toContain('choiceTreemap');
   });
 
