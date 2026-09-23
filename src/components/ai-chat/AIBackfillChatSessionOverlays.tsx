@@ -6,6 +6,7 @@
  * @description Extracts the session-history and session-creation overlays out of AIBackfillChatModal so the modal can focus on orchestration while these presentation-heavy surfaces preserve their existing behavior.
  * @updated 2026-07-22: Replaced legacy fixed session-list text colors with shared theme tokens for dark-mode readability.
  * @updated 2026-05-15: Extracted the history overlay and new-session dialog from AIBackfillChatModal.
+ * @updated 2026-09-23: Declares the secondary text theme token used by session previews.
  */
 import React from 'react';
 import { Check, MessageSquarePlus, Pencil, Trash2, X } from 'lucide-react';
@@ -28,6 +29,7 @@ interface AIChatSessionOverlayTheme {
   primaryButtonBg: string;
   primaryButtonBorder: string;
   primaryButtonText: string;
+  textSecondary: string;
   textMuted: string;
   textPrimary: string;
 }

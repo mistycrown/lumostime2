@@ -11,6 +11,7 @@
  * @updated 2026-07-05: Surfaced local-query keywords and hit summaries in pending chat feedback, and added debug sections for query request/result/retry rounds.
  * @updated 2026-07-05: Wired the foreground local-query loop back into real category/review data and fed accumulated query history into follow-up unified turns.
  * @updated 2026-05-15: Added foreground turn preparation plus unified-turn execution helpers.
+ * @updated 2026-09-23: Preserves the assistant local-query target union during route normalization.
  */
 
 import type { AIConversationTurn } from '../../services/aiService';
@@ -288,7 +289,7 @@ const resolveQueryRoute = (
     };
   }
 
-  const normalizedTargets = request.targets.includes('all')
+  const normalizedTargets: AssistantLocalQueryRequest['targets'] = request.targets.includes('all')
     ? ['todos', 'reviews', 'categories', 'activities', 'scopes']
     : request.targets.filter((target) => target !== 'logs');
 

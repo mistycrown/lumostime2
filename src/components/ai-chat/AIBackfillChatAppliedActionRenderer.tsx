@@ -7,6 +7,7 @@
  * @updated 2026-07-31: Added rendering for AI-created timeline Plan blocks as todo-linked planned actions.
  * @updated 2026-07-06: Added rendering for AI-created principles and self-beliefs with undo affordances.
  * @updated 2026-05-15: Extracted create-log, create-todo, update-todo, and edit-log action rendering from AIBackfillChatModal.
+ * @updated 2026-09-23: Removes an unreachable create-subtask branch from the create-log renderer.
  */
 import React from 'react';
 import { ListTodo, Pencil, Undo2 } from 'lucide-react';
@@ -210,15 +211,6 @@ const RenderLogAction: React.FC<AIBackfillChatAppliedActionRendererProps & {
           </span>
         )}
       </div>
-
-      {action.kind === 'create_subtask' && action.snapshot.parentTodoTitle && (
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: theme.textMuted }}>
-          <span className="inline-flex items-center gap-1">
-            <span className="font-bold">↳</span>
-            <span>{action.snapshot.parentTodoTitle}</span>
-          </span>
-        </div>
-      )}
 
       {action.errorMessage && (
         <p className="mt-2 text-xs" style={{ color: theme.dangerText }}>{action.errorMessage}</p>

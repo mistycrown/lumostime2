@@ -5,6 +5,7 @@
  * @pos Component Support Test (AI Background Workflow)
  * @description Verifies that background request assembly keeps required fields and omits empty optional prompt sections.
  * @updated 2026-09-22: Added coverage for extracted background request assembly.
+ * @updated 2026-09-23: Supplies required trigger ids in background request fixtures.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -50,6 +51,7 @@ describe('buildAssistantBackgroundTurnRequest', () => {
   it('only enables persisted debug output when requested', () => {
     const request = buildAssistantBackgroundTurnRequest({
       trigger: {
+        id: 'trigger-1',
         type: 'checkin',
         source: 'system',
         text: 'Check in',
@@ -67,6 +69,7 @@ describe('buildAssistantBackgroundTurnRequest', () => {
 
     const disabledRequest = buildAssistantBackgroundTurnRequest({
       trigger: {
+        id: 'trigger-2',
         type: 'checkin',
         source: 'system',
         text: 'Check in',

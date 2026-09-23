@@ -5,6 +5,7 @@
  * @pos Test (AI Foreground Turn)
  * @description Verifies that foreground local log queries normalize filter-expression tokens to display names instead of raw ids before execution.
  * @updated 2026-07-06: Added coverage that converts `#writing %paper` into name-based filter tokens for log retrieval.
+ * @updated 2026-09-23: Keeps assertions aligned with the local-query request contract.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -56,7 +57,6 @@ describe('foreground local-query normalization contract', () => {
     expect(normalized.mode).toBe('filter_expression');
     expect(normalized.targets).toEqual(['logs']);
     expect(normalized.query).toBe('#写作 %论文');
-    expect(normalized.reason).toBeUndefined();
   });
 
 

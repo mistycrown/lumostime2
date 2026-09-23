@@ -7,6 +7,7 @@
  * @updated 2026-08-11: Added debug fallback coverage for failures that bypass the AI service exchange capture.
  * @updated 2026-05-16: Added debug-block coverage so prompt text before the first labeled section remains visible in the debug viewer.
  * @updated 2026-05-16: Added coverage for labeled custom prompt blocks and fallback block labels.
+ * @updated 2026-09-23: Aligns debug-exchange fixtures with the normalized response contract.
  */
 import { describe, expect, it } from 'vitest';
 import { buildDebugBlocks, buildPersonaPrompt, getErrorDebugSections } from './AIBackfillChatHelpers';
@@ -89,7 +90,7 @@ describe('buildDebugBlocks', () => {
       },
       response: {
         status: 200,
-        headers: {},
+        ok: true,
         body: {
           choices: [
             {

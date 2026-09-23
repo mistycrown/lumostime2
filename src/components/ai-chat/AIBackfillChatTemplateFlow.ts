@@ -5,6 +5,7 @@
  * @pos Component Support (AI Integration)
  * @description Pulls the staged weekly/monthly review template lifecycle out of AIBackfillChatModal so template session setup and first-turn orchestration live beside the other extracted AI chat helpers.
  * @updated 2026-05-15: Extracted weekly/monthly template session creation, guided selection, and opening-turn flows from AIBackfillChatModal.
+ * @updated 2026-09-23: Preserves template discriminants and forwards error debug sections through opening turns.
  */
 import { aiService, type AIConversationTurn } from '../../services/aiService';
 import {
@@ -245,7 +246,7 @@ export const runWeeklyReviewTemplateGuidedSelection = async ({
     mutateSession(sessionId, (currentSession) => ({
       ...currentSession,
       title: weeklyReviewTemplateService.getSessionTitle(selection),
-      ...(currentSession.templateMeta
+      ...(currentSession.templateMeta?.templateType === 'weekly_review'
         ? {
           templateMeta: {
             ...currentSession.templateMeta,
@@ -342,7 +343,7 @@ export const runMonthlyReviewTemplateGuidedSelection = async ({
     mutateSession(sessionId, (currentSession) => ({
       ...currentSession,
       title: monthlyReviewTemplateService.getSessionTitle(selection),
-      ...(currentSession.templateMeta
+      ...(currentSession.templateMeta?.templateType === 'monthly_review'
         ? {
           templateMeta: {
             ...currentSession.templateMeta,
@@ -418,6 +419,7 @@ export const runWeeklyReviewTemplateOpeningTurn = async ({
   buildConversationHistory,
   buildPersonaPrompt,
   debugMode,
+  getErrorDebugSections,
   getRetryableAIErrorMessage,
   isAbortError,
   mutateSession,
@@ -521,6 +523,7 @@ export const runMonthlyReviewTemplateOpeningTurn = async ({
   buildConversationHistory,
   buildPersonaPrompt,
   debugMode,
+  getErrorDebugSections,
   getRetryableAIErrorMessage,
   isAbortError,
   monthDataText,

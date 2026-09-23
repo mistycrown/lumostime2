@@ -5,6 +5,7 @@
  * @pos Component Support (AI Integration)
  * @description Keeps background execution synchronization and due-item dispatch out of the modal coordinator.
  * @updated 2026-09-22: Extracted background dispatch callbacks.
+ * @updated 2026-09-23: Adds the required stable id to the native check-in trigger payload.
  */
 
 import { useCallback } from 'react';
@@ -81,6 +82,7 @@ export function useAIBackfillChatBackgroundDispatch(options: Record<string, any>
         const systemPrompt = await assistantTurnService.buildSystemPrompt({
           mode: 'background',
           trigger: {
+            id: `native_checkin:${now.toISOString()}`,
             type: 'checkin',
             source: 'system',
             text: 'Native background check-in trigger',

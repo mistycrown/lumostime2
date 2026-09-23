@@ -5,6 +5,7 @@
  * @pos Component Support (AI Integration)
  * @description Keeps persona and profile editing workflows out of the main AI chat coordinator.
  * @updated 2026-09-22: Extracted persona, prompt-block, shortcut, and avatar handlers from AIBackfillChatModal.
+ * @updated 2026-09-23: Returns the custom-prompt deletion handler used by the settings panel.
  */
 import type { ChangeEvent, Dispatch, SetStateAction } from 'react';
 import type { AIChatPersona, AIChatSession, AIChatShortcut, AIChatUserProfile, AIChatCustomPromptBlock } from './AIBackfillChatShared';
@@ -367,6 +368,7 @@ export const useAIBackfillChatPersonaProfile = ({
     handleCancelUserEmojiAvatarEdit,
     handleCreatePersona,
     handleDeleteCurrentPersona,
+    handleDeleteCustomPromptBlock,
     handleDeleteShortcut,
     handleUpdateCustomPromptBlock,
     handleUpdateShortcut,
