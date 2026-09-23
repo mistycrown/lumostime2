@@ -6,6 +6,7 @@
  * @description Verifies that foreground local log queries normalize filter-expression tokens to display names instead of raw ids before execution.
  * @updated 2026-07-06: Added coverage that converts `#writing %paper` into name-based filter tokens for log retrieval.
  * @updated 2026-09-23: Keeps assertions aligned with the local-query request contract.
+ * @updated 2026-09-23: Covers native user-turn notification for new foreground messages.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -188,5 +189,36 @@ describe('foreground retry preparation', () => {
       role: 'assistant',
       tone: 'pending'
     });
+  });
+
+  it('notifies the native assistant for a new foreground user turn', () => {
+    const session: any = {
+      id: 'session-2',
+      title: 'Test',
+      personaId: 'persona-1',
+      createdAt: 1,
+      updatedAt: 1,
+      messages: []
+    };
+    let notification: { text: string; at: string } | null = null;
+
+    prepareForegroundTurn({
+      activeSession: session,
+      buildRetryConversationHistory: () => [],
+      conversationHistoryCache: new Map(),
+      createSessionTitleFromUserMessage: (value) => value,
+      isMonthlyReviewTemplateSession: false,
+      isWeeklyReviewTemplateSession: false,
+      mutateSession: () => undefined,
+      notifyUserTurn: async (text, at) => {
+        notification = { text, at };
+      },
+      onNotifyUserTurnError: () => undefined,
+      setInputText: () => undefined,
+      trimmedText: 'Hello assistant'
+    });
+
+    expect(notification).toMatchObject({ text: 'Hello assistant' });
+    expect(notification?.at).toEqual(expect.any(String));
   });
 });

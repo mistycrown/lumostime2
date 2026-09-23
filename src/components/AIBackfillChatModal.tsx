@@ -37,6 +37,7 @@
  * @updated 2026-09-22: Extracts home and conversation main view composition.
  * @updated 2026-09-22: Extracts the chat composer and quick-command menu.
  * @updated 2026-09-23: Removes stale extracted inputs, restores custom-prompt deletion wiring, and removes duplicate header props.
+ * @updated 2026-09-23: Restores foreground-send dependencies for native user-turn notification and review commands.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -2362,6 +2363,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   const handleSend = useAIBackfillChatSend({
 
+    AssistantAgent,
     activePersona,
     activeRequestRef,
     activeSession,
@@ -2369,6 +2371,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     applyAssistantMemoryPatch,
     applyUnifiedReminders,
     applyUnifiedToolCalls,
+    appendUserMessage,
     assistantAgentConfig,
     assistantContextBuilder,
     assistantMemoryService,
