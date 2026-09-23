@@ -1,7 +1,7 @@
 /**
  * @file TimeOrbitChart.tsx
  * @input Duration logs, a calendar range, and an activity chart palette.
- * @output A three-level 24-hour activity orbit and shared hourly aggregation helpers.
+ * @output A single fine 24-hour activity orbit and shared hourly aggregation helpers.
  * @pos Component (Activity Statistics)
  * @description Maps hourly duration to time position, activity level, and arc length.
  */
@@ -106,20 +106,6 @@ const describeArc = (center: number, radius: number, startAngle: number, endAngl
   return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
 };
 
-const getLevel = (minutes: number, maximum: number): 0 | 1 | 2 | 3 => {
-  if (minutes <= 0 || maximum <= 0) return 0;
-  const ratio = minutes / maximum;
-  if (ratio >= 0.66) return 3;
-  if (ratio >= 0.33) return 2;
-  return 1;
-};
-
-const LEVELS: Array<{ radius: number; label: string }> = [
-  { radius: 62, label: '低活跃' },
-  { radius: 84, label: '中等活跃' },
-  { radius: 106, label: '高活跃' }
-];
-
 export interface TimeOrbitChartProps {
   logs: Array<Pick<Log, 'duration' | 'startTime' | 'endTime'>>;
   range: RhythmRange;
@@ -132,34 +118,36 @@ export const TimeOrbitChart: React.FC<TimeOrbitChartProps> = ({ logs, range, pal
   const hasData = summary.totalMinutes > 0;
   const center = 160;
   const startAtTop = -Math.PI / 2;
-  const tickHours = [0, 6, 12, 18];
+  const tickHours = Array.from({ length: 12 }, (_, index) => index * 2);
+  const orbitRadius = 96;
 
   return (
     <div className="mx-auto w-full max-w-[360px]">
       <svg viewBox="0 0 320 320" className="w-full" role="img" aria-label={`时间轨道环，${range === 'week' ? '本周' : '本月'}，总时长 ${formatRhythmDuration(summary.totalMinutes)}`}>
-        <circle cx={center} cy={center} r={116} fill={palette.background} opacity="0.42" />
-        {LEVELS.map((level) => <circle key={level.radius} cx={center} cy={center} r={level.radius} fill="none" stroke={palette.grid} strokeWidth="1" strokeDasharray="2 5" />)}
+        <circle cx={center} cy={center} r={orbitRadius} fill="none" stroke={palette.grid} strokeWidth="1.2" />
         {tickHours.map((hour) => {
           const angle = startAtTop + (hour / 24) * Math.PI * 2;
-          const labelPoint = polarPoint(center, 132, angle);
-          return <text key={hour} x={labelPoint.x} y={labelPoint.y + 3} textAnchor="middle" fill="#8f8174" fontSize="10" fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace">{hour}</text>;
+          const inner = polarPoint(center, orbitRadius - 5, angle);
+          const outer = polarPoint(center, orbitRadius + 5, angle);
+          return <line key={`tick-${hour}`} x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y} stroke={palette.grid} strokeWidth="1" />;
+        })}
+        {tickHours.map((hour) => {
+          const angle = startAtTop + (hour / 24) * Math.PI * 2;
+          const labelPoint = polarPoint(center, 120, angle);
+          return <text key={hour} x={labelPoint.x} y={labelPoint.y + 3} textAnchor="middle" fill="#8f8174" fontSize="9" fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace">{String(hour).padStart(2, '0')}</text>;
         })}
         {summary.buckets.map((bucket) => {
-          const level = getLevel(bucket.minutes, maximum);
-          if (level === 0) return null;
+          if (bucket.minutes <= 0 || maximum <= 0) return null;
           const startAngle = startAtTop + (bucket.hour / 24) * Math.PI * 2;
-          const endAngle = startAngle + Math.max(0.05, Math.min(bucket.minutes / 60, 1) * Math.PI * 2 / 24);
-          const radius = LEVELS[level - 1].radius;
-          return <path key={bucket.hour} d={describeArc(center, radius, startAngle, endAngle)} fill="none" stroke={palette.accent} strokeWidth="12" strokeLinecap="round" opacity={0.46 + level * 0.16}><title>{`${String(bucket.hour).padStart(2, '0')}:00 · ${formatRhythmDuration(bucket.minutes)} · ${LEVELS[level - 1].label}`}</title></path>;
+          const endAngle = startAngle + Math.max(0.02, Math.min(bucket.minutes / 60, 1) * Math.PI * 2 / 24);
+          const intensity = 0.18 + (bucket.minutes / maximum) * 0.76;
+          return <path key={bucket.hour} d={describeArc(center, orbitRadius, startAngle, endAngle)} fill="none" stroke={palette.accent} strokeWidth="5" strokeLinecap="round" opacity={intensity}><title>{`${String(bucket.hour).padStart(2, '0')}:00 · ${formatRhythmDuration(bucket.minutes)}`}</title></path>;
         })}
         <circle cx={center} cy={center} r="43" fill={palette.background} stroke={palette.grid} strokeWidth="1" />
         <text x={center} y={center - 4} textAnchor="middle" fill="#5d5147" fontSize="10">累计时长</text>
         <text x={center} y={center + 15} textAnchor="middle" fill="#4b3d32" fontSize="17" fontFamily="ui-serif, Georgia, serif">{hasData ? formatRhythmDuration(summary.totalMinutes) : '暂无记录'}</text>
         {hasData && <text x={center} y={center + 31} textAnchor="middle" fill="#9a8b7e" fontSize="9">{summary.activeDays} 天</text>}
       </svg>
-      <div className="mt-1 flex flex-wrap justify-center gap-x-4 gap-y-1 text-[10px] text-[#8f8174]">
-        {LEVELS.map((level, index) => <span key={level.label} className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: palette.accent, opacity: 0.46 + (index + 1) * 0.16 }} />{level.label}</span>)}
-      </div>
     </div>
   );
 };
