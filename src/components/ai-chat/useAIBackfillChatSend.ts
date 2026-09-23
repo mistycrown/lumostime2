@@ -5,6 +5,7 @@
  * @pos Component Support (AI Integration)
  * @description Keeps the foreground command router and request lifecycle out of the modal coordinator.
  * @updated 2026-09-22: Extracted the foreground send handler.
+ * @updated 2026-09-23: Keeps only live send dependencies and requires the assistant agent/user-message adapters.
  */
 
 export function useAIBackfillChatSend(options: Record<string, any>) {
@@ -88,10 +89,8 @@ export function useAIBackfillChatSend(options: Record<string, any>) {
     setIsHistoryPanelOpen,
     setIsLoading,
     setIsPersonaPanelOpen,
-    shouldUseNativeReminderTriggerDispatch,
     todoCategories,
-    todos,
-    trimmedText,
+     todos,
     weeklyReviewTemplateService,
     weeklyReviews,
     onUnreadAssistantMessage
