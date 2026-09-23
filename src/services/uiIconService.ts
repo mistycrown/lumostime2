@@ -1,7 +1,6 @@
 /**
  * @file uiIconService.ts
  * @input Icon ID, Theme selection, Emoji for matching
- * @updated 2026-09-23: Restores a valid saved theme before its remote assets have finished downloading.
  * @output Icon URLs, Icon metadata, Theme switching
  * @pos Service (UI Icon System)
  * @description UI 图标主题服务 - 管理应用内所有 UI 图标的主题切换
@@ -34,7 +33,6 @@
 
 import React from 'react';
 import { resolveAssetPath } from '../utils/assetPath';
-import { uiIconAssetService } from './uiIconAssetService';
 
 // UI 图标类型定义
 export type UIIconType =
@@ -424,10 +422,7 @@ class UIIconService {
      */
     private loadTheme() {
         const saved = localStorage.getItem(this.STORAGE_KEY);
-        if (
-            saved
-            && UI_ICON_THEMES.includes(saved as UIIconTheme)
-        ) {
+        if (saved && UI_ICON_THEMES.includes(saved as UIIconTheme)) {
             this.currentTheme = saved as UIIconTheme;
         }
     }
@@ -477,13 +472,9 @@ class UIIconService {
         }
 
         const iconNumber = ICON_NUMBER_MAP[iconType];
-        const isBundledPreview = Number(iconNumber) <= 4;
-        const bundledWebp = resolveAssetPath(`/uiicon/${this.currentTheme}/${iconNumber}.webp`);
-        const bundledPng = resolveAssetPath(`/uiicon/${this.currentTheme}/${iconNumber}.png`);
         return {
-            primary: uiIconAssetService.getCachedIconUrl(this.currentTheme, `${iconNumber}.webp`)
-                || (isBundledPreview ? bundledWebp : ''),
-            fallback: isBundledPreview ? bundledPng : ''
+            primary: resolveAssetPath(`/uiicon/${this.currentTheme}/${iconNumber}.webp`),
+            fallback: resolveAssetPath(`/uiicon/${this.currentTheme}/${iconNumber}.png`)
         };
     }
 

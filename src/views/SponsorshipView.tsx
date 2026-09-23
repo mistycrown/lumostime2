@@ -46,7 +46,6 @@ import { imageService } from '../services/imageService';
 import { buildCustomStickerViewSets } from '../services/customStickerAssetService';
 import { resolveAssetPath } from '../utils/assetPath';
 import { getTimePalPreviewPath } from '../constants/timePalConfig';
-import { uiIconAssetService } from '../services/uiIconAssetService';
 
 interface SponsorshipViewProps {
     onBack: () => void;
@@ -229,9 +228,6 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [supporterId, setSupporterId] = useState<number | undefined>(undefined);
     const [selectedIcon, setSelectedIcon] = useState('default');
     const [isChangingIcon, setIsChangingIcon] = useState(false);
-    const [downloadedUiIconThemes, setDownloadedUiIconThemes] = useState<string[]>([]);
-    const [downloadingUiIconTheme, setDownloadingUiIconTheme] = useState<string | null>(null);
-    const [uiIconDownloadProgress, setUiIconDownloadProgress] = useState(0);
     // 使用 useMemo 避免重复实例化
     const redemptionService = React.useMemo(() => new RedemptionService(), []);
     const [showDonationModal, setShowDonationModal] = useState(false);
@@ -432,11 +428,6 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
     // 应用主题方案
     const applyThemePreset = async (preset: ThemePreset) => {
-        if (preset.uiTheme !== 'default' && !uiIconAssetService.isThemeDownloaded(preset.uiTheme)) {
-            onToast('info', `请先下载 ${preset.uiTheme} UI 图标主题`);
-            return;
-        }
-
         try {
             const oldTheme = uiIconTheme;
             
@@ -480,46 +471,9 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     };
 
     // 处理 UI 图标主题切换，并触发图标迁移
-    useEffect(() => {
-        setDownloadedUiIconThemes(uiIconAssetService.listDownloadedThemes());
-        const refreshDownloadedThemes = () => {
-            setDownloadedUiIconThemes(uiIconAssetService.listDownloadedThemes());
-        };
-        window.addEventListener('ui-icon-assets-ready', refreshDownloadedThemes);
-        window.addEventListener('ui-icon-assets-invalidated', refreshDownloadedThemes);
-        return () => {
-            window.removeEventListener('ui-icon-assets-ready', refreshDownloadedThemes);
-            window.removeEventListener('ui-icon-assets-invalidated', refreshDownloadedThemes);
-        };
-    }, []);
-
-    const handleUiIconThemeDownload = async (theme: string) => {
-        if (downloadingUiIconTheme) {
-            return;
-        }
-
-        setDownloadingUiIconTheme(theme);
-        setUiIconDownloadProgress(0);
-        try {
-            await uiIconAssetService.downloadTheme(theme, setUiIconDownloadProgress);
-            setDownloadedUiIconThemes((previous) => Array.from(new Set([...previous, theme])));
-            onToast('success', `${theme} UI 图标主题已下载`);
-        } catch (error) {
-            console.error('[SponsorshipView] UI icon theme download failed:', error);
-            onToast('error', 'UI 图标主题下载失败，请检查网络后重试');
-        } finally {
-            setDownloadingUiIconTheme(null);
-        }
-    };
-
     const handleUiIconThemeChange = async (newTheme: string) => {
-        if (newTheme !== 'default' && !uiIconAssetService.isThemeDownloaded(newTheme)) {
-            onToast('info', '请先下载这个 UI 图标主题');
-            return;
-        }
-
         const oldTheme = uiIconTheme;
-
+        
         setUiIconTheme(newTheme);
         
         // 只在首次从 default 切换到自定义主题时生成 uiIcon
@@ -1370,11 +1324,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                     key={theme}
                                                     theme={theme}
                                                     currentTheme={uiIconTheme}
-                                                    isDownloaded={downloadedUiIconThemes.includes(theme)}
-                                                    isDownloading={downloadingUiIconTheme === theme}
-                                                    downloadProgress={uiIconDownloadProgress}
                                                     onThemeChange={handleUiIconThemeChange}
-                                                    onDownload={handleUiIconThemeDownload}
                                                 />
                                             ))}
                                         </div>

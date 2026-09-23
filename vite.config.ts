@@ -24,11 +24,6 @@ const copyPublicAssetsWithoutGit = (): Plugin => {
       if (entry.isDirectory()) {
         copyDirectory(sourcePath, targetPath);
       } else if (entry.isFile()) {
-        const relativePath = path.relative(publicDirectory, sourcePath).replace(/\\/g, '/');
-        const isOptionalUiIcon = /^uiicon\/[^/]+\/(?:0[5-9]|[1-9][0-9])\.webp$/i.test(relativePath);
-        if (isOptionalUiIcon) {
-          continue;
-        }
         copyFileSync(sourcePath, targetPath);
       }
     }

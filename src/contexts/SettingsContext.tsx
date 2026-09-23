@@ -12,11 +12,8 @@
  * @updated 2026-09-15: Added a persisted global font-scale preference applied through the root CSS variable.
  * @updated 2026-09-15: Fixed missing font-scale storage to default to 100% instead of the minimum value.
  * @updated 2026-09-22: Rehydrates persisted preference and Memoir filter state from cloud/export restore events.
- * @updated 2026-09-23: Preserves selected UI icon themes and downloads missing local assets on startup.
- * @updated 2026-09-23: Shows startup UI theme download progress and reports failures.
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
-import { LoaderCircle } from 'lucide-react';
 import {
     AppAwarenessAppBinding,
     AppAwarenessRun,
@@ -32,9 +29,7 @@ import {
 import { DEFAULT_USER_PERSONAL_INFO } from '../constants';
 import { SETTINGS_KEYS, THEME_KEYS } from '../constants/storageKeys';
 import { appAwarenessService } from '../services/appAwarenessService';
-import { UI_ICON_THEMES, uiIconService } from '../services/uiIconService';
-import { uiIconAssetService } from '../services/uiIconAssetService';
-import { useToast } from './ToastContext';
+import { uiIconService } from '../services/uiIconService';
 import { fontService } from '../services/fontService';
 import {
     DEFAULT_TIMELINE_STYLE_THEME,
@@ -332,7 +327,6 @@ export const useSettings = () => {
 export const useOptionalSettings = () => useContext(SettingsContext);
 
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { addToast } = useToast();
     const hasInitializedSyncRelevantTimestampRef = useRef(false);
 
     // 基础偏好
@@ -612,45 +606,14 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const [uiIconTheme, setUiIconTheme] = useState<string>(() => {
         const stored = localStorage.getItem('lumostime_ui_icon_theme');
-        return stored && UI_ICON_THEMES.includes(stored as typeof UI_ICON_THEMES[number])
-            ? stored
-            : 'default';
+        return stored || 'default'; // Default to default (built-in icons)
     });
-    const [, setUiIconAssetRevision] = useState(0);
-
-    useEffect(() => {
-        const handleUiIconAssetsReady = () => {
-            setUiIconAssetRevision((revision) => revision + 1);
-        };
-
-        window.addEventListener('ui-icon-assets-ready', handleUiIconAssetsReady);
-        return () => window.removeEventListener('ui-icon-assets-ready', handleUiIconAssetsReady);
-    }, []);
 
     useEffect(() => {
         localStorage.setItem('lumostime_ui_icon_theme', uiIconTheme);
         // 同步到 uiIconService
         uiIconService.setTheme(uiIconTheme as any);
-        if (uiIconTheme !== 'default') {
-            void uiIconAssetService.ensureThemeAvailable(uiIconTheme, (progress) => {
-                window.dispatchEvent(new CustomEvent('ui-icon-download-progress', {
-                    detail: { theme: uiIconTheme, progress }
-                }));
-            }).then(() => {
-                window.dispatchEvent(new CustomEvent('ui-icon-download-progress', {
-                    detail: { theme: uiIconTheme, complete: true }
-                }));
-            }).catch((error) => {
-                console.warn('[SettingsContext] Failed to auto-download current UI icon theme', error);
-                window.dispatchEvent(new CustomEvent('ui-icon-download-progress', {
-                    detail: { theme: uiIconTheme, failed: true }
-                }));
-                addToast('error', '当前 UI 图标主题下载失败，请检查网络后重试');
-            });
-        } else {
-            void uiIconAssetService.activateTheme(uiIconTheme);
-        }
-    }, [addToast, uiIconTheme]);
+    }, [uiIconTheme]);
 
     const [colorScheme, setColorScheme] = useState<string>(() => {
         const stored = localStorage.getItem('lumostime_color_scheme');
@@ -758,10 +721,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             const storedScheduleStyle = localStorage.getItem(THEME_KEYS.SCHEDULE_STYLE);
             const storedTimelineConfigs = localStorage.getItem(THEME_KEYS.TIMELINE_STYLE_CONFIGS);
 
-            const storedUiIconTheme = localStorage.getItem(THEME_KEYS.UI_ICON_THEME);
-            const isValidUiIconTheme = storedUiIconTheme
-                && UI_ICON_THEMES.includes(storedUiIconTheme as typeof UI_ICON_THEMES[number]);
-            setUiIconTheme(isValidUiIconTheme ? storedUiIconTheme : 'default');
+            setUiIconTheme(localStorage.getItem(THEME_KEYS.UI_ICON_THEME) || 'default');
             setColorScheme(localStorage.getItem(THEME_KEYS.COLOR_SCHEME) || 'default');
             setThemeMode(readStoredThemeMode(localStorage));
             setFontFamily(localStorage.getItem('lumostime_font_family') || 'default');
@@ -1198,71 +1158,6 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setSceneCardTimerMode
         }}>
             {children}
-            <UiIconDownloadProgress />
         </SettingsContext.Provider>
-    );
-};
-
-interface UiIconDownloadProgressState {
-    theme: string;
-    progress: number;
-}
-
-const UiIconDownloadProgress: React.FC = () => {
-    const [state, setState] = useState<UiIconDownloadProgressState | null>(null);
-    const clearTimerRef = useRef<number | null>(null);
-
-    useEffect(() => {
-        const handleProgress = (event: Event) => {
-            const detail = (event as CustomEvent<{
-                theme?: string;
-                progress?: number;
-                complete?: boolean;
-                failed?: boolean;
-            }>).detail;
-
-            if (clearTimerRef.current !== null) {
-                window.clearTimeout(clearTimerRef.current);
-                clearTimerRef.current = null;
-            }
-
-            if (detail?.complete) {
-                clearTimerRef.current = window.setTimeout(() => setState(null), 700);
-            } else if (detail?.failed) {
-                setState(null);
-            } else if (detail?.theme && typeof detail.progress === 'number') {
-                setState({ theme: detail.theme, progress: detail.progress });
-            }
-        };
-
-        window.addEventListener('ui-icon-download-progress', handleProgress);
-        return () => {
-            window.removeEventListener('ui-icon-download-progress', handleProgress);
-            if (clearTimerRef.current !== null) {
-                window.clearTimeout(clearTimerRef.current);
-            }
-        };
-    }, []);
-
-    if (!state) {
-        return null;
-    }
-
-    return (
-        <div className="pointer-events-none fixed left-1/2 top-[calc(1rem+var(--app-safe-area-top))] z-[219] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2" aria-live="polite">
-            <div className="rounded-lg border border-stone-200 bg-white px-4 py-3 shadow-lg">
-                <div className="mb-2 flex items-center gap-2 text-sm text-stone-700">
-                    <LoaderCircle size={16} className="animate-spin text-stone-500" />
-                    <span className="min-w-0 flex-1 truncate">正在下载当前 UI 图标主题：{state.theme}</span>
-                    <span className="shrink-0 tabular-nums">{state.progress}%</span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-stone-100">
-                    <div
-                        className="h-full rounded-full bg-emerald-600 transition-[width] duration-200"
-                        style={{ width: `${state.progress}%` }}
-                    />
-                </div>
-            </div>
-        </div>
     );
 };
