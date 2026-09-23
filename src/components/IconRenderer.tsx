@@ -324,7 +324,7 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     // 3. 如果使用 UI Icon，渲染图片
     if (shouldUseUIIcon) {
         const iconType = value as UIIconType;
-        const { primary, fallback } = uiIconService.getRemoteIconPathWithFallback(iconType);
+        const { primary, fallback } = uiIconService.getIconPathWithFallback(iconType);
         
         const imageSize = getImageSize();
         const sizeStyle = { 
@@ -406,7 +406,7 @@ export const useIconRenderer = (icon: string, uiIcon?: string) => {
     
     if (shouldRenderAsImage) {
         const iconType = value as UIIconType;
-        const { primary, fallback } = uiIconService.getRemoteIconPathWithFallback(iconType);
+        const { primary, fallback } = uiIconService.getIconPathWithFallback(iconType);
         
         return {
             isImage: true,

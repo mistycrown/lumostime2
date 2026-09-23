@@ -30,6 +30,7 @@ import { DEFAULT_USER_PERSONAL_INFO } from '../constants';
 import { SETTINGS_KEYS, THEME_KEYS } from '../constants/storageKeys';
 import { appAwarenessService } from '../services/appAwarenessService';
 import { uiIconService } from '../services/uiIconService';
+import { uiIconAssetService } from '../services/uiIconAssetService';
 import { fontService } from '../services/fontService';
 import {
     DEFAULT_TIMELINE_STYLE_THEME,
@@ -606,13 +607,26 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const [uiIconTheme, setUiIconTheme] = useState<string>(() => {
         const stored = localStorage.getItem('lumostime_ui_icon_theme');
-        return stored || 'default'; // Default to default (built-in icons)
+        const isAvailable = stored === 'default'
+            || Boolean(stored && uiIconAssetService.isThemeDownloaded(stored));
+        return isAvailable ? (stored || 'default') : 'default';
     });
+    const [, setUiIconAssetRevision] = useState(0);
+
+    useEffect(() => {
+        const handleUiIconAssetsReady = () => {
+            setUiIconAssetRevision((revision) => revision + 1);
+        };
+
+        window.addEventListener('ui-icon-assets-ready', handleUiIconAssetsReady);
+        return () => window.removeEventListener('ui-icon-assets-ready', handleUiIconAssetsReady);
+    }, []);
 
     useEffect(() => {
         localStorage.setItem('lumostime_ui_icon_theme', uiIconTheme);
         // 同步到 uiIconService
         uiIconService.setTheme(uiIconTheme as any);
+        void uiIconAssetService.activateTheme(uiIconTheme);
     }, [uiIconTheme]);
 
     const [colorScheme, setColorScheme] = useState<string>(() => {
@@ -721,7 +735,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             const storedScheduleStyle = localStorage.getItem(THEME_KEYS.SCHEDULE_STYLE);
             const storedTimelineConfigs = localStorage.getItem(THEME_KEYS.TIMELINE_STYLE_CONFIGS);
 
-            setUiIconTheme(localStorage.getItem(THEME_KEYS.UI_ICON_THEME) || 'default');
+            const storedUiIconTheme = localStorage.getItem(THEME_KEYS.UI_ICON_THEME);
+            const isAvailableUiIconTheme = storedUiIconTheme === 'default'
+                || Boolean(storedUiIconTheme && uiIconAssetService.isThemeDownloaded(storedUiIconTheme));
+            setUiIconTheme(isAvailableUiIconTheme ? (storedUiIconTheme || 'default') : 'default');
             setColorScheme(localStorage.getItem(THEME_KEYS.COLOR_SCHEME) || 'default');
             setThemeMode(readStoredThemeMode(localStorage));
             setFontFamily(localStorage.getItem('lumostime_font_family') || 'default');

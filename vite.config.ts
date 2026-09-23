@@ -1,10 +1,53 @@
 import path from 'path';
-import { readFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
+import type { Plugin } from 'vite';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import electron from 'vite-plugin-electron/simple';
 import renderer from 'vite-plugin-electron-renderer';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
+
+const copyPublicAssetsWithoutGit = (): Plugin => {
+  let outputDirectory = '';
+  const publicDirectory = path.resolve(__dirname, 'public');
+
+  const copyDirectory = (sourceDirectory: string, targetDirectory: string): void => {
+    mkdirSync(targetDirectory, { recursive: true });
+
+    for (const entry of readdirSync(sourceDirectory, { withFileTypes: true })) {
+      if (entry.name === '.git') {
+        continue;
+      }
+
+      const sourcePath = path.join(sourceDirectory, entry.name);
+      const targetPath = path.join(targetDirectory, entry.name);
+      if (entry.isDirectory()) {
+        copyDirectory(sourcePath, targetPath);
+      } else if (entry.isFile()) {
+        const relativePath = path.relative(publicDirectory, sourcePath).replace(/\\/g, '/');
+        const isOptionalUiIcon = /^uiicon\/[^/]+\/(?:0[5-9]|[1-9][0-9])\.webp$/i.test(relativePath);
+        if (isOptionalUiIcon) {
+          continue;
+        }
+        copyFileSync(sourcePath, targetPath);
+      }
+    }
+  };
+
+  return {
+    name: 'copy-public-assets-without-git',
+    apply: 'build',
+    configResolved(config) {
+      outputDirectory = config.build.outDir;
+    },
+    writeBundle() {
+      if (path.basename(outputDirectory) === 'dist') {
+        copyDirectory(publicDirectory, outputDirectory);
+      }
+    }
+  };
+};
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   const isProduction = mode === 'production';
@@ -27,6 +70,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     plugins: [
+      copyPublicAssetsWithoutGit(),
       react(),
       ...(shouldUploadSentrySourceMaps ? [sentryVitePlugin({
         authToken: env.SENTRY_AUTH_TOKEN,
@@ -67,6 +111,7 @@ export default defineConfig(({ mode }) => {
       }
     },
     build: {
+      copyPublicDir: false,
       sourcemap: shouldUploadSentrySourceMaps ? 'hidden' : false,
       // 使用 esbuild 进行压缩（比 terser 更快，内存占用更少）
       minify: isProduction ? 'esbuild' : false,

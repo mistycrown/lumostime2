@@ -33,7 +33,7 @@
 
 import React from 'react';
 import { resolveAssetPath } from '../utils/assetPath';
-import { remoteUiIconAssetService } from './remoteUiIconAssetService';
+import { uiIconAssetService } from './uiIconAssetService';
 
 // UI 图标类型定义
 export type UIIconType =
@@ -423,7 +423,11 @@ class UIIconService {
      */
     private loadTheme() {
         const saved = localStorage.getItem(this.STORAGE_KEY);
-        if (saved && UI_ICON_THEMES.includes(saved as UIIconTheme)) {
+        if (
+            saved
+            && UI_ICON_THEMES.includes(saved as UIIconTheme)
+            && (saved === 'default' || uiIconAssetService.isThemeDownloaded(saved))
+        ) {
             this.currentTheme = saved as UIIconTheme;
         }
     }
@@ -462,22 +466,6 @@ class UIIconService {
     }
 
     /**
-     * Resolve a remote icon first and keep the bundled icon as the browser fallback.
-     * Native widget configuration should continue to use getIconPathWithFallback.
-     */
-    getRemoteIconPathWithFallback(iconType: UIIconType): { primary: string; fallback: string } {
-        if (this.currentTheme === 'default') {
-            return { primary: '', fallback: '' };
-        }
-
-        const iconNumber = ICON_NUMBER_MAP[iconType];
-        return {
-            primary: remoteUiIconAssetService.getIconPath(this.currentTheme, `${iconNumber}.webp`),
-            fallback: resolveAssetPath(`/uiicon/${this.currentTheme}/${iconNumber}.webp`)
-        };
-    }
-
-    /**
      * 获取图标路径（带降级支持）
      * 优先使用 WebP，如果加载失败则降级到 PNG
      * @param iconType 图标类型
@@ -489,22 +477,14 @@ class UIIconService {
         }
 
         const iconNumber = ICON_NUMBER_MAP[iconType];
+        const isBundledPreview = Number(iconNumber) <= 4;
+        const bundledWebp = resolveAssetPath(`/uiicon/${this.currentTheme}/${iconNumber}.webp`);
+        const bundledPng = resolveAssetPath(`/uiicon/${this.currentTheme}/${iconNumber}.png`);
         return {
-            primary: resolveAssetPath(`/uiicon/${this.currentTheme}/${iconNumber}.webp`),
-            fallback: resolveAssetPath(`/uiicon/${this.currentTheme}/${iconNumber}.png`)
+            primary: uiIconAssetService.getCachedIconUrl(this.currentTheme, `${iconNumber}.webp`)
+                || (isBundledPreview ? bundledWebp : ''),
+            fallback: isBundledPreview ? bundledPng : ''
         };
-    }
-
-    /**
-     * Check the configured static host before switching to a remote UI icon theme.
-     * A failed probe is non-fatal because the renderer can still use bundled assets.
-     */
-    async checkRemoteThemeAvailability(theme: UIIconTheme) {
-        if (theme === 'default') {
-            return { theme, available: true, url: '' };
-        }
-
-        return remoteUiIconAssetService.checkThemeAvailability(theme);
     }
 
     /**
@@ -663,7 +643,7 @@ export const getUIIconStringFromAssetPath = (assetPath?: string | null): string 
 export const useUIIcon = (iconType: UIIconType) => {
     const theme = uiIconService.getCurrentTheme();
     const isCustom = theme !== 'default';
-    const paths = uiIconService.getRemoteIconPathWithFallback(iconType);
+    const paths = uiIconService.getIconPathWithFallback(iconType);
 
     return {
         isCustomTheme: isCustom,

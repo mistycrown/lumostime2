@@ -1,7 +1,7 @@
 /**
  * @file remoteUiIconAssetService.ts
  * @input UI icon theme and icon file names
- * @output Remote UI icon URLs and availability checks
+ * @output Remote UI icon URLs and downloadable file lists
  * @pos Service (Remote Static Assets)
  * @description Resolves optional UI icon assets from the hosted static repository while leaving bundled fallback assets available.
  *
@@ -11,6 +11,7 @@
 import { UI_ICON_ASSET_BASE_URL, UI_ICON_ASSET_ROOT } from '../config/uiIconAssets';
 
 const AVAILABILITY_TIMEOUT_MS = 8000;
+const UI_ICON_FILE_NAMES = Array.from({ length: 96 }, (_, index) => `${String(index + 1).padStart(2, '0')}.webp`);
 
 const buildRemotePath = (theme: string, filename: string): string => (
   `${UI_ICON_ASSET_BASE_URL}/${UI_ICON_ASSET_ROOT}/${encodeURIComponent(theme)}/${encodeURIComponent(filename)}`
@@ -35,42 +36,19 @@ const fetchWithTimeout = async (url: string): Promise<Response> => {
   }
 };
 
-export type RemoteUiIconThemeCheckResult = {
-  theme: string;
-  available: boolean;
-  url: string;
-  status?: number;
-};
-
 class RemoteUiIconAssetService {
   getIconPath(theme: string, filename: string): string {
     return buildRemotePath(theme, filename);
   }
 
-  async checkThemeAvailability(theme: string): Promise<RemoteUiIconThemeCheckResult> {
-    const url = this.getIconPath(theme, '01.webp');
-
-    try {
-      const response = await fetchWithTimeout(url);
-      return {
-        theme,
-        available: response.ok,
-        url,
-        status: response.status
-      };
-    } catch (error) {
-      console.warn('[RemoteUiIconAssetService] Remote UI icon probe failed', {
-        theme,
-        url,
-        error
-      });
-      return {
-        theme,
-        available: false,
-        url
-      };
-    }
+  getDownloadFileNames(): string[] {
+    return UI_ICON_FILE_NAMES.slice(4);
   }
+
+  async fetchIcon(theme: string, filename: string): Promise<Response> {
+    return fetchWithTimeout(this.getIconPath(theme, filename));
+  }
+
 }
 
 export const remoteUiIconAssetService = new RemoteUiIconAssetService();
