@@ -52,7 +52,7 @@ describe('activity statistic cards', () => {
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'kind' }, attributes)).toEqual(['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'choiceStacked']);
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'parts' }, attributes)).toEqual(['choiceBar', 'choiceHeatmap']);
     expect(getChartTypesForSource({ type: 'categoryActivity' }, attributes)).toEqual(['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'choiceStacked']);
-    expect(getChartTypesForSource({ type: 'categoryDuration' }, attributes)).toEqual(['numberArea', 'numberCalendar', 'numberKpi', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap', 'tagDurationTimeOrbit', 'tagDurationPetalTimeline']);
+    expect(getChartTypesForSource({ type: 'categoryDuration' }, attributes)).toEqual(['numberArea', 'numberCalendar', 'numberKpi', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap', 'tagDurationPetalTimeline']);
     const legacyMultiDonut: ActivityStatisticCard = {
       id: 'legacy-donut', source: { type: 'attribute', attributeId: 'parts' }, chartType: 'choiceDonut', range: '30d', metric: 'count', order: 0
     };
@@ -85,6 +85,13 @@ describe('activity statistic cards', () => {
       id: 'stacked-year', source: { type: 'attribute', attributeId: 'mood' }, chartType: 'choiceStacked', range: 'year', metric: 'count', order: 0
     };
     expect(normalizeStatisticCards({ id: 'activity-3', name: 'Activity', color: '#000', attributes: [single], statisticCards: [card] } as Activity)[0]?.range).toBe('30d');
+  });
+
+  it('keeps the yearly range for petal rhythm cards', () => {
+    const card: ActivityStatisticCard = {
+      id: 'petal-year', source: { type: 'tagDuration' }, chartType: 'tagDurationPetalTimeline', range: 'year', metric: 'duration', order: 0
+    };
+    expect(normalizeStatisticCards(activity([card]))[0]?.range).toBe('year');
   });
 
   it('exposes chart families that match each attribute shape', () => {

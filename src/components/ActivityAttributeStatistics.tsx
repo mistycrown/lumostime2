@@ -24,7 +24,7 @@
  * @updated 2026-09-21: Makes fixed statistic-card metrics reactive so count/duration switches refresh immediately.
  * @updated 2026-09-21: Enlarges cross-month choice heatmaps to two monthly columns and removes redundant chart subtitles.
  * @updated 2026-09-21: Restores statistic-card type subtitles while keeping the redundant inner chart description removed.
- * @updated 2026-09-23: Adds shared weekly/monthly time orbit and petal rhythm charts for duration sources.
+ * @updated 2026-09-23: Adds shared weekly/monthly/yearly petal rhythm charts for duration sources.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
@@ -42,8 +42,7 @@ import { getChartPalette } from '../utils/chartPalette';
 import type { ChartPalette } from '../utils/chartPalette';
 import { useChartPaletteSequences } from '../hooks/useChartPaletteSequences';
 import { useSponsorshipUnlocked } from '../hooks/useSponsorshipUnlocked';
-import { PetalTimelineChart } from './stats/PetalTimelineChart';
-import { TimeOrbitChart, type RhythmRange } from './stats/TimeOrbitChart';
+import { PetalTimelineChart, type RhythmRange } from './stats/PetalTimelineChart';
 
 export { getTextTerms } from '../utils/textSegmentation';
 
@@ -68,7 +67,8 @@ const TAG_DURATION_RANGE_OPTIONS: Array<{ key: RangeKey; label: string }> = [
 
 const TAG_DURATION_RHYTHM_RANGE_OPTIONS: Array<{ key: RhythmRange; label: string }> = [
   { key: 'week', label: '本周' },
-  { key: 'month', label: '本月' }
+  { key: 'month', label: '本月' },
+  { key: 'year', label: '本年' }
 ];
 
 const STATISTIC_MODE_OPTIONS: Array<{ key: StatisticMode; label: string }> = [
@@ -514,7 +514,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
 };
 
 const CARD_TYPE_LABELS: Record<ActivityStatisticCardType, string> = {
-  textCloud: '词云', numberArea: '面积趋势', numberHistogram: '数值分布', numberCalendar: '数值日历', numberKpi: '数值概览', choiceBar: '选项分布', choiceDonut: '选项环形图', choiceHeatmap: '选项热力图', choiceTreemap: '选项矩形图', choiceStacked: '选项堆叠图', tagDurationBoxplot: '标签时长箱线图', tagDurationWeekHourHeatmap: '星期 × 小时热力图', tagDurationTimeOrbit: '时间轨道环', tagDurationPetalTimeline: '花瓣时序图'
+  textCloud: '词云', numberArea: '面积趋势', numberHistogram: '数值分布', numberCalendar: '数值日历', numberKpi: '数值概览', choiceBar: '选项分布', choiceDonut: '选项环形图', choiceHeatmap: '选项热力图', choiceTreemap: '选项矩形图', choiceStacked: '选项堆叠图', tagDurationBoxplot: '标签时长箱线图', tagDurationWeekHourHeatmap: '星期 × 小时热力图', tagDurationPetalTimeline: '花瓣时序图'
 };
 const CARD_TYPE_ICONS: Record<ActivityStatisticCardType, React.ComponentType<{ size?: number }>> = {
   textCloud: Type,
@@ -529,7 +529,6 @@ const CARD_TYPE_ICONS: Record<ActivityStatisticCardType, React.ComponentType<{ s
   choiceStacked: Layers3,
   tagDurationBoxplot: BarChart3,
   tagDurationWeekHourHeatmap: Clock3,
-  tagDurationTimeOrbit: Clock3,
   tagDurationPetalTimeline: PieChart
 };
 const RANGE_DAYS: Record<string, number> = { '7d': 7, '30d': 30 };
@@ -961,7 +960,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
       ? [{ key: 'year' as const, label: '本年' }]
       : selectedCard.chartType === 'tagDurationWeekHourHeatmap'
         ? TAG_DURATION_RANGE_OPTIONS
-        : selectedCard.chartType === 'tagDurationTimeOrbit' || selectedCard.chartType === 'tagDurationPetalTimeline'
+        : selectedCard.chartType === 'tagDurationPetalTimeline'
           ? TAG_DURATION_RHYTHM_RANGE_OPTIONS
         : RANGE_OPTIONS
     : RANGE_OPTIONS;
@@ -986,7 +985,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     const nextRange = nextType === 'choiceStacked' && selectedCard.range === 'year' ? '30d'
       : nextType === 'tagDurationBoxplot' ? 'year'
       : nextType === 'tagDurationWeekHourHeatmap' ? 'all'
-      : nextType === 'tagDurationTimeOrbit' || nextType === 'tagDurationPetalTimeline' ? 'week'
+      : nextType === 'tagDurationPetalTimeline' ? 'week'
         : nextType === 'numberCalendar' ? 'year' : selectedCard.range;
     updateSelectedCard({
       source: next.source,
@@ -1001,7 +1000,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     const nextRange = type === 'choiceStacked' && selectedCard.range === 'year' ? '30d'
       : type === 'tagDurationBoxplot' ? 'year'
       : type === 'tagDurationWeekHourHeatmap' ? 'all'
-      : type === 'tagDurationTimeOrbit' || type === 'tagDurationPetalTimeline' ? 'week'
+      : type === 'tagDurationPetalTimeline' ? 'week'
         : type === 'numberCalendar' ? 'year' : selectedCard.range;
     updateSelectedCard({ chartType: type, range: nextRange, metric: type === 'numberArea' || type === 'numberHistogram' || type === 'numberCalendar' || type === 'numberKpi' ? 'value' : type === 'choiceBar' || type === 'choiceDonut' || type === 'choiceStacked' ? selectedCard.metric === 'duration' ? 'duration' : 'count' : 'count' });
   };
@@ -1019,10 +1018,9 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
       if (card.chartType === 'tagDurationWeekHourHeatmap') {
         return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">TAG DURATION / 星期 × 小时</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><TagDurationWeekHourHeatmap logs={logs} range={card.range} palette={chartPalette} /></section>;
       }
-      if (card.chartType === 'tagDurationTimeOrbit' || card.chartType === 'tagDurationPetalTimeline') {
-        const rhythmRange: RhythmRange = card.range === 'month' ? 'month' : 'week';
-        const Chart = card.chartType === 'tagDurationTimeOrbit' ? TimeOrbitChart : PetalTimelineChart;
-        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">{card.chartType === 'tagDurationTimeOrbit' ? 'TIME ORBIT / 24 HOURS' : 'PETAL TIMELINE / 24 HOURS'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><Chart logs={logs} range={rhythmRange} palette={chartPalette} /></section>;
+      if (card.chartType === 'tagDurationPetalTimeline') {
+        const rhythmRange: RhythmRange = card.range === 'month' ? 'month' : card.range === 'year' ? 'year' : 'week';
+        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">PETAL TIMELINE / 12 PETALS</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><PetalTimelineChart logs={logs} range={rhythmRange} palette={chartPalette} /></section>;
       }
        const tagLogs = createTagDurationLogs(cardLogs, durationAttribute.id);
        return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [durationAttribute] }} logs={tagLogs} hideToolbar chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} onChange={undefined} /></section>;
