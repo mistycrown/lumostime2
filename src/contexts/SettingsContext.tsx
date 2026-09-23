@@ -12,6 +12,7 @@
  * @updated 2026-09-15: Added a persisted global font-scale preference applied through the root CSS variable.
  * @updated 2026-09-15: Fixed missing font-scale storage to default to 100% instead of the minimum value.
  * @updated 2026-09-22: Rehydrates persisted preference and Memoir filter state from cloud/export restore events.
+ * @updated 2026-09-23: Preserves selected UI icon themes and downloads missing local assets on startup.
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
@@ -29,7 +30,7 @@ import {
 import { DEFAULT_USER_PERSONAL_INFO } from '../constants';
 import { SETTINGS_KEYS, THEME_KEYS } from '../constants/storageKeys';
 import { appAwarenessService } from '../services/appAwarenessService';
-import { uiIconService } from '../services/uiIconService';
+import { UI_ICON_THEMES, uiIconService } from '../services/uiIconService';
 import { uiIconAssetService } from '../services/uiIconAssetService';
 import { fontService } from '../services/fontService';
 import {
@@ -607,9 +608,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const [uiIconTheme, setUiIconTheme] = useState<string>(() => {
         const stored = localStorage.getItem('lumostime_ui_icon_theme');
-        const isAvailable = stored === 'default'
-            || Boolean(stored && uiIconAssetService.isThemeDownloaded(stored));
-        return isAvailable ? (stored || 'default') : 'default';
+        return stored && UI_ICON_THEMES.includes(stored as typeof UI_ICON_THEMES[number])
+            ? stored
+            : 'default';
     });
     const [, setUiIconAssetRevision] = useState(0);
 
@@ -626,7 +627,13 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         localStorage.setItem('lumostime_ui_icon_theme', uiIconTheme);
         // 同步到 uiIconService
         uiIconService.setTheme(uiIconTheme as any);
-        void uiIconAssetService.activateTheme(uiIconTheme);
+        if (uiIconTheme !== 'default') {
+            void uiIconAssetService.ensureThemeAvailable(uiIconTheme).catch((error) => {
+                console.warn('[SettingsContext] Failed to auto-download current UI icon theme', error);
+            });
+        } else {
+            void uiIconAssetService.activateTheme(uiIconTheme);
+        }
     }, [uiIconTheme]);
 
     const [colorScheme, setColorScheme] = useState<string>(() => {
@@ -736,9 +743,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             const storedTimelineConfigs = localStorage.getItem(THEME_KEYS.TIMELINE_STYLE_CONFIGS);
 
             const storedUiIconTheme = localStorage.getItem(THEME_KEYS.UI_ICON_THEME);
-            const isAvailableUiIconTheme = storedUiIconTheme === 'default'
-                || Boolean(storedUiIconTheme && uiIconAssetService.isThemeDownloaded(storedUiIconTheme));
-            setUiIconTheme(isAvailableUiIconTheme ? (storedUiIconTheme || 'default') : 'default');
+            const isValidUiIconTheme = storedUiIconTheme
+                && UI_ICON_THEMES.includes(storedUiIconTheme as typeof UI_ICON_THEMES[number]);
+            setUiIconTheme(isValidUiIconTheme ? storedUiIconTheme : 'default');
             setColorScheme(localStorage.getItem(THEME_KEYS.COLOR_SCHEME) || 'default');
             setThemeMode(readStoredThemeMode(localStorage));
             setFontFamily(localStorage.getItem('lumostime_font_family') || 'default');

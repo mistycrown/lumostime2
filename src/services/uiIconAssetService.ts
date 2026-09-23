@@ -6,6 +6,7 @@
  * @description Downloads optional UI icon themes on demand and serves only locally stored assets to the renderer.
  *
  * @updated 2026-09-23: Added persistent UI icon theme downloads for IndexedDB and Capacitor Filesystem.
+ * @updated 2026-09-23: Verifies local theme files and repairs incomplete downloads without changing the selected theme.
  */
 
 import { imageService } from './imageService';
@@ -37,6 +38,7 @@ const writeDownloadedThemes = (themes: string[]): void => {
 
 class UiIconAssetService {
   private readonly objectUrlCache = new Map<string, string>();
+  private readonly downloads = new Map<string, Promise<void>>();
 
   listDownloadedThemes(): string[] {
     return readDownloadedThemes();
@@ -46,18 +48,35 @@ class UiIconAssetService {
     return this.listDownloadedThemes().includes(theme);
   }
 
+  async ensureThemeAvailable(theme: string): Promise<void> {
+    if (this.isThemeDownloaded(theme) && await this.activateTheme(theme)) {
+      return;
+    }
+    await this.downloadTheme(theme);
+  }
+
   getCachedIconUrl(theme: string, filename: string): string | null {
     return this.objectUrlCache.get(getStorageKey(theme, filename)) || null;
   }
 
   async downloadTheme(theme: string, onProgress?: DownloadProgress): Promise<void> {
-    if (this.isThemeDownloaded(theme)) {
-      await this.activateTheme(theme);
+    const existingDownload = this.downloads.get(theme);
+    if (existingDownload) {
+      await existingDownload;
       onProgress?.(100);
       return;
     }
 
-    const storedKeys: string[] = [];
+    const download = this.downloadThemeFiles(theme, onProgress);
+    this.downloads.set(theme, download);
+    try {
+      await download;
+    } finally {
+      this.downloads.delete(theme);
+    }
+  }
+
+  private async downloadThemeFiles(theme: string, onProgress?: DownloadProgress): Promise<void> {
     const filenames = remoteUiIconAssetService.getDownloadFileNames();
 
     try {
@@ -71,28 +90,30 @@ class UiIconAssetService {
         const blob = await response.blob();
         const storageKey = getStorageKey(theme, filename);
         await imageService.writeImage(storageKey, blob);
-        storedKeys.push(storageKey);
         onProgress?.(Math.round(((index + 1) / filenames.length) * 100));
       }
 
       writeDownloadedThemes([...this.listDownloadedThemes(), theme]);
       await this.activateTheme(theme);
     } catch (error) {
-      await Promise.all(storedKeys.map((storageKey) => imageService.deleteImageLocalOnly(storageKey).catch(() => undefined)));
       throw error;
     }
   }
 
-  async activateTheme(theme: string): Promise<void> {
+  async activateTheme(theme: string): Promise<boolean> {
     if (!this.isThemeDownloaded(theme)) {
-      return;
+      return false;
     }
 
     const filenames = remoteUiIconAssetService.getDownloadFileNames();
-    await Promise.all(filenames.map((filename) => this.loadLocalIconUrl(theme, filename)));
+    const urls = await Promise.all(filenames.map((filename) => this.loadLocalIconUrl(theme, filename)));
+    if (urls.some((url) => !url)) {
+      return false;
+    }
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('ui-icon-assets-ready', { detail: { theme } }));
     }
+    return true;
   }
 
   private async loadLocalIconUrl(theme: string, filename: string): Promise<string | null> {

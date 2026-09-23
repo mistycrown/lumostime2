@@ -482,6 +482,11 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     // 处理 UI 图标主题切换，并触发图标迁移
     useEffect(() => {
         setDownloadedUiIconThemes(uiIconAssetService.listDownloadedThemes());
+        const refreshDownloadedThemes = () => {
+            setDownloadedUiIconThemes(uiIconAssetService.listDownloadedThemes());
+        };
+        window.addEventListener('ui-icon-assets-ready', refreshDownloadedThemes);
+        return () => window.removeEventListener('ui-icon-assets-ready', refreshDownloadedThemes);
     }, []);
 
     const handleUiIconThemeDownload = async (theme: string) => {
