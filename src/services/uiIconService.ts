@@ -1,6 +1,7 @@
 /**
  * @file uiIconService.ts
  * @input Icon ID, Theme selection, Emoji for matching
+ * @updated 2026-09-23: Restores a valid saved theme before its remote assets have finished downloading.
  * @output Icon URLs, Icon metadata, Theme switching
  * @pos Service (UI Icon System)
  * @description UI 图标主题服务 - 管理应用内所有 UI 图标的主题切换
@@ -426,7 +427,6 @@ class UIIconService {
         if (
             saved
             && UI_ICON_THEMES.includes(saved as UIIconTheme)
-            && (saved === 'default' || uiIconAssetService.isThemeDownloaded(saved))
         ) {
             this.currentTheme = saved as UIIconTheme;
         }
