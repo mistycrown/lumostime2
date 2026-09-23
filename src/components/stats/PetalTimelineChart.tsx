@@ -1,0 +1,55 @@
+/**
+ * @file PetalTimelineChart.tsx
+ * @input Duration logs, a calendar range, and an activity chart palette.
+ * @output A 24-petal radial rhythm chart.
+ * @pos Component (Activity Statistics)
+ * @description Uses the shared hourly duration buckets from the time orbit chart.
+ */
+import React, { useMemo } from 'react';
+import type { Log } from '../../types';
+import type { ChartPalette } from '../../utils/chartPalette';
+import { aggregateHourBuckets, formatRhythmDuration, type RhythmRange } from './TimeOrbitChart';
+
+export interface PetalTimelineChartProps {
+  logs: Array<Pick<Log, 'duration' | 'startTime' | 'endTime'>>;
+  range: RhythmRange;
+  palette: ChartPalette;
+}
+
+export const PetalTimelineChart: React.FC<PetalTimelineChartProps> = ({ logs, range, palette }) => {
+  const summary = useMemo(() => aggregateHourBuckets(logs, range), [logs, range]);
+  const maximum = Math.max(...summary.buckets.map((bucket) => bucket.minutes), 0);
+  const center = 160;
+  const startAtTop = -Math.PI / 2;
+  const hasData = summary.totalMinutes > 0;
+
+  return (
+    <div className="mx-auto w-full max-w-[360px]">
+      <svg viewBox="0 0 320 320" className="w-full" role="img" aria-label={`花瓣时序图，${range === 'week' ? '本周' : '本月'}，总时长 ${formatRhythmDuration(summary.totalMinutes)}`}>
+        <circle cx={center} cy={center} r="116" fill={palette.background} opacity="0.36" />
+        {[0, 6, 12, 18].map((hour) => {
+          const point = {
+            x: center + 132 * Math.cos(startAtTop + (hour / 24) * Math.PI * 2),
+            y: center + 132 * Math.sin(startAtTop + (hour / 24) * Math.PI * 2)
+          };
+          return <text key={hour} x={point.x} y={point.y + 3} textAnchor="middle" fill="#8f8174" fontSize="10" fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace">{hour}</text>;
+        })}
+        {summary.buckets.map((bucket, index) => {
+          if (bucket.minutes <= 0 || maximum <= 0) return null;
+          const ratio = bucket.minutes / maximum;
+          const angle = startAtTop + (bucket.hour / 24) * Math.PI * 2;
+          const length = 34 + ratio * 74;
+          const distance = 32 + length / 2;
+          const color = palette.colors[index % palette.colors.length] || palette.accent;
+          return <ellipse key={bucket.hour} cx={center} cy={center - distance} rx={10 + ratio * 6} ry={length / 2} transform={`rotate(${(angle * 180) / Math.PI + 90} ${center} ${center})`} fill={color} fillOpacity={0.42 + ratio * 0.38} stroke={palette.background} strokeWidth="1.5"><title>{`${String(bucket.hour).padStart(2, '0')}:00 · ${formatRhythmDuration(bucket.minutes)}`}</title></ellipse>;
+        })}
+        <circle cx={center} cy={center} r="43" fill={palette.background} stroke={palette.grid} strokeWidth="1" />
+        <text x={center} y={center - 4} textAnchor="middle" fill="#5d5147" fontSize="10">累计时长</text>
+        <text x={center} y={center + 15} textAnchor="middle" fill="#4b3d32" fontSize="17" fontFamily="ui-serif, Georgia, serif">{hasData ? formatRhythmDuration(summary.totalMinutes) : '暂无记录'}</text>
+        {hasData && <text x={center} y={center + 31} textAnchor="middle" fill="#9a8b7e" fontSize="9">{summary.activeDays} 天</text>}
+      </svg>
+    </div>
+  );
+};
+
+export default PetalTimelineChart;

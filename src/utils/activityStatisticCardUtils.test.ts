@@ -52,7 +52,7 @@ describe('activity statistic cards', () => {
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'kind' }, attributes)).toEqual(['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'choiceStacked']);
     expect(getChartTypesForSource({ type: 'attribute', attributeId: 'parts' }, attributes)).toEqual(['choiceBar', 'choiceHeatmap']);
     expect(getChartTypesForSource({ type: 'categoryActivity' }, attributes)).toEqual(['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'choiceStacked']);
-    expect(getChartTypesForSource({ type: 'categoryDuration' }, attributes)).toEqual(['numberArea', 'numberCalendar', 'numberKpi', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap']);
+    expect(getChartTypesForSource({ type: 'categoryDuration' }, attributes)).toEqual(['numberArea', 'numberCalendar', 'numberKpi', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap', 'tagDurationTimeOrbit', 'tagDurationPetalTimeline']);
     const legacyMultiDonut: ActivityStatisticCard = {
       id: 'legacy-donut', source: { type: 'attribute', attributeId: 'parts' }, chartType: 'choiceDonut', range: '30d', metric: 'count', order: 0
     };
