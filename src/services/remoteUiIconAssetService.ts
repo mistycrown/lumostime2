@@ -5,11 +5,12 @@
  * @pos Service (Remote Static Assets)
  * @description Resolves optional UI icon assets from the hosted static repository while leaving bundled fallback assets available.
  *
- * @updated 2026-09-23: Adds GitHub/Gitee failover and uses CapacitorHttp for native binary downloads.
+ * @updated 2026-09-23: Adds source failover and normalizes native Base64 binary responses into validated WebP data.
  */
 
 import { UI_ICON_ASSET_BASE_URLS, UI_ICON_ASSET_ROOT } from '../config/uiIconAssets';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import { toValidatedWebpBlob } from '../utils/uiIconAssetUtils';
 
 const AVAILABILITY_TIMEOUT_MS = 8000;
 const UI_ICON_FILE_NAMES = Array.from({ length: 96 }, (_, index) => `${String(index + 1).padStart(2, '0')}.webp`);
@@ -26,9 +27,7 @@ const fetchWithTimeout = async (url: string): Promise<Response> => {
       connectTimeout: AVAILABILITY_TIMEOUT_MS,
       readTimeout: AVAILABILITY_TIMEOUT_MS
     });
-    const body = result.data instanceof Blob
-      ? result.data
-      : new Blob([result.data as BlobPart], { type: 'image/webp' });
+    const body = await toValidatedWebpBlob(result.data);
     return new Response(body, { status: result.status });
   }
 

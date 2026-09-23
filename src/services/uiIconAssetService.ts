@@ -6,11 +6,12 @@
  * @description Downloads optional UI icon themes on demand and serves only locally stored assets to the renderer.
  *
  * @updated 2026-09-23: Added persistent UI icon theme downloads for IndexedDB and Capacitor Filesystem.
- * @updated 2026-09-23: Verifies local theme files and repairs incomplete downloads without changing the selected theme.
+ * @updated 2026-09-23: Validates stored WebP assets and repairs invalid downloads without changing the selected theme.
  */
 
 import { imageService } from './imageService';
 import { remoteUiIconAssetService } from './remoteUiIconAssetService';
+import { toValidatedWebpBlob } from '../utils/uiIconAssetUtils';
 
 const DOWNLOADED_THEMES_KEY = 'lumostime_ui_icon_downloaded_themes';
 const STORAGE_PREFIX = 'uiicon';
@@ -40,6 +41,13 @@ class UiIconAssetService {
   private readonly objectUrlCache = new Map<string, string>();
   private readonly downloads = new Map<string, Promise<void>>();
 
+  private clearDownloadedTheme(theme: string): void {
+    writeDownloadedThemes(this.listDownloadedThemes().filter((downloadedTheme) => downloadedTheme !== theme));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ui-icon-assets-invalidated', { detail: { theme } }));
+    }
+  }
+
   listDownloadedThemes(): string[] {
     return readDownloadedThemes();
   }
@@ -49,9 +57,6 @@ class UiIconAssetService {
   }
 
   async ensureThemeAvailable(theme: string): Promise<void> {
-    if (this.isThemeDownloaded(theme) && await this.activateTheme(theme)) {
-      return;
-    }
     await this.downloadTheme(theme);
   }
 
@@ -60,6 +65,14 @@ class UiIconAssetService {
   }
 
   async downloadTheme(theme: string, onProgress?: DownloadProgress): Promise<void> {
+    if (this.isThemeDownloaded(theme)) {
+      if (await this.activateTheme(theme)) {
+        onProgress?.(100);
+        return;
+      }
+      this.clearDownloadedTheme(theme);
+    }
+
     const existingDownload = this.downloads.get(theme);
     if (existingDownload) {
       await existingDownload;
@@ -87,15 +100,19 @@ class UiIconAssetService {
           throw new Error(`UI icon download failed: ${theme}/${filename} (${response.status})`);
         }
 
-        const blob = await response.blob();
+        const blob = await toValidatedWebpBlob(await response.blob());
         const storageKey = getStorageKey(theme, filename);
         await imageService.writeImage(storageKey, blob);
         onProgress?.(Math.round(((index + 1) / filenames.length) * 100));
       }
 
       writeDownloadedThemes([...this.listDownloadedThemes(), theme]);
-      await this.activateTheme(theme);
+      const activated = await this.activateTheme(theme);
+      if (!activated) {
+        throw new Error(`Downloaded UI icon theme could not be loaded locally: ${theme}`);
+      }
     } catch (error) {
+      this.clearDownloadedTheme(theme);
       throw error;
     }
   }
@@ -128,11 +145,10 @@ class UiIconAssetService {
       if (storedData === undefined || storedData === null) {
         throw new Error(`Local UI icon is missing: ${storageKey}`);
       }
-      const url = storedData instanceof Blob
-        ? URL.createObjectURL(storedData)
-        : typeof storedData === 'string'
-          ? `data:image/webp;base64,${storedData}`
-          : URL.createObjectURL(new Blob([storedData], { type: 'image/webp' }));
+      const blob = await toValidatedWebpBlob(storedData);
+      const url = typeof storedData === 'string'
+        ? `data:image/webp;base64,${storedData.replace(/^data:[^;,]+;base64,/, '')}`
+        : URL.createObjectURL(blob);
       this.objectUrlCache.set(storageKey, url);
       return url;
     } catch (error) {
