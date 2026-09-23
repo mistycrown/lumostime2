@@ -226,6 +226,46 @@ describe('aiService unified turn normalization', () => {
     expect(requestBody.messages[0].content).not.toContain('categoryId 固定为 quick');
   });
 
+  it('resolves relative quick-add todo dates against the supplied local date', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(createJsonTextResponse({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            toolCalls: [{
+              toolName: 'create_todo',
+              args: {
+                title: '去看老师',
+                categoryId: 'todo-study',
+                linkedCategoryId: 'study',
+                linkedActivityId: 'teacher'
+              }
+            }]
+          })
+        }
+      }]
+    }));
+    Object.defineProperty(globalThis, 'fetch', {
+      value: fetchSpy,
+      configurable: true
+    });
+
+    const result = await quickAddService.requestQuickAddTodoWithDebug(
+      '明天去看老师',
+      {},
+      {},
+      {
+        currentDateTime: '2026-09-23T10:00:00+08:00',
+        currentDateKey: '2026-09-23'
+      }
+    );
+    const requestInit = fetchSpy.mock.calls[0]?.[1] as { body?: string } | undefined;
+    const requestBody = requestInit?.body ? JSON.parse(requestInit.body) : {};
+
+    expect(result.toolCall?.args.scheduledDate).toBe('2026-09-24');
+    expect(result.toolCall?.args.deadlineDate).toBeUndefined();
+    expect(requestBody.messages[0].content).toContain('Current local date key: 2026-09-23');
+  });
+
   it('normalizes quick-add-note fragments without rewriting their text', async () => {
     Object.defineProperty(globalThis, 'fetch', {
       value: vi.fn().mockResolvedValue(createJsonTextResponse({

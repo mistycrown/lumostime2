@@ -4,6 +4,7 @@
  * @output Structured one-turn quick-add tool calls for todos, backfills, and notes
  * @pos Service (AI Quick Add)
  * @description Keeps all quick-add prompts, contracts, and normalization isolated from the general AI service.
+ * @updated 2026-09-23: Supplies local date context and normalizes relative dates for quick-add todos.
  */
 
 import type { AssistantTurnDictionaryContext } from '../types/assistant';
@@ -29,6 +30,11 @@ export interface AIBackfillToolCall {
 export interface AIQuickAddTodoResult {
   toolCall?: AITodoToolCall;
   debug: AIDebugExchange;
+}
+
+export interface AIQuickAddTodoTimeContext {
+  currentDateTime?: string;
+  currentDateKey?: string;
 }
 
 export interface AIQuickAddBackfillCreateLogArgs {
@@ -83,16 +89,107 @@ const normalizeText = (value: unknown): string | undefined => (
   typeof value === 'string' && value.trim() ? value.trim() : undefined
 );
 
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const addDaysToDateKey = (dateKey: string, dayOffset: number): string => {
+  const date = new Date(`${dateKey}T00:00:00`);
+  date.setDate(date.getDate() + dayOffset);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getRelativeDateOffset = (value: string): number | undefined => {
+  if (value.includes('大后天')) return 3;
+  if (value.includes('后天')) return 2;
+  if (value.includes('明天')) return 1;
+  if (value.includes('今天')) return 0;
+  return undefined;
+};
+
+const getRelativeWeekdayDate = (value: string, currentDateKey: string): string | undefined => {
+  const match = value.match(/(下周|下星期|本周|本星期)([一二三四五六日天])/);
+  if (!match) {
+    return undefined;
+  }
+
+  const weekday = '一二三四五六日'.indexOf(match[2] === '天' ? '日' : match[2]);
+  if (weekday < 0) {
+    return undefined;
+  }
+
+  const currentDate = new Date(`${currentDateKey}T00:00:00`);
+  const currentWeekday = (currentDate.getDay() + 6) % 7;
+  const offset = match[1].startsWith('下')
+    ? 7 - currentWeekday + weekday
+    : (weekday - currentWeekday + 7) % 7;
+  return addDaysToDateKey(currentDateKey, offset);
+};
+
+const resolveQuickAddDate = (
+  value: unknown,
+  description: string,
+  currentDateKey?: string
+): string | undefined => {
+  const candidate = normalizeText(value);
+  if (candidate && DATE_KEY_PATTERN.test(candidate)) {
+    return candidate;
+  }
+
+  if (!currentDateKey || !DATE_KEY_PATTERN.test(currentDateKey)) {
+    return undefined;
+  }
+
+  const relativeText = candidate || description;
+  const offset = getRelativeDateOffset(relativeText);
+  if (offset !== undefined) {
+    return addDaysToDateKey(currentDateKey, offset);
+  }
+
+  return getRelativeWeekdayDate(relativeText, currentDateKey);
+};
+
+const normalizeQuickAddTodoToolCall = (
+  item: any,
+  description: string,
+  currentDateKey?: string
+) => {
+  if (item?.toolName !== 'create_todo') {
+    return item;
+  }
+
+  const args = item.args || {};
+  const scheduledDate = resolveQuickAddDate(args.scheduledDate, description, currentDateKey);
+  const deadlineDate = resolveQuickAddDate(args.deadlineDate, '', currentDateKey);
+  return {
+    ...item,
+    args: {
+      ...args,
+      kind: 'project',
+      ...(scheduledDate ? { scheduledDate } : {}),
+      ...(deadlineDate ? { deadlineDate } : {})
+    }
+  };
+};
+
 export const quickAddService = {
   requestQuickAddTodoWithDebug: async (
     description: string,
     options: AIRequestOptions = {},
-    dictionaryContext: AssistantTurnDictionaryContext = {}
+    dictionaryContext: AssistantTurnDictionaryContext = {},
+    timeContext: AIQuickAddTodoTimeContext = {}
   ): Promise<AIQuickAddTodoResult> => {
+    const normalizedDescription = description.trim();
+    const currentDateTime = timeContext.currentDateTime?.trim() || 'not provided';
+    const currentDateKey = timeContext.currentDateKey?.trim() || 'not provided';
     const systemPrompt = [
       'You are the structured tool caller for quick-add todos.',
       'Create exactly one todo from the user description. Do not chat, explain, summarize, or call another tool.',
-      'Return JSON: {"toolCalls":[{"toolName":"create_todo","args":{"title":"todo title","kind":"project","categoryId":"todo category id","linkedCategoryId":"activity category id","linkedActivityId":"activity id","defaultScopeIds":["scope id"]}}]}.',
+      'Return JSON: {"toolCalls":[{"toolName":"create_todo","args":{"title":"todo title","kind":"project","categoryId":"todo category id","linkedCategoryId":"activity category id","linkedActivityId":"activity id","defaultScopeIds":["scope id"],"note":"optional note","scheduledDate":"YYYY-MM-DD","deadlineDate":"YYYY-MM-DD"}}]}.',
+      `Current local datetime: ${currentDateTime}`,
+      `Current local date key: ${currentDateKey}`,
+      'Convert relative dates such as 今天、明天、后天、下周一 into an absolute YYYY-MM-DD value using the supplied current local date key. Never put relative words in scheduledDate or deadlineDate.',
       'Keep the key information from the user description. Select ids only from the supplied dictionary.',
       'Do not use the reserved quick category; use a normal todo category and linked activity when possible.',
       'If the description contains an explicit note/date/deadline, preserve it in note/scheduledDate/deadlineDate without inventing information.',
@@ -101,12 +198,14 @@ export const quickAddService = {
 
     const { result, debug } = await aiService.requestStructuredJsonWithDebug({
       systemPrompt,
-      userPrompt: description.trim(),
+      userPrompt: normalizedDescription,
       normalizeResult: (rawValue: any) => {
         const rawToolCalls = Array.isArray(rawValue?.toolCalls)
-          ? rawValue.toolCalls.map((item: any) => item?.toolName === 'create_todo'
-            ? { ...item, args: { ...(item.args || {}), kind: 'project' } }
-            : item)
+          ? rawValue.toolCalls.map((item: any) => normalizeQuickAddTodoToolCall(
+            item,
+            normalizedDescription,
+            timeContext.currentDateKey
+          ))
           : [];
         const toolCall = rawToolCalls.find((item: any) => item?.toolName === 'create_todo') as AITodoToolCall | undefined;
         return { toolCall };
