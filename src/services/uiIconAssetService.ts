@@ -56,8 +56,8 @@ class UiIconAssetService {
     return this.listDownloadedThemes().includes(theme);
   }
 
-  async ensureThemeAvailable(theme: string): Promise<void> {
-    await this.downloadTheme(theme);
+  async ensureThemeAvailable(theme: string, onProgress?: DownloadProgress): Promise<void> {
+    await this.downloadTheme(theme, onProgress);
   }
 
   getCachedIconUrl(theme: string, filename: string): string | null {
@@ -67,7 +67,6 @@ class UiIconAssetService {
   async downloadTheme(theme: string, onProgress?: DownloadProgress): Promise<void> {
     if (this.isThemeDownloaded(theme)) {
       if (await this.activateTheme(theme)) {
-        onProgress?.(100);
         return;
       }
       this.clearDownloadedTheme(theme);
@@ -93,6 +92,7 @@ class UiIconAssetService {
     const filenames = remoteUiIconAssetService.getDownloadFileNames();
 
     try {
+      onProgress?.(0);
       for (let index = 0; index < filenames.length; index += 1) {
         const filename = filenames[index];
         const response = await remoteUiIconAssetService.fetchIcon(theme, filename);
