@@ -6,6 +6,7 @@
  * @description Centralizes the stable session and template helper logic used by AIBackfillChatModal so the main modal can focus on React state orchestration instead of carrying pure data transforms inline.
  * @updated 2026-05-21: Added a shared assistant-context conversation serializer so web foreground prompts and native background snapshots preserve per-turn timestamps through the same mapping path.
  * @updated 2026-05-15: Extracted session initialization, immutable session update helpers, and review-template metadata resolvers from AIBackfillChatModal.
+ * @updated 2026-09-23: Simplifies conversation-history narrowing without an invalid type predicate.
  */
 import type { AIConversationTurn } from '../../services/aiService';
 import type { AppliedActionStatus } from '../../services/assistantActionExecutor';
@@ -320,14 +321,14 @@ export const buildConversationHistoryFromSessionMessages = (
     return [];
   }
 
-  const turns = messages
+  const turns: AIConversationTurn[] = messages
     .filter((message) => message.tone !== 'system' && message.tone !== 'pending')
     .map((message) => ({
       role: message.role,
       content: message.content.trim(),
       createdAt: options.formatCreatedAt(new Date(message.createdAt))
     }))
-    .filter((turn): turn is AIConversationTurn => Boolean(turn.content));
+    .filter((turn) => Boolean(turn.content));
 
   if (turns.length <= 1) {
     return [];

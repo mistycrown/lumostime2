@@ -7,6 +7,7 @@
  * @updated 2026-06-07: Added weekly/monthly newspaper writeback runners so periodic AI newspapers can persist and render dedicated result cards like the daily flow.
  * @updated 2026-05-17: Daily review and newspaper writeback flows now preserve provider reasoning summaries so the generated result message can render the same collapsible thinking block as ordinary chat.
  * @updated 2026-05-15: Extracted daily, weekly, and monthly narrative writeback runners from AIBackfillChatModal.
+ * @updated 2026-09-23: Uses resolved template metadata types for writeback callbacks.
  */
 import { aiService, type AIConversationTurn } from '../../services/aiService';
 import { dailyNewspaperService } from '../../services/dailyNewspaperService';
@@ -37,6 +38,8 @@ import type { WeeklyReviewTemplateSessionMeta } from '../../services/weeklyRevie
 import type { MonthlyReviewTemplateSessionMeta } from '../../services/monthlyReviewTemplateService';
 
 type AddToast = (type: 'success' | 'error' | 'info', message: string) => void;
+type WeeklyReviewTemplateResolvedMeta = Required<Pick<WeeklyReviewTemplateSessionMeta, 'weekStartDate' | 'weekEndDate' | 'selectedRangeLabel' | 'methodId' | 'methodLabel'>>;
+type MonthlyReviewTemplateResolvedMeta = Required<Pick<MonthlyReviewTemplateSessionMeta, 'monthStartDate' | 'monthEndDate' | 'selectedRangeLabel' | 'methodId' | 'methodLabel'>>;
 
 interface ActiveRequestState {
   controller: AbortController;
@@ -93,7 +96,7 @@ interface WeeklyWritebackOptions extends ReviewWritebackRunnerBase {
     weekDataText: string;
     weeklyReview: WeeklyReview;
   };
-  resolveTemplateMeta: (session: AIChatSession) => WeeklyReviewTemplateSessionMeta | null;
+  resolveTemplateMeta: (session: AIChatSession) => WeeklyReviewTemplateResolvedMeta | null;
   session: AIChatSession;
   setWeeklyReviews: (updater: (reviews: WeeklyReview[]) => WeeklyReview[]) => void;
   updateWeeklyReviewTemplateStage: (
@@ -142,7 +145,7 @@ interface MonthlyWritebackOptions extends ReviewWritebackRunnerBase {
     monthDataText: string;
     monthlyReview: MonthlyReview;
   };
-  resolveTemplateMeta: (session: AIChatSession) => MonthlyReviewTemplateSessionMeta | null;
+  resolveTemplateMeta: (session: AIChatSession) => MonthlyReviewTemplateResolvedMeta | null;
   session: AIChatSession;
   setMonthlyReviews: (updater: (reviews: MonthlyReview[]) => MonthlyReview[]) => void;
   updateWeeklyReviewTemplateStage: (

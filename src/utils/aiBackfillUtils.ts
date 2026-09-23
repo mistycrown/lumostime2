@@ -5,6 +5,7 @@
  * @pos Utility (AI backfill)
  * @description Keeps AI backfill date handling consistent so the service and chat UI can share the same default-date, cross-day split, and dedupe rules.
  * @updated 2026-04-22: Added per-tool-call date normalization, midnight split handling, and reusable timestamp/date formatting helpers for AI backfill.
+ * @updated 2026-09-23: Narrows unknown date inputs before trimming them.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -46,11 +47,10 @@ export const addDaysToDateKey = (dateKey: string, dayOffset: number): string => 
   return formatDateKey(baseDate);
 };
 
-export const normalizeBackfillDate = (value: unknown, fallbackDate: string): string => (
-  isValidBackfillDate(typeof value === 'string' ? value.trim() : null)
-    ? value.trim()
-    : fallbackDate
-);
+export const normalizeBackfillDate = (value: unknown, fallbackDate: string): string => {
+  const normalizedValue = typeof value === 'string' ? value.trim() : null;
+  return isValidBackfillDate(normalizedValue) ? normalizedValue : fallbackDate;
+};
 
 export const parseTimeOnDateKey = (dateKey: string, hhmm: string): number | null => {
   const match = TIME_PATTERN.exec(hhmm.trim());

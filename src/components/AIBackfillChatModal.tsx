@@ -36,6 +36,7 @@
  * @updated 2026-09-22: Extracts applied-action rendering and prompt layout helpers.
  * @updated 2026-09-22: Extracts home and conversation main view composition.
  * @updated 2026-09-22: Extracts the chat composer and quick-command menu.
+ * @updated 2026-09-23: Removes stale extracted inputs, restores custom-prompt deletion wiring, and removes duplicate header props.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -168,7 +169,6 @@ import { AIBackfillChatConversationPane } from './ai-chat/AIBackfillChatConversa
 import { AIChatHome } from './ai-chat/AIChatHome';
 import {
   normalizeDreamRetryYearMonth,
-  parseDreamMonthSelection,
   runDreamCommand as runDreamCommandFlow
 } from './ai-chat/AIBackfillChatDreamFlow';
 import {
@@ -471,7 +471,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const { todoUpdateContext, subtaskParentContext, logEditContext } = useAIBackfillChatContextData({
     categories,
     logs,
-    parseDreamMonthSelection,
     scopes,
     todoCategories,
     todos
@@ -1698,6 +1697,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     handleCancelUserEmojiAvatarEdit,
     handleCreatePersona,
     handleDeleteCurrentPersona,
+    handleDeleteCustomPromptBlock,
     handleDeleteShortcut,
     handleUpdateCustomPromptBlock,
     handleUpdateShortcut,
@@ -2659,7 +2659,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           activePersona={activePersona}
           debugMode={debugMode}
           isDesktopWidgetMode={isDesktopWidgetMode}
-          isHomeView={isHomeView}
           isHomeView={isHomeView}
           isLoading={isLoading}
           onClose={onClose}

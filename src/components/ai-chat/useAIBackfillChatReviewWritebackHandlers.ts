@@ -5,6 +5,7 @@
  * @pos Component Support (AI Integration)
  * @description Keeps review writeback dependency assembly out of the main chat modal.
  * @updated 2026-09-22: Extracted review writeback runner adapters from AIBackfillChatModal.
+ * @updated 2026-09-23: Matches resolver callback types to the metadata fields actually returned.
  */
 import type { AIConversationTurn } from '../../services/aiService';
 import type { AppliedChatAction } from '../../services/assistantActionExecutor';
@@ -26,6 +27,9 @@ import {
   runWeeklyReviewNarrativeWriteback as runWeeklyReviewNarrativeWritebackFlow
 } from './AIBackfillChatReviewWriteback';
 import type { AIChatPersona, AIChatSession } from './AIBackfillChatShared';
+
+type WeeklyReviewTemplateResolvedMeta = Required<Pick<WeeklyReviewTemplateSessionMeta, 'weekStartDate' | 'weekEndDate' | 'selectedRangeLabel' | 'methodId' | 'methodLabel'>>;
+type MonthlyReviewTemplateResolvedMeta = Required<Pick<MonthlyReviewTemplateSessionMeta, 'monthStartDate' | 'monthEndDate' | 'selectedRangeLabel' | 'methodId' | 'methodLabel'>>;
 
 type ActiveRequestState = {
   controller: AbortController;
@@ -51,8 +55,8 @@ export interface AIBackfillChatReviewWritebackHandlerOptions {
   mutateSession: (sessionId: string, updater: (session: AIChatSession) => AIChatSession) => void;
   replacePendingWithResult: (...args: any[]) => void;
   resolveSessionPersona: (session: AIChatSession) => AIChatPersona;
-  resolveMonthlyReviewTemplateSessionMeta: (session: AIChatSession) => MonthlyReviewTemplateSessionMeta | null;
-  resolveWeeklyReviewTemplateSessionMeta: (session: AIChatSession) => WeeklyReviewTemplateSessionMeta | null;
+  resolveMonthlyReviewTemplateSessionMeta: (session: AIChatSession) => MonthlyReviewTemplateResolvedMeta | null;
+  resolveWeeklyReviewTemplateSessionMeta: (session: AIChatSession) => WeeklyReviewTemplateResolvedMeta | null;
   setDailyNewspaperWritebackConfirmation: () => void;
   setDailyReviews: (updater: (reviews: DailyReview[]) => DailyReview[]) => void;
   setDailyReviewWritebackConfirmation: (value: null) => void;

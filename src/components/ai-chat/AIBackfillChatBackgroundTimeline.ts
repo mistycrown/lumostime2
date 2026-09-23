@@ -5,6 +5,7 @@
  * @pos Component Support (AI Background History)
  * @description Merges Web-orchestrated turns with native wake/request diagnostics while preserving debug payloads and request lifecycle state.
  * @updated 2026-09-22: Extracted background-history timeline assembly from AIBackfillChatModal.
+ * @updated 2026-09-23: Aligns message outcome labeling with the unified send_message action type.
  */
 
 import type { AIDebugExchange } from '../../services/aiService';
@@ -132,7 +133,7 @@ export const buildAssistantBackgroundTimeline = ({
       ? '这次后台请求失败了'
       : trimmedDecisionSummary && trimmedDecisionSummary !== trimmedMessage
         ? trimmedDecisionSummary
-        : entry.action === 'reply' && trimmedMessage
+        : entry.action === 'send_message' && trimmedMessage
           ? '这次请求成功并返回了一条消息'
           : entry.action === 'silent'
             ? '这次请求成功，但选择了静默'
