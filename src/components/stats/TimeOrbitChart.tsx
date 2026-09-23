@@ -1,11 +1,11 @@
 /**
  * @file TimeOrbitChart.tsx
  * @input Duration logs, a calendar range, and an activity chart palette.
- * @output A single fine 24-hour activity orbit and shared hourly aggregation helpers.
+ * @output A semantic three-track 24-hour star orbit and shared hourly aggregation helpers.
  * @pos Component (Activity Statistics)
  * @description Maps hourly duration to time position, activity level, and arc length.
  */
-import React, { useMemo } from 'react';
+import React, { useId, useMemo } from 'react';
 import type { Log } from '../../types';
 import { getLogDurationSeconds } from '../../utils/scopeStatsUtils';
 import type { ChartPalette } from '../../utils/chartPalette';
@@ -106,6 +106,24 @@ const describeArc = (center: number, radius: number, startAngle: number, endAngl
   return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
 };
 
+const getTrackIndex = (minutes: number, maximum: number): 0 | 1 | 2 => {
+  if (maximum <= 0 || minutes / maximum >= 0.66) return 0;
+  if (minutes / maximum >= 0.33) return 1;
+  return 2;
+};
+
+const TRACKS: Array<{ radius: number; label: string; shortLabel: string }> = [
+  { radius: 106, label: '外轨 · 高活跃时段', shortLabel: '高活跃' },
+  { radius: 86, label: '中轨 · 中等活跃时段', shortLabel: '中等' },
+  { radius: 66, label: '内轨 · 低活跃时段', shortLabel: '低活跃' }
+];
+
+const STARS = [
+  [72, 75, 1.4], [104, 52, 1], [137, 73, 0.8], [198, 58, 1.2], [232, 84, 1.6],
+  [255, 139, 0.9], [61, 159, 1], [91, 216, 1.4], [124, 239, 0.8], [209, 228, 1.1],
+  [245, 201, 0.8], [176, 242, 1.5], [148, 93, 0.7], [220, 119, 0.7]
+] as const;
+
 export interface TimeOrbitChartProps {
   logs: Array<Pick<Log, 'duration' | 'startTime' | 'endTime'>>;
   range: RhythmRange;
@@ -119,35 +137,49 @@ export const TimeOrbitChart: React.FC<TimeOrbitChartProps> = ({ logs, range, pal
   const center = 160;
   const startAtTop = -Math.PI / 2;
   const tickHours = Array.from({ length: 12 }, (_, index) => index * 2);
-  const orbitRadius = 96;
+  const starFieldId = `orbit-stars-${range}-${useId().replace(/:/g, '')}`;
 
   return (
     <div className="mx-auto w-full max-w-[360px]">
-      <svg viewBox="0 0 320 320" className="w-full" role="img" aria-label={`时间轨道环，${range === 'week' ? '本周' : '本月'}，总时长 ${formatRhythmDuration(summary.totalMinutes)}`}>
-        <circle cx={center} cy={center} r={orbitRadius} fill="none" stroke={palette.grid} strokeWidth="1.2" />
+      <svg viewBox="0 0 320 320" className="w-full" role="img" aria-label={`时间轨道环，${range === 'week' ? '本周' : '本月'}，外轨高活跃、中轨中等、内轨低活跃，总时长 ${formatRhythmDuration(summary.totalMinutes)}`}>
+        <defs>
+          <radialGradient id={starFieldId} cx="50%" cy="46%" r="65%">
+            <stop offset="0%" stopColor="#344969" />
+            <stop offset="68%" stopColor="#1d2b46" />
+            <stop offset="100%" stopColor="#111c31" />
+          </radialGradient>
+        </defs>
+        <circle cx={center} cy={center} r="121" fill={`url(#${starFieldId})`} opacity="0.96" />
+        {STARS.map(([x, y, radius], index) => <circle key={index} cx={x} cy={y} r={radius} fill={index % 3 === 0 ? '#f6dfaa' : '#d7e7ef'} opacity={0.5 + (index % 4) * 0.12} />)}
+        <path d="M226 58c-9 5-13 17-8 27 5 10 17 14 27 9-9 1-17-4-21-12-4-8-3-17 2-24Z" fill="#f4e8c8" opacity="0.9" />
+        {TRACKS.map((track) => <circle key={track.radius} cx={center} cy={center} r={track.radius} fill="none" stroke="#9bb0c5" strokeWidth="1" strokeDasharray="1.5 4" opacity="0.7" />)}
         {tickHours.map((hour) => {
           const angle = startAtTop + (hour / 24) * Math.PI * 2;
-          const inner = polarPoint(center, orbitRadius - 5, angle);
-          const outer = polarPoint(center, orbitRadius + 5, angle);
-          return <line key={`tick-${hour}`} x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y} stroke={palette.grid} strokeWidth="1" />;
+          const inner = polarPoint(center, 61, angle);
+          const outer = polarPoint(center, 111, angle);
+          return <line key={`tick-${hour}`} x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y} stroke="#b8c9d7" strokeWidth="0.7" opacity="0.35" />;
         })}
         {tickHours.map((hour) => {
           const angle = startAtTop + (hour / 24) * Math.PI * 2;
-          const labelPoint = polarPoint(center, 120, angle);
-          return <text key={hour} x={labelPoint.x} y={labelPoint.y + 3} textAnchor="middle" fill="#8f8174" fontSize="9" fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace">{String(hour).padStart(2, '0')}</text>;
+          const labelPoint = polarPoint(center, 128, angle);
+          return <text key={hour} x={labelPoint.x} y={labelPoint.y + 3} textAnchor="middle" fill="#d7e4ec" fontSize="8.5" fontFamily="var(--font-family)" fontVariant="tabular-nums">{String(hour).padStart(2, '0')}</text>;
         })}
         {summary.buckets.map((bucket) => {
           if (bucket.minutes <= 0 || maximum <= 0) return null;
+          const track = TRACKS[getTrackIndex(bucket.minutes, maximum)];
           const startAngle = startAtTop + (bucket.hour / 24) * Math.PI * 2;
           const endAngle = startAngle + Math.max(0.02, Math.min(bucket.minutes / 60, 1) * Math.PI * 2 / 24);
-          const intensity = 0.18 + (bucket.minutes / maximum) * 0.76;
-          return <path key={bucket.hour} d={describeArc(center, orbitRadius, startAngle, endAngle)} fill="none" stroke={palette.accent} strokeWidth="5" strokeLinecap="round" opacity={intensity}><title>{`${String(bucket.hour).padStart(2, '0')}:00 · ${formatRhythmDuration(bucket.minutes)}`}</title></path>;
+          const intensity = 0.56 + (bucket.minutes / maximum) * 0.4;
+          return <path key={bucket.hour} d={describeArc(center, track.radius, startAngle, endAngle)} fill="none" stroke={palette.accent} strokeWidth="5.5" strokeLinecap="round" opacity={intensity}><title>{`${String(bucket.hour).padStart(2, '0')}:00 · ${formatRhythmDuration(bucket.minutes)} · ${track.shortLabel}`}</title></path>;
         })}
-        <circle cx={center} cy={center} r="43" fill={palette.background} stroke={palette.grid} strokeWidth="1" />
-        <text x={center} y={center - 4} textAnchor="middle" fill="#5d5147" fontSize="10">累计时长</text>
-        <text x={center} y={center + 15} textAnchor="middle" fill="#4b3d32" fontSize="17" fontFamily="ui-serif, Georgia, serif">{hasData ? formatRhythmDuration(summary.totalMinutes) : '暂无记录'}</text>
-        {hasData && <text x={center} y={center + 31} textAnchor="middle" fill="#9a8b7e" fontSize="9">{summary.activeDays} 天</text>}
+        <circle cx={center} cy={center} r="43" fill="#16243c" stroke="#adc0cf" strokeWidth="1" opacity="0.96" />
+        <text x={center} y={center - 17} textAnchor="middle" fill="#c3d4df" fontSize="9" fontFamily="var(--font-family)">累计时长</text>
+        <text x={center} y={center + 2} textAnchor="middle" fill="#f7ead0" fontSize="17" fontFamily="var(--font-family)">{hasData ? formatRhythmDuration(summary.totalMinutes) : '暂无记录'}</text>
+        {hasData && <text x={center} y={center + 19} textAnchor="middle" fill="#a8bdca" fontSize="8.5" fontFamily="var(--font-family)">{summary.activeDays} 天</text>}
       </svg>
+      <div className="mt-1 flex flex-wrap justify-center gap-x-3 gap-y-1 text-[10px] text-[#8f8174]">
+        {TRACKS.map((track, index) => <span key={track.radius} className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: palette.accent, opacity: 0.58 + index * 0.12 }} />{track.label}</span>)}
+      </div>
     </div>
   );
 };
