@@ -8,6 +8,7 @@
 import React from 'react';
 import { Check } from 'lucide-react';
 import { resolveAssetPath } from '../utils/assetPath';
+import { remoteUiIconAssetService } from '../services/remoteUiIconAssetService';
 
 interface UiThemeButtonProps {
     theme: string;
@@ -36,11 +37,11 @@ export const UiThemeButton: React.FC<UiThemeButtonProps> = ({
                 {[1, 2, 3, 4].map((num) => (
                     <div key={num} className="bg-stone-50 rounded flex items-center justify-center">
                         <img
-                            src={resolveAssetPath(`/uiicon/${theme}/${String(num).padStart(2, '0')}.webp`)}
+                            src={remoteUiIconAssetService.getIconPath(theme, `${String(num).padStart(2, '0')}.webp`)}
                             alt={`icon-${num}`}
                             className="w-full h-full object-contain p-0.5"
                             onError={(e) => {
-                                e.currentTarget.src = resolveAssetPath(`/uiicon/${theme}/${String(num).padStart(2, '0')}.png`);
+                                e.currentTarget.src = resolveAssetPath(`/uiicon/${theme}/${String(num).padStart(2, '0')}.webp`);
                             }}
                         />
                     </div>

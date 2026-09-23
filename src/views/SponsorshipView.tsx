@@ -46,6 +46,7 @@ import { imageService } from '../services/imageService';
 import { buildCustomStickerViewSets } from '../services/customStickerAssetService';
 import { resolveAssetPath } from '../utils/assetPath';
 import { getTimePalPreviewPath } from '../constants/timePalConfig';
+import { UIIconTheme, uiIconService } from '../services/uiIconService';
 
 interface SponsorshipViewProps {
     onBack: () => void;
@@ -473,6 +474,13 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     // 处理 UI 图标主题切换，并触发图标迁移
     const handleUiIconThemeChange = async (newTheme: string) => {
         const oldTheme = uiIconTheme;
+
+        if (newTheme !== 'default') {
+            const remoteThemeCheck = await uiIconService.checkRemoteThemeAvailability(newTheme as UIIconTheme);
+            if (!remoteThemeCheck.available) {
+                onToast('info', '远程 UI 图标暂不可用，已保留内置资源作为回退');
+            }
+        }
         
         setUiIconTheme(newTheme);
         
