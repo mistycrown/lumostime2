@@ -22,6 +22,7 @@
  * @updated 2026-08-11: Clears native daily actions only after their updated state has been sent back to the widget.
  * @updated 2026-08-11: Serializes native daily-action replay and responds immediately while the WebView is active.
  * @updated 2026-09-02: Rebuilds persisted widget UI icon assets when the selected UI icon theme changes.
+ * @updated 2026-09-23: Refreshes Android widgets after downloaded UI icon assets become available.
  */
 import { App as CapacitorApp } from '@capacitor/app';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -129,8 +130,21 @@ export const useWidgetBridgeSync = () => {
       }
     };
 
+    const handleUiIconAssetsReady = () => {
+      if (isNativeAndroidWidgetSupported()) {
+        fireAndForgetWidgetBridgeCall(
+          'Failed to refresh widgets after UI icon assets downloaded',
+          () => WidgetBridge.refreshWidget()
+        );
+      }
+    };
+
     window.addEventListener('ui-icon-theme-changed', handleUiIconThemeChanged);
-    return () => window.removeEventListener('ui-icon-theme-changed', handleUiIconThemeChanged);
+    window.addEventListener('ui-icon-assets-ready', handleUiIconAssetsReady);
+    return () => {
+      window.removeEventListener('ui-icon-theme-changed', handleUiIconThemeChanged);
+      window.removeEventListener('ui-icon-assets-ready', handleUiIconAssetsReady);
+    };
   }, []);
 
   useEffect(() => {
