@@ -33,9 +33,9 @@ class NavigationBackgroundService {
             name: '1',
             type: 'preset',
             url: '/dchhnew/1.webp',
-            offsetY: '0px',
+            offsetY: '13px',
             offsetX: '0px',
-            scale: 1,
+            scale: 1.15,
             opacity: 1
         }
     ];

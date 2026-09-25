@@ -25,6 +25,12 @@ interface NavigationDecorationDebuggerProps {
     service?: NavigationTuningService;
     previewEventName?: string;
     title?: string;
+    resetSettings?: {
+        offsetY: number;
+        offsetX: number;
+        scale: number;
+        opacity: number;
+    };
 }
 
 export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebuggerProps> = ({
@@ -32,7 +38,8 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
     onClose,
     service = navigationDecorationService,
     previewEventName = 'navigationDecorationPreview',
-    title = '样式调试'
+    title = '样式调试',
+    resetSettings = { offsetY: 0, offsetX: 0, scale: 100, opacity: 60 }
 }) => {
     // Current settings state
     const [offsetY, setOffsetY] = useState(0);
@@ -151,17 +158,17 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
 
     const handleReset = () => {
         // 恢复默认值
-        setOffsetY(0);
-        setOffsetX(0); // 改为0px
-        setScale(100);
-        setOpacity(60);
+        setOffsetY(resetSettings.offsetY);
+        setOffsetX(resetSettings.offsetX); // 改为0px
+        setScale(resetSettings.scale);
+        setOpacity(resetSettings.opacity);
         
         // 清除保存的自定义设置
         service.saveCustomSettings(activeId, {
-            offsetY: '60px', // 默认回退值
-            offsetX: '0px', 
-            scale: 1,
-            opacity: 1
+            offsetY: `${resetSettings.offsetY}px`,
+            offsetX: `${resetSettings.offsetX}px`,
+            scale: resetSettings.scale / 100,
+            opacity: resetSettings.opacity / 100
         });
     };
 
