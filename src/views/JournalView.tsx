@@ -11,6 +11,7 @@
  * @updated 2026-04-20: Enabled the mood calendar modal date title to jump directly into that day's daily review.
  * @updated 2026-07-21: Added dark-mode semantic hooks for the Memoir calendar, timeline, and date navigation rail.
  * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
+ * @updated 2026-09-25: Made the Memoir sticky title bar fully transparent so the page background remains visible beneath it.
  */
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { DailyReview, Log, WeeklyReview, MonthlyReview } from '../types';
@@ -129,7 +130,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
 }) => {
     const { categories } = useCategoryScope();
     const { setLogs, collections, collectionEntries } = useData();
-    const { backgroundUrl, hasBackground, panelOverlayOpacity, useReducedEffects } = useBackgroundDisplay();
+    const { backgroundUrl, hasBackground, panelOverlayOpacity } = useBackgroundDisplay();
     const {
         memoirFilterConfig,
         uiTheme,
@@ -723,9 +724,9 @@ export const JournalView: React.FC<JournalViewProps> = ({
             />
 
             {/* Sticky Header - 标题栏随滚动缩小 */}
-            <header className={`sticky top-0 z-40 transition-all duration-300 pt-[var(--app-safe-area-top)] ${isScrolled
-                ? `bg-[#faf9f6]/90 ${useReducedEffects ? '' : 'backdrop-blur-md'} shadow-sm h-[calc(3rem+var(--app-safe-area-top))]`
-                : `bg-[#faf9f6]/80 ${useReducedEffects ? '' : 'backdrop-blur-sm'} h-[calc(3.5rem+var(--app-safe-area-top))]`
+            <header className={`sticky top-0 z-40 border-transparent bg-transparent transition-all duration-300 pt-[var(--app-safe-area-top)] ${isScrolled
+                ? 'h-[calc(3rem+var(--app-safe-area-top))]'
+                : 'h-[calc(3.5rem+var(--app-safe-area-top))]'
                 }`}>
                 <div className="max-w-xl mx-auto px-6 h-full flex items-center justify-center relative">
                     <h1 className={`font-serif text-stone-800 font-bold transition-all duration-300 ${isScrolled ? 'text-[16px]' : 'text-[18px]'
