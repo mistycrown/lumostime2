@@ -12,6 +12,7 @@
  * @updated 2026-09-15: Added a persisted global font-scale preference applied through the root CSS variable.
  * @updated 2026-09-15: Fixed missing font-scale storage to default to 100% instead of the minimum value.
  * @updated 2026-09-22: Rehydrates persisted preference and Memoir filter state from cloud/export restore events.
+ * @updated 2026-09-25: Added persisted new sticker selector layout configuration.
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
@@ -99,6 +100,11 @@ import {
     PREFERENCES_RESTORED_EVENT,
     preferencesBackupService
 } from '../services/preferencesBackupService';
+import {
+    DEFAULT_STICKER_SELECTOR_CONFIG,
+    normalizeStickerSelectorConfig,
+    type StickerSelectorConfig
+} from '../services/stickerSelectorLayoutService';
 
 export type DefaultArchiveView = 'CHRONICLE' | 'MEMOIR';
 export type DefaultIndexView = 'TAGS' | 'SCOPE';
@@ -242,6 +248,8 @@ interface SettingsContextType {
     // Selector 默认页设置
     defaultSelectorPage: DefaultSelectorPage;
     setDefaultSelectorPage: React.Dispatch<React.SetStateAction<DefaultSelectorPage>>;
+    stickerSelectorConfig: StickerSelectorConfig;
+    setStickerSelectorConfig: React.Dispatch<React.SetStateAction<StickerSelectorConfig>>;
 
     // 应用规则
     appRules: { [packageName: string]: string };
@@ -815,6 +823,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             if (nextSceneCardTimerMode === 'realtime' || nextSceneCardTimerMode === 'backfill') setSceneCardTimerMode(nextSceneCardTimerMode);
             const nextSelectorPage = get('lumostime_default_selector_page');
             if (nextSelectorPage) setDefaultSelectorPage(nextSelectorPage);
+            const restoredStickerSelectorConfig = parse<unknown>('lumostime_sticker_selector_config', null);
+            if (restoredStickerSelectorConfig) {
+                setStickerSelectorConfig(normalizeStickerSelectorConfig(restoredStickerSelectorConfig));
+            }
             setTimelineLayout(isTimelineLayoutMode(get('lumostime_timeline_layout')) ? get('lumostime_timeline_layout') as TimelineLayoutMode : DEFAULT_TIMELINE_LAYOUT_MODE);
             setTimelineTodoSidebarCollapsed(get('lumostime_timeline_todo_sidebar_collapsed') === 'true');
             const todoRatio = Number.parseFloat(get('lumostime_timeline_todo_sidebar_ratio') || '');
@@ -842,6 +854,19 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [defaultSelectorPage, setDefaultSelectorPage] = useState<DefaultSelectorPage>(() => {
         const stored = localStorage.getItem('lumostime_default_selector_page');
         return stored || 'emoji';
+    });
+
+    const [stickerSelectorConfig, setStickerSelectorConfig] = useState<StickerSelectorConfig>(() => {
+        const stored = localStorage.getItem('lumostime_sticker_selector_config');
+        if (!stored) {
+            return DEFAULT_STICKER_SELECTOR_CONFIG;
+        }
+
+        try {
+            return normalizeStickerSelectorConfig(JSON.parse(stored));
+        } catch {
+            return DEFAULT_STICKER_SELECTOR_CONFIG;
+        }
     });
 
     useEffect(() => {
@@ -942,6 +967,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, [defaultSelectorPage]);
 
     useEffect(() => {
+        localStorage.setItem('lumostime_sticker_selector_config', JSON.stringify(stickerSelectorConfig));
+    }, [stickerSelectorConfig]);
+
+    useEffect(() => {
         localStorage.setItem('lumostime_custom_narrative_templates', JSON.stringify(customNarrativeTemplates));
     }, [customNarrativeTemplates]);
 
@@ -1026,7 +1055,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         timelineTodoSidebarRatio,
         timelineQuickColorSidebarRatio,
         associationSelectorColumns,
-        memoirFilterConfig
+        memoirFilterConfig,
+        stickerSelectorConfig
     ]);
 
     useEffect(() => {
@@ -1115,6 +1145,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setEmojiStyle,
             defaultSelectorPage,
             setDefaultSelectorPage,
+            stickerSelectorConfig,
+            setStickerSelectorConfig,
             appRules,
             setAppRules,
             appAwarenessTemplates,

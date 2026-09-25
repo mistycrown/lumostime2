@@ -9,6 +9,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-07-21: Added the synchronized month-calendar number style selector to the style tab.
  * @updated 2026-08-15: Added confirmation before clearing the saved redemption-code state.
+ * @updated 2026-09-25: Added the opt-in merged-group sticker selector settings and management UI.
  */
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, Fish, Check, X, Plus } from 'lucide-react';
@@ -17,7 +18,7 @@ import { ToastType } from '../components/Toast';
 import { RedemptionService } from '../services/redemptionService';
 import { IconPreview } from '../components/IconPreview';
 import { BackgroundSelector } from '../components/BackgroundSelector';
-import { NavigationDecorationSelector } from '../components/NavigationDecorationSelector';
+import { NavigationBackgroundSelector } from '../components/NavigationBackgroundSelector';
 import { TimelineStyleSelector } from '../components/TimelineStyleSelector';
 import { ScheduleStyleSelector } from '../components/ScheduleStyleSelector';
 import { ColorSchemeSelector } from '../components/ColorSchemeSelector';
@@ -46,6 +47,10 @@ import { imageService } from '../services/imageService';
 import { buildCustomStickerViewSets } from '../services/customStickerAssetService';
 import { resolveAssetPath } from '../utils/assetPath';
 import { getTimePalPreviewPath } from '../constants/timePalConfig';
+import {
+    buildDefaultStickerSelectorGroups,
+    type StickerSelectorGroup
+} from '../services/stickerSelectorLayoutService';
 
 interface SponsorshipViewProps {
     onBack: () => void;
@@ -243,7 +248,9 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         customStickerSets,
         setCustomStickerSets,
         customStickers,
-        setCustomStickers
+        setCustomStickers,
+        stickerSelectorConfig,
+        setStickerSelectorConfig
     } = useSettings();
     const { dailyReviews } = useReview();
     
@@ -318,6 +325,10 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [isEditingStickerSet, setIsEditingStickerSet] = useState(false);
     const [editingStickerSetId, setEditingStickerSetId] = useState<string | null>(null);
     const [stickerSetName, setStickerSetName] = useState('');
+    const [editingSelectorGroupId, setEditingSelectorGroupId] = useState<string | null>(null);
+    const [isSelectorGroupEditorOpen, setIsSelectorGroupEditorOpen] = useState(false);
+    const [selectorGroupName, setSelectorGroupName] = useState('');
+    const [selectorGroupSourceSetIds, setSelectorGroupSourceSetIds] = useState<string[]>([]);
     const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<StickerDeleteTarget>(null);
     const [isClearCodeConfirmOpen, setIsClearCodeConfirmOpen] = useState(false);
 
@@ -585,6 +596,83 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         setIsEditingStickerSet(false);
         setEditingStickerSetId(null);
         setStickerSetName('');
+    };
+
+    const selectorSourceSets = React.useMemo(
+        () => stickerService.getAllStickerSets(),
+        [customStickerSets, customStickers]
+    );
+
+    const handleNewStickerSelectorToggle = (enabled: boolean) => {
+        setStickerSelectorConfig((previous) => ({
+            enabled,
+            groups: enabled && previous.groups.length === 0
+                ? buildDefaultStickerSelectorGroups()
+                : previous.groups
+        }));
+    };
+
+    const openSelectorGroupEditor = (group?: StickerSelectorGroup) => {
+        setIsSelectorGroupEditorOpen(true);
+        setEditingSelectorGroupId(group?.id || null);
+        setSelectorGroupName(group?.name || '');
+        setSelectorGroupSourceSetIds(group?.sourceSetIds || []);
+    };
+
+    const closeSelectorGroupEditor = () => {
+        setIsSelectorGroupEditorOpen(false);
+        setEditingSelectorGroupId(null);
+        setSelectorGroupName('');
+        setSelectorGroupSourceSetIds([]);
+    };
+
+    const handleSaveSelectorGroup = () => {
+        const trimmedName = selectorGroupName.trim();
+        const validSourceSetIds = selectorGroupSourceSetIds.filter((setId) => (
+            selectorSourceSets.some((set) => set.id === setId)
+        ));
+
+        if (!trimmedName || validSourceSetIds.length === 0) {
+            onToast('error', '请输入名称并至少选择一个贴纸小组');
+            return;
+        }
+
+        const groupId = editingSelectorGroupId || `sticker-group-${crypto.randomUUID()}`;
+        const nextGroup: StickerSelectorGroup = {
+            id: groupId,
+            name: trimmedName,
+            sourceSetIds: validSourceSetIds
+        };
+
+        setStickerSelectorConfig((previous) => {
+            const groupsWithoutEdited = previous.groups
+                .filter((group) => group.id !== editingSelectorGroupId)
+                .map((group) => ({
+                    ...group,
+                    sourceSetIds: group.sourceSetIds.filter((setId) => !validSourceSetIds.includes(setId))
+                }))
+                .filter((group) => group.sourceSetIds.length > 0);
+            const editedIndex = previous.groups.findIndex((group) => group.id === editingSelectorGroupId);
+
+            if (editedIndex < 0) {
+                return { ...previous, groups: [...groupsWithoutEdited, nextGroup] };
+            }
+
+            groupsWithoutEdited.splice(Math.min(editedIndex, groupsWithoutEdited.length), 0, nextGroup);
+            return { ...previous, groups: groupsWithoutEdited };
+        });
+        closeSelectorGroupEditor();
+        onToast('success', editingSelectorGroupId ? '大分组已更新' : '大分组已创建');
+    };
+
+    const handleDeleteSelectorGroup = (groupId: string) => {
+        setStickerSelectorConfig((previous) => ({
+            ...previous,
+            groups: previous.groups.filter((group) => group.id !== groupId)
+        }));
+        if (editingSelectorGroupId === groupId) {
+            closeSelectorGroupEditor();
+        }
     };
 
     const countStickerReferences = (imageFilename: string) => stickerReferenceCounts.get(imageFilename) || 0;
@@ -1420,6 +1508,77 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                             ))}
                                         </div>
 
+                                        <div className="rounded-2xl border border-stone-200 bg-white p-4 space-y-4">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div>
+                                                    <h5 className="text-sm font-medium text-stone-700">新版 sticker 选择器</h5>
+                                                    <p className="mt-1 text-xs text-stone-500">将多个贴纸小组合并后，以瀑布流连续浏览。</p>
+                                                </div>
+                                                <label className="relative inline-flex cursor-pointer items-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="peer sr-only"
+                                                        checked={stickerSelectorConfig.enabled}
+                                                        onChange={(event) => handleNewStickerSelectorToggle(event.target.checked)}
+                                                    />
+                                                    <span className="h-6 w-11 rounded-full bg-stone-200 transition peer-checked:bg-stone-800 peer-focus-visible:ring-2 peer-focus-visible:ring-stone-300 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5" />
+                                                </label>
+                                            </div>
+
+                                            {stickerSelectorConfig.enabled && (
+                                                <>
+                                                    <div className="space-y-2">
+                                                        {stickerSelectorConfig.groups.map((group) => (
+                                                            <div key={group.id} className="flex items-center justify-between rounded-xl border border-stone-200 px-3 py-2">
+                                                                <div className="min-w-0">
+                                                                    <div className="truncate text-sm font-medium text-stone-700">{group.name}</div>
+                                                                    <div className="text-xs text-stone-400">{group.sourceSetIds.length} 个小组</div>
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <button type="button" onClick={() => openSelectorGroupEditor(group)} className="text-xs text-stone-500 hover:text-stone-800">编辑</button>
+                                                                    <button type="button" onClick={() => handleDeleteSelectorGroup(group.id)} className="text-xs text-red-400 hover:text-red-600">删除</button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+
+                                                    {isSelectorGroupEditorOpen ? (
+                                                        <div className="rounded-xl bg-stone-50 p-3 space-y-3">
+                                                            <input
+                                                                value={selectorGroupName}
+                                                                onChange={(event) => setSelectorGroupName(event.target.value)}
+                                                                placeholder="大分组名称"
+                                                                className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-stone-400"
+                                                            />
+                                                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                                                {selectorSourceSets.map((set) => {
+                                                                    const checked = selectorGroupSourceSetIds.includes(set.id);
+                                                                    return (
+                                                                        <label key={set.id} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-2 py-2 text-xs ${checked ? 'border-stone-500 bg-white text-stone-800' : 'border-stone-200 text-stone-500'}`}>
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={checked}
+                                                                                onChange={() => setSelectorGroupSourceSetIds((previous) => checked ? previous.filter((id) => id !== set.id) : [...previous, set.id])}
+                                                                            />
+                                                                            <span className="truncate">{set.name}</span>
+                                                                        </label>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                            <div className="flex justify-end gap-2">
+                                                                <button type="button" onClick={closeSelectorGroupEditor} className="rounded-lg px-3 py-1.5 text-xs text-stone-500 hover:bg-white">取消</button>
+                                                                <button type="button" onClick={handleSaveSelectorGroup} className="rounded-lg bg-stone-800 px-3 py-1.5 text-xs text-white hover:bg-stone-700">保存大分组</button>
+                                                            </div>
+                                                        </div>
+                                                    ) : null}
+
+                                                    <button type="button" onClick={() => openSelectorGroupEditor()} className="w-full rounded-xl border border-dashed border-stone-300 py-2 text-xs text-stone-600 hover:border-stone-500 hover:text-stone-800">
+                                                        + 新建大分组
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+
                                         <StickerSetEditModal
                                             isOpen={isEditingStickerSet}
                                             setId={editingStickerSetId}
@@ -1479,7 +1638,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                             {activeTab === 'navigation' && (
                                 /* 导航栏样式 */
-                                <NavigationDecorationSelector onToast={onToast} />
+                                <NavigationBackgroundSelector onToast={onToast} />
                             )}
 
                             {activeTab === 'timepal' && (
