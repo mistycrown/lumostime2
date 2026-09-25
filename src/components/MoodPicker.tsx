@@ -454,10 +454,10 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
                                                                 onClose();
                                                             }}
                                                             aria-label={sticker.label || '选择贴纸'}
-                                                            className="flex h-16 w-full items-center justify-center rounded-xl p-1 transition-all hover:bg-stone-50 active:bg-stone-100 relative"
+                                                            className="flex h-14 w-full items-center justify-center rounded-xl p-1 transition-all hover:bg-stone-50 active:bg-stone-100 relative"
                                                         >
-                                                            <div className="relative flex h-14 w-14 items-center justify-center">
-                                                                <IconRenderer icon={stickerIcon} size={52} />
+                                                            <div className="relative flex h-12 w-12 items-center justify-center">
+                                                                <IconRenderer icon={stickerIcon} size={44} />
                                                             </div>
                                                         </button>
                                                     );
