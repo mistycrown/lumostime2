@@ -7,6 +7,7 @@
  * @updated 2026-09-22: Extracted result composition handlers from AIBackfillChatModal.
  */
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+import type { AIChatUnreadTarget } from '../../contexts/AIChatWindowContext';
 import { assistantMemoryService } from '../../services/assistantMemoryService';
 import type { AppliedChatAction } from '../../services/assistantActionExecutor';
 import { buildAssistantDisplayParts } from '../../utils/assistantMessageParts';
@@ -63,7 +64,7 @@ type ReplacePendingResultOptions = {
 
 export interface AIBackfillChatResultHandlerOptions {
   isOpenRef: MutableRefObject<boolean>;
-  onUnreadAssistantMessage?: (count?: number) => void;
+  onUnreadAssistantMessage?: (count?: number, target?: AIChatUnreadTarget) => void;
   replaceMessage: (sessionId: string, messageId: string, nextMessage: AIChatMessage) => void;
   setExpandedDreamUpdateMessageIds: Dispatch<SetStateAction<Set<string>>>;
   refreshAssistantMemorySnapshot: () => void;
@@ -141,7 +142,10 @@ export const useAIBackfillChatResultHandlers = ({
       }
   
       if (!isOpenRef.current) {
-        onUnreadAssistantMessage?.(1);
+        onUnreadAssistantMessage?.(1, {
+          targetSessionId: sessionId,
+          targetMessageId: pendingMessageId
+        });
       }
     };
 
@@ -217,4 +221,3 @@ export const useAIBackfillChatResultHandlers = ({
     resolveForegroundAssistantReply
   };
 };
-

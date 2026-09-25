@@ -5,6 +5,7 @@
  * @pos Type Definitions (Assistant Agent)
  * @description Defines the structured contracts used by the Android-first assistant agent layer so background triggers, memory updates, reminder queues, and AI system-turn decisions can stay typed and stable across services and plugins.
  *
+ * @updated 2026-09-25: Added optional persisted session/message targets to surfaced assistant turn results for unread-message navigation.
  * @updated 2026-09-14: Added the optional persona name to the native background snapshot contract for Android notification titles.
  * @updated 2026-09-04: Added explicit structured reminder removal actions so AI-confirmed cancellations mutate the durable reminder queue.
  * @updated 2026-09-09: Added a terminal failed reminder status for bounded background dispatch retries.
@@ -298,6 +299,8 @@ export interface AssistantOrchestratorResult {
   appliedReminders?: AssistantReminder[];
   updatedMemory: AssistantMemory;
   surfacedMessage?: string;
+  targetSessionId?: string;
+  persistedMessageId?: string;
 }
 
 export type AssistantTurnMode = 'foreground' | 'background';

@@ -146,7 +146,10 @@ export function useAIBackfillChatBackgroundTriggers(options: Record<string, any>
           }
           handledAssistantTriggerIdsRef.current.add(triggerId);
           if (result.surfacedMessage && !isOpenRef.current) {
-            onUnreadAssistantMessage?.(1);
+            onUnreadAssistantMessage?.(1, {
+              targetSessionId: result.targetSessionId || targetSession.id,
+              ...(result.persistedMessageId ? { targetMessageId: result.persistedMessageId } : {})
+            });
             addToast('info', `${getBackgroundPersonaDisplayName(targetSession)}：${result.surfacedMessage}`);
           }
           return;
@@ -170,7 +173,10 @@ export function useAIBackfillChatBackgroundTriggers(options: Record<string, any>
         refreshAssistantMemorySnapshot();
         reloadPersistedChatSessions();
         if (result.surfacedMessage && !isOpenRef.current) {
-          onUnreadAssistantMessage?.(1);
+          onUnreadAssistantMessage?.(1, {
+            targetSessionId: result.targetSessionId || targetSession?.id || '',
+            ...(result.persistedMessageId ? { targetMessageId: result.persistedMessageId } : {})
+          });
           addToast('info', `${getBackgroundPersonaDisplayName(targetSession)}：${result.surfacedMessage}`);
         }
       } catch (error) {
@@ -279,7 +285,10 @@ export function useAIBackfillChatBackgroundTriggers(options: Record<string, any>
         refreshAssistantMemorySnapshot();
         reloadPersistedChatSessions();
         if (result.surfacedMessage && !isOpenRef.current) {
-          onUnreadAssistantMessage?.(1);
+          onUnreadAssistantMessage?.(1, {
+            targetSessionId: result.targetSessionId || targetSession.id,
+            ...(result.persistedMessageId ? { targetMessageId: result.persistedMessageId } : {})
+          });
           addToast('info', `${getBackgroundPersonaDisplayName(targetSession)}：${result.surfacedMessage}`);
         }
       } catch (error) {

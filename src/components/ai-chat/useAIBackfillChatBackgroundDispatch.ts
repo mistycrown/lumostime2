@@ -179,7 +179,10 @@ export function useAIBackfillChatBackgroundDispatch(options: Record<string, any>
           return;
         }
         if (result.surfacedMessage && !isOpenRef.current) {
-          onUnreadAssistantMessage?.(1);
+          onUnreadAssistantMessage?.(1, {
+            targetSessionId: result.targetSessionId || targetSession.id,
+            ...(result.persistedMessageId ? { targetMessageId: result.persistedMessageId } : {})
+          });
           addToast('info', `${getBackgroundPersonaDisplayName(targetSession)}：${result.surfacedMessage}`);
         }
       }).catch((error) => {
@@ -239,7 +242,10 @@ export function useAIBackfillChatBackgroundDispatch(options: Record<string, any>
         syncAssistantScheduledTasks(new Date());
         reloadPersistedChatSessions();
         if (result.surfacedMessage && !isOpenRef.current) {
-          onUnreadAssistantMessage?.(1);
+          onUnreadAssistantMessage?.(1, {
+            targetSessionId: result.targetSessionId || targetSession.id,
+            ...(result.persistedMessageId ? { targetMessageId: result.persistedMessageId } : {})
+          });
           addToast('info', `${getBackgroundPersonaDisplayName(targetSession)}：${result.surfacedMessage}`);
         }
       }).catch((error) => {
