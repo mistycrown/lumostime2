@@ -177,16 +177,16 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
                             className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-800 outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-200"
                         />
                     </label>
-                    <div className="mt-4 flex gap-2 overflow-x-auto border-t border-stone-100 pt-4 pb-2">
+                    <div className="mt-4 grid grid-cols-5 gap-1.5 border-t border-stone-100 pt-4 pb-1">
                         {navigationIconService.getSlots().map((slot) => {
                             const selectedIcon = customIcons.find((icon) => icon.id === editingScheme.mapping[slot]);
                             return (
-                                <div key={slot} className="flex min-w-[68px] flex-1 flex-col items-center gap-2">
+                                <div key={slot} className="flex min-w-0 flex-col items-center gap-1.5 text-center">
                                     <span className="text-xs text-stone-600">{SLOT_LABELS[slot]}</span>
                                     <button
                                         type="button"
                                         onClick={() => pickSlotImage(slot)}
-                                        className={`relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-white p-1.5 transition-colors ${selectedIcon ? 'border-stone-300' : 'border-dashed border-stone-300'}`}
+                                        className={`relative flex aspect-square w-full max-w-14 items-center justify-center overflow-hidden rounded-xl border bg-white p-1.5 transition-colors ${selectedIcon ? 'border-stone-300' : 'border-dashed border-stone-300'}`}
                                         aria-label={`选择${SLOT_LABELS[slot]}图标`}
                                     >
                                         {selectedIcon ? renderIcon(selectedIcon, selectedIcon.name, 'h-full w-full object-contain') : <span className="flex flex-col items-center gap-1 text-stone-400"><Upload size={15} /><span className="text-[10px]">上传</span></span>}
