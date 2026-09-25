@@ -8,6 +8,7 @@
  * @updated 2026-06-06: Unified `@` matching so linked-log todo filters can match both todo titles and todo category names.
  * @updated 2026-08-09: Planned timeline blocks are excluded from filter statistics.
  * @updated 2026-09-05: Note keywords also match saved Activity attribute values, excluding attribute names.
+ * @updated 2026-09-25: Added standalone `-keyword` exclusions; negative terms do not participate in OR groups.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -53,10 +54,15 @@ export function normalizeFiltersOrder(filters: Filter[]): Filter[] {
 export function parseFilterExpression(expression: string): ParsedFilterCondition {
     const condition: ParsedFilterCondition = {
         tags: [],
+        excludedTags: [],
         scopes: [],
+        excludedScopes: [],
         todos: [],
+        excludedTodos: [],
         notes: [],
-        reactions: []
+        excludedNotes: [],
+        reactions: [],
+        excludedReactions: []
     };
 
     if (!expression || !expression.trim()) {
@@ -70,22 +76,27 @@ export function parseFilterExpression(expression: string): ParsedFilterCondition
     // 帮助函数: 识别类型并提取内容
     // Returns: { type: 'tags'|'scopes'|'todos'|'notes'|'reactions', content: string }
     const parseToken = (token: string) => {
-        if (token.startsWith('#')) return { type: 'tags' as const, content: token.substring(1) };
-        if (token.startsWith('%')) return { type: 'scopes' as const, content: token.substring(1) };
-        if (token.startsWith('@')) return { type: 'todos' as const, content: token.substring(1) };
-        if (token.startsWith('^')) return { type: 'reactions' as const, content: token.substring(1) };
-        return { type: 'notes' as const, content: token };
+        const excluded = token.startsWith('-') && token.length > 1;
+        const normalizedToken = excluded ? token.substring(1) : token;
+
+        if (normalizedToken.startsWith('#')) return { type: 'tags' as const, content: normalizedToken.substring(1), excluded };
+        if (normalizedToken.startsWith('%')) return { type: 'scopes' as const, content: normalizedToken.substring(1), excluded };
+        if (normalizedToken.startsWith('@')) return { type: 'todos' as const, content: normalizedToken.substring(1), excluded };
+        if (normalizedToken.startsWith('^')) return { type: 'reactions' as const, content: normalizedToken.substring(1), excluded };
+        return { type: 'notes' as const, content: normalizedToken, excluded };
     };
 
     let pendingOR = false;
     let lastType: 'tags' | 'scopes' | 'todos' | 'notes' | 'reactions' | null = null;
+    let lastWasExcluded = false;
 
     for (const token of tokens) {
         if (!token) continue;
 
         // 检查 OR 关键字 (不区分大小写)
         if (token.toUpperCase() === 'OR') {
-            pendingOR = true;
+            // Negative terms are standalone conditions and never participate in OR.
+            pendingOR = !lastWasExcluded;
             continue;
         }
 
@@ -94,8 +105,22 @@ export function parseFilterExpression(expression: string): ParsedFilterCondition
         // 确定生效的类型 (处理前缀继承)
         let effectiveType = current.type;
 
+        if (current.excluded) {
+            const excludedKey = `excluded${effectiveType[0].toUpperCase()}${effectiveType.slice(1)}` as
+                | 'excludedTags'
+                | 'excludedScopes'
+                | 'excludedTodos'
+                | 'excludedNotes'
+                | 'excludedReactions';
+            condition[excludedKey].push(current.content);
+            lastType = effectiveType;
+            lastWasExcluded = true;
+            pendingOR = false;
+            continue;
+        }
+
         // 处理 OR 逻辑
-        if (pendingOR && lastType) {
+        if (pendingOR && lastType && !lastWasExcluded) {
             // 前缀继承: 如果当前词无前缀(notes)，且上一个词不是notes，则继承上一个词的类型
             if (current.type === 'notes' && lastType !== 'notes') {
                 effectiveType = lastType;
@@ -122,6 +147,7 @@ export function parseFilterExpression(expression: string): ParsedFilterCondition
 
         // 更新状态
         lastType = effectiveType;
+        lastWasExcluded = false;
         pendingOR = false; // 重置 OR 标志
     }
 
@@ -169,6 +195,24 @@ const matchesGroupedKeywords = (
 
         return normalizedValues.some((value) => value.includes(normalizedKeyword));
     }));
+};
+
+const matchesExcludedKeywords = (
+    keywords: string[],
+    values: string[]
+): boolean => {
+    const normalizedValues = values
+        .map((value) => value.trim().toLowerCase())
+        .filter((value) => value.length > 0);
+
+    return keywords.every((keyword) => {
+        const normalizedKeyword = keyword.trim().toLowerCase();
+        if (!normalizedKeyword) {
+            return true;
+        }
+
+        return !normalizedValues.some((value) => value.includes(normalizedKeyword));
+    });
 };
 
 const resolveLinkedTodoActivityNames = (
@@ -250,16 +294,28 @@ export function matchesTodoFilter(
     if (!matchesGroupedKeywords(condition.todos, [todo.title, todoCategoryName])) {
         return false;
     }
+    if (!matchesExcludedKeywords(condition.excludedTodos, [todo.title, todoCategoryName])) {
+        return false;
+    }
 
     if (!matchesGroupedKeywords(condition.tags, [linkedActivityName, linkedCategoryName])) {
+        return false;
+    }
+    if (!matchesExcludedKeywords(condition.excludedTags, [linkedActivityName, linkedCategoryName])) {
         return false;
     }
 
     if (!matchesGroupedKeywords(condition.scopes, scopeNames)) {
         return false;
     }
+    if (!matchesExcludedKeywords(condition.excludedScopes, scopeNames)) {
+        return false;
+    }
 
     if (!matchesGroupedKeywords(condition.notes, [todo.note || ''])) {
+        return false;
+    }
+    if (!matchesExcludedKeywords(condition.excludedNotes, [todo.note || ''])) {
         return false;
     }
 
@@ -289,6 +345,37 @@ export function matchesFilter(
     condition: ParsedFilterCondition,
     context: FilterContext
 ): boolean {
+    const category = context.categories.find((item) => item.id === log.categoryId);
+    const activity = category?.activities.find((item) => item.id === log.activityId);
+    const tagValues = [activity?.name || log.title || '', category?.name || ''];
+    if (!matchesGroupedKeywords(condition.tags, tagValues)) return false;
+    if (!matchesExcludedKeywords(condition.excludedTags, tagValues)) return false;
+
+    const scopeNames = context.scopes
+        .filter((scope) => log.scopeIds?.includes(scope.id))
+        .map((scope) => scope.name);
+    if (!matchesGroupedKeywords(condition.scopes, scopeNames)) return false;
+    if (!matchesExcludedKeywords(condition.excludedScopes, scopeNames)) return false;
+
+    const linkedTodo = log.linkedTodoId
+        ? context.todos.find((todo) => todo.id === log.linkedTodoId)
+        : undefined;
+    const todoValues = linkedTodo
+        ? [linkedTodo.title, resolveTodoCategoryName(linkedTodo.categoryId, context.todoCategories)]
+        : [];
+    if (!matchesGroupedKeywords(condition.todos, todoValues)) return false;
+    if (!matchesExcludedKeywords(condition.excludedTodos, todoValues)) return false;
+
+    const noteAndAttributeValues = [log.note || '', ...resolveLogAttributeValueTexts(log, activity)];
+    if (!matchesGroupedKeywords(condition.notes, noteAndAttributeValues)) return false;
+    if (!matchesExcludedKeywords(condition.excludedNotes, noteAndAttributeValues)) return false;
+
+    const reactionValues = log.reactions || [];
+    if (!matchesGroupedKeywords(condition.reactions, reactionValues)) return false;
+    if (!matchesExcludedKeywords(condition.excludedReactions, reactionValues)) return false;
+
+    return true;
+    /* Legacy implementation retained below for migration comparison.
     // 1. 检查标签筛选 (#)
     if (condition.tags.length > 0) {
         const category = context.categories.find(c => c.id === log.categoryId);
@@ -390,6 +477,7 @@ export function matchesFilter(
  * 计算筛选器的匹配统计
  * 返回匹配的记录数量和总时长
  */
+}
 export function getFilterStats(
     logs: Log[],
     filter: Filter,

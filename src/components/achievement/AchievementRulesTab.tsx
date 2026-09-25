@@ -1072,7 +1072,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
                 placeholder="例如：#阅读 %学习"
               />
               <p className="mt-2 text-xs leading-6 text-stone-400">
-                支持 `#标签`、`%领域`、`@待办/分类`、`^Reaction`、备注关键词，以及 `OR` 连接同类条件。
+                支持 `#标签`、`%领域`、`@待办/分类`、`^Reaction`、备注关键词、`-关键词` 排除，以及 `OR` 连接同类正向条件。
               </p>
             </label>
           ) : draft.targetType === 'todoCategory' ? (

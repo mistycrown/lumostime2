@@ -1216,10 +1216,15 @@ export interface Filter {
 
 export interface ParsedFilterCondition {
   tags: string[][]; // # (AND, OR)
+  excludedTags: string[]; // -# (AND, each term is an independent exclusion)
   scopes: string[][]; // % (AND, OR)
+  excludedScopes: string[]; // -% (AND, each term is an independent exclusion)
   todos: string[][]; // @ (AND, OR)
+  excludedTodos: string[]; // -@ (AND, each term is an independent exclusion)
   notes: string[][];
+  excludedNotes: string[]; // - (AND, each term is an independent exclusion)
   reactions: string[][]; // ^ Reaction Emoji (AND, OR)
+  excludedReactions: string[]; // -^ (AND, each term is an independent exclusion)
 }
 
 // Memoir

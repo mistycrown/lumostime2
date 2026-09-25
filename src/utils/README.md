@@ -84,6 +84,7 @@ Contains pure utility functions for data processing and business logic calculati
 - `checkStreakUtils.ts`: [Active] - Resolves per-item daily check streaks, global multiplier tiers, and weighted check-category completion values for achievement rules.
 - `colorAdapterUtils.ts`: [Active] - Unifies chart/card/schedule/tag color rendering across Tailwind palette classes and custom HEX colors.
 - `filterUtils.ts`: [Active] - Parses custom filter expressions, computes stats, normalizes saved custom filter order, and matches note conditions against log notes plus saved Activity attribute values while excluding attribute names; month-view todo hidden-filter expressions also match todo title/category, linked activity/category, default scopes, and note text.
+- `filterUtils.ts`: Custom expressions also support standalone `-keyword` exclusions. Negative terms are independent AND conditions and are never joined through `OR`.
 - `noteTemplateUtils.ts`: [Active] - Sorts note templates, builds context-aware note template recommendations, and appends template text into notes consistently.
 - `scopeStatsUtils.ts`: [Active] - Centralizes scope duration aggregation and counts full duration for every linked scope on a log.
 - `scopeSortUtils.ts`: [Active] - Centralizes scope selection ordering so batch tools, pickers, and scope-related filter chips all follow the saved scope-management order.

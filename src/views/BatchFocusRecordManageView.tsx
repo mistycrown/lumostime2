@@ -1524,7 +1524,7 @@ export const BatchFocusRecordManageView: React.FC<BatchFocusRecordManageViewProp
                                 className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stone-300 resize-none"
                             />
                             <div className="text-xs text-stone-400 space-y-1">
-                                <p>语法: #活动 %领域 @待办/分类 备注关键词 | 用OR表示或关系。建议先修改少量数据，确认无误后再全部批量操作。</p>
+                                <p>语法: #活动 %领域 @待办/分类 备注关键词，-关键词表示排除；用 OR 表示同类条件的或关系（排除条件不参与 OR）。建议先修改少量数据，确认无误后再全部批量操作。</p>
                             </div>
                         </div>
 
