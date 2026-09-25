@@ -424,7 +424,7 @@ export const assistantContextBuilder = {
     ]));
 
     return [
-      '以下是候选词典无损表。字段与应用词典一一对应；活动通过 categoryId 关联分类；子任务通过 parentTodoId 关联父任务；日志候选中的 id 可直接用于 edit_log；数组字段保持 JSON 数组；空值记为 - 。',
+      '以下是候选词典无损表。字段与应用词典一一对应；活动通过 categoryId 关联分类；子任务通过 parentTodoId 关联主任务；日志候选中的 id 可直接用于 edit_log；数组字段保持 JSON 数组；空值记为 - 。',
       buildExactTableSection('ActivityCategories', ['id', 'name'], activityCategoryRows),
       buildExactTableSection('Activities', ['categoryId', 'id', 'name'], activityRows),
       buildExactTableSection('Scopes', ['id', 'name'], scopeRows),

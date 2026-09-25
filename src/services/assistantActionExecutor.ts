@@ -1679,7 +1679,7 @@ export const assistantActionExecutor = {
           actionId: buildActionId(),
           kind: 'create_subtask',
           status: 'failed',
-          errorMessage: '没有找到可挂载的父任务，或父任务不允许再添加子任务，这次我先没有自动创建。',
+          errorMessage: '没有找到可挂载的主任务，或主任务不允许再添加子任务，这次我先没有自动创建。',
           snapshot: {
             title: args.title || '未命名子任务',
             categoryId: parentTodo?.categoryId || '',

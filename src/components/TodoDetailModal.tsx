@@ -1197,7 +1197,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                         className="block text-left transition-colors hover:text-stone-800"
                       >
                         <span className="underline decoration-dashed underline-offset-4">
-                          父任务：{parentTodo.title}
+                          主任务：{parentTodo.title}
                         </span>
                       </button>
                     )}
@@ -1875,8 +1875,8 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
             {parentTodo && (
               <section className="border-b border-stone-200/80 pb-6">
                 <div className="mb-4">
-                  <h3 className="text-[11px] font-bold uppercase tracking-[0.28em] text-stone-400">父任务</h3>
-                  <p className="mt-2 text-sm leading-6 text-stone-500">当前子任务会实时继承父任务的分类、关联活动和领域。</p>
+                  <h3 className="text-[11px] font-bold uppercase tracking-[0.28em] text-stone-400">主任务</h3>
+                  <p className="mt-2 text-sm leading-6 text-stone-500">当前子任务会实时继承主任务的分类、关联活动和领域。</p>
                 </div>
                 <button
                   type="button"
@@ -1886,7 +1886,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                   <div className="min-w-0">
                     <div className="truncate text-base font-semibold text-stone-700 transition-colors group-hover:text-stone-900">{parentTodo.title}</div>
                     <div className="mt-1 text-[11px] tracking-[0.12em] text-stone-400">
-                      {parentTodo.scheduledDate ? `安排 ${formatDateFieldValue(parentTodo.scheduledDate)}` : '父任务未设置安排日期'}
+                      {parentTodo.scheduledDate ? `安排 ${formatDateFieldValue(parentTodo.scheduledDate)}` : '主任务未设置安排日期'}
                     </div>
                   </div>
                   <ChevronRight size={14} className="mt-1 shrink-0 text-stone-300 transition-colors group-hover:text-stone-500" />

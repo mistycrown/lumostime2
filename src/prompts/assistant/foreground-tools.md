@@ -105,7 +105,7 @@
 - `create_todo`
   如果任务足够具体：返回 `create_todo`。
   如果已有等价 todo 存在：优先 `update_todo`，或只回复而不重复创建。
-  如果用户要“创建父任务并同时拆出子任务”，优先把子任务放进同一个 `create_todo.args.subtasks`，而不是拆成两步。
+  如果用户要“创建主任务并同时拆出子任务”，优先把子任务放进同一个 `create_todo.args.subtasks`，而不是拆成两步。
 - `update_todo`
   只更新那些能从已提供 candidates 里清晰匹配到的 todos。
 - `create_subtask`
@@ -199,7 +199,7 @@
 
 - 只在已提供 candidates 中的顶层、非 recurring parent todo 之下创建子任务。
 - 如果用户没有明确要求给子任务安排日期或截止时间，就省略 `scheduledDate` 和 `deadlineDate`。
-- 如果父任务本身也需要新建，优先使用 `create_todo.args.subtasks` 一次返回父任务和它的直接子任务；只有父任务已经明确存在于 candidates 里时，才单独返回 `create_subtask`。
+- 如果主任务本身也需要新建，优先使用 `create_todo.args.subtasks` 一次返回主任务和它的直接子任务；只有主任务已经明确存在于 candidates 里时，才单独返回 `create_subtask`。
 
 ### 4. 保留分类：小事 / 未来
 
@@ -410,7 +410,7 @@
 }
 ```
 
-### 父任务连同子任务一起创建示例
+### 主任务连同子任务一起创建示例
 
 ```json
 {

@@ -33,7 +33,7 @@
 - `update_todo`
   用户想修改某个现有 todo 的内容、安排、截止日期、备注、状态或置顶状态。
 - `create_subtask`
-  用户想把一个父任务拆成子任务。
+  用户想把一个主任务拆成子任务。
 - `reminder_request`
   用户明确想在某个时间、某段延迟后，或未来某个时刻收到提醒。
 - `daily_planning`
@@ -77,7 +77,7 @@
 - 对 `create_todo`，优先创建清晰、可执行的事项，而不是模糊的大项目容器，除非用户明确想要更宽泛的任务。
 - 如果用户想“创建一个任务，并顺手拆成几个子任务”，优先返回一个 `create_todo`，并把直接子任务放进 `create_todo.args.subtasks`。
 - 对 `update_todo`，如果已有清晰匹配的 todo，就复用它。
-- 对 `create_subtask`，只有父任务明确时才创建子任务。
+- 对 `create_subtask`，只有主任务明确时才创建子任务。
 - 对 `reminder_request`，具体 reminder 调用规则见 `memory-rules.md`。
 - 对 `daily_planning`，如果计划足够具体，就转成 todos；如果太模糊，就问一个短追问。
 - 对 `clarify_missing_information`，只问一个短而有针对性的问题。

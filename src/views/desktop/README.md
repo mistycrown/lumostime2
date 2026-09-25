@@ -8,7 +8,7 @@
 - 2026-05-23: `DesktopQuickWidgetView.tsx`, `DesktopTodayWidgetView.tsx`, and `DesktopTodoQuickEditorWindowView.tsx` now reuse the shared desktop todo sync channel from `desktopWidgetService.ts`, so quick-task creation and inline title edits repaint sibling widget windows immediately instead of waiting for focus or the 10-second polling fallback.
 - 2026-05-18: Added `DesktopAIWidgetView.tsx`, which keeps the shared AI chat mounted inside the normal app provider tree while the Electron `desktop-ai` window switches between compact quick-chat mode and a narrow edge-hide restore handle.
 
-- 2026-05-18: `DesktopTodayWidgetView.tsx` now renders one-level subtasks inline beneath visible parent rows, while subtasks whose parent is outside the current section fall back to standalone `子任务 @父任务` labels so the compact today widget no longer drops hierarchy context.
+- 2026-05-18: `DesktopTodayWidgetView.tsx` now renders one-level subtasks inline beneath visible parent rows, while subtasks whose parent is outside the current section fall back to standalone `子任务 @主任务` labels so the compact today widget no longer drops hierarchy context.
 - 2026-05-18: `DesktopMonthWidgetView.tsx` now shifts the visible calendar by one week for vertical wheel/trackpad navigation while keeping header arrows as whole-page jumps, so `1/2/3 -> 2/3/4` works in 3-week mode.
 
 - 2026-05-18: `DesktopMonthCalendar.tsx` 支持在月视图小组件中为如果是 recurring（循环）类型的任务靠右渲染 `Repeat2` 图标，模仿截止 (due) 条目的 Flag 样式，保持 UI 一致。
@@ -22,7 +22,7 @@
 - 2026-05-17: 支持了桌面月历小组件中任务着色模式的屏内切换，用户可以在显示设置面板中选择“按排期”或“按分类”进行着色渲染，并能直接无缝同步和读取应用内已有的排期或分类颜色配置。
 - 2026-05-17: `DesktopTodoQuickEditorWindowView.tsx` now hosts the shared widget quick editor inside its own transparent always-on-top Electron window, with an added quick toggle-complete action button next to the external-link button in the popover header, so todo clicks from today/quick/month widgets can open a larger editor beyond the source widget bounds instead of getting clipped by the widget `BrowserWindow`.
 - 2026-05-17: `DesktopTodayWidgetView.tsx`, `DesktopQuickWidgetView.tsx`, `DesktopMonthWidgetView.tsx`, and `DesktopMonthCalendar.tsx` now route todo clicks into that external quick-editor window, using screen-space anchors instead of local popover coordinates.
-- 2026-05-17: 优化了月历小组件计划栏，禁用列表项的点击跳转详情事件，移除了 hover 时向右的跳转详情箭头，变更为可点击的展开/收缩子任务按钮，支持父任务对其下子任务的收起与展开操作，无子任务的项则直接删除按钮，并在折叠状态下常驻显示展开图标。
+- 2026-05-17: 优化了月历小组件计划栏，禁用列表项的点击跳转详情事件，移除了 hover 时向右的跳转详情箭头，变更为可点击的展开/收缩子任务按钮，支持主任务对其下子任务的收起与展开操作，无子任务的项则直接删除按钮，并在折叠状态下常驻显示展开图标。
 - 2026-05-17: 新增了 `DesktopTimerWidgetView.tsx`（桌面计时器小组件）视图。长宽固定为 240px x 120px。静止（Resting）状态下大字呼吸计时，悬停（Hover）状态下展现活动标题与全功能操作按钮，支持主题与透明度调节，打通了结束专注与快速打开主页面的跨窗口动作转发。
 - 2026-05-17: `DesktopMonthWidgetView.tsx` now keeps already dated unfinished todos visible across the right-side `arrange` / `maybe` / `due` tabs, sorts undated rows before dated rows inside each todo category, and shows compact trailing dates like `5/20` so items can be rescheduled in place.
 - 2026-05-17: 优化了月历小组件（DesktopMonthWidgetView.tsx）右侧计划栏的分类标签，将其顺序变更为 maybe / arrange / due 并默认选中 arrange 标签，标签样式改为英文小写形式。
@@ -34,7 +34,7 @@
 - 2026-05-17: The desktop month widget now supports a persisted top-right sidebar collapse toggle, and `DesktopMonthCalendar.tsx` now reuses the shared week-trace lane layout so cross-day `Trace` bars stay connected while `Maybe` and `Done` match the app month-view styling.
 - 2026-05-17: `DesktopMonthCalendar.tsx` now estimates visible todo rows from the widget's real body height, so taller month-widget cells keep using spare vertical space before showing `+N`.
 
-- 2026-05-17: `DesktopMonthWidgetView.tsx` now groups the right planning sidebar by todo category, removes the extra linked-category line, and keeps one-level subtasks visible under their parent rows or as standalone `子任务 @父任务` rows when the parent is filtered out.
+- 2026-05-17: `DesktopMonthWidgetView.tsx` now groups the right planning sidebar by todo category, removes the extra linked-category line, and keeps one-level subtasks visible under their parent rows or as standalone `子任务 @主任务` rows when the parent is filtered out.
 
 ## Included Views
 
@@ -65,7 +65,7 @@
 - Handles widget data refresh, cross-window sync, and drag-and-drop write-back.
 - Uses one-week vertical wheel/trackpad shifts while preserving whole-page header navigation.
 - Renders grouped `Arrange / Maybe / Due` sidebar sections so tasks stay separated by todo group, subtasks remain visible, and every planning tab can show both undated and already dated unfinished todos for rescheduling.
-- 计划栏支持父任务对其下子任务的折叠/展开操作，默认展开，并在折叠状态下有常驻的 `ChevronRight` 图标，禁用了条目详情跳转点击事件。
+- 计划栏支持主任务对其下子任务的折叠/展开操作，默认展开，并在折叠状态下有常驻的 `ChevronRight` 图标，禁用了条目详情跳转点击事件。
 
 ### `DesktopMonthCalendar.tsx`
 
