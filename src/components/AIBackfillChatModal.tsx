@@ -2745,6 +2745,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           setIsHomeView={setIsHomeView}
           setIsPersonaPanelOpen={setIsPersonaPanelOpen}
           setSessions={setSessions}
+          pendingHomeMessageRef={pendingHomeMessageRef}
           shortcuts={shortcuts}
           sortedSessions={sortedSessions}
           toggleDreamUpdateExpansion={toggleDreamUpdateExpansion}
