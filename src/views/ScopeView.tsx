@@ -181,9 +181,10 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
 
     return (
         <div 
-            className="h-full bg-[#faf9f6] overflow-y-auto pb-24 no-scrollbar"
+            className="relative isolate h-full bg-[#faf9f6] overflow-y-auto pb-24 no-scrollbar"
             id="scopes-content"
         >
+            <div aria-hidden="true" className="transparent-index-overlay pointer-events-none fixed inset-0 z-0" />
             {/* Scope Cards */}
             <div className="p-6 space-y-3">
                 {activeScopes.length === 0 ? (

@@ -8,6 +8,7 @@
  * @updated 2026-08-09: Planned timeline blocks are excluded from tag and category log counts.
  * @updated 2026-08-26: Defers activity migration until batch submission and passes the atomic batch apply handler.
  * @updated 2026-08-26: Separates archived categories from active categories and allows archived categories to be reopened for cascading restore.
+ * @updated 2026-09-25: Adds a full-viewport background mask for transparent title-bar mode.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -91,9 +92,10 @@ export const TagsView: React.FC<TagsViewProps> = ({ logs, onSelectTag, onSelectC
 
    return (
       <div 
-         className="h-full bg-[#faf9f6] overflow-y-auto no-scrollbar pb-24 px-4 pt-4"
+         className="relative isolate h-full bg-[#faf9f6] overflow-y-auto no-scrollbar pb-24 px-4 pt-4"
          id="tags-content"
       >
+         <div aria-hidden="true" className="transparent-index-overlay pointer-events-none fixed inset-0 z-0" />
 
          <div className="flex justify-between items-center px-2 mb-4 text-[10px] text-stone-400 font-bold uppercase tracking-widest">
             <span>Main Categories</span>
