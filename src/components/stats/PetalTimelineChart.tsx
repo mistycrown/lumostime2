@@ -111,7 +111,7 @@ const annularSectorPath = (center: number, innerRadius: number, outerRadius: num
 
 const RadialHistogram: React.FC<{ summary: HourBucketSummary; range: RhythmRange; palette: ChartPalette }> = ({ summary, range, palette }) => {
   const center = 160;
-  const innerRadius = 32;
+  const innerRadius = 24;
   const maxRadius = 112;
   const maximum = Math.max(...summary.buckets.map((bucket) => bucket.minutes), 0);
   const startAtTop = -Math.PI / 2;
@@ -125,13 +125,13 @@ const RadialHistogram: React.FC<{ summary: HourBucketSummary; range: RhythmRange
         const ratio = maximum > 0 ? bucket.minutes / maximum : 0;
         const outerRadius = innerRadius + ratio * (maxRadius - innerRadius);
         const valuePath = annularSectorPath(center, innerRadius, Math.max(innerRadius + 1, outerRadius), angle + gap, angle + step - gap);
-        const labelPoint = polarPoint(center, maxRadius + 20, angle + step / 2);
+        const labelPoint = polarPoint(center, maxRadius + 10, angle + step / 2);
         return <g key={bucket.hour}>
           {bucket.minutes > 0 && <path d={valuePath} fill={palette.accent} fillOpacity={0.25 + ratio * 0.68}><title>{`${String(bucket.hour).padStart(2, '0')}:00–${String((bucket.hour + 1) % 24).padStart(2, '0')}:00 · ${formatRhythmDuration(bucket.minutes)}`}</title></path>}
           <text x={labelPoint.x} y={labelPoint.y + 3} textAnchor="middle" fill="#8f8174" fontSize="8" fontFamily="var(--font-family)" fontVariant="tabular-nums">{bucket.hour}</text>
         </g>;
       })}
-      <circle cx={center} cy={center} r="27" fill={palette.background} stroke={palette.grid} strokeWidth="1" />
+      <circle cx={center} cy={center} r="20" fill={palette.background} stroke={palette.grid} strokeWidth="1" />
     </svg>
   </div>;
 };
