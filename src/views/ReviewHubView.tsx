@@ -7,6 +7,7 @@
  * @updated 2026-04-17: Replaced Chronicle card color-mix shadows and blur-only surfaces with Android-safe fallbacks to avoid HarmonyOS gradient artifacts behind archive cards, then softened the archive card shadows for a lighter page feel.
  * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
  * @updated 2026-09-14: Localized Chronicle page labels and empty-state copy to Chinese without changing date formatting.
+ * @updated 2026-09-25: Connects the Chronicle title bar transparency to the navigation setting.
  *
  * 鈿狅笍 Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -16,6 +17,7 @@ import { Capacitor } from '@capacitor/core';
 import { DailyReview, WeeklyReview, MonthlyReview, Log } from '../types';
 import { parseNarrative } from '../utils/narrativeUtils';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
+import { navigationBackgroundService, NAVIGATION_TRANSPARENCY_CHANGE_EVENT } from '../services/navigationBackgroundService';
 
 interface ReviewHubViewProps {
   dailyReviews: DailyReview[];
@@ -37,8 +39,18 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
   onOpenMonthlyReview
 }) => {
   const [isScrolled, setIsScrolled] = React.useState(false);
+  const [isTransparentNavigation, setIsTransparentNavigation] = React.useState(() => navigationBackgroundService.isTransparentNavigationEnabled());
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   const { backgroundUrl, hasBackground, panelOverlayOpacity, useReducedEffects } = useBackgroundDisplay();
+
+  React.useEffect(() => {
+    const handleTransparencyChange = (event: Event) => {
+      setIsTransparentNavigation((event as CustomEvent<{ enabled: boolean }>).detail.enabled);
+    };
+
+    window.addEventListener(NAVIGATION_TRANSPARENCY_CHANGE_EVENT, handleTransparencyChange);
+    return () => window.removeEventListener(NAVIGATION_TRANSPARENCY_CHANGE_EVENT, handleTransparencyChange);
+  }, []);
 
   const prefersCompatibleArchiveCards = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -260,8 +272,9 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
         style={{ backgroundColor: `rgba(250, 249, 246, ${panelOverlayOpacity})` }}
       />
       <header
-        className={`sticky top-0 z-40 transition-all duration-300 pt-[var(--app-safe-area-top)] ${
-          isScrolled
+        className={`sticky top-0 z-40 transition-all duration-300 pt-[var(--app-safe-area-top)] ${isTransparentNavigation
+          ? 'border-transparent bg-transparent h-[calc(3rem+var(--app-safe-area-top))]'
+          : isScrolled
             ? `bg-[#faf9f6]/90 ${useReducedEffects ? '' : 'backdrop-blur-md'} shadow-sm h-[calc(3rem+var(--app-safe-area-top))]`
             : `bg-[#faf9f6]/80 ${useReducedEffects ? '' : 'backdrop-blur-sm'} h-[calc(3.5rem+var(--app-safe-area-top))]`
         }`}

@@ -6,6 +6,7 @@
  * @updated 2026-08-09: Let the daily-check overview and detail views own their compact headers.
  * @updated 2026-04-25: Let floating switch-button fallback icons inherit the button theme color so default UI icons stay visible on accent-theme white buttons.
  * @updated 2026-04-25: Added a `min-h-0` guard on the main content shell so nested scene lists can keep scrolling on mobile WebViews.
+ * @updated 2026-09-25: Applies the persisted transparent-navigation setting to supported top title bars while excluding Todo schedule mode.
  * @pos Component (Layout)
  * @description 主应用布局组件 - 包含顶部导航栏、主内容区域和浮动按钮
  * 
@@ -23,6 +24,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useToast } from '../contexts/ToastContext';
 import { UIIcon } from './UIIcon';
 import { FloatingButton } from './FloatingButton';
+import { navigationBackgroundService, NAVIGATION_TRANSPARENCY_CHANGE_EVENT } from '../services/navigationBackgroundService';
 
 interface MainLayoutProps {
     children: React.ReactNode;
@@ -63,6 +65,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     statsTitle
 }) => {
     const [isTodoScheduleMode, setIsTodoScheduleMode] = useState<boolean>(() => localStorage.getItem('todoScreenMode') === 'week');
+    const [isTransparentNavigation, setIsTransparentNavigation] = useState(() => navigationBackgroundService.isTransparentNavigationEnabled());
     const {
         currentView, setCurrentView,
         isSettingsOpen, setIsSettingsOpen,
@@ -111,6 +114,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         };
     }, []);
 
+    useEffect(() => {
+        const handleTransparencyChange = (event: Event) => {
+            setIsTransparentNavigation((event as CustomEvent<{ enabled: boolean }>).detail.enabled);
+        };
+
+        window.addEventListener(NAVIGATION_TRANSPARENCY_CHANGE_EVENT, handleTransparencyChange);
+        return () => window.removeEventListener(NAVIGATION_TRANSPARENCY_CHANGE_EVENT, handleTransparencyChange);
+    }, []);
+
     const getHeaderTitle = () => {
         if (isDailyNewspaperOpen) return 'Daily Newspaper';
         if (isWeeklyNewspaperOpen) return 'Weekly Newspaper';
@@ -138,6 +150,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         return VIEW_TITLES[currentView];
     };
 
+    const hasReviewSubpage = isDailyReviewOpen || isDailyNewspaperOpen || isWeeklyNewspaperOpen
+        || isMonthlyNewspaperOpen || isOnThisDayOpen || isWeeklyReviewOpen || isMonthlyReviewOpen || isAchievementOpen;
+    const supportsTransparentTitleBar = currentView === AppView.RECORD
+        || (currentView === AppView.TODO && !isTodoScheduleMode)
+        || (currentView === AppView.REVIEW && !hasReviewSubpage)
+        || currentView === AppView.TAGS
+        || currentView === AppView.SCOPE;
+    const shouldUseTransparentTitleBar = isTransparentNavigation && supportsTransparentTitleBar;
+
     return (
         <div className={`h-screen w-screen flex flex-col text-stone-800 overflow-hidden select-none font-serif relative pb-[env(safe-area-inset-bottom)]`}>
 
@@ -152,9 +173,13 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 // Hide header for REVIEW view (Memoir/Chronicle use their own headers) UNLESS a modal review is open
                 (currentView !== AppView.REVIEW || isDailyReviewOpen || isDailyNewspaperOpen || isWeeklyNewspaperOpen || isMonthlyNewspaperOpen || isOnThisDayOpen || isWeeklyReviewOpen || isMonthlyReviewOpen) && (
                     <header
-                        className={`flex items-center justify-between px-5 border-b border-stone-100 shrink-0 z-30 transition-all duration-300 pt-[var(--app-safe-area-top)] ${isHeaderScrolled
-                            ? 'h-[calc(3rem+var(--app-safe-area-top))] bg-[#faf9f6]/90 backdrop-blur-md shadow-sm'
-                            : currentView === AppView.REVIEW ? 'h-[calc(3.5rem+var(--app-safe-area-top))] bg-[#faf9f6]/80 backdrop-blur-sm' : 'h-[calc(3.5rem+var(--app-safe-area-top))] bg-[#faf9f6]/80 backdrop-blur-sm'
+                        className={`${shouldUseTransparentTitleBar ? 'absolute inset-x-0 top-0' : 'relative'} flex items-center justify-between px-5 shrink-0 z-30 transition-all duration-300 pt-[var(--app-safe-area-top)] ${shouldUseTransparentTitleBar ? 'border-transparent bg-transparent' : 'border-b border-stone-100'} ${shouldUseTransparentTitleBar
+                            ? isHeaderScrolled
+                                ? 'h-[calc(3rem+var(--app-safe-area-top))]'
+                                : 'h-[calc(3.5rem+var(--app-safe-area-top))]'
+                            : isHeaderScrolled
+                                ? 'h-[calc(3rem+var(--app-safe-area-top))] bg-[#faf9f6]/90 backdrop-blur-md shadow-sm'
+                                : 'h-[calc(3.5rem+var(--app-safe-area-top))] bg-[#faf9f6]/80 backdrop-blur-sm'
                             }`}
                     >
                         <div className="w-8 flex items-center">
