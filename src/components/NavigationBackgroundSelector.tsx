@@ -8,6 +8,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, Plus, Settings, X } from 'lucide-react';
 import { ToastType } from './Toast';
+import { NavigationDecorationSelector } from './NavigationDecorationSelector';
 import { NavigationDecorationDebugger } from './NavigationDecorationDebugger';
 import {
     navigationBackgroundService,
@@ -113,9 +114,7 @@ export const NavigationBackgroundSelector: React.FC<NavigationBackgroundSelector
             </div>
 
             {!enabled ? (
-                <div className="rounded-2xl border border-dashed border-stone-200 bg-white/70 p-5 text-sm text-stone-400">
-                    开启后使用新版导航背景设置。当前仍使用旧版导航贴图。
-                </div>
+                <NavigationDecorationSelector onToast={onToast} />
             ) : (
                 <>
                     <div className="flex items-center justify-between gap-4">
