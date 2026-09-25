@@ -8,7 +8,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Check, Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
 import { ToastType } from './Toast';
 import {
     getNavigationIconFallbackUrl,
@@ -43,9 +43,9 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
     const [customIcons, setCustomIcons] = useState<NavigationIconOption[]>(() => navigationIconService.getCustomIcons());
     const [schemes, setSchemes] = useState<NavigationIconScheme[]>(() => navigationIconService.getCustomSchemes());
     const [editingScheme, setEditingScheme] = useState<NavigationIconScheme | null>(null);
-    const [openSlot, setOpenSlot] = useState<NavigationIconSlot | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const uploadSlotRef = useRef<NavigationIconSlot | null>(null);
 
     const reload = () => {
         setSelection(navigationIconService.getSelection());
@@ -83,7 +83,6 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
 
     const closeEditor = () => {
         setEditingScheme(null);
-        setOpenSlot(null);
         reload();
     };
 
@@ -94,19 +93,16 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
         navigationIconService.updateCustomScheme(editingScheme.id, { name });
     };
 
-    const selectSchemeIcon = (slot: NavigationIconSlot, iconId: string | null) => {
-        if (!editingScheme) return;
-        const mapping = { ...editingScheme.mapping };
-        if (iconId) mapping[slot] = iconId;
-        else delete mapping[slot];
-        const next = { ...editingScheme, mapping };
-        setEditingScheme(next);
-        navigationIconService.setSchemeMapping(editingScheme.id, slot, iconId);
+    const pickSlotImage = (slot: NavigationIconSlot) => {
+        uploadSlotRef.current = slot;
+        fileInputRef.current?.click();
     };
 
     const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
+        const slot = uploadSlotRef.current;
+        if (!slot || !editingScheme) return;
         if (!file.type.startsWith('image/')) {
             onToast('error', '请选择图片文件');
             return;
@@ -118,14 +114,17 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
 
         setIsUploading(true);
         try {
-            await navigationIconService.addCustomIcon(file);
+            const icon = await navigationIconService.addCustomIcon(file);
+            navigationIconService.setSchemeMapping(editingScheme.id, slot, icon.id);
             reload();
-            onToast('success', '导航图标已添加');
+            setEditingScheme(navigationIconService.getCustomSchemes().find((scheme) => scheme.id === editingScheme.id) || null);
+            onToast('success', `${SLOT_LABELS[slot]}图标已更新`);
         } catch (error) {
             console.error('[NavigationIconSelector] Failed to upload icon', error);
             onToast('error', '添加导航图标失败');
         } finally {
             setIsUploading(false);
+            uploadSlotRef.current = null;
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
@@ -178,33 +177,20 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
                             className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-800 outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-200"
                         />
                     </label>
-                    <div className="mt-4 divide-y divide-stone-100 border-t border-stone-100">
+                    <div className="mt-4 flex gap-2 overflow-x-auto border-t border-stone-100 pt-4 pb-2">
                         {navigationIconService.getSlots().map((slot) => {
                             const selectedIcon = customIcons.find((icon) => icon.id === editingScheme.mapping[slot]);
-                            const isOpen = openSlot === slot;
                             return (
-                                <div key={slot} className="relative flex min-h-[108px] items-start justify-between gap-4 py-4">
-                                    <span className="pt-1 text-sm text-stone-600">{SLOT_LABELS[slot]}</span>
-                                    <div className="relative">
-                                        <button
-                                            type="button"
-                                            onClick={() => setOpenSlot(isOpen ? null : slot)}
-                                            className={`flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border bg-white p-1.5 transition-colors ${selectedIcon ? 'border-stone-300' : 'border-stone-700'}`}
-                                            aria-label={`选择${SLOT_LABELS[slot]}图标`}
-                                        >
-                                            {selectedIcon ? renderIcon(selectedIcon, selectedIcon.name, 'h-full w-full object-contain') : <span className="text-[11px] text-stone-400">文字</span>}
-                                        </button>
-                                        {isOpen && (
-                                            <div className="absolute right-0 top-[72px] z-10 grid w-[232px] grid-cols-5 gap-2 rounded-xl border border-stone-200 bg-white p-2 shadow-lg">
-                                                <button type="button" onClick={() => { selectSchemeIcon(slot, null); setOpenSlot(null); }} className={`flex h-10 w-10 items-center justify-center rounded-lg border text-[10px] text-stone-400 ${!selectedIcon ? 'border-stone-700' : 'border-stone-200'}`}>文字</button>
-                                                {customIcons.map((icon) => (
-                                                    <button key={icon.id} type="button" onClick={() => { selectSchemeIcon(slot, icon.id); setOpenSlot(null); }} className={`flex h-10 w-10 items-center justify-center rounded-lg border bg-stone-50 p-1 ${selectedIcon?.id === icon.id ? 'border-stone-700' : 'border-stone-200'}`}>
-                                                        {renderIcon(icon, icon.name, 'h-full w-full object-contain')}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
+                                <div key={slot} className="flex min-w-[68px] flex-1 flex-col items-center gap-2">
+                                    <span className="text-xs text-stone-600">{SLOT_LABELS[slot]}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => pickSlotImage(slot)}
+                                        className={`relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-white p-1.5 transition-colors ${selectedIcon ? 'border-stone-300' : 'border-dashed border-stone-300'}`}
+                                        aria-label={`选择${SLOT_LABELS[slot]}图标`}
+                                    >
+                                        {selectedIcon ? renderIcon(selectedIcon, selectedIcon.name, 'h-full w-full object-contain') : <span className="flex flex-col items-center gap-1 text-stone-400"><Upload size={15} /><span className="text-[10px]">上传</span></span>}
+                                    </button>
                                 </div>
                             );
                         })}
@@ -212,12 +198,7 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
                 </div>
                 <div className="flex shrink-0 items-center justify-between gap-3 border-t border-stone-100 bg-white px-5 py-4">
                     <button type="button" onClick={handleDeleteScheme} className="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700"><Trash2 size={14} /> 删除方案</button>
-                    <div className="flex items-center gap-2">
-                        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="inline-flex items-center gap-1 rounded-xl border border-dashed border-stone-300 px-3 py-2 text-xs text-stone-500 hover:border-stone-500">
-                            <Plus size={14} /> {isUploading ? '上传中' : '添加图标'}
-                        </button>
-                        <button type="button" onClick={closeEditor} className="rounded-xl bg-stone-800 px-4 py-2 text-xs text-white hover:bg-stone-700">完成</button>
-                    </div>
+                    <button type="button" onClick={closeEditor} className="rounded-xl bg-stone-800 px-4 py-2 text-xs text-white hover:bg-stone-700">完成</button>
                 </div>
             </div>
         </div>
