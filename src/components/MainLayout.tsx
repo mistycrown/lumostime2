@@ -25,6 +25,7 @@ import { useToast } from '../contexts/ToastContext';
 import { UIIcon } from './UIIcon';
 import { FloatingButton } from './FloatingButton';
 import { navigationBackgroundService, NAVIGATION_TRANSPARENCY_CHANGE_EVENT } from '../services/navigationBackgroundService';
+import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 
 interface MainLayoutProps {
     children: React.ReactNode;
@@ -66,6 +67,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 }) => {
     const [isTodoScheduleMode, setIsTodoScheduleMode] = useState<boolean>(() => localStorage.getItem('todoScreenMode') === 'week');
     const [isTransparentNavigation, setIsTransparentNavigation] = useState(() => navigationBackgroundService.isTransparentNavigationEnabled());
+    const { backgroundUrl, hasBackground } = useBackgroundDisplay();
     const {
         currentView, setCurrentView,
         isSettingsOpen, setIsSettingsOpen,
@@ -161,6 +163,18 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
     return (
         <div className={`h-screen w-screen flex flex-col text-stone-800 overflow-hidden select-none font-serif relative pb-[env(safe-area-inset-bottom)]`}>
+
+            {shouldUseTransparentTitleBar && hasBackground && (
+                <div
+                    className="pointer-events-none absolute inset-0 z-0"
+                    style={{
+                        backgroundImage: `url(${backgroundUrl})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat'
+                    }}
+                />
+            )}
 
             {/* Top Header Bar */}
             {!isSettingsOpen && currentView !== AppView.DAILY_CHECKS && currentView !== AppView.DAILY_CHECK_DETAIL && (currentView !== AppView.TIMELINE || isDailyReviewOpen || isDailyNewspaperOpen || isWeeklyNewspaperOpen || isMonthlyNewspaperOpen || isOnThisDayOpen || isWeeklyReviewOpen || isMonthlyReviewOpen || isAchievementOpen) && !isStatsFullScreen &&
