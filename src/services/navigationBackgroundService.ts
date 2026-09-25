@@ -5,6 +5,7 @@
  * @pos Service (UI Customization)
  * @description Keeps the new navigation-background mode isolated from the legacy foreground decoration mode.
  * @updated 2026-09-25: Registers uploaded navigation backgrounds in the theme image manifest group.
+ * @updated 2026-09-25: Added a persisted transparent-navigation toggle for the supported primary pages.
  */
 import { resolveAssetPath } from '../utils/assetPath';
 import { imageService } from './imageService';
@@ -21,10 +22,12 @@ const ENABLED_KEY = 'navigation_new_mode_enabled';
 const CURRENT_KEY = 'navigation_new_background';
 const SETTINGS_KEY = 'navigation_new_background_settings';
 const CUSTOM_KEY = 'navigation_new_background_custom_list';
+const TRANSPARENT_NAVIGATION_KEY = 'navigation_transparent_enabled';
 
 export const NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT = 'navigationBackgroundModeChange';
 export const NAVIGATION_BACKGROUND_CHANGE_EVENT = 'navigationBackgroundChange';
 export const NAVIGATION_BACKGROUND_PREVIEW_EVENT = 'navigationBackgroundPreview';
+export const NAVIGATION_TRANSPARENCY_CHANGE_EVENT = 'navigationTransparencyChange';
 
 class NavigationBackgroundService {
     private readonly builtIn: NavigationDecorationOption[] = [
@@ -51,6 +54,15 @@ class NavigationBackgroundService {
     setEnabled(enabled: boolean): void {
         localStorage.setItem(ENABLED_KEY, String(enabled));
         window.dispatchEvent(new CustomEvent(NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT, { detail: { enabled } }));
+    }
+
+    isTransparentNavigationEnabled(): boolean {
+        return localStorage.getItem(TRANSPARENT_NAVIGATION_KEY) === 'true';
+    }
+
+    setTransparentNavigationEnabled(enabled: boolean): void {
+        localStorage.setItem(TRANSPARENT_NAVIGATION_KEY, String(enabled));
+        window.dispatchEvent(new CustomEvent(NAVIGATION_TRANSPARENCY_CHANGE_EVENT, { detail: { enabled } }));
     }
 
     getCurrentBackground(): string {
