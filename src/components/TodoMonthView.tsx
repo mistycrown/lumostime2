@@ -2001,7 +2001,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                         className="w-full resize-none rounded-2xl border border-stone-200 bg-white/88 px-3 py-2.5 text-[13px] leading-5 text-stone-700 outline-none transition-colors placeholder:text-stone-300 focus:border-stone-300"
                       />
                       <p className="mt-2 text-[11px] leading-5 text-stone-400">
-                        语法同自定义筛选器：空格=与，OR=或，@待办/分类，#活动/分类，%领域，无前缀=备注。
+                        语法同自定义筛选器：空格=与，OR=或，-关键词=排除（排除条件不参与 OR），@待办/分类，#活动/分类，%领域，无前缀=备注。
                       </p>
                     </div>
                   )}

@@ -258,3 +258,56 @@ describe('matchesFilter note and attribute-value matching', () => {
     expect(matchesFilter(log, parseFilterExpression('\u4e0d\u5b58\u5728 \u4e66\u7c4d'), context)).toBe(false);
   });
 });
+
+describe('negative filter conditions', () => {
+  test('parses negative terms as independent conditions and never joins them with OR', () => {
+    expect(parseFilterExpression('#瀛︿範 -#闃呰 %鍋ュ悍 -%瀛︽牎')).toMatchObject({
+      tags: [['瀛︿範']],
+      excludedTags: ['闃呰'],
+      scopes: [['鍋ュ悍']],
+      excludedScopes: ['瀛︽牎']
+    });
+
+    expect(parseFilterExpression('-#闃呰 OR #璺戞')).toMatchObject({
+      excludedTags: ['闃呰'],
+      tags: [['璺戞']]
+    });
+    expect(parseFilterExpression('-#闃呰 OR -#璺戞').excludedTags).toEqual(['闃呰', '璺戞']);
+  });
+
+  test('applies negative log conditions across tags, scopes, notes, and reactions', () => {
+    const context = {
+      categories: activityCategories,
+      scopes,
+      todos: [],
+      todoCategories: []
+    };
+    const readingName = activityCategories[0].activities[0].name;
+    const runningName = activityCategories[1].activities[0].name;
+    const schoolScopeName = scopes[1].name;
+    const log = buildLog({ note: 'Night review', reactions: ['🌸'] });
+
+    expect(matchesFilter(log, parseFilterExpression(`-#${runningName}`), context)).toBe(true);
+    expect(matchesFilter(log, parseFilterExpression(`-#${readingName}`), context)).toBe(false);
+    expect(matchesFilter(log, parseFilterExpression(`#${readingName} -%${schoolScopeName} -Night`), context)).toBe(false);
+    expect(matchesFilter(log, parseFilterExpression('-^🌸'), context)).toBe(false);
+  });
+
+  test('applies negative conditions to todo title, category, linked activity, scope, and note', () => {
+    const todo = buildTodo({});
+    const context = {
+      categories: activityCategories,
+      scopes,
+      todoCategories,
+      todos: [todo]
+    };
+    const planCategoryName = todoCategories[0].name;
+    const lifeCategoryName = todoCategories[1].name;
+    const readingName = activityCategories[0].activities[0].name;
+    const schoolScopeName = scopes[1].name;
+
+    expect(matchesTodoFilterExpression(todo, `-@${planCategoryName}`, context)).toBe(false);
+    expect(matchesTodoFilterExpression(todo, `-@${lifeCategoryName}`, context)).toBe(true);
+    expect(matchesTodoFilterExpression(todo, `#${readingName} -%${schoolScopeName} -Night`, context)).toBe(true);
+  });
+});
