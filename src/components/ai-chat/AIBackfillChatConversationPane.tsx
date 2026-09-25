@@ -691,7 +691,11 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
                   应用结果
                 </p>
                 <div className="space-y-2">
-                  {message.appliedActions?.map((action) => renderAppliedAction(message.id, action))}
+                  {message.appliedActions?.map((action) => (
+                    <React.Fragment key={`${message.id}-action-${action.actionId}`}>
+                      {renderAppliedAction(message.id, action)}
+                    </React.Fragment>
+                  ))}
                   {message.assistantLetterResult && (
                     <div
                       className="border-l-2 pl-3 pr-1 py-1"
