@@ -4,12 +4,14 @@
  * @output Remote Storage Operations (Upload/Download)
  * @pos Service (Data Synchronization)
  * @description Manages Tencent Cloud COS connections and file operations using official COS SDK, providing the same interface as WebDAV service.
+ * @updated 2026-09-25: Stores versioned content/theme image groups in the cloud manifest.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 // @ts-ignore
 import COS from 'cos-js-sdk-v5';
 import { Capacitor } from '@capacitor/core';
+import { buildCloudImageManifest, CloudImageManifest, ImageManifestUpload } from './imageManifest';
 
 // S3 Configuration Interface (now for Tencent Cloud COS)
 export interface S3Config {
@@ -485,15 +487,11 @@ export class S3Service {
     /**
      * Upload image reference list
      */
-    async uploadImageList(imageList: string[]): Promise<boolean> {
+    async uploadImageList(imageList: ImageManifestUpload): Promise<boolean> {
         if (!this.config || !this.client) throw new Error('COS not configured');
 
         return new Promise((resolve, reject) => {
-            const data = {
-                images: imageList,
-                timestamp: Date.now(),
-                version: '1.0.0'
-            };
+            const data = buildCloudImageManifest(imageList);
 
             const filename = 'lumostime_images.json';
             const bodyContent = JSON.stringify(data, null, 2);
@@ -527,7 +525,7 @@ export class S3Service {
     /**
      * Download image reference list
      */
-    async downloadImageList(): Promise<{ images: string[], timestamp: number } | null> {
+    async downloadImageList(): Promise<CloudImageManifest | { images: string[], timestamp: number } | null> {
         if (!this.config || !this.client) throw new Error('COS not configured');
 
         const filename = 'lumostime_images.json';

@@ -4,6 +4,7 @@
  * @output Remote storage operations for S3-compatible storage
  * @pos Service (Data Synchronization)
  * @description Manages generic S3-compatible storage using the AWS S3 client while preserving the existing sync object layout.
+ * @updated 2026-09-25: Stores versioned content/theme image groups in the cloud manifest.
  *
  * 修改历史:
  * - 2026-04-19: Added isolated compatible S3 service so Tencent Cloud COS can remain unchanged while supporting generic S3-compatible storage.
@@ -22,6 +23,7 @@ import { HTTP, HTTPResponse } from '@awesome-cordova-plugins/http';
 import { Capacitor } from '@capacitor/core';
 import { HttpRequest, HttpResponse } from '@smithy/protocol-http';
 import type { HttpHandlerOptions } from '@smithy/types';
+import { buildCloudImageManifest, CloudImageManifest, ImageManifestUpload } from './imageManifest';
 
 export interface CompatibleS3Config {
   bucketName: string;
@@ -610,12 +612,8 @@ export class CompatibleS3Service {
     }
   }
 
-  async uploadImageList(imageList: string[]): Promise<boolean> {
-    const data = {
-      images: imageList,
-      timestamp: Date.now(),
-      version: '1.0.0'
-    };
+  async uploadImageList(imageList: ImageManifestUpload): Promise<boolean> {
+    const data = buildCloudImageManifest(imageList);
 
     await this.getClient().send(new PutObjectCommand({
       Bucket: this.getBucket(),
@@ -628,7 +626,7 @@ export class CompatibleS3Service {
     return true;
   }
 
-  async downloadImageList(): Promise<{ images: string[]; timestamp: number } | null> {
+  async downloadImageList(): Promise<CloudImageManifest | { images: string[]; timestamp: number } | null> {
     try {
       const response = await this.getClient().send(new GetObjectCommand({
         Bucket: this.getBucket(),

@@ -10,6 +10,7 @@
  * @updated 2026-07-21: Added the synchronized month-calendar number style selector to the style tab.
  * @updated 2026-08-15: Added confirmation before clearing the saved redemption-code state.
  * @updated 2026-09-25: Added the opt-in merged-group sticker selector settings and management UI.
+ * @updated 2026-09-25: Registers custom sticker uploads in the theme image manifest group.
  */
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, Fish, Check, X, Plus } from 'lucide-react';
@@ -755,7 +756,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         }
 
         try {
-            const filename = await imageService.saveImage(file);
+            const filename = await imageService.saveImage(file, 'theme');
             const now = Date.now();
             const stickerId = crypto.randomUUID();
             const createdStickerRecord = {

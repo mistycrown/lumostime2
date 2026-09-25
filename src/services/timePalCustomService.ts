@@ -5,6 +5,7 @@
  * @output 自定义时光小友元数据（localStorage）和本地图片文件（imageService）
  * @pos Service (TimePal Customization)
  * @updated 2026-08-10: Registers TimePal stage images in the canonical image list for export, sync, and cleanup protection.
+ * @updated 2026-09-25: Keeps TimePal stage images in the theme image manifest group.
  */
 import { TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 import { CUSTOM_TIMEPAL_PREFIX, extractCustomTimePalId } from '../constants/timePalConfig';
@@ -127,7 +128,7 @@ class TimePalCustomService {
         const items = this.getAllItems();
         items.push(newItem);
         this.saveItems(items);
-        stageFilenames.forEach(filename => imageService.addToReferencedList(filename, false));
+        stageFilenames.forEach(filename => imageService.addToReferencedList(filename, false, 'theme'));
         this.emitChanged();
 
         return newItem;

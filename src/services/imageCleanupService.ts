@@ -1,9 +1,10 @@
 /**
  * @file imageCleanupService.ts
- * @input Log records, Todo cover images, settings image references, local images
+ * @input Log records, Todo cover images, grouped theme settings references, local images
  * @output Cleanup operations
  * @pos Service (Image Management)
- * @description Automatically detects and removes unreferenced images to free up storage space, including protected settings images.
+ * @description Automatically detects and removes unreferenced images to free up storage space with separate content/theme reference strategies.
+ * @updated 2026-09-25: Applies separate content/theme reference strategies and reports cleanup candidates by group.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -15,6 +16,7 @@ import { imageService } from './imageService';
 import { getSettingsReferencedImages } from './settingsImageReferenceService';
 import { webdavService } from './webdavService';
 import { collectCustomStickerReferencedImages } from './customStickerAssetService';
+import { ImageManifestGroups } from './imageManifest';
 
 export interface CleanupResult {
     totalImages: number;
@@ -32,23 +34,24 @@ export class ImageCleanupService {
     /**
      * 获取所有 logs 中引用的图片文件名（包括对应的缩略图）
      */
-    private getReferencedImages(
+    private getReferencedImageGroups(
         logs: Log[],
         todos: TodoItem[] = [],
         dailyReviews: DailyReview[] = [],
         customStickerSets: CustomStickerSetRecord[] = [],
         customStickers: CustomStickerRecord[] = []
-    ): Set<string> {
-        const referencedImages = new Set<string>();
+    ): ImageManifestGroups {
+        const content = new Set<string>();
+        const theme = new Set<string>();
         
         logs.forEach(log => {
             if (log.images && Array.isArray(log.images)) {
                 log.images.forEach(imageName => {
                     if (imageName && typeof imageName === 'string') {
                         // 添加原图
-                        referencedImages.add(imageName);
+                        content.add(imageName);
                         // 添加对应的缩略图
-                        referencedImages.add(`thumb_${imageName}`);
+                        content.add(`thumb_${imageName}`);
                     }
                 });
             }
@@ -58,21 +61,32 @@ export class ImageCleanupService {
             if (!todo?.coverImage || typeof todo.coverImage !== 'string') {
                 return;
             }
-            referencedImages.add(todo.coverImage);
+            content.add(todo.coverImage);
             if (!todo.coverImage.startsWith('thumb_')) {
-                referencedImages.add(`thumb_${todo.coverImage}`);
+                content.add(`thumb_${todo.coverImage}`);
             }
         });
 
         getSettingsReferencedImages().forEach((imageName) => {
-            referencedImages.add(imageName);
+            theme.add(imageName);
         });
 
         collectCustomStickerReferencedImages(dailyReviews, customStickerSets, customStickers).forEach((imageName) => {
-            referencedImages.add(imageName);
+            theme.add(imageName);
         });
         
-        return referencedImages;
+        return { content: [...content], theme: [...theme] };
+    }
+
+    private getReferencedImages(
+        logs: Log[],
+        todos: TodoItem[] = [],
+        dailyReviews: DailyReview[] = [],
+        customStickerSets: CustomStickerSetRecord[] = [],
+        customStickers: CustomStickerRecord[] = []
+    ): Set<string> {
+        const groups = this.getReferencedImageGroups(logs, todos, dailyReviews, customStickerSets, customStickers);
+        return new Set([...groups.content, ...groups.theme]);
     }
     
     /**
@@ -144,7 +158,11 @@ export class ImageCleanupService {
     ): Promise<{
         totalImages: number;
         referencedImages: number;
+        contentReferencedImages: number;
+        themeReferencedImages: number;
         unreferencedImages: string[];
+        unreferencedContentImages: string[];
+        unreferencedThemeImages: string[];
         orphanedThumbnails: string[];
         orphanedOriginals: string[];
     }> {
@@ -156,12 +174,23 @@ export class ImageCleanupService {
             const { originalImages, thumbnailImages, pairedImages } = this.groupImagesByPairs(allImageFiles);
             
             // 获取所有被引用的图片（包括对应的缩略图）
-            const referencedImages = this.getReferencedImages(logs, todos, dailyReviews, customStickerSets, customStickers);
+            const referencedGroups = this.getReferencedImageGroups(logs, todos, dailyReviews, customStickerSets, customStickers);
+            const referencedImages = new Set([...referencedGroups.content, ...referencedGroups.theme]);
+            const manifest = imageService.getReferencedImageManifest();
+            const isReferenced = (filename: string): boolean => {
+                if (manifest.theme.includes(filename)) {
+                    return referencedGroups.theme.includes(filename);
+                }
+                if (manifest.content.includes(filename)) {
+                    return referencedGroups.content.includes(filename);
+                }
+                return referencedImages.has(filename);
+            };
             
             // 找出未被引用的原图（只检查原图，缩略图会自动跟随）
-            const unreferencedOriginals = originalImages.filter(imageName => 
-                !referencedImages.has(imageName)
-            );
+            const unreferencedOriginals = originalImages.filter(imageName => !isReferenced(imageName));
+            const unreferencedContentImages = unreferencedOriginals.filter((filename) => manifest.content.includes(filename));
+            const unreferencedThemeImages = unreferencedOriginals.filter((filename) => manifest.theme.includes(filename));
             
             // 找出孤立的缩略图（没有对应原图的缩略图）
             const orphanedThumbnails = thumbnailImages.filter(thumbName => {
@@ -210,7 +239,11 @@ export class ImageCleanupService {
             return {
                 totalImages: allImageFiles.length,
                 referencedImages: referencedImages.size,
+                contentReferencedImages: referencedGroups.content.length,
+                themeReferencedImages: referencedGroups.theme.length,
                 unreferencedImages,
+                unreferencedContentImages,
+                unreferencedThemeImages,
                 orphanedThumbnails,
                 orphanedOriginals
             };
@@ -478,6 +511,8 @@ export class ImageCleanupService {
             report += `## 📊 总体统计\n`;
             report += `- **总图片文件数**: ${checkResult.totalImages}\n`;
             report += `- **被引用图片文件数**: ${checkResult.referencedImages}\n`;
+            report += `- **日志/待办组引用数**: ${checkResult.contentReferencedImages}\n`;
+            report += `- **主题设置组引用数**: ${checkResult.themeReferencedImages}\n`;
             report += `- **待清理文件数**: ${checkResult.unreferencedImages.length}\n`;
             report += `- **总引用次数**: ${usageStats.totalReferences}\n\n`;
             
@@ -493,6 +528,22 @@ export class ImageCleanupService {
                     unreferencedOriginals.forEach((imageName, index) => {
                         const hasThumb = checkResult.unreferencedImages.includes(`thumb_${imageName}`);
                         report += `${index + 1}. \`${imageName}\`${hasThumb ? ' + 缩略图' : ''}\n`;
+                    });
+                    report += `\n`;
+                }
+
+                if (checkResult.unreferencedContentImages.length > 0) {
+                    report += `## 日志/待办组待清理 (${checkResult.unreferencedContentImages.length} 组)\n`;
+                    checkResult.unreferencedContentImages.forEach((imageName, index) => {
+                        report += `${index + 1}. \`${imageName}\`\n`;
+                    });
+                    report += `\n`;
+                }
+
+                if (checkResult.unreferencedThemeImages.length > 0) {
+                    report += `## 主题设置组待清理 (${checkResult.unreferencedThemeImages.length} 组)\n`;
+                    checkResult.unreferencedThemeImages.forEach((imageName, index) => {
+                        report += `${index + 1}. \`${imageName}\`\n`;
                     });
                     report += `\n`;
                 }

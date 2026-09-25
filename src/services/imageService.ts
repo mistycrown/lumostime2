@@ -1,10 +1,11 @@
 /**
  * @file imageService.ts
- * @input Image Files (Blob/File), log references, todo cover references
- * @output Persistence & URL Generation
+ * @input Image Files (Blob/File), content references, and theme settings references
+ * @output Persistence, grouped image manifests, and URL Generation
  * @pos Service (Local Storage)
  * @description Handles saving, retrieving, and deleting images.
  * Uses Capacitor Filesystem for Native/Electron, and IndexedDB for Web fallback.
+ * @updated 2026-09-25: Split local image manifests into content and theme groups, and added explicit group-aware registration for uploads and cleanup.
  * @updated 2026-05-05: Reused settings-level protected image references during manifest rebuild so AI assistant avatars participate in cleanup protection and sync.
  * @updated 2026-08-10: Supports original-only image-list registration for TimePal stage images that have no thumbnail files.
  * @updated 2026-05-04: Preserve uploaded PNG/WebP transparency by keeping source-compatible filenames and thumbnail encodings instead of forcing JPEG output.
@@ -16,6 +17,13 @@ import { Capacitor } from '@capacitor/core';
 import { CustomStickerRecord, CustomStickerSetRecord, DailyReview, Log, TodoItem } from '../types';
 import { collectCustomStickerReferencedImages } from './customStickerAssetService';
 import { getSettingsReferencedImages } from './settingsImageReferenceService';
+import {
+    createEmptyImageManifestGroups,
+    flattenImageManifestGroups,
+    ImageManifestGroups,
+    ImageReferenceGroup,
+    normalizeImageManifestGroups
+} from './imageManifest';
 
 // DB Configuration for Web Fallback
 const DB_NAME = 'LumosTimeImagesDB';
@@ -26,6 +34,7 @@ const DB_VERSION = 1;
 const DELETED_IMAGES_KEY = 'lumos_deleted_images';
 // Key for referenced images list
 const REFERENCED_IMAGES_KEY = 'lumos_referenced_images';
+const IMAGE_MANIFEST_VERSION = 2;
 const TRANSPARENT_IMAGE_MIME_TYPES = new Set([
     'image/png',
     'image/webp',
@@ -86,7 +95,7 @@ class ImageService {
     /**
      * Save an image file and return the unique filename
      */
-    async saveImage(file: Blob | File): Promise<string> {
+    async saveImage(file: Blob | File, group: ImageReferenceGroup = 'content'): Promise<string> {
         // console.log(`[ImageService] ========== saveImage 开始 ==========`);
         // console.log(`[ImageService] 文件类型: ${file.type}, 大小: ${file.size} bytes`);
 
@@ -134,7 +143,7 @@ class ImageService {
 
         // 3. 添加到引用列表
         // console.log(`[ImageService] 添加到引用列表: ${filename}`);
-        this.addToReferencedList(filename);
+        this.addToReferencedList(filename, true, group);
 
         // 4. 触发全局事件通知图片已上传，需要同步
         if (typeof window !== 'undefined') {
@@ -152,7 +161,7 @@ class ImageService {
      * Save a camera image returned from a native file path.
      * Camera URIs on Android are more reliable when read through Filesystem first.
      */
-    async saveNativeCameraImage(filePath: string, format = 'jpeg'): Promise<string> {
+    async saveNativeCameraImage(filePath: string, format = 'jpeg', group: ImageReferenceGroup = 'content'): Promise<string> {
         await this.ensureInit();
 
         const filename = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}.${this.normalizeImageExtension(format)}`;
@@ -194,7 +203,7 @@ class ImageService {
             console.error(`[ImageService] ✗ 相机缩略图生成/保存失败: thumb_${filename}`, e);
         }
 
-        this.addToReferencedList(filename);
+        this.addToReferencedList(filename, true, group);
 
         if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('imageUploaded', {
@@ -805,34 +814,73 @@ class ImageService {
     /**
      * 获取当前的引用图片列表
      */
-    getReferencedImagesList(): string[] {
+    getReferencedImageManifest(): ImageManifestGroups {
         try {
             const raw = localStorage.getItem(REFERENCED_IMAGES_KEY);
-            return raw ? JSON.parse(raw) : [];
+            if (!raw) {
+                return createEmptyImageManifestGroups();
+            }
+
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                const themeReferences = getSettingsReferencedImages();
+                const content: string[] = [];
+                const theme: string[] = [];
+                parsed.forEach((filename: unknown) => {
+                    if (typeof filename !== 'string' || !filename.trim()) {
+                        return;
+                    }
+                    if (themeReferences.has(filename)) {
+                        theme.push(filename);
+                    } else {
+                        content.push(filename);
+                    }
+                });
+                return normalizeImageManifestGroups({ content, theme });
+            }
+
+            return normalizeImageManifestGroups(
+                parsed && typeof parsed.groups === 'object' ? parsed.groups : parsed
+            );
         } catch (e) {
             console.error('[ImageService] 获取引用列表失败', e);
-            return [];
+            return createEmptyImageManifestGroups();
         }
+    }
+
+    getReferencedImagesList(): string[] {
+        return flattenImageManifestGroups(this.getReferencedImageManifest());
     }
 
     /**
      * 更新引用图片列表（完全替换）
      */
-    updateReferencedImagesList(images: string[]): void {
+    updateReferencedImageManifest(groups: ImageManifestGroups): void {
         try {
-            localStorage.setItem(REFERENCED_IMAGES_KEY, JSON.stringify(images));
-            // console.log(`[ImageService] 更新引用列表: ${images.length} 个图片`);
+            localStorage.setItem(REFERENCED_IMAGES_KEY, JSON.stringify({
+                version: IMAGE_MANIFEST_VERSION,
+                groups: normalizeImageManifestGroups(groups)
+            }));
         } catch (e) {
             console.error('[ImageService] 更新引用列表失败', e);
         }
     }
 
+    updateReferencedImagesList(images: string[]): void {
+        this.updateReferencedImageManifest({ content: images, theme: [] });
+    }
+
     /**
      * 添加图片到引用列表
      */
-    addToReferencedList(filename: string, includeThumbnail = true): void {
+    addToReferencedList(
+        filename: string,
+        includeThumbnail = true,
+        group: ImageReferenceGroup = 'content'
+    ): void {
         try {
-            const list = this.getReferencedImagesList();
+            const manifest = this.getReferencedImageManifest();
+            const list = manifest[group];
             let updated = false;
 
             if (!list.includes(filename)) {
@@ -850,13 +898,13 @@ class ImageService {
             }
 
             if (updated) {
-                this.updateReferencedImagesList(list);
+                this.updateReferencedImageManifest({ ...manifest, [group]: list });
                 // console.log(`[ImageService] 添加到引用列表: ${filename}, 当前总数: ${list.length}`);
 
                 // 触发图片列表变化事件
                 if (typeof window !== 'undefined') {
                     window.dispatchEvent(new CustomEvent('imageListChanged', {
-                        detail: { images: list }
+                        detail: { images: this.getReferencedImagesList(), groups: this.getReferencedImageManifest() }
                     }));
                 }
             }
@@ -870,18 +918,22 @@ class ImageService {
      */
     removeFromReferencedList(filename: string): void {
         try {
-            let list = this.getReferencedImagesList();
-            const originalLength = list.length;
-            list = list.filter(f => f !== filename && f !== `thumb_${filename}`);
+            const manifest = this.getReferencedImageManifest();
+            const nextManifest: ImageManifestGroups = {
+                content: manifest.content.filter(f => f !== filename && f !== `thumb_${filename}`),
+                theme: manifest.theme.filter(f => f !== filename && f !== `thumb_${filename}`)
+            };
+            const originalLength = flattenImageManifestGroups(manifest).length;
+            const nextLength = flattenImageManifestGroups(nextManifest).length;
 
-            if (list.length !== originalLength) {
-                this.updateReferencedImagesList(list);
+            if (nextLength !== originalLength) {
+                this.updateReferencedImageManifest(nextManifest);
                 // console.log(`[ImageService] 从引用列表移除: ${filename}, 剩余: ${list.length}`);
 
                 // 触发图片列表变化事件
                 if (typeof window !== 'undefined') {
                     window.dispatchEvent(new CustomEvent('imageListChanged', {
-                        detail: { images: list }
+                        detail: { images: flattenImageManifestGroups(nextManifest), groups: nextManifest }
                     }));
                 }
             }
@@ -893,13 +945,7 @@ class ImageService {
     /**
      * 根据logs重建引用列表（用于修复/同步）
      */
-    private collectReferencedImages(
-        logs: Log[] = [],
-        todos: TodoItem[] = [],
-        dailyReviews: DailyReview[] = [],
-        customStickerSets: CustomStickerSetRecord[] = [],
-        customStickers: CustomStickerRecord[] = []
-    ): Set<string> {
+    private collectContentReferencedImages(logs: Log[] = [], todos: TodoItem[] = []): Set<string> {
         const referencedSet = new Set<string>();
         logs.forEach(log => {
             if (log.images && Array.isArray(log.images)) {
@@ -920,6 +966,15 @@ class ImageService {
                 referencedSet.add(`thumb_${todo.coverImage}`);
             }
         });
+        return referencedSet;
+    }
+
+    private collectThemeReferencedImages(
+        dailyReviews: DailyReview[] = [],
+        customStickerSets: CustomStickerSetRecord[] = [],
+        customStickers: CustomStickerRecord[] = []
+    ): Set<string> {
+        const referencedSet = new Set<string>();
         getSettingsReferencedImages().forEach((filename) => {
             referencedSet.add(filename);
         });
@@ -927,6 +982,32 @@ class ImageService {
             referencedSet.add(filename);
         });
         return referencedSet;
+    }
+
+    private collectReferencedImages(
+        logs: Log[] = [],
+        todos: TodoItem[] = [],
+        dailyReviews: DailyReview[] = [],
+        customStickerSets: CustomStickerSetRecord[] = [],
+        customStickers: CustomStickerRecord[] = []
+    ): Set<string> {
+        return new Set([
+            ...this.collectContentReferencedImages(logs, todos),
+            ...this.collectThemeReferencedImages(dailyReviews, customStickerSets, customStickers)
+        ]);
+    }
+
+    buildReferencedImageManifest(
+        logs: Log[] = [],
+        todos: TodoItem[] = [],
+        dailyReviews: DailyReview[] = [],
+        customStickerSets: CustomStickerSetRecord[] = [],
+        customStickers: CustomStickerRecord[] = []
+    ): ImageManifestGroups {
+        return {
+            content: Array.from(this.collectContentReferencedImages(logs, todos)),
+            theme: Array.from(this.collectThemeReferencedImages(dailyReviews, customStickerSets, customStickers))
+        };
     }
 
     buildReferencedImagesList(
@@ -946,16 +1027,20 @@ class ImageService {
         customStickerSets: CustomStickerSetRecord[] = [],
         customStickers: CustomStickerRecord[] = []
     ): Promise<string[]> {
-        const referencedImages = this.buildReferencedImagesList(logs, todos, dailyReviews, customStickerSets, customStickers);
+        const referencedGroups = this.buildReferencedImageManifest(logs, todos, dailyReviews, customStickerSets, customStickers);
         const localFiles = new Set(await this.listImages());
-        const list = referencedImages.filter((filename) => localFiles.has(filename));
-        this.updateReferencedImagesList(list);
+        const groups: ImageManifestGroups = {
+            content: referencedGroups.content.filter((filename) => localFiles.has(filename)),
+            theme: referencedGroups.theme.filter((filename) => localFiles.has(filename))
+        };
+        const list = flattenImageManifestGroups(groups);
+        this.updateReferencedImageManifest(groups);
         // console.log(`[ImageService] 重建引用列表: ${list.length} 个图片`);
 
         // 触发图片列表变化事件
         if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('imageListChanged', {
-                detail: { images: list }
+                detail: { images: list, groups }
             }));
         }
 
@@ -975,7 +1060,8 @@ class ImageService {
         console.log('[ImageService] ========== 开始清理未引用的图片 ==========');
 
         // 1. 从logs重建正确的引用列表
-        const referencedImages = this.collectReferencedImages(logs, todos, dailyReviews, customStickerSets, customStickers);
+        const referencedGroups = this.buildReferencedImageManifest(logs, todos, dailyReviews, customStickerSets, customStickers);
+        const referencedImages = new Set(flattenImageManifestGroups(referencedGroups));
 
         // console.log(`[ImageService] Logs中引用的图片: ${referencedImages.size} 个`);
 
@@ -989,7 +1075,7 @@ class ImageService {
 
         // 4. 从列表中移除未引用的图片
         if (unreferencedImages.length > 0) {
-            this.updateReferencedImagesList(Array.from(referencedImages));
+            this.updateReferencedImageManifest(referencedGroups);
             // console.log(`[ImageService] ✓ 已从列表中移除 ${unreferencedImages.length} 个未引用的图片`);
         }
 

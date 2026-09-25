@@ -14,6 +14,7 @@
  * 
  * 闁宠法濯寸粭?Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-09-17: Fixed custom background deletion reporting failure after persistence succeeds.
+ * @updated 2026-09-25: Registers custom background assets in the theme image manifest group.
  * @updated 2026-09-20: Prevented Base64 image URLs from being persisted in localStorage and added runtime hydration for native file-backed backgrounds.
  * @updated 2026-08-10: Added canonical image-list storage and restore hydration for custom backgrounds.
  * @updated 2026-04-20: Added event-driven background subscriptions, image preloading, and lighter reapply scheduling to reduce mobile jank and white flashes.
@@ -436,7 +437,7 @@ class BackgroundService {
                     changed = true;
                     return {
                         ...background,
-                        imageFilename: await imageService.saveImage(await response.blob())
+                        imageFilename: await imageService.saveImage(await response.blob(), 'theme')
                     };
                 } catch (error) {
                     console.warn('[BackgroundService] Failed to register legacy custom background:', background.id, error);
@@ -536,7 +537,7 @@ class BackgroundService {
             thumbnail: dataUrl,
         };
 
-        customBackground.imageFilename = await imageService.saveImage(file);
+        customBackground.imageFilename = await imageService.saveImage(file, 'theme');
 
         if (Capacitor.isNativePlatform()) {
             const persisted = await this.persistNativeBackgroundFile(dataUrl, backgroundId, file.name);

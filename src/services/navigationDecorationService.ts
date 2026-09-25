@@ -14,6 +14,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-08-10: Added canonical image-list storage and restore hydration for custom navigation decorations.
+ * @updated 2026-09-25: Registers custom navigation decoration uploads in the theme image manifest group.
  */
 
 import { Capacitor } from '@capacitor/core';
@@ -216,7 +217,7 @@ class NavigationDecorationService {
                     changed = true;
                     return {
                         ...decoration,
-                        imageFilename: await imageService.saveImage(await response.blob())
+                        imageFilename: await imageService.saveImage(await response.blob(), 'theme')
                     };
                 } catch (error) {
                     console.warn('[NavigationDecorationService] Failed to register legacy custom decoration:', decoration.id, error);
@@ -277,7 +278,7 @@ class NavigationDecorationService {
             opacity: 1
         };
 
-        customDecoration.imageFilename = await imageService.saveImage(file);
+        customDecoration.imageFilename = await imageService.saveImage(file, 'theme');
 
         if (Capacitor.isNativePlatform()) {
             const persisted = await this.persistNativeDecorationFile(dataUrl, decorationId, file.name);

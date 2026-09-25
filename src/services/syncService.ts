@@ -4,6 +4,7 @@
  * @output Image sync operations and storage service selection
  * @pos Service
  * @description Handles one-way image sync for WebDAV, Tencent COS, and compatible S3 storage.
+ * @updated 2026-09-25: Supports grouped content/theme image manifests while preserving flat-list compatibility.
  * @updated 2026-04-19: Added compatible S3 support and allow callers to explicitly choose the target storage service so multiple configured providers do not cross-write images.
  */
 import { Capacitor } from '@capacitor/core';
@@ -13,6 +14,7 @@ import { s3Service } from './s3Service';
 import { compatibleS3Service } from './compatibleS3Service';
 import { imageService } from './imageService';
 import { SYNC_CONFIG } from '../config/syncConfig';
+import { CloudImageManifest, ImageManifestUpload } from './imageManifest';
 
 export interface SyncResult {
   uploaded: number;
@@ -29,8 +31,8 @@ export interface StorageService {
   uploadImage(filename: string, buffer: ArrayBuffer | string | Blob): Promise<boolean>;
   downloadImage(filename: string): Promise<ArrayBuffer>;
   deleteImage(filename: string): Promise<boolean>;
-  uploadImageList(imageList: string[]): Promise<boolean>;
-  downloadImageList(): Promise<{ images: string[]; timestamp: number } | null>;
+  uploadImageList(imageList: ImageManifestUpload): Promise<boolean>;
+  downloadImageList(): Promise<(CloudImageManifest | { images: string[]; timestamp: number }) | null>;
   getImageListTimestamp(): Promise<number>;
   createDirectory?(path: string): Promise<boolean>;
   getDirectoryContents?(path: string): Promise<any[]>;

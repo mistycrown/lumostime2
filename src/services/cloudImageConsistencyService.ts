@@ -4,6 +4,7 @@
  * @output Cloud image consistency analysis and optional repair
  * @pos Service (Cloud Image Diagnostics)
  * @description Compares local image references against cloud manifests and real cloud files, and can repair the cloud side using local state as the source of truth.
+ * @updated 2026-09-25: Reads and repairs grouped content/theme cloud manifests while comparing the same flattened file set.
  * @updated 2026-03-23: Added explicit cloud consistency check/repair flow so daily sync no longer auto-repairs cloud image state, and aligned diagnostics with the local image manifest instead of recalculating from all records.
  */
 
@@ -13,6 +14,7 @@ import { imageService } from './imageService';
 import { s3Service } from './s3Service';
 import { compatibleS3Service } from './compatibleS3Service';
 import { webdavService } from './webdavService';
+import { ImageManifestGroups } from './imageManifest';
 
 type ActiveCloudKind = 's3' | 'compatible-s3' | 'webdav';
 type ActiveCloudService = typeof s3Service | typeof compatibleS3Service | typeof webdavService;
@@ -301,10 +303,16 @@ class CloudImageConsistencyService {
             }
         }
 
+        const localGroups = imageService.getReferencedImageManifest();
         const finalManifest = analysis.localManifest.filter((filename) => cloudFileSet.has(filename));
+        const finalManifestSet = new Set(finalManifest);
+        const finalGroups: ImageManifestGroups = {
+            content: localGroups.content.filter((filename) => finalManifestSet.has(filename)),
+            theme: localGroups.theme.filter((filename) => finalManifestSet.has(filename))
+        };
 
         try {
-            await context.service.uploadImageList(finalManifest);
+            await context.service.uploadImageList(finalGroups);
         } catch (error: any) {
             errors.push(`更新云端图片列表失败：${error?.message || '未知错误'}`);
         }
