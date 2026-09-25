@@ -31,6 +31,7 @@ import { iconService, ICON_OPTIONS } from '../services/iconService';
 import { Category } from '../types';
 import { useSettings } from '../contexts/SettingsContext';
 import { useReview } from '../contexts/ReviewContext';
+import { useNavigation } from '../contexts/NavigationContext';
 import { InputModal } from '../components/InputModal';
 import { PresetEditModal } from '../components/PresetEditModal';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -253,6 +254,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         setStickerSelectorConfig
     } = useSettings();
     const { dailyReviews } = useReview();
+    const { setIsSettingsOpen } = useNavigation();
     
     // 根据时间段随机选择背景图片
     const [bannerImage] = useState(() => {
@@ -1638,7 +1640,16 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                             {activeTab === 'navigation' && (
                                 /* 导航栏样式 */
-                                <NavigationBackgroundSelector onToast={onToast} />
+                                <NavigationBackgroundSelector
+                                    onToast={onToast}
+                                    onOpenDebugger={() => {
+                                        onBack();
+                                        setIsSettingsOpen(false);
+                                        window.setTimeout(() => {
+                                            (window as any).LumosTime?.debug?.enableNavBackground?.();
+                                        }, 0);
+                                    }}
+                                />
                             )}
 
                             {activeTab === 'timepal' && (

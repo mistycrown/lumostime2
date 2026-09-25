@@ -9,23 +9,21 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Check, Plus, Settings, X } from 'lucide-react';
 import { ToastType } from './Toast';
 import { NavigationDecorationSelector } from './NavigationDecorationSelector';
-import { NavigationDecorationDebugger } from './NavigationDecorationDebugger';
 import {
     navigationBackgroundService,
     NAVIGATION_BACKGROUND_CHANGE_EVENT,
-    NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT,
-    NAVIGATION_BACKGROUND_PREVIEW_EVENT
+    NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT
 } from '../services/navigationBackgroundService';
 
 interface NavigationBackgroundSelectorProps {
     onToast: (type: ToastType, message: string) => void;
+    onOpenDebugger?: () => void;
 }
 
-export const NavigationBackgroundSelector: React.FC<NavigationBackgroundSelectorProps> = ({ onToast }) => {
+export const NavigationBackgroundSelector: React.FC<NavigationBackgroundSelectorProps> = ({ onToast, onOpenDebugger }) => {
     const [enabled, setEnabled] = useState(() => navigationBackgroundService.isEnabled());
     const [backgrounds, setBackgrounds] = useState(() => navigationBackgroundService.getAllBackgrounds());
     const [currentId, setCurrentId] = useState(() => navigationBackgroundService.getCurrentBackground());
-    const [showDebugger, setShowDebugger] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -121,7 +119,7 @@ export const NavigationBackgroundSelector: React.FC<NavigationBackgroundSelector
                         <p className="text-xs text-stone-500">选择背景后可调整位置、缩放和透明度。</p>
                         <button
                             type="button"
-                            onClick={() => setShowDebugger(true)}
+                            onClick={() => onOpenDebugger?.()}
                             className="flex shrink-0 items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-stone-600 shadow-sm hover:bg-stone-100"
                         >
                             <Settings size={14} /> 调整
@@ -167,20 +165,6 @@ export const NavigationBackgroundSelector: React.FC<NavigationBackgroundSelector
                 </>
             )}
 
-            {showDebugger && enabled && (
-                <NavigationDecorationDebugger
-                    currentDecorationId={currentId}
-                    onClose={() => setShowDebugger(false)}
-                    service={{
-                        getAllDecorations: navigationBackgroundService.getAllBackgrounds.bind(navigationBackgroundService),
-                        getDecorationById: navigationBackgroundService.getBackgroundById.bind(navigationBackgroundService),
-                        saveCustomSettings: navigationBackgroundService.saveCustomSettings.bind(navigationBackgroundService),
-                        setCurrentDecoration: navigationBackgroundService.setCurrentBackground.bind(navigationBackgroundService)
-                    }}
-                    previewEventName={NAVIGATION_BACKGROUND_PREVIEW_EVENT}
-                    title="导航背景调整"
-                />
-            )}
         </div>
     );
 };
