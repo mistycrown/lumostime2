@@ -5,6 +5,7 @@
  * @pos Component (Sponsorship Navigation Settings)
  * @description Provides the new navigation background workflow without changing the legacy foreground decoration page.
  * @updated 2026-09-25: Added the navigation icon mode selector for the new navigation bar.
+ * @updated 2026-09-25: Added the opt-in transparent navigation toggle above the new navigation mode setting.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, Plus, Settings, X } from 'lucide-react';
@@ -14,7 +15,8 @@ import { NavigationIconSelector } from './NavigationIconSelector';
 import {
     navigationBackgroundService,
     NAVIGATION_BACKGROUND_CHANGE_EVENT,
-    NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT
+    NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT,
+    NAVIGATION_TRANSPARENCY_CHANGE_EVENT
 } from '../services/navigationBackgroundService';
 
 interface NavigationBackgroundSelectorProps {
@@ -24,6 +26,7 @@ interface NavigationBackgroundSelectorProps {
 
 export const NavigationBackgroundSelector: React.FC<NavigationBackgroundSelectorProps> = ({ onToast, onOpenDebugger }) => {
     const [enabled, setEnabled] = useState(() => navigationBackgroundService.isEnabled());
+    const [transparentNavigation, setTransparentNavigation] = useState(() => navigationBackgroundService.isTransparentNavigationEnabled());
     const [backgrounds, setBackgrounds] = useState(() => navigationBackgroundService.getAllBackgrounds());
     const [currentId, setCurrentId] = useState(() => navigationBackgroundService.getCurrentBackground());
     const [isUploading, setIsUploading] = useState(false);
@@ -39,11 +42,16 @@ export const NavigationBackgroundSelector: React.FC<NavigationBackgroundSelector
             setEnabled((event as CustomEvent<{ enabled: boolean }>).detail.enabled);
         };
         const handleBackgroundChange = () => reload();
+        const handleTransparencyChange = (event: Event) => {
+            setTransparentNavigation((event as CustomEvent<{ enabled: boolean }>).detail.enabled);
+        };
         window.addEventListener(NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT, handleModeChange);
         window.addEventListener(NAVIGATION_BACKGROUND_CHANGE_EVENT, handleBackgroundChange);
+        window.addEventListener(NAVIGATION_TRANSPARENCY_CHANGE_EVENT, handleTransparencyChange);
         return () => {
             window.removeEventListener(NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT, handleModeChange);
             window.removeEventListener(NAVIGATION_BACKGROUND_CHANGE_EVENT, handleBackgroundChange);
+            window.removeEventListener(NAVIGATION_TRANSPARENCY_CHANGE_EVENT, handleTransparencyChange);
         };
     }, []);
 
@@ -51,6 +59,12 @@ export const NavigationBackgroundSelector: React.FC<NavigationBackgroundSelector
         const next = !enabled;
         setEnabled(next);
         navigationBackgroundService.setEnabled(next);
+    };
+
+    const handleTransparentNavigationToggle = () => {
+        const next = !transparentNavigation;
+        setTransparentNavigation(next);
+        navigationBackgroundService.setTransparentNavigationEnabled(next);
     };
 
     const handleSelect = (id: string) => {
@@ -106,9 +120,9 @@ export const NavigationBackgroundSelector: React.FC<NavigationBackgroundSelector
                         role="switch"
                         aria-checked={enabled}
                         onClick={handleToggle}
-                        className={`relative h-6 w-11 rounded-full transition-colors ${enabled ? 'bg-stone-800' : 'bg-stone-300'}`}
+                        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${enabled ? 'bg-stone-800' : 'bg-stone-300'}`}
                     >
-                        <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                        <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0'}`} />
                     </button>
                 </div>
             </div>
