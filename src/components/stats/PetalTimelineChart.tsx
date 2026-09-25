@@ -1,12 +1,13 @@
 /**
  * @file PetalTimelineChart.tsx
  * @input Duration logs, a calendar range, and an activity chart palette.
- * @output A complete, equal-sized 12-petal radial rhythm chart with value encoded by tone.
+ * @output A radial rhythm chart rendered as petals or hourly histogram sectors.
  * @pos Component (Activity Statistics)
- * @description Owns the shared hourly duration aggregation used by the petal rhythm chart.
+ * @description Owns the shared hourly duration aggregation used by both timeline styles.
+ * @updated 2026-09-25: Adds a 24-hour radial histogram style while keeping petals as the default.
  */
 import React, { useMemo } from 'react';
-import type { Log } from '../../types';
+import type { ActivityTimelineStyle, Log } from '../../types';
 import type { ChartPalette } from '../../utils/chartPalette';
 import { getLogDurationSeconds } from '../../utils/scopeStatsUtils';
 
@@ -89,10 +90,61 @@ export interface PetalTimelineChartProps {
   logs: Array<Pick<Log, 'duration' | 'startTime' | 'endTime'>>;
   range: RhythmRange;
   palette: ChartPalette;
+  timelineStyle?: ActivityTimelineStyle;
 }
 
-export const PetalTimelineChart: React.FC<PetalTimelineChartProps> = ({ logs, range, palette }) => {
+const rangeLabel = (range: RhythmRange) => range === 'week' ? '本周' : range === 'month' ? '本月' : '本年';
+
+const polarPoint = (center: number, radius: number, angle: number) => ({
+  x: center + radius * Math.cos(angle),
+  y: center + radius * Math.sin(angle)
+});
+
+const annularSectorPath = (center: number, innerRadius: number, outerRadius: number, startAngle: number, endAngle: number) => {
+  const outerStart = polarPoint(center, outerRadius, startAngle);
+  const outerEnd = polarPoint(center, outerRadius, endAngle);
+  const innerEnd = polarPoint(center, innerRadius, endAngle);
+  const innerStart = polarPoint(center, innerRadius, startAngle);
+  const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
+  return `M ${outerStart.x} ${outerStart.y} A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${outerEnd.x} ${outerEnd.y} L ${innerEnd.x} ${innerEnd.y} A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${innerStart.x} ${innerStart.y} Z`;
+};
+
+const RadialHistogram: React.FC<{ summary: HourBucketSummary; range: RhythmRange; palette: ChartPalette }> = ({ summary, range, palette }) => {
+  const center = 160;
+  const innerRadius = 44;
+  const maxRadius = 112;
+  const maximum = Math.max(...summary.buckets.map((bucket) => bucket.minutes), 0);
+  const startAtTop = -Math.PI / 2;
+  const step = (Math.PI * 2) / 24;
+  const hasData = summary.totalMinutes > 0;
+  return <div className="mx-auto w-full max-w-[360px]">
+    <svg viewBox="0 0 320 320" className="w-full" role="img" aria-label={`时序图，直方样式，${rangeLabel(range)}，总时长 ${formatRhythmDuration(summary.totalMinutes)}`}>
+      <circle cx={center} cy={center} r={maxRadius} fill={palette.background} opacity="0.3" />
+      {summary.buckets.map((bucket) => {
+        const angle = startAtTop + bucket.hour * step;
+        const gap = 0.035;
+        const ratio = maximum > 0 ? bucket.minutes / maximum : 0;
+        const outerRadius = innerRadius + ratio * (maxRadius - innerRadius);
+        const basePath = annularSectorPath(center, innerRadius, maxRadius, angle + gap, angle + step - gap);
+        const valuePath = annularSectorPath(center, innerRadius, Math.max(innerRadius + 1, outerRadius), angle + gap, angle + step - gap);
+        const labelPoint = polarPoint(center, maxRadius + 20, angle + step / 2);
+        return <g key={bucket.hour}>
+          <path d={basePath} fill={palette.grid} fillOpacity="0.42" stroke={palette.background} strokeWidth="1" />
+          {bucket.minutes > 0 && <path d={valuePath} fill={palette.accent} fillOpacity={0.25 + ratio * 0.68} stroke={palette.background} strokeWidth="1"><title>{`${String(bucket.hour).padStart(2, '0')}:00–${String((bucket.hour + 1) % 24).padStart(2, '0')}:00 · ${formatRhythmDuration(bucket.minutes)}`}</title></path>}
+          <text x={labelPoint.x} y={labelPoint.y + 3} textAnchor="middle" fill="#8f8174" fontSize="8" fontFamily="var(--font-family)" fontVariant="tabular-nums">{bucket.hour}</text>
+        </g>;
+      })}
+      <circle cx={center} cy={center} r="38" fill={palette.background} stroke={palette.grid} strokeWidth="1" />
+      <text x={center} y={center - 12} textAnchor="middle" fill="#5d5147" fontSize="9" fontFamily="var(--font-family)">累计时长</text>
+      <text x={center} y={center + 8} textAnchor="middle" fill="#4b3d32" fontSize="16" fontFamily="var(--font-family)">{hasData ? formatRhythmDuration(summary.totalMinutes) : '暂无记录'}</text>
+      {hasData && <text x={center} y={center + 24} textAnchor="middle" fill="#9a8b7e" fontSize="8.5" fontFamily="var(--font-family)">{summary.activeDays} 天</text>}
+    </svg>
+  </div>;
+};
+
+export const PetalTimelineChart: React.FC<PetalTimelineChartProps> = ({ logs, range, palette, timelineStyle = 'petal' }) => {
   const summary = useMemo(() => aggregateHourBuckets(logs, range), [logs, range]);
+  if (timelineStyle === 'histogram') return <RadialHistogram summary={summary} range={range} palette={palette} />;
   const maximum = Math.max(...Array.from({ length: 12 }, (_, index) => (summary.buckets[index * 2]?.minutes || 0) + (summary.buckets[index * 2 + 1]?.minutes || 0)), 0);
   const center = 160;
   const startAtTop = -Math.PI / 2;
@@ -101,7 +153,7 @@ export const PetalTimelineChart: React.FC<PetalTimelineChartProps> = ({ logs, ra
 
   return (
     <div className="mx-auto w-full max-w-[360px]">
-      <svg viewBox="0 0 320 320" className="w-full" role="img" aria-label={`花瓣时序图，${range === 'week' ? '本周' : range === 'month' ? '本月' : '本年'}，总时长 ${formatRhythmDuration(summary.totalMinutes)}`}>
+      <svg viewBox="0 0 320 320" className="w-full" role="img" aria-label={`时序图，花瓣样式，${rangeLabel(range)}，总时长 ${formatRhythmDuration(summary.totalMinutes)}`}>
         <circle cx={center} cy={center} r="116" fill={palette.background} opacity="0.36" />
         {Array.from({ length: 12 }, (_, index) => index * 2).map((hour) => {
           const point = {
