@@ -17,6 +17,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-09-25: Added opt-in navigation-background rendering while preserving legacy foreground decorations.
+ * @updated 2026-09-25: Moved new-mode tuning to the main screen, removed background tiling, and removed the opaque navigation surface.
  */
 import React, { useState, useEffect } from 'react';
 import { AppView } from '../types';
@@ -66,6 +67,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         opacity: 0.6
     });
     const [showDebugger, setShowDebugger] = useState(false);
+    const [showBackgroundDebugger, setShowBackgroundDebugger] = useState(false);
     const [isNewNavigation, setIsNewNavigation] = useState(() => navigationBackgroundService.isEnabled());
     const [currentBackground, setCurrentBackground] = useState(() => navigationBackgroundService.getCurrentBackground());
     const [backgroundUrl, setBackgroundUrl] = useState('');
@@ -141,7 +143,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         };
         const handleModeChange = (event: CustomEvent<{ enabled: boolean }>) => {
             setIsNewNavigation(event.detail.enabled);
-            if (event.detail.enabled) setShowDebugger(false);
+            setShowDebugger(false);
+            if (!event.detail.enabled) setShowBackgroundDebugger(false);
         };
 
         window.addEventListener(NAVIGATION_BACKGROUND_CHANGE_EVENT, handleBackgroundChange as EventListener);
@@ -157,6 +160,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         }
         (window as any).LumosTime.debug.enableNavDeco = () => setShowDebugger(true);
         (window as any).LumosTime.debug.disableNavDeco = () => setShowDebugger(false);
+        (window as any).LumosTime.debug.enableNavBackground = () => setShowBackgroundDebugger(true);
+        (window as any).LumosTime.debug.disableNavBackground = () => setShowBackgroundDebugger(false);
 
         return () => {
             window.removeEventListener('navigationDecorationChange', handleDecorationChange as EventListener);
@@ -167,6 +172,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             if ((window as any).LumosTime?.debug) {
                 delete (window as any).LumosTime.debug.enableNavDeco;
                 delete (window as any).LumosTime.debug.disableNavDeco;
+                delete (window as any).LumosTime.debug.enableNavBackground;
+                delete (window as any).LumosTime.debug.disableNavBackground;
             }
         };
     }, []);
@@ -177,9 +184,11 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
     if (!isVisible) return null;
 
-    const bgColor = (currentView === AppView.TIMELINE || isIndexView(currentView))
-        ? 'bg-[#faf9f6]/80 backdrop-blur-md'
-        : 'bg-white/80 backdrop-blur-md';
+    const bgColor = isNewNavigation
+        ? 'bg-transparent'
+        : (currentView === AppView.TIMELINE || isIndexView(currentView))
+            ? 'bg-[#faf9f6]/80 backdrop-blur-md'
+            : 'bg-white/80 backdrop-blur-md';
 
     // Calculate dynamic styles
     const navStyle: React.CSSProperties = {};
@@ -218,16 +227,16 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 )}
 
                 {/* 导航栏 */}
-                <nav className={`relative h-12 md:h-16 box-content border-t border-stone-100 flex justify-around items-center pb-[env(safe-area-inset-bottom)] ${bgColor}`}>
+                <nav className={`relative h-12 md:h-16 box-content flex justify-around items-center pb-[env(safe-area-inset-bottom)] ${isNewNavigation ? 'border-t border-transparent' : 'border-t border-stone-100'} ${bgColor}`}>
                     {isNewNavigation && backgroundUrl && (
                         <div
                             aria-hidden="true"
                             className="pointer-events-none absolute inset-0 overflow-hidden"
                             style={{
                                 backgroundImage: `url("${backgroundUrl}")`,
-                                backgroundRepeat: 'repeat-x',
+                                backgroundRepeat: 'no-repeat',
                                 backgroundPosition: `${backgroundSettings.offsetX} ${backgroundSettings.offsetY}`,
-                                backgroundSize: `auto ${backgroundSettings.scale * 100}%`,
+                                backgroundSize: `${Math.max(100, backgroundSettings.scale * 100)}% 100%`,
                                 opacity: backgroundSettings.opacity
                             }}
                         />
@@ -262,6 +271,20 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 <NavigationDecorationDebugger
                     currentDecorationId={currentDecoration}
                     onClose={handleCloseDebugger}
+                />
+            )}
+            {showBackgroundDebugger && isNewNavigation && (
+                <NavigationDecorationDebugger
+                    currentDecorationId={currentBackground}
+                    onClose={() => setShowBackgroundDebugger(false)}
+                    service={{
+                        getAllDecorations: navigationBackgroundService.getAllBackgrounds.bind(navigationBackgroundService),
+                        getDecorationById: navigationBackgroundService.getBackgroundById.bind(navigationBackgroundService),
+                        saveCustomSettings: navigationBackgroundService.saveCustomSettings.bind(navigationBackgroundService),
+                        setCurrentDecoration: navigationBackgroundService.setCurrentBackground.bind(navigationBackgroundService)
+                    }}
+                    previewEventName={NAVIGATION_BACKGROUND_PREVIEW_EVENT}
+                    title="导航背景调整"
                 />
             )}
         </>
