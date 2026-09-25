@@ -606,6 +606,10 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         [customStickerSets, customStickers]
     );
 
+    const getSelectorSourceSetOwner = (setId: string) => stickerSelectorConfig.groups.find((group) => (
+        group.id !== editingSelectorGroupId && group.sourceSetIds.includes(setId)
+    ));
+
     const handleNewStickerSelectorToggle = (enabled: boolean) => {
         setStickerSelectorConfig((previous) => ({
             enabled,
@@ -631,8 +635,13 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
     const handleSaveSelectorGroup = () => {
         const trimmedName = selectorGroupName.trim();
+        const claimedByOtherGroup = new Set(
+            stickerSelectorConfig.groups
+                .filter((group) => group.id !== editingSelectorGroupId)
+                .flatMap((group) => group.sourceSetIds)
+        );
         const validSourceSetIds = selectorGroupSourceSetIds.filter((setId) => (
-            selectorSourceSets.some((set) => set.id === setId)
+            selectorSourceSets.some((set) => set.id === setId) && !claimedByOtherGroup.has(setId)
         ));
 
         if (!trimmedName || validSourceSetIds.length === 0) {
@@ -650,11 +659,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         setStickerSelectorConfig((previous) => {
             const groupsWithoutEdited = previous.groups
                 .filter((group) => group.id !== editingSelectorGroupId)
-                .map((group) => ({
-                    ...group,
-                    sourceSetIds: group.sourceSetIds.filter((setId) => !validSourceSetIds.includes(setId))
-                }))
-                .filter((group) => group.sourceSetIds.length > 0);
+                .map((group) => ({ ...group }));
             const editedIndex = previous.groups.findIndex((group) => group.id === editingSelectorGroupId);
 
             if (editedIndex < 0) {
@@ -1511,7 +1516,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                             ))}
                                         </div>
 
-                                        <div className="rounded-2xl border border-stone-200 bg-white p-4 space-y-4">
+                                        <div className="space-y-4 border-t border-stone-200 pt-5">
                                             <div className="flex items-center justify-between gap-3">
                                                 <div>
                                                     <h5 className="text-sm font-medium text-stone-700">新版 sticker 选择器</h5>
@@ -1530,9 +1535,9 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                                             {stickerSelectorConfig.enabled && (
                                                 <>
-                                                    <div className="space-y-2">
+                                                    <div className="divide-y divide-stone-200 border-y border-stone-200">
                                                         {stickerSelectorConfig.groups.map((group) => (
-                                                            <div key={group.id} className="flex items-center justify-between rounded-xl border border-stone-200 px-3 py-2">
+                                                            <div key={group.id} className="flex items-center justify-between py-3">
                                                                 <div className="min-w-0">
                                                                     <div className="truncate text-sm font-medium text-stone-700">{group.name}</div>
                                                                     <div className="text-xs text-stone-400">{group.sourceSetIds.length} 个小组</div>
@@ -1546,25 +1551,32 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                     </div>
 
                                                     {isSelectorGroupEditorOpen ? (
-                                                        <div className="rounded-xl bg-stone-50 p-3 space-y-3">
+                                                        <div className="space-y-3 border-b border-stone-200 pb-4">
                                                             <input
                                                                 value={selectorGroupName}
                                                                 onChange={(event) => setSelectorGroupName(event.target.value)}
                                                                 placeholder="大分组名称"
                                                                 className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-stone-400"
                                                             />
-                                                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
                                                                 {selectorSourceSets.map((set) => {
                                                                     const checked = selectorGroupSourceSetIds.includes(set.id);
+                                                                    const owner = getSelectorSourceSetOwner(set.id);
+                                                                    const unavailable = Boolean(owner);
                                                                     return (
-                                                                        <label key={set.id} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-2 py-2 text-xs ${checked ? 'border-stone-500 bg-white text-stone-800' : 'border-stone-200 text-stone-500'}`}>
-                                                                            <input
-                                                                                type="checkbox"
-                                                                                checked={checked}
-                                                                                onChange={() => setSelectorGroupSourceSetIds((previous) => checked ? previous.filter((id) => id !== set.id) : [...previous, set.id])}
-                                                                            />
+                                                                        <button
+                                                                            key={set.id}
+                                                                            type="button"
+                                                                            disabled={unavailable}
+                                                                            onClick={() => setSelectorGroupSourceSetIds((previous) => checked ? previous.filter((id) => id !== set.id) : [...previous, set.id])}
+                                                                            className={`flex min-w-0 items-center gap-2 py-2 text-left text-xs transition-colors ${unavailable ? 'cursor-not-allowed text-stone-300' : 'text-stone-600 hover:text-stone-900'}`}
+                                                                        >
+                                                                            <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px] ${checked ? 'border-stone-800 bg-stone-800 text-white' : 'border-stone-300 text-transparent'} ${unavailable ? 'border-stone-200 bg-stone-100' : ''}`}>
+                                                                                {checked ? '✓' : ''}
+                                                                            </span>
                                                                             <span className="truncate">{set.name}</span>
-                                                                        </label>
+                                                                            {owner && <span className="ml-auto shrink-0 text-[10px] text-stone-300">已在{owner.name}</span>}
+                                                                        </button>
                                                                     );
                                                                 })}
                                                             </div>
