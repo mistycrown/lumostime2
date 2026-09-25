@@ -2781,6 +2781,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           inputText={inputText}
           isComposerMenuOpen={isComposerMenuOpen}
           isDesktopWidgetMode={isDesktopWidgetMode}
+          isHomeView={isHomeView}
           isLoading={isLoading}
           isPersonaPanelOpen={isPersonaPanelOpen}
           isStopActionVisible={isStopActionVisible}
