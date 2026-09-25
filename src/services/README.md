@@ -139,6 +139,7 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 - `webdavService.ts`: [Active] - WebDAV client implementation supporting Web (Proxy) and Native (Cordova HTTP) environments. Automatically converts Base64 images to ArrayBuffer for proper upload.
 
 - `achievementBottleIconPackService.ts`: [Active] - Stores achievement bottle icon-pack options, dynamic discovery, and stable WebP preview paths for sponsorship settings, preset persistence, and bottle rendering.
+- `customStickerZipService.ts`: Parses folder-based sticker ZIP archives, filters image files, sorts entries deterministically, and caps each imported group at 16 images.
 
 ## Recently Added (2026-02)
 - `themePresetService.ts`: 新增 - 主题预设应用服务，将复杂的主题切换逻辑拆分为多个独立方法
@@ -148,4 +149,4 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 - `navigationIconService.ts`: 管理新版导航栏文字、粉色内置方案、多套自定义方案及图片引用
 
 > ⚠️ Once the folder I belong to changes, please update me.
-> ⚠️ 本文档最后更新：2026-05-17
+> ⚠️ 本文档最后更新：2026-09-25
