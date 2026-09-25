@@ -1,7 +1,7 @@
 /**
  * @file MoodPicker.tsx
  * @updated 2026-05-05: Hide sticker labels in the picker and tighten the 4x4 grid so 16 stickers fit without an inner scrollbar.
- * @updated 2026-09-25: Added an opt-in merged-group sticker picker with a scrollable masonry layout while preserving the legacy picker.
+ * @updated 2026-09-25: Added an opt-in merged-group sticker picker with a scrollable compact grid while preserving the legacy picker.
  * @description 心情选择器组件 - 用于每日回顾（全屏模态框样式）
  * 支持 emoji 和自定义贴纸组
  */
@@ -224,7 +224,7 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
     // 处理触摸开始
     const handleTouchStart = (e: React.TouchEvent) => {
         // 只在已验证且不在自定义模式时启用滑动
-        if (!isRedeemed || isCustomMode) return;
+        if (!isRedeemed || isCustomMode || stickerSelectorConfig.enabled) return;
         
         setTouchEnd(null);
         setTouchStart(e.targetTouches[0].clientX);
@@ -232,14 +232,14 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
     
     // 处理触摸移动
     const handleTouchMove = (e: React.TouchEvent) => {
-        if (!isRedeemed || isCustomMode) return;
+        if (!isRedeemed || isCustomMode || stickerSelectorConfig.enabled) return;
         
         setTouchEnd(e.targetTouches[0].clientX);
     };
     
     // 处理触摸结束
     const handleTouchEnd = () => {
-        if (!isRedeemed || isCustomMode) return;
+        if (!isRedeemed || isCustomMode || stickerSelectorConfig.enabled) return;
         if (!touchStart || !touchEnd) return;
         
         const distance = touchStart - touchEnd;
@@ -442,7 +442,7 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
 
                                     if (stickerSelectorConfig.enabled) {
                                         return (
-                                            <div className="columns-2 sm:columns-3 gap-2 mb-4 max-h-[52vh] overflow-y-auto pr-1">
+                                            <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 mb-4 max-h-[52vh] overflow-y-auto overscroll-contain pr-1 touch-pan-y">
                                                 {currentStickerSet.stickers.map((sticker) => {
                                                     const stickerIcon = `image:${sticker.path}`;
 
@@ -454,10 +454,10 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
                                                                 onClose();
                                                             }}
                                                             aria-label={sticker.label || '选择贴纸'}
-                                                            className="mb-2 inline-flex w-full break-inside-avoid items-center justify-center rounded-2xl p-2 transition-all hover:bg-stone-50 relative"
+                                                            className="flex h-16 w-full items-center justify-center rounded-xl p-1 transition-all hover:bg-stone-50 active:bg-stone-100 relative"
                                                         >
-                                                            <div className="relative flex items-center justify-center w-full aspect-square max-w-[112px]">
-                                                                <IconRenderer icon={stickerIcon} size="100%" />
+                                                            <div className="relative flex h-14 w-14 items-center justify-center">
+                                                                <IconRenderer icon={stickerIcon} size={52} />
                                                             </div>
                                                         </button>
                                                     );
