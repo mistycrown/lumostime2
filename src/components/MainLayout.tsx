@@ -173,7 +173,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 // Hide header for REVIEW view (Memoir/Chronicle use their own headers) UNLESS a modal review is open
                 (currentView !== AppView.REVIEW || isDailyReviewOpen || isDailyNewspaperOpen || isWeeklyNewspaperOpen || isMonthlyNewspaperOpen || isOnThisDayOpen || isWeeklyReviewOpen || isMonthlyReviewOpen) && (
                     <header
-                        className={`${shouldUseTransparentTitleBar ? 'absolute inset-x-0 top-0' : 'relative'} flex items-center justify-between px-5 shrink-0 z-30 transition-all duration-300 pt-[var(--app-safe-area-top)] ${shouldUseTransparentTitleBar ? 'border-transparent bg-transparent' : 'border-b border-stone-100'} ${shouldUseTransparentTitleBar
+                        className={`relative flex items-center justify-between px-5 shrink-0 z-30 transition-all duration-300 pt-[var(--app-safe-area-top)] ${shouldUseTransparentTitleBar ? 'border-transparent bg-transparent' : 'border-b border-stone-100'} ${shouldUseTransparentTitleBar
                             ? isHeaderScrolled
                                 ? 'h-[calc(3rem+var(--app-safe-area-top))]'
                                 : 'h-[calc(3.5rem+var(--app-safe-area-top))]'
