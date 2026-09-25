@@ -63,6 +63,9 @@ export const THEME_KEYS = {
     CURRENT_BACKGROUND: 'lumos_current_background',
     /** 导航装饰 */
     NAVIGATION_DECORATION: 'navigation_decoration',
+    /** 新版导航图标选择与自定义图标库 */
+    NAVIGATION_ICON_SELECTION: 'navigation_icon_selection_v1',
+    NAVIGATION_ICON_CUSTOM_LIST: 'navigation_icon_custom_list_v1',
     /** 自定义主题预设列表 */
     CUSTOM_PRESETS: 'lumostime_custom_presets',
 } as const;
