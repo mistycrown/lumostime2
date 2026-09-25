@@ -109,6 +109,24 @@ export const NavigationBackgroundSelector: React.FC<NavigationBackgroundSelector
 
     return (
         <div className="space-y-4">
+            <div className="rounded-2xl bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-4">
+                    <div>
+                        <h3 className="text-sm font-bold text-stone-700">标题栏透明</h3>
+                        <p className="mt-1 text-xs text-stone-400">记录、待办、档案和索引页使用透明导航栏</p>
+                    </div>
+                    <button
+                        type="button"
+                        role="switch"
+                        aria-checked={transparentNavigation}
+                        onClick={handleTransparentNavigationToggle}
+                        className={`relative h-6 w-11 rounded-full transition-colors ${transparentNavigation ? 'bg-stone-800' : 'bg-stone-300'}`}
+                    >
+                        <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${transparentNavigation ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                </div>
+            </div>
+
             <div className="rounded-2xl bg-white p-4 shadow-sm space-y-4">
                 <div className="flex items-center justify-between gap-4">
                     <div>
