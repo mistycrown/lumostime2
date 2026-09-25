@@ -66,6 +66,7 @@ export const THEME_KEYS = {
     /** 新版导航图标选择与自定义图标库 */
     NAVIGATION_ICON_SELECTION: 'navigation_icon_selection_v1',
     NAVIGATION_ICON_CUSTOM_LIST: 'navigation_icon_custom_list_v1',
+    NAVIGATION_ICON_SCHEMES: 'navigation_icon_schemes_v1',
     /** 自定义主题预设列表 */
     CUSTOM_PRESETS: 'lumostime_custom_presets',
 } as const;

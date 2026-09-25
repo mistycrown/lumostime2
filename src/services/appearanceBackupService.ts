@@ -30,6 +30,7 @@ const APPEARANCE_STORAGE_KEYS = [
   'navigation_decoration_custom_list',
   'navigation_icon_selection_v1',
   'navigation_icon_custom_list_v1',
+  'navigation_icon_schemes_v1',
   'lumos_custom_backgrounds',
   THEME_KEYS.CUSTOM_PRESETS,
   THEME_KEYS.SCHEDULE_STYLE,
