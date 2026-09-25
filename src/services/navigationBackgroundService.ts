@@ -4,6 +4,7 @@
  * @output New navigation background selection, persistence, and adjustment events
  * @pos Service (UI Customization)
  * @description Keeps the new navigation-background mode isolated from the legacy foreground decoration mode.
+ * @updated 2026-09-25: Registers uploaded navigation backgrounds in the theme image manifest group.
  */
 import { resolveAssetPath } from '../utils/assetPath';
 import { imageService } from './imageService';
@@ -129,7 +130,7 @@ class NavigationBackgroundService {
     }
 
     async addCustomBackground(file: File): Promise<NavigationDecorationOption> {
-        const imageFilename = await imageService.saveImage(file);
+        const imageFilename = await imageService.saveImage(file, 'theme');
         const url = await imageService.getImageUrl(imageFilename);
         const background: NavigationDecorationOption = {
             id: `new_custom_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,

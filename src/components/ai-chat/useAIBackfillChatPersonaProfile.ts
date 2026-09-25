@@ -4,6 +4,7 @@
  * @output Persona/profile editing handlers including avatar upload and local image cleanup
  * @pos Component Support (AI Integration)
  * @description Keeps persona and profile editing workflows out of the main AI chat coordinator.
+ * @updated 2026-09-25: Registers persona and user avatar uploads in the theme image manifest group.
  * @updated 2026-09-22: Extracted persona, prompt-block, shortcut, and avatar handlers from AIBackfillChatModal.
  * @updated 2026-09-23: Returns the custom-prompt deletion handler used by the settings panel.
  */
@@ -228,7 +229,7 @@ export const useAIBackfillChatPersonaProfile = ({
     setIsEmojiEditorOpen(false);
     setIsUploadingAvatar(true);
     try {
-      const filename = await imageService.saveImage(file);
+      const filename = await imageService.saveImage(file, 'theme');
       if (previousAvatarImage) {
         await imageService.deleteImage(previousAvatarImage).catch((error) => {
           console.error('[AIBackfillChatModal] Failed to delete previous avatar image', error);
@@ -299,7 +300,7 @@ export const useAIBackfillChatPersonaProfile = ({
     setIsUserEmojiEditorOpen(false);
     setIsUploadingUserAvatar(true);
     try {
-      const filename = await imageService.saveImage(file);
+      const filename = await imageService.saveImage(file, 'theme');
       if (previousAvatarImage) {
         await imageService.deleteImage(previousAvatarImage).catch((error) => {
           console.error('[AIBackfillChatModal] Failed to delete previous user avatar image', error);

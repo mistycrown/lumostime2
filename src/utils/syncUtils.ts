@@ -1,6 +1,7 @@
 /**
  * @file syncUtils.ts
  * @description Unified cloud sync helpers for WebDAV, COS, and compatible S3.
+ * @updated 2026-09-25: Builds and uploads separate content/theme image manifest groups with legacy cloud-list compatibility.
  * @updated 2026-06-21: Added write-after-read verification for main backup uploads so stale cloud reads or failed overwrites cannot be reported as a successful sync.
  * @updated 2026-04-20: Cleaned user-facing messages and kept compatible S3 fully aligned with the shared upload/restore flow.
  * @updated 2026-08-10: Includes appearance and TimePal theme image assets in cloud image manifests.
@@ -17,6 +18,11 @@ import { syncService } from '../services/syncService';
 import { validateAndFixData, validateLocalData } from './dataValidation';
 import { buildSyncPayloadMetadata, isSameSyncPayload } from './syncPayloadMetadata';
 import { reportDiagnostic, reportException, withErrorReference } from '../services/errorReporting';
+import {
+  flattenImageManifestGroups,
+  ImageManifestGroups,
+  normalizeCloudImageManifest
+} from '../services/imageManifest';
 
 export type CloudService = typeof webdavService | typeof s3Service | typeof compatibleS3Service;
 export type CloudServiceName = 'webdav' | 's3' | 'compatible-s3';
@@ -65,17 +71,37 @@ function buildBackupFailureMessage(service: CloudService, error: any): string {
   return `云端备份失败：${detail}`;
 }
 
+function buildReferencedImageManifest(data: any): ImageManifestGroups {
+  const manifest = typeof imageService.buildReferencedImageManifest === 'function'
+    ? imageService.buildReferencedImageManifest(
+      data?.logs || [],
+      data?.todos || [],
+      data?.dailyReviews || [],
+      data?.customStickerSets || [],
+      data?.customStickers || []
+    )
+    : {
+      content: imageService.buildReferencedImagesList(
+      data?.logs || [],
+      data?.todos || [],
+      data?.dailyReviews || [],
+      data?.customStickerSets || [],
+      data?.customStickers || []
+      ),
+      theme: []
+    };
+
+  return {
+    content: [...new Set(manifest.content)],
+    theme: [...new Set([
+      ...manifest.theme,
+      ...appearanceBackupService.getReferencedImageFilenames(data?.appearanceData)
+    ])]
+  };
+}
+
 function buildReferencedImageList(data: any): string[] {
-  return [...new Set([
-    ...imageService.buildReferencedImagesList(
-    data?.logs || [],
-    data?.todos || [],
-    data?.dailyReviews || [],
-    data?.customStickerSets || [],
-    data?.customStickers || []
-    ),
-    ...appearanceBackupService.getReferencedImageFilenames(data?.appearanceData)
-  ])];
+  return flattenImageManifestGroups(buildReferencedImageManifest(data));
 }
 
 async function listCloudImageFiles(service: CloudService): Promise<string[] | null> {
@@ -280,15 +306,18 @@ export async function uploadDataToCloud(
       };
     }
 
-    const localImageList = buildReferencedImageList(localData);
-    imageService.updateReferencedImagesList(localImageList);
+    const localImageGroups = buildReferencedImageManifest(localData);
+    const localImageList = flattenImageManifestGroups(localImageGroups);
+    if (typeof imageService.updateReferencedImageManifest === 'function') {
+      imageService.updateReferencedImageManifest(localImageGroups);
+    } else {
+      imageService.updateReferencedImagesList(localImageList);
+    }
 
     let oldCloudImageList: string[] = [];
     try {
       const cloudImageData = await service.downloadImageList();
-      if (Array.isArray(cloudImageData?.images)) {
-        oldCloudImageList = cloudImageData.images;
-      }
+      oldCloudImageList = normalizeCloudImageManifest(cloudImageData).images;
     } catch (error) {
       console.warn('[syncUtils] Failed to read cloud image manifest before upload, treat as empty.', error);
     }
@@ -306,7 +335,12 @@ export async function uploadDataToCloud(
     const uploadedSet = new Set(imageResult?.uploadedFiles || []);
     const finalManifest = localImageList.filter((filename) => existingCloudSet.has(filename) || uploadedSet.has(filename));
 
-    await service.uploadImageList(finalManifest);
+    const finalSet = new Set(finalManifest);
+    const finalGroups: ImageManifestGroups = {
+      content: localImageGroups.content.filter((filename) => finalSet.has(filename)),
+      theme: localImageGroups.theme.filter((filename) => finalSet.has(filename))
+    };
+    await service.uploadImageList(finalGroups);
 
     return {
       success: true,
@@ -388,15 +422,19 @@ export async function downloadDataFromCloud(
       };
     }
 
-    const restoredImageList = buildReferencedImageList(data);
-    imageService.updateReferencedImagesList(restoredImageList);
+    const restoredImageGroups = buildReferencedImageManifest(data);
+    const restoredImageList = flattenImageManifestGroups(restoredImageGroups);
+    if (typeof imageService.updateReferencedImageManifest === 'function') {
+      imageService.updateReferencedImageManifest(restoredImageGroups);
+    } else {
+      imageService.updateReferencedImagesList(restoredImageList);
+    }
 
     let cloudImageList: string[] = [];
     try {
       const cloudImageData = await service.downloadImageList();
-      if (Array.isArray(cloudImageData?.images)) {
-        cloudImageList = cloudImageData.images;
-      }
+      const normalizedCloudManifest = normalizeCloudImageManifest(cloudImageData);
+      cloudImageList = normalizedCloudManifest.images;
     } catch (error) {
       console.warn('[syncUtils] Failed to read cloud image manifest during restore, fallback to restored JSON references.', error);
     }

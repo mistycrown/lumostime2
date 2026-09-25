@@ -11,6 +11,7 @@
 import { createClient, WebDAVClient } from 'webdav';
 import { HTTP } from '@awesome-cordova-plugins/http';
 import { Capacitor } from '@capacitor/core';
+import { buildCloudImageManifest, CloudImageManifest, ImageManifestUpload } from './imageManifest';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Buffer } from 'buffer';
 
@@ -705,15 +706,11 @@ export class WebDAVService {
     /**
      * 上传图片引用列表（独立文件）
      */
-    async uploadImageList(imageList: string[]): Promise<boolean> {
+    async uploadImageList(imageList: ImageManifestUpload): Promise<boolean> {
         if (!this.config && !this.client) throw new Error('WebDAV not configured');
 
         try {
-            const data = {
-                images: imageList,
-                timestamp: Date.now(),
-                version: '1.0.0'
-            };
+            const data = buildCloudImageManifest(imageList);
             const content = JSON.stringify(data, null, 2);
             const filename = 'lumostime_images.json';
 
@@ -740,13 +737,13 @@ export class WebDAVService {
                     timeout: 30000
                 });
 
-                console.log(`[WebDAV] ✓ 图片列表上传成功: ${imageList.length} 个图片, status: ${response.status}`);
+                console.log(`[WebDAV] ✓ 图片列表上传成功: ${data.images.length} 个图片, status: ${response.status}`);
                 return response.status === 200 || response.status === 201 || response.status === 204;
             }
 
             // Browser/Electron fallback
             await this.client!.putFileContents(`/${filename}`, content, { overwrite: true });
-            console.log(`[WebDAV] ✓ 图片列表上传成功: ${imageList.length} 个图片`);
+            console.log(`[WebDAV] ✓ 图片列表上传成功: ${data.images.length} 个图片`);
             return true;
         } catch (e) {
             console.error('[WebDAV] 图片列表上传失败', e);
@@ -757,7 +754,7 @@ export class WebDAVService {
     /**
      * 下载图片引用列表（独立文件）
      */
-    async downloadImageList(): Promise<{ images: string[], timestamp: number } | null> {
+    async downloadImageList(): Promise<CloudImageManifest | { images: string[], timestamp: number } | null> {
         if (!this.config && !this.client) throw new Error('WebDAV not configured');
 
         const filename = 'lumostime_images.json';
