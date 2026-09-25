@@ -4,6 +4,7 @@
  * @output Background assistant turn decisions plus applied reminder or memory side effects
  * @pos Service (Assistant Orchestrator)
  * @description Orchestrates Android-first assistant system turns by loading structured memory, assembling a prompt, calling the existing AI service, and applying the resulting silent/message/reminder/memory actions back into local state.
+ * @updated 2026-09-25: Returns persisted session/message targets with surfaced replies so unread AI entry points can navigate directly to the new message.
  * @updated 2026-09-14: Resolves notification display names directly from the configured persona name.
  * @updated 2026-09-04: Executes structured AI reminder removal actions in Web and native-background hydration paths.
  * @updated 2026-05-17: Persisted background chat/history writes now mark the unified AI backup state as changed so background-only AI activity can trigger cloud-sync/export timestamp updates.
@@ -767,6 +768,7 @@ export const assistantOrchestratorService = {
     }
   ): {
     surfacedMessages: string[];
+    surfacedMessageLocations: PersistedAssistantMessageLocation[];
     didHydrateHistory: boolean;
     didUpdateMemory: boolean;
     didUpdateReminders: boolean;
@@ -778,6 +780,7 @@ export const assistantOrchestratorService = {
     );
     const assistantConfig = assistantAgentConfigService.getConfig();
     const surfacedMessages: string[] = [];
+    const surfacedMessageLocations: PersistedAssistantMessageLocation[] = [];
     let didHydrateHistory = false;
     let didUpdateMemory = false;
     let didUpdateReminders = false;
@@ -941,10 +944,14 @@ export const assistantOrchestratorService = {
         }
 
         surfacedMessages.push(assistantReply);
+        if (persistedLocation) {
+          surfacedMessageLocations.push(persistedLocation);
+        }
       });
 
     return {
       surfacedMessages,
+      surfacedMessageLocations,
       didHydrateHistory,
       didUpdateMemory,
       didUpdateReminders
@@ -1181,6 +1188,10 @@ export const assistantOrchestratorService = {
       updatedMemory,
       ...(appliedReminders.length > 0 ? { appliedReminders } : {}),
       ...(surfacedMessage ? { surfacedMessage } : {}),
+      ...(surfacedMessageLocation ? {
+        targetSessionId: surfacedMessageLocation.sessionId,
+        persistedMessageId: surfacedMessageLocation.messageId
+      } : {}),
       debug
     };
   }

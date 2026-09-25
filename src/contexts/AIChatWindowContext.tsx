@@ -3,6 +3,7 @@
  * @description Keeps the shared AI chat window mounted at the app level so closing the modal only hides UI and does not interrupt in-flight AI execution.
  * @updated 2026-04-30: Added a shared hardware-back bridge so Android back presses can unwind AI subpages before closing the root chat window.
  * @updated 2026-04-26: Added session/message navigation targets so Android assistant notifications can reopen the shared chat at the exact background message.
+ * @updated 2026-09-25: Keeps the latest unread assistant message target so AI entry buttons open that message directly.
  * @updated 2026-09-20: Added a one-shot return intent for review detail pages opened from the AI workspace.
  */
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -15,6 +16,11 @@ interface OpenAIChatOptions {
   initialInputText?: string;
 }
 
+export interface AIChatUnreadTarget {
+  targetSessionId: string;
+  targetMessageId?: string;
+}
+
 interface AIChatWindowContextValue {
   isAIChatOpen: boolean;
   unreadCount: number;
@@ -25,7 +31,7 @@ interface AIChatWindowContextValue {
   openAIChat: (options?: OpenAIChatOptions) => void;
   closeAIChat: () => void;
   handleAIChatBack: () => boolean;
-  incrementUnreadCount: (count?: number) => void;
+  incrementUnreadCount: (count?: number, target?: AIChatUnreadTarget) => void;
   markAIChatRead: () => void;
   shouldReturnToAIChat: boolean;
   requestAIChatReturn: () => void;
@@ -49,18 +55,21 @@ export const AIChatWindowProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [targetSessionId, setTargetSessionId] = useState<string | undefined>(undefined);
   const [targetMessageId, setTargetMessageId] = useState<string | undefined>(undefined);
   const [initialInputText, setInitialInputText] = useState<string | undefined>(undefined);
+  const [unreadTarget, setUnreadTarget] = useState<AIChatUnreadTarget | undefined>(undefined);
   const [shouldReturnToAIChat, setShouldReturnToAIChat] = useState(false);
   const shouldReturnToAIChatRef = useRef(false);
   const aiChatBackHandlerRef = useRef<(() => boolean) | null>(null);
 
   const openAIChat = useCallback((options?: OpenAIChatOptions) => {
-    setTargetDate(options?.targetDate ? new Date(options.targetDate) : undefined);
-    setTargetSessionId(options?.targetSessionId?.trim() || undefined);
-    setTargetMessageId(options?.targetMessageId?.trim() || undefined);
-    setInitialInputText(options?.initialInputText?.trim() || undefined);
+    const hasUnreadTarget = unreadCount > 0 && Boolean(unreadTarget?.targetSessionId);
+    setTargetDate(hasUnreadTarget ? undefined : options?.targetDate ? new Date(options.targetDate) : undefined);
+    setTargetSessionId(hasUnreadTarget ? unreadTarget?.targetSessionId : options?.targetSessionId?.trim() || undefined);
+    setTargetMessageId(hasUnreadTarget ? unreadTarget?.targetMessageId : options?.targetMessageId?.trim() || undefined);
+    setInitialInputText(hasUnreadTarget ? undefined : options?.initialInputText?.trim() || undefined);
     setUnreadCount(0);
+    setUnreadTarget(undefined);
     setIsAIChatOpen(true);
-  }, []);
+  }, [unreadCount, unreadTarget]);
 
   const closeAIChat = useCallback(() => {
     setIsAIChatOpen(false);
@@ -101,16 +110,23 @@ export const AIChatWindowProvider: React.FC<{ children: ReactNode }> = ({ childr
     return true;
   }, [closeAIChat, isAIChatOpen]);
 
-  const incrementUnreadCount = useCallback((count = 1) => {
+  const incrementUnreadCount = useCallback((count = 1, target?: AIChatUnreadTarget) => {
     if (count <= 0) {
       return;
     }
 
     setUnreadCount((previous) => previous + count);
+    if (target?.targetSessionId?.trim()) {
+      setUnreadTarget({
+        targetSessionId: target.targetSessionId.trim(),
+        ...(target.targetMessageId?.trim() ? { targetMessageId: target.targetMessageId.trim() } : {})
+      });
+    }
   }, []);
 
   const markAIChatRead = useCallback(() => {
     setUnreadCount(0);
+    setUnreadTarget(undefined);
   }, []);
 
   const value = useMemo<AIChatWindowContextValue>(() => ({

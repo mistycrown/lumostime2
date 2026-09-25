@@ -38,6 +38,7 @@
  * @updated 2026-09-22: Extracts the chat composer and quick-command menu.
  * @updated 2026-09-23: Removes stale extracted inputs, restores custom-prompt deletion wiring, and removes duplicate header props.
  * @updated 2026-09-23: Restores foreground-send dependencies for native user-turn notification and review commands.
+ * @updated 2026-09-25: Carries surfaced background message locations into the shared unread AI navigation target.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -78,6 +79,7 @@ import { useReview } from '../contexts/ReviewContext';
 import { useSession } from '../contexts/SessionContext';
 import { useToast } from '../contexts/ToastContext';
 import { useSettings } from '../contexts/SettingsContext';
+import type { AIChatUnreadTarget } from '../contexts/AIChatWindowContext';
 import { AppView } from '../types';
 import type { DailyReview, Log, MonthlyReview, TodoItem, TodoRecurrenceRule, WeeklyReview } from '../types';
 import type {
@@ -323,7 +325,7 @@ interface AIBackfillChatModalProps {
   targetMessageId?: string;
   initialInputText?: string;
   registerBackHandler?: (handler: (() => boolean) | null) => void;
-  onUnreadAssistantMessage?: (count?: number) => void;
+  onUnreadAssistantMessage?: (count?: number, target?: AIChatUnreadTarget) => void;
   onMarkRead?: () => void;
   onRequestReturnToAI?: () => void;
 }
@@ -1006,7 +1008,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       if (hydrationResult.surfacedMessages.length > 0) {
         reloadPersistedChatSessions();
         if (!isOpenRef.current) {
-          onUnreadAssistantMessage?.(hydrationResult.surfacedMessages.length);
+          const latestLocation = hydrationResult.surfacedMessageLocations[hydrationResult.surfacedMessageLocations.length - 1];
+          onUnreadAssistantMessage?.(
+            hydrationResult.surfacedMessages.length,
+            latestLocation
+              ? { targetSessionId: latestLocation.sessionId, targetMessageId: latestLocation.messageId }
+              : undefined
+          );
           const backgroundTargetSession = sessions.find((session) => session.id === backgroundTargetSessionId);
           const personaName = getBackgroundPersonaDisplayName(backgroundTargetSession);
           addToast('info', `${personaName}：${hydrationResult.surfacedMessages[hydrationResult.surfacedMessages.length - 1]}`);
@@ -1367,7 +1375,11 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           : undefined
       );
 
-      return result;
+      return {
+        ...result,
+        targetSessionId: targetSession.id,
+        persistedMessageId: pendingMessageId
+      };
     } catch (error) {
       replacePendingWithResult(
         targetSession.id,
