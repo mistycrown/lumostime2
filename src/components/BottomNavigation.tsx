@@ -231,15 +231,20 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                     {isNewNavigation && backgroundUrl && (
                         <div
                             aria-hidden="true"
-                            className="pointer-events-none absolute inset-0 overflow-hidden"
-                            style={{
-                                backgroundImage: `url("${backgroundUrl}")`,
-                                backgroundRepeat: 'no-repeat',
-                                backgroundPosition: `${backgroundSettings.offsetX} ${backgroundSettings.offsetY}`,
-                                backgroundSize: `${Math.max(100, backgroundSettings.scale * 100)}% 100%`,
-                                opacity: backgroundSettings.opacity
-                            }}
-                        />
+                            className="pointer-events-none absolute bottom-0 left-0 z-0 h-0 w-full overflow-visible"
+                        >
+                            <img
+                                src={backgroundUrl}
+                                alt=""
+                                className="absolute bottom-0 left-1/2 max-w-none"
+                                style={{
+                                    width: `${Math.max(100, backgroundSettings.scale * 100)}%`,
+                                    height: 'auto',
+                                    opacity: backgroundSettings.opacity,
+                                    transform: `translateX(calc(-50% + ${backgroundSettings.offsetX})) translateY(${backgroundSettings.offsetY})`
+                                }}
+                            />
+                        </div>
                     )}
                     {visibleNavItems.map((item) => {
                         const isActive = item.view === AppView.TAGS
