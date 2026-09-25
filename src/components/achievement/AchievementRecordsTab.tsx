@@ -286,7 +286,7 @@ export const AchievementRecordsTab: React.FC<AchievementRecordsTabProps> = ({
                 )}
                 {item.targetType === 'todoCategory' && (
                   <div className="mt-1 text-xs leading-6 text-stone-400">
-                    统计口径：{item.includeSubtasks !== false ? '含子任务' : '仅父任务'}
+                    统计口径：{item.includeSubtasks !== false ? '含子任务' : '仅主任务'}
                   </div>
                 )}
               </div>

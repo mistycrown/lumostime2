@@ -677,7 +677,7 @@ export const AchievementRulesTab: React.FC<AchievementRulesTabProps> = ({
                     {summaryText}
                     {attributeSummary}
                     {rule.targetType === 'todoCategory'
-                      ? ` · ${rule.includeSubtasks !== false ? '含子任务' : '仅父任务'}`
+                      ? ` · ${rule.includeSubtasks !== false ? '含子任务' : '仅主任务'}`
                       : ''}
                     {targetPreview ? ` · ${targetPreview}` : ''}
                   </div>

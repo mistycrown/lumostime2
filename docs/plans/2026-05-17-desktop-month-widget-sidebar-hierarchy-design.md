@@ -15,7 +15,7 @@ Use a grouped sidebar data model before rendering:
 1. Filter todos by the active planning tab (`Arrange`, `Maybe`, `Due`).
 2. Group visible todos by their todo-category id.
 3. Within each group, render root tasks first and attach visible direct subtasks underneath.
-4. If a subtask stays visible but its parent is filtered out of the current tab, render it as a standalone row with plain-text `子任务 @父任务` context.
+4. If a subtask stays visible but its parent is filtered out of the current tab, render it as a standalone row with plain-text `子任务 @主任务` context.
 5. Remove the extra linked-category line so each task row is just one line of title text.
 
 ## Notes

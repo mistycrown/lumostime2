@@ -15,7 +15,7 @@ The AI chat workspace can create subtasks directly from natural language. In the
 ### Result Card Label
 
 - Standalone todo: `@分类`
-- AI-created subtask: `@分类 / 父任务`
+- AI-created subtask: `@分类 / 主任务`
 
 This applies only inside the AI applied-result card renderer.
 
@@ -33,9 +33,9 @@ This applies only inside the AI applied-result card renderer.
 ## Verification
 
 - Create subtasks without mentioning dates:
-  - result cards show `@分类 / 父任务`
+  - result cards show `@分类 / 主任务`
   - no `安排 YYYY-MM-DD`
   - success reply does not claim dates were arranged
 - Create subtasks with explicit date wording:
   - planner may keep `scheduledDate`
-  - result cards still show `@分类 / 父任务`
+  - result cards still show `@分类 / 主任务`

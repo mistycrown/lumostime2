@@ -2,7 +2,7 @@
 
 ## Goal
 
-In the Todo week schedule view only, when a visible scheduled item is a subtask, render its parent task immediately after the subtask title as `子任务标题 @父任务标题`.
+In the Todo week schedule view only, when a visible scheduled item is a subtask, render its parent task immediately after the subtask title as `子任务标题 @主任务标题`.
 
 ## Scope
 
