@@ -1,21 +1,23 @@
 /**
  * @file NavigationIconSelector.tsx
- * @input Toast callback and persisted navigation icon groups
- * @output New navigation icon mode and per-slot custom mappings
+ * @input Toast callback and persisted navigation icon schemes
+ * @output Scheme selection and modal editing for the new navigation bar
  * @pos Component (Sponsorship Navigation Settings)
- * @description TimePal-style image selector for the five new navigation entries.
+ * @description Compact TimePal-style scheme selector with a separate editor modal.
+ * @updated 2026-09-25: Reworked the page view into a compact multi-scheme selector.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, Plus, X } from 'lucide-react';
+import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { ToastType } from './Toast';
 import {
+    getNavigationIconFallbackUrl,
     NAVIGATION_ICON_CHANGE_EVENT,
     navigationIconService,
     NavigationIconMode,
     NavigationIconOption,
+    NavigationIconScheme,
     NavigationIconSelection,
-    NavigationIconSlot,
-    getNavigationIconFallbackUrl
+    NavigationIconSlot
 } from '../services/navigationIconService';
 import { APPEARANCE_RESTORED_EVENT } from '../services/appearanceBackupService';
 
@@ -31,21 +33,23 @@ const SLOT_LABELS: Record<NavigationIconSlot, string> = {
     index: '索引'
 };
 
-const MODE_LABELS: Array<{ id: NavigationIconMode; name: string; description: string }> = [
-    { id: 'text', name: '文字导航', description: '显示入口文字' },
-    { id: 'pink', name: '粉色图标', description: '内置五张图标' },
-    { id: 'custom', name: '自定义图标', description: '为入口自由搭配' }
-];
+const getSchemePreview = (scheme: NavigationIconScheme, customIcons: NavigationIconOption[]) => (
+    navigationIconService.getPreviewIconForScheme(scheme) || customIcons[0]
+);
 
 export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ onToast }) => {
     const [selection, setSelection] = useState<NavigationIconSelection>(() => navigationIconService.getSelection());
     const [customIcons, setCustomIcons] = useState<NavigationIconOption[]>(() => navigationIconService.getCustomIcons());
+    const [schemes, setSchemes] = useState<NavigationIconScheme[]>(() => navigationIconService.getCustomSchemes());
+    const [editingScheme, setEditingScheme] = useState<NavigationIconScheme | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const reload = () => {
         setSelection(navigationIconService.getSelection());
         setCustomIcons(navigationIconService.getCustomIcons());
+        setSchemes(navigationIconService.getCustomSchemes());
+        setEditingScheme((current) => current ? navigationIconService.getCustomSchemes().find((scheme) => scheme.id === current.id) || null : null);
     };
 
     useEffect(() => {
@@ -57,14 +61,44 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
         };
     }, []);
 
-    const handleModeSelect = (mode: NavigationIconMode) => {
+    const selectMode = (mode: NavigationIconMode) => {
         navigationIconService.setMode(mode);
-        setSelection(navigationIconService.getSelection());
+        reload();
     };
 
-    const handleSlotSelect = (slot: NavigationIconSlot, iconId: string | null) => {
-        navigationIconService.setCustomMapping(slot, iconId);
-        setSelection(navigationIconService.getSelection());
+    const selectScheme = (schemeId: string) => {
+        navigationIconService.setActiveScheme(schemeId);
+        reload();
+    };
+
+    const openNewScheme = () => {
+        const scheme = navigationIconService.createCustomScheme();
+        setEditingScheme(scheme);
+        reload();
+    };
+
+    const openScheme = (scheme: NavigationIconScheme) => setEditingScheme(scheme);
+
+    const closeEditor = () => {
+        setEditingScheme(null);
+        reload();
+    };
+
+    const updateSchemeName = (name: string) => {
+        if (!editingScheme) return;
+        const next = { ...editingScheme, name };
+        setEditingScheme(next);
+        navigationIconService.updateCustomScheme(editingScheme.id, { name });
+    };
+
+    const selectSchemeIcon = (slot: NavigationIconSlot, iconId: string | null) => {
+        if (!editingScheme) return;
+        const mapping = { ...editingScheme.mapping };
+        if (iconId) mapping[slot] = iconId;
+        else delete mapping[slot];
+        const next = { ...editingScheme, mapping };
+        setEditingScheme(next);
+        navigationIconService.setSchemeMapping(editingScheme.id, slot, iconId);
     };
 
     const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,10 +115,9 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
 
         setIsUploading(true);
         try {
-            const icon = await navigationIconService.addCustomIcon(file);
-            navigationIconService.setMode('custom');
+            await navigationIconService.addCustomIcon(file);
             reload();
-            onToast('success', `已添加图标：${icon.name}`);
+            onToast('success', '导航图标已添加');
         } catch (error) {
             console.error('[NavigationIconSelector] Failed to upload icon', error);
             onToast('error', '添加导航图标失败');
@@ -94,107 +127,119 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
         }
     };
 
-    const handleDelete = async (icon: NavigationIconOption, event: React.MouseEvent) => {
-        event.stopPropagation();
+    const handleDeleteIcon = async (icon: NavigationIconOption) => {
         if (await navigationIconService.deleteCustomIcon(icon.id)) {
             reload();
+            if (editingScheme) setEditingScheme(navigationIconService.getCustomSchemes().find((scheme) => scheme.id === editingScheme.id) || null);
             onToast('success', '导航图标已删除');
         }
     };
 
-    const getSlotIcon = (slot: NavigationIconSlot) => {
-        const iconId = selection.customMapping[slot];
-        return customIcons.find((icon) => icon.id === iconId);
+    const handleDeleteScheme = () => {
+        if (!editingScheme) return;
+        navigationIconService.deleteCustomScheme(editingScheme.id);
+        setEditingScheme(null);
+        reload();
+        onToast('success', '方案已删除');
     };
 
+    const renderIcon = (icon: NavigationIconOption | undefined, alt: string, className: string) => (
+        icon ? (
+            <img
+                src={icon.url}
+                alt={alt}
+                className={className}
+                onError={(event) => {
+                    const fallbackUrl = getNavigationIconFallbackUrl(event.currentTarget.src);
+                    if (fallbackUrl !== event.currentTarget.src) event.currentTarget.src = fallbackUrl;
+                }}
+            />
+        ) : <span className="font-serif text-lg text-stone-500">Aa</span>
+    );
+
     return (
-        <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-2">
-                {MODE_LABELS.map((mode) => {
-                    const selected = selection.mode === mode.id;
-                    return (
-                        <button
-                            key={mode.id}
-                            type="button"
-                            onClick={() => handleModeSelect(mode.id)}
-                            className={`relative flex min-h-[92px] flex-col items-center justify-center gap-1 rounded-2xl border-2 bg-white px-2 py-3 text-center transition-all ${selected ? 'border-stone-700 bg-stone-50 shadow-sm' : 'border-stone-200 hover:border-stone-400'}`}
-                        >
-                            {mode.id === 'pink' ? (
-                                <img
-                                    src={navigationIconService.getBuiltInIcons()[0].url}
-                                    alt=""
-                                    className="h-9 w-9 object-contain"
-                                    onError={(event) => {
-                                        const fallbackUrl = getNavigationIconFallbackUrl(event.currentTarget.src);
-                                        if (fallbackUrl !== event.currentTarget.src) event.currentTarget.src = fallbackUrl;
-                                    }}
-                                />
-                            ) : mode.id === 'custom' && customIcons[0] ? (
-                                <img src={customIcons[0].url} alt="" className="h-9 w-9 object-contain" />
-                            ) : (
-                                <span className="text-lg font-serif text-stone-700">Aa</span>
-                            )}
-                            <span className="text-xs font-semibold text-stone-700">{mode.name}</span>
-                            <span className="text-[10px] text-stone-400">{mode.description}</span>
-                            {selected && <span className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-stone-800 text-white"><Check size={10} /></span>}
-                        </button>
-                    );
-                })}
+        <>
+            <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-sm font-bold text-stone-700">导航图标</h3>
+                    <button type="button" onClick={openNewScheme} className="inline-flex items-center gap-1 text-xs text-stone-500 hover:text-stone-800">
+                        <Plus size={14} /> 新增方案
+                    </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        onClick={() => selectMode('text')}
+                        className={`relative flex h-16 min-w-[76px] flex-1 items-center justify-center gap-2 rounded-xl border px-2 text-xs transition-colors ${selection.mode === 'text' ? 'border-stone-700 bg-stone-50 text-stone-800' : 'border-stone-200 text-stone-500 hover:border-stone-400'}`}
+                    >
+                        <span className="font-serif text-lg">Aa</span><span>文字</span>
+                        {selection.mode === 'text' && <Check size={13} className="absolute right-1.5 top-1.5" />}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => selectMode('pink')}
+                        className={`relative flex h-16 min-w-[76px] flex-1 items-center justify-center gap-2 rounded-xl border px-2 text-xs transition-colors ${selection.mode === 'pink' ? 'border-stone-700 bg-stone-50 text-stone-800' : 'border-stone-200 text-stone-500 hover:border-stone-400'}`}
+                    >
+                        {renderIcon(navigationIconService.getBuiltInIcons()[0], '粉色图标', 'h-9 w-9 object-contain')}<span>粉色</span>
+                        {selection.mode === 'pink' && <Check size={13} className="absolute right-1.5 top-1.5" />}
+                    </button>
+                    {schemes.map((scheme) => {
+                        const isActive = selection.mode === 'custom' && selection.schemeId === scheme.id;
+                        return (
+                            <div key={scheme.id} className={`relative flex h-16 min-w-[110px] flex-1 items-center rounded-xl border px-2 transition-colors ${isActive ? 'border-stone-700 bg-stone-50' : 'border-stone-200 hover:border-stone-400'}`}>
+                                <button type="button" onClick={() => selectScheme(scheme.id)} className="flex min-w-0 flex-1 items-center justify-center gap-2 text-xs text-stone-600">
+                                    {renderIcon(getSchemePreview(scheme, customIcons), scheme.name, 'h-9 w-9 object-contain')}
+                                    <span className="max-w-[72px] truncate">{scheme.name}</span>
+                                </button>
+                                <button type="button" onClick={() => openScheme(scheme)} aria-label={`编辑${scheme.name}`} className="absolute right-1 top-1 rounded p-1 text-stone-400 hover:bg-stone-200 hover:text-stone-700">
+                                    <Pencil size={12} />
+                                </button>
+                                {isActive && <Check size={13} className="absolute bottom-1 right-1.5" />}
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
 
-            {selection.mode === 'pink' && (
-                <div className="grid grid-cols-5 gap-2 rounded-2xl bg-white p-3 shadow-sm">
-                    {navigationIconService.getBuiltInIcons().map((icon, index) => (
-                        <div key={icon.id} className="space-y-1 text-center">
-                            <div className="flex aspect-square items-center justify-center rounded-xl bg-stone-50 p-2">
-                                <img
-                                    src={icon.url}
-                                    alt={`${SLOT_LABELS[navigationIconService.getSlots()[index]]}图标`}
-                                    className="h-full w-full object-contain"
-                                    onError={(event) => {
-                                        const fallbackUrl = getNavigationIconFallbackUrl(event.currentTarget.src);
-                                        if (fallbackUrl !== event.currentTarget.src) event.currentTarget.src = fallbackUrl;
-                                    }}
-                                />
-                            </div>
-                            <span className="text-[10px] text-stone-500">{SLOT_LABELS[navigationIconService.getSlots()[index]]}</span>
+            {editingScheme && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 p-4" role="dialog" aria-modal="true" aria-label="编辑导航图标方案">
+                    <div className="max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-base font-bold text-stone-800">编辑导航图标方案</h3>
+                            <button type="button" onClick={closeEditor} aria-label="关闭" className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100"><X size={17} /></button>
                         </div>
-                    ))}
-                </div>
-            )}
-
-            {selection.mode === 'custom' && (
-                <div className="space-y-3 rounded-2xl bg-white p-3 shadow-sm">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                        {navigationIconService.getSlots().map((slot) => {
-                            const selectedIcon = getSlotIcon(slot);
-                            return (
-                                <div key={slot} className="rounded-xl border border-stone-200 p-2">
-                                    <div className="mb-2 flex items-center justify-between">
-                                        <span className="text-xs font-semibold text-stone-600">{SLOT_LABELS[slot]}</span>
-                                        <span className="text-[10px] text-stone-400">{selectedIcon?.name || '文字回退'}</span>
-                                    </div>
-                                    <div className="flex gap-2 overflow-x-auto pb-1">
-                                        <button type="button" onClick={() => handleSlotSelect(slot, null)} className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border-2 text-xs text-stone-400 ${!selectedIcon ? 'border-stone-700 bg-stone-50' : 'border-stone-200'}`}>文字</button>
+                        <label className="mb-4 block text-xs text-stone-500">
+                            方案名称
+                            <input value={editingScheme.name} onChange={(event) => updateSchemeName(event.target.value)} className="mt-1 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm text-stone-800 outline-none focus:border-stone-500" />
+                        </label>
+                        <div className="space-y-3">
+                            {navigationIconService.getSlots().map((slot) => (
+                                <div key={slot} className="border-t border-stone-100 pt-3">
+                                    <div className="mb-2 text-xs font-semibold text-stone-600">{SLOT_LABELS[slot]}</div>
+                                    <div className="flex flex-wrap gap-2">
+                                        <button type="button" onClick={() => selectSchemeIcon(slot, null)} className={`flex h-14 w-14 items-center justify-center rounded-lg border text-[11px] text-stone-400 ${!editingScheme.mapping[slot] ? 'border-stone-700 bg-stone-50' : 'border-stone-200'}`}>文字</button>
                                         {customIcons.map((icon) => (
-                                            <div key={icon.id} className="relative shrink-0">
-                                                <button type="button" onClick={() => handleSlotSelect(slot, icon.id)} className={`flex h-14 w-14 items-center justify-center rounded-lg border-2 bg-stone-50 p-1 ${selectedIcon?.id === icon.id ? 'border-stone-700' : 'border-stone-200'}`}>
-                                                    <img src={icon.url} alt={icon.name} className="h-full w-full object-contain" />
-                                                </button>
-                                                <button type="button" onClick={(event) => void handleDelete(icon, event)} aria-label={`删除${icon.name}`} className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white"><X size={9} /></button>
-                                            </div>
+                                            <button key={icon.id} type="button" onClick={() => selectSchemeIcon(slot, icon.id)} className={`relative flex h-14 w-14 items-center justify-center rounded-lg border bg-stone-50 p-1 ${editingScheme.mapping[slot] === icon.id ? 'border-stone-700' : 'border-stone-200'}`}>
+                                                {renderIcon(icon, icon.name, 'h-full w-full object-contain')}
+                                            </button>
                                         ))}
                                     </div>
                                 </div>
-                            );
-                        })}
+                            ))}
+                        </div>
+                        <div className="mt-5 flex items-center justify-between border-t border-stone-100 pt-4">
+                            <button type="button" onClick={handleDeleteScheme} className="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700"><Trash2 size={14} /> 删除方案</button>
+                            <div className="flex items-center gap-2">
+                                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="inline-flex items-center gap-1 rounded-lg border border-dashed border-stone-300 px-3 py-2 text-xs text-stone-500 hover:border-stone-500">
+                                    <Plus size={14} /> {isUploading ? '上传中' : '添加图标'}
+                                </button>
+                                <button type="button" onClick={closeEditor} className="rounded-lg bg-stone-800 px-4 py-2 text-xs text-white hover:bg-stone-700">完成</button>
+                            </div>
+                        </div>
                     </div>
-                    <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-stone-300 py-2 text-xs text-stone-500 hover:border-stone-500">
-                        {isUploading ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-stone-400 border-t-transparent" /> : <><Plus size={15} /> 添加自定义图标</>}
-                    </button>
                 </div>
             )}
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleUpload} className="hidden" />
-        </div>
+        </>
     );
 };

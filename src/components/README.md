@@ -298,7 +298,7 @@ Components for theme and appearance customization.
 - `ColorSchemeSelector.tsx`: 配色方案选择器
 - `CustomColorGroupManager.tsx`: 自定义色组（HEX 输入实时预览、回车提交、重复校验、上移下移排序、自动保存）
 - `NavigationDecorationSelector.tsx`: 导航装饰选择器
-- `NavigationIconSelector.tsx`: 新版导航栏图标组选择器，支持内置粉色图标与自定义入口映射
+- `NavigationIconSelector.tsx`: 新版导航栏图标方案选择器，支持粉色内置方案、多套自定义方案和弹窗编辑
 - `UIIconSelector.tsx`: UI 图标主题选择器
 - `PresetEditModal.tsx`: 主题预设编辑弹窗
 
