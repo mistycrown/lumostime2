@@ -11,9 +11,10 @@
  * @updated 2026-08-15: Added confirmation before clearing the saved redemption-code state.
  * @updated 2026-09-25: Added the opt-in merged-group sticker selector settings and management UI.
  * @updated 2026-09-25: Registers custom sticker uploads in the theme image manifest group.
+ * @updated 2026-09-25: Added direct ZIP import for folder-based custom sticker groups.
  */
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Fish, Check, X, Plus } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { ChevronLeft, Fish, Check, X, Plus, Upload } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { ToastType } from '../components/Toast';
 import { RedemptionService } from '../services/redemptionService';
@@ -29,7 +30,7 @@ import { AchievementBottleIconPackSelector } from '../components/achievement/Ach
 import { AchievementBottleStyleSelector } from '../components/achievement/AchievementBottleStyleSelector';
 import { CalendarNumberStyleSelector } from '../components/CalendarNumberStyleSelector';
 import { iconService, ICON_OPTIONS } from '../services/iconService';
-import { Category } from '../types';
+import { Category, CustomStickerRecord, CustomStickerSetRecord } from '../types';
 import { useSettings } from '../contexts/SettingsContext';
 import { useReview } from '../contexts/ReviewContext';
 import { useNavigation } from '../contexts/NavigationContext';
@@ -47,6 +48,7 @@ import { IconRenderer } from '../components/IconRenderer';
 import { StickerSetEditModal } from '../components/StickerSetEditModal';
 import { imageService } from '../services/imageService';
 import { buildCustomStickerViewSets } from '../services/customStickerAssetService';
+import { parseCustomStickerZip } from '../services/customStickerZipService';
 import { resolveAssetPath } from '../utils/assetPath';
 import { getTimePalPreviewPath } from '../constants/timePalConfig';
 import {
@@ -334,6 +336,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [selectorGroupSourceSetIds, setSelectorGroupSourceSetIds] = useState<string[]>([]);
     const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<StickerDeleteTarget>(null);
     const [isClearCodeConfirmOpen, setIsClearCodeConfirmOpen] = useState(false);
+    const [isImportingStickerZip, setIsImportingStickerZip] = useState(false);
+    const stickerZipInputRef = useRef<HTMLInputElement>(null);
 
     // 用户统计数据
     const [userStats, setUserStats] = useState<UserStats | null>(null);
@@ -735,6 +739,111 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         setIsEditingStickerSet(true);
         setEditingStickerSetId(setId);
         setStickerSetName(currentSet.name);
+    };
+
+    const getUniqueStickerSetName = (baseName: string, usedNames: Set<string>): string => {
+        const normalizedBaseName = baseName.trim() || '未命名贴纸组';
+        let candidate = normalizedBaseName;
+        let suffix = 2;
+
+        while (usedNames.has(candidate)) {
+            candidate = `${normalizedBaseName} (${suffix})`;
+            suffix += 1;
+        }
+
+        usedNames.add(candidate);
+        return candidate;
+    };
+
+    const handleStickerZipChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const zipFile = event.target.files?.[0];
+        event.target.value = '';
+
+        if (!zipFile) {
+            return;
+        }
+
+        setIsImportingStickerZip(true);
+        try {
+            const groups = await parseCustomStickerZip(zipFile);
+            if (groups.length === 0) {
+                onToast('error', '压缩包中没有可导入的贴纸图片');
+                return;
+            }
+
+            const usedNames = new Set(customStickerSets.map((set) => set.name));
+            const importedSets: CustomStickerSetRecord[] = [];
+            const importedStickers: CustomStickerRecord[] = [];
+            const failedGroupNames: string[] = [];
+            let truncatedCount = 0;
+
+            for (const group of groups) {
+                const setId = crypto.randomUUID();
+                const setName = getUniqueStickerSetName(group.name, usedNames);
+                const savedFilenames: string[] = [];
+                const now = Date.now();
+
+                try {
+                    const stickerRecords: CustomStickerRecord[] = [];
+                    for (const [slotIndex, image] of group.images.entries()) {
+                        const filename = await imageService.saveImage(image.blob, 'theme');
+                        savedFilenames.push(filename);
+                        stickerRecords.push({
+                            id: crypto.randomUUID(),
+                            setId,
+                            imageFilename: filename,
+                            thumbnailFilename: `thumb_${filename}`,
+                            label: image.label,
+                            sortOrder: slotIndex,
+                            status: 'active',
+                            createdAt: now,
+                            updatedAt: now
+                        });
+                    }
+
+                    importedStickers.push(...stickerRecords);
+                    importedSets.push({
+                        id: setId,
+                        name: setName,
+                        description: undefined,
+                        stickerIds: stickerRecords.map((sticker) => sticker.id),
+                        status: 'active',
+                        createdAt: now,
+                        updatedAt: now
+                    });
+                    truncatedCount += group.truncatedCount;
+                } catch (error) {
+                    console.error(`[SponsorshipView] 导入贴纸组失败: ${group.name}`, error);
+                    failedGroupNames.push(group.name);
+                    await Promise.allSettled(savedFilenames.map((filename) => imageService.deleteImage(filename)));
+                }
+            }
+
+            if (importedSets.length > 0) {
+                setCustomStickers((previous) => [...previous, ...importedStickers]);
+                setCustomStickerSets((previous) => [...previous, ...importedSets]);
+            }
+
+            if (importedSets.length === 0) {
+                onToast('error', failedGroupNames.length > 0 ? '贴纸组导入失败，请重试' : '没有成功导入贴纸组');
+                return;
+            }
+
+            const totalStickerCount = importedStickers.length;
+            const details = [
+                failedGroupNames.length > 0 ? `失败 ${failedGroupNames.length} 组` : '',
+                truncatedCount > 0 ? `截取 ${truncatedCount} 张` : ''
+            ].filter(Boolean);
+            onToast(
+                failedGroupNames.length > 0 ? 'error' : 'success',
+                `已导入 ${importedSets.length} 个贴纸组、${totalStickerCount} 张贴纸${details.length > 0 ? `（${details.join('，')}）` : ''}`
+            );
+        } catch (error) {
+            console.error('[SponsorshipView] 读取贴纸压缩包失败:', error);
+            onToast('error', '压缩包读取失败，请确认文件格式正确');
+        } finally {
+            setIsImportingStickerZip(false);
+        }
     };
 
     const handleUploadStickerToSlot = async (targetSetId: string, slotIndex: number, file: File) => {
@@ -1448,6 +1557,30 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                     <span className="text-[10px] font-medium text-stone-500">新建</span>
                                                 </div>
                                             </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => stickerZipInputRef.current?.click()}
+                                                disabled={isImportingStickerZip}
+                                                className="relative rounded-lg border-2 border-dashed border-stone-200 overflow-hidden bg-white transition-all hover:border-stone-300 disabled:cursor-wait disabled:opacity-60"
+                                                style={{ aspectRatio: '1/1' }}
+                                                aria-label="从压缩包上传贴纸"
+                                            >
+                                                <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-stone-400">
+                                                    <Upload size={20} />
+                                                    <span className="text-[10px] font-medium text-stone-500">
+                                                        {isImportingStickerZip ? '导入中' : '压缩包'}
+                                                    </span>
+                                                </div>
+                                            </button>
+
+                                            <input
+                                                ref={stickerZipInputRef}
+                                                type="file"
+                                                accept=".zip,application/zip,application/x-zip-compressed"
+                                                className="hidden"
+                                                onChange={handleStickerZipChange}
+                                            />
 
                                             {customStickerViewSets.map((setView) => (
                                                 <button
