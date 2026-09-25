@@ -12,6 +12,7 @@
  * @updated 2026-05-14: Changed Android reminder alarms to dispatch one metadata-rich `reminder_due` trigger back to the Web layer, preserving the local-offset request path and preventing duplicate native-plus-web AI reminder runs.
  * @updated 2026-09-02: Executes due reminders directly through the native background AI executor when its config and snapshot are ready, consuming reminders only after a successful request and retaining Web fallback retries otherwise.
  * @updated 2026-09-02: Executes due assistant letters through the same native executor lifecycle so a suspended WebView cannot consume the scheduled letter before an AI request succeeds.
+ * @updated 2026-09-25: Bounds failed native assistant-letter dispatches and adds retry backoff so an expired schedule cannot spin in a tight loop.
  * @updated 2026-09-02: Clamps the activity nudge gap to the configured minimum check-in interval so short test intervals are not silently deferred by the default gap.
  * @updated 2026-09-02: Preserves the current random-check-in deadline when native snapshot/config refreshes only require reminder schedule reconciliation.
  * @updated 2026-09-02: Uses a 10-minute default minimum random-check-in nudge gap for new native service state.
@@ -66,6 +67,10 @@ public class AssistantAgentService extends Service {
     private static final String KEY_LETTER_ENABLED = "letter_enabled";
     private static final String KEY_NEXT_LETTER_AT = "next_letter_at";
     private static final String KEY_LAST_LETTER_DISPATCHED_FOR = "last_letter_dispatched_for";
+    private static final String KEY_LETTER_DISPATCH_ATTEMPT_COUNT = "letter_dispatch_attempt_count";
+    private static final String KEY_LAST_LETTER_DISPATCH_ATTEMPT_AT_MS = "last_letter_dispatch_attempt_at_ms";
+    private static final long LETTER_RETRY_DELAY_MS = 60_000L;
+    private static final int MAX_LETTER_DISPATCH_ATTEMPTS = 3;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Random random = new Random();
@@ -81,6 +86,8 @@ public class AssistantAgentService extends Service {
     private boolean letterEnabled = false;
     private String nextLetterAt = "";
     private String lastLetterDispatchedFor = "";
+    private int letterDispatchAttemptCount = 0;
+    private long lastLetterDispatchAttemptAtMs = 0L;
     private long nextRandomCheckinAtMs = 0L;
     private long nextReminderDispatchAtMs = 0L;
     private long nextLetterDispatchAtMs = 0L;
@@ -521,11 +528,19 @@ public class AssistantAgentService extends Service {
             || dueAtMs <= 0L
             || dueAtMs > nowMs
             || normalizedNextLetterAt.equals(safeTrim(lastLetterDispatchedFor))
+            || letterDispatchAttemptCount >= MAX_LETTER_DISPATCH_ATTEMPTS
+            || (lastLetterDispatchAttemptAtMs > 0L && nowMs - lastLetterDispatchAttemptAtMs < LETTER_RETRY_DELAY_MS)
         ) {
             return;
         }
 
         String attemptedAt = formatTimestamp(nowMs);
+        letterDispatchAttemptCount += 1;
+        lastLetterDispatchAttemptAtMs = nowMs;
+        prefs().edit()
+            .putInt(KEY_LETTER_DISPATCH_ATTEMPT_COUNT, letterDispatchAttemptCount)
+            .putLong(KEY_LAST_LETTER_DISPATCH_ATTEMPT_AT_MS, lastLetterDispatchAttemptAtMs)
+            .apply();
         String triggerId = "assistant_letter_due:" + normalizedNextLetterAt;
         com.getcapacitor.JSObject metadata = new com.getcapacitor.JSObject();
         metadata.put("scheduledFor", normalizedNextLetterAt);
@@ -552,7 +567,13 @@ public class AssistantAgentService extends Service {
                     @Override
                     public void onCompleted() {
                         lastLetterDispatchedFor = normalizedNextLetterAt;
-                        prefs().edit().putString(KEY_LAST_LETTER_DISPATCHED_FOR, lastLetterDispatchedFor).apply();
+                        letterDispatchAttemptCount = 0;
+                        lastLetterDispatchAttemptAtMs = 0L;
+                        prefs().edit()
+                            .putString(KEY_LAST_LETTER_DISPATCHED_FOR, lastLetterDispatchedFor)
+                            .putInt(KEY_LETTER_DISPATCH_ATTEMPT_COUNT, 0)
+                            .remove(KEY_LAST_LETTER_DISPATCH_ATTEMPT_AT_MS)
+                            .apply();
                         handler.post(() -> {
                             nativeLetterRequestInFlight = false;
                             scheduleNextAssistantLetterDispatch(System.currentTimeMillis());
@@ -563,6 +584,12 @@ public class AssistantAgentService extends Service {
                     @Override
                     public void onFailed() {
                         handler.post(() -> {
+                            if (letterDispatchAttemptCount >= MAX_LETTER_DISPATCH_ATTEMPTS) {
+                                lastLetterDispatchedFor = normalizedNextLetterAt;
+                                prefs().edit()
+                                    .putString(KEY_LAST_LETTER_DISPATCHED_FOR, lastLetterDispatchedFor)
+                                    .apply();
+                            }
                             nativeLetterRequestInFlight = false;
                             scheduleNextAssistantLetterDispatch(System.currentTimeMillis());
                             syncUnifiedStatusNotification();
@@ -726,7 +753,13 @@ public class AssistantAgentService extends Service {
                 nextLetterAt = incomingNextLetterAt;
                 if (!nextLetterAt.equals(safeTrim(lastLetterDispatchedFor))) {
                     lastLetterDispatchedFor = "";
-                    prefs().edit().remove(KEY_LAST_LETTER_DISPATCHED_FOR).apply();
+                    letterDispatchAttemptCount = 0;
+                    lastLetterDispatchAttemptAtMs = 0L;
+                    prefs().edit()
+                        .remove(KEY_LAST_LETTER_DISPATCHED_FOR)
+                        .remove(KEY_LETTER_DISPATCH_ATTEMPT_COUNT)
+                        .remove(KEY_LAST_LETTER_DISPATCH_ATTEMPT_AT_MS)
+                        .apply();
                 }
             }
             prefs().edit().putString(KEY_NEXT_LETTER_AT, nextLetterAt).apply();
@@ -742,6 +775,8 @@ public class AssistantAgentService extends Service {
                 prefs().edit()
                     .remove(KEY_NEXT_LETTER_AT)
                     .remove(KEY_LAST_LETTER_DISPATCHED_FOR)
+                    .remove(KEY_LETTER_DISPATCH_ATTEMPT_COUNT)
+                    .remove(KEY_LAST_LETTER_DISPATCH_ATTEMPT_AT_MS)
                     .apply();
             }
         }
@@ -817,18 +852,24 @@ public class AssistantAgentService extends Service {
             return;
         }
 
-        if (nextLetterAtMs <= nowMs && normalizedNextLetterAt.equals(safeTrim(lastLetterDispatchedFor))) {
+        if (nextLetterAtMs <= nowMs && (
+            normalizedNextLetterAt.equals(safeTrim(lastLetterDispatchedFor))
+            || letterDispatchAttemptCount >= MAX_LETTER_DISPATCH_ATTEMPTS
+        )) {
             return;
         }
 
-        nextLetterDispatchAtMs = nextLetterAtMs;
-        long delayMs = Math.max(0L, nextLetterAtMs - nowMs);
+        long retryEligibleAtMs = lastLetterDispatchAttemptAtMs > 0L
+            ? lastLetterDispatchAttemptAtMs + LETTER_RETRY_DELAY_MS
+            : nextLetterAtMs;
+        nextLetterDispatchAtMs = Math.max(nextLetterAtMs, retryEligibleAtMs);
+        long delayMs = Math.max(0L, nextLetterDispatchAtMs - nowMs);
         if (delayMs <= 0L) {
             handler.post(letterDispatchRunnable);
             return;
         }
 
-        AssistantLetterAlarmScheduler.schedule(this, nextLetterAtMs);
+        AssistantLetterAlarmScheduler.schedule(this, nextLetterDispatchAtMs);
     }
 
     private boolean shouldDispatchRandomCheckin(long nowMs) {
@@ -933,6 +974,8 @@ public class AssistantAgentService extends Service {
         letterEnabled = sharedPreferences.getBoolean(KEY_LETTER_ENABLED, false);
         nextLetterAt = safeTrim(sharedPreferences.getString(KEY_NEXT_LETTER_AT, ""));
         lastLetterDispatchedFor = safeTrim(sharedPreferences.getString(KEY_LAST_LETTER_DISPATCHED_FOR, ""));
+        letterDispatchAttemptCount = Math.max(0, sharedPreferences.getInt(KEY_LETTER_DISPATCH_ATTEMPT_COUNT, 0));
+        lastLetterDispatchAttemptAtMs = Math.max(0L, sharedPreferences.getLong(KEY_LAST_LETTER_DISPATCH_ATTEMPT_AT_MS, 0L));
     }
 
     private void recordUserTurn(long atMs) {

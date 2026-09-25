@@ -1381,6 +1381,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         persistedMessageId: pendingMessageId
       };
     } catch (error) {
+      assistantAgentConfigService.saveConfig(
+        assistantLetterScheduler.buildFailurePatch(
+          assistantAgentConfigService.getConfig(),
+          { now, attemptedAt: now.toISOString() }
+        )
+      );
+      setAssistantAgentConfig(assistantAgentConfigService.getConfig());
       replacePendingWithResult(
         targetSession.id,
         pendingMessageId,

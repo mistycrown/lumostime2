@@ -181,6 +181,14 @@ export function useAIBackfillChatBackgroundTriggers(options: Record<string, any>
         }
       } catch (error) {
         console.error('[AIBackfillChatModal] Assistant system turn failed', error);
+        if (trigger.type === 'assistant_letter_due') {
+          try {
+            await AssistantAgent.acknowledgeSystemTrigger({ id: triggerId });
+            handledAssistantTriggerIdsRef.current.add(triggerId);
+          } catch (acknowledgeError) {
+            console.error('[AIBackfillChatModal] Failed to acknowledge failed assistant letter trigger', acknowledgeError);
+          }
+        }
         if (trigger.type === 'reminder_due') {
           const reminderId = typeof trigger.metadata?.reminderId === 'string'
             ? trigger.metadata.reminderId.trim()
