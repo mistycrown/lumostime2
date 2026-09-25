@@ -16,6 +16,7 @@ import {
   ActivityStatisticCard,
   ActivityStatisticCardSource,
   ActivityStatisticCardType,
+  ActivityTimelineStyle,
   ActivityStatisticMetric,
   ActivityStatisticRange
 } from '../types';
@@ -23,6 +24,7 @@ import {
 const RANGES: ActivityStatisticRange[] = ['all', '7d', '30d', 'week', 'month', 'year'];
 const METRICS: ActivityStatisticMetric[] = ['value', 'count', 'duration', 'average', 'sum'];
 const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi', 'choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'choiceStacked', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap', 'tagDurationPetalTimeline'];
+const TIMELINE_STYLES: ActivityTimelineStyle[] = ['petal', 'histogram'];
 
 export const getDefaultChartType = (type: ActivityAttributeDefinition['type']): ActivityStatisticCardType => {
   if (type === 'text') return 'textCloud';
@@ -88,6 +90,9 @@ const normalizeCard = (raw: unknown, index: number, attributes: ActivityAttribut
     ? '30d'
     : rawRange === 'all' && source.type !== 'tagDuration' && source.type !== 'categoryDuration' ? '30d' : rawRange;
   const metric = METRICS.includes(item.metric as ActivityStatisticMetric) ? item.metric as ActivityStatisticMetric : 'count';
+  const timelineStyle = chartType === 'tagDurationPetalTimeline' && (source.type === 'tagDuration' || source.type === 'categoryDuration')
+    ? (TIMELINE_STYLES.includes(item.timelineStyle as ActivityTimelineStyle) ? item.timelineStyle as ActivityTimelineStyle : 'petal')
+    : undefined;
   const normalizedMetric = source.type === 'attribute' && sourceAttribute?.type === 'number'
     ? (chartType === 'numberKpi' ? (metric === 'average' || metric === 'sum' ? metric : 'average') : 'value')
     : chartType === 'choiceBar' || chartType === 'choiceDonut' || chartType === 'choiceStacked'
@@ -99,6 +104,7 @@ const normalizeCard = (raw: unknown, index: number, attributes: ActivityAttribut
     chartType,
     range,
     metric: normalizedMetric,
+    ...(timelineStyle ? { timelineStyle } : {}),
     order: Number.isFinite(item.order) ? Number(item.order) : index
   };
 };
@@ -152,7 +158,7 @@ export const getStatisticCardLabel = (card: ActivityStatisticCard, attributes: A
     choiceStacked: '选项堆叠图',
     tagDurationBoxplot: '标签时长箱线图',
     tagDurationWeekHourHeatmap: '星期 × 小时热力图',
-    tagDurationPetalTimeline: '花瓣时序图'
+    tagDurationPetalTimeline: '时序图'
   };
   return `${name} · ${labels[card.chartType]}`;
 };

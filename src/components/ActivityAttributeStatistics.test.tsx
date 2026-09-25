@@ -177,6 +177,16 @@ describe('extended statistic card sources', () => {
     expect(cards.map((card) => card.range)).toEqual(['year', 'all']);
   });
 
+  it('defaults timeline styles to petals and preserves the histogram choice', () => {
+    const activity = { id: 'activity-3', name: 'Activity', color: '#000', attributes: [], statisticCards: [
+      { id: 'legacy', source: { type: 'tagDuration' as const }, chartType: 'tagDurationPetalTimeline' as const, range: 'week' as const, metric: 'count' as const, order: 0 },
+      { id: 'histogram', source: { type: 'categoryDuration' as const }, chartType: 'tagDurationPetalTimeline' as const, range: 'month' as const, metric: 'count' as const, timelineStyle: 'histogram' as const, order: 1 },
+      { id: 'invalid', source: { type: 'tagDuration' as const }, chartType: 'tagDurationPetalTimeline' as const, range: 'year' as const, metric: 'count' as const, timelineStyle: 'invalid' as const, order: 2 }
+    ] };
+    const cards = normalizeStatisticCards(activity as unknown as Activity);
+    expect(cards.map((card) => card.timelineStyle)).toEqual(['petal', 'histogram', 'petal']);
+  });
+
   it('splits duration across hours for the natural week', () => {
     const now = new Date(2026, 8, 23, 12, 0, 0, 0);
     const start = new Date(2026, 8, 22, 23, 30, 0, 0).getTime();
