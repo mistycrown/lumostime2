@@ -143,7 +143,7 @@ export const PetalTimelineChart: React.FC<PetalTimelineChartProps> = ({ logs, ra
   const center = 160;
   const startAtTop = -Math.PI / 2;
   const hasData = summary.totalMinutes > 0;
-  const petalPath = `M ${center} ${center - 4} C ${center - 22} ${center - 10}, ${center - 29} ${center - 34}, ${center - 28} ${center - 55} C ${center - 27} ${center - 75}, ${center - 13} ${center - 94}, ${center - 3} ${center - 99} C ${center - 1} ${center - 100}, ${center + 1} ${center - 100}, ${center + 3} ${center - 99} C ${center + 13} ${center - 94}, ${center + 27} ${center - 75}, ${center + 28} ${center - 55} C ${center + 29} ${center - 34}, ${center + 22} ${center - 10}, ${center} ${center - 4} Z`;
+  const petalPath = `M ${center} ${center - 4} C ${center - 26} ${center - 11}, ${center - 34} ${center - 39}, ${center - 33} ${center - 64} C ${center - 32} ${center - 87}, ${center - 15} ${center - 109}, ${center - 3} ${center - 115} C ${center - 1} ${center - 116}, ${center + 1} ${center - 116}, ${center + 3} ${center - 115} C ${center + 15} ${center - 109}, ${center + 32} ${center - 87}, ${center + 33} ${center - 64} C ${center + 34} ${center - 39}, ${center + 26} ${center - 11}, ${center} ${center - 4} Z`;
 
   return (
     <div className="mx-auto w-full max-w-[360px]">
@@ -151,8 +151,8 @@ export const PetalTimelineChart: React.FC<PetalTimelineChartProps> = ({ logs, ra
         <circle cx={center} cy={center} r="116" fill={palette.background} opacity="0.36" />
         {Array.from({ length: 12 }, (_, index) => index * 2).map((hour) => {
           const point = {
-            x: center + 132 * Math.cos(startAtTop + (hour / 24) * Math.PI * 2),
-            y: center + 132 * Math.sin(startAtTop + (hour / 24) * Math.PI * 2)
+            x: center + 123 * Math.cos(startAtTop + (hour / 24) * Math.PI * 2),
+            y: center + 123 * Math.sin(startAtTop + (hour / 24) * Math.PI * 2)
           };
           return <text key={hour} x={point.x} y={point.y + 3} textAnchor="middle" fill="#8f8174" fontSize="9" fontFamily="var(--font-family)" fontVariant="tabular-nums">{String(hour).padStart(2, '0')}</text>;
         })}
