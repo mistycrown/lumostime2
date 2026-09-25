@@ -120,9 +120,9 @@ export const NavigationBackgroundSelector: React.FC<NavigationBackgroundSelector
                         role="switch"
                         aria-checked={transparentNavigation}
                         onClick={handleTransparentNavigationToggle}
-                        className={`relative h-6 w-11 rounded-full transition-colors ${transparentNavigation ? 'bg-stone-800' : 'bg-stone-300'}`}
+                        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${transparentNavigation ? 'bg-stone-800' : 'bg-stone-300'}`}
                     >
-                        <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${transparentNavigation ? 'translate-x-6' : 'translate-x-1'}`} />
+                        <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${transparentNavigation ? 'translate-x-5' : 'translate-x-0'}`} />
                     </button>
                 </div>
             </div>
