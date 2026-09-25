@@ -77,6 +77,7 @@ export function AIBackfillChatMainView(props: Record<string, any>) {
     setReminderUpdateExpansion,
     setDreamUpdateExpansion,
     setSessions,
+    pendingHomeMessageRef,
     shortcuts,
     sortedSessions,
     theme,
@@ -151,10 +152,9 @@ export function AIBackfillChatMainView(props: Record<string, any>) {
               onSendShortcut={(text) => {
                 const latestSession = sortedSessions[0] || activeSession;
                 if (!latestSession) return;
+                pendingHomeMessageRef.current = text;
                 setActiveSessionId(latestSession.id);
                 setIsHomeView(false);
-                setInputText(text);
-                focusComposerAtEnd();
               }}
             />
           ) : (
