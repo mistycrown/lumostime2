@@ -4,11 +4,13 @@
  * @output New-mode toggle, background selection/upload, and tuning controls
  * @pos Component (Sponsorship Navigation Settings)
  * @description Provides the new navigation background workflow without changing the legacy foreground decoration page.
+ * @updated 2026-09-25: Added the navigation icon mode selector for the new navigation bar.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, Plus, Settings, X } from 'lucide-react';
 import { ToastType } from './Toast';
 import { NavigationDecorationSelector } from './NavigationDecorationSelector';
+import { NavigationIconSelector } from './NavigationIconSelector';
 import {
     navigationBackgroundService,
     NAVIGATION_BACKGROUND_CHANGE_EVENT,
@@ -115,6 +117,13 @@ export const NavigationBackgroundSelector: React.FC<NavigationBackgroundSelector
                 <NavigationDecorationSelector onToast={onToast} />
             ) : (
                 <>
+                    <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+                        <div>
+                            <h3 className="text-sm font-bold text-stone-700">导航栏图标</h3>
+                            <p className="mt-1 text-xs text-stone-400">用图片替换新版导航文字，也可以上传自己的图标。</p>
+                        </div>
+                        <NavigationIconSelector onToast={onToast} />
+                    </div>
                     <div className="flex items-center justify-between gap-4">
                         <p className="text-xs text-stone-500">选择背景后可调整位置、缩放和透明度。</p>
                         <button

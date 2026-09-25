@@ -4,7 +4,7 @@
  * @output Referenced image filenames used by settings features
  * @pos Service (Image Management)
  * @description Collects persisted settings-level image filenames so cleanup and sync manifest rebuild can keep user-owned assets.
- * @updated 2026-09-25: Included active custom sticker assets so legacy flat manifests can be migrated into the theme group.
+ * @updated 2026-09-25: Included active custom sticker assets and custom navigation icon assets so legacy flat manifests can be migrated into the theme group.
  * @updated 2026-05-05: Added AI assistant persona and AI user avatar images to the protected settings reference set.
  * @updated 2026-08-10: Added custom background and navigation decoration image filenames to the protected settings reference set.
  */
@@ -15,6 +15,7 @@ const AI_CHAT_PERSONAS_KEY = 'lumostime_ai_chat_personas_v1';
 const AI_CHAT_USER_PROFILE_KEY = 'lumostime_ai_chat_user_profile_v1';
 const CUSTOM_BACKGROUND_KEY = 'lumos_custom_backgrounds';
 const CUSTOM_NAVIGATION_KEY = 'navigation_decoration_custom_list';
+const CUSTOM_NAVIGATION_ICON_KEY = 'navigation_icon_custom_list_v1';
 const CUSTOM_STICKERS_KEY = 'lumostime_custom_stickers_v2';
 
 interface StoredCustomTimePalItem {
@@ -63,6 +64,7 @@ export const getSettingsReferencedImages = (): Set<string> => {
   const aiChatUserProfile = readRawJson<StoredAIChatUserProfile | null>(AI_CHAT_USER_PROFILE_KEY, null);
   const customBackgrounds = readRawJson<StoredImageAsset[]>(CUSTOM_BACKGROUND_KEY, []);
   const customNavigationDecorations = readRawJson<StoredImageAsset[]>(CUSTOM_NAVIGATION_KEY, []);
+  const customNavigationIcons = readRawJson<StoredImageAsset[]>(CUSTOM_NAVIGATION_ICON_KEY, []);
   const customStickers = readRawJson<StoredCustomSticker[]>(CUSTOM_STICKERS_KEY, []);
 
   if (Array.isArray(customTimePalItems)) {
@@ -92,6 +94,13 @@ export const getSettingsReferencedImages = (): Set<string> => {
   }
 
   [...customBackgrounds, ...customNavigationDecorations].forEach((asset) => {
+    if (isValidFilename(asset?.imageFilename)) {
+      referencedImages.add(asset.imageFilename);
+      referencedImages.add(`thumb_${asset.imageFilename}`);
+    }
+  });
+
+  customNavigationIcons.forEach((asset) => {
     if (isValidFilename(asset?.imageFilename)) {
       referencedImages.add(asset.imageFilename);
       referencedImages.add(`thumb_${asset.imageFilename}`);

@@ -6,6 +6,7 @@
  * @description Centralizes the user-facing appearance and TimePal settings that must survive export, cloud restore, and reinstall.
  * @updated 2026-08-10: Added the first unified appearance backup block with built-in-font fallback and theme-image reference extraction.
  * @updated 2026-09-15: Included the global font-scale preference in appearance backups.
+ * @updated 2026-09-25: Included navigation icon selections and custom image hydration in appearance backups.
  */
 import { TIMEPAL_KEYS, THEME_KEYS } from '../constants/storageKeys';
 import { fontService } from './fontService';
@@ -13,6 +14,7 @@ import { uiIconService } from './uiIconService';
 import { colorSchemeService } from './colorSchemeService';
 import { backgroundService } from './backgroundService';
 import { navigationDecorationService } from './navigationDecorationService';
+import { NAVIGATION_ICON_CHANGE_EVENT, navigationIconService } from './navigationIconService';
 
 export const APPEARANCE_RESTORED_EVENT = 'lumostime:appearance-restored';
 
@@ -26,6 +28,8 @@ const APPEARANCE_STORAGE_KEYS = [
   THEME_KEYS.NAVIGATION_DECORATION,
   'navigation_decoration_custom_settings',
   'navigation_decoration_custom_list',
+  'navigation_icon_selection_v1',
+  'navigation_icon_custom_list_v1',
   'lumos_custom_backgrounds',
   THEME_KEYS.CUSTOM_PRESETS,
   THEME_KEYS.SCHEDULE_STYLE,
@@ -115,6 +119,11 @@ const collectImageReferencesFromSnapshot = (snapshot: AppearanceStorage): string
     customDecorations.forEach((item) => addImageReference(referenced, item?.imageFilename));
   }
 
+  const customNavigationIcons = parseJsonValue(snapshot, 'navigation_icon_custom_list_v1');
+  if (Array.isArray(customNavigationIcons)) {
+    customNavigationIcons.forEach((item) => addImageReference(referenced, item?.imageFilename));
+  }
+
   return [...referenced];
 };
 
@@ -149,6 +158,7 @@ export const appearanceBackupService = {
     navigationDecorationService.setCurrentDecoration(restoredStorage[THEME_KEYS.NAVIGATION_DECORATION] || 'default');
     void backgroundService.hydrateImageBackedCustomBackgrounds();
     void navigationDecorationService.hydrateImageBackedCustomDecorations();
+    void navigationIconService.hydrateCustomIcons();
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event(APPEARANCE_RESTORED_EVENT));
@@ -156,6 +166,7 @@ export const appearanceBackupService = {
       window.dispatchEvent(new Event('timepal-click-switch-changed'));
       window.dispatchEvent(new Event('timepal-stage-thresholds-changed'));
       window.dispatchEvent(new Event('timepal-custom-changed'));
+      window.dispatchEvent(new Event(NAVIGATION_ICON_CHANGE_EVENT));
     }
   },
 

@@ -13,6 +13,7 @@ const AI_CHAT_PERSONAS_KEY = 'lumostime_ai_chat_personas_v1';
 const AI_CHAT_USER_PROFILE_KEY = 'lumostime_ai_chat_user_profile_v1';
 const CUSTOM_BACKGROUND_KEY = 'lumos_custom_backgrounds';
 const CUSTOM_NAVIGATION_KEY = 'navigation_decoration_custom_list';
+const CUSTOM_NAVIGATION_ICON_KEY = 'navigation_icon_custom_list_v1';
 
 const createLocalStorageMock = (): LocalStorageMock => {
   const store = new Map<string, string>();
@@ -70,11 +71,16 @@ describe('getSettingsReferencedImages', () => {
     localStorage.setItem(CUSTOM_NAVIGATION_KEY, JSON.stringify([
       { imageFilename: 'custom-navigation.png' }
     ]));
+    localStorage.setItem(CUSTOM_NAVIGATION_ICON_KEY, JSON.stringify([
+      { imageFilename: 'custom-navigation-icon.webp' }
+    ]));
 
     expect(Array.from(getSettingsReferencedImages()).sort()).toEqual([
       'custom-background.png',
+      'custom-navigation-icon.webp',
       'custom-navigation.png',
       'thumb_custom-background.png',
+      'thumb_custom-navigation-icon.webp',
       'thumb_custom-navigation.png'
     ]);
   });

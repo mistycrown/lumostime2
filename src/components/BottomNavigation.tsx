@@ -30,6 +30,7 @@ import {
     NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT,
     NAVIGATION_BACKGROUND_PREVIEW_EVENT
 } from '../services/navigationBackgroundService';
+import { getNavigationIconFallbackUrl, NAVIGATION_ICON_CHANGE_EVENT, navigationIconService } from '../services/navigationIconService';
 
 interface BottomNavigationProps {
     currentView: AppView;
@@ -42,11 +43,11 @@ const isIndexView = (view: AppView): boolean => (
 );
 
 const NAV_ITEMS = [
-    { view: AppView.RECORD, label: '记录' },
-    { view: AppView.TODO, label: '待办' },
-    { view: AppView.TIMELINE, label: '脉络' },
-    { view: AppView.REVIEW, label: '档案' },
-    { view: AppView.TAGS, label: '索引' },
+    { view: AppView.RECORD, label: '记录', key: 'record' },
+    { view: AppView.TODO, label: '待办', key: 'todo' },
+    { view: AppView.TIMELINE, label: '脉络', key: 'timeline' },
+    { view: AppView.REVIEW, label: '档案', key: 'review' },
+    { view: AppView.TAGS, label: '索引', key: 'index' },
 ];
 
 const NAV_ITEM_KEYS = ['record', 'todo', 'timeline', 'review', 'index'] as const;
@@ -57,7 +58,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     isVisible
 }) => {
     const { defaultIndexView, navigationModuleVisibility } = useSettings();
-    const visibleNavItems = NAV_ITEMS.filter((_, index) => navigationModuleVisibility[NAV_ITEM_KEYS[index]]);
+    const visibleNavItems = NAV_ITEMS.filter((item) => navigationModuleVisibility[item.key as typeof NAV_ITEM_KEYS[number]]);
     const [currentDecoration, setCurrentDecoration] = useState<string>('default');
     const [decorationUrl, setDecorationUrl] = useState<string>('');
     const [settings, setSettings] = useState({
@@ -77,6 +78,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         scale: 1,
         opacity: 1
     });
+    const [iconSelection, setIconSelection] = useState(() => navigationIconService.getSelection());
+    const [failedIconSlots, setFailedIconSlots] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
         const updateState = (decorationId: string, overrideSettings?: any) => {
@@ -146,10 +149,15 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             setShowDebugger(false);
             if (!event.detail.enabled) setShowBackgroundDebugger(false);
         };
+        const handleIconChange = () => {
+            setIconSelection(navigationIconService.getSelection());
+            setFailedIconSlots({});
+        };
 
         window.addEventListener(NAVIGATION_BACKGROUND_CHANGE_EVENT, handleBackgroundChange as EventListener);
         window.addEventListener(NAVIGATION_BACKGROUND_PREVIEW_EVENT, handleBackgroundPreview as EventListener);
         window.addEventListener(NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT, handleModeChange as EventListener);
+        window.addEventListener(NAVIGATION_ICON_CHANGE_EVENT, handleIconChange);
 
         // Debug functions with namespace to avoid global pollution
         if (!(window as any).LumosTime) {
@@ -169,6 +177,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             window.removeEventListener(NAVIGATION_BACKGROUND_CHANGE_EVENT, handleBackgroundChange as EventListener);
             window.removeEventListener(NAVIGATION_BACKGROUND_PREVIEW_EVENT, handleBackgroundPreview as EventListener);
             window.removeEventListener(NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT, handleModeChange as EventListener);
+            window.removeEventListener(NAVIGATION_ICON_CHANGE_EVENT, handleIconChange);
             if ((window as any).LumosTime?.debug) {
                 delete (window as any).LumosTime.debug.enableNavDeco;
                 delete (window as any).LumosTime.debug.disableNavDeco;
@@ -250,6 +259,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                         const isActive = item.view === AppView.TAGS
                             ? isIndexView(currentView)
                             : currentView === item.view;
+                        const icon = iconSelection.mode === 'text' ? undefined : navigationIconService.getIconForSlot(item.key as typeof NAV_ITEM_KEYS[number]);
+                        const showIcon = isNewNavigation && Boolean(icon) && !failedIconSlots[item.key];
                         return (
                             <div
                                 key={item.view}
@@ -262,9 +273,25 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                                 }}
                                 className={`relative z-10 flex-1 h-full flex items-center justify-center cursor-pointer transition-all duration-200 ${isActive ? 'text-stone-900' : 'text-stone-400'}`}
                             >
-                                <span className={`font-serif text-[13px] tracking-[1px] transition-all duration-200 ${isActive ? 'font-black' : 'font-medium'}`}>
-                                    {item.label}
-                                </span>
+                                {showIcon ? (
+                                    <img
+                                        src={icon?.url}
+                                        alt={item.label}
+                                        className={`h-7 w-7 object-contain transition-all duration-200 md:h-9 md:w-9 ${isActive ? 'opacity-100' : 'opacity-55'}`}
+                                        onError={(event) => {
+                                            const fallbackUrl = icon?.url ? getNavigationIconFallbackUrl(icon.url) : '';
+                                            if (fallbackUrl && event.currentTarget.src !== fallbackUrl && icon?.url.endsWith('.webp')) {
+                                                event.currentTarget.src = fallbackUrl;
+                                                return;
+                                            }
+                                            setFailedIconSlots((previous) => ({ ...previous, [item.key]: true }));
+                                        }}
+                                    />
+                                ) : (
+                                    <span className={`font-serif text-[13px] tracking-[1px] transition-all duration-200 ${isActive ? 'font-black' : 'font-medium'}`}>
+                                        {item.label}
+                                    </span>
+                                )}
                             </div>
                         );
                     })}
