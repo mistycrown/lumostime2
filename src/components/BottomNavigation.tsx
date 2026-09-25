@@ -18,6 +18,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-09-25: Added opt-in navigation-background rendering while preserving legacy foreground decorations.
  * @updated 2026-09-25: Moved new-mode tuning to the main screen, removed background tiling, and removed the opaque navigation surface.
+ * @updated 2026-09-25: Added page-scoped transparent navigation styling with schedule-calendar exclusion for Todo.
  */
 import React, { useState, useEffect } from 'react';
 import { AppView } from '../types';
@@ -28,7 +29,8 @@ import {
     navigationBackgroundService,
     NAVIGATION_BACKGROUND_CHANGE_EVENT,
     NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT,
-    NAVIGATION_BACKGROUND_PREVIEW_EVENT
+    NAVIGATION_BACKGROUND_PREVIEW_EVENT,
+    NAVIGATION_TRANSPARENCY_CHANGE_EVENT
 } from '../services/navigationBackgroundService';
 import { getNavigationIconFallbackUrl, NAVIGATION_ICON_CHANGE_EVENT, navigationIconService } from '../services/navigationIconService';
 
@@ -70,6 +72,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     const [showDebugger, setShowDebugger] = useState(false);
     const [showBackgroundDebugger, setShowBackgroundDebugger] = useState(false);
     const [isNewNavigation, setIsNewNavigation] = useState(() => navigationBackgroundService.isEnabled());
+    const [isTransparentNavigation, setIsTransparentNavigation] = useState(() => navigationBackgroundService.isTransparentNavigationEnabled());
+    const [isTodoScheduleMode, setIsTodoScheduleMode] = useState(() => localStorage.getItem('todoScreenMode') === 'week');
     const [currentBackground, setCurrentBackground] = useState(() => navigationBackgroundService.getCurrentBackground());
     const [backgroundUrl, setBackgroundUrl] = useState('');
     const [backgroundSettings, setBackgroundSettings] = useState({
@@ -149,6 +153,12 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             setShowDebugger(false);
             if (!event.detail.enabled) setShowBackgroundDebugger(false);
         };
+        const handleTransparencyChange = (event: CustomEvent<{ enabled: boolean }>) => {
+            setIsTransparentNavigation(event.detail.enabled);
+        };
+        const handleTodoScheduleModeChange = (event: CustomEvent<{ isWeekMode?: boolean }>) => {
+            setIsTodoScheduleMode(Boolean(event.detail?.isWeekMode));
+        };
         const handleIconChange = () => {
             setIconSelection(navigationIconService.getSelection());
             setFailedIconSlots({});
@@ -157,6 +167,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         window.addEventListener(NAVIGATION_BACKGROUND_CHANGE_EVENT, handleBackgroundChange as EventListener);
         window.addEventListener(NAVIGATION_BACKGROUND_PREVIEW_EVENT, handleBackgroundPreview as EventListener);
         window.addEventListener(NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT, handleModeChange as EventListener);
+        window.addEventListener(NAVIGATION_TRANSPARENCY_CHANGE_EVENT, handleTransparencyChange as EventListener);
+        window.addEventListener('todo-schedule-mode-changed', handleTodoScheduleModeChange as EventListener);
         window.addEventListener(NAVIGATION_ICON_CHANGE_EVENT, handleIconChange);
 
         // Debug functions with namespace to avoid global pollution
@@ -177,6 +189,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             window.removeEventListener(NAVIGATION_BACKGROUND_CHANGE_EVENT, handleBackgroundChange as EventListener);
             window.removeEventListener(NAVIGATION_BACKGROUND_PREVIEW_EVENT, handleBackgroundPreview as EventListener);
             window.removeEventListener(NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT, handleModeChange as EventListener);
+            window.removeEventListener(NAVIGATION_TRANSPARENCY_CHANGE_EVENT, handleTransparencyChange as EventListener);
+            window.removeEventListener('todo-schedule-mode-changed', handleTodoScheduleModeChange as EventListener);
             window.removeEventListener(NAVIGATION_ICON_CHANGE_EVENT, handleIconChange);
             if ((window as any).LumosTime?.debug) {
                 delete (window as any).LumosTime.debug.enableNavDeco;
@@ -193,7 +207,12 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
     if (!isVisible) return null;
 
-    const bgColor = isNewNavigation
+    const supportsTransparentNavigation = currentView === AppView.RECORD
+        || (currentView === AppView.TODO && !isTodoScheduleMode)
+        || currentView === AppView.REVIEW
+        || isIndexView(currentView);
+    const shouldUseTransparentNavigation = isTransparentNavigation && supportsTransparentNavigation;
+    const bgColor = isNewNavigation || shouldUseTransparentNavigation
         ? 'bg-transparent'
         : (currentView === AppView.TIMELINE || isIndexView(currentView))
             ? 'bg-[#faf9f6]/80 backdrop-blur-md'
@@ -236,7 +255,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 )}
 
                 {/* 导航栏 */}
-                <nav className={`relative h-12 md:h-16 box-content flex justify-around items-center pb-[env(safe-area-inset-bottom)] ${isNewNavigation ? 'border-t border-transparent' : 'border-t border-stone-100'} ${bgColor}`}>
+                <nav className={`relative h-12 md:h-16 box-content flex justify-around items-center pb-[env(safe-area-inset-bottom)] ${isNewNavigation || shouldUseTransparentNavigation ? 'border-t border-transparent' : 'border-t border-stone-100'} ${bgColor}`}>
                     {isNewNavigation && backgroundUrl && (
                         <div
                             aria-hidden="true"
