@@ -213,30 +213,30 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
                         <Plus size={14} /> 新增方案
                     </button>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
                     <button
                         type="button"
                         onClick={() => selectMode('text')}
-                        className={`relative flex h-16 min-w-[76px] flex-1 items-center justify-center gap-2 rounded-xl border px-2 text-xs transition-colors ${selection.mode === 'text' ? 'border-stone-700 bg-stone-50 text-stone-800' : 'border-stone-200 text-stone-500 hover:border-stone-400'}`}
+                        className={`relative flex aspect-square min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-2 text-xs transition-colors ${selection.mode === 'text' ? 'border-stone-700 bg-stone-50 text-stone-800' : 'border-stone-200 text-stone-500 hover:border-stone-400'}`}
                     >
-                        <span className="font-serif text-lg">Aa</span><span>文字</span>
+                        <span className="flex aspect-square h-10 items-center justify-center font-serif text-lg">Aa</span><span>文字</span>
                         {selection.mode === 'text' && <Check size={13} className="absolute right-1.5 top-1.5" />}
                     </button>
                     <button
                         type="button"
                         onClick={() => selectMode('pink')}
-                        className={`relative flex h-16 min-w-[76px] flex-1 items-center justify-center gap-2 rounded-xl border px-2 text-xs transition-colors ${selection.mode === 'pink' ? 'border-stone-700 bg-stone-50 text-stone-800' : 'border-stone-200 text-stone-500 hover:border-stone-400'}`}
+                        className={`relative flex aspect-square min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-2 text-xs transition-colors ${selection.mode === 'pink' ? 'border-stone-700 bg-stone-50 text-stone-800' : 'border-stone-200 text-stone-500 hover:border-stone-400'}`}
                     >
-                        {renderIcon(navigationIconService.getBuiltInIcons()[0], '粉色图标', 'h-9 w-9 object-contain')}<span>粉色</span>
+                        {renderIcon(navigationIconService.getBuiltInIcons()[0], '粉色图标', 'aspect-square h-10 w-10 object-contain')}<span>粉色</span>
                         {selection.mode === 'pink' && <Check size={13} className="absolute right-1.5 top-1.5" />}
                     </button>
                     {schemes.map((scheme) => {
                         const isActive = selection.mode === 'custom' && selection.schemeId === scheme.id;
                         return (
-                            <div key={scheme.id} className={`relative flex h-16 min-w-[110px] flex-1 items-center rounded-xl border px-2 transition-colors ${isActive ? 'border-stone-700 bg-stone-50' : 'border-stone-200 hover:border-stone-400'}`}>
-                                <button type="button" onClick={() => selectScheme(scheme.id)} className="flex min-w-0 flex-1 items-center justify-center gap-2 text-xs text-stone-600">
-                                    {renderIcon(getSchemePreview(scheme, customIcons), scheme.name, 'h-9 w-9 object-contain')}
-                                    <span className="max-w-[72px] truncate">{scheme.name}</span>
+                            <div key={scheme.id} className={`relative flex aspect-square min-w-0 items-center justify-center rounded-xl border px-2 transition-colors ${isActive ? 'border-stone-700 bg-stone-50' : 'border-stone-200 hover:border-stone-400'}`}>
+                                <button type="button" onClick={() => selectScheme(scheme.id)} className="flex min-w-0 flex-col items-center justify-center gap-1 text-xs text-stone-600">
+                                    {renderIcon(getSchemePreview(scheme, customIcons), scheme.name, 'aspect-square h-10 w-10 object-contain')}
+                                    <span className="max-w-full truncate">{scheme.name}</span>
                                 </button>
                                 <button type="button" onClick={() => openScheme(scheme)} aria-label={`编辑${scheme.name}`} className="absolute right-1 top-1 rounded p-1 text-stone-400 hover:bg-stone-200 hover:text-stone-700">
                                     <Pencil size={12} />
