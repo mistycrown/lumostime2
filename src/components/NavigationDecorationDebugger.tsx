@@ -1,11 +1,19 @@
 /**
  * @file NavigationDecorationDebugger.tsx
  * @description 导航栏装饰调试工具 - 增强版 (支持缩放、透明度、位置调整)
+ * @updated 2026-09-25: Added a service adapter so the same tuning controls can adjust new navigation backgrounds.
  */
 
 import React, { useState, useEffect } from 'react';
 import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X, Save, ZoomIn, Sun, Move, RotateCcw } from 'lucide-react';
 import { navigationDecorationService } from '../services/navigationDecorationService';
+
+export interface NavigationTuningService {
+    getAllDecorations: () => Array<{ id: string; name: string; url: string; offsetY?: string; offsetX?: string; scale?: number; opacity?: number }>;
+    getDecorationById: (id: string) => { id: string; name: string; url: string; offsetY?: string; offsetX?: string; scale?: number; opacity?: number } | undefined;
+    saveCustomSettings: (id: string, settings: { offsetY: string; offsetX: string; scale: number; opacity: number }) => void;
+    setCurrentDecoration: (id: string) => void;
+}
 
 interface NavigationDecorationDebuggerProps {
     currentDecorationId: string;
@@ -14,11 +22,17 @@ interface NavigationDecorationDebuggerProps {
     // to notify parent. However, BottomNavigation handles the rendering.
     // So when we switch here, we should trigger the same change event or callback.
     onClose: () => void;
+    service?: NavigationTuningService;
+    previewEventName?: string;
+    title?: string;
 }
 
 export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebuggerProps> = ({
     currentDecorationId,
-    onClose
+    onClose,
+    service = navigationDecorationService,
+    previewEventName = 'navigationDecorationPreview',
+    title = '样式调试'
 }) => {
     // Current settings state
     const [offsetY, setOffsetY] = useState(0);
@@ -31,7 +45,7 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
 
     // Sync state when activeId changes
     useEffect(() => {
-        const deco = navigationDecorationService.getDecorationById(activeId);
+        const deco = service.getDecorationById(activeId);
         if (deco) {
             // Include custom settings check which is done inside getDecorationById
             // Parse Offset Y
@@ -89,7 +103,7 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
         // But to make BottomNavigation update, we need to change what it reads.
         // We can emit the event with the *full calculated settings* in detail, and update BottomNav to use them.
 
-        window.dispatchEvent(new CustomEvent('navigationDecorationPreview', {
+        window.dispatchEvent(new CustomEvent(previewEventName, {
             detail: {
                 id: activeId,
                 settings: {
@@ -112,14 +126,14 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
             opacity: opacity / 100
         };
 
-        navigationDecorationService.saveCustomSettings(activeId, settings);
+        service.saveCustomSettings(activeId, settings);
 
         setIsSaved(true);
         setTimeout(() => setIsSaved(false), 1000);
     };
 
     const handleSwitch = (direction: 'prev' | 'next') => {
-        const all = navigationDecorationService.getAllDecorations();
+        const all = service.getAllDecorations();
         const idx = all.findIndex(d => d.id === activeId);
         if (idx === -1) return;
 
@@ -132,7 +146,7 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
 
         const newId = all[newIdx].id;
         setActiveId(newId);
-        navigationDecorationService.setCurrentDecoration(newId); // This triggers the main change event
+        service.setCurrentDecoration(newId); // This triggers the main change event
     };
 
     const handleReset = () => {
@@ -143,7 +157,7 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
         setOpacity(60);
         
         // 清除保存的自定义设置
-        navigationDecorationService.saveCustomSettings(activeId, {
+        service.saveCustomSettings(activeId, {
             offsetY: '60px', // 默认回退值
             offsetX: '0px', 
             scale: 1,
@@ -157,7 +171,7 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
             <div className="flex items-center justify-between mb-4 border-b border-stone-100 pb-3">
                 <h3 className="text-sm font-bold text-stone-800 flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                    样式调试
+                    {title}
                 </h3>
                 <div className="flex items-center gap-1">
                     <button 
